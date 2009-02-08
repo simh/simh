@@ -1,6 +1,6 @@
 /* pdp1_drm.c: PDP-1 drum simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -203,13 +203,16 @@ if ((drm_dev.flags & DEV_DIS) == 0) {                   /* serial enabled? */
             iosta = iosta & ~IOS_DRM;                   /* clear flags */
             drm_err = 0;
             t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
-            if (t <= 0) t = t + DRM_NUMWDT;             /* wrap around? */
+            if (t <= 0)                                 /* wrap around? */
+                t = t + DRM_NUMWDT;
             sim_activate (&drm_unit, t);                /* start operation */
             break;
 
         case 063:                                       /* DTD */
-            if (pulse == 011) return (stop_inst << IOT_V_REASON) | dat;
-            if (iosta & IOS_DRM) return (dat | IOT_SKP); /* skip if done */
+            if (pulse == 011)
+                return (stop_inst << IOT_V_REASON) | dat;
+            if (iosta & IOS_DRM)                        /* skip if done */
+                return (dat | IOT_SKP);
             break;
 
         case 064:                                       /* DSE, DSP */
@@ -231,7 +234,8 @@ if ((drp_dev.flags & DEV_DIS) == 0) {                   /* parallel enabled? */
             drp_ta = dat & DRP_TAMASK;                  /* set track addr */
             if (IR & 02000) {                           /* DBA? */
                 t = drp_ta - GET_POS (drp_time);        /* delta words */
-                if (t <= 0) t = t + DRP_NUMWDT;         /* wrap around? */
+                if (t <= 0)                             /* wrap around? */
+                    t = t + DRP_NUMWDT;
                 sim_activate (&drp_unit, t);            /* start operation */
                 drp_unit.FUNC = DRP_BRK;                /* mark as break */
                 }
@@ -251,7 +255,8 @@ if ((drp_dev.flags & DEV_DIS) == 0) {                   /* parallel enabled? */
         case 063:                                       /* DCL */
             drp_ma = dat & AMASK;                       /* set mem address */
             t = drp_ta - GET_POS (drp_time);            /* delta words */
-            if (t <= 0) t = t + DRP_NUMWDT;             /* wrap around? */
+            if (t <= 0)                                 /* wrap around? */
+                t = t + DRP_NUMWDT;
             sim_activate (&drp_unit, t);                /* start operation */
             iosta = iosta | IOS_DRP;                    /* set busy */
             break;
@@ -287,10 +292,12 @@ for (i = 0; i < DRM_NUMWDS; i++, da++) {                /* do transfer */
             M[drm_ma] = fbuf[da];                       /* read word */
         }
     else {                                              /* write */
-        if ((drm_wlk >> (drm_da >> 4)) & 1) drm_err = 1;
+        if ((drm_wlk >> (drm_da >> 4)) & 1)
+            drm_err = 1;
         else {                                          /* not locked */
             fbuf[da] = M[drm_ma];						/* write word */
-            if (da >= uptr->hwmark) uptr->hwmark = da + 1;
+            if (da >= uptr->hwmark)
+                uptr->hwmark = da + 1;
             }
         }
     drm_ma = (drm_ma + 1) & AMASK;                      /* incr mem addr */
@@ -324,7 +331,8 @@ uint32 *fbuf = uptr->filebuf;
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drp_err = 1;                                        /* set error */
     iosta = iosta & ~IOS_DRP;                           /* clear busy */
-    if (uptr->FUNC) dev_req_int (drm_sbs);              /* req intr */
+    if (uptr->FUNC)                                     /* req intr */
+        dev_req_int (drm_sbs);
     return IORETURN (drp_stopioe, SCPE_UNATT);
     }
 
@@ -340,7 +348,8 @@ if (uptr->FUNC == DRP_RW) {                             /* read/write? */
         }                                               /* end for */
     }                                                   /* end if */
 iosta = iosta & ~IOS_DRP;                               /* clear busy */
-if (uptr->FUNC) dev_req_int (drm_sbs);                  /* req intr */
+if (uptr->FUNC)                                         /* req intr */
+    dev_req_int (drm_sbs);
 return SCPE_OK;
 }
 

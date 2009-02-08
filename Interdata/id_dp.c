@@ -1,6 +1,6 @@
 /* id_dp.c: Interdata 2.5MB/10MB cartridge disk simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -276,7 +276,8 @@ switch (op) {                                           /* case IO op */
     case IO_WD:                                         /* write data */
         if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
             ">>DPC WD = %02X, STA = %02X\n", dat, dp_sta);
-        if (dp_sta & STC_IDL) dp_hdsc = dat & HS_MASK;  /* idle? hdsc */
+        if (dp_sta & STC_IDL)                           /* idle? hdsc */
+            dp_hdsc = dat & HS_MASK;
         else {                                          /* data xfer */
             dp_sta = dp_sta | STA_BSY;                  /* set busy */
             dp_db = dat & 0xFF;                         /* store data */
@@ -285,7 +286,8 @@ switch (op) {                                           /* case IO op */
 
     case IO_SS:                                         /* status */
         t = dp_sta & STC_MASK;                          /* get status */
-        if (t & SETC_EX) t = t | STA_EX;                /* test for EX */
+        if (t & SETC_EX)                                /* test for EX */
+            t = t | STA_EX;
         return t;
 
     case IO_OC:                                         /* command */
@@ -298,15 +300,19 @@ switch (op) {                                           /* case IO op */
             }
         u = (dp_svun - dp_dib.dno - o_DP0) / o_DP0;     /* get unit */
         uptr = dp_dev.units + u;                        /* ignore if busy */
-        if (!(dp_sta & STC_IDL) || sim_is_active (uptr)) break;
+        if (!(dp_sta & STC_IDL) || sim_is_active (uptr))
+            break;
         dp_cmd = f;                                     /* save cmd */
-        if (dp_cmd == CMC_WR) dp_sta = 0;               /* write: bsy=0 else */
+        if (dp_cmd == CMC_WR)                           /* write: bsy=0 else */
+            dp_sta = 0;
         else dp_sta = STA_BSY;                          /* bsy=1,idl,err=0 */
         dp_1st = 1;                                     /* xfr not started */
         dp_bptr = 0;                                    /* buffer empty */
-        if (dp_svun & o_DPF) dp_plat = 1;               /* upper platter? */
+        if (dp_svun & o_DPF)                            /* upper platter? */
+            dp_plat = 1;
         else dp_plat = 0;                               /* no, lower */
-        if (good_cmd[f]) sim_activate (uptr, dp_rtime); /* legal? sched */
+        if (good_cmd[f])                                /* legal? sched */
+            sim_activate (uptr, dp_rtime);
         break;
         }
 
@@ -321,18 +327,21 @@ int32 diff;
 uint32 t, u;
 UNIT *uptr;
 
-if (dev == dp_dib.dno) return dpc (dev, op, dat);       /* controller? */
+if (dev == dp_dib.dno)                                  /* controller? */
+    return dpc (dev, op, dat);
 u = (dev - dp_dib.dno - o_DP0) / o_DP0;                 /* get unit num */
 uptr = dp_dev.units + u;                                /* get unit ptr */
 switch (op) {                                           /* case IO op */
 
     case IO_ADR:                                        /* select */
-        if (dp_sta & STC_IDL) dp_svun = dev;            /* idle? save unit */
+        if (dp_sta & STC_IDL)                           /* idle? save unit */
+            dp_svun = dev;
         return BY;                                      /* byte only */
 
     case IO_WD:                                         /* write data */
-        if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
-            ">>DP%d WD = %02X, STA = %02X\n", u, dat, dp_sta);
+        if (DEBUG_PRS (dp_dev))
+            fprintf (sim_deb, ">>DP%d WD = %02X, STA = %02X\n",
+                     u, dat, dp_sta);
         if (GET_DTYPE (uptr->flags) == TYPE_2315)       /* 2.5MB drive? */
             dp_cyl = dat & 0xFF;                        /* cyl is 8b */
         else dp_cyl = ((dp_cyl << 8) | dat) & DMASK16;  /* insert byte */
@@ -344,19 +353,25 @@ switch (op) {                                           /* case IO op */
             ((dp_sta & STC_IDL)? 0: STD_ILK) |
             (uptr->STD & STD_UST);
         else t = STD_MOV | STD_NRDY;                    /* off = X'09' */
-        if (t & SETD_EX) t = t | STA_EX;                /* test for ex */
+        if (t & SETD_EX)                                /* test for ex */
+            t = t | STA_EX;
         return t;
  
    case IO_OC:                                          /* command */
-        if (DEBUG_PRS (dp_dev)) fprintf (sim_deb,
-            ">>DP%d OC = %02X, STA = %02X\n", u, dat, dp_sta);
+        if (DEBUG_PRS (dp_dev))
+            fprintf (sim_deb, ">>DP%d OC = %02X, STA = %02X\n",
+                     u, dat, dp_sta);
         dpd_arm[u] = int_chg (v_DPC + u + 1, dat, dpd_arm[u]);
-        if (dat & CMD_SK) t = dp_cyl;                   /* seek? get cyl */
-        else if (dat & CMD_RST) t = 0;                  /* rest? cyl 0 */
+        if (dat & CMD_SK)                               /* seek? get cyl */
+            t = dp_cyl;
+        else if (dat & CMD_RST)                         /* rest? cyl 0 */
+            t = 0; 
         else break;                                     /* no action */
         diff = t - uptr->CYL;
-        if (diff < 0) diff = -diff;                     /* ABS cyl diff */
-        else if (diff == 0) diff = 1;                   /* must be nz */
+        if (diff < 0)                                   /* ABS cyl diff */
+            diff = -diff;
+        else if (diff == 0)                             /* must be nz */
+            diff = 1;
         uptr->STD = STD_MOV;                            /* stat = moving */
         uptr->CYL = t;                                  /* put on cyl */
         sim_activate (uptr, diff * dp_stime);           /* schedule */
@@ -383,12 +398,14 @@ t_stat r;
 
 if (uptr->STD & STD_MOV) {                              /* seek? */
     uptr->STD = 0;                                      /* clr seek in prog */
-    if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;  /* offl? hangs */
+    if ((uptr->flags & UNIT_ATT) == 0)                  /* offl? hangs */
+        return SCPE_OK;
     if (cyl >= drv_tab[dtype].cyl) {                    /* bad cylinder? */
         uptr->STD = STD_ILA;                            /* error */
         uptr->CYL = drv_tab[dtype].cyl - 1;             /* put at edge */
         }
-    if (dpd_arm[u]) SET_INT (v_DPC + u + 1);            /* req intr */
+    if (dpd_arm[u])                                     /* req intr */
+        SET_INT (v_DPC + u + 1);
     return SCPE_OK;
     }
 
@@ -400,8 +417,10 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
 
     case CMC_RD:                                        /* read */
         if (sch_actv (dp_dib.sch, dp_dib.dno)) {        /* sch transfer? */
-            if (dp_dter (uptr, dp_1st)) return SCPE_OK; /* check xfr err */
-            if (r = dp_rds (uptr)) return r;            /* read sec, err? */
+            if (dp_dter (uptr, dp_1st))                 /* check xfr err */
+                return SCPE_OK;
+            if (r = dp_rds (uptr))                      /* read sec, err? */
+                return r;
             dp_1st = 0;
             t = sch_wrmem (dp_dib.sch, dpxb, DP_NUMBY); /* write to memory */
             if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
@@ -415,10 +434,12 @@ switch (dp_cmd & 0x7) {                                 /* case on func */
 
     case CMC_WR:                                        /* write */
         if (sch_actv (dp_dib.sch, dp_dib.dno)) {        /* sch transfer? */
-            if (dp_dter (uptr, dp_1st)) return SCPE_OK; /* check xfr err */
+            if (dp_dter (uptr, dp_1st))                 /* check xfr err */
+                return SCPE_OK;
             dp_bptr = sch_rdmem (dp_dib.sch, dpxb, DP_NUMBY); /* read from mem */
             dp_db = dpxb[dp_bptr - 1];                  /* last byte */
-            if (r = dp_wds (uptr)) return r;            /* write sec, err? */
+            if (r = dp_wds (uptr))                      /* write sec, err? */
+                return r;
             dp_1st = 0;
             if (sch_actv (dp_dib.sch, dp_dib.dno)) {    /* more to do? */       
                 sim_activate (uptr, dp_rtime);          /* reschedule */
@@ -441,7 +462,8 @@ t_stat dp_rds (UNIT *uptr)
 uint32 i;
 
 i = fxread (dpxb, sizeof (uint8), DP_NUMBY, uptr->fileref);
-for ( ; i < DP_NUMBY; i++) dpxb[i] = 0;                 /* fill with 0's */
+for ( ; i < DP_NUMBY; i++)                              /* fill with 0's */
+    dpxb[i] = 0;
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("DP I/O error");
     clearerr (uptr->fileref);
@@ -482,7 +504,8 @@ if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
 hd = GET_SRF (dp_hdsc);                                 /* get head */
 sc = GET_SEC (dp_hdsc);                                 /* get sector */
 if (dp_cyl != (uint32) uptr->CYL) {                     /* wrong cylinder? */
-    if (dp_cyl == 0) uptr->CYL = 0;
+    if (dp_cyl == 0)
+        uptr->CYL = 0;
     else {
         dp_done (STC_ACF);                              /* error, done */
         return TRUE;
@@ -498,7 +521,8 @@ if (!first && (sc == 0) && (hd == 0)) {                 /* cyl overflow? */
     }
 sa = GET_SA (dp_plat, uptr->CYL, hd, sc, dtype);        /* curr disk addr */
 fseek (uptr->fileref, sa * DP_NUMBY, SEEK_SET);
-if ((sc + 1) < DP_NUMSC) dp_hdsc = dp_hdsc + 1;         /* end of track? */
+if ((sc + 1) < DP_NUMSC)                                /* end of track? */
+    dp_hdsc = dp_hdsc + 1;
 else dp_hdsc = (dp_hdsc ^ HS_HMASK) & HS_HMASK;         /* sec 0, nxt srf */
 return FALSE;
 }
@@ -509,7 +533,8 @@ void dp_done (uint32 flg)
 {
 dp_sta = (dp_sta | STC_IDL | flg) & ~STA_BSY;           /* set flag, idle */
 SET_INT (v_DPC);                                        /* unmaskable intr */
-if (flg) sch_stop (dp_dib.sch);                         /* if err, stop ch */
+if (flg)                                                /* if err, stop ch */
+    sch_stop (dp_dib.sch);
 return;
 }
 
@@ -548,10 +573,13 @@ t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);                           /* attach unit */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 uptr->CYL = 0;
-if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;     /* autosize? */
-if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
+if ((uptr->flags & UNIT_AUTO) == 0)                 /* autosize? */
+    return SCPE_OK;
+if ((p = ftell (uptr->fileref)) == 0)
+    return SCPE_OK;
 for (i = 0; drv_tab[i].surf != 0; i++) {
     if (p <= drv_tab[i].size) {
         uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
@@ -568,8 +596,10 @@ t_stat dp_detach (UNIT *uptr)
 {
 uint32 u = uptr - dp_dev.units;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
-if (dpd_arm[u]) SET_INT (v_DPC + u + 1);                /* if arm, intr */
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+if (dpd_arm[u])                                         /* if arm, intr */
+    SET_INT (v_DPC + u + 1);
 return detach_unit (uptr);
 }
 
@@ -577,7 +607,8 @@ return detach_unit (uptr);
 
 t_stat dp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = drv_tab[GET_DTYPE (val)].size;
 return SCPE_OK;
 }

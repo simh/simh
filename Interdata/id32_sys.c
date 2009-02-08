@@ -104,7 +104,8 @@ const char *sim_stop_messages[] = {
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-if (flag) return pt_dump (fileref, cptr, fnam);
+if (flag)
+    return pt_dump (fileref, cptr, fnam);
 return lp_load (fileref, cptr, fnam);
 }
 
@@ -306,19 +307,23 @@ uint32 rx2;
 
 if ((ea1 & 0xC000) == 0) {                              /* RX1 */
     fprintf (of, "%-X", ea1);
-    if (rx) fprintf (of, "(R%d)", rx);
+    if (rx)
+        fprintf (of, "(R%d)", rx);
     return -3;
     }
 if (ea1 & 0x8000) {                                     /* RX2 */
     ea1 = addr + 4 + SEXT15 (ea1);
     fprintf (of, "%-X", ea1 & VAMASK32);
-    if (rx) fprintf (of, "(R%d)", rx);
+    if (rx)
+        fprintf (of, "(R%d)", rx);
     return -3;
     }
 rx2 = (ea1 >> 8) & 0xF;                                 /* RX3 */
 fprintf (of, "%-X", ((ea1 << 16) | ea2) & VAMASK32);
-if (rx && !rx2) fprintf (of, "(R%d)", rx);
-if (rx2) fprintf (of, "(R%d,R%d)", rx, rx2);
+if (rx && !rx2)
+    fprintf (of, "(R%d)", rx);
+if (rx2)
+    fprintf (of, "(R%d,R%d)", rx, rx2);
 return -5;
 }
 
@@ -342,29 +347,38 @@ int32 bflag, c1, c2, rdx;
 t_stat r;
 DEVICE *dptr;
 
-if (uptr == NULL) uptr = &cpu_unit;                     /* anon = CPU */
+if (uptr == NULL)                                       /* anon = CPU */
+    uptr = &cpu_unit;
 dptr = find_dev_from_unit (uptr);                       /* find dev */
-if (dptr == NULL) return SCPE_IERR;
-if (dptr->dwidth < 16) bflag = 1;                       /* 8b dev? */
+if (dptr == NULL)
+    return SCPE_IERR;
+if (dptr->dwidth < 16)                                  /* 8b dev? */
+    bflag = 1;
 else bflag = 0;                                         /* assume 16b */
-if (sw & SWMASK ('D')) rdx = 10;                        /* get radix */
-else if (sw & SWMASK ('O')) rdx = 8;
-else if (sw & SWMASK ('H')) rdx = 16;
+if (sw & SWMASK ('D'))                                  /* get radix */
+    rdx = 10;
+else if (sw & SWMASK ('O'))
+    rdx = 8;
+else if (sw & SWMASK ('H'))
+    rdx = 16;
 else rdx = dptr->dradix;
 
 if (sw & SWMASK ('A')) {                                /* ASCII char? */
-    if (bflag) c1 = val[0] & 0x7F;
+    if (bflag)
+        c1 = val[0] & 0x7F;
     else c1 = (val[0] >> ((addr & 1)? 0: 8)) & 0x7F;    /* get byte */
     fprintf (of, (c1 < 0x20)? "<%02X>": "%c", c1);
     return 0;
     }
 if (sw & SWMASK ('B')) {                                /* byte? */
-    if (bflag) c1 = val[0] & 0xFF;
+    if (bflag)
+        c1 = val[0] & 0xFF;
     else c1 = (val[0] >> ((addr & 1)? 0: 8)) & 0xFF;    /* get byte */
     fprint_val (of, c1, rdx, 8, PV_RZRO);
     return 0;
     }
-if (bflag) return SCPE_ARG;                             /* 16b only */
+if (bflag)                                              /* 16b only */
+    return SCPE_ARG;
 
 if (sw & SWMASK ('C')) {                                /* string? */
     c1 = (val[0] >> 8) & 0x7F;
@@ -379,7 +393,8 @@ if (sw & SWMASK ('W')) {                                /* halfword? */
     }
 if (sw & SWMASK ('M')) {                                /* inst format? */
     r = fprint_sym_m (of, addr, val);                   /* decode inst */
-    if (r <= 0) return r;
+    if (r <= 0)
+        return r;
     }
 
 fprint_val (of, (val[0] << 16) | val[1], rdx, 32, PV_RZRO);
@@ -430,7 +445,7 @@ for (i = 0; opc_val[i] != 0xFFFF; i++) {                /* loop thru ops */
             fprintf (of, "%-X,", r1);
         case I_V_SX:                                    /* ext short branch */
             fprintf (of, "%-X", ((inst & MSK_SBF)?
-                (addr + r2 + r2): (addr - r2 - r2)));
+                    (addr + r2 + r2): (addr - r2 - r2)));
             return -1;
 
         case I_V_R:                                     /* register */
@@ -439,12 +454,14 @@ for (i = 0; opc_val[i] != 0xFFFF; i++) {                /* loop thru ops */
 
         case I_V_RI:                                    /* reg-immed */
             fprintf (of, "R%d,%-X", r1, ea1);
-            if (r2) fprintf (of, "(R%d)", r2);
+            if (r2)
+                fprintf (of, "(R%d)", r2);
             return -3;
 
         case I_V_RF:                                    /* reg-full imm */
             fprintf (of, "R%d,%-X", r1, (ea1 << 16) | ea2);
-            if (r2) fprintf (of, "(R%d)", r2);
+            if (r2)
+                fprintf (of, "(R%d)", r2);
             return -5;
 
         case I_V_MX:                                    /* mask-memory */
@@ -479,19 +496,24 @@ int32 reg;
 
 if ((*cptr == 'R') || (*cptr == 'r')) {                 /* R? */
     cptr++;                                             /* skip */
-    if (rtype == R_M) return -1;                        /* cant be mask */
+    if (rtype == R_M)                                   /* cant be mask */
+        return -1;
     }
 if ((*cptr >= '0') && (*cptr <= '9')) {
     reg = *cptr++ - '0';
     if ((*cptr >= '0') && (*cptr <= '9'))
         reg = (reg * 10) + (*cptr - '0'); 
     else --cptr;
-    if (reg > 0xF) return -1;
+    if (reg > 0xF)
+        return -1;
     }
-else if ((*cptr >= 'a') && (*cptr <= 'f')) reg = (*cptr - 'a') + 10;
-else if ((*cptr >= 'A') && (*cptr <= 'F')) reg = (*cptr - 'A') + 10;
+else if ((*cptr >= 'a') && (*cptr <= 'f'))
+    reg = (*cptr - 'a') + 10;
+else if ((*cptr >= 'A') && (*cptr <= 'F'))
+    reg = (*cptr - 'A') + 10;
 else return -1;
-if ((rtype == R_F) && (reg & 1)) return -1;
+if ((rtype == R_F) && (reg & 1))
+    return -1;
 *optr = cptr + 1;
 return reg;
 }
@@ -514,14 +536,17 @@ int32 idx;
 
 errno = 0;
 *imm = strtoul (cptr, &tptr, 16);                       /* get immed */
-if (errno || (*imm > max) || (cptr == tptr)) return SCPE_ARG;
+if (errno || (*imm > max) || (cptr == tptr))
+    return SCPE_ARG;
 if (*tptr == '(') {                                     /* index? */
     if ((idx = get_reg (tptr + 1, &tptr, R_R)) < 0)
         return SCPE_ARG;
-    if (*tptr++ != ')') return SCPE_ARG;
+    if (*tptr++ != ')')
+        return SCPE_ARG;
     *inst = *inst | idx;
     }
-if (*tptr != 0) return SCPE_ARG;
+if (*tptr != 0)
+    return SCPE_ARG;
 return SCPE_OK;
 }
 
@@ -543,7 +568,8 @@ int32 sign = 1;
 if (*cptr == '.') {                                     /* relative? */
     cptr++;
     *ea = addr;
-    if (*cptr == '+') cptr++;                           /* .+? */
+    if (*cptr == '+')                                   /* .+? */
+        cptr++;
     else if (*cptr == '-') {                            /* .-? */
         sign = -1;
         cptr++;
@@ -553,7 +579,8 @@ if (*cptr == '.') {                                     /* relative? */
 else *ea = 0;
 errno = 0;
 *ea = *ea + (sign * ((int32) strtoul (cptr, tptr, 16)));
-if (errno || (cptr == *tptr)) return SCPE_ARG;
+if (errno || (cptr == *tptr))
+    return SCPE_ARG;
 return SCPE_OK;
 }
 
@@ -565,19 +592,27 @@ int32 bflag, by, rdx, num;
 t_stat r;
 DEVICE *dptr;
 
-if (uptr == NULL) uptr = &cpu_unit;                     /* anon = CPU */
+if (uptr == NULL)                                       /* anon = CPU */
+    uptr = &cpu_unit;
 dptr = find_dev_from_unit (uptr);                       /* find dev */
-if (dptr == NULL) return SCPE_IERR;
-if (dptr->dwidth < 16) bflag = 1;                       /* 8b device? */
+if (dptr == NULL)
+    return SCPE_IERR;
+if (dptr->dwidth < 16)                                  /* 8b dev? */
+    bflag = 1;
 else bflag = 0;                                         /* assume 16b */
-if (sw & SWMASK ('D')) rdx = 10;                        /* get radix */
-else if (sw & SWMASK ('O')) rdx = 8;
-else if (sw & SWMASK ('H')) rdx = 16;
+if (sw & SWMASK ('D'))                                  /* get radix */
+    rdx = 10;
+else if (sw & SWMASK ('O'))
+    rdx = 8;
+else if (sw & SWMASK ('H'))
+    rdx = 16;
 else rdx = dptr->dradix;
 
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
-    if (bflag) val[0] = (t_value) cptr[0];
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
+    if (bflag)
+        val[0] = (t_value) cptr[0];
     else val[0] = (addr & 1)?
         (val[0] & ~0xFF) | ((t_value) cptr[0]):
         (val[0] & 0xFF) | (((t_value) cptr[0]) << 8);
@@ -585,30 +620,36 @@ if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
     }
 if (sw & SWMASK ('B')) {                                /* byte? */
     by = get_uint (cptr, rdx, DMASK8, &r);              /* get byte */
-    if (r != SCPE_OK) return SCPE_ARG;
+    if (r != SCPE_OK)
+        return SCPE_ARG;
     if (bflag) val[0] = by;
     else val[0] = (addr & 1)?
         (val[0] & ~0xFF) | by:
         (val[0] & 0xFF) | (by << 8);
     return 0;
     }
-if (bflag) return SCPE_ARG;                             /* 16b only */
+if (bflag)                                              /* 16b only */
+    return SCPE_ARG;
 
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII chars? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = ((t_value) cptr[0] << 8) | (t_value) cptr[1];
     return -1;
     }
 if (sw & SWMASK ('W')) {                                /* halfword? */
     val[0] = (int32) get_uint (cptr, rdx, DMASK16, &r); /* get number */
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     return -1;
     }
 
 r = parse_sym_m (cptr, addr, val);                      /* try to parse inst */
-if (r <= 0) return r;
+if (r <= 0)
+    return r;
 num = (int32) get_uint (cptr, rdx, DMASK32, &r);        /* get number */
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 val[0] = (num >> 16) & DMASK16;
 val[1] = num & DMASK16;
 return -3;
@@ -636,27 +677,31 @@ char *tptr, gbuf[CBUFSIZE];
 vp = 0;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 inst = opc_val[i] & 0xFFFF;                             /* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 if (r1_type[j]) {                                       /* any R1 field? */
     cptr = get_glyph (cptr, gbuf, ',');                 /* get R1 field */
     if ((r1 = get_reg (gbuf, &tptr, r1_type[j])) < 0)
-            return SCPE_ARG;
-    if (*tptr != 0) return SCPE_ARG;
+        return SCPE_ARG;
+    if (*tptr != 0)
+        return SCPE_ARG;
     inst = inst | (r1 << 4);                            /* or in R1 */
     }
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get operand */
-if (*cptr) return SCPE_ARG;                             /* should be end */
+if (*cptr)                                              /* should be end */
+    return SCPE_ARG;
 switch (j) {                                            /* case on class */
 
     case I_V_FF: case I_V_SI:                           /* flt-flt, sh imm */
     case I_V_MR: case I_V_RR:                           /* mask/reg-register */
     case I_V_R:                                         /* register */
         if ((r2 = get_reg (gbuf, &tptr, r2_type[j])) < 0)
-                return SCPE_ARG;
-        if (*tptr != 0) return SCPE_ARG;
+            return SCPE_ARG;
+        if (*tptr != 0)
+            return SCPE_ARG;
         inst = inst | r2;                               /* or in R2 */
         break;
 
@@ -664,7 +709,8 @@ switch (j) {                                            /* case on class */
     case I_V_MX: case I_V_RX:                           /* mask/reg-memory */
     case I_V_X:                                         /* memory */
         r = get_addr (gbuf, &tptr, &t, addr);           /* get addr */
-        if (r != SCPE_OK) return SCPE_ARG;              /* error? */
+        if (r != SCPE_OK)                               /* error? */
+            return SCPE_ARG;
         rx2 = 0;                                        /* assume no 2nd */
         if (*tptr == '(') {                             /* index? */
             if ((r2 = get_reg (tptr + 1, &tptr, R_R)) < 0) 
@@ -674,9 +720,11 @@ switch (j) {                                            /* case on class */
                 if ((rx2 = get_reg (tptr + 1, &tptr, R_R)) < 0)
                     return SCPE_ARG;
                 }
-            if (*tptr++ != ')') return SCPE_ARG;        /* all done? */
+            if (*tptr++ != ')')                         /* all done? */
+                return SCPE_ARG;
             }
-        if (*tptr != 0) return SCPE_ARG;
+        if (*tptr != 0)
+            return SCPE_ARG;
         val[0] = inst;                                  /* store inst */
         if (rx2 == 0) {                                 /* no 2nd? */
             if (t < 0x4000) {                           /* RX1? */
@@ -697,14 +745,16 @@ switch (j) {                                            /* case on class */
 
     case I_V_RI:                                        /* 16b immediate */
         r = get_imm (gbuf, &t, &inst, DMASK16);         /* process imm */
-        if (r != SCPE_OK) return r;
+        if (r != SCPE_OK)
+            return r;
         val[0] = inst;
         val[1] = t;
         return -3;
 
     case I_V_RF:
         r = get_imm (gbuf, &t, &inst, DMASK32);         /* process imm */
-        if (r != SCPE_OK) return r;
+        if (r != SCPE_OK)
+            return r;
         val[0] = inst;
         val[1] = (t >> 16) & DMASK16;
         val[2] = t & DMASK16;

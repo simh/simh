@@ -1,6 +1,6 @@
 /* vax_syslist.c: VAX device list
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -109,25 +109,30 @@ t_stat r;
 int32 val;
 uint32 origin, limit;
 
-if (flag) return SCPE_ARG;                              /* dump? */
+if (flag)                                               /* dump? */
+    return SCPE_ARG;
 origin = 0;                                             /* memory */
 limit = (uint32) cpu_unit.capac;
 if (sim_switches & SWMASK ('O')) {                      /* origin? */
     origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
-    if (r != SCPE_OK) return SCPE_ARG;
+    if (r != SCPE_OK)
+        return SCPE_ARG;
     }
 
 while ((val = getc (fileref)) != EOF) {                 /* read byte stream */
     if (sim_switches & SWMASK ('R')) {                  /* ROM0? */
-        if (origin >= ROMSIZE) return SCPE_NXM;
+        if (origin >= ROMSIZE)
+            return SCPE_NXM;
         rom_wr_B (ROM0BASE + origin, val);
         }
     else if (sim_switches & SWMASK ('S')) {             /* ROM1? */
-        if (origin >= ROMSIZE) return SCPE_NXM;
+        if (origin >= ROMSIZE)
+            return SCPE_NXM;
         rom_wr_B (ROM1BASE + origin, val);
         }
     else {
-        if (origin >= limit) return SCPE_NXM;           /* NXM? */
+        if (origin >= limit)                            /* NXM? */
+            return SCPE_NXM;
         WriteB (origin, val);                           /* memory */
         }
     origin = origin + 1;

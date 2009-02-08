@@ -27,6 +27,7 @@
    tti1         second terminal input
    tto1         second terminal output
 
+   19-Nov-08    RMS     Revised for common TMXR show routines
    09-May-03    RMS     Added network device flag
    05-Jan-03    RMS     Fixed calling sequence for setmod
    03-Oct-02    RMS     Added DIBs
@@ -63,8 +64,6 @@ t_stat tto1_reset (DEVICE *dptr);
 t_stat ttx1_setmod (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tti1_attach (UNIT *uptr, char *cptr);
 t_stat tti1_detach (UNIT *uptr);
-t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 void ttx1_enbdis (int32 dis);
 
 /* TTI1 data structures
@@ -93,13 +92,14 @@ REG tti1_reg[] = {
 MTAB tti1_mod[] = {
     { UNIT_DASHER, 0, "ANSI", "ANSI", &ttx1_setmod },
     { UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx1_setmod },
-    { UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &tti1_summ },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &tt_desc },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &tt_desc },
+      &tmxr_dscln, NULL, (void *) &tt_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &tti1_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &tt_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &tti1_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &tt_desc },
     { 0 }
     };
 
@@ -136,6 +136,10 @@ REG tto1_reg[] = {
 MTAB tto1_mod[] = {
     { UNIT_DASHER, 0, "ANSI", "ANSI", &ttx1_setmod },
     { UNIT_DASHER, UNIT_DASHER, "Dasher", "DASHER", &ttx1_setmod },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
+      &tmxr_set_log, &tmxr_show_log, &tt_desc },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
+      &tmxr_set_nolog, NULL, &tt_desc },
     { 0 }
     };
 
@@ -225,7 +229,8 @@ return SCPE_OK;
 
 int32 tto1 (int32 pulse, int32 code, int32 AC)
 {
-if (code == ioDOA) tto1_unit.buf = AC & 0377;
+if (code == ioDOA)
+    tto1_unit.buf = AC & 0377;
 switch (pulse) {                                        /* decode IR<8:9> */
 
     case iopS:                                          /* start */
@@ -256,7 +261,8 @@ dev_busy = dev_busy & ~INT_TTO1;                        /* clear busy */
 dev_done = dev_done | INT_TTO1;                         /* set done */
 int_req = (int_req & ~INT_DEV) | (dev_done & ~dev_disable);
 c = tto1_unit.buf & 0177;
-if ((tto1_unit.flags & UNIT_DASHER) && (c == 031)) c = '\b';
+if ((tto1_unit.flags & UNIT_DASHER) && (c == 031))
+    c = '\b';
 if (tt1_ldsc.conn) {                                    /* connected? */
     if (tt1_ldsc.xmte) {                                /* tx enabled? */
         tmxr_putc_ln (&tt1_ldsc, c);                    /* output char */
@@ -297,7 +303,8 @@ t_stat tti1_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = tmxr_attach (&tt_desc, uptr, cptr);                 /* attach */
-if (r != SCPE_OK) return r;                             /* error */
+if (r != SCPE_OK)                                       /* error */
+    return r;
 sim_activate (uptr, tmxr_poll);                         /* start poll */
 return SCPE_OK;
 }
@@ -314,30 +321,12 @@ sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
-/* Show summary processor */
-
-t_stat tti1_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-if (tt1_ldsc.conn) fprintf (st, "connected");
-else fprintf (st, "disconnected");
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat tti1_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-if (val) tmxr_fconns (st, &tt1_ldsc, -1);
-else tmxr_fstats (st, &tt1_ldsc, -1);
-return SCPE_OK;
-}
-
 /* Enable/disable device */
 
 void ttx1_enbdis (int32 dis)
 {
 if (dis) {
-    tti1_dev.flags = tto1_dev.flags | DEV_DIS;
+    tti1_dev.flags = tti1_dev.flags | DEV_DIS;
     tto1_dev.flags = tto1_dev.flags | DEV_DIS;
     }
 else {

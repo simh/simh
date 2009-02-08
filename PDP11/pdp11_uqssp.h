@@ -1,6 +1,6 @@
 /* pdp11_uqssp.h: Unibus/Qbus storage systems port definitions file
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a

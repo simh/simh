@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -265,7 +265,8 @@
 #define LOG_BL          0x4
 
 #define DT_SETDONE      tccm = tccm | CSR_DONE; \
-						if (tccm & CSR_IE) SET_INT (DTA)
+						if (tccm & CSR_IE) \
+                            SET_INT (DTA)
 #define DT_CLRDONE      tccm = tccm & ~CSR_DONE; \
 						CLR_INT (DTA)
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
@@ -412,13 +413,15 @@ switch (j) {
 
     case 000:                                           /* TCST */
         mot = DTS_GETMOT (dt_unit[unum].STATE);         /* get motion */
-        if (mot >= DTS_ATSF) tcst = tcst | STA_UPS;     /* set/clr speed */
+        if (mot >= DTS_ATSF)                            /* set/clr speed */
+            tcst = tcst | STA_UPS;
         else tcst = tcst & ~STA_UPS;
         *data = tcst;
         break;
 
     case 001:                                           /* TCCM */
-        if (tcst & STA_ALLERR) tccm = tccm | CSR_ERR;   /* set/clr error */
+        if (tcst & STA_ALLERR)                          /* set/clr error */
+            tccm = tccm | CSR_ERR;
         else tccm = tccm & ~CSR_ERR;
         *data = tccm;
         break;
@@ -452,15 +455,17 @@ j = (PA >> 1) & 017;                                    /* get reg offset */
 switch (j) {
 
     case 000:                                           /* TCST */
-        if ((access == WRITEB) && (PA & 1)) break;
+        if ((access == WRITEB) && (PA & 1))
+            break;
         tcst = (tcst & ~STA_RW) | (data & STA_RW);
         break;
 
     case 001:                                           /* TCCM */
         old_tccm = tccm;                                /* save prior */
-        if (access == WRITEB) data = (PA & 1)?
-            (tccm & 0377) | (data << 8): (tccm & ~0377) | data;
-        if ((data & CSR_IE) == 0) CLR_INT (DTA);
+        if (access == WRITEB)
+            data = (PA & 1)? (tccm & 0377) | (data << 8): (tccm & ~0377) | data;
+        if ((data & CSR_IE) == 0)
+            CLR_INT (DTA);
         else if ((((tccm & CSR_IE) == 0) && (tccm & CSR_DONE)) ||
             (data & CSR_DONE)) SET_INT (DTA);
         tccm = (tccm & ~CSR_RW) | (data & CSR_RW);
@@ -468,7 +473,8 @@ switch (j) {
             tcst = tcst & ~STA_ALLERR;                  /* clear errors */
             tccm = tccm & ~(CSR_ERR | CSR_DONE);        /* clear done, err */
             CLR_INT (DTA);                              /* clear int */
-            if ((old_tccm ^ tccm) & CSR_UNIT) dt_deselect (old_tccm);
+            if ((old_tccm ^ tccm) & CSR_UNIT)
+                dt_deselect (old_tccm);
             unum = CSR_GETUNIT (tccm);                  /* get drive */
             fnc = CSR_GETFNC (tccm);                    /* get function */
             if (fnc == FNC_STOP) {                      /* stop all? */
@@ -484,11 +490,13 @@ switch (j) {
                 ((fnc == FNC_WALL) && (uptr->flags & UNIT_WPRT)) ||
                 ((fnc == FNC_WRIT) && (uptr->flags & UNIT_WPRT)))
                 dt_seterr (uptr, STA_ILO);              /* illegal op */
-            if (!(tccm & CSR_ERR)) dt_newsa (tccm);
+            if (!(tccm & CSR_ERR))
+                dt_newsa (tccm);
             }
         else if ((tccm & CSR_ERR) == 0) {               /* clear err? */
             tcst = tcst & ~STA_RWERR;
-            if (tcst & STA_ALLERR) tccm = tccm | CSR_ERR;
+            if (tcst & STA_ALLERR)
+                tccm = tccm | CSR_ERR;
             }
         break;
 
@@ -570,7 +578,8 @@ if (new_fnc == FNC_SSEL) {                              /* stop unit? */
     }
 
 if (prev_mot == DTS_STOP) {                             /* start? */
-    if (dt_setpos (uptr)) return;                       /* update pos */
+    if (dt_setpos (uptr))                               /* update pos */
+        return;
     sim_cancel (uptr);                                  /* stop current */
     sim_activate (uptr, dt_dctime - (dt_dctime >> 2));  /* sched accel */
     DTS_SETSTA (DTS_ACCF | new_dir, 0);                 /* state = accel */
@@ -586,7 +595,8 @@ if (prev_dir ^ new_dir) {                               /* dir chg? */
     }
 
 if (prev_mot < DTS_ACCF) {                              /* not accel/at speed? */
-    if (dt_setpos (uptr)) return;                       /* update pos */
+    if (dt_setpos (uptr))                               /* update pos */
+        return;
     sim_cancel (uptr);                                  /* cancel cur */
     sim_activate (uptr, dt_dctime - (dt_dctime >> 2));  /* sched accel */
     DTS_SETSTA (DTS_ACCF | new_dir, 0);                 /* state = accel */
@@ -621,7 +631,8 @@ int32 fnc, dir, blk, unum, relpos, newpos;
 uint32 oldpos;
 
 oldpos = uptr->pos;                                     /* save old pos */
-if (dt_setpos (uptr)) return;                           /* update pos */
+if (dt_setpos (uptr))                                   /* update pos */
+    return;
 uptr->STATE = newsta;                                   /* update state */
 fnc = DTS_GETFNC (uptr->STATE);                         /* set variables */
 dir = DTS_GETMOT (uptr->STATE) & DTS_DIR;
@@ -639,23 +650,27 @@ sim_cancel (uptr);                                      /* cancel cur op */
 switch (fnc) {                                          /* case function */
 
     case DTS_OFR:                                       /* off reel */
-        if (dir) newpos = -1000;                        /* rev? < start */
+        if (dir)                                        /* rev? < start */
+            newpos = -1000;
         else newpos = DTU_FWDEZ (uptr) + DT_EZLIN + 1000; /* fwd? > end */
         break;
 
     case FNC_SRCH:                                      /* search */
-        if (dir) newpos = DT_BLK2LN ((DT_QFEZ (uptr)?
-            DTU_TSIZE (uptr): blk), uptr) - DT_BLKLN - DT_WSIZE;
-        else newpos = DT_BLK2LN ((DT_QREZ (uptr)?
-            0: blk + 1), uptr) + DT_BLKLN + (DT_WSIZE - 1);
-        if (DEBUG_PRI (dt_dev, LOG_MS)) fprintf (sim_deb, ">>DT%d: searching %s\n",
-            unum, (dir? "backward": "forward"));
+        if (dir)
+            newpos = DT_BLK2LN ((DT_QFEZ (uptr)? DTU_TSIZE (uptr): blk), uptr) -
+                DT_BLKLN - DT_WSIZE;
+        else newpos = DT_BLK2LN ((DT_QREZ (uptr)? 0: blk + 1), uptr) + 
+                DT_BLKLN + (DT_WSIZE - 1);
+        if (DEBUG_PRI (dt_dev, LOG_MS))
+            fprintf (sim_deb, ">>DT%d: searching %s\n", unum,
+                    (dir? "backward": "forward"));
         break;
 
     case FNC_WRIT:                                      /* write */
     case FNC_READ:                                      /* read */
         if (DT_QEZ (uptr)) {                            /* in "ok" end zone? */
-            if (dir) newpos = DTU_FWDEZ (uptr) - DT_HTLIN - DT_WSIZE;
+            if (dir)
+                newpos = DTU_FWDEZ (uptr) - DT_HTLIN - DT_WSIZE;
             else newpos = DT_EZLIN + DT_HTLIN + (DT_WSIZE - 1);
             break;
             }
@@ -665,10 +680,11 @@ switch (fnc) {                                          /* case function */
             dt_seterr (uptr, STA_BLKM);
             return;
             }
-        if (dir) newpos = DT_BLK2LN (((relpos >= (DTU_LPERB (uptr) - DT_HTLIN))?
-            blk + 1: blk), uptr) - DT_HTLIN - DT_WSIZE;
-        else newpos = DT_BLK2LN (((relpos < DT_HTLIN)?
-            blk: blk + 1), uptr) + DT_HTLIN + (DT_WSIZE - 1);
+        if (dir)
+            newpos = DT_BLK2LN (((relpos >= (DTU_LPERB (uptr) - DT_HTLIN))? blk + 1: blk), uptr) -
+                DT_HTLIN - DT_WSIZE;
+        else newpos = DT_BLK2LN (((relpos < DT_HTLIN)? blk: blk + 1), uptr) +
+                DT_HTLIN + (DT_WSIZE - 1);
         if (DEBUG_PRI (dt_dev, LOG_RW) ||
            (DEBUG_PRI (dt_dev, LOG_BL) && (blk == dt_logblk)))
             fprintf (sim_deb, ">>DT%d: %s block %d %s\n",
@@ -679,7 +695,8 @@ switch (fnc) {                                          /* case function */
     case FNC_RALL:                                      /* read all */
     case FNC_WALL:                                      /* write all */
         if (DT_QEZ (uptr)) {                            /* in "ok" end zone? */
-            if (dir) newpos = DTU_FWDEZ (uptr) - DT_WSIZE;
+            if (dir)
+                newpos = DTU_FWDEZ (uptr) - DT_WSIZE;
             else newpos = DT_EZLIN + (DT_WSIZE - 1);
             }
         else {
@@ -689,7 +706,8 @@ switch (fnc) {                                          /* case function */
                 dt_seterr (uptr, STA_BLKM);
                 return;
                 }
-            if (dir) newpos = DT_BLK2LN (blk + 1, uptr) - DT_CSMLN - DT_WSIZE;
+            if (dir)
+                newpos = DT_BLK2LN (blk + 1, uptr) - DT_CSMLN - DT_WSIZE;
             else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);
 			}
         if (fnc == FNC_WALL) sim_activate               /* write all? */
@@ -735,7 +753,8 @@ int32 unum, delta;
 
 new_time = sim_grtime ();                               /* current time */
 ut = new_time - uptr->LASTT;                            /* elapsed time */
-if (ut == 0) return FALSE;                              /* no time gone? exit */
+if (ut == 0)                                            /* no time gone? exit */
+    return FALSE;
 uptr->LASTT = new_time;                                 /* update last time */
 switch (mot & ~DTS_DIR) {                               /* case on motion */
 
@@ -760,7 +779,8 @@ switch (mot & ~DTS_DIR) {                               /* case on motion */
         break;
         }
 
-if (mot & DTS_DIR) uptr->pos = uptr->pos - delta;       /* update pos */
+if (mot & DTS_DIR)                                      /* update pos */
+    uptr->pos = uptr->pos - delta;
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
@@ -875,8 +895,10 @@ switch (fnc) {                                          /* at speed, check fnc *
                 }
             tcwc = (tcwc + 1) & DMASK;                  /* incr MA, WC */
             tcba = (tcba + 2) & DMASK;
-            if (tcba <= 1) tccm = CSR_INCMEX (tccm);
-            if (tcwc == 0) dt_substate = 1;
+            if (tcba <= 1)
+                tccm = CSR_INCMEX (tccm);
+            if (tcwc == 0)
+                dt_substate = 1;
             }
         if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))      /* not end blk? */
             sim_activate (uptr, DT_WSIZE * dt_ltime);
@@ -899,7 +921,8 @@ switch (fnc) {                                          /* at speed, check fnc *
 
     case FNC_WRIT:                                      /* write */
         wrd = DT_LIN2WD (uptr->pos, uptr);              /* get word # */
-        if (dt_substate) tcdt = 0;                      /* wc ovf? fill */
+        if (dt_substate)                                /* wc ovf? fill */
+            tcdt = 0;
         else {
             ma = (CSR_GETMEX (tccm) << 16) | tcba;      /* form 18b addr */
             if (Map_ReadW (ma, 2, &wbuf)) {             /* fetch word */
@@ -909,12 +932,15 @@ switch (fnc) {                                          /* at speed, check fnc *
             tcdt = wbuf;                                /* get word */
             tcwc = (tcwc + 1) & DMASK;                  /* incr MA, WC */
             tcba = (tcba + 2) & DMASK;
-            if (tcba <= 1) tccm = CSR_INCMEX (tccm);
+            if (tcba <= 1)
+                tccm = CSR_INCMEX (tccm);
             }
         ba = (blk * DTU_BSIZE (uptr)) + wrd;            /* buffer ptr */
         fbuf[ba] = tcdt;                                /* write word */
-        if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;
-        if (tcwc == 0) dt_substate = 1;
+        if (ba >= uptr->hwmark)
+            uptr->hwmark = ba + 1;
+        if (tcwc == 0)
+            dt_substate = 1;
         if (wrd != (dir? 0: DTU_BSIZE (uptr) - 1))      /* not end blk? */
             sim_activate (uptr, DT_WSIZE * dt_ltime);
         else if (dt_substate) {                         /* wc ovf? */
@@ -939,7 +965,8 @@ switch (fnc) {                                          /* at speed, check fnc *
             dat = fbuf[ba];                             /* get tape word */
             }
         else dat = dt_gethdr (uptr, blk, relpos);       /* get hdr */
-        if (dir) dat = dt_comobv (dat);                 /* rev? comp obv */
+        if (dir)                                        /* rev? comp obv */
+            dat = dt_comobv (dat);
         tcdt = dat & DMASK;                             /* low 16b */
         tcst = (tcst & ~STA_M_XD) | ((dat >> 16) & STA_M_XD);
         sim_activate (uptr, DT_WSIZE * dt_ltime);
@@ -958,10 +985,12 @@ switch (fnc) {                                          /* at speed, check fnc *
             (relpos < (DTU_LPERB (uptr) - DT_HTLIN))) {
             wrd = DT_LIN2WD (uptr->pos, uptr);
             dat = (STA_GETXD (tcst) << 16) | tcdt;      /* get data word */
-            if (dir) dat = dt_comobv (dat);             /* rev? comp obv */
+            if (dir)                                    /* rev? comp obv */
+                dat = dt_comobv (dat);
             ba = (blk * DTU_BSIZE (uptr)) + wrd;        /* buffer ptr */
             fbuf[ba] = dat;                             /* write word */
-            if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;
+            if (ba >= uptr->hwmark)
+                uptr->hwmark = ba + 1;
             }
 /*      else                                            /* ignore hdr */ 
         sim_activate (uptr, DT_WSIZE * dt_ltime);
@@ -990,7 +1019,8 @@ if (!(tccm & CSR_DONE)) {                               /* not done? */
     }
 if (mot >= DTS_ACCF) {                                  /* ~stopped or stopping? */
     sim_cancel (uptr);                                  /* cancel activity */
-    if (dt_setpos (uptr)) return;                       /* update position */
+    if (dt_setpos (uptr))                               /* update position */
+        return;
     sim_activate (uptr, dt_dctime);                     /* sched decel */
     DTS_SETSTA (DTS_DECF | (mot & DTS_DIR), 0);         /* state = decel */
     }
@@ -1006,7 +1036,8 @@ int32 dir = mot & DTS_DIR;
 
 if (mot == DTS_STOP) return;                            /* already stopped? */
 if ((mot & ~DTS_DIR) != DTS_DECF) {                     /* !already stopping? */
-    if (dt_setpos (uptr)) return;                       /* update pos */
+    if (dt_setpos (uptr))                               /* update pos */
+        return;
     sim_cancel (uptr);                                  /* stop current */
     sim_activate (uptr, dt_dctime);                     /* schedule decel */
     }
@@ -1020,7 +1051,8 @@ void dt_schedez (UNIT *uptr, int32 dir)
 {
 int32 newpos;
 
-if (dir) newpos = DT_EZLIN - DT_WSIZE;                  /* rev? rev ez */
+if (dir)                                                /* rev? rev ez */
+    newpos = DT_EZLIN - DT_WSIZE;
 else newpos = DTU_FWDEZ (uptr) + DT_WSIZE;              /* fwd? fwd ez */
 sim_activate (uptr, ABS (newpos - ((int32) uptr->pos)) * dt_ltime);
 return;
@@ -1059,8 +1091,10 @@ int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos)
 {
 int32 wrd = relpos / DT_WSIZE;
 
-if (wrd == DT_BLKWD) return blk;                        /* fwd blknum */
-if (wrd == DT_CSMWD) return 077;                        /* rev csum */
+if (wrd == DT_BLKWD)                                    /* fwd blknum */
+    return blk;
+if (wrd == DT_CSMWD)                                    /* rev csum */
+    return 077;
 if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_CSMWD - 1)) /* fwd csum */
     return (dt_csum (uptr, blk) << 12);
 if (wrd == (2 * DT_HTWRD + DTU_BSIZE (uptr) - DT_BLKWD - 1)) /* rev blkno */
@@ -1080,7 +1114,8 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all activity */
     if (sim_is_running) {                               /* RESET? */
         prev_mot = DTS_GETMOT (uptr->STATE);            /* get motion */
         if ((prev_mot & ~DTS_DIR) > DTS_DECF) {         /* accel or spd? */
-            if (dt_setpos (uptr)) continue;             /* update pos */
+            if (dt_setpos (uptr))                       /* update pos */
+                continue;
             sim_cancel (uptr);
             sim_activate (uptr, dt_dctime);             /* sched decel */
             DTS_SETSTA (DTS_DECF | (prev_mot & DTS_DIR), 0);
@@ -1152,7 +1187,8 @@ int32 i;
 extern int32 saved_PC;
 
 dt_unit[unitno].pos = DT_EZLIN;
-for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & DT_M_NUMDR;
 M[BOOT_CSR >> 1] = (dt_dib.ba & DMASK) + 02;
 saved_PC = BOOT_ENTRY;
@@ -1177,7 +1213,8 @@ int32 u = uptr - dt_dev.units;
 t_stat r;
 
 r = attach_unit (uptr, cptr);                           /* attach */
-if (r != SCPE_OK) return r;                             /* fail? */
+if (r != SCPE_OK)                                       /* fail? */
+    return r;
 if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
     uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT; /* default 16b */
     if (sim_switches & SWMASK ('T'))                    /* att 12b? */
@@ -1187,7 +1224,7 @@ if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
     else if (!(sim_switches & SWMASK ('A')) &&          /* autosize? */
         ((sz = sim_fsize (uptr->fileref)) > D16_FILSIZ)) {
         if (sz <= D8_FILSIZ)
-        uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
+            uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
         else uptr->flags = uptr->flags & ~(UNIT_8FMT | UNIT_11FMT);
         }
     }
@@ -1199,15 +1236,19 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
 printf ("%s%d: ", sim_dname (&dt_dev), u);
-if (uptr->flags & UNIT_8FMT) printf ("12b format");
-else if (uptr->flags & UNIT_11FMT) printf ("16b format");
+if (uptr->flags & UNIT_8FMT)
+    printf ("12b format");
+else if (uptr->flags & UNIT_11FMT)
+    printf ("16b format");
 else printf ("18b/36b format");
 printf (", buffering file in memory\n");
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (int16), D8_NBSIZE, uptr->fileref);
-        if (k == 0) break;
-        for ( ; k < D8_NBSIZE; k++) pdp8b[k] = 0;
+        if (k == 0)
+            break;
+        for ( ; k < D8_NBSIZE; k++)
+            pdp8b[k] = 0;
         for (k = 0; k < D8_NBSIZE; k = k + 3) {         /* loop thru blk */
             fbuf[ba] = ((uint32) (pdp8b[k] & 07777) << 6) |
                 ((uint32) (pdp8b[k + 1] >> 6) & 077);
@@ -1221,8 +1262,10 @@ if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
 else if (uptr->flags & UNIT_11FMT) {                    /* 16b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
-        if (k == 0) break;
-        for ( ; k < D18_BSIZE; k++) pdp11b[k] = 0;
+        if (k == 0)
+            break;
+        for ( ; k < D18_BSIZE; k++)
+            pdp11b[k] = 0;
         for (k = 0; k < D18_BSIZE; k++)
             fbuf[ba++] = pdp11b[k];
         }
@@ -1252,13 +1295,15 @@ uint16 pdp11b[D18_BSIZE];
 uint32 ba, k, *fbuf;
 int32 u = uptr - dt_dev.units;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_OK;
 if (sim_is_active (uptr)) {                             /* active? cancel op */
     sim_cancel (uptr);
     if ((u == CSR_GETUNIT (tccm)) && ((tccm & CSR_DONE) == 0)) {
         tcst = tcst | STA_SEL;
         tccm = tccm | CSR_ERR | CSR_DONE;
-        if (tccm & CSR_IE) SET_INT (DTA);
+        if (tccm & CSR_IE)
+            SET_INT (DTA);
 		}
     uptr->STATE = uptr->pos = 0;
     }
@@ -1276,7 +1321,8 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
                 ba = ba + 2;
                 }                                       /* end loop blk */
             fxwrite (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
-            if (ferror (uptr->fileref)) break;
+            if (ferror (uptr->fileref))
+                break;
             }                                           /* end loop file */
         }                                               /* end if 12b */
     else if (uptr->flags & UNIT_11FMT) {                /* 16b? */
@@ -1284,7 +1330,8 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
             for (k = 0; k < D18_BSIZE; k++)             /* loop blk */
                 pdp11b[k] = fbuf[ba++] & DMASK;
             fxwrite (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
-            if (ferror (uptr->fileref)) break;
+            if (ferror (uptr->fileref))
+                break;
             }                                           /* end loop file */
         }                                               /* end if 16b */
     else fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */

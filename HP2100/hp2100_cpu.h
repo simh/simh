@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.c and hp2100_defs.h
+   26-Jun-08    JDB     Added mp_control to CPU state externals
    24-Apr-08    JDB     Added calc_defer() prototype
    20-Apr-08    JDB     Added DEB_VIS and DEB_SIG debug flags
    26-Nov-07    JDB     Added extern sim_deb, cpu_dev, DEB flags for debug printouts
@@ -45,6 +47,9 @@
 
 #ifndef _HP2100_CPU_H_
 #define _HP2100_CPU_H_  0
+
+#include <setjmp.h>
+
 
 /* CPU model definition flags */
 
@@ -171,11 +176,97 @@
 #define PCQ_MASK        (PCQ_SIZE - 1)
 #define PCQ_ENTRY       pcq[pcq_p = (pcq_p - 1) & PCQ_MASK] = err_PC
 
-/* simulator state */
+/* Memory reference instructions */
 
-extern FILE *sim_deb;
+#define I_IA            0100000                         /* indirect address */
+#define I_AB            0004000                         /* A/B select */
+#define I_CP            0002000                         /* current page */
+#define I_DISP          0001777                         /* page displacement */
+#define I_PAGENO        0076000                         /* page number */
+
+/* Other instructions */
+
+#define I_NMRMASK       0172000                         /* non-mrf opcode */
+#define I_ASKP          0002000                         /* alter/skip */
+#define I_IO            0102000                         /* I/O */
+#define I_CTL           0004000                         /* CTL on/off */
+#define I_HC            0001000                         /* hold/clear */
+#define I_DEVMASK       0000077                         /* device select code mask */
+#define I_GETIOOP(x)    (((x) >> 6) & 07)               /* I/O sub op */
+
+/* Instruction masks */
+
+#define I_MRG           0074000                         /* MRG instructions */
+#define I_MRG_I         (I_MRG | I_IA)                  /* MRG indirect instruction group */
+#define I_JSB           0014000                         /* JSB instruction */
+#define I_JSB_I         (I_JSB | I_IA)                  /* JSB,I instruction */
+#define I_JMP           0024000                         /* JMP instruction */
+#define I_ISZ           0034000                         /* ISZ instruction */
+
+#define I_IOG           0107700                         /* I/O group instruction */
+#define I_SFS           0102300                         /* SFS instruction */
+#define I_STF           0102100                         /* STF instruction */
+
+/* Memory management */
+
+#define VA_N_OFF        10                              /* offset width */
+#define VA_M_OFF        ((1 << VA_N_OFF) - 1)           /* offset mask */
+#define VA_GETOFF(x)    ((x) & VA_M_OFF)
+#define VA_N_PAG        (VA_N_SIZE - VA_N_OFF)          /* page width */
+#define VA_V_PAG        (VA_N_OFF)                      /* page offset */
+#define VA_M_PAG        ((1 << VA_N_PAG) - 1)           /* page mask */
+#define VA_GETPAG(x)    (((x) >> VA_V_PAG) & VA_M_PAG)
+
+/* Maps */
+
+#define MAP_NUM         4                               /* num maps */
+#define MAP_LNT         (1 << VA_N_PAG)                 /* map length */
+#define MAP_MASK        ((MAP_NUM * MAP_LNT) - 1)
+#define SMAP            0                               /* system map */
+#define UMAP            (SMAP + MAP_LNT)                /* user map */
+#define PAMAP           (UMAP + MAP_LNT)                /* port A map */
+#define PBMAP           (PAMAP + MAP_LNT)               /* port B map */
+
+/* DMS map entries */
+
+#define MAP_V_RPR       15                              /* read prot */
+#define MAP_V_WPR       14                              /* write prot */
+#define RDPROT          (1 << MAP_V_RPR)                /* read access check */
+#define WRPROT          (1 << MAP_V_WPR)                /* write access check */
+#define NOPROT          0                               /* no access check */
+#define MAP_RSVD        0036000                         /* reserved bits */
+#define MAP_N_PAG       (PA_N_SIZE - VA_N_OFF)          /* page width */
+#define MAP_V_PAG       (VA_N_OFF)
+#define MAP_M_PAG       ((1 << MAP_N_PAG) - 1)
+#define MAP_GETPAG(x)   (((x) & MAP_M_PAG) << MAP_V_PAG)
+
+/* MEM status register */
+
+#define MST_ENBI        0100000                         /* MEM enabled at interrupt */
+#define MST_UMPI        0040000                         /* User map selected at inerrupt */
+#define MST_ENB         0020000                         /* MEM enabled currently */
+#define MST_UMP         0010000                         /* User map selected currently */
+#define MST_PRO         0004000                         /* Protected mode enabled currently */
+#define MST_FLT         0002000                         /* Base page portion mapped */
+#define MST_FENCE       0001777                         /* Base page fence */
+
+/* MEM violation register */
+
+#define MVI_V_RPR       15                              /* must be same as */
+#define MVI_V_WPR       14                              /* MAP_V_xPR */
+#define MVI_RPR         (1 << MVI_V_RPR)                /* rd viol */
+#define MVI_WPR         (1 << MVI_V_WPR)                /* wr viol */
+#define MVI_BPG         0020000                         /* base page viol */
+#define MVI_PRV         0010000                         /* priv viol */
+#define MVI_MEB         0000200                         /* me bus enb @ viol */
+#define MVI_MEM         0000100                         /* mem enb @ viol */
+#define MVI_UMP         0000040                         /* usr map @ viol */
+#define MVI_PAG         0000037                         /* pag sel */
 
 /* CPU registers */
+
+#define AR              ABREG[0]                        /* A = reg 0 */
+#define BR              ABREG[1]                        /* B = reg 1 */
 
 extern uint16 ABREG[2];                                 /* A/B regs (use AR/BR) */
 extern uint32 PC;                                       /* P register */
@@ -186,47 +277,53 @@ extern uint32 XR;                                       /* X register */
 extern uint32 YR;                                       /* Y register */
 extern uint32 E;                                        /* E register */
 extern uint32 O;                                        /* O register */
-extern uint32 dev_ctl[2];                               /* device control */
 
 /* CPU state */
 
-extern uint32 err_PC;
-extern uint32 dms_enb;
-extern uint32 dms_ump;
-extern uint32 dms_sr;
-extern uint32 dms_vr;
-extern uint32 mp_fence;
-extern uint32 mp_viol;
-extern uint32 mp_mevff;
-extern uint32 iop_sp;
-extern uint32 ion_defer;
-extern uint32 intaddr;
-extern uint16 pcq[PCQ_SIZE];
-extern uint32 pcq_p;
-extern uint32 stop_inst;
-extern UNIT cpu_unit;
-extern DEVICE cpu_dev;
+extern uint32  err_PC;
+extern uint32  dms_enb;
+extern uint32  dms_ump;
+extern uint32  dms_sr;
+extern uint32  dms_vr;
+extern uint32  mp_control;
+extern uint32  mp_fence;
+extern uint32  mp_viol;
+extern uint32  mp_mevff;
+extern uint32  iop_sp;
+extern t_bool  ion_defer;
+extern uint32  intaddr;
+extern uint16  pcq [PCQ_SIZE];
+extern uint32  pcq_p;
+extern uint32  stop_inst;
+extern UNIT    cpu_unit;
+extern DEVICE  cpu_dev;
+extern jmp_buf save_env;
 
 /* CPU functions */
 
-t_stat resolve (uint32 MA, uint32 *addr, uint32 irq);
-uint8 ReadB (uint32 addr);
-uint8 ReadBA (uint32 addr);
-uint16 ReadW (uint32 addr);
-uint16 ReadWA (uint32 addr);
-uint16 ReadIO (uint32 addr, uint32 map);
-void WriteB (uint32 addr, uint32 dat);
-void WriteBA (uint32 addr, uint32 dat);
-void WriteW (uint32 addr, uint32 dat);
-void WriteWA (uint32 addr, uint32 dat);
-void WriteIO (uint32 addr, uint32 dat, uint32 map);
-t_stat iogrp (uint32 ir, uint32 iotrap);
-uint32 calc_int (void);
-uint32 calc_defer (void);
-void mp_dms_jmp (uint32 va);
-uint16 dms_rmap (uint32 mapi);
-void dms_wmap (uint32 mapi, uint32 dat);
-void dms_viol (uint32 va, uint32 st);
-uint32 dms_upd_sr (void);
+#define MP_ABORT(va)    longjmp (save_env, (va))
+
+extern t_stat resolve    (uint32 MA, uint32 *addr, uint32 irq);
+extern uint16 ReadPW     (uint32 pa);
+extern uint8  ReadB      (uint32 va);
+extern uint8  ReadBA     (uint32 va);
+extern uint16 ReadW      (uint32 va);
+extern uint16 ReadWA     (uint32 va);
+extern uint16 ReadIO     (uint32 va, uint32 map);
+extern void   WritePW    (uint32 pa, uint32 dat);
+extern void   WriteB     (uint32 va, uint32 dat);
+extern void   WriteBA    (uint32 va, uint32 dat);
+extern void   WriteW     (uint32 va, uint32 dat);
+extern void   WriteWA    (uint32 va, uint32 dat);
+extern void   WriteIO    (uint32 va, uint32 dat, uint32 map);
+extern t_stat iogrp      (uint32 ir, uint32 iotrap);
+extern uint32 calc_int   (void);
+extern t_bool calc_defer (void);
+extern void   mp_dms_jmp (uint32 va, uint32 plb);
+extern uint16 dms_rmap   (uint32 mapi);
+extern void   dms_wmap   (uint32 mapi, uint32 dat);
+extern void   dms_viol   (uint32 va, uint32 st);
+extern uint32 dms_upd_vr (uint32 va);
+extern uint32 dms_upd_sr (void);
 
 #endif

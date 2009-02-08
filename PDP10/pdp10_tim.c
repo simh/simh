@@ -1,6 +1,6 @@
 /* pdp10_tim.c: PDP-10 tim subsystem simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -199,7 +199,7 @@ tim_ttg = tim_period;                                   /* reload */
 apr_flg = apr_flg | APRF_TIM;                           /* request interrupt */
 if (Q_ITS) {                                            /* ITS? */
     if (pi_act == 0)
-	quant = (quant + TIM_ITS_QUANT) & DMASK;
+	    quant = (quant + TIM_ITS_QUANT) & DMASK;
     if (TSTS (pcst)) {                                  /* PC sampling? */
         WriteP ((a10) pcst & AMASK, pager_PC);          /* store sample */
         pcst = AOB (pcst);                              /* add 1,,1 */
@@ -216,7 +216,8 @@ int32 clk_cosched (int32 wait)
 {
 int32 t;
 
-if (tim_mult == TIM_MULT_T20) return wait;
+if (tim_mult == TIM_MULT_T20)
+    return wait;
 t = sim_is_active (&tim_unit);
 return (t? t - 1: wait);
 }
@@ -259,7 +260,8 @@ else {
     uptr->wait = TIM_WAIT_T10;
     tmr_poll = TIM_WAIT_T10;
     tim_mult = TIM_MULT_T10;
-    if (Q_ITS) uptr->flags = uptr->flags | UNIT_Y2K;
+    if (Q_ITS)
+        uptr->flags = uptr->flags | UNIT_Y2K;
     else uptr->flags = uptr->flags & ~UNIT_Y2K;
     }
 tmxr_poll = tmr_poll * tim_mult;
@@ -275,9 +277,10 @@ struct tm *tptr;
 
 curtim = time (NULL);                                   /* get time */
 tptr = localtime (&curtim);                             /* decompose */
-if (tptr == NULL) return SCPE_NXM;                      /* Y2K prob? */
+if (tptr == NULL)
+    return SCPE_NXM; 
 if ((tptr->tm_year > 99) && !(tim_unit.flags & UNIT_Y2K))
-    tptr->tm_year = 99; 
+    tptr->tm_year = 99;                                 /* Y2K prob? */
 
 switch ((PA >> 1) & 03) {                               /* decode PA<3:1> */
 

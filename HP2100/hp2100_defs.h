@@ -23,6 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Sep-08    JDB     Added POLL_FIRST to indicate immediate connection attempt
+   15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.h
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
+   25-Jun-08    JDB     Added PIF device
+   17-Jun-08    JDB     Declared fmt_char() function
+   26-May-08    JDB     Added MPX device
    24-Apr-08    JDB     Added I_MRG_I, I_JSB, I_JSB_I, and I_JMP instruction masks
    14-Apr-08    JDB     Changed TMR_MUX to TMR_POLL for idle support
                         Added POLLMODE, sync_poll() declaration
@@ -52,10 +58,13 @@
    questions about the HP2100; and of Dave Bryan in adding features and
    correcting errors throughout the simulator.
 */
+
+
 #ifndef _HP2100_DEFS_H_
 #define _HP2100_DEFS_H_ 0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
 
 /* Simulator stop and notification codes */
 
@@ -70,12 +79,9 @@
 #define STOP_PWROFF     9                               /* device powered off */
 #define NOTE_IOG        10                              /* I/O instr executed */
 
-#define ABORT_PRO       1                               /* protection abort */
-
 /* Memory */
 
 #define MEMSIZE         (cpu_unit.capac)                /* actual memory size */
-#define MEM_ADDR_OK(x)  (((uint32) (x)) < fwanxm)
 #define VA_N_SIZE       15                              /* virtual addr size */
 #define VASIZE          (1 << VA_N_SIZE)
 #define VAMASK          077777                          /* virt addr mask */
@@ -92,8 +98,6 @@
 #define DMASK           0177777                         /* 16b data mask/maximum value */
 #define DMAX            0077777                         /* 16b maximum signed value */
 #define DMASK8          0377                            /* 8b data mask/maximum value */
-#define AR              ABREG[0]                        /* A = reg 0 */
-#define BR              ABREG[1]                        /* B = reg 1 */
 
 /* Portable conversions (sign-extension, unsigned-to-signed) */
 
@@ -102,132 +106,90 @@
 #define INT16(u)        ((u) > DMAX   ? (-(int16) (DMASK   - (u)) - 1) : (int16) (u))
 #define INT32(u)        ((u) > DMAX32 ? (-(int32) (DMASK32 - (u)) - 1) : (int32) (u))
 
-/* Memory reference instructions */
-
-#define I_IA            0100000                         /* indirect address */
-#define I_AB            0004000                         /* A/B select */
-#define I_CP            0002000                         /* current page */
-#define I_DISP          0001777                         /* page displacement */
-#define I_PAGENO        0076000                         /* page number */
-
-/* Other instructions */
-
-#define I_NMRMASK       0172000                         /* non-mrf opcode */
-#define I_SRG           0000000                         /* shift */
-#define I_ASKP          0002000                         /* alter/skip */
-#define I_EXTD          0100000                         /* extend */
-#define I_IO            0102000                         /* I/O */
-#define I_CTL           0004000                         /* CTL on/off */
-#define I_HC            0001000                         /* hold/clear */
-#define I_DEVMASK       0000077                         /* device mask */
-#define I_GETIOOP(x)    (((x) >> 6) & 07)               /* I/O sub op */
-
-/* Instruction masks */
-
-#define I_MRG           0074000                         /* MRG instructions */
-#define I_MRG_I         (I_MRG | I_IA)                  /* MRG indirect instruction group */
-#define I_JSB           0014000                         /* JSB instruction */
-#define I_JSB_I         (I_JSB | I_IA)                  /* JSB,I instruction */
-#define I_JMP           0024000                         /* JMP instruction */
-#define I_ISZ           0034000                         /* ISZ instruction */
-
-#define I_IOG           0107700                         /* I/O group instruction */
-#define I_SFS           0102300                         /* SFS instruction */
-#define I_STF           0102100                         /* STF instruction */
-
-/* DMA channels */
-
-#define DMA_OE          020000000000                    /* byte packing odd/even flag */
-#define DMA1_STC        0100000                         /* DMA - issue STC */
-#define DMA1_PB         0040000                         /* DMA - pack bytes */
-#define DMA1_CLC        0020000                         /* DMA - issue CLC */
-#define DMA2_OI         0100000                         /* DMA - output/input */
-
-struct DMA {                                            /* DMA channel */
-    uint32      cw1;                                    /* device select */
-    uint32      cw2;                                    /* direction, address */
-    uint32      cw3;                                    /* word count */
-    uint32      latency;                                /* 1st cycle delay */
-    uint32      packer;                                 /* byte-packer holding reg */
-    };
-
-/* Memory management */
-
-#define VA_N_OFF        10                              /* offset width */
-#define VA_M_OFF        ((1 << VA_N_OFF) - 1)           /* offset mask */
-#define VA_GETOFF(x)    ((x) & VA_M_OFF)
-#define VA_N_PAG        (VA_N_SIZE - VA_N_OFF)          /* page width */
-#define VA_V_PAG        (VA_N_OFF)
-#define VA_M_PAG        ((1 << VA_N_PAG) - 1)
-#define VA_GETPAG(x)    (((x) >> VA_V_PAG) & VA_M_PAG)
-
-/* Maps */
-
-#define MAP_NUM         4                               /* num maps */
-#define MAP_LNT         (1 << VA_N_PAG)                 /* map length */
-#define MAP_MASK        ((MAP_NUM * MAP_LNT) - 1)
-#define SMAP            0                               /* system map */
-#define UMAP            (SMAP + MAP_LNT)                /* user map */
-#define PAMAP           (UMAP + MAP_LNT)                /* port A map */
-#define PBMAP           (PAMAP + MAP_LNT)               /* port B map */
-
-/* DMS map entries */
-
-#define MAP_V_RPR       15                              /* read prot */
-#define MAP_V_WPR       14                              /* write prot */
-#define RD              (1 << MAP_V_RPR)
-#define WR              (1 << MAP_V_WPR)
-#define MAP_MBZ         0036000                         /* must be zero */
-#define MAP_N_PAG       (PA_N_SIZE - VA_N_OFF)          /* page width */
-#define MAP_V_PAG       (VA_N_OFF)
-#define MAP_M_PAG       ((1 << MAP_N_PAG) - 1)
-#define MAP_GETPAG(x)   (((x) & MAP_M_PAG) << MAP_V_PAG)
-
-/* Map status register */
-
-#define MST_ENBI        0100000                         /* mem enb @ int */
-#define MST_UMPI        0040000                         /* usr map @ int */
-#define MST_ENB         0020000                         /* mem enb */
-#define MST_UMP         0010000                         /* usr map */
-#define MST_PRO         0004000                         /* protection */
-#define MST_FLT         0002000                         /* fence comp */
-#define MST_FENCE       0001777                         /* base page fence */
-
-/* Map violation register */
-
-#define MVI_V_RPR       15                              /* must be same as */
-#define MVI_V_WPR       14                              /* MAP_V_xPR */
-#define MVI_RPR         (1 << MVI_V_RPR)                /* rd viol */
-#define MVI_WPR         (1 << MVI_V_WPR)                /* wr viol */
-#define MVI_BPG         0020000                         /* base page viol */
-#define MVI_PRV         0010000                         /* priv viol */
-#define MVI_MEB         0000200                         /* me bus enb @ viol */
-#define MVI_MEM         0000100                         /* mem enb @ viol */
-#define MVI_UMP         0000040                         /* usr map @ viol */
-#define MVI_PAG         0000037                         /* pag sel */
-
 /* Timers */
 
 #define TMR_CLK         0                               /* clock */
 #define TMR_POLL        1                               /* input polling */
 
 #define POLL_RATE       100                             /* poll 100 times per second */
+#define POLL_FIRST      1                               /* first poll is "immediate" */
 #define POLL_WAIT       15800                           /* initial poll ~ 10 msec. */
 
 typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization modes */
 
-/* I/O sub-opcodes */
+/* I/O instruction sub-opcodes */
 
-#define ioHLT           0                               /* halt */
-#define ioFLG           1                               /* set/clear flag */
-#define ioSFC           2                               /* skip on flag clear */
-#define ioSFS           3                               /* skip on flag set */
-#define ioMIX           4                               /* merge into A/B */
-#define ioLIX           5                               /* load into A/B */
-#define ioOTX           6                               /* output from A/B */
-#define ioCTL           7                               /* set/clear control */
-#define ioEDT           8                               /* DMA: end data transfer */
-#define ioCRS           9                               /* control reset ("CLC 0") */
+#define soHLT           0                               /* halt */
+#define soFLG           1                               /* set/clear flag */
+#define soSFC           2                               /* skip on flag clear */
+#define soSFS           3                               /* skip on flag set */
+#define soMIX           4                               /* merge into A/B */
+#define soLIX           5                               /* load into A/B */
+#define soOTX           6                               /* output from A/B */
+#define soCTL           7                               /* set/clear control */
+
+
+/* I/O backplane signals.
+
+   The IOSIG declarations mirror the I/O backplane signals.  These are sent to
+   the device I/O signal handlers for action.  Normally, only one signal may be
+   sent at a time.  However, the ioCLF signal may be added (arithmetically) to
+   another signal; the handlers will process the other signal first and then the
+   CLF signal.
+
+   Implementation notes:
+
+    1. The first valid signal must have a value > 0, and ioCLF must be
+       enumerated last, so that adding ioCLF produces a result > ioCLF.
+
+    2. The signals are structured so that all those that might change the
+       interrupt state are enumerated after ioSIR.  The handlers will detect
+       this and add an ioSIR signal automatically.
+
+    3. In hardware, the POPIO signal is asserted concurrently with the CRS
+       signal.  Under simulation, ioPOPIO implies ioCRS, so the handlers are
+       structured to fall from POPIO handling into CRS handling.  It is not
+       necessary to send both signals for a PRESET.
+
+    4. In hardware, the SIR signal is generated unconditionally every T5 period
+       to time the setting of the IRQ flip-flop.  Under simulation, ioSIR is
+       sent to set the PRL, IRQ, and SRQ signals as indicated by the interface
+       logic.  It is necessary to send ioSIR only when that logic indicates a
+       change in one or more of the three signals.
+
+    5. In hardware, the ENF signal is unconditionally generated every T2 period
+       to time the setting of the flag flip-flop and to reset the IRQ flip-flop.
+       If the flag buffer flip-flip is set, then flag will be set by ENF.  If
+       the flag buffer is clear, ENF will not affect flag.  Under simulation,
+       ioENF is sent to set the flag buffer and flag flip-flops.  For those
+       interfaces where this action is identical to that provided by STF, the
+       ioENF handler may simply fall into the ioSTF handler.
+
+    6. The ioSKF signal is never sent to an I/O device.  Rather, it is returned
+       from the device if the SFC or SFS condition is true.
+
+    7. A device will receive ioNONE when a HLT instruction is executed, and the
+       H/C bit is clear (i.e., no CLF generated).
+*/
+
+typedef enum { CLEAR, SET } FLIP_FLOP;                  /* flip-flop type and values */
+
+typedef enum { ioNONE,                                  /* no signal asserted */
+               ioSKF,                                   /* skip on flag */
+               ioSFC,                                   /* skip if flag is clear */
+               ioSFS,                                   /* skip if flag is set */
+               ioIOI,                                   /* I/O data input */
+               ioIOO,                                   /* I/O data output */
+               ioEDT,                                   /* end data transfer */
+               ioSIR,                                   /* set interrupt request */
+               ioIAK,                                   /* interrupt acknowledge */
+               ioCRS,                                   /* control reset */
+               ioPOPIO,                                 /* power-on preset to I/O */
+               ioCLC,                                   /* clear control flip-flop */
+               ioSTC,                                   /* set control flip-flop */
+               ioENF,                                   /* enable flag */
+               ioSTF,                                   /* set flag flip-flop */
+               ioCLF } IOSIG;                           /* clear flag flip-flop */
 
 /* I/O devices - fixed assignments */
 
@@ -239,6 +201,7 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define PRO             005                             /* parity/mem protect */
 #define DMA0            006                             /* DMA channel 0 */
 #define DMA1            007                             /* DMA channel 1 */
+#define OPTDEV          DMALT0                          /* start of optional devices */
 #define VARDEV          (DMA1 + 1)                      /* start of var assign */
 #define M_NXDEV         (INT_M (CPU) | INT_M (OVF) | \
                          INT_M (DMALT0) | INT_M (DMALT1))
@@ -267,6 +230,8 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define IPLO            033                             /* 12566B link out */
 #define DS              034                             /* 13037A control */
 #define BACI            035                             /* 12966A Buffered Async Comm Interface */
+#define MPX             036                             /* 12792A/B/C 8-channel multiplexer */
+#define PIF             037                             /* 12620A/12936A Privileged Interrupt Fence */
 #define MUXL            040                             /* 12920A lower data */
 #define MUXU            041                             /* 12920A upper data */
 #define MUXC            042                             /* 12920A control */
@@ -285,59 +250,75 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define IBL_OPT         0000070                         /* options in <5:3> */
 #define IBL_DP_REM      0000001                         /* DP removable */
 #define IBL_DS_HEAD     0000003                         /* DS head number */
-#define IBL_LNT         64                              /* boot length */
+#define IBL_LNT         64                              /* boot ROM length */
 #define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
 #define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
 #define IBL_END         (IBL_LNT - 1)                   /* last location */
 
+typedef uint16 BOOT_ROM [IBL_LNT];                      /* boot ROM data */
+
 /* Dynamic device information table */
 
+typedef uint32 IODISP (uint32 select_code, IOSIG signal, uint32 data);  /* I/O signal dispatch function */
+
 typedef struct {
-    uint32      devno;                                  /* device number */
-    uint32      cmd;                                    /* saved command */
-    uint32      ctl;                                    /* saved control */
-    uint32      flg;                                    /* saved flag */
-    uint32      fbf;                                    /* saved flag buf */
-    uint32      srq;                                    /* saved svc req */
-    int32       (*iot)(int32 op, int32 ir, int32 dat);  /* I/O routine */
+    uint32 devno;                                       /* device select code */
+    IODISP *iot;                                        /* pointer to I/O signal dispatcher */
     } DIB;
 
 /* I/O macros */
 
-#define INT_V(x)        ((x) & 037)                     /* device bit pos */
-#define INT_M(x)        (1u << INT_V (x))               /* device bit mask */
-#define setCMD(D)       dev_cmd[(D)/32] = dev_cmd[(D)/32] | INT_M ((D))
-#define clrCMD(D)       dev_cmd[(D)/32] = dev_cmd[(D)/32] & ~INT_M (D)
-#define setCTL(D)       dev_ctl[(D)/32] = dev_ctl[(D)/32] | INT_M ((D))
-#define clrCTL(D)       dev_ctl[(D)/32] = dev_ctl[(D)/32] & ~INT_M (D)
-#define setFBF(D)       dev_fbf[(D)/32] = dev_fbf[(D)/32] | INT_M (D)
-#define clrFBF(D)       dev_fbf[(D)/32] = dev_fbf[(D)/32] & ~INT_M (D)
-#define setFLG(D)       dev_flg[(D)/32] = dev_flg[(D)/32] | INT_M (D); \
-                        setFBF(D)
-#define clrFLG(D)       dev_flg[(D)/32] = dev_flg[(D)/32] & ~INT_M (D); \
-                        clrFBF(D)
-#define setFSR(D)       dev_flg[(D)/32] = dev_flg[(D)/32] | INT_M (D); \
-                        setFBF(D); setSRQ(D)
-#define clrFSR(D)       dev_flg[(D)/32] = dev_flg[(D)/32] & ~INT_M (D); \
-                        clrFBF(D); clrSRQ(D)
-#define setSRQ(D)       dev_srq[(D)/32] = dev_srq[(D)/32] | INT_M ((D))
-#define clrSRQ(D)       dev_srq[(D)/32] = dev_srq[(D)/32] & ~INT_M (D)
-#define CMD(D)          ((dev_cmd[(D)/32] >> INT_V (D)) & 1)
-#define CTL(D)          ((dev_ctl[(D)/32] >> INT_V (D)) & 1)
-#define FLG(D)          ((dev_flg[(D)/32] >> INT_V (D)) & 1)
-#define FBF(D)          ((dev_fbf[(D)/32] >> INT_V (D)) & 1)
-#define SRQ(D)          ((dev_srq[(D)/32] >> INT_V (D)) & 1)
+#define IOBASE(S)       ((S) > ioCLF ? (S) - ioCLF : (S))   /* base signal from compound signal */
+
+#define INT_V(x)        ((x) & 037)                         /* device bit position */
+#define INT_M(x)        (1u << INT_V (x))                   /* device bit mask */
+
+#define setSKF(B)       data = (uint32) ((B) ? ioSKF : ioNONE)
+
+#define setPRL(S,B)     dev_prl[(S)/32] = dev_prl[(S)/32] & ~INT_M (S) | (((B) & 1) << INT_V (S))
+#define setIRQ(S,B)     dev_irq[(S)/32] = dev_irq[(S)/32] & ~INT_M (S) | (((B) & 1) << INT_V (S))
+#define setSRQ(S,B)     dev_srq[(S)/32] = dev_srq[(S)/32] & ~INT_M (S) | (((B) & 1) << INT_V (S))
+
+#define setstdSKF(N)    setSKF ((base_signal == ioSFC) && !N ## _flag || \
+                                (base_signal == ioSFS) && N ## _flag)
+
+#define setstdPRL(S,N)  setPRL ((S), !(N ## _control & N ## _flag));
+#define setstdIRQ(S,N)  setIRQ ((S), N ## _control & N ## _flag & N ## _flagbuf);
+#define setstdSRQ(S,N)  setSRQ ((S), N ## _flag);
+
+#define PRL(S)          ((dev_prl[(S)/32] >> INT_V (S)) & 1)
+#define IRQ(S)          ((dev_irq[(S)/32] >> INT_V (S)) & 1)
+#define SRQ(S)          ((dev_srq[(S)/32] >> INT_V (S)) & 1)
 
 #define IOT_V_REASON    16
-#define IORETURN(f,v)   ((f)? (v): SCPE_OK)             /* stop on error */
+#define IORETURN(F,V)   ((F) ? (V) : SCPE_OK)           /* stop on I/O error */
 
-/* Function prototypes */
+/* CPU state */
 
-int32 sync_poll (POLLMODE poll_mode);
-t_stat ibl_copy (const uint16 pboot[IBL_LNT], int32 dev);
-t_stat hp_setdev (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
-void hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
-t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
+extern uint32 SR;                                       /* S register (for IBL) */
+extern uint32 dev_prl [2], dev_irq [2], dev_srq [2];    /* I/O signal vectors */
+
+/* Simulator state */
+
+extern FILE *sim_deb;
+extern FILE *sim_log;
+extern int32 sim_step;
+extern int32 sim_switches;
+
+/* CPU functions */
+
+extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev);
+extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
+
+/* System functions */
+
+extern t_stat      fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
+extern const char *fmt_char   (uint8 ch);
+extern t_stat      hp_setdev  (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+/* Standard device functions */
+
+extern int32 sync_poll (POLLMODE poll_mode);
 
 #endif

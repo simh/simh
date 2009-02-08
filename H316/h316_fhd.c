@@ -1,6 +1,6 @@
 /* h316_fhd.c: H316/516 fixed head simulator
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -186,24 +186,30 @@ switch (inst) {                                         /* case on opcode */
             fhd_eor = 1;                                /* stop */
             CLR_INT (INT_FHD);                          /* clear int req */
             }
-        else if (fnc == 003) fhd_go (1);                /* start, DMA */
-        else if (fnc == 007) fhd_go (0);                /* start, IO bus */
+        else if (fnc == 003)                            /* start, DMA */
+            fhd_go (1);
+        else if (fnc == 007)                            /* start, IO bus */
+            fhd_go (0);
         else return IOBADFNC (dat);
         break;
 
     case ioOTA:                                         /* output */
-        if (fnc) return IOBADFNC (dat);                 /* only fnc 0 */
+        if (fnc)                                        /* only fnc 0 */
+            return IOBADFNC (dat);
         if (fhd_rdy) {                                  /* ready? */
             fhd_buf = dat;                              /* store data */
-            if (fhd_otas == OTA_CW1) fhd_go1 (dat);     /* expecting CW1? */
-            else if (fhd_otas == OTA_CW2) fhd_go2 (dat);/* expecting CW2? */
+            if (fhd_otas == OTA_CW1)                    /* expecting CW1? */
+                fhd_go1 (dat);
+            else if (fhd_otas == OTA_CW2)               /* expecting CW2? */
+                fhd_go2 (dat);
             else fhd_rdy = 0;                           /* normal, clr ready */
             return IOSKIP (dat);
             }
         break;
 
     case ioINA:                                         /* input */
-        if (fnc) return IOBADFNC (dat);                 /* only fnc 0 */
+        if (fnc)                                        /* only fnc 0 */
+            return IOBADFNC (dat);
         if (fhd_rdy) {                                  /* ready? */
             fhd_rdy = 0;                                /* clear ready */
             return IOSKIP (dat | fhd_buf);              /* return data */
@@ -233,13 +239,15 @@ void fhd_go (uint32 dma)
 {
 int32 ch = fhd_dib.chan - 1;                            /* DMA/DMC chan */
 
-if (fhd_busy) return;                                   /* ignore if busy */
+if (fhd_busy)                                           /* ignore if busy */
+    return;
 fhd_busy = 1;                                           /* ctlr is busy */
 fhd_eor = 0;                                            /* transfer not done */
 fhd_csum = 0;                                           /* init checksum */
 fhd_dte = 0;                                            /* clear errors */
 fhd_ace = 0;
-if (ch >= 0) fhd_dma = dma;                             /* DMA allowed? */
+if (ch >= 0)                                            /* DMA allowed? */
+    fhd_dma = dma;
 else fhd_dma = 0;                                       /* no, force IO bus */
 fhd_otas = OTA_CW1;                                     /* expect CW1 */
 fhd_rdy = 1;                                            /* set ready */
@@ -259,7 +267,8 @@ int32 ch = fhd_dib.chan - 1;                            /* DMA/DMC chan */
 fhd_cw1 = dat;                                          /* store CW1 */
 fhd_otas = OTA_CW2;                                     /* expect CW2 */
 fhd_rdy = 1;                                            /* set ready */
-if (fhd_dma && Q_DMA (ch)) SET_CH_REQ (ch);             /* DMA? set chan request */
+if (fhd_dma && Q_DMA (ch))                              /* DMA? set chan request */
+    SET_CH_REQ (ch);
 return;
 }
 
@@ -284,7 +293,8 @@ if ((wa >= FH_NUMWD) ||                                 /* if bad char addr */
     }
 if (fhd_cw1 & CW1_RW) {                                 /* write? */
     fhd_rdy = 1;                                        /* set ready */
-    if (fhd_dma) SET_CH_REQ (ch);                       /* if DMA/DMC, req chan */
+    if (fhd_dma)                                        /* if DMA/DMC, req chan */
+        SET_CH_REQ (ch);
     }
 else {
     fhd_rdy = 0;                                        /* read, clear ready */
@@ -292,7 +302,8 @@ else {
         dma_ad[ch] = dma_ad[ch] | DMA_IN;               /* force input */
     }
 t = wa - GET_POS (fhd_time);                            /* delta to new loc */
-if (t < 0) t = t + FH_NUMWD;                            /* wrap around? */
+if (t < 0)                                              /* wrap around? */
+    t = t + FH_NUMWD;
 sim_activate (&fhd_unit, t * fhd_time);                 /* schedule op */
 return;
 }
@@ -312,7 +323,8 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* unattached? */
     }
 
 if (fhd_eor || fhd_rdy) {                               /* done or ready set? */
-    if (fhd_rdy) fhd_dte = 1;                           /* if ready set, data err */
+    if (fhd_rdy)                                        /* if ready set, data err */
+        fhd_dte = 1;
     if (fhd_cw1 & CW1_RW) {                             /* write? */
         if (!fhd_rdy) {                                 /* buffer full? */
             fhd_putc (uptr, fhd_buf >> 8);              /* store last word */
@@ -322,7 +334,8 @@ if (fhd_eor || fhd_rdy) {                               /* done or ready set? */
         }
     else {                                              /* read */
         fhd_getc (uptr, &c1);                           /* get csum */
-        if (fhd_csum) fhd_dte = 1;                      /* if csum != 0, err */
+        if (fhd_csum)                                   /* if csum != 0, err */
+            fhd_dte = 1;
         }
     fhd_busy = 0;                                       /* operation complete */
     SET_INT (INT_FHD);
@@ -330,17 +343,22 @@ if (fhd_eor || fhd_rdy) {                               /* done or ready set? */
     }
 
 if (fhd_cw1 & CW1_RW) {                                 /* write? */
-    if (fhd_putc (uptr, fhd_buf >> 8)) return SCPE_OK;
-    if (fhd_putc (uptr, fhd_buf)) return SCPE_OK;
+    if (fhd_putc (uptr, fhd_buf >> 8))
+        return SCPE_OK;
+    if (fhd_putc (uptr, fhd_buf))
+        return SCPE_OK;
     }
-else {
-    if (fhd_getc (uptr, &c1)) return SCPE_OK;           /* read */
-    if (fhd_getc (uptr, &c2)) return SCPE_OK;
+else {                                                  /* read */
+    if (fhd_getc (uptr, &c1))
+        return SCPE_OK;
+    if (fhd_getc (uptr, &c2))
+        return SCPE_OK;
     fhd_buf = (c1 << 8) | c2;
     }
 sim_activate (uptr, fhd_time);                          /* next word */
 fhd_rdy = 1;                                            /* set ready */
-if (fhd_dma) SET_CH_REQ (ch);                           /* if DMA/DMC, req chan */
+if (fhd_dma)                                            /* if DMA/DMC, req chan */
+    SET_CH_REQ (ch);
 return SCPE_OK;
 }
 
@@ -356,9 +374,11 @@ uint32 ba = (((sf * FH_NUMTK) + tk) * FH_NUMWD) + wa;   /* buffer offset */
 uint16 *fbuf = uptr->filebuf;                           /* buffer base */
 uint32 wd;
 
-if (fhd_bad_wa (wa)) return TRUE;                       /* addr bad? */
+if (fhd_bad_wa (wa))                                    /* addr bad? */
+    return TRUE;
 fhd_cw2 = fhd_cw2 + 1;                                  /* incr char addr */
-if (ca & 1) wd = fbuf[ba] & 0377;                       /* select char */
+if (ca & 1)                                             /* select char */
+    wd = fbuf[ba] & 0377;
 else wd = (fbuf[ba] >> 8) & 0377;
 fhd_csum = fhd_csword (fhd_csum, wd);                   /* put in csum */
 *ch = wd;                                               /* return */
@@ -377,12 +397,15 @@ uint32 ba = (((sf * FH_NUMTK) + tk) * FH_NUMWD) + wa;   /* buffer offset */
 uint16 *fbuf = uptr->filebuf;                           /* buffer base */
 
 ch = ch & 0377;                                         /* mask char */
-if (fhd_bad_wa (wa)) return TRUE;                       /* addr bad? */
+if (fhd_bad_wa (wa))                                    /* addr bad? */
+    return TRUE;
 fhd_cw2 = fhd_cw2 + 1;                                  /* incr char addr */
-if (ca & 1) fbuf[ba] = (fbuf[ba] & ~0377) | ch;         /* odd? low char */
+if (ca & 1)                                             /* odd? low char */
+    fbuf[ba] = (fbuf[ba] & ~0377) | ch;
 else fbuf[ba] = (fbuf[ba] & 0377) | (ch << 8);          /* even, hi char */
 fhd_csum = fhd_csword (fhd_csum, ch);                   /* put in csum */
-if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;          /* update hwmark */
+if (ba >= uptr->hwmark)                                 /* update hwmark */
+    uptr->hwmark = ba + 1;
 return FALSE;
 }
 
@@ -436,7 +459,8 @@ uint32 ds_bytes = FH_WDPSF * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     sf = (sz + ds_bytes - 1) / ds_bytes;
-    if (sf >= FH_NUMSF) sf = FH_NUMSF - 1;
+    if (sf >= FH_NUMSF)
+        sf = FH_NUMSF - 1;
     uptr->flags = (uptr->flags & ~UNIT_SF) |
         (sf << UNIT_V_SF);
     }
@@ -448,8 +472,10 @@ return attach_unit (uptr, cptr);
 
 t_stat fhd_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val < 0) return SCPE_IERR;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (val < 0)
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = UNIT_GETSF (val) * FH_WDPSF;
 return SCPE_OK;
 }

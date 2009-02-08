@@ -987,7 +987,7 @@ static uint16 GET_WORD(register uint32 a) {
 t_stat sim_instr_nommu(void) {
     extern int32 sim_interval;
     extern uint32 sim_brk_summ;
-    int32 reason = 0;
+    int32 reason = SCPE_OK;
     register uint32 AF;
     register uint32 BC;
     register uint32 DE;
@@ -1018,9 +1018,11 @@ t_stat sim_instr_nommu(void) {
     while (TRUE) {                                  /* loop until halted    */
         if (sim_interval <= 0) {                    /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_poll_kbd()) == SCPE_STOP) break;  /* poll on platforms without reliable signalling */
+            if ((reason = sim_poll_kbd()) == SCPE_STOP)
+                break;  /* poll on platforms without reliable signalling */
 #endif
-            if ((reason = sim_process_event())) break;
+            if ((reason = sim_process_event()))
+                break;
         }
 
         if (l_sim_brk_summ && sim_brk_test(PC, SWMASK('E'))) {/* breakpoint?      */
@@ -1115,8 +1117,10 @@ t_stat sim_instr_nommu(void) {
 
             case 0x10:      /* DJNZ dd */
                 CHECK_CPU_8080;
-                if ((BC -= 0x100) & 0xff00) PC += (int8) GET_BYTE(PC) + 1;
-                else PC++;
+                if ((BC -= 0x100) & 0xff00)
+                    PC += (int8) GET_BYTE(PC) + 1;
+                else
+                    PC++;
                 break;
 
             case 0x11:      /* LD DE,nnnn */
@@ -1196,8 +1200,10 @@ t_stat sim_instr_nommu(void) {
 
             case 0x20:      /* JR NZ,dd */
                 CHECK_CPU_8080;
-                if (TSTFLAG(Z)) PC++;
-                else PC += (int8) GET_BYTE(PC) + 1;
+                if (TSTFLAG(Z))
+                    PC++;
+                else
+                    PC += (int8) GET_BYTE(PC) + 1;
                 break;
 
             case 0x21:      /* LD HL,nnnn */
@@ -1238,26 +1244,31 @@ t_stat sim_instr_nommu(void) {
                 if (TSTFLAG(N)) {   /* last operation was a subtract */
                     int hd = cbits || acu > 0x99;
                     if (TSTFLAG(H) || (temp > 9)) { /* adjust low digit */
-                        if (temp > 5) SETFLAG(H, 0);
+                        if (temp > 5)
+                            SETFLAG(H, 0);
                         acu -= 6;
                         acu &= 0xff;
                     }
-                    if (hd) acu -= 0x160;   /* adjust high digit */
+                    if (hd)
+                        acu -= 0x160;   /* adjust high digit */
                 }
                 else {          /* last operation was an add */
                     if (TSTFLAG(H) || (temp > 9)) { /* adjust low digit */
                         SETFLAG(H, (temp > 9));
                         acu += 6;
                     }
-                    if (cbits || ((acu & 0x1f0) > 0x90)) acu += 0x60;   /* adjust high digit */
+                    if (cbits || ((acu & 0x1f0) > 0x90))
+                        acu += 0x60;   /* adjust high digit */
                 }
                 AF = (AF & 0x12) | rrdrldTable[acu & 0xff] | ((acu >> 8) & 1) | cbits;
                 break;
 
             case 0x28:      /* JR Z,dd */
                 CHECK_CPU_8080;
-                if (TSTFLAG(Z)) PC += (int8) GET_BYTE(PC) + 1;
-                else PC++;
+                if (TSTFLAG(Z))
+                    PC += (int8) GET_BYTE(PC) + 1;
+                else
+                    PC++;
                 break;
 
             case 0x29:      /* ADD HL,HL */
@@ -1299,8 +1310,10 @@ t_stat sim_instr_nommu(void) {
 
             case 0x30:      /* JR NC,dd */
                 CHECK_CPU_8080;
-                if (TSTFLAG(C)) PC++;
-                else PC += (int8) GET_BYTE(PC) + 1;
+                if (TSTFLAG(C))
+                    PC++;
+                else
+                    PC += (int8) GET_BYTE(PC) + 1;
                 break;
 
             case 0x31:      /* LD SP,nnnn */
@@ -1340,8 +1353,10 @@ t_stat sim_instr_nommu(void) {
 
             case 0x38:      /* JR C,dd */
                 CHECK_CPU_8080;
-                if (TSTFLAG(C))  PC += (int8) GET_BYTE(PC) + 1;
-                else PC++;
+                if (TSTFLAG(C))
+                    PC += (int8) GET_BYTE(PC) + 1;
+                else
+                    PC++;
                 break;
 
             case 0x39:      /* ADD HL,SP */
@@ -2050,7 +2065,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xc0:      /* RET NZ */
-                if (!(TSTFLAG(Z))) POP(PC);
+                if (!(TSTFLAG(Z)))
+                    POP(PC);
                 break;
 
             case 0xc1:      /* POP BC */
@@ -2087,7 +2103,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xc8:      /* RET Z */
-                if (TSTFLAG(Z)) POP(PC);
+                if (TSTFLAG(Z))
+                    POP(PC);
                 break;
 
             case 0xc9:      /* RET */
@@ -2194,8 +2211,10 @@ t_stat sim_instr_nommu(void) {
                     case 0x40:  /* BIT */
                         if (acu & (1 << ((op >> 3) & 7)))
                             AF = (AF & ~0xfe) | 0x10 | (((op & 0x38) == 0x38) << 7);
-                        else AF = (AF & ~0xfe) | 0x54;
-                        if ((op & 7) != 6) AF |= (acu & 0x28);
+                        else
+                            AF = (AF & ~0xfe) | 0x54;
+                        if ((op & 7) != 6)
+                            AF |= (acu & 0x28);
                         temp = acu;
                         break;
 
@@ -2265,7 +2284,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xd0:      /* RET NC */
-                if (!(TSTFLAG(C))) POP(PC);
+                if (!(TSTFLAG(C)))
+                    POP(PC);
                 break;
 
             case 0xd1:      /* POP DE */
@@ -2302,7 +2322,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xd8:      /* RET C */
-                if (TSTFLAG(C)) POP(PC);
+                if (TSTFLAG(C))
+                    POP(PC);
                 break;
 
             case 0xd9:      /* EXX */
@@ -2845,8 +2866,10 @@ t_stat sim_instr_nommu(void) {
                             case 0x40:  /* BIT */
                                 if (acu & (1 << ((op >> 3) & 7)))
                                     AF = (AF & ~0xfe) | 0x10 | (((op & 0x38) == 0x38) << 7);
-                                else AF = (AF & ~0xfe) | 0x54;
-                                if ((op & 7) != 6) AF |= (acu & 0x28);
+                                else
+                                    AF = (AF & ~0xfe) | 0x54;
+                                if ((op & 7) != 6)
+                                    AF |= (acu & 0x28);
                                 temp = acu;
                                 break;
 
@@ -2936,7 +2959,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xe0:      /* RET PO */
-                if (!(TSTFLAG(P))) POP(PC);
+                if (!(TSTFLAG(P)))
+                    POP(PC);
                 break;
 
             case 0xe1:      /* POP HL */
@@ -2971,7 +2995,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xe8:      /* RET PE */
-                if (TSTFLAG(P)) POP(PC);
+                if (TSTFLAG(P))
+                    POP(PC);
                 break;
 
             case 0xe9:      /* JP (HL) */
@@ -3296,7 +3321,8 @@ t_stat sim_instr_nommu(void) {
                             (((sum - ((cbits & 16) >> 4)) & 2) << 4) | (cbits & 16) |
                             ((sum - ((cbits >> 4) & 1)) & 8) |
                             ((--BC & ADDRMASK) != 0) << 2 | 2;
-                        if ((sum & 15) == 8 && (cbits & 16) != 0) AF &= ~8;
+                        if ((sum & 15) == 8 && (cbits & 16) != 0)
+                            AF &= ~8;
                         break;
 
 /*  SF, ZF, YF, XF flags are affected by decreasing register B, as in DEC B.
@@ -3349,7 +3375,8 @@ t_stat sim_instr_nommu(void) {
                             (((sum - ((cbits & 16) >> 4)) & 2) << 4) | (cbits & 16) |
                             ((sum - ((cbits >> 4) & 1)) & 8) |
                             ((--BC & ADDRMASK) != 0) << 2 | 2;
-                        if ((sum & 15) == 8 && (cbits & 16) != 0) AF &= ~8;
+                        if ((sum & 15) == 8 && (cbits & 16) != 0)
+                            AF &= ~8;
                         break;
 
 /*  SF, ZF, YF, XF flags are affected by decreasing register B, as in DEC B.
@@ -3380,7 +3407,8 @@ t_stat sim_instr_nommu(void) {
                     case 0xb0:      /* LDIR */
                         acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
-                        if (BC == 0) BC = 0x10000;
+                        if (BC == 0)
+                            BC = 0x10000;
                         do {
                             acu = RAM_PP(HL);
                             PUT_BYTE_PP(DE, acu);
@@ -3392,7 +3420,8 @@ t_stat sim_instr_nommu(void) {
                     case 0xb1:      /* CPIR */
                         acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
-                        if (BC == 0) BC = 0x10000;
+                        if (BC == 0)
+                            BC = 0x10000;
                         do {
                             temp = RAM_PP(HL);
                             op = --BC != 0;
@@ -3403,12 +3432,14 @@ t_stat sim_instr_nommu(void) {
                             (((sum - ((cbits & 16) >> 4)) & 2) << 4) |
                             (cbits & 16) | ((sum - ((cbits >> 4) & 1)) & 8) |
                             op << 2 | 2;
-                        if ((sum & 15) == 8 && (cbits & 16) != 0) AF &= ~8;
+                        if ((sum & 15) == 8 && (cbits & 16) != 0)
+                            AF &= ~8;
                         break;
 
                     case 0xb2:      /* INIR */
                         temp = HIGH_REGISTER(BC);
-                        if (temp == 0) temp = 0x100;
+                        if (temp == 0)
+                            temp = 0x100;
                         do {
                             acu = in(LOW_REGISTER(BC));
                             PUT_BYTE(HL, acu);
@@ -3421,7 +3452,8 @@ t_stat sim_instr_nommu(void) {
 
                     case 0xb3:      /* OTIR */
                         temp = HIGH_REGISTER(BC);
-                        if (temp == 0) temp = 0x100;
+                        if (temp == 0)
+                            temp = 0x100;
                         do {
                             acu = GET_BYTE(HL);
                             out(LOW_REGISTER(BC), acu);
@@ -3434,7 +3466,8 @@ t_stat sim_instr_nommu(void) {
 
                     case 0xb8:      /* LDDR */
                         BC &= ADDRMASK;
-                        if (BC == 0) BC = 0x10000;
+                        if (BC == 0)
+                            BC = 0x10000;
                         do {
                             acu = RAM_MM(HL);
                             PUT_BYTE_MM(DE, acu);
@@ -3446,7 +3479,8 @@ t_stat sim_instr_nommu(void) {
                     case 0xb9:      /* CPDR */
                         acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
-                        if (BC == 0) BC = 0x10000;
+                        if (BC == 0)
+                            BC = 0x10000;
                         do {
                             temp = RAM_MM(HL);
                             op = --BC != 0;
@@ -3457,12 +3491,14 @@ t_stat sim_instr_nommu(void) {
                             (((sum - ((cbits & 16) >> 4)) & 2) << 4) |
                             (cbits & 16) | ((sum - ((cbits >> 4) & 1)) & 8) |
                             op << 2 | 2;
-                        if ((sum & 15) == 8 && (cbits & 16) != 0) AF &= ~8;
+                        if ((sum & 15) == 8 && (cbits & 16) != 0)
+                            AF &= ~8;
                         break;
 
                     case 0xba:      /* INDR */
                         temp = HIGH_REGISTER(BC);
-                        if (temp == 0) temp = 0x100;
+                        if (temp == 0)
+                            temp = 0x100;
                         do {
                             acu = in(LOW_REGISTER(BC));
                             PUT_BYTE(HL, acu);
@@ -3475,7 +3511,8 @@ t_stat sim_instr_nommu(void) {
 
                     case 0xbb:      /* OTDR */
                         temp = HIGH_REGISTER(BC);
-                        if (temp == 0) temp = 0x100;
+                        if (temp == 0)
+                            temp = 0x100;
                         do {
                             acu = GET_BYTE(HL);
                             out(LOW_REGISTER(BC), acu);
@@ -3501,7 +3538,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xf0:      /* RET P */
-                if (!(TSTFLAG(S))) POP(PC);
+                if (!(TSTFLAG(S)))
+                    POP(PC);
                 break;
 
             case 0xf1:      /* POP AF */
@@ -3534,7 +3572,8 @@ t_stat sim_instr_nommu(void) {
                 break;
 
             case 0xf8:      /* RET M */
-                if (TSTFLAG(S)) POP(PC);
+                if (TSTFLAG(S))
+                    POP(PC);
                 break;
 
             case 0xf9:      /* LD SP,HL */
@@ -4068,8 +4107,10 @@ t_stat sim_instr_nommu(void) {
                             case 0x40:  /* BIT */
                                 if (acu & (1 << ((op >> 3) & 7)))
                                     AF = (AF & ~0xfe) | 0x10 | (((op & 0x38) == 0x38) << 7);
-                                else AF = (AF & ~0xfe) | 0x54;
-                                if ((op & 7) != 6) AF |= (acu & 0x28);
+                                else
+                                    AF = (AF & ~0xfe) | 0x54;
+                                if ((op & 7) != 6)
+                                    AF |= (acu & 0x28);
                                 temp = acu;
                                 break;
 

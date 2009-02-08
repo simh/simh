@@ -1,6 +1,6 @@
 /* pdp10_cpu.c: PDP-10 CPU simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -627,14 +627,16 @@ t_stat r;
 
 /* Restore register state */
 
-if ((r = build_dib_tab ()) != SCPE_OK) return r;        /* build, chk dib_tab */
+if ((r = build_dib_tab ()) != SCPE_OK)                  /* build, chk dib_tab */
+    return r;
 pager_PC = PC = saved_PC & AMASK;                       /* load local PC */
 set_dyn_ptrs ();                                        /* set up local ptrs */
 pager_tc = FALSE;                                       /* not in trap cycle */
 pager_pi = FALSE;                                       /* not in pi sequence */
 rlog = 0;                                               /* not in extend */
 pi_eval ();                                             /* eval pi system */
-if (!Q_ITS) its_1pr = 0;                                /* ~ITS, clr 1-proc */
+if (!Q_ITS)                                             /* ~ITS, clr 1-proc */
+    its_1pr = 0;
 t20_idlelock = 0;                                       /* clr T20 idle lock */
 
 /* Abort handling
@@ -659,9 +661,11 @@ if ((abortval > 0) || pager_pi) {                       /* stop or pi err? */
 
 else if (abortval == PAGE_FAIL) {                       /* page fail */
     d10 mb;
-    if (rlog) xtcln (rlog);                             /* clean up extend */
+    if (rlog)                                           /* clean up extend */
+        xtcln (rlog);
     rlog = 0;                                           /* clear log */
-    if (pager_tc) flags = pager_flags;                  /* trap? get flags */
+    if (pager_tc)                                       /* trap? get flags */
+        flags = pager_flags;
     if (T20PAG) {                                       /* TOPS-20 paging? */
         WriteP (upta + UPT_T20_PFL, pager_word);        /* write page fail wd */
         WriteP (upta + UPT_T20_OFL, XWD (flags, 0));
@@ -672,7 +676,8 @@ else if (abortval == PAGE_FAIL) {                       /* page fail */
         a10 ea;                                         /* TOPS-10 or ITS */
         if (Q_ITS) {                                    /* ITS? */
             ea = epta + EPT_ITS_PAG + (pi_m2lvl[pi_act] * 3);
-            if (its_1pr) flags = flags | F_1PR;         /* store 1-proc */
+            if (its_1pr)                                /* store 1-proc */
+                flags = flags | F_1PR;
             its_1pr = 0;                                /* clear 1-proc */
             }
         else ea = upta + UPT_T10_PAG;
@@ -699,7 +704,8 @@ pager_tc = FALSE;                                       /* not in trap cycle */
 pflgs = 0;                                              /* not in PXCT */
 xct_cnt = 0;                                            /* count XCT's */
 if (sim_interval <= 0) {                                /* check clock queue */
-    if (i = sim_process_event ()) ABORT (i);            /* error?  stop sim */
+    if (i = sim_process_event ())                       /* error?  stop sim */
+        ABORT (i);
     pi_eval ();                                         /* eval pi system */
     }
 
@@ -714,9 +720,11 @@ if (qintr) {
     pager_pi = TRUE;                                    /* flag in pi seq */
     if (vec = pi_ub_vec (qintr, &uba)) {                /* Unibus interrupt? */
         mb = ReadP (epta + EPT_UBIT + uba);             /* get dispatch table */
-        if (mb == 0) ABORT (STOP_ZERINT);               /* invalid? stop */
+        if (mb == 0)                                    /* invalid? stop */
+            ABORT (STOP_ZERINT);
         inst = ReadE ((((a10) mb) + (vec / 4)) & AMASK);
-        if (inst == 0) ABORT (STOP_ZERINT);
+        if (inst == 0)
+            ABORT (STOP_ZERINT);
         }
     else inst = ReadP (epta + EPT_PIIT + (2 * qintr));
     op = GET_OP (inst);                                 /* get opcode */
@@ -744,7 +752,8 @@ if (qintr) {
     pi_act = pi_act | pi_l2bit[qintr];                  /* set level active */
     pi_eval ();                                         /* eval pi system */
     pager_pi = FALSE;                                   /* end of sequence */
-    if (sim_interval) sim_interval--;                   /* charge for instr */
+    if (sim_interval)                                   /* charge for instr */
+        sim_interval--;
     continue;
     }                                                   /* end if interrupt */
             
@@ -792,15 +801,18 @@ ac = GET_AC (inst);                                     /* get AC */
 for (indrct = inst, i = 0; i < ind_max; i++) {          /* calc eff addr */
     ea = GET_ADDR (indrct);
     xr = GET_XR (indrct);
-    if (xr) ea = (ea + ((a10) XR (xr, MM_EA))) & AMASK;
-    if (TST_IND (indrct)) indrct = Read (ea, MM_EA);
+    if (xr)
+        ea = (ea + ((a10) XR (xr, MM_EA))) & AMASK;
+    if (TST_IND (indrct))
+        indrct = Read (ea, MM_EA);
     else break;
     }
 if (i >= ind_max)
     ABORT (STOP_IND);                                   /* too many ind? stop */
 if (hst_lnt) {                                          /* history enabled? */
     hst_p = (hst_p + 1);                                /* next entry */
-    if (hst_p >= hst_lnt) hst_p = 0;
+    if (hst_p >= hst_lnt)
+        hst_p = 0;
     hst[hst_p].pc = pager_PC | HIST_PC;
     hst[hst_p].ea = ea;
     hst[hst_p].ir = inst;
@@ -810,7 +822,9 @@ switch (op) {                                           /* case on opcode */
 
 /* UUO's (0000 - 0077) - checked against KS10 ucode */
 
-case 0000:  if (stop_op0) { ABORT (STOP_ILLEG); }
+case 0000:  if (stop_op0) {
+                ABORT (STOP_ILLEG);
+                }
             goto MUUO;
 case 0001:                                              /* local UUO's */
 case 0002:
@@ -854,12 +868,14 @@ case 0037:  Write (040, UUOWORD, MM_CUR);               /* store op, ac, ea */
 /* case 0101:   MUUO                                    /* unassigned */
 case 0102:  if (Q_ITS && !TSTF (F_USR)) {               /* GFAD (KL), XCTRI (ITS) */
                 inst = Read (ea, MM_OPND);
-                pflgs = pflgs | ac; goto XCT;
+                pflgs = pflgs | ac;
+                goto XCT;
                 }
             goto MUUO;
 case 0103:  if (Q_ITS && !TSTF (F_USR)) {               /* GFSB (KL), XCTR (ITS) */
                 inst = Read (ea, MM_OPND);
-                pflgs = pflgs | ac; goto XCT;
+                pflgs = pflgs | ac;
+                goto XCT;
                 }
             goto MUUO;
 /* case 0104:   MUUO                                    /* JSYS (T20) */
@@ -895,7 +911,8 @@ case 0127:  RD; AC(ac) = fltr (mb); break;              /* FLTR */
 /* case 0130:   MUUO                                    /* UFA */
 /* case 0131:   MUUO                                    /* DFN */
 case 0132:  AC(ac) = fsc (AC(ac), ea); break;           /* FSC */
-case 0133:  if (!ac) ibp (ea, pflgs);                   /* IBP */
+case 0133:  if (!ac)                                    /* IBP */
+                ibp (ea, pflgs);
             else adjbp (ac, ea, pflgs); break;
 case 0134:  CIBP; LDB; CLRF (F_FPD); break;             /* ILBP */
 case 0135:  LDB; break;                                 /* LDB */
@@ -952,7 +969,8 @@ case 0206:  mb = SWP (AC(ac)); WR; break;               /* MOVSM */
 case 0207:  RM; mb = SWP (mb); WR; LAC; break;          /* MOVSS */
 case 0210:  RD; AC(ac) = MOVN (mb); break;              /* MOVN */
 case 0211:  AC(ac) = NEG (IM);                          /* MOVNI */
-            if (AC(ac) == 0) SETF (F_C0 | F_C1); break;
+            if (AC(ac) == 0) SETF (F_C0 | F_C1);
+            break;
 case 0212:  RM; mb = MOVN (AC(ac)); WR; break;          /* MOVNM */
 case 0213:  RM; mb = MOVN (mb); WR; LAC; break;         /* MOVNS */
 case 0214:  RD; AC(ac) = MOVM (mb); break;              /* MOVM */
@@ -979,7 +997,8 @@ case 0240:  AC(ac) = ash (AC(ac), ea); break;           /* ASH */
 case 0241:  AC(ac) = rot (AC(ac), ea); break;           /* ROT */
 case 0242:  AC(ac) = lsh (AC(ac), ea); break;           /* LSH */
 case 0243:  AC(P1) = jffo (AC(ac));                     /* JFFO */
-            if (AC(ac)) JUMP (ea); break;
+            if (AC(ac)) JUMP (ea);
+            break;
 case 0244:  ashc (ac, ea); break;                       /* ASHC */
 case 0245:  rotc (ac, ea); break;                       /* ROTC */
 case 0246:  lshc (ac, ea); break;                       /* LSHC */
@@ -1001,7 +1020,8 @@ case 0256:  if (xct_cnt++ >= xct_max)                   /* XCT */
                 pflgs = pflgs | ac;
             goto XCT;
 case 0257:  if (Q_ITS) goto MUUO;                       /* MAP */
-            AC(ac) = map (ea, MM_OPND); break;
+            AC(ac) = map (ea, MM_OPND);
+            break;
 case 0260:  WRP (FLPC); AOBAC;                          /* PUSHJ */
             SUBJ (ea); PUSHF; break;
 case 0261:  RD; WRP (mb); AOBAC; PUSHF; break;          /* PUSH */
@@ -1376,7 +1396,8 @@ MUUO:
         (pager_tc? UPT_NPCT: 0);                        /* calculate vector */
     mb = ReadP (ea);                                    /* new flags, PC */
     JUMP (mb);                                          /* set new PC */
-    if (TSTF (F_USR)) mb = mb | XWD (F_UIO, 0);         /* set PCU */
+    if (TSTF (F_USR))                                   /* set PCU */
+        mb = mb | XWD (F_UIO, 0);
     set_newflags (mb, FALSE);                           /* set new flags */
     break;
 
@@ -1452,7 +1473,8 @@ case 0254:                                              /* JRST */
         break;  
 
     case 015:                                           /* JRST 15 = XJRST */
-        if (!T20PAG) goto MUUO;                         /* only in TOPS20 paging */
+        if (!T20PAG)                                    /* only in TOPS20 paging */
+            goto MUUO;
         JUMP (Read (ea, MM_OPND));                      /* jump to M[ea] */
         break;
         }                                               /* end case subop */
@@ -1498,15 +1520,18 @@ d10 r;
 
 r = (a + b) & DMASK;
 if (TSTS (a & b)) {                                     /* cases 7,8 */
-    if (TSTS (r)) SETF (F_C0 | F_C1);                   /* case 8 */
+    if (TSTS (r))                                       /* case 8 */
+        SETF (F_C0 | F_C1);
     else SETF (F_C0 | F_AOV | F_T1);                    /* case 7 */
     return r;
     }
 if (!TSTS (a | b)) {                                    /* cases 1,2 */
-    if (TSTS (r)) SETF (F_C1 | F_AOV | F_T1);           /* case 2 */
+    if (TSTS (r))                                       /* case 2 */
+        SETF (F_C1 | F_AOV | F_T1);
     return r;                                           /* case 1 */
     }
-if (!TSTS (r)) SETF (F_C0 | F_C1);                      /* cases 3,5 */
+if (!TSTS (r))                                          /* cases 3,5 */
+    SETF (F_C0 | F_C1); 
 return r;
 }
 
@@ -1518,15 +1543,18 @@ d10 r;
 
 r = (a - b) & DMASK;
 if (TSTS (a & ~b)) {                                    /* cases 7,8 */
-    if (TSTS (r)) SETF (F_C0 | F_C1);                   /* case 8 */
+    if (TSTS (r))                                       /* case 8 */
+        SETF (F_C0 | F_C1);
     else SETF (F_C0 | F_AOV | F_T1);                    /* case 7 */
     return r;
     }
 if (!TSTS (a | ~b)) {                                   /* cases 1,2 */
-    if (TSTS (r)) SETF (F_C1 | F_AOV | F_T1);           /* case 2 */
+    if (TSTS (r))                                       /* case 2 */
+        SETF (F_C1 | F_AOV | F_T1);
     return r;                                           /* case 1 */
     }
-if (!TSTS (r)) SETF (F_C0 | F_C1);                      /* cases 3,5 */
+if (!TSTS (r))                                          /* cases 3,5 */
+    SETF (F_C0 | F_C1);
 return r;
 }
 
@@ -1537,8 +1565,10 @@ d10 lsh (d10 val, a10 ea)
 {
 int32 sc = LIT8 (ea);
 
-if (sc > 35) return 0;
-if (ea & RSIGN) return (val >> sc);
+if (sc > 35)
+    return 0;
+if (ea & RSIGN)
+    return (val >> sc);
 return ((val << sc) & DMASK);
 }
 
@@ -1548,8 +1578,10 @@ d10 rot (d10 val, a10 ea)
 {
 int32 sc = LIT8 (ea) % 36;
 
-if (sc == 0) return val;
-if (ea & RSIGN) sc = 36 - sc;
+if (sc == 0)
+    return val;
+if (ea & RSIGN)
+    sc = 36 - sc;
 return (((val << sc) | (val >> (36 - sc))) & DMASK);
 }
 
@@ -1565,13 +1597,16 @@ int32 p1 = ADDAC (ac, 1);
 AC(p1) = CLRS (AC(p1)) + CLRS (rs[1]);                  /* add lo */
 r = (AC(ac) + rs[0] + (TSTS (AC(p1))? 1: 0)) & DMASK;   /* add hi+cry */
 if (TSTS (AC(ac) & rs[0])) {                            /* cases 7,8 */
-    if (TSTS (r)) SETF (F_C0 | F_C1);                   /* case 8 */
+    if (TSTS (r))                                       /* case 8 */
+        SETF (F_C0 | F_C1);
     else SETF (F_C0 | F_AOV | F_T1);                    /* case 7 */
     }
 else if (!TSTS (AC(ac) | rs[0])) {                      /* cases 1,2 */
-    if (TSTS (r)) SETF (F_C1 | F_AOV | F_T1);           /* case 2 */
+    if (TSTS (r))                                       /* case 2 */
+        SETF (F_C1 | F_AOV | F_T1);
     }
-else if (!TSTS (r)) SETF (F_C0 | F_C1);                 /* cases 3,5 */
+else if (!TSTS (r))                                     /* cases 3,5 */
+    SETF (F_C0 | F_C1);
 AC(ac) = r;
 AC(p1) = TSTS (r)? SETS (AC(p1)): CLRS (AC(p1));
 return;
@@ -1587,13 +1622,16 @@ int32 p1 = ADDAC (ac, 1);
 AC(p1) = CLRS (AC(p1)) - CLRS (rs[1]);                  /* sub lo */
 r = (AC(ac) - rs[0] - (TSTS (AC(p1))? 1: 0)) & DMASK;   /* sub hi,borrow */
 if (TSTS (AC(ac) & ~rs[0])) {                           /* cases 7,8 */
-    if (TSTS (r)) SETF (F_C0 | F_C1);                   /* case 8 */
+    if (TSTS (r))                                       /* case 8 */
+        SETF (F_C0 | F_C1);
     else SETF (F_C0 | F_AOV | F_T1);                    /* case 7 */
     }
 else if (!TSTS (AC(ac) | ~rs[0])) {                     /* cases 1,2 */
-    if (TSTS (r)) SETF (F_C1 | F_AOV | F_T1);           /* case 2 */
+    if (TSTS (r))                                       /* case 2 */
+        SETF (F_C1 | F_AOV | F_T1);
     }
-else if (!TSTS (r)) SETF (F_C0 | F_C1);                 /* cases 3,5 */
+else if (!TSTS (r))                                     /* cases 3,5 */
+    SETF (F_C0 | F_C1);
 AC(ac) = r;
 AC(p1) = (TSTS (r)? SETS (AC(p1)): CLRS (AC(p1))) & DMASK;
 return;
@@ -1607,7 +1645,8 @@ void lshc (int32 ac, a10 ea)
 int32 p1 = ADDAC (ac, 1);
 int32 sc = LIT8 (ea);
 
-if (sc > 71) AC(ac) = AC(p1) = 0;
+if (sc > 71)
+    AC(ac) = AC(p1) = 0;
 else if (ea & RSIGN) {
     if (sc >= 36) {
         AC(p1) = AC(ac) >> (sc - 36);
@@ -1639,8 +1678,10 @@ int32 p1 = ADDAC (ac, 1);
 int32 sc = LIT8 (ea) % 72;
 d10 t = AC(ac);
 
-if (sc == 0) return;
-if (ea & RSIGN) sc = 72 - sc;
+if (sc == 0)
+    return;
+if (ea & RSIGN)
+    sc = 72 - sc;
 if (sc >= 36) {
     AC(ac) = ((AC(p1) << (sc - 36)) | (t >> (72 - sc))) & DMASK;
     AC(p1) = ((t << (sc - 36)) | (AC(p1) >> (72 - sc))) & DMASK;
@@ -1661,12 +1702,15 @@ d10 sign = TSTS (val);
 d10 fill = sign? ONES: 0;
 d10 so;
 
-if (sc == 0) return val;
-if (sc > 35) sc = 35;                                   /* cap sc at 35 */
+if (sc == 0)
+    return val;
+if (sc > 35)                                            /* cap sc at 35 */
+    sc = 35;
 if (ea & RSIGN)
     return (((val >> sc) | (fill << (36 - sc))) & DMASK);
 so = val >> (35 - sc);                                  /* bits lost left + sign */
-if (so != (sign? bytemask[sc + 1]: 0)) SETF (F_AOV | F_T1);
+if (so != (sign? bytemask[sc + 1]: 0))
+    SETF (F_AOV | F_T1);
 return (sign | ((val << sc) & MMASK));
 }
 
@@ -1678,8 +1722,10 @@ d10 sign = TSTS (AC(ac));
 d10 fill = sign? ONES: 0;
 d10 so;
 
-if (sc == 0) return;
-if (sc > 70) sc = 70;                                   /* cap sc at 70 */
+if (sc == 0)
+    return;
+if (sc > 70)                                            /* cap sc at 70 */
+    sc = 70;
 AC(ac) = CLRS (AC(ac));                                 /* clear signs */
 AC(p1) = CLRS (AC(p1));
 if (ea & RSIGN) {
@@ -1697,13 +1743,15 @@ else {
     if (sc >= 35) {                                     /* left 36..70 */
         so = AC(p1) >> (70 - sc);                       /* bits lost left */
         if ((AC(ac) != (sign? MMASK: 0)) ||
-            (so != (sign? bytemask[sc - 35]: 0))) SETF (F_AOV | F_T1);
+            (so != (sign? bytemask[sc - 35]: 0)))
+            SETF (F_AOV | F_T1);
         AC(ac) = sign | ((AC(p1) << (sc - 35)) & MMASK);
         AC(p1) = sign;
         }
     else {
         so = AC(ac) >> (35 - sc);                       /* bits lost left */
-        if (so != (sign? bytemask[sc]: 0)) SETF (F_AOV | F_T1);
+        if (so != (sign? bytemask[sc]: 0))
+            SETF (F_AOV | F_T1);
         AC(ac) = sign |
             (((AC(ac) << sc) | (AC(p1) >> (35 - sc))) & MMASK);
         AC(p1) = sign | ((AC(p1) << sc) & MMASK);
@@ -1727,11 +1775,14 @@ d10 indrct;
 for (indrct = inst, i = 0; i < ind_max; i++) {
     ea = GET_ADDR (indrct);
     xr = GET_XR (indrct);
-    if (xr) ea = (ea + ((a10) XR (xr, prv))) & AMASK;
-    if (TST_IND (indrct)) indrct = Read (ea, prv);
+    if (xr)
+        ea = (ea + ((a10) XR (xr, prv))) & AMASK;
+    if (TST_IND (indrct))
+        indrct = Read (ea, prv);
     else break;
     }
-if (i >= ind_max) ABORT (STOP_IND);
+if (i >= ind_max)
+    ABORT (STOP_IND);
 return ea;
 }
 
@@ -1751,12 +1802,14 @@ a10 ea;
 xr = GET_XR (inst);
 ea = GET_ADDR (inst);
 if (TST_IND (inst)) {                                   /* indirect? */
-    if (xr) ea = (ea + ((a10) XR (xr, MM_EA))) & AMASK;
+    if (xr)
+        ea = (ea + ((a10) XR (xr, MM_EA))) & AMASK;
     ea = (a10) Read (ea, MM_EA);
     }
 else if (xr) {                                          /* direct + idx? */
     ea = ea + ((a10) XR (xr, MM_EA));
-    if (TSTS (XR (xr, MM_EA))) ea = ea & AMASK;
+    if (TSTS (XR (xr, MM_EA)))
+        ea = ea & AMASK;
     }
 return ea;
 }
@@ -1773,11 +1826,14 @@ d10 mb;
 for (i = 0; i < ind_max; i++) {
     mb = inst;
     xr = GET_XR (inst);
-    if (xr) mb = (mb & AMASK) + XR (xr, MM_EA);
-    if (TST_IND (inst)) inst = Read (((a10) mb) & AMASK, MM_EA);
+    if (xr)
+        mb = (mb & AMASK) + XR (xr, MM_EA);
+    if (TST_IND (inst))
+        inst = Read (((a10) mb) & AMASK, MM_EA);
     else break;
     }
-if (i >= ind_max) ABORT (STOP_IND);
+if (i >= ind_max)
+    ABORT (STOP_IND);
 return (mb & DMASK);
 }
 
@@ -1962,8 +2018,10 @@ int32 test_int (void)
 int32 t;
 
 if (sim_interval <= 0) {                                /* check queue */
-    if (t = sim_process_event ()) return t;             /* IO event? */
-    if (pi_eval ()) return (INTERRUPT);                 /* interrupt? */
+    if (t = sim_process_event ())                       /* IO event? */
+        return t;
+    if (pi_eval ())                                     /* interrupt? */
+        return (INTERRUPT);
     }
 else sim_interval--;                                    /* count clock */
 return 0;
@@ -1986,7 +2044,8 @@ d10 left, right;
 
 left = ADDL (val, imm);
 right = ADDR (val, imm);
-if (TSTS ((val ^ left) & (~left ^ RLZ (imm)))) SETF (F_T2);
+if (TSTS ((val ^ left) & (~left ^ RLZ (imm))))
+    SETF (F_T2);
 return (left | right);
 }
 
@@ -1998,10 +2057,12 @@ int32 jffo (d10 val)
 {
 int32 i, by;
 
-if ((val & DMASK) == 0) return 0;
+if ((val & DMASK) == 0)
+    return 0;
 for (i = 0; i <= 28; i = i + 7) {                       /* scan five bytes */
     by = (int32) ((val >> (29 - i)) & 0177);
-    if (by) return (pi_m2lvl[by] + i - 1);
+    if (by)
+        return (pi_m2lvl[by] + i - 1);
     }
 return 35;                                              /* must be bit 35 */
 }
@@ -2019,8 +2080,10 @@ int32 p1 = ADDAC (ac,1);
 int32 i;
 d10 val;
 
-if (sc == 0) return;                                    /* any shift? */
-if (ea & RSIGN) sc = 72 - sc;                           /* if right, make left */
+if (sc == 0)                                            /* any shift? */
+    return;
+if (ea & RSIGN)                                         /* if right, make left */
+    sc = 72 - sc;
 for (i = 0; i < sc; i++) {                              /* one bit at a time */
     val = TSTS (AC(ac));                                /* shift out */
     AC(ac) = ((AC(ac) << 1) | (AC(p1) & 1)) & DMASK;
@@ -2055,10 +2118,14 @@ t_bool wrapr (a10 ea, int32 prv)
 int32 bits = APR_GETF (ea);
 
 apr_lvl = ea & APR_M_LVL;
-if (ea & APR_SENB) apr_enb = apr_enb | bits;            /* set enables? */
-if (ea & APR_CENB) apr_enb = apr_enb & ~bits;           /* clear enables? */
-if (ea & APR_CFLG) apr_flg = apr_flg & ~bits;           /* clear flags? */
-if (ea & APR_SFLG) apr_flg = apr_flg | bits;            /* set flags? */
+if (ea & APR_SENB)                                      /* set enables? */
+    apr_enb = apr_enb | bits;
+if (ea & APR_CENB)                                      /* clear enables? */
+    apr_enb = apr_enb & ~bits;
+if (ea & APR_CFLG)                                      /* clear flags? */
+    apr_flg = apr_flg & ~bits;
+if (ea & APR_SFLG)                                      /* set flags? */
+    apr_flg = apr_flg | bits;
 if (apr_flg & APRF_ITC) {                               /* interrupt console? */
     fe_intr ();                                         /* explicit callout */
     apr_flg = apr_flg & ~APRF_ITC;                      /* interrupt clears */
@@ -2094,7 +2161,8 @@ int32 fl = (int32) LRZ (newf);
 
 if (jrst && TSTF (F_USR)) {                             /* if in user now */
     fl = fl | F_USR;                                    /* can't clear user */
-    if (!TSTF (F_UIO)) fl = fl & ~F_UIO;                /* if !UIO, can't set */
+    if (!TSTF (F_UIO))                                  /* if !UIO, can't set */
+        fl = fl & ~F_UIO;
     }
 if (Q_ITS && (fl & F_1PR)) {                            /* ITS 1-proceed? */
     its_1pr = 1;                                        /* set flag */
@@ -2133,13 +2201,20 @@ t_bool wrpi (a10 ea, int32 prv)
 {
 int32 lvl = ea & PI_M_LVL;
 
-if (ea & PI_INIT) pi_on = pi_enb = pi_act = pi_prq = 0;
-if (ea & PI_CPRQ) pi_prq = pi_prq & ~lvl;               /* clear prog reqs? */
-if (ea & PI_SPRQ) pi_prq = pi_prq | lvl;                /* set prog reqs? */
-if (ea & PI_SENB) pi_enb = pi_enb | lvl;                /* enable levels? */
-if (ea & PI_CENB) pi_enb = pi_enb & ~lvl;               /* disable levels? */
-if (ea & PI_SON) pi_on = 1;                             /* enable pi? */
-if (ea & PI_CON) pi_on = 0;                             /* disable pi? */
+if (ea & PI_INIT)
+    pi_on = pi_enb = pi_act = pi_prq = 0;
+if (ea & PI_CPRQ)                                       /* clear prog reqs? */
+    pi_prq = pi_prq & ~lvl;
+if (ea & PI_SPRQ)                                       /* set prog reqs? */
+    pi_prq = pi_prq | lvl;
+if (ea & PI_SENB)                                       /* enable levels? */
+    pi_enb = pi_enb | lvl;
+if (ea & PI_CENB)                                       /* disable levels? */
+    pi_enb = pi_enb & ~lvl;
+if (ea & PI_SON)                                        /* enable pi? */
+    pi_on = 1;
+if (ea & PI_CON)                                        /* disable pi? */
+    pi_on = 0;
 pi_eval ();                                             /* eval pi system */
 return FALSE;
 }
@@ -2181,7 +2256,8 @@ if (pi_on) {
     pi_ioq = pi_ub_eval ();
     reqlvl = pi_m2lvl[((pi_apr | pi_ioq | pi_prq) & pi_enb)];
     actlvl = pi_m2lvl[pi_act];
-    if ((actlvl == 0) || (reqlvl < actlvl)) qintr = reqlvl;
+    if ((actlvl == 0) || (reqlvl < actlvl))
+        qintr = reqlvl;
     }
 return qintr;
 }
@@ -2208,10 +2284,13 @@ hsb = (Q_ITS)? UC_HSBITS: UC_HSBDEC;                    /* set HSB */
 set_dyn_ptrs ();
 set_ac_display (ac_cur);
 pi_eval ();
-if (M == NULL) M = (d10 *) calloc (MAXMEMSIZE, sizeof (d10));
-if (M == NULL) return SCPE_MEM;
+if (M == NULL)
+    M = (d10 *) calloc (MAXMEMSIZE, sizeof (d10));
+if (M == NULL)
+    return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -2221,14 +2300,18 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr ea, UNIT *uptr, int32 sw)
 {
-if (vptr == NULL) return SCPE_ARG;
-if (ea < AC_NUM) *vptr = AC(ea) & DMASK;
+if (vptr == NULL)
+    return SCPE_ARG;
+if (ea < AC_NUM)
+    *vptr = AC(ea) & DMASK;
 else {
     if (sw & SWMASK ('V')) {
         ea = conmap (ea, PTF_CON, sw);
-        if (ea >= MAXMEMSIZE) return SCPE_REL;
+        if (ea >= MAXMEMSIZE)
+            return SCPE_REL;
         }
-    if (ea >= MEMSIZE) return SCPE_NXM;
+    if (ea >= MEMSIZE)
+        return SCPE_NXM;
     *vptr = M[ea] & DMASK;
     }
 return SCPE_OK;
@@ -2238,13 +2321,16 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr ea, UNIT *uptr, int32 sw)
 {
-if (ea < AC_NUM) AC(ea) = val & DMASK;
+if (ea < AC_NUM)
+    AC(ea) = val & DMASK;
 else {
     if (sw & SWMASK ('V')) {
         ea = conmap (ea, PTF_CON | PTF_WR, sw);
-        if (ea >= MAXMEMSIZE) return SCPE_REL;
+        if (ea >= MAXMEMSIZE)
+            return SCPE_REL;
         }
-    if (ea >= MEMSIZE) return SCPE_NXM;
+    if (ea >= MEMSIZE)
+        return SCPE_NXM;
     M[ea] = val & DMASK;
     }
 return SCPE_OK;
@@ -2259,8 +2345,10 @@ REG *rptr;
 int i;
 
 rptr = find_reg ("AC0", NULL, &cpu_dev);
-if (rptr == NULL) return;
-for (i = 0; i < AC_NUM; i++, rptr++) rptr->loc = (void *) (acbase + i);
+if (rptr == NULL)
+    return;
+for (i = 0; i < AC_NUM; i++, rptr++)
+    rptr->loc = (void *) (acbase + i);
 return;
 }
 
@@ -2272,12 +2360,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -2286,7 +2376,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -2304,14 +2395,17 @@ InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC      AC            EA      IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */

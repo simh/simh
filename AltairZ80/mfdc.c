@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: mfdc.c 1773 2008-01-11 05:46:19Z hharte $                        *
+ * $Id: mfdc.c 1995 2008-07-15 03:59:13Z hharte $                        *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -58,12 +58,14 @@
 #define DBG_PRINT(args)
 #endif
 
-#define SEEK_MSG    0x01
-#define ORDERS_MSG  0x02
-#define CMD_MSG     0x04
-#define RD_DATA_MSG 0x08
-#define WR_DATA_MSG 0x10
-#define STATUS_MSG  0x20
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define SEEK_MSG    (1 << 1)
+#define CMD_MSG     (1 << 2)
+#define RD_DATA_MSG (1 << 3)
+#define WR_DATA_MSG (1 << 4)
+#define STATUS_MSG  (1 << 5)
+#define ORDERS_MSG  (1 << 7)
 
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -140,8 +142,6 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData);
 
 static int32 mdskdev(const int32 Addr, const int32 rw, const int32 data);
 
-static int32 trace_level = 0;
-
 static UNIT mfdc_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MFDC_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MFDC_CAPACITY) },
@@ -150,7 +150,6 @@ static UNIT mfdc_unit[] = {
 };
 
 static REG mfdc_reg[] = {
-    { HRDATA (TRACELEVEL, trace_level, 16), },
     { NULL }
 };
 
@@ -165,13 +164,29 @@ static MTAB mfdc_mod[] = {
     { 0 }
 };
 
+#define TRACE_PRINT(level, args)    if(mfdc_dev.dctrl & level) {    \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB mfdc_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "SEEK",   SEEK_MSG },
+    { "CMD",    CMD_MSG },
+    { "RDDATA", RD_DATA_MSG },
+    { "WRDATA", WR_DATA_MSG },
+    { "STATUS", STATUS_MSG },
+    { "ORDERS", ORDERS_MSG },
+    { NULL,     0 }
+};
+
 DEVICE mfdc_dev = {
     "MDSK", mfdc_unit, mfdc_reg, mfdc_mod,
     MFDC_MAX_DRIVES, 10, 31, 1, MFDC_MAX_DRIVES, MFDC_MAX_DRIVES,
     NULL, NULL, &mfdc_reset,
     NULL, &mfdc_attach, &mfdc_detach,
-    &mfdc_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &mfdc_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    mfdc_dt, NULL, "Micropolis FD Control MDSK"
 };
 
 /* Micropolis FD Control Boot ROM
@@ -293,13 +308,16 @@ t_stat mfdc_detach(UNIT *uptr)
         }
     }
 
-    if (i >= MFDC_MAX_DRIVES) return SCPE_ARG;
+    if (i >= MFDC_MAX_DRIVES)
+        return SCPE_ARG;
 
     DBG_PRINT(("Detach MFDC%d\n", i));
-    diskClose(mfdc_info->drive[i].imd);
+    r = diskClose(&mfdc_info->drive[i].imd);
+    if (r != SCPE_OK)
+        return r;
 
     r = detach_unit(uptr);  /* detach unit */
-    if ( r != SCPE_OK)
+    if (r != SCPE_OK)
         return r;
 
     return SCPE_OK;
@@ -462,7 +480,7 @@ static uint8 MFDC_Read(const uint32 Addr)
                         if(pDrive->uptr->fileref == NULL) {
                             printf(".fileref is NULL!" NLP);
                         } else {
-                            fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                            sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
                             fread(sdata.raw, MFDC_SECTOR_LEN, 1, (pDrive->uptr)->fileref);
 #else
@@ -583,7 +601,7 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                             if(pDrive->uptr->fileref == NULL) {
                                 printf(".fileref is NULL!" NLP);
                             } else {
-                                fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                                sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
                                 fwrite(sdata.raw, MFDC_SECTOR_LEN, 1, (pDrive->uptr)->fileref);
 #else
@@ -632,7 +650,7 @@ static void MFDC_Command(uint8 cData)
             TRACE_PRINT(CMD_MSG, ("MFDC: " ADDRESS_FORMAT " No Op." NLP, PCX));
             break;
         case MFDC_CMD_SELECT:
-            mfdc_info->sel_drive = cModifier & 3;
+            mfdc_info->sel_drive = cModifier & 0x03;
             mfdc_info->head = (cModifier & 0x10) >> 4;
             mfdc_info->selected = TRUE;
 

@@ -1,6 +1,6 @@
 /* sds_drm.c: SDS 940 Project Genie drum simulator
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -153,15 +153,19 @@ int32 t, op = inst & 07700;
 switch (fnc) {
 
     case IO_CONN:                                       /* connect */
-        if (op == 00400) return drm_reset (&drm_dev);   /* EOM 404 = reset */
+        if (op == 00400)                                /* EOM 404 = reset */
+            return drm_reset (&drm_dev);
         if (op == 00500) {                              /* EOM 504 = read DA */
-            if (sim_is_active (&drm_unit)) return SCPE_OK; /* must be idle */
+            if (sim_is_active (&drm_unit))
+                return SCPE_OK; /* must be idle */
             t = GET_TWORD (drm_xtime);                  /* get position */
-            if (t < DRM_NUMGP) M[DRM_AD] = DRM_NUMWD - t; /* in gap? */
+            if (t < DRM_NUMGP)                          /* in gap? */
+                M[DRM_AD] = DRM_NUMWD - t;
             else M[DRM_AD] = (t - DRM_NUMGP) | DRM_ADAT;/* in data */
             }
         else if (op == 00200) {                         /* EOM 204 = start */
-            if (sim_is_active (&drm_unit)) return SCPE_OK;  /* must be idle */
+            if (sim_is_active (&drm_unit))              /* must be idle */
+                return SCPE_OK;
             drm_sta = DRM_SFET;                         /* state = fetch */
             sim_activate (&drm_unit, drm_ftime);        /* activate */
             }
@@ -204,7 +208,8 @@ if (drm_sta != DRM_SXFR) {                              /* fetch drum prog? */
         drm_par = 0;                                    /* init parity */
         rda = (drm_da & DRM_SWMASK) + (DRM_GETSC (drm_da) * DRM_NUMGP);
         t = rda - GET_TWORD (drm_xtime);                /* difference */
-        if (t <= 0) t = t + (DRM_NUMSC * DRM_PHYWD);    /* add trk lnt */
+        if (t <= 0)                                     /* add trk lnt */
+            t = t + (DRM_NUMSC * DRM_PHYWD);
         sim_activate (&drm_unit, t * drm_xtime);        /* activate */
         }
     else {
@@ -228,7 +233,8 @@ if (drm_sta != DRM_SXFR) {                              /* fetch drum prog? */
             return SCPE_OK;
 
         case DRM_EIE:                                   /* end, int if err */
-            if (!drm_err) return SCPE_OK;
+            if (!drm_err)
+                return SCPE_OK;
 
         case DRM_EIU:                                   /* end, int uncond */
             int_req = int_req | INT_DRM;
@@ -245,28 +251,32 @@ else {                                                  /* transfer word */
     if (drm_rw) {                                       /* write? */
         dwd = M[drm_ca];                                /* get mem word */
         fbuf[drm_da] = dwd;                             /* write to drum */
-        if (drm_da >= uptr->hwmark) uptr->hwmark = drm_da + 1;
+        if (drm_da >= uptr->hwmark)
+            uptr->hwmark = drm_da + 1;
         }
     else {                                              /* read */
         dwd = fbuf[drm_da];                             /* get drum word */
         M[drm_ca] = dwd;                                /* write to mem */
         }
     drm_da = drm_da + 1;                                /* inc drum addr */
-    if (drm_da >= DRM_SIZE) drm_da = 0;                 /* wrap */
+    if (drm_da >= DRM_SIZE)                             /* wrap */
+        drm_da = 0;
     drm_ca = (drm_ca + 1) & PAMASK;                     /* inc core addr */
     drm_wc = (drm_wc - 1) & DRM_WCMASK;                 /* dec word cnt */
     drm_par = drm_par ^ (dwd >> 12);                    /* parity */
     drm_par = ((drm_par << 1) | (drm_par >> 11)) & 07777;
     drm_par = drm_par ^ (dwd & 07777);
     if (drm_wc) {                                       /* more to do */
-        if (drm_da & DRM_M_WD) sim_activate (uptr, drm_xtime);
+        if (drm_da & DRM_M_WD)
+            sim_activate (uptr, drm_xtime);
         else sim_activate (uptr, drm_xtime * DRM_NUMGP);
         }
     else {                                              /* end xfr */
 #if defined (DRM_PAR)
         if ((drm_da & DRM_M_WD) && drm_rw) {            /* wr end mid sector? */
             M[drm_da] = drm_par << 12;                  /* clobber data */
-            if (drm_da >= uptr->hwmark) uptr->hwmark = drm_da + 1;
+            if (drm_da >= uptr->hwmark)
+                uptr->hwmark = drm_da + 1;
             }
 #endif
         drm_sta = DRM_SFET;                             /* back to fetch */

@@ -25,6 +25,7 @@
 
    uba                  DW780 Unibus adapter
 
+   19-Nov-08    RMS     Moved I/O support routines to I/O library
    28-May-08    RMS     Inlined physical memory routines
    25-Jan-08    RMS     Fixed declarations (from Mark Pizzolato)
 */
@@ -208,9 +209,8 @@ extern t_stat build_dib_tab (void);
 
 /* Unibus IO page dispatches */
 
-static t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
-static t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
-static DIB *iodibp[IOPAGESIZE >> 1];
+t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
+t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 
 /* Unibus interrupt request to interrupt action map */
 
@@ -307,11 +307,12 @@ if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? 
     return SCPE_OK;
     }
 ofs = NEXUS_GETOFS (pa);                                /* get offset */
-if (uba_aiip && (ofs != UBACNF_OF)                      /* init in prog? */
-    && (ofs != UBADR_OF)) return SCPE_NXM;              /* only cnf, dr */
+if (uba_aiip && (ofs != UBACNF_OF)&& (ofs != UBADR_OF)) /* init in prog? */
+    return SCPE_NXM;                                    /* only cnf, dr */
 if (ofs >= UBAMAP_OF) {                                 /* map? */
     idx = ofs - UBAMAP_OF;
-    if (idx >= UBA_NMAPR) return SCPE_NXM;              /* valid? */
+    if (idx >= UBA_NMAPR)                               /* valid? */
+        return SCPE_NXM;
     *val = uba_map[idx] & UBAMAP_RD;
     if (DEBUG_PRI (uba_dev, UBA_DEB_MRD))
         fprintf (sim_deb, ">>UBA: map %d read, value = %X\n", idx, *val);
@@ -396,10 +397,12 @@ if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? 
     }
 ofs = NEXUS_GETOFS (pa);                                /* get offset */
 if (uba_aiip && (ofs != UBACNF_OF) && (ofs != UBADR_OF) &&
-    (ofs != UBACR_OF) && (ofs != UBASR_OF)) return SCPE_NXM;
+    (ofs != UBACR_OF) && (ofs != UBASR_OF))
+    return SCPE_NXM;
 if (ofs >= UBAMAP_OF) {                                 /* map? */
     idx = ofs - UBAMAP_OF;
-    if (idx >= UBA_NMAPR) return SCPE_NXM;              /* valid? */
+    if (idx >= UBA_NMAPR)                               /* valid? */
+        return SCPE_NXM;
     uba_map[idx] = val & UBAMAP_WR;
     if (DEBUG_PRI (uba_dev, UBA_DEB_MWR))
         fprintf (sim_deb, ">>UBA: map %d write, value = %X\n", idx, val);
@@ -517,7 +520,8 @@ uint32 iod;
 if ((lnt == L_BYTE) ||                                  /* byte? */
     ((lnt == L_WORD) && ((pa & 1) == 0))) {             /* aligned word? */
     iod = ReadUb (pa);                                  /* DATI from Unibus */
-    if (pa & 2) iod = iod << 16;                        /* position */
+    if (pa & 2)                                         /* position */
+        iod = iod << 16;
     }
 else {
     printf (">>UBA: invalid read mask, pa = %x, lnt = %d\n", pa, lnt);
@@ -540,7 +544,8 @@ return iod;
 
 void WriteIO (uint32 pa, int32 val, int32 lnt)
 {
-if (lnt == L_BYTE) WriteUb (pa, val, WRITEB);           /* byte? DATOB */
+if (lnt == L_BYTE)                                      /* byte? DATOB */
+    WriteUb (pa, val, WRITEB);
 else if ((lnt == L_WORD) && ((pa & 1) == 0))            /* aligned word? */
      WriteUb (pa, val, WRITE);                          /* DATO */
 else {
@@ -562,10 +567,12 @@ for (i = 0; i < (IPL_HMAX - IPL_HMIN); i++)             /* clear all UBA req */
 if (((uba_dr & UBADR_DINTR) == 0) && !uba_uiip &&       /* intr enabled? */
     (uba_cr & UBACR_IFS) && (uba_cr & UBACR_BRIE)) {
     for (i = 0; i < (IPL_HMAX - IPL_HMIN); i++) {
-        if (int_req[i]) nexus_req[i] |= (1 << TR_UBA);
+        if (int_req[i])
+            nexus_req[i] |= (1 << TR_UBA);
         }
     }
-if (uba_int) SET_NEXUS_INT (UBA);                       /* adapter int? */
+if (uba_int)                                            /* adapter int? */
+    SET_NEXUS_INT (UBA);
 return;
 }
 
@@ -585,7 +592,8 @@ if (((uba_dr & UBADR_DINTR) == 0) && !uba_uiip &&       /* intr enabled? */
     for (i = 0; int_req[lvl] && (i < 32); i++) {
         if ((int_req[lvl] >> i) & 1) {
             int_req[lvl] = int_req[lvl] & ~(1u << i);
-            if (int_ack[lvl][i]) return (vec | int_ack[lvl][i]());
+            if (int_ack[lvl][i])
+                return (vec | int_ack[lvl][i]());
             return (vec | int_vec[lvl][i]);
             }
         }
@@ -608,9 +616,11 @@ uint32 ma, dat;
 
 ba = ba & UBADDRMASK;                                   /* mask UB addr */
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!uba_map_addr (ba + i, &ma)) return (bc - i);   /* page inv or NXM? */
+    if (!uba_map_addr (ba + i, &ma))                    /* page inv or NXM? */
+        return (bc - i);
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                  /* limit to rem xfr */
+        pbc = bc - i;
     if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
         fprintf (sim_deb, ">>UBA: 8b read, ma = %X, bc = %X\n", ma, pbc);
     if ((ma | pbc) & 3) {                               /* aligned LW? */
@@ -640,9 +650,11 @@ uint32 ma, dat;
 ba = ba & UBADDRMASK;                                   /* mask UB addr */
 bc = bc & ~01;
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!uba_map_addr (ba + i, &ma)) return (bc - i);   /* page inv or NXM? */
+    if (!uba_map_addr (ba + i, &ma))                    /* page inv or NXM? */
+        return (bc - i);
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
+        pbc = bc - i;
     if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
         fprintf (sim_deb, ">>UBA: 16b read, ma = %X, bc = %X\n", ma, pbc);
     if ((ma | pbc) & 1) {                               /* aligned word? */
@@ -678,9 +690,11 @@ uint32 ma, dat;
 
 ba = ba & UBADDRMASK;                                   /* mask UB addr */
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!uba_map_addr (ba + i, &ma)) return (bc - i);   /* page inv or NXM? */
+    if (!uba_map_addr (ba + i, &ma))                    /* page inv or NXM? */
+        return (bc - i);
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
+        pbc = bc - i;
     if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
         fprintf (sim_deb, ">>UBA: 8b write, ma = %X, bc = %X\n", ma, pbc);
     if ((ma | pbc) & 3) {                               /* aligned LW? */
@@ -711,9 +725,11 @@ uint32 ma, dat;
 ba = ba & UBADDRMASK;                                   /* mask UB addr */
 bc = bc & ~01;
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!uba_map_addr (ba + i, &ma)) return (bc - i);   /* page inv or NXM? */
+    if (!uba_map_addr (ba + i, &ma))                    /* page inv or NXM? */
+        return (bc - i);
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
+        pbc = bc - i;
     if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
         fprintf (sim_deb, ">>UBA: 16b write, ma = %X, bc = %X\n", ma, pbc);
     if ((ma | pbc) & 1) {                               /* aligned word? */
@@ -751,7 +767,8 @@ uint32 ublk, umap;
 
 ublk = ua >> VA_V_VPN;                                  /* Unibus blk */
 if ((ublk < UBACR_GETDSB (uba_cr)) ||                   /* map disabled? */
-    (ublk >= UBA_NMAPR)) return FALSE;                  /* unimplemented? */
+    (ublk >= UBA_NMAPR))                                /* unimplemented? */
+    return FALSE;
 umap = uba_map[ublk];                                   /* get map */
 if (umap & UBAMAP_VLD) {                                /* valid? */
     *ma = ((umap & UBAMAP_PAG) << VA_V_VPN) + VA_GETOFF (ua);
@@ -771,7 +788,8 @@ uint32 ublk, umap;
 
 ublk = ua >> VA_V_VPN;                                  /* Unibus blk */
 if ((ublk < UBACR_GETDSB (uba_cr)) ||                   /* map disabled? */
-    (ublk >= UBA_NMAPR)) return FALSE;                  /* unimplemented? */
+    (ublk >= UBA_NMAPR))                                /* unimplemented? */
+    return FALSE;
 umap = uba_map[ublk];                                   /* get map */
 if (umap & UBAMAP_VLD) {                                /* valid? */
     *ma = ((umap & UBAMAP_PAG) << VA_V_VPN) + VA_GETOFF (ua);
@@ -790,7 +808,8 @@ void uba_set_dpr (uint32 ua, t_bool wr)
 uint32 ublk, umap, dpr;
 
 ublk = ua >> VA_V_VPN;                                  /* Unibus blk */
-if (ublk >= UBA_NMAPR) return;                          /* paranoia */
+if (ublk >= UBA_NMAPR)                                  /* paranoia */
+    return;
 umap = uba_map[ublk];                                   /* get map */
 dpr = UBAMAP_GETDP (umap);                              /* get bdp */
 if (dpr) uba_dpr[dpr] = (uba_dpr[dpr] & ~(UBADPR_UA|UBADPR_DIR)) |
@@ -903,8 +922,10 @@ for (i = 0; i < IPL_HLVL; i++) {
     uba_svr[i] = 0;
     uba_rvr[i] = 0;
     }
-for (i = 0; i < UBA_NMAPR; i++) uba_map[i] = 0;
-for (i = 0; i < UBA_NDPATH; i++) uba_dpr[i] = 0;
+for (i = 0; i < UBA_NMAPR; i++)
+    uba_map[i] = 0;
+for (i = 0; i < UBA_NDPATH; i++)
+    uba_dpr[i] = 0;
 uba_sr = 0;
 uba_cr = 0;
 uba_dr = 0;
@@ -918,7 +939,8 @@ t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 ua = (uint32) exta, pa;
 
-if ((vptr == NULL) || (ua >= UBADDRSIZE)) return SCPE_ARG;
+if ((vptr == NULL) || (ua >= UBADDRSIZE))
+    return SCPE_ARG;
 if (uba_map_addr_c (ua, &pa) && ADDR_IS_MEM (pa)) {
     *vptr = (uint32) ReadW (pa);
     return SCPE_OK;
@@ -932,231 +954,13 @@ t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 ua = (uint32) exta, pa;
 
-if (ua >= UBADDRSIZE) return SCPE_ARG;
+if (ua >= UBADDRSIZE)
+    return SCPE_ARG;
 if (uba_map_addr_c (ua, &pa) && ADDR_IS_MEM (pa)) {
     WriteW (pa, (int32) val);
     return SCPE_OK;
     }
 return SCPE_NXM;
-}
-
-/* Enable/disable autoconfiguration */
-
-t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if (cptr != NULL) return SCPE_ARG;
-autcon_enb = val;
-return auto_config (NULL, 0);
-}
-
-/* Show autoconfiguration status */
-
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-fprintf (st, "autoconfiguration ");
-fprintf (st, autcon_enb? "enabled": "disabled");
-return SCPE_OK;
-}
-
-/* Change device address */
-
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-uint32 newba;
-t_stat r;
-
-if (cptr == NULL) return SCPE_ARG;
-if ((val == 0) || (uptr == NULL)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-newba = (uint32) get_uint (cptr, 16, IOPAGEBASE+IOPAGEMASK, &r);
-if (r != SCPE_OK) return r;
-if ((newba <= IOPAGEBASE) ||                            /* must be > 0 */
-    (newba % ((uint32) val))) return SCPE_ARG;          /* check modulus */
-dibp->ba = newba;                                       /* store */
-dptr->flags = dptr->flags & ~DEV_FLTA;                  /* not floating */
-autcon_enb = 0;                                         /* autoconfig off */
-return SCPE_OK;
-}
-
-/* Show device address */
-
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-
-if (uptr == NULL) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE)) return SCPE_IERR;
-fprintf (st, "address=%08X", dibp->ba);
-if (dibp->lnt > 1)
-    fprintf (st, "-%08X", dibp->ba + dibp->lnt - 1);
-if (dptr->flags & DEV_FLTA) fprintf (st, "*");
-return SCPE_OK;
-}
-
-/* Set address floating */
-
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-DEVICE *dptr;
-
-if (cptr == NULL) return SCPE_ARG;
-if ((val == 0) || (uptr == NULL)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dptr->flags = dptr->flags | DEV_FLTA;                   /* floating */
-return auto_config (NULL, 0);                           /* autoconfigure */
-}
-
-/* Change device vector */
-
-t_stat set_vec (UNIT *uptr, int32 arg, char *cptr, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-uint32 newvec;
-t_stat r;
-
-if (cptr == NULL) return SCPE_ARG;
-if (uptr == NULL) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-newvec = (uint32) get_uint (cptr, 16, 01000, &r);
-if ((r != SCPE_OK) ||
-    ((newvec + (dibp->vnum * 4)) >= 01000) ||
-    (newvec & ((dibp->vnum > 1)? 07: 03))) return SCPE_ARG;
-dibp->vec = newvec;
-dptr->flags = dptr->flags & ~DEV_FLTA;                  /* not floating */
-autcon_enb = 0;                                         /* autoconfig off */
-return SCPE_OK;
-}
-
-/* Show device vector */
-
-t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-uint32 vec, numvec;
-
-if (uptr == NULL) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-vec = dibp->vec;
-if (arg) numvec = arg;
-else numvec = dibp->vnum;
-if (vec == 0) fprintf (st, "no vector");
-else {
-    fprintf (st, "vector=%X", vec);
-    if (numvec > 1) fprintf (st, "-%X", vec + (4 * (numvec - 1)));
-    }
-return SCPE_OK;
-}
-
-/* Init Unibus tables */
-
-void init_ubus_tab (void)
-{
-int32 i, j;
-
-for (i = 0; i < IPL_HLVL; i++) {                        /* clear int tables */
-    for (j = 0; j < 32; j++) {
-        int_vec[i][j] = 0;
-        int_ack[i][j] = NULL;
-        }
-    }
-for (i = 0; i < (IOPAGESIZE >> 1); i++) {               /* clear dispatch tab */
-    iodispR[i] = NULL;
-    iodispW[i] = NULL;
-    iodibp[i] = NULL;
-    }
-return;
-}
-
-/* Build Unibus tables */
-
-t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp)
-{
-int32 i, idx, vec, ilvl, ibit;
-
-if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR; /* validate args */
-if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
-for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
-    idx = dibp->vloc + i;                               /* vector index */
-    vec = dibp->vec? (dibp->vec + (i * 4)): 0;          /* vector addr */
-    ilvl = idx / 32;
-    ibit = idx % 32;
-    if ((int_ack[ilvl][ibit] && dibp->ack[i] &&         /* conflict? */
-        (int_ack[ilvl][ibit] != dibp->ack[i])) ||
-        (int_vec[ilvl][ibit] && vec &&
-        (int_vec[ilvl][ibit] != vec))) {
-        printf ("Device %s interrupt slot conflict at %d\n",
-            sim_dname (dptr), idx);
-        if (sim_log) fprintf (sim_log,
-            "Device %s interrupt slot conflict at %d\n",
-            sim_dname (dptr), idx);
-        return SCPE_STOP;
-        }
-    if (dibp->ack[i]) int_ack[ilvl][ibit] = dibp->ack[i];
-    else if (vec) int_vec[ilvl][ibit] = vec;
-    }
-for (i = 0; i < (int32) dibp->lnt; i = i + 2) {         /* create entries */
-    idx = ((dibp->ba + i) & IOPAGEMASK) >> 1;           /* index into disp */
-    if ((iodispR[idx] && dibp->rd &&                    /* conflict? */
-        (iodispR[idx] != dibp->rd)) ||
-        (iodispW[idx] && dibp->wr &&
-        (iodispW[idx] != dibp->wr))) {
-        printf ("Device %s address conflict at %08o\n",
-            sim_dname (dptr), dibp->ba);
-        if (sim_log) fprintf (sim_log,
-            "Device %s address conflict at %08o\n",
-            sim_dname (dptr), dibp->ba);
-        return SCPE_STOP;
-        }
-    if (dibp->rd) iodispR[idx] = dibp->rd;              /* set rd dispatch */
-    if (dibp->wr) iodispW[idx] = dibp->wr;              /* set wr dispatch */
-    iodibp[idx] = dibp;                                 /* remember DIB */
-    }
-return SCPE_OK;
-}
-
-/* Show IO space */
-
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-uint32 i, j;
-DEVICE *dptr;
-DIB *dibp;
-
-if (build_dib_tab ()) return SCPE_OK;                   /* build IO page */
-for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
-    if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
-        dibp = iodibp[i];                               /* DIB for block */
-        for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
-            if (((DIB*) sim_devices[j]->ctxt) == dibp) {
-                dptr = sim_devices[j];                  /* locate device */
-                break;
-                }                                       /* end if */
-            }                                           /* end for j */
-        fprintf (st, "%08X - %08X%c\t%s\n", dibp->ba,
-            dibp->ba + dibp->lnt - 1,
-            (dptr && (dptr->flags & DEV_FLTA))? '*': ' ',
-            dptr? sim_dname (dptr): "CPU");
-        }                                               /* end if */
-    }                                                   /* end for i */
-return SCPE_OK;
 }
 
 /* Show UBA virtual address */
@@ -1177,146 +981,5 @@ if (cptr) {
         }
     }
 fprintf (of, "Invalid argument\n");
-return SCPE_OK;
-}
-
-/* Autoconfiguration
-
-   The table reflects the MicroVAX 3900 microcode, with one addition - the
-   number of controllers field handles devices where multiple instances
-   are simulated through a single DEVICE structure (e.g., DZ, VH).
-
-   A minus number of vectors indicates a field that should be calculated
-   but not placed in the DIB (RQ, TQ dynamic vectors) */
-
-#define AUTO_MAXC       4
-#define AUTO_CSRBASE    0010
-#define AUTO_VECBASE    0300
-
-typedef struct {
-    char        *dnam[AUTO_MAXC];
-    int32       numc;
-    int32       numv;
-    uint32      amod;
-    uint32      vmod;
-    uint32      fixa[AUTO_MAXC];
-    uint32      fixv[AUTO_MAXC];
-    } AUTO_CON;
-
-AUTO_CON auto_tab[] = {
-    { { NULL }, 1, 2, 0, 8, { 0 } },                    /* DLV11J - fx CSRs */
-    { { NULL }, 1, 2, 8, 8 },                           /* DJ11 */
-    { { NULL }, 1, 2, 16, 8 },                          /* DH11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DQ11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DU11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DUP11 */
-    { { NULL }, 10, 2, 8, 8 },                          /* LK11A */
-    { { NULL }, 1, 2, 8, 8 },                           /* DMC11 */
-    { { "DZ" }, DZ_MUXES, 2, 8, 8 },                    /* DZ11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* KMC11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* LPP11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* VMV21 */
-    { { NULL }, 1, 2, 16, 8 },                          /* VMV31 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DWR70 */
-    { { "RL", "RLB" }, 1, 1, 8, 4, {IOBA_RL}, {VEC_RL} }, /* RL11 */
-    { { "TS", "TSB", "TSC", "TSD" }, 1, 1, 0, 4,          /* TS11 */
-        {IOBA_TS, IOBA_TS + 4, IOBA_TS + 8, IOBA_TS + 12},
-        {VEC_TS} },
-    { { NULL }, 1, 2, 16, 8 },                          /* LPA11K */
-    { { NULL }, 1, 2, 8, 8 },                           /* KW11C */
-    { { NULL }, 1, 1, 8, 8 },                           /* reserved */
-    { { "RX", "RY" }, 1, 1, 8, 4, {IOBA_RX} , {VEC_RX} }, /* RX11/RX211 */
-    { { NULL }, 1, 1, 8, 4 },                           /* DR11W */
-    { { NULL }, 1, 1, 8, 4, { 0, 0 }, { 0 } },          /* DR11B - fx CSRs,vec */
-    { { NULL }, 1, 2, 8, 8 },                           /* DMP11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DPV11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* ISB11 */
-    { { NULL }, 1, 2, 16, 8 },                          /* DMV11 */
-    { { "XU", "XUB" }, 1, 1, 8, 4, {IOBA_XU}, {VEC_XU} }, /* DEUNA */
-    { { "XQ", "XQB" }, 1, 1, 0, 4,                      /* DEQNA */
-        {IOBA_XQ,IOBA_XQB}, {VEC_XQ} },                 /*       */
-    { { "RQ", "RQB", "RQC", "RQD" }, 1, -1, 4, 4,       /* RQDX3 */
-            {IOBA_RQ}, {VEC_RQ} },
-    { { NULL }, 1, 8, 32, 4 },                          /* DMF32 */
-    { { NULL }, 1, 2, 16, 8 },                          /* KMS11 */
-    { { NULL }, 1, 1, 16, 4 },                          /* VS100 */
-    { { "TQ", "TQB" }, 1, -1, 4, 4, {IOBA_TQ}, {VEC_TQ} }, /* TQK50 */
-    { { NULL }, 1, 2, 16, 8 },                          /* KMV11 */
-    { { "VH" }, VH_MUXES, 2, 16, 8 },                   /* DHU11/DHQ11 */
-    { { NULL }, 1, 6, 32, 4 },                          /* DMZ32 */
-    { { NULL }, 1, 6, 32, 4 },                          /* CP132 */
-    { { NULL }, 1, 2, 64, 8, { 0 } },                   /* QVSS - fx CSR */
-    { { NULL }, 1, 1, 8, 4 },                           /* VS31 */
-    { { NULL }, 1, 1, 0, 4, { 0 } },                    /* LNV11 - fx CSR */
-    { { NULL }, 1, 1, 16, 4 },                          /* LNV21/QPSS */
-    { { NULL }, 1, 1, 8, 4, { 0 } },                    /* QTA - fx CSR */
-    { { NULL }, 1, 1, 8, 4 },                           /* DSV11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* CSAM */
-    { { NULL }, 1, 2, 8, 8 },                           /* ADV11C */
-    { { NULL }, 1, 0, 8, 0 },                           /* AAV11C */
-    { { NULL }, 1, 2, 8, 8, { 0 }, { 0 } },             /* AXV11C - fx CSR,vec */
-    { { NULL }, 1, 2, 4, 8, { 0 } },                    /* KWV11C - fx CSR */
-    { { NULL }, 1, 2, 8, 8, { 0 } },                    /* ADV11D - fx CSR */
-    { { NULL }, 1, 2, 8, 8, { 0 } },                    /* AAV11D - fx CSR */
-    { { "QDSS" }, 1, 3, 0, 16, {IOBA_QDSS} },           /* QDSS - fx CSR */
-    { { NULL }, -1 }                                    /* end table */
-};
-
-t_stat auto_config (char *name, int32 nctrl)
-{
-uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
-uint32 vec = VEC_Q + AUTO_VECBASE;
-AUTO_CON *autp;
-DEVICE *dptr;
-DIB *dibp;
-uint32 j, k, vmask, amask;
-
-if (autcon_enb == 0) return SCPE_OK;                    /* enabled? */
-if (name) {                                             /* updating? */
-    if (nctrl < 0) return SCPE_ARG;
-    for (autp = auto_tab; autp->numc >= 0; autp++) {
-        for (j = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
-            if (strcmp (name, autp->dnam[j]) == 0)
-                autp->numc = nctrl;
-            }
-        }
-    }
-for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
-    if (autp->amod) {                                   /* floating csr? */
-        amask = autp->amod - 1;
-        csr = (csr + amask) & ~amask;                   /* align csr */
-        }
-    for (j = k = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
-        dptr = find_dev (autp->dnam[j]);                /* find ctrl */
-        if ((dptr == NULL) || (dptr->flags & DEV_DIS) ||
-            !(dptr->flags & DEV_FLTA)) continue;        /* enabled, floating? */
-        dibp = (DIB *) dptr->ctxt;                      /* get DIB */
-        if (dibp == NULL) return SCPE_IERR;             /* not there??? */
-        if (autp->amod) {                               /* dyn csr needed? */
-            if (autp->fixa[k])                          /* fixed csr avail? */
-                dibp->ba = autp->fixa[k];               /* use it */
-            else {                                      /* no fixed left */
-                dibp->ba = csr;                         /* set CSR */
-                csr += (autp->numc * autp->amod);       /* next CSR */
-                }                                       /* end else */
-            }                                           /* end if dyn csr */
-        if (autp->numv && autp->vmod) {                 /* dyn vec needed? */
-            uint32 numv = abs (autp->numv);             /* get num vec */
-            if (autp->fixv[k]) {                        /* fixed vec avail? */
-                if (autp->numv > 0)
-                    dibp->vec = autp->fixv[k];          /* use it */
-                }
-            else {                                      /* no fixed left */
-                vmask = autp->vmod - 1;
-                vec = (vec + vmask) & ~vmask;           /* align vector */
-                if (autp->numv > 0)
-                    dibp->vec = vec;                    /* set vector */
-                vec += (autp->numc * numv * 4);
-                }                                       /* end else */
-            }                                           /* end if dyn vec */
-        k++;                                            /* next instance */
-        }                                               /* end for j */
-    if (autp->amod) csr = csr + 2;                      /* flt CSR? gap */
-    }                                                   /* end for i */
 return SCPE_OK;
 }

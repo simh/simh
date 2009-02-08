@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,14 +29,192 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       8
-#define SIM_PATCH       0
+#define SIM_PATCH       1
 #define SIM_DELTA       0
 
 /* V3.8 revision history
 
 patch   date            module(s) and fix(es)
 
-  0     tbd             scp.c:
+  1     08-Feb-09       scp.c:
+                        - revised RESTORE unit logic for consistency
+                        - "detach_all" ignores error status returns if shutting down (from Dave Bryan)
+                        - DO cmd missing params now default to null string (from Dave Bryan)
+                        - DO cmd sub_args now allows "\\" to specify literal backslash (from Dave Bryan)
+                        - decommitted MTAB_VAL
+                        - fixed implementation of MTAB_NC
+                        - fixed warnings in help printouts
+
+                        sim_tape.c:
+                        - fixed signed/unsigned warning in sim_tape_set_fmt (from Dave Bryan)
+
+                        sim_tmxr.c, sim_tmxr.h:
+                        - added line connection order to tmxr_poll_conn,
+                          added tmxr_set_lnorder and tmxr_show_lnorder (from Dave Bryan)
+                        - print device and line to which connection was made (from Dave Bryan)
+                        - added three new standardized SHOW routines
+
+                        all terminal multiplexers:
+                        - revised for new common SHOW routines in TMXR library
+                        - rewrote set size routines not to use MTAB_VAL
+
+                        hp2100_cpu.c (from Dave Bryan):
+                        - VIS and IOP are now mutually exclusive on 1000-F
+                        - Removed A/B shadow register variables
+                        - Moved hp_setdev, hp_showdev to hp2100_sys.c
+                        - Moved non-existent memory checks to WritePW
+                        - Fixed mp_dms_jmp to accept lower bound, check write protection
+                        - Corrected DMS violation register set conditions
+                        - Refefined ABORT to pass address, moved def to hp2100_cpu.h
+                        - Combined dms and dms_io routines
+                        - JSB to 0/1 with W5 out and fence = 0 erroneously causes MP abort
+                        - Unified I/O slot dispatch by adding DIBs for CPU, MP, and DMA
+                        - Rewrote device I/O to model backplane signals
+                        - EDT no longer passes DMA channel
+                        - Added SET CPU IDLE/NOIDLE, idle detection for DOS/RTE
+                        - Breakpoints on interrupt trap cells now work
+
+                        hp2100_cpu0.c (from Dave Bryan):
+                        - .FLUN and self-tests for VIS and SIGNAL are NOP if not present
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Removed option-present tests (now in UIG dispatchers)
+                        - Added "user microcode" dispatcher for unclaimed instructions
+
+                        hp2100_cpu1.c (from Dave Bryan):
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Moved option-present tests to UIG dispatchers
+                        - Call "user microcode" dispatcher for unclaimed UIG instructions
+
+                        hp2100_cpu2.c (from Dave Bryan):
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Removed option-present tests (now in UIG dispatchers)
+                        - Updated mp_dms_jmp calling sequence
+                        - Fixed DJP, SJP, and UJP jump target validation
+                        - RVA/B conditionally updates dms_vr before returning value
+                        
+                        hp2100_cpu3.c (from Dave Bryan):
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Removed option-present tests (now in UIG dispatchers)
+                        - Updated mp_dms_jmp calling sequence
+
+                        hp2100_cpu4.c, hp2100_cpu7.c (from Dave Bryan):
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Removed option-present tests (now in UIG dispatchers)
+
+                        hp2100_cpu5.c (from Dave Bryan):
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Removed option-present tests (now in UIG dispatchers)
+                        - Redefined ABORT to pass address, moved def to hp2100_cpu.h
+                        - Rewrote device I/O to model backplane signals
+
+                        hp2100_cpu6.c (from Dave Bryan):
+                        - Corrected .SIP debug formatting
+                        - Moved microcode function prototypes to hp2100_cpu1.h
+                        - Removed option-present tests (now in UIG dispatchers)
+                        - Rewrote device I/O to model backplane signals
+
+                        hp2100 all peripherals (from Dave Bryan):
+                        - Rewrote device I/O to model backplane signals
+
+                        hp2100_baci.c (from Dave Bryan):
+                        - Fixed STC,C losing interrupt request on BREAK
+                        - Changed Telnet poll to connect immediately after reset or attach
+                        - Added REG_FIT to register variables < 32-bit size
+                        - Moved fmt_char() function to hp2100_sys.c
+
+                        hp2100_dp.c, hp2100_dq.c (from Dave Bryan):
+                        - Added REG_FIT to register variables < 32-bit size
+
+                        hp2100_dr.c (from Dave Bryan):
+                        - Revised drc_boot to use ibl_copy
+
+                        hp2100_fp1.c (from Dave Bryan):
+                        - Quieted bogus gcc warning in fp_exec
+
+                        hp2100_ipl.c (from Dave Bryan):
+                        - Changed socket poll to connect immediately after reset or attach
+                        - Revised EDT handler to refine completion delay conditions
+                        - Revised ipl_boot to use ibl_copy
+
+                        hp2100_lpt.c (from Dave Bryan):
+                        - Changed CTIME register width to match documentation
+
+                        hp2100_mpx.c (from Dave Bryan):
+                        - Implemented 12792C eight-channel terminal multiplexer
+
+                        hp2100_ms.c (from Dave Bryan):
+                        - Revised to use AR instead of saved_AR in boot
+
+                        hp2100_mt.c (from Dave Bryan):
+                        - Fixed missing flag after CLR command
+                        - Moved write enable and format commands from MTD to MTC
+                        
+                        hp2100_mux.c (from Dave Bryan):
+                        - SHOW MUX CONN/STAT with SET MUX DIAG is no longer disallowed
+                        - Changed Telnet poll to connect immediately after reset or attach
+                        - Added LINEORDER support
+                        - Added BREAK deferral to allow RTE break-mode to work
+
+                        hp2100_pif.c (from Dave Bryan):
+                        - Implemented 12620A/12936A Privileged Interrupt Fences
+
+                        hp2100_sys.c (from Dave Bryan):
+                        - Fixed IAK instruction dual-use mnemonic display
+                        - Moved hp_setdev, hp_showdev from hp2100_cpu.c
+                        - Changed sim_load to use WritePW instead of direct M[] access
+                        - Added PIF device
+                        - Moved fmt_char() function from hp2100_baci.c
+                        - Added MPX device
+
+                        hp2100_cpu.h (from Dave Bryan):
+                        - Rearranged declarations with hp2100_cpu.c and hp2100_defs.h
+                        - Added mp_control to CPU state externals
+
+                        hp2100_cpu1.h (from Dave Bryan):
+                        - Moved microcode function prototypes here
+
+                        hp2100_defs.h (from Dave Bryan):
+                        - Added POLL_FIRST to indicate immediate connection attempt
+                        - Rearranged declarations with hp2100_cpu.h
+                        - Added PIF device
+                        - Declared fmt_char() function
+                        - Added MPX device
+
+                        i1401_cpu.c:
+                        - fixed bug in ZA and ZS (from Bob Abeles)
+                        - fixed tape indicator implementation (from Bob Abeles)
+                        - added missing magtape modifier A (from Van Snyder)
+
+                        i1401_mt.c:
+                        - added -n (no rewind) option to BOOT (from Van Snyder)
+                        - fixed bug to mask input to 6b on read (from Bob Abeles)
+
+                        lgp_stddev.c:
+                        - changed encode character from # to !, due to overlap
+
+                        pdp11_cpu.c:
+                        - fixed failure to clear cpu_bme on RESET (found by Walter Mueller)
+
+                        pdp11_dz.c:
+                        - added MTAB_NC modifier on SET LOG command (found by Walter Mueller)
+
+                        pdp11_io.c, vax_io.c, vax780_uba.c:
+                        - revised to use PDP-11 I/O library
+
+                        pdp11_io_lib.c:
+                        - created common library for Unibus/Qbus support routines
+
+                        pdp11_cis.c, vax_cis.c:
+                        - fixed bug in ASHP left overflow calc (Word/NibbleLShift)
+                        - fixed bug in DIVx (LntDstr calculation)
+
+                        sds_lp.c:
+                        - fixed loss of carriage control position on space op
+
+                        vax_stddev.c, vax780_stddev.c
+                        - modified to resync TODR on any clock reset
+
+  0     15-Jun-08       scp.c:
                         - fixed bug in local/global register search (found by Mark Pizzolato)
                         - fixed bug in restore of RO units (from Mark Pizzolato)
                         - added SET/SHO/NO BR with default argument (from Dave Bryan)

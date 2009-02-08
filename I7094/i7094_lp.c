@@ -1,6 +1,6 @@
 /* i7094_lp.c: IBM 716 line printer simulator
 
-   Copyright (c) 2003-2007, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -185,7 +185,8 @@ DEVICE lpt_dev = {
 
 t_stat lpt_chsel (uint32 ch, uint32 sel, uint32 unit)
 {
-if (sel & CHSL_NDS) return ch6_end_nds (ch);            /* nds? nop */
+if (sel & CHSL_NDS)                                     /* nds? nop */
+    return ch6_end_nds (ch);
 
 switch (sel) {                                          /* case on cmd */
 
@@ -219,7 +220,8 @@ uint32 u = (lpt_cmd & CMD_BIN)? U_LPBIN: U_LPBCD;       /* reconstruct unit */
 
 lpt_chob = val & DMASK;                                 /* store data */
 lpt_chob_v = 1;                                         /* set valid */
-if (lpt_sta == ECS_DATA) return SCPE_OK;
+if (lpt_sta == ECS_DATA)
+    return SCPE_OK;
 if (lpt_sta == LPS_DATA) {
     lpt_bbuf[lpt_bptr++] = lpt_chob;                    /* store data */
     if (eorfl ||                                        /* end record, or */
@@ -248,9 +250,11 @@ switch (lpt_sta) {                                      /* case on state */
             lpt_bbuf[i] = 0;
         for (i = 0; i < LPT_ECHLNT; i++)                /* clear echo buffer */
             lpt_ebuf[i] = 0;
-        if (lpt_cmd & CMD_BIN) lpt_bptr = LPB_1ROW;     /* set buffer ptr */
+        if (lpt_cmd & CMD_BIN)                          /* set buffer ptr */
+            lpt_bptr = LPB_1ROW;
         else lpt_bptr = LPB_9ROW;
-        if (lpt_cmd & CMD_ECHO) lpt_sta = ECS_DATA;     /* set data state */
+        if (lpt_cmd & CMD_ECHO)                         /* set data state */
+            lpt_sta = ECS_DATA;
         else lpt_sta = LPS_DATA;
         ch6_req_wr (CH_A, u);                           /* request channel */
         lpt_chob = 0;                                   /* clr, inval buffer */
@@ -261,7 +265,8 @@ switch (lpt_sta) {                                      /* case on state */
     case LPS_DATA:                                      /* print data state */
         if (!ch6_qconn (CH_A, u))                       /* disconnect? */
             return lpt_end_line (uptr);                 /* line is done */
-        if (lpt_chob_v) lpt_chob_v = 0;                 /* valid? clear */
+        if (lpt_chob_v)                                 /* valid? clear */
+            lpt_chob_v = 0;
         else ind_ioc = 1;                               /* no, io check */
         ch6_req_wr (CH_A, u);                           /* request chan again */
         sim_activate (uptr, (lpt_bptr & 1)? lpt_tleft: lpt_tright);
@@ -284,7 +289,8 @@ switch (lpt_sta) {                                      /* case on state */
             sim_activate (uptr, lpt_tleft);             /* short timer */
             }
         else {                                          /* print cycle */
-            if (lpt_chob_v) lpt_chob_v = 0;             /* valid? clear */
+            if (lpt_chob_v)                             /* valid? clear */
+                lpt_chob_v = 0;
             else ind_ioc = 1;                           /* no, io check */
             lpt_bbuf[map] = lpt_chob;                   /* store in buffer */
             sim_activate (uptr, (lpt_bptr & 1)? lpt_tleft: lpt_tright);
@@ -320,7 +326,8 @@ for (col = 0; col < 72; col++) {                        /* proc 72 columns */
     dat = bit_masks[35 - (col % 36)];                   /* mask for column */
     for (row = 0; row < 12; row++) {                    /* proc 12 rows */
         bufw = (row * 2) + (col / 36);                  /* index to buffer */
-        if (lpt_bbuf[bufw] & dat) colbin |= col_masks[row];
+        if (lpt_bbuf[bufw] & dat)
+            colbin |= col_masks[row];
         }
     bcd = colbin_to_bcd (colbin);                       /* column bin -> BCD */
     lpt_cbuf[col] = pch[bcd];                           /* -> ASCII */
@@ -339,7 +346,8 @@ if (uptr->flags & UNIT_ATT) {                           /* file? */
         }
     }
 else if (uptr->flags & UNIT_CONS) {                     /* print to console? */
-    for (i = 0; lpt_cbuf[i] != 0; i++) sim_putchar (lpt_cbuf[i]);
+    for (i = 0; lpt_cbuf[i] != 0; i++)
+        sim_putchar (lpt_cbuf[i]);
     sim_putchar ('\r');
     sim_putchar ('\n');
     }
@@ -356,8 +364,10 @@ t_stat lpt_reset (DEVICE *dptr)
 {
 uint32 i;
 
-for (i = 0; i < LPT_BINLNT; i++) lpt_bbuf[i] = 0;       /* clear bin buf */
-for (i = 0; i < LPT_ECHLNT; i++) lpt_ebuf[i] = 0;       /* clear echo buf */
+for (i = 0; i < LPT_BINLNT; i++)                        /* clear bin buf */
+    lpt_bbuf[i] = 0;
+for (i = 0; i < LPT_ECHLNT; i++)                        /* clear echo buf */
+    lpt_ebuf[i] = 0;
 lpt_sta = 0;                                            /* clear state */
 lpt_cmd = 0;                                            /* clear modes */
 lpt_bptr = 0;                                           /* clear buf ptr */

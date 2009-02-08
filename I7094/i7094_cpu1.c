@@ -1,6 +1,6 @@
 /* i7094_cpu1.c: IBM 7094 CPU complex instructions
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -72,12 +72,14 @@ t_uint64 mop = op & MMASK;
 
 AC = AC & AC_S;                                         /* isolate AC sign */
 if ((AC? 1: 0) ^ ((op & SIGN)? 1: 0)) {                 /* signs diff? sub */
-    if (mac >= mop) AC = AC | (mac - mop);              /* AC >= MQ */
+    if (mac >= mop)                                     /* AC >= MQ */
+        AC = AC | (mac - mop);
     else AC = (AC ^ AC_S) | (mop - mac);                /* <, sign change */
     }
 else {
     AC = AC | ((mac + mop) & AC_MMASK);                 /* signs same, add */
-    if ((AC ^ mac) & AC_P) ind_ovf = 1;                 /* P change? overflow */
+    if ((AC ^ mac) & AC_P)                              /* P change? overflow */
+        ind_ovf = 1;
     }
 return;
 }
@@ -88,14 +90,16 @@ void op_mpy (t_uint64 ac, t_uint64 sr, uint32 sc)
 {
 uint32 sign;
 
-if (sc == 0) return;                                    /* sc = 0? nop */
+if (sc == 0)                                            /* sc = 0? nop */
+    return;
 sign = ((MQ & SIGN)? 1: 0) ^ ((sr & SIGN)? 1: 0);       /* result sign */
 ac = ac & AC_MMASK;                                     /* clear AC sign */
 sr = sr & MMASK;                                        /* mpy magnitude */
 MQ = MQ & MMASK;                                        /* MQ magnitude */
 if (sr && MQ) {                                         /* mpy != 0? */
     while (sc--) {                                      /* for sc */
-        if (MQ & 1) ac = (ac + sr) & AC_MMASK;          /* MQ35? AC += mpy */
+        if (MQ & 1)                                     /* MQ35? AC += mpy */
+            ac = (ac + sr) & AC_MMASK;
         MQ = (MQ >> 1) | ((ac & 1) << 34);              /* AC'MQ >> 1 */
         ac = ac >> 1;
         }
@@ -115,11 +119,13 @@ t_bool op_div (t_uint64 sr, uint32 sc)
 {
 uint32 signa, signm;
 
-if (sc == 0) return FALSE;                              /* sc = 0? nop */
+if (sc == 0)                                            /* sc = 0? nop */
+    return FALSE;
 signa = (AC & AC_S)? 1: 0;                              /* get signs */
 signm = (sr & SIGN)? 1: 0;
 sr = sr & MMASK;                                        /* get dvr magn */
-if ((AC & AC_MMASK) >= sr) return TRUE;                 /* |AC| >= |sr|? */
+if ((AC & AC_MMASK) >= sr)                              /* |AC| >= |sr|? */
+    return TRUE;
 AC = AC & AC_MMASK;                                     /* AC, MQ magn */
 MQ = MQ & MMASK;
 while (sc--) {                                          /* for sc */
@@ -130,8 +136,10 @@ while (sc--) {                                          /* for sc */
         MQ = MQ | 1;                                    /* set quo bit */
         }
     }
-if (signa ^ signm) MQ = MQ | SIGN;                      /* quo neg? */
-if (signa) AC = AC | AC_S;                              /* rem neg? */
+if (signa ^ signm)                                      /* quo neg? */
+    MQ = MQ | SIGN;
+if (signa)                                              /* rem neg? */
+    AC = AC | AC_S;
 return FALSE;                                           /* div ok */
 }
 
@@ -145,7 +153,8 @@ if ((sc >= 35)?                                         /* shift >= 35? */
     ((AC & MMASK) != 0):                                /* test all bits for ovf */
     (((AC & MMASK) >> (35 - sc)) != 0))                 /* test only 35-sc bits */
     ind_ovf = 1;
-if (sc >= 37) AC = AC & AC_S;                           /* sc >= 37? result 0 */
+if (sc >= 37)                                           /* sc >= 37? result 0 */
+    AC = AC & AC_S;
 else AC = (AC & AC_S) | ((AC << sc) & AC_MMASK);        /* shift, save sign */
 return;
 }
@@ -154,7 +163,8 @@ void op_ars (uint32 addr)
 {
 uint32 sc = addr & SCMASK;
 
-if (sc >= 37) AC = AC & AC_S;                           /* sc >= 37? result 0 */
+if (sc >= 37)                                           /* sc >= 37? result 0 */
+    AC = AC & AC_S;
 else AC = (AC & AC_S) | ((AC & AC_MMASK) >> sc);        /* shift, save sign */
 return;
 }
@@ -167,9 +177,11 @@ AC = AC & AC_MMASK;                                     /* clear AC sign */
 for (sc = addr & SCMASK; sc != 0; sc--) {               /* for SC */
     AC = ((AC << 1) & AC_MMASK) | ((MQ >> 34) & 1);     /* AC'MQ << 1 */
     MQ = (MQ & SIGN) | ((MQ << 1) & MMASK);             /* preserve MQ sign */
-    if (AC & AC_P) ind_ovf = 1;                         /* if P, overflow */
+    if (AC & AC_P)                                      /* if P, overflow */
+        ind_ovf = 1;
     }
-if (MQ & SIGN) AC = AC | AC_S;                          /* set ACS from MQS */
+if (MQ & SIGN)                                          /* set ACS from MQS */
+    AC = AC | AC_S;
 return;
 }
 
@@ -194,7 +206,8 @@ if (sc != 0) {
         MQ = (mac >> (sc - 35)) & MMASK;                /* MQ has AC only */
     else MQ = 0;                                        /* >72? MQ = 0 */
     }
-if (AC & AC_S) MQ = MQ | SIGN;                          /* set MQS from ACS */
+if (AC & AC_S)                                          /* set MQS from ACS */
+    MQ = MQ | SIGN;
 return;
 }
 
@@ -206,7 +219,8 @@ for (sc = addr & SCMASK; sc != 0; sc--) {               /* for SC */
     AC = (AC & AC_S) | ((AC << 1) & AC_MMASK) |         /* AC'MQ << 1 */
         ((MQ >> 35) & 1);                               /* preserve AC sign */
     MQ = (MQ << 1) & DMASK;
-    if (AC & AC_P) ind_ovf = 1;                         /* if P, overflow */
+    if (AC & AC_P)                                      /* if P, overflow */
+        ind_ovf = 1;
     }
 return;
 }
@@ -243,11 +257,13 @@ uint32 ch, spill;
 switch (addr) {
 
     case 00000:                                         /* CLM */
-        if (cpu_model & I_9X) AC = AC & AC_S;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            AC = AC & AC_S;
         break;
 
     case 00001:                                         /* LBT */
-        if ((AC & 1) != 0) PC = (PC + 1) & AMASK;
+        if ((AC & 1) != 0)
+            PC = (PC + 1) & AMASK;
         break;
 
     case 00002:                                         /* CHS */
@@ -263,7 +279,8 @@ switch (addr) {
         break;
 
     case 00005:                                         /* IOT */
-        if (ind_ioc) ind_ioc = 0;
+        if (ind_ioc)
+            ind_ioc = 0;
         else PC = (PC + 1) & AMASK;
         break;
 
@@ -272,7 +289,8 @@ switch (addr) {
         break;
 
     case 00007:                                         /* ETM */
-        if (cpu_model & I_9X) mode_ttrap = 1;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            mode_ttrap = 1;
         break;
 
     case 00010:                                         /* RND */
@@ -283,12 +301,14 @@ switch (addr) {
     case 00011:                                         /* FRN */
         if (cpu_model & I_9X) {                         /* 709X only */
             spill = op_frnd ();
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             }
         break;
 
     case 00012:                                         /* DCT */
-        if (ind_dvc) ind_dvc = 0;
+        if (ind_dvc)
+            ind_dvc = 0;
         else PC = (PC + 1) & AMASK;
         break;
 
@@ -299,11 +319,13 @@ switch (addr) {
         break;
 
     case 00016:                                         /* LMTM */
-        if (cpu_model & I_94) mode_multi = 0;           /* 709X only */
+        if (cpu_model & I_94)                           /* 709X only */
+            mode_multi = 0;
         break;
 
     case 00140:                                         /* SLF */
-        if (cpu_model & I_9X) SLT = 0;                  /* 709X only */
+        if (cpu_model & I_9X)                       /* 709X only */
+            SLT = 0;
         break;
 
     case 00141: case 00142: case 00143: case 00144:     /* SLN */
@@ -320,7 +342,8 @@ switch (addr) {
     case 01000: case 02000: case 03000: case 04000:     /* BTT */
     case 05000: case 06000: case 07000: case 10000:
         if (cpu_model & I_9X) {                         /* 709X only */
-            if (sel_trap (PC)) break;                   /* sel trap? */
+            if (sel_trap (PC))                          /* sel trap? */
+                break;
             ch = GET_U_CH (addr);                       /* get channel */
             if (ch_flags[ch] & CHF_BOT)                 /* BOT? */
                 ch_flags[ch] &= ~CHF_BOT;               /* clear */
@@ -351,11 +374,13 @@ uint32 t, ch;
 switch (addr) {
 
     case 00000:                                         /* CLM */
-        if (cpu_model & I_9X) AC = AC & AC_S;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            AC = AC & AC_S;
         break;
 
     case 00001:                                         /* PBT */
-        if ((AC & AC_P) != 0) PC = (PC + 1) & AMASK;
+        if ((AC & AC_P) != 0)
+            PC = (PC + 1) & AMASK;
         break;
 
     case 00002:                                         /* EFTM */
@@ -366,31 +391,38 @@ switch (addr) {
         break;
 
     case 00003:                                         /* SSM */
-        if (cpu_model & I_9X) AC = AC | AC_S;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            AC = AC | AC_S;
         break;
 
     case 00004:                                         /* LFTM */
-        if (cpu_model & I_9X) mode_ftrap = 0;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            mode_ftrap = 0;
         break;
 
     case 00005:                                         /* ESTM */
-        if (cpu_model & I_9X) mode_strap = 1;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            mode_strap = 1;
         break;
 
     case 00006:                                         /* ECTM */
-        if (cpu_model & I_9X) mode_ctrap = 1;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            mode_ctrap = 1;
         break;
 
     case 00007:                                         /* LTM */
-        if (cpu_model & I_9X) mode_ttrap = 0;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            mode_ttrap = 0;
         break;
 
     case 00010:                                         /* LSNM */
-        if (cpu_model & I_9X) mode_storn = 0;           /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            mode_storn = 0;
         break;
 
     case 00012:                                         /* RTT (704) */
-        if (cpu_model & I_9X) sel_trap (PC);            /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            sel_trap (PC);
         break;
 
     case 00016:                                         /* EMTM */
@@ -398,14 +430,16 @@ switch (addr) {
         break;
 
     case 00140:                                         /* SLF */
-        if (cpu_model & I_9X) SLT = 0;                  /* 709X only */
+        if (cpu_model & I_9X)                           /* 709X only */
+            SLT = 0;
         break;
 
     case 00141: case 00142: case 00143: case 00144:     /* SLT */
         if (cpu_model & I_9X) {                         /* 709X only */
             t = SLT & (1u << (00144 - addr));
             SLT = SLT & ~t;
-            if (t != 0) PC = (PC + 1) & AMASK;
+            if (t != 0)
+                PC = (PC + 1) & AMASK;
             }
         break;
 
@@ -418,7 +452,8 @@ switch (addr) {
 
     case 001000: case 002000: case 003000: case 004000: /* ETT */
     case 005000: case 006000: case 007000: case 010000:
-        if (sel_trap (PC)) break;                       /* sel trap? */
+        if (sel_trap (PC))                              /* sel trap? */
+            break;
         ch = GET_U_CH (addr);                           /* get channel */
         if (ch_flags[ch] & CHF_EOT)                     /* EOT? */
             ch_flags[ch] = ch_flags[ch] & ~CHF_EOT;     /* clear */
@@ -448,7 +483,8 @@ MQ = 0;                                                 /* clear MQ */
 fp_unpack (AC, 0, 1, &op1);                             /* unpack AC */
 fp_unpack (sr, 0, 0, &op2);                             /* unpack sr */
 if (op1.ch > op2.ch) {                                  /* AC exp > SR exp? */
-    if (AC & AC_P) op1.s = 1;                           /* AC P or's with S */
+    if (AC & AC_P)                                      /* AC P or's with S */
+        op1.s = 1;
     t = op1;                                            /* swap operands */
     op1 = op2;
     op2 = t;
@@ -456,7 +492,8 @@ if (op1.ch > op2.ch) {                                  /* AC exp > SR exp? */
     }
 diff = op2.ch - op1.ch;                                 /* exp diff */
 if (diff) {                                             /* any shift? */
-    if ((diff < 0) || (diff > 077)) op1.fr = 0;         /* diff > 63? */
+    if ((diff < 0) || (diff > 077))                     /* diff > 63? */
+        op1.fr = 0;
     else op1.fr = op1.fr >> diff;                       /* no, denormalize */
     }
 if (op1.s ^ op2.s) {                                    /* subtract? */
@@ -577,7 +614,8 @@ fp_unpack (sr, sr1, 0, &op2);                           /* unpack sr'sr1 */
 if (op1.ch > op2.ch) {                                  /* AC exp > SR exp? */
     if (((op1.ch - op2.ch) > 0100) && (AC & B9)) ;      /* early out */
     else SI = FP_PACK36 (op1.s, op1.ch, FP_HIFRAC (op1.fr));
-    if (AC & AC_P) op1.s = 1;                           /* AC P or's with S */
+    if (AC & AC_P)                                      /* AC P or's with S */
+        op1.s = 1;
     t = op1;                                            /* swap operands */
     op1 = op2;
     op2 = t;
@@ -590,7 +628,8 @@ else {                                                  /* AC <= SR */
     } 
 diff = op2.ch - op1.ch;                                 /* exp diff */
 if (diff) {                                             /* any shift? */
-    if ((diff < 0) || (diff > 077)) op1.fr = 0;         /* diff > 63? */
+    if ((diff < 0) || (diff > 077))                     /* diff > 63? */
+        op1.fr = 0;
     else op1.fr = op1.fr >> diff;                       /* no, denormalize */
     }
 if (op1.s ^ op2.s) {                                    /* subtract? */
@@ -659,7 +698,8 @@ if (op1.fr) {                                           /* A'B != 0? */
     SI = tx >> FP_N_FR;                                 /* SI keeps B * C */
     }
 else {
-    if (norm) SI = sr;                                  /* early out */
+    if (norm)                                           /* early out */
+        SI = sr;
     else SI = FP_PACK36 (op2.s, op2.ch, 0);
     }
 if (norm) {                                             /* normalize? */
@@ -740,21 +780,25 @@ tr = tr << FP_N_FR;                                     /* R << 27 */
 tq1d = (tq1 * ((t_uint64) FP_LOFRAC (sr1))) &           /* Q1 * D */
     ~((t_uint64) FP_FMASK);                             /* top 27 bits */
 csign = (tr < tq1d);                                    /* correction sign */
-if (csign) trmq1d = tq1d - tr;                          /* |R|<|Q1*D|? compl */
+if (csign)                                              /* |R|<|Q1*D|? compl */
+    trmq1d = tq1d - tr;
 else trmq1d = tr - tq1d;                                /* no, subtr ok */
 SI = FP_PACK36 (op1.s, op1.ch, tq1);                    /* SI has Q1 */
 if (trmq1d >= (2 * op2.fr)) {                           /* |R-Q1*D| >= 2*|C|? */
-    AC = FP_PACK38 (csign ^ ac_s, 0, FP_HIFRAC (trmq1d));       /* AC has R-Q1*D */
+    AC = FP_PACK38 (csign ^ ac_s, 0, FP_HIFRAC (trmq1d)); /* AC has R-Q1*D */
     MQ = (csign ^ ac_s)? SIGN: 0;                       /* MQ = sign only */
     return TRAP_F_DVC;                                  /* divide check */
     }
 tq2 = fp_fracdiv (trmq1d, op2.fr, NULL);                /* |R-Q1*D| / |C| */
-if (trmq1d >= op2.fr) tq2 &= ~((t_uint64) 1);           /* can only gen 27b quo */
+if (trmq1d >= op2.fr)                                   /* can only gen 27b quo */
+    tq2 &= ~((t_uint64) 1);
 op1.fr = tq1 << FP_N_FR;                                /* shift Q1 into place */
-if (csign) op1.fr = op1.fr - tq2;                       /* sub or add Q2 */
+if (csign)                                              /* sub or add Q2 */
+    op1.fr = op1.fr - tq2;
 else op1.fr = op1.fr + tq2;
 fp_norm (&op1);                                         /* normalize */
-if (op1.fr) mqch = op1.ch - FP_N_FR;                    /* non-zero? */
+if (op1.fr)                                             /* non-zero? */
+    mqch = op1.ch - FP_N_FR;
 else op1.ch = mqch = 0;                                 /* clear AC, MQ exp */
 return fp_pack (&op1, op1.s, mqch);                     /* pack AC, MQ */
 }
@@ -786,7 +830,8 @@ return spill;
 t_uint64 fp_fracdiv (t_uint64 dvd, t_uint64 dvr, t_uint64 *rem)
 {
 dvr = dvr >> FP_N_FR;
-if (rem) *rem = dvd % dvr;
+if (rem)
+    *rem = dvd % dvr;
 return (dvd / dvr);
 }
         
@@ -795,7 +840,8 @@ return (dvd / dvr);
 void fp_norm (UFP *op)
 {
 op->fr = op->fr & FP_DFMASK;                            /* mask fraction */
-if (op->fr == 0) return;                                /* zero? */
+if (op->fr == 0)                                        /* zero? */
+    return;
 while ((op->fr & FP_FNORM) == 0) {                      /* until norm */
     op->fr = op->fr << 1;                               /* lsh 1 */
     op->ch--;                                           /* decr exp */
@@ -828,10 +874,14 @@ uint32 spill;
 
 AC = FP_PACK38 (op->s, op->ch, FP_HIFRAC (op->fr));     /* pack AC */
 MQ = FP_PACK36 (mqs, mqch, FP_LOFRAC (op->fr));         /* pack MQ */
-if (op->ch > FP_M_CH) spill = TRAP_F_OVF | TRAP_F_AC;   /* check AC exp */
-else if (op->ch < 0) spill = TRAP_F_AC;
+if (op->ch > FP_M_CH)                                   /* check AC exp */
+    spill = TRAP_F_OVF | TRAP_F_AC;
+else if (op->ch < 0)
+    spill = TRAP_F_AC;
 else spill = 0;
-if (mqch > FP_M_CH) spill |= (TRAP_F_OVF | TRAP_F_MQ);  /* check MQ exp */
-else if (mqch < 0) spill |= TRAP_F_MQ;
+if (mqch > FP_M_CH)                                     /* check MQ exp */
+    spill |= (TRAP_F_OVF | TRAP_F_MQ);
+else if (mqch < 0)
+    spill |= TRAP_F_MQ;
 return spill;
 }

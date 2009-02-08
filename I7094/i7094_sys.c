@@ -1,6 +1,6 @@
 /* i7094_sys.c: IBM 7094 simulator interface
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -571,9 +571,11 @@ DEVICE *dptr;
 t_uint64 inst;
 
 inst = val[0];
-if (uptr == NULL) uptr = &cpu_unit;
+if (uptr == NULL)
+    uptr = &cpu_unit;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 
 if (sw & SWMASK ('C')) {                                /* character? */
     c = (uint32) (inst & 077);
@@ -588,15 +590,18 @@ if (sw & SWMASK ('S')) {                                /* string? */
     return SCPE_OK;
     }
 if (!(sw & (SWMASK ('M')|SWMASK ('I')|SWMASK ('N'))) || /* M, N or I? */
-    (dptr->dwidth != 36)) return SCPE_ARG;
+    (dptr->dwidth != 36))
+    return SCPE_ARG;
 
 /* Instruction decode */
 
 fld[0] = ((uint32) inst & 0777777);
 fld[1] = GET_TAG (inst);                                /* get 3 fields */
 fld[2] = GET_DEC (inst);
-if (sw & SWMASK ('I')) inst |= IFAKE_7607;              /* decode as 7607? */
-if (sw & SWMASK ('N')) inst |= IFAKE_7909;              /* decode as 7909? */
+if (sw & SWMASK ('I'))                                  /* decode as 7607? */
+    inst |= IFAKE_7607;
+if (sw & SWMASK ('N'))                                  /* decode as 7909? */
+    inst |= IFAKE_7909;
 
 for (i = 0; opc_v[i] > 0; i++) {                        /* loop thru ops */
     j = (int32) ((opc_v[i] >> I_V_FL) & I_M_FL);        /* get class */
@@ -604,18 +609,22 @@ for (i = 0; opc_v[i] > 0; i++) {                        /* loop thru ops */
         if (inst & ind_test[j])                         /* indirect? */
             fprintf (of, "%s*", opcode[i]);
         else fprintf (of, "%s", opcode[i]);             /* opcode */
-        for (k = 0; k < 3; k++) fld[k] = fld[k] & fld_max[j][k];
+        for (k = 0; k < 3; k++)
+            fld[k] = fld[k] & fld_max[j][k];
         for (k = 0; k < 3; k++) {                       /* loop thru fields */
             fmt = fld_fmt[j][k];                        /* get format */
-            if (fmt == INST_P_XIT) return SCPE_OK;
+            if (fmt == INST_P_XIT)
+                return SCPE_OK;
             switch (fmt) {                              /* case on format */
 
             case INST_P_PNT:                            /* print nz, else term */
                 for (l = k, c = 0; l < 3; l++) c |= fld[k];
-                if (c == 0) return SCPE_OK;
+                if (c == 0)
+                    return SCPE_OK;
             case INST_P_PNZ:                            /* print non-zero */
                 fputc (k? ',': ' ', of);
-                if (fld[k]) fprintf (of, "%-o", fld[k]);
+                if (fld[k])
+                    fprintf (of, "%-o", fld[k]);
                 break;
             case INST_P_PRA:                            /* print always */
                 fputc (k? ',': ' ', of);
@@ -639,10 +648,12 @@ return SCPE_ARG;
 uint32 cvt_code_to_ascii (uint32 c, int32 sw)
 {
 if (sw & SWMASK ('B')) {
-    if (sw & SWMASK ('A')) return bcd_to_ascii_a[c];
+    if (sw & SWMASK ('A'))
+        return bcd_to_ascii_a[c];
     else return bcd_to_ascii_h[c];
     }
-else if (sw & SWMASK ('A')) return nine_to_ascii_a[c];
+else if (sw & SWMASK ('A'))
+    return nine_to_ascii_a[c];
 else return nine_to_ascii_h[c];
 }
 
@@ -668,15 +679,18 @@ char gbuf[CBUFSIZE];
 
 while (isspace (*cptr)) cptr++;
 if ((sw & SWMASK ('C')) || ((*cptr == '\'') && cptr++)) { /* character? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (t_value) cvt_ascii_to_code (cptr[0] & 0177, sw);
     return SCPE_OK;
     }
 if ((sw & SWMASK ('S')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     for (i = 0; i < 6; i++) {
         c = cptr[0] & 0177;
-        if (c) val[0] = (val[0] << 6) | ((t_value) cvt_ascii_to_code (c, sw));
+        if (c)
+            val[0] = (val[0] << 6) | ((t_value) cvt_ascii_to_code (c, sw));
         else {
             val[0] = val[0] << (6 * (6 - i));
             break;
@@ -693,24 +707,30 @@ if (gbuf[j - 1] == '*') {                               /* indirect? */
     }
 else ind = FALSE;
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 j = (uint32) ((opc_v[i] >> I_V_FL) & I_M_FL);           /* get class */
 val[0] = opc_v[i] & DMASK;
 if (ind) {
-    if (ind_test[j]) val[0] |= ind_test[j];
+    if (ind_test[j])
+        val[0] |= ind_test[j];
     else return SCPE_ARG;
     }
 
-for (i = 0; i < 3; i++) fld[i] = 0;                     /* clear inputs */
+for (i = 0; i < 3; i++)                                 /* clear inputs */
+    fld[i] = 0;
 for (i = 0; (i < 3) && *cptr; i++) {                    /* parse inputs */
-    if (i < 2) cptr = get_glyph (cptr, gbuf, ',');      /* get glyph */
+    if (i < 2)                                          /* get glyph */
+        cptr = get_glyph (cptr, gbuf, ',');
     else cptr = get_glyph (cptr, gbuf, 0);
     if (gbuf[0]) {                                      /* anything? */
         fld[i] = get_uint (gbuf, 8, fld_max[j][i], &r);
-        if ((r != SCPE_OK) || (fld_max[j][i] == 0)) return SCPE_ARG;
+        if ((r != SCPE_OK) || (fld_max[j][i] == 0))
+            return SCPE_ARG;
         }
     }
-if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
+if (*cptr != 0)                                         /* junk at end? */
+    return SCPE_ARG;
 
 val[0] = val[0] | fld[0] | (fld[1] << INST_V_TAG) | (fld[2] << INST_V_DEC);
 return SCPE_OK;
@@ -722,6 +742,7 @@ return SCPE_OK;
 
 uint32 cvt_ascii_to_code (uint32 c, int32 sw)
 {
-if (sw & SWMASK ('B')) return ascii_to_bcd[c];
+if (sw & SWMASK ('B'))
+    return ascii_to_bcd[c];
 else return ascii_to_nine[c];
 }

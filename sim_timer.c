@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Sep-08    RMS     Added "stability threshold" for idle routine
    27-May-08    RMS     Fixed bug in Linux idle routines (from Walter Mueller)
    18-Jun-07    RMS     Modified idle to exclude counted delays
    22-Mar-07    RMS     Added sim_rtcn_init_all
@@ -52,6 +53,7 @@
 t_bool sim_idle_enab = FALSE;                           /* global flag */
 
 static uint32 sim_idle_rate_ms = 0;
+static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static uint32 sim_throt_ms_start = 0;
 static uint32 sim_throt_ms_stop = 0;
 static uint32 sim_throt_type = 0;
@@ -146,7 +148,8 @@ const t_bool rtc_avail = TRUE;
 
 uint32 sim_os_msec ()
 {
-if (sim_idle_rate_ms) return timeGetTime ();
+if (sim_idle_rate_ms)
+    return timeGetTime ();
 else return GetTickCount ();
 }
 
@@ -317,8 +320,10 @@ for (i = 0, tot = 0; i < sleep1Samples; i++) {
     tot += (t2 - t1);
     }
 tim = (tot + (sleep1Samples - 1)) / sleep1Samples;
-if (tim == 0) tim = 1;
-else if (tim > SIM_IDLE_MAX) tim = 0;
+if (tim == 0)
+    tim = 1;
+else if (tim > SIM_IDLE_MAX)
+    tim = 0;
 return tim;
 
 #endif
@@ -347,6 +352,7 @@ static uint32 rtc_nxintv[SIM_NTIMERS] = { 0 };          /* next interval */
 static int32 rtc_based[SIM_NTIMERS] = { 0 };            /* base delay */
 static int32 rtc_currd[SIM_NTIMERS] = { 0 };            /* current delay */
 static int32 rtc_initd[SIM_NTIMERS] = { 0 };            /* initial delay */
+static uint32 rtc_elapsed[SIM_NTIMERS] = { 0 };         /* sec since init */
 
 void sim_rtcn_init_all (void)
 {
@@ -360,8 +366,10 @@ return;
 
 int32 sim_rtcn_init (int32 time, int32 tmr)
 {
-if (time == 0) time = 1;
-if ((tmr < 0) || (tmr >= SIM_NTIMERS)) return time;
+if (time == 0)
+    time = 1;
+if ((tmr < 0) || (tmr >= SIM_NTIMERS))
+    return time;
 rtc_rtime[tmr] = sim_os_msec ();
 rtc_vtime[tmr] = rtc_rtime[tmr];
 rtc_nxintv[tmr] = 1000;
@@ -370,6 +378,7 @@ rtc_hz[tmr] = 0;
 rtc_based[tmr] = time;
 rtc_currd[tmr] = time;
 rtc_initd[tmr] = time;
+rtc_elapsed[tmr] = 0;
 return time;
 }
 
@@ -378,12 +387,16 @@ int32 sim_rtcn_calb (int32 ticksper, int32 tmr)
 uint32 new_rtime, delta_rtime;
 int32 delta_vtime;
 
-if ((tmr < 0) || (tmr >= SIM_NTIMERS)) return 10000;
+if ((tmr < 0) || (tmr >= SIM_NTIMERS))
+    return 10000;
 rtc_hz[tmr] = ticksper;
 rtc_ticks[tmr] = rtc_ticks[tmr] + 1;                    /* count ticks */
-if (rtc_ticks[tmr] < ticksper) return rtc_currd[tmr];   /* 1 sec yet? */
+if (rtc_ticks[tmr] < ticksper)                          /* 1 sec yet? */
+    return rtc_currd[tmr];
 rtc_ticks[tmr] = 0;                                     /* reset ticks */
-if (!rtc_avail) return rtc_currd[tmr];                  /* no timer? */
+rtc_elapsed[tmr] = rtc_elapsed[tmr] + 1;                /* count sec */
+if (!rtc_avail)                                         /* no timer? */
+    return rtc_currd[tmr];
 new_rtime = sim_os_msec ();                             /* wall time */
 if (new_rtime < rtc_rtime[tmr]) {                       /* time running backwards? */
     rtc_rtime[tmr] = new_rtime;                         /* reset wall time */
@@ -399,13 +412,17 @@ if (delta_rtime == 0)                                   /* gap too small? */
 else rtc_based[tmr] = (int32) (((double) rtc_based[tmr] * (double) rtc_nxintv[tmr]) /
     ((double) delta_rtime));                            /* new base rate */
 delta_vtime = rtc_vtime[tmr] - rtc_rtime[tmr];          /* gap */
-if (delta_vtime > SIM_TMAX) delta_vtime = SIM_TMAX;     /* limit gap */
-else if (delta_vtime < -SIM_TMAX) delta_vtime = -SIM_TMAX;
+if (delta_vtime > SIM_TMAX)                             /* limit gap */
+    delta_vtime = SIM_TMAX;
+else if (delta_vtime < -SIM_TMAX)
+    delta_vtime = -SIM_TMAX;
 rtc_nxintv[tmr] = 1000 + delta_vtime;                   /* next wtime */
 rtc_currd[tmr] = (int32) (((double) rtc_based[tmr] * (double) rtc_nxintv[tmr]) /
     1000.0);                                            /* next delay */
-if (rtc_based[tmr] <= 0) rtc_based[tmr] = 1;            /* never negative or zero! */
-if (rtc_currd[tmr] <= 0) rtc_currd[tmr] = 1;            /* never negative or zero! */
+if (rtc_based[tmr] <= 0)                                /* never negative or zero! */
+    rtc_based[tmr] = 1;
+if (rtc_currd[tmr] <= 0)                                /* never negative or zero! */
+    rtc_currd[tmr] = 1;
 return rtc_currd[tmr];
 }
 
@@ -449,19 +466,23 @@ uint32 cyc_ms, w_ms, w_idle, act_ms;
 int32 act_cyc;
 
 if ((sim_clock_queue == NULL) ||                        /* clock queue empty? */
-    ((sim_clock_queue->flags & UNIT_IDLE) == 0)) {      /* event not idle-able? */
-    if (sin_cyc) sim_interval = sim_interval - 1;
+    ((sim_clock_queue->flags & UNIT_IDLE) == 0) ||      /* event not idle-able? */
+    (rtc_elapsed[tmr] < sim_idle_stable)) {             /* timer not stable? */
+    if (sin_cyc)
+        sim_interval = sim_interval - 1;
     return FALSE;
     }
 cyc_ms = (rtc_currd[tmr] * rtc_hz[tmr]) / 1000;         /* cycles per msec */
 if ((sim_idle_rate_ms == 0) || (cyc_ms == 0)) {         /* not possible? */
-    if (sin_cyc) sim_interval = sim_interval - 1;
+    if (sin_cyc)
+        sim_interval = sim_interval - 1;
     return FALSE;
     }
 w_ms = (uint32) sim_interval / cyc_ms;                  /* ms to wait */
 w_idle = w_ms / sim_idle_rate_ms;                       /* intervals to wait */
 if (w_idle == 0) {                                      /* none? */
-    if (sin_cyc) sim_interval = sim_interval - 1;
+    if (sin_cyc)
+        sim_interval = sim_interval - 1;
     return FALSE;
     }
 act_ms = sim_os_ms_sleep (w_idle);                      /* wait */
@@ -476,14 +497,25 @@ return TRUE;
 
 t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (sim_idle_rate_ms == 0) return SCPE_NOFNC;
+t_stat r;
+uint32 v;
+
+if (sim_idle_rate_ms == 0)
+    return SCPE_NOFNC;
 if ((val != 0) && (sim_idle_rate_ms > (uint32) val))
     return SCPE_NOFNC;
+if (cptr) {
+    v = (uint32) get_uint (cptr, 10, SIM_IDLE_STMAX, &r);
+    if ((r != SCPE_OK) || (v < SIM_IDLE_STMIN))
+        return SCPE_ARG;
+    sim_idle_stable = v;
+    }
 sim_idle_enab = TRUE;
 if (sim_throt_type != SIM_THROT_NONE) {
     sim_set_throt (0, NULL);
     printf ("Throttling disabled\n");
-    if (sim_log) fprintf (sim_log, "Throttling disabled\n");
+    if (sim_log)
+        fprintf (sim_log, "Throttling disabled\n");
     }
 return SCPE_OK;
 }
@@ -500,7 +532,9 @@ return SCPE_OK;
 
 t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, sim_idle_enab? "idle enabled": "idle disabled");
+if (sim_idle_enab)
+    fprintf (st, "idle enabled, stability wait = %ds", sim_idle_stable);
+else fputs ("idle disabled", st);
 return SCPE_OK;
 }
 
@@ -512,24 +546,31 @@ char *tptr, c;
 t_value val;
 
 if (arg == 0) {
-    if ((cptr != 0) && (*cptr != 0)) return SCPE_ARG;
+    if ((cptr != 0) && (*cptr != 0))
+        return SCPE_ARG;
     sim_throt_type = SIM_THROT_NONE;
     sim_throt_cancel ();
     }
-else if (sim_idle_rate_ms == 0) return SCPE_NOFNC;
+else if (sim_idle_rate_ms == 0)
+    return SCPE_NOFNC;
 else {
     val = strtotv (cptr, &tptr, 10);
-    if (cptr == tptr) return SCPE_ARG;
+    if (cptr == tptr)
+        return SCPE_ARG;
     c = toupper (*tptr++);
-    if (*tptr != 0) return SCPE_ARG;
-    if (c == 'M') sim_throt_type = SIM_THROT_MCYC;
-    else if (c == 'K') sim_throt_type = SIM_THROT_KCYC;
+    if (*tptr != 0)
+        return SCPE_ARG;
+    if (c == 'M') 
+        sim_throt_type = SIM_THROT_MCYC;
+    else if (c == 'K')
+        sim_throt_type = SIM_THROT_KCYC;
     else if ((c == '%') && (val > 0) && (val < 100))
         sim_throt_type = SIM_THROT_PCT;
     else return SCPE_ARG;
     if (sim_idle_enab) {
         printf ("Idling disabled\n");
-        if (sim_log) fprintf (sim_log, "Idling disabled\n");
+        if (sim_log)
+            fprintf (sim_log, "Idling disabled\n");
         sim_clr_idle (NULL, 0, NULL, NULL);
         }
     sim_throt_val = (uint32) val;

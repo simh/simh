@@ -1,6 +1,6 @@
 /* vax_sysdev.c: VAX 3900 system-specific logic
 
-   Copyright (c) 1998-2005, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -480,7 +480,8 @@ int32 rom_read_delay (int32 val)
 uint32 i, l = rom_delay;
 int32 loopval = 0;
 
-if (rom_unit.flags & UNIT_NODELAY) return val;
+if (rom_unit.flags & UNIT_NODELAY)
+    return val;
 
 /* Calibrate the loop delay factor when first used.
    Do this 4 times to and use the largest value computed. */
@@ -501,13 +502,16 @@ if (rom_delay == 0) {
         for (i = 0; i < c; i++)
             loopval |= (loopval + ts) ^ rom_swapb (rom_swapb (loopval + ts));
         te = sim_os_msec (); 
-        if ((te - ts) < 50) continue;                   /* sample big enough? */
+        if ((te - ts) < 50)                         /* sample big enough? */
+            continue;
         if (rom_delay < (loopval + (c / (te - ts) / 1000) + 1))
             rom_delay = loopval + (c / (te - ts) / 1000) + 1;
-        if (++samples >= 4) break;
+        if (++samples >= 4)
+            break;
         c = c / 2;
         }
-    if (rom_delay < 5) rom_delay = 5;
+    if (rom_delay < 5)
+        rom_delay = 5;
     }
 
 for (i = 0; i < l; i++)
@@ -537,8 +541,10 @@ t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 addr = (uint32) exta;
 
-if ((vptr == NULL) || (addr & 03)) return SCPE_ARG;
-if (addr >= ROMSIZE) return SCPE_NXM;
+if ((vptr == NULL) || (addr & 03))
+    return SCPE_ARG;
+if (addr >= ROMSIZE)
+    return SCPE_NXM;
 *vptr = rom[addr >> 2];
 return SCPE_OK;
 }
@@ -549,8 +555,10 @@ t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 addr = (uint32) exta;
 
-if (addr & 03) return SCPE_ARG;
-if (addr >= ROMSIZE) return SCPE_NXM;
+if (addr & 03)
+    return SCPE_ARG;
+if (addr >= ROMSIZE)
+    return SCPE_NXM;
 rom[addr >> 2] = (uint32) val;
 return SCPE_OK;
 }
@@ -559,8 +567,10 @@ return SCPE_OK;
 
 t_stat rom_reset (DEVICE *dptr)
 {
-if (rom == NULL) rom = (uint32 *) calloc (ROMSIZE >> 2, sizeof (uint32));
-if (rom == NULL) return SCPE_MEM;
+if (rom == NULL)
+    rom = (uint32 *) calloc (ROMSIZE >> 2, sizeof (uint32));
+if (rom == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -592,8 +602,10 @@ t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 addr = (uint32) exta;
 
-if ((vptr == NULL) || (addr & 03)) return SCPE_ARG;
-if (addr >= NVRSIZE) return SCPE_NXM;
+if ((vptr == NULL) || (addr & 03))
+    return SCPE_ARG;
+if (addr >= NVRSIZE)
+    return SCPE_NXM;
 *vptr = nvr[addr >> 2];
 return SCPE_OK;
 }
@@ -604,8 +616,10 @@ t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 addr = (uint32) exta;
 
-if (addr & 03) return SCPE_ARG;
-if (addr >= NVRSIZE) return SCPE_NXM;
+if (addr & 03)
+    return SCPE_ARG;
+if (addr >= NVRSIZE)
+    return SCPE_NXM;
 nvr[addr >> 2] = (uint32) val;
 return SCPE_OK;
 }
@@ -619,7 +633,8 @@ if (nvr == NULL) {
     nvr_unit.filebuf = nvr;
     ssc_cnf = ssc_cnf | SSCCNF_BLO;
     }
-if (nvr == NULL) return SCPE_MEM;
+if (nvr == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -668,7 +683,8 @@ return (csi_unit.buf & 0377);
 
 void csrs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) CLR_INT (CSI);
+if ((data & CSR_IE) == 0)
+    CLR_INT (CSI);
 else if ((csi_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     SET_INT (CSI);
 csi_csr = (csi_csr & ~CSICSR_RW) | (data & CSICSR_RW);
@@ -692,7 +708,8 @@ return (cso_csr & CSOCSR_IMP);
 
 void csts_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) CLR_INT (CSO);
+if ((data & CSR_IE) == 0)
+    CLR_INT (CSO);
 else if ((cso_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     SET_INT (CSO);
 cso_csr = (cso_csr & ~CSOCSR_RW) | (data & CSOCSR_RW);
@@ -711,8 +728,10 @@ return;
 t_stat cso_svc (UNIT *uptr)
 {
 cso_csr = cso_csr | CSR_DONE;
-if (cso_csr & CSR_IE) SET_INT (CSO);
-if ((cso_unit.flags & UNIT_ATT) == 0) return SCPE_OK;
+if (cso_csr & CSR_IE)
+    SET_INT (CSO);
+if ((cso_unit.flags & UNIT_ATT) == 0)
+    return SCPE_OK;
 if (putc (cso_unit.buf, cso_unit.fileref) == EOF) {
     perror ("CSO I/O error");
     clearerr (cso_unit.fileref);
@@ -1105,7 +1124,8 @@ return;
 int32 parity (int32 val, int32 odd)
 {
 for ( ; val != 0; val = val >> 1) {
-    if (val & 1) odd = odd ^ 1;
+    if (val & 1)
+        odd = odd ^ 1;
     }
 return odd;
 }
@@ -1337,7 +1357,8 @@ if (interp || (tmr_csr[tmr] & TMR_CSR_RUN)) {           /* interp, running? */
     if ((tmr_inc[tmr] == TMR_INC) &&                    /* scale large int */
         (tmr_poll > TMR_INC))
         delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
-    if (delta >= tmr_inc[tmr]) delta = tmr_inc[tmr] - 1;
+    if (delta >= tmr_inc[tmr])
+        delta = tmr_inc[tmr] - 1;
     return tmr_tir[tmr] + delta;
     }
 return tmr_tir[tmr];
@@ -1345,7 +1366,8 @@ return tmr_tir[tmr];
 
 void tmr_csr_wr (int32 tmr, int32 val)
 {
-if ((tmr < 0) || (tmr > 1)) return;
+if ((tmr < 0) || (tmr > 1))
+    return;
 if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
     sim_cancel (&sysd_unit[tmr]);                       /* cancel timer */
     if (tmr_csr[tmr] & TMR_CSR_RUN)                     /* run 1 -> 0? */
@@ -1354,7 +1376,8 @@ if ((val & TMR_CSR_RUN) == 0) {                         /* clearing run? */
 tmr_csr[tmr] = tmr_csr[tmr] & ~(val & TMR_CSR_W1C);     /* W1C csr */
 tmr_csr[tmr] = (tmr_csr[tmr] & ~TMR_CSR_RW) |           /* new r/w */
     (val & TMR_CSR_RW);
-if (val & TMR_CSR_XFR) tmr_tir[tmr] = tmr_tnir[tmr];    /* xfr set? */
+if (val & TMR_CSR_XFR)                                  /* xfr set? */
+    tmr_tir[tmr] = tmr_tnir[tmr];
 if (val & TMR_CSR_RUN)  {                               /* run? */
     if (val & TMR_CSR_XFR)                              /* new tir? */
         sim_cancel (&sysd_unit[tmr]);                   /* stop prev */
@@ -1368,7 +1391,8 @@ else if (val & TMR_CSR_SGL) {                           /* single step? */
     }
 if ((tmr_csr[tmr] & (TMR_CSR_DON | TMR_CSR_IE)) !=      /* update int */
     (TMR_CSR_DON | TMR_CSR_IE)) {
-        if (tmr) CLR_INT (TMR1);
+        if (tmr)
+            CLR_INT (TMR1);
         else CLR_INT (TMR0);
         }
 return;
@@ -1402,7 +1426,8 @@ if (new_tir < tmr_tir[tmr]) {                           /* ovflo? */
         tmr_sched (tmr);                                /* reactivate */
         }
     if (tmr_csr[tmr] & TMR_CSR_IE) {                    /* set int req */
-        if (tmr) SET_INT (TMR1);
+        if (tmr)
+            SET_INT (TMR1);
         else SET_INT (TMR0);
         }
     }
@@ -1430,7 +1455,8 @@ else {
     tmr_inc[tmr] = TMR_INC;                             /* usec/interval */
     tmr_time = tmr_poll;
     }
-if (tmr_time == 0) tmr_time = 1;
+if (tmr_time == 0)
+    tmr_time = 1;
 if ((tmr_inc[tmr] == TMR_INC) && (tmr_time > clk_time)) {
 
 /* Align scheduled event to be identical to the event for the next clock
@@ -1462,10 +1488,12 @@ int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
 int32 i, st1, st2, p2, hsir, acc;
 
-if (p1 & 0x80) p1 = p1 + mchk_ref;                      /* mref? set v/p */
+if (p1 & 0x80)                                          /* mref? set v/p */
+    p1 = p1 + mchk_ref;
 p2 = mchk_va + 4;                                       /* save vap */
 for (i = hsir = 0; i < 16; i++) {                       /* find hsir */
-    if ((SISR >> i) & 1) hsir = i;
+    if ((SISR >> i) & 1)
+        hsir = i;
     }
 st1 = ((((uint32) opc) & 0xFF) << 24) |
     (hsir << 16) |
@@ -1494,9 +1522,11 @@ int32 temp;
 conpc = PC;                                             /* save PC */
 conpsl = ((PSL | cc) & 0xFFFF00FF) | CON_HLTINS;        /* PSL, param */
 temp = (PSL >> PSL_V_CUR) & 0x7;                        /* get is'cur */
-if (temp > 4) conpsl = conpsl | CON_BADPSL;             /* invalid? */
+if (temp > 4)                                           /* invalid? */
+    conpsl = conpsl | CON_BADPSL;
 else STK[temp] = SP;                                    /* save stack */
-if (mapen) conpsl = conpsl | CON_MAPON;                 /* mapping on? */
+if (mapen)                                              /* mapping on? */
+    conpsl = conpsl | CON_MAPON;
 mapen = 0;                                              /* turn off map */
 SP = IS;                                                /* set SP from IS */
 PSL = PSL_IS | PSL_IPL1F;                               /* PSL = 41F0000 */
@@ -1516,13 +1546,15 @@ PC = ROMBASE;
 PSL = PSL_IS | PSL_IPL1F;
 conpc = 0;
 conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
-if (rom == NULL) return SCPE_IERR;
+if (rom == NULL)
+    return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
     printf ("Loading boot code from ka655x.bin\n");
-    if (sim_log) fprintf (sim_log, 
-        "Loading boot code from ka655x.bin\n");
+    if (sim_log)
+        fprintf (sim_log, "Loading boot code from ka655x.bin\n");
     r = load_cmd (0, "-R ka655x.bin");
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
 return SCPE_OK;
 }
@@ -1556,7 +1588,8 @@ t_stat sysd_powerup (void)
 {
 int32 i;
 
-for (i = 0; i < (CMCTLSIZE >> 2); i++) cmctl_reg[i] = 0;
+for (i = 0; i < (CMCTLSIZE >> 2); i++)
+    cmctl_reg[i] = 0;
 for (i = 0; i < 2; i++) {
     tmr_tivr[i] = 0;
     ssc_adsm[i] = ssc_adsk[i] = 0;

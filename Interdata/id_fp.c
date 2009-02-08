@@ -1,6 +1,6 @@
 /* id_fp.c: Interdata floating point instructions
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -218,7 +218,8 @@ uint32 f_flt (uint32 op, uint32 r1, uint32 r2)          /* 16b */
 struct ufp res = { 0, 0x44, 0, 0 };                     /* +, 16**4 */
 uint32 cc;
 
-if (R[r2] == 0) cc = 0;                                 /* zero arg? */
+if (R[r2] == 0)                                         /* zero arg? */
+    cc = 0;
 else if (R[r2] & SIGN16) {                              /* neg arg? */
     res.sign = FP_M_SIGN;                               /* set sign */
     res.h = ((~R[r2] + 1) & DMASK16) << 8;              /* get magnitude */
@@ -264,8 +265,10 @@ int32 ediff;
 
 ReadFP2 (&fop2, op, r2, ea);                            /* get op2, norm */
 UnpackFPR (&fop1, op, r1);                              /* get op1, norm */
-if (op & 1) fop2.sign = fop2.sign ^ 1;                  /* if sub, inv sign2 */
-if (fop1.h == 0) fop1 = fop2;                           /* if op1 = 0, res = op2 */
+if (op & 1)                                             /* if sub, inv sign2 */
+    fop2.sign = fop2.sign ^ 1;
+if (fop1.h == 0)                                        /* if op1 = 0, res = op2 */
+    fop1 = fop2;
 else if (fop2.h != 0) {                                 /* if op2 = 0, no add */
     if ((fop1.exp < fop2.exp) ||                        /* |op1| < |op2|? */
         ((fop1.exp == fop2.exp) &&
@@ -277,13 +280,15 @@ else if (fop2.h != 0) {                                 /* if op2 = 0, no add */
         }
     ediff = fop1.exp - fop2.exp;                        /* exp difference */
     if (OP_DPFP (op) || fp_in_hwre) {                   /* dbl prec or hwre? */
-        if (ediff >= 14) fop2.h = fop2.l = 0;           /* diff too big? */
+        if (ediff >= 14)                                /* diff too big? */
+            fop2.h = fop2.l = 0;
         else if (ediff) {                               /* any difference? */
             FR_RSH_V (fop2, ediff * 4);                 /* shift frac */
             }
         }
     else {                                              /* sgl prec ucode */
-        if (ediff >= 6) fop2.h = 0;                     /* diff too big? */
+        if (ediff >= 6)                                 /* diff too big? */
+            fop2.h = 0;
         else if (ediff)                                 /* any difference? */
             fop2.h = fop2.h >> (ediff * 4);             /* shift frac */
         }
@@ -328,7 +333,8 @@ if (fop1.h && fop2.h) {                                 /* if both != 0 */
         return StoreFPX (&res, op, r1);                 /* early out */
     if ((fop1.l | fop2.l) == 0) {                       /* 24b x 24b? */
         for (i = 0; i < 24; i++) {                      /* 24 iterations */
-            if (fop2.h & 1) res.h = res.h + fop1.h;     /* add hi only */
+            if (fop2.h & 1)                             /* add hi only */
+                res.h = res.h + fop1.h;
             FR_RSH_K (res, 1);                          /* shift dp res */
             fop2.h = fop2.h >> 1;
             }
@@ -336,13 +342,17 @@ if (fop1.h && fop2.h) {                                 /* if both != 0 */
     else {                                              /* some low 0's */
         if (fop2.l != 0) {                              /* 56b x 56b? */
             for (i = 0; i < 32; i++) {                  /* do low 32b */
-                if (fop2.l & 1) { FR_ADD (res, fop1); }
+                if (fop2.l & 1) {
+                    FR_ADD (res, fop1);
+                    }
                 FR_RSH_K (res, 1);
                 fop2.l = fop2.l >> 1;
                 }
             }
         for (i = 0; i < 24; i++) {                      /* do hi 24b */
-            if (fop2.h & 1) { FR_ADD (res, fop1); }
+            if (fop2.h & 1) {
+                FR_ADD (res, fop1);
+                }
             FR_RSH_K (res, 1);
             fop2.h = fop2.h >> 1;
             }
@@ -364,7 +374,8 @@ int32 i;
 
 ReadFP2 (&fop2, op, r2, ea);                            /* get op2, norm */
 UnpackFPR (&fop1, op, r1);                              /* get op1, norm */
-if (fop2.h == 0) return CC_C | CC_V;                    /* div by zero? */
+if (fop2.h == 0)                                        /* div by zero? */
+    return CC_C | CC_V;
 if (fop1.h) {                                           /* dvd != 0? */
     quo.sign = fop1.sign ^ fop2.sign;                   /* sign = diff */
     quo.exp = fop1.exp - fop2.exp + FP_BIAS;            /* exp = diff */
@@ -388,7 +399,8 @@ if (fop1.h) {                                           /* dvd != 0? */
         }
     if (!OP_DPFP (op)) {                                /* single? */
         quo.h = quo.l;                                  /* move quotient */
-        if (fop1.h >= (fop2.h << 3)) quo.l = FP_ROUND;
+        if (fop1.h >= (fop2.h << 3))
+            quo.l = FP_ROUND;
         else quo.l = 0;
         }                                               /* don't need to normalize */
     }                                                   /* end if fop1.h */
@@ -429,7 +441,8 @@ uint32 hi;
 
 if (OP_TYPE (op) > OP_RR) {                             /* mem ref? */
     hi = ReadF (ea, VR);                                /* get hi */
-    if (OP_DPFP (op)) fop->l = ReadF (ea + 4, VR);      /* dp? get lo */
+    if (OP_DPFP (op))                                   /* dp? get lo */
+        fop->l = ReadF (ea + 4, VR);
     else fop->l = 0;                                    /* sp, lo = 0 */
     }
 else {
@@ -515,7 +528,8 @@ uint32 StoreFPX (struct ufp *fop, uint32 op, uint32 r1)
 {
 uint32 cc = CC_V;
 
-if (fop->exp < 0) fop->h = fop->l = 0;                  /* undf? clean 0 */
+if (fop->exp < 0)                                       /* undf? clean 0 */
+    fop->h = fop->l = 0;
 else {
     fop->h = (fop->sign)? 0xFFFFFFFF: 0x7FFFFFFF;       /* overflow */
     fop->l = 0xFFFFFFFF;

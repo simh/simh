@@ -1,6 +1,6 @@
 /* pdp18b_drm.c: drum/fixed head disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -136,7 +136,8 @@ int32 drm61 (int32 dev, int32 pulse, int32 AC)
 int32 t;
 
 if (pulse & 001) {                                      /* DRSF */
-    if (TST_INT (DRM)) AC = AC | IOT_SKP;
+    if (TST_INT (DRM))
+        AC = AC | IOT_SKP;
     }
 if (pulse & 002) {                                      /* DRCF */
     CLR_INT (DRM);                                      /* clear done */
@@ -145,7 +146,8 @@ if (pulse & 002) {                                      /* DRCF */
 if (pulse & 004) {                                      /* DRSS */
     drm_da = AC & DRM_SMASK;                            /* load sector # */
     t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
-    if (t <= 0) t = t + DRM_NUMWDT;                     /* wrap around? */
+    if (t <= 0)                                         /* wrap around? */
+        t = t + DRM_NUMWDT;
     sim_activate (&drm_unit, t * drm_time);             /* schedule op */
     }
 return AC;
@@ -156,13 +158,15 @@ int32 drm62 (int32 dev, int32 pulse, int32 AC)
 int32 t;
 
 if (pulse & 001) {                                      /* DRSN */
-    if (drm_err == 0) AC = AC | IOT_SKP;
+    if (drm_err == 0)
+        AC = AC | IOT_SKP;
     }
 if (pulse & 004) {                                      /* DRCS */
     CLR_INT (DRM);                                      /* clear done */
     drm_err = 0;                                        /* clear error */
     t = ((drm_da % DRM_NUMSC) * DRM_NUMWDS) - GET_POS (drm_time);
-    if (t <= 0) t = t + DRM_NUMWDT;                     /* wrap around? */
+    if (t <= 0)                                         /* wrap around? */
+        t = t + DRM_NUMWDT;
     sim_activate (&drm_unit, t * drm_time);             /* schedule op */
     }
 return AC;
@@ -192,10 +196,12 @@ for (i = 0; i < DRM_NUMWDS; i++, da++) {                /* do transfer */
             M[drm_ma] = fbuf[da];                       /* read word */
         }
     else {                                              /* write */
-        if ((drm_wlk >> (drm_da >> 4)) & 1) drm_err = 1;
+        if ((drm_wlk >> (drm_da >> 4)) & 1)
+            drm_err = 1;
         else {                                          /* not locked */
             fbuf[da] = M[drm_ma];                       /* write word */
-            if (da >= uptr->hwmark) uptr->hwmark = da + 1;
+            if (da >= uptr->hwmark)
+                uptr->hwmark = da + 1;
             }
         }
     drm_ma = (drm_ma + 1) & 0177777;                    /* incr mem addr */
@@ -241,8 +247,10 @@ t_stat drm_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 PC;
 
-if (drm_dib.dev != DEV_DRM) return STOP_NONSTD;         /* non-std addr? */
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+if (drm_dib.dev != DEV_DRM)                             /* non-std addr? */
+    return STOP_NONSTD;
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 PC = BOOT_START;
 return SCPE_OK;
 }

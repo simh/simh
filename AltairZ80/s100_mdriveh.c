@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_mdriveh.c 1773 2008-01-11 05:46:19Z hharte $                *
+ * $Id: s100_mdriveh.c 1940 2008-06-13 05:28:57Z hharte $                *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -53,10 +53,12 @@
 #define DBG_PRINT(args)
 #endif
 
-#define SEEK_MSG    0x01
-#define RD_DATA_MSG 0x08
-#define WR_DATA_MSG 0x10
-#define VERBOSE_MSG 0x80
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define SEEK_MSG    (1 << 1)
+#define RD_DATA_MSG (1 << 3)
+#define WR_DATA_MSG (1 << 4)
+#define VERBOSE_MSG (1 << 7)
 
 #define MDRIVEH_MAX_DRIVES    8
 
@@ -90,8 +92,6 @@ static int32 mdrivehdev(const int32 port, const int32 io, const int32 data);
 static uint8 MDRIVEH_Read(const uint32 Addr);
 static uint8 MDRIVEH_Write(const uint32 Addr, uint8 cData);
 
-static int32 trace_level = 0;       /* Disable all tracing by default */
-
 static UNIT mdriveh_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_DISABLE + UNIT_ROABLE, MDRIVEH_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_DISABLE + UNIT_DIS + UNIT_ROABLE, MDRIVEH_CAPACITY) },
@@ -104,7 +104,6 @@ static UNIT mdriveh_unit[] = {
 };
 
 static REG mdriveh_reg[] = {
-    { HRDATA (TRACELEVEL, trace_level, 16), },
     { NULL }
 };
 
@@ -119,13 +118,27 @@ static MTAB mdriveh_mod[] = {
     { 0 }
 };
 
+#define TRACE_PRINT(level, args)    if(mdriveh_dev.dctrl & level) { \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB mdriveh_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "SEEK",   SEEK_MSG },
+    { "RDDATA", RD_DATA_MSG },
+    { "WRDATA", WR_DATA_MSG },
+    { "VERBOSE",VERBOSE_MSG },
+    { NULL,     0 }
+};
+
 DEVICE mdriveh_dev = {
     "MDRIVEH", mdriveh_unit, mdriveh_reg, mdriveh_mod,
     MDRIVEH_MAX_DRIVES, 10, 31, 1, MDRIVEH_MAX_DRIVES, MDRIVEH_MAX_DRIVES,
     NULL, NULL, &mdriveh_reset,
     NULL, NULL, NULL,
-    &mdriveh_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &mdriveh_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    mdriveh_dt, NULL, "Compupro Memory Drive MDRIVEH"
 };
 
 

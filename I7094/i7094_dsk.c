@@ -1,6 +1,6 @@
 /* i7094_dsk.c: 7631 file control (disk/drum) simulator
 
-   Copyright (c) 2005-2006, Robert M Supnik
+   Copyright (c) 2005-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -434,7 +434,8 @@ t_stat dsk_chsel (uint32 ch, uint32 sel, uint32 unit)
 uint32 u;
 
 dsk_ch = ch;
-if (dsk_sta != DSK_IDLE) dsk_uend (ch, DSKS_INVS);      /* not idle? seq check */
+if (dsk_sta != DSK_IDLE)                                /* not idle? seq check */
+    dsk_uend (ch, DSKS_INVS);
 
 switch (sel) {
 
@@ -453,8 +454,10 @@ switch (sel) {
         if (dsk_mode == DSKC_WFMT)                      /* write format? */
             return dsk_uend (ch, DSKS_INVS);            /* sequence error */
     case CHSL_WRS:                                      /* write */
-        if (dsk_mode == 0) dsk_uend (ch, DSKS_INVS);    /* no mode? seq check */
-        if (dsk_mode == DSKC_WFMT) sel = CHSL_FMT;      /* format? fake sel */
+        if (dsk_mode == 0)                              /* no mode? seq check */
+            dsk_uend (ch, DSKS_INVS);
+        if (dsk_mode == DSKC_WFMT)                      /* format? fake sel */
+            sel = CHSL_FMT;
         u = (dsk_acc * DSK_NUMDR) + dsk_mod;            /* access unit number */
         if (sim_is_active (&dsk_unit[u]))               /* access in use? */
             return dsk_uend (ch, DSKS_ACCN);            /* access not ready */
@@ -473,7 +476,8 @@ return SCPE_OK;
 
 t_stat dsk_chwr (uint32 ch, t_uint64 val, uint32 stopf)
 {
-if (stopf) dsk_stop = 1;                                /* stop? */
+if (stopf)                                              /* stop? */
+    dsk_stop = 1;
 
 else {
     val = val & DMASK;
@@ -513,8 +517,10 @@ dsk_sta = DSK_IDLE;                                     /* ctrl is idle */
 
 for (i = 0; i < 8; i++) {                               /* get chars from cmd */
     d = (uint32) (cmd >> (6 * (9 - i))) & BCD_MASK;
-    if (d == BCD_ZERO) d = 0;
-    else if (d == 0) d = BCD_ZERO;                      /* BCD zero cvt */
+    if (d == BCD_ZERO)
+        d = 0;
+    else if (d == 0)                                    /* BCD zero cvt */
+        d = BCD_ZERO;
     bcd[i] = d;
     }
 
@@ -640,11 +646,13 @@ switch (dsk_sta) {                                      /* case on state */
             return SCPE_OK;
             }
         dat = dsk_buf[dsk_rptr++];                      /* get word */
-        if (!dsk_stop) ch9_req_rd (dsk_ch, dat);        /* send wd to chan */
+        if (!dsk_stop)                                  /* send wd to chan */
+            ch9_req_rd (dsk_ch, dat);
         break;
 
     case CHSL_SNS|CHSL_3RD:                             /* 3rd state */
-        if (dsk_qdone (dsk_ch)) return SCPE_OK;         /* done? exit */
+        if (dsk_qdone (dsk_ch))                         /* done? exit */
+            return SCPE_OK;
         dsk_sta = CHSL_SNS;                             /* repeat sequence */
         break;
         }
@@ -693,18 +701,22 @@ switch (dsk_sta) {                                      /* case on state */
 
     case CHSL_RDS|CHSL_2ND:                             /* read data transmit */
         if (r = dsk_xfer_done (uaptr, dtyp)) {          /* transfer done? */
-            if (r != ERR_ENDRC) return r;               /* error? */
+            if (r != ERR_ENDRC)                         /* error? */
+                return r;
             dsk_sta = CHSL_RDS|CHSL_3RD;                /* next state */
             sim_activate (uaptr, dsk_gtime);            /* gap time */
             return SCPE_OK;
             }
         rdat = dsk_buf[dsk_rptr++];                     /* get word */
-        if (dsk_rptr == T1STREC) dsk_rptr++;            /* if THA, skip after HA */
-        if (!dsk_stop) ch9_req_rd (dsk_ch, rdat);       /* give to channel */
+        if (dsk_rptr == T1STREC)                        /* if THA, skip after HA */
+            dsk_rptr++;
+        if (!dsk_stop)                                  /* give to channel */
+            ch9_req_rd (dsk_ch, rdat);
         break;
 
     case CHSL_RDS|CHSL_3RD:                             /* read end rec/trk */
-        if (dsk_qdone (dsk_ch)) return SCPE_OK;         /* done? exit */
+        if (dsk_qdone (dsk_ch))                         /* done? exit */
+            return SCPE_OK;
         dsk_sta = CHSL_RDS;                             /* repeat sequence */
         break;
 
@@ -719,28 +731,35 @@ switch (dsk_sta) {                                      /* case on state */
         break;
 
     case CHSL_WRS|CHSL_2ND:                             /* write data transmit */
-        if (dsk_chob_v) dsk_chob_v = 0;                 /* valid? clear */
-        else if (!dsk_stop) ch9_set_ioc (dsk_ch);       /* no, no stop? io chk */
+        if (dsk_chob_v)                                 /* valid? clear */
+            dsk_chob_v = 0;
+        else if (!dsk_stop)                             /* no, no stop? io chk */
+            ch9_set_ioc (dsk_ch);
         if (dsk_wchk) {                                 /* write check? */
             if (dsk_buf[dsk_rptr++] != dsk_chob)        /* data mismatch? */
                 return dsk_uend (dsk_ch, DSKS_CMPC);    /* error */
             }
         else dsk_buf[dsk_rptr++] = dsk_chob;            /* write, store word */
-        if (dsk_rptr == T1STREC) dsk_rptr++;            /* if THA, skip after HA */
+        if (dsk_rptr == T1STREC)                        /* if THA, skip after HA */
+            dsk_rptr++;
         if (r = dsk_xfer_done (uaptr, dtyp)) {          /* transfer done? */
-            if (r != ERR_ENDRC) return r;               /* error? */
+            if (r != ERR_ENDRC)                         /* error? */
+                return r;
             dsk_sta = CHSL_WRS|CHSL_3RD;                /* next state */
             sim_activate (uaptr, dsk_gtime);            /* gap time */
             return SCPE_OK;
             }
-        if (!dsk_stop) ch_req |= REQ_CH (dsk_ch);       /* more to do */
+        if (!dsk_stop)                                  /* more to do */
+            ch_req |= REQ_CH (dsk_ch);
         break;
 
     case CHSL_WRS|CHSL_3RD:                             /* write done */
         if (!dsk_wchk) {                                /* if write */
-            if (r = dsk_wr_trk (udptr, trk)) return r;  /* write track; err? */
+            if (r = dsk_wr_trk (udptr, trk))            /* write track; err? */
+                return r;
             }
-        if (dsk_qdone (dsk_ch)) return SCPE_OK;         /* done? exit */
+        if (dsk_qdone (dsk_ch))                         /* done? exit */
+            return SCPE_OK;
         dsk_sta = CHSL_WRS;                             /* repeat sequence */
         break;
 
@@ -757,7 +776,8 @@ switch (dsk_sta) {                                      /* case on state */
    real 7320, 1301, 1302, or 2302. */
 
     case CHSL_FMT:                                      /* initialization */
-        for (i = 0; i < DSK_BUFSIZ; i++) dsk_buf[i] = 0;/* clear track buf */
+        for (i = 0; i < DSK_BUFSIZ; i++)                /* clear track buf */
+            dsk_buf[i] = 0;
         dsk_rbase = T1STREC;                            /* init record ptr */
         dsk_rptr = 0;                                   /* init format ptr */
         dsk_fmt_cntr = 0;                               /* init counter */
@@ -771,7 +791,8 @@ switch (dsk_sta) {                                      /* case on state */
         if ((dtyp == TYPE_7320) || (dtyp == TYPE_1301))
             format = fmt_thdr_7320;
         else format = fmt_thdr_1302;
-        if (!dsk_get_fmtc (dtyp, &fc)) return SCPE_OK;  /* get fmt char; err? */
+        if (!dsk_get_fmtc (dtyp, &fc))                  /* get fmt char; err? */
+            return SCPE_OK;
         if (fc != format[dsk_rptr++])                   /* mismatch? */
             return dsk_uend (dsk_ch, DSKS_FMTC);        /* format check */
         if (format[dsk_rptr] == 0) {                    /* end format? */
@@ -784,7 +805,8 @@ switch (dsk_sta) {                                      /* case on state */
         if ((dtyp == TYPE_7320) || (dtyp == TYPE_1301))
             format = fmt_rhdr_7320;
         else format = fmt_rhdr_1302;
-        if (!dsk_get_fmtc (dtyp, &fc)) return SCPE_OK;  /* get fmt char; err? */
+        if (!dsk_get_fmtc (dtyp, &fc))                  /* get fmt char; err? */
+            return SCPE_OK;
         if (fc != format[dsk_rptr++])                   /* mismatch? */
             return dsk_uend (dsk_ch, DSKS_FMTC);        /* format check */
         if (format[dsk_rptr] == 0) {                    /* end format? */
@@ -794,8 +816,10 @@ switch (dsk_sta) {                                      /* case on state */
         break;
 
     case CHSL_FMT|CHSL_4TH:                             /* count record size */
-        if (!dsk_get_fmtc (dtyp, &fc)) return SCPE_OK;  /* get fmt char; err? */
-        if (fc == BCD_ONE) dsk_rlim++;                  /* more record? */
+        if (!dsk_get_fmtc (dtyp, &fc))                  /* get fmt char; err? */
+            return SCPE_OK;
+        if (fc == BCD_ONE)                              /* more record? */
+            dsk_rlim++;
         else {
             uint32 rsiz = dsk_rlim / 6;                 /* rec size words */
             if ((fc != BCD_TWO) ||                      /* improper end? */
@@ -810,12 +834,14 @@ switch (dsk_sta) {                                      /* case on state */
         break;
 
     case CHSL_FMT|CHSL_5TH:                             /* record or track end */
-        if (!dsk_get_fmtc (dtyp, &fc)) return SCPE_OK;  /* get fmt char; err? */
+        if (!dsk_get_fmtc (dtyp, &fc))                  /* get fmt char; err? */
+            return SCPE_OK;
         if (fc == BCD_TWO) {                            /* back to record header? */
             dsk_rptr = 2;                               /* already done 2 chars */
             dsk_sta = CHSL_FMT|CHSL_3RD;                /* record header state */
             }
-        else if (fc != BCD_ONE) dsk_uend (dsk_ch, DSKS_FMTC);   /* format check */
+        else if (fc != BCD_ONE)                         /* format check */
+            dsk_uend (dsk_ch, DSKS_FMTC);
         else {
             if (!dsk_wchk) {                            /* actual write? */
                 trk = trk - (trk % dsk_tab[dtyp].trkpc);        /* cyl start */
@@ -867,7 +893,8 @@ if (ferror (udptr->fileref)) {                          /* error? */
     dsk_uend (dsk_ch, DSKS_DSKE);
     return SCPE_IOERR;
     }
-for ( ; k < dsk_tab[dtyp].wdspt; k++) dsk_buf[k] = 0;   /* zero fill */
+for ( ; k < dsk_tab[dtyp].wdspt; k++)                   /* zero fill */
+    dsk_buf[k] = 0;
 dsk_rbase = T1STREC;                                    /* record base */
 rlnt = (uint32) dsk_buf[dsk_rbase + RLNT];              /* length */
 dsk_rlim = dsk_rbase + rlnt + RDATA;                    /* end */
@@ -876,7 +903,8 @@ if ((rlnt == 0) || (dsk_rlim >= dsk_tab[dtyp].wdspt)) { /* invalid record? */
     return STOP_INVFMT;
     }
 if (dsk_mode != DSKC_SREC) {                            /* not single record? */
-    if (dsk_mode == DSKC_THA) dsk_rptr = 0;             /* trk home addr? */
+    if (dsk_mode == DSKC_THA)                           /* trk home addr? */
+        dsk_rptr = 0;
     else {
         if (((dsk_rec << 24) ^ dsk_buf[THA2]) & HA2_MASK) {
             dsk_uend (dsk_ch, DSKS_NRCF);               /* invalid HA2 */
@@ -919,7 +947,8 @@ t_stat dsk_xfer_done (UNIT *uaptr, uint32 dtyp)
 {
 uint32 rlnt;
 
-if (dsk_rptr < dsk_rlim) return SCPE_OK;                /* record done? */
+if (dsk_rptr < dsk_rlim)                                /* record done? */
+    return SCPE_OK;
 if (dsk_stop || !ch9_qconn (dsk_ch) ||                  /* stop or err disc or */
     (dsk_mode == DSKC_SREC)) {                          /* single record? */
     ch9_set_end (dsk_ch, 0);                            /* set end */
@@ -986,11 +1015,14 @@ t_bool dsk_get_fmtc (uint32 dtyp, uint8 *fc)
 uint32 cc = dsk_fmt_cntr % 6;
 
 if (cc == 0) {                                          /* start of word? */
-    if (dsk_chob_v) dsk_chob_v = 0;                     /* valid? clear */
-    else if (!dsk_stop) ch9_set_ioc (dsk_ch);           /* no, no stop? io chk */
+    if (dsk_chob_v)                                     /* valid? clear */
+        dsk_chob_v = 0;
+    else if (!dsk_stop)                                 /* no, no stop? io chk */
+        ch9_set_ioc (dsk_ch);
     }
 *fc = ((uint8) (dsk_chob >> ((5 - cc) * 6))) & 077;     /* get character */
-if ((cc == 5) && !dsk_stop) ch_req |= REQ_CH (dsk_ch);  /* end of word? */
+if ((cc == 5) && !dsk_stop)                             /* end of word? */
+    ch_req |= REQ_CH (dsk_ch);
 if (dsk_fmt_cntr++ >= dsk_tab[dtyp].fchpt) {            /* track overflow? */
     dsk_uend (dsk_ch, DSKS_FMTC);                       /* format check */
     return FALSE;
@@ -1004,9 +1036,12 @@ t_stat dsk_uend (uint32 ch, t_uint64 stat)
 {
 dsk_sns |= stat;
 dsk_sns &= ~(DSKS_PCHK|DSKS_DCHK|DSKS_EXCC);
-if (dsk_sns & DSKS_PALL) dsk_sns |= DSKS_PCHK;
-if (dsk_sns & DSKS_DALL) dsk_sns |= DSKS_DCHK;
-if (dsk_sns & DSKS_EALL) dsk_sns |= DSKS_EXCC;
+if (dsk_sns & DSKS_PALL)
+    dsk_sns |= DSKS_PCHK;
+if (dsk_sns & DSKS_DALL)
+    dsk_sns |= DSKS_DCHK;
+if (dsk_sns & DSKS_EALL)
+    dsk_sns |= DSKS_EXCC;
 ch9_set_end (ch, CHINT_UEND);
 ch_req |= REQ_CH (ch);
 dsk_sta = DSK_IDLE;
@@ -1046,7 +1081,8 @@ dsk_stop = 0;
 dsk_fmt_cntr = 0;
 dsk_chob = 0;
 dsk_chob_v = 0;
-for (i = 0; i < DSK_BUFSIZ; i++) dsk_buf[i] = 0;
+for (i = 0; i < DSK_BUFSIZ; i++)
+    dsk_buf[i] = 0;
 for (i = 0; i <= (2 * DSK_NUMDR); i++) {
     uptr = dsk_dev.units + i;
     sim_cancel (uptr);
@@ -1065,7 +1101,8 @@ t_stat r;
 
 uptr->capac = dsk_tab[dtyp].size;
 r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->TRK = 0;
 uptr->SKF = 0;
 uptr->flags &= ~(UNIT_INOP0|UNIT_INOP1);
@@ -1080,11 +1117,13 @@ uint32 dtyp = GET_DTYPE (val);
 uint32 u = uptr - dsk_dev.units;
 UNIT *u1;
 
-if (u & 1) return SCPE_ARG;
+if (u & 1)
+    return SCPE_ARG;
 u1 = dsk_dev.units + u + 1;
 if ((uptr->flags & UNIT_ATT) || (u1->flags & UNIT_ATT))
     return SCPE_ALATT;
-if (val == TYPE_7320) u1->flags = (u1->flags & ~UNIT_DISABLE) | UNIT_DIS;
+if (val == TYPE_7320)
+    u1->flags = (u1->flags & ~UNIT_DISABLE) | UNIT_DIS;
 else {
     u1->flags = (u1->flags & ~UNIT_TYPE) | val | UNIT_DISABLE;
     u1->capac = dsk_tab[dtyp].size;
@@ -1107,31 +1146,38 @@ t_bool ctss;
 t_uint64 dbuf[DSK_BUFSIZ];
 DEVICE *dptr;
 
-if (uptr == NULL) return SCPE_IERR;
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if (uptr == NULL)
+    return SCPE_IERR;
+if ((uptr->flags & UNIT_ATT) == 0)
+    return SCPE_UNATT;
 dptr = find_dev_from_unit (uptr);
 u = uptr - dptr->units;
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 
 dtyp = GET_DTYPE (uptr->flags);
 if ((dtyp == TYPE_7320) || (dtyp == TYPE_1301))
     format = ctss_fmt_7320;
 else format = ctss_fmt_1302;
 for (a = 0, ctss = TRUE; a < dsk_tab[dtyp].accpm; a++) {
-    if (val) tlim = dsk_tab[dtyp].trkpa;
+    if (val)
+        tlim = dsk_tab[dtyp].trkpa;
     else tlim = 1;
     for (t = 0; t < tlim; t++) {
         da = DSK_DA (a, t, dtyp);                       /* get disk address */
         sim_fseek (uptr->fileref, da, SEEK_SET);        /* read track */
         k = sim_fread (dbuf, sizeof (t_uint64), dsk_tab[dtyp].wdspt, uptr->fileref);
-        if (ferror (uptr->fileref)) return SCPE_IOERR;  /* error? */
-        for ( ; k < dsk_tab[dtyp].wdspt; k++) dbuf[k] = 0;
+        if (ferror (uptr->fileref))                     /* error? */
+            return SCPE_IOERR;
+        for ( ; k < dsk_tab[dtyp].wdspt; k++)
+            dbuf[k] = 0;
         rptr = T1STREC;
         rlnt = (uint32) dbuf[rptr + RLNT];
-        if (dbuf[THA2] != CTSS_HA2) ctss = FALSE;
+        if (dbuf[THA2] != CTSS_HA2)
+            ctss = FALSE;
         if (rlnt == 0) {
-            if (a || t) fprintf (st,
-                "Unformatted track, unit = %d, access = %d, track = %d\n", u, a, t);
+            if (a || t)
+                fprintf (st, "Unformatted track, unit = %d, access = %d, track = %d\n", u, a, t);
             else fprintf (st, "Unit %d is unformatted\n", u);
             return SCPE_OK;
             }
@@ -1144,29 +1190,35 @@ for (a = 0, ctss = TRUE; a < dsk_tab[dtyp].accpm; a++) {
                     rlnt, u, a, t, rec);
                 return SCPE_OK;
 				}
-            if (rlnt > maxrsz) maxrsz = rlnt;
-            if (rlnt < minrsz) minrsz = rlnt;
+            if (rlnt > maxrsz)
+                maxrsz = rlnt;
+            if (rlnt < minrsz)
+                minrsz = rlnt;
             rptr = rlim;
             rlnt = (uint32) dbuf[rptr + RLNT];
             }
-        if (format[ctptr] != 0) ctss = FALSE;
-        if (rec > maxrno) maxrno = rec;
-        if (rec < minrno) minrno = rec;
+        if (format[ctptr] != 0)
+            ctss = FALSE;
+        if (rec > maxrno)
+            maxrno = rec;
+        if (rec < minrno)
+            minrno = rec;
         }
     }
-if (val == 0) return SCPE_OK;
-if (ctss) fprintf (st, "CTSS format\n");
-else if ((minrno == maxrno) && (minrsz == maxrsz)) fprintf (st, 
-    "Valid fixed format, records/track = %d, record size = %d\n",
-     minrno, minrsz);
-else if (minrsz == maxrsz) fprintf (st,
-    "Valid variable format, records/track = %d-%d, record size = %d\n",
-     minrno, maxrno, minrsz);
-else if (minrno == maxrno) fprintf (st,
-    "Valid variable format, records/track = %d, record sizes = %d-%d\n",
-     minrno, minrsz, maxrsz);
-else fprintf (st,
-    "Valid variable format, records/track = %d-%d, record sizes = %d-%d\n",
-     minrno, maxrno, minrsz, maxrsz);
+if (val == 0)
+    return SCPE_OK;
+if (ctss)
+    fprintf (st, "CTSS format\n");
+else if ((minrno == maxrno) && (minrsz == maxrsz))
+    fprintf (st, "Valid fixed format, records/track = %d, record size = %d\n",
+             minrno, minrsz);
+else if (minrsz == maxrsz)
+    fprintf (st, "Valid variable format, records/track = %d-%d, record size = %d\n",
+             minrno, maxrno, minrsz);
+else if (minrno == maxrno)
+    fprintf (st, "Valid variable format, records/track = %d, record sizes = %d-%d\n",
+             minrno, minrsz, maxrsz);
+else fprintf (st, "Valid variable format, records/track = %d-%d, record sizes = %d-%d\n",
+              minrno, maxrno, minrsz, maxrsz);
 return SCPE_OK;
 }

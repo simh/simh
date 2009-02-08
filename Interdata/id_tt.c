@@ -1,6 +1,6 @@
 /* id_tt.c: Interdata teletype
 
-   Copyright (c) 2000-2007, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -143,7 +143,8 @@ switch (op) {                                           /* case IO op */
         if (tt_rd != old_rd) {                          /* rw change? */
             if (tt_rd? tt_chp: !sim_is_active (&tt_unit[TTO])) {
                 tt_sta = 0;                             /* busy = 0 */
-                if (tt_arm) SET_INT (v_TT);             /* req intr */
+                if (tt_arm)                             /* req intr */
+                    SET_INT (v_TT);
                 }
             else {
                 tt_sta = STA_BSY;                       /* busy = 1 */
@@ -155,18 +156,21 @@ switch (op) {                                           /* case IO op */
 
     case IO_RD:                                         /* read */
         tt_chp = 0;                                     /* clear pend */
-        if (tt_rd) tt_sta = (tt_sta | STA_BSY) & ~STA_OVR;
+        if (tt_rd)
+            tt_sta = (tt_sta | STA_BSY) & ~STA_OVR;
         return (tt_unit[TTI].buf & 0xFF);
 
     case IO_WD:                                         /* write */
         tt_unit[TTO].buf = dat & 0xFF;                  /* save char */
-        if (!tt_rd) tt_sta = tt_sta | STA_BSY;          /* set busy */
+        if (!tt_rd)                                     /* set busy */
+            tt_sta = tt_sta | STA_BSY;
         sim_activate (&tt_unit[TTO], tt_unit[TTO].wait);
         break;
 
     case IO_SS:                                         /* status */
         t = tt_sta & STA_MASK;                          /* get status */
-        if (t & SET_EX) t = t | STA_EX;                 /* test for EX */
+        if (t & SET_EX)                                 /* test for EX */
+            t = t | STA_EX;
         return t;
         }
 
@@ -181,11 +185,14 @@ int32 out, temp;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_poll));   /* continue poll */
 tt_sta = tt_sta & ~STA_BRK;                             /* clear break */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
+    return temp;
 if (tt_rd) {                                            /* read mode? */
     tt_sta = tt_sta & ~STA_BSY;                         /* clear busy */
-    if (tt_arm) SET_INT (v_TT);                         /* if armed, intr */
-    if (tt_chp) tt_sta = tt_sta | STA_OVR;              /* got char? overrun */
+    if (tt_arm)                                         /* if armed, intr */
+        SET_INT (v_TT);
+    if (tt_chp)                                         /* got char? overrun */
+        tt_sta = tt_sta | STA_OVR;
     }
 tt_chp = 1;                                             /* char pending */
 out = temp & 0x7F;                                      /* echo is 7B */
@@ -219,7 +226,8 @@ if (ch >= 0) {
     }
 if (!tt_rd) {                                           /* write mode? */
     tt_sta = tt_sta & ~STA_BSY;                         /* clear busy */
-    if (tt_arm) SET_INT (v_TT);                         /* if armed, intr */
+    if (tt_arm)                                         /* if armed, intr */
+        SET_INT (v_TT);
     }
 uptr->pos = uptr->pos + 1;                              /* incr count */
 return SCPE_OK;
@@ -229,7 +237,8 @@ return SCPE_OK;
 
 t_stat tt_reset (DEVICE *dptr)
 {
-if (dptr->flags & DEV_DIS) sim_cancel (&tt_unit[TTI]);  /* dis? cancel poll */
+if (dptr->flags & DEV_DIS)                              /* dis? cancel poll */
+    sim_cancel (&tt_unit[TTI]);
 else sim_activate_abs (&tt_unit[TTI], KBD_WAIT (tt_unit[TTI].wait, lfc_poll));
 sim_cancel (&tt_unit[TTO]);                             /* cancel output */
 tt_rd = tt_fdpx = 1;                                    /* read, full duplex */
@@ -246,7 +255,8 @@ return SCPE_OK;
 t_stat tt_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 tt_unit[TTO].flags = (tt_unit[TTO].flags & ~TT_MODE) | val;
-if (val == TT_MODE_7P) val = TT_MODE_7B;
+if (val == TT_MODE_7P)
+    val = TT_MODE_7B;
 tt_unit[TTI].flags = (tt_unit[TTI].flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
@@ -255,11 +265,13 @@ return SCPE_OK;
 
 t_stat tt_set_break (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (tt_dev.flags & DEV_DIS) return SCPE_NOFNC;
+if (tt_dev.flags & DEV_DIS)
+    return SCPE_NOFNC;
 tt_sta = tt_sta | STA_BRK;
 if (tt_rd) {                                            /* read mode? */
     tt_sta = tt_sta & ~STA_BSY;                         /* clear busy */
-    if (tt_arm) SET_INT (v_TT);                         /* if armed, intr */
+    if (tt_arm)                                         /* if armed, intr */
+        SET_INT (v_TT);
     }
 sim_cancel (&tt_unit[TTI]);                             /* restart TT poll */
 sim_activate (&tt_unit[TTI], tt_unit[TTI].wait);        /* so brk is seen */

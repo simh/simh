@@ -1,6 +1,6 @@
 /* i7094_drm.c: 7289/7320A drum simulator
 
-   Copyright (c) 2005-2006, Robert M Supnik
+   Copyright (c) 2005-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -163,15 +163,18 @@ DEVICE drm_dev = {
 t_stat drm_chsel (uint32 ch, uint32 sel, uint32 unit)
 {
 drm_ch = ch;                                            /* save channel */
-if (sel & CHSL_NDS) return ch6_end_nds (ch);            /* nds? nop */
+if (sel & CHSL_NDS)                                     /* nds? nop */
+    return ch6_end_nds (ch);
 
 switch (sel) {                                          /* case on cmd */
 
     case CHSL_RDS:                                      /* read */
     case CHSL_WRS:                                      /* write */
-        if (drm_sta != DRM_IDLE) return ERR_STALL;      /* busy? */
+        if (drm_sta != DRM_IDLE)                        /* busy? */
+            return ERR_STALL;
         drm_sta = DRM_1ST;                              /* initial state */
-        if (sel == CHSL_WRS) drm_op = 1;                /* set read/write */
+        if (sel == CHSL_WRS)                            /* set read/write */
+            drm_op = 1;
         else drm_op = 0;                                /* LCHx sends addr */
         break;                                          /* wait for addr */
 
@@ -201,9 +204,11 @@ if (drm_sta == DRM_1ST) {
     drm_da = DRM_GETDA (val);                           /* get drum addr */
     cp = GET_POS (drm_time);                            /* current pos in sec */
     dp = (drm_da & DRM_SCMASK) - cp;                    /* delta to desired pos */
-    if (dp <= 0) dp = dp + DRM_NUMWDS;                  /* if neg, add rev */
+    if (dp <= 0)                                        /* if neg, add rev */
+        dp = dp + DRM_NUMWDS;
     sim_activate (&drm_unit[u], dp * drm_time);         /* schedule */
-    if (drm_op) ch6_req_wr (ch, U_DRM);                 /* if write, get word */
+    if (drm_op)                                         /* if write, get word */
+        ch6_req_wr (ch, U_DRM);
     drm_sta = DRM_DATA;
     drm_chob = 0;                                       /* clr, inval buffer */
     drm_chob_v = 0;
@@ -236,12 +241,15 @@ switch (drm_sta) {                                      /* case on state */
 
     case DRM_DATA:                                      /* data */
         if (drm_op) {                                   /* write? */
-            if (drm_chob_v) drm_chob_v = 0;             /* valid? clear */
+            if (drm_chob_v)                             /* valid? clear */
+                drm_chob_v = 0;
             else if (ch6_qconn (drm_ch, U_DRM))         /* no, chan conn? */
                 ind_ioc = 1;                            /* io check */
             fbuf[drm_da] = drm_chob;                    /* get data */
-            if (drm_da >= uptr->hwmark) uptr->hwmark = drm_da + 1;
-            if (!drm_da_incr ()) ch6_req_wr (drm_ch, U_DRM);
+            if (drm_da >= uptr->hwmark)
+                uptr->hwmark = drm_da + 1;
+            if (!drm_da_incr ())
+                ch6_req_wr (drm_ch, U_DRM);
             }
         else{                                           /* read */
             ch6_req_rd (drm_ch, U_DRM, fbuf[drm_da], 0); /* send word to channel */
@@ -265,7 +273,8 @@ return SCPE_OK;
 t_bool drm_da_incr (void)
 {
 drm_da = drm_da + 1;
-if (drm_da & DRM_SCMASK) return FALSE;
+if (drm_da & DRM_SCMASK)
+    return FALSE;
 drm_sta = DRM_EOS;
 return TRUE;
 }
@@ -281,6 +290,7 @@ drm_op = 0;
 drm_sta = DRM_IDLE;
 drm_chob = 0;
 drm_chob_v = 0;
-for (i = 0; i < dptr->numunits; i++) sim_cancel (dptr->units + i);
+for (i = 0; i < dptr->numunits; i++)
+    sim_cancel (dptr->units + i);
 return SCPE_OK;
 }

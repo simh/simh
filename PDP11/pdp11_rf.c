@@ -1,6 +1,6 @@
 /* pdp11_rf.c: RF11 fixed head disk simulator
 
-   Copyright (c) 2006, Robert M Supnik
+   Copyright (c) 2006-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -246,9 +246,10 @@ int32 t, fnc;
 switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
     case 0:                                             /* RFCS */
-        if (access == WRITEB) data = (PA & 1)?
-            (rf_cs & 0377) | (data << 8): (rf_cs & ~0377) | data;
-        if (data & RFCS_CLR) rf_reset (&rf_dev);        /* clear? */
+        if (access == WRITEB)
+            data = (PA & 1)? (rf_cs & 0377) | (data << 8): (rf_cs & ~0377) | data;
+        if (data & RFCS_CLR)                            /* clear? */
+            rf_reset (&rf_dev);
         if ((data & RFCS_IE) == 0)                      /* int disable? */
             CLR_INT (RF);                               /* clr int request */
         else if ((rf_cs & (RFCS_DONE + RFCS_IE)) == RFCS_DONE)
@@ -258,7 +259,8 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
             ((fnc = GET_FUNC (rf_cs)) != RFNC_NOP)) {
             rf_unit.FUNC = fnc;                         /* save function */
             t = (rf_da & RF_WMASK) - GET_POS (rf_time); /* delta to new loc */
-            if (t < 0) t = t + RF_NUMWD;                /* wrap around? */
+            if (t < 0)                                  /* wrap around? */
+                t = t + RF_NUMWD;
             sim_activate (&rf_unit, t * rf_time);       /* schedule op */
             rf_cs &= ~(RFCS_WCHK|RFCS_DPAR|RFCS_NED|RFCS_WLK|RFCS_MXFR|RFCS_DONE);
             CLR_INT (RF);
@@ -269,26 +271,26 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
         break;
 
     case 1:                                             /* RFWC */
-        if (access == WRITEB) data = (PA & 1)?
-            (rf_wc & 0377) | (data << 8): (rf_wc & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)? (rf_wc & 0377) | (data << 8): (rf_wc & ~0377) | data;
         rf_wc = data;
         break;
 
     case 2:                                             /* RFCMA */
-        if (access == WRITEB) data = (PA & 1)?
-            (rf_cma & 0377) | (data << 8): (rf_cma & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)? (rf_cma & 0377) | (data << 8): (rf_cma & ~0377) | data;
         rf_cma = data & RFCMA_RW;
         break;
 
     case 3:                                             /* RFDA */
-        if (access == WRITEB) data = (PA & 1)?
-            (rf_da & 0377) | (data << 8): (rf_da & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)? (rf_da & 0377) | (data << 8): (rf_da & ~0377) | data;
         rf_da = data;
         break;
 
     case 4:                                             /* RFDAE */
-        if (access == WRITEB) data = (PA & 1)?
-            (rf_dae & 0377) | (data << 8): (rf_dae & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)? (rf_dae & 0377) | (data << 8): (rf_dae & ~0377) | data;
         rf_dae = (rf_dae & ~RFDAE_W) | (data & RFDAE_W);
         break;
 
@@ -364,7 +366,8 @@ do {
                 }
             fbuf[da] = dat;						       /* write word */
             rf_dbr = dat;
-            if (da >= uptr->hwmark) uptr->hwmark = da + 1;
+            if (da >= uptr->hwmark)
+                uptr->hwmark = da + 1;
             }
         }
     da = (da + 1) & 017777777;                          /* incr disk addr */
@@ -460,7 +463,8 @@ t_stat rf_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 saved_PC;
 
-for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_CSR >> 1] = (rf_dib.ba & DMASK) + 012;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
@@ -475,7 +479,8 @@ uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
-    if (p >= RF_NUMDK) p = RF_NUMDK - 1;
+    if (p >= RF_NUMDK)
+        p = RF_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) |
         (p << UNIT_V_PLAT);
     }
@@ -487,8 +492,10 @@ return attach_unit (uptr, cptr);
 
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val < 0) return SCPE_IERR;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (val < 0)
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;

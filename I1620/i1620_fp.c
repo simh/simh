@@ -71,11 +71,13 @@ uint8 d0, d1, esign;
 esign = M[ad] & FLAG;                                   /* get exp sign */
 d0 = M[ad] & DIGIT;                                     /* get exp lo digit */
 MM (ad);
-if ((M[ad] & FLAG) == 0) return STOP_FPMF;              /* no flag on hi exp? */
+if ((M[ad] & FLAG) == 0)                                /* no flag on hi exp? */
+    return STOP_FPMF;
 d1 = M[ad] & DIGIT;                                     /* get exp hi digit */
 MM (ad);
 fp->addr = ad;                                          /* save mant addr */
-if (BAD_DIGIT (d1) || BAD_DIGIT (d0)) return STOP_INVDIG; /* exp bad dig? */
+if (BAD_DIGIT (d1) || BAD_DIGIT (d0))                   /* exp bad dig? */
+    return STOP_INVDIG;
 fp->exp = ((d1 * 10) + d0) * (esign? -1: 1);            /* convert exponent */
 fp->sign = (M[ad] & FLAG)? 1: 0;                        /* get mantissa sign */
 return fp_scan_mant (fp->addr, &(fp->lnt), &(fp->zero));
@@ -87,9 +89,12 @@ t_stat fp_unpack_two (uint32 dad, uint32 sad, FPA *dfp, FPA *sfp)
 {
 t_stat r;
 
-if ((r = fp_unpack (dad, dfp)) != SCPE_OK) return r;    /* unpack dst */
-if ((r = fp_unpack (sad, sfp)) != SCPE_OK) return r;    /* unpack src */
-if (sfp->lnt != dfp->lnt) return STOP_FPUNL;            /* lnts must be equal */
+if ((r = fp_unpack (dad, dfp)) != SCPE_OK)              /* unpack dst */
+    return r;
+if ((r = fp_unpack (sad, sfp)) != SCPE_OK)              /* unpack src */
+    return r;
+if (sfp->lnt != dfp->lnt)                               /* lnts must be equal */
+    return STOP_FPUNL;
 return SCPE_OK;
 }
 
@@ -103,7 +108,8 @@ uint32 i, mad;
 e = (fp->exp >= 0)? fp->exp: -fp->exp;                  /* get |exp| */                                 
 if (e > FP_EMAX) {                                      /* too big? */
     ind[IN_EXPCHK] = 1;                                 /* set indicator */
-    if (fp->exp < 0) return fp_zero (fp);               /* underflow? */
+    if (fp->exp < 0)                                    /* underflow? */
+        return fp_zero (fp);
     mad = fp->addr;
     for (i = 0; i < fp->lnt; i++) {                     /* mant = 99...99 */
         M[mad] = (M[mad] & FLAG) | 9;
@@ -123,11 +129,13 @@ void fp_rsh (FPA *fp, uint32 n)
 {
 uint32 i, sad, dad;
 
-if (n == 0) return;                                     /* zero? done */
+if (n == 0)                                             /* zero? done */
+    return;
 sad = ADDR_S (fp->addr, n);                             /* src = addr - n */
 dad = fp->addr;                                         /* dst = n */
 for (i = 0; i < fp->lnt; i++) {                         /* move digits */
-    if (i >= (fp->lnt - n)) M[dad] = M[dad] & FLAG;
+    if (i >= (fp->lnt - n))
+        M[dad] = M[dad] & FLAG;
     else M[dad] = (M[dad] & FLAG) | (M[sad] & DIGIT);
     MM (dad);
     MM (sad);
@@ -180,7 +188,8 @@ for (l = 1; l <= FP_LMAX; l++) {                        /* scan to get length */
     if (d) z = 0;                                       /* non-zero? */
     if ((l != 1) && (M[ad] & FLAG)) {                   /* flag past first dig? */
         *lnt = l;                                       /* set returns */
-        if (zro) *zro = z;
+        if (zro)
+            *zro = z;
         return SCPE_OK;
         }
     MM (ad);
@@ -194,7 +203,8 @@ void fp_copy_mant (uint32 d, uint32 s, uint32 l)
 {
 uint32 i;
 
-if (ind[IN_HP]) M[d] = M[d] & ~FLAG;                    /* clr/set sign */
+if (ind[IN_HP])                                         /* clr/set sign */
+    M[d] = M[d] & ~FLAG;
 else M[d] = M[d] | FLAG;
 for (i = 0; i < l; i++) {                               /* copy src */
     M[d] = (M[d] & FLAG) | (M[s] & DIGIT);              /* preserve flags */
@@ -215,8 +225,10 @@ s = ADDR_S (s, l - 1);
 for (i = 0; i < l; i++) {                               /* compare dst:src */
     dd = M[d] & DIGIT;                                  /* get dst digit */
     sd = M[s] & DIGIT;                                  /* get src digit */
-    if (dd > sd) return 1;                              /* >? done */
-    if (dd < sd) return -1;                             /* <? done */
+    if (dd > sd)                                        /* >? done */
+        return 1;
+    if (dd < sd)                                        /* <? done */
+        return -1;
     PP (d);                                             /* =? continue */
     PP (s);
     }
@@ -234,17 +246,20 @@ uint8 sav_src[FP_LMAX];
 t_stat r;
 
 r = fp_unpack_two (d, s, &dfp, &sfp);                   /* unpack operands */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 dif = dfp.exp - sfp.exp;                                /* exp difference */
 
 if (sfp.zero || (dif >= ((int32) dfp.lnt))) {           /* src = 0, or too small? */
-    if (dfp.zero) return fp_zero (&dfp);                /* res = dst, zero? */          
+    if (dfp.zero)                                       /* res = dst, zero? */      
+        return fp_zero (&dfp);    
     ind[IN_EZ] = 0;                                     /* res nz, set EZ, HP */
     ind[IN_HP] = (dfp.sign == 0);
     return SCPE_OK;
     }
 if (dfp.zero || (dif <= -((int32) dfp.lnt))) {          /* dst = 0, or too small? */
-    if (sfp.zero) return fp_zero (&dfp);                /* res = src, zero? */
+    if (sfp.zero)                                       /* res = src, zero? */
+        return fp_zero (&dfp);
     r = xmt_field (d, s, 3);                            /* copy src to dst */
     ind[IN_EZ] = 0;                                     /* res nz, set EZ, HP */
     ind[IN_HP] = (dfp.sign == 0);
@@ -271,7 +286,8 @@ if (dif > 0) {                                          /* src denormalized? */
         MM (sad);
         }
     }
-if (r != SCPE_OK) return r;                             /* add error? */
+if (r != SCPE_OK)                                       /* add error? */
+    return r;
 
 hi = ADDR_S (dfp.addr, dfp.lnt - 1);                    /* addr of hi digit */
 if (sta == ADD_CARRY) {                                 /* carry out? */
@@ -281,7 +297,8 @@ if (sta == ADD_CARRY) {                                 /* carry out? */
     ind[IN_EZ] = 0;                                     /* not zero */
     ind[IN_HP] = (dfp.sign == 0);                       /* set HP */
     }
-else if (ind[IN_EZ]) return fp_zero (&dfp);             /* result zero? */
+else if (ind[IN_EZ])                                    /* result zero? */
+    return fp_zero (&dfp);
 else {
     while ((M[hi] & DIGIT) == 0) {                      /* until normalized */
         fp_lsh_1 (&dfp);                                /* left shift */
@@ -301,11 +318,14 @@ uint32 pad;
 t_stat r;
 
 r = fp_unpack_two (d, s, &dfp, &sfp);                   /* unpack operands */
-if (r != SCPE_OK) return r;                             /* error? */
-if (sfp.zero || dfp.zero) return fp_zero (&dfp);        /* either zero? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
+if (sfp.zero || dfp.zero)                               /* either zero? */
+    return fp_zero (&dfp);
 
 r = mul_field (dfp.addr, sfp.addr);                     /* mul, set EZ, HP */
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 if (M[ADDR_S (PROD_AREA_END, 2 * dfp.lnt)] & DIGIT) {   /* hi prod dig set? */
     pad = ADDR_S (PROD_AREA_END - 1, dfp.lnt);          /* no normalization */
     dfp.exp = dfp.exp + sfp.exp;                        /* res exp = sum */
@@ -329,12 +349,14 @@ int32 ez;
 t_stat r;
 
 r = fp_unpack_two (d, s, &dfp, &sfp);                   /* unpack operands */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 if (sfp.zero) {                                         /* divide by zero? */
     ind[IN_OVF] = 1;                                    /* dead jim */
     return SCPE_OK;
     }
-if (dfp.zero) return fp_zero (&dfp);                    /* divide into zero? */
+if (dfp.zero)                                           /* divide into zero? */
+    return fp_zero (&dfp);
 
 for (i = 0; i < PROD_AREA_LEN; i++)                     /* clear prod area */
     M[PROD_AREA + i] = 0;
@@ -349,10 +371,13 @@ else {
     dfp.exp = dfp.exp - sfp.exp;                        /* res exp = diff */
     }
 r = xmt_divd (pad, dfp.addr);                           /* xmt dividend */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 r = div_field (a100ml, sfp.addr, &ez);                  /* divide fractions */
-if (r != SCPE_OK) return r;                             /* error? */
-if (ez) return fp_zero (&dfp);                          /* result zero? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
+if (ez)                                                 /* result zero? */
+    return fp_zero (&dfp);
 
 ind[IN_HP] = ((dfp.sign ^ sfp.sign) == 0);              /* set res sign */
 ind[IN_EZ] = 0;                                         /* not zero */
@@ -368,7 +393,8 @@ t_stat fp_fsr (uint32 d, uint32 s)
 uint32 cnt;
 uint8 t;
 
-if (d == s) return SCPE_OK;                             /* no move? */
+if (d == s)                                             /* no move? */
+    return SCPE_OK;
 
 cnt = 0;
 M[d] = (M[d] & FLAG) | (M[s] & DIGIT);                  /* move 1st wo flag */
@@ -376,7 +402,8 @@ do {
     MM (d);                                             /* decr ptrs */
     MM (s);
     t = M[d] = M[s] & (FLAG | DIGIT);                   /* copy others */
-    if (cnt++ > MEMSIZE) return STOP_FWRAP;             /* (stop runaway) */
+    if (cnt++ > MEMSIZE)                                /* (stop runaway) */
+        return STOP_FWRAP;
     } while ((t & FLAG) == 0);                          /* until src flag */
 
 cnt = 0;
@@ -384,7 +411,8 @@ do {
     MM (d);                                             /* decr pointer */
     t = M[d];                                           /* save old val */
     M[d] = 0;                                           /* zero field */
-    if (cnt++ > MEMSIZE) return STOP_FWRAP;             /* (stop runaway) */
+    if (cnt++ > MEMSIZE)                                /* (stop runaway) */
+        return STOP_FWRAP;
     } while ((t & FLAG) == 0);                          /* until dst flag */
 return SCPE_OK;
 } 
@@ -397,10 +425,12 @@ uint32 i, lnt;
 uint8 sign;
 t_stat r;
 
-if (d == s) return SCPE_OK;
+if (d == s)
+    return SCPE_OK;
 sign = M[s] & FLAG;                                     /* get src sign */
 r = fp_scan_mant (s, &lnt, NULL);                       /* get src length */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 s = ADDR_S (s, lnt - 1);                                /* hi order src */
 M[d] = M[s] & (FLAG | DIGIT);                           /* move 1st w flag */
 M[s] = M[s] & ~FLAG;                                    /* clr flag from src */
@@ -414,6 +444,7 @@ while ((M[d] & FLAG) == 0) {                            /* until flag */
     M[d] = 0;                                           /* clear field */
     PP (d);
     }
-if (sign) M[d] = FLAG;                                  /* -? zero under sign */
+if (sign)                                               /* -? zero under sign */
+    M[d] = FLAG;
 return SCPE_OK;
 }

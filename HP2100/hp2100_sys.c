@@ -23,6 +23,12 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Sep-08    JDB     Fixed IAK instruction dual-use mnemonic display
+   07-Aug-08    JDB     Moved hp_setdev, hp_showdev from hp2100_cpu.c
+                        Changed sim_load to use WritePW instead of direct M[] access
+   18-Jun-08    JDB     Added PIF device
+   17-Jun-08    JDB     Moved fmt_char() function from hp2100_baci.c
+   26-May-08    JDB     Added MPX device
    24-Apr-08    JDB     Changed fprint_sym to handle step with irq pending
    07-Dec-07    JDB     Added BACI device
    27-Nov-07    JDB     Added RTE OS/VMA/EMA mnemonics
@@ -50,13 +56,17 @@
 #include <ctype.h>
 
 extern DEVICE cpu_dev;
-extern UNIT cpu_unit;
+extern UNIT   cpu_unit;
+extern REG    cpu_reg[];
+
 extern DEVICE mp_dev;
 extern DEVICE dma0_dev, dma1_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tty_dev, clk_dev;
-extern DEVICE lps_dev, lpt_dev;
+extern DEVICE lps_dev;
+extern DEVICE lpt_dev;
 extern DEVICE baci_dev;
+extern DEVICE mpx_dev;
 extern DEVICE mtd_dev, mtc_dev;
 extern DEVICE msd_dev, msc_dev;
 extern DEVICE dpd_dev, dpc_dev;
@@ -65,9 +75,7 @@ extern DEVICE drd_dev, drc_dev;
 extern DEVICE ds_dev;
 extern DEVICE muxl_dev, muxu_dev, muxc_dev;
 extern DEVICE ipli_dev, iplo_dev;
-extern REG cpu_reg[];
-extern uint16 *M;
-extern uint32 fwanxm;
+extern DEVICE pif_dev;
 
 /* SCP data structures and interface routines
 
@@ -99,6 +107,7 @@ DEVICE *sim_devices[] = {
     &lps_dev,
     &lpt_dev,
     &baci_dev,
+    &mpx_dev,
     &dpd_dev, &dpc_dev,
     &dqd_dev, &dqc_dev,
     &drd_dev, &drc_dev,
@@ -107,6 +116,7 @@ DEVICE *sim_devices[] = {
     &msd_dev, &msc_dev,
     &muxl_dev, &muxu_dev, &muxc_dev,
     &ipli_dev, &iplo_dev,
+    &pif_dev,
     NULL
     };
 
@@ -163,7 +173,7 @@ for (zerocnt = 1;; zerocnt = -10) {                     /* block loop */
     csum = origin;                                      /* seed checksum */
     for (i = 0; i < count; i++) {                       /* get data words */
         if ((word = fgetw (fileref)) < 0) return SCPE_FMT;
-        if (MEM_ADDR_OK (origin)) M[origin] = word;
+        WritePW (origin, word);
         origin = origin + 1;
         csum = csum + word;
         }
@@ -210,7 +220,7 @@ static const char *opcode[] = {
 /* These mnemonics are used by debug printouts, so put them first. */
 
  "$LIBR", "$LIBX", ".TICK", ".TNAM",                /* RTE-6/VM OS firmware */
- ".STIO", ".FNW",  ".IRT",  ".LLS", 
+ ".STIO", ".FNW",  ".IRT",  ".LLS",
  ".SIP",  ".YLD",  ".CPM",  ".ETEQ",
  ".ENTN", "$OTST", ".ENTC", ".DSPI",
  "$DCPC", "$MPV",  "$DEV",  "$TBG",                 /* alternates for dual-use */
@@ -411,6 +421,7 @@ if (sw & SIM_SW_STOP) {                                 /* simulator stop? */
     irq = calc_int ();                                  /* check interrupt */
 
     if (irq && (!ion_defer || !calc_defer())) {         /* pending interrupt and not deferred? */
+        addr = irq;                                     /* set display address to trap cell */
         inst = val[0] = ReadIO (irq, SMAP);             /* load trap cell instruction */
         val[1] = ReadIO (irq + 1, SMAP);                /*   might be multi-word */
         val[2] = ReadIO (irq + 2, SMAP);                /*   although it's unlikely */
@@ -717,4 +728,78 @@ if (clef) {                                             /* CLE seen? */
     else val[0] = val[0] | 040;                         /* fill in shift */
     }
 return ret;
+}
+
+
+/* Format a character into a printable string.
+
+   Control characters are translated to readable strings.  Printable characters
+   retain their original form but are enclosed in single quotes.  Characters
+   outside of the ASCII range are represented as escaped octal values.
+*/
+
+const char *fmt_char (uint8 ch)
+{
+static const char *const ctl [] = { "NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL",
+                                    "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI",
+                                    "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
+                                    "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US" };
+static char rep [5];
+
+if (ch <= '\037')                                       /* ASCII control character? */
+    return ctl [ch];                                    /* return string representation */
+
+else if (ch == '\177')                                  /* ASCII delete? */
+    return "DEL";                                       /* return string representation */
+
+else if (ch > '\177') {                                 /* beyond printable range? */
+    sprintf (rep, "\\%03o", ch);                        /* format value */
+    return rep;                                         /* return escaped octal code */
+    }
+
+else {                                                  /* printable character */
+    rep [0] = '\'';                                     /* form string */
+    rep [1] = ch;                                       /*   containing character */
+    rep [2] = '\'';
+    rep [3] = '\0';
+    return rep;                                         /* return quoted character */
+    }
+}
+
+
+/* Set device number */
+
+t_stat hp_setdev (UNIT *uptr, int32 num, char *cptr, void *desc)
+{
+DEVICE *dptr = (DEVICE *) desc;
+DIB *dibp;
+int32 i, newdev;
+t_stat r;
+
+if (cptr == NULL) return SCPE_ARG;
+if ((desc == NULL) || (num > 1)) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+newdev = get_uint (cptr, 8, I_DEVMASK - num, &r);
+if (r != SCPE_OK) return r;
+if (newdev < VARDEV) return SCPE_ARG;
+for (i = 0; i <= num; i++, dibp++) dibp->devno = newdev + i;
+return SCPE_OK;
+}
+
+
+/* Show device number */
+
+t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, void *desc)
+{
+DEVICE *dptr = (DEVICE *) desc;
+DIB *dibp;
+int32 i;
+
+if ((desc == NULL) || (num > 1)) return SCPE_IERR;
+dibp = (DIB *) dptr->ctxt;
+if (dibp == NULL) return SCPE_IERR;
+fprintf (st, "devno=%o", dibp->devno);
+for (i = 1; i <= num; i++) fprintf (st, "/%o", dibp->devno + i);
+return SCPE_OK;
 }

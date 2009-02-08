@@ -109,8 +109,6 @@ extern int32    sim_switches ;
 extern FILE *   sim_log ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
-t_stat  qty_summary ( FILE * st, UNIT * uptr, int32 val, void * desc ) ;
-t_stat  qty_show    ( FILE * st, UNIT * uptr, int32 val, void * desc ) ;
 t_stat  qty_setnl   ( UNIT * uptr, int32 val, char * cptr, void * desc ) ;
 
 t_stat  qty_attach  ( UNIT * uptr, char * cptr ) ;
@@ -158,8 +156,6 @@ UNIT    qty_unit =
         UDATA (&qty_svc, (UNIT_ATTABLE), 0)
         } ;
 
-REG qty_nlreg = { DRDATA (NLINES, qty_desc.lines, 7), PV_LEFT };
-
 REG qty_reg[] =  /*  ('alm_reg' should be similar to this except for device code related items)  */
         {
         { ORDATA (BUF, qty_unit.buf, 8) },
@@ -179,14 +175,15 @@ MTAB    qty_mod[] =
         { UNIT_8B, 0, "7b", "7B", NULL },
         { UNIT_8B, UNIT_8B, "8b", "8B", NULL },
         { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-            &tmxr_dscln, NULL, &qty_desc },
-        { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &qty_summary },
+            &tmxr_dscln, NULL, (void *)&qty_desc },
+        { UNIT_ATT, UNIT_ATT, "connections", NULL,
+          NULL, &tmxr_show_summ, (void *)&qty_desc },
         { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-            NULL, &qty_show, NULL },
+            NULL, &tmxr_show_cstat, (void *)&qty_desc },
         { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-            NULL, &qty_show, NULL },
-        { MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-            &qty_setnl, NULL, &qty_nlreg },
+            NULL, &tmxr_show_cstat, (void *)&qty_desc },
+        { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+            &qty_setnl, &tmxr_show_lines, (void *) &qty_desc },
         { 0 }
         } ;
 
@@ -749,50 +746,6 @@ int32 qty( int32 pulse, int32 code, int32 AC )
 
     return ( DG_RETURN( ioresult, iodata ) ) ;
     }   /*  end of 'qty'  */
-
-    /*--------------------------------------------------------------*/
-    /*                            qty_summary                       */
-    /*--------------------------------------------------------------*/
-
-t_stat qty_summary( FILE * st, UNIT * uptr, int32 val, void * desc )
-    {
-    int32   i, t ;
-
-    for (i = t = 0 ; i < qty_desc.lines ; ++i )
-        if ( qty_ldsc[i].conn )
-        {
-        ++t ;
-        }
-    fprintf( st, "%d connection%s", t, ((t)? "s" : "") ) ;
-    return ( SCPE_OK ) ;
-    }   /*  end of 'qty_summ'  */
-
-
-    /*--------------------------------------------------------------*/
-    /*                             qty_show                         */
-    /*--------------------------------------------------------------*/
-
-t_stat qty_show( FILE * st, UNIT * uptr, int32 val, void * desc )
-    {
-    int32   i, t ;
-
-    for (i = t = 0 ; i < qty_desc.lines ; ++i )
-        if ( qty_ldsc[i].conn )
-        {
-        t = 1; 
-        if ( val )
-            {
-            tmxr_fconns( st, &qty_ldsc[i], i ) ;
-            }
-        else
-            {
-            tmxr_fstats( st, &qty_ldsc[i], i ) ;
-            }
-        }
-    if ( t == 0 ) fprintf( st, "none connected\n" ) ;
-    return ( SCPE_OK ) ;
-    }   /*  end of 'qty_show'  */
-
 
     /*--------------------------------------------------------------*/
     /*                             qty_setnl                        */

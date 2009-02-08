@@ -1,6 +1,6 @@
 /* vax_stddev.c: VAX 3900 standard I/O devices
 
-   Copyright (c) 1998-2007, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    17-Oct-06    RMS     Synced keyboard poll to real-time clock for idling
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -77,6 +78,7 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat todr_resync (void);
 
 extern int32 sysd_hlt_enb (void);
 
@@ -234,7 +236,8 @@ return (tto_csr & TTOCSR_IMP);
 
 void iccs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) CLR_INT (CLK);
+if ((data & CSR_IE) == 0)
+    CLR_INT (CLK);
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
 return;
 }
@@ -242,13 +245,15 @@ return;
 void todr_wr (int32 data)
 {
 todr_reg = data;
-if (data) todr_blow = 0;
+if (data)
+    todr_blow = 0;
 return;
 }
 
 void rxcs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) CLR_INT (TTI);
+if ((data & CSR_IE) == 0)
+    CLR_INT (TTI);
 else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     SET_INT (TTI);
 tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
@@ -257,7 +262,8 @@ return;
 
 void txcs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) CLR_INT (TTO);
+if ((data & CSR_IE) == 0)
+    CLR_INT (TTO);
 else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     SET_INT (TTO);
 tto_csr = (tto_csr & ~TTOCSR_RW) | (data & TTOCSR_RW);
@@ -284,15 +290,18 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
 if (c & SCPE_BREAK) {                                   /* break? */
-    if (sysd_hlt_enb ()) hlt_pin = 1;                   /* if enabled, halt */
+    if (sysd_hlt_enb ())                                /* if enabled, halt */
+        hlt_pin = 1;
     tti_unit.buf = TTIBUF_ERR | TTIBUF_FRM | TTIBUF_RBR;
     }
 else tti_unit.buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
-if (tti_csr & CSR_IE) SET_INT (TTI);
+if (tti_csr & CSR_IE)
+    SET_INT (TTI);
 return SCPE_OK;
 }
 
@@ -324,7 +333,8 @@ if (c >= 0) {
         }
     }
 tto_csr = tto_csr | CSR_DONE;
-if (tto_csr & CSR_IE) SET_INT (TTO);
+if (tto_csr & CSR_IE)
+    SET_INT (TTO);
 uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
@@ -349,12 +359,14 @@ t_stat clk_svc (UNIT *uptr)
 {
 int32 t;
 
-if (clk_csr & CSR_IE) SET_INT (CLK);
+if (clk_csr & CSR_IE)
+    SET_INT (CLK);
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
 sim_activate (&clk_unit, t);                            /* reactivate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
-if (!todr_blow) todr_reg = todr_reg + 1;                /* incr TODR */
+if (!todr_blow)                                         /* incr TODR */
+    todr_reg = todr_reg + 1;
 return SCPE_OK;
 }
 
@@ -368,18 +380,20 @@ t = sim_is_active (&clk_unit);
 return (t? t - 1: wait);
 }
 
-/* Powerup routine */
+/* TODR resync routine */
 
-t_stat todr_powerup (void)
+t_stat todr_resync (void)
 {
 uint32 base;
 time_t curr;
 struct tm *ctm;
 
 curr = time (NULL);                                     /* get curr time */
-if (curr == (time_t) -1) return SCPE_NOFNC;             /* error? */
+if (curr == (time_t) -1)                                /* error? */
+    return SCPE_NOFNC;
 ctm = localtime (&curr);                                /* decompose */
-if (ctm == NULL) return SCPE_NOFNC;                     /* error? */
+if (ctm == NULL)                                        /* error? */
+    return SCPE_NOFNC;
 base = (((((ctm->tm_yday * 24) +                        /* sec since 1-Jan */
         ctm->tm_hour) * 60) +
         ctm->tm_min) * 60) +
@@ -395,7 +409,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
-if (sim_switches & SWMASK ('P')) todr_powerup ();       /* powerup? */
+todr_resync ();                                         /* resync clock */
 clk_csr = 0;
 CLR_INT (CLK);
 t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init timer */

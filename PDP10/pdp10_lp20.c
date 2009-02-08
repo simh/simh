@@ -1,6 +1,6 @@
 /* pdp10_lp20.c: PDP-10 LP20 line printer simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -291,17 +291,19 @@ update_lpcs (0);                                        /* update csr's */
 switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
 
     case 00:                                            /* LPCSA */
-        if (access == WRITEB) data = (pa & 1)?
-            (lpcsa & 0377) | (data << 8): (lpcsa & ~0377) | data;
+        if (access == WRITEB)
+            data = (pa & 1)? (lpcsa & 0377) | (data << 8): (lpcsa & ~0377) | data;
         if (data & CSA_ECLR) {                          /* error clear? */
             lpcsa = (lpcsa | CSA_DONE) & ~CSA_GO;       /* set done, clr go */
             lpcsb = lpcsb & ~CSB_ECLR;                  /* clear err */
             sim_cancel (&lp20_unit);                    /* cancel I/O */
             }
-        if (data & CSA_INIT) lp20_reset (&lp20_dev);    /* init? */
+        if (data & CSA_INIT)                            /* init? */
+            lp20_reset (&lp20_dev);
         if (data & CSA_GO) {                            /* go set? */
             if ((lpcsa & CSA_GO) == 0) {                /* not set before? */
-                if (lpcsb & CSB_ERR) lpcsb = lpcsb | CSB_GOE;
+                if (lpcsb & CSB_ERR)
+                    lpcsb = lpcsb | CSB_GOE;
                 lpcsum = 0;                             /* clear checksum */
                 sim_activate (&lp20_unit, lp20_unit.wait);
                 }
@@ -314,27 +316,27 @@ switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
         break;                                          /* ignore writes to TEST */
 
     case 02:                                            /* LPBA */
-        if (access == WRITEB) data = (pa & 1)?
-            (lpba & 0377) | (data << 8): (lpba & ~0377) | data;
+        if (access == WRITEB)
+            data = (pa & 1)? (lpba & 0377) | (data << 8): (lpba & ~0377) | data;
         lpba = data;
         break;
 
     case 03:                                            /* LPBC */
-        if (access == WRITEB) data = (pa & 1)?
-            (lpbc & 0377) | (data << 8): (lpbc & ~0377) | data;
+        if (access == WRITEB)
+            data = (pa & 1)? (lpbc & 0377) | (data << 8): (lpbc & ~0377) | data;
         lpbc = data & BC_MASK;
         lpcsa = lpcsa & ~CSA_DONE;
         break;
 
     case 04:                                            /* LPPAGC */
-        if (access == WRITEB) data = (pa & 1)?
-            (lppagc & 0377) | (data << 8): (lppagc & ~0377) | data;
+        if (access == WRITEB)
+            data = (pa & 1)? (lppagc & 0377) | (data << 8): (lppagc & ~0377) | data;
         lppagc = data & PAGC_MASK;
         break;
 
     case 05:                                            /* LPRDAT */
-        if (access == WRITEB) data = (pa & 1)?
-            (lprdat & 0377) | (data << 8): (lprdat & ~0377) | data;
+        if (access == WRITEB)
+            data = (pa & 1)? (lprdat & 0377) | (data << 8): (lprdat & ~0377) | data;
         lprdat = data & RDAT_MASK;
         txram[lpcbuf & TX_AMASK] = lprdat;              /* load RAM */
         break;
@@ -344,7 +346,8 @@ switch ((pa >> 1) & 07) {                               /* case on PA<3:1> */
             lpcolc = data & 0377;
         else {
             lpcbuf = data & 0377;                       /* even byte, word */
-            if (access == WRITE) lpcolc = (data >> 8) & 0377;
+            if (access == WRITE)
+                lpcolc = (data >> 8) & 0377;
             }
         break;
 
@@ -366,16 +369,20 @@ return SCPE_OK;
    actions : = print_input, print_xlate, davfu_action, interrupt
 
    if (inter) {
-        if (!xlate || delim || delim_hold) interrupt;
-        else if (paper) davfu_action;
+        if (!xlate || delim || delim_hold)
+            interrupt;
+        else if (paper)
+            davfu_action;
         else print_xlate;
 		}
    else if (paper) {
-        if (xlate || delim || delim_hold) davfu_action;
+        if (xlate || delim || delim_hold)
+            davfu_action;
         else print_input;
 		}
    else {
-        if (xlate || delim || delim_hold) print_xlate;
+        if (xlate || delim || delim_hold)
+            print_xlate;
         else print_input;
 		}
 */
@@ -434,15 +441,16 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
             dvld = dvlnt = 0;                           /* reset lnt */
         else if (lpcbuf == 0357) {                      /* stop DVU load? */
             dvptr = 0;                                  /* reset ptr */
-            if (dvld & 1) dvlnt = 0;                    /* if odd, invalid */
+            if (dvld & 1)                               /* if odd, invalid */
+                dvlnt = 0;
             }
         else if (dvld == 0) {                           /* even state? */
             temp = lpcbuf & DV_DMASK;
             dvld = 1;
             }
         else if (dvld == 1) {                           /* odd state? */
-            if (dvlnt < DV_SIZE) davfu[dvlnt++] = 
-                temp | ((lpcbuf & DV_DMASK) << 6);
+            if (dvlnt < DV_SIZE)
+                davfu[dvlnt++] = temp | ((lpcbuf & DV_DMASK) << 6);
             dvld = 0;
             }
         break;
@@ -453,7 +461,8 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
         lprdat = txram[lpcbuf];                         /* get RAM char */
         txst = (TX_GETFL (lprdat) << 1) |               /* get state */
             ((lpcsa & CSA_DELH)? 1: 0);                 /* plus delim hold */ 
-        if (lprdat & TX_DELH) lpcsa = lpcsa | CSA_DELH;
+        if (lprdat & TX_DELH)
+            lpcsa = lpcsa | CSA_DELH;
         else lpcsa = lpcsa & ~CSA_DELH;
         lpcsa = lpcsa & ~CSA_UNDF;                      /* assume char ok */
         switch (txcase[txst]) {                         /* case on state */
@@ -486,7 +495,8 @@ for (i = 0, cont = TRUE; (i < tbc) && cont; ba++, i++) {
 lpba = ba & 0177777;
 lpcsa = (lpcsa & ~CSA_UAE) | ((ba >> (16 - CSA_V_UAE)) & CSA_UAE);
 lpbc = (lpbc + i) & BC_MASK;
-if (lpbc) update_lpcs (CSA_MBZ);                        /* intr, but not done */
+if (lpbc)                                               /* intr, but not done */
+    update_lpcs (CSA_MBZ);
 else update_lpcs (CSA_DONE);                            /* intr and done */
 if ((fnc == FNC_PR) && ferror (lp20_unit.fileref)) {
     perror ("LP I/O error");
@@ -511,10 +521,14 @@ t_bool r = TRUE;
 int32 i, rpt = 1;
 
 lppdat = c & 0177;                                      /* mask char to 7b */
-if (lppdat == 000) return TRUE;                         /* NUL? no op */
-if (lppdat == 012) return lp20_adv (1, TRUE);           /* LF? adv carriage */
-if (lppdat == 014) return lp20_davfu (DV_TOF);          /* FF? top of form */
-if (lppdat == 015) lpcolc = 0;                          /* CR? reset col cntr */
+if (lppdat == 000)                                      /* NUL? no op */
+    return TRUE;
+if (lppdat == 012)                                      /* LF? adv carriage */
+    return lp20_adv (1, TRUE);
+if (lppdat == 014)                                      /* FF? top of form */
+    return lp20_davfu (DV_TOF);
+if (lppdat == 015)                                      /* CR? reset col cntr */
+    lpcolc = 0;
 else if (lppdat == 011) {                               /* TAB? simulate */
     lppdat = ' ';                                       /* with spaces */
     if (lpcolc >= 128) {
@@ -524,7 +538,8 @@ else if (lppdat == 011) {                               /* TAB? simulate */
     else rpt = 8 - (lpcolc & 07);                       /* else adv 1 to 8 */
     }           
 else {
-    if (lppdat < 040) lppdat = ' ';                     /* cvt non-prnt to spc */
+    if (lppdat < 040)                                   /* cvt non-prnt to spc */
+        lppdat = ' ';
     if (lpcolc >= LP_WIDTH)                             /* line full? */
         r = lp20_adv (1, TRUE);                         /* adv carriage */
     }
@@ -539,12 +554,14 @@ t_bool lp20_adv (int32 cnt, t_bool dvuadv)
 {
 int32 i;
 
-if (cnt == 0) return TRUE;
+if (cnt == 0)
+    return TRUE;
 lpcolc = 0;                                             /* reset col cntr */
 for (i = 0; i < cnt; i++)
     fputc ('\n', lp20_unit.fileref);
 lp20_unit.pos = ftell (lp20_unit.fileref);              /* print 'n' newlines */
-if (dvuadv) dvptr = (dvptr + cnt) % dvlnt;              /* update DAVFU ptr */
+if (dvuadv)                                             /* update DAVFU ptr */
+    dvptr = (dvptr + cnt) % dvlnt;
 if (davfu[dvptr] & (1 << DV_TOF)) {                     /* at top of form? */
     if (lppagc = (lppagc - 1) & PAGC_MASK) {            /* decr page cntr */
         lpcsa = lpcsa & ~CSA_PZRO;                      /* update status */
@@ -562,13 +579,17 @@ t_bool lp20_davfu (int32 cnt)
 {
 int i;
 
-if (cnt > DV_MAX) cnt = 7;                              /* inval chan? */
+if (cnt > DV_MAX)                                       /* inval chan? */
+    cnt = 7;
 for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
     dvptr = dvptr + 1;                                  /* adv DAVFU ptr */
-    if (dvptr >= dvlnt) dvptr = 0;                      /* wrap at end */
+    if (dvptr >= dvlnt)                                 /* wrap at end */
+        dvptr = 0;
     if (davfu[dvptr] & (1 << cnt)) {                    /* channel stop set? */
-        if (cnt) return lp20_adv (i + 1, FALSE);        /* ~TOF, adv */
-        if (lpcolc) lp20_adv (1, FALSE);                /* TOF, need newline? */
+        if (cnt)                                        /* ~TOF, adv */
+            return lp20_adv (i + 1, FALSE);
+        if (lpcolc)                                     /* TOF, need newline? */
+            lp20_adv (1, FALSE);
         fputc ('\f', lp20_unit.fileref);                /* print form feed */
         lp20_unit.pos = ftell (lp20_unit.fileref); 
         if (lppagc = (lppagc - 1) & PAGC_MASK) {        /* decr page cntr */
@@ -576,7 +597,7 @@ for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
             return TRUE;
             }
         else {
-                lpcsa = lpcsa | CSA_PZRO;               /* stop if zero */
+            lpcsa = lpcsa | CSA_PZRO;                   /* stop if zero */
             return FALSE;
             }
         }
@@ -589,7 +610,8 @@ return FALSE;
 
 void update_lpcs (int32 flg)
 {
-if (flg) lp20_irq = 1;                                  /* set int req */
+if (flg)                                                /* set int req */
+    lp20_irq = 1;
 lpcsa = (lpcsa | flg) & ~(CSA_MBZ | CSA_ERR | CSA_ONL | CSA_DVON);
 lpcsb = (lpcsb | CSB_OFFL | CSB_DVOF) & ~CSB_MBZ;
 if (lp20_unit.flags & UNIT_ATT) {
@@ -601,8 +623,10 @@ if (dvlnt) {
     lpcsa = lpcsa | CSA_DVON;
     lpcsb = lpcsb & ~CSB_DVOF;
     }
-if (lpcsb & CSB_ERR) lpcsa = lpcsa | CSA_ERR;
-if ((lpcsa & CSA_IE) && lp20_irq) int_req = int_req | INT_LP20;
+if (lpcsb & CSB_ERR)
+    lpcsa = lpcsa | CSA_ERR;
+if ((lpcsa & CSA_IE) && lp20_irq)
+    int_req = int_req | INT_LP20;
 else int_req = int_req & ~INT_LP20;
 return;
 }
@@ -633,8 +657,10 @@ t_stat lp20_attach (UNIT *uptr, char *cptr)
 t_stat reason;
     
 reason = attach_unit (uptr, cptr);                      /* attach file */
-if (lpcsa & CSA_ONL) return reason;                     /* just file chg? */
-if (sim_is_active (&lp20_unit)) update_lpcs (0);        /* busy? no int */
+if (lpcsa & CSA_ONL)                                    /* just file chg? */
+    return reason;
+if (sim_is_active (&lp20_unit))                         /* busy? no int */
+    update_lpcs (0);
 else update_lpcs (CSA_MBZ);                             /* interrupt */
 return reason;
 }
@@ -643,7 +669,8 @@ t_stat lp20_detach (UNIT *uptr)
 {
 t_stat reason;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
 reason = detach_unit (uptr);
 sim_cancel (&lp20_unit);
 lpcsa = lpcsa & ~CSA_GO;
@@ -655,8 +682,10 @@ t_stat lp20_clear_vfu (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int i;
 
-if (!get_yn ("Clear DAVFU? [N]", FALSE)) return SCPE_OK;
-for (i = 0; i < DV_SIZE; i++) davfu[i] = 0;
+if (!get_yn ("Clear DAVFU? [N]", FALSE))
+    return SCPE_OK;
+for (i = 0; i < DV_SIZE; i++)
+    davfu[i] = 0;
 dvlnt = dvptr = 0;
 update_lpcs (0);
 return SCPE_OK;

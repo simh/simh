@@ -25,6 +25,9 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Moved option-present tests to UIG dispatchers
+                        Call "user microcode" dispatcher for unclaimed UIG instructions
    20-Apr-08    JDB     Fixed VIS and SIGNAL to depend on the FPP and HAVE_INT64
    28-Nov-07    JDB     Added fprint_ops, fprint_regs for debug printouts
    17-Nov-07    JDB     Enabled DIAG as NOP on 1000 F-Series
@@ -45,31 +48,47 @@
    - HP 1000 M/E/F-Series Computers Engineering and Reference Documentation
         (92851-90001, Mar-1981)
    - Macro/1000 Reference Manual (92059-90001, Dec-1992)
+   - HP 93585A Double Integer Firmware Package Installation and Programming
+        Manual (93585-90007, Feb-1984)
 
    Additional references are listed with the associated firmware
    implementations, as are the HP option model numbers pertaining to the
    applicable CPUs.
 
+
    This source file contains the Extended Arithmetic Unit simulator and the User
    Instruction Group (a.k.a. "Macro") dispatcher for the 2100 and 1000 (21MX)
    CPUs.  The UIG simulators reside in separate source files, due to the large
-   number of firmware options available for the 1000 machines.  Unit flags
-   indicate which options are present in the current system.
+   number of firmware options available for these machines.  Unit flags indicate
+   which options are present in the current system.
 
    This module also provides generalized instruction operand processing.
 
-   The microcode address space of the 2100 encompassed four modules of 256 words
+   The 2100 and 1000 machines were microprogrammable; the 2116/15/14 machines
+   were not.  Both user- and HP-written microprograms were supported.  The
+   microcode address space of the 2100 encompassed four modules of 256 words
    each.  The 1000 M-series expanded that to sixteen modules, and the 1000
    E/F-series expanded that still further to sixty-four modules.  Each CPU had
    its own microinstruction set, although the micromachines of the various 1000
    models were similar internally.
+
+   The UIG instructions were divided into ranges assigned to HP firmware
+   options, reserved for future HP use, and reserved for user microprograms.
+   User microprograms could occupy any range not already used on a given
+   machine, but in practice, some effort was made to avoid the HP-reserved
+   ranges.
+
+   User microprogram simulation is supported by routing any UIG instruction not
+   allocated to an installed firmware option to a user-firmware dispatcher.
+   Site-specific microprograms may be simulated there.  In the absence of such a
+   simulation, an unimplemented instruction stop will occur.
 
    Regarding option instruction sets, there was some commonality across CPU
    types.  EAU instructions were identical across all models, and the floating
    point set was the same on the 2100 and 1000.  Other options implemented
    proper instruction supersets (e.g., the Fast FORTRAN Processor from 2100 to
    1000-M to 1000-E to 1000-F) or functional equivalence with differing code
-   points (the 2000 I/O Processor from 2100 to 1000 and extended-precision
+   points (the 2000 I/O Processor from 2100 to 1000, and the extended-precision
    floating-point instructions from 1000-E to 1000-F).
 
    The 2100 decoded the EAU and UIG sets separately in hardware and supported
@@ -95,30 +114,15 @@
    The design of the 1000 microinstruction set was such that executing an
    instruction for which no microcode was present (e.g., executing a FFP
    instruction when the FFP firmware was not installed) resulted in a NOP.
-   Under simulation, such execution causes an undefined instruction stop.
+   Under simulation, such execution causes an undefined instruction stop if
+   "stop_inst" is non-zero and a NOP otherwise.
 */
+
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 #include "hp2100_cpu1.h"
 
-#if defined (HAVE_INT64)                                /* int64 support available */
-extern t_stat cpu_fpp (uint32 IR, uint32 intrq);        /* Floating Point Processor */
-extern t_stat cpu_sis (uint32 IR, uint32 intrq);        /* Scientific Instruction Set */
-extern t_stat cpu_vis (uint32 IR, uint32 intrq);        /* Vector Instruction Set */
-extern t_stat cpu_signal (uint32 IR, uint32 intrq);     /* SIGNAL/1000 */
-#else                                                   /* int64 support unavailable */
-extern t_stat cpu_fp (uint32 IR, uint32 intrq);         /* Firmware Floating Point */
-#endif                                                  /* end of int64 support */
-
-extern t_stat cpu_ffp (uint32 IR, uint32 intrq);        /* Fast FORTRAN Processor */
-extern t_stat cpu_ds (uint32 IR, uint32 intrq);         /* Distributed Systems */
-extern t_stat cpu_dbi (uint32 IR, uint32 intrq);        /* Double integer */
-extern t_stat cpu_rte_vma (uint32 IR, uint32 intrq);    /* RTE-4/6 EMA/VMA */
-extern t_stat cpu_rte_os (uint32 IR, uint32 intrq, uint32 iotrap);  /* RTE-6 OS */
-extern t_stat cpu_iop (uint32 IR, uint32 intrq);        /* 2000 I/O Processor */
-extern t_stat cpu_dms (uint32 IR, uint32 intrq);        /* Dynamic mapping system */
-extern t_stat cpu_eig (uint32 IR, uint32 intrq);        /* Extended instruction group */
 
 /* EAU
 
@@ -333,6 +337,7 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 return reason;
 }
 
+
 /* UIG 0
 
    The first User Instruction Group (UIG) encodes firmware options for the 2100
@@ -351,13 +356,9 @@ return reason;
      105320-105337  Scientific Instruction Set    -       -       -      std
      105340-105357  RTE-6/VM Operating System     -       -      opt     opt
 
-   Because the 2100 IOP microcode uses the same instruction range as the 2100 FP
-   and FFP options, it cannot coexist with them.  To simplify simulation, the
-   2100 IOP instructions are remapped to the equivalent 1000 instructions and
-   dispatched to the UIG 1 module.
-
-   Note that if the 2100 IOP is installed, the only valid UIG instructions are
-   IOP instructions, as the IOP used the full 2100 microcode addressing space.
+   If the 2100 IOP is installed, the only valid UIG instructions are IOP
+   instructions, as the IOP used the full 2100 microcode addressing space.  The
+   IOP dispatcher remaps the 2100 codes to 1000 codes for execution.
 
    The F-Series moved the three-word extended real instructions from the FFP
    range to the base floating-point range and added four-word double real and
@@ -366,42 +367,42 @@ return reason;
    the rest assigned to the floating-point range.  Consequently, many
    instruction codes for the F-Series are different from the E-Series.
 
-   Notes:
+   Implementation notes:
 
-     1. Product 93585A, available from the "Specials" group, added double
-        integer microcode to the E-Series.  The instruction codes were different
-        from those in the F-Series to avoid conflicting with the E-Series FFP.
-        HP manual number 93585-90007 documents the double integer instructions,
-        but no copy of this manual has been found.  The Macro/1000 manual
-        (92059-090001) lists E-Series double integer instructions as occupying
-        the code points of the F-Series Scientific Instruction Set.
+    1. Product 93585A, available from the "Specials" group, added double integer
+       microcode to the E-Series.  The instruction codes were different from
+       those in the F-Series to avoid conflicting with the E-Series FFP.
 
-     2. To run the double-integer instructions diagnostic in the absence of
-        64-bit integer support (and therefore of F-Series simulation), a special
-        DBI dispatcher may be enabled by defining ENABLE_DIAG during
-        compilation.  This dispatcher will remap the F-Series DBI instructions
-        to the E-Series codes, so that the F-Series diagnostic may be run.
-        Because several of the F-Series DBI instruction codes replace M/E-Series
-        FFP codes, this dispatcher will only operate if FFP is disabled.
+    2. To run the double-integer instructions diagnostic in the absence of
+       64-bit integer support (and therefore of F-Series simulation), a special
+       DBI dispatcher may be enabled by defining ENABLE_DIAG during compilation.
+       This dispatcher will remap the F-Series DBI instructions to the E-Series
+       codes, so that the F-Series diagnostic may be run.  Because several of
+       the F-Series DBI instruction codes replace M/E-Series FFP codes, this
+       dispatcher will only operate if FFP is disabled.
 
-        Note that enabling the dispatcher will produce non-standard FP behavior.
-        For example, any code in the range 105000-105017 normally would execute
-        a FAD instruction.  With the dispatcher enabled, 105014 would execute a
-        .DAD, while the other codes would execute a FAD.  Therefore, ENABLE_DIAG
-        should only be used to run the diagnostic and is not intended for
-        general use.
+       Note that enabling the dispatcher will produce non-standard FP behavior.
+       For example, any code in the range 105000-105017 normally would execute a
+       FAD instruction.  With the dispatcher enabled, 105014 would execute a
+       .DAD, while the other codes would execute a FAD.  Therefore, ENABLE_DIAG
+       should only be used to run the diagnostic and is not intended for general
+       use.
+
+    3. Any instruction not claimed by an installed option will be sent to the
+       user microcode dispatcher.
 */
 
 t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap)
 {
 if ((cpu_unit.flags & UNIT_IOP) &&                      /* I/O Processor? */
-    (UNIT_CPU_TYPE == UNIT_TYPE_2100))                  /* 2100 CPU? */
+    (UNIT_CPU_TYPE == UNIT_TYPE_2100))                  /*   and 2100 CPU? */
     return cpu_iop (IR, intrq);                         /* dispatch to IOP */
 
 
-#if !defined (HAVE_INT64) && defined (ENABLE_DIAG)      /* DBI diagnostic dispatcher wanted */
+#if !defined (HAVE_INT64) && defined (ENABLE_DIAG)      /* special DBI diagnostic dispatcher */
 
-if ((cpu_unit.flags & UNIT_FFP) == 0)
+if (((cpu_unit.flags & UNIT_FFP) == 0) &&               /* FFP absent? */
+    (cpu_unit.flags & UNIT_DBI))                        /*   and DBI present? */
     switch (IR & 0377) {
         case 0014:                                      /* .DAD 105014 */
             return cpu_dbi (0105321, intrq);
@@ -440,7 +441,7 @@ if ((cpu_unit.flags & UNIT_FFP) == 0)
             return cpu_dbi (0105333, intrq);
         }                                               /* otherwise, continue */
 
-#endif                                                  /* end of DBI dispatcher */
+#endif                                                  /* end of special DBI dispatcher */
 
 
 switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
@@ -451,36 +452,57 @@ switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
     case 003:                                           /* 105060-105077 */
     case 004:                                           /* 105100-105117 */
     case 005:                                           /* 105120-105137 */
+        if (cpu_unit.flags & UNIT_FP)                   /* FP option installed? */
 #if defined (HAVE_INT64)                                /* int64 support available */
-        return cpu_fpp (IR, intrq);                     /* Floating Point Processor */
+            return cpu_fpp (IR, intrq);                 /* Floating Point Processor */
 #else                                                   /* int64 support unavailable */
-        return cpu_fp (IR, intrq);                      /* Firmware Floating Point */
+            return cpu_fp (IR, intrq);                  /* Firmware Floating Point */
 #endif                                                  /* end of int64 support */
+        else
+            break;
 
     case 010:                                           /* 105200-105217 */
     case 011:                                           /* 105220-105237 */
-        return cpu_ffp (IR, intrq);                     /* Fast FORTRAN Processor */
+        if (cpu_unit.flags & UNIT_FFP)                  /* FFP option installed? */
+            return cpu_ffp (IR, intrq);                 /* Fast FORTRAN Processor */
+        else
+            break;
 
     case 012:                                           /* 105240-105257 */
-        return cpu_rte_vma (IR, intrq);                 /* RTE-4/6 EMA/VMA */
+        if (cpu_unit.flags & UNIT_VMAOS)                /* VMA/OS option installed? */
+            return cpu_rte_vma (IR, intrq);             /* RTE-6 VMA */
+        else if (cpu_unit.flags & UNIT_EMA)             /* EMA option installed? */
+            return cpu_rte_ema (IR, intrq);             /* RTE-4 EMA */
+        else
+            break;
 
     case 014:                                           /* 105300-105317 */
-        return cpu_ds (IR, intrq);                      /* Distributed System */
+        if (cpu_unit.flags & UNIT_DS)                   /* DS option installed? */
+            return cpu_ds (IR, intrq);                  /* Distributed System */
+        else
+            break;
 
     case 015:                                           /* 105320-105337 */
 #if defined (HAVE_INT64)                                /* int64 support available */
         if (UNIT_CPU_MODEL == UNIT_1000_F)              /* F-series? */
-            return cpu_sis (IR, intrq);                 /* Scientific Instruction */
+            return cpu_sis (IR, intrq);                 /* Scientific Instruction is standard */
         else                                            /* M/E-series */
 #endif                                                  /* end of int64 support */
+        if (cpu_unit.flags & UNIT_DBI)                  /* DBI option installed? */
             return cpu_dbi (IR, intrq);                 /* Double integer */
+        else
+            break;
 
     case 016:                                           /* 105340-105357 */
-        return cpu_rte_os (IR, intrq, iotrap);          /* RTE-6 OS */
+        if (cpu_unit.flags & UNIT_VMAOS)                /* VMA/OS option installed? */
+            return cpu_rte_os (IR, intrq, iotrap);      /* RTE-6 OS */
+        else
+            break;
     }
 
-return stop_inst;                                       /* others undefined */
+return cpu_user (IR, intrq);                            /* try user microcode */
 }
+
 
 /* UIG 1
 
@@ -490,15 +512,25 @@ return stop_inst;                                       /* others undefined */
 
      Instructions   Option Name                   1000-M  1000-E  1000-F
      -------------  ----------------------------  ------  ------  ------
-     10x400-10x437  2000 IOP                       opt     opt      -
-     10x460-10x477  2000 IOP                       opt     opt      -
+     10x400-10x437  2000 IOP                       opt     opt     opt
+     10x460-10x477  2000 IOP                       opt     opt     opt
      10x460-10x477  Vector Instruction Set          -       -      opt
-     105520-105537  Distributed System             opt      -       -
-     105600-105617  SIGNAL/1000 Instruction Set     -       -      opt
+     10x520-10x537  Distributed System             opt      -       -
+     10x600-10x617  SIGNAL/1000 Instruction Set     -       -      opt
      10x700-10x737  Dynamic Mapping System         opt     opt     std
      10x740-10x777  Extended Instruction Group     std     std     std
 
    Only 1000 systems execute these instructions.
+
+   Implementation notes:
+
+    1. The Distributed System (DS) microcode was mapped to different instruction
+       ranges for the M-Series and the E/F-Series.  The sequence of instructions
+       was identical, though, so we remap the former range to the latter before
+       dispatching.
+
+    2. Any instruction not claimed by an installed option will be sent to the
+       user microcode dispatcher.
 */
 
 t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap)
@@ -510,35 +542,51 @@ switch ((IR >> 4) & 017) {                              /* decode IR<7:4> */
 
     case 000:                                           /* 105400-105417 */
     case 001:                                           /* 105420-105437 */
-        return cpu_iop (IR, intrq);                     /* 2000 I/O Processor */
+        if (cpu_unit.flags & UNIT_IOP)                  /* IOP option installed? */
+            return cpu_iop (IR, intrq);                 /* 2000 I/O Processor */
+        else
+            break;
 
     case 003:                                           /* 105460-105477 */
 #if defined (HAVE_INT64)                                /* int64 support available */
-        if (UNIT_CPU_MODEL == UNIT_1000_F)              /* F-series? */
+        if (cpu_unit.flags & UNIT_VIS)                  /* VIS option installed? */
             return cpu_vis (IR, intrq);                 /* Vector Instruction Set */
-        else                                            /* M/E-series */
+        else
 #endif                                                  /* end of int64 support */
+        if (cpu_unit.flags & UNIT_IOP)                  /* IOP option installed? */
             return cpu_iop (IR, intrq);                 /* 2000 I/O Processor */
+        else
+            break;
 
     case 005:                                           /* 105520-105537 */
-        IR = IR ^ 0000620;                              /* remap to 105300-105317 */
-        return cpu_ds (IR, intrq);                      /* Distributed System */
+        if (cpu_unit.flags & UNIT_DS) {                 /* DS option installed? */
+            IR = IR ^ 0000620;                          /* remap to 105300-105317 */
+            return cpu_ds (IR, intrq);                  /* Distributed System */
+            }
+        else
+            break;
 
 #if defined (HAVE_INT64)                                /* int64 support available */
     case 010:                                           /* 105600-105617 */
-        return cpu_signal (IR, intrq);                  /* SIGNAL/1000 Instructions */
+        if (cpu_unit.flags & UNIT_SIGNAL)               /* SIGNAL option installed? */
+            return cpu_signal (IR, intrq);              /* SIGNAL/1000 Instructions */
+        else
+            break;
 #endif                                                  /* end of int64 support */
 
     case 014:                                           /* 105700-105717 */
     case 015:                                           /* 105720-105737 */
-        return cpu_dms (IR, intrq);                     /* Dynamic Mapping System */
+        if (cpu_unit.flags & UNIT_DMS)                  /* DMS option installed? */
+            return cpu_dms (IR, intrq);                 /* Dynamic Mapping System */
+        else
+            break;
 
-    case 016:                                           /* 105740-105737 */
+    case 016:                                           /* 105740-105757 */
     case 017:                                           /* 105760-105777 */
         return cpu_eig (IR, intrq);                     /* Extended Instruction Group */
     }
 
-return stop_inst;                                       /* others undefined */
+return cpu_user (IR, intrq);                            /* try user microcode */
 }
 
 

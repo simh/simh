@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: sim_imd.h 1904 2008-05-21 06:57:57Z hharte $                     *
+ * $Id: sim_imd.h 1987 2008-07-08 03:25:57Z hharte $                     *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -33,7 +33,7 @@
  *                                                                       *
  * Module Description:                                                   *
  *     ImageDisk Disk Image File access module for SIMH, definitions.    *
- *     see :                                                             *
+ *     See: http://www.classiccmp.org/dunfield/img/index.htm             *
  *     for details on the ImageDisk format and other utilities.          *
  *                                                                       *
  * Environment:                                                          *
@@ -42,11 +42,11 @@
  *************************************************************************/
 
 typedef struct {
-    unsigned char mode;
-    unsigned char cyl;
-    unsigned char head;
-    unsigned char nsects;
-    unsigned char sectsize;
+    uint8 mode;
+    uint8 cyl;
+    uint8 head;
+    uint8 nsects;
+    uint8 sectsize;
 } IMD_HEADER;
 
 
@@ -73,6 +73,7 @@ typedef struct {
 #define IMD_DISK_IO_ERROR_CRC           (1 << 1)    /* Data read/written, but got a CRC error. */
 #define IMD_DISK_IO_DELETED_ADDR_MARK   (1 << 2)    /* Sector had a deleted address mark */
 #define IMD_DISK_IO_COMPRESSED          (1 << 3)    /* Sector is compressed in the IMD file (Read Only) */
+#define IMD_DISK_IO_ERROR_WPROT         (1 << 4)    /* Disk is write protected */
 
 #define IMD_MODE_500K_FM        0
 #define IMD_MODE_300K_FM        1
@@ -85,26 +86,38 @@ typedef struct {
 #define IMD_MODE_MFM(x)     (x >= IMD_MODE_500K_MFM)
 
 typedef struct {
-    unsigned char mode;
-    unsigned char nsects;
-    unsigned int sectsize;
-    unsigned int sectorOffsetMap[MAX_SPT];
-    unsigned char start_sector;
+    uint8 mode;
+    uint8 nsects;
+    uint32 sectsize;
+    uint32 sectorOffsetMap[MAX_SPT];
+    uint8 start_sector;
+    uint8 logicalHead[MAX_SPT];
+    uint8 logicalCyl[MAX_SPT];
 } TRACK_INFO;
 
 typedef struct {
     FILE *file;
-    unsigned int ntracks;
-    unsigned char nsides;
-    unsigned char flags;
+    uint32 ntracks;
+    uint8 nsides;
+    uint8 flags;
     TRACK_INFO track[MAX_CYL][MAX_HEAD];
 } DISK_INFO;
 
-extern DISK_INFO *diskOpen(FILE *fileref, int isVerbose); /*char *filename); */
-extern unsigned int diskClose(DISK_INFO *myDisk);
-extern unsigned int imdGetSides(DISK_INFO *myDisk);
-extern unsigned int imdIsWriteLocked(DISK_INFO *myDisk);
+extern DISK_INFO *diskOpen(FILE *fileref, uint32 isVerbose);
+extern t_stat diskClose(DISK_INFO **myDisk);
+extern t_stat diskCreate(FILE *fileref, char *ctlr_comment);
+extern uint32 imdGetSides(DISK_INFO *myDisk);
+extern uint32 imdIsWriteLocked(DISK_INFO *myDisk);
 
-extern int sectSeek(DISK_INFO *myDisk, unsigned int Cyl, unsigned int Head);
-extern int sectRead(DISK_INFO *myDisk, unsigned int Cyl, unsigned int Head, unsigned int Sector, unsigned char *buf, unsigned int buflen, unsigned int *flags, unsigned int *readlen);
-extern int sectWrite(DISK_INFO *myDisk, unsigned int Cyl, unsigned int Head, unsigned int Sector, unsigned char *buf, unsigned int buflen, unsigned int *flags, unsigned int *writelen);
+extern t_stat sectSeek(DISK_INFO *myDisk, uint32 Cyl, uint32 Head);
+extern t_stat sectRead(DISK_INFO *myDisk, uint32 Cyl, uint32 Head, uint32 Sector, uint8 *buf, uint32 buflen, uint32 *flags, uint32 *readlen);
+extern t_stat sectWrite(DISK_INFO *myDisk, uint32 Cyl, uint32 Head, uint32 Sector, uint8 *buf, uint32 buflen, uint32 *flags, uint32 *writelen);
+extern t_stat trackWrite(DISK_INFO *myDisk,
+               uint32 Cyl,
+               uint32 Head,
+               uint32 numSectors,
+               uint32 sectorLen,
+               uint8 *sectorMap,
+               uint8 mode,
+               uint8 fillbyte,
+               uint32 *flags);

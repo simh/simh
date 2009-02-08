@@ -1,6 +1,6 @@
 /* i7094_cd.c: IBM 711/721 card reader/punch
 
-   Copyright (c) 2003-2007, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -182,7 +182,8 @@ DEVICE cdp_dev = {
 
 t_stat cdr_chsel (uint32 ch, uint32 sel, uint32 unit)
 {
-if (sel & CHSL_NDS) return ch6_end_nds (ch);            /* nds? nop */
+if (sel & CHSL_NDS)                                     /* nds? nop */
+    return ch6_end_nds (ch);
 
 switch (sel) {                                          /* case on data sel */
 
@@ -210,7 +211,8 @@ uint32 i, col, row, bufw, colbin;
 char cdr_cbuf[(2 * CD_CHRLNT) + 2];
 t_uint64 dat = 0;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* not attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return SCPE_UNATT;
 switch (cdr_sta) {                                      /* case on state */
 
     case CDS_INIT:                                      /* initial state */
@@ -275,7 +277,8 @@ t_stat cdr_reset (DEVICE *dptr)
 {
 uint32 i;
 
-for (i = 0; i < CD_BINLNT; i++) cdr_bbuf[i] = 0;        /* clear buffer */
+for (i = 0; i < CD_BINLNT; i++)                         /* clear buffer */
+    cdr_bbuf[i] = 0;
 cdr_sta = 0;                                            /* clear state */
 cdr_bptr = 0;                                           /* clear buf ptr */
 sim_cancel (&cdr_unit);                                 /* stop reader */
@@ -310,9 +313,11 @@ return SCPE_OK;
 
 t_stat cd_attach (UNIT *uptr, char *cptr)
 {
-t_stat r = attach_unit (uptr, cptr);
+t_stat r;
 
-if (r != SCPE_OK) return r;                             /* attach */
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK)                                       /* attach */
+    return r;
 if (sim_switches & SWMASK ('T'))                        /* text? */
     uptr->flags = uptr->flags & ~UNIT_CBN;
 else if (sim_switches & SWMASK ('C'))                   /* column binary? */
@@ -335,7 +340,8 @@ return (uptr->flags & UNIT_ATT)? SCPE_NOFNC: SCPE_OK;
 
 t_stat cdp_chsel (uint32 ch, uint32 sel, uint32 unit)
 {
-if (sel & CHSL_NDS) return ch6_end_nds (ch);            /* nds? nop */
+if (sel & CHSL_NDS)                                     /* nds? nop */
+    return ch6_end_nds (ch);
 
 switch (sel) {                                          /* case on cmd */
 
@@ -393,7 +399,8 @@ switch (cdp_sta) {                                      /* case on state */
     case CDS_DATA:                                      /* data state */
         if (!ch6_qconn (CH_A, U_CDP))                   /* chan disconnect? */
             return cdp_card_end (uptr);                 /* write card */
-        if (cdp_chob_v) cdp_chob_v = 0;                 /* valid? clear */
+        if (cdp_chob_v)                                 /* valid? clear */
+            cdp_chob_v = 0;
         else ind_ioc = 1;                               /* no, io check */
         ch6_req_wr (CH_A, U_CDP);                       /* req channel */
         sim_activate (uptr, (cdp_bptr & 1)? cdp_tleft: cdp_tright);
@@ -418,8 +425,10 @@ uint32 i, col, row, bufw, colbin;
 char *pch, bcd, cdp_cbuf[(2 * CD_CHRLNT) + 2];
 t_uint64 dat;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* not attached? */
-if (uptr->flags & UNIT_PCA) pch = bcd_to_ascii_a;
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return SCPE_UNATT;
+if (uptr->flags & UNIT_PCA)
+    pch = bcd_to_ascii_a;
 else pch = bcd_to_ascii_h;
 for (col = 0; col < ((2 * CD_CHRLNT) + 1); col++)
     cdp_cbuf[col] = ' ';                                /* clear char buf */
@@ -428,7 +437,8 @@ for (col = 0; col < 72; col++) {                        /* process 72 columns */
     dat = bit_masks[35 - (col % 36)];                   /* mask for column */
     for (row = 0; row < 12; row++) {                    /* proc 12 rows */
         bufw = (row * 2) + (col / 36);                  /* index to buffer */
-        if (cdp_bbuf[bufw] & dat) colbin |= col_masks[row];
+        if (cdp_bbuf[bufw] & dat)
+            colbin |= col_masks[row];
         }
     if (cdp_unit.flags & UNIT_CBN) {                    /* column binary? */
         cdp_cbuf[2 * col] = pch[(colbin >> 6) & 077];
@@ -462,7 +472,8 @@ t_stat cdp_reset (DEVICE *dptr)
 {
 uint32 i;
 
-for (i = 0; i < 24; i++) cdp_bbuf[i] = 0;               /* clear buffer */
+for (i = 0; i < 24; i++)                                /* clear buffer */
+    cdp_bbuf[i] = 0;
 cdp_sta = 0;                                            /* clear state */
 cdp_bptr = 0;                                           /* clear buf ptr */
 cdp_chob = 0;
@@ -493,7 +504,8 @@ uint32 i;
 char bcd;
 
 for (i = 0, bcd = 0; i < 12; i++) {                     /* 'sum' rows */
-    if (cb & (1 << i)) bcd |= row_val[i];
+    if (cb & (1 << i))
+        bcd |= row_val[i];
     }
 return bcd;
 }

@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: flashwriter2.c 1753 2008-01-02 16:36:47Z Hharte $                *
+ * $Id: flashwriter2.c 1941 2008-06-13 05:31:03Z hharte $                *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http:/*www.hartetec.com                                               *
@@ -43,20 +43,11 @@
 
 #include "altairz80_defs.h"
 
-#if defined (_WIN32)
-#include <windows.h>
-#else
-#include "sim_sock.h"
-#endif
-
-#include "sim_tmxr.h"
-
 #ifdef DBG_MSG
 #define DBG_PRINT(args) printf args
 #else
 #define DBG_PRINT(args)
 #endif
-
 
 extern int32 sio0s(const int32 port, const int32 io, const int32 data);
 extern int32 sio0d(const int32 port, const int32 io, const int32 data);
@@ -80,29 +71,21 @@ typedef struct {
     uint8 M[FW2_CAPACITY];  /* FlashWriter 2K Video Memory */
 } FW2_INFO;
 
-static FW2_INFO *fw2_info[4];
-static uint8 port_map[4] = { 0x11, 0x15, 0x17, 0x19 };
+static FW2_INFO *fw2_info[FW2_MAX_BOARDS];
+static uint8 port_map[FW2_MAX_BOARDS] = { 0x11, 0x15, 0x17, 0x19 };
 
 static int32 fw2dev(const int32 Addr, const int32 rw, const int32 data);
-static t_stat fw2_reset(DEVICE *dptr);
 static t_stat fw2_attach(UNIT *uptr, char *cptr);
 static t_stat fw2_detach(UNIT *uptr);
 static uint8 FW2_Read(const uint32 Addr);
 static uint8 FW2_Write(const uint32 Addr, uint8 cData);
 static t_stat get_base_address(char *cptr, uint32 *baseaddr);
 
-static int32 FWIITrace = FALSE;
-
 static UNIT fw2_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, FW2_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, FW2_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, FW2_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, FW2_CAPACITY) }
-};
-
-static REG fw2_reg[] = {
-    { DRDATA (FWIITRACE,  FWIITrace, 8), },
-    { NULL }
 };
 
 static MTAB fw2_mod[] = {
@@ -114,19 +97,13 @@ static MTAB fw2_mod[] = {
 };
 
 DEVICE fw2_dev = {
-    "FWII", fw2_unit, fw2_reg, fw2_mod,
+    "FWII", fw2_unit, NULL, fw2_mod,
     FW2_MAX_BOARDS, 10, 31, 1, FW2_MAX_BOARDS, FW2_MAX_BOARDS,
-    NULL, NULL, &fw2_reset,
+    NULL, NULL, NULL,
     NULL, &fw2_attach, &fw2_detach,
-    NULL, 0, 0,
-    NULL, NULL, NULL
+    NULL, (DEV_DISABLE | DEV_DIS), 0,
+    NULL, NULL, "Vector Graphic Flashwriter 2 FWII"
 };
-
-/* Reset routine */
-static t_stat fw2_reset(DEVICE *dptr)
-{
-    return SCPE_OK;
-}
 
 /* Attach routine */
 static t_stat fw2_attach(UNIT *uptr, char *cptr)
@@ -137,7 +114,7 @@ static t_stat fw2_attach(UNIT *uptr, char *cptr)
     char *tptr;
 
     r = get_base_address(cptr, &baseaddr);
-    if(r != SCPE_OK)    /* error?*/
+    if(r != SCPE_OK)    /* error? */
         return r;
 
     DBG_PRINT(("%s\n", __FUNCTION__));
@@ -145,7 +122,7 @@ static t_stat fw2_attach(UNIT *uptr, char *cptr)
     for(i = 0; i < FW2_MAX_BOARDS; i++) {
         if(&fw2_dev.units[i] == uptr) {
             if(uptr->flags & UNIT_FW2_VERBOSE) {
-                printf("Attaching unit %d\n at %04x", i, baseaddr);
+                printf("Attaching unit %d at %04x\n", i, baseaddr);
             }
             break;
         }
@@ -171,7 +148,8 @@ static t_stat fw2_attach(UNIT *uptr, char *cptr)
     }
 
     tptr = (char *) malloc (strlen (cptr) + 3); /* get string buf */
-    if (tptr == NULL) return SCPE_MEM;          /* no more mem? */
+    if (tptr == NULL)
+        return SCPE_MEM;          /* no more mem? */
     sprintf(tptr, "0x%04x", baseaddr);          /* copy base address */
     uptr->filename = tptr;                      /* save */
     uptr->flags = uptr->flags | UNIT_ATT;
@@ -192,7 +170,8 @@ static t_stat fw2_detach(UNIT *uptr)
         }
     }
 
-    if (i >= FW2_MAX_BOARDS) return SCPE_ARG;
+    if (i >= FW2_MAX_BOARDS)
+        return SCPE_ARG;
 
     /* Disconnect FlashWriter2: unmap memory and I/O resources */
     sim_map_resource(fw2_info[i]->uptr->u3, FW2_CAPACITY, RESOURCE_TYPE_MEMORY, &fw2dev, TRUE);
@@ -200,7 +179,7 @@ static t_stat fw2_detach(UNIT *uptr)
     sim_map_resource(0x01, 1, RESOURCE_TYPE_IO, &sio0d, TRUE);
 
     if(fw2_info[i]) {
-        free(fw2_info[1]);
+        free(fw2_info[i]);
     }
 
     free (uptr->filename);                  /* free base address string */
@@ -209,7 +188,8 @@ static t_stat fw2_detach(UNIT *uptr)
     return SCPE_OK;
 }
 
-static t_stat get_base_address(char *cptr, uint32 *baseaddr) {
+static t_stat get_base_address(char *cptr, uint32 *baseaddr)
+{
     uint32 b;
     sscanf(cptr, "%x", &b);
     if(b & (FW2_CAPACITY-1)) {
@@ -227,12 +207,13 @@ static int32 fw2dev(const int32 Addr, const int32 rw, const int32 data)
 {
     int32 bank = getBankSelect();
     if(bank == 0) {
-    if(rw == 0) { /* Read */
-        return(FW2_Read(Addr));
-    } else {    /* Write */
-        return(FW2_Write(Addr, data));
-    }
-    } else return 0xff;
+        if(rw == 0) { /* Read */
+            return(FW2_Read(Addr));
+        } else {    /* Write */
+            return(FW2_Write(Addr, data));
+        }
+    } else
+        return 0xff;
 }
 
 

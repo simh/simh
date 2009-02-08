@@ -1,6 +1,6 @@
 /* vax_syscm.c: PDP-11 compatibility mode symbolic decode and parse
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -220,12 +220,14 @@ switch (mode) {
         break;
 
     case 2:
-        if (reg != 7) fprintf (of, "(%s)+", rname[reg]);
+        if (reg != 7)
+            fprintf (of, "(%s)+", rname[reg]);
         else fprintf (of, "#%-X", nval);
         break;
 
     case 3:
-        if (reg != 7) fprintf (of, "@(%s)+", rname[reg]);
+        if (reg != 7)
+            fprintf (of, "@(%s)+", rname[reg]);
         else fprintf (of, "@#%-X", nval);
         break;
 
@@ -238,12 +240,14 @@ switch (mode) {
         break;
 
     case 6:
-        if (reg != 7) fprintf (of, "%-X(%s)", nval, rname[reg]);
+        if (reg != 7)
+            fprintf (of, "%-X(%s)", nval, rname[reg]);
         else fprintf (of, "%-X", (nval + addr + 4) & 0177777);
         break;
 
     case 7:
-        if (reg != 7) fprintf (of, "@%-X(%s)", nval, rname[reg]);
+        if (reg != 7)
+            fprintf (of, "@%-X(%s)", nval, rname[reg]);
         else fprintf (of, "@%-X", (nval + addr + 4) & 0177777);
         break;
         }                                               /* end case */
@@ -274,12 +278,13 @@ for (i = j = 0; i < 3; i++, j = j + 2)
     val[i] = (int32) (bytes[j] | (bytes[j + 1] << 8));
     
 if (sw & SWMASK ('R')) {                                /* radix 50? */
-    if (val[0] > 0174777) return SCPE_ARG;              /* max value */
+    if (val[0] > 0174777)                               /* max value */
+        return SCPE_ARG;
     c3 = val[0] % 050;
     c2 = (val[0] / 050) % 050;
     c1 = val[0] / (050 * 050);
     fprintf (of, "%c%c%c", r50_to_asc[c1],
-            r50_to_asc[c2], r50_to_asc[c3]);
+             r50_to_asc[c2], r50_to_asc[c3]);
     return -1;
     }
 if (!(sw & SWMASK ('P')) || (addr & 1) || (addr > WMASK))
@@ -382,9 +387,11 @@ int32 get_reg (char *cptr, char mchar)
 {
 int32 i;
 
-if (*(cptr + 2) != mchar) return -1;
+if (*(cptr + 2) != mchar)
+    return -1;
 for (i = 0; i < 8; i++) {
-    if (strncmp (cptr, rname[i], 2) == 0) return i;
+    if (strncmp (cptr, rname[i], 2) == 0)
+        return i;
     }
 return -1;
 }
@@ -425,11 +432,13 @@ if (*cptr == '-') {                                     /* -? */
 errno = 0;
 val = strtoul (cptr, &tptr, 16);
 if (cptr == tptr) {                                     /* no number? */
-    if (*pflag == (A_REL + A_NUM)) return NULL;         /* .+, .-? */
+    if (*pflag == (A_REL + A_NUM))                      /* .+, .-? */
+        return NULL;
     *dptr = 0;
     return cptr;
     }
-if (errno || (*pflag == A_REL)) return NULL;            /* .n? */
+if (errno || (*pflag == A_REL))                         /* .n? */
+    return NULL;
 *dptr = (minus? -val: val) & 0177777;
 *pflag = *pflag | A_NUM;
 return tptr;
@@ -469,10 +478,12 @@ if (strncmp (cptr, "-(", 2) == 0) {                     /* autodecrement? */
     pflag = pflag | A_MIN;
     cptr++;
     }
-else if ((cptr = get_addr (cptr, &disp, &pflag)) == NULL) return 1;
+else if ((cptr = get_addr (cptr, &disp, &pflag)) == NULL)
+    return 1;
 if (*cptr == '(') {                                     /* register index? */
     pflag = pflag | A_PAR;
-    if ((reg = get_reg (cptr + 1, ')')) < 0) return 1;
+    if ((reg = get_reg (cptr + 1, ')')) < 0)
+        return 1;
     cptr = cptr + 4;
     if (*cptr == '+') {                                 /* autoincrement? */
         pflag = pflag | A_PLS;
@@ -483,7 +494,8 @@ else if ((reg = get_reg (cptr, 0)) >= 0) {
     pflag = pflag | A_REG;
     cptr = cptr + 2;
     }
-if (*cptr != 0) return 1;                               /* all done? */
+if (*cptr != 0)                                         /* all done? */
+    return 1;
 
 switch (pflag) {                                        /* case on syntax */
 
@@ -556,14 +568,16 @@ int32 ad32 = (int32) addr;
 t_stat r;
 char *tptr, gbuf[CBUFSIZE];
 
-if (sw & SWMASK ('R')) return SCPE_ARG;                 /* radix 50 */
+if (sw & SWMASK ('R'))                                  /* radix 50 */
+    return SCPE_ARG;
 if (!(sw & SWMASK ('P')) || (ad32 & 1) || (ad32 > WMASK))
     return SCPE_ARG;
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 n1 = n2 = pflag = 0;
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 val[0] = opc_val[i] & 0177777;                          /* get value */
 j = (opc_val[i] >> I_V_CL) & I_M_CL;                    /* get class */
 
@@ -574,43 +588,51 @@ switch (j) {                                            /* case on class */
 
     case I_V_REG:                                       /* register */
         cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
-        if ((reg = get_reg (gbuf, 0)) < 0) return SCPE_ARG;
+        if ((reg = get_reg (gbuf, 0)) < 0)
+            return SCPE_ARG;
         val[0] = val[0] | reg;
         break;
 
     case I_V_3B: case I_V_6B: case I_V_8B:              /* xb literal */
         cptr = get_glyph (cptr, gbuf, 0);               /* get literal */
         d = (int32) get_uint (gbuf, 16, (1 << j) - 1, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
+        if (r != SCPE_OK)
+            return SCPE_ARG;
         val[0] = val[0] | d;                            /* put in place */
         break;
 
     case I_V_BR:                                        /* cond br */
         cptr = get_glyph (cptr, gbuf, 0);               /* get address */
         tptr = get_addr (gbuf, &disp, &pflag);          /* parse */
-        if ((tptr == NULL) || (*tptr != 0)) return SCPE_ARG;
+        if ((tptr == NULL) || (*tptr != 0))
+            return SCPE_ARG;
         if ((pflag & A_REL) == 0)
             disp = (disp - ad32) & 0177777;
-        if ((disp & 1) || (disp > 0400) && (disp < 0177402)) return SCPE_ARG;
+        if ((disp & 1) || (disp > 0400) && (disp < 0177402))
+            return SCPE_ARG;
         val[0] = val[0] | (((disp - 2) >> 1) & 0377);
         break;
 
     case I_V_SOB:                                       /* sob */
         cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
-        if ((reg = get_reg (gbuf, 0)) < 0) return SCPE_ARG;
+        if ((reg = get_reg (gbuf, 0)) < 0)
+            return SCPE_ARG;
         val[0] = val[0] | (reg << 6);
         cptr = get_glyph (cptr, gbuf, 0);               /* get address */
         tptr = get_addr (gbuf, &disp, &pflag);          /* parse */
-        if ((tptr == NULL) || (*tptr != 0)) return SCPE_ARG;
+        if ((tptr == NULL) || (*tptr != 0))
+            return SCPE_ARG;
         if ((pflag & A_REL) == 0)
             disp = (disp - ad32) & 0177777;
-        if ((disp & 1) || ((disp > 2) && (disp < 0177604))) return SCPE_ARG;
+        if ((disp & 1) || ((disp > 2) && (disp < 0177604)))
+            return SCPE_ARG;
         val[0] = val[0] | (((2 - disp) >> 1) & 077);
         break;
 
     case I_V_RSOP:                                      /* reg, sop */
         cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
-        if ((reg = get_reg (gbuf, 0)) < 0) return SCPE_ARG;
+        if ((reg = get_reg (gbuf, 0)) < 0)
+            return SCPE_ARG;
         val[0] = val[0] | (reg << 6);                   /* fall through */
     case I_V_SOP:                                       /* sop */
         cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
@@ -625,7 +647,8 @@ switch (j) {                                            /* case on class */
             return SCPE_ARG;
         val[0] = val[0] | spec;
         cptr = get_glyph (cptr, gbuf, 0);               /* get glyph */
-        if ((reg = get_reg (gbuf, 0)) < 0) return SCPE_ARG;
+        if ((reg = get_reg (gbuf, 0)) < 0)
+            return SCPE_ARG;
         val[0] = val[0] | (reg << 6);
         break;
 
@@ -646,8 +669,9 @@ switch (j) {                                            /* case on class */
             for (i = 0; (opcode[i] != NULL) &&
                 (strcmp (opcode[i], gbuf) != 0) ; i++) ;
             if ((((opc_val[i] >> I_V_CL) & I_M_CL) != j) ||
-                (opcode[i] == NULL)) return SCPE_ARG;
-                val[0] = val[0] | (opc_val[i] & 0177777);
+                (opcode[i] == NULL))
+                return SCPE_ARG;
+            val[0] = val[0] | (opc_val[i] & 0177777);
             }
         break;
 

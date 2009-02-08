@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -171,26 +171,32 @@ t_stat r;
 
 if (sim_is_active (&cdr_unit)) {                        /* busy? */
     sim_cancel (&cdr_unit);                             /* cancel */
-    if (r = cdr_svc (&cdr_unit)) return r;              /* process */
+    if (r = cdr_svc (&cdr_unit))                        /* process */
+        return r;
     }
-if ((cdr_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT; /* attached? */
+if ((cdr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
+    return SCPE_UNATT;
 ind[IN_READ] = ind[IN_LST] = s1sel = s2sel = 0;         /* default stacker */
 cbn = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_C);   /* col binary? */
-for (i = 0; i < 2 * CBUFSIZE; i++) rbuf[i] = 0;         /* clear extended buf */
+for (i = 0; i < 2 * CBUFSIZE; i++)                      /* clear extended buf */
+    rbuf[i] = 0;
 fgets (rbuf, (cbn)? 2 * CBUFSIZE: CBUFSIZE,             /* rd bin/char card */
      cdr_unit.fileref);
-if (feof (cdr_unit.fileref)) return STOP_NOCD;          /* eof? */
+if (feof (cdr_unit.fileref))                            /* eof? */
+    return STOP_NOCD;
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     ind[IN_READ] = 1;  
     perror ("Card reader I/O error");
     clearerr (cdr_unit.fileref);
-    if (iochk) return SCPE_IOERR;
+    if (iochk)
+        return SCPE_IOERR;
     return SCPE_OK;
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 if (ssa) {                                              /* if last cd on */
     getc (cdr_unit.fileref);                            /* see if more */
-    if (feof (cdr_unit.fileref)) ind[IN_LST] = 1;       /* eof? set flag */
+    if (feof (cdr_unit.fileref))                        /* eof? set flag */
+        ind[IN_LST] = 1;
     fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);
     }
 if (cbn) {                                              /* column binary */
@@ -228,13 +234,17 @@ t_stat cdr_svc (UNIT *uptr)
 {
 int32 i;
 
-if (s1sel) uptr = &stack_unit[1];                       /* stacker 1? */
-else if (s2sel) uptr = &stack_unit[2];                  /* stacker 2? */
+if (s1sel)                                              /* stacker 1? */
+    uptr = &stack_unit[1];
+else if (s2sel)                                         /* stacker 2? */
+    uptr = &stack_unit[2];
 else uptr = &stack_unit[0];                             /* then default */
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
 for (i = 0; i < CDR_WIDTH; i++)
     rbuf[i] = bcd2ascii (rbuf[i], uptr->flags & UNIT_PCH);
-for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--) rbuf[i] = 0;
+for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--)
+    rbuf[i] = 0;
 rbuf[CDR_WIDTH] = 0;                                    /* null at end */
 fputs (rbuf, uptr->fileref);                            /* write card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
@@ -242,7 +252,8 @@ uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("Card stacker I/O error");
     clearerr (uptr->fileref);
-    if (iochk) return SCPE_IOERR;
+    if (iochk)
+        return SCPE_IOERR;
     }
 return SCPE_OK;
 }
@@ -260,10 +271,13 @@ static char pbuf[(2 * CDP_WIDTH) + 1];                  /* + null */
 t_bool use_h;
 UNIT *uptr;
 
-if (s8sel) uptr = &stack_unit[2];                       /* stack 8? */
-else if (s4sel) uptr = &stack_unit[4];                  /* stack 4? */
+if (s8sel)                                              /* stack 8? */
+    uptr = &stack_unit[2];
+else if (s4sel)                                         /* stack 4? */
+    uptr = &stack_unit[4];
 else uptr = &cdp_unit;                                  /* normal output */
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_UNATT;
 use_h = uptr->flags & UNIT_PCH;
 ind[IN_PNCH] = s4sel = s8sel = 0;                       /* clear flags */
 cbn = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_C);   /* col binary? */
@@ -299,7 +313,8 @@ uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("Card punch I/O error");
     clearerr (uptr->fileref);
-    if (iochk) return SCPE_IOERR;
+    if (iochk)
+        return SCPE_IOERR;
     ind[IN_PNCH] = 1;
     }
 return SCPE_OK;
@@ -314,10 +329,14 @@ return SCPE_OK;
 
 t_stat select_stack (int32 ilnt, int32 mod)
 {
-if (mod == BCD_ONE) s1sel = 1;
-else if (mod == BCD_TWO) s2sel = 1;
-else if (mod == BCD_FOUR) s4sel = 1;
-else if (mod == BCD_EIGHT) s8sel = 1;
+if (mod == BCD_ONE)
+    s1sel = 1;
+else if (mod == BCD_TWO)
+    s2sel = 1;
+else if (mod == BCD_FOUR)
+    s4sel = 1;
+else if (mod == BCD_EIGHT)
+    s8sel = 1;
 return SCPE_OK;
 }
 
@@ -353,8 +372,10 @@ t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 saved_IS;
 
-for (i = 0; i < CDR_WIDTH; i++) M[CDR_BUF + i] = 0;     /* clear buffer */
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+for (i = 0; i < CDR_WIDTH; i++)                         /* clear buffer */
+    M[CDR_BUF + i] = 0;
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 saved_IS = BOOT_START;
 return SCPE_OK;
 }
@@ -381,7 +402,8 @@ uint32 i;
 char bcd;
 
 for (i = 0, bcd = 0; i < 12; i++) {                     /* 'sum' rows */
-    if (cb & (1 << i)) bcd |= row_val[i];
+    if (cb & (1 << i))
+        bcd |= row_val[i];
     }
 return bcd;
 }

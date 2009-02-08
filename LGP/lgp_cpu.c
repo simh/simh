@@ -1,6 +1,6 @@
 /* lgp_cpu.c: LGP CPU simulator
 
-   Copyright (c) 2004-2005, Robert M. Supnik
+   Copyright (c) 2004-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -279,7 +279,8 @@ PC = PC & AMASK;                                        /* mask PC */
 sim_cancel_step ();                                     /* defang SCP step */
 if (lgp21_sov) {                                        /* stop sense pending? */
     lgp21_sov = 0;
-    if (!OVF) PC = (PC + 1) & AMASK;                    /* ovf off? skip */
+    if (!OVF)                                           /* ovf off? skip */
+        PC = (PC + 1) & AMASK;
     else OVF = 0;                                       /* on? reset */
     }
 
@@ -287,7 +288,8 @@ if (lgp21_sov) {                                        /* stop sense pending? *
 
 do {
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (r = sim_process_event ()) break;
+        if (r = sim_process_event ())
+            break;
         }
 
     if (delay > 0) {                                    /* delay to next instr */
@@ -374,7 +376,7 @@ switch (op) {                                           /* case on opcode */
 
     case OP_T:                                          /* conditional transfer */
         if ((A & SIGN) ||                               /* A < 0 or */
-           ((ir & SIGN) && t_switch)) {                 /* -T and Tswitch set? */
+            ((ir & SIGN) && t_switch)) {                /* -T and Tswitch set? */
             PCQ_ENTRY;
             PC = ea;                                    /* transfer */
             }
@@ -416,7 +418,8 @@ switch (op) {                                           /* case on opcode */
 
     case OP_D:                                          /* divide */
         dat = Read (ea);                                /* get operand */
-        if (Div32 (A, dat, &A)) ovf_this_cycle = TRUE;  /* divide; overflow? */
+        if (Div32 (A, dat, &A))                         /* divide; overflow? */
+            ovf_this_cycle = TRUE;
         delay = I_delay (opc, ea, op);
         break;
 
@@ -431,7 +434,8 @@ switch (op) {                                           /* case on opcode */
     case OP_P:                                          /* output */
         if (Q_LGP21) {                                  /* LGP-21 */
             ch = A >> 26;                               /* char, 6b */
-            if (ir & SIGN) ch = (ch & 0x3C) | 2;        /* 4b? convert */
+            if (ir & SIGN)                              /* 4b? convert */
+                ch = (ch & 0x3C) | 2;
             dev = I_GETTK (ir);                         /* device select */
             }
         else {                                          /* LGP-30 */
@@ -468,7 +472,8 @@ switch (op) {                                           /* case on opcode */
                     ((ea & 0x100) && !bp4) ||           /* or if */
                     ((ir & SIGN) && !OVF))              /* ovf sel and off */
                     PC = (PC + 1) & AMASK;
-                if (ir & SIGN) OVF = 0;                 /* -Z? clr overflow */
+                if (ir & SIGN)                          /* -Z? clr overflow */
+                    OVF = 0;
                 }
             else {                                      /* stop */
                 lgp21_sov = (ir & SIGN)? 1: 0;          /* pending sense? */
@@ -476,12 +481,14 @@ switch (op) {                                           /* case on opcode */
                 }
             }
         else {                                          /* LGP-30 */
-            if (out_done) out_done = 0;                 /* P complete? */
+            if (out_done)                               /* P complete? */
+                out_done = 0;
             else if (((ea & 0x800) && bp32) ||          /* bpt switch set? */
                 ((ea & 0x400) && bp16) ||
                 ((ea & 0x200) && bp8) ||
                 ((ea & 0x100) && bp4)) ;                /* don't stop or stall */
-            else if (out_strt) reason = STOP_STALL;     /* P pending? stall */
+            else if (out_strt)                          /* P pending? stall */
+                reason = STOP_STALL;
             else reason = STOP_STOP;                    /* no, stop */
             }
         delay = I_delay (sim_grtime (), ea, op);        /* next instruction */
@@ -489,7 +496,8 @@ switch (op) {                                           /* case on opcode */
         }
 
 if (ovf_this_cycle) {
-    if (Q_LGP21) OVF = 1;                               /* LGP-21? set OVF */
+    if (Q_LGP21)                                        /* LGP-21? set OVF */
+        OVF = 1;
     else reason = STOP_OVF;                             /* LGP-30? stop */
     }
 return reason;
@@ -512,7 +520,8 @@ return;
 
 uint32 shift_in (uint32 a, uint32 dat, uint32 sh4)
 {
-if (sh4) return (((a << 4) | (dat >> 2)) & DMASK);
+if (sh4)
+    return (((a << 4) | (dat >> 2)) & DMASK);
 return (((a << 6) | dat) & DMASK);
 }
 
@@ -524,7 +533,8 @@ uint32 sgn = a ^ b;
 uint32 ah, bh, al, bl, rhi, rlo, rmid1, rmid2;
 
 if ((a == 0) || (b == 0)) {                             /* zero argument? */
-    if (low) *low = 0;
+    if (low)
+        *low = 0;
     return 0;
     }
 a = ABS (a);
@@ -539,14 +549,17 @@ rmid2 = al * bh;
 rlo = al * bl;
 rhi = rhi + ((rmid1 >> 16) & M16) + ((rmid2 >> 16) & M16);
 rmid1 = (rlo + (rmid1 << 16)) & M32;                    /* add mid1 to lo */
-if (rmid1 < rlo) rhi = rhi + 1;                         /* carry? incr hi */
+if (rmid1 < rlo)                                        /* carry? incr hi */
+    rhi = rhi + 1;
 rmid2 = (rmid1 + (rmid2 << 16)) & M32;                  /* add mid2 to to */
-if (rmid2 < rmid1) rhi = rhi + 1;                       /* carry? incr hi */
+if (rmid2 < rmid1)                                      /* carry? incr hi */
+    rhi = rhi + 1;
 if (sgn & SIGN) {                                       /* result negative? */
     rmid2 = NEG (rmid2);                                /* negate */
     rhi = (~rhi + (rmid2 == 0)) & M32;
     }
-if (low) *low = rmid2;                                  /* low result */
+if (low)                                                /* low result */
+    *low = rmid2;
 return rhi & M32;
 }
 
@@ -559,7 +572,8 @@ uint32 i, quo;
 
 dvd = ABS (dvd);
 dvr = ABS (dvr);
-if (dvd >= dvr) return TRUE;
+if (dvd >= dvr)
+    return TRUE;
 for (i = quo = 0; i < 31; i++) {                        /* 31 iterations */
     quo = quo << 1;                                     /* shift quotient */
     dvd = dvd << 1;                                     /* shift dividend */
@@ -569,8 +583,10 @@ for (i = quo = 0; i < 31; i++) {                        /* 31 iterations */
         }
     }
 quo = (quo + 1) & MMASK;                                /* round low bit */
-if (sgn & SIGN) quo = NEG (quo);                        /* result -? */
-if (q) *q = quo;                                        /* return quo */
+if (sgn & SIGN)                                         /* result -? */
+    quo = NEG (quo);
+if (q)                                                  /* return quo */
+    *q = quo;
 return FALSE;                                           /* no overflow */
 }
 
@@ -599,10 +615,12 @@ else {
     opdelta = (oprp - curp + NSC_30) & SCMASK_30;
     }
 if (tmax == 0) {                                        /* skip ea calc? */
-    if (pcdelta >= tmin) return pcdelta - 1;            /* new PC >= min? */
+    if (pcdelta >= tmin)                                /* new PC >= min? */
+        return pcdelta - 1;
     return pcdelta + nsc - 1;
     }
-if ((opdelta >= tmin) && (opdelta <= tmax)) return pcdelta - 1;
+if ((opdelta >= tmin) && (opdelta <= tmax))
+    return pcdelta - 1;
 return pcdelta + nsc - 1;
 }
 
@@ -619,7 +637,8 @@ lgp21_sov = 0;
 delay = 0;
 lgp_vm_init ();
 pcq_r = find_reg ("CQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -629,7 +648,8 @@ return SCPE_OK;
 
 t_stat cpu_set_30opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (Q_LGP21) return SCPE_ARG;
+if (Q_LGP21)
+    return SCPE_ARG;
 return SCPE_OK;
 }
 
@@ -637,9 +657,12 @@ return SCPE_OK;
 
 t_stat cpu_set_30opt_i (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (Q_LGP21 || (cptr == NULL)) return SCPE_ARG;
-if (strcmp (cptr, "TTI") == 0) uptr->flags = uptr->flags & ~UNIT_INPT;
-else if (strcmp (cptr, "PTR") == 0) uptr->flags = uptr->flags | UNIT_INPT;
+if (Q_LGP21 || (cptr == NULL))
+    return SCPE_ARG;
+if (strcmp (cptr, "TTI") == 0)
+    uptr->flags = uptr->flags & ~UNIT_INPT;
+else if (strcmp (cptr, "PTR") == 0)
+    uptr->flags = uptr->flags | UNIT_INPT;
 else return SCPE_ARG;
 return SCPE_OK;
 }
@@ -648,9 +671,12 @@ return SCPE_OK;
 
 t_stat cpu_set_30opt_o (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (Q_LGP21 || (cptr == NULL)) return SCPE_ARG;
-if (strcmp (cptr, "TTO") == 0) uptr->flags = uptr->flags & ~UNIT_OUTPT;
-else if (strcmp (cptr, "PTP") == 0) uptr->flags = uptr->flags | UNIT_OUTPT;
+if (Q_LGP21 || (cptr == NULL))
+    return SCPE_ARG;
+if (strcmp (cptr, "TTO") == 0)
+    uptr->flags = uptr->flags & ~UNIT_OUTPT;
+else if (strcmp (cptr, "PTP") == 0)
+    uptr->flags = uptr->flags | UNIT_OUTPT;
 else return SCPE_ARG;
 return SCPE_OK;
 }
@@ -659,7 +685,8 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val) uptr->flags = uptr->flags & ~(UNIT_IN4B|UNIT_INPT|UNIT_OUTPT);
+if (val)
+    uptr->flags = uptr->flags & ~(UNIT_IN4B|UNIT_INPT|UNIT_OUTPT);
 return reset_all (0);
 }
 
@@ -668,8 +695,10 @@ return reset_all (0);
 t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 fputs (Q_LGP21? "LGP-21": "LGP-30", st);
-if (uptr->flags & UNIT_TTSS_D) fputs (", track/sector", st);
-if (uptr->flags & UNIT_LGPH_D) fputs (", LGP hex", st);
+if (uptr->flags & UNIT_TTSS_D)
+    fputs (", track/sector", st);
+if (uptr->flags & UNIT_LGPH_D)
+    fputs (", LGP hex", st);
 fputs (Q_MANI? ", manual": ", tape", st);
 if (!Q_LGP21) {
     fputs (Q_IN4B? ", 4b": ", 6b", st);
@@ -683,8 +712,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = Read (addr);
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = Read (addr);
 return SCPE_OK;
 }
 
@@ -692,7 +723,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 Write (addr, val);
 return SCPE_OK;
 }
@@ -706,12 +738,14 @@ t_stat r;
 
 if (cptr) {
     inst = get_uint (cptr, 16, DMASK, &r);
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
 else inst = IR;
 while ((r = cpu_one_inst (PC, inst)) == STOP_STALL) {
     sim_interval = 0;
-    if (r = sim_process_event ()) return r;
+    if (r = sim_process_event ())
+        return r;
     }
 return r;
 }
@@ -725,7 +759,8 @@ t_stat r;
 
 if (cptr) {
     inst = get_uint (cptr, 16, DMASK, &r);
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     IR = inst;
     }
 else IR = A;

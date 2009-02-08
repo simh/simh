@@ -1,6 +1,6 @@
 /* sds_rad.c: SDS 940 fixed head disk simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -136,25 +136,31 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:                                       /* connect */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != rad_dib.chan) return SCPE_IERR;   /* wrong chan? */
-        if (CHC_GETCPW (inst) > 1) return STOP_INVIOP;  /* 1-2 char/word? */
+        if (new_ch != rad_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
+        if (CHC_GETCPW (inst) > 1)                      /* 1-2 char/word? */
+            return STOP_INVIOP;
         if (sim_is_active (&rad_unit) || (alert == POT_RADA)) /* protocol viol? */
             return STOP_INVIOP;
         rad_err = 0;                                    /* clr error */
         rad_sba = 0;                                    /* clr sec bptr */
         chan_set_flag (rad_dib.chan, CHF_12B);          /* 12B mode */
         t = (rad_da & RAD_SCMASK) - GET_SECTOR (rad_time * RAD_NUMWD);
-        if (t <= 0) t = t + RAD_NUMSC;                  /* seek */
+        if (t <= 0)                                     /* seek */
+            t = t + RAD_NUMSC;
         sim_activate (&rad_unit, t * rad_time * (RAD_NUMWD / 2));
         xfr_req = xfr_req & ~XFR_RAD;                   /* clr xfr flg */
         break;
 
     case IO_EOM1:                                       /* EOM mode 1 */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != rad_dib.chan) return SCPE_IERR;   /* wrong chan? */
-        if ((inst & 00600) == 00200) alert = POT_RADS;  /* alert for sec */     
+        if (new_ch != rad_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
+        if ((inst & 00600) == 00200)                    /* alert for sec */
+            alert = POT_RADS;     
         else if ((inst & 06600) == 0) {                 /* alert for addr */
-            if (sim_is_active (&rad_unit)) rad_err = 1; /* busy? */
+            if (sim_is_active (&rad_unit))              /* busy? */
+                rad_err = 1;
             else {
                 rad_nobi = (inst & 01000)? 1: 0;        /* save inc type */
                 alert = POT_RADA;                       /* set alert */
@@ -164,7 +170,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_DISC:                                       /* disconnect */
         rad_end_op (0);                                 /* normal term */
-        if (inst & DEV_OUT) return rad_fill (rad_sba);  /* fill write */
+        if (inst & DEV_OUT)                             /* fill write */
+            return rad_fill (rad_sba);
         break;
 
     case IO_WREOR:                                      /* write eor */
@@ -173,7 +180,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_SKS:                                        /* SKS */
         new_ch = I_GETSKCH (inst);                      /* sks chan */
-        if (new_ch != rad_dib.chan) return SCPE_IERR;   /* wrong chan? */
+        if (new_ch != rad_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
         t = I_GETSKCND (inst);                          /* sks cond */
         lun = RAD_GETLUN (rad_da);
         if (((t == 000) && !sim_is_active (&rad_unit)) || /* 10026: ready */
@@ -193,7 +201,8 @@ switch (fnc) {                                          /* case function */
             rad_end_op (CHF_ERR | CHF_EOR);             /* set rad err */
             return SCPE_OK;
             }
-        if (rad_sba & 1) *dat = fbuf[p] & 07777;        /* odd byte? */
+        if (rad_sba & 1)                                /* odd byte? */
+            *dat = fbuf[p] & 07777;
         else *dat = (fbuf[p] >> 12) & 07777;            /* even */
         rad_sba = rad_adjda (rad_sba, 1);               /* next byte */
         break;
@@ -210,9 +219,11 @@ switch (fnc) {                                          /* case function */
             rad_end_op (CHF_ERR | CHF_EOR);             /* set rad err */
             return SCPE_OK;
             }
-        if (rad_sba & 1) fbuf[p] = fbuf[p] | (*dat & 07777); /* odd byte? */
+        if (rad_sba & 1)                                /* odd byte? */
+            fbuf[p] = fbuf[p] | (*dat & 07777);
         else fbuf[p] = (*dat & 07777) << 12;            /* even */
-        if (p >= rad_unit.hwmark) rad_unit.hwmark = p + 1; /* mark hiwater */
+        if (p >= rad_unit.hwmark)                       /* mark hiwater */
+            rad_unit.hwmark = p + 1;
         rad_sba = rad_adjda (rad_sba, 1);               /* next byte */
         break;
 
@@ -257,8 +268,10 @@ uint32 *fbuf = rad_unit.filebuf;
 int32 wa = (sba + 1) >> 1;                              /* whole words */
 
 if (sba && (p < rad_unit.capac)) {                      /* fill needed? */
-    for ( ; wa < RAD_NUMWD; wa++) fbuf[p + wa] = 0;
-    if ((p + wa) >= rad_unit.hwmark) rad_unit.hwmark = p + wa + 1;
+    for ( ; wa < RAD_NUMWD; wa++)
+        fbuf[p + wa] = 0;
+    if ((p + wa) >= rad_unit.hwmark)
+        rad_unit.hwmark = p + wa + 1;
     rad_adjda (sba, RAD_NUMWD - 1);                     /* inc da */
     }
 return SCPE_OK;
@@ -283,7 +296,8 @@ return sba;
 
 void rad_end_op (int32 fl)
 {
-if (fl) chan_set_flag (rad_dib.chan, fl);               /* set flags */
+if (fl)                                                 /* set flags */
+    chan_set_flag (rad_dib.chan, fl);
 xfr_req = xfr_req & ~XFR_RAD;                           /* clear xfr */
 sim_cancel (&rad_unit);                                 /* stop */
 if (fl & CHF_ERR) {                                     /* error? */

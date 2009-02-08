@@ -1,6 +1,6 @@
 /* pdp10_rp.c - RH11/RP04/05/06/07 RM02/03/05/80 "Massbus" disk controller
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -541,7 +541,8 @@ switch (j) {                                            /* decode PA<5:1> */
     case 007:                                           /* RPAS */
         *data = 0;
         for (i = 0; i < RP_NUMDR; i++)
-            if (rpds[i] & DS_ATA) *data = *data | (AS_U0 << i);
+            if (rpds[i] & DS_ATA)
+                *data = *data | (AS_U0 << i);
         break;
 
     case 010:                                           /* RPLA */
@@ -631,7 +632,8 @@ rmhr[drv] = data;
 switch (j) {                                            /* decode PA<5:1> */
 
     case 000:                                           /* RPCS1 */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
         if (data & CS1_TRE) {                           /* error clear? */
             rpcs1 = rpcs1 & ~CS1_TRE;                   /* clr CS1<TRE> */
             rpcs2 = rpcs2 & ~CS2_ERR;                   /* clr CS2<15:8> */
@@ -654,61 +656,71 @@ switch (j) {                                            /* decode PA<5:1> */
                 uptr->FUNC = GET_FNC (data);            /* set func */
                 if ((uptr->FUNC >= FNC_XFER) &&         /* data xfer and */
                    ((rpcs1 & CS1_DONE) == 0))           /* ~rdy? PGE */
-                        rpcs2 = rpcs2 | CS2_PGE;
+                    rpcs2 = rpcs2 | CS2_PGE;
                 else rp_go (drv, uptr->FUNC);
                 }
             }
         break;  
 
     case 001:                                           /* RPWC */
-        if (access == WRITEB) data = (PA & 1)?
-            (rpwc & 0377) | (data << 8): (rpwc & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (rpwc & 0377) | (data << 8): (rpwc & ~0377) | data;
         rpwc = data;
         break;
 
     case 002:                                           /* RPBA */
-        if (access == WRITEB) data = (PA & 1)?
-            (rpba & 0377) | (data << 8): (rpba & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (rpba & 0377) | (data << 8): (rpba & ~0377) | data;
         rpba = data & ~BA_MBZ;
         break;
 
     case 003:                                           /* RPDA */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
         rpda[drv] = data & ~DA_MBZ;
         break;
 
     case 004:                                           /* RPCS2 */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
-        if (data & CS2_CLR) rp_reset (&rp_dev);         /* init? */
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
+        if (data & CS2_CLR)                             /* init? */
+            rp_reset (&rp_dev);
         else {
             if ((data & ~rpcs2) & (CS2_PE | CS2_MXF))
                 cs1f = CS1_SC;                          /* diagn intr */
-            if (access == WRITEB) data = (rpcs2 &       /* merge data */
-                ((PA & 1)? 0377: 0177400)) | data;
+            if (access == WRITEB)                       /* merge data */
+                data = (rpcs2 & ((PA & 1)? 0377: 0177400)) | data;
             rpcs2 = (rpcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;
             }
         drv = GET_UNIT (rpcs2);
         break;
 
     case 006:                                           /* RPER1 */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
         rper1[drv] = data;
         break;
 
     case 007:                                           /* RPAS */
-        if ((access == WRITEB) && (PA & 1)) break;
+        if ((access == WRITEB) && (PA & 1))
+            break;
         for (i = 0; i < RP_NUMDR; i++)
-            if (data & (AS_U0 << i)) rpds[i] = rpds[i] & ~DS_ATA;
+            if (data & (AS_U0 << i))
+                rpds[i] = rpds[i] & ~DS_ATA;
         break;
 
     case 011:                                           /* RPDB */
-        if (access == WRITEB) data = (PA & 1)?
-            (rpdb & 0377) | (data << 8): (rpdb & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (rpdb & 0377) | (data << 8): (rpdb & ~0377) | data;
         rpdb = data;
         break;
 
     case 012:                                           /* RPMR */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
         rpmr[drv] = data;
         break;
 
@@ -717,7 +729,8 @@ switch (j) {                                            /* decode PA<5:1> */
         break;
 
     case 016:                                           /* RPDC */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
         rpdc[drv] = data & ~DC_MBZ;
         break;
 
@@ -810,7 +823,8 @@ switch (fnc) {                                          /* case on function */
             }
         rpds[drv] = (rpds[drv] & ~DS_RDY) | DS_PIP;     /* set positioning */
         t = abs (dc - uptr->CYL);                       /* cyl diff */
-        if (t == 0) t = 1;                              /* min time */
+        if (t == 0)                                     /* min time */
+            t = 1;
         sim_activate (uptr, rp_swait * t);              /* schedule */
         uptr->CYL = dc;                                 /* save cylinder */
         return;
@@ -934,11 +948,13 @@ switch (uptr->FUNC) {                                   /* case on function */
                     break;
                     }
                 dbuf[twc10] = M[mpa10];                 /* write to disk */
-                if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;
+                if ((rpcs2 & CS2_UAI) == 0)
+                    ba = ba + 4;
                 }
             if (fc10 = twc10 & (RP_NUMWD - 1)) {        /* fill? */
                 fc10 = RP_NUMWD - fc10;
-                for (i = 0; i < fc10; i++) dbuf[twc10 + i] = 0;
+                for (i = 0; i < fc10; i++)
+                    dbuf[twc10 + i] = 0;
                 }
             fxwrite (dbuf, sizeof (d10), twc10 + fc10, uptr->fileref);
             err = ferror (uptr->fileref);
@@ -946,7 +962,8 @@ switch (uptr->FUNC) {                                   /* case on function */
         else {                                          /* read, wchk, readh */
             awc10 = fxread (dbuf, sizeof (d10), wc10, uptr->fileref);
             err = ferror (uptr->fileref);
-            for ( ; awc10 < wc10; awc10++) dbuf[awc10] = 0;
+            for ( ; awc10 < wc10; awc10++)
+                dbuf[awc10] = 0;
             for (twc10 = 0; twc10 < wc10; twc10++) {
                 pa10 = ba >> 2;
                 vpn = PAG_GETVPN (pa10);                /* map addr */
@@ -969,7 +986,8 @@ switch (uptr->FUNC) {                                   /* case on function */
                      rpcs2 = rpcs2 | CS2_WCE;           /* set error */
                      break;
                      }
-                if ((rpcs2 & CS2_UAI) == 0) ba = ba + 4;
+                if ((rpcs2 & CS2_UAI) == 0)
+                    ba = ba + 4;
                 }
             }                                           /* end else */
 
@@ -977,7 +995,8 @@ switch (uptr->FUNC) {                                   /* case on function */
         rpba = (ba & 0177777) & ~BA_MBZ;                /* lower 16b */
         rpcs1 = (rpcs1 & ~ CS1_UAE) | ((ba >> (16 - CS1_V_UAE)) & CS1_UAE);
         da = da + twc10 + (RP_NUMWD - 1);
-        if (da >= drv_tab[dtype].size) rpds[drv] = rpds[drv] | DS_LST;
+        if (da >= drv_tab[dtype].size)
+            rpds[drv] = rpds[drv] | DS_LST;
         da = da / RP_NUMWD;
         rpda[drv] = da % drv_tab[dtype].sect;
         da = da / drv_tab[dtype].sect;
@@ -1026,9 +1045,11 @@ UNIT *uptr;
 if ((flag & ~rpcs1) & CS1_DONE)                         /* DONE 0 to 1? */
     rpiff = (rpcs1 & CS1_IE)? 1: 0;                     /* CSTB INTR <- IE */
 uptr = rp_dev.units + drv;                              /* get unit */
-if (rp_unit[drv].flags & UNIT_DIS) rpds[drv] = rper1[drv] = 0;
+if (rp_unit[drv].flags & UNIT_DIS)
+    rpds[drv] = rper1[drv] = 0;
 else rpds[drv] = (rpds[drv] | DS_DPR) & ~DS_PGM;
-if (rp_unit[drv].flags & UNIT_ATT) rpds[drv] = rpds[drv] | DS_MOL;
+if (rp_unit[drv].flags & UNIT_ATT)
+    rpds[drv] = rpds[drv] | DS_MOL;
 else rpds[drv] = rpds[drv] & ~(DS_MOL | DS_VV | DS_RDY);
 if (rper1[drv] | rper2[drv] | rper3[drv])
     rpds[drv] = rpds[drv] | DS_ERR;
@@ -1036,11 +1057,16 @@ else rpds[drv] = rpds[drv] & ~DS_ERR;
 
 rpcs1 = (rpcs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ | CS1_DRV)) | CS1_DVA | flag;
 rpcs1 = rpcs1 | (uptr->FUNC << CS1_V_FNC);
-if (sim_is_active (uptr)) rpcs1 = rpcs1 | CS1_GO;
-if (rpcs2 & CS2_ERR) rpcs1 = rpcs1 | CS1_TRE | CS1_SC;
-else if (rpcs1 & CS1_TRE) rpcs1 = rpcs1 | CS1_SC;
-for (i = 0; i < RP_NUMDR; i++)
-    if (rpds[i] & DS_ATA) rpcs1 = rpcs1 | CS1_SC;
+if (sim_is_active (uptr))
+    rpcs1 = rpcs1 | CS1_GO;
+if (rpcs2 & CS2_ERR)
+    rpcs1 = rpcs1 | CS1_TRE | CS1_SC;
+else if (rpcs1 & CS1_TRE)
+    rpcs1 = rpcs1 | CS1_SC;
+for (i = 0; i < RP_NUMDR; i++) {
+    if (rpds[i] & DS_ATA)
+        rpcs1 = rpcs1 | CS1_SC;
+    }
 if (rpiff || ((rpcs1 & CS1_SC) && (rpcs1 & CS1_DONE) && (rpcs1 & CS1_IE)))
     int_req = int_req | INT_RP;
 else int_req = int_req & ~INT_RP;
@@ -1072,9 +1098,11 @@ for (i = 0; i < RP_NUMDR; i++) {
     uptr = rp_dev.units + i;
     sim_cancel (uptr);
     uptr->CYL = uptr->FUNC = 0;
-    if (uptr->flags & UNIT_ATT) rpds[i] = (rpds[i] & DS_VV) |
-        DS_DPR | DS_RDY | DS_MOL | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
-    else if (uptr->flags & UNIT_DIS) rpds[i] = 0;
+    if (uptr->flags & UNIT_ATT)
+        rpds[i] = (rpds[i] & DS_VV) | DS_DPR | DS_RDY | DS_MOL |
+                ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+    else if (uptr->flags & UNIT_DIS)
+        rpds[i] = 0;
     else rpds[i] = DS_DPR;
     rper1[i] = 0;
     rper2[i] = 0;
@@ -1100,15 +1128,18 @@ t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
 rpds[drv] = DS_ATA | DS_MOL | DS_RDY | DS_DPR |
     ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
 rper1[drv] = 0;
 update_rpcs (CS1_SC, drv);
 
-if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;     /* autosize? */
-if ((p = sim_fsize (uptr->fileref)) == 0) return SCPE_OK;
+if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
+    return SCPE_OK;
+if ((p = sim_fsize (uptr->fileref)) == 0)
+    return SCPE_OK;
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int) sizeof (d10))) {
         uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
@@ -1125,7 +1156,8 @@ t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
 rpds[drv] = (rpds[drv] & ~(DS_MOL | DS_RDY | DS_WRL | DS_VV | DS_OF)) |
     DS_ATA;
@@ -1145,7 +1177,8 @@ t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 dtype = GET_DTYPE (val);
 
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = drv_tab[dtype].size;
 return SCPE_OK;
 }

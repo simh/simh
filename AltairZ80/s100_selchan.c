@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_selchan.c 1771 2008-01-09 07:10:46Z hharte $                *
+ * $Id: s100_selchan.c 1995 2008-07-15 03:59:13Z hharte $                *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -53,13 +53,15 @@
 #define DBG_PRINT(args)
 #endif
 
-#define TRACE_MSG   0x01
-#define DMA_MSG     0x02
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define VERBOSE_MSG (1 << 1)
+#define DMA_MSG     (1 << 2)
 
-#define SELCHAN_MAX_DRIVES    1
+#define SELCHAN_MAX_DRIVES  1
 
-#define UNIT_V_SELCHAN_VERBOSE     (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_SELCHAN_VERBOSE       (1 << UNIT_V_SELCHAN_VERBOSE)
+#define UNIT_V_SELCHAN_VERBOSE  (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
+#define UNIT_SELCHAN_VERBOSE    (1 << UNIT_V_SELCHAN_VERBOSE)
 
 typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
@@ -78,24 +80,23 @@ extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
-extern REG *sim_PC;
 
-/* These are needed for DMA.  PIO Mode has not been implemented yet. */
-extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
-extern uint8 GetBYTEWrapper(const uint32 Addr);
+/* These are needed for DMA. */
+extern void PutByteDMA(const uint32 Addr, const uint32 Value);
+extern uint8 GetByteDMA(const uint32 Addr);
 
 static t_stat selchan_reset(DEVICE *selchan_dev);
 
 static int32 selchandev(const int32 port, const int32 io, const int32 data);
 
-static int32 trace_level    = 0;        /* Disable all tracing by default */
 
 static UNIT selchan_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_DISABLE + UNIT_ROABLE, 0) }
 };
 
 static REG selchan_reg[] = {
-    { HRDATA (TRACELEVEL,   trace_level,           16), },
+    { HRDATA (DMA_MODE,    selchan_info_data.dma_mode,    8), },
+    { HRDATA (DMA_ADDR,    selchan_info_data.dma_addr,    24), },
     { NULL }
 };
 
@@ -108,13 +109,25 @@ static MTAB selchan_mod[] = {
     { 0 }
 };
 
+#define TRACE_PRINT(level, args)    if(selchan_dev.dctrl & level) { \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB selchan_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "VERBOSE",VERBOSE_MSG },
+    { "DMA",    DMA_MSG },
+    { NULL,     0 }
+};
+
 DEVICE selchan_dev = {
     "SELCHAN", selchan_unit, selchan_reg, selchan_mod,
     SELCHAN_MAX_DRIVES, 10, 31, 1, SELCHAN_MAX_DRIVES, SELCHAN_MAX_DRIVES,
     NULL, NULL, &selchan_reset,
     NULL, NULL, NULL,
-    &selchan_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &selchan_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    selchan_dt, NULL, "Compupro Selector Channel SELCHAN"
 };
 
 /* Reset routine */
@@ -154,7 +167,7 @@ static int32 selchandev(const int32 port, const int32 io, const int32 data)
         selchan_info->reg_cnt ++;
 
         if(selchan_info->reg_cnt == 4) {
-            TRACE_PRINT(TRACE_MSG, ("SELCHAN: " ADDRESS_FORMAT " DMA=0x%06x, Mode=0x%02x (%s, %s, %s)" NLP,
+            TRACE_PRINT(VERBOSE_MSG, ("SELCHAN: " ADDRESS_FORMAT " DMA=0x%06x, Mode=0x%02x (%s, %s, %s)" NLP,
                 PCX,
                 selchan_info->dma_addr,
                 selchan_info->dma_mode,
@@ -165,7 +178,7 @@ static int32 selchandev(const int32 port, const int32 io, const int32 data)
 
         return 0;
     } else {
-        TRACE_PRINT(TRACE_MSG, ("SELCHAN: " ADDRESS_FORMAT " Reset" NLP, PCX));
+        TRACE_PRINT(VERBOSE_MSG, ("SELCHAN: " ADDRESS_FORMAT " Reset" NLP, PCX));
         selchan_info->reg_cnt = 0;
         return(0xFF);
     }
@@ -191,9 +204,9 @@ int32 selchan_dma(uint8 *buf, uint32 len)
             (selchan_info->dma_mode & SELCHAN_MODE_WRITE) ? "WR" : "RD", len));
         for(i=0;i<len;i++) {
             if(selchan_info->dma_mode & SELCHAN_MODE_WRITE) {
-                PutBYTEWrapper(selchan_info->dma_addr + i, buf[i]);
+                PutByteDMA(selchan_info->dma_addr + i, buf[i]);
             } else {
-                buf[i] = GetBYTEWrapper(selchan_info->dma_addr + i);
+                buf[i] = GetByteDMA(selchan_info->dma_addr + i);
             }
         }
 

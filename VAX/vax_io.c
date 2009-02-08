@@ -183,9 +183,8 @@ DEVICE qba_dev = {
 
 /* IO page dispatches */
 
-static t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
-static t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
-static DIB *iodibp[IOPAGESIZE >> 1];
+t_stat (*iodispR[IOPAGESIZE >> 1])(int32 *dat, int32 ad, int32 md);
+t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 
 /* Interrupt request to interrupt action map */
 
@@ -243,7 +242,8 @@ int32 ReadIO (uint32 pa, int32 lnt)
 int32 iod;
 
 iod = ReadQb (pa);                                      /* wd from Qbus */
-if (lnt < L_LONG) iod = iod << ((pa & 2)? 16: 0);       /* bw? position */
+if (lnt < L_LONG)                                       /* bw? position */
+    iod = iod << ((pa & 2)? 16: 0);
 else iod = (ReadQb (pa + 2) << 16) | iod;               /* lw, get 2nd wd */
 SET_IRQL;
 return iod;
@@ -261,8 +261,10 @@ return iod;
 
 void WriteIO (uint32 pa, int32 val, int32 lnt)
 {
-if (lnt == L_BYTE) WriteQb (pa, val, WRITEB);
-else if (lnt == L_WORD) WriteQb (pa, val, WRITE);
+if (lnt == L_BYTE)
+    WriteQb (pa, val, WRITEB);
+else if (lnt == L_WORD)
+    WriteQb (pa, val, WRITE);
 else {
     WriteQb (pa, val & 0xFFFF, WRITE);
     WriteQb (pa + 2, (val >> 16) & 0xFFFF, WRITE);
@@ -285,17 +287,25 @@ static const int32 sw_int_mask[IPL_SMAX] = {
     0xE000, 0xC000, 0x8000                              /* C - E */
     };
 
-if (hlt_pin) return IPL_HLTPIN;                         /* hlt pin int */
-if ((ipl < IPL_MEMERR) && mem_err) return IPL_MEMERR;   /* mem err int */
-if ((ipl < IPL_CRDERR) && crd_err) return IPL_CRDERR;   /* crd err int */
+if (hlt_pin)                                            /* hlt pin int */
+    return IPL_HLTPIN;
+if ((ipl < IPL_MEMERR) && mem_err)                      /* mem err int */
+    return IPL_MEMERR;
+if ((ipl < IPL_CRDERR) && crd_err)                      /* crd err int */
+    return IPL_CRDERR;
 for (i = IPL_HMAX; i >= IPL_HMIN; i--) {                /* chk hwre int */
-    if (i <= ipl) return 0;                             /* at ipl? no int */
-    if (int_req[i - IPL_HMIN]) return i;                /* req != 0? int */
+    if (i <= ipl)                                       /* at ipl? no int */
+        return 0;
+    if (int_req[i - IPL_HMIN])                          /* req != 0? int */
+        return i;
     }
-if (ipl >= IPL_SMAX) return 0;                          /* ipl >= sw max? */
-if ((t = SISR & sw_int_mask[ipl]) == 0) return 0;       /* eligible req */
+if (ipl >= IPL_SMAX)                                    /* ipl >= sw max? */
+    return 0;
+if ((t = SISR & sw_int_mask[ipl]) == 0)                 /* eligible req */
+    return 0;
 for (i = IPL_SMAX; i > ipl; i--) {                      /* check swre int */
-    if ((t >> i) & 1) return i;                         /* req != 0? int */
+    if ((t >> i) & 1)                                   /* req != 0? int */
+        return i;
     }
 return 0;
 }
@@ -321,7 +331,8 @@ if (lvl > IPL_HMAX) {                                   /* error req lvl? */
 for (i = 0; int_req[l] && (i < 32); i++) {
     if ((int_req[l] >> i) & 1) {
         int_req[l] = int_req[l] & ~(1u << i);
-        if (int_ack[l][i]) return int_ack[l][i]();
+        if (int_ack[l][i])
+            return int_ack[l][i]();
         return int_vec[l][i];
         }
     }
@@ -383,7 +394,8 @@ switch (rg) {
 
     case 1:                                             /* DSER */
         cq_dser = (cq_dser & ~val) & CQDSER_MASK;
-        if (val & CQDSER_SME) cq_ipc = cq_ipc & ~CQIPC_QME;
+        if (val & CQDSER_SME)
+            cq_ipc = cq_ipc & ~CQIPC_QME;
         break;
 
     case 2: case 3:
@@ -445,7 +457,8 @@ int32 cqmap_rd (int32 pa)
 {
 int32 ma = (pa & CQMAPAMASK) + cq_mbr;                  /* mem addr */
 
-if (ADDR_IS_MEM (ma)) return M[ma >> 2];
+if (ADDR_IS_MEM (ma))
+    return M[ma >> 2];
 cq_serr (ma);                                           /* set err */
 MACH_CHECK (MCHK_READ);                                 /* mcheck */
 return 0;
@@ -481,7 +494,8 @@ int32 cqmem_rd (int32 pa)
 int32 qa = pa & CQMAMASK;                               /* Qbus addr */
 uint32 ma;
 
-if (qba_map_addr (qa, &ma)) return M[ma >> 2];          /* map addr */
+if (qba_map_addr (qa, &ma))                             /* map addr */
+    return M[ma >> 2];
 MACH_CHECK (MCHK_READ);                                 /* err? mcheck */
 return 0;
 }
@@ -515,7 +529,8 @@ if (ADDR_IS_MEM (qmma)) {                               /* legit? */
     int32 qmap = M[qmma >> 2];                          /* get map */
     if (qmap & CQMAP_VLD) {                             /* valid? */
         *ma = ((qmap & CQMAP_PAG) << VA_V_VPN) + VA_GETOFF (qa);
-        if (ADDR_IS_MEM (*ma)) return TRUE;             /* legit addr */
+        if (ADDR_IS_MEM (*ma))                          /* legit addr */
+            return TRUE;
         cq_serr (*ma);                                  /* slave nxm */
         return FALSE;
         }
@@ -547,7 +562,8 @@ return FALSE;
 
 void cq_merr (int32 pa)
 {
-if (cq_dser & CQDSER_ERR) cq_dser = cq_dser | CQDSER_LST;
+if (cq_dser & CQDSER_ERR)
+    cq_dser = cq_dser | CQDSER_LST;
 cq_dser = cq_dser | CQDSER_MNX;                         /* master nxm */
 cq_mear = (pa >> VA_V_VPN) & CQMEAR_MASK;               /* page addr */
 return;
@@ -557,7 +573,8 @@ return;
 
 void cq_serr (int32 pa)
 {
-if (cq_dser & CQDSER_ERR) cq_dser = cq_dser | CQDSER_LST;
+if (cq_dser & CQDSER_ERR)
+    cq_dser = cq_dser | CQDSER_LST;
 cq_dser = cq_dser | CQDSER_SNX;                         /* slave nxm */
 cq_sear = (pa >> VA_V_VPN) & CQSEAR_MASK;
 return;
@@ -586,10 +603,12 @@ t_stat qba_reset (DEVICE *dptr)
 {
 int32 i;
 
-if (sim_switches & SWMASK ('P')) qba_powerup ();
+if (sim_switches & SWMASK ('P'))
+    qba_powerup ();
 cq_scr = (cq_scr & CQSCR_BHL) | CQSCR_POK;
 cq_dser = cq_mear = cq_sear = cq_ipc = 0;
-for (i = 0; i < IPL_HLVL; i++) int_req[i] = 0;
+for (i = 0; i < IPL_HLVL; i++)
+    int_req[i] = 0;
 return SCPE_OK;
 }
 
@@ -735,7 +754,8 @@ t_stat qba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 qa = (uint32) exta, pa;
 
-if ((vptr == NULL) || (qa >= CQMSIZE)) return SCPE_ARG;
+if ((vptr == NULL) || (qa >= CQMSIZE))
+    return SCPE_ARG;
 if (qba_map_addr_c (qa, &pa) && ADDR_IS_MEM (pa)) {
     *vptr = (uint32) ReadW (pa);
     return SCPE_OK;
@@ -749,7 +769,8 @@ t_stat qba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw)
 {
 uint32 qa = (uint32) exta, pa;
 
-if (qa >= CQMSIZE) return SCPE_ARG;
+if (qa >= CQMSIZE)
+    return SCPE_ARG;
 if (qba_map_addr_c (qa, &pa) && ADDR_IS_MEM (pa)) {
     WriteW (pa, (int32) val);
     return SCPE_OK;
@@ -757,245 +778,23 @@ if (qba_map_addr_c (qa, &pa) && ADDR_IS_MEM (pa)) {
 return SCPE_NXM;
 }
 
-/* Enable/disable autoconfiguration */
-
-t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-if (cptr != NULL) return SCPE_ARG;
-autcon_enb = val;
-return auto_config (NULL, 0);
-}
-
-/* Show autoconfiguration status */
-
-t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-fprintf (st, "autoconfiguration ");
-fprintf (st, autcon_enb? "enabled": "disabled");
-return SCPE_OK;
-}
-
-/* Change device address */
-
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-uint32 newba;
-t_stat r;
-
-if (cptr == NULL) return SCPE_ARG;
-if ((val == 0) || (uptr == NULL)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-newba = (uint32) get_uint (cptr, 16, IOPAGEBASE+IOPAGEMASK, &r);        /* get new */
-if (r != SCPE_OK) return r;
-if ((newba <= IOPAGEBASE) ||                            /* must be > 0 */
-    (newba % ((uint32) val))) return SCPE_ARG;          /* check modulus */
-dibp->ba = newba;                                       /* store */
-dptr->flags = dptr->flags & ~DEV_FLTA;                  /* not floating */
-autcon_enb = 0;                                         /* autoconfig off */
-return SCPE_OK;
-}
-
-/* Show device address */
-
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-
-if (uptr == NULL) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE)) return SCPE_IERR;
-fprintf (st, "address=%08X", dibp->ba);
-if (dibp->lnt > 1)
-    fprintf (st, "-%08X", dibp->ba + dibp->lnt - 1);
-if (dptr->flags & DEV_FLTA) fprintf (st, "*");
-return SCPE_OK;
-}
-
-/* Set address floating */
-
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc)
-{
-DEVICE *dptr;
-
-if (cptr == NULL) return SCPE_ARG;
-if ((val == 0) || (uptr == NULL)) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dptr->flags = dptr->flags | DEV_FLTA;                   /* floating */
-return auto_config (NULL, 0);                           /* autoconfigure */
-}
-
-/* Change device vector */
-
-t_stat set_vec (UNIT *uptr, int32 arg, char *cptr, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-uint32 newvec;
-t_stat r;
-
-if (cptr == NULL) return SCPE_ARG;
-if (uptr == NULL) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-newvec = (uint32) get_uint (cptr, 16, VEC_Q + 01000, &r);
-if ((r != SCPE_OK) || (newvec <= VEC_Q) ||
-    ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
-    (newvec & ((dibp->vnum > 1)? 07: 03))) return SCPE_ARG;
-dibp->vec = newvec;
-dptr->flags = dptr->flags & ~DEV_FLTA;                  /* not floating */
-autcon_enb = 0;                                         /* autoconfig off */
-return SCPE_OK;
-}
-
-/* Show device vector */
-
-t_stat show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
-{
-DEVICE *dptr;
-DIB *dibp;
-uint32 vec, numvec;
-
-if (uptr == NULL) return SCPE_IERR;
-dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-vec = dibp->vec;
-if (arg) numvec = arg;
-else numvec = dibp->vnum;
-if (vec == 0) fprintf (st, "no vector");
-else {
-    fprintf (st, "vector=%X", vec);
-    if (numvec > 1) fprintf (st, "-%X", vec + (4 * (numvec - 1)));
-    }
-return SCPE_OK;
-}
-
-/* Build dispatch tables */
-
-t_stat build_dsp_tab (DEVICE *dptr, DIB *dibp)
-{
-uint32 i, idx;
-
-if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR; /* validate args */
-for (i = 0; i < dibp->lnt; i = i + 2) {                 /* create entries */
-    idx = ((dibp->ba + i) & IOPAGEMASK) >> 1;           /* index into disp */
-    if ((iodispR[idx] && dibp->rd &&                    /* conflict? */
-        (iodispR[idx] != dibp->rd)) ||
-        (iodispW[idx] && dibp->wr &&
-        (iodispW[idx] != dibp->wr))) {
-        printf ("Device %s address conflict at %08o\n",
-            sim_dname (dptr), dibp->ba);
-        if (sim_log) fprintf (sim_log,
-            "Device %s address conflict at %08o\n",
-            sim_dname (dptr), dibp->ba);
-        return SCPE_STOP;
-        }
-    if (dibp->rd) iodispR[idx] = dibp->rd;              /* set rd dispatch */
-    if (dibp->wr) iodispW[idx] = dibp->wr;              /* set wr dispatch */
-    iodibp[idx] = dibp;                                 /* remember DIB */
-    }
-return SCPE_OK;
-}
-
-
-/* Build interrupt tables */
-
-t_stat build_int_vec (DEVICE *dptr, DIB *dibp)
-{
-int32 i, idx, vec, ilvl, ibit;
-
-if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR; /* validate args */
-if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
-for (i = 0; i < dibp->vnum; i++) {                      /* loop thru vec */
-    idx = dibp->vloc + i;                               /* vector index */
-    vec = dibp->vec? (dibp->vec + (i * 4)): 0;          /* vector addr */
-    ilvl = idx / 32;
-    ibit = idx % 32;
-    if ((int_ack[ilvl][ibit] && dibp->ack[i] &&         /* conflict? */
-        (int_ack[ilvl][ibit] != dibp->ack[i])) ||
-        (int_vec[ilvl][ibit] && vec &&
-        (int_vec[ilvl][ibit] != vec))) {
-        printf ("Device %s interrupt slot conflict at %d\n",
-            sim_dname (dptr), idx);
-        if (sim_log) fprintf (sim_log,
-        "Device %s interrupt slot conflict at %d\n",
-            sim_dname (dptr), idx);
-        return SCPE_STOP;
-        }
-    if (dibp->ack[i]) int_ack[ilvl][ibit] = dibp->ack[i];
-    else if (vec) int_vec[ilvl][ibit] = vec;
-    }
-return SCPE_OK;
-}
-
 /* Build dib_tab from device list */
 
 t_stat build_dib_tab (void)
 {
-int32 i, j;
+int32 i;
 DEVICE *dptr;
 DIB *dibp;
 t_stat r;
 
-for (i = 0; i < IPL_HLVL; i++) {                        /* clear int tables */
-    for (j = 0; j < 32; j++) {
-        int_vec[i][j] = 0;
-        int_ack[i][j] = NULL;
-        }
-    }
-for (i = 0; i < (IOPAGESIZE >> 1); i++) {               /* clear dispatch tab */
-    iodispR[i] = NULL;
-    iodispW[i] = NULL;
-    iodibp[i] = NULL;
-    }
+init_ubus_tab ();                                       /* init bus tables */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
-        if (r = build_int_vec (dptr, dibp))             /* add to intr tab */
-            return r;
-        if (r = build_dsp_tab (dptr, dibp))             /* add to dispatch tab */
+        if (r = build_ubus_tab (dptr, dibp))            /* add to bus tab */
             return r;
         }                                               /* end if enabled */
     }                                                   /* end for */
-return SCPE_OK;
-}
-
-/* Show IO space */
-
-t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-uint32 i, j;
-DEVICE *dptr;
-DIB *dibp;
-
-if (build_dib_tab ()) return SCPE_OK;                   /* build IO page */
-for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
-    if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
-        dibp = iodibp[i];                               /* DIB for block */
-        for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
-            if (((DIB*) sim_devices[j]->ctxt) == dibp) {
-                dptr = sim_devices[j];                  /* locate device */
-                break;
-                }                                       /* end if */
-            }                                           /* end for j */
-    fprintf (st, "%08X - %08X%c\t%s\n", dibp->ba,
-            dibp->ba + dibp->lnt - 1,
-            (dptr && (dptr->flags & DEV_FLTA))? '*': ' ',
-            dptr? sim_dname (dptr): "CPU");
-        }                                               /* end if */
-    }                                                   /* end for i */
 return SCPE_OK;
 }
 
@@ -1017,146 +816,5 @@ if (cptr) {
         }
     }
 fprintf (of, "Invalid argument\n");
-return SCPE_OK;
-}
-
-/* Autoconfiguration
-
-   The table reflects the MicroVAX 3900 microcode, with one addition - the
-   number of controllers field handles devices where multiple instances
-   are simulated through a single DEVICE structure (e.g., DZ, VH).
-
-   A minus number of vectors indicates a field that should be calculated
-   but not placed in the DIB (RQ, TQ dynamic vectors) */
-
-#define AUTO_MAXC       4
-#define AUTO_CSRBASE    0010
-#define AUTO_VECBASE    0300
-
-typedef struct {
-    char        *dnam[AUTO_MAXC];
-    int32       numc;
-    int32       numv;
-    uint32      amod;
-    uint32      vmod;
-    uint32      fixa[AUTO_MAXC];
-    uint32      fixv[AUTO_MAXC];
-    } AUTO_CON;
-
-AUTO_CON auto_tab[] = {
-    { { NULL }, 1, 2, 0, 8, { 0 } },                    /* DLV11J - fx CSRs */
-    { { NULL }, 1, 2, 8, 8 },                           /* DJ11 */
-    { { NULL }, 1, 2, 16, 8 },                          /* DH11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DQ11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DU11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DUP11 */
-    { { NULL }, 10, 2, 8, 8 },                          /* LK11A */
-    { { NULL }, 1, 2, 8, 8 },                           /* DMC11 */
-    { { "DZ" }, DZ_MUXES, 2, 8, 8 },                    /* DZ11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* KMC11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* LPP11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* VMV21 */
-    { { NULL }, 1, 2, 16, 8 },                          /* VMV31 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DWR70 */
-    { { "RL", "RLB" }, 1, 1, 8, 4, {IOBA_RL}, {VEC_RL} }, /* RL11 */
-    { { "TS", "TSB", "TSC", "TSD" }, 1, 1, 0, 4,        /* TS11 */
-        {IOBA_TS, IOBA_TS + 4, IOBA_TS + 8, IOBA_TS + 12},
-        {VEC_TS} },
-    { { NULL }, 1, 2, 16, 8 },                          /* LPA11K */
-    { { NULL }, 1, 2, 8, 8 },                           /* KW11C */
-    { { NULL }, 1, 1, 8, 8 },                           /* reserved */
-    { { "RX", "RY" }, 1, 1, 8, 4, {IOBA_RX} , {VEC_RX} }, /* RX11/RX211 */
-    { { NULL }, 1, 1, 8, 4 },                           /* DR11W */
-    { { NULL }, 1, 1, 8, 4, { 0, 0 }, { 0 } },          /* DR11B - fx CSRs,vec */
-    { { NULL }, 1, 2, 8, 8 },                           /* DMP11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DPV11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* ISB11 */
-    { { NULL }, 1, 2, 16, 8 },                          /* DMV11 */
-    { { "XU", "XUB" }, 1, 1, 8, 4, {IOBA_XU}, {VEC_XU} }, /* DEUNA */
-    { { "XQ", "XQB" }, 1, 1, 0, 4,                      /* DEQNA */
-        {IOBA_XQ,IOBA_XQB}, {VEC_XQ} },
-    { { "RQ", "RQB", "RQC", "RQD" }, 1, -1, 4, 4,       /* RQDX3 */
-        {IOBA_RQ}, {VEC_RQ} },
-    { { NULL }, 1, 8, 32, 4 },                          /* DMF32 */
-    { { NULL }, 1, 2, 16, 8 },                          /* KMS11 */
-    { { NULL }, 1, 1, 16, 4 },                          /* VS100 */
-    { { "TQ", "TQB" }, 1, -1, 4, 4, {IOBA_TQ}, {VEC_TQ} }, /* TQK50 */
-    { { NULL }, 1, 2, 16, 8 },                          /* KMV11 */
-    { { "VH" }, VH_MUXES, 2, 16, 8 },                   /* DHU11/DHQ11 */
-    { { NULL }, 1, 6, 32, 4 },                          /* DMZ32 */
-    { { NULL }, 1, 6, 32, 4 },                          /* CP132 */
-    { { NULL }, 1, 2, 64, 8, { 0 } },                   /* QVSS - fx CSR */
-    { { NULL }, 1, 1, 8, 4 },                           /* VS31 */
-    { { NULL }, 1, 1, 0, 4, { 0 } },                    /* LNV11 - fx CSR */
-    { { NULL }, 1, 1, 16, 4 },                          /* LNV21/QPSS */
-    { { NULL }, 1, 1, 8, 4, { 0 } },                    /* QTA - fx CSR */
-    { { NULL }, 1, 1, 8, 4 },                           /* DSV11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* CSAM */
-    { { NULL }, 1, 2, 8, 8 },                           /* ADV11C */
-    { { NULL }, 1, 0, 8, 0 },                           /* AAV11C */
-    { { NULL }, 1, 2, 8, 8, { 0 }, { 0 } },             /* AXV11C - fx CSR,vec */
-    { { NULL }, 1, 2, 4, 8, { 0 } },                    /* KWV11C - fx CSR */
-    { { NULL }, 1, 2, 8, 8, { 0 } },                    /* ADV11D - fx CSR */
-    { { NULL }, 1, 2, 8, 8, { 0 } },                    /* AAV11D - fx CSR */
-    { { "QDSS" }, 1, 3, 0, 16, {IOBA_QDSS} },           /* QDSS - fx CSR */
-    { { NULL }, -1 }                                    /* end table */
-};
-
-t_stat auto_config (char *name, int32 nctrl)
-{
-uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
-uint32 vec = VEC_Q + AUTO_VECBASE;
-AUTO_CON *autp;
-DEVICE *dptr;
-DIB *dibp;
-uint32 j, k, vmask, amask;
-
-if (autcon_enb == 0) return SCPE_OK;                    /* enabled? */
-if (name) {                                             /* updating? */
-    if (nctrl < 0) return SCPE_ARG;
-    for (autp = auto_tab; autp->numc >= 0; autp++) {
-        for (j = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
-            if (strcmp (name, autp->dnam[j]) == 0)
-                autp->numc = nctrl;
-            }
-        }
-    }
-for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
-    if (autp->amod) {                                   /* floating csr? */
-        amask = autp->amod - 1;
-        csr = (csr + amask) & ~amask;                   /* align csr */
-        }
-    for (j = k = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
-        dptr = find_dev (autp->dnam[j]);                /* find ctrl */
-        if ((dptr == NULL) || (dptr->flags & DEV_DIS) ||
-            !(dptr->flags & DEV_FLTA)) continue;        /* enabled, floating? */
-        dibp = (DIB *) dptr->ctxt;                      /* get DIB */
-        if (dibp == NULL) return SCPE_IERR;             /* not there??? */
-        if (autp->amod) {                               /* dyn csr needed? */
-            if (autp->fixa[k])                          /* fixed csr avail? */
-                dibp->ba = autp->fixa[k];               /* use it */
-            else {                                      /* no fixed left */
-                dibp->ba = csr;                         /* set CSR */
-                csr += (autp->numc * autp->amod);       /* next CSR */
-                }                                       /* end else */
-            }                                           /* end if dyn csr */
-        if (autp->numv && autp->vmod) {                 /* dyn vec needed? */
-            uint32 numv = abs (autp->numv);             /* get num vec */
-            if (autp->fixv[k]) {                        /* fixed vec avail? */
-                if (autp->numv > 0)
-                    dibp->vec = autp->fixv[k];          /* use it */
-                }
-            else {                                      /* no fixed left */
-                vmask = autp->vmod - 1;
-                vec = (vec + vmask) & ~vmask;           /* align vector */
-                if (autp->numv > 0)
-                    dibp->vec = vec;                    /* set vector */
-                vec += (autp->numc * numv * 4);
-                }                                       /* end else */
-            }                                           /* end if dyn vec */
-        k++;                                            /* next instance */
-        }                                               /* end for j */
-    if (autp->amod) csr = csr + 2;                      /* flt CSR? gap */
-    }                                                   /* end for i */
 return SCPE_OK;
 }

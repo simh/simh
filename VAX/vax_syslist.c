@@ -1,6 +1,6 @@
 /* vax_sys.c: VAX simulator interface
 
-   Copyright (c) 1998-2006, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -105,7 +105,8 @@ uint32 origin, limit;
 extern int32 ssc_cnf;
 #define SSCCNF_BLO      0x80000000
 
-if (flag) return SCPE_ARG;                              /* dump? */
+if (flag)                                               /* dump? */
+    return SCPE_ARG;
 if (sim_switches & SWMASK ('R')) {                      /* ROM? */
     origin = ROMBASE;
     limit = ROMBASE + ROMSIZE;
@@ -120,11 +121,13 @@ else {
     limit = (uint32) cpu_unit.capac;
     if (sim_switches & SWMASK ('O')) {                  /* origin? */
         origin = (int32) get_uint (cptr, 16, 0xFFFFFFFF, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
+        if (r != SCPE_OK)
+            return SCPE_ARG;
         }
     }
 while ((i = getc (fileref)) != EOF) {                   /* read byte stream */
-    if (origin >= limit) return SCPE_NXM;               /* NXM? */
+    if (origin >= limit)                                /* NXM? */
+        return SCPE_NXM;
     if (sim_switches & SWMASK ('R'))                    /* ROM? */
         rom_wr_B (origin, i);                           /* not writeable */
     else WriteB (origin, i);                            /* store byte */

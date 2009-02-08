@@ -1,6 +1,6 @@
 /* sim_fio.c: simulator file I/O library
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -84,7 +84,8 @@ size_t c, j;
 int32 k;
 unsigned char by, *sptr, *dptr;
 
-if ((size == 0) || (count == 0)) return 0;              /* check arguments */
+if ((size == 0) || (count == 0))                        /* check arguments */
+    return 0;
 c = fread (bptr, size, count, fptr);                    /* read buffer */
 if (sim_end || (size == sizeof (char)) || (c == 0))     /* le, byte, or err? */
     return c;                                           /* done */
@@ -105,7 +106,8 @@ size_t c, j, nelem, nbuf, lcnt, total;
 int32 i, k;
 unsigned char *sptr, *dptr;
 
-if ((size == 0) || (count == 0)) return 0;              /* check arguments */
+if ((size == 0) || (count == 0))                        /* check arguments */
+    return 0;
 if (sim_end || (size == sizeof (char)))                 /* le or byte? */
     return fwrite (bptr, size, count, fptr);            /* done */
 nelem = FLIP_SIZE / size;                               /* elements in buffer */
@@ -118,11 +120,13 @@ sptr = (unsigned char *) bptr;                          /* init input ptr */
 for (i = nbuf; i > 0; i--) {                            /* loop on buffers */
     c = (i == 1)? lcnt: nelem;
     for (j = 0, dptr = sim_flip; j < c; j++) {          /* loop on items */
-        for (k = size - 1; k >= 0; k--) *(dptr + k) = *sptr++;
+        for (k = size - 1; k >= 0; k--)
+            *(dptr + k) = *sptr++;
         dptr = dptr + size;
         }
     c = fwrite (sim_flip, size, c, fptr);
-    if (c == 0) return total;
+    if (c == 0)
+        return total;
     total = total + c;
     }
 return total;
@@ -135,7 +139,8 @@ uint32 sim_fsize_name (char *fname)
 FILE *fp;
 uint32 sz;
 
-if ((fp = sim_fopen (fname, "rb")) == NULL) return 0;
+if ((fp = sim_fopen (fname, "rb")) == NULL)
+    return 0;
 sz = sim_fsize (fp);
 fclose (fp);
 return sz;
@@ -145,7 +150,8 @@ uint32 sim_fsize (FILE *fp)
 {
 uint32 pos, sz;
 
-if (fp == NULL) return 0;
+if (fp == NULL)
+    return 0;
 pos = ftell (fp);
 fseek (fp, 0, SEEK_END);
 sz = ftell (fp);
@@ -222,7 +228,8 @@ switch (whence) {
         break;
 
     case SEEK_CUR:
-        if (fgetpos (st, &filepos)) return (-1);
+        if (fgetpos (st, &filepos))
+            return (-1);
         fileaddr = fpos_t_to_int64 (&filepos);
         fileaddr = fileaddr + offset;
         break;
@@ -266,7 +273,8 @@ switch (whence) {
         break;
 
     case SEEK_CUR:
-        if (fgetpos (st, &fileaddr)) return (-1);
+        if (fgetpos (st, &fileaddr))
+            return (-1);
         fileaddr = fileaddr + offset;
         break;
 

@@ -65,7 +65,7 @@ extern void PutBYTEExtended(register uint32 Addr, const register uint32 Value);
  */
 
 /* [JCE] Stop gcc -Wall complaining */
-void i86_intr_raise(PC_ENV *m, uint8 intrnum);
+extern void i86_intr_raise(PC_ENV *m, uint8 intrnum);
 
 /* the following table was generated using the following
    code (running on an IBM AT, Turbo C++ 2.0), for all values of i
@@ -83,7 +83,7 @@ void i86_intr_raise(PC_ENV *m, uint8 intrnum);
        }
  */
 
-char parity_tab[] = {
+uint8 parity_tab[] = {
 /*0*/  1, /*1*/  0, /*2*/  0, /*3*/  1,
 /*4*/  0, /*5*/  1, /*6*/  1, /*7*/  0,
 /*8*/  0, /*9*/  1, /*a*/  1, /*b*/  0,
@@ -150,7 +150,7 @@ char parity_tab[] = {
 /*fc*/  1, /*fd*/  0, /*fe*/  0, /*ff*/  1,
 };
 
-char xor_0x3_tab[] = { 0, 1, 1, 0 };
+uint8 xor_0x3_tab[] = { 0, 1, 1, 0 };
 
 /* CARRY CHAIN CALCULATION.
    This represents a somewhat expensive calculation which is
@@ -605,37 +605,35 @@ uint8 rcl_byte(PC_ENV *m, uint8 d, uint8 s)
     /* [JCE] Extra brackets to stop gcc -Wall moaning */
     if ((cnt = s % 9))     /* not a typo, do nada if cnt==0 */
     {
-          /* extract the new CARRY FLAG. */
-              /* CF <-  b_(8-n)             */
-          cf =  (d >> (8-cnt)) & 0x1;
-          /* get the low stuff which rotated
-             into the range B_7 .. B_cnt */
-          /* B_(7) .. B_(n)  <-  b_(8-(n+1)) .. b_0  */
-          /* note that the right hand side done by the mask */
-          res = (d << cnt) & 0xff;
-          /* now the high stuff which rotated around
-             into the positions B_cnt-2 .. B_0 */
-          /* B_(n-2) .. B_0 <-  b_7 .. b_(8-(n-1)) */
-          /* shift it downward, 7-(n-2) = 9-n positions.
-             and mask off the result before or'ing in.
-           */
-          mask = (1<<(cnt-1)) - 1;
-          res |= (d >> (9-cnt)) & mask;
-          /* if the carry flag was set, or it in.  */
-          if (ACCESS_FLAG(m,F_CF))   /* carry flag is set */
-              {
-             /*  B_(n-1) <- cf */
-             res |=  1 << (cnt-1);
-              }
-          /* set the new carry flag, based on the variable "cf" */
-          CONDITIONAL_SET_FLAG(cf, m, F_CF);
-          /* OVERFLOW is set *IFF* cnt==1, then it is the
-             xor of CF and the most significant bit.  Blecck. */
-                  /* parenthesized this expression since it appears to
-             be causing OF to be misset */
-          CONDITIONAL_SET_FLAG(cnt==1&&
-                       xor_0x3_tab[cf+((res>>6)&0x2)],
-                       m, F_OF);
+        /* extract the new CARRY FLAG.  */
+        /* CF <-  b_(8-n)               */
+        cf =  (d >> (8-cnt)) & 0x1;
+        /* get the low stuff which rotated
+           into the range B_7 .. B_cnt */
+        /* B_(7) .. B_(n)  <-  b_(8-(n+1)) .. b_0  */
+        /* note that the right hand side done by the mask */
+        res = (d << cnt) & 0xff;
+        /* now the high stuff which rotated around
+           into the positions B_cnt-2 .. B_0 */
+        /* B_(n-2) .. B_0 <-  b_7 .. b_(8-(n-1)) */
+        /* shift it downward, 7-(n-2) = 9-n positions.
+           and mask off the result before or'ing in.
+        */
+        mask = (1<<(cnt-1)) - 1;
+        res |= (d >> (9-cnt)) & mask;
+        /* if the carry flag was set, or it in.  */
+        if (ACCESS_FLAG(m,F_CF))   /* carry flag is set */
+        {
+            /*  B_(n-1) <- cf */
+            res |=  1 << (cnt-1);
+        }
+        /* set the new carry flag, based on the variable "cf" */
+        CONDITIONAL_SET_FLAG(cf, m, F_CF);
+        /* OVERFLOW is set *IFF* cnt==1, then it is the
+           xor of CF and the most significant bit.  Blecck. */
+        /* parenthesized this expression since it appears to
+           be causing OF to be missed. */
+        CONDITIONAL_SET_FLAG(cnt==1&&xor_0x3_tab[cf+((res>>6)&0x2)], m, F_OF);
     }
     return res & 0xff;
 }
@@ -649,39 +647,38 @@ uint16  rcl_word(PC_ENV *m, uint16 d, uint16 s)
     /* [JCE] Extra brackets to stop gcc -Wall moaning */
     if ((cnt = s % 17))     /* not a typo, do nada if cnt==0 */
     {
-       /* extract the new CARRY FLAG. */
-       /* CF <-  b_(16-n)             */
-       cf =  (d >> (16-cnt)) & 0x1;
-       /* get the low stuff which rotated
-          into the range B_15 .. B_cnt */
-       /* B_(15) .. B_(n)  <-  b_(16-(n+1)) .. b_0  */
-       /* note that the right hand side done by the mask */
-       res = (d << cnt) & 0xffff;
-       /* now the high stuff which rotated around
-          into the positions B_cnt-2 .. B_0 */
-       /* B_(n-2) .. B_0 <-  b_15 .. b_(16-(n-1)) */
-       /* shift it downward, 15-(n-2) = 17-n positions.
-          and mask off the result before or'ing in.
-          */
-       mask = (1<<(cnt-1)) - 1;
-       res |= (d >> (17-cnt)) & mask;
-       /* if the carry flag was set, or it in.  */
-       if (ACCESS_FLAG(m, F_CF))   /* carry flag is set */
-           {
-          /*  B_(n-1) <- cf */
-          res |=  1 << (cnt-1);
-           }
-       /* set the new carry flag, based on the variable "cf" */
-       CONDITIONAL_SET_FLAG(cf, m, F_CF);
-       /* OVERFLOW is set *IFF* cnt==1, then it is the
-          xor of CF and the most significant bit.  Blecck.
-          Note that we're forming a 2 bit word here to index
-          into the table. The expression cf+(res>>14)&0x2
-              represents the two bit word b_15 CF.
+        /* extract the new CARRY FLAG. */
+        /* CF <-  b_(16-n)             */
+        cf =  (d >> (16-cnt)) & 0x1;
+        /* get the low stuff which rotated
+           into the range B_15 .. B_cnt */
+        /* B_(15) .. B_(n)  <-  b_(16-(n+1)) .. b_0  */
+        /* note that the right hand side done by the mask */
+        res = (d << cnt) & 0xffff;
+        /* now the high stuff which rotated around
+           into the positions B_cnt-2 .. B_0 */
+        /* B_(n-2) .. B_0 <-  b_15 .. b_(16-(n-1)) */
+        /* shift it downward, 15-(n-2) = 17-n positions.
+           and mask off the result before or'ing in.
+         */
+        mask = (1<<(cnt-1)) - 1;
+        res |= (d >> (17-cnt)) & mask;
+        /* if the carry flag was set, or it in.  */
+        if (ACCESS_FLAG(m, F_CF))   /* carry flag is set */
+        {
+            /*  B_(n-1) <- cf */
+            res |=  1 << (cnt-1);
+        }
+        /* set the new carry flag, based on the variable "cf" */
+        CONDITIONAL_SET_FLAG(cf, m, F_CF);
+        /* OVERFLOW is set *IFF* cnt==1, then it is the
+           xor of CF and the most significant bit.  Blecck.
+           Note that we're forming a 2 bit word here to index
+           into the table. The expression cf+(res>>14)&0x2
+           represents the two bit word b_15 CF.
         */
-       /* parenthesized following expression... */
-       CONDITIONAL_SET_FLAG(cnt==1&&xor_0x3_tab[cf+((res>>14)&0x2)],
-                       m, F_OF);
+        /* parenthesized following expression... */
+        CONDITIONAL_SET_FLAG(cnt==1&&xor_0x3_tab[cf+((res>>14)&0x2)], m, F_OF);
     }
     return res & 0xffff;
 }
@@ -692,74 +689,73 @@ uint8 rcr_byte(PC_ENV *m, uint8 d, uint8 s)
     uint8 mask, cf, ocf = 0;
     /* rotate right through carry */
     /*
-      s is the rotate distance.  It varies from 0 - 8.
-      d is the byte object rotated.
-      have
-               CF  B_7 B_6 B_5 B_4 B_3 B_2 B_1 B_0
-      The new rotate is done mod 9, and given this,
-      for a rotation of n bits (mod 9) the new carry flag is
-      then located n bits from the LSB.  The low part is
-      then shifted up cnt bits, and the high part is or'd
-      in.  Using CAPS for new values, and lowercase for the
-      original values, this can be expressed as:
-           IF n > 0
-               1) CF <-  b_(n-1)
-           2) B_(8-(n+1)) .. B_(0)  <-  b_(7) .. b_(n)
-           3) B_(8-n) <- cf
-           4) B_(7) .. B_(8-(n-1)) <-  b_(n-2) .. b_(0)
-      I think this is correct.
+        s is the rotate distance.  It varies from 0 - 8.
+        d is the byte object rotated.
+        have
+        CF  B_7 B_6 B_5 B_4 B_3 B_2 B_1 B_0
+        The new rotate is done mod 9, and given this,
+        for a rotation of n bits (mod 9) the new carry flag is
+        then located n bits from the LSB.  The low part is
+        then shifted up cnt bits, and the high part is or'd
+        in.  Using CAPS for new values, and lowercase for the
+        original values, this can be expressed as:
+        IF n > 0
+        1) CF <-  b_(n-1)
+        2) B_(8-(n+1)) .. B_(0)  <-  b_(7) .. b_(n)
+        3) B_(8-n) <- cf
+        4) B_(7) .. B_(8-(n-1)) <-  b_(n-2) .. b_(0)
+        I think this is correct.
     */
     res = d;
     /* [JCE] Extra brackets to stop gcc -Wall moaning */
     if ((cnt = s % 9))     /* not a typo, do nada if cnt==0 */
     {
-       /* extract the new CARRY FLAG. */
-       /* CF <-  b_(n-1)              */
-       if (cnt == 1)
-           {
-          cf = d & 0x1;
-          /* note hackery here.  Access_flag(..) evaluates to either
-                0 if flag not set
-            non-zero if flag is set.
-             doing access_flag(..) != 0 casts that into either
-                     0..1 in any representation of the flags register
-             (i.e. packed bit array or unpacked.)
-                   */
-          ocf = ACCESS_FLAG(m,F_CF) != 0;
-           }
-       else
-         cf =  (d >> (cnt-1)) & 0x1;
-       /* B_(8-(n+1)) .. B_(0)  <-  b_(7) .. b_n  */
-       /* note that the right hand side done by the mask
-          This is effectively done by shifting the
-          object to the right.  The result must be masked,
-          in case the object came in and was treated
-          as a negative number.  Needed???*/
-       mask = (1<<(8-cnt))-1;
-       res = (d >> cnt) & mask;
-       /* now the high stuff which rotated around
-          into the positions B_cnt-2 .. B_0 */
-       /* B_(7) .. B_(8-(n-1)) <-  b_(n-2) .. b_(0) */
-       /* shift it downward, 7-(n-2) = 9-n positions.
-          and mask off the result before or'ing in.
-          */
-       res |= (d << (9-cnt));
-       /* if the carry flag was set, or it in.  */
-       if (ACCESS_FLAG(m,F_CF))   /* carry flag is set */
-           {
-          /*  B_(8-n) <- cf */
-          res |=  1 << (8 - cnt);
-           }
-       /* set the new carry flag, based on the variable "cf" */
-       CONDITIONAL_SET_FLAG(cf, m, F_CF);
-       /* OVERFLOW is set *IFF* cnt==1, then it is the
-          xor of CF and the most significant bit.  Blecck. */
-       /* parenthesized... */
-       if (cnt == 1)
-             { /* [JCE] Explicit braces to stop gcc -Wall moaning */
-           CONDITIONAL_SET_FLAG(xor_0x3_tab[ocf+((d>>6)&0x2)],
-                  m, F_OF);
-             }
+        /* extract the new CARRY FLAG. */
+        /* CF <-  b_(n-1)              */
+        if (cnt == 1)
+        {
+            cf = d & 0x1;
+            /* note hackery here.  Access_flag(..) evaluates to either
+               0 if flag not set
+               non-zero if flag is set.
+               doing access_flag(..) != 0 casts that into either
+               0..1 in any representation of the flags register
+               (i.e. packed bit array or unpacked.)
+            */
+            ocf = ACCESS_FLAG(m,F_CF) != 0;
+        }
+        else
+            cf =  (d >> (cnt-1)) & 0x1;
+        /* B_(8-(n+1)) .. B_(0)  <-  b_(7) .. b_n  */
+        /* note that the right hand side done by the mask
+        This is effectively done by shifting the
+        object to the right.  The result must be masked,
+        in case the object came in and was treated
+        as a negative number.  Needed???*/
+        mask = (1<<(8-cnt))-1;
+        res = (d >> cnt) & mask;
+        /* now the high stuff which rotated around
+           into the positions B_cnt-2 .. B_0 */
+        /* B_(7) .. B_(8-(n-1)) <-  b_(n-2) .. b_(0) */
+        /* shift it downward, 7-(n-2) = 9-n positions.
+           and mask off the result before or'ing in.
+        */
+        res |= (d << (9-cnt));
+        /* if the carry flag was set, or it in.  */
+        if (ACCESS_FLAG(m,F_CF))   /* carry flag is set */
+        {
+            /*  B_(8-n) <- cf */
+            res |=  1 << (8 - cnt);
+        }
+        /* set the new carry flag, based on the variable "cf" */
+        CONDITIONAL_SET_FLAG(cf, m, F_CF);
+        /* OVERFLOW is set *IFF* cnt==1, then it is the
+        xor of CF and the most significant bit.  Blecck. */
+        /* parenthesized... */
+        if (cnt == 1)
+        { /* [JCE] Explicit braces to stop gcc -Wall moaning */
+            CONDITIONAL_SET_FLAG(xor_0x3_tab[ocf+((d>>6)&0x2)], m, F_OF);
+        }
     }
     return res;
 }
@@ -770,67 +766,66 @@ uint16 rcr_word(PC_ENV *m, uint16 d, uint16 s)
     uint16 mask, cf, ocf = 0;
     /* rotate right through carry */
     /*
-      s is the rotate distance.  It varies from 0 - 8.
-      d is the byte object rotated.
-      have
-               CF  B_15   ...   B_0
-      The new rotate is done mod 17, and given this,
-      for a rotation of n bits (mod 17) the new carry flag is
-      then located n bits from the LSB.  The low part is
-      then shifted up cnt bits, and the high part is or'd
-      in.  Using CAPS for new values, and lowercase for the
-      original values, this can be expressed as:
-           IF n > 0
-               1) CF <-  b_(n-1)
-           2) B_(16-(n+1)) .. B_(0)  <-  b_(15) .. b_(n)
-           3) B_(16-n) <- cf
-           4) B_(15) .. B_(16-(n-1)) <-  b_(n-2) .. b_(0)
-      I think this is correct.
+        s is the rotate distance.  It varies from 0 - 8.
+        d is the byte object rotated.
+        have
+        CF  B_15   ...   B_0
+        The new rotate is done mod 17, and given this,
+        for a rotation of n bits (mod 17) the new carry flag is
+        then located n bits from the LSB.  The low part is
+        then shifted up cnt bits, and the high part is or'd
+        in.  Using CAPS for new values, and lowercase for the
+        original values, this can be expressed as:
+        IF n > 0
+        1) CF <-  b_(n-1)
+        2) B_(16-(n+1)) .. B_(0)  <-  b_(15) .. b_(n)
+        3) B_(16-n) <- cf
+        4) B_(15) .. B_(16-(n-1)) <-  b_(n-2) .. b_(0)
+        I think this is correct.
     */
     res = d;
     /* [JCE] Extra brackets to stop gcc -Wall moaning */
     if ((cnt = s % 17))     /* not a typo, do nada if cnt==0 */
     {
-       /* extract the new CARRY FLAG. */
-       /* CF <-  b_(n-1)              */
-       if (cnt==1)
-           {
-          cf = d & 0x1;
-          /* see note above on teh byte version */
-          ocf = ACCESS_FLAG(m,F_CF) != 0;
-           }
-       else
-         cf =  (d >> (cnt-1)) & 0x1;
-       /* B_(16-(n+1)) .. B_(0)  <-  b_(15) .. b_n  */
-       /* note that the right hand side done by the mask
-          This is effectively done by shifting the
-          object to the right.  The result must be masked,
-          in case the object came in and was treated
-          as a negative number.  Needed???*/
-       mask = (1<<(16-cnt))-1;
-       res = (d >> cnt) & mask;
-       /* now the high stuff which rotated around
-          into the positions B_cnt-2 .. B_0 */
-       /* B_(15) .. B_(16-(n-1)) <-  b_(n-2) .. b_(0) */
-       /* shift it downward, 15-(n-2) = 17-n positions.
-          and mask off the result before or'ing in.
-          */
-       res |= (d << (17-cnt));
-       /* if the carry flag was set, or it in.  */
-       if (ACCESS_FLAG(m,F_CF))   /* carry flag is set */
-           {
-          /*  B_(16-n) <- cf */
-          res |=  1 << (16 - cnt);
-           }
-       /* set the new carry flag, based on the variable "cf" */
-       CONDITIONAL_SET_FLAG(cf, m, F_CF);
-       /* OVERFLOW is set *IFF* cnt==1, then it is the
-          xor of CF and the most significant bit.  Blecck. */
-       if (cnt==1)
-             { /* [JCE] Explicit braces to stop gcc -Wall moaning */
-         CONDITIONAL_SET_FLAG(xor_0x3_tab[ocf+((d>>14)&0x2)],
-                m, F_OF);
-             }
+        /* extract the new CARRY FLAG. */
+        /* CF <-  b_(n-1)              */
+        if (cnt==1)
+        {
+            cf = d & 0x1;
+            /* see note above on teh byte version */
+            ocf = ACCESS_FLAG(m,F_CF) != 0;
+        }
+        else
+            cf =  (d >> (cnt-1)) & 0x1;
+        /* B_(16-(n+1)) .. B_(0)  <-  b_(15) .. b_n  */
+        /* note that the right hand side done by the mask
+           This is effectively done by shifting the
+           object to the right.  The result must be masked,
+           in case the object came in and was treated
+           as a negative number.  Needed???*/
+        mask = (1<<(16-cnt))-1;
+        res = (d >> cnt) & mask;
+        /* now the high stuff which rotated around
+           into the positions B_cnt-2 .. B_0 */
+        /* B_(15) .. B_(16-(n-1)) <-  b_(n-2) .. b_(0) */
+        /* shift it downward, 15-(n-2) = 17-n positions.
+           and mask off the result before or'ing in.
+        */
+        res |= (d << (17-cnt));
+        /* if the carry flag was set, or it in.  */
+        if (ACCESS_FLAG(m,F_CF))   /* carry flag is set */
+        {
+            /*  B_(16-n) <- cf */
+            res |=  1 << (16 - cnt);
+        }
+        /* set the new carry flag, based on the variable "cf" */
+        CONDITIONAL_SET_FLAG(cf, m, F_CF);
+        /* OVERFLOW is set *IFF* cnt==1, then it is the
+           xor of CF and the most significant bit.  Blecck. */
+        if (cnt==1)
+        { /* [JCE] Explicit braces to stop gcc -Wall moaning */
+            CONDITIONAL_SET_FLAG(xor_0x3_tab[ocf+((d>>14)&0x2)], m, F_OF);
+        }
     }
     return res;
 }
@@ -865,9 +860,7 @@ uint8 rol_byte(PC_ENV *m, uint8 d, uint8 s)
        CONDITIONAL_SET_FLAG(res&0x1, m, F_CF);
        /* OVERFLOW is set *IFF* cnt==1, then it is the
           xor of CF and the most significant bit.  Blecck. */
-       CONDITIONAL_SET_FLAG(cnt==1  &&
-                xor_0x3_tab[(res&0x1)+((res>>6)&0x2)],
-                m, F_OF);
+       CONDITIONAL_SET_FLAG(cnt==1&&xor_0x3_tab[(res&0x1)+((res>>6)&0x2)], m, F_OF);
     }
     return res&0xff;
 }
@@ -902,9 +895,7 @@ uint16 rol_word(PC_ENV *m, uint16 d, uint16 s)
        CONDITIONAL_SET_FLAG(res&0x1, m, F_CF);
        /* OVERFLOW is set *IFF* cnt==1, then it is the
           xor of CF and the most significant bit.  Blecck. */
-       CONDITIONAL_SET_FLAG(cnt==1  &&
-                xor_0x3_tab[(res&0x1)+((res>>14)&0x2)],
-                m, F_OF);
+       CONDITIONAL_SET_FLAG(cnt==1&&xor_0x3_tab[(res&0x1)+((res>>14)&0x2)], m, F_OF);
     }
     return res&0xffff;
 }
@@ -937,9 +928,7 @@ uint8 ror_byte(PC_ENV *m, uint8 d, uint8 s)
        CONDITIONAL_SET_FLAG(res&0x80, m, F_CF);
        /* OVERFLOW is set *IFF* cnt==1, then it is the
           xor of the two most significant bits.  Blecck. */
-       CONDITIONAL_SET_FLAG(cnt==1  &&
-                xor_0x3_tab[(res>>6)&0x3],
-                m, F_OF);
+       CONDITIONAL_SET_FLAG(cnt==1&& xor_0x3_tab[(res>>6)&0x3], m, F_OF);
     }
     return res&0xff;
 }
@@ -973,9 +962,7 @@ uint16 ror_word(PC_ENV *m, uint16 d, uint16 s)
        CONDITIONAL_SET_FLAG(res&0x8000, m, F_CF);
        /* OVERFLOW is set *IFF* cnt==1, then it is the
           xor of CF and the most significant bit.  Blecck. */
-       CONDITIONAL_SET_FLAG(cnt==1  &&
-                xor_0x3_tab[(res>>14)&0x3],
-                m, F_OF);
+       CONDITIONAL_SET_FLAG(cnt==1  && xor_0x3_tab[(res>>14)&0x3], m, F_OF);
     }
     return res & 0xffff;
 }
@@ -985,45 +972,46 @@ uint8 shl_byte(PC_ENV *m, uint8 d, uint8 s)
     uint32 cnt,res,cf;
     if (s < 8)
     {
-       cnt = s % 8;
-       /* last bit shifted out goes into carry flag */
-       if (cnt>0)
-           {
-          res = d << cnt;
-          cf = d & (1<<(8-cnt));
-          CONDITIONAL_SET_FLAG(cf, m, F_CF);
-          CONDITIONAL_SET_FLAG((res&0xff)==0, m, F_ZF);
-          CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
-          CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-           }
-       else
-           {
-          res = (uint8)d;
-           }
-       if (cnt == 1)
-           {
-          /* Needs simplification. */
-          CONDITIONAL_SET_FLAG(
-               (((res&0x80)==0x80) ^
+        cnt = s % 8;
+        /* last bit shifted out goes into carry flag */
+        if (cnt>0)
+        {
+            res = d << cnt;
+            cf = d & (1<<(8-cnt));
+            CONDITIONAL_SET_FLAG(cf, m, F_CF);
+            CONDITIONAL_SET_FLAG((res&0xff)==0, m, F_ZF);
+            CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
+            CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
+        }
+        else
+        {
+            res = (uint8)d;
+        }
+        if (cnt == 1)
+        {
+            /* Needs simplification. */
+            CONDITIONAL_SET_FLAG(
+            (((res&0x80)==0x80) ^
             (ACCESS_FLAG(m,F_CF) != 0)) ,
-               /* was (m->R_FLG&F_CF)==F_CF)), */
-               m, F_OF);
-           }
-       else
-           {
-          CLEAR_FLAG(m,F_OF);
-           }
+            /* was (m->R_FLG&F_CF)==F_CF)), */
+            m, F_OF);
+        }
+        else
+        {
+            CLEAR_FLAG(m,F_OF);
+        }
     }
     else
     {
-       res = 0;
-       CLEAR_FLAG(m,F_CF);
-       CLEAR_FLAG(m,F_OF);
-       CLEAR_FLAG(m,F_SF);
-       CLEAR_FLAG(m,F_PF);
-       SET_FLAG(m,F_ZF);
+        res = 0;
+/*      CLEAR_FLAG(m,F_CF);*/
+        CONDITIONAL_SET_FLAG((s == 8) && (d & 1), m, F_CF); /* Peter Schorn bug fix */
+        CLEAR_FLAG(m,F_OF);
+        CLEAR_FLAG(m,F_SF);
+        CLEAR_FLAG(m,F_PF);
+        SET_FLAG(m,F_ZF);
     }
-    return res&0xff;
+    return res & 0xff;
 }
 
 uint16 shl_word(PC_ENV *m, uint16 d, uint16 s)
@@ -1031,45 +1019,46 @@ uint16 shl_word(PC_ENV *m, uint16 d, uint16 s)
     uint32 cnt,res,cf;
     if (s < 16)
     {
-       cnt = s % 16;
-       if (cnt > 0)
-           {
-          res = d << cnt;
-          /* last bit shifted out goes into carry flag */
-          cf = d & (1<<(16-cnt));
-          CONDITIONAL_SET_FLAG(cf, m, F_CF);
-          CONDITIONAL_SET_FLAG((res&0xffff)==0, m, F_ZF);
-          CONDITIONAL_SET_FLAG(res & 0x8000, m, F_SF);
-          CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-           }
-       else
-           {
-          res = (uint16)d;
-           }
-       if (cnt == 1)
-           {
-          /* Needs simplification. */
-          CONDITIONAL_SET_FLAG(
-              (((res&0x8000)==0x8000) ^
-               (ACCESS_FLAG(m,F_CF) != 0)),
-               /*((m&F_CF)==F_CF)),*/
-                       m, F_OF);
-           }
-       else
-           {
-          CLEAR_FLAG(m,F_OF);
-           }
+        cnt = s % 16;
+        if (cnt > 0)
+        {
+            res = d << cnt;
+            /* last bit shifted out goes into carry flag */
+            cf = d & (1<<(16-cnt));
+            CONDITIONAL_SET_FLAG(cf, m, F_CF);
+            CONDITIONAL_SET_FLAG((res&0xffff)==0, m, F_ZF);
+            CONDITIONAL_SET_FLAG(res & 0x8000, m, F_SF);
+            CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
+        }
+        else
+        {
+            res = (uint16)d;
+        }
+        if (cnt == 1)
+        {
+            /* Needs simplification. */
+            CONDITIONAL_SET_FLAG(
+            (((res&0x8000)==0x8000) ^
+            (ACCESS_FLAG(m,F_CF) != 0)),
+            /*((m&F_CF)==F_CF)),*/
+            m, F_OF);
+        }
+        else
+        {
+            CLEAR_FLAG(m,F_OF);
+        }
     }
     else
     {
-       res = 0;
-       CLEAR_FLAG(m,F_CF);
-       CLEAR_FLAG(m,F_OF);
-       SET_FLAG(m,F_ZF);
-       CLEAR_FLAG(m,F_SF);
-       CLEAR_FLAG(m,F_PF);
+        res = 0;
+        /*      CLEAR_FLAG(m,F_CF);*/
+        CONDITIONAL_SET_FLAG((s == 16) && (d & 1), m, F_CF); /* Peter Schorn bug fix */
+        CLEAR_FLAG(m,F_OF);
+        SET_FLAG(m,F_ZF);
+        CLEAR_FLAG(m,F_SF);
+        CLEAR_FLAG(m,F_PF);
     }
-    return res&0xffff;
+    return res & 0xffff;
 }
 
 uint8 shr_byte(PC_ENV *m, uint8 d, uint8 s)
@@ -1077,41 +1066,41 @@ uint8 shr_byte(PC_ENV *m, uint8 d, uint8 s)
     uint32 cnt,res,cf,mask;
     if (s < 8)
     {
-       cnt = s % 8;
-       if (cnt > 0)
-           {
-          mask = (1<<(8-cnt))-1;
-          cf = d & (1<<(cnt-1));
-          res = (d >> cnt) & mask;
-          CONDITIONAL_SET_FLAG(cf, m, F_CF);
-          CONDITIONAL_SET_FLAG((res&0xff)==0, m, F_ZF);
-          CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
-          CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-           }
-       else
-           {
-          res = (uint8) d;
-           }
-       if (cnt == 1)
-           {
-          CONDITIONAL_SET_FLAG(
-              xor_0x3_tab[(res>>6)&0x3], m, F_OF);
-           }
-       else
-           {
-          CLEAR_FLAG(m,F_OF);
-           }
+        cnt = s % 8;
+        if (cnt > 0)
+        {
+            mask = (1<<(8-cnt))-1;
+            cf = d & (1<<(cnt-1));
+            res = (d >> cnt) & mask;
+            CONDITIONAL_SET_FLAG(cf, m, F_CF);
+            CONDITIONAL_SET_FLAG((res&0xff)==0, m, F_ZF);
+            CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
+            CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
+        }
+        else
+        {
+            res = (uint8) d;
+        }
+        if (cnt == 1)
+        {
+            CONDITIONAL_SET_FLAG(xor_0x3_tab[(res>>6)&0x3], m, F_OF);
+        }
+        else
+        {
+            CLEAR_FLAG(m,F_OF);
+        }
     }
     else
     {
-       res = 0;
-       CLEAR_FLAG(m,F_CF);
-       CLEAR_FLAG(m,F_OF);
-       SET_FLAG(m,F_ZF);
-       CLEAR_FLAG(m,F_SF);
-       CLEAR_FLAG(m,F_PF);
+        res = 0;
+        /*      CLEAR_FLAG(m,F_CF);*/
+        CONDITIONAL_SET_FLAG((s == 8) && (d & 0x80), m, F_CF); /* Peter Schorn bug fix */
+        CLEAR_FLAG(m,F_OF);
+        SET_FLAG(m,F_ZF);
+        CLEAR_FLAG(m,F_SF);
+        CLEAR_FLAG(m,F_PF);
     }
-    return res&0xff;
+    return res & 0xff;
 }
 
 uint16 shr_word(PC_ENV *m, uint16 d, uint16 s)
@@ -1120,41 +1109,41 @@ uint16 shr_word(PC_ENV *m, uint16 d, uint16 s)
     res = d;
     if (s < 16)
     {
-       cnt = s % 16;
-       if (cnt > 0)
-           {
-          mask = (1<<(16-cnt))-1;
-          cf = d & (1<<(cnt-1));
-          res = (d >> cnt) & mask;
-          CONDITIONAL_SET_FLAG(cf, m, F_CF);
-          CONDITIONAL_SET_FLAG((res&0xffff)==0, m, F_ZF);
-          CONDITIONAL_SET_FLAG(res & 0x8000, m, F_SF);
-          CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-           }
-       else
-           {
-          res = d;
-           }
-       if (cnt == 1)
-           {
-          CONDITIONAL_SET_FLAG(
-              xor_0x3_tab[(res>>14)&0x3], m, F_OF);
-           }
-       else
-           {
-          CLEAR_FLAG(m,F_OF);
-           }
+        cnt = s % 16;
+        if (cnt > 0)
+        {
+            mask = (1<<(16-cnt))-1;
+            cf = d & (1<<(cnt-1));
+            res = (d >> cnt) & mask;
+            CONDITIONAL_SET_FLAG(cf, m, F_CF);
+            CONDITIONAL_SET_FLAG((res&0xffff)==0, m, F_ZF);
+            CONDITIONAL_SET_FLAG(res & 0x8000, m, F_SF);
+            CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
+        }
+        else
+        {
+            res = d;
+        }
+        if (cnt == 1)
+        {
+            CONDITIONAL_SET_FLAG(xor_0x3_tab[(res>>14)&0x3], m, F_OF);
+        }
+        else
+        {
+            CLEAR_FLAG(m,F_OF);
+        }
     }
     else
     {
-       res = 0;
-       CLEAR_FLAG(m,F_CF);
-       CLEAR_FLAG(m,F_OF);
-       SET_FLAG(m,F_ZF);
-       CLEAR_FLAG(m,F_SF);
-       CLEAR_FLAG(m,F_PF);
+        res = 0;
+        /*      CLEAR_FLAG(m,F_CF);*/
+        CONDITIONAL_SET_FLAG((s == 16) && (d & 0x8000), m, F_CF); /* Peter Schorn bug fix */
+        CLEAR_FLAG(m,F_OF);
+        SET_FLAG(m,F_ZF);
+        CLEAR_FLAG(m,F_SF);
+        CLEAR_FLAG(m,F_PF);
     }
-    return res&0xffff;
+    return res & 0xffff;
 }
 
 /* XXXX ??? flags may be wrong??? */
@@ -1164,38 +1153,38 @@ uint8 sar_byte(PC_ENV *m, uint8 d, uint8 s)
     res = d;
     sf = d & 0x80;
     cnt = s % 8;
-    if(cnt > 0 && cnt < 8)
+    if (cnt > 0 && cnt < 8)
     {
-       mask = (1<<(8-cnt))-1;
-       cf = d & (1<<(cnt-1));
-       res = (d >> cnt) & mask;
-       CONDITIONAL_SET_FLAG(cf, m, F_CF);
-       if (sf)
-           {
-          res |= ~mask;
-           }
-       CONDITIONAL_SET_FLAG((res&0xff)==0, m, F_ZF);
-       CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
-       CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
+        mask = (1<<(8-cnt))-1;
+        cf = d & (1<<(cnt-1));
+        res = (d >> cnt) & mask;
+        CONDITIONAL_SET_FLAG(cf, m, F_CF);
+        if (sf)
+        {
+            res |= ~mask;
+        }
+        CONDITIONAL_SET_FLAG((res&0xff)==0, m, F_ZF);
+        CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
+        CONDITIONAL_SET_FLAG(res & 0x80, m, F_SF);
     }
     else if (cnt >= 8)
     {
-       if (sf)
-           {
-          res = 0xff;
-          SET_FLAG(m,F_CF);
-          CLEAR_FLAG(m,F_ZF);
-          SET_FLAG(m, F_SF);
-          SET_FLAG(m, F_PF);
-           }
-       else
-           {
-          res = 0;
-          CLEAR_FLAG(m,F_CF);
-          SET_FLAG(m,F_ZF);
-          CLEAR_FLAG(m, F_SF);
-          CLEAR_FLAG(m, F_PF);
-           }
+        if (sf)
+        {
+            res = 0xff;
+            SET_FLAG(m,F_CF);
+            CLEAR_FLAG(m,F_ZF);
+            SET_FLAG(m, F_SF);
+            SET_FLAG(m, F_PF);
+        }
+        else
+        {
+            res = 0;
+            CLEAR_FLAG(m,F_CF);
+            SET_FLAG(m,F_ZF);
+            CLEAR_FLAG(m, F_SF);
+            CLEAR_FLAG(m, F_PF);
+        }
     }
     return res&0xff;
 }
@@ -1208,38 +1197,38 @@ uint16 sar_word(PC_ENV *m, uint16 d, uint16 s)
     res = d;
     if (cnt > 0 && cnt < 16)
     {
-       mask = (1<<(16-cnt))-1;
-       cf = d & (1<<(cnt-1));
-       res = (d >> cnt) & mask;
-       CONDITIONAL_SET_FLAG(cf, m, F_CF);
-       if (sf)
-         {
-        res |= ~mask;
-         }
+        mask = (1<<(16-cnt))-1;
+        cf = d & (1<<(cnt-1));
+        res = (d >> cnt) & mask;
+        CONDITIONAL_SET_FLAG(cf, m, F_CF);
+        if (sf)
+        {
+            res |= ~mask;
+        }
         CONDITIONAL_SET_FLAG((res&0xffff)==0, m, F_ZF);
         CONDITIONAL_SET_FLAG(res & 0x8000, m, F_SF);
         CONDITIONAL_SET_FLAG(parity_tab[res&0xff], m, F_PF);
     }
     else if (cnt >= 16)
     {
-       if (sf)
-           {
-          res = 0xffff;
-          SET_FLAG(m,F_CF);
-          CLEAR_FLAG(m,F_ZF);
-          SET_FLAG(m, F_SF);
-          SET_FLAG(m, F_PF);
-           }
-       else
-           {
-          res = 0;
-          CLEAR_FLAG(m,F_CF);
-          SET_FLAG(m,F_ZF);
-          CLEAR_FLAG(m, F_SF);
-          CLEAR_FLAG(m, F_PF);
-           }
+        if (sf)
+        {
+            res = 0xffff;
+            SET_FLAG(m,F_CF);
+            CLEAR_FLAG(m,F_ZF);
+            SET_FLAG(m, F_SF);
+            SET_FLAG(m, F_PF);
+        }
+        else
+        {
+            res = 0;
+            CLEAR_FLAG(m,F_CF);
+            SET_FLAG(m,F_ZF);
+            CLEAR_FLAG(m, F_SF);
+            CLEAR_FLAG(m, F_PF);
+        }
     }
-    return res&0xffff;
+    return res & 0xffff;
 }
 
 uint8 sbb_byte(PC_ENV *m, uint8 d, uint8 s)

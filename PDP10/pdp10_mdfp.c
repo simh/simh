@@ -1,6 +1,6 @@
 /* pdp10_mdfp.c: PDP-10 multiply/divide and floating point simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -194,8 +194,10 @@ if (dvr == 0) {                                         /* divide by 0? */
     }
 rs[0] = dvd / dvr;                                      /* get quotient */
 rs[1] = dvd % dvr;                                      /* get remainder */
-if (TSTS (a ^ b)) rs[0] = NEG (rs[0]);                  /* sign of result */
-if (TSTS (a)) rs[1] = NEG (rs[1]);                      /* sign of remainder */
+if (TSTS (a ^ b))                                       /* sign of result */
+    rs[0] = NEG (rs[0]);
+if (TSTS (a))                                           /* sign of remainder */
+    rs[1] = NEG (rs[1]);
 return TRUE;
 }
 
@@ -226,7 +228,9 @@ else {
     rs[1] = r & MMASK;
     }
 
-if (TSTS (s1 ^ s2)) { MKDNEG (rs); }                    /* result -? */
+if (TSTS (s1 ^ s2)) {                                   /* result -? */
+    MKDNEG (rs);
+    }
 else if (TSTS (rs[0])) {                                /* result +, 2**70? */
     SETF (F_AOV | F_T1);                                /* overflow */
     rs[1] = SETS (rs[1]);                               /* consistent - */
@@ -249,7 +253,9 @@ d10 dvd[2];
 
 dvd[0] = AC(ac);                                        /* divd high */
 dvd[1] = CLRS (AC(p1));                                 /* divd lo, clr sgn */
-if (TSTS (AC(ac))) { DMOVN (dvd); }                     /* make divd positive */
+if (TSTS (AC(ac))) {                                    /* make divd positive */
+    DMOVN (dvd);
+    }
 if (dvd[0] >= dvr) {                                    /* divide fail? */
     SETF (F_AOV | F_DCK | F_T1);                        /* set flags, return */
     return FALSE;
@@ -271,8 +277,10 @@ else {
     rs[0] = t / dvr;                                    /* quotient */
     rs[1] = t % dvr;                                    /* remainder */
     }
-if (TSTS (AC(ac) ^ b)) rs[0] = NEG (rs[0]);             /* sign of result */
-if (TSTS (AC(ac))) rs[1] = NEG (rs[1]);                 /* sign of remainder */
+if (TSTS (AC(ac) ^ b))                                  /* sign of result */
+    rs[0] = NEG (rs[0]);
+if (TSTS (AC(ac)))                                      /* sign of remainder */
+    rs[1] = NEG (rs[1]);
 return TRUE;
 }
 
@@ -291,11 +299,16 @@ d10 mpc[2], sign;
 mpc[0] = AC(ac);                                        /* mplcnd hi */
 mpc[1] = CLRS (AC(p1));                                 /* mplcnd lo, clr sgn */
 sign = mpc[0] ^ mpy[0];                                 /* sign of result */
-if (TSTS (mpc[0])) { DMOVN (mpc); }                     /* get abs (mpcnd) */
-if (TSTS (mpy[0])) { DMOVN (mpy); }                     /* get abs (mpyer) */
+if (TSTS (mpc[0])) {                                    /* get abs (mpcnd) */
+    DMOVN (mpc);
+    }
+if (TSTS (mpy[0])) {                                    /* get abs (mpyer) */
+    DMOVN (mpy);
+    }
 else mpy[1] = CLRS (mpy[1]);                            /* clear mpy lo sign */
 AC(ac) = AC(p1) = AC(p2) = AC(p3) = 0;                  /* clear AC's */
-if (((mpy[0] | mpy[1]) == 0) || ((mpc[0] | mpc[1]) == 0)) return;
+if (((mpy[0] | mpy[1]) == 0) || ((mpc[0] | mpc[1]) == 0))
+    return;
 for (i = 0; i < 71; i++) {                              /* 71 mpyer bits */
     if (i) {                                            /* shift res, mpy */
         AC(p3) = (AC(p3) >> 1) | ((AC(p2) & 1) << 34);
@@ -317,7 +330,8 @@ if (TSTS (sign)) {                                      /* result minus? */
     AC(p1) = (~AC(p1) + (AC(p2) == 0)) & MMASK;
     AC(ac) = (~AC(ac) + (AC(p1) == 0)) & DMASK;
     }
-else if (TSTS (AC(ac))) SETF (F_AOV | F_T1);            /* wrong sign */
+else if (TSTS (AC(ac)))                                 /* wrong sign */
+    SETF (F_AOV | F_T1);
 if (TSTS (AC(ac))) {                                    /* if result - */
     AC(p1) = SETS (AC(p1));                             /* make signs consistent */
     AC(p2) = SETS (AC(p2));
@@ -334,16 +348,20 @@ int32 i, cryin;
 d10 sign, qu[2], dvd[4];
 
 dvd[0] = AC(ac);                                        /* save dividend */
-for (i = 1; i < 4; i++) dvd[i] = CLRS (AC(ADDAC (ac, i)));
+for (i = 1; i < 4; i++)
+    dvd[i] = CLRS (AC(ADDAC (ac, i)));
 sign = AC(ac) ^ dvr[0];                                 /* sign of result */
 if (TSTS (AC(ac))) {                                    /* get abs (dividend) */
     for (i = 3, cryin = 1; i > 0; i--) {                /* negate quad */
         dvd[i] = (~dvd[i] + cryin) & MMASK;             /* comp + carry in */
-        if (dvd[i]) cryin = 0;                          /* next carry in */
+        if (dvd[i])                                     /* next carry in */
+            cryin = 0;
         }
     dvd[0] = (~dvd[0] + cryin) & DMASK;
     }
-if (TSTS (dvr[0])) { DMOVN (dvr); }                     /* get abs (divisor) */
+if (TSTS (dvr[0])) {                                    /* get abs (divisor) */
+    DMOVN (dvr);
+    }
 else dvr[1] = CLRS (dvr[1]);
 if (DCMPGE (dvd, dvr)) {                                /* will divide work? */
     SETF (F_AOV | F_DCK | F_T1);                        /* no, set flags */
@@ -363,8 +381,12 @@ for (i = 0; i < 70; i++) {                              /* 70 quotient bits */
         qu[1] = qu[1] + 1;                              /* set quotient bit */
         }
     }
-if (TSTS (sign) && (qu[0] | qu[1])) { MKDNEG (qu); }
-if (TSTS (AC(ac)) && (dvd[0] | dvd[1])) { MKDNEG (dvd); }
+if (TSTS (sign) && (qu[0] | qu[1])) {
+    MKDNEG (qu);
+    }
+if (TSTS (AC(ac)) && (dvd[0] | dvd[1])) {
+    MKDNEG (dvd);
+    }
 AC(ac) = qu[0];                                         /* quotient */
 AC(ADDAC(ac, 1)) = qu[1];
 AC(ADDAC(ac, 2)) = dvd[0];                              /* remainder */
@@ -388,9 +410,12 @@ d10 fad (d10 op1, d10 op2, t_bool rnd, int32 inv)
 int32 ediff;
 UFP a, b, t;
 
-if (inv) op2 = NEG (op2);                               /* subtract? -b */
-if (op1 == 0) funpack (op2, 0, &a, AFRC);               /* a = 0? result is b */
-else if (op2 == 0) funpack (op1, 0, &a, AFRC);          /* b = 0? result is a */
+if (inv)                                                /* subtract? -b */
+    op2 = NEG (op2);
+if (op1 == 0)                                           /* a = 0? result is b */
+    funpack (op2, 0, &a, AFRC);
+else if (op2 == 0)                                      /* b = 0? result is a */
+    funpack (op1, 0, &a, AFRC);
 else {
     funpack (op1, 0, &a, SFRC);                         /* unpack operands */
     funpack (op2, 0, &b, SFRC);                         /* fracs are 2's comp */
@@ -401,8 +426,10 @@ else {
         b = t;
         ediff = -ediff;
         }
-    if (ediff > 63) ediff = 63;                         /* cap diff at 63 */
-    if (ediff) b.fhi = (t_int64) b.fhi >> ediff;        /* shift b (signed) */
+    if (ediff > 63)                                     /* cap diff at 63 */
+        ediff = 63;
+    if (ediff)                                          /* shift b (signed) */
+        b.fhi = (t_int64) b.fhi >> ediff;
     a.fhi = a.fhi + b.fhi;                              /* add fractions */
     if (a.sign ^ b.sign) {                              /* add or subtract? */
         if (a.fhi & FP_UCRY) {                          /* subtract, frac -? */
@@ -412,7 +439,8 @@ else {
         else a.sign = 0;                                /* result is + */
         }
     else {
-        if (a.sign) a.fhi = UNEG (a.fhi);               /* add, src -? comp */
+        if (a.sign)                                     /* add, src -? comp */
+            a.fhi = UNEG (a.fhi);
         if (a.fhi & FP_UCRY) {                          /* check for carry */
             a.fhi = a.fhi >> 1;                         /* flo won't be used */
             a.exp = a.exp + 1;
@@ -436,7 +464,8 @@ UFP a, b;
 
 funpack (op1, 0, &a, AFRC);                             /* unpack operands */
 funpack (op2, 0, &b, AFRC);                             /* fracs are abs val */
-if ((a.fhi == 0) || (b.fhi == 0)) return 0;             /* either 0?  */
+if ((a.fhi == 0) || (b.fhi == 0))                       /* either 0?  */
+    return 0;
 a.sign = a.sign ^ b.sign;                               /* result sign */
 a.exp = a.exp + b.exp - FP_BIAS + 1;                    /* result exponent */
 a.fhi = (a.fhi >> FP_V_SPM) * (b.fhi >> FP_V_SPM);      /* high 27b of result */
@@ -489,9 +518,11 @@ d10 fsc (d10 val, a10 ea)
 int32 sc = LIT8 (ea);
 UFP a;
 
-if (val == 0) return 0;
+if (val == 0)
+    return 0;
 funpack (val, 0, &a, AFRC);                             /* unpack operand */
-if (ea & RSIGN) a.exp = a.exp - sc;                     /* adjust exponent */
+if (ea & RSIGN)                                         /* adjust exponent */
+    a.exp = a.exp - sc;
 else a.exp = a.exp + sc;
 fnorm (&a, 0);                                          /* renormalize */
 return fpack (&a, NULL, FALSE);                         /* pack result */
@@ -521,16 +552,20 @@ t_uint64 so;
 UFP a;
 
 funpack (mb, 0, &a, AFRC);                              /* unpack operand */
-if (a.exp > (FP_BIAS + FP_N_FHI + FP_N_EXP)) SETF (F_AOV | F_T1);
-else if (a.exp < FP_BIAS) AC(ac) = 0;                   /* < 1/2? */
+if (a.exp > (FP_BIAS + FP_N_FHI + FP_N_EXP))
+    SETF (F_AOV | F_T1);
+else if (a.exp < FP_BIAS)                               /* < 1/2? */
+    AC(ac) = 0;
 else {
     sc = FP_V_UNORM - (a.exp - FP_BIAS) + 1;
     AC(ac) = a.fhi >> sc;
     if (rnd) {
         so = a.fhi << (64 - sc);
-        if (so >= (0x8000000000000000 + a.sign)) AC(ac) = AC(ac) + 1;
+        if (so >= (0x8000000000000000 + a.sign))
+            AC(ac) = AC(ac) + 1;
         }
-    if (a.sign) AC(ac) = NEG (AC(ac));
+    if (a.sign)
+        AC(ac) = NEG (AC(ac));
     }
 return;
 }
@@ -546,11 +581,13 @@ int32 p1 = ADDAC (ac, 1);
 int32 ediff;
 UFP a, b, t;
 
-if (inv) { DMOVN (rs); }                                /* subtract? -b */
-if ((AC(ac) | AC(p1)) == 0) funpack (rs[0], rs[1], &a, AFRC);
-                                                        /* a == 0? sum = b */
-else if ((rs[0] | rs[1]) == 0) funpack (AC(ac), AC(p1), &a, AFRC);
-                                                        /* b == 0? sum = a */
+if (inv) {                                              /* subtract? -b */
+    DMOVN (rs);
+    }
+if ((AC(ac) | AC(p1)) == 0)                             /* a == 0? sum = b */
+    funpack (rs[0], rs[1], &a, AFRC);
+else if ((rs[0] | rs[1]) == 0)                          /* b == 0? sum = a */
+    funpack (AC(ac), AC(p1), &a, AFRC);
 else {
     funpack (AC(ac), AC(p1), &a, SFRC);                 /* unpack operands */
     funpack (rs[0], rs[1], &b, SFRC);
@@ -561,7 +598,8 @@ else {
         b = t;
         ediff = -ediff;
         }
-    if (ediff > 127) ediff = 127;                       /* cap diff at 127 */
+    if (ediff > 127)                                    /* cap diff at 127 */
+        ediff = 127;
     if (ediff > 63) {                                   /* diff > 63? */
         a.flo = (t_int64) b.fhi >> (ediff - 64);        /* b hi to a lo */
         b.fhi = b.sign? FP_ONES: 0;                     /* hi = all sign */
@@ -579,7 +617,9 @@ else {
         else a.sign = 0;                                /* result is + */
         }
     else {
-        if (a.sign) { DUNEG (a); };                     /* add, src -? comp */
+        if (a.sign) {                                   /* add, src -? comp */
+            DUNEG (a);
+            };
         if (a.fhi & FP_UCRY) {                          /* check for carry */
             a.fhi = a.fhi >> 1;                         /* flo won't be used */
             a.exp = a.exp + 1;
@@ -684,16 +724,18 @@ r->flo = 0;
 if (r->sign) {
     r->exp = r->exp ^ FP_M_EXP;                         /* 1s comp exp */
     if (sgn) {                                          /* signed frac? */
-        if (r->fhi) r->fhi = r->fhi | FP_UCRY;          /* extend sign */ 
+        if (r->fhi)                                     /* extend sign */ 
+            r->fhi = r->fhi | FP_UCRY;
         else {
             r->exp = r->exp + 1;
             r->fhi = FP_UCRY | FP_UNORM;
             }
         }
     else {                                              /* abs frac */
-        if (r->fhi) r->fhi = UNEG (r->fhi) & FP_UFRAC;
+        if (r->fhi)
+            r->fhi = UNEG (r->fhi) & FP_UFRAC;
         else {
-                r->exp = r->exp + 1;
+            r->exp = r->exp + 1;
             r->fhi = FP_UNORM;
             }
         }
@@ -725,7 +767,8 @@ if ((a->fhi | a->flo) == 0) {                           /* if fraction = 0 */
     }
 while ((a->fhi & FP_UNORM) == 0) {                      /* normalized? */
     for (i = 0; i < 6; i++) {
-        if (a->fhi & normmask[i]) break;
+        if (a->fhi & normmask[i])
+            break;
         }
     a->fhi = (a->fhi << normtab[i]) | (a->flo >> (64 - normtab[i]));
     a->flo = a->flo << normtab[i];
@@ -747,19 +790,25 @@ d10 fpack (UFP *r, d10 *lo, t_bool fdvneg)
 {
 d10 val[2];
 
-if (r->exp < 0) SETF (F_AOV | F_FOV | F_FXU | F_T1);
-else if (r->exp > FP_M_EXP) SETF (F_AOV | F_FOV | F_T1);
+if (r->exp < 0)
+    SETF (F_AOV | F_FOV | F_FXU | F_T1);
+else if (r->exp > FP_M_EXP)
+    SETF (F_AOV | F_FOV | F_T1);
 val[0] = (((((d10) r->exp) & FP_M_EXP) << FP_V_EXP) |
     ((r->fhi & FP_UFHI) >> FP_V_UFHI)) & DMASK;
-if (lo) val[1] = ((r->fhi & FP_UFLO) >> FP_V_UFLO) & MMASK;
+if (lo)
+    val[1] = ((r->fhi & FP_UFLO) >> FP_V_UFLO) & MMASK;
 else val[1] = 0;
 if (r->sign) {                                          /* negate? */
     if (fdvneg) {                                       /* fdvr special? */
         val[1] = ~val[1] & MMASK;                       /* 1's comp */
         val[0] = ~val[0] & DMASK;
 		}
-    else { DMOVN (val); }                               /* 2's comp */
+    else {                                              /* 2's comp */
+        DMOVN (val);
+        }
     }
-if (lo) *lo = val[1];
+if (lo)
+    *lo = val[1];
 return val[0];
 }

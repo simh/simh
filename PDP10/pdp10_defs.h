@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -760,6 +760,7 @@ t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat auto_config (char *name, int32 num);
 
 int32 clk_cosched (int32 wait);

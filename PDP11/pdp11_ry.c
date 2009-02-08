@@ -1,6 +1,6 @@
 /* pdp11_ry.c: RX211/RXV21/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -322,7 +322,8 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
                 }                                       /* end switch func */
             return SCPE_OK;
             }                                           /* end if GO */
-        if ((data & RYCS_IE) == 0) CLR_INT (RY);
+        if ((data & RYCS_IE) == 0)
+            CLR_INT (RY);
         else if ((ry_csr & (RYCS_DONE + RYCS_IE)) == RYCS_DONE)
             SET_INT (RY);
         ry_csr = (ry_csr & ~RYCS_RW) | (data & RYCS_RW);
@@ -396,7 +397,8 @@ switch (ry_state) {                                     /* case on state */
             break;
             }
         if (func == RYCS_FILL) {                        /* fill? read */
-            for (i = 0; i < RY_NUMBY; i++) rx2xb[i] = 0;
+            for (i = 0; i < RY_NUMBY; i++)
+                rx2xb[i] = 0;
             t = Map_ReadB (ba, ry_wc << 1, rx2xb);
             }
         else t = Map_WriteB (ba, ry_wc << 1, rx2xb);
@@ -437,7 +439,8 @@ switch (ry_state) {                                     /* case on state */
             break;
             }
         da = CALC_DA (ry_track, ry_sector, bps);        /* get disk address */
-        if (func == RYCS_WRDEL) ry_esr = ry_esr | RYES_DD; /* del data? */
+        if (func == RYCS_WRDEL)                         /* del data? */
+            ry_esr = ry_esr | RYES_DD;
         if (func == RYCS_READ) {                        /* read? */
             for (i = 0; i < bps; i++)
                 rx2xb[i] = fbuf[da + i];
@@ -450,7 +453,8 @@ switch (ry_state) {                                     /* case on state */
             for (i = 0; i < bps; i++)                   /* write */
                 fbuf[da + i] = rx2xb[i];
             da = da + bps;
-            if (da > uptr->hwmark) uptr->hwmark = da;
+            if (da > uptr->hwmark)
+                uptr->hwmark = da;
             }
         ry_done (0, 0);                                 /* done */
         break;
@@ -465,9 +469,11 @@ switch (ry_state) {                                     /* case on state */
         break;
 
 	case SDXFR:                                         /* erase disk */
-		for (i = 0; i < (int32) uptr->capac; i++) fbuf[i] = 0;
+		for (i = 0; i < (int32) uptr->capac; i++)
+            fbuf[i] = 0;
 		uptr->hwmark = (uint32) uptr->capac;
-		if (ry_csr & RYCS_DEN) uptr->flags = uptr->flags | UNIT_DEN;
+		if (ry_csr & RYCS_DEN)
+            uptr->flags = uptr->flags | UNIT_DEN;
 		else uptr->flags = uptr->flags & ~UNIT_DEN;
 		ry_done (0, 0);
 		break;
@@ -511,7 +517,8 @@ switch (ry_state) {                                     /* case on state */
 		for (i = 0; i < bps; i++)                       /* read sector */
 			rx2xb[i] = fbuf[da + i];
 		ry_done (RYES_ID, 0);                           /* set done */
-		if ((ry_unit[1].flags & UNIT_ATT) == 0) ry_ecode = 0020;
+		if ((ry_unit[1].flags & UNIT_ATT) == 0)
+            ry_ecode = 0020;
 		break;
 		}                                               /* end case state */
 
@@ -528,9 +535,11 @@ int32 drv = (ry_csr & RYCS_DRV)? 1: 0;
 
 ry_state = IDLE;                                        /* now idle */
 ry_csr = ry_csr | RYCS_DONE;                            /* set done */
-if (ry_csr & CSR_IE) SET_INT (RY);                      /* if ie, intr */
+if (ry_csr & CSR_IE)                                    /* if ie, intr */
+    SET_INT (RY);
 ry_esr = (ry_esr | esr_flags) & ~(RYES_USEL|RYES_DDEN|RYES_DRDY);
-if (drv) ry_esr = ry_esr | RYES_USEL;                   /* updates RYES */
+if (drv)                                                /* updates RYES */
+    ry_esr = ry_esr | RYES_USEL;
 if (ry_unit[drv].flags & UNIT_ATT) {
     ry_esr = ry_esr | RYES_DRDY;
     if (ry_unit[drv].flags & UNIT_DEN)
@@ -556,7 +565,8 @@ ry_track = ry_sector = 0;                               /* clear trk, sector */
 ry_state = IDLE;                                        /* ctrl idle */
 CLR_INT (RY);                                           /* clear int req */
 sim_cancel (&ry_unit[1]);                               /* cancel drive 1 */
-if (dptr->flags & UNIT_DIS) sim_cancel (&ry_unit[0]);   /* disabled? */
+if (dptr->flags & UNIT_DIS)                             /* disabled? */
+    sim_cancel (&ry_unit[0]);
 else if (ry_unit[0].flags & UNIT_BUF)  {                /* attached? */
     ry_state = INIT_COMPLETE;                           /* yes, sched init */
     sim_activate (&ry_unit[0], ry_swait * abs (1 - ry_unit[0].TRACK));
@@ -572,7 +582,8 @@ t_stat ry_attach (UNIT *uptr, char *cptr)
 uint32 sz;
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
-    if (sz > RX_SIZE) uptr->flags = uptr->flags | UNIT_DEN;
+    if (sz > RX_SIZE)
+        uptr->flags = uptr->flags | UNIT_DEN;
     else uptr->flags = uptr->flags & ~UNIT_DEN;
     }
 uptr->capac = (uptr->flags & UNIT_DEN)? RY_SIZE: RX_SIZE;
@@ -583,7 +594,8 @@ return attach_unit (uptr, cptr);
 
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = val? RY_SIZE: RX_SIZE;
 return SCPE_OK;
 }
@@ -667,7 +679,8 @@ extern uint16 *M;
 
 if ((ry_unit[unitno & RX_M_NUMDR].flags & UNIT_DEN) == 0)
     return SCPE_NOFNC;
-for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
 M[BOOT_CSR >> 1] = ry_dib.ba & DMASK;
 saved_PC = BOOT_ENTRY;

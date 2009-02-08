@@ -1,6 +1,6 @@
 /* pdp10_ksio.c: PDP-10 KS10 I/O subsystem simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -71,13 +71,16 @@
 
 #include "pdp10_defs.h"
 #include <setjmp.h>
+#include "sim_sock.h"
+#include "sim_tmxr.h"
 
 #define XBA_MBZ         0400000                         /* ba mbz */
 #define eaRB            (ea & ~1)
 #define GETBYTE(ea,x)   ((((ea) & 1)? (x) >> 8: (x)) & 0377)
 #define UBNXM_FAIL(pa,op) \
                         n = iocmap[GET_IOUBA (pa)]; \
-                        if (n >= 0) ubcs[n] = ubcs[n] | UBCS_TMO | UBCS_NXD; \
+                        if (n >= 0) \
+                            ubcs[n] = ubcs[n] | UBCS_TMO | UBCS_NXD; \
                         pager_word = PF_HARD | PF_VIRT | PF_IO | \
                             ((op == WRITEB)? PF_BYTE: 0) | \
                             (TSTF (F_USR)? PF_USER: 0) | (pa); \
@@ -195,10 +198,12 @@ t_bool io710 (int32 ac, a10 ea)
 {
 d10 val;
 
-if (Q_ITS) AC(ac) = ReadIO (IO_UBA3 | ea);              /* IORDI */
+if (Q_ITS)                                              /* IORDI */
+    AC(ac) = ReadIO (IO_UBA3 | ea);
 else {                                                  /* TIOE */
     val = ReadIO (ea);                                  /* read word */
-    if ((AC(ac) & val) == 0) return TRUE;
+    if ((AC(ac) & val) == 0)
+        return TRUE;
     }
 return FALSE;
 }
@@ -212,10 +217,12 @@ t_bool io711 (int32 ac, a10 ea)
 {
 d10 val;
 
-if (Q_ITS) AC(ac) = ReadIO (IO_UBA1 | ea);              /* IORDQ */
+if (Q_ITS)                                              /* IORDQ */
+    AC(ac) = ReadIO (IO_UBA1 | ea);
 else {                                                  /* TION */
     val = ReadIO (ea);                                  /* read word */
-    if ((AC(ac) & val) != 0) return TRUE;
+    if ((AC(ac) & val) != 0)
+        return TRUE;
     }
 return FALSE;
 }
@@ -248,7 +255,8 @@ void io714 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0177777;
-if (Q_ITS) WriteIO (IO_UBA3 | ea, val, WRITE);          /* IOWRI */
+if (Q_ITS)                                              /* IOWRI */
+    WriteIO (IO_UBA3 | ea, val, WRITE);
 else {
     temp = ReadIO (ea);                                 /* BSIO */
     temp = temp | val;
@@ -266,7 +274,8 @@ void io715 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0177777;
-if (Q_ITS) WriteIO (IO_UBA1 | ea, val, WRITE);          /* IOWRQ */
+if (Q_ITS)                                              /* IOWRQ */
+    WriteIO (IO_UBA1 | ea, val, WRITE);
 else {
     temp = ReadIO (ea);                                 /* BCIO */
     temp = temp & ~val;
@@ -291,7 +300,8 @@ if (Q_ITS) {                                            /* IORDBI */
 else {                                                  /* TIOEB */
     val = ReadIO (eaRB);
     val = GETBYTE (ea, val);
-    if ((AC(ac) & val) == 0) return TRUE;
+    if ((AC(ac) & val) == 0)
+        return TRUE;
     }
 return FALSE;
 }
@@ -312,7 +322,8 @@ if (Q_ITS) {                                            /* IORDBQ */
 else {                                                  /* TIONB */
     val = ReadIO (eaRB);
     val = GETBYTE (ea, val);
-    if ((AC(ac) & val) != 0) return TRUE;
+    if ((AC(ac) & val) != 0)
+        return TRUE;
     }
 return FALSE;
 }
@@ -348,7 +359,8 @@ void io724 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0377;
-if (Q_ITS) WriteIO (IO_UBA3 | ea, val, WRITEB);         /* IOWRBI */
+if (Q_ITS)                                              /* IOWRBI */
+    WriteIO (IO_UBA3 | ea, val, WRITEB);
 else {
     temp = ReadIO (eaRB);                               /* BSIOB */
     temp = GETBYTE (ea, temp);
@@ -367,7 +379,8 @@ void io725 (d10 val, a10 ea)
 d10 temp;
 
 val = val & 0377;
-if (Q_ITS) WriteIO (IO_UBA1 | ea, val, WRITEB);         /* IOWRBQ */
+if (Q_ITS)                                              /* IOWRBQ */
+    WriteIO (IO_UBA1 | ea, val, WRITEB);
 else {
     temp = ReadIO (eaRB);                               /* BCIOB */
     temp = GETBYTE (ea, temp);
@@ -423,8 +436,9 @@ a10 Map_Addr10 (a10 ba, int32 ub)
 a10 pa10;
 int32 vpn = PAG_GETVPN (ba >> 2);                       /* get PDP-10 page number */
     
-if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) ||
-    ((ubmap[ub][vpn] & UMAP_VLD) == 0)) return -1;      /* invalid map? */
+if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) ||          /* invalid map? */
+    ((ubmap[ub][vpn] & UMAP_VLD) == 0))
+    return -1;
 pa10 = (ubmap[ub][vpn] + PAG_GETOFF (ba >> 2)) & PAMASK;
 return pa10;
 }
@@ -499,7 +513,8 @@ for ( ; ba < lim; ba++) {                               /* by bytes */
         return (lim - ba);                              /* return bc */
         }
     val = *buf++;                                       /* get data */
-    if (ba & 2) M[pa10] = (M[pa10] & 0777777600000) | val;
+    if (ba & 2)
+        M[pa10] = (M[pa10] & 0777777600000) | val;
     else M[pa10] = (M[pa10] & 0600000777777) | (val << 18);
     }
 return 0;
@@ -533,15 +548,18 @@ int32 i, masked_irq;
 
 for (i = masked_irq = 0; i < UBANUM; i++) {
     if ((rlvl == UBCS_GET_HI (ubcs[i])) &&              /* req on hi level? */
-        (masked_irq = int_req & ubabr76[i])) break;
+        (masked_irq = int_req & ubabr76[i]))
+        break;
     if ((rlvl == UBCS_GET_LO (ubcs[i])) &&              /* req on lo level? */
-        (masked_irq = int_req & ubabr54[i])) break;
+        (masked_irq = int_req & ubabr54[i]))
+        break;
     }
 *uba = (i << 1) + 1;                                    /* store uba # */
 for (i = 0; (i < 32) && masked_irq; i++) {              /* find hi pri req */
     if ((masked_irq >> i) & 1) {
         int_req = int_req & ~(1u << i);                 /* clear req */
-        if (int_ack[i]) return int_ack[i]();
+        if (int_ack[i])
+            return int_ack[i]();
         return int_vec[i];                              /* return vector */
         }
     }
@@ -554,7 +572,8 @@ t_stat ubmap_rd (int32 *val, int32 pa, int32 mode)
 {
 int32 n = iocmap[GET_IOUBA (pa)];
 
-if (n < 0) ABORT (STOP_ILLIOC);
+if (n < 0)
+    ABORT (STOP_ILLIOC);
 *val = ubmap[n][pa & UMAP_AMASK];
 return SCPE_OK;
 }
@@ -563,7 +582,8 @@ t_stat ubmap_wr (int32 val, int32 pa, int32 mode)
 {
 int32 n = iocmap[GET_IOUBA (pa)];
 
-if (n < 0) ABORT (STOP_ILLIOC);
+if (n < 0)
+    ABORT (STOP_ILLIOC);
 ubmap[n][pa & UMAP_AMASK] = UMAP_POSFL (val) | UMAP_POSPN (val);
 return SCPE_OK;
 }
@@ -574,9 +594,12 @@ t_stat ubs_rd (int32 *val, int32 pa, int32 mode)
 {
 int32 n = iocmap[GET_IOUBA (pa)];
 
-if (n < 0) ABORT (STOP_ILLIOC);
-if (int_req & ubabr76[n]) ubcs[n] = ubcs[n] | UBCS_HI;
-if (int_req & ubabr54[n]) ubcs[n] = ubcs[n] | UBCS_LO;
+if (n < 0)
+    ABORT (STOP_ILLIOC);
+if (int_req & ubabr76[n])
+    ubcs[n] = ubcs[n] | UBCS_HI;
+if (int_req & ubabr54[n])
+    ubcs[n] = ubcs[n] | UBCS_LO;
 *val = ubcs[n] = ubcs[n] & ~UBCS_RDZ;
 return SCPE_OK;
 }
@@ -585,14 +608,17 @@ t_stat ubs_wr (int32 val, int32 pa, int32 mode)
 {
 int32 n = iocmap[GET_IOUBA (pa)];
 
-if (n < 0) ABORT (STOP_ILLIOC);
+if (n < 0)
+    ABORT (STOP_ILLIOC);
 if (val & UBCS_INI) {
     reset_all (5);                                      /* start after UBA */
     ubcs[n] = val & UBCS_DXF;
     }
 else ubcs[n] = val & UBCS_RDW;
-if (int_req & ubabr76[n]) ubcs[n] = ubcs[n] | UBCS_HI;
-if (int_req & ubabr54[n]) ubcs[n] = ubcs[n] | UBCS_LO;
+if (int_req & ubabr76[n])
+    ubcs[n] = ubcs[n] | UBCS_HI;
+if (int_req & ubabr54[n])
+    ubcs[n] = ubcs[n] | UBCS_LO;
 return SCPE_OK;
 }
 
@@ -615,7 +641,8 @@ t_stat uba_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 uba = uptr - uba_unit;
 
-if (addr >= UMAP_MEMSIZE) return SCPE_NXM;
+if (addr >= UMAP_MEMSIZE)
+    return SCPE_NXM;
 *vptr = ubmap[uba][addr];
 return SCPE_OK;
 }
@@ -624,7 +651,8 @@ t_stat uba_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 uba = uptr - uba_unit;
 
-if (addr >= UMAP_MEMSIZE) return SCPE_NXM;
+if (addr >= UMAP_MEMSIZE)
+    return SCPE_NXM;
 ubmap[uba][addr] = (int32) val & UMAP_MASK;
 return SCPE_OK;
 }
@@ -636,7 +664,8 @@ int32 i, uba;
 int_req = 0;
 for (uba = 0; uba < UBANUM; uba++) {
     ubcs[uba] = 0;
-    for (i = 0; i < UMAP_MEMSIZE; i++) ubmap[uba][i] = 0;
+    for (i = 0; i < UMAP_MEMSIZE; i++)
+        ubmap[uba][i] = 0;
     }
 pi_eval ();
 return SCPE_OK;
@@ -651,17 +680,23 @@ DIB *dibp;
 uint32 newba;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
-if ((val == 0) || (uptr == NULL)) return SCPE_IERR;
+if (cptr == NULL)
+    return SCPE_ARG;
+if ((val == 0) || (uptr == NULL))
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 newba = (uint32) get_uint (cptr, 8, PAMASK, &r);        /* get new */
-if ((r != SCPE_OK) || (newba == dibp->ba)) return r;
-if (GET_IOUBA (newba) != GET_IOUBA (dibp->ba)) return SCPE_ARG;
-if (newba % ((uint32) val)) return SCPE_ARG;            /* check modulus */
-if (GET_IOUBA (newba) != GET_IOUBA (dibp->ba)) return SCPE_ARG;
+if ((r != SCPE_OK) || (newba == dibp->ba))
+    return r;
+if (GET_IOUBA (newba) != GET_IOUBA (dibp->ba))
+    return SCPE_ARG;
+if (newba % ((uint32) val))                             /* check modulus */
+    return SCPE_ARG;
 dibp->ba = newba;                                       /* store */
 return SCPE_OK;
 }
@@ -673,11 +708,14 @@ t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr;
 DIB *dibp;
 
-if (uptr == NULL) return SCPE_IERR;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE)) return SCPE_IERR;
+if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE))
+    return SCPE_IERR;
 fprintf (st, "address=%07o", dibp->ba);
 if (dibp->lnt > 1)
     fprintf (st, "-%07o", dibp->ba + dibp->lnt - 1);
@@ -693,16 +731,21 @@ DIB *dibp;
 uint32 newvec;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
-if (uptr == NULL) return SCPE_IERR;
+if (cptr == NULL)
+    return SCPE_ARG;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 newvec = (uint32) get_uint (cptr, 8, VEC_Q + 01000, &r);
 if ((r != SCPE_OK) || (newvec == VEC_Q) ||
     ((newvec + (dibp->vnum * 4)) >= (VEC_Q + 01000)) ||
-    (newvec & ((dibp->vnum > 1)? 07: 03))) return SCPE_ARG;
+    (newvec & ((dibp->vnum > 1)? 07: 03)))
+    return SCPE_ARG;
 dibp->vec = newvec;
 return SCPE_OK;
 }
@@ -715,20 +758,37 @@ DEVICE *dptr;
 DIB *dibp;
 uint32 vec, numvec;
 
-if (uptr == NULL) return SCPE_IERR;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 vec = dibp->vec;
-if (arg) numvec = arg;
+if (arg)
+    numvec = arg;
 else numvec = dibp->vnum;
-if (vec == 0) fprintf (st, "no vector");
+if (vec == 0)
+    fprintf (st, "no vector");
 else {
     fprintf (st, "vector=%o", vec);
-    if (numvec > 1) fprintf (st, "-%o", vec + (4 * (numvec - 1)));
+    if (numvec > 1)
+        fprintf (st, "-%o", vec + (4 * (numvec - 1)));
     }
 return SCPE_OK;
+}
+
+/* Show vector for terminal multiplexor */
+
+t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 arg, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+
+if ((mp == NULL) || (arg == 0))
+    return SCPE_IERR;
+return show_vec (st, uptr, ((mp->lines * 2) / arg), desc);
 }
 
 /* Test for conflict in device addresses */
@@ -743,16 +803,17 @@ end = curr->ba + curr->lnt - 1;                         /* get end */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if ((dibp == NULL) || (dibp == curr) ||
-        (dptr->flags & DEV_DIS)) continue;
+        (dptr->flags & DEV_DIS))
+        continue;
     if (((curr->ba >= dibp->ba) &&                      /* overlap start? */
         (curr->ba < (dibp->ba + dibp->lnt))) ||
         ((end >= dibp->ba) &&                           /* overlap end? */
         (end < (dibp->ba + dibp->lnt)))) {
         printf ("Device %s address conflict at %08o\n",
             sim_dname (dptr), dibp->ba);
-        if (sim_log) fprintf (sim_log,
-            "Device %s address conflict at %08o\n",
-            sim_dname (dptr), dibp->ba);
+        if (sim_log)
+            fprintf (sim_log, "Device %s address conflict at %08o\n",
+                     sim_dname (dptr), dibp->ba);
         return TRUE;
         }
     }
@@ -763,7 +824,8 @@ return FALSE;
 
 void build_int_vec (int32 vloc, int32 ivec, int32 (*iack)(void) )
 {
-if (iack != NULL) int_ack[vloc] = iack;
+if (iack != NULL)
+    int_ack[vloc] = iack;
 else int_vec[vloc] = ivec;
 return;
 }
@@ -783,23 +845,27 @@ for (i = 0; i < 32; i++) {                              /* clear intr tables */
 for (i = j = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
-        if (dibp->vnum > VEC_DEVMAX) return SCPE_IERR;
+        if (dibp->vnum > VEC_DEVMAX)
+            return SCPE_IERR;
         for (k = 0; k < dibp->vnum; k++)                /* loop thru vec */
             build_int_vec (dibp->vloc + k,              /* add vector */
                 dibp->vec + (k * 4), dibp->ack[k]);
         if (dibp->lnt != 0) {                           /* I/O addresses? */
             dib_tab[j++] = dibp;                        /* add DIB to dib_tab */
-            if (j >= DIB_MAX) return SCPE_IERR;         /* too many? */
+            if (j >= DIB_MAX)                           /* too many? */
+                return SCPE_IERR;
             }   
         }                                               /* end if enabled */
     }                                                   /* end for */
 for (i = 0; (dibp = std_dib[i]) != NULL; i++) {         /* loop thru std */
     dib_tab[j++] = dibp;                                /* add to dib_tab */
-    if (j >= DIB_MAX) return SCPE_IERR;                 /* too many? */
+    if (j >= DIB_MAX)                                   /* too many? */
+        return SCPE_IERR;
     }
 dib_tab[j] = NULL;                                      /* end with NULL */
 for (i = 0; (dibp = dib_tab[i]) != NULL; i++) {         /* test built dib_tab */
-    if (dev_conflict (dibp)) return SCPE_STOP;          /* for conflicts */
+    if (dev_conflict (dibp))                            /* for conflicts */
+        return SCPE_STOP;
     }
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* id32_dboot.c: Interdata 32b simulator disk bootstrap
 
-   Copyright (c) 2000-2006, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -299,7 +299,8 @@ uptr = dptr->units + u;                                 /* get capacity */
 cap = uptr->capac >> 20;
 for (i = typ = 0; dboot_tab[i].name != NULL; i++) {
     if ((strcmp (dboot_tab[i].name, dptr->name) == 0) &&
-        ((dboot_tab[i].sw == 0) || (dboot_tab[i].sw & sim_switches)) &&
+        ((dboot_tab[i].sw == 0) ||
+        (dboot_tab[i].sw & sim_switches)) &&
         (dboot_tab[i].cap == cap)) {
         typ = dboot_tab[i].dtype;
         off = dboot_tab[i].offset;
@@ -307,7 +308,8 @@ for (i = typ = 0; dboot_tab[i].name != NULL; i++) {
         break;
         }
     }
-if (typ == 0) return SCPE_NOFNC;
+if (typ == 0)
+    return SCPE_NOFNC;
 
 IOWriteBlk (DBOOT_BEG, DBOOT_LEN, dboot_rom);           /* copy boot */
 IOWriteB (AL_DEV, ttp_dib.dno);                         /* bin input dev */

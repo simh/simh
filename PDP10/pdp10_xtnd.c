@@ -1,6 +1,6 @@
 /* pdp10_xtnd.c: PDP-10 extended instruction simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -194,7 +194,8 @@ int32 flg, i, s2, t, pp, pat, xop, xac, ret;
 xinst = Read (ea, MM_OPND);                             /* get extended instr */
 xop = GET_OP (xinst);                                   /* get opcode */
 xac = GET_AC (xinst);                                   /* get AC */
-if (xac || (xop == 0) || (xop > XT_MOVSRJ)) return XT_MUUO;
+if (xac || (xop == 0) || (xop > XT_MOVSRJ))
+    return XT_MUUO;
 rlog = 0;                                               /* clear log */
 switch (xop) {                                          /* case on opcode */
 
@@ -214,19 +215,25 @@ switch (xop) {                                          /* case on opcode */
     case XT_CMPSGE:                                     /* CMPSGE */
     case XT_CMPSN:                                      /* CMPSN */
     case XT_CMPSG:                                      /* CMPSG */
-        if ((AC(ac) | AC(p3)) & XT_MBZ) return XT_MUUO; /* check length MBZ */
+        if ((AC(ac) | AC(p3)) & XT_MBZ)                 /* check length MBZ */
+            return XT_MUUO;
         f1 = Read (ADDA (ea, 1), MM_OPND) & bytemask[GET_S (AC(p1))];
         f2 = Read (ADDA (ea, 2), MM_OPND) & bytemask[GET_S (AC(p4))];
         b1 = b2 = 0;
         for (flg = 0; (AC(ac) | AC(p3)) && (b1 == b2); flg++) {
-            if (flg && (t = test_int ())) ABORT (t);
+            if (flg && (t = test_int ()))
+                ABORT (t);
             rlog = 0;                                   /* clear log */
-            if (AC(ac)) b1 = incloadbp (p1, pflgs);     /* src1 */
+            if (AC(ac))                                 /* src1 */
+                b1 = incloadbp (p1, pflgs);
             else b1 = f1;
-            if (AC(p3)) b2 = incloadbp (p4, pflgs);     /* src2 */
+            if (AC(p3))                                 /* src2 */
+                b2 = incloadbp (p4, pflgs);
             else b2 = f2;
-            if (AC(ac)) AC(ac) = (AC(ac) - 1) & XLNTMASK;
-            if (AC(p3)) AC(p3) = (AC(p3) - 1) & XLNTMASK;
+            if (AC(ac))
+                AC(ac) = (AC(ac) - 1) & XLNTMASK;
+            if (AC(p3))
+                AC(p3) = (AC(p3) - 1) & XLNTMASK;
             }
         switch (xop) {
         case XT_CMPSL:
@@ -261,18 +268,24 @@ switch (xop) {                                          /* case on opcode */
         rs[0] = AC(ac);                                 /* get src opnd */
         rs[1] = CLRS (AC(p1));
         if (!TSTF (F_FPD)) {                            /* set up done yet? */
-            if (TSTS (AC(ac))) { DMOVN (rs); }          /* get abs value */
-            for (i = 22; i > 1; i--) {                  /* find field width */
-                if (DCMPGE (rs, pwrs10[i])) break;
+            if (TSTS (AC(ac))) {                        /* get abs value */
+                DMOVN (rs);
                 }
-            if (i > (AC(p3) & XLNTMASK)) return XT_NOSK;
+            for (i = 22; i > 1; i--) {                  /* find field width */
+                if (DCMPGE (rs, pwrs10[i]))
+                    break;
+                }
+            if (i > (AC(p3) & XLNTMASK))
+                return XT_NOSK;
             if ((i < (AC(p3) & XLNTMASK)) && (AC(p3) & XT_LFLG)) {
                 f1 = Read (ADDA (ea, 1), MM_OPND);
                 filldst (f1, p3, (AC(p3) & XLNTMASK) - i, pflgs);
                 }
             else AC(p3) = (AC(p3) & XFLGMASK) | i;
-            if (TSTS (AC(ac))) AC(p3) = AC(p3) | XT_MFLG;
-            if (AC(ac) | AC(p1)) AC(p3) = AC(p3) | XT_NFLG;
+            if (TSTS (AC(ac)))
+                AC(p3) = AC(p3) | XT_MFLG;
+            if (AC(ac) | AC(p1))
+                AC(p3) = AC(p3) | XT_NFLG;
             AC(ac) = rs[0];                             /* update state */
             AC(p1) = rs[1];
             SETF (F_FPD);                               /* mark set up done */
@@ -281,18 +294,22 @@ switch (xop) {                                          /* case on opcode */
 /* Now do actual binary to decimal conversion */
 
         for (flg = 0; AC(p3) & XLNTMASK; flg++) {
-            if (flg && (t = test_int ())) ABORT (t);
+            if (flg && (t = test_int ()))
+                ABORT (t);
             rlog = 0;                                   /* clear log */
             i = (int32) AC(p3) & XLNTMASK;              /* get length */
-            if (i > 22) i = 22;                         /* put in range */
+            if (i > 22)                                 /* put in range */
+                i = 22;
             for (digit = 0; (digit < 10) && DCMPGE (rs, pwrs10[i]); digit++) {
                 rs[0] = rs[0] - pwrs10[i][0] - (rs[1] < pwrs10[i][1]);
                 rs[1] = (rs[1] - pwrs10[i][1]) & MMASK;
                 }
-            if (xop == XT_CVTBDO) digit = (digit + xoff) & DMASK;
+            if (xop == XT_CVTBDO)
+                digit = (digit + xoff) & DMASK;
             else {
                 f1 = Read (e1 + (int32) digit, MM_OPND);
-                if ((i == 1) && (AC(p3) & XT_LFLG)) f1 = f1 >> 18;
+                if ((i == 1) && (AC(p3) & XT_LFLG))
+                    f1 = f1 >> 18;
                 digit = f1 & RMASK;
                 }
             incstorebp (digit, p4, pflgs);              /* store digit */
@@ -314,7 +331,8 @@ switch (xop) {                                          /* case on opcode */
     case XT_CVTDBT:                                     /* CVTDBT */
     case XT_CVTDBO:                                     /* CVTDBO */
         e1 = calc_ea (xinst, MM_EA);                    /* get ext inst addr */
-        if ((AC(ac) & XT_SFLG) == 0) AC(p3) = AC(p4) = 0; /* !S? clr res */
+        if ((AC(ac) & XT_SFLG) == 0)                    /* !S? clr res */
+            AC(p3) = AC(p4) = 0;
         else AC(p4) = CLRS (AC(p4));                    /* clear low sign */
         if (xop == XT_CVTDBO) {                         /* offset? */
             xoff = (e1 & RSIGN)? (e1 | LMASK): e1;      /* get offset */
@@ -322,23 +340,28 @@ switch (xop) {                                          /* case on opcode */
             }
         xflgs = AC(ac) & XFLGMASK;                      /* get xlation flags */
         for (flg = 0; AC(ac) & XLNTMASK; flg++) {
-            if (flg && (t = test_int ())) ABORT (t);
+            if (flg && (t = test_int ()))
+                ABORT (t);
             rlog = 0;                                   /* clear log */
             b1 = incloadbp (p1, pflgs);                 /* get byte */
-            if (xop == XT_CVTDBO) b1 = (b1 + xoff) & DMASK;
+            if (xop == XT_CVTDBO)
+                b1 = (b1 + xoff) & DMASK;
             else {
                 b1 = xlate (b1, e1, &xflgs, MM_OPND);
                 if (b1 < 0) {                           /* terminated? */
                     AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
-                    if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));  
+                    if (TSTS (AC(p3)))
+                        AC(p4) = SETS (AC(p4));  
                     return XT_NOSK;
                     }
-                if (xflgs & XT_SFLG) b1 = b1 & XT_DGMASK;
+                if (xflgs & XT_SFLG)
+                    b1 = b1 & XT_DGMASK;
                 else b1 = 0;
                 }
             AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
             if ((b1 < 0) || (b1 > 9)) {                 /* bad digit? done */
-                if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));      
+                if (TSTS (AC(p3)))
+                    AC(p4) = SETS (AC(p4));      
                 return XT_NOSK;
                 }
             AC(p4) = (AC(p4) * 10) + b1;                /* base * 10 + digit */
@@ -349,7 +372,8 @@ switch (xop) {                                          /* case on opcode */
             AC(p4) = -AC(p4) & MMASK;
             AC(p3) = (~AC(p3) + (AC(p4) == 0)) & DMASK;
             }
-        if (TSTS (AC(p3))) AC(p4) = SETS (AC(p4));      
+        if (TSTS (AC(p3)))
+            AC(p4) = SETS (AC(p4));      
         return XT_SKIP;
 
 /* String move instructions - checked against KS10 ucode
@@ -365,14 +389,16 @@ switch (xop) {                                          /* case on opcode */
     case XT_MOVST:                                      /* MOVST */
     case XT_MOVSRJ:                                     /* MOVSRJ */
     case XT_MOVSLJ:                                     /* MOVSLJ */
-        if (AC(p3) & XT_MBZ) return XT_MUUO;            /* test dst lnt MBZ */
+        if (AC(p3) & XT_MBZ)                            /* test dst lnt MBZ */
+            return XT_MUUO;
         f1 = Read (ADDA (ea, 1), MM_OPND);              /* get fill */
         switch (xop) {                                  /* case on instr */
 
         case XT_MOVSO:                                  /* MOVSO */
             AC(ac) = AC(ac) & XLNTMASK;                 /* trim src length */
             xoff = calc_ea (xinst, MM_EA);              /* get offset */
-            if (xoff & RSIGN) xoff = xoff | LMASK;      /* sign extend 18b */
+            if (xoff & RSIGN)                           /* sign extend 18b */
+                xoff = xoff | LMASK;
             s2 = GET_S (AC(p4));                        /* get dst byte size */
             break;
 
@@ -382,10 +408,12 @@ switch (xop) {                                          /* case on opcode */
 
         case XT_MOVSRJ:                                 /* MOVSRJ */
             AC(ac) = AC(ac) & XLNTMASK;                 /* trim src length */
-            if (AC(p3) == 0) return (AC(ac)? XT_NOSK: XT_SKIP);
+            if (AC(p3) == 0)
+                return (AC(ac)? XT_NOSK: XT_SKIP);
             if (AC(ac) > AC(p3)) {                      /* adv src ptr */
                 for (flg = 0; AC(ac) > AC(p3); flg++) {
-                    if (flg && (t = test_int ())) ABORT (t);
+                    if (flg && (t = test_int ()))
+                        ABORT (t);
                     AC(p1) = incbp (AC(p1));
                     AC(ac) = (AC(ac) - 1) & XLNTMASK;
                     }
@@ -400,9 +428,11 @@ switch (xop) {                                          /* case on opcode */
             }                                           /* end case xop */
 
         xflgs = AC(ac) & XFLGMASK;                      /* get xlation flags */
-        if (AC(p3) == 0) return (AC(ac)? XT_NOSK: XT_SKIP);
+        if (AC(p3) == 0)
+            return (AC(ac)? XT_NOSK: XT_SKIP);
         for (flg = 0; AC(p3) & XLNTMASK; flg++) {
-            if (flg && (t = test_int ())) ABORT (t);
+            if (flg && (t = test_int ()))
+                ABORT (t);
             rlog = 0;                                   /* clear log */
             if (AC(ac) & XLNTMASK) {                    /* any source? */
                 b1 = incloadbp (p1, pflgs);             /* src byte */
@@ -419,7 +449,8 @@ switch (xop) {                                          /* case on opcode */
                         AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
                         return XT_NOSK;
                         }
-                    if (xflgs & XT_SFLG) b1 = b1 & XT_BYMASK;
+                    if (xflgs & XT_SFLG)
+                        b1 = b1 & XT_BYMASK;
                     else b1 = -1;
                     }   
                 }
@@ -428,7 +459,8 @@ switch (xop) {                                          /* case on opcode */
                 incstorebp (b1, p4, pflgs);             /* store byte */
                 AC(p3) = (AC(p3) - 1) & XLNTMASK;       /* update state */
                 }
-            if (AC(ac) & XLNTMASK) AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
+            if (AC(ac) & XLNTMASK)
+                AC(ac) = xflgs | ((AC(ac) - 1) & XLNTMASK);
             }
         return (AC(ac) & XLNTMASK)? XT_NOSK: XT_SKIP;
 
@@ -441,12 +473,14 @@ switch (xop) {                                          /* case on opcode */
         AC + 4  =       destination byte pointer
 */
 
-    case XT_EDIT:                                               /* EDIT */
-        if (AC(ac) & XT_MBZE) return XT_MUUO;           /* check pattern MBZ */
+    case XT_EDIT:                                       /* EDIT */
+        if (AC(ac) & XT_MBZE)                           /* check pattern MBZ */
+            return XT_MUUO;
         xflgs = AC(ac) & XFLGMASK;                      /* get xlation flags */
         e1 = calc_ea (xinst, MM_EA);                    /* get xlate tbl addr */
         for (ppi = 1, ret = -1, flg = 0; ret < 0; flg++, ppi = 1) {
-            if (flg && (t = test_int ())) ABORT (t);
+            if (flg && (t = test_int ()))
+                ABORT (t);
             rlog = 0;                                   /* clear log */
             pp = (int32) AC(ac) & AMASK;                /* get pattern ptr */
             b1 = Read (pp, MM_OPND);                    /* get pattern word */
@@ -462,15 +496,17 @@ switch (xop) {                                          /* case on opcode */
                 entad = (e1 + ((int32) b1 >> 1)) & AMASK;
                 f1 = ((Read (entad, MM_OPND) >> ((b1 & 1)? 0: 18)) & RMASK);
                 i = XT_GETCODE (f1);
-                if (i & 2) xflgs = 
-                    (i & 1)? xflgs | XT_MFLG: xflgs & ~XT_MFLG;
+                if (i & 2)
+                    xflgs = (i & 1)? xflgs | XT_MFLG: xflgs & ~XT_MFLG;
                 switch (i) {
 
                 case 00: case 02: case 03:
-                    if (xflgs & XT_SFLG) f1 = f1 & XT_BYMASK;
+                    if (xflgs & XT_SFLG)
+                        f1 = f1 & XT_BYMASK;
                     else {
                         f1 = Read (INCA (ea), MM_OPND);
-                        if (f1 == 0) break;
+                        if (f1 == 0)
+                            break;
                         }
                     incstorebp (f1, p4, pflgs);
                     break;
@@ -485,7 +521,8 @@ switch (xop) {                                          /* case on opcode */
                     if ((xflgs & XT_SFLG) == 0) {
                         f2 = Read (ADDA (ea, 2), MM_OPND);
                         Write ((a10) AC(p3), AC(p4), MM_OPND);
-                        if (f2) incstorebp (f2, p4, pflgs);
+                        if (f2)
+                            incstorebp (f2, p4, pflgs);
                         xflgs = xflgs | XT_SFLG;
                         }
                     incstorebp (f1, p4, pflgs);
@@ -502,7 +539,8 @@ switch (xop) {                                          /* case on opcode */
                 if ((xflgs & XT_SFLG) == 0) {
                     f2 = Read (ADDA (ea, 2), MM_OPND);
                     Write ((a10) AC(p3), AC(p4), MM_OPND);
-                    if (f2) incstorebp (f2, p4, pflgs);
+                    if (f2)
+                        incstorebp (f2, p4, pflgs);
                     xflgs = xflgs | XT_SFLG;
                     }
                 break;
@@ -522,17 +560,20 @@ switch (xop) {                                          /* case on opcode */
                     f1 = Read (ea + (pat & ED_M_NUM) + 1, MM_OPND);
                 else {
                     f1 = Read (ea + 1, MM_OPND);
-                    if (f1 == 0) break;
+                    if (f1 == 0)
+                        break;
                     }
                 incstorebp (f1, p4, pflgs);
                 break;
 
             case (0100 + (ED_SKPM >> ED_V_POPC)):       /* skip on M */
-                if (xflgs & XT_MFLG) ppi = (pat & ED_M_NUM) + 2;
+                if (xflgs & XT_MFLG)
+                    ppi = (pat & ED_M_NUM) + 2;
                 break;
 
             case (0100 + (ED_SKPN >> ED_V_POPC)):       /* skip on N */
-                if (xflgs & XT_NFLG) ppi = (pat & ED_M_NUM) + 2;
+                if (xflgs & XT_NFLG)
+                    ppi = (pat & ED_M_NUM) + 2;
                 break;
 
             case (0100 + (ED_SKPA >> ED_V_POPC)):       /* skip always */
@@ -681,7 +722,8 @@ int32 i, t;
 int32 p1 = ADDA (ac, 1);
 
 for (i = 0; i < cnt; i++) {
-    if (i && (t = test_int ())) ABORT (t);
+    if (i && (t = test_int ()))
+        ABORT (t);
     rlog = 0;                                           /* clear log */ 
     incstorebp (fill, p1, pflgs);
     AC(ac) = (AC(ac) & XFLGMASK) | ((AC(ac) - 1) & XLNTMASK);

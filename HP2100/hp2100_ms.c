@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,12 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   ms           13181A 7970B 800bpi nine track magnetic tape
+   MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
-   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   11-Aug-08    JDB     Revised to use AR instead of saved_AR in boot
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders
    18-Sep-06    JDB     Fixed 2nd CLR after WC causing another write
                         Improve debug reporting, add debug flags
    14-Sep-06    JDB     Removed local BOT flag, now uses sim_tape_bot
@@ -61,28 +63,17 @@
    30-May-02    RMS     Widened POS to 32b
    22-Apr-02    RMS     Added maximum record length test
 
-   Magnetic tapes are represented as a series of variable records
-   of the form:
-
-        32b byte count
-        byte 0
-        byte 1
-        :
-        byte n-2
-        byte n-1
-        32b byte count
-
-   If the byte count is odd, the record is padded with an extra byte
-   of junk.  File marks are represented by a byte count of 0.
-
    References:
    - 13181B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
             (13181-90901, Nov-1982)
    - 13183B Digital Magnetic Tape Unit Interface Kit Operating and Service Manual
             (13183-90901, Nov-1983)
+   - SIMH Magtape Representation and Handling (Bob Supnik, 30-Aug-2006)
 */
 
+
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 #include "sim_tape.h"
 
 #define UNIT_V_OFFLINE  (MTUF_V_UF + 0)                 /* unit offline */
@@ -158,18 +149,23 @@
 #define STA_DYN         (STA_PE  | STA_SEL | STA_TBSY | STA_BOT | \
                          STA_EOT | STA_WLK | STA_LOCAL)
 
-extern uint32 PC, SR;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
-extern int32 sim_switches;
-extern FILE *sim_deb;
-
-int32 ms_ctype = 0;                                     /* ctrl type */
+enum { A13181, A13183 } ms_ctype = A13181;              /* ctrl type */
 int32 ms_timing = 1;                                    /* timing type */
+
+FLIP_FLOP msc_control = CLEAR;
+FLIP_FLOP msc_flag = CLEAR;
+FLIP_FLOP msc_flagbuf = CLEAR;
+
 int32 msc_sta = 0;                                      /* status */
 int32 msc_buf = 0;                                      /* buffer */
 int32 msc_usl = 0;                                      /* unit select */
 int32 msc_1st = 0;                                      /* first service */
 int32 msc_stopioe = 1;                                  /* stop on error */
+
+FLIP_FLOP msd_control = CLEAR;
+FLIP_FLOP msd_flag = CLEAR;
+FLIP_FLOP msd_flagbuf = CLEAR;
+
 int32 msd_buf = 0;                                      /* data buffer */
 uint8 msxb[DBSIZE] = { 0 };                             /* data buffer */
 t_mtrlnt ms_ptr = 0, ms_max = 0;                        /* buffer ptrs */
@@ -210,8 +206,8 @@ const TIMESET msc_times[3] = {
     };
 
 DEVICE msd_dev, msc_dev;
-int32 msdio (int32 inst, int32 IR, int32 dat);
-int32 mscio (int32 inst, int32 IR, int32 dat);
+uint32 msdio (uint32 select_code, IOSIG signal, uint32 data);
+uint32 mscio (uint32 select_code, IOSIG signal, uint32 data);
 t_stat msc_svc (UNIT *uptr);
 t_stat msc_reset (DEVICE *dptr);
 t_stat msc_attach (UNIT *uptr, char *cptr);
@@ -228,6 +224,8 @@ t_stat ms_set_reelsize (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ms_show_reelsize (FILE *st, UNIT *uptr, int32 val, void *desc);
 void ms_config_timing (void);
 char *ms_cmd_name (uint32 cmd);
+t_stat ms_clear (void);
+
 
 /* MSD data structures
 
@@ -237,8 +235,8 @@ char *ms_cmd_name (uint32 cmd);
 */
 
 DIB ms_dib[] = {
-    { MSD, 0, 0, 0, 0, 0, &msdio },
-    { MSC, 0, 0, 0, 0, 0, &mscio }
+    { MSD, &msdio },
+    { MSC, &mscio }
     };
 
 #define msd_dib ms_dib[0]
@@ -248,11 +246,9 @@ UNIT msd_unit = { UDATA (NULL, 0, 0) };
 
 REG msd_reg[] = {
     { ORDATA (BUF, msd_buf, 16) },
-    { FLDATA (CMD, msd_dib.cmd, 0), REG_HRO },
-    { FLDATA (CTL, msd_dib.ctl, 0) },
-    { FLDATA (FLG, msd_dib.flg, 0) },
-    { FLDATA (FBF, msd_dib.fbf, 0) },
-    { FLDATA (SRQ, msd_dib.srq, 0) },
+    { FLDATA (CTL, msd_control, 0) },
+    { FLDATA (FLG, msd_flag, 0) },
+    { FLDATA (FBF, msd_flagbuf, 0) },
     { BRDATA (DBUF, msxb, 8, 8, DBSIZE) },
     { DRDATA (BPTR, ms_ptr, DB_N_SIZE + 1) },
     { DRDATA (BMAX, ms_max, DB_N_SIZE + 1) },
@@ -299,11 +295,9 @@ REG msc_reg[] = {
     { ORDATA (BUF, msc_buf, 16) },
     { ORDATA (USEL, msc_usl, 2) },
     { FLDATA (FSVC, msc_1st, 0) },
-    { FLDATA (CMD, msc_dib.cmd, 0), REG_HRO },
-    { FLDATA (CTL, msc_dib.ctl, 0) },
-    { FLDATA (FLG, msc_dib.flg, 0) },
-    { FLDATA (FBF, msc_dib.fbf, 0) },
-    { FLDATA (SRQ, msc_dib.srq, 0) },
+    { FLDATA (CTL, msc_control, 0) },
+    { FLDATA (FLG, msc_flag, 0) },
+    { FLDATA (FBF, msc_flagbuf, 0) },
     { URDATA (POS, msc_unit[0].pos, 10, T_ADDR_W, 0, MS_NUMDR, PV_LEFT) },
     { URDATA (FNC, msc_unit[0].FNC, 8, 8, 0, MS_NUMDR, REG_HRO) },
     { URDATA (UST, msc_unit[0].UST, 8, 12, 0, MS_NUMDR, REG_HRO) },
@@ -365,178 +359,248 @@ DEVICE msc_dev = {
     0, msc_deb, NULL, NULL
     };
 
-/* IO instructions */
 
-int32 msdio (int32 inst, int32 IR, int32 dat)
+/* Data channel I/O signal handler */
+
+uint32 msdio (uint32 select_code, IOSIG signal, uint32 data)
 {
-int32 devd;
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
 
-devd = IR & I_DEVMASK;                                  /* get device no */
-switch (inst) {                                         /* case on opcode */
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-    case ioFLG:                                         /* flag clear/set */
-        if ((IR & I_HC) == 0) { setFSR (devd); }        /* STF */
+    case ioCLF:                                         /* clear flag flip-flop */
+        msd_flag = msd_flagbuf = CLEAR;
         break;
 
-    case ioSFC:                                         /* skip flag clear */
-        if (FLG (devd) == 0) PC = (PC + 1) & VAMASK;
+    case ioSTF:                                         /* set flag flip-flop */
+    case ioENF:                                         /* enable flag */
+        msd_flag = msd_flagbuf = SET;
         break;
 
-    case ioSFS:                                         /* skip flag set */
-        if (FLG (devd) != 0) PC = (PC + 1) & VAMASK;
+    case ioSFC:                                         /* skip if flag is clear */
+        setstdSKF (msd);
         break;
 
-    case ioOTX:                                         /* output */
-        msd_buf = dat;                                  /* store data */
+    case ioSFS:                                         /* skip if flag is set */
+        setstdSKF (msd);
         break;
 
-    case ioMIX:                                         /* merge */
-        dat = dat | msd_buf;
+    case ioIOI:                                         /* I/O data input */
+        data = msd_buf;
         break;
 
-    case ioLIX:                                         /* load */
-        dat = msd_buf;
+    case ioIOO:                                         /* I/O data output */
+        msd_buf = data;                                 /* store data */
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
-    case ioCTL:                                         /* control clear/set */
-        if (IR & I_CTL) {                               /* CLC */
-            clrCTL (devd);                              /* clr ctl, cmd */
-            clrCMD (devd);
-            }
-        else {                                          /* STC */
-            setCTL (devd);                              /* set ctl, cmd */
-            setCMD (devd);
-            }
+    case ioPOPIO:                                       /* power-on preset to I/O */
+        ms_clear ();                                    /* issue CLR to controller */
+                                                        /* fall into CRS handler */
+    case ioCRS:                                         /* control reset */
+        msd_flag = msd_flagbuf = SET;                   /* set flag and flag buffer */
+                                                        /* fall into CLC handler */
+    case ioCLC:                                         /* clear control flip-flop */
+        msd_control = CLEAR;
         break;
 
-    case ioEDT:                                         /* DMA end */
-        clrFSR (devd);                                  /* same as CLF */
+    case ioSTC:                                         /* set control flip-flop */
+        msd_control = SET;
         break;
 
-    default:
+    case ioEDT:                                         /* end data transfer */
+        msd_flag = msd_flagbuf = CLEAR;                 /* same as CLF */
         break;
-        }
 
-if (IR & I_HC) { clrFSR (devd); }                       /* H/C option */
-return dat;
+    case ioSIR:                                         /* set interrupt request */
+        setstdPRL (select_code, msd);                   /* set standard PRL signal */
+        setstdIRQ (select_code, msd);                   /* set standard IRQ signal */
+        setstdSRQ (select_code, msd);                   /* set standard SRQ signal */
+        break;
+
+    case ioIAK:                                         /* interrupt acknowledge */
+        msd_flagbuf = CLEAR;
+        break;
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
+    }
+
+if (signal > ioCLF)                                     /* multiple signals? */
+    msdio (select_code, ioCLF, 0);                      /* issue CLF */
+else if (signal > ioSIR)                                /* signal affected interrupt status? */
+    msdio (select_code, ioSIR, 0);                      /* set interrupt request */
+
+return data;
 }
 
-int32 mscio (int32 inst, int32 IR, int32 dat)
+
+/* Command channel I/O signal handler.
+
+   Implementation notes:
+
+    1. Commands are usually initiated with an STC cc,C instruction.  The CLR
+       command completes immediately and sets the flag.  This requires that we
+       ignore the CLF part (but still process the SIR).
+
+    2. The command channel card clears its flag and flag buffer on EDT, but as
+       it never asserts SRQ, it will never get EDT.  Under simulation, we omit
+       the EDT handler.
+
+    3. In hardware, the command channel card passes PRH to PRL.  The data card
+       actually drives PRL with both channels' control and flag states.  That
+       is, the priority chain is broken at the data card, even when the command
+       card is interrupting.  This works in hardware, but we must break PRL at
+       the command card under simulation to allow the command card to interrupt.
+*/
+
+uint32 mscio (uint32 select_code, IOSIG signal, uint32 data)
 {
-int32 i, devc, devd, sched_time;
-t_stat st;
-UNIT *uptr = msc_dev.units + msc_usl;
 static const uint8 map_sel[16] = {
     0, 0, 1, 1, 2, 2, 2, 2,
     3, 3, 3, 3, 3, 3, 3, 3
     };
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+int32 sched_time;
+UNIT *uptr = msc_dev.units + msc_usl;
 
-devc = IR & I_DEVMASK;                                  /* get device no */
-devd = devc - 1;
-switch (inst) {                                         /* case on opcode */
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-    case ioFLG:                                         /* flag clear/set */
-        if ((IR & I_HC) == 0) { setFSR (devc); }        /* STF */
+    case ioCLF:                                         /* clear flag flip-flop */
+        msc_flag = msc_flagbuf = CLEAR;
         break;
 
-    case ioSFC:                                         /* skip flag clear */
-        if (FLG (devc) == 0) PC = (PC + 1) & VAMASK;
+
+    case ioSTF:                                         /* set flag flip-flop */
+    case ioENF:                                         /* enable flag */
+        msc_flag = msc_flagbuf = SET;
         break;
 
-    case ioSFS:                                         /* skip flag set */
-        if (FLG (devc) != 0) PC = (PC + 1) & VAMASK;
+
+    case ioSFC:                                         /* skip if flag is clear */
+        setstdSKF (msc);
         break;
 
-    case ioOTX:                                         /* output */
+
+    case ioSFS:                                         /* skip if flag is set */
+        setstdSKF (msc);
+        break;
+
+
+    case ioIOI:                                         /* I/O data input */
+        data = msc_sta & ~STA_DYN;                      /* get card status */
+
+        if ((uptr->flags & UNIT_OFFLINE) == 0) {        /* online? */
+            data = data | uptr->UST;                    /* add unit status */
+
+            if (sim_tape_bot (uptr))                    /* BOT? */
+                data = data | STA_BOT;
+
+            if (sim_is_active (uptr) &&                 /* TBSY unless RWD at BOT */
+                !((uptr->FNC & FNF_RWD) && sim_tape_bot (uptr)))
+                data = data | STA_TBSY;
+
+            if (sim_tape_wrp (uptr))                    /* write prot? */
+                data = data | STA_WLK;
+
+            if (sim_tape_eot (uptr))                    /* EOT? */
+                data = data | STA_EOT;
+            }
+
+        else
+            data = data | STA_TBSY | STA_LOCAL;
+
+        if (ms_ctype == A13183)                         /* 13183A? */
+            data = data | STA_PE | (msc_usl << STA_V_SEL);
+
         if (DEBUG_PRI (msc_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", dat);
-        msc_buf = dat;
+            fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", data);
+
+        break;
+
+
+    case ioIOO:                                         /* I/O data output */
+        if (DEBUG_PRI (msc_dev, DEB_CPU))
+            fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", data);
+
+        msc_buf = data;
         msc_sta = msc_sta & ~STA_REJ;                   /* clear reject */
-        if ((dat & 0377) == FNC_CLR) break;             /* clear always ok */
+
+        if ((data & 0377) == FNC_CLR)                   /* clear always ok */
+            break;
+
         if (msc_sta & STA_BUSY) {                       /* busy? reject */
             msc_sta = msc_sta | STA_REJ;                /* dont chg select */
             break;
             }
-        if (dat & FNF_CHS) {                            /* select change */
-            msc_usl = map_sel[FNC_GETSEL (dat)];        /* is immediate */
+
+        if (data & FNF_CHS) {                           /* select change */
+            msc_usl = map_sel[FNC_GETSEL (data)];       /* is immediate */
             uptr = msc_dev.units + msc_usl;
             if (DEBUG_PRI (msc_dev, DEB_CMDS))
                 fprintf (sim_deb, ">>MSC OTx: Unit %d selected\n", msc_usl);
             }
-        if (((dat & FNF_MOT) && sim_is_active (uptr)) ||
-            ((dat & FNF_REV) && sim_tape_bot (uptr)) ||
-            ((dat & FNF_WRT) && sim_tape_wrp (uptr)))
+
+        if (((data & FNF_MOT) && sim_is_active (uptr)) ||
+            ((data & FNF_REV) && sim_tape_bot (uptr)) ||
+            ((data & FNF_WRT) && sim_tape_wrp (uptr)))
             msc_sta = msc_sta | STA_REJ;                /* reject? */
+
         break;
 
-    case ioLIX:                                         /* load */
-        dat = 0;
-    case ioMIX:                                         /* merge */
-        dat = dat | (msc_sta & ~STA_DYN);               /* get card status */
-        if ((uptr->flags & UNIT_OFFLINE) == 0) {        /* online? */
-            dat = dat | uptr->UST;                      /* add unit status */
-            if (sim_tape_bot (uptr))                    /* BOT? */
-                dat = dat | STA_BOT;
-            if (sim_is_active (uptr) &&                 /* TBSY unless RWD at BOT */
-                !((uptr->FNC & FNF_RWD) && sim_tape_bot (uptr)))
-                dat = dat | STA_TBSY;
-            if (sim_tape_wrp (uptr))                    /* write prot? */
-                dat = dat | STA_WLK;
-            if (sim_tape_eot (uptr))                    /* EOT? */
-                dat = dat | STA_EOT;
-            }
-        else dat = dat | STA_TBSY | STA_LOCAL;
-        if (ms_ctype) dat = dat | STA_PE |              /* 13183A? */
-            (msc_usl << STA_V_SEL);
-        if (DEBUG_PRI (msc_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", dat);
+
+    case ioPOPIO:                                       /* power-on preset to I/O */
+                                                        /* fall into CRS handler */
+
+    case ioCRS:                                         /* control reset */
+        msc_flag = msc_flagbuf = SET;                   /* set flag and flag buffer */
+                                                        /* fall into CLC handler */
+
+    case ioCLC:                                         /* clear control flip-flop */
+        msc_control = CLEAR;
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
-    case ioCTL:                                         /* control clear/set */
-        if (IR & I_CTL) { clrCTL (devc); }              /* CLC */
-        else if (!(msc_sta & STA_REJ)) {                /* STC, last cmd rejected? */
+
+    case ioSTC:                                         /* set control flip-flop */
+        if (!(msc_sta & STA_REJ)) {                     /* last cmd rejected? */
             if ((msc_buf & 0377) == FNC_CLR) {          /* clear? */
-                for (i = 0; i < MS_NUMDR; i++) {        /* look for write in progr */
-                    if (sim_is_active (&msc_unit[i]) && /* unit active? */
-                        (msc_unit[i].FNC == FNC_WC) &&  /* last cmd write? */
-                        (ms_ptr > 0)) {                 /* partial buffer? */
-                        if (DEBUG_PRI (msc_dev, DEB_RWS))
-                            fprintf (sim_deb,
-                                ">>MSC STC: Unit %d wrote %d word partial record\n",
-                                i, ms_ptr / 2);
-                        if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF))
-                            ms_map_err (uptr, st);      /* discard any error */
-                        ms_ptr = 0;                     /* clear partial */
-                        }
-                    if ((msc_unit[i].UST & STA_REW) == 0)
-                        sim_cancel (&msc_unit[i]);      /* stop if not rew */
-                    }
-                setCTL (devc);                          /* set CTL for STC */
-                setFSR (devc);                          /* set FLG for completion */
-                msc_sta = msc_1st = 0;                  /* clr ctlr status */
+                ms_clear ();                            /* issue CLR to controller */
+
+                msc_control = SET;                      /* set CTL for STC */
+                msc_flag = msc_flagbuf = SET;           /* set FLG for completion */
+
+                signal = ioSTC;                         /* eliminate possible CLF */
+
                 if (DEBUG_PRI (msc_dev, DEB_CMDS))
                     fputs (">>MSC STC: Controller cleared\n", sim_deb);
-                return SCPE_OK;
+
+                break;                                  /* command completes immediately */
                 }
+
             uptr->FNC = msc_buf & 0377;                 /* save function */
+
             if (uptr->FNC & FNF_RWD) {                  /* rewind? */
                 if (!sim_tape_bot (uptr))               /* not at BOT? */
                     uptr->UST = STA_REW;                /* set rewinding */
+
                 sched_time = msc_rtime;                 /* set response time */
                 }
+
             else {
                 if (sim_tape_bot (uptr))                /* at BOT? */
                     sched_time = msc_btime;             /* use BOT start time */
+
                 else if ((uptr->FNC == FNC_GAP) || (uptr->FNC == FNC_GFM))
                     sched_time = msc_gtime;             /* use gap traversal time */
+
                 else sched_time = 0;
+
                 if (uptr->FNC != FNC_GAP)
                     sched_time += msc_ctime;            /* add base command time */
                 }
+
             if (msc_buf & ~FNC_SEL) {                   /* NOP for unit sel alone */
                 sim_activate (uptr, sched_time);        /* else schedule op */
+
                 if (DEBUG_PRI (msc_dev, DEB_CMDS))
                     fprintf (sim_deb,
                         ">>MSC STC: Unit %d command %03o (%s) scheduled, "
@@ -544,25 +608,42 @@ switch (inst) {                                         /* case on opcode */
                         msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
                         uptr->pos, sched_time);
                 }
+
             else if (DEBUG_PRI (msc_dev, DEB_CMDS))
                 fputs (">>MSC STC: Unit select (NOP)\n", sim_deb);
+
             msc_sta = STA_BUSY;                         /* ctrl is busy */
             msc_1st = 1;
-            setCTL (devc);                              /* go */
+            msc_control = SET;                          /* go */
             }
         break;
 
-    case ioEDT:                                         /* DMA end */
-        clrFSR (devc);                                  /* same as CLF */
+
+    case ioSIR:                                         /* set interrupt request */
+        setstdPRL (select_code, msc);                   /* set standard PRL signal */
+        setstdIRQ (select_code, msc);                   /* set standard IRQ signal */
+        setstdSRQ (select_code, msc);                   /* set standard SRQ signal */
         break;
 
-    default:
-        break;
-        }
 
-if (IR & I_HC) { clrFSR (devc); }                       /* H/C option */
-return dat;
+    case ioIAK:                                         /* interrupt acknowledge */
+        msc_flagbuf = CLEAR;
+        break;
+
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
+    }
+
+
+if (signal > ioCLF)                                     /* multiple signals? */
+    mscio (select_code, ioCLF, 0);                      /* issue CLF */
+else if (signal > ioSIR)                                /* signal affected interrupt status? */
+    mscio (select_code, ioSIR, 0);                      /* set interrupt request */
+
+return data;
 }
+
 
 /* Unit service
 
@@ -582,17 +663,15 @@ return dat;
 
 t_stat msc_svc (UNIT *uptr)
 {
-int32 devc, devd, unum;
+int32 unum;
 t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
 
-devc = msc_dib.devno;                                   /* get device nos */
-devd = msd_dib.devno;
 unum = uptr - msc_dev.units;                            /* get unit number */
 
 if ((uptr->FNC != FNC_RWS) && (uptr->flags & UNIT_OFFLINE)) {  /* offline? */
     msc_sta = (msc_sta | STA_REJ) & ~STA_BUSY;          /* reject */
-    setFSR (devc);                                      /* set cch flg */
+    mscio (msc_dib.devno, ioENF, 0);                    /* set flag */
     return IORETURN (msc_stopioe, SCPE_UNATT);
     }
 
@@ -695,14 +774,15 @@ switch (uptr->FNC) {                                    /* case on function */
                     }
                 break;                                  /* err, done */
                 }
-            if (ms_ctype) msc_sta = msc_sta | STA_ODD;  /* set ODD for 13183A */
+            if (ms_ctype == A13183)
+                msc_sta = msc_sta | STA_ODD;            /* set ODD for 13183A */
             }
-        if (CTL (devd) && (ms_ptr < ms_max)) {          /* DCH on, more data? */
-            if (FLG (devd)) msc_sta = msc_sta | STA_TIM | STA_PAR;
+        if (msd_control && (ms_ptr < ms_max)) {         /* DCH on, more data? */
+            if (msd_flag) msc_sta = msc_sta | STA_TIM | STA_PAR;
             msd_buf = ((uint16) msxb[ms_ptr] << 8) |
                       ((ms_ptr + 1 == ms_max) ? 0 : msxb[ms_ptr + 1]);
             ms_ptr = ms_ptr + 2;
-            setFSR (devd);                              /* set dch flg */
+            msdio (msd_dib.devno, ioENF, 0);            /* set flag */
             sim_activate (uptr, msc_xtime);             /* re-activate */
             return SCPE_OK;
             }
@@ -739,8 +819,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 }
             else msc_sta = msc_sta | STA_PAR;
            }
-        if (CTL (devd)) {                               /* xfer flop set? */
-            setFSR (devd);                              /* set dch flag */
+        if (msd_control) {                              /* xfer flop set? */
+            msdio (msd_dib.devno, ioENF, 0);            /* set flag */
             sim_activate (uptr, msc_xtime);             /* re-activate */
             return SCPE_OK;
             }
@@ -770,7 +850,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
         }
 
-setFSR (devc);                                          /* set cch flg */
+mscio (msc_dib.devno, ioENF, 0);                        /* set flag */
 msc_sta = msc_sta & ~STA_BUSY;                          /* update status */
 if (DEBUG_PRI (msc_dev, DEB_CMDS))
      fprintf (sim_deb,
@@ -778,6 +858,7 @@ if (DEBUG_PRI (msc_dev, DEB_CMDS))
         unum, uptr->FNC & 0377, ms_cmd_name (uptr->FNC));
 return r;
 }
+
 
 /* Write an erase gap */
 
@@ -792,6 +873,7 @@ if (st = sim_tape_wrgap (uptr, gap_len, tape_bpi))      /* write gap */
 else
     return SCPE_OK;
 }
+
 
 /* Map tape error status */
 
@@ -820,8 +902,11 @@ switch (st) {
 
     case MTSE_EOM:                                      /* end of medium */
     case MTSE_TMK:                                      /* end of file */
-        msc_sta = msc_sta | STA_EOF | (ms_ctype ? 0 : STA_ODD);
-        break;                                          /* EOF also sets ODD for 13181A */
+        msc_sta = msc_sta | STA_EOF;
+
+        if (ms_ctype == A13181)
+            msc_sta = msc_sta | STA_ODD;                /* EOF also sets ODD for 13181A */
+        break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
         msc_sta = msc_sta | STA_PAR;
@@ -844,6 +929,41 @@ switch (st) {
 return SCPE_OK;
 }
 
+
+/* Controller clear */
+
+t_stat ms_clear (void)
+{
+int32 i;
+t_stat st;
+UNIT *uptr;
+
+for (i = 0; i < MS_NUMDR; i++) {                        /* look for write in progr */
+    uptr = &msc_unit [i];                               /* get pointer to unit */
+
+    if (sim_is_active (uptr) &&                         /* unit active? */
+        (uptr->FNC == FNC_WC) &&                        /*   and last cmd write? */
+        (ms_ptr > 0)) {                                 /*   and partial buffer? */
+        if (DEBUG_PRI (msc_dev, DEB_RWS))
+            fprintf (sim_deb,
+                ">>MSC rws: Unit %d wrote %d word partial record\n", i, ms_ptr / 2);
+
+        if (st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF))
+            ms_map_err (uptr, st);                      /* discard any error */
+
+        ms_ptr = 0;                                     /* clear partial */
+        }
+
+    if ((uptr->UST & STA_REW) == 0)
+        sim_cancel (uptr);                              /* stop if not rew */
+    }
+
+msc_sta = msc_1st = 0;                                  /* clr ctlr status */
+
+return SCPE_OK;
+}
+
+
 /* Reset routine */
 
 t_stat msc_reset (DEVICE *dptr)
@@ -852,24 +972,30 @@ int32 i;
 UNIT *uptr;
 
 hp_enbdis_pair (dptr,                                   /* make pair cons */
-    (dptr == &msd_dev)? &msc_dev: &msd_dev);
+    (dptr == &msd_dev) ? &msc_dev : &msd_dev);
+
+if (sim_switches & SWMASK ('P'))                        /* PON reset? */
+    ms_config_timing ();
+
+if (dptr == &msc_dev)                                   /* command channel reset? */
+    mscio (msc_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to command channel */
+else                                                    /* data channel reset */
+    msdio (msd_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to data channel */
+
 msc_buf = msd_buf = 0;
 msc_sta = msc_usl = 0;
 msc_1st = 0;
-msc_dib.cmd = msd_dib.cmd = 0;                          /* clear cmd */
-msc_dib.ctl = msd_dib.ctl = 0;                          /* clear ctl */
-msc_dib.flg = msd_dib.flg = 1;                          /* set flg */
-msc_dib.fbf = msd_dib.fbf = 1;                          /* set fbf */
-msc_dib.srq = msd_dib.srq = 1;                          /* srq follows flg */
+
 for (i = 0; i < MS_NUMDR; i++) {
     uptr = msc_dev.units + i;
     sim_tape_reset (uptr);
     sim_cancel (uptr);
     uptr->UST = 0;
     }
-ms_config_timing ();
+
 return SCPE_OK;
 }
+
 
 /* Attach routine */
 
@@ -906,7 +1032,7 @@ void ms_config_timing (void)
 {
 uint32 i, tset;
 
-tset = (ms_timing << 1) | (ms_timing? 0 : ms_ctype);    /* select timing set */
+tset = (ms_timing << 1) | (ms_timing ? 0 : ms_ctype);   /* select timing set */
 for (i = 0; i < (sizeof (timers) / sizeof (timers[0])); i++)
     *timers[i] = msc_times[tset][i];                    /* assign times */
 }
@@ -949,8 +1075,10 @@ return SCPE_OK;
 
 t_stat ms_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (ms_ctype) fprintf (st, "13183A");
-else fprintf (st, "13181A");
+if (ms_ctype == A13183)
+    fprintf (st, "13183A");
+else
+    fprintf (st, "13181A");
 return SCPE_OK;
 }
 
@@ -995,7 +1123,7 @@ else switch (reel) {
         return SCPE_ARG;
         }
 
-uptr->capac = uptr->REEL? (TCAP << uptr->REEL) << ms_ctype: 0;
+uptr->capac = uptr->REEL ? (TCAP << uptr->REEL) << ms_ctype : 0;
 return SCPE_OK;
 }
 
@@ -1044,7 +1172,7 @@ switch (cmd & 0377) {
 
 /* 7970B/7970E bootstrap routine (HP 12992D ROM) */
 
-const uint16 ms_rom[IBL_LNT] = {
+const BOOT_ROM ms_rom = {
     0106501,                    /*ST LIB 1              ; read sw */
     0006011,                    /*   SLB,RSS            ; bit 0 set? */
     0027714,                    /*   JMP RD             ; no read */
@@ -1114,13 +1242,11 @@ const uint16 ms_rom[IBL_LNT] = {
 t_stat msc_boot (int32 unitno, DEVICE *dptr)
 {
 int32 dev;
-extern uint32 saved_AR;
 
 if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
 dev = msd_dib.devno;                                    /* get data chan dev */
 if (ibl_copy (ms_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
 SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);      /* set SR */
-if ((sim_switches & SWMASK ('S')) && saved_AR) SR = SR | 1;     /* skip? */
+if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;   /* skip? */
 return SCPE_OK;
 }
-

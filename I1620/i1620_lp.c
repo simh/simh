@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2007, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -164,7 +164,8 @@ switch (op) {                                           /* decode op */
 
     case OP_K:                                          /* control */
         lpt_savctrl = (f0 << 4) | f1;                   /* form ctrl */
-        if (lpt_savctrl & K_IMM) return lpt_print ();   /* immediate? */
+        if (lpt_savctrl & K_IMM)                        /* immediate? */
+            return lpt_print ();
         break;
 
     case OP_DN:
@@ -177,18 +178,21 @@ switch (op) {                                           /* decode op */
         for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {     /* only fill buf */
             d = M[pa] & DIGIT;                          /* get digit */
             z = M[pa - 1] & DIGIT;                      /* get zone */
-            if ((d & REC_MARK) == REC_MARK) break;      /* 8-2 char? */
+            if ((d & REC_MARK) == REC_MARK)             /* 8-2 char? */
+                break;
             lpc = alp_to_lpt[(z << 4) | d];             /* translate pair */
             if (lpc < 0) {                              /* bad char? */
                 ind[IN_WRCHK] = ind[IN_PRCHK] = 1;      /* wr chk */
-                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                if (io_stop)                            /* set return status */
+                    sta = STOP_INVCHR;
                 }
             lpt_buf[lpt_bptr] = lpc & 0x7F;             /* fill buffer */
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
         if ((f1 & 1) == 0) {            ;               /* print now? */
             r = lpt_print ();                           /* print line */
-            if (r != SCPE_OK) return r;
+            if (r != SCPE_OK)
+                return r;
             }
         return sta;
 
@@ -213,18 +217,21 @@ end = pa + len;
 for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {             /* only fill buf */
     d = M[pa];                                          /* get digit */
     if (len? (pa >= end):                               /* end reached? */
-        ((d & REC_MARK) == REC_MARK)) break;
+        ((d & REC_MARK) == REC_MARK))
+        break;
     lpc = num_to_lpt[d];                                /* translate */
     if (lpc < 0) {                                      /* bad char? */
         ind[IN_WRCHK] = ind[IN_PRCHK] = 1;              /* wr chk */
-        if (io_stop) sta = STOP_INVCHR;                 /* set return status */
+        if (io_stop)                                    /* set return status */
+            sta = STOP_INVCHR;
         }
     lpt_buf[lpt_bptr++] = lpc & 0x7F;                   /* fill buffer */
     PP (pa);                                            /* incr mem addr */
     }
 if ((f1 & 1) == 0) {                                    /* print now? */
     r = lpt_print ();                                   /* print line */
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
 return sta;
 }
@@ -264,12 +271,16 @@ if ((ctrl & K_LIN) == ((ctrl & K_IMM)? 0: K_LIN))       /* space lines? */
     return lpt_space (ctrl & K_LCNT, FALSE);
 chan = lpt_savctrl & K_CHAN;                            /* basic chan */
 if (lpt_savctrl & K_CH10) {                             /* chan 10-12? */
-    if (chan == 0) chan = 10;
-    else if (chan == 3) chan = 11;
-    else if (chan == 4) chan = 12;
+    if (chan == 0)
+        chan = 10;
+    else if (chan == 3)
+        chan = 11;
+    else if (chan == 4)
+        chan = 12;
     else chan = 0;
     }
-if ((chan == 0) || (chan > 12)) return STOP_INVFNC;
+if ((chan == 0) || (chan > 12))
+    return STOP_INVFNC;
 for (i = 1; i < cct_lnt + 1; i++) {                     /* sweep thru cct */
     if (CHP (chan, cct[(cct_ptr + i) % cct_lnt]))
         return lpt_space (i, TRUE);
@@ -322,7 +333,8 @@ void lpt_buf_init (void)
 int32 i;
 
 lpt_bptr = 0;
-for (i = 0; i < LPT_WIDTH + 1; i++) lpt_buf[i] = 0;
+for (i = 0; i < LPT_WIDTH + 1; i++)
+    lpt_buf[i] = 0;
 return;
 }
 

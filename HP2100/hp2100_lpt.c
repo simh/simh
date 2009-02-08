@@ -1,6 +1,6 @@
 /* hp2100_lpt.c: HP 2100 12845B line printer simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,12 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   lpt          12845B 2607 line printer
+   LPT          12845B 2607 line printer
 
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
+                        Changed CTIME register width to match documentation
    22-Jan-07    RMS     Added UNIT_TEXT flag
-   28-Dec-06    JDB     Added ioCRS state to I/O decoders (action unverified)
+   28-Dec-06    JDB     Added ioCRS state to I/O decoders
    19-Nov-04    JDB     Added restart when set online, etc.
    29-Sep-04    JDB     Added SET OFFLINE/ONLINE, POWEROFF/POWERON
                         Fixed status returns for error conditions
@@ -36,6 +38,10 @@
                         Implemented DMA SRQ (follows FLG)
    25-Apr-03    RMS     Revised for extended file support
    24-Oct-02    RMS     Cloned from 12653A
+
+   Reference:
+   - 12845A Line Printer Operating and Service Manual (12845-90001, Aug-1972)
+
 
    The 2607 provides three status bits via the interface:
 
@@ -62,9 +68,6 @@
      SET LPT ONLINE   --> print button down
      ATT LPT <file>   --> paper loaded
      DET LPT          --> paper out
-
-   Reference:
-   - 12845A Line Printer Operating and Service Manual (12845-90001, Aug-1972)
 */
 
 #include "hp2100_defs.h"
@@ -86,8 +89,9 @@
 #define UNIT_POWEROFF   (1 << UNIT_V_POWEROFF)
 #define UNIT_OFFLINE    (1 << UNIT_V_OFFLINE)
 
-extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
+FLIP_FLOP lpt_control = CLEAR;
+FLIP_FLOP lpt_flag = CLEAR;
+FLIP_FLOP lpt_flagbuf = CLEAR;
 
 int32 lpt_ctime = 4;                                    /* char time */
 int32 lpt_ptime = 10000;                                /* print time */
@@ -98,7 +102,7 @@ static int32 lpt_cct[8] = {
     };
 
 DEVICE lpt_dev;
-int32 lptio (int32 inst, int32 IR, int32 dat);
+uint32 lptio (uint32 select_code, IOSIG signal, uint32 data);
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_restart (UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -111,7 +115,7 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
    lpt_reg      LPT register list
 */
 
-DIB lpt_dib = { LPT, 0, 0, 0, 0, 0, &lptio };
+DIB lpt_dib = { LPT, &lptio };
 
 UNIT lpt_unit = {
     UDATA (&lpt_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE+UNIT_TEXT, 0)
@@ -119,14 +123,12 @@ UNIT lpt_unit = {
 
 REG lpt_reg[] = {
     { ORDATA (BUF, lpt_unit.buf, 7) },
-    { FLDATA (CMD, lpt_dib.cmd, 0) },
-    { FLDATA (CTL, lpt_dib.ctl, 0) },
-    { FLDATA (FLG, lpt_dib.flg, 0) },
-    { FLDATA (FBF, lpt_dib.fbf, 0) },
-    { FLDATA (SRQ, lpt_dib.srq, 0) },
+    { FLDATA (CTL, lpt_control, 0) },
+    { FLDATA (FLG, lpt_flag,    0) },
+    { FLDATA (FBF, lpt_flagbuf, 0) },
     { DRDATA (LCNT, lpt_lcnt, 7) },
     { DRDATA (POS, lpt_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (CTIME, lpt_ctime, 31), PV_LEFT },
+    { DRDATA (CTIME, lpt_ctime, 24), PV_LEFT },
     { DRDATA (PTIME, lpt_ptime, 24), PV_LEFT },
     { FLDATA (STOP_IOE, lpt_stopioe, 0) },
     { ORDATA (DEVNO, lpt_dib.devno, 6), REG_HRO },
@@ -151,84 +153,122 @@ DEVICE lpt_dev = {
     &lpt_dib, DEV_DISABLE
     };
 
-/* IO instructions */
 
-int32 lptio (int32 inst, int32 IR, int32 dat)
+/* I/O signal handler */
+
+uint32 lptio (uint32 select_code, IOSIG signal, uint32 data)
 {
-int32 dev;
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
 
-dev = IR & I_DEVMASK;                                   /* get device no */
-switch (inst) {                                         /* case on opcode */
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-    case ioFLG:                                         /* flag clear/set */
-        if ((IR & I_HC) == 0) { setFSR (dev); }         /* STF */
+    case ioCLF:                                         /* clear flag flip-flop */
+        lpt_flag = lpt_flagbuf = CLEAR;
         break;
 
-    case ioSFC:                                         /* skip flag clear */
-        if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
+
+    case ioSTF:                                         /* set flag flip-flop */
+    case ioENF:                                         /* enable flag */
+        lpt_flag = lpt_flagbuf = SET;
         break;
 
-    case ioSFS:                                         /* skip flag set */
-        if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
+
+    case ioSFC:                                         /* skip if flag is clear */
+        setstdSKF (lpt);
         break;
 
-    case ioOTX:                                         /* output */
-        lpt_unit.buf = dat & (LPT_CTL | 0177);
+
+    case ioSFS:                                         /* skip if flag is set */
+        setstdSKF (lpt);
         break;
 
-    case ioLIX:                                         /* load */
-        dat = 0;                                        /* default sta = 0 */
-    case ioMIX:                                         /* merge */
+
+    case ioIOI:                                         /* I/O data input */
         if (lpt_unit.flags & UNIT_POWEROFF)             /* power off? */
-            dat = dat | LPT_PWROFF;
+            data = LPT_PWROFF;
+
         else if (!(lpt_unit.flags & UNIT_OFFLINE)) {    /* online? */
             if (lpt_unit.flags & UNIT_ATT) {            /* paper loaded? */
-                dat = dat | LPT_RDY;
+                data = LPT_RDY;
                 if (!sim_is_active (&lpt_unit))         /* printer busy? */
-                    dat = dat | LPT_NBSY;
+                    data = data | LPT_NBSY;
                 }
+
             else if (lpt_lcnt == LPT_PAGELNT - 1)       /* paper out, at BOF? */
-                dat = dat | LPT_PAPO;
+                data = LPT_PAPO;
             }
+
+        else
+            data = 0;
         break;
 
-    case ioCRS:                                         /* control reset (action unverif) */
-    case ioCTL:                                         /* control clear/set */
-        if (IR & I_CTL) {                               /* CLC */
-            clrCMD (dev);                               /* clear ctl, cmd */
-            clrCTL (dev);
-            }
-        else {                                          /* STC */
-            setCMD (dev);                               /* set ctl, cmd */
-            setCTL (dev);
-            sim_activate (&lpt_unit,                    /* schedule op */
-                (lpt_unit.buf & LPT_CTL)? lpt_ptime: lpt_ctime);
-            }
+
+    case ioIOO:                                         /* I/O data output */
+        lpt_unit.buf = data & (LPT_CTL | 0177);
         break;
 
-    default:
-        break;
-        }
 
-if (IR & I_HC) { clrFSR (dev); }                        /* H/C option */
-return dat;
+    case ioPOPIO:                                       /* power-on preset to I/O */
+        lpt_flag = lpt_flagbuf = SET;                   /* set flag and flag buffer */
+        lpt_unit.buf = 0;                               /* clear output buffer */
+                                                        /* fall into CRS handler */
+
+    case ioCRS:                                         /* control reset */
+                                                        /* fall into CLC handler */
+
+    case ioCLC:                                         /* clear control flip-flop */
+        lpt_control = CLEAR;
+        break;
+
+
+    case ioSTC:                                         /* set control flip-flop */
+        lpt_control = SET;
+        sim_activate (&lpt_unit,                        /* schedule op */
+            (lpt_unit.buf & LPT_CTL)? lpt_ptime: lpt_ctime);
+        break;
+
+
+    case ioSIR:                                         /* set interrupt request */
+        setstdPRL (select_code, lpt);                   /* set standard PRL signal */
+        setstdIRQ (select_code, lpt);                   /* set standard IRQ signal */
+        setstdSRQ (select_code, lpt);                   /* set standard SRQ signal */
+        break;
+
+
+    case ioIAK:                                         /* interrupt acknowledge */
+        lpt_flagbuf = CLEAR;
+        break;
+
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
+    }
+
+
+if (signal > ioCLF)                                     /* multiple signals? */
+    lptio (select_code, ioCLF, 0);                      /* issue CLF */
+else if (signal > ioSIR)                                /* signal affected interrupt status? */
+    lptio (select_code, ioSIR, 0);                      /* set interrupt request */
+
+return data;
 }
+
 
 /* Unit service */
 
 t_stat lpt_svc (UNIT *uptr)
 {
-int32 i, skip, chan, dev;
+int32 i, skip, chan;
 
-dev = lpt_dib.devno;                                    /* get dev no */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 else if (uptr->flags & UNIT_OFFLINE)                    /* offline? */
     return IORETURN (lpt_stopioe, STOP_OFFLINE);
 else if (uptr->flags & UNIT_POWEROFF)                   /* powered off? */
     return IORETURN (lpt_stopioe, STOP_PWROFF);
-clrCMD (dev);                                           /* clear cmd */
-setFSR (dev);                                           /* set flag, fbf */
+
+lptio (lpt_dib.devno, ioENF, 0);                        /* set flag */
+
 if (uptr->buf & LPT_CTL) {                              /* control word? */
     if (uptr->buf & LPT_CHAN) {
         chan = uptr->buf & LPT_CHANM;
@@ -257,16 +297,17 @@ lpt_unit.pos = ftell (uptr->fileref);                   /* update pos */
 return SCPE_OK;
 }
 
-/* Reset routine - called from SCP, flags in DIB */
+
+/* Reset routine */
 
 t_stat lpt_reset (DEVICE *dptr)
 {
-lpt_dib.cmd = lpt_dib.ctl = 0;                          /* clear cmd, ctl */
-lpt_dib.flg = lpt_dib.fbf = lpt_dib.srq = 1;            /* set flg, fbf, srq */
-lpt_unit.buf = 0;
+lptio (lpt_dib.devno, ioPOPIO, 0);                      /* send POPIO signal */
+
 sim_cancel (&lpt_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
+
 
 /* Restart I/O routine
 
@@ -284,10 +325,11 @@ return SCPE_OK;
 
 t_stat lpt_restart (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-if (lpt_dib.cmd && lpt_dib.ctl && !sim_is_active (uptr))
+if (lpt_control && !sim_is_active (uptr))
     sim_activate (uptr, 0);                             /* reschedule I/O */
 return SCPE_OK;
 }
+
 
 /* Attach routine */
 

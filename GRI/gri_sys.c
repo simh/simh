@@ -93,19 +93,23 @@ char gbuf[CBUFSIZE];
 if (*cptr != 0) {                                       /* more input? */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get origin */
     org = get_uint (gbuf, 8, AMASK, &r);
-    if (r != SCPE_OK) return r;
-    if (*cptr != 0) return SCPE_ARG;                    /* no more */
+    if (r != SCPE_OK)
+        return r;
+    if (*cptr != 0)                                     /* no more */
+        return SCPE_ARG;
     }
 else org = 0200;                                        /* default 200 */
 
 for (;;) {                                              /* until EOF */
     while ((c = getc (fileref)) == 0) ;                 /* skip starting 0's */
-    if (c == EOF) break;                                /* EOF? done */
+    if (c == EOF)                                       /* EOF? done */
+        break;
     for ( ; c != 0; ) {                                 /* loop until ctl = 0 */
                                                         /* ign ctrl frame */
         if ((c = getc (fileref)) == EOF)                /* get high byte */
             return SCPE_FMT;                            /* EOF is error */
-        if (!MEM_ADDR_OK (org)) return SCPE_NXM;
+        if (!MEM_ADDR_OK (org))
+            return SCPE_NXM;
         M[org] = ((c & 0377) << 8);                     /* store high */
         if ((c = getc (fileref)) == EOF)                /* get low byte */
             return SCPE_FMT;                            /* EOF is error */
@@ -114,7 +118,8 @@ for (;;) {                                              /* until EOF */
         if ((c = getc (fileref)) == EOF)                /* get ctrl frame */
             return SCPE_OK;                             /* EOF is ok */
         }                                               /* end block for */
-    if (!(sim_switches & SWMASK ('C'))) return SCPE_OK;
+    if (!(sim_switches & SWMASK ('C')))
+        return SCPE_OK;
     }                                                   /* end tape for */
 return SCPE_OK;
 }
@@ -293,12 +298,14 @@ for (i = nfirst = 0; fname[i] != NULL; i++) {
     if (((inst & fop[i].imask) == fop[i].inst) &&
         ((op & fop[i].omask) == fop[i].oper)) {
         op = op & ~fop[i].omask;
-        if (nfirst) fputc (' ', of);
+        if (nfirst)
+            fputc (' ', of);
         nfirst = 1;
         fprintf (of, "%s", fname[i]);
         }
     }
-if (op) fprintf (of, " %o", op);
+if (op)
+    fprintf (of, " %o", op);
 return;
 }
 
@@ -335,7 +342,8 @@ uint32 inst, src, dst, op, bop;
 
 inst = val[0];
 if (sw & SWMASK ('A')) {                                /* ASCII? */
-    if (inst > 0377) return SCPE_ARG;
+    if (inst > 0377)
+        return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
@@ -344,7 +352,8 @@ if (sw & SWMASK ('C')) {                                /* characters? */
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
-if (!(sw & SWMASK ('M'))) return SCPE_ARG;
+if (!(sw & SWMASK ('M')))
+    return SCPE_ARG;
 
 /* Instruction decode */
 
@@ -382,27 +391,30 @@ for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
 
         case F_V_RR:                                    /* reg reg */
             if (strcmp (unsrc[src], undst[dst]) == 0) {
-                if (bop) fprintf (of, "%s %s,%s", opcode[i + 2],
-                    unsrc[src], opname[bop]);
+                if (bop)
+                    fprintf (of, "%s %s,%s", opcode[i + 2],
+                             unsrc[src], opname[bop]);
                 else fprintf (of, "%s %s", opcode[i + 2], unsrc[src]);
                 }
             else {
-                if (bop) fprintf (of, "%s %s,%s,%s", opcode[i],
-                    unsrc[src], opname[bop], undst[dst]);
+                if (bop)
+                    fprintf (of, "%s %s,%s,%s", opcode[i],
+                             unsrc[src], opname[bop], undst[dst]);
                 else fprintf (of, "%s %s,%s", opcode[i],
-                    unsrc[src], undst[dst]);
+                              unsrc[src], undst[dst]);
                 }
             break;
 
         case F_V_ZR:                                    /* zero reg */
-            if (bop) fprintf (of, "%s %s,%s", opcode[i],
-                opname[bop], undst[dst]);
+            if (bop)
+                fprintf (of, "%s %s,%s", opcode[i],
+                         opname[bop], undst[dst]);
             else fprintf (of, "%s %s", opcode[i], undst[dst]);
             break;
 
         case F_V_JC:                                    /* jump cond */
             fprintf (of, "%s %s,%s,",
-                opcode[i], unsrc[src], cdname[op >> 1]);
+                     opcode[i], unsrc[src], cdname[op >> 1]);
             fprint_addr (of, val[1], 0, U_SC);
             break;
 
@@ -412,14 +424,16 @@ for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
             break;
 
         case F_V_RM:                                    /* reg mem */
-            if (bop) fprintf (of, "%s %s,%s,",
-                opcode[i], unsrc[src], opname[bop]);
+            if (bop)
+                fprintf (of, "%s %s,%s,",
+                         opcode[i], unsrc[src], opname[bop]);
             else fprintf (of, "%s %s,", opcode[i], unsrc[src]);
             fprint_addr (of, val[1], op & MEM_MOD, dst);
             break;
 
         case F_V_ZM:                                    /* zero mem */
-            if (bop) fprintf (of, "%s %s,", opcode[i], opname[bop]);
+            if (bop)
+                fprintf (of, "%s %s,", opcode[i], opname[bop]);
             else fprintf (of, "%s ", opcode[i]);
             fprint_addr (of, val[1], op & MEM_MOD, dst);
             break;
@@ -427,14 +441,16 @@ for (i = 0; opcode[i] != NULL; i++) {                   /* loop thru ops */
         case F_V_MR:                                    /* mem reg */
             fprintf (of, "%s ", opcode[i]);
             fprint_addr (of, val[1], op & MEM_MOD, dst);
-            if (bop) fprintf (of, ",%s,%s", opname[bop], undst[dst]);
+            if (bop)
+                fprintf (of, ",%s,%s", opname[bop], undst[dst]);
             else fprintf (of, ",%s", undst[dst]);
             break;
 
         case F_V_MS:                                    /* mem self */
             fprintf (of, "%s ", opcode[i]);
             fprint_addr (of, val[1], op & MEM_MOD, dst);
-            if (bop) fprintf (of, ",%s", opname[bop]);
+            if (bop)
+                fprintf (of, ",%s", opname[bop]);
             break;
             }                                           /* end case */
 
@@ -465,7 +481,8 @@ while (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);                   /* get glyph */
     d = get_uint (gbuf, 8, 017, &r);                    /* octal? */
     if (r == SCPE_OK) {                                 /* ok? */
-        if (d & fncm) return NULL;                      /* already filled? */
+        if (d & fncm)                                   /* already filled? */
+            return NULL;
         fncv = fncv | d;                                /* save */
         fncm = fncm | d;                                /* field filled */
         }
@@ -473,13 +490,15 @@ while (*cptr) {
         for (i = 0; fname[i] != NULL; i++) {            /* search table */
             if ((strcmp (gbuf, fname[i]) == 0) &&       /* match for inst? */
                 ((inst & fop[i].imask) == fop[i].inst)) {
-                if (fop[i].oper & fncm) return NULL;    /* already filled? */
+                if (fop[i].oper & fncm)                 /* already filled? */
+                    return NULL;
                 fncm = fncm | fop[i].omask;
                 fncv = fncv | fop[i].oper;
                 break;
                 }
             }
-        if (fname[i] == NULL) return NULL;
+        if (fname[i] == NULL)
+            return NULL;
         }                                               /* end else */
     }                                                   /* end while */
 val[0] = val[0] | (fncv << I_V_OP);                     /* store fnc */
@@ -496,7 +515,8 @@ cptr = get_glyph (cptr, gbuf, term);                    /* get glyph */
 if (gbuf[0] == '#')                                     /* indexed? */
     d = get_uint (gbuf + 1, 8, AMASK, &r) | INDEX;      /* [0, 77777] */
 else d = get_uint (gbuf, 8, DMASK, &r);                 /* [0,177777] */
-if (r != SCPE_OK) return NULL;
+if (r != SCPE_OK)
+    return NULL;
 val[1] = d;                                             /* second wd */
 return cptr;
 }
@@ -510,11 +530,13 @@ t_stat r;
 cptr = get_glyph (cptr, gbuf, term);                    /* get glyph */
 for (d = 0; d < 64; d++) {                              /* symbol match? */
     if ((strcmp (gbuf, unsrc[d]) == 0) ||
-        (strcmp (gbuf, undst[d]) == 0)) break;
+        (strcmp (gbuf, undst[d]) == 0))
+        break;
     }
 if (d >= 64) {                                          /* no, [0,63]? */
     d = get_uint (gbuf, 8, 077, &r);
-    if (r != SCPE_OK) return NULL;
+    if (r != SCPE_OK)
+        return NULL;
     }
 val[0] = val[0] | (d << (src? I_V_SRC: I_V_DST));       /* or to inst */
 return cptr;
@@ -554,14 +576,15 @@ char *tptr, gbuf[CBUFSIZE];
 
 while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (t_value) cptr[0] & 0177;
     return SCPE_OK;
     }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
-    val[0] = (((t_value) cptr[0] & 0177) << 8) |
-              ((t_value) cptr[1] & 0177);
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
+    val[0] = (((t_value) cptr[0] & 0177) << 8) | ((t_value) cptr[1] & 0177);
     return SCPE_OK;
     }
 
@@ -569,7 +592,8 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 val[0] = opc_val[i] & DMASK;                            /* get value */
 j = (opc_val[i] >> F_V_FL) & F_M_FL;                    /* get class */
 
@@ -577,10 +601,12 @@ switch (j) {                                            /* case on class */
 
     case F_V_FO:                                        /* func out */
         tptr = strchr (cptr, ',');                      /* find dst */
-        if (!tptr) return SCPE_ARG;                     /* none? */
+        if (!tptr)                                      /* none? */
+            return SCPE_ARG;
         *tptr = 0;                                      /* split fields */
         cptr = get_fnc (cptr, val);                     /* fo # */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_sd (tptr + 1, val, 0, FALSE);        /* dst */
         break;
 
@@ -590,7 +616,8 @@ switch (j) {                                            /* case on class */
 
     case F_V_SF:                                        /* skip func */
         cptr = get_sd (cptr, val, ',', TRUE);           /* src */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
 
     case F_V_SFI:                                       /* skip func impl */
         cptr = get_fnc (cptr, val);                     /* fo # */
@@ -598,33 +625,40 @@ switch (j) {                                            /* case on class */
 
     case F_V_RR:                                        /* reg-reg */
         cptr = get_sd (cptr, val, ',', TRUE);           /* src */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_op (cptr, val, ',');                 /* op */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_sd (cptr, val, 0, FALSE);            /* dst */
         break;
 
     case F_V_ZR:                                        /* zero-reg */
         cptr = get_op (cptr, val, ',');                 /* op */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_sd (cptr, val, 0, FALSE);            /* dst */
         break;
 
     case F_V_RS:                                        /* reg self */
         cptr = get_sd (cptr, val, ',', TRUE);           /* src */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         val[0] = val[0] | I_GETSRC (val[0]);            /* duplicate */
         cptr = get_op (cptr, val, 0);                   /* op */
         break;
 
     case F_V_JC:                                        /* jump cond */
         cptr = get_sd (cptr, val, ',', TRUE);           /* src */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_glyph (cptr, gbuf, ',');             /* cond */
         for (k = 0; k < 8; k++) {                       /* symbol? */
-            if (strcmp (gbuf, cdname[k]) == 0) break;
+            if (strcmp (gbuf, cdname[k]) == 0)
+                break;
             }
-        if (k >= 8) return SCPE_ARG;
+        if (k >= 8)
+            return SCPE_ARG;
         val[0] = val[0] | (k << (I_V_OP + 1));          /* or to inst */
 
     case F_V_JU:                                        /* jump uncond */
@@ -633,28 +667,34 @@ switch (j) {                                            /* case on class */
 
     case F_V_RM:                                        /* reg mem */
         cptr = get_sd (cptr, val, ',', TRUE);           /* src */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
     case F_V_ZM:                                        /* zero mem */
         cptr = get_op (cptr, val, ',');                 /* op */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_ma (cptr, val, 0);                   /* addr */
         break;
 
     case F_V_MR:                                        /* mem reg */
         cptr = get_ma (cptr, val, ',');                 /* addr */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_op (cptr, val, ',');                 /* op */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_sd (cptr, val, 0, FALSE);            /* dst */
         break;
 
     case F_V_MS:                                        /* mem self */
         cptr = get_ma (cptr, val, ',');                 /* addr */
-        if (!cptr) return SCPE_ARG;
+        if (!cptr)
+            return SCPE_ARG;
         cptr = get_op (cptr, val, 0);                   /* op */
         break;
     }                                                   /* end case */
 
-if (!cptr || (*cptr != 0)) return SCPE_ARG;             /* junk at end? */
+if (!cptr || (*cptr != 0))                              /* junk at end? */
+    return SCPE_ARG;
 return (j >= F_2WD)? -1: SCPE_OK;
 }

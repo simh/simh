@@ -1,6 +1,6 @@
 /* id_pt.c: Interdata paper tape reader
 
-   Copyright (c) 2000-2005, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -135,7 +135,8 @@ switch (op) {                                           /* case IO op */
                 }
             else {                                      /* not active */
                 pt_sta = pt_sta & ~STA_BSY;             /* busy = 0 */
-                if (pt_arm) SET_INT (v_PT);             /* no, set int */
+                if (pt_arm)                             /* no, set int */
+                    SET_INT (v_PT);
                 }
             }
         if (pt_rd) {                                    /* reader? */
@@ -158,12 +159,14 @@ switch (op) {                                           /* case IO op */
             pt_sta = pt_sta & ~STA_DU;                  /* clr eof */
             }
         pt_chp = 0;                                     /* clr char pend */
-        if (pt_rd) pt_sta = pt_sta | STA_BSY;           /* set busy */
+        if (pt_rd)                                      /* set busy */
+            pt_sta = pt_sta | STA_BSY;
         return (pt_unit[PTR].buf & 0xFF);               /* return char */
 
     case IO_WD:                                         /* write */
         pt_unit[PTP].buf = dat & DMASK8;                /* save char */
-        if (!pt_rd) pt_sta = pt_sta | STA_BSY;          /* set busy */
+        if (!pt_rd)                                     /* set busy */
+            pt_sta = pt_sta | STA_BSY;
         sim_activate (&pt_unit[PTP], pt_unit[PTP].wait);
         break;
 
@@ -173,7 +176,8 @@ switch (op) {                                           /* case IO op */
             t = t | STA_NMTN;                           /* stopped? */
         if ((pt_unit[pt_rd? PTR: PTP].flags & UNIT_ATT) == 0)
             t = t | STA_DU;                             /* offline? */
-        if (t & SET_EX) t = t | STA_EX;                 /* test for EX */
+        if (t & SET_EX)                                 /* test for EX */
+            t = t | STA_EX;
         return t;
         }
 
@@ -190,14 +194,17 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return IORETURN (ptr_stopioe, SCPE_UNATT);
 if (pt_rd) {                                            /* read mode? */
     pt_sta = pt_sta & ~STA_BSY;                         /* clear busy */
-    if (pt_arm) SET_INT (v_PT);                         /* if armed, intr */
-    if (pt_chp) pt_sta = pt_sta | STA_OVR;              /* overrun? */
+    if (pt_arm)                                         /* if armed, intr */
+        SET_INT (v_PT);
+    if (pt_chp)                                         /* overrun? */
+        pt_sta = pt_sta | STA_OVR;
     }
 pt_chp = 1;                                             /* char pending */
 if ((temp = getc (uptr->fileref)) == EOF) {             /* error? */
     if (feof (uptr->fileref)) {                         /* eof? */
         pt_sta = pt_sta | STA_DU;                       /* set DU */
-        if (ptr_stopioe) printf ("PTR end of file\n");
+        if (ptr_stopioe)
+            printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
@@ -206,7 +213,8 @@ if ((temp = getc (uptr->fileref)) == EOF) {             /* error? */
     }
 uptr->buf = temp & DMASK8;                              /* store char */
 uptr->pos = uptr->pos + 1;                              /* incr pos */
-if (pt_slew) sim_activate (uptr, uptr->wait);           /* slew? continue */
+if (pt_slew)                                            /* slew? continue */
+    sim_activate (uptr, uptr->wait);
 return SCPE_OK;
 }
 
@@ -216,7 +224,8 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (!pt_rd) {                                           /* write mode? */
     pt_sta = pt_sta & ~STA_BSY;                         /* clear busy */
-    if (pt_arm) SET_INT (v_PT);                         /* if armed, intr */
+    if (pt_arm)                                         /* if armed, intr */
+        SET_INT (v_PT);
     }
 if (putc (uptr->buf, uptr -> fileref) == EOF) {         /* write char */
     perror ("PTP I/O error");
@@ -339,22 +348,30 @@ uint32 i, lo, hi, cs;
 char *tptr;
 extern DEVICE cpu_dev;
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_2FARG;
 tptr = get_range (NULL, cptr, &lo, &hi, cpu_dev.aradix, 0xFFFF, 0);
-if ((tptr == NULL) || (lo < INTSVT)) return SCPE_ARG;
-if (*tptr != 0) return SCPE_2MARG;
-for (i = lo, cs = 0; i <= hi; i++) cs = cs ^ IOReadB (i);
+if ((tptr == NULL) || (lo < INTSVT))
+    return SCPE_ARG;
+if (*tptr != 0)
+    return SCPE_2MARG;
+for (i = lo, cs = 0; i <= hi; i++)
+    cs = cs ^ IOReadB (i);
 IOWriteBlk (LOAD_START, LOAD_LEN, load_rom);
 IOWriteB (LOAD_LO, (lo >> 8) & 0xFF);
 IOWriteB (LOAD_LO + 1, lo & 0xFF);
 IOWriteB (LOAD_HI, (hi >> 8) & 0xFF);
 IOWriteB (LOAD_HI + 1, hi & 0xFF);
 IOWriteB (LOAD_CS, cs & 0xFF);
-for (i = 0; i < LOAD_LDR; i++) fputc (0, of);
+for (i = 0; i < LOAD_LDR; i++)
+    fputc (0, of);
 for (i = LOAD_START; i < (LOAD_START + LOAD_LEN); i++)
     fputc (IOReadB (i), of);
-for (i = 0; i < LOAD_LDR; i++) fputc (0, of);
-for (i = lo; i <= hi; i++) fputc (IOReadB (i), of);
-for (i = 0; i < LOAD_LDR; i++) fputc (0, of);
+for (i = 0; i < LOAD_LDR; i++)
+    fputc (0, of);
+for (i = lo; i <= hi; i++)
+    fputc (IOReadB (i), of);
+for (i = 0; i < LOAD_LDR; i++)
+    fputc (0, of);
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp11_dz.c: DZ11 terminal multiplexor simulator
 
-   Copyright (c) 2001-2007, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dz           DZ11 terminal multiplexor
 
+   29-Dec-08    RMS     Added MTAB_NC to SET LOG command (found by Walter Mueller)
+   19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -175,9 +177,6 @@ void dz_clr_rxint (int32 dz);
 void dz_set_rxint (int32 dz);
 void dz_clr_txint (int32 dz);
 void dz_set_txint (int32 dz);
-t_stat dz_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dz_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dz_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -196,8 +195,6 @@ DIB dz_dib = {
     };
 
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
-
-REG dz_nlreg = { DRDATA (NLINES, dz_desc.lines, 6), PV_LEFT };
 
 REG dz_reg[] = {
     { BRDATA (CSR, dz_csr, DEV_RDX, 16, DZ_MUXES) },
@@ -222,24 +219,25 @@ MTAB dz_mod[] = {
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &dz_desc },
-    { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &dz_summ },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &dz_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &dz_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dz_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &dz_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dz_desc },
     { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &dz_show_vec, NULL },
+    { MTAB_XTD|MTAB_VDV, DZ_LINES, "VECTOR", "VECTOR",
+      &set_vec, &show_vec_mux, (void *) &dz_desc },
 #if !defined (VM_PDP10)
     { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
       &set_addr_flt, NULL, NULL },
 #endif
-    { MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-      &dz_setnl, NULL, &dz_nlreg },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "LOG",
+    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+      &dz_setnl, &tmxr_show_lines, (void *) &dz_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_NC, 0, NULL, "LOG",
       &dz_set_log, NULL, &dz_desc },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "NOLOG",
+    { MTAB_XTD | MTAB_VDV | MTAB_NC, 0, NULL, "NOLOG",
       &dz_set_nolog, NULL, &dz_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LOG", NULL,
       NULL, &dz_show_log, &dz_desc },
@@ -270,7 +268,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         dz_csr[dz] = dz_csr[dz] & ~CSR_SA;              /* clr silo alarm */
         if (dz_csr[dz] & CSR_MSE) {                     /* scanner on? */
             dz_rbuf[dz] = dz_getc (dz);                 /* get top of silo */
-            if (!dz_rbuf[dz]) dz_sae[dz] = 1;           /* empty? re-enable */
+            if (!dz_rbuf[dz])                           /* empty? re-enable */
+                dz_sae[dz] = 1;
             tmxr_poll_rx (&dz_desc);                    /* poll input */
             dz_update_rcvi ();                          /* update rx intr */
             }
@@ -305,16 +304,19 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (access == WRITEB) data = (PA & 1)?          /* byte? merge */
             (dz_csr[dz] & 0377) | (data << 8):
             (dz_csr[dz] & ~0377) | data;
-        if (data & CSR_CLR) dz_clear (dz, FALSE);       /* clr? reset */
+        if (data & CSR_CLR)                             /* clr? reset */
+            dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
             sim_activate (&dz_unit, clk_cosched (tmxr_poll));
         else dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
-        if ((data & CSR_RIE) == 0) dz_clr_rxint (dz);   /* RIE = 0? */
+        if ((data & CSR_RIE) == 0)                      /* RIE = 0? */
+            dz_clr_rxint (dz);
         else if (((dz_csr[dz] & CSR_IE) == 0) &&        /* RIE 0->1? */
              ((dz_csr[dz] & CSR_SAE)?
              (dz_csr[dz] & CSR_SA): (dz_csr[dz] & CSR_RDONE)))
             dz_set_rxint (dz);
-        if ((data & CSR_TIE) == 0) dz_clr_txint (dz);   /* TIE = 0? */
+        if ((data & CSR_TIE) == 0)                      /* TIE = 0? */
+            dz_clr_txint (dz);
         else if (((dz_csr[dz] & CSR_TIE) == 0) && (dz_csr[dz] & CSR_TRDY))
             dz_set_txint (dz);
         dz_csr[dz] = (dz_csr[dz] & ~CSR_RW) | (data & CSR_RW);
@@ -324,7 +326,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         dz_lpr[dz] = data;
         line = (dz * DZ_LINES) + LPR_GETLN (data);      /* get line num */
         lp = &dz_ldsc[line];                            /* get line desc */
-        if (dz_lpr[dz] & LPR_RCVE) lp->rcve = 1;        /* rcv enb? on */
+        if (dz_lpr[dz] & LPR_RCVE)                      /* rcv enb? on */
+            lp->rcve = 1;
         else lp->rcve = 0;                              /* else line off */
         tmxr_poll_rx (&dz_desc);                        /* poll input */
         dz_update_rcvi ();                              /* update rx intr */
@@ -367,7 +370,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             line = (dz * DZ_LINES) + CSR_GETTL (dz_csr[dz]);
             lp = &dz_ldsc[line];                        /* get line desc */
             c = sim_tt_outcvt (dz_tdr[dz], TT_GET_MODE (dz_unit.flags));
-            if (c >= 0) tmxr_putc_ln (lp, c);           /* store char */
+            if (c >= 0)                                 /* store char */
+                tmxr_putc_ln (lp, c);
             tmxr_poll_tx (&dz_desc);                    /* poll output */
             dz_update_xmti ();                          /* update int */
             }
@@ -399,7 +403,7 @@ if (t) {                                                /* any enabled? */
     if ((newln >= 0) && dz_mctl) {                      /* got a live one? */
         dz = newln / DZ_LINES;                          /* get mux num */
         if (dz_tcr[dz] & (1 << (newln + TCR_V_DTR)))    /* DTR set? */
-         dz_msr[dz] |= (1 << (newln + MSR_V_CD));       /* set cdet */
+            dz_msr[dz] |= (1 << (newln + MSR_V_CD));    /* set cdet */
         else dz_msr[dz] |= (1 << newln);                /* set ring */
         }
     tmxr_poll_rx (&dz_desc);                            /* poll input */
@@ -420,8 +424,10 @@ uint32 i, line, c;
 for (i = c = 0; (i < DZ_LINES) && (c == 0); i++) {      /* loop thru lines */
     line = (dz * DZ_LINES) + i;                         /* get line num */
     c = tmxr_getc_ln (&dz_ldsc[line]);                  /* test for input */
-    if (c & SCPE_BREAK) c = RBUF_VALID | RBUF_FRME;     /* break? frame err */
-    if (c) c = c | (i << RBUF_V_RLINE);                 /* or in line # */
+    if (c & SCPE_BREAK)                                 /* break? frame err */
+        c = RBUF_VALID | RBUF_FRME;
+    if (c)                                              /* or in line # */
+        c = c | (i << RBUF_V_RLINE);
     }                                                   /* end for */
 return c;
 }
@@ -492,7 +498,8 @@ return;
 void dz_clr_rxint (int32 dz)
 {
 dz_rxi = dz_rxi & ~(1 << dz);                           /* clr mux rcv int */
-if (dz_rxi == 0) CLR_INT (DZRX);                        /* all clr? */
+if (dz_rxi == 0)                                        /* all clr? */
+    CLR_INT (DZRX);
 else SET_INT (DZRX);                                    /* no, set intr */
 return;
 }
@@ -520,7 +527,8 @@ return 0;
 void dz_clr_txint (int32 dz)
 {
 dz_txi = dz_txi & ~(1 << dz);                           /* clr mux xmt int */
-if (dz_txi == 0) CLR_INT (DZTX);                        /* all clr? */
+if (dz_txi == 0)                                        /* all clr? */
+    CLR_INT (DZTX);
 else SET_INT (DZTX);                                    /* no, set intr */
 return;
 }
@@ -554,7 +562,8 @@ int32 i, line;
 dz_csr[dz] = 0;                                         /* clear CSR */
 dz_rbuf[dz] = 0;                                        /* silo empty */
 dz_lpr[dz] = 0;                                         /* no params */
-if (flag) dz_tcr[dz] = 0;                               /* INIT? clr all */
+if (flag)                                               /* INIT? clr all */
+    dz_tcr[dz] = 0;
 else dz_tcr[dz] &= ~0377;                               /* else save dtr */
 dz_tdr[dz] = 0;
 dz_sae[dz] = 1;                                         /* alarm on */
@@ -562,7 +571,8 @@ dz_clr_rxint (dz);                                      /* clear int */
 dz_clr_txint (dz);
 for (i = 0; i < DZ_LINES; i++) {                        /* loop thru lines */
     line = (dz * DZ_LINES) + i;
-    if (!dz_ldsc[line].conn) dz_ldsc[line].xmte = 1;    /* set xmt enb */
+    if (!dz_ldsc[line].conn)                            /* set xmt enb */
+        dz_ldsc[line].xmte = 1;
     dz_ldsc[line].rcve = 0;                             /* clr rcv enb */
     }
 return SCPE_OK;
@@ -572,7 +582,8 @@ t_stat dz_reset (DEVICE *dptr)
 {
 int32 i, ndev;
 
-for (i = 0; i < DZ_MUXES; i++) dz_clear (i, TRUE);      /* init muxes */
+for (i = 0; i < DZ_MUXES; i++)                          /* init muxes */
+    dz_clear (i, TRUE);
 dz_rxi = dz_txi = 0;                                    /* clr master int */
 CLR_INT (DZRX);
 CLR_INT (DZTX);
@@ -590,15 +601,18 @@ extern int32 sim_switches;
 
 dz_mctl = dz_auto = 0;                                  /* modem ctl off */
 r = tmxr_attach (&dz_desc, uptr, cptr);                 /* attach mux */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 if (sim_switches & SWMASK ('M')) {                      /* modem control? */
     dz_mctl = 1;
     printf ("Modem control activated\n");
-    if (sim_log) fprintf (sim_log, "Modem control activated\n");
+    if (sim_log)
+        fprintf (sim_log, "Modem control activated\n");
     if (sim_switches & SWMASK ('A')) {                  /* autodisconnect? */
         dz_auto = 1;
         printf ("Auto disconnect activated\n");
-        if (sim_log) fprintf (sim_log, "Auto disconnect activated\n");
+        if (sim_log)
+            fprintf (sim_log, "Auto disconnect activated\n");
         }
     }
 return SCPE_OK;
@@ -611,37 +625,6 @@ t_stat dz_detach (UNIT *uptr)
 return tmxr_detach (&dz_desc, uptr);
 }
 
-/* Show summary processor */
-
-t_stat dz_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < dz_desc.lines; i++) {               /* get num conn */
-    if (dz_ldsc[i].conn) t = t + 1;
-	}
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat dz_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < dz_desc.lines; i++) {               /* loop thru conn */
-    if (dz_ldsc[i].conn) {
-        t = 1; 
-        if (val) tmxr_fconns (st, &dz_ldsc[i], i);
-        else tmxr_fstats (st, &dz_ldsc[i], i);
-        }
-    }
-if (t == 0) fprintf (st, "all disconnected\n");
-return SCPE_OK;
-}
-
 /* SET LINES processor */
 
 t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -649,12 +632,16 @@ t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 newln, i, t, ndev;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
-if ((r != SCPE_OK) || (newln == dz_desc.lines)) return r;
-if ((newln == 0) || (newln % DZ_LINES)) return SCPE_ARG;
+if ((r != SCPE_OK) || (newln == dz_desc.lines))
+    return r;
+if ((newln == 0) || (newln % DZ_LINES))
+    return SCPE_ARG;
 if (newln < dz_desc.lines) {
-    for (i = newln, t = 0; i < dz_desc.lines; i++) t = t | dz_ldsc[i].conn;
+    for (i = newln, t = 0; i < dz_desc.lines; i++)
+        t = t | dz_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
         return SCPE_OK;
     for (i = newln; i < dz_desc.lines; i++) {
@@ -672,13 +659,6 @@ ndev = ((dz_dev.flags & DEV_DIS)? 0: (dz_desc.lines / DZ_LINES));
 return auto_config (dz_dev.name, ndev);                 /* auto config */
 }
 
-/* SHOW VECTOR processor */
-
-t_stat dz_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-return show_vec (st, uptr, ((dz_desc.lines * 2) / DZ_LINES), desc);
-}
-
 /* SET LOG processor */
 
 t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -687,12 +667,15 @@ char *tptr;
 t_stat r;
 int32 ln;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 tptr = strchr (cptr, '=');
-if ((tptr == NULL) || (*tptr == 0)) return SCPE_ARG;
+if ((tptr == NULL) || (*tptr == 0))
+    return SCPE_ARG;
 *tptr++ = 0;
 ln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
-if ((r != SCPE_OK) || (ln >= dz_desc.lines)) return SCPE_ARG;
+if ((r != SCPE_OK) || (ln >= dz_desc.lines))
+    return SCPE_ARG;
 return tmxr_set_log (NULL, ln, tptr, desc);
 }
 
@@ -703,9 +686,11 @@ t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat r;
 int32 ln;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 ln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
-if ((r != SCPE_OK) || (ln >= dz_desc.lines)) return SCPE_ARG;
+if ((r != SCPE_OK) || (ln >= dz_desc.lines))
+    return SCPE_ARG;
 return tmxr_set_nolog (NULL, ln, NULL, desc);
 }
 

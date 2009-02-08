@@ -151,7 +151,8 @@ do {                                                    /* data block */
     if ((lo = getc (fi)) == EOF)
         return SCPE_FMT;
     wd = (hi << 6) | lo;
-    if (wd > 07777) origin = wd & 07777;
+    if (wd > 07777)
+        origin = wd & 07777;
     else M[origin++ & 07777] = wd;
     if ((hi = getc (fi)) == EOF)
         return SCPE_FMT;
@@ -223,7 +224,8 @@ return SCPE_IERR;
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
+if ((*cptr != 0) || (flag != 0))
+    return SCPE_ARG;
 if ((sim_switches & SWMASK ('R')) ||                    /* RIM format? */
     (match_ext (fnam, "RIM") && !(sim_switches & SWMASK ('B'))))
     return sim_load_rim (fileref);
@@ -544,7 +546,8 @@ t_stat r;
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 inst = val[0];
 if (sw & SWMASK ('A')) {                                /* ASCII? */
-    if (inst > 0377) return SCPE_ARG;
+    if (inst > 0377)
+        return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
@@ -561,7 +564,8 @@ if (sw & SWMASK ('T')) {                                /* TSS8 packed? */
 if ((sw & SWMASK ('F')) &&                              /* FPP8? */
     ((r = fprint_sym_fpp (of, val)) != SCPE_ARG))
     return r;
-if (!(sw & SWMASK ('M'))) return SCPE_ARG;
+if (!(sw & SWMASK ('M')))
+    return SCPE_ARG;
 
 /* Instruction decode */
 
@@ -602,7 +606,8 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             disp = inst & 0177;                         /* displacement */
             fprintf (of, "%s%s", opcode[i], ((inst & 00400)? " I ": " "));
             if (inst & 0200) {                          /* current page? */
-                if (cflag) fprintf (of, "%-o", (addr & 07600) | disp);
+                if (cflag)
+                    fprintf (of, "%-o", (addr & 07600) | disp);
                 else fprintf (of, "C %-o", disp);
                 }
             else fprintf (of, "%-o", disp);             /* page zero */
@@ -614,17 +619,20 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
 
         case I_V_OP1:                                   /* operate group 1 */
             sp = fprint_opr (of, inst & 0361, j, 0);
-            if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            if (opcode[i])
+                fprintf (of, (sp? " %s": "%s"), opcode[i]);
             break;
 
         case I_V_OP2:                                   /* operate group 2 */
-            if (opcode[i]) fprintf (of, "%s", opcode[i]); /* skips */
+            if (opcode[i])
+                fprintf (of, "%s", opcode[i]); /* skips */
             fprint_opr (of, inst & 0206, j, opcode[i] != NULL);
             break;      
 
         case I_V_OP3:                                   /* operate group 3 */
             sp = fprint_opr (of, inst & 0320, j, 0);
-            if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            if (opcode[i])
+                fprintf (of, (sp? " %s": "%s"), opcode[i]);
             break;
             }                                           /* end case */
 
@@ -655,18 +663,21 @@ char gbuf[CBUFSIZE];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (t_value) cptr[0] | 0200;
     return SCPE_OK;
     }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (((t_value) cptr[0] & 077) << 6) |
               ((t_value) cptr[1] & 077);
     return SCPE_OK;
     }
 if ((sw & SWMASK ('T')) || ((*cptr == '"') && cptr++)) { /* TSS8 string? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (((t_value) (cptr[0] - 040) & 077) << 6) |
               ((t_value) (cptr[1] - 040) & 077);
     return SCPE_OK;
@@ -678,7 +689,8 @@ if ((r = parse_sym_fpp (cptr, val)) != SCPE_ARG)        /* FPP8 inst? */
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 val[0] = opc_val[i] & 07777;                            /* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
@@ -697,12 +709,14 @@ switch (j) {                                            /* case on class */
                         (strcmp (opcode[i], gbuf) != 0) ; i++) ;
             if (opcode[i] != NULL) {
                 k = (opc_val[i] >> I_V_FL) & I_M_FL;
-                if (k != j) return SCPE_ARG;
+                if (k != j)
+                    return SCPE_ARG;
                 val[0] = val[0] | (opc_val[i] & 07777);
                 }
             else {
                 d = get_uint (gbuf, 8, 07, &r);
-                if (r != SCPE_OK) return SCPE_ARG;
+                if (r != SCPE_OK)
+                    return SCPE_ARG;
                 val[0] = val[0] | (d << 3);
                 break;
                 }
@@ -722,8 +736,10 @@ switch (j) {                                            /* case on class */
             }
         else {
             d = get_uint (gbuf, 8, 07777, &r);
-            if (r != SCPE_OK) return SCPE_ARG;
-            if (d <= 0177) val[0] = val[0] | d;
+            if (r != SCPE_OK)
+                return SCPE_ARG;
+            if (d <= 0177)
+                val[0] = val[0] | d;
             else if (cflag && (((addr ^ d) & 07600) == 0))
                 val[0] = val[0] | (d & 0177) | 0200;
             else return SCPE_ARG;

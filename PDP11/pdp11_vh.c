@@ -1,6 +1,6 @@
 /* pdp11_vh.c: DHQ11 asynchronous terminal multiplexor simulator
 
-   Copyright (c) 2004-2006, John A. Dundas III
+   Copyright (c) 2004-2008, John A. Dundas III
    Portions derived from work by Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    vh		    DHQ11 asynch multiplexor for SIMH
 
+   19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
    07-Jul-05	RMS	    Removed extraneous externs
@@ -292,14 +293,11 @@ static t_stat vh_clear (int32 vh, t_bool flag);
 static t_stat vh_reset (DEVICE *dptr);
 static t_stat vh_attach (UNIT *uptr, char *cptr);
 static t_stat vh_detach (UNIT *uptr);       
-static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc); 
-static t_stat vh_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_debug (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_putc (int32 vh, TMLX *lp, int32 chan, int32 data);
 static void doDMA (int32 vh, int32 chan);
-static t_stat vh_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 int32 tmxr_send_buffered_data (TMLN *lp);
 
@@ -323,8 +321,6 @@ static UNIT vh_unit[VH_MUXES] = {
 	{ UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
 };
 
-static const REG vh_nlreg = { DRDATA (NLINES, vh_desc.lines, 6), PV_LEFT };
-
 static const REG vh_reg[] = {
 	{ BRDATA (CSR,     vh_csr, DEV_RDX, 16, VH_MUXES) },
 	{ GRDATA (DEVADDR, vh_dib.ba, DEV_RDX, 32, 0), REG_HRO },
@@ -343,18 +339,19 @@ static const MTAB vh_mod[] = {
 	{ UNIT_HANGUP, UNIT_HANGUP, "hangup", "HANGUP", NULL },
 	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-		&set_vec, &vh_show_vec, NULL },
+	{ MTAB_XTD|MTAB_VDV, VH_LINES, "VECTOR", "VECTOR",
+		&set_vec, &show_vec_mux, (void *) &vh_desc },
 	{ MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
 		&set_addr_flt, NULL, NULL },
 	/* this one is dangerous, don't use yet */
-	{ MTAB_XTD|MTAB_VDV|MTAB_VAL, 0, "lines", "LINES",
-		NULL, NULL, (REG *)&vh_nlreg },
-	{ UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &vh_summ },
+	{ MTAB_XTD|MTAB_VDV, 0, "LINES", "LINES",
+		NULL, &tmxr_show_lines, (void *) &vh_desc },
+	{ UNIT_ATT, UNIT_ATT, "summary", NULL,
+        NULL, &tmxr_show_summ, (void *) &vh_desc },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-		NULL, &vh_show, NULL },
+		NULL, &tmxr_show_cstat, (void *) &vh_desc },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-		NULL, &vh_show, NULL },
+		NULL, &tmxr_show_cstat, (void *) &vh_desc },
 	{ MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
 		&tmxr_dscln, NULL, &vh_desc },
 	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEBUG", NULL,
@@ -1266,40 +1263,6 @@ static t_stat vh_attach (	UNIT	*uptr,
 static t_stat vh_detach (	UNIT	*uptr	)
 {
 	return (tmxr_detach (&vh_desc, uptr));
-}
-
-static t_stat vh_summ (	FILE	*st,
-			UNIT	*uptr,
-			int32	val,
-			void	*desc	)
-{
-int32 i, t;
-
-for (i = t = 0; i < vh_desc.lines; i++) {               /* get num conn */
-    if (vh_ldsc[i].conn) t = t + 1;  }
-fprintf (st, "%d %s", t, (t == 1) ? "connection" : "connections");
-return SCPE_OK;
-}
-
-static t_stat vh_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < vh_desc.lines; i++) {               /* loop thru conn */
-        if (vh_ldsc[i].conn) {
-            t = 1;
-            if (val) tmxr_fconns (st, &vh_ldsc[i], i);
-            else tmxr_fstats (st, &vh_ldsc[i], i);  }  }
-if (t == 0) fprintf (st, "all disconnected\n");
-return SCPE_OK;
-}
-
-static t_stat vh_show_vec (	FILE	*st,
-				UNIT	*uptr,
-				int32	val,
-				void	*desc	)
-{
-	return (show_vec (st, uptr, ((vh_desc.lines * 2) / VH_LINES), desc));
 }
 
 static void debug_line (	FILE	*st,

@@ -1,6 +1,6 @@
 /* pdp18b_lp.c: 18b PDP's line printer simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -134,10 +134,12 @@ int32 lp62_65 (int32 dev, int32 pulse, int32 dat)
 {
 int32 i;
 
-if ((pulse & 01) && TST_INT (LPT)) dat = IOT_SKP | dat; /* LPSF */
+if ((pulse & 01) && TST_INT (LPT))                      /* LPSF */
+    dat = IOT_SKP | dat;
 if (pulse & 02) {
     int32 sb = pulse & 060;                             /* subopcode */
-    if (sb == 000) CLR_INT (LPT);                       /* LPCF */
+    if (sb == 000)                                      /* LPCF */
+        CLR_INT (LPT);
     if ((sb == 040) && (lp62_bp < BPTR_MAX)) {          /* LPLD */
         i = lp62_bp * 3;                                /* cvt to chr ptr */
         lp62_buf[i] = fio_to_asc[(dat >> 12) & 077];
@@ -157,7 +159,8 @@ int32 lp62_66 (int32 dev, int32 pulse, int32 dat)
 {
 if ((pulse & 01) && TST_INT (LPTSPC))                   /* LSSF */
     dat = IOT_SKP | dat;
-if (pulse & 02) CLR_INT (LPTSPC);                       /* LSCF */
+if (pulse & 02)                                         /* LSCF */
+    CLR_INT (LPTSPC);
 if (pulse & 04) {                                       /* LSPR */
     lp62_spc = 020 | (dat & 07);                        /* space */
     sim_activate (&lp62_unit, lp62_unit.wait);          /* activate */
@@ -192,7 +195,8 @@ else {
     SET_INT (LPT);                                      /* print */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
         return IORETURN (lp62_stopioe, SCPE_UNATT);
-    if (lp62_ovrpr) fputc ('\r', uptr->fileref);        /* overprint? */
+    if (lp62_ovrpr)                                     /* overprint? */
+        fputc ('\r', uptr->fileref);
     fputs (lp62_buf, uptr->fileref);                    /* print buffer */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
@@ -201,7 +205,8 @@ else {
         return SCPE_IOERR;
         }
     lp62_bp = 0;
-    for (i = 0; i <= LP62_BSIZE; i++) lp62_buf[i] = 0;  /* clear buffer */
+    for (i = 0; i <= LP62_BSIZE; i++)                   /* clear buffer */
+        lp62_buf[i] = 0;
     lp62_ovrpr = 1;                                     /* set overprint */
     }
 return SCPE_OK;
@@ -217,7 +222,8 @@ CLR_INT (LPT);                                          /* clear intrs */
 CLR_INT (LPTSPC);
 sim_cancel (&lp62_unit);                                /* deactivate unit */
 lp62_bp = 0;                                            /* clear buffer ptr */
-for (i = 0; i <= LP62_BSIZE; i++) lp62_buf[i] = 0;      /* clear buffer */
+for (i = 0; i <= LP62_BSIZE; i++)                       /* clear buffer */
+    lp62_buf[i] = 0;
 lp62_spc = 0;                                           /* clear state */
 lp62_ovrpr = 0;                                         /* clear overprint */
 return SCPE_OK;
@@ -317,15 +323,18 @@ int32 lp647_65 (int32 dev, int32 pulse, int32 dat)
 int32 i, sb;
 
 sb = pulse & 060;                                       /* subcode */
-if ((pulse & 01) && lp647_don) dat = IOT_SKP | dat;     /* LPSF */
+if ((pulse & 01) && lp647_don)                          /* LPSF */
+    dat = IOT_SKP | dat;
 if (pulse & 02) {                                       /* pulse 02 */
     lp647_don = 0;                                      /* clear done */
     CLR_INT (LPT);                                      /* clear int req */
     if (sb == 000) {                                    /* LPCB */
-        for (i = 0; i < LP647_BSIZE; i++) lp647_buf[i] = 0;
+        for (i = 0; i < LP647_BSIZE; i++)
+            lp647_buf[i] = 0;
         lp647_bp = 0;                                   /* reset buf ptr */
         lp647_don = 1;                                  /* set done */
-        if (lp647_ie) SET_INT (LPT);                    /* set int */
+        if (lp647_ie)                                   /* set int */
+            SET_INT (LPT);
         }
     }
 if (pulse & 004) {                                      /* LPDI */
@@ -356,7 +365,8 @@ if (pulse & 004) {                                      /* LPDI */
             lp647_bp = lp647_bp + 1;
             }
         lp647_don = 1;                                  /* set done */
-        if (lp647_ie) SET_INT (LPT);                    /* set int */
+        if (lp647_ie)                                   /* set int */
+            SET_INT (LPT);
         break;
         }                                               /* end case */
     }
@@ -365,7 +375,8 @@ return dat;
 
 int32 lp647_66 (int32 dev, int32 pulse, int32 dat)
 {
-if ((pulse & 01) && lp647_err) dat = IOT_SKP | dat;     /* LPSE */
+if ((pulse & 01) && lp647_err)                          /* LPSE */
+    dat = IOT_SKP | dat;
 if (pulse & 02) {                                       /* LPCF */
     lp647_don = 0;                                      /* clear done, int */
     CLR_INT (LPT);
@@ -378,7 +389,8 @@ if (pulse & 04) {
 #if defined (PDP9)
     else {                                              /* LPEI */
         lp647_ie = 1;                                   /* set int enable */
-        if (lp647_don) SET_INT (LPT);
+        if (lp647_don)
+            SET_INT (LPT);
         }
 #endif
     }
@@ -398,7 +410,8 @@ int32 i;
 char pbuf[LP647_BSIZE + 2];
 
 lp647_don = 1;
-if (lp647_ie) SET_INT (LPT);                            /* set flag */
+if (lp647_ie)                                           /* set flag */
+    SET_INT (LPT);
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     lp647_err = 1;                                      /* set error */
     return IORETURN (lp647_stopioe, SCPE_UNATT);
@@ -406,9 +419,11 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
 if ((lp647_iot & 020) == 0) {                           /* print? */
     for (i = 0; i < lp647_bp; i++)                      /* translate buffer */
         pbuf[i] = lp647_buf[i] | ((lp647_buf[i] >= 040)? 0: 0100);
-    if ((lp647_iot & 060) == 0) pbuf[lp647_bp++] = '\r';
+    if ((lp647_iot & 060) == 0)
+        pbuf[lp647_bp++] = '\r';
     pbuf[lp647_bp++] = 0;                               /* append nul */
-    for (i = 0; i < LP647_BSIZE; i++) lp647_buf[i] = 0; /* clear buffer */
+    for (i = 0; i < LP647_BSIZE; i++)                   /* clear buffer */
+        lp647_buf[i] = 0;
     fputs (pbuf, uptr->fileref);                        /* print buffer */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* error? */
@@ -444,7 +459,8 @@ CLR_INT (LPT);                                          /* clear int */
 sim_cancel (&lp647_unit);                               /* deactivate unit */
 lp647_bp = 0;                                           /* clear buffer ptr */
 lp647_iot = 0;                                          /* clear state */
-for (i = 0; i < LP647_BSIZE; i++) lp647_buf[i] = 0;     /* clear buffer */
+for (i = 0; i < LP647_BSIZE; i++)                       /* clear buffer */
+    lp647_buf[i] = 0;
 return SCPE_OK;
 }
 
@@ -541,8 +557,10 @@ int32 lp09_66 (int32 dev, int32 pulse, int32 dat)
 int32 sb = pulse & 060;                                 /* subopcode */
 
 if (pulse & 001) {
-    if ((sb == 000) && lp09_don) dat = IOT_SKP | dat;   /* LSDF */
-    if ((sb == 020) && lp09_err) dat = IOT_SKP | dat;   /* LSEF */
+    if ((sb == 000) && lp09_don)                        /* LSDF */
+        dat = IOT_SKP | dat;
+    if ((sb == 020) && lp09_err)                        /* LSEF */
+        dat = IOT_SKP | dat;
     }
 if (pulse & 002) {
     if (sb == 000) {                                    /* LSCF */
@@ -566,7 +584,8 @@ if (pulse & 004) {
         }
     else if (sb == 040) {                               /* LION */
         lp09_ie = 1;                                    /* set int enab */
-        if (lp09_don) SET_INT (LPT);                    /* if done, set int */
+        if (lp09_don)                                   /* if done, set int */
+            SET_INT (LPT);
         }
     }
 return dat;
@@ -579,13 +598,15 @@ t_stat lp09_svc (UNIT *uptr)
 int32 c;
 
 lp09_don = 1;                                           /* set done */
-if (lp09_ie) SET_INT (LPT);                             /* int enb? req int */
+if (lp09_ie)                                            /* int enb? req int */
+    SET_INT (LPT);
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     lp09_err = 1;                                       /* set error */
     return IORETURN (lp09_stopioe, SCPE_UNATT);
     }
 c = uptr->buf & 0177;                                   /* get char */
-if ((c == 0) || (c == 0177)) return SCPE_OK;            /* skip NULL, DEL */
+if ((c == 0) || (c == 0177))                            /* skip NULL, DEL */
+    return SCPE_OK;
 fputc (c, uptr->fileref);                               /* print char */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
@@ -730,23 +751,30 @@ if (pulse & 01) {
         header = M[(M[LPT_CA] + 1) & AMASK];            /* get first word */
         M[LPT_CA] = (M[LPT_CA] + 2) & DMASK;
         lp15_mode = header & 1;                         /* mode */
-        if (sb == 040) lp15_lc = 1;                     /* line count */
+        if (sb == 040)                                  /* line count */
+            lp15_lc = 1;
         else lp15_lc = (header >> 9) & 0377;
-        if (lp15_lc == 0) lp15_lc = 256;
+        if (lp15_lc == 0)
+            lp15_lc = 256;
         lp15_bp = 0;                                    /* reset buf ptr */
         }
-    else if (sb == 060) lp15_ie = 0;                    /* LPDI */
+    else if (sb == 060)                                 /* LPDI */
+        lp15_ie = 0;
     }
-if ((pulse & 02) && (sb == 040)) dat = dat | lp15_updsta (0); /* LPOS, LPRS */
-if ((pulse & 04) && (sb == 040)) lp15_ie = 1;           /* LPEI */
+if ((pulse & 02) && (sb == 040))                        /* LPOS, LPRS */
+    dat = dat | lp15_updsta (0);
+if ((pulse & 04) && (sb == 040))                        /* LPEI */
+    lp15_ie = 1;
 lp15_updsta (0);                                        /* update status */
 return dat;
 }
 
 int32 lp15_66 (int32 dev, int32 pulse, int32 dat)
 {
-if (pulse == 021) lp15_sta = lp15_sta & ~STA_DON;       /* LPCD */
-if (pulse == 041) lp15_sta = 0;                         /* LPCF */
+if (pulse == 021)                                       /* LPCD */
+    lp15_sta = lp15_sta & ~STA_DON;
+if (pulse == 041)                                       /* LPCF */
+    lp15_sta = 0;
 lp15_updsta (0);                                        /* update status */
 return dat;
 }
@@ -805,14 +833,16 @@ for (more = 1; more != 0; ) {                           /* loop until ctrl */
             lp15_bp = more = 0;
             }
         else {
-            if (lp15_bp < LP15_BSIZE) lp15_buf[lp15_bp++] = c[i];
+            if (lp15_bp < LP15_BSIZE)
+                lp15_buf[lp15_bp++] = c[i];
             else lp15_sta = lp15_sta | STA_OVF;
             }
         }
     }
 
 lp15_lc = lp15_lc - 1;                                  /* decr line count */
-if (lp15_lc) sim_activate (&lp15_unit, uptr->wait);     /* more to do? */
+if (lp15_lc)                                            /* more to do? */
+    sim_activate (&lp15_unit, uptr->wait);
 else lp15_updsta (STA_DON);                             /* no, set done */
 return SCPE_OK;
 }
@@ -822,9 +852,12 @@ return SCPE_OK;
 int32 lp15_updsta (int32 new)
 {
 lp15_sta = (lp15_sta | new) & ~(STA_CLR | STA_ERR | STA_BUSY);
-if (lp15_sta & STA_EFLGS) lp15_sta = lp15_sta | STA_ERR; /* update errors */
-if (sim_is_active (&lp15_unit)) lp15_sta = lp15_sta | STA_BUSY;
-if (lp15_ie && (lp15_sta & STA_DON)) SET_INT (LPT);
+if (lp15_sta & STA_EFLGS)                               /* update errors */
+    lp15_sta = lp15_sta | STA_ERR;
+if (sim_is_active (&lp15_unit))
+    lp15_sta = lp15_sta | STA_BUSY;
+if (lp15_ie && (lp15_sta & STA_DON))
+    SET_INT (LPT);
 else CLR_INT (LPT);                                     /* update int */
 return lp15_sta;
 }

@@ -1223,45 +1223,47 @@ long disasm (unsigned char *data, char *output, int segsize, long offset)
     for (p = itable[*data]; *p; p++) {
       if ( (length = matches(*p, data, asize, osize,
                  segsize, rep, &tmp_ins)) ) {
-    works = TRUE;
-    /*
-     * Final check to make sure the types of r/m match up.
-     */
-    for (i = 0; i < (*p)->operands; i++) {
-      if (
-          /* If it's a mem-only EA but we have a register, die. */
-          ((tmp_ins.oprs[i].segment & SEG_RMREG) &&
-           !(MEMORY & ~(*p)->opd[i])) ||
+        works = TRUE;
+        /*
+         * Final check to make sure the types of r/m match up.
+         */
+        for (i = 0; i < (*p)->operands; i++) {
+          if (
+              /* If it's a mem-only EA but we have a register, die. */
+              ((tmp_ins.oprs[i].segment & SEG_RMREG) &&
+               !(MEMORY & ~(*p)->opd[i])) ||
 
-          /* If it's a reg-only EA but we have a memory ref, die. */
-          (!(tmp_ins.oprs[i].segment & SEG_RMREG) &&
-           !(REGNORM & ~(*p)->opd[i]) &&
-           !((*p)->opd[i] & REG_SMASK)) ||
+              /* If it's a reg-only EA but we have a memory ref, die. */
+              (!(tmp_ins.oprs[i].segment & SEG_RMREG) &&
+               !(REGNORM & ~(*p)->opd[i]) &&
+               !((*p)->opd[i] & REG_SMASK)) ||
 
-          /* Register type mismatch (eg FS vs REG_DESS): die. */
-          ((((*p)->opd[i] & (REGISTER | FPUREG)) ||
-        (tmp_ins.oprs[i].segment & SEG_RMREG)) &&
-           !whichreg ((*p)->opd[i], tmp_ins.oprs[i].basereg))) {
-        works = FALSE;
-        break;
+              /* Register type mismatch (eg FS vs REG_DESS): die. */
+              ((((*p)->opd[i] & (REGISTER | FPUREG)) ||
+            (tmp_ins.oprs[i].segment & SEG_RMREG)) &&
+               !whichreg ((*p)->opd[i], tmp_ins.oprs[i].basereg))) {
+            works = FALSE;
+            break;
+          }
+        }
+
+        if (works) {
+          goodness = (*p)->flags & IF_PFMASK;
+          if ( goodness < best ) {
+            /* This is the best one found so far */
+            best        = goodness;
+            best_p      = p;
+            best_length = length;
+            ins         = tmp_ins;
+          }
+        }
       }
     }
 
-    if (works) {
-      goodness = (*p)->flags & IF_PFMASK;
-      if ( goodness < best ) {
-        /* This is the best one found so far */
-        best        = goodness;
-        best_p      = p;
-        best_length = length;
-        ins         = tmp_ins;
-      }
+    if (!best_p) {          /* no instruction was matched */
+        sprintf(output, "db 0%02xh", data[0]);
+        return 1;
     }
-      }
-    }
-
-    if (!best_p)
-    return 0;              /* no instruction was matched */
 
     /* Pick the best match */
     p      = best_p;
@@ -1282,13 +1284,13 @@ long disasm (unsigned char *data, char *output, int segsize, long offset)
       case P_O32:   slen += sprintf(output+slen, "o32 "); break;
     }
 
-    for (i = 0; i < elements(ico); i++)
+    for (i = 0; i < (int)elements(ico); i++)
     if ((*p)->opcode == ico[i]) {
         slen += sprintf(output+slen, "%s%s", icn[i],
                 whichcond(ins.condition));
         break;
     }
-    if (i >= elements(ico))
+    if (i >= (int)elements(ico))
     slen += sprintf(output+slen, "%s", insn_names[(*p)->opcode]);
     colon = FALSE;
     length += data - origdata;         /* fix up for prefixes */

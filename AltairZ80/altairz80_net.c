@@ -26,9 +26,14 @@
 
 #include "altairz80_defs.h"
 #include "sim_sock.h"
+
+/* Debug flags */
+#define ACCEPT_MSG  (1 << 0)
+#define DROP_MSG    (1 << 1)
+#define IN_MSG      (1 << 2)
+#define OUT_MSG     (1 << 3)
+
 extern uint32 PCX;
-extern char messageBuffer[];
-extern void printMessage(void);
 
 #define UNIT_V_SERVER   (UNIT_V_UF + 0) /* define machine as a server   */
 #define UNIT_SERVER     (1 << UNIT_V_SERVER)
@@ -43,13 +48,11 @@ static t_stat set_net       (UNIT *uptr, int32 value, char *cptr, void *desc);
 int32 netStatus             (const int32 port, const int32 io, const int32 data);
 int32 netData               (const int32 port, const int32 io, const int32 data);
 
+extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
+                               int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+
 #define MAX_CONNECTIONS 2   /* maximal number of server connections */
 #define BUFFER_LENGTH   512 /* length of input and output buffer    */
-#define NET_ACCEPT      1   /* bit masks for trace_level            */
-#define NET_DROP        2
-#define NET_IN          4
-#define NET_OUT         8
-static int32 trace_level = 0;
 
 static struct {
     int32   Z80StatusPort;              /* Z80 status port associated with this ioSocket, read only             */
@@ -66,9 +69,9 @@ static struct {
     int32   outputSize;                 /* number of characters in circular output buffer                       */
 } serviceDescriptor[MAX_CONNECTIONS+1] = {   /* serviceDescriptor[0] holds the information for a client          */
 /*  stat    dat ms  ios in      inPR    inPW    inS out     outPR   outPW   outS */
-    {50,    51, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}, /* client Z80 port 50 and 51    */
-    {40,    41, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}, /* server Z80 port 40 and 41    */
-    {42,    43, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}  /* server Z80 port 42 and 43    */
+    {0x32,  0x33, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}, /* client Z80 port 50 and 51  */
+    {0x28,  0x29, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}, /* server Z80 port 40 and 41  */
+    {0x2a,  0x2b, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}  /* server Z80 port 42 and 43  */
 };
 
 static UNIT net_unit = {
@@ -84,7 +87,6 @@ static REG net_reg[] = {
     { DRDATA (POLL,         net_unit.wait,  32)             },
     { HRDATA (IPHOST,       net_unit.u4,    32),    REG_RO  },
     { DRDATA (PORT,         net_unit.u3,    32),    REG_RO  },
-    { HRDATA (TRACELEVEL,   trace_level,    32)             },
     { NULL }
 };
 
@@ -94,18 +96,31 @@ static MTAB net_mod[] = {
     { 0 }
 };
 
+#define TRACE_PRINT(level, args)    if (net_dev.dctrl & level) {    \
+                                        printf args;                \
+                                    }
+
+/* Debug Flags */
+static DEBTAB net_dt[] = {
+    { "ACCEPT", ACCEPT_MSG  },
+    { "DROP",   DROP_MSG    },
+    { "IN",     IN_MSG      },
+    { "OUT",    OUT_MSG     },
+    { NULL,     0 }
+};
+
 DEVICE net_dev = {
     "NET", &net_unit, net_reg, net_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &net_reset,
     NULL, &net_attach, &net_detach,
-    NULL, 0, 0,
-    NULL, NULL, NULL
+    NULL, (DEV_DISABLE | DEV_DEBUG), 0,
+    net_dt, NULL, "Network NET"
 };
 
 static t_stat set_net(UNIT *uptr, int32 value, char *cptr, void *desc) {
     char temp[CBUFSIZE];
-    if ((net_unit.flags & UNIT_ATT) && ((net_unit.flags & UNIT_SERVER) != value)) {
+    if ((net_unit.flags & UNIT_ATT) && ((net_unit.flags & UNIT_SERVER) != (uint32)value)) {
         strncpy(temp, net_unit.filename, CBUFSIZE); /* save name for later attach */
         net_detach(&net_unit);
         net_unit.flags ^= UNIT_SERVER; /* now switch from client to server and vice versa */
@@ -128,41 +143,54 @@ static t_stat net_reset(DEVICE *dptr) {
     uint32 i;
     if (net_unit.flags & UNIT_ATT)
         sim_activate(&net_unit, net_unit.wait); /* start poll */
-    for (i = 0; i <= MAX_CONNECTIONS; i++)
+    for (i = 0; i <= MAX_CONNECTIONS; i++) {
         serviceDescriptor_reset(i);
+        sim_map_resource(serviceDescriptor[i].Z80StatusPort, 1,
+                         RESOURCE_TYPE_IO, &netStatus, dptr->flags & DEV_DIS);
+        sim_map_resource(serviceDescriptor[i].Z80DataPort, 1,
+                         RESOURCE_TYPE_IO, &netData, dptr->flags & DEV_DIS);
+    }
     return SCPE_OK;
 }
 
 static t_stat net_attach(UNIT *uptr, char *cptr) {
     uint32 i, ipa, ipp;
     t_stat r = get_ipaddr(cptr, &ipa, &ipp);
-    if (r != SCPE_OK) return SCPE_ARG;
-    if (ipa == 0) ipa = 0x7F000001; /* localhost = 127.0.0.1 */
-    if (ipp == 0) ipp = 3000;
+    if (r != SCPE_OK)
+        return SCPE_ARG;
+    if (ipa == 0)
+        ipa = 0x7F000001; /* localhost = 127.0.0.1 */
+    if (ipp == 0)
+        ipp = 3000;
     net_unit.u3 = ipp;
     net_unit.u4 = ipa;
     net_reset(&net_dev);
-    for (i = 0; i <= MAX_CONNECTIONS; i++) serviceDescriptor[i].ioSocket = 0;
+    for (i = 0; i <= MAX_CONNECTIONS; i++)
+        serviceDescriptor[i].ioSocket = 0;
     if (net_unit.flags & UNIT_SERVER) {
         net_unit.wait = NET_INIT_POLL_SERVER;
         serviceDescriptor[1].masterSocket = sim_master_sock(ipp);
-        if (serviceDescriptor[1].masterSocket == INVALID_SOCKET) return SCPE_IOERR;
+        if (serviceDescriptor[1].masterSocket == INVALID_SOCKET)
+            return SCPE_IOERR;
     }
     else {
         net_unit.wait = NET_INIT_POLL_CLIENT;
         serviceDescriptor[0].ioSocket = sim_connect_sock(ipa, ipp);
-        if (serviceDescriptor[0].ioSocket == INVALID_SOCKET) return SCPE_IOERR;
+        if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
+            return SCPE_IOERR;
     }
     net_unit.flags |= UNIT_ATT;
     net_unit.filename = (char *) calloc(CBUFSIZE, sizeof (char));   /* alloc name buf */
-    if (net_unit.filename == NULL) return SCPE_MEM;
+    if (net_unit.filename == NULL)
+        return SCPE_MEM;
     strncpy(net_unit.filename, cptr, CBUFSIZE);                     /* save name */
     return SCPE_OK;
 }
 
 static t_stat net_detach(UNIT *uptr) {
     uint32 i;
-    if (!(net_unit.flags & UNIT_ATT)) return SCPE_OK;       /* if not attached simply return */
+    if (!(net_unit.flags & UNIT_ATT))
+        return SCPE_OK;       /* if not attached simply return */
     if (net_unit.flags & UNIT_SERVER)
         sim_close_sock(serviceDescriptor[1].masterSocket, TRUE);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -187,15 +215,14 @@ static t_stat net_svc(UNIT *uptr) {
                     s = sim_accept_conn(serviceDescriptor[1].masterSocket, NULL);
                     if (s != INVALID_SOCKET) {
                         serviceDescriptor[i].ioSocket = s;
-                        if (trace_level & NET_ACCEPT) {
-                            MESSAGE_3("Accepted connection %i with socket %i.", i, s);
-                        }
+                        TRACE_PRINT(ACCEPT_MSG, ("NET: " ADDRESS_FORMAT " Accepted connection %i with socket %i." NLP, PCX, i, s));
                     }
                 }
         }
         else if (serviceDescriptor[0].ioSocket == 0) {
             serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.u4, net_unit.u3);
-            if (serviceDescriptor[0].ioSocket == INVALID_SOCKET) return SCPE_IOERR;
+            if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
+                return SCPE_IOERR;
             printf("\rWaiting for server ... Type g<return> (possibly twice) when ready" NLP);
             return SCPE_STOP;
         }
@@ -205,9 +232,8 @@ static t_stat net_svc(UNIT *uptr) {
                     r = sim_read_sock(serviceDescriptor[i].ioSocket, svcBuffer,
                         BUFFER_LENGTH - serviceDescriptor[i].inputSize);
                     if (r == -1) {
-                        if (trace_level & NET_DROP) {
-                            MESSAGE_3("Drop connection %i with socket %i.", i, serviceDescriptor[i].ioSocket);
-                        }
+                        TRACE_PRINT(DROP_MSG, ("NET: " ADDRESS_FORMAT " Drop connection %i with socket %i." NLP,
+                                    PCX, i, serviceDescriptor[i].ioSocket));
                         sim_close_sock(serviceDescriptor[i].ioSocket, FALSE);
                         serviceDescriptor[i].ioSocket = 0;
                         serviceDescriptor_reset(i);
@@ -226,7 +252,8 @@ static t_stat net_svc(UNIT *uptr) {
                     k = serviceDescriptor[i].outputPosRead;
                     for (j = 0; j < serviceDescriptor[i].outputSize; j++) {
                         svcBuffer[j] = serviceDescriptor[i].outputBuffer[k++];
-                        if (k == BUFFER_LENGTH) k = 0;
+                        if (k == BUFFER_LENGTH)
+                            k = 0;
                     }
                     r = sim_write_sock(serviceDescriptor[i].ioSocket, svcBuffer, serviceDescriptor[i].outputSize);
                     if (r >= 0) {
@@ -235,7 +262,8 @@ static t_stat net_svc(UNIT *uptr) {
                         if (serviceDescriptor[i].outputPosRead >= BUFFER_LENGTH)
                             serviceDescriptor[i].outputPosRead -= BUFFER_LENGTH;
                     }
-                    else printf("write %i" NLP, r);
+                    else
+                        printf("write %i" NLP, r);
                 }
             }
     }
@@ -244,7 +272,8 @@ static t_stat net_svc(UNIT *uptr) {
 
 int32 netStatus(const int32 port, const int32 io, const int32 data) {
     uint32 i;
-    if ((net_unit.flags & UNIT_ATT) == 0) return 0;
+    if ((net_unit.flags & UNIT_ATT) == 0)
+        return 0;
     net_svc(&net_unit);
     if (io == 0)    /* IN   */
         for (i = 0; i <= MAX_CONNECTIONS; i++)
@@ -257,7 +286,8 @@ int32 netStatus(const int32 port, const int32 io, const int32 data) {
 int32 netData(const int32 port, const int32 io, const int32 data) {
     uint32 i;
     char result;
-    if ((net_unit.flags & UNIT_ATT) == 0) return 0;
+    if ((net_unit.flags & UNIT_ATT) == 0)
+        return 0;
     net_svc(&net_unit);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
         if (serviceDescriptor[i].Z80DataPort == port)
@@ -273,10 +303,8 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                         serviceDescriptor[i].inputPosRead = 0;
                     serviceDescriptor[i].inputSize--;
                 }
-                if (trace_level & NET_IN) {
-                    MESSAGE_4(" IN(%i)=%03xh (%c)", port, (result & 0xff),
-                        (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?');
-                }
+                TRACE_PRINT(IN_MSG, ("NET: " ADDRESS_FORMAT "  IN(%i)=%03xh (%c)" NLP, PCX, port, (result & 0xff),
+                            (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?'));
                 return result;
             }
             else {          /* OUT  */
@@ -291,10 +319,8 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                         serviceDescriptor[i].outputPosWrite = 0;
                     serviceDescriptor[i].outputSize++;
                 }
-                if (trace_level & NET_OUT) {
-                    MESSAGE_4("OUT(%i)=%03xh (%c)", port, data,
-                        (32 <= data) && (data <= 127) ? data : '?');
-                }
+                TRACE_PRINT(OUT_MSG, ("NET: " ADDRESS_FORMAT " OUT(%i)=%03xh (%c)" NLP, PCX, port, data,
+                                      (32 <= data) && (data <= 127) ? data : '?'));
                 return 0;
             }
     return 0;

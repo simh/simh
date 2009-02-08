@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2007, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -197,7 +197,8 @@ switch (inst) {                                         /* case on opcode */
         case FNC_DMANM:                                 /* set DMA/DMC */
         case FNC_DMAAU:
             mt_usel = u;                                /* save unit select */
-            if (mt_dib.chan) mt_dma = 1;                /* set DMA if configured */
+            if (mt_dib.chan)                            /* set DMA if configured */
+                mt_dma = 1;
             else mt_dma = 0;
             break;
 
@@ -220,7 +221,8 @@ switch (inst) {                                         /* case on opcode */
             mt_usel = u;                                /* save unit select */
             if ((uptr->flags & UNIT_ATT) == 0)          /* not attached? */
                 return (((mt_stopioe? SCPE_UNATT: SCPE_OK) << IOT_V_REASON) | dat);
-            if (sim_is_active (uptr)) return dat;       /* nop if busy */
+            if (sim_is_active (uptr))                   /* nop if busy */
+                return dat;
             if (wrt_fnc[fnc] && sim_tape_wrp (uptr))
                 return ((STOP_MTWRP << IOT_V_REASON) | dat);
             uptr->FNC = fnc;
@@ -234,7 +236,8 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioINA:                                         /* INA */
-        if (fnc) return IOBADFNC (dat);                 /* fnc 0 only */
+        if (fnc)                                        /* fnc 0 only */
+            return IOBADFNC (dat);
         if (mt_rdy) {                                   /* ready? */
             mt_rdy = 0;                                 /* clear ready */
             return IOSKIP (dat | mt_buf);               /* ret buf, skip */
@@ -242,7 +245,8 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioOTA:                                         /* OTA */
-        if (fnc) return IOBADFNC (dat);                 /* fnc 0 only */
+        if (fnc)                                        /* fnc 0 only */
+            return IOBADFNC (dat);
         if (mt_rdy) {                                   /* ready? */
             mt_rdy = 0;                                 /* clear ready */
             mt_buf = dat;                               /* store buf */
@@ -255,15 +259,18 @@ switch (inst) {                                         /* case on opcode */
         switch (fnc) {
 
         case 000:                                       /* ready */
-            if (mt_rdy) return IOSKIP (dat);
+            if (mt_rdy)
+                return IOSKIP (dat);
             break;
 
         case 001:                                       /* !busy */
-            if (!mt_busy) return IOSKIP (dat);
+            if (!mt_busy)
+                return IOSKIP (dat);
             break;
 
         case 002:                                       /* !error */
-            if (!mt_err) return IOSKIP (dat);
+            if (!mt_err)
+                return IOSKIP (dat);
             break;
 
         case 003:                                       /* !BOT */
@@ -271,24 +278,28 @@ switch (inst) {                                         /* case on opcode */
             break;
 
         case 004:                                       /* !interrupting */
-            if (!TST_INTREQ (INT_MT)) return IOSKIP (dat);
+            if (!TST_INTREQ (INT_MT))
+                return IOSKIP (dat);
             break;
 
         case 005:                                       /* !EOT */
-            if (!(uptr->UST & STA_EOT)) return IOSKIP (dat);
+            if (!(uptr->UST & STA_EOT))
+                return IOSKIP (dat);
             break;
 
         case 006:                                       /* !EOF */
-            if (!mt_eof) return IOSKIP (dat);
+            if (!mt_eof)
+                return IOSKIP (dat);
             break;
 
         case 007:                                       /* !write prot */
-            if (!sim_tape_wrp (uptr)) return IOSKIP (dat);
+            if (!sim_tape_wrp (uptr))
+                return IOSKIP (dat);
             break;
 
         case 011:                                       /* operational */
-            if ((uptr->flags & UNIT_ATT) &&
-                ((uptr->FNC & 017) != FNC_REW)) return IOSKIP (dat);
+            if ((uptr->flags & UNIT_ATT) && ((uptr->FNC & 017) != FNC_REW))
+                return IOSKIP (dat);
             break;
 
         case 012:                                       /* skip if !chan 2 */
@@ -299,7 +310,8 @@ switch (inst) {                                         /* case on opcode */
 
         case 014:                                       /* !rewinding */
             uptr = mt_dev.units + (dev & 03);           /* use specified unit */
-            if ((uptr->FNC & 017) != FNC_REW) return IOSKIP (dat);
+            if ((uptr->FNC & 017) != FNC_REW)
+                return IOSKIP (dat);
             break;
             }
         break;
@@ -349,7 +361,8 @@ switch (uptr->FNC) {                                    /* case on function */
         uptr->UST = STA_BOT;                            /* set BOT */
         uptr->FNC = FNC_NOP;                            /* nop function */
         for (i = 0; i < MT_NUMDR; i++) {                /* last rewind? */
-            if ((mt_unit[i].FNC & 017) == FNC_REW) return SCPE_OK;
+            if ((mt_unit[i].FNC & 017) == FNC_REW)
+                return SCPE_OK;
             }
         mt_updint (mt_rdy, 1);                          /* yes, motion done */
         return SCPE_OK;
@@ -399,7 +412,8 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_RBCD2 | FNC_2ND:                           /* read, word */
     case FNC_RBIN2 | FNC_2ND:
     case FNC_RBIN3 | FNC_2ND:
-        if (mt_ptr >= mt_max) break;                    /* record done? */
+        if (mt_ptr >= mt_max)                           /* record done? */
+            break;
         c1 = mtxb[mt_ptr++] & 077;                      /* get 2 chars */
         c2 = mtxb[mt_ptr++] & 077;
         if (uptr->FNC == (FNC_RBCD2 | FNC_2ND)) {       /* BCD? */
@@ -412,17 +426,20 @@ switch (uptr->FNC) {                                    /* case on function */
             }
         else c3 = 0;
         sim_activate (uptr, mt_xtime);                  /* no, sched word */
-        if (mt_eor) return SCPE_OK;                     /* xfer done? */
+        if (mt_eor)                                     /* xfer done? */
+            return SCPE_OK;
         mt_buf = (c1 << 10) | (c2 << 4) | c3;           /* pack chars */
         if (mt_rdy) mt_err = 1;                         /* buf full? err */
         mt_updint (1, mt_mdirq);                        /* set ready */
-        if (mt_dma) SET_CH_REQ (ch);                    /* DMC/DMA? req chan */
+        if (mt_dma)                                     /* DMC/DMA? req chan */
+            SET_CH_REQ (ch);
         return SCPE_OK;                                 /* continue */
         
     case FNC_WBCD2: case FNC_WBIN2: case FNC_WBIN3:     /* write first */
         mt_ptr = 0;                                     /* clear buf ptr */
         mt_updint (1, mt_mdirq);                        /* set ready */
-        if (mt_dma) SET_CH_REQ (ch);                    /* DMC/DMA? req chan */
+        if (mt_dma)                                     /* DMC/DMA? req chan */
+            SET_CH_REQ (ch);
         uptr->FNC = uptr->FNC | FNC_2ND;                /* next state */
         sim_activate (uptr, mt_xtime);                  /* sched xfer */
         return SCPE_OK;                                 /* continue */
@@ -431,7 +448,8 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_WBIN2 | FNC_2ND:
     case FNC_WBIN3 | FNC_2ND:
         if (mt_eor || mt_rdy) {                         /* done or no data? */
-            if (!mt_rdy) mt_wrwd (uptr, mt_buf);        /* write last word */
+            if (!mt_rdy)                                /* write last word */
+                mt_wrwd (uptr, mt_buf);
             else mt_rdy = 0;                            /* rdy must be clr */
             if (mt_ptr) {                               /* any data? */
                 if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr))  /* write, err? */
@@ -442,7 +460,8 @@ switch (uptr->FNC) {                                    /* case on function */
         mt_wrwd (uptr, mt_buf);                         /* write word */
         sim_activate (uptr, mt_xtime);                  /* no, sched word */
         mt_updint (1, mt_mdirq);                        /* set ready */
-        if (mt_dma) SET_CH_REQ (ch);                    /* DMC/DMA? req chan */
+        if (mt_dma)                                     /* DMC/DMA? req chan */
+            SET_CH_REQ (ch);
         return SCPE_OK;                                 /* continue */
 
     default:                                            /* unknown */
@@ -473,13 +492,18 @@ uint32 c1, c2;
 c1 = (dat >> 10) & 077;                                 /* get 2 chars */
 c2 = (dat >> 4) & 077;
 if (uptr->FNC == (FNC_WBCD2 | FNC_2ND)) {               /* BCD? */
-    if (c1 == 0) c1 = 012;                              /* change 0 to 12 */
-    if (c2 == 0) c2 = 012;
+    if (c1 == 0)
+        c1 = 012;                              /* change 0 to 12 */
+    if (c2 == 0)
+        c2 = 012;
     }
-if (mt_ptr < DBSIZE) mtxb[mt_ptr++] = c1;               /* store 2 char */
-if (mt_ptr < DBSIZE) mtxb[mt_ptr++] = c2;
+if (mt_ptr < DBSIZE)                                    /* store 2 char */
+    mtxb[mt_ptr++] = c1;
+if (mt_ptr < DBSIZE)
+    mtxb[mt_ptr++] = c2;
 if ((uptr->FNC == (FNC_WBIN3 | FNC_2ND)) &&             /* write 3? */
-    (mt_ptr < DBSIZE)) mtxb[mt_ptr++] = mt_buf & 017;
+    (mt_ptr < DBSIZE))
+    mtxb[mt_ptr++] = mt_buf & 017;
 return;
 }
 
@@ -505,7 +529,8 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         mt_err = 1;                                     /* error */
-        if (mt_stopioe) return SCPE_IOERR;
+        if (mt_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_RECE:                                     /* record in error */
@@ -531,7 +556,8 @@ void mt_updint (uint32 rdy, uint32 mdirq)
 {
 mt_rdy = rdy;                                           /* store new ready */
 mt_mdirq = mdirq;                                       /* store new motion irq */
-if ((mt_rdy && !mt_dma) || mt_mdirq) SET_INT (INT_MT);  /* update int request */
+if ((mt_rdy && !mt_dma) || mt_mdirq)                    /* update int request */
+    SET_INT (INT_MT);
 else CLR_INT (INT_MT);
 return;
 }
@@ -571,7 +597,8 @@ t_stat mt_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);                       /* attach unit */
-if (r != SCPE_OK) return r;                             /* update status */
+if (r != SCPE_OK)                                       /* update status */
+    return r;
 uptr->UST = STA_BOT;
 return r;
 }

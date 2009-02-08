@@ -29,6 +29,11 @@
 #include "altairz80_defs.h"
 #include <assert.h>
 
+/* Debug flags */
+#define READ_MSG    (1 << 0)
+#define WRITE_MSG   (1 << 1)
+#define VERBOSE_MSG (1 << 2)
+
 /* The following routines are based on work from Howard M. Harte */
 static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -40,8 +45,6 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr);
 
 #define UNIT_V_HDSK_WLK         (UNIT_V_UF + 0) /* write locked                             */
 #define UNIT_HDSK_WLK           (1 << UNIT_V_HDSK_WLK)
-#define UNIT_V_HDSK_VERBOSE     (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_HDSK_VERBOSE       (1 << UNIT_V_HDSK_VERBOSE)
 #define HDSK_MAX_SECTOR_SIZE    1024            /* maximum size of a sector                 */
 #define HDSK_SECTOR_SIZE        u5              /* size of sector                           */
 #define HDSK_SECTORS_PER_TRACK  u4              /* sectors per track                        */
@@ -61,13 +64,11 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr);
 #define DPB_NAME_LENGTH         15
 #define BOOTROM_SIZE_HDSK       256
 
-extern char messageBuffer[];
 extern uint32 PCX;
 extern REG *sim_PC;
 extern UNIT cpu_unit;
 
 extern void install_ALTAIRbootROM(void);
-extern void printMessage(void);
 extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
 extern uint8 GetBYTEWrapper(const uint32 Addr);
 extern t_stat install_bootrom(int32 bootrom[], int32 size, int32 addr, int32 makeROM);
@@ -87,7 +88,6 @@ static int32 selectedDisk;
 static int32 selectedSector;
 static int32 selectedTrack;
 static int32 selectedDMA;
-static int32 trace_level            = 0;
 
 typedef struct {
     char    name[DPB_NAME_LENGTH + 1];  /* name of CP/M disk parameter block    */
@@ -152,21 +152,28 @@ static REG hdsk_reg[] = {
     { DRDATA (HDSEC,        selectedSector,         32),    REG_RO  },
     { DRDATA (HDTRK,        selectedTrack,          32),    REG_RO  },
     { DRDATA (HDDMA,        selectedDMA,            32),    REG_RO  },
-    { HRDATA (TRACELEVEL,   trace_level,            16),            },
     { NULL }
 };
 
 static MTAB hdsk_mod[] = {
-    { MTAB_XTD|MTAB_VDV,            0,                  "IOBASE",   "IOBASE", &set_iobase, &show_iobase, NULL },
-    { MTAB_XTD|MTAB_VUN|MTAB_VAL,   0,                  "FORMAT",   "FORMAT", &set_format, &show_format, NULL },
-    { UNIT_HDSK_WLK,                0,                  "WRTENB",   "WRTENB", NULL  },
-    { UNIT_HDSK_WLK,                UNIT_HDSK_WLK,      "WRTLCK",   "WRTLCK", NULL  },
-    /* quiet, no warning messages       */
-    { UNIT_HDSK_VERBOSE,            0,                  "QUIET",    "QUIET", NULL   },
-    /* verbose, show warning messages   */
-    { UNIT_HDSK_VERBOSE,            UNIT_HDSK_VERBOSE,  "VERBOSE",  "VERBOSE", NULL },
-    { MTAB_XTD|MTAB_VUN|MTAB_VAL,   0,                  "GEOM",     "GEOM", &set_geom, &show_geom, NULL },
+    { MTAB_XTD|MTAB_VDV,    0,              "IOBASE",   "IOBASE", &set_iobase, &show_iobase, NULL },
+    { MTAB_XTD|MTAB_VUN,    0,              "FORMAT",   "FORMAT", &set_format, &show_format, NULL },
+    { UNIT_HDSK_WLK,        0,              "WRTENB",   "WRTENB", NULL  },
+    { UNIT_HDSK_WLK,        UNIT_HDSK_WLK,  "WRTLCK",   "WRTLCK", NULL  },
+    { MTAB_XTD|MTAB_VUN,    0,              "GEOM",     "GEOM", &set_geom, &show_geom, NULL },
     { 0 }
+};
+
+#define TRACE_PRINT(level, args)    if (hdsk_dev.dctrl & level) {   \
+                                        printf args;                \
+                                    }
+
+/* Debug Flags */
+static DEBTAB hdsk_dt[] = {
+    { "READ",       READ_MSG    },
+    { "WRITE",      WRITE_MSG   },
+    { "VERBOSE",    VERBOSE_MSG },
+    { NULL,         0 }
 };
 
 DEVICE hdsk_dev = {
@@ -174,8 +181,8 @@ DEVICE hdsk_dev = {
     8, 10, 31, 1, 8, 8,
     NULL, NULL, &hdsk_reset,
     &hdsk_boot, &hdsk_attach, NULL,
-    &hdsk_info_data, (DEV_DISABLE), 0,
-    NULL, NULL, NULL
+    &hdsk_info_data, (DEV_DISABLE | DEV_DEBUG), 0,
+    hdsk_dt, NULL, "Hard Disk HDSK"
 };
 
 /* Reset routine */
@@ -235,11 +242,13 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
         uptr -> flags |= UNIT_HDSK_WLK;
         printf("HDSK%c: WARNING: Forcing WRTLCK.\n", unitChar);
         /* check whether capacity corresponds to setting of tracks, sectors per track and sector size   */
-        if (uptr -> capac != (uptr -> HDSK_NUMBER_OF_TRACKS *
+        if (uptr -> capac != (uint32)(uptr -> HDSK_NUMBER_OF_TRACKS *
                 uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE)) {
             printf("HDSK%c: WARNING: Fixing geometry.\n", unitChar);
-            if (uptr -> HDSK_SECTORS_PER_TRACK    == 0) uptr -> HDSK_SECTORS_PER_TRACK  = 32;
-            if (uptr -> HDSK_SECTOR_SIZE          == 0) uptr -> HDSK_SECTOR_SIZE        = 128;
+            if (uptr -> HDSK_SECTORS_PER_TRACK == 0)
+                uptr -> HDSK_SECTORS_PER_TRACK = 32;
+            if (uptr -> HDSK_SECTOR_SIZE == 0)
+                uptr -> HDSK_SECTOR_SIZE = 128;
         }
     }
     else {  /* Case 2: disk parameter block found                                               */
@@ -263,12 +272,15 @@ static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
     uint32 numberOfTracks, numberOfSectors, sectorSize;
     int result, n;
 
-    if (cptr == NULL) return SCPE_ARG;
-    if (uptr == NULL) return SCPE_IERR;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    if (uptr == NULL)
+        return SCPE_IERR;
     result = sscanf(cptr, "%d/%d/%d%n", &numberOfTracks, &numberOfSectors, &sectorSize, &n);
     if ((result != 3) || (result == EOF) || (cptr[n] != 0)) {
         result = sscanf(cptr, "T:%d/N:%d/S:%d%n", &numberOfTracks, &numberOfSectors, &sectorSize, &n);
-        if ((result != 3) || (result == EOF) || (cptr[n] != 0)) return SCPE_ARG;
+        if ((result != 3) || (result == EOF) || (cptr[n] != 0))
+            return SCPE_ARG;
     }
     uptr -> HDSK_NUMBER_OF_TRACKS     = numberOfTracks;
     uptr -> HDSK_SECTORS_PER_TRACK    = numberOfSectors;
@@ -279,7 +291,8 @@ static t_stat set_geom(UNIT *uptr, int32 val, char *cptr, void *desc) {
 
 /* Show disk geometry routine */
 static t_stat show_geom(FILE *st, UNIT *uptr, int32 val, void *desc) {
-    if (uptr == NULL) return SCPE_IERR;
+    if (uptr == NULL)
+        return SCPE_IERR;
     fprintf(st, "T:%d/N:%d/S:%d", uptr -> HDSK_NUMBER_OF_TRACKS,
         uptr -> HDSK_SECTORS_PER_TRACK, uptr -> HDSK_SECTOR_SIZE);
     return SCPE_OK;
@@ -292,9 +305,12 @@ static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
     char fmtname[DPB_NAME_LENGTH + 1];
     int32 i;
 
-    if (cptr == NULL) return SCPE_ARG;
-    if (uptr == NULL) return SCPE_IERR;
-    if (sscanf(cptr, "%" QUOTE2(DPB_NAME_LENGTH) "s", fmtname) == 0) return SCPE_ARG;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    if (uptr == NULL)
+        return SCPE_IERR;
+    if (sscanf(cptr, "%" QUOTE2(DPB_NAME_LENGTH) "s", fmtname) == 0)
+        return SCPE_ARG;
     for (i = 0; dpb[i].capac != 0; i++) {
         if (strncmp(fmtname, dpb[i].name, strlen(fmtname)) == 0) {
             uptr -> HDSK_FORMAT_TYPE = i;
@@ -315,7 +331,8 @@ static t_stat set_format(UNIT *uptr, int32 val, char *cptr, void *desc) {
 
 /* Show disk format routine */
 static t_stat show_format(FILE *st, UNIT *uptr, int32 val, void *desc) {
-    if (uptr == NULL) return SCPE_IERR;
+    if (uptr == NULL)
+        return SCPE_IERR;
     fprintf(st, "%s", dpb[uptr -> HDSK_FORMAT_TYPE].name);
     return SCPE_OK;
 }
@@ -375,14 +392,6 @@ static t_stat hdsk_boot(int32 unitno, DEVICE *dptr) {
     return SCPE_OK;
 }
 
-/* returns TRUE iff there exists a disk with VERBOSE */
-static int32 hdsk_hasVerbose(void) {
-    int32 i;
-    for (i = 0; i < HDSK_NUMBER; i++)
-        if (hdsk_dev.units[i].flags & UNIT_HDSK_VERBOSE) return TRUE;
-    return FALSE;
-}
-
 /*  The hard disk port is 0xfd. It understands the following commands.
 
     1.  Reset
@@ -436,40 +445,33 @@ static int32 hdsk_hasVerbose(void) {
 /* check the parameters and return TRUE iff parameters are correct or have been repaired */
 static int32 checkParameters(void) {
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
-    int32 currentFlag;
     if ((selectedDisk < 0) || (selectedDisk >= HDSK_NUMBER)) {
-        if (hdsk_hasVerbose()) {
-            MESSAGE_2("HDSK%d does not exist, will use HDSK0 instead.", selectedDisk);
-        }
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Disk %i does not exist, will use HDSK0 instead." NLP,
+                                  selectedDisk, PCX, selectedDisk));
         selectedDisk = 0;
     }
-    currentFlag = hdsk_dev.units[selectedDisk].flags;
-    if ((currentFlag & UNIT_ATT) == 0) {
-        if (currentFlag & UNIT_HDSK_VERBOSE) {
-            MESSAGE_2("HDSK%d is not attached.", selectedDisk);
-        }
+    if ((hdsk_dev.units[selectedDisk].flags & UNIT_ATT) == 0) {
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Disk %i is not attached." NLP,
+                                  selectedDisk, PCX, selectedDisk));
         return FALSE; /* cannot read or write */
     }
     if ((selectedSector < 0) || (selectedSector >= uptr -> HDSK_SECTORS_PER_TRACK)) {
-        if (currentFlag & UNIT_HDSK_VERBOSE) {
-            MESSAGE_4("HDSK%d: 0 <= Sector=%02d < %d violated, will use 0 instead.",
-                selectedDisk, selectedSector, uptr -> HDSK_SECTORS_PER_TRACK);
-        }
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Constraint violation 0 <= Sector=%02d < %d, will use sector 0 instead." NLP,
+                                  selectedDisk, PCX, selectedSector, uptr -> HDSK_SECTORS_PER_TRACK));
         selectedSector = 0;
     }
     if ((selectedTrack < 0) || (selectedTrack >= uptr -> HDSK_NUMBER_OF_TRACKS)) {
-        if (currentFlag & UNIT_HDSK_VERBOSE) {
-            MESSAGE_4("HDSK%d: 0 <= Track=%04d < %04d violated, will use 0 instead.",
-                selectedDisk, selectedTrack, uptr -> HDSK_NUMBER_OF_TRACKS);
-        }
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Constraint violation 0 <= Track=%04d < %04d, will use track 0 instead." NLP,
+                                  selectedDisk, PCX, selectedTrack, uptr -> HDSK_NUMBER_OF_TRACKS));
         selectedTrack = 0;
     }
     selectedDMA &= ADDRMASK;
-    if (trace_level) {
-        MESSAGE_7("%s HDSK%d Track=%04d Sector=%02d Len=%04d DMA=%04x",
-            (hdskLastCommand == HDSK_READ) ? "Read" : "Write",
-            selectedDisk, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
-    }
+    if ((hdsk_dev.dctrl & READ_MSG) && (hdskLastCommand == HDSK_READ))
+        printf("HDSK%d " ADDRESS_FORMAT " Read Track=%04d Sector=%02d Len=%04d DMA=%04x" NLP,
+               selectedDisk, PCX, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
+    if ((hdsk_dev.dctrl & WRITE_MSG) && (hdskLastCommand == HDSK_WRITE))
+        printf("HDSK%d " ADDRESS_FORMAT " Write Track=%04d Sector=%02d Len=%04d DMA=%04x" NLP,
+               selectedDisk, PCX, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
     return TRUE;
 }
 
@@ -478,13 +480,12 @@ static int32 doSeek(void) {
     if (fseek(uptr -> fileref,
         (uptr -> HDSK_SECTORS_PER_TRACK * uptr -> HDSK_SECTOR_SIZE) * selectedTrack +
             (uptr -> HDSK_SECTOR_SIZE * selectedSector), SEEK_SET)) {
-        if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-            MESSAGE_4("Could not access HDSK%d Sector=%02d Track=%04d.",
-                selectedDisk, selectedSector, selectedTrack);
-        }
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Could not access Sector=%02d Track=%04d." NLP,
+                                  selectedDisk, PCX, selectedSector, selectedTrack));
         return CPM_ERROR;
     }
-    else return CPM_OK;
+    else
+        return CPM_OK;
 }
 
 uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
@@ -492,17 +493,18 @@ uint8 hdskbuf[HDSK_MAX_SECTOR_SIZE] = { 0 };    /* data buffer  */
 static int32 doRead(void) {
     int32 i;
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
-    if (doSeek()) return CPM_ERROR;
+    if (doSeek())
+        return CPM_ERROR;
 
     if (fread(hdskbuf, uptr -> HDSK_SECTOR_SIZE, 1, uptr -> fileref) != 1) {
-        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) hdskbuf[i] = CPM_EMPTY;
-        if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-            MESSAGE_4("Could not read HDSK%d Sector=%02d Track=%04d.",
-                selectedDisk, selectedSector, selectedTrack);
-        }
+        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
+            hdskbuf[i] = CPM_EMPTY;
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Could not read Sector=%02d Track=%04d." NLP,
+                                  selectedDisk, PCX, selectedSector, selectedTrack));
         return CPM_OK; /* allows the creation of empty hard disks */
     }
-    for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) PutBYTEWrapper(selectedDMA + i, hdskbuf[i]);
+    for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
+        PutBYTEWrapper(selectedDMA + i, hdskbuf[i]);
     return CPM_OK;
 }
 
@@ -511,21 +513,19 @@ static int32 doWrite(void) {
 
     UNIT *uptr = &hdsk_dev.units[selectedDisk];
     if (((uptr -> flags) & UNIT_HDSK_WLK) == 0) { /* write enabled */
-        if (doSeek()) return CPM_ERROR;
-        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++) hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
+        if (doSeek())
+            return CPM_ERROR;
+        for (i = 0; i < uptr -> HDSK_SECTOR_SIZE; i++)
+            hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
         if (fwrite(hdskbuf, uptr -> HDSK_SECTOR_SIZE, 1, uptr -> fileref) != 1) {
-            if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-                MESSAGE_4("Could not write HDSK%d Sector=%02d Track=%04d.",
-                    selectedDisk, selectedSector, selectedTrack);
-            }
+            TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Could not write Sector=%02d Track=%04d." NLP,
+                                      selectedDisk, PCX, selectedSector, selectedTrack));
             return CPM_ERROR;
         }
     }
     else {
-        if ((uptr -> flags) & UNIT_HDSK_VERBOSE) {
-            MESSAGE_4("Could not write to locked HDSK%d Sector=%02d Track=%04d.",
-                selectedDisk, selectedSector, selectedTrack);
-        }
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Could not write to locked disk Sector=%02d Track=%04d." NLP,
+                                  selectedDisk, PCX, selectedSector, selectedTrack));
         return CPM_ERROR;
     }
     return CPM_OK;
@@ -555,7 +555,8 @@ static int32 hdsk_in(const int32 port) {
         params[13] = current.off & 0xff; params[14] = (current.off >> 8) & 0xff;
         params[15] = current.psh;
         params[16] = current.phm;
-        if (++paramcount >= 19) hdskLastCommand = HDSK_NONE;
+        if (++paramcount >= 19)
+            hdskLastCommand = HDSK_NONE;
         if (paramcount <= 17)
             return params[paramcount - 1];
         else if (paramcount == 18)
@@ -563,13 +564,14 @@ static int32 hdsk_in(const int32 port) {
         else if (paramcount == 19)
             return (uptr -> HDSK_SECTOR_SIZE >> 8);
         else {
-            MESSAGE_2("HDSK%d Get parameter error.", selectedDisk);
+            printf("HDSK%d: " ADDRESS_FORMAT " Get parameter error." NLP,
+                   selectedDisk, PCX);
         }
 
     }
-    else if (hdsk_hasVerbose()) {
-        MESSAGE_4("Illegal IN command detected (port=%03xh, cmd=%d, pos=%d).",
-            port, hdskLastCommand, hdskCommandPosition);
+    else {
+        TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Illegal IN command detected (port=%03xh, cmd=%d, pos=%d)." NLP,
+                                  selectedDisk, PCX, port, hdskLastCommand, hdskCommandPosition));
     }
     return CPM_OK;
 }
@@ -627,10 +629,8 @@ static int32 hdsk_out(const int32 port, const int32 data) {
             if ((HDSK_RESET <= data) && (data <= HDSK_PARAM))
                  hdskLastCommand = data;
             else {
-                if (hdsk_hasVerbose()) {
-                    MESSAGE_3("Illegal OUT command detected (port=%03xh, cmd=%d).",
-                        port, data);
-                }
+                TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Illegal OUT command detected (port=%03xh, cmd=%d)." NLP,
+                                          selectedDisk, PCX, port, data));
                 hdskLastCommand = HDSK_RESET;
             }
             hdskCommandPosition = 0;

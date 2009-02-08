@@ -1,6 +1,6 @@
 /* pdp8_pt.c: PDP-8 paper tape reader/punch simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -162,7 +162,8 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
     if (feof (ptr_unit.fileref)) {
-        if (ptr_stopioe) printf ("PTR end of file\n");
+        if (ptr_stopioe)
+            printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
@@ -281,8 +282,10 @@ int32 i;
 extern int32 saved_PC;
 extern uint16 M[];
 
-if (ptr_dib.dev != DEV_PTR) return STOP_NOTSTD;         /* only std devno */
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+if (ptr_dib.dev != DEV_PTR)                             /* only std devno */
+    return STOP_NOTSTD;
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

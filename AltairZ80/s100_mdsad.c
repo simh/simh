@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_mdsad.c 1773 2008-01-11 05:46:19Z hharte $                  *
+ * $Id: s100_mdsad.c 1995 2008-07-15 03:59:13Z hharte $                  *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -47,22 +47,23 @@
 #include <windows.h>
 #endif
 
-#include "sim_imd.h"
-
 #ifdef DBG_MSG
 #define DBG_PRINT(args) printf args
 #else
 #define DBG_PRINT(args)
 #endif
 
-#define SEEK_MSG            0x01
-#define ORDERS_MSG          0x02
-#define CMD_MSG             0x04
-#define RD_DATA_MSG         0x08
-#define WR_DATA_MSG         0x10
-#define STATUS_MSG          0x20
-#define RD_DATA_DETAIL_MSG  0x40
-#define WR_DATA_DETAIL_MSG  0x80
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define SEEK_MSG    (1 << 1)
+#define CMD_MSG     (1 << 2)
+#define RD_DATA_MSG (1 << 3)
+#define WR_DATA_MSG (1 << 4)
+#define STATUS_MSG  (1 << 5)
+#define ORDERS_MSG  (1 << 6)
+#define VERBOSE_MSG (1 << 7)
+#define RD_DATA_DETAIL_MSG  (1 << 8)
+#define WR_DATA_DETAIL_MSG  (1 << 9)
 
 extern uint32 PCX;
 extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -90,7 +91,6 @@ typedef union {
 
 typedef struct {
     UNIT *uptr;
-    DISK_INFO *imd;
     uint8 track;
     uint8 wp;       /* Disk write protected */
     uint8 sector;   /* Current Sector number */
@@ -161,7 +161,6 @@ static SECTOR_FORMAT sdata;
 #define UNIT_MDSAD_VERBOSE      (1 << UNIT_V_MDSAD_VERBOSE)
 #define MDSAD_CAPACITY          (70*10*MDSAD_SECTOR_LEN)    /* Default North Star Disk Capacity */
 #define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.                */
-#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.                  */
 #define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.              */
 
 /* MDS-AD Controller Subcases */
@@ -223,8 +222,6 @@ static uint8 MDSAD_Read(const uint32 Addr);
 
 static int32 mdsaddev(const int32 Addr, const int32 rw, const int32 data);
 
-static int32 trace_level = 0;
-
 static UNIT mdsad_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MDSAD_CAPACITY) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MDSAD_CAPACITY) },
@@ -233,7 +230,6 @@ static UNIT mdsad_unit[] = {
 };
 
 static REG mdsad_reg[] = {
-    { HRDATA (TRACELEVEL,   trace_level,           16), },
     { NULL }
 };
 
@@ -248,13 +244,32 @@ static MTAB mdsad_mod[] = {
     { 0 }
 };
 
+#define TRACE_PRINT(level, args)    if(mdsad_dev.dctrl & level) {   \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB mdsad_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "SEEK",   SEEK_MSG },
+    { "CMD",    CMD_MSG },
+    { "RDDATA", RD_DATA_MSG },
+    { "WRDATA", WR_DATA_MSG },
+    { "STATUS", STATUS_MSG },
+    { "ORDERS", ORDERS_MSG },
+    { "RDDETAIL", RD_DATA_DETAIL_MSG },
+    { "WRDETAIL", WR_DATA_DETAIL_MSG },
+    { "VERBOSE",VERBOSE_MSG },
+    { NULL,     0 }
+};
+
 DEVICE mdsad_dev = {
     "MDSAD", mdsad_unit, mdsad_reg, mdsad_mod,
     MDSAD_MAX_DRIVES, 10, 31, 1, MDSAD_MAX_DRIVES, MDSAD_MAX_DRIVES,
     NULL, NULL, &mdsad_reset,
     &mdsad_boot, &mdsad_attach, &mdsad_detach,
-    &mdsad_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &mdsad_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    mdsad_dt, NULL, "North Star Floppy Controller MDSAD"
 };
 
 /* Reset routine */
@@ -311,9 +326,7 @@ t_stat mdsad_attach(UNIT *uptr, char *cptr)
 
     if(uptr->capac > 0) {
         fgets(header, 4, uptr->fileref);
-        if(!strcmp(header, "IMD")) {
-            uptr->u3 = IMAGE_TYPE_IMD;
-        } else if(!strcmp(header, "CPT")) {
+        if(!strcmp(header, "CPT")) {
             printf("CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             mdsad_detach(uptr);
@@ -325,24 +338,8 @@ t_stat mdsad_attach(UNIT *uptr, char *cptr)
 
     if (uptr->flags & UNIT_MDSAD_VERBOSE)
         printf("MDSAD%d, attached to '%s', type=%s, len=%d\n", i, cptr,
-            uptr->u3 == IMAGE_TYPE_IMD ? "IMD" : uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
+            uptr->u3 == uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
-
-    if(uptr->u3 == IMAGE_TYPE_IMD) {
-        if(uptr->capac < 318000) {
-            printf("Cannot create IMD files with SIMH.\nCopy an existing file and format it with CP/M.\n");
-            mdsad_detach(uptr);
-            return SCPE_OPENERR;
-        }
-
-        if (uptr->flags & UNIT_MDSAD_VERBOSE)
-            printf("--------------------------------------------------------\n");
-        mdsad_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_MDSAD_VERBOSE));
-        if (uptr->flags & UNIT_MDSAD_VERBOSE)
-            printf("\n");
-    } else {
-        mdsad_info->drive[i].imd = NULL;
-    }
 
     return SCPE_OK;
 }
@@ -360,16 +357,16 @@ t_stat mdsad_detach(UNIT *uptr)
         }
     }
 
-    if (i >= MDSAD_MAX_DRIVES) return SCPE_ARG;
+    if (i >= MDSAD_MAX_DRIVES)
+        return SCPE_ARG;
 
     DBG_PRINT(("Detach MDSAD%d\n", i));
-    diskClose(mdsad_info->drive[i].imd);
 
     r = detach_unit(uptr);  /* detach unit */
     if(r != SCPE_OK)
         return r;
 
-    mdsad_dev.units[i].fileref = NULL; /* psco check if ok */
+    mdsad_dev.units[i].fileref = NULL;
     return SCPE_OK;
 }
 
@@ -428,13 +425,25 @@ static void showdata(int32 isRead) {
     printf("MDSAD: " ADDRESS_FORMAT " %s Sector =" NLP "\t", PCX, isRead ? "Read" : "Write");
     for(i=0; i < MDSAD_SECTOR_LEN; i++) {
         printf("%02X ", sdata.u.data[i]);
-        if(((i+1) & 0xf) == 0) printf(NLP "\t");
+        if(((i+1) & 0xf) == 0)
+            printf(NLP "\t");
     }
     printf(NLP);
 }
 
 static int checksum;
 static uint32 sec_offset;
+
+static uint32 calculate_mdsad_sec_offset(uint8 track, uint8 head, uint8 sector)
+{
+    if(mdsad_info->orders.ss == 0) {
+        return ((track * (MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK)) + (sector * MDSAD_SECTOR_LEN));
+    } else {
+        return ((((MDSAD_TRACKS-1) - track) * (MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK)) +
+                 ((MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK) * MDSAD_TRACKS) + /* Skip over side 0 */
+                 (sector * MDSAD_SECTOR_LEN)); /* Sector offset from beginning of track. */
+    }
+}
 
 static uint8 MDSAD_Read(const uint32 Addr)
 {
@@ -452,9 +461,6 @@ static uint8 MDSAD_Read(const uint32 Addr)
             break;
         case MDSAD_WRITE_DATA:
         {
-            unsigned int flags = 0;
-            unsigned int writelen;
-
             if(mdsad_info->datacount == 0) {
                 TRACE_PRINT(WR_DATA_MSG, ("MDSAD: " ADDRESS_FORMAT
                     " WRITE Start:  Drive: %d, Track=%d, Head=%d, Sector=%d" NLP,
@@ -464,9 +470,9 @@ static uint8 MDSAD_Read(const uint32 Addr)
                     mdsad_info->orders.ss,
                     pDrive->sector));
 
-                sec_offset = (pDrive->track * (MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK)) +
-                             (mdsad_info->orders.ss * ((MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK) * MDSAD_TRACKS)) +
-                             (pDrive->sector * MDSAD_SECTOR_LEN);
+                sec_offset = calculate_mdsad_sec_offset(pDrive->track,
+                    mdsad_info->orders.ss,
+                    pDrive->sector);
 
             }
 
@@ -487,27 +493,15 @@ static uint8 MDSAD_Read(const uint32 Addr)
                         PCX, mdsad_info->orders.ds));
                     return 0x00;
                 }
-                if(trace_level & WR_DATA_DETAIL_MSG) showdata(FALSE);
+                if(mdsad_dev.dctrl & WR_DATA_DETAIL_MSG)
+                    showdata(FALSE);
                 switch((pDrive->uptr)->u3)
                 {
-                    case IMAGE_TYPE_IMD:
-                        if(pDrive->imd == NULL) {
-                            printf(".imd is NULL!" NLP);
-                        }
-                        sectWrite(pDrive->imd,
-                            pDrive->track,
-                            mdsad_info->orders.ss,
-                            pDrive->sector,
-                            sdata.u.data,
-                            MDSAD_SECTOR_LEN,
-                            &flags,
-                            &writelen);
-                        break;
                     case IMAGE_TYPE_DSK:
                         if(pDrive->uptr->fileref == NULL) {
                             printf(".fileref is NULL!" NLP);
                         } else {
-                            fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                            sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
                             fwrite(sdata.u.data, MDSAD_SECTOR_LEN, 1,
                                 (pDrive->uptr)->fileref);
                         }
@@ -546,6 +540,11 @@ static uint8 MDSAD_Read(const uint32 Addr)
                     break;
             }
 
+            if(mdsad_info->orders.ds != (mdsad_info->orders.ds & 0x03)) {
+                TRACE_PRINT(ERROR_MSG, ("MDSAD: " ADDRESS_FORMAT
+                    " Controller Orders update drive %x" NLP, PCX, mdsad_info->orders.ds));
+                mdsad_info->orders.ds &= 0x03;
+            }
             TRACE_PRINT(ORDERS_MSG, ("MDSAD: " ADDRESS_FORMAT
                 " Controller Orders: Drive=%x[%x], DD=%d, SS=%d, DP=%d, ST=%d" NLP,
                 PCX,
@@ -705,9 +704,6 @@ static uint8 MDSAD_Read(const uint32 Addr)
                     break;
                 case MDSAD_READ_DATA:   /* READ DATA */
                 {
-                    unsigned int flags;
-                    unsigned int readlen;
-
                     if(mdsad_info->datacount == 0) {
                         TRACE_PRINT(RD_DATA_MSG, ("MDSAD: " ADDRESS_FORMAT
                             " READ Start:  Drive: %d, Track=%d, Head=%d, Sector=%d" NLP,
@@ -719,9 +715,9 @@ static uint8 MDSAD_Read(const uint32 Addr)
 
                             checksum = 0;
 
-                            sec_offset = (pDrive->track * (MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK)) +
-                                         (mdsad_info->orders.ss * ((MDSAD_SECTOR_LEN * MDSAD_SECTORS_PER_TRACK) * MDSAD_TRACKS)) +
-                                         (pDrive->sector * MDSAD_SECTOR_LEN);
+                            sec_offset = calculate_mdsad_sec_offset(pDrive->track,
+                                mdsad_info->orders.ss,
+                                pDrive->sector);
 
                             if ((pDrive->uptr == NULL) ||
                                     (pDrive->uptr->fileref == NULL)) {
@@ -733,25 +729,11 @@ static uint8 MDSAD_Read(const uint32 Addr)
 
                             switch((pDrive->uptr)->u3)
                             {
-                                case IMAGE_TYPE_IMD:
-                                    if(pDrive->imd == NULL) {
-                                        printf(".imd is NULL!" NLP);
-                                    }
-/*                                  DBG_PRINT(("%s: Read: imd=%p" NLP, __FUNCTION__, mdsad_info->drive[mdsad_info->sel_drive].imd)); */
-                                    sectRead(pDrive->imd,
-                                        pDrive->track,
-                                        mdsad_info->orders.ss,
-                                        pDrive->sector,
-                                        sdata.u.data,
-                                        MDSAD_SECTOR_LEN,
-                                        &flags,
-                                        &readlen);
-                                    break;
                                 case IMAGE_TYPE_DSK:
                                     if(pDrive->uptr->fileref == NULL) {
                                         printf(".fileref is NULL!" NLP);
                                     } else {
-                                        fseek((pDrive->uptr)->fileref,
+                                        sim_fseek((pDrive->uptr)->fileref,
                                             sec_offset, SEEK_SET);
                                         fread(&sdata.u.data[0], MDSAD_SECTOR_LEN,
                                             1, (pDrive->uptr)->fileref);
@@ -766,10 +748,11 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                         NLP, __FUNCTION__);
                                     break;
                             }
-                            if(trace_level & RD_DATA_DETAIL_MSG) showdata(TRUE);
+                            if(mdsad_dev.dctrl & RD_DATA_DETAIL_MSG)
+                                showdata(TRUE);
                     }
 
-                    if(mdsad_info->datacount < 0x200) {
+                    if(mdsad_info->datacount < MDSAD_SECTOR_LEN) {
                         cData = sdata.u.data[mdsad_info->datacount];
 
                         /* Exclusive OR */

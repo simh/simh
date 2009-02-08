@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2007, Robert M Supnik
+   Copyright (c) 1998-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,8 +29,9 @@
    todr         TODR clock
    tmr          interval timer
 
+   17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
-   29-Oct-2006  RMS     Added clock coscheduler function
+   29-Oct-06    RMS     Added clock coscheduler function
                         Synced keyboard to clock for idling
    11-May-06    RMS     Revised timer logic for EVKAE
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -201,7 +202,7 @@ t_stat fl_reset (DEVICE *dptr);
 int32 icr_rd (t_bool interp);
 void tmr_incr (uint32 inc);
 void tmr_sched (void);
-t_stat todr_powerup (void);
+t_stat todr_resync (void);
 t_stat fl_wr_txdb (int32 data);
 t_bool fl_test_xfr (UNIT *uptr, t_bool wr);
 void fl_protocol_error (void);
@@ -372,7 +373,8 @@ return (tti_csr & RXCS_RD);
 
 void rxcs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) tto_int = 0;
+if ((data & CSR_IE) == 0)
+    tto_int = 0;
 else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     tti_int = 1;
 tti_csr = (tti_csr & ~RXCS_WR) | (data & RXCS_WR);
@@ -396,7 +398,8 @@ return (tto_csr & TXCS_RD);
 
 void txcs_wr (int32 data)
 {
-if ((data & CSR_IE) == 0) tto_int = 0;
+if ((data & CSR_IE) == 0)
+    tto_int = 0;
 else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     tto_int = 1;
 tto_csr = (tto_csr & ~TXCS_WR) | (data & TXCS_WR);
@@ -408,7 +411,8 @@ void txdb_wr (int32 data)
 tto_buf = data & WMASK;                                 /* save data */
 tto_csr = tto_csr & ~CSR_DONE;                          /* clear flag */
 tto_int = 0;                                            /* clear int */
-if (tto_buf & TXDB_SEL) fl_wr_txdb (tto_buf);           /* floppy? */
+if (tto_buf & TXDB_SEL)                                 /* floppy? */
+    fl_wr_txdb (tto_buf);
 else sim_activate (&tto_unit, tto_unit.wait);           /* no, console */
 return;
 }
@@ -420,13 +424,15 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
 if (c & SCPE_BREAK)                                     /* break? */
     tti_buf = RXDB_ERR | RXDB_FRM;
 else tti_buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
-if (tti_csr & CSR_IE) tti_int = 1;
+if (tti_csr & CSR_IE)
+    tti_int = 1;
 return SCPE_OK;
 }
 
@@ -459,7 +465,8 @@ if ((tto_buf & TXDB_SEL) == 0) {                        /* for console? */
     uptr->pos = uptr->pos + 1;
     }
 tto_csr = tto_csr | CSR_DONE;
-if (tto_csr & CSR_IE) tto_int = 1;
+if (tto_csr & CSR_IE)
+    tto_int = 1;
 return SCPE_OK;
 }
 
@@ -526,7 +533,8 @@ else if (val & TMR_CSR_SGL) {                           /* single step? */
         tmr_icr = tmr_nicr;                             /* reload tir */
     }
 if ((tmr_iccs & (TMR_CSR_DON | TMR_CSR_IE)) !=          /* update int */
-    (TMR_CSR_DON | TMR_CSR_IE)) tmr_int = 0;
+    (TMR_CSR_DON | TMR_CSR_IE))
+    tmr_int = 0;
 return;
 }
 
@@ -538,7 +546,8 @@ if (interp || (tmr_iccs & TMR_CSR_RUN)) {               /* interp, running? */
     delta = sim_grtime () - tmr_sav;                    /* delta inst */
     if (tmr_use_100hz && (tmr_poll > TMR_INC))          /* scale large int */
         delta = (uint32) ((((double) delta) * TMR_INC) / tmr_poll);
-    if (delta >= tmr_inc) delta = tmr_inc - 1;
+    if (delta >= tmr_inc)
+        delta = tmr_inc - 1;
     return tmr_icr + delta;
     }
 return tmr_icr;
@@ -590,7 +599,8 @@ if (new_icr < tmr_icr) {                                /* ovflo? */
         tmr_icr = tmr_nicr;                             /* reload */
         tmr_sched ();                                   /* reactivate */
         }
-    if (tmr_iccs & TMR_CSR_IE) tmr_int = 1;             /* ie? set int req */
+    if (tmr_iccs & TMR_CSR_IE)                          /* ie? set int req */
+        tmr_int = 1;
     else tmr_int = 0;
     }
 else {
@@ -646,7 +656,7 @@ tmr_nicr = 0;
 tmr_int = 0;
 tmr_use_100hz = 1;
 sim_cancel (&tmr_unit);                                 /* cancel timer */
-if (sim_switches & SWMASK ('P')) todr_powerup ();       /* powerup? set TODR */
+todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
@@ -663,16 +673,18 @@ todr_reg = data;
 return;
 }
 
-t_stat todr_powerup (void)
+t_stat todr_resync (void)
 {
 uint32 base;
 time_t curr;
 struct tm *ctm;
 
 curr = time (NULL);                                     /* get curr time */
-if (curr == (time_t) -1) return SCPE_NOFNC;             /* error? */
+if (curr == (time_t) -1)                                /* error? */
+    return SCPE_NOFNC;
 ctm = localtime (&curr);                                /* decompose */
-if (ctm == NULL) return SCPE_NOFNC;                     /* error? */
+if (ctm == NULL)                                        /* error? */
+    return SCPE_NOFNC;
 base = (((((ctm->tm_yday * 24) +                        /* sec since 1-Jan */
         ctm->tm_hour) * 60) +
         ctm->tm_min) * 60) +
@@ -689,7 +701,8 @@ int32 sel = TXDB_GETSEL (data);                         /* get selection */
 
 if (sel == TXDB_FCMD) {                                 /* floppy command? */
     fl_fnc = FL_GETFNC (data);                          /* get function */
-    if (fl_state != FL_IDLE) switch (fl_fnc) {          /* cmd in prog? */
+    if (fl_state != FL_IDLE)                            /* cmd in prog? */
+        switch (fl_fnc) {
 
         case FL_FNCCA:                                  /* cancel? */
             sim_cancel (&fl_unit);                      /* stop op */
@@ -736,13 +749,15 @@ else if (sel == TXDB_FDAT) {                            /* floppy data? */
 
         case FL_RWDT:                                   /* expecting track */
             fl_track = data & FL_M_TRACK;
-            if (fl_fnc == FL_FNCRD) fl_state = FL_READ;
+            if (fl_fnc == FL_FNCRD)
+                fl_state = FL_READ;
             else fl_state = FL_FILL;
             break;
 
         case FL_FILL:                                   /* expecting wr data */
             fl_buf[fl_bptr++] = data & BMASK;
-            if (fl_bptr >= FL_NUMBY) fl_state = FL_WRITE;
+            if (fl_bptr >= FL_NUMBY)
+                fl_state = FL_WRITE;
             break;
 
         default:
@@ -758,7 +773,8 @@ else {
         data = data & COMM_MASK;                        /* byte to select */
         tti_buf = comm_region[data] | COMM_DATA;
         tti_csr = tti_csr | CSR_DONE;                   /* set input flag */
-        if (tti_csr & CSR_IE) tti_int = 1;
+        if (tti_csr & CSR_IE)
+            tti_int = 1;
         }
     else if (sel == TXDB_MISC) {                        /* misc function? */
         switch (data & MISC_MASK) {                     /* case on function */
@@ -808,12 +824,14 @@ switch (fl_state) {                                     /* case on state */
     case FL_READ: case FL_WRITE:                        /* read, write */
         fl_state = fl_state + 1;                        /* set next state */
         t = abs (fl_track - uptr->TRACK);               /* # tracks to seek */
-        if (t == 0) t = 1;                              /* minimum 1 */
+        if (t == 0)                                     /* minimum 1 */
+            t = 1;
         sim_activate (uptr, fl_swait * t);              /* schedule seek */
                                                         /* fall thru, set flag */
     case FL_RWDS: case FL_RWDT: case FL_FILL:           /* rwds, rwdt, fill */
         tto_csr = tto_csr | CSR_DONE;                   /* set output done */
-        if (tto_csr & CSR_IE) tto_int = 1;
+        if (tto_csr & CSR_IE)
+            tto_int = 1;
         break;
 
     case FL_READ1:                                      /* read, seek done */
@@ -823,7 +841,8 @@ switch (fl_state) {                                     /* case on state */
                 fl_buf[i] = fbuf[da + i];
             tti_buf = fl_esr | FL_CDONE;                /* completion code */
             tti_csr = tti_csr | CSR_DONE;               /* set input flag */
-            if (tti_csr & CSR_IE) tti_int = 1;      
+            if (tti_csr & CSR_IE)
+                tti_int = 1;      
             fl_state = FL_EMPTY;                        /* go empty */
             }
         else fl_state = FL_DONE;                        /* error? cmd done */
@@ -834,7 +853,8 @@ switch (fl_state) {                                     /* case on state */
         if ((tti_csr & CSR_DONE) == 0) {                /* prev data taken? */
             tti_buf = FL_CDATA | fl_buf[fl_bptr++];     /* get next byte */
             tti_csr = tti_csr | CSR_DONE;               /* set input flag */
-            if (tti_csr & CSR_IE) tti_int = 1;
+            if (tti_csr & CSR_IE)
+                tti_int = 1;
             if (fl_bptr >= FL_NUMBY) {                  /* buffer empty? */
                 fl_state = FL_IDLE;                     /* cmd done */
                 break;
@@ -849,9 +869,11 @@ switch (fl_state) {                                     /* case on state */
             for (i = 0; i < FL_NUMBY; i++)              /* copy buf to sector */
                 fbuf[da + i] = fl_buf[i];
             da = da + FL_NUMBY;
-            if (da > uptr->hwmark) uptr->hwmark = da;   /* update hwmark */
+            if (da > uptr->hwmark)                      /* update hwmark */
+                uptr->hwmark = da;
             }
-        if (fl_fnc == FL_FNCWD) fl_esr |= FL_STADDA;    /* wrdel? set status*/
+        if (fl_fnc == FL_FNCWD)                         /* wrdel? set status */
+            fl_esr |= FL_STADDA;
         fl_state = FL_DONE;                             /* command done */
         sim_activate (uptr, fl_xwait);                  /* schedule */
         break;
@@ -862,7 +884,8 @@ switch (fl_state) {                                     /* case on state */
         else {                                          /* yes */
             tti_buf = fl_esr | FL_CDONE;                /* completion code */
             tti_csr = tti_csr | CSR_DONE;               /* set input flag */
-            if (tti_csr & CSR_IE) tti_int = 1;
+            if (tti_csr & CSR_IE)
+                tti_int = 1;
             fl_state = FL_IDLE;                         /* floppy idle */
             }
         break;    
@@ -871,7 +894,8 @@ switch (fl_state) {                                     /* case on state */
         if ((tti_csr & CSR_DONE) == 0) {                /* input buf empty? */
             tti_buf = fl_ecode;                         /* return err code */
             tti_csr = tti_csr | CSR_DONE;               /* set input flag */
-            if (tti_csr & CSR_IE) tti_int = 1;
+            if (tti_csr & CSR_IE)
+                tti_int = 1;
             fl_state = FL_DONE;                         /* command done */
             }
         sim_activate (uptr, fl_xwait);
@@ -906,11 +930,13 @@ void fl_protocol_error (void)
 {
 if ((tto_csr & CSR_DONE) == 0) {                        /* output busy? */
     tto_csr = tto_csr | CSR_DONE;                       /* set done */
-    if (tto_csr & CSR_IE) tto_int = 1;
+    if (tto_csr & CSR_IE)
+        tto_int = 1;
     }
 if ((tti_csr & CSR_DONE) == 0) {                        /* input idle? */
     tti_csr = tti_csr | CSR_DONE;                       /* set done */
-    if (tti_csr & CSR_IE) tti_int = 1;
+    if (tti_csr & CSR_IE)
+        tti_int = 1;
     }
 tti_buf = FL_CPROT;                                     /* status */
 fl_state = FL_IDLE;                                     /* floppy idle */
@@ -931,7 +957,8 @@ fl_state = FL_IDLE;                                     /* ctrl idle */
 fl_bptr = 0;
 sim_cancel (&fl_unit);                                  /* cancel drive */
 fl_unit.TRACK = 0;
-for (i = 0; i < COMM_LNT; i++) comm_region[i] = 0;
+for (i = 0; i < COMM_LNT; i++)
+    comm_region[i] = 0;
 comm_region[COMM_FPLV] = VER_FPLA;
 comm_region[COMM_PCSV] = VER_PCS;
 comm_region[COMM_WCSV] = VER_WCSP;

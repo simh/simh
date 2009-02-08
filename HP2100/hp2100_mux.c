@@ -23,8 +23,15 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   mux,muxl,muxc        12920A terminal multiplexor
+   MUX,MUXL,MUXM        12920A terminal multiplexor
 
+   25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
+   09-Oct-08    JDB     "muxl_unit" defined one too many units (17 instead of 16)
+   10-Sep-08    JDB     SHOW MUX CONN/STAT with SET MUX DIAG is no longer disallowed
+   07-Sep-08    JDB     Changed Telnet poll to connect immediately after reset or attach
+   27-Aug-08    JDB     Added LINEORDER support
+   12-Aug-08    JDB     Added BREAK deferral to allow RTE break-mode to work
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    16-Apr-08    JDB     Sync mux poll with console poll for idle compatibility
    06-Mar-07    JDB     Corrected "mux_sta" size from 16 to 21 elements
                         Fixed "muxc_reset" to clear lines 16-20
@@ -51,32 +58,107 @@
    01-Nov-02    RMS     Added 7B/8B support
    22-Aug-02    RMS     Updated for changes to sim_tmxr
 
-   The 12920A consists of three separate devices
-
-   mux                  scanner (upper data card)
-   muxl                 lines (lower data card)
-   muxm                 modem control (control card)
-
-   The lower data card has no CMD flop; the control card has no CMD flop.
-   The upper data card has none of the usual flops.
-
    Reference:
-   - 12920A Asynchronous Multiplexer Interface Kits Operating and Service
-            Manual (12920-90001, Oct-1972)
+   - 12920A Asynchronous Multiplexer Interface Kits Operating and Service Manual
+        (12920-90001, Oct-1972)
+
+
+   The 12920A was a 16-channel asynchronous terminal multiplexer.  It supported
+   direct-connected terminals as well as modems at speeds up to 2400 baud.  It
+   was the primary terminal multiplexer for the HP 2000 series of Time-Shared
+   BASIC systems.
+
+   The multiplexer was implemented as a three-card set consisting of a lower
+   data card, an upper data card, and a modem control card.  Under simulation,
+   these are implemented by three devices:
+
+     MUXL   lower data card (lines)
+     MUX    upper data card (scanner)
+     MUXM   control card (modem control)
+
+   The lower and upper data cards must be in adjacent I/O slots.  The control
+   card may be placed in any slot, although in practice it was placed in the
+   slot above the upper data card, so that all three cards were physically
+   together.
+
+   The 12920A supported one or two control cards (two cards were used with
+   801-type automatic dialers).  Under simulation, only one control card is
+   supported.
+
+   Implementation notes:
+
+    1. If a BREAK is detected during an input poll, and we are not in diagnostic
+       mode, we defer recognition until either a character is output or a second
+       successive input poll occurs.  This is necessary for RTE break-mode
+       operation.  Without this deferral, a BREAK during output would be ignored
+       by the RTE driver, making it impossible to stop a long listing.
+
+       The problem is due to timing differences between simulated and real time.
+       The RTE multiplexer driver is a privileged driver.  Privileged drivers
+       bypass RTE to provide rapid interrupt handling.  To inform RTE that an
+       operation is complete, e.g., that a line has been written, the interrupt
+       section of the driver sets a device timeout of one clock tick (10
+       milliseconds).  When that timeout occurs, RTE is entered normally to
+       complete the I/O transaction.  While the completion timeout is pending,
+       the driver ignores any further interrupts from the multiplexer line.
+
+       The maximum communication rate for the multiplexer is 2400 baud, or
+       approximately 4.2 milliseconds per character transferred.  A typical line
+       of 20 characters would therefore take ~85 milliseconds, plus the 10
+       millisecond completion timeout, or about 95 milliseconds total.  BREAK
+       recognition would be ignored for roughly 10% of that time.  At lower baud
+       rates, recognition would be ignored for a correspondingly smaller
+       percentage of the time.
+
+       However, SIMH uses an optimized timing of 500 instructions per character
+       transfer, rather than the ~6600 instructions that a character transfer
+       should take, and so a typical 20-character line will take about 11,000
+       instructions.  On the other hand, the clock tick is calibrated to real
+       time, and 10 milliseconds of real time takes about 420,000 instructions
+       on a 2.0 GHz PC.  To be recognized, then, the BREAK key must be pressed
+       in a window that is open for about 2.5% of the time.  Therefore, the
+       BREAK key will be ignored about 97.5% of the time, and RTE break-mode
+       effectively will not work.
+
+       Deferring BREAK recognition until the next character is output ensures
+       that the BREAK interrupt will be accepted (the simulator delivers input
+       interrupts before output interrupts, so the BREAK interrupt arrives
+       before the output character transmit interrupt).  If an output operation
+       is not in progress, then the BREAK will be recognized at the next input
+       poll.
 */
+
+
+#include <ctype.h>
 
 #include "hp2100_defs.h"
 #include "sim_sock.h"
 #include "sim_tmxr.h"
-#include <ctype.h>
 
-#define MUX_LINES       16                              /* user lines */
-#define MUX_ILINES      5                               /* diag rcv only */
+
+/* Unit references */
+
+#define MUX_LINES       16                              /* number of user lines */
+#define MUX_ILINES      5                               /* number of diag rcv only lines */
+
+
+/* Service times */
+
+#define MUXL_WAIT       500
+
+
+/* Unit flags */
+
 #define UNIT_V_MDM      (TTUF_V_UF + 0)                 /* modem control */
 #define UNIT_V_DIAG     (TTUF_V_UF + 1)                 /* loopback diagnostic */
 #define UNIT_MDM        (1 << UNIT_V_MDM)
 #define UNIT_DIAG       (1 << UNIT_V_DIAG)
-#define MUXL_WAIT       500
+
+/* Debug flags */
+
+#define DEB_CMDS        (1 << 0)                        /* Command initiation and completion */
+#define DEB_CPU         (1 << 1)                        /* CPU I/O */
+#define DEB_XFER        (1 << 2)                        /* Socket receive and transmit */
 
 /* Channel number (OTA upper, LIA lower or upper) */
 
@@ -152,55 +234,13 @@
 #define DSR             LIC_S1                          /* S1 = dsr */
 
 #define LIC_TSTI(ch)    (((muxc_lia[ch] ^ muxc_ota[ch]) & \
-                     ((muxc_ota[ch] & (OTC_ES2|OTC_ES1)) >> OTC_V_ES)) \
-                     << LIC_V_I)
+                          ((muxc_ota[ch] & (OTC_ES2|OTC_ES1)) >> OTC_V_ES)) \
+                         << LIC_V_I)
 
-/* Debug flags */
 
-#define DEB_CMDS        (1 << 0)                        /* Command initiation and completion */
-#define DEB_CPU         (1 << 1)                        /* CPU I/O */
-#define DEB_XFER        (1 << 2)                        /* Socket receive and transmit */
+/* Program constants */
 
-extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
-extern FILE *sim_deb;
-
-uint16 mux_sta[MUX_LINES + MUX_ILINES];                 /* line status */
-uint16 mux_rpar[MUX_LINES + MUX_ILINES];                /* rcv param */
-uint16 mux_xpar[MUX_LINES];                             /* xmt param */
-uint16 mux_rbuf[MUX_LINES + MUX_ILINES];                /* rcv buf */
-uint16 mux_xbuf[MUX_LINES];                             /* xmt buf */
-uint8 mux_rchp[MUX_LINES + MUX_ILINES];                 /* rcv chr pend */
-uint8 mux_xdon[MUX_LINES];                              /* xmt done */
-uint8 muxc_ota[MUX_LINES];                              /* ctrl: Cn,ESn,SSn */
-uint8 muxc_lia[MUX_LINES];                              /* ctrl: Sn */
-uint32 muxl_ibuf = 0;                                   /* low in: rcv data */
-uint32 muxl_obuf = 0;                                   /* low out: param */
-uint32 muxu_ibuf = 0;                                   /* upr in: status */
-uint32 muxu_obuf = 0;                                   /* upr out: chan */
-uint32 muxc_chan = 0;                                   /* ctrl chan */
-uint32 muxc_scan = 0;                                   /* ctrl scan */
-
-TMLN mux_ldsc[MUX_LINES] = { { 0 } };                   /* line descriptors */
-TMXR mux_desc = { MUX_LINES, 0, 0, mux_ldsc };          /* mux descriptor */
-
-DEVICE muxl_dev, muxu_dev, muxc_dev;
-int32 muxlio (int32 inst, int32 IR, int32 dat);
-int32 muxuio (int32 inst, int32 IR, int32 dat);
-int32 muxcio (int32 inst, int32 IR, int32 dat);
-t_stat muxi_svc (UNIT *uptr);
-t_stat muxo_svc (UNIT *uptr);
-t_stat muxc_reset (DEVICE *dptr);
-t_stat mux_attach (UNIT *uptr, char *cptr);
-t_stat mux_detach (UNIT *uptr);
-t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat mux_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat mux_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-void mux_data_int (void);
-void mux_ctrl_int (void);
-void mux_diag (int32 c);
-
-static uint8 odd_par[256] = {
+static const uint8 odd_par [256] = {
  1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1,        /* 000-017 */
  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 020-037 */
  0, 1, 1, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 1, 1, 0,        /* 040-067 */
@@ -222,78 +262,98 @@ static uint8 odd_par[256] = {
 #define RCV_PAR(x)      (odd_par[(x) & 0377] ? 0 : LIL_PAR)
 #define XMT_PAR(x)      (odd_par[(x) & 0377] ? 0 : OTL_PAR)
 
-/* Debug flags table */
 
-DEBTAB mux_deb[] = {
-    { "CMDS", DEB_CMDS },
-    { "CPU",  DEB_CPU },
-    { "XFER", DEB_XFER },
-    { NULL,   0 }  };
+/* Multiplexer controller state variables */
+
+FLIP_FLOP muxl_control = CLEAR;
+FLIP_FLOP muxl_flag = CLEAR;
+FLIP_FLOP muxl_flagbuf = CLEAR;
+
+uint32 muxl_ibuf = 0;                                   /* low in: rcv data */
+uint32 muxl_obuf = 0;                                   /* low out: param */
+
+uint32 muxu_ibuf = 0;                                   /* upr in: status */
+uint32 muxu_obuf = 0;                                   /* upr out: chan */
+
+FLIP_FLOP muxc_control = CLEAR;
+FLIP_FLOP muxc_flag = CLEAR;
+FLIP_FLOP muxc_flagbuf = CLEAR;
+
+uint32 muxc_chan = 0;                                   /* ctrl chan */
+uint32 muxc_scan = 0;                                   /* ctrl scan */
+
+
+/* Multiplexer per-line state variables */
+
+uint16 mux_sta   [MUX_LINES + MUX_ILINES];              /* line status */
+uint16 mux_rpar  [MUX_LINES + MUX_ILINES];              /* rcv param */
+uint16 mux_xpar  [MUX_LINES];                           /* xmt param */
+uint8  mux_rchp  [MUX_LINES + MUX_ILINES];              /* rcv chr pend */
+uint8  mux_xdon  [MUX_LINES];                           /* xmt done */
+uint8  muxc_ota  [MUX_LINES];                           /* ctrl: Cn,ESn,SSn */
+uint8  muxc_lia  [MUX_LINES];                           /* ctrl: Sn */
+uint8  mux_defer [MUX_LINES];                           /* break deferred flags */
+
+
+/* Multiplexer per-line buffer variables */
+
+uint16 mux_rbuf[MUX_LINES + MUX_ILINES];                /* rcv buf */
+uint16 mux_xbuf[MUX_LINES];                             /* xmt buf */
+
+
+/* Multiplexer local routines */
+
+void mux_receive (int32 ln, int32 c, t_bool diag);
+void mux_data_int (void);
+void mux_ctrl_int (void);
+void mux_diag (int32 c);
+
+
+/* Multiplexer global routines */
+
+uint32 muxlio (uint32 select_code, IOSIG signal, uint32 data);
+uint32 muxuio (uint32 select_code, IOSIG signal, uint32 data);
+uint32 muxcio (uint32 select_code, IOSIG signal, uint32 data);
+t_stat muxi_svc (UNIT *uptr);
+t_stat muxo_svc (UNIT *uptr);
+t_stat muxc_reset (DEVICE *dptr);
+t_stat mux_attach (UNIT *uptr, char *cptr);
+t_stat mux_detach (UNIT *uptr);
+t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
+
+
+/* MUX data structures.
+
+   mux_order   MUX line connection order table
+   mux_ldsc    MUX line descriptors
+   mux_desc    MUX multiplexer descriptor
+*/
+
+int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
+TMLN  mux_ldsc [MUX_LINES] = { { 0 } };                     /* line descriptors */
+TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
 
 DIB mux_dib[] = {
-    { MUXL, 0, 0, 0, 0, 0, &muxlio },
-    { MUXU, 0, 0, 0, 0, 0, &muxuio }
+    { MUXL, &muxlio },
+    { MUXU, &muxuio }
     };
 
 #define muxl_dib mux_dib[0]
 #define muxu_dib mux_dib[1]
 
-/* MUX data structures
 
-   muxu_dev     MUX device descriptor
-   muxu_unit    MUX unit descriptor
-   muxu_reg     MUX register list
-   muxu_mod     MUX modifiers list
-*/
+/* MUXL data structures.
 
-UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_WAIT };
-
-REG muxu_reg[] = {
-    { ORDATA (IBUF, muxu_ibuf, 16) },
-    { ORDATA (OBUF, muxu_obuf, 16) },
-    { FLDATA (CMD, muxu_dib.cmd, 0), REG_HRO },
-    { FLDATA (CTL, muxu_dib.ctl, 0), REG_HRO },
-    { FLDATA (FLG, muxu_dib.flg, 0), REG_HRO },
-    { FLDATA (FBF, muxu_dib.fbf, 0), REG_HRO },
-    { FLDATA (SRQ, muxu_dib.srq, 0), REG_HRO },
-    { ORDATA (DEVNO, muxu_dib.devno, 6), REG_HRO },
-    { NULL }
-    };
-
-MTAB muxu_mod[] = {
-    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", &mux_setdiag },
-    { UNIT_DIAG, 0, "terminal mode", "TERM", &mux_setdiag },
-    { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &mux_summ },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &mux_show, NULL },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &mux_show, NULL },
-    { MTAB_XTD|MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &muxl_dev },
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &mux_desc },
-    { 0 }
-    };
-
-DEVICE muxu_dev = {
-    "MUX", &muxu_unit, muxu_reg, muxu_mod,
-    1, 10, 31, 1, 8, 8,
-    &tmxr_ex, &tmxr_dep, &muxc_reset,
-    NULL, &mux_attach, &mux_detach,
-    &muxu_dib, DEV_NET | DEV_DISABLE | DEV_DEBUG,
-    0, mux_deb, NULL, NULL
-    };
-
-/* MUXL data structures
-
-   muxl_dev     MUXL device descriptor
-   muxl_unit    MUXL unit descriptor
+   muxl_dib     MUXL device information block
+   muxl_unit    MUXL unit list
    muxl_reg     MUXL register list
-   muxl_mod     MUXL modifiers list
+   muxl_mod     MUXL modifier list
+   muxl_dev     MUXL device descriptor
 */
+
+DEVICE muxl_dev;
 
 UNIT muxl_unit[] = {
-    { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT },
@@ -312,30 +372,10 @@ UNIT muxl_unit[] = {
     { UDATA (&muxo_svc, TT_MODE_UC, 0), MUXL_WAIT }
     };
 
-MTAB muxl_mod[] = {
-    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
-    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
-    { UNIT_MDM, 0, "no dataset", "NODATASET", NULL },
-    { UNIT_MDM, UNIT_MDM, "dataset", "DATASET", NULL },
-    { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &mux_desc },
-    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
-      &tmxr_set_log, &tmxr_show_log, &mux_desc },
-    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
-      &tmxr_set_nolog, NULL, &mux_desc },
-    { MTAB_XTD|MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &muxl_dev },
-    { 0 }
-    };
-
 REG muxl_reg[] = {
-    { FLDATA (CMD, muxl_dib.cmd, 0), REG_HRO },
-    { FLDATA (CTL, muxl_dib.ctl, 0) },
-    { FLDATA (FLG, muxl_dib.flg, 0) },
-    { FLDATA (FBF, muxl_dib.fbf, 0) },
-    { FLDATA (SRQ, muxl_dib.srq, 0) },
+    { FLDATA (CTL, muxl_control, 0) },
+    { FLDATA (FLG, muxl_flag,    0) },
+    { FLDATA (FBF, muxl_flagbuf, 0) },
     { BRDATA (STA, mux_sta, 8, 16, MUX_LINES + MUX_ILINES) },
     { BRDATA (RPAR, mux_rpar, 8, 16, MUX_LINES + MUX_ILINES) },
     { BRDATA (XPAR, mux_xpar, 8, 16, MUX_LINES) },
@@ -343,38 +383,143 @@ REG muxl_reg[] = {
     { BRDATA (XBUF, mux_xbuf, 8, 16, MUX_LINES) },
     { BRDATA (RCHP, mux_rchp, 8, 1, MUX_LINES + MUX_ILINES) },
     { BRDATA (XDON, mux_xdon, 8, 1, MUX_LINES) },
+    { BRDATA (BDFR, mux_defer, 8, 1, MUX_LINES) },
     { URDATA (TIME, muxl_unit[0].wait, 10, 24, 0,
               MUX_LINES, REG_NZ + PV_LEFT) },
     { ORDATA (DEVNO, muxl_dib.devno, 6), REG_HRO },
     { NULL }
     };
 
-DEVICE muxl_dev = {
-    "MUXL", muxl_unit, muxl_reg, muxl_mod,
-    MUX_LINES, 10, 31, 1, 8, 8,
-    NULL, NULL, &muxc_reset,
-    NULL, NULL, NULL,
-    &muxl_dib, DEV_DISABLE
+MTAB muxl_mod[] = {
+    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL, NULL, NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL, NULL, NULL },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL, NULL, NULL },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL, NULL, NULL },
+
+    { UNIT_MDM, UNIT_MDM, "dataset",    "DATASET",   NULL, NULL, NULL },
+    { UNIT_MDM,        0, "no dataset", "NODATASET", NULL, NULL, NULL },
+
+    { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &mux_desc },
+    { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, NULL,  "NOLOG", &tmxr_set_nolog, NULL,           &mux_desc },
+
+    { MTAB_XTD | MTAB_VUN, 0, NULL,    "DISCONNECT", &tmxr_dscln, NULL,        &mux_desc },
+    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",      &hp_setdev,  &hp_showdev, &muxl_dev },
+
+    { 0 }
     };
 
-/* MUXM data structures
+DEVICE muxl_dev = {
+    "MUXL",                                 /* device name */
+    muxl_unit,                              /* unit array */
+    muxl_reg,                               /* register array */
+    muxl_mod,                               /* modifier array */
+    MUX_LINES,                              /* number of units */
+    10,                                     /* address radix */
+    31,                                     /* address width */
+    1,                                      /* address increment */
+    8,                                      /* data radix */
+    8,                                      /* data width */
+    NULL,                                   /* examine routine */
+    NULL,                                   /* deposit routine */
+    &muxc_reset,                            /* reset routine */
+    NULL,                                   /* boot routine */
+    NULL,                                   /* attach routine */
+    NULL,                                   /* detach routine */
+    &muxl_dib,                              /* device information block */
+    DEV_DISABLE,                            /* device flags */
+    0,                                      /* debug control flags */
+    NULL,                                   /* debug flag name table */
+    NULL,                                   /* memory size change routine */
+    NULL };                                 /* logical device name */
 
-   muxc_dev     MUXM device descriptor
-   muxc_unit    MUXM unit descriptor
-   muxc_reg     MUXM register list
-   muxc_mod     MUXM modifiers list
+
+/* MUXU data structures
+
+   muxu_dib     MUXU device information block
+   muxu_unit    MUXU unit list
+   muxu_reg     MUXU register list
+   muxu_mod     MUXU modifier list
+   muxu_deb     MUXU debug list
+   muxu_dev     MUXU device descriptor
 */
 
-DIB muxc_dib = { MUXC, 0, 0, 0, 0, 0, &muxcio };
+DEVICE muxu_dev;
+
+UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_FIRST };
+
+REG muxu_reg[] = {
+    { ORDATA (IBUF, muxu_ibuf, 16) },
+    { ORDATA (OBUF, muxu_obuf, 16) },
+    { ORDATA (DEVNO, muxu_dib.devno, 6), REG_HRO },
+    { NULL }
+    };
+
+MTAB muxu_mod[] = {
+    { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", &mux_setdiag, NULL,            NULL },
+    { UNIT_DIAG, 0,         "terminal mode",   "TERM", &mux_setdiag, NULL,            NULL },
+    { UNIT_ATT,  UNIT_ATT,  "",                NULL,   NULL,         &tmxr_show_summ, &mux_desc },
+
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "LINEORDER", "LINEORDER", &tmxr_set_lnorder, &tmxr_show_lnorder, &mux_desc },
+
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
+    { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mux_desc },
+    { MTAB_XTD | MTAB_VDV,            1, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &muxl_dev },
+
+    { 0 }
+    };
+
+DEBTAB muxu_deb [] = {
+    { "CMDS", DEB_CMDS },
+    { "CPU",  DEB_CPU },
+    { "XFER", DEB_XFER },
+    { NULL,   0 }
+    };
+
+DEVICE muxu_dev = {
+    "MUX",                                  /* device name */
+    &muxu_unit,                             /* unit array */
+    muxu_reg,                               /* register array */
+    muxu_mod,                               /* modifier array */
+    1,                                      /* number of units */
+    10,                                     /* address radix */
+    31,                                     /* address width */
+    1,                                      /* address increment */
+    8,                                      /* data radix */
+    8,                                      /* data width */
+    &tmxr_ex,                               /* examine routine */
+    &tmxr_dep,                              /* deposit routine */
+    &muxc_reset,                            /* reset routine */
+    NULL,                                   /* boot routine */
+    &mux_attach,                            /* attach routine */
+    &mux_detach,                            /* detach routine */
+    &muxu_dib,                              /* device information block */
+    DEV_NET | DEV_DISABLE | DEV_DEBUG,      /* device flags */
+    0,                                      /* debug control flags */
+    muxu_deb,                               /* debug flag name table */
+    NULL,                                   /* memory size change routine */
+    NULL };                                 /* logical device name */
+
+
+/* MUXC data structures.
+
+   muxc_dib     MUXC device information block
+   muxc_unit    MUXC unit list
+   muxc_reg     MUXC register list
+   muxc_mod     MUXC modifier list
+   muxc_dev     MUXC device descriptor
+*/
+
+DEVICE muxc_dev;
+
+DIB muxc_dib = { MUXC, &muxcio };
 
 UNIT muxc_unit = { UDATA (NULL, 0, 0) };
 
 REG muxc_reg[] = {
-    { FLDATA (CMD, muxc_dib.cmd, 0), REG_HRO },
-    { FLDATA (CTL, muxc_dib.ctl, 0) },
-    { FLDATA (FLG, muxc_dib.flg, 0) },
-    { FLDATA (FBF, muxc_dib.fbf, 0) },
-    { FLDATA (SRQ, muxc_dib.srq, 0) },
+    { FLDATA (CTL, muxc_control, 0) },
+    { FLDATA (FLG, muxc_flag,    0) },
+    { FLDATA (FBF, muxc_flagbuf, 0) },
     { FLDATA (SCAN, muxc_scan, 0) },
     { ORDATA (CHAN, muxc_chan, 4) },
     { BRDATA (DSO, muxc_ota, 8, 6, MUX_LINES) },
@@ -384,77 +529,113 @@ REG muxc_reg[] = {
     };
 
 MTAB muxc_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &muxc_dev },
+    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &muxc_dev },
     { 0 }
     };
 
 DEVICE muxc_dev = {
-    "MUXM", &muxc_unit, muxc_reg, muxc_mod,
-    1, 10, 31, 1, 8, 8,
-    NULL, NULL, &muxc_reset,
-    NULL, NULL, NULL,
-    &muxc_dib, DEV_DISABLE
-    };
+    "MUXM",                                 /* device name */
+    &muxc_unit,                             /* unit array */
+    muxc_reg,                               /* register array */
+    muxc_mod,                               /* modifier array */
+    1,                                      /* number of units */
+    10,                                     /* address radix */
+    31,                                     /* address width */
+    1,                                      /* address increment */
+    8,                                      /* data radix */
+    8,                                      /* data width */
+    NULL,                                   /* examine routine */
+    NULL,                                   /* deposit routine */
+    &muxc_reset,                            /* reset routine */
+    NULL,                                   /* boot routine */
+    NULL,                                   /* attach routine */
+    NULL,                                   /* detach routine */
+    &muxc_dib,                              /* device information block */
+    DEV_DISABLE,                            /* device flags */
+    0,                                      /* debug control flags */
+    NULL,                                   /* debug flag name table */
+    NULL,                                   /* memory size change routine */
+    NULL };                                 /* logical device name */
 
-/* I/O instructions: data cards
 
-   Implementation note: the operating manual says that "at least 100
-   milliseconds of CLC 0s must be programmed" by systems employing the
-   multiplexer to ensure that the multiplexer resets.  In practice, such systems
-   issue 128K CLC 0 instructions.  As we provide debug logging of multiplexer
-   resets, a CRS counter is used to ensure that only one debug line is printed
-   in response to these 128K CRS invocations.
+/* Lower data card I/O signal handler.
+
+   Implementation notes:
+
+    1. The operating manual says that "at least 100 milliseconds of CLC 0s must
+       be programmed" by systems employing the multiplexer to ensure that the
+       multiplexer resets.  In practice, such systems issue 128K CLC 0
+       instructions.  As we provide debug logging of multiplexer resets, a CRS
+       counter is used to ensure that only one debug line is printed in response
+       to these 128K CRS invocations.
 */
 
-int32 muxlio (int32 inst, int32 IR, int32 dat)
+uint32 muxlio (uint32 select_code, IOSIG signal, uint32 data)
 {
-int32 dev, ln;
-t_bool is_crs;
-static uint32 crs_count = 0;                            /* cntr for crs repeat */
+int32 ln;
+const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+static uint32 crs_count = 0;                            /* cntr for ioCRS repeat */
 
-dev = IR & I_DEVMASK;                                   /* get device no */
-is_crs = FALSE;
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-switch (inst) {                                         /* case on opcode */
+    case ioCLF:                                         /* clear flag flip-flop */
+        muxl_flag = muxl_flagbuf = CLEAR;
 
-    case ioFLG:                                         /* flag clear/set */
-        if ((IR & I_HC) == 0) { setFSR (dev); }         /* STF */
+        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+            fputs (">>MUXl cmds: [CLF] Flag cleared\n", sim_deb);
+
+        mux_data_int ();                                /* look for new int */
         break;
 
-    case ioSFC:                                         /* skip flag clear */
-        if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
+
+    case ioSTF:                                         /* set flag flip-flop */
+    case ioENF:                                         /* enable flag */
+        muxl_flag = muxl_flagbuf = SET;
+
+        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+            fputs (">>MUXl cmds: [STF] Flag set\n", sim_deb);
         break;
 
-    case ioSFS:                                         /* skip flag set */
-        if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
+
+    case ioSFC:                                         /* skip if flag is clear */
+        setstdSKF (muxl);
         break;
 
-    case ioOTX:                                         /* output */
-        muxl_obuf = dat;                                /* store data */
+
+    case ioSFS:                                         /* skip if flag is set */
+        setstdSKF (muxl);
+        break;
+
+
+    case ioIOI:                                         /* I/O data input */
+        data = muxl_ibuf;
 
         if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            if (dat & OTL_P)
-                fprintf (sim_deb, ">>MUXl OTx: Parameter = %06o\n", dat);
+            fprintf (sim_deb, ">>MUXl cpu:  [LIx%s] Data = %06o\n", hold_or_clear, data);
+        break;
+
+
+    case ioIOO:                                         /* I/O data output */
+        muxl_obuf = data;                               /* store data */
+
+        if (DEBUG_PRI (muxu_dev, DEB_CPU))
+            if (data & OTL_P)
+                fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Parameter = %06o\n", hold_or_clear, data);
             else
-                fprintf (sim_deb, ">>MUXl OTx: Data = %06o\n", dat);
+                fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Data = %06o\n", hold_or_clear, data);
         break;
 
-    case ioLIX:                                         /* load */
-        dat = 0;
 
-    case ioMIX:                                         /* merge */
-        dat = dat | muxl_ibuf;
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXl LIx: Data = %06o\n", dat);
-        break;
+    case ioPOPIO:                                       /* power-on preset to I/O */
+        muxl_flag = muxl_flagbuf = SET;                 /* set flag andflag buffer */
+                                                        /* fall into CRS handler */
 
     case ioCRS:                                         /* control reset */
-        is_crs = TRUE;
-
         if (crs_count)                                  /* already reset? */
             break;                                      /* skip redundant clear */
+
+        muxl_control = CLEAR;                           /* clear control flip-flop */
 
         for (ln = 0; ln < MUX_LINES; ln++) {            /* clear transmit info */
             mux_xbuf[ln] = mux_xpar[ln] = 0;
@@ -464,171 +645,239 @@ switch (inst) {                                         /* case on opcode */
         for (ln = 0; ln < (MUX_LINES + MUX_ILINES); ln++) {
             mux_rbuf[ln] = mux_rpar[ln] = 0;            /* clear receive info */
             mux_sta[ln] = mux_rchp[ln] = 0;
-            }                                           /* fall into CLC SC */
-
-    case ioCTL:                                         /* control clear/set */
-        if (IR & I_CTL) {                               /* CLC */
-            clrCTL (dev);
-
-            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>MUXl CLC: Data interrupt inhibited\n");
             }
-        else {                                          /* STC */
-            setCTL (dev);                               /* set ctl */
-            ln = MUX_CHAN (muxu_obuf);                  /* get chan # */
+        break;
 
-            if (muxl_obuf & OTL_TX) {                   /* transmit? */
-                if (ln < MUX_LINES) {                   /* line valid? */
-                    if (muxl_obuf & OTL_P) {            /* parameter? */
-                        mux_xpar[ln] = muxl_obuf;       /* store param value */
+
+    case ioCLC:                                         /* clear control flip-flop */
+        muxl_control = CLEAR;
+
+        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+            fprintf (sim_deb, ">>MUXl cmds: [CLC%s] Data interrupt inhibited\n", hold_or_clear);
+        break;
+
+
+    case ioSTC:                                         /* set control flip-flop */
+        muxl_control = SET;                             /* set control */
+
+        ln = MUX_CHAN (muxu_obuf);                      /* get chan # */
+
+        if (muxl_obuf & OTL_TX) {                       /* transmit? */
+            if (ln < MUX_LINES) {                       /* line valid? */
+                if (muxl_obuf & OTL_P) {                /* parameter? */
+                    mux_xpar[ln] = muxl_obuf;           /* store param value */
+                    if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                        fprintf (sim_deb,
+                            ">>MUXl cmds: [STC%s] Transmit channel %d parameter %06o stored\n",
+                            hold_or_clear, ln, muxl_obuf);
+                    }
+
+                else {                                          /* data */
+                    if (mux_xpar[ln] & OTL_TPAR)                /* parity requested? */
+                        muxl_obuf =                             /* add parity bit */
+                            muxl_obuf & ~OTL_PAR |
+                            XMT_PAR(muxl_obuf);
+                    mux_xbuf[ln] = muxl_obuf;                   /* load buffer */
+
+                    if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
+                        mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
                         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                            fprintf (sim_deb,
-                                ">>MUXl STC: Transmit channel %d parameter %06o stored\n",
-                                ln, muxl_obuf);
+                            fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data overrun\n",
+                                              hold_or_clear, ln);
                         }
-
-                    else {                              /* data */
-                        if (mux_xpar[ln] & OTL_TPAR)    /* parity requested? */
-                            muxl_obuf =                 /* add parity bit */
-                                muxl_obuf & ~OTL_PAR |
-                                XMT_PAR(muxl_obuf);
-                        mux_xbuf[ln] = muxl_obuf;       /* load buffer */
-
-                        if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
-                            mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
-                            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                                fprintf (sim_deb,
-                                    ">>MUXl STC: Transmit channel %d data overrun\n", ln);
-                            }
-                        else {
-                            if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
-                                mux_ldsc[ln].conn = 1;              /* connect this line */
-                            sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
-                            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                                fprintf (sim_deb,
-                                    ">>MUXl STC: Transmit channel %d data %06o scheduled\n",
-                                    ln, muxl_obuf);
-                            }
+                    else {
+                        if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
+                            mux_ldsc[ln].conn = 1;              /* connect this line */
+                        sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
+                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                            fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data %06o scheduled\n",
+                                              hold_or_clear, ln, muxl_obuf);
                         }
                     }
-                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))    /* line invalid */
-                    fprintf (sim_deb, ">>MUXl STC: Transmit channel %d invalid\n", ln);
+                }
+            else if (DEBUG_PRI (muxu_dev, DEB_CMDS))            /* line invalid */
+                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d invalid\n", hold_or_clear, ln);
+            }
+
+        else                                                /* receive */
+            if (ln < (MUX_LINES + MUX_ILINES)) {            /* line valid? */
+                if (muxl_obuf & OTL_P) {                    /* parameter? */
+                    mux_rpar[ln] = muxl_obuf;               /* store param value */
+                    if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                        fprintf (sim_deb,
+                            ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o stored\n",
+                            hold_or_clear, ln, muxl_obuf);
+                    }
+
+                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))    /* data (invalid action) */
+                    fprintf (sim_deb,
+                        ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o invalid action\n",
+                        hold_or_clear, ln, muxl_obuf);
                 }
 
-            else                                        /* receive */
-                if (ln < (MUX_LINES + MUX_ILINES)) {    /* line valid? */
-                    if (muxl_obuf & OTL_P) {            /* parameter? */
-                        mux_rpar[ln] = muxl_obuf;       /* store param value */
-                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                            fprintf (sim_deb,
-                                ">>MUXl STC: Receive channel %d parameter %06o stored\n",
-                                ln, muxl_obuf);
-                        }
-
-                    else if (DEBUG_PRI (muxu_dev, DEB_CMDS))    /* data (invalid action) */
-                        fprintf (sim_deb,
-                            ">>MUXl STC: Receive channel %d parameter %06o invalid action\n",
-                            ln, muxl_obuf);
-                    }
-
-                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))    /* line invalid */
-                    fprintf (sim_deb, ">>MUXl STC: Receive channel %d invalid\n", ln);
-            }                                           /* end STC */
+            else if (DEBUG_PRI (muxu_dev, DEB_CMDS))        /* line invalid */
+                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Receive channel %d invalid\n", hold_or_clear, ln);
         break;
 
-    default:
-        break;
-        }
 
-if (is_crs)                                             /* control reset? */
+    case ioSIR:                                         /* set interrupt request */
+        setstdPRL (select_code, muxl);                  /* set standard PRL signal */
+        setstdIRQ (select_code, muxl);                  /* set standard IRQ signal */
+        setstdSRQ (select_code, muxl);                  /* set standard SRQ signal */
+        break;
+
+
+    case ioIAK:                                         /* interrupt acknowledge */
+        muxl_flagbuf = CLEAR;
+        break;
+
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
+    }
+
+
+if (signal > ioCLF)                                     /* multiple signals? */
+    muxlio (select_code, ioCLF, 0);                     /* issue CLF */
+
+else if (signal > ioSIR)                                /* signal affected interrupt status? */
+    muxlio (select_code, ioSIR, 0);                     /* set interrupt request */
+
+
+if (signal == ioCRS)                                    /* control reset? */
     crs_count = crs_count + 1;                          /* increment count */
 
-else if (crs_count) {                                   /* something else */
+else if (crs_count && (signal != ioSIR)) {              /* counting CRSes? */
     if (DEBUG_PRI (muxu_dev, DEB_CMDS))                 /* report reset count */
-        fprintf (sim_deb,
-            ">>MUXl CRS: Multiplexer reset %d times\n", crs_count);
+        fprintf (sim_deb, ">>MUXl cmds: [CRS] Multiplexer reset %d times\n",
+                          crs_count);
     crs_count = 0;                                      /* clear counter */
     }
 
-if (IR & I_HC) {                                        /* H/C option */
-    clrFSR (dev);                                       /* clear flag */
-    mux_data_int ();                                    /* look for new int */
-    }
-return dat;
+return data;
 }
 
-int32 muxuio (int32 inst, int32 IR, int32 dat)
+
+/* Upper data card I/O signal handler.
+
+   The upper data card does not have a control, flag, or flag buffer flip-flop.
+   It does not drive the IRQ or SRQ lines, so the I/O dispatcher does not handle
+   the ioSIR signal.
+
+   Implementation notes:
+
+    1. The upper and lower data card hardware takes a number of actions in
+       response to the CRS signal.  Under simulation, these actions are taken by
+       the lower data card CRS handler.
+*/
+
+uint32 muxuio (uint32 select_code, IOSIG signal, uint32 data)
 {
-switch (inst) {                                         /* case on opcode */
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
 
-    case ioOTX:                                         /* output */
-        muxu_obuf = dat;                                /* store data */
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXu OTx: Data channel = %d\n", MUX_CHAN(dat));
-        break;
-
-    case ioLIX:                                         /* load */
-        dat = 0;
-
-    case ioMIX:                                         /* merge */
-        dat = dat | muxu_ibuf;
+    case ioIOI:                                         /* I/O data input */
+        data = muxu_ibuf;
 
         if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXu LIx: Status = %06o, channel = %d\n", dat, MUX_CHAN(dat));
+            fprintf (sim_deb, ">>MUXu cpu:  [LIx] Status = %06o, channel = %d\n",
+                              data, MUX_CHAN(data));
         break;
 
-    default:
+
+    case ioIOO:                                         /* I/O data output */
+        muxu_obuf = data;                               /* store data */
+
+        if (DEBUG_PRI (muxu_dev, DEB_CPU))
+            fprintf (sim_deb, ">>MUXu cpu:  [OTx] Data channel = %d\n", MUX_CHAN(data));
         break;
+
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
     }
 
-return dat;
+return data;
 }
 
-/* I/O instructions: control card
+
+/* Control card I/O signal handler.
 
    In diagnostic mode, the control signals C1 and C2 are looped back to status
    signals S1 and S2.  Changing the control signals may cause an interrupt, so a
-   test is performed after OTx processing.
+   test is performed after IOO processing.
 */
 
-int32 muxcio (int32 inst, int32 IR, int32 dat)
+uint32 muxcio (uint32 select_code, IOSIG signal, uint32 data)
 {
-int32 dev, ln, t, old;
+const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+int32 ln, old;
 
-dev = IR & I_DEVMASK;                                   /* get device no */
-switch (inst) {                                         /* case on opcode */
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-    case ioFLG:                                         /* flag clear/set */
-        if ((IR & I_HC) == 0) { setFSR (dev); }         /* STF */
+    case ioCLF:                                         /* clear flag flip-flop */
+        muxc_flag = muxc_flagbuf = CLEAR;
+
+        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+            fputs (">>MUXc cmds: [CLF] Flag cleared\n", sim_deb);
+
+        mux_ctrl_int ();                                /* look for new int */
         break;
 
-    case ioSFC:                                         /* skip flag clear */
-        if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
+
+    case ioSTF:                                         /* set flag flip-flop */
+    case ioENF:                                         /* enable flag */
+        muxc_flag = muxc_flagbuf = SET;
+
+        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+            fputs (">>MUXc cmds: [STF] Flag set\n", sim_deb);
         break;
 
-    case ioSFS:                                         /* skip flag set */
-        if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
+
+    case ioSFC:                                         /* skip if flag is clear */
+        setstdSKF (muxc);
         break;
 
-    case ioOTX:                                         /* output */
-        ln = muxc_chan = OTC_CHAN (dat);                /* set channel */
 
-        if (dat & OTC_SCAN) muxc_scan = 1;              /* set scan flag */
+    case ioSFS:                                         /* skip if flag is set */
+        setstdSKF (muxc);
+        break;
+
+
+    case ioIOI:                                                 /* I/O data input */
+        data = LIC_MBO | PUT_CCH (muxc_chan) |                  /* mbo, chan num */
+               LIC_TSTI (muxc_chan) |                           /* I2, I1 */
+               (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) |    /* ES2, ES1 */
+               (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1));       /* S2, S1 */
+
+        if (DEBUG_PRI (muxu_dev, DEB_CPU))
+            fprintf (sim_deb, ">>MUXc cpu:  [LIx%s] Status = %06o, channel = %d\n",
+                              hold_or_clear, data, muxc_chan);
+
+        muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;           /* incr channel */
+        break;
+
+
+    case ioIOO:                                         /* I/O data output */
+        ln = muxc_chan = OTC_CHAN (data);               /* set channel */
+
+        if (data & OTC_SCAN) muxc_scan = 1;             /* set scan flag */
         else muxc_scan = 0;
 
-        if (dat & OTC_UPD) {                            /* update? */
+        if (data & OTC_UPD) {                           /* update? */
             old = muxc_ota[ln];                         /* save prior val */
             muxc_ota[ln] =                              /* save ESn,SSn */
-                (muxc_ota[ln] & ~OTC_RW) | (dat & OTC_RW);
+                (muxc_ota[ln] & ~OTC_RW) | (data & OTC_RW);
 
-            if (dat & OTC_EC2)                          /* if EC2, upd C2 */
+            if (data & OTC_EC2)                         /* if EC2, upd C2 */
                 muxc_ota[ln] =
-                    (muxc_ota[ln] & ~OTC_C2) | (dat & OTC_C2);
+                    (muxc_ota[ln] & ~OTC_C2) | (data & OTC_C2);
 
-            if (dat & OTC_EC1)                          /* if EC1, upd C1 */
+            if (data & OTC_EC1)                         /* if EC1, upd C1 */
                 muxc_ota[ln] =
-                    (muxc_ota[ln] & ~OTC_C1) | (dat & OTC_C1);
+                    (muxc_ota[ln] & ~OTC_C1) | (data & OTC_C1);
 
             if (muxu_unit.flags & UNIT_DIAG)            /* loopback? */
                 muxc_lia[ln ^ 1] =                      /* set S1, S2 to C1, C2 */
@@ -639,53 +888,62 @@ switch (inst) {                                         /* case on opcode */
                 (old & DTR) &&                              /* DTR drop? */
                 !(muxc_ota[ln] & DTR)) {
                 tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
-                tmxr_reset_ln (&mux_ldsc[ln]);          /* reset line */
-                muxc_lia[ln] = 0;                       /* dataset off */
+                tmxr_reset_ln (&mux_ldsc[ln]);              /* reset line */
+                muxc_lia[ln] = 0;                           /* dataset off */
                 }
-            }                                           /* end update */
+            }                                               /* end update */
 
         if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXc OTx: Parameter = %06o, channel = %d\n",
-                dat, ln);
+            fprintf (sim_deb, ">>MUXc cpu:  [OTx%s] Parameter = %06o, channel = %d\n",
+                              hold_or_clear, data, ln);
 
-        if ((muxu_unit.flags & UNIT_DIAG) &&            /* loopback? */
-            (!FLG(muxc_dib.devno)))                     /* flag clear? */
-            mux_ctrl_int ();                            /* status chg may interrupt */
+        if ((muxu_unit.flags & UNIT_DIAG) && (!muxc_flag))  /* loopback and flag clear? */
+            mux_ctrl_int ();                                /* status chg may interrupt */
         break;
 
-    case ioLIX:                                         /* load */
-        dat = 0;
 
-    case ioMIX:                                         /* merge */
-        t = LIC_MBO | PUT_CCH (muxc_chan) |             /* mbo, chan num */
-            LIC_TSTI (muxc_chan) |                      /* I2, I1 */
-            (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) | /* ES2, ES1 */
-            (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1));  /* S2, S1 */
-        dat = dat | t;                                  /* return status */
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXc LIx: Status = %06o, channel = %d\n",
-                dat, muxc_chan);
-
-        muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;       /* incr channel */
-        break;
+    case ioPOPIO:                                       /* power-on preset to I/O */
+        muxc_flag = muxc_flagbuf = SET;                 /* set flag and flag buffer */
+                                                        /* fall into CRS handler */
 
     case ioCRS:                                         /* control reset */
-    case ioCTL:                                         /* ctrl clear/set */
-        if (IR & I_CTL) { clrCTL (dev); }               /* CLC */
-        else { setCTL (dev); }                          /* STC */
+                                                        /* fall into CLC handler */
+
+    case ioCLC:                                         /* clear control flip-flop */
+        muxc_control = CLEAR;
         break;
 
-    default:
+
+    case ioSTC:                                         /* set control flip-flop */
+        muxc_control = SET;
         break;
+
+
+    case ioSIR:                                         /* set interrupt request */
+        setstdPRL (select_code, muxc);                  /* set standard PRL signal */
+        setstdIRQ (select_code, muxc);                  /* set standard IRQ signal */
+        setstdSRQ (select_code, muxc);                  /* set standard SRQ signal */
+        break;
+
+
+    case ioIAK:                                         /* interrupt acknowledge */
+        muxc_flagbuf = CLEAR;
+        break;
+
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
     }
 
-if (IR & I_HC) {                                        /* H/C option */
-    clrFSR (dev);                                       /* clear flag */
-    mux_ctrl_int ();                                    /* look for new int */
-    }
-return dat;
+
+if (signal > ioCLF)                                     /* multiple signals? */
+    muxcio (select_code, ioCLF, 0);                     /* issue CLF */
+else if (signal > ioSIR)                                /* signal affected interrupt status? */
+    muxcio (select_code, ioSIR, 0);                     /* set interrupt request */
+
+return data;
 }
+
 
 /* Unit service - receive side
 
@@ -702,9 +960,16 @@ loopback = ((muxu_unit.flags & UNIT_DIAG) != 0);        /* diagnostic mode? */
 
 if (!loopback) {                                        /* terminal mode? */
     if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;  /* attached? */
-    muxu_unit.wait = sync_poll (SERVICE);               /* synchronize poll */
-    sim_activate (uptr, muxu_unit.wait);                /* continue poll */
+
+    if (uptr->wait == POLL_FIRST)                       /* first poll? */
+        uptr->wait = sync_poll (INITIAL);               /* initial synchronization */
+    else                                                /* not first */
+        uptr->wait = sync_poll (SERVICE);               /* continue synchronization */
+
+    sim_activate (uptr, uptr->wait);                    /* continue polling */
+
     ln = tmxr_poll_conn (&mux_desc);                    /* look for connect */
+
     if (ln >= 0) {                                      /* got one? */
         if ((muxl_unit[ln].flags & UNIT_MDM) &&         /* modem ctrl? */
             (muxc_ota[ln] & DTR))                       /* DTR? */
@@ -713,7 +978,7 @@ if (!loopback) {                                        /* terminal mode? */
         mux_ldsc[ln].rcve = 1;                          /* rcv enabled */
         }
     tmxr_poll_rx (&mux_desc);                           /* poll for input */
-}
+    }
 
 for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
     if (mux_ldsc[ln].conn) {                            /* connected? */
@@ -724,47 +989,26 @@ for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
             mux_ldsc[ln].conn = 0;                      /* clear connection */
             }
 
+        else if (mux_defer[ln])                         /* break deferred? */
+            c = SCPE_BREAK;                             /* supply it now */
+
         else
             c = tmxr_getc_ln (&mux_ldsc[ln]);           /* get char from Telnet */
 
-        if (c) {                                        /* valid char? */
-            if (c & SCPE_BREAK) {                       /* break? */
-                mux_sta[ln] = mux_sta[ln] | LIU_BRK;
-                mux_rbuf[ln] = 0;                       /* no char */
-                }
-            else {                                      /* normal */
-                if (mux_rchp[ln])                       /* char already pending? */
-                    mux_sta[ln] = mux_sta[ln] | LIU_LOST;
-
-                if (!loopback) {                        /* terminal mode? */
-                    c = sim_tt_inpcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
-                    if (mux_rpar[ln] & OTL_ECHO) {      /* echo? */
-                        TMLN *lp = &mux_ldsc[ln];       /* get line */
-                        tmxr_putc_ln (lp, c);           /* output char */
-                        tmxr_poll_tx (&mux_desc);       /* poll xmt */
-                        }
-                    }
-                mux_rbuf[ln] = c;                       /* save char */
-                }
-
-            mux_rchp[ln] = 1;                           /* char pending */
-
-            if (DEBUG_PRI (muxu_dev, DEB_XFER))
-                fprintf (sim_deb, ">>MUXi svc: Line %d character %06o received\n",
-                    ln, c);
-
-            if (mux_rpar[ln] & OTL_DIAG) mux_diag (c);  /* rcv diag? */
-            }                                           /* end if char */
-        }                                               /* end if connected */
+        if (c)                                          /* valid char? */
+            mux_receive (ln, c, loopback);              /* process it */
+        }
 
     else                                                /* not connected */
         if (!loopback)                                  /* terminal mode? */
             muxc_lia[ln] = 0;                           /* line disconnected */
-    }                                                   /* end for */
-if (!FLG (muxl_dib.devno)) mux_data_int ();             /* scan for data int */
-if (!FLG (muxc_dib.devno)) mux_ctrl_int ();             /* scan modem */
+    }
+
+if (!muxl_flag) mux_data_int ();                        /* scan for data int */
+if (!muxc_flag) mux_ctrl_int ();                        /* scan modem */
 return SCPE_OK;
 }
+
 
 /* Unit service - transmit side */
 
@@ -785,6 +1029,9 @@ if (mux_ldsc[ln].conn) {                                /* connected? */
     if (mux_ldsc[ln].xmte) {                            /* xmt enabled? */
         if (loopback)                                   /* diagnostic mode? */
             mux_ldsc[ln].conn = 0;                      /* clear connection */
+
+        else if (mux_defer[ln])                         /* break deferred? */
+            mux_receive (ln, SCPE_BREAK, loopback);     /* process it now */
 
         if ((mux_xbuf[ln] & OTL_SYNC) == 0) {           /* start bit 0? */
             TMLN *lp = &mux_ldsc[ln];                   /* get line */
@@ -808,8 +1055,8 @@ if (mux_ldsc[ln].conn) {                                /* connected? */
         mux_xdon[ln] = 1;                               /* set for xmit irq */
 
         if (DEBUG_PRI (muxu_dev, DEB_XFER) && (loopback | (c >= 0)))
-            fprintf (sim_deb, ">>MUXo svc: Line %d character %06o sent\n",
-                ln, (loopback ? fc : c));
+            fprintf (sim_deb, ">>MUXl xfer: Line %d character %s sent\n",
+                ln, fmt_char ((uint8) (loopback ? fc : c)));
         }
 
     else {                                              /* buf full */
@@ -819,9 +1066,64 @@ if (mux_ldsc[ln].conn) {                                /* connected? */
         }
     }
 
-if (!FLG (muxl_dib.devno)) mux_data_int ();             /* scan for int */
+if (!muxl_flag) mux_data_int ();                        /* scan for int */
 return SCPE_OK;
 }
+
+
+/* Process a character received from a multiplexer port */
+
+void mux_receive (int32 ln, int32 c, t_bool diag)
+{
+if (c & SCPE_BREAK) {                                   /* break? */
+    if (mux_defer[ln] || diag) {                        /* break deferred or diagnostic mode? */
+        mux_defer[ln] = 0;                              /* process now */
+        mux_rbuf[ln] = 0;                               /* break returns NUL */
+        mux_sta[ln] = mux_sta[ln] | LIU_BRK;            /* set break status */
+
+        if (DEBUG_PRI (muxu_dev, DEB_XFER))
+            if (diag)
+                fputs (">>MUXl xfer: Break detected\n", sim_deb);
+            else
+                fputs (">>MUXl xfer: Deferred break processed\n", sim_deb);
+        }
+
+    else {
+        mux_defer[ln] = 1;                              /* defer break */
+
+        if (DEBUG_PRI (muxu_dev, DEB_XFER))
+            fputs (">>MUXl xfer: Break detected and deferred\n", sim_deb);
+
+        return;
+        }
+    }
+else {                                                  /* normal */
+    if (mux_rchp[ln])                                   /* char already pending? */
+        mux_sta[ln] = mux_sta[ln] | LIU_LOST;
+
+    if (!diag) {                                        /* terminal mode? */
+        c = sim_tt_inpcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
+        if (mux_rpar[ln] & OTL_ECHO) {                  /* echo? */
+            TMLN *lp = &mux_ldsc[ln];                   /* get line */
+            tmxr_putc_ln (lp, c);                       /* output char */
+            tmxr_poll_tx (&mux_desc);                   /* poll xmt */
+            }
+        }
+    mux_rbuf[ln] = c;                                   /* save char */
+    }
+
+mux_rchp[ln] = 1;                                       /* char pending */
+
+if (DEBUG_PRI (muxu_dev, DEB_XFER))
+    fprintf (sim_deb, ">>MUXl xfer: Line %d character %s received\n",
+                      ln, fmt_char ((uint8) c));
+
+if (mux_rpar[ln] & OTL_DIAG)                            /* diagnose this line? */
+    mux_diag (c);                                       /* do diagnosis */
+
+return;
+}
+
 
 /* Look for data interrupt */
 
@@ -839,9 +1141,9 @@ for (i = 0; i < MUX_LINES; i++) {                       /* rcv lines */
         mux_sta[i] = 0;
 
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXd irq: Receive channel %d interrupt requested\n", i);
+            fprintf (sim_deb, ">>MUXl cmds: Receive channel %d interrupt requested\n", i);
 
-        setFSR (muxl_dib.devno);                        /* interrupt */
+        muxlio (muxl_dib.devno, ioENF, 0);              /* interrupt */
         return;
         }
     }
@@ -855,30 +1157,31 @@ for (i = 0; i < MUX_LINES; i++) {                       /* xmt lines */
         mux_sta[i] = 0;
 
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXd irq: Transmit channel %d interrupt requested\n", i);
+            fprintf (sim_deb, ">>MUXl cmds: Transmit channel %d interrupt requested\n", i);
 
-        setFSR (muxl_dib.devno);                        /* interrupt */
+        muxlio (muxl_dib.devno, ioENF, 0);              /* interrupt */
         return;
         }
     }
-for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {        /* diag lines */
-    if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {       /* enabled, char? */
-        muxl_ibuf = PUT_DCH (i) |                       /* lo buf = char */
+for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {    /* diag lines */
+    if ((mux_rpar[i] & OTL_ENB) && mux_rchp[i]) {           /* enabled, char? */
+        muxl_ibuf = PUT_DCH (i) |                           /* lo buf = char */
             mux_rbuf[i] & LIL_CHAR |
             RCV_PAR (mux_rbuf[i]);
-        muxu_ibuf = PUT_DCH (i) | mux_sta[i] | LIU_DG;  /* hi buf = stat */
-        mux_rchp[i] = 0;                                /* clr char, stat */
+        muxu_ibuf = PUT_DCH (i) | mux_sta[i] | LIU_DG;      /* hi buf = stat */
+        mux_rchp[i] = 0;                                    /* clr char, stat */
         mux_sta[i] = 0;
 
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXd irq: Receive channel %d interrupt requested\n", i);
+            fprintf (sim_deb, ">>MUXl cmds: Receive channel %d interrupt requested\n", i);
 
-        setFSR (muxl_dib.devno);
+        muxlio (muxl_dib.devno, ioENF, 0);                  /* interrupt */
         return;
         }
     }
 return;
 }
+
 
 /* Look for control interrupt
 
@@ -902,15 +1205,16 @@ for (i = 0; i < line_count; i++) {
 
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
             fprintf (sim_deb,
-                ">>MUXc irq: Control channel %d interrupt requested (poll = %d)\n",
+                ">>MUXc cmds: Control channel %d interrupt requested (poll = %d)\n",
                 muxc_chan, i + 1);
 
-        setFSR (muxc_dib.devno);                        /* set flag */
+        muxcio (muxc_dib.devno, ioENF, 0);              /* set flag */
         break;
         }
     }
 return;
 }
+
 
 /* Set diagnostic lines for given character */
 
@@ -932,6 +1236,7 @@ for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {
 return;
 }
 
+
 /* Reset an individual line */
 
 void mux_reset_ln (int32 i)
@@ -939,7 +1244,7 @@ void mux_reset_ln (int32 i)
 mux_rbuf[i] = mux_xbuf[i] = 0;                          /* clear state */
 mux_rpar[i] = mux_xpar[i] = 0;
 mux_rchp[i] = mux_xdon[i] = 0;
-mux_sta[i] = 0;
+mux_sta[i] = mux_defer[i] = 0;
 muxc_ota[i] = muxc_lia[i] = 0;                          /* clear modem */
 if (mux_ldsc[i].conn &&                                 /* connected? */
     ((muxu_unit.flags & UNIT_DIAG) == 0))               /* term mode? */
@@ -949,7 +1254,8 @@ sim_cancel (&muxl_unit[i]);
 return;
 }
 
-/* Reset routine */
+
+/* Reset routine for lower data, upper data, and control cards */
 
 t_stat muxc_reset (DEVICE *dptr)
 {
@@ -967,41 +1273,52 @@ else {
     hp_enbdis_pair (dptr, &muxc_dev);
     hp_enbdis_pair (dptr, &muxl_dev);
     }
-muxl_dib.cmd = muxl_dib.ctl = 0;                        /* init lower */
-muxl_dib.flg = muxl_dib.fbf = muxl_dib.srq = 1;
-muxu_dib.cmd = muxu_dib.ctl = 0;                        /* upper not */
-muxu_dib.flg = muxu_dib.fbf = muxu_dib.srq = 0;         /* implemented */
-muxc_dib.cmd = muxc_dib.ctl = 0;                        /* init ctrl */
-muxc_dib.flg = muxc_dib.fbf = muxc_dib.srq = 1;
+
+if (dptr == &muxl_dev)                                  /* lower data reset? */
+    muxlio (muxl_dib.devno, ioPOPIO, 0);                /* send POPIO signal to lower data card */
+else if (dptr == &muxu_dev)                             /* upper data reset? */
+    muxuio (muxu_dib.devno, ioPOPIO, 0);                /* send POPIO signal to upper data card */
+else                                                    /* control card reset */
+    muxcio (muxc_dib.devno, ioPOPIO, 0);                /* send POPIO signal to control card */
+
 muxc_chan = muxc_scan = 0;                              /* init modem scan */
+
 if (muxu_unit.flags & UNIT_ATT) {                       /* master att? */
-    if (!sim_is_active (&muxu_unit)) {
-        muxu_unit.wait = sync_poll (INITIAL);           /* synchronize poll */
-        sim_activate (&muxu_unit, muxu_unit.wait);      /* activate */
-        }
+    muxu_unit.wait = POLL_FIRST;                        /* set up poll */
+    sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
     }
-else sim_cancel (&muxu_unit);                           /* else stop */
-for (i = 0; i < MUX_LINES; i++) mux_reset_ln (i);       /* reset lines 0-15 */
+else
+    sim_cancel (&muxu_unit);                            /* else stop */
+
+for (i = 0; i < MUX_LINES; i++)
+    mux_reset_ln (i);                                   /* reset lines 0-15 */
+
 for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++)  /* reset lines 16-20 */
     mux_rbuf[i] = mux_rpar[i] = mux_sta[i] = mux_rchp[i] = 0;
+
 return SCPE_OK;
 }
+
 
 /* Attach master unit */
 
 t_stat mux_attach (UNIT *uptr, char *cptr)
 {
-t_stat r;
+t_stat status = SCPE_OK;
 
 if (muxu_unit.flags & UNIT_DIAG)                        /* diag mode? */
     return SCPE_NOFNC;                                  /* command not allowed */
 
-r = tmxr_attach (&mux_desc, uptr, cptr);                /* attach */
-if (r != SCPE_OK) return r;                             /* error */
-muxu_unit.wait = sync_poll (INITIAL);                   /* synchronize poll */
-sim_activate (uptr, muxu_unit.wait);                    /* start poll */
+status = tmxr_attach (&mux_desc, uptr, cptr);           /* attach */
+
+if (status == SCPE_OK) {
+    muxu_unit.wait = POLL_FIRST;                        /* set up poll */
+    sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
+    }
+
 return SCPE_OK;
 }
+
 
 /* Detach master unit */
 
@@ -1016,7 +1333,8 @@ sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
-/* Diagnostic/normal mode routine
+
+/* Diagnostic/normal mode routine,
 
    Diagnostic testing wants to exercise as much of the regular simulation code
    as possible to ensure good test coverage.  Normally, input polling and output
@@ -1048,42 +1366,5 @@ else {                                                  /* set term */
     for (ln = 0; ln < MUX_LINES; ln++)                  /* clear connections */
         mux_ldsc[ln].conn = 0;                          /* on all lines */
     }
-return SCPE_OK;
-}
-
-/* Show summary processor */
-
-t_stat mux_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-if (muxu_unit.flags & UNIT_DIAG)                        /* diag mode? */
-    return SCPE_NOFNC;                                  /* command not allowed */
-
-for (i = t = 0; i < MUX_LINES; i++) t = t + (mux_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat mux_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-if (muxu_unit.flags & UNIT_DIAG)                        /* diag mode? */
-    return SCPE_NOFNC;                                  /* command not allowed */
-
-for (i = t = 0; i < MUX_LINES; i++) t = t + (mux_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < MUX_LINES; i++) {
-        if (mux_ldsc[i].conn) {
-            if (val) tmxr_fconns (st, &mux_ldsc[i], i);
-            else tmxr_fstats (st, &mux_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
 return SCPE_OK;
 }

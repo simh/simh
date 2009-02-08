@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Added address masking for system page table reads
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -178,8 +179,10 @@ if (mapen) {                                            /* mapping on? */
     }
 else pa = va & PAMASK;
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
-    if (lnt >= L_LONG) return ReadL (pa);               /* long, quad? */
-    if (lnt == L_WORD) return ReadW (pa);               /* word? */
+    if (lnt >= L_LONG)                                  /* long, quad? */
+        return ReadL (pa);
+    if (lnt == L_WORD)                                  /* word? */
+        return ReadW (pa);
     return ReadB (pa);                                  /* byte */
     }
 if (mapen && ((off + lnt) > VA_PAGSIZE)) {              /* cross page? */
@@ -199,7 +202,8 @@ if (lnt >= L_LONG) {                                    /* lw unaligned? */
     wh = ReadL (pa1);                                   /* extract */
     return ((((wl >> sc) & align[bo]) | (wh << (32 - sc))) & LMASK);
     }
-else if (bo == 1) return ((ReadL (pa) >> 8) & WMASK);
+else if (bo == 1)
+    return ((ReadL (pa) >> 8) & WMASK);
 else {
     wl = ReadL (pa);                                    /* word cross lw */
     wh = ReadL (pa1);                                   /* read, extract */
@@ -237,8 +241,10 @@ if (mapen) {
     }
 else pa = va & PAMASK;
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
-    if (lnt >= L_LONG) WriteL (pa, val);                /* long, quad? */
-    else if (lnt == L_WORD) WriteW (pa, val);           /* word? */
+    if (lnt >= L_LONG)                                  /* long, quad? */
+        WriteL (pa, val);
+    else if (lnt == L_WORD)                             /* word? */
+        WriteW (pa, val);
     else WriteB (pa, val);                              /* byte */
     return;
     }
@@ -292,7 +298,8 @@ if (mapen) {                                            /* mapping on? */
     if ((xpte.pte & acc) && (xpte.tag == vpn))          /* TB hit, acc ok? */ 
         return (xpte.pte & TLB_PFN) | off;
     xpte = fill (va, L_BYTE, acc, status);              /* fill TB */
-    if (*status == PR_OK) return (xpte.pte & TLB_PFN) | off;
+    if (*status == PR_OK)
+        return (xpte.pte & TLB_PFN) | off;
     else return -1;
     }
 return va & PAMASK;                                     /* ret phys addr */
@@ -310,10 +317,12 @@ SIM_INLINE int32 ReadB (uint32 pa)
 {
 int32 dat;
 
-if (ADDR_IS_MEM (pa)) dat = M[pa >> 2];
+if (ADDR_IS_MEM (pa))
+    dat = M[pa >> 2];
 else {
     mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa)) dat = ReadIO (pa, L_BYTE);
+    if (ADDR_IS_IO (pa))
+        dat = ReadIO (pa, L_BYTE);
     else dat = ReadReg (pa, L_BYTE);
     }
 return ((dat >> ((pa & 3) << 3)) & BMASK);
@@ -323,10 +332,12 @@ SIM_INLINE int32 ReadW (uint32 pa)
 {
 int32 dat;
 
-if (ADDR_IS_MEM (pa)) dat = M[pa >> 2];
+if (ADDR_IS_MEM (pa))
+    dat = M[pa >> 2];
 else {
     mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa)) dat = ReadIO (pa, L_WORD);
+    if (ADDR_IS_IO (pa))
+        dat = ReadIO (pa, L_WORD);
     else dat = ReadReg (pa, L_WORD);
     }
 return ((dat >> ((pa & 2)? 16: 0)) & WMASK);
@@ -334,7 +345,8 @@ return ((dat >> ((pa & 2)? 16: 0)) & WMASK);
 
 SIM_INLINE int32 ReadL (uint32 pa)
 {
-if (ADDR_IS_MEM (pa)) return M[pa >> 2];
+if (ADDR_IS_MEM (pa))
+    return M[pa >> 2];
 mchk_ref = REF_V;
 if (ADDR_IS_IO (pa)) return ReadIO (pa, L_LONG);
 return ReadReg (pa, L_LONG);
@@ -342,10 +354,12 @@ return ReadReg (pa, L_LONG);
 
 SIM_INLINE int32 ReadLP (uint32 pa)
 {
-if (ADDR_IS_MEM (pa)) return M[pa >> 2];
+if (ADDR_IS_MEM (pa))
+    return M[pa >> 2];
 mchk_va = pa;
 mchk_ref = REF_P;
-if (ADDR_IS_IO (pa)) return ReadIO (pa, L_LONG);
+if (ADDR_IS_IO (pa))
+    return ReadIO (pa, L_LONG);
 return ReadReg (pa, L_LONG);
 }
 
@@ -368,7 +382,8 @@ if (ADDR_IS_MEM (pa)) {
     }
 else {
     mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa)) WriteIO (pa, val, L_BYTE);
+    if (ADDR_IS_IO (pa))
+        WriteIO (pa, val, L_BYTE);
     else WriteReg (pa, val, L_BYTE);
     }
 return;
@@ -383,7 +398,8 @@ if (ADDR_IS_MEM (pa)) {
     }
 else {
     mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa)) WriteIO (pa, val, L_WORD);
+    if (ADDR_IS_IO (pa))
+        WriteIO (pa, val, L_WORD);
     else WriteReg (pa, val, L_WORD);
     }
 return;
@@ -391,10 +407,12 @@ return;
 
 SIM_INLINE void WriteL (uint32 pa, int32 val)
 {
-if (ADDR_IS_MEM (pa)) M[pa >> 2] = val;
+if (ADDR_IS_MEM (pa))
+    M[pa >> 2] = val;
 else {
     mchk_ref = REF_V;
-    if (ADDR_IS_IO (pa)) WriteIO (pa, val, L_LONG);
+    if (ADDR_IS_IO (pa))
+        WriteIO (pa, val, L_LONG);
     else WriteReg (pa, val, L_LONG);
     }
 return;
@@ -402,11 +420,13 @@ return;
 
 void WriteLP (uint32 pa, int32 val)
 {
-if (ADDR_IS_MEM (pa)) M[pa >> 2] = val;
+if (ADDR_IS_MEM (pa))
+    M[pa >> 2] = val;
 else {
     mchk_va = pa;
     mchk_ref = REF_P;
-    if (ADDR_IS_IO (pa)) WriteIO (pa, val, L_LONG);
+    if (ADDR_IS_IO (pa))
+        WriteIO (pa, val, L_LONG);
     else WriteReg (pa, val, L_LONG);
     }
 return;
@@ -424,7 +444,10 @@ return;
 */
 
 #define MM_ERR(param) { \
-    if (stat) { *stat = param; return zero_pte; } \
+    if (stat) { \
+        *stat = param; \
+        return zero_pte; \
+        } \
     p1 = MM_PARAM (acc & TLB_WACC, param); \
     p2 = va; \
     ABORT ((param & PR_TNV)? ABORT_TNV: ABORT_ACV); }
@@ -442,11 +465,13 @@ if (va & VA_S0) {                                       /* system space? */
     }
 else {
     if (va & VA_P1) {                                   /* P1? */
-        if (ptidx < d_p1lr) MM_ERR (PR_LNV);
+        if (ptidx < d_p1lr)
+            MM_ERR (PR_LNV);
         ptead = d_p1br + ptidx;
         }
     else {                                              /* P0 */
-        if (ptidx >= d_p0lr) MM_ERR (PR_LNV);
+        if (ptidx >= d_p0lr)
+            MM_ERR (PR_LNV);
         ptead = d_p0br + ptidx;
         }
     if ((ptead & VA_S0) == 0)
@@ -459,9 +484,11 @@ else {
             MM_ERR (PR_PLNV);
         pte = ReadLP ((d_sbr + ptidx) & PAMASK);        /* get system pte */
 #if defined (VAX_780)
-        if ((pte & PTE_ACC) == 0) MM_ERR (PR_PACV);     /* spte ACV? */
+        if ((pte & PTE_ACC) == 0)                       /* spte ACV? */
+            MM_ERR (PR_PACV);
 #endif
-        if ((pte & PTE_V) == 0) MM_ERR (PR_PTNV);       /* spte TNV? */
+        if ((pte & PTE_V) == 0)                         /* spte TNV? */
+            MM_ERR (PR_PTNV);
         stlb[tbi].tag = vpn;                            /* set stlb tag */
         stlb[tbi].pte = cvtacc[PTE_GETACC (pte)] |
             ((pte << VA_N_OFF) & TLB_PFN);              /* set stlb data */
@@ -471,10 +498,13 @@ else {
 pte = ReadL (ptead);                                    /* read pte */
 tlbpte = cvtacc[PTE_GETACC (pte)] |                     /* cvt access */
     ((pte << VA_N_OFF) & TLB_PFN);                      /* set addr */
-if ((tlbpte & acc) == 0) MM_ERR (PR_ACV);               /* chk access */
-if ((pte & PTE_V) == 0) MM_ERR (PR_TNV);                /* check valid */
+if ((tlbpte & acc) == 0)                                /* chk access */
+    MM_ERR (PR_ACV);
+if ((pte & PTE_V) == 0)                                 /* check valid */
+    MM_ERR (PR_TNV);
 if (acc & TLB_WACC) {                                   /* write? */
-    if ((pte & PTE_M) == 0) WriteL (ptead, pte | PTE_M);
+    if ((pte & PTE_M) == 0)
+        WriteL (ptead, pte | PTE_M);
     tlbpte = tlbpte | TLB_M;                            /* set M */
     }
 vpn = VA_GETVPN (va);
@@ -510,7 +540,8 @@ int32 i;
 
 for (i = 0; i < VA_TBSIZE; i++) {
     ptlb[i].tag = ptlb[i].pte = -1;
-    if (stb) stlb[i].tag = stlb[i].pte = -1;
+    if (stb)
+        stlb[i].tag = stlb[i].pte = -1;
     }
 return;
 }
@@ -521,7 +552,8 @@ void zap_tb_ent (uint32 va)
 {
 int32 tbi = VA_GETTBI (VA_GETVPN (va));
 
-if (va & VA_S0) stlb[tbi].tag = stlb[tbi].pte = -1;
+if (va & VA_S0)
+    stlb[tbi].tag = stlb[tbi].pte = -1;
 else ptlb[tbi].tag = ptlb[tbi].pte = -1;
 return;
 }
@@ -535,7 +567,8 @@ int32 tbi = VA_GETTBI (vpn);
 TLBENT xpte;
 
 xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];
-if (xpte.tag == vpn) return TRUE;
+if (xpte.tag == vpn)
+    return TRUE;
 return FALSE;
 }
 
@@ -546,8 +579,10 @@ t_stat tlb_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 int32 tlbn = uptr - tlb_unit;
 int32 idx = (uint32) addr >> 1;
 
-if (idx >= VA_TBSIZE) return SCPE_NXM;
-if (addr & 1) *vptr = ((uint32) (tlbn? stlb[idx].pte: ptlb[idx].pte));
+if (idx >= VA_TBSIZE)
+    return SCPE_NXM;
+if (addr & 1)
+    *vptr = ((uint32) (tlbn? stlb[idx].pte: ptlb[idx].pte));
 else *vptr = ((uint32) (tlbn? stlb[idx].tag: ptlb[idx].tag));
 return SCPE_OK;
 }
@@ -559,7 +594,8 @@ t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 int32 tlbn = uptr - tlb_unit;
 int32 idx = (uint32) addr >> 1;
 
-if (idx >= VA_TBSIZE) return SCPE_NXM;
+if (idx >= VA_TBSIZE)
+    return SCPE_NXM;
 if (addr & 1) {
     if (tlbn) stlb[idx].pte = (int32) val;
     else ptlb[idx].pte = (int32) val;

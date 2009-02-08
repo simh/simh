@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -299,12 +299,14 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
 
         case 2:                                         /* STFPS */
             FPS = FPS & FPS_RW;
-            if (dstspec <= 07) R[dstspec] = FPS;
+            if (dstspec <= 07)
+                R[dstspec] = FPS;
             else WriteW (FPS, GeteaW (dstspec));
             break;
 
         case 3:                                         /* STST */
-            if (dstspec <= 07) R[dstspec] = FEC;
+            if (dstspec <= 07)
+                R[dstspec] = FEC;
             else WriteI ((FEC << 16) | FEA, GeteaFP (dstspec, LONG),
                  dstspec, LONG);
             break;
@@ -326,7 +328,8 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
 
         case 2:                                         /* ABSf */
             ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
-            if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
+            if (GET_EXP (fsrc.h) == 0)
+                fsrc = zero_fac;
             else fsrc.h = fsrc.h & ~FP_SIGN;
             WriteFP (&fsrc, ea, dstspec, lenf);
             FPS = setfcc (FPS, fsrc.h, 0);
@@ -334,7 +337,8 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
 
         case 3:                                         /* NEGf */
             ReadFP (&fsrc, ea = GeteaFP (dstspec, lenf), dstspec, lenf);
-            if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
+            if (GET_EXP (fsrc.h) == 0)
+                fsrc = zero_fac;
             else fsrc.h = fsrc.h ^ FP_SIGN;
             WriteFP (&fsrc, ea, dstspec, lenf);
             FPS = setfcc (FPS, fsrc.h, 0);
@@ -355,8 +359,10 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
 
     case 017:                                           /* LDCff' */
         ReadFP (&fsrc, GeteaFP (dstspec, 12 - lenf), dstspec, 12 - lenf);
-        if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
-        if ((FPS & (FPS_D + FPS_T)) == 0) newV = roundfp11 (&fsrc);
+        if (GET_EXP (fsrc.h) == 0)
+            fsrc = zero_fac;
+        if ((FPS & (FPS_D + FPS_T)) == 0)
+            newV = roundfp11 (&fsrc);
         else newV = 0;
         F_STORE (qdouble, fsrc, FR[ac]);
         FPS = setfcc (FPS, fsrc.h, newV);
@@ -364,8 +370,10 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
 
     case 014:                                           /* STCff' */
         F_LOAD (qdouble, FR[ac], fac);
-        if (GET_EXP (fac.h) == 0) fac = zero_fac;
-        if ((FPS & (FPS_D + FPS_T)) == FPS_D) newV = roundfp11 (&fac);
+        if (GET_EXP (fac.h) == 0)
+            fac = zero_fac;
+        if ((FPS & (FPS_D + FPS_T)) == FPS_D)
+            newV = roundfp11 (&fac);
         else newV = 0;
         WriteFP (&fac, GeteaFP (dstspec, 12 - lenf), dstspec, 12 - lenf);
         FPS = setfcc (FPS, fac.h, newV);
@@ -374,8 +382,10 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
     case 007:                                           /* CMPf */
         ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
         F_LOAD (qdouble, FR[ac], fac);
-        if (GET_EXP (fsrc.h) == 0) fsrc = zero_fac;
-        if (GET_EXP (fac.h) == 0) fac = zero_fac;
+        if (GET_EXP (fsrc.h) == 0)
+            fsrc = zero_fac;
+        if (GET_EXP (fac.h) == 0)
+            fac = zero_fac;
         if ((fsrc.h == fac.h) && (fsrc.l == fac.l)) {   /* equal? */
             FPS = (FPS & ~FPS_CC) | FPS_Z;
             if ((fsrc.h | fsrc.l) == 0) {               /* zero? */
@@ -385,7 +395,8 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             }
         FPS = (FPS & ~FPS_CC) | ((fsrc.h >> (FP_V_SIGN - PSW_V_N)) & FPS_N);
         if ((GET_SIGN (fsrc.h ^ fac.h) == 0) && (fac.h != 0) &&
-            F_LT (fsrc, fac)) FPS = FPS ^ FPS_N;
+            F_LT (fsrc, fac))
+            FPS = FPS ^ FPS_N;
         break;
 
     case 015:                                           /* LDEXP */
@@ -395,11 +406,13 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         newV = 0;
         if ((dst > 0177) && (dst <= 0177600)) {
             if (dst < 0100000) {
-                if (fpnotrap (FEC_OVFLO)) fac = zero_fac;
+                if (fpnotrap (FEC_OVFLO))
+                    fac = zero_fac;
                 newV = FPS_V;
                 }
             else {
-                if (fpnotrap (FEC_UNFLO)) fac = zero_fac;
+                if (fpnotrap (FEC_UNFLO))
+                    fac = zero_fac;
                 }
             }
         F_STORE (qdouble, fac, FR[ac]);
@@ -413,23 +426,28 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         V = 0;
         C = 0;
         FPS = (FPS & ~FPS_CC) | (N << PSW_V_N) | (Z << PSW_V_Z);
-        if (dstspec <= 07) R[dstspec] = dst;
+        if (dstspec <= 07)
+            R[dstspec] = dst;
         else WriteW (dst, GeteaW (dstspec));
         break;
 
     case 016:                                           /* LDCif */
         leni = FPS & FPS_L? LONG: WORD;
-        if (dstspec <= 07) fac.l = R[dstspec] << 16;
+        if (dstspec <= 07)
+            fac.l = R[dstspec] << 16;
         else fac.l = ReadI (GeteaFP (dstspec, leni), dstspec, leni);
         fac.h = 0;
         if (fac.l) {
-            if (sign = GET_SIGN_L (fac.l)) fac.l = (fac.l ^ 0xFFFFFFFF) + 1;
-            for (i = 0; GET_SIGN_L (fac.l) == 0; i++) fac.l = fac.l << 1;
+            if (sign = GET_SIGN_L (fac.l))
+                fac.l = (fac.l ^ 0xFFFFFFFF) + 1;
+            for (i = 0; GET_SIGN_L (fac.l) == 0; i++)
+                fac.l = fac.l << 1;
             exp = ((FPS & FPS_L)? FP_BIAS + 32: FP_BIAS + 16) - i;
             fac.h = (sign << FP_V_SIGN) | (exp << FP_V_EXP) |
                 ((fac.l >> (31 - FP_V_HB)) & FP_FRACH);
             fac.l = (fac.l << (FP_V_HB + 1)) & FP_FRACL;
-            if ((FPS & (FPS_D + FPS_T)) == 0) roundfp11 (&fac);
+            if ((FPS & (FPS_D + FPS_T)) == 0)
+                roundfp11 (&fac);
             }
         F_STORE (qdouble, fac, FR[ac]);
         FPS = setfcc (FPS, fac.h, 0);
@@ -448,30 +466,35 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
             i = FP_BIAS + 16;
             }
         C = 0;
-        if (exp <= FP_BIAS) dst = 0;
+        if (exp <= FP_BIAS)
+            dst = 0;
         else if (exp > i) {
             dst = 0;
             C = 1;
             }
         else {
             F_RSH_V (fac, FP_V_HB + 1 + i - exp, fsrc);
-            if (leni == WORD) fsrc.l = fsrc.l & ~0177777;
+            if (leni == WORD)
+                fsrc.l = fsrc.l & ~0177777;
             if (fsrc.l >= i_limit[leni == LONG][sign]) {
                 dst = 0;
                 C = 1;
                 }  
             else {
                 dst = fsrc.l;
-                if (sign) dst = -dst;
+                if (sign)
+                    dst = -dst;
                 }
             }
         N = GET_SIGN_L (dst);
         Z = (dst == 0);
         V = 0;
-        if (C) fpnotrap (FEC_ICVT);
+        if (C)
+            fpnotrap (FEC_ICVT);
         FPS = (FPS & ~FPS_CC) | (N << PSW_V_N) |
             (Z << PSW_V_Z) | (C << PSW_V_C);
-        if (dstspec <= 07) R[dstspec] = (dst >> 16) & 0177777;
+        if (dstspec <= 07)
+            R[dstspec] = (dst >> 16) & 0177777;
         else WriteI (dst, GeteaFP (dstspec, leni), dstspec, leni);
         break;
 
@@ -503,7 +526,8 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
     case 006:                                           /* SUBf */
         ReadFP (&fsrc, GeteaFP (dstspec, lenf), dstspec, lenf);
         F_LOAD (qdouble, FR[ac], fac);
-        if (GET_EXP (fsrc.h) != 0) fsrc.h = fsrc.h ^ FP_SIGN;
+        if (GET_EXP (fsrc.h) != 0)
+            fsrc.h = fsrc.h ^ FP_SIGN;
         newV = addfp11 (&fac, &fsrc);
         F_STORE (qdouble, fac, FR[ac]);
         FPS = setfcc (FPS, fac.h, newV);
@@ -557,27 +581,32 @@ switch (spec >> 3) {                                    /* case on spec */
         return (R[reg] | ds);
 
     case 2:                                             /* (R)+ */
-        if (reg == 7) len = 2;
+        if (reg == 7)
+            len = 2;
         R[reg] = ((adr = R[reg]) + len) & 0177777;
-        if (update_MM) MMR1 = (len << 3) | reg;
+        if (update_MM)
+            MMR1 = (len << 3) | reg;
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
-        if (update_MM) MMR1 = 020 | reg;
+        if (update_MM)
+            MMR1 = 020 | reg;
         adr = ReadW (adr | ds);
         return (adr | dsenable);
 
     case 4:                                             /* -(R) */
         adr = R[reg] = (R[reg] - len) & 0177777;
-        if (update_MM) MMR1 = (((-len) & 037) << 3) | reg;
+        if (update_MM)
+            MMR1 = (((-len) & 037) << 3) | reg;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         return (adr | ds);
 
     case 5:                                             /* @-(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
-        if (update_MM) MMR1 = 0360 | reg;
+        if (update_MM)
+            MMR1 = 0360 | reg;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
         adr = ReadW (adr | ds);
@@ -610,7 +639,8 @@ return 0;
 
 uint32 ReadI (int32 VA, int32 spec, int32 len)
 {
-if ((len == WORD) || (spec == 027)) return (ReadW (VA) << 16);
+if ((len == WORD) || (spec == 027))
+    return (ReadW (VA) << 16);
 return ((ReadW (VA) << 16) |
          ReadW ((VA & ~0177777) | ((VA + 2) & 0177777)));
 }
@@ -663,7 +693,8 @@ return;
 void WriteI (int32 data, int32 VA, int32 spec, int32 len)
 {
 WriteW ((data >> 16) & 0177777, VA);
-if ((len == WORD) || (spec == 027)) return;
+if ((len == WORD) || (spec == 027))
+    return;
 WriteW (data & 0177777, (VA & ~0177777) | ((VA + 2) & 0177777));
 return;
 }
@@ -687,10 +718,12 @@ if (spec <= 07) {
     return;
     }
 WriteW ((fptr->h >> FP_V_F0) & 0177777, VA);
-if (spec == 027) return;
+if (spec == 027)
+    return;
 exta = VA & ~0177777;
 WriteW ((fptr->h >> FP_V_F1) & 0177777, exta | ((VA + 2) & 0177777));
-if (len == LONG) return;
+if (len == LONG)
+    return;
 WriteW ((fptr->l >> FP_V_F2) & 0177777, exta | ((VA + 4) & 0177777));
 WriteW ((fptr->l >> FP_V_F3) & 0177777, exta | ((VA + 6) & 0177777));
 return;
@@ -704,10 +737,12 @@ int32 reg, exta;
 fpac_t fac, fsrc;
 
 reg = IR & 07;                                          /* isolate reg */
-if (reg == 7) exta = isenable;                          /* choose I,D */
+if (reg == 7)                                           /* choose I,D */
+    exta = isenable; 
 else exta = dsenable;
 if (IR & 000740) {                                      /* defined? */
-    if (CPUT (CPUT_03)) ReadW (exta | R[reg]);          /* 11/03 reads word */
+    if (CPUT (CPUT_03))                                 /* 11/03 reads word */
+        ReadW (exta | R[reg]);
     ABORT (TRAP_ILL);
 	}
 FEC = 0;                                                /* no errors */
@@ -732,7 +767,8 @@ switch ((IR >> 3) & 3) {                                /* case IR<5:3> */
         break;
 
     case 1:                                             /* FSUB */
-        if (fsrc.h != 0) fsrc.h = fsrc.h ^ FP_SIGN;     /* invert sign */
+        if (fsrc.h != 0)                                /* invert sign */
+            fsrc.h = fsrc.h ^ FP_SIGN;
         addfp11 (&fac, &fsrc);
         break;
 
@@ -757,8 +793,10 @@ if (FEC == 0) {                                         /* no err? */
     N = (GET_SIGN (fac.h) != 0);                        /* set N,Z */
     Z = (fac.h == 0);
     }
-else if (FEC == FEC_OVFLO) V = 1;                       /* ovf? trap set */
-else if (FEC == FEC_UNFLO) V = N = 1;                   /* unf? trap set */
+else if (FEC == FEC_OVFLO)                              /* ovf? trap set */
+    V = 1;
+else if (FEC == FEC_UNFLO)                              /* unf? trap set */
+    V = N = 1;
 else return SCPE_IERR;                                  /* what??? */
 return SCPE_OK;
 }
@@ -788,15 +826,19 @@ if (facexp == 0) {                                      /* fac = 0? */
     *facp = fsrcexp? *fsrcp: zero_fac;                  /* result fsrc or 0 */
     return 0;
     }
-if (fsrcexp == 0) return 0;                             /* fsrc = 0? no op */
+if (fsrcexp == 0)                                       /* fsrc = 0? no op */
+    return 0;
 ediff = facexp - fsrcexp;                               /* exponent diff */
-if (ediff >= 60) return 0;                              /* too big? no op */
+if (ediff >= 60)                                        /* too big? no op */
+    return 0;
 F_GET_FRAC_P (facp, facfrac);                           /* get fractions */
 F_GET_FRAC_P (fsrcp, fsrcfrac);
 F_LSH_GUARD (facfrac);                                  /* guard fractions */
 F_LSH_GUARD (fsrcfrac);
 if (GET_SIGN (facp->h) != GET_SIGN (fsrcp->h)) {        /* signs different? */
-    if (ediff) { F_RSH_V (fsrcfrac, ediff, fsrcfrac); } /* sub, shf fsrc */
+    if (ediff) {                                        /* sub, shf fsrc */
+        F_RSH_V (fsrcfrac, ediff, fsrcfrac);
+        }
     F_SUB (fsrcfrac, facfrac, facfrac);                 /* sub fsrc from fac */
     if ((facfrac.h | facfrac.l) == 0)  {                /* result zero? */
         *facp = zero_fac;                               /* no overflow */
@@ -933,7 +975,8 @@ if (facexp > ((FPS & FPS_D)? FP_BIAS + 56: FP_BIAS + 24)) {
 F_RSH_V (fmask_fac, facexp - FP_BIAS, fmask);           /* shift mask */
 fsrcfrac.l = facfrac.l & fmask.l;                       /* extract fraction */
 fsrcfrac.h = facfrac.h & fmask.h;
-if ((fsrcfrac.h | fsrcfrac.l) == 0) *fracp = zero_fac;
+if ((fsrcfrac.h | fsrcfrac.l) == 0)
+    *fracp = zero_fac;
 else {
     F_LSH_V (fsrcfrac, facexp - FP_BIAS, fsrcfrac);
     fsrcexp = FP_BIAS;
@@ -996,7 +1039,8 @@ mpc = *f2p;
 F_LSH_GUARD (mpc);                                      /* guard multipicand */
 if ((mpy.l | mpc.l) == 0) {                             /* 24b x 24b? */
     for (i = 0; i < 24; i++) {
-        if (mpy.h & 1) result.h = result.h + mpc.h;
+        if (mpy.h & 1)
+            result.h = result.h + mpc.h;
         F_RSH_1 (result);
         mpy.h = mpy.h >> 1;
         }
@@ -1059,7 +1103,8 @@ for (i = count; (i > 0) && ((facfrac.h | facfrac.l) != 0); i--) {
     F_LSH_1 (quo);                                      /* shift quotient */
     if (!F_LT (facfrac, fsrcfrac)) {                    /* divd >= divr? */
         F_SUB (fsrcfrac, facfrac, facfrac);             /* divd - divr */
-        if (qd) quo.l = quo.l | 1;                      /* double or single? */
+        if (qd)                                         /* double or single? */
+            quo.l = quo.l | 1;
         else quo.h = quo.h | 1;
         }
     F_LSH_1 (facfrac);                                  /* shift divd */
@@ -1095,8 +1140,10 @@ return round_and_pack (facp, facexp, &quo, 1);
 int32 setfcc (int32 oldst, int32 result, int32 newV)
 {
 oldst = (oldst & ~FPS_CC) | newV;
-if (GET_SIGN (result)) oldst = oldst | FPS_N;
-if (GET_EXP (result) == 0) oldst = oldst | FPS_Z;
+if (GET_SIGN (result))
+    oldst = oldst | FPS_N;
+if (GET_EXP (result) == 0)
+    oldst = oldst | FPS_Z;
 return oldst;
 }
 
@@ -1116,7 +1163,8 @@ outf = *fptr;                                           /* get argument */
 F_ADD (fround_fac, outf, outf);                         /* round */
 if (GET_SIGN (outf.h ^ fptr->h)) {                      /* flipped sign? */
     outf.h = (outf.h ^ FP_SIGN) & 0xFFFFFFFF;           /* restore sign */
-    if (fpnotrap (FEC_OVFLO)) *fptr = zero_fac;         /* if no int, clear */
+    if (fpnotrap (FEC_OVFLO))                           /* if no int, clear */
+        *fptr = zero_fac;
     else *fptr = outf;                                  /* return rounded */
     return FPS_V;                                       /* overflow */
     }
@@ -1158,10 +1206,12 @@ facp->l = frac.l & FP_FRACL;
 facp->h = (facp->h & FP_SIGN) | ((exp & FP_M_EXP) << FP_V_EXP) |
     (frac.h & FP_FRACH);
 if (exp > 0377) {
-    if (fpnotrap (FEC_OVFLO)) *facp = zero_fac;
+    if (fpnotrap (FEC_OVFLO))
+        *facp = zero_fac;
     return FPS_V;
     }
-if ((exp <= 0) && (fpnotrap (FEC_UNFLO))) *facp = zero_fac;
+if ((exp <= 0) && (fpnotrap (FEC_UNFLO)))
+    *facp = zero_fac;
 return 0;
 }
 
@@ -1178,10 +1228,12 @@ int32 fpnotrap (int32 code)
 static const int32 test_code[] = { 0, 0, 0, FPS_IC, FPS_IV, FPS_IU, FPS_IUV };
 
 if ((code >= FEC_ICVT) && (code <= FEC_UNDFV) &&
-    ((FPS & test_code[code >> 1]) == 0)) return TRUE;
+    ((FPS & test_code[code >> 1]) == 0))
+    return TRUE;
 FPS = FPS | FPS_ER;
 FEC = code;
 FEA = (backup_PC - 2) & 0177777;
-if ((FPS & FPS_ID) == 0) setTRAP (TRAP_FPE);
+if ((FPS & FPS_ID) == 0)
+    setTRAP (TRAP_FPE);
 return FALSE;
 }

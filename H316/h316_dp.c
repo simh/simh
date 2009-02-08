@@ -1,6 +1,6 @@
 /* h316_dp.c: Honeywell 4623, 4651, 4720 disk simulator
 
-   Copyright (c) 2003-2005, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -389,11 +389,13 @@ switch (inst) {                                         /* case on opcode */
             break;      
 
         case FNC_RDS:                                   /* read status */
-            if (dp_sta & STA_BUSY) return dat;          /* ignore if busy */
+            if (dp_sta & STA_BUSY)                      /* ignore if busy */
+                return dat;
             dp_sta = (dp_sta | STA_RDY) & ~(STA_MBZ | STA_ANYER);
             if (dp_sta & STA_ALLERR) dp_sta = dp_sta | STA_ANYER;
             dp_buf = dp_sta;
-            if (dp_dma && Q_DMA (ch)) SET_CH_REQ (ch);  /* DMA? set chan req */
+            if (dp_dma && Q_DMA (ch))                   /* DMA? set chan req */
+                SET_CH_REQ (ch);
             break;
 
         case FNC_DMA:                                   /* set DMA/DMC */
@@ -414,7 +416,8 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioINA:                                         /* INA */
-        if (fnc) return IOBADFNC (dat);                 /* fnc 0 only */
+        if (fnc)                                        /* fnc 0 only */
+            return IOBADFNC (dat);
         if (dp_sta & STA_RDY) {                         /* ready? */
             dp_sta = dp_sta & ~STA_RDY;                 /* clear ready */
             return IOSKIP (dat | dp_buf);               /* ret buf, skip */
@@ -422,12 +425,15 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioOTA:                                         /* OTA */
-        if (fnc) return IOBADFNC (dat);                 /* fnc 0 only */
+        if (fnc)                                        /* fnc 0 only */
+            return IOBADFNC (dat);
         if (dp_sta & STA_RDY) {                         /* ready? */
             dp_sta = dp_sta & ~STA_RDY;                 /* clear ready */
             dp_buf = dat;                               /* store buf */
-            if (dp_otas == OTA_CW1) dp_go1 (dat);       /* expecting CW1? */
-            else if (dp_otas == OTA_CW2) dp_go2 (dat);  /* expecting CW2? */
+            if (dp_otas == OTA_CW1)                     /* expecting CW1? */
+                dp_go1 (dat);
+            else if (dp_otas == OTA_CW2)                /* expecting CW2? */
+                dp_go2 (dat);
             return IOSKIP (dat);
             }
         break;
@@ -437,23 +443,28 @@ switch (inst) {                                         /* case on opcode */
         switch (fnc) {
 
         case 000:                                       /* ready */
-            if (dp_sta & STA_RDY) return IOSKIP (dat);
+            if (dp_sta & STA_RDY)
+                return IOSKIP (dat);
             break;
 
         case 001:                                       /* !interrupting */
-            if (!TST_INTREQ (INT_DP)) return IOSKIP (dat);
+            if (!TST_INTREQ (INT_DP))
+                return IOSKIP (dat);
             break;
 
         case 002:                                       /* operational */
-            if (!(dp_sta & (STA_BUSY | STA_ALLERR))) return IOSKIP (dat);
+            if (!(dp_sta & (STA_BUSY | STA_ALLERR)))
+                return IOSKIP (dat);
             break;
 
         case 003:                                       /* !error */
-            if (!(dp_sta & STA_ALLERR)) return IOSKIP (dat);
+            if (!(dp_sta & STA_ALLERR))
+                return IOSKIP (dat);
             break;
 
         case 004:                                       /* !busy */
-            if (!(dp_sta & STA_BUSY)) return IOSKIP (dat);
+            if (!(dp_sta & STA_BUSY))
+                return IOSKIP (dat);
             break;
 
         case 011: case 012: case 013:                   /* !not seeking 0-6 */
@@ -481,7 +492,8 @@ t_stat dp_go (uint32 fnc)
 {
 int32 ch = dp_dib.chan - 1;                             /* DMA/DMC chan */
 
-if (dp_sta & STA_BUSY) return SCPE_OK;                  /* ignore if busy */
+if (dp_sta & STA_BUSY)                                  /* ignore if busy */
+    return SCPE_OK;
 dp_fnc = fnc;                                           /* save function */
 dp_xip = 0;                                             /* transfer not started */
 dp_eor = 0;                                             /* not end of range */
@@ -530,7 +542,8 @@ switch (dp_fnc) {                                       /* case on function */
     case FNC_RW:                                        /* read/write */
         dp_otas = OTA_CW2;                              /* expect CW2 */
         dp_sta = dp_sta | STA_RDY;                      /* set ready */
-        if (dp_dma && Q_DMA (ch)) SET_CH_REQ (ch);      /* DMA? set chan request */
+        if (dp_dma && Q_DMA (ch))                       /* DMA? set chan request */
+            SET_CH_REQ (ch);
         break;
         }
 
@@ -571,9 +584,11 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case FNC_SEEK:                                      /* seek, need cyl */
         offs = CW1_GETOFFS (dp_cw1);                    /* get offset */
-        if (dp_cw1 & CW1_DIR) dcyl = uptr->CYL - offs;  /* get desired cyl */
+        if (dp_cw1 & CW1_DIR)                           /* get desired cyl */
+            dcyl = uptr->CYL - offs;
         else dcyl = uptr->CYL + offs;
-        if ((offs == 0) || (dcyl < 0) ||
+        if ((offs == 0) ||
+            (dcyl < 0) ||
             (dcyl >= (int32) dp_tab[dp_ctype].cyl))     
             return dp_done (1, STA_SEKER);              /* bad seek? */
 
@@ -581,13 +596,15 @@ switch (uptr->FNC) {                                    /* case on function */
         dp_sta = dp_sta & ~STA_BUSY;                    /* clear busy */
         uptr->FNC = FNC_SEEK | FNC_2ND;                 /* next state */
         st = (abs (dcyl - uptr->CYL)) * dp_stime;       /* schedule seek */
-        if (st == 0) st = dp_stime;
+        if (st == 0)
+            st = dp_stime;
         uptr->CYL = dcyl;                               /* put on cylinder */
         sim_activate (uptr, st);
         return SCPE_OK;
 
     case FNC_SEEK | FNC_2ND:                            /* seek, 2nd state */
-        if (dp_sta & STA_BUSY) dp_defint = 1;           /* busy? queue intr */
+        if (dp_sta & STA_BUSY)                          /* busy? queue intr */
+            dp_defint = 1;
         else SET_INT (INT_DP);                          /* no, req intr */
         return SCPE_OK;
 
@@ -629,7 +646,8 @@ switch (uptr->FNC) {                                    /* case on function */
 */
 
     case FNC_FMT:                                       /* format */
-        for (i = 0; i < DP_TRKLEN; i++) dpxb[i] = 0;    /* clear track */
+        for (i = 0; i < DP_TRKLEN; i++)                 /* clear track */
+            dpxb[i] = 0;
         dp_xip = dp_xip | XIP_FMT;                      /* format in progress */
         dp_rptr = 0;                                    /* init record ptr */
         dp_gap = 0;                                     /* no gap before first */
@@ -646,7 +664,8 @@ switch (uptr->FNC) {                                    /* case on function */
         uptr->FNC = FNC_FMT | FNC_3RD;                  /* data state */
         if (dp_eor) {                                   /* record done? */
             dp_eor = 0;                                 /* clear for restart */
-            if (dp_dma) SET_INT (INT_DP);               /* DMA/DMC? intr */
+            if (dp_dma)                                 /* DMA/DMC? intr */
+                SET_INT (INT_DP);
             }
         break;                                          /* set up next word */
 
@@ -664,7 +683,8 @@ switch (uptr->FNC) {                                    /* case on function */
             }
         if (dp_eor) {                                   /* record done? */
             dp_eor = 0;                                 /* clear for restart */
-            if (dp_dma) SET_INT (INT_DP);               /* DMA/DMC? intr */
+            if (dp_dma)                                 /* DMA/DMC? intr */
+                SET_INT (INT_DP);
             dpxb[dp_rptr + REC_DATA + dp_wptr] = dp_csum; /* store checksum */
             uptr->FNC = uptr->FNC | FNC_4TH;            /* pause state */
             sim_activate (uptr, 5 * dp_xtime);          /* schedule pause */
@@ -715,7 +735,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 return dp_done (1, STA_WPRER);          /* error */
             dp_xip = dp_xip | XIP_WRT;                  /* write in progress */
             dp_sta = dp_sta | STA_RDY;                  /* set ready */
-            if (dp_dma) SET_CH_REQ (ch);                /* if DMA/DMC, req chan */
+            if (dp_dma)                                 /* if DMA/DMC, req chan */
+                SET_CH_REQ (ch);
             }
         else if (Q_DMA (ch))                            /* read; DMA? */
             dma_ad[ch] = dma_ad[ch] | DMA_IN;           /* force input */
@@ -727,7 +748,8 @@ switch (uptr->FNC) {                                    /* case on function */
         if (dp_cw1 & CW1_RW) {                          /* write? */
             if (dp_sta & STA_RDY)                       /* timing failure? */
                 return dp_wrdone (uptr, STA_DTRER);     /* yes, error */
-            if (r = dp_wrwd (uptr, dp_buf)) return r;   /* wr word, error? */
+            if (r = dp_wrwd (uptr, dp_buf))             /* wr word, error? */
+                return r;
             if (dp_eor) {                               /* transfer done? */
                 dpxb[dp_rptr + REC_DATA + dp_wptr] = dp_csum;
                 return dp_wrdone (uptr, 0);             /* clear busy, intr req */
@@ -739,8 +761,7 @@ switch (uptr->FNC) {                                    /* case on function */
             dp_csum = dp_csum ^ dp_buf;                 /* xor to csum */
             if ((dp_wptr > lnt) || dp_eor)              /* transfer done? */
                 return dp_done (1,
-                    (dp_csum? STA_CSMER: 0) |
-                    ((dp_wptr >= lnt)? STA_EOR: 0));
+                    (dp_csum? STA_CSMER: 0) | ((dp_wptr >= lnt)? STA_EOR: 0));
             if (dp_sta & STA_RDY)                       /* data buf full? */
                 return dp_done (1, STA_DTRER);          /* no, underrun */
             dp_wptr++;                                  /* next word */
@@ -752,7 +773,8 @@ switch (uptr->FNC) {                                    /* case on function */
         }                                               /* end case */
 
 dp_sta = dp_sta | STA_RDY;                              /* set ready */
-if (dp_dma) SET_CH_REQ (ch);                            /* if DMA/DMC, req chan */
+if (dp_dma)                                             /* if DMA/DMC, req chan */
+    SET_CH_REQ (ch);
 sim_activate (uptr, dp_xtime);                          /* schedule word */
 return SCPE_OK;
 }
@@ -766,7 +788,8 @@ int32 l;
 
 fseek (uptr->fileref, da * sizeof (uint16), SEEK_SET);
 l = fxread (buf, sizeof (uint16), DP_TRKLEN, uptr->fileref);
-for ( ; l < DP_TRKLEN; l++) buf[l] = 0;
+for ( ; l < DP_TRKLEN; l++)
+    buf[l] = 0;
 if (ferror (uptr->fileref)) {
     perror ("DP I/O error");
     clearerr (uptr->fileref);
@@ -800,9 +823,12 @@ t_bool dp_findrec (uint32 addr)
 dp_rptr = 0;
 
 do {
-    if (dpxb[dp_rptr + REC_LNT] == 0) return FALSE;
-    if (dpxb[dp_rptr + REC_LNT] >= DP_TRKLEN) return TRUE;
-    if (dpxb[dp_rptr + REC_ADDR] == addr) return TRUE;
+    if (dpxb[dp_rptr + REC_LNT] == 0)
+        return FALSE;
+    if (dpxb[dp_rptr + REC_LNT] >= DP_TRKLEN)
+        return TRUE;
+    if (dpxb[dp_rptr + REC_ADDR] == addr)
+        return TRUE;
     dp_rptr = dp_rptr + dpxb[dp_rptr + REC_LNT] + REC_OVHD;
     } while (dp_rptr < DP_TRKLEN);
 return FALSE;
@@ -827,7 +853,8 @@ if (dp_wptr < (lnt + REC_MAXEXT)) {
     }
 dpxb[dp_rptr + REC_DATA + dp_wptr] = dp_csum;           /* write csum */
 dpxb[dp_rptr + lnt + REC_OVHD] = 0;                     /* zap rest of track */
-if (r = dp_wrdone (uptr, STA_UNSER)) return r;          /* dump track */
+if (r = dp_wrdone (uptr, STA_UNSER))                    /* dump track */
+    return r;
 return STOP_DPOVR;
 }       
 
@@ -845,7 +872,8 @@ t_stat dp_done (uint32 req, uint32 flg)
 {
 dp_xip = 0;                                             /* clear xfr in prog */
 dp_sta = (dp_sta | flg) & ~(STA_BUSY | STA_MBZ);        /* clear busy */
-if (req || dp_defint) SET_INT (INT_DP);                 /* if req, set intr */
+if (req || dp_defint)                                   /* if req, set intr */
+    SET_INT (INT_DP);
 dp_defint = 0;                                          /* clr def intr */
 return SCPE_OK;
 }
@@ -886,7 +914,8 @@ t_stat dp_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 return dp_showformat (stdout, uptr, 0, NULL);
 }
 
@@ -896,7 +925,8 @@ t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 i;
 
-if ((val < 0) || (val >= DP_NUMTYP) || (cptr != NULL)) return SCPE_ARG;
+if ((val < 0) || (val >= DP_NUMTYP) || (cptr != NULL))
+    return SCPE_ARG;
 for (i = 0; i < DP_NUMDRV; i++) {
     if (dp_unit[i].flags & UNIT_ATT) return SCPE_ALATT;
     }
@@ -910,7 +940,8 @@ return SCPE_OK;
 
 t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (dp_ctype >= DP_NUMTYP) return SCPE_IERR;
+if (dp_ctype >= DP_NUMTYP)
+    return SCPE_IERR;
 fprintf (st, "%s", dp_tab[dp_ctype].name);
 return SCPE_OK;
 }
@@ -945,29 +976,37 @@ uint16 tbuf[DP_TRKLEN];
 float finp;
 t_stat r;
 
-if (uptr == NULL) return SCPE_IERR;
-if (cptr == NULL) return SCPE_ARG;
-if (!(uptr->flags & UNIT_ATT)) return SCPE_UNATT;
+if (uptr == NULL)
+    return SCPE_IERR;
+if (cptr == NULL)
+    return SCPE_ARG;
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_UNATT;
 inp = (int32) get_uint (cptr, 10, 2048, &r);
-if (r != SCPE_OK) return r;
-if (inp == 0) return SCPE_ARG;
+if (r != SCPE_OK)
+    return r;
+if (inp == 0)
+    return SCPE_ARG;
 finp = (float) inp;
 if (sim_switches & SWMASK ('R')) {                      /* format records? */
     nr = inp;
     nw = (int32) ((dp_tab[dp_ctype].wrds / (finp + ((finp - 1.0) / 20.0))) - REC_OVHD_WRDS);
-    if (nw <= 0) return SCPE_ARG;
+    if (nw <= 0)
+        return SCPE_ARG;
     }
 else {
     nw = inp;                                           /* format words */
     nr = (int32) ((((20.0 * dp_tab[dp_ctype].wrds) / (finp + REC_OVHD_WRDS)) + 1.0) / 21.0);
-    if (nr <= 0) return SCPE_ARG;
+    if (nr <= 0)
+        return SCPE_ARG;
     }
 printf ("Proposed format: records/track = %d, record size = %d\n", nr, nw);
 if (!get_yn ("Formatting will destroy all data on this disk; proceed? [N]", FALSE))
     return SCPE_OK;
 for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
     for (h = 0; h < dp_tab[dp_ctype].surf; h++) {
-        for (i = 0; i < DP_TRKLEN; i++) tbuf[i] = 0;
+        for (i = 0; i < DP_TRKLEN; i++)
+            tbuf[i] = 0;
         rptr = 0;
         for (i = 0; i < nr; i++) {
             tbuf[rptr + REC_LNT] = nw & DMASK;
@@ -976,7 +1015,8 @@ for (c = cntr = 0; c < dp_tab[dp_ctype].cyl; c++) {
             else tbuf[rptr + REC_ADDR] = (c << 8) + (h << 3) + i;
             rptr = rptr + nw + REC_OVHD;
             }
-        if (r = dp_wrtrk (uptr, tbuf, c, h)) return r;
+        if (r = dp_wrtrk (uptr, tbuf, c, h))
+            return r;
         }
     }
 printf ("Formatting complete\n");
@@ -995,16 +1035,19 @@ uint32 maxsec = 0;
 uint16 tbuf[DP_TRKLEN];
 t_stat r;
 
-if (uptr == NULL) return SCPE_IERR;
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if (uptr == NULL)
+    return SCPE_IERR;
+if ((uptr->flags & UNIT_ATT) == 0)
+    return SCPE_UNATT;
 for (c = 0; c < dp_tab[dp_ctype].cyl; c++) {
     for (h = 0; h < dp_tab[dp_ctype].surf; h++) {
-        if (r = dp_rdtrk (uptr, tbuf, c, h)) return r;
+        if (r = dp_rdtrk (uptr, tbuf, c, h))
+            return r;
         rptr = 0;
         rlnt = tbuf[rptr + REC_LNT];
         if (rlnt == 0) {
-            if (c || h) fprintf (st,
-                "Unformatted track, cyl = %d, head = %d\n", c, h);
+            if (c || h)
+                fprintf (st, "Unformatted track, cyl = %d, head = %d\n", c, h);
             else fprintf (st, "Disk is unformatted\n");
             return SCPE_OK;
             }
@@ -1019,26 +1062,29 @@ for (c = 0; c < dp_tab[dp_ctype].cyl; c++) {
                     tbuf[rptr + REC_EXT], c, h, sec);
                 return SCPE_OK;
                 }
-            if (rlnt > maxrec) maxrec = rlnt;
-            if (rlnt < minrec) minrec = rlnt;
+            if (rlnt > maxrec)
+                maxrec = rlnt;
+            if (rlnt < minrec)
+                minrec = rlnt;
             rptr = rptr + rlnt + REC_OVHD;
             rlnt = tbuf[rptr + REC_LNT];
             }
-        if (sec > maxsec) maxsec = sec;
-        if (sec < minsec) minsec = sec;
+        if (sec > maxsec)
+            maxsec = sec;
+        if (sec < minsec)
+            minsec = sec;
         }
     }
-if ((minrec == maxrec) && (minsec == maxsec)) fprintf (st, 
-    "Valid fixed format, records/track = %d, record size = %d\n",
-     minsec, minrec);
-else if (minrec == maxrec) fprintf (st,
-    "Valid variable format, records/track = %d-%d, record size = %d\n",
-     minsec, maxsec, minrec);
-else if (minsec == maxsec) fprintf (st,
-    "Valid variable format, records/track = %d, record sizes = %d-%d\n",
-     minsec, minrec, maxrec);
-else fprintf (st,
-    "Valid variable format, records/track = %d-%d, record sizes = %d-%d\n",
-     minsec, maxsec, minrec, maxrec);
+if ((minrec == maxrec) && (minsec == maxsec))
+    fprintf (st, "Valid fixed format, records/track = %d, record size = %d\n",
+             minsec, minrec);
+else if (minrec == maxrec)
+    fprintf (st, "Valid variable format, records/track = %d-%d, record size = %d\n",
+             minsec, maxsec, minrec);
+else if (minsec == maxsec)
+    fprintf (st, "Valid variable format, records/track = %d, record sizes = %d-%d\n",
+             minsec, minrec, maxrec);
+else fprintf (st, "Valid variable format, records/track = %d-%d, record sizes = %d-%d\n",
+              minsec, maxsec, minrec, maxrec);
 return SCPE_OK;
 }

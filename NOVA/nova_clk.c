@@ -167,8 +167,10 @@ return SCPE_OK;
 
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val != 50) && (val != 60)) return SCPE_IERR;
+if (cptr)
+    return SCPE_ARG;
+if ((val != 50) && (val != 60))
+    return SCPE_IERR;
 clk_tps[0] = val;
 return SCPE_OK;
 }

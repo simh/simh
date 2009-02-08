@@ -224,15 +224,18 @@ return SCPE_OK;
 
 t_stat tty_fo (uint32 op)
 {
-if (op & TTY_IRDY) dev_done = dev_done & ~INT_TTI;
-if (op & TTY_ORDY) dev_done = dev_done & ~INT_TTO;
+if (op & TTY_IRDY)
+    dev_done = dev_done & ~INT_TTI;
+if (op & TTY_ORDY)
+    dev_done = dev_done & ~INT_TTO;
 return SCPE_OK;
 }
 
 uint32 tty_sf (uint32 op)
 {
 if (((op & TTY_IRDY) && (dev_done & INT_TTI)) ||
-    ((op & TTY_ORDY) && (dev_done & INT_TTO))) return 1;
+    ((op & TTY_ORDY) && (dev_done & INT_TTO)))
+    return 1;
 return 0;
 }
 
@@ -243,8 +246,10 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_activate (uptr, uptr->wait);                        /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
-if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
+if (c & SCPE_BREAK)                                     /* break? */
+    uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 dev_done = dev_done | INT_TTI;                          /* set ready */
 uptr->pos = uptr->pos + 1;
@@ -310,16 +315,20 @@ return SCPE_OK;
 
 t_stat hsrp_fo (uint32 op)
 {
-if (op & PT_IRDY) dev_done = dev_done & ~INT_HSR;
-if (op & PT_ORDY) dev_done = dev_done & ~INT_HSP;
-if (op & PT_STRT) sim_activate (&hsr_unit, hsr_unit.wait);
+if (op & PT_IRDY)
+    dev_done = dev_done & ~INT_HSR;
+if (op & PT_ORDY)
+    dev_done = dev_done & ~INT_HSP;
+if (op & PT_STRT)
+    sim_activate (&hsr_unit, hsr_unit.wait);
 return SCPE_OK;
 }
 
 uint32 hsrp_sf (uint32 op)
 {
 if (((op & PT_IRDY) && (dev_done & INT_HSR)) ||
-    ((op & PT_ORDY) && (dev_done & INT_HSP))) return 1;
+    ((op & PT_ORDY) && (dev_done & INT_HSP)))
+    return 1;
 return 0;
 }
 
@@ -331,7 +340,8 @@ if ((hsr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (hsr_stopioe, SCPE_UNATT);
 if ((temp = getc (hsr_unit.fileref)) == EOF) {          /* read char */
     if (feof (hsr_unit.fileref)) {                      /* err or eof? */
-        if (hsr_stopioe) printf ("HSR end of file\n");
+        if (hsr_stopioe)
+            printf ("HSR end of file\n");
         else return SCPE_OK;
         }
     else perror ("HSR I/O error");
@@ -380,23 +390,27 @@ return SCPE_OK;
 
 t_stat rtc_fo (int32 op)
 {
-if (op & RTC_OFF) sim_cancel (&rtc_unit);               /* clock off? */
+if (op & RTC_OFF)                                       /* clock off? */
+    sim_cancel (&rtc_unit);
 if ((op & RTC_ON) && !sim_is_active (&rtc_unit))        /* clock on? */
     sim_activate (&rtc_unit, sim_rtc_init (rtc_unit.wait));
-if (op & RTC_OV) dev_done = dev_done & ~INT_RTC;        /* clr ovflo? */
+if (op & RTC_OV)                                        /* clr ovflo? */
+    dev_done = dev_done & ~INT_RTC;
 return SCPE_OK;
 }
 
 uint32 rtc_sf (int32 op)
 {
-if ((op & RTC_OV) && (dev_done & INT_RTC)) return 1;
+if ((op & RTC_OV) && (dev_done & INT_RTC))
+    return 1;
 return 0;
 }
 
 t_stat rtc_svc (UNIT *uptr)
 {
 M[RTC_CTR] = (M[RTC_CTR] + 1) & DMASK;                  /* incr counter */
-if (M[RTC_CTR] == 0) dev_done = dev_done | INT_RTC;     /* ovflo? set ready */
+if (M[RTC_CTR] == 0)                                    /* ovflo? set ready */
+    dev_done = dev_done | INT_RTC;
 sim_activate (&rtc_unit, sim_rtc_calb (rtc_tps));       /* reactivate */
 return SCPE_OK;
 }

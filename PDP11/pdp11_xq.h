@@ -1,7 +1,7 @@
 /* pdp11_xq.h: DEQNA/DELQA ethernet controller information
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2002-2005, David T. Hittner
+   Copyright (c) 2002-2008, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

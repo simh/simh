@@ -1,6 +1,6 @@
 /* pdp8_td.c: PDP-8 simple DECtape controller (TD8E) simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -280,15 +280,18 @@ int32 diff, t;
 switch (pulse) {
 
     case 01:                                            /* SDSS */
-        if (td_slf) return AC | IOT_SKP;
+        if (td_slf)
+            return AC | IOT_SKP;
         break;
 
     case 02:                                            /* SDST */
-        if (td_tme) return AC | IOT_SKP;
+        if (td_tme)
+            return AC | IOT_SKP;
         break;
 
     case 03:                                            /* SDSQ */
-        if (td_qlf) return AC | IOT_SKP;
+        if (td_qlf)
+            return AC | IOT_SKP;
         break;
 
     case 04:                                            /* SDLC */
@@ -344,7 +347,8 @@ int32 prev_mving, new_mving, prev_dir, new_dir;
 UNIT *uptr;
 
 uptr = td_dev.units + TDC_GETUNIT (newf);               /* new unit */
-if ((uptr->flags & UNIT_ATT) == 0) return FALSE;        /* new unit attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* new unit attached? */
+    return FALSE;
 
 new_mving = ((newf & TDC_STPGO) != 0);                  /* new moving? */
 prev_mving = (uptr->STATE != STA_STOP);                 /* previous moving? */
@@ -353,10 +357,12 @@ prev_dir = ((uptr->STATE & STA_DIR) != 0);              /* previous dir? */
 
 td_mtk = 0;                                             /* mark trk reg cleared */
 
-if (!prev_mving && !new_mving) return FALSE;            /* stop from stop? */
+if (!prev_mving && !new_mving)                          /* stop from stop? */
+    return FALSE;
 
 if (new_mving && !prev_mving) {                         /* start from stop? */
-    if (td_setpos (uptr)) return TRUE;                  /* update pos */
+    if (td_setpos (uptr))                               /* update pos */
+        return TRUE;
     sim_cancel (uptr);                                  /* stop current */
     sim_activate (uptr, td_dctime - (td_dctime >> 2));  /* sched accel */
     uptr->STATE = STA_ACC | new_dir;                    /* set status */
@@ -367,7 +373,8 @@ if (new_mving && !prev_mving) {                         /* start from stop? */
 if ((prev_mving && !new_mving) ||                       /* stop from moving? */
     (prev_dir != new_dir)) {                            /* dir chg while moving? */
 	if (uptr->STATE >= STA_ACC) {						/* not stopping? */
-		if (td_setpos (uptr)) return TRUE;				/* update pos */
+		if (td_setpos (uptr))				            /* update pos */
+            return TRUE;
 		sim_cancel (uptr);								/* stop current */
 		sim_activate (uptr, td_dctime);					/* schedule decel */
 		uptr->STATE = STA_DEC | prev_dir;				/* set status */
@@ -404,7 +411,8 @@ int32 delta;
 
 new_time = sim_grtime ();                               /* current time */
 ut = new_time - uptr->LASTT;                            /* elapsed time */
-if (ut == 0) return FALSE;                              /* no time gone? exit */
+if (ut == 0)                                            /* no time gone? exit */
+    return FALSE;
 uptr->LASTT = new_time;                                 /* update last time */
 switch (uptr->STATE & ~STA_DIR) {                       /* case on motion */
 
@@ -429,7 +437,8 @@ switch (uptr->STATE & ~STA_DIR) {                       /* case on motion */
         break;
         }
 
-if (uptr->STATE & STA_DIR) uptr->pos = uptr->pos - delta; /* update pos */
+if (uptr->STATE & STA_DIR)                              /* update pos */
+    uptr->pos = uptr->pos - delta;
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
@@ -456,7 +465,8 @@ int32 mtkb, datb;
    Accelerating - next state must be up to speed, fall through
    Up to speed - process line */
 
-if (mot == STA_STOP) return SCPE_OK;                    /* stopped? done */
+if (mot == STA_STOP)                                    /* stopped? done */
+    return SCPE_OK;
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     uptr->STATE = uptr->pos = 0;                        /* also done */
     return SCPE_UNATT;
@@ -483,7 +493,8 @@ switch (mot) {                                          /* case on motion */
         break;
 
     case STA_UTS:                                       /* up to speed */
-        if (dir) uptr->pos = uptr->pos - 1;             /* adjust position */
+        if (dir)                                        /* adjust position */
+            uptr->pos = uptr->pos - 1;
         else uptr->pos = uptr->pos + 1;
         uptr->LASTT = sim_grtime ();                    /* save time */
         if (((int32) uptr->pos < 0) ||                  /* off reel? */
@@ -505,7 +516,8 @@ switch (mot) {                                          /* case on motion */
    synthesizing the mark track, based on tape position, and the header data. */
 
 sim_activate (uptr, td_ltime);                          /* sched next line */
-if (unum != su) return SCPE_OK;                         /* not sel? done */
+if (unum != su)                                         /* not sel? done */
+    return SCPE_OK;
 td_slf = 1;                                             /* set single */
 td_qlctr = (td_qlctr + 1) % DT_WSIZE;                   /* count words */
 if (td_qlctr == 0) {                                    /* lines mod 4? */
@@ -646,7 +658,8 @@ int32 nibp = 3 * (DT_WSIZE - 1 - (line % DT_WSIZE));    /* nibble pos */
 
 ba = ba + (line / DT_WSIZE);                            /* block addr */
 fbuf[ba] = (fbuf[ba] & ~(07 << nibp)) | (dat << nibp);  /* upd data nibble */
-if (ba >= uptr->hwmark) uptr->hwmark = ba + 1;          /* upd length */
+if (ba >= uptr->hwmark)                                 /* upd length */
+    uptr->hwmark = ba + 1;
 return;
 }
 
@@ -661,7 +674,8 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all activity */
     uptr = td_dev.units + i;
     if (sim_is_running) {                               /* CAF? */
         if (uptr->STATE >= STA_ACC) {                   /* accel or uts? */
-            if (td_setpos (uptr)) continue;             /* update pos */
+            if (td_setpos (uptr))                       /* update pos */
+                continue;
             sim_cancel (uptr);
             sim_activate (uptr, td_dctime);             /* sched decel */
             uptr->STATE = STA_DEC | (uptr->STATE & STA_DIR);
@@ -729,10 +743,13 @@ t_stat td_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 saved_PC;
 
-if (unitno) return SCPE_ARG;                            /* only unit 0 */
-if (td_dib.dev != DEV_TD8E) return STOP_NOTSTD;         /* only std devno */
+if (unitno)
+    return SCPE_ARG;                                    /* only unit 0 */
+if (td_dib.dev != DEV_TD8E)
+    return STOP_NOTSTD;                                 /* only std devno */
 td_unit[unitno].pos = DT_EZLIN;
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }
@@ -756,7 +773,8 @@ t_stat r;
 uint32 ba, sz;
 
 r = attach_unit (uptr, cptr);                           /* attach */
-if (r != SCPE_OK) return r;                             /* fail? */
+if (r != SCPE_OK)                                       /* fail? */
+    return r;
 if ((sim_switches & SIM_SW_REST) == 0) {                /* not from rest? */
     uptr->flags = (uptr->flags | UNIT_8FMT) & ~UNIT_11FMT;
     if (sim_switches & SWMASK ('F'))                    /* att 18b? */
@@ -779,8 +797,10 @@ if (uptr->filebuf == NULL) {                            /* can't alloc? */
     }
 fbuf = (uint16 *) uptr->filebuf;                        /* file buffer */
 printf ("%s%d: ", sim_dname (&td_dev), u);
-if (uptr->flags & UNIT_8FMT) printf ("12b format");
-else if (uptr->flags & UNIT_11FMT) printf ("16b format");
+if (uptr->flags & UNIT_8FMT)
+    printf ("12b format");
+else if (uptr->flags & UNIT_11FMT)
+    printf ("16b format");
 else printf ("18b/36b format");
 printf (", buffering file in memory\n");
 if (uptr->flags & UNIT_8FMT)                            /* 12b? */
@@ -790,11 +810,14 @@ else {                                                  /* 16b/18b */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         if (uptr->flags & UNIT_11FMT) {
             k = fxread (pdp11b, sizeof (uint16), D18_NBSIZE, uptr->fileref);
-            for (i = 0; i < k; i++) pdp18b[i] = pdp11b[i];
+            for (i = 0; i < k; i++)
+                pdp18b[i] = pdp11b[i];
             }
         else k = fxread (pdp18b, sizeof (uint32), D18_NBSIZE, uptr->fileref);
-        if (k == 0) break;
-        for ( ; k < D18_NBSIZE; k++) pdp18b[k] = 0;
+        if (k == 0)
+            break;
+        for ( ; k < D18_NBSIZE; k++)
+            pdp18b[k] = 0;
         for (k = 0; k < D18_NBSIZE; k = k + 2) {        /* loop thru blk */
             fbuf[ba] = (pdp18b[k] >> 6) & 07777;
             fbuf[ba + 1] = ((pdp18b[k] & 077) << 6) |
@@ -814,9 +837,12 @@ mtkpb = (DTU_BSIZE (uptr) * DT_WSIZE) / DT_LPERMC;      /* mtk codes per blk */
 k = td_set_mtk (MTK_INTER, u, 0);                       /* fill mark track */
 k = td_set_mtk (MTK_FWD_BLK, u, k);                     /* bit array */
 k = td_set_mtk (MTK_REV_GRD, u, k);
-for (i = 0; i < 4; i++) k = td_set_mtk (MTK_FWD_PRE, u, k);
-for (i = 0; i < (mtkpb - 4); i++) k = td_set_mtk (MTK_DATA, u, k);
-for (i = 0; i < 4; i++) k = td_set_mtk (MTK_REV_PRE, u, k);
+for (i = 0; i < 4; i++)
+    k = td_set_mtk (MTK_FWD_PRE, u, k);
+for (i = 0; i < (mtkpb - 4); i++)
+    k = td_set_mtk (MTK_DATA, u, k);
+for (i = 0; i < 4; i++)
+    k = td_set_mtk (MTK_REV_PRE, u, k);
 k = td_set_mtk (MTK_FWD_GRD, u, k);
 k = td_set_mtk (MTK_REV_BLK, u, k);
 k = td_set_mtk (MTK_INTER, u, k);
@@ -838,7 +864,8 @@ int32 i, k;
 int32 u = uptr - td_dev.units;
 uint32 ba;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_OK;
 fbuf = (uint16 *) uptr->filebuf;                        /* file buffer */
 if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
     printf ("%s%d: writing buffer to file\n", sim_dname (&td_dev), u);
@@ -856,7 +883,8 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
                 ba = ba + 3;
                 }                                       /* end loop blk */
             if (uptr->flags & UNIT_11FMT) {             /* 16b? */
-                for (i = 0; i < D18_NBSIZE; i++) pdp11b[i] = pdp18b[i];
+                for (i = 0; i < D18_NBSIZE; i++)
+                    pdp11b[i] = pdp18b[i];
                 fxwrite (pdp11b, sizeof (uint16),
                     D18_NBSIZE, uptr->fileref);
                 }

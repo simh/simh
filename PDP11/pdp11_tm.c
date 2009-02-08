@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -311,7 +311,8 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
     case 1:                                             /* MTC */
         uptr = tm_dev.units + GET_UNIT (tm_cmd);        /* select unit */
-        if ((tm_cmd & MTC_DONE) == 0) tm_sta = tm_sta | STA_ILL;
+        if ((tm_cmd & MTC_DONE) == 0)
+            tm_sta = tm_sta | STA_ILL;
         else {
             if (access == WRITEB) data = (PA & 1)?
                 (tm_cmd & 0377) | (data << 8):
@@ -326,25 +327,27 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
                 SET_INT (TM);                           /* set int request */
             tm_cmd = (tm_cmd & ~MTC_RW) | (data & MTC_RW);
             uptr = tm_dev.units + GET_UNIT (tm_cmd);    /* new unit */
-            if (data & MTC_GO) tm_go (uptr);            /* new function? */
+            if (data & MTC_GO)                          /* new function? */
+                tm_go (uptr);
             }
         tm_updcsta (uptr);                              /* update status */
         break;
 
     case 2:                                             /* MTBRC */
-        if (access == WRITEB) data = (PA & 1)?
-            (tm_bc & 0377) | (data << 8): (tm_bc & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)? (tm_bc & 0377) | (data << 8): (tm_bc & ~0377) | data;
         tm_bc = data;
         break;
 
     case 3:                                             /* MTCMA */
-        if (access == WRITEB) data = (PA & 1)?
-            (tm_ca & 0377) | (data << 8): (tm_ca & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)? (tm_ca & 0377) | (data << 8): (tm_ca & ~0377) | data;
         tm_ca = data;
         break;
 
     case 4:                                             /* MTD */
-        if ((access == WRITEB) && (PA & 1)) return SCPE_OK;
+        if ((access == WRITEB) && (PA & 1))
+            return SCPE_OK;
         tm_db = data & 0377;
         break;
         }                                               /* end switch */
@@ -363,10 +366,10 @@ if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not attached? */
      sim_is_active (uptr) ||                            /* busy? */
     (((f == MTC_WRITE) || (f == MTC_WREOF) || (f == MTC_WREXT)) &&
       sim_tape_wrp (uptr))) {                           /* write locked? */
-        tm_sta = tm_sta | STA_ILL;                      /* illegal */
-        tm_set_done ();                                 /* set done */
-        return;
-        }
+    tm_sta = tm_sta | STA_ILL;                          /* illegal */
+    tm_set_done ();                                     /* set done */
+    return;
+    }
 uptr->USTAT = uptr->USTAT & (STA_WLK | STA_ONL);        /* clear status */
 tm_sta = 0;                                             /* clear errors */
 if (f == MTC_UNLOAD) {                                  /* unload? */
@@ -403,8 +406,7 @@ cbc = 0200000 - tm_bc;                                  /* get bc */
 if (uptr->USTAT & STA_REW) {                            /* rewind? */
     sim_tape_rewind (uptr);                             /* update position */
     if (uptr->flags & UNIT_ATT)                         /* still on line? */
-        uptr->USTAT = STA_ONL | STA_BOT |
-            (sim_tape_wrp (uptr)? STA_WLK: 0);
+        uptr->USTAT = STA_ONL | STA_BOT | (sim_tape_wrp (uptr)? STA_WLK: 0);
     else uptr->USTAT = 0;
     if (u == GET_UNIT (tm_cmd)) {                       /* selected? */
         tm_set_done ();                                 /* set done */
@@ -421,19 +423,23 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* if not attached */
     return IORETURN (tm_stopioe, SCPE_UNATT);
     }
 
-if (DEBUG_PRS (tm_dev)) fprintf (sim_deb,
-    ">>TM: op=%o, ma=%o, bc=%o, pos=%d\n", f, xma, tm_bc, uptr->pos);
+if (DEBUG_PRS (tm_dev))
+    fprintf (sim_deb, ">>TM: op=%o, ma=%o, bc=%o, pos=%d\n",
+             f, xma, tm_bc, uptr->pos);
 switch (f) {                                            /* case on function */
 
     case MTC_READ:                                      /* read */
-        st = sim_tape_rdrecf (uptr, tmxb, &tbc, MT_MAXFR);      /* read rec */
-        if (st == MTSE_RECE) tm_sta = tm_sta | STA_PAR; /* rec in error? */
+        st = sim_tape_rdrecf (uptr, tmxb, &tbc, MT_MAXFR); /* read rec */
+        if (st == MTSE_RECE)                            /* rec in error? */
+            tm_sta = tm_sta | STA_PAR;
         else if (st != MTSE_OK) {                       /* other error? */
             r = tm_map_err (uptr, st);                  /* map error */
             break;
             }
-        if (tbc > cbc) tm_sta = tm_sta | STA_RLE;       /* wrong size? */
-        if (tbc < cbc) cbc = tbc;                       /* use smaller */
+        if (tbc > cbc)                                  /* wrong size? */
+            tm_sta = tm_sta | STA_RLE;
+        if (tbc < cbc)                                  /* use smaller */
+            cbc = tbc;
         if (t = Map_WriteB (xma, cbc, tmxb)) {          /* copy buf to mem */
             tm_sta = tm_sta | STA_NXM;                  /* NXM, set err */
             cbc = cbc - t;                              /* adj byte cnt */
@@ -447,7 +453,8 @@ switch (f) {                                            /* case on function */
         if (t = Map_ReadB (xma, cbc, tmxb)) {           /* copy mem to buf */
             tm_sta = tm_sta | STA_NXM;                  /* NXM, set err */
             cbc = cbc - t;                              /* adj byte cnt */
-            if (cbc == 0) break;                        /* no xfr? done */
+            if (cbc == 0)                               /* no xfr? done */
+                break;
             }
         if (st = sim_tape_wrrecf (uptr, tmxb, cbc))     /* write rec, err? */
             r = tm_map_err (uptr, st);                  /* map error */
@@ -487,9 +494,9 @@ tm_cmd = (tm_cmd & ~MTC_EMA) | ((xma >> (16 - MTC_V_EMA)) & MTC_EMA);
 tm_ca = xma & 0177777;                                  /* update mem addr */
 tm_set_done ();                                         /* set done */
 tm_updcsta (uptr);                                      /* update status */
-if (DEBUG_PRS (tm_dev)) fprintf (sim_deb,
-    ">>TM: sta=%o, ma=%o, bc=%o, pos=%d\n",
-    tm_sta, tm_ca, tm_bc, uptr->pos);
+if (DEBUG_PRS (tm_dev))
+    fprintf (sim_deb, ">>TM: sta=%o, ma=%o, bc=%o, pos=%d\n",
+             tm_sta, tm_ca, tm_bc, uptr->pos);
 return r;
 }
 
@@ -498,12 +505,16 @@ return r;
 int32 tm_updcsta (UNIT *uptr)
 {
 tm_sta = (tm_sta & ~(STA_DYN | STA_CLR)) | (uptr->USTAT & STA_DYN);
-if (sim_tape_eot (uptr)) tm_sta = tm_sta | STA_EOT;
-if (sim_is_active (uptr)) tm_sta = tm_sta & ~STA_TUR;
+if (sim_tape_eot (uptr))
+    tm_sta = tm_sta | STA_EOT;
+if (sim_is_active (uptr))
+    tm_sta = tm_sta & ~STA_TUR;
 else tm_sta = tm_sta | STA_TUR;
-if (tm_sta & STA_EFLGS) tm_cmd = tm_cmd | MTC_ERR;
+if (tm_sta & STA_EFLGS)
+    tm_cmd = tm_cmd | MTC_ERR;
 else tm_cmd = tm_cmd & ~MTC_ERR;
-if ((tm_cmd & MTC_IE) == 0) CLR_INT (TM);
+if ((tm_cmd & MTC_IE) == 0)
+    CLR_INT (TM);
 return tm_sta;
 }
 
@@ -512,7 +523,8 @@ return tm_sta;
 void tm_set_done (void)
 {
 tm_cmd = tm_cmd | MTC_DONE;
-if (tm_cmd & MTC_IE) SET_INT (TM);
+if (tm_cmd & MTC_IE)
+    SET_INT (TM);
 return;
 }
 
@@ -534,7 +546,8 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         tm_sta = tm_sta | STA_PAR;                      /* parity error */
-        if (tm_stopioe) return SCPE_IOERR;
+        if (tm_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
@@ -575,13 +588,15 @@ for (u = 0; u < TM_NUMDR; u++) {                        /* loop thru units */
     uptr = tm_dev.units + u;
     sim_tape_reset (uptr);                              /* reset tape */
     sim_cancel (uptr);                                  /* cancel activity */
-    if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_ONL |
-        (sim_tape_bot (uptr)? STA_BOT: 0) |
-        (sim_tape_wrp (uptr)? STA_WLK: 0);
+    if (uptr->flags & UNIT_ATT)
+        uptr->USTAT = STA_ONL | (sim_tape_bot (uptr)? STA_BOT: 0) |
+                                (sim_tape_wrp (uptr)? STA_WLK: 0);
     else uptr->USTAT = 0;
     }
-if (tmxb == NULL) tmxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
-if (tmxb == NULL) return SCPE_MEM;
+if (tmxb == NULL)
+    tmxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
+if (tmxb == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -593,9 +608,11 @@ t_stat r;
 int32 u = uptr - tm_dev.units;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->USTAT = STA_ONL | STA_BOT | (sim_tape_wrp (uptr)? STA_WLK: 0);
-if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
+if (u == GET_UNIT (tm_cmd))
+    tm_updcsta (uptr);
 return r;
 }
 
@@ -605,9 +622,12 @@ t_stat tm_detach (UNIT* uptr)
 {
 int32 u = uptr - tm_dev.units;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
-if (!sim_is_active (uptr)) uptr->USTAT = 0;
-if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_OK;
+if (!sim_is_active (uptr))
+    uptr->USTAT = 0;
+if (u == GET_UNIT (tm_cmd))
+    tm_updcsta (uptr);
 return sim_tape_detach (uptr);
 }
 
@@ -621,7 +641,8 @@ if ((uptr->flags & UNIT_ATT) &&
     (val || sim_tape_wrp (uptr)))
 	uptr->USTAT = uptr->USTAT | STA_WLK;
 else uptr->USTAT = uptr->USTAT & ~STA_WLK;
-if (u == GET_UNIT (tm_cmd)) tm_updcsta (uptr);
+if (u == GET_UNIT (tm_cmd))
+    tm_updcsta (uptr);
 return SCPE_OK;
 }
 

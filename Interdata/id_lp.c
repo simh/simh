@@ -163,7 +163,8 @@ int32 t;
 t_stat r = SCPE_OK;
 
 lpt_sta = 0;                                            /* clear busy */
-if (lpt_arm) SET_INT (v_LPT);                           /* armed? intr */
+if (lpt_arm)                                            /* armed? intr */
+    SET_INT (v_LPT);
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 t = uptr->buf;                                          /* get character */
@@ -171,9 +172,12 @@ if (lpt_spnd || ((t >= LF) && (t < CR))) {              /* spc pend or spc op? *
     lpt_spnd = 0;
     if (lpt_bufout (uptr) != SCPE_OK)                   /* print */
         return SCPE_IOERR;
-    if ((t == 1) || (t == LF)) lpt_spc (uptr, 1);       /* single space */
-    else if (t == VT) r = lpt_vfu (uptr, VT_VFU - 1);   /* VT->VFU */
-    else if (t == 0xC) r = lpt_vfu (uptr, FF_VFU - 1);  /* FF->VFU */
+    if ((t == 1) || (t == LF))                          /* single space */
+        lpt_spc (uptr, 1);
+    else if (t == VT)                                   /* VT->VFU */
+        r = lpt_vfu (uptr, VT_VFU - 1);
+    else if (t == 0xC)                                  /* FF->VFU */
+        r = lpt_vfu (uptr, FF_VFU - 1);
     else if ((t >= SPC_BASE) && (t < VFU_BASE))
         lpt_spc (uptr, t - SPC_BASE);                   /* space */
     else if ((t >= VFU_BASE) && (t < VFU_BASE + VFU_WIDTH))
@@ -193,7 +197,8 @@ else if (t == CR) {                                     /* CR? */
 else if (t >= 0x20) {                                   /* printable? */
     if ((uptr->flags & UNIT_UC) && islower (t))         /* UC only? */
         t = toupper (t);
-    if (lpt_bptr < LPT_WIDTH) lpxb[lpt_bptr++] = t;
+    if (lpt_bptr < LPT_WIDTH)
+        lpxb[lpt_bptr++] = t;
     }
 return r;
 }
@@ -218,7 +223,8 @@ if (lpxb[0]) {                                          /* any char left? */
         }
     }   
 lpt_bptr = 0;                                           /* reset buffer */
-for (i = 0; i < LPT_WIDTH; i++) lpxb[i] = ' ';
+for (i = 0; i < LPT_WIDTH; i++)
+    lpxb[i] = ' ';
 lpxb[LPT_WIDTH] = 0;
 return r;
 }
@@ -235,7 +241,8 @@ if ((ch == (FF_VFU - 1)) && VFUP (ch, lpt_vfut[0])) {   /* top of form? */
 for (i = 1; i < lpt_vful + 1; i++) {                    /* sweep thru cct */
     lpt_vfup = (lpt_vfup + 1) % lpt_vful;               /* adv pointer */
     if (VFUP (ch, lpt_vfut[lpt_vfup])) {                /* chan punched? */
-        for (j = 0; j < i; j++) fputc ('\n', uptr->fileref);
+        for (j = 0; j < i; j++)
+            fputc ('\n', uptr->fileref);
         return SCPE_OK;
         }
     }
@@ -246,9 +253,11 @@ t_stat lpt_spc (UNIT *uptr, int32 cnt)
 {
 int32 i;
 
-if (cnt == 0) fputc ('\r', uptr->fileref);
+if (cnt == 0)
+     fputc ('\r', uptr->fileref);
 else {
-    for (i = 0; i < cnt; i++) fputc ('\n', uptr->fileref);
+    for (i = 0; i < cnt; i++)
+        fputc ('\n', uptr->fileref);
     lpt_vfup = (lpt_vfup + cnt) % lpt_vful;
     }
 return SCPE_OK;
@@ -263,7 +272,8 @@ int32 i;
 sim_cancel (&lpt_unit);                                 /* deactivate */
 lpt_sta = 0;                                            /* clr busy */
 lpt_bptr = 0;                                           /* clr buf ptr */
-for (i = 0; i < LPT_WIDTH; i++) lpxb[i] = ' ';          /* clr buf */
+for (i = 0; i < LPT_WIDTH; i++)                         /* clr buf */
+    lpxb[i] = ' ';
 lpxb[LPT_WIDTH] = 0;
 CLR_INT (v_LPT);                                        /* clearr int */
 CLR_ENB (v_LPT);                                        /* disable int */
@@ -288,30 +298,36 @@ uint32 rpt;
 t_stat r;
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
-if (*cptr != 0) return SCPE_ARG;
+if (*cptr != 0)
+    return SCPE_ARG;
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
     mask = 0;
     if (*cptr == '(') {                                 /* repeat count? */
         cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */
         rpt = get_uint (gbuf, 10, VFU_LNT, &r);         /* repeat count */
-        if (r != SCPE_OK) return SCPE_FMT;
+        if (r != SCPE_OK)
+            return SCPE_FMT;
         }
     else rpt = 1;
     while (*cptr != 0) {                                /* get col no's */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
         col = get_uint (gbuf, 10, 7, &r);               /* column number */
-        if (r != SCPE_OK) return SCPE_FMT;
+        if (r != SCPE_OK)
+            return SCPE_FMT;
         mask = mask | (1 << col);                       /* set bit */
         }
     for ( ; rpt > 0; rpt--) {                           /* store vals */
-        if (ptr >= VFU_LNT) return SCPE_FMT;
+        if (ptr >= VFU_LNT)
+            return SCPE_FMT;
         vfubuf[ptr++] = mask;
         }
     }
-if (ptr == 0) return SCPE_FMT;
+if (ptr == 0)
+    return SCPE_FMT;
 lpt_vful = ptr;
 lpt_vfup = 0;
-for (rpt = 0; rpt < lpt_vful; rpt++) lpt_vfut[rpt] = vfubuf[rpt];
+for (rpt = 0; rpt < lpt_vful; rpt++)
+    lpt_vfut[rpt] = vfubuf[rpt];
 return SCPE_OK;
 }

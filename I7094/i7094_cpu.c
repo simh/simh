@@ -617,7 +617,8 @@ t_bool tracing;
 /* Restore register state */
 
 ch_set_map ();                                          /* set dispatch map */
-if (!(cpu_model & (I_94|I_CT))) mode_multi = 1;         /* ~7094? MTM always on */
+if (!(cpu_model & (I_94|I_CT)))                         /* ~7094? MTM always on */
+    mode_multi = 1;
 eamask = mode_storn? A704_MASK: AMASK;                  /* set eff addr mask */
 inst_base = inst_base & ~AMASK;                         /* A/B sel is 1b */
 data_base = data_base & ~AMASK;
@@ -649,16 +650,19 @@ while (reason == SCPE_OK) {                             /* loop until error */
         }
 
     if (sim_interval <= 0) {                            /* intv cnt expired? */
-        if (reason = sim_process_event ()) break;       /* process events */
+        if (reason = sim_process_event ())              /* process events */
+            break;
         chtr_pend = chtr_eval (NULL);                   /* eval chan traps */
         }
 
     for (i = 0; ch_req && (i < NUM_CHAN); i++) {        /* loop thru channels */
         if (ch_req & REQ_CH (i)) {                      /* channel request? */
-            if (reason = ch_proc (i)) break;
+            if (reason = ch_proc (i))
+                break;
             }
         chtr_pend = chtr_eval (NULL);
-        if (reason) break;                              /* error? */
+        if (reason)                                     /* error? */
+            break;
         }
 
     if (chtr_pend) {                                    /* channel trap? */
@@ -681,7 +685,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             }
         oldPC = PC;                                     /* save current PC */
         PC = (PC + 1) & eamask;                         /* increment PC */
-        if (!ReadI (oldPC, &IR)) continue;              /* get inst; trap? */
+        if (!ReadI (oldPC, &IR))                        /* get inst; trap? */
+            continue;
         }
 
     sim_interval = sim_interval - 1;
@@ -718,20 +723,24 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;      
 
         case 02:                                        /* TIX */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (xr > dec) {                             /* if xr > decr */
                 put_xr (tag, xr - dec);                 /* xr -= decr */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = addr;                         /* branch */
                 }
             break;      
 
         case 03:                                        /* TXH */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (xr > dec) {                             /* if xr > decr */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = addr;                         /* branch */
                 }
             break;
@@ -743,20 +752,25 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 06:                                        /* TNX */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
-            if (xr > dec) put_xr (tag, xr - dec);       /* if xr > decr */
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
+            if (xr > dec)                               /* if xr > decr */
+                put_xr (tag, xr - dec);
             else {                                      /* xr -= decr */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = addr;                         /* branch */
                 }
             break;      
 
         case 07:                                        /* TXL */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (xr <= dec) {                            /* if xr <= decr */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = addr;                         /* branch */
                 }
             break;
@@ -769,25 +783,31 @@ while (reason == SCPE_OK) {                             /* loop until error */
         op = GET_OPC (IR);                              /* get opcode */
         fl = op_flags[op];                              /* get flags */
         if (fl & I_MODEL & ~cpu_model) {                /* invalid for model? */
-            if (stop_illop) reason = STOP_ILLEG;        /* possible stop */
+            if (stop_illop)                             /* possible stop */
+                reason = STOP_ILLEG;
             continue;
             }
         if (tag && (fl & I_X))                          /* tag and indexable? */
             ea = (addr - get_xri (tag)) & eamask;       /* do indexing */
         else ea = addr;
         if (TST_IND (IR) && (fl & I_N)) {               /* indirect? */
-            if (!ReadI (ea, &SR)) continue;             /* get ind; trap? */
+            if (!ReadI (ea, &SR))                       /* get ind; trap? */
+                continue;
             addr = (uint32) SR & eamask;                /* get address */
             tagi = GET_TAG (SR);                        /* get tag */
             if (tagi)                                   /* tag? */
                 ea = (addr - get_xri (tagi)) & eamask;  /* do indexing */
             else ea = addr;
             }
-        if ((fl & I_R) && !Read (ea, &SR)) continue;    /* read opnd; trap? */
+        if ((fl & I_R) && !Read (ea, &SR))              /* read opnd; trap? */
+            continue;
         else if (fl & I_D) {                            /* double prec? */
-            if ((ea & 1) && fp_trap (TRAP_F_ODD)) continue;
-            if (!Read (ea, &SR)) continue;              /* SR gets high */
-            if (!Read (ea | 1, &sr1)) continue;         /* "sr1" gets low */
+            if ((ea & 1) && fp_trap (TRAP_F_ODD))
+                continue;
+            if (!Read (ea, &SR))                        /* SR gets high */
+                continue;
+            if (!Read (ea | 1, &sr1))                   /* "sr1" gets low */
+                continue;
             }
         if (tracing) {                                  /* tracing or history? */
             if (hst_lnt)                                /* history enabled? */
@@ -802,7 +822,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00000:                                     /* HTR */
         case 01000:                                     /* also -HTR */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ht_pend = 1;                                /* transfer pending */
             ht_addr = ea;                               /* save address */
             reason = STOP_HALT;                         /* halt if I/O done */
@@ -824,7 +845,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00040:                                     /* TLQ */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             s1 = (AC & AC_S)? 1: 0;                     /* get AC, MQ sign, */
             s2 = (MQ & SIGN)? 1: 0;                     /* magnitude */
             t1 = AC & AC_MMASK;
@@ -832,7 +854,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             if ((s1 != s2)? s2:                         /* y, br if MQ- */
                 ((t1 != t2) && (s2 ^ (t1 > t2)))) {     /* n, br if sgn-^AC>MQ */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
@@ -842,10 +865,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00042:                                     /* TIO */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((SI & AC) == (AC & DMASK)) {            /* if ind on */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
@@ -859,10 +884,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00046:                                     /* TIF */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((SI & AC) == 0) {                       /* if ind off */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
@@ -873,7 +900,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00054:                                     /* RFT */
             t = IR & RMASK;
-            if ((SI & t) == 0) PC = (PC + 1) & eamask;  /* if ind off, skip */
+            if ((SI & t) == 0)                          /* if ind off, skip */
+                PC = (PC + 1) & eamask;
             break;
 
         case 00055:                                     /* SIR */
@@ -882,7 +910,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00056:                                     /* RNT */
             t = IR & RMASK;
-            if ((SI & t) == t) PC = (PC + 1) & eamask;  /* if ind on, skip */
+            if ((SI & t) == t)                          /* if ind on, skip */
+                PC = (PC + 1) & eamask;
             break;
 
         case 00057:                                     /* RIR */
@@ -890,24 +919,30 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00074:                                     /* TSX */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
-            if (tag) put_xr (tag, ~oldPC + 1);          /* save -inst loc */
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
+            if (tag)                                    /* save -inst loc */
+                put_xr (tag, ~oldPC + 1);
             PCQ_ENTRY;
-            if (mode_ttrap) TrapXfr (TRAP_TRA_PC);      /* trap? */
+            if (mode_ttrap)                             /* trap? */
+                TrapXfr (TRAP_TRA_PC);
             else PC = ea;                               /* branch */
             break;
 
         case 00100:                                     /* TZE */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((AC & AC_MMASK) == 0) {                 /* if AC Q,P,1-35 = 0 */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
 
         case 00101:                                     /* (CTSS) TIA */
-            if (prot_trap (0)) break;                   /* not user mode? */
+            if (prot_trap (0))                          /* not user mode? */
+                break;
             PCQ_ENTRY;
             PC = ea;
             inst_base = 0;
@@ -918,7 +953,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             SR = ea;
             while (sc) {
                 ea = (uint32) ((AC & 077) + SR) & eamask;
-                if (!Read (ea, &SR)) break;
+                if (!Read (ea, &SR))
+                    break;
                 AC = (AC & AC_S) | ((AC >> 6) & 0017777777777) |
                     (SR & 0770000000000);
                 sc--;
@@ -928,10 +964,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00120:                                     /* TPL */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((AC & AC_S) == 0) {                     /* if AC + */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
@@ -943,10 +981,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00140:                                     /* TOV */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (ind_ovf)  {                             /* if overflow */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 ind_ovf = 0;                            /* clear overflow */
                 }
@@ -954,10 +994,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00161:                                     /* TQO */
             if (!mode_ftrap) {                          /* only in 704 mode */
-                if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+                if (mode_ttrap)
+                    WriteTA (TRAP_STD_SAV, oldPC);
                 if (ind_mqo)  {                         /* if MQ overflow */
                     PCQ_ENTRY;
-                    if (mode_ttrap) TrapXfr (TRAP_TRA_PC);      /* trap? */
+                    if (mode_ttrap)                     /* trap? */
+                        TrapXfr (TRAP_TRA_PC);
                     else PC = ea;                       /* branch */
                     ind_mqo = 0;                        /* clear overflow */
                     }
@@ -965,10 +1007,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00162:                                     /* TQP */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((MQ & SIGN) == 0)  {                    /* if MQ + */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
@@ -986,12 +1030,14 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 00220:                                     /* DVH */
             if (op_div (SR, 043)) {
                 ind_dvc = 1;
-                if (!prot_trap (0)) reason = STOP_DIVCHK;
+                if (!prot_trap (0))
+                    reason = STOP_DIVCHK;
                 }
             break;
 
         case 00221:                                     /* DVP */
-            if (op_div (SR, 043)) ind_dvc = 1;
+            if (op_div (SR, 043))
+                ind_dvc = 1;
             break;
 
         case 00224:                                     /* VDH */
@@ -999,79 +1045,95 @@ while (reason == SCPE_OK) {                             /* loop until error */
             sc = GET_VCNT (IR);
             if (op_div (SR, sc)) {
                 ind_dvc = 1;
-                if (!prot_trap (0)) reason = STOP_DIVCHK;
+                if (!prot_trap (0))
+                    reason = STOP_DIVCHK;
                 }
             break;
 
         case 00225:                                     /* VDP */
         case 00227:                                     /* for diagnostic */
             sc = GET_VCNT (IR);
-            if (op_div (SR, sc)) ind_dvc = 1;
+            if (op_div (SR, sc))
+                ind_dvc = 1;
             break;
 
         case 00240:                                     /* FDH */
             spill = op_fdv (SR);
             if (spill == TRAP_F_DVC) {
                 ind_dvc = 1;
-                if (!prot_trap (0)) reason = STOP_DIVCHK;
+                if (!prot_trap (0))
+                    reason = STOP_DIVCHK;
                 }
-            else if (spill) fp_trap (spill);
+            else if (spill)
+                fp_trap (spill);
             break;
 
         case 00241:                                     /* FDP */
             spill = op_fdv (SR);
-            if (spill == TRAP_F_DVC) ind_dvc = 1;
-            else if (spill) fp_trap (spill);
+            if (spill == TRAP_F_DVC)
+                ind_dvc = 1;
+            else if (spill)
+                fp_trap (spill);
             break;
 
         case 00260:                                     /* FMP */
             spill = op_fmp (SR, 1);                     /* MQ * SR */
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00261:                                     /* DFMP */
             spill = op_dfmp (SR, sr1, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00300:                                     /* FAD */
             spill = op_fad (SR, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00301:                                     /* DFAD */
             spill = op_dfad (SR, sr1, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00302:                                     /* FSB */
             spill = op_fad (SR ^ SIGN, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00303:                                     /* DFSB */
             spill = op_dfad (SR ^ SIGN, sr1, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00304:                                     /* FAM */
             spill = op_fad (SR & ~SIGN, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00305:                                     /* DFAM */
             spill = op_dfad (SR & ~SIGN, sr1, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00306:                                     /* FSM */
             spill = op_fad (SR | SIGN, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00307:                                     /* DFSM */
             spill = op_dfad (SR | SIGN, sr1, 1);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 00320:                                     /* ANS */
@@ -1089,16 +1151,19 @@ while (reason == SCPE_OK) {                             /* loop until error */
             t1 = AC & AC_MMASK;                         /* magnitudes */
             t2 = SR & MMASK;
             if (s1 ^ s2) {                              /* diff signs? */
-                if (s1) PC = (PC + 2) & eamask;         /* AC < mem? skip 2 */
+                if (s1)                                 /* AC < mem? skip 2 */
+                    PC = (PC + 2) & eamask;
                 }
-            else if (t1 == t2) PC = (PC + 1) & eamask;  /* equal? skip 1 */
+            else if (t1 == t2)                          /* equal? skip 1 */
+                PC = (PC + 1) & eamask;
             else if ((t1 < t2) ^ s1)                    /* AC < mem, AC +, or */
                 PC = (PC + 2) & eamask;                 /* AC > mem, AC -? */
             break;
 
         case 00361:                                     /* ACL */
             t = (AC + SR) & DMASK;                      /* AC P,1-35 + SR */
-            if (t < SR) t = (t + 1) & DMASK;            /* end around carry */
+            if (t < SR)                                 /* end around carry */
+                t = (t + 1) & DMASK;
             AC = (AC & (AC_S | AC_Q)) | t;              /* preserve AC S,Q */
             break;
 
@@ -1115,7 +1180,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00420:                                     /* HPR */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             reason = STOP_HALT;                         /* halt if I/O done */
             break;
 
@@ -1133,13 +1199,16 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00443:                                     /* DLD */
             AC = (SR & MMASK) | ((SR & SIGN)? AC_S: 0); /* normal load */
-            if (!Read (ea | 1, &SR)) break;             /* second load */
+            if (!Read (ea | 1, &SR))                    /* second load */
+                break;
             MQ = SR;
-            if (ea & 1) fp_trap (TRAP_F_ODD);           /* trap after exec */
+            if (ea & 1)                                 /* trap after exec */
+                fp_trap (TRAP_F_ODD);
             break;
 
         case 00444:                                     /* OFT */
-            if ((SI & SR) == 0) PC = (PC + 1) & eamask; /* skip if ind off */
+            if ((SI & SR) == 0)                         /* skip if ind off */
+                PC = (PC + 1) & eamask;
             break;
 
         case 00445:                                     /* RIS */
@@ -1147,7 +1216,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00446:                                     /* ONT */
-            if ((SI & SR) == SR) PC = (PC + 1) & eamask;/* skip if ind on */
+            if ((SI & SR) == SR)                        /* skip if ind on */
+                PC = (PC + 1) & eamask;
             break;
 
         case 00460:                                     /* LDA (704) */
@@ -1163,7 +1233,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00520:                                     /* ZET */
-            if ((SR & MMASK) == 0) PC = (PC + 1) & eamask; /* skip if M 1-35 = 0 */
+            if ((SR & MMASK) == 0)                      /* skip if M 1-35 = 0 */
+                PC = (PC + 1) & eamask;
             break;
 
         case 00522:                                     /* XEC */
@@ -1177,11 +1248,13 @@ while (reason == SCPE_OK) {                             /* loop until error */
             goto XEC;                                   /* start over */
 
         case 00534:                                     /* LXA */
-            if (tag) put_xr (tag, (uint32) SR);         /* M addr -> xr */
+            if (tag)                                    /* M addr -> xr */
+                put_xr (tag, (uint32) SR);
             break;
 
         case 00535:                                     /* LAC */
-            if (tag) put_xr (tag, NEG ((uint32) SR));   /* -M addr -> xr */
+            if (tag)                                    /* -M addr -> xr */
+                put_xr (tag, NEG ((uint32) SR));
             break;
 
         case 00560:                                     /* LDQ */
@@ -1189,12 +1262,14 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00562:                                     /* (CTSS) LRI */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ind_reloc = ((uint32) SR) & VA_BLK;
             break;
 
         case 00564:                                     /* ENB */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             chtr_enab = (uint32) SR;                    /* set enables */
             chtr_inht = 0;                              /* clear inhibit */
             chtr_inhi = 1;                              /* 1 cycle delay */
@@ -1255,11 +1330,13 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00734:                                     /* PAX */
-            if (tag) put_xr (tag, (uint32) AC);         /* AC addr -> xr */
+            if (tag)                                    /* AC addr -> xr */
+                put_xr (tag, (uint32) AC);
             break;
 
         case 00737:                                     /* PAC */
-            if (tag) put_xr (tag, NEG ((uint32) AC));   /* -AC addr -> xr */
+            if (tag)                                    /* -AC addr -> xr */
+                put_xr (tag, NEG ((uint32) AC));
             break;
 
         case 00754:                                     /* PXA */
@@ -1271,7 +1348,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00760:                                     /* PSE */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             reason = op_pse (ea);
             break;
 
@@ -1295,7 +1373,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00774:                                     /* AXT */
-            if (tag) put_xr (tag, addr);                /* IR addr -> xr */
+            if (tag)                                    /* IR addr -> xr */
+                put_xr (tag, addr);
             break;
 
 /* Negative instructions */
@@ -1320,7 +1399,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01054:                                     /* LFT */
             t = (IR & RMASK) << 18;
-            if ((SI & t) == 0) PC = (PC + 1) & eamask;  /* if ind off, skip */
+            if ((SI & t) == 0)                          /* if ind off, skip */
+                PC = (PC + 1) & eamask;
             break;
 
         case 01055:                                     /* SIL */
@@ -1329,7 +1409,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01056:                                     /* LNT */
             t = (IR & RMASK) << 18;
-            if ((SI & t) == t) PC = (PC + 1) & eamask;  /* if ind on, skip */
+            if ((SI & t) == t)                          /* if ind on, skip */
+                PC = (PC + 1) & eamask;
             break;
 
         case 01057:                                     /* RIL */
@@ -1337,16 +1418,19 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01100:                                     /* TNZ */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((AC & AC_MMASK) != 0) {                 /* if AC != 0 */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
 
         case 01101:                                     /* (CTSS) TIB */
-            if (prot_trap (0)) break;                   /* not user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             PCQ_ENTRY;
             PC = ea;
             mode_user = 1;
@@ -1358,7 +1442,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             SR = ea;
             while (sc) {
                 ea = (uint32) ((MQ >> 30) + SR) & eamask;
-                if (!Read (ea, &SR)) break;
+                if (!Read (ea, &SR))
+                    break;
                 MQ = ((MQ << 6) & DMASK) | (MQ >> 30);
                 AC = (AC & AC_S) | ((AC + SR) & AC_MMASK);
                 sc--;
@@ -1368,10 +1453,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01120:                                     /* TMI */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if ((AC & AC_S) != 0)  {                    /* if AC - */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
@@ -1383,10 +1470,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01140:                                     /* TNO */
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (!ind_ovf)  {                            /* if no overflow */
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             ind_ovf = 0;                                /* clear overflow */
@@ -1397,7 +1486,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             SR = ea;
             while (sc) {
                 ea = (uint32) ((MQ >> 30) + SR) & eamask;
-                if (!Read (ea, &SR)) break;
+                if (!Read (ea, &SR))
+                    break;
                 MQ = ((MQ << 6) & DMASK) | (SR >> 30);
                 sc--;
                 }
@@ -1407,72 +1497,87 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01200:                                     /* MPR */
             op_mpy (0, SR, 043);
-            if (MQ & B1) AC = (AC & AC_S) | ((AC + 1) & AC_MMASK);
+            if (MQ & B1)
+                AC = (AC & AC_S) | ((AC + 1) & AC_MMASK);
             break;
 
         case 01240:                                     /* DFDH */
             spill = op_dfdv (SR, sr1);
             if (spill == TRAP_F_DVC) {
                 ind_dvc = 1;
-                if (!prot_trap (0)) reason = STOP_DIVCHK;
+                if (!prot_trap (0))
+                    reason = STOP_DIVCHK;
                 }
-            else if (spill) fp_trap (spill);
+            else if (spill)
+                fp_trap (spill);
             break;
 
         case 01241:                                     /* DFDP */
             spill = op_dfdv (SR, sr1);
-            if (spill == TRAP_F_DVC) ind_dvc = 1;
-            else if (spill) fp_trap (spill);
+            if (spill == TRAP_F_DVC)
+                ind_dvc = 1;
+            else if (spill)
+                fp_trap (spill);
             break;
 
         case 01260:                                     /* UFM */
             spill = op_fmp (SR, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01261:                                     /* DUFM */
             spill = op_dfmp (SR, sr1, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01300:                                     /* UFA */
             spill = op_fad (SR, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01301:                                     /* DUFA */
             spill = op_dfad (SR, sr1, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01302:                                     /* UFS */
             spill = op_fad (SR ^ SIGN, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01303:                                     /* DUFS */
             spill = op_dfad (SR ^ SIGN, sr1, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01304:                                     /* UAM */
             spill = op_fad (SR & ~SIGN, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01305:                                     /* DUAM */
             spill = op_dfad (SR & ~SIGN, sr1, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01306:                                     /* USM */
             spill = op_fad (SR | SIGN, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01307:                                     /* DUSM */
             spill = op_dfad (SR | SIGN, sr1, 0);
-            if (spill) fp_trap (spill);
+            if (spill)
+                fp_trap (spill);
             break;
 
         case 01320:                                     /* ANA */
@@ -1481,8 +1586,10 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01340:                                     /* LAS */
             t = AC & AC_MMASK;                          /* AC Q,P,1-35 */
-            if (t < SR) PC = (PC + 2) & eamask;
-            else if (t == SR) PC = (PC + 1) & eamask;
+            if (t < SR)
+                PC = (PC + 2) & eamask;
+            else if (t == SR)
+                PC = (PC + 1) & eamask;
             break;
 
         case 01400:                                     /* SBM */
@@ -1498,19 +1605,23 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01520:                                     /* NZT */
-            if ((SR & MMASK) != 0) PC = (PC + 1) & eamask;      ;
+            if ((SR & MMASK) != 0)
+                PC = (PC + 1) & eamask;
             break;
 
         case 01534:                                     /* LXD */
-            if (tag) put_xr (tag, GET_DEC (SR));        /* M decr -> xr */
+            if (tag)                                    /* M decr -> xr */
+                put_xr (tag, GET_DEC (SR));
             break;
 
         case 01535:                                     /* LDC */
-            if (tag) put_xr (tag, NEG (GET_DEC (SR)));  /* -M decr -> xr */
+            if (tag)                                    /* -M decr -> xr */
+                put_xr (tag, NEG (GET_DEC (SR)));
             break;
 
         case 01564:                                     /* (CTSS) LPI */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ind_start = ((uint32) SR) & VA_BLK;
             ind_limit = (GET_DEC (SR) & VA_BLK) | VA_OFF;
             break;
@@ -1526,7 +1637,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01603:                                     /* DST */
             SR = (AC & MMASK) | ((AC & AC_S)? SIGN: 0);
-            if (!Write (ea, SR)) break;
+            if (!Write (ea, SR))
+                break;
             Write ((ea + 1) & eamask, MQ);
             break;
 
@@ -1557,11 +1669,13 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01734:                                     /* PDX */
-            if (tag) put_xr (tag, GET_DEC (AC));        /* AC decr -> xr */
+            if (tag)                                    /* AC decr -> xr */
+                put_xr (tag, GET_DEC (AC));
             break;
 
         case 01737:                                     /* PDC */
-            if (tag) put_xr (tag, NEG (GET_DEC (AC)));  /* -AC decr -> xr */
+            if (tag)                                    /* -AC decr -> xr */
+                put_xr (tag, NEG (GET_DEC (AC)));
             break;
 
         case 01754:                                     /* PXD */
@@ -1573,12 +1687,14 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;                                      /* -xr -> AC decr */
 
         case 01760:                                     /* MSE */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             reason = op_mse (ea);
             break;
 
         case 01761:                                     /* (CTSS) ext core */
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             if (ea == 041)                              /* SEA? */
                 data_base = 0;
             else if (ea == 042)                         /* SEB? */
@@ -1605,24 +1721,29 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01773:                                     /* RQL */
             sc = (ea & SCMASK) % 36;
-            if (sc) MQ = ((MQ << sc) | (MQ >> (36 - sc))) & DMASK;
+            if (sc)
+                MQ = ((MQ << sc) | (MQ >> (36 - sc))) & DMASK;
             break;
 
         case 01774:                                     /* AXC */
-            if (tag) put_xr (tag, NEG (addr));          /* -IR addr -> xr */
+            if (tag)                                    /* -IR addr -> xr */
+                put_xr (tag, NEG (addr));
             break;
 
 /* IO instructions */
 
         case 00022: case 00024: case 00026:             /* TRCx */
         case 01022: case 01024: case 01026:     
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = ((op & 077) - 00022) | ((op >> 9) & 01);
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (!BIT_TST (chtr_enab, CHTR_V_TRC + ch) &&
                 (ch_flags[ch] & CHF_TRC)) {
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 ch_flags[ch] = ch_flags[ch] & ~CHF_TRC;
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
@@ -1630,13 +1751,16 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00027: case 01027:
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = 6 + ((op >> 9) & 01);
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (!BIT_TST (chtr_enab, CHTR_V_TRC + ch) &&
                 (ch_flags[ch] & CHF_TRC)) {
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 ch_flags[ch] = ch_flags[ch] & ~CHF_TRC;
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
@@ -1645,13 +1769,16 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00030: case 00031: case 00032: case 00033: /* TEFx */
         case 01030: case 01031: case 01032: case 01033:
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = ((op & 03) << 1) | ((op >> 9) & 01);
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (!BIT_TST (chtr_enab, CHTR_V_CME + ch) &&
                 (ch_flags[ch] & CHF_EOF)) {
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 ch_flags[ch] = ch_flags[ch] & ~CHF_EOF;
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
@@ -1660,31 +1787,38 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00060: case 00061: case 00062: case 00063: /* TCOx */
         case 00064: case 00065: case 00066: case 00067:
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = op & 07;
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (ch_sta[ch] != CHXS_IDLE) {
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;      
 
         case 01060: case 01061: case 01062: case 01063: /* TCNx */
         case 01064: case 01065: case 01066: case 01067:
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = op & 07;
-            if (mode_ttrap) WriteTA (TRAP_STD_SAV, oldPC);
+            if (mode_ttrap)
+                WriteTA (TRAP_STD_SAV, oldPC);
             if (ch_sta[ch] == CHXS_IDLE) {
                 PCQ_ENTRY;
-                if (mode_ttrap) TrapXfr (TRAP_TRA_PC);  /* trap? */
+                if (mode_ttrap)                         /* trap? */
+                    TrapXfr (TRAP_TRA_PC);
                 else PC = ea;                           /* branch */
                 }
             break;
 
         case 00540: case 00541: case 00542: case 00543: /* RCHx */
         case 01540: case 01541: case 01542: case 01543:
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = ((op & 03) << 1) | ((op >> 9) & 01);
             reason = ch_op_start (ch, ea, TRUE);
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
@@ -1692,7 +1826,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00544: case 00545: case 00546: case 00547: /* LCHx */
         case 01544: case 01545: case 01546: case 01547:
-            if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             ch = ((op & 03) << 1) | ((op >> 9) & 01);
             reason = ch_op_start (ch, ea, FALSE);
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
@@ -1700,9 +1835,10 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00640: case 00641: case 00642: case 00643: /* SCHx */
         case 01640: case 01641: case 01642: case 01643:
-             if (prot_trap (0)) break;                   /* user mode? */
+            if (prot_trap (0))                          /* user mode? */
+                break;
              ch = ((op & 03) << 1) | ((op >> 9) & 01);
-            if ((reason = ch_op_store (ch, &SR)) == SCPE_OK)
+             if ((reason = ch_op_store (ch, &SR)) == SCPE_OK)
                 Write (ea, SR);
             break;
 
@@ -1714,63 +1850,72 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00762:                                     /* RDS */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_ds (ch, CHSL_RDS, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 00764:                                     /* BSR */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_BSR, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 00766:                                     /* WRS */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_ds (ch, CHSL_WRS, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 00770:                                     /* WEF */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_WEF, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 00772:                                     /* REW */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_REW, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 01764:                                     /* BSF */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_BSF, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 01772:                                     /* RUN */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_RUN, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         case 00776:                                     /* SDN */
-            if (prot_trap (0) || sel_trap (PC)) break;
+            if (prot_trap (0) || sel_trap (PC))
+                break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_SDN, GET_U_UNIT (ea));
             chtr_pend = chtr_eval (NULL);               /* eval chan traps */
             break;
 
         default:
-            if (stop_illop) reason = STOP_ILLEG;
+            if (stop_illop)
+                reason = STOP_ILLEG;
             break;
             }
         }                                               /* end else */
@@ -1784,18 +1929,21 @@ while (reason == SCPE_OK) {                             /* loop until error */
             t_stat r;
             for (i = 0; (i < HALT_IO_LIMIT) && !ch_qidle (); i++) {
                 sim_interval = 0;
-                if (r = sim_process_event ()) return r; /* process events */
+                if (r = sim_process_event ())           /* process events */
+                    return r;
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
                 while (ch_req) {                        /* until no ch req */
                     for (j = 0; j < NUM_CHAN; j++) {    /* loop thru channels */
                         if (ch_req & REQ_CH (j)) {      /* channel request? */
-                            if (r = ch_proc (j)) return r;
+                            if (r = ch_proc (j))
+                                return r;
                             }
                         chtr_pend = chtr_eval (NULL);
                         }
                     }                                   /* end while ch_req */
                 }                                       /* end for wait */
-            if (chtr_pend) reason = 0;                  /* trap? cancel HALT */
+            if (chtr_pend)                              /* trap? cancel HALT */
+                reason = 0;
             }                                           /* end if HALT */
         }                                               /* end if reason */
     }                                                   /* end while */
@@ -1813,9 +1961,12 @@ tag = tag & INST_M_TAG;
 if (tag) {
     if (mode_multi) {
         uint32 r = 0;
-        if (tag & 1) r = r | XR[1];
-        if (tag & 2) r = r | XR[2];
-        if (tag & 4) r = r | XR[4];
+        if (tag & 1)
+            r = r | XR[1];
+        if (tag & 2)
+            r = r | XR[2];
+        if (tag & 4)
+            r = r | XR[4];
         return r & eamask;
         }
     return XR[tag] & eamask;
@@ -1836,9 +1987,12 @@ tag = tag & INST_M_TAG;
 if (tag) {
     if (mode_multi) {
         uint32 r = 0;
-        if (tag & 1) r = r | XR[1];
-        if (tag & 2) r = r | XR[2];
-        if (tag & 4) r = r | XR[4];
+        if (tag & 1)
+            r = r | XR[1];
+        if (tag & 2)
+            r = r | XR[2];
+        if (tag & 4)
+            r = r | XR[4];
         put_xr (tag, r);
         return r & eamask;
         }
@@ -1856,9 +2010,12 @@ dat = dat & eamask;
 
 if (tag) {
     if (mode_multi) {
-        if (tag & 1) XR[1] = dat;
-        if (tag & 2) XR[2] = dat;
-        if (tag & 4) XR[4] = dat;
+        if (tag & 1)
+            XR[1] = dat;
+        if (tag & 2)
+            XR[2] = dat;
+        if (tag & 4)
+            XR[4] = dat;
         }
     else XR[tag] = dat;
     }
@@ -1876,8 +2033,10 @@ if (mode_ftrap) {
     return TRUE;
     }
 else {
-    if (spill & TRAP_F_AC) ind_ovf = 1;
-    if (spill & TRAP_F_MQ) ind_mqo = 1;
+    if (spill & TRAP_F_AC)
+        ind_ovf = 1;
+    if (spill & TRAP_F_MQ)
+        ind_mqo = 1;
     }
 return FALSE;
 }
@@ -1901,8 +2060,10 @@ void WriteTAD (uint32 pa, uint32 addr, uint32 decr)
 {
 t_uint64 mem;
 
-if (inst_base) decr |= TRAP_F_BINST;
-if (data_base) decr |= TRAP_F_BDATA;
+if (inst_base)
+    decr |= TRAP_F_BINST;
+if (data_base)
+    decr |= TRAP_F_BDATA;
 mem = ReadP (pa) & ~(XMASK | AMASK);
 mem |= (((t_uint64) (decr & AMASK)) << INST_V_DEC) |
     ((t_uint64) (addr & AMASK));
@@ -2029,7 +2190,8 @@ mode_ctrap = 0;
 mode_strap = 0;
 mode_ftrap = 1;
 mode_storn = 0;
-if (cpu_model & (I_94|I_CT)) mode_multi = 0;
+if (cpu_model & (I_94|I_CT))
+    mode_multi = 0;
 else mode_multi = 1;
 mode_user = 0;
 inst_base = 0;
@@ -2040,10 +2202,13 @@ chtr_inht = chtr_inhi = 0;
 ht_pend = 0;
 SLT = 0;
 XR[0] = 0;
-if (M == NULL) M = (t_uint64 *) calloc (MAXMEMSIZE, sizeof (t_uint64));
-if (M == NULL) return SCPE_MEM;
+if (M == NULL)
+    M = (t_uint64 *) calloc (MAXMEMSIZE, sizeof (t_uint64));
+if (M == NULL)
+    return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -2053,10 +2218,13 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr ea, UNIT *uptr, int32 sw)
 {
-if (vptr == NULL) return SCPE_ARG;
-if ((sw & (SWMASK ('A') | SWMASK ('B')))? (ea > AMASK): (ea >= MEMSIZE)) return SCPE_NXM;
+if (vptr == NULL)
+    return SCPE_ARG;
+if ((sw & (SWMASK ('A') | SWMASK ('B')))? (ea > AMASK): (ea >= MEMSIZE))
+    return SCPE_NXM;
 if ((sw & SWMASK ('B')) ||
-    ((sw & SWMASK ('V')) && mode_user && inst_base)) ea = ea | BCORE_BASE;
+    ((sw & SWMASK ('V')) && mode_user && inst_base))
+    ea = ea | BCORE_BASE;
 *vptr = M[ea] & DMASK;
 return SCPE_OK;
 }
@@ -2065,8 +2233,10 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr ea, UNIT *uptr, int32 sw)
 {
-if ((sw & (SWMASK ('A') | SWMASK ('B')))? (ea > AMASK): (ea >= MEMSIZE)) return SCPE_NXM;
-if (sw & SWMASK ('B')) ea = ea | BCORE_BASE;
+if ((sw & (SWMASK ('A') | SWMASK ('B')))? (ea > AMASK): (ea >= MEMSIZE))
+    return SCPE_NXM;
+if (sw & SWMASK ('B'))
+    ea = ea | BCORE_BASE;
 M[ea] = val & DMASK;
 return SCPE_OK;
 }
@@ -2089,7 +2259,8 @@ else {
     uptr->capac = STDMEMSIZE;
     chuptr->flags |= UNIT_ATTABLE;
     }
-if (!(cpu_model & I_94)) mode_multi = 1;
+if (!(cpu_model & I_94))
+    mode_multi = 1;
 return SCPE_OK;
 }
 
@@ -2097,8 +2268,10 @@ return SCPE_OK;
 
 t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (cpu_model & I_CT) fputs ("CTSS", st);
-else if (cpu_model & I_94) fputs ("7094", st);
+if (cpu_model & I_CT)
+    fputs ("CTSS", st);
+else if (cpu_model & I_94)
+    fputs ("7094", st);
 else fputs ("7090", st);
 return SCPE_OK;
 }
@@ -2129,11 +2302,13 @@ if (pc & HIST_PC) {
     if (hst_ch & HIST_CH_I) {                               /* IO only? */
         uint32 op = GET_OPC (ir);                           /* get opcode */
         if ((ir & INST_T_DEC) ||
-            !(inst_io_tab[op / 32] & (1u << (op & 037)))) return;
+            !(inst_io_tab[op / 32] & (1u << (op & 037))))
+            return;
         }
     }
 hst_p = (hst_p + 1);                                        /* next entry */
-if (hst_p >= hst_lnt) hst_p = 0;
+if (hst_p >= hst_lnt)
+    hst_p = 0;
 hst[hst_p].pc = pc;
 hst[hst_p].ir = ir;
 hst[hst_p].ac = AC;
@@ -2153,12 +2328,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -2167,10 +2344,13 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
-    if (sim_switches & SWMASK ('I')) hst_ch = HIST_CH_I|HIST_CH_C;
-    else if (sim_switches & SWMASK ('C')) hst_ch = HIST_CH_C;
+    if (sim_switches & SWMASK ('I'))
+        hst_ch = HIST_CH_I|HIST_CH_C;
+    else if (sim_switches & SWMASK ('C'))
+        hst_ch = HIST_CH_C;
     else hst_ch = 0;
     }
 return SCPE_OK;
@@ -2190,8 +2370,10 @@ sim_eval = ir;
 if (pc & HIST_PC) {                                     /* instruction? */
     fputs ("CPU ", st);
     fprintf (st, "%05o ", pc & AMASK);
-    if (rpt == 0) fprintf (st, "       ");
-    else if (rpt < 1000000) fprintf (st, "%6d ", rpt);
+    if (rpt == 0)
+        fprintf (st, "       ");
+    else if (rpt < 1000000)
+        fprintf (st, "%6d ", rpt);
     else fprintf (st, "%5dM ", rpt / 1000000);
     fprint_val (st, ac, 8, 38, PV_RZRO);
     fputc (' ', st);
@@ -2199,7 +2381,8 @@ if (pc & HIST_PC) {                                     /* instruction? */
     fputc (' ', st);
     fprint_val (st, si, 8, 36, PV_RZRO);
     fputc (' ', st);
-    if (ir & INST_T_DEC) fprintf (st, "       ");
+    if (ir & INST_T_DEC)
+        fprintf (st, "       ");
     else fprintf (st, "%05o  ", ea);
     if (fprint_sym (st, pc & AMASK, &sim_eval, &cpu_unit, SWMASK ('M')) > 0) {
         fputs ("(undefined) ", st);
@@ -2210,9 +2393,9 @@ if (pc & HIST_PC) {                                     /* instruction? */
         fprint_val (st, opnd, 8, 36, PV_RZRO);
         fputc (']', st);
         }
-    fputc ('\n', st);                               /* end line */
-    }                                               /* end if instruction */
-else if (ch = HIST_CH (pc)) {                       /* channel? */
+    fputc ('\n', st);                                   /* end line */
+    }                                                   /* end if instruction */
+else if (ch = HIST_CH (pc)) {                           /* channel? */
     fprintf (st, "CH%c ", 'A' + ch - 1);
     fprintf (st, "%05o  ", pc & AMASK);
     fputs ("                                              ", st);
@@ -2222,8 +2405,8 @@ else if (ch = HIST_CH (pc)) {                       /* channel? */
         fputs ("(undefined) ", st);
         fprint_val (st, ir, 8, 36, PV_RZRO);
         }
-    fputc ('\n', st);                               /* end line */
-    }                                               /* end else channel */
+    fputc ('\n', st);                                   /* end line */
+    }                                                   /* end else channel */
 return SCPE_OK;
 }
 
@@ -2236,14 +2419,17 @@ char *cptr = (char *) desc;
 t_stat r;
 InstHistory *h;
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "    PC    repeat AC            MQ           SI           EA     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */

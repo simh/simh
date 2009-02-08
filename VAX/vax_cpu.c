@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   21-May-08    RMS     Removed inline support
    28-May-08    RMS     Inlined instruction prefetch, physical memory routines
    13-Aug-07    RMS     Fixed bug in read access g-format indexed specifiers
    28-Apr-07    RMS     Removed clock initialization
@@ -184,14 +185,20 @@
 #define op6             opnd[6]
 #define op7             opnd[7]
 #define op8             opnd[8]
-#define CHECK_FOR_PC    if (rn == nPC) RSVD_ADDR_FAULT
-#define CHECK_FOR_SP    if (rn >= nSP) RSVD_ADDR_FAULT
-#define CHECK_FOR_AP    if (rn >= nAP) RSVD_ADDR_FAULT
-#define WRITE_B(r)      if (spec > (GRN | nPC)) Write (va, r, L_BYTE, WA); \
+#define CHECK_FOR_PC    if (rn == nPC) \
+                            RSVD_ADDR_FAULT
+#define CHECK_FOR_SP    if (rn >= nSP) \
+                            RSVD_ADDR_FAULT
+#define CHECK_FOR_AP    if (rn >= nAP) \
+                            RSVD_ADDR_FAULT
+#define WRITE_B(r)      if (spec > (GRN | nPC)) \
+                            Write (va, r, L_BYTE, WA); \
                         else R[rn] = (R[rn] & ~BMASK) | ((r) & BMASK)
-#define WRITE_W(r)      if (spec > (GRN | nPC)) Write (va, r, L_WORD, WA); \
+#define WRITE_W(r)      if (spec > (GRN | nPC)) \
+                            Write (va, r, L_WORD, WA); \
                         else R[rn] = (R[rn] & ~WMASK) | ((r) & WMASK)
-#define WRITE_L(r)      if (spec > (GRN | nPC)) Write (va, r, L_LONG, WA); \
+#define WRITE_L(r)      if (spec > (GRN | nPC)) \
+                            Write (va, r, L_LONG, WA); \
                         else R[rn] = (r)
 #define WRITE_Q(rl,rh)  if (spec > (GRN | nPC)) { \
                         if ((Test (va + 7, WA, &mstat) >= 0) || \
@@ -200,7 +207,8 @@
                             Write (va + 4, rh, L_LONG, WA); \
                             } \
                         else { \
-                            if (rn >= nSP) RSVD_ADDR_FAULT; \
+                            if (rn >= nSP) \
+                                RSVD_ADDR_FAULT; \
                             R[rn] = rl; \
                             R[rn + 1] = rh; \
                             }
@@ -488,7 +496,8 @@ int32 acc;                                              /* set by setjmp */
 int abortval;
 t_stat r;
 
-if ((r = build_dib_tab ()) != SCPE_OK) return r;        /* build, chk dib_tab */
+if ((r = build_dib_tab ()) != SCPE_OK)                  /* build, chk dib_tab */
+    return r;
 if ((PSL & PSL_MBZ) ||                                  /* validate PSL<mbz> */
     ((PSL & PSL_CM) && BadCmPSL (PSL)) ||               /* validate PSL<cm> */
     ((PSL_GETCUR (PSL) != KERN) &&                      /* esu => is, ipl = 0 */
@@ -516,7 +525,8 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
             int32 rrn, rlnt;
             rrn = RQ_GETRN (recq[i]);                   /* recover reg # */
             rlnt = DR_LNT (RQ_GETLNT (recq[i]));        /* recovery lnt */
-            if (recq[i] & RQ_DIR) R[rrn] = R[rrn] - rlnt;
+            if (recq[i] & RQ_DIR)
+                R[rrn] = R[rrn] - rlnt;
             else R[rrn] = R[rrn] + rlnt;
             }
         }
@@ -529,14 +539,16 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
     case SCB_RESIN:                                     /* rsrv inst fault */
     case SCB_RESAD:                                     /* rsrv addr fault */
     case SCB_RESOP:                                     /* rsrv opnd fault */
-        if (in_ie) ABORT (STOP_INIE);                   /* in exc? panic */
+        if (in_ie)                                      /* in exc? panic */
+            ABORT (STOP_INIE);
         cc = intexc (-abortval, cc, 0, IE_EXC);         /* take exception */
         GET_CUR;                                        /* PSL<cur> changed */
         break;
 
     case SCB_CMODE:                                     /* comp mode fault */
     case SCB_ARITH:                                     /* arithmetic fault */
-        if (in_ie) ABORT (STOP_INIE);                   /* in exc? panic */
+        if (in_ie)                                      /* in exc? panic */
+            ABORT (STOP_INIE);
         cc = intexc (-abortval, cc, 0, IE_EXC);         /* take exception */
         GET_CUR;
         in_ie = 1;
@@ -548,7 +560,8 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
     case SCB_ACV:                                       /* ACV fault */
     case SCB_TNV:                                       /* TNV fault */
         if (in_ie) {                                    /* in exception? */
-            if (PSL & PSL_IS) ABORT (STOP_INIE);        /* on is? panic */
+            if (PSL & PSL_IS)                           /* on is? panic */
+                ABORT (STOP_INIE);
             cc = intexc (SCB_KSNV, cc, 0, IE_SVE);      /* ksnv */
             GET_CUR;
             }
@@ -564,7 +577,8 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
         break;
 
     case SCB_MCHK:                                      /* machine check */
-        if (in_ie) ABORT (STOP_INIE);                   /* in exception? */
+        if (in_ie)                                      /* in exc? panic */
+            ABORT (STOP_INIE);
         cc = machine_check (p1, opc, cc, delta);        /* system specific */
         in_ie = 0;
         GET_CUR;                                        /* PSL<cur> changed */
@@ -596,7 +610,8 @@ for ( ;; ) {
     recqptr = 0;                                        /* clr recovery q */
     if (sim_interval <= 0) {                            /* chk clock queue */
         temp = sim_process_event ();
-        if (temp) ABORT (temp);
+        if (temp)
+            ABORT (temp);
         SET_IRQL;                                       /* update interrupts */
         }
 
@@ -627,13 +642,15 @@ for ( ;; ) {
                 continue;                               /* continue */
                 }
             else if (temp >= IPL_HMIN)                  /* hardware req? */
-                 vec = get_vector (temp);               /* get vector */
-            else if (temp > IPL_SMAX) ABORT (STOP_UIPL);
+                vec = get_vector (temp);                /* get vector */
+            else if (temp > IPL_SMAX)
+                ABORT (STOP_UIPL);
             else {
                 vec = SCB_IPLSOFT + (temp << 2);
                 SISR = SISR & ~(1u << temp);
                 }
-            if (vec) cc = intexc (vec, cc, temp, IE_INT);/* take intr */
+            if (vec)                                    /* take intr */
+                cc = intexc (vec, cc, temp, IE_INT);
             GET_CUR;                                    /* set cur mode */
             }
         else trpirq = 0;                                /* clear everything */
@@ -648,7 +665,8 @@ for ( ;; ) {
             GET_CUR;                                    /* set cur mode */
             continue;
             }
-        if (PSL & PSW_T) PSL = PSL | PSL_TP;            /* if T, set TP */
+        if (PSL & PSW_T)                                /* if T, set TP */
+            PSL = PSL | PSL_TP;
         if (PSL & PSL_CM) {                             /* compat mode? */
             cc = op_cmode (cc);                         /* exec instr */
             continue;                                   /* skip fetch */
@@ -668,7 +686,8 @@ for ( ;; ) {
         }
     numspec = drom[opc][0];                             /* get # specs */
     if (PSL & PSL_FPD) {
-        if ((numspec & DR_F) == 0) RSVD_INST_FAULT;
+        if ((numspec & DR_F) == 0)
+            RSVD_INST_FAULT;
         }
     else {
         numspec = numspec & DR_NSPMASK;                 /* get # specifiers */
@@ -961,7 +980,9 @@ for ( ;; ) {
             case AID|WB: case AID|WW: case AID|WL: case AID|WQ: case AID|WO:
                 opnd[j++] = OP_MEM;
             case AID|AB: case AID|AW: case AID|AL: case AID|AQ: case AID|AO:
-                if (rn == nPC) { GET_ISTR (va = opnd[j++], L_LONG); }
+                if (rn == nPC) {
+                    GET_ISTR (va = opnd[j++], L_LONG);
+                    }
                 else {
                     va = opnd[j++] = Read (R[rn], L_LONG, RA);
                     R[rn] = R[rn] + 4;
@@ -1485,7 +1506,8 @@ for ( ;; ) {
         for (i = 0; i < j; i++)
             hst[hst_p].opnd[i] = opnd[i];
         lim = PC - fault_PC;
-        if ((uint32) lim > INST_SIZE) lim = INST_SIZE;
+        if ((uint32) lim > INST_SIZE)
+            lim = INST_SIZE;
         for (i = 0; i < lim; i++) {
             if ((cpu_ex (&wd, fault_PC + i, &cpu_unit, SWMASK ('V'))) == SCPE_OK)
                 hst[hst_p].inst[i] = (uint8) wd;
@@ -1495,7 +1517,8 @@ for ( ;; ) {
                 }
             }
         hst_p = hst_p + 1;
-        if (hst_p >= hst_lnt) hst_p = 0;
+        if (hst_p >= hst_lnt)
+            hst_p = 0;
         }
 
 /* Dispatch to instructions */
@@ -1683,14 +1706,18 @@ for ( ;; ) {
         r = op0 & BMASK;                                /* set result */
         WRITE_B (r);                                    /* store result */
         CC_IIZZ_B (r);                                  /* initial cc's */
-        if ((op0 > 127) || (op0 < -128)) { V_INTOV; }
+        if ((op0 > 127) || (op0 < -128)) {
+            V_INTOV;
+            }
         break;
 
     case CVTLW:
         r = op0 & WMASK;                                /* set result */
         WRITE_W (r);                                    /* store result */
         CC_IIZZ_W (r);                                  /* initial cc's */
-        if ((op0 > 32767) || (op0 < -32768)) { V_INTOV; }
+        if ((op0 > 32767) || (op0 < -32768)) {
+            V_INTOV;
+            }
         break;
 
     case CVTWB:
@@ -1698,13 +1725,16 @@ for ( ;; ) {
         WRITE_B (r);                                    /* store result */
         CC_IIZZ_B (r);                                  /* initial cc's */
         temp = SXTW (op0);                              /* cvt op to long */
-        if ((temp > 127) || (temp < -128)) { V_INTOV; }
+        if ((temp > 127) || (temp < -128)) {
+            V_INTOV;
+            }
         break;
 
     case ADAWI:
         if (op1 >= 0) temp = R[op1] & WMASK;            /* reg? ADDW2 */
         else {
-            if (op2 & 1) RSVD_OPND_FAULT;               /* mem? chk align */
+            if (op2 & 1)                                /* mem? chk align */
+                RSVD_OPND_FAULT;
             temp = Read (op2, L_WORD, WA);              /* ok, ADDW2 */
             }
         r = (op0 + temp) & WMASK;
@@ -1771,7 +1801,8 @@ for ( ;; ) {
         r = (op1 + op0 + (cc & CC_C)) & LMASK;          /* calc result */
         WRITE_L (r);                                    /* store result */
         CC_ADD_L (r, op0, op1);                         /* set cc's */
-        if ((r == op1) && op0) cc = cc | CC_C;          /* special case */
+        if ((r == op1) && op0)                          /* special case */
+            cc = cc | CC_C;
         break;
 
     case ADDL2: case ADDL3:
@@ -1796,7 +1827,8 @@ for ( ;; ) {
         r = (op1 - op0 - (cc & CC_C)) & LMASK;          /* calc result */
         WRITE_L (r);                                    /* store result */
         CC_SUB_L (r, op0, op1);                         /* set cc's */
-        if ((op0 == op1) && r) cc = cc | CC_C;          /* special case */
+        if ((op0 == op1) && r)                          /* special case */
+            cc = cc | CC_C;
         break;
 
     case SUBL2: case SUBL3:
@@ -1810,7 +1842,9 @@ for ( ;; ) {
         r = temp & BMASK;                               /* mask to result */
         WRITE_B (r);                                    /* store result */
         CC_IIZZ_B (r);                                  /* set cc's */
-        if ((temp > 127) || (temp < -128)) { V_INTOV; }
+        if ((temp > 127) || (temp < -128)) {
+            V_INTOV;
+            }
         break;
 
     case MULW2: case MULW3:
@@ -1818,14 +1852,18 @@ for ( ;; ) {
         r = temp & WMASK;                               /* mask to result */
         WRITE_W (r);                                    /* store result */
         CC_IIZZ_W (r);                                  /* set cc's */
-        if ((temp > 32767) || (temp < -32768)) { V_INTOV; }
+        if ((temp > 32767) || (temp < -32768)) {
+            V_INTOV;
+            }
         break;
 
     case MULL2: case MULL3:
         r = op_emul (op0, op1, &rh);                    /* get 64b result */
         WRITE_L (r);                                    /* store result */
         CC_IIZZ_L (r);                                  /* set cc's */
-        if (rh != ((r & LSIGN)? -1: 0)) { V_INTOV; }    /* chk overflow */
+        if (rh != ((r & LSIGN)? -1: 0)) {               /* chk overflow */
+            V_INTOV;
+            }
         break;
 
     case DIVB2: case DIVB3:
@@ -1970,8 +2008,8 @@ for ( ;; ) {
 
     case ROTL:
         j = op0 % 32;                                   /* reduce sc, mod 32 */
-        if (j) r = ((((uint32) op1) << j) |
-            (((uint32) op1) >> (32 - j))) & LMASK;
+        if (j)
+            r = ((((uint32) op1) << j) | (((uint32) op1) >> (32 - j))) & LMASK;
         else r = op1;
         WRITE_L (r);                                    /* store result */
         CC_IIZP_L (r);                                  /* set cc's */
@@ -1980,21 +2018,25 @@ for ( ;; ) {
     case ASHL:
         if (op0 & BSIGN) {                              /* right shift? */
             temp = 0x100 - op0;                         /* get |shift| */
-            if (temp > 31) r = (op1 & LSIGN)? LMASK: 0; /* sc > 31? */
+            if (temp > 31)                              /* sc > 31? */
+                r = (op1 & LSIGN)? LMASK: 0;
             else r = op1 >> temp;                       /* shift */
             WRITE_L (r);                                /* store result */
             CC_IIZZ_L (r);                              /* set cc's */
             break;
             }
         else {
-            if (op0 > 31) r = temp = 0;                 /* sc > 31? */
+            if (op0 > 31)                               /* sc > 31? */
+                r = temp = 0;
             else {
                 r = (((uint32) op1) << op0) & LMASK;    /* shift */
                 temp = r >> op0;                        /* shift back */
                 }
             WRITE_L (r);                                /* store result */
             CC_IIZZ_L (r);                              /* set cc's */
-            if (op1 != temp) { V_INTOV; }               /* bits lost? */
+            if (op1 != temp) {                          /* bits lost? */
+                V_INTOV;
+                }
             }
         break;
 
@@ -2002,7 +2044,9 @@ for ( ;; ) {
         r = op_ashq (opnd, &rh, &flg);                  /* do qw shift */
         WRITE_Q (r, rh);                                /* store results */
         CC_IIZZ_Q (r, rh);                              /* set cc's */
-        if (flg) { V_INTOV; }                           /* if ovflo, set */
+        if (flg) {                                      /* if ovflo, set */
+            V_INTOV;
+            }
         break;
 
 /* EMUL - emul mplr.rl,mpcn.rl,add.rl,dst.wq
@@ -2031,7 +2075,8 @@ for ( ;; ) {
 */
 
     case EDIV:
-        if (op5 < 0) Read (op6, L_LONG, WA);            /* wtest remainder */
+        if (op5 < 0)                                    /* wtest remainder */
+            Read (op6, L_LONG, WA);
         if (op0 == 0) {                                 /* divide by zero? */
             flg = CC_V;                                 /* set V */
             r = opnd[1];                                /* quo = low divd */
@@ -2040,11 +2085,15 @@ for ( ;; ) {
             }
         else {
             r = op_ediv (opnd, &rh, &flg);              /* extended divide */
-            if (flg) { INTOV; }                         /* if ovf+IV, set trap */
+            if (flg) {                                  /* if ovf+IV, set trap */
+                INTOV;
+                }
             }
-        if (op3 >= 0) R[op3] = r;                       /* store quotient */
+        if (op3 >= 0)                                   /* store quotient */
+            R[op3] = r;
         else Write (op4, r, L_LONG, WA);
-        if (op5 >= 0) R[op5] = rh;                      /* store remainder */
+        if (op5 >= 0)                                   /* store remainder */
+            R[op5] = rh;
         else Write (op6, rh, L_LONG, WA);
         CC_IIZZ_L (r);                                  /* set cc's */
         cc = cc | flg;                                  /* set V if required */
@@ -2079,51 +2128,63 @@ for ( ;; ) {
         break;
 
     case BGEQ:
-        if (!(cc & CC_N)) BRANCHB (brdisp);             /* br if N = 0 */
+        if (!(cc & CC_N))                               /* br if N = 0 */
+            BRANCHB (brdisp);
         break;
 
     case BLSS:
-        if (cc & CC_N) BRANCHB (brdisp);                /* br if N = 1 */
+        if (cc & CC_N)                                  /* br if N = 1 */
+            BRANCHB (brdisp);
         break;
 
     case BNEQ:
-        if (!(cc & CC_Z)) BRANCHB (brdisp);             /* br if Z = 0 */
+        if (!(cc & CC_Z))                               /* br if Z = 0 */
+            BRANCHB (brdisp);
         break;
 
     case BEQL:
-        if (cc & CC_Z) BRANCHB (brdisp);                /* br if Z = 1 */
+        if (cc & CC_Z)                                  /* br if Z = 1 */
+            BRANCHB (brdisp);
         break;
 
     case BVC:
-        if (!(cc & CC_V)) BRANCHB (brdisp);             /* br if V = 0 */
+        if (!(cc & CC_V))                               /* br if V = 0 */
+            BRANCHB (brdisp);
         break;
 
     case BVS:
-        if (cc & CC_V) BRANCHB (brdisp);                /* br if V = 1 */
+        if (cc & CC_V)                                  /* br if V = 1 */
+            BRANCHB (brdisp);
         break;
 
     case BGEQU:
-        if (!(cc & CC_C)) BRANCHB (brdisp);             /* br if C = 0 */
+        if (!(cc & CC_C))                               /* br if C = 0 */
+            BRANCHB (brdisp);
         break;
 
     case BLSSU:
-        if (cc & CC_C) BRANCHB (brdisp);                /* br if C = 1 */
+        if (cc & CC_C)                                  /* br if C = 1 */
+            BRANCHB (brdisp);
         break;
 
     case BGTR:
-        if (!(cc & (CC_N | CC_Z))) BRANCHB (brdisp);    /* br if N | Z = 0 */
+        if (!(cc & (CC_N | CC_Z)))                      /* br if N | Z = 0 */
+            BRANCHB (brdisp);
         break;
 
     case BLEQ:
-        if (cc & (CC_N | CC_Z)) BRANCHB (brdisp);       /* br if N | Z = 1 */
+        if (cc & (CC_N | CC_Z))                         /* br if N | Z = 1 */
+            BRANCHB (brdisp);
         break;
 
     case BGTRU:
-        if (!(cc & (CC_C | CC_Z))) BRANCHB (brdisp);    /* br if C | Z = 0 */
+        if (!(cc & (CC_C | CC_Z)))                      /* br if C | Z = 0 */
+            BRANCHB (brdisp);
         break;
 
     case BLEQU:
-        if (cc & (CC_C | CC_Z)) BRANCHB (brdisp);       /* br if C | Z = 1 */
+        if (cc & (CC_C | CC_Z))                         /* br if C | Z = 1 */
+            BRANCHB (brdisp);
         break;
 
 /* Simple jumps and subroutine calls - op addr.ab
@@ -2158,7 +2219,8 @@ for ( ;; ) {
         WRITE_L (r);                                    /* store result */
         CC_IIZP_L (r);                                  /* set cc's */
         V_SUB_L (r, 1, op0);                            /* test for ovflo */    
-        if (r >= 0) BRANCHB (brdisp);                   /* if >= 0, branch */
+        if (r >= 0)                                     /* if >= 0, branch */
+            BRANCHB (brdisp);
         break;
 
     case SOBGTR:
@@ -2166,7 +2228,8 @@ for ( ;; ) {
         WRITE_L (r);                                    /* store result */
         CC_IIZP_L (r);                                  /* set cc's */
         V_SUB_L (r, 1, op0);                            /* test for ovflo */    
-        if (r > 0) BRANCHB (brdisp);                    /* if >= 0, branch */
+        if (r > 0)                                      /* if >= 0, branch */
+            BRANCHB (brdisp);
         break;
 
 /* AOB instructions - op limit.rl,idx.ml,disp.bb
@@ -2183,7 +2246,8 @@ for ( ;; ) {
         WRITE_L (r);                                    /* store result */
         CC_IIZP_L (r);                                  /* set cc's */
         V_ADD_L (r, 1, op1);                            /* test for ovflo */
-        if (r < op0) BRANCHB (brdisp);                  /* if < lim, branch */
+        if (r < op0)                                    /* if < lim, branch */
+            BRANCHB (brdisp);
         break;
 
     case AOBLEQ:
@@ -2191,7 +2255,8 @@ for ( ;; ) {
         WRITE_L (r);                                    /* store result */
         CC_IIZP_L (r);                                  /* set cc's */
         V_ADD_L (r, 1, op1);                            /* test for ovflo */
-        if (r <= op0) BRANCHB (brdisp);                 /* if < lim, branch */
+        if (r <= op0)                                   /* if < lim, branch */
+            BRANCHB (brdisp);
         break;
 
 /* ACB instructions - op limit.rx,add.rx,index.mx,disp.bw
@@ -2209,8 +2274,8 @@ for ( ;; ) {
         WRITE_B (r);                                    /* store result */
         CC_IIZP_B (r);                                  /* set cc's */
         V_ADD_B (r, op1, op2);                          /* test for ovflo */
-        if ((op1 & BSIGN)? (SXTB (r) >= SXTB (op0)):
-            (SXTB (r) <= SXTB (op0))) BRANCHW (brdisp);
+        if ((op1 & BSIGN)? (SXTB (r) >= SXTB (op0)): (SXTB (r) <= SXTB (op0)))
+            BRANCHW (brdisp);
         break;
 
     case ACBW:
@@ -2218,8 +2283,8 @@ for ( ;; ) {
         WRITE_W (r);                                    /* store result */
         CC_IIZP_W (r);                                  /* set cc's */
         V_ADD_W (r, op1, op2);                          /* test for ovflo */
-        if ((op1 & WSIGN)? (SXTW (r) >= SXTW (op0)):
-            (SXTW (r) <= SXTW (op0))) BRANCHW (brdisp);
+        if ((op1 & WSIGN)? (SXTW (r) >= SXTW (op0)): (SXTW (r) <= SXTW (op0)))
+            BRANCHW (brdisp);
         break;
 
     case ACBL:
@@ -2241,7 +2306,8 @@ for ( ;; ) {
     case CASEB:
         r = (op0 - op1) & BMASK;                        /* sel - base */
         CC_CMP_B (r, op2);                              /* r:limit, set cc's */
-        if (r > op2) JUMP (PC + ((op2 + 1) * 2));       /* r > limit (unsgnd)? */
+        if (r > op2)                                    /* r > limit (unsgnd)? */
+            JUMP (PC + ((op2 + 1) * 2));
         else {
             temp = Read (PC + (r * 2), L_WORD, RA);
             BRANCHW (temp);
@@ -2251,7 +2317,8 @@ for ( ;; ) {
     case CASEW:
         r = (op0 - op1) & WMASK;                        /* sel - base */
         CC_CMP_W (r, op2);                              /* r:limit, set cc's */
-        if (r > op2) JUMP (PC + ((op2 + 1) * 2));       /* r > limit (unsgnd)? */
+        if (r > op2)                                    /* r > limit (unsgnd)? */
+            JUMP (PC + ((op2 + 1) * 2));
         else {
             temp = Read (PC + (r * 2), L_WORD, RA);
             BRANCHW (temp);
@@ -2262,7 +2329,7 @@ for ( ;; ) {
         r = (op0 - op1) & LMASK;                        /* sel - base */
         CC_CMP_L (r, op2);                              /* r:limit, set cc's */
         if (((uint32) r) > ((uint32) op2))              /* r > limit (unsgnd)? */
-                JUMP (PC + ((op2 + 1) * 2));
+            JUMP (PC + ((op2 + 1) * 2));
         else {
             temp = Read (PC + (r * 2), L_WORD, RA);
             BRANCHW (temp);
@@ -2277,35 +2344,43 @@ for ( ;; ) {
 */
 
     case BBS:
-        if (op_bb_n (opnd, acc)) BRANCHB (brdisp);      /* br if bit set */
+        if (op_bb_n (opnd, acc))                        /* br if bit set */
+            BRANCHB (brdisp);
         break;
 
     case BBC:
-        if (!op_bb_n (opnd, acc)) BRANCHB (brdisp);     /* br if bit clr */
+        if (!op_bb_n (opnd, acc))                       /* br if bit clr */
+            BRANCHB (brdisp);
         break;
 
     case BBSS: case BBSSI:
-        if (op_bb_x (opnd, 1, acc)) BRANCHB (brdisp);   /* br if set, set */
+        if (op_bb_x (opnd, 1, acc))                     /* br if set, set */
+            BRANCHB (brdisp);
         break;
 
     case BBCC: case BBCCI:
-        if (!op_bb_x (opnd, 0, acc)) BRANCHB (brdisp);  /* br if clr, clr*/
+        if (!op_bb_x (opnd, 0, acc))                    /* br if clr, clr*/
+            BRANCHB (brdisp);
         break;
 
     case BBSC:
-        if (op_bb_x (opnd, 0, acc)) BRANCHB (brdisp);   /* br if clr, set */
+        if (op_bb_x (opnd, 0, acc))                     /* br if clr, set */
+            BRANCHB (brdisp);
         break;
 
     case BBCS:
-        if (!op_bb_x (opnd, 1, acc)) BRANCHB (brdisp);  /* br if set, clr */
+        if (!op_bb_x (opnd, 1, acc))                    /* br if set, clr */
+            BRANCHB (brdisp);
         break;
 
     case BLBS:
-        if (op0 & 1) BRANCHB (brdisp);                  /* br if bit set */
+        if (op0 & 1)                                    /* br if bit set */
+            BRANCHB (brdisp);
         break;
 
     case BLBC:
-        if ((op0 & 1) == 0) BRANCHB (brdisp);           /* br if bit clear */
+        if ((op0 & 1) == 0)                             /* br if bit clear */
+            BRANCHB (brdisp);
         break;
 
 /* Extract field instructions - ext?v pos.rl,size.rb,base.wb,dst.wl
@@ -2321,7 +2396,8 @@ for ( ;; ) {
 
     case EXTV:
         r = op_extv (opnd, vfldrp1, acc);               /* get field */
-        if (r & byte_sign[op1]) r = r | ~byte_mask[op1];
+        if (r & byte_sign[op1])
+            r = r | ~byte_mask[op1];
         WRITE_L (r);                                    /* store field */
         CC_IIZP_L (r);                                  /* set cc's */
         break;
@@ -2343,7 +2419,8 @@ for ( ;; ) {
 
     case CMPV:
         r = op_extv (opnd, vfldrp1, acc);               /* get field */
-        if (r & byte_sign[op1]) r = r | ~byte_mask[op1];
+        if (r & byte_sign[op1])
+            r = r | ~byte_mask[op1];
         CC_CMP_L (r, op4);                              /* set cc's */
         break;
 
@@ -2412,7 +2489,8 @@ for ( ;; ) {
 /* Miscellaneous instructions */
 
     case HALT:
-        if (PSL & PSL_CUR) RSVD_INST_FAULT;             /* not kern? rsvd inst */
+        if (PSL & PSL_CUR)                              /* not kern? rsvd inst */
+            RSVD_INST_FAULT;
         else if (cpu_unit.flags & UNIT_CONH)            /* halt to console? */
             cc = con_halt (CON_HLTINS, cc);             /* enter firmware */
         else {
@@ -2435,13 +2513,15 @@ for ( ;; ) {
         break;
 
     case BISPSW:
-        if (opnd[0] & PSW_MBZ) RSVD_OPND_FAULT;
+        if (opnd[0] & PSW_MBZ)
+            RSVD_OPND_FAULT;
         PSL = PSL | (opnd[0] & ~CC_MASK);
         cc = cc | (opnd[0] & CC_MASK);
         break;
 
     case BICPSW:
-        if (opnd[0] & PSW_MBZ) RSVD_OPND_FAULT;
+        if (opnd[0] & PSW_MBZ)
+            RSVD_OPND_FAULT;
         PSL = PSL & ~opnd[0];
         cc = cc & ~opnd[0];
         break;
@@ -2460,7 +2540,8 @@ for ( ;; ) {
         break;
 
     case INDEX:
-        if ((op0 < op1) || (op0 > op2)) SET_TRAP (TRAP_SUBSCR);
+        if ((op0 < op1) || (op0 > op2))
+            SET_TRAP (TRAP_SUBSCR);
         r = (op0 + op4) * op3;
         WRITE_L (r);
         CC_IIZZ_L (r);
@@ -2529,13 +2610,15 @@ for ( ;; ) {
         break;
 
     case MOVD:
-        if ((r = op_movfd (op0)) == 0) op1 = 0;
+        if ((r = op_movfd (op0)) == 0)
+            op1 = 0;
         WRITE_Q (r, op1);
         CC_IIZP_FP (r);
         break;
 
     case MOVG:
-        if ((r = op_movg (op0)) == 0) op1 = 0;
+        if ((r = op_movg (op0)) == 0)
+            op1 = 0;
         WRITE_Q (r, op1);
         CC_IIZP_FP (r);
         break;
@@ -2547,13 +2630,15 @@ for ( ;; ) {
         break;
 
     case MNEGD:
-        if ((r = op_mnegfd (op0)) == 0) op1 = 0;
+        if ((r = op_mnegfd (op0)) == 0)
+            op1 = 0;
         WRITE_Q (r, op1);
         CC_IIZZ_FP (r);
         break;
 
     case MNEGG:
-        if ((r = op_mnegg (op0)) == 0) op1 = 0;
+        if ((r = op_mnegg (op0)) == 0)
+            op1 = 0;
         WRITE_Q (r, op1);
         CC_IIZZ_FP (r);
         break;
@@ -2610,14 +2695,18 @@ for ( ;; ) {
         r = op_cvtfdgi (opnd, &flg, opc) & BMASK;
         WRITE_B (r);
         CC_IIZZ_B (r);
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     case CVTFW: case CVTDW: case CVTGW:
         r = op_cvtfdgi (opnd, &flg, opc) & WMASK;
         WRITE_W (r);
         CC_IIZZ_W (r);
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     case CVTFL: case CVTDL: case CVTGL:
@@ -2625,7 +2714,9 @@ for ( ;; ) {
         r = op_cvtfdgi (opnd, &flg, opc) & LMASK;
         WRITE_L (r);
         CC_IIZZ_L (r);
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     case CVTFD:
@@ -2730,7 +2821,8 @@ for ( ;; ) {
         WRITE_L (r);                                    /* write result */
         CC_IIZP_FP (r);                                 /* set cc's */
         if ((temp & CC_Z) || ((op1 & FPSIGN)?           /* test br cond */
-           !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+           !(temp & CC_N): (temp & CC_N)))
+           BRANCHW (brdisp);
         break;
 
     case ACBD:
@@ -2739,7 +2831,8 @@ for ( ;; ) {
         WRITE_Q (r, rh);
         CC_IIZP_FP (r);
         if ((temp & CC_Z) || ((op2 & FPSIGN)?           /* test br cond */
-           !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+           !(temp & CC_N): (temp & CC_N)))
+           BRANCHW (brdisp);
         break;
 
     case ACBG:
@@ -2748,7 +2841,8 @@ for ( ;; ) {
         WRITE_Q (r, rh);
         CC_IIZP_FP (r);
         if ((temp & CC_Z) || ((op2 & FPSIGN)?           /* test br cond */
-           !(temp & CC_N): (temp & CC_N))) BRANCHW (brdisp);
+           !(temp & CC_N): (temp & CC_N)))
+           BRANCHW (brdisp);
         break;
 
 /* EMODF
@@ -2762,12 +2856,16 @@ for ( ;; ) {
 
     case EMODF:
         r = op_emodf (opnd, &temp, &flg);
-        if (op5 < 0) Read (op6, L_LONG, WA);
-        if (op3 >= 0) R[op3] = temp;
+        if (op5 < 0)
+            Read (op6, L_LONG, WA);
+        if (op3 >= 0)
+            R[op3] = temp;
         else Write (op4, temp, L_LONG, WA);
         WRITE_L (r);
         CC_IIZZ_FP (r);
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
 /* EMODD, EMODG
@@ -2785,11 +2883,14 @@ for ( ;; ) {
             Read (op8, L_BYTE, WA);
             Read ((op8 + 7) & LMASK, L_BYTE, WA);
 			}
-        if (op5 >= 0) R[op5] = temp;
+        if (op5 >= 0)
+            R[op5] = temp;
         else Write (op6, temp, L_LONG, WA);
         WRITE_Q (r, rh);
         CC_IIZZ_FP (r);
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     case EMODG:
@@ -2798,11 +2899,14 @@ for ( ;; ) {
             Read (op8, L_BYTE, WA);
             Read ((op8 + 7) & LMASK, L_BYTE, WA);
 			}
-        if (op5 >= 0) R[op5] = temp;
+        if (op5 >= 0)
+            R[op5] = temp;
         else Write (op6, temp, L_LONG, WA);
         WRITE_Q (r, rh);
         CC_IIZZ_FP (r);
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
 /* POLY */
@@ -2923,17 +3027,21 @@ int32 sc, val, t;
 while ((bo + lnt) > ibcnt) {                            /* until enuf bytes */
     if ((ppc < 0) || (VA_GETOFF (ppc) == 0)) {          /* PPC inv, xpg? */
         ppc = Test ((PC + ibcnt) & ~03, RD, &t);        /* xlate PC */
-        if (ppc < 0) Read ((PC + ibcnt) & ~03, L_LONG, RA);
+        if (ppc < 0)
+            Read ((PC + ibcnt) & ~03, L_LONG, RA);
         }
-    if (ibcnt == 0) ibufl = ReadLP (ppc);               /* fill low */
+    if (ibcnt == 0)                                     /* fill low */
+        ibufl = ReadLP (ppc);
     else ibufh = ReadLP (ppc);                          /* or high */
     ppc = ppc + 4;                                      /* incr phys PC */
     ibcnt = ibcnt + 4;                                  /* incr ibuf cnt */
     }
 PC = PC + lnt;                                          /* incr PC */
-if (lnt == L_BYTE) val = (ibufl >> (bo << 3)) & BMASK;  /* byte? */
+if (lnt == L_BYTE)                                      /* byte? */
+    val = (ibufl >> (bo << 3)) & BMASK;
 else if (lnt == L_WORD) {                               /* word? */
-    if (bo == 3) val = ((ibufl >> 24) & 0xFF) | ((ibufh & 0xFF) << 8);
+    if (bo == 3)
+        val = ((ibufl >> 24) & 0xFF) | ((ibufh & 0xFF) << 8);
     else val = (ibufl >> (bo << 3)) & WMASK;
     }
 else if (bo) {                                          /* unaligned lw? */
@@ -2996,10 +3104,13 @@ PSL = PSL_IS | PSL_IPL1F;
 SISR = 0;
 ASTLVL = 4;
 mapen = 0;
-if (M == NULL) M = (uint32 *) calloc (((uint32) MEMSIZE) >> 2, sizeof (uint32));
-if (M == NULL) return SCPE_MEM;
+if (M == NULL)
+    M = (uint32 *) calloc (((uint32) MEMSIZE) >> 2, sizeof (uint32));
+if (M == NULL)
+    return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return build_dib_tab ();
@@ -3012,7 +3123,8 @@ t_stat cpu_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw)
 int32 st;
 uint32 addr = (uint32) exta;
 
-if (vptr == NULL) return SCPE_ARG;
+if (vptr == NULL) 
+    return SCPE_ARG;
 if (sw & SWMASK ('V')) {
     int32 acc = cpu_get_vsw (sw);
     addr = Test (addr, acc, &st);
@@ -3058,14 +3170,18 @@ int32 mc = 0;
 uint32 i, clim;
 uint32 *nM = NULL;
 
-if ((val <= 0) || (val > MAXMEMSIZE_X)) return SCPE_ARG;
-for (i = val; i < MEMSIZE; i = i + 4) mc = mc | M[i >> 2];
+if ((val <= 0) || (val > MAXMEMSIZE_X))
+    return SCPE_ARG;
+for (i = val; i < MEMSIZE; i = i + 4)
+    mc = mc | M[i >> 2];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
 nM = (uint32 *) calloc (val >> 2, sizeof (uint32));
-if (nM == NULL) return SCPE_MEM;
+if (nM == NULL)
+    return SCPE_MEM;
 clim = (uint32) ((((uint32) val) < MEMSIZE)? val: MEMSIZE);
-for (i = 0; i < clim; i = i + 4) nM[i >> 2] = M[i >> 2];
+for (i = 0; i < clim; i = i + 4)
+    nM[i >> 2] = M[i >> 2];
 free (M);
 M = nM;
 MEMSIZE = val; 
@@ -3095,7 +3211,8 @@ if (cptr) {
     if (r == SCPE_OK) {
         int32 acc = cpu_get_vsw (sim_switches);
         pa = Test (va, acc, &st);
-        if (st == PR_OK) fprintf (of, "Virtual %-X = physical %-X\n", va, pa);
+        if (st == PR_OK)
+            fprintf (of, "Virtual %-X = physical %-X\n", va, pa);
         else fprintf (of, "Virtual %-X: %s\n", va, mm_str[st]);
         return SCPE_OK;
         }
@@ -3111,10 +3228,14 @@ int32 cpu_get_vsw (int32 sw)
 int32 md;
 
 set_map_reg ();                                         /* update dyn reg */
-if (sw & SWMASK ('K')) md = KERN;
-else if (sw & SWMASK ('E')) md = EXEC;
-else if (sw & SWMASK ('S')) md = SUPV;
-else if (sw & SWMASK ('U')) md = USER;
+if (sw & SWMASK ('K'))
+    md = KERN;
+else if (sw & SWMASK ('E')) 
+    md = EXEC;
+else if (sw & SWMASK ('S'))
+    md = SUPV;
+else if (sw & SWMASK ('U'))
+    md = USER;
 else md = PSL_GETCUR (PSL);
 return ACC_MASK (md);
 }
@@ -3127,12 +3248,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].iPC = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].iPC = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -3141,7 +3264,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+            return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -3160,18 +3284,22 @@ extern t_value *sim_eval;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC       PSL       IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(di++) % hst_lnt];                         /* entry pointer */
-    if (h->iPC == 0) continue;                          /* filled in? */
+    if (h->iPC == 0)                                    /* filled in? */
+        continue;
     fprintf(st, "%08X %08X| ", h->iPC, h->PSL);         /* PC, PSL */
     numspec = drom[h->opc][0] & DR_NSPMASK;             /* #specifiers */
     if (opcode[h->opc] == NULL)                         /* undefined? */
@@ -3179,7 +3307,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
     else if (h->PSL & PSL_FPD)                          /* FPD set? */
         fprintf (st, "%s FPD set", opcode[h->opc]);
     else {                                              /* normal */
-        for (i = 0; i < INST_SIZE; i++) sim_eval[i] = h->inst[i];
+        for (i = 0; i < INST_SIZE; i++)
+            sim_eval[i] = h->inst[i];
         if ((fprint_sym (st, h->iPC, sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "%03X (undefined)", h->opc);
         if ((numspec > 1) ||
@@ -3207,21 +3336,26 @@ numspec = drom[h->opc][0] & DR_NSPMASK;                 /* #specifiers */
 fputs ("\n                  ", st);                     /* space */
 for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
     disp = drom[h->opc][i];                             /* specifier type */
-    if (disp == RG) disp = RQ;                          /* fix specials */
-    else if (disp >= BB) break;                         /* ignore branches */
+    if (disp == RG)                                     /* fix specials */
+        disp = RQ;
+    else if (disp >= BB)
+        break;                         /* ignore branches */
     else switch (disp & (DR_LNMASK|DR_ACMASK)) {
 
     case RB: case RW: case RL:                          /* read */
     case AB: case AW: case AL: case AQ: case AO:        /* address */
     case MB: case MW: case ML:                          /* modify */
-        if (line == 0) fprintf (st, " %08X", h->opnd[j]);
+        if (line == 0)
+            fprintf (st, " %08X", h->opnd[j]);
         else fputs ("         ", st);
         j = j + 1;
         break;
     case RQ: case MQ:                                   /* read, modify quad */
-        if (line <= 1) fprintf (st, " %08X", h->opnd[j + line]);
+        if (line <= 1)
+            fprintf (st, " %08X", h->opnd[j + line]);
         else fputs ("         ", st);
-        if (line == 0) more = TRUE;
+        if (line == 0)
+            more = TRUE;
         j = j + 2;
         break;
     case RO: case MO:                                   /* read, modify octa */
@@ -3230,7 +3364,8 @@ for (i = 1, j = 0, more = FALSE; i <= numspec; i++) {   /* loop thru specs */
         j = j + 4;
         break;
     case WB: case WW: case WL: case WQ: case WO:        /* write */
-        if (line == 0) fprintf (st, " %08X", h->opnd[j + 1]);
+        if (line == 0)
+            fprintf (st, " %08X", h->opnd[j + 1]);
         else fputs ("         ", st);
         j = j + 2;
         break;

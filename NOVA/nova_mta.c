@@ -282,7 +282,8 @@ switch (pulse) {                                        /* decode IR<8:9> */
 
     case iopS:                                          /* start */
         c = GET_CMD (mta_cu);                           /* get command */
-        if (dev_busy & INT_MTA) break;                  /* ignore if busy */
+        if (dev_busy & INT_MTA)                         /* ignore if busy */
+            break;
         if ((uptr->USTAT & STA_RDY) == 0) {             /* drive not ready? */
             mta_sta = mta_sta | STA_ILL;                /* illegal op */
             dev_busy = dev_busy & ~INT_MTA;             /* clear busy */
@@ -293,14 +294,16 @@ switch (pulse) {                                        /* decode IR<8:9> */
             mta_upddsta (uptr, (uptr->USTAT &           /* update status */
                 ~(STA_BOT | STA_EOF | STA_EOT | STA_RDY)) | STA_REW);
             sim_activate (uptr, mta_rwait);             /* start IO */
-            if (c == CU_UNLOAD) detach_unit (uptr);
+            if (c == CU_UNLOAD)
+                detach_unit (uptr);
             }
         else {
             mta_sta = 0;                                /* clear errors */
             dev_busy = dev_busy | INT_MTA;              /* set busy */
             dev_done = dev_done & ~INT_MTA;             /* clear done */
             int_req = int_req & ~INT_MTA;               /* clear int */
-            if (ctype[c]) sim_activate (uptr, mta_cwait);
+            if (ctype[c])
+                sim_activate (uptr, mta_cwait);
             else {
                 mta_upddsta (uptr, uptr->USTAT &
                    ~(STA_BOT | STA_EOF | STA_EOT | STA_RDY));
@@ -349,7 +352,8 @@ wc = WC_SIZE - (mta_wc & WC_MASK);                      /* io wc */
 if (uptr->USTAT & STA_REW) {                            /* rewind? */
     sim_tape_rewind (uptr);                             /* update tape */
     mta_upddsta (uptr, (uptr->USTAT & ~STA_REW) | STA_BOT | STA_RDY);
-    if (u == GET_UNIT (mta_cu)) mta_updcsta (uptr);
+    if (u == GET_UNIT (mta_cu))
+        mta_updcsta (uptr);
     return SCPE_OK;
     }
 
@@ -364,7 +368,8 @@ else switch (c) {                                       /* case on command */
 		break;
 
     case CU_DMODE:                                      /* drive mode */
-        if (!sim_tape_bot (uptr)) mta_sta = mta_sta | STA_ILL;  /* must be BOT */
+        if (!sim_tape_bot (uptr))                       /* must be BOT */
+            mta_sta = mta_sta | STA_ILL;
         else mta_upddsta (uptr, (mta_cu & CU_PE)?       /* update drv status */
             uptr->USTAT | STA_PEM: uptr->USTAT & ~ STA_PEM);
         break;
@@ -372,14 +377,17 @@ else switch (c) {                                       /* case on command */
     case CU_READ:                                       /* read */
     case CU_READNS:                                     /* read non-stop */
         st = sim_tape_rdrecf (uptr, mtxb, &tbc, MTA_MAXFR); /* read rec */
-        if (st == MTSE_RECE) mta_sta = mta_sta | STA_DAE;   /* rec in err? */
+        if (st == MTSE_RECE)                            /* rec in err? */
+            mta_sta = mta_sta | STA_DAE;
         else if (st != MTSE_OK) {                       /* other error? */
             r = mta_map_err (uptr, st);                 /* map error */
             break;
             }
         cbc = wc * 2;                                   /* expected bc */
-        if (tbc & 1) mta_sta = mta_sta | STA_ODD;       /* odd byte count? */
-        if (tbc > cbc) mta_sta = mta_sta | STA_WCO;     /* too big? */
+        if (tbc & 1)                                    /* odd byte count? */
+            mta_sta = mta_sta | STA_ODD;
+        if (tbc > cbc)                                  /* too big? */
+            mta_sta = mta_sta | STA_WCO;
         else {
             cbc = tbc;                                  /* no, use it */
             wc = (cbc + 1) / 2;                         /* adjust wc */
@@ -388,7 +396,8 @@ else switch (c) {                                       /* case on command */
             c1 = mtxb[p++];
             c2 = mtxb[p++];
             pa = MapAddr (0, mta_ma);                   /* map address */
-            if (MEM_ADDR_OK (pa)) M[pa] = (c1 << 8) | c2;
+            if (MEM_ADDR_OK (pa))
+                M[pa] = (c1 << 8) | c2;
             mta_ma = (mta_ma + 1) & AMASK;
             }
         mta_wc = (mta_wc + wc) & DMASK;
@@ -466,8 +475,10 @@ int32 mta_updcsta (UNIT *uptr)                          /* update ctrl */
 {
 mta_sta = (mta_sta & ~(STA_DYN | STA_CLR | STA_ERR1 | STA_ERR2)) |
     (uptr->USTAT & STA_DYN) | STA_SET;
-if (mta_sta & STA_EFLGS1) mta_sta = mta_sta | STA_ERR1;
-if (mta_sta & STA_EFLGS2) mta_sta = mta_sta | STA_ERR2;
+if (mta_sta & STA_EFLGS1)
+    mta_sta = mta_sta | STA_ERR1;
+if (mta_sta & STA_EFLGS2)
+    mta_sta = mta_sta | STA_ERR2;
 return mta_sta;
 }
 
@@ -477,7 +488,8 @@ void mta_upddsta (UNIT *uptr, int32 newsta)             /* drive status */
 {
 int32 change;
 
-if ((uptr->flags & UNIT_ATT) == 0) newsta = 0;          /* offline? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* offline? */
+    newsta = 0;
 change = (uptr->USTAT ^ newsta) & STA_MON;              /* changes? */
 uptr->USTAT = newsta & STA_DYN;                         /* update status */
 if (change) {
@@ -571,8 +583,10 @@ for (u = 0; u < MTA_NUMDR; u++) {                       /* loop thru units */
     else uptr->USTAT = 0;
     }
 mta_updcsta (&mta_unit[0]);                             /* update status */
-if (mtxb == NULL) mtxb = (uint8 *) calloc (MTA_MAXFR, sizeof (uint8));
-if (mtxb == NULL) return SCPE_MEM;
+if (mtxb == NULL)
+    mtxb = (uint8 *) calloc (MTA_MAXFR, sizeof (uint8));
+if (mtxb == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -583,9 +597,11 @@ t_stat mta_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
-if (!sim_is_active (uptr)) mta_upddsta (uptr, STA_RDY | STA_BOT | STA_PEM |
-    (sim_tape_wrp (uptr)? STA_WLK: 0));
+if (r != SCPE_OK)
+    return r;
+if (!sim_is_active (uptr))
+    mta_upddsta (uptr, STA_RDY | STA_BOT | STA_PEM |
+        (sim_tape_wrp (uptr)? STA_WLK: 0));
 return r;
 }
 
@@ -593,8 +609,10 @@ return r;
 
 t_stat mta_detach (UNIT* uptr)
 {
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
-if (!sim_is_active (uptr)) mta_upddsta (uptr, 0);
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+if (!sim_is_active (uptr))
+    mta_upddsta (uptr, 0);
 return sim_tape_detach (uptr);
 }
 
@@ -607,7 +625,6 @@ if ((uptr->flags & UNIT_ATT) && (val || sim_tape_wrp (uptr)))
 else mta_upddsta (uptr, uptr->USTAT & ~STA_WLK);
 return SCPE_OK;
 }
-
 
 /*  Boot routine  */
 

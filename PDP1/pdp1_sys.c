@@ -1,6 +1,6 @@
 /* pdp1_sys.c: PDP-1 simulator interface
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -119,7 +119,8 @@ int32 i, tmp, word;
 
 word = 0;
 for (i = 0; i < 3;) {
-    if ((tmp = getc (inf)) == EOF) return -1;
+    if ((tmp = getc (inf)) == EOF)
+        return -1;
     if (tmp & 0200) {
         word = (word << 6) | (tmp & 077);
         i++;
@@ -133,11 +134,13 @@ t_stat rim_load (FILE *inf, int32 fld)
 int32 origin, val;
 
 for (;;) {
-    if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
+    if ((val = pdp1_getw (inf)) < 0)
+        return SCPE_FMT;
     if (((val & 0760000) == OP_DIO) ||                  /* DIO? */
         ((val & 0760000) == OP_DAC)) {                  /* hack - Macro1 err */
         origin = val & DAMASK;
-        if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
+        if ((val = pdp1_getw (inf)) < 0)
+            return SCPE_FMT;
         M[fld | origin] = val;
         }
     else if ((val & 0760000) == OP_JMP) {               /* JMP? */
@@ -154,25 +157,34 @@ t_stat blk_load (FILE *inf, int32 fld)
 int32 val, start, count, csum;
 
 for (;;) {
-    if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;   /* get word, EOF? */
+    if ((val = pdp1_getw (inf)) < 0)                    /* get word, EOF? */
+        return SCPE_FMT;
     if ((val & 0760000) == OP_DIO) {                    /* DIO? */
         csum = val;                                     /* init checksum */
         start = val & DAMASK;                           /* starting addr */
-        if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
-        if ((val & 0760000) != OP_DIO) return SCPE_FMT;
+        if ((val = pdp1_getw (inf)) < 0)
+            return SCPE_FMT;
+        if ((val & 0760000) != OP_DIO)
+            return SCPE_FMT;
         csum = csum + val;
-        if (csum > DMASK) csum = (csum + 1) & DMASK;
+        if (csum > DMASK)
+            csum = (csum + 1) & DMASK;
         count = (val & DAMASK) - start;                 /* block count */
-        if (count <= 0) return SCPE_FMT;
+        if (count <= 0)
+            return SCPE_FMT;
         while (count--) {                               /* loop on data */
-            if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
+            if ((val = pdp1_getw (inf)) < 0)
+                return SCPE_FMT;
             csum = csum + val;
-            if (csum > DMASK) csum = (csum + 1) & DMASK;
+            if (csum > DMASK)
+                csum = (csum + 1) & DMASK;
             M[fld | start] = val;
             start = (start + 1) & DAMASK;
             }
-        if ((val = pdp1_getw (inf)) < 0) return SCPE_FMT;
-        if (val != csum) return SCPE_CSUM;
+        if ((val = pdp1_getw (inf)) < 0)
+            return SCPE_FMT;
+        if (val != csum)
+            return SCPE_CSUM;
         }
     else if ((val & 0760000) == OP_JMP) {               /* JMP? */
         PC = fld | (val & DAMASK);
@@ -188,15 +200,18 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 t_stat sta;
 int32 fld;
 
-if (flag != 0) return SCPE_ARG;
+if (flag != 0)
+    return SCPE_ARG;
 if (cptr && (*cptr != 0)) {
     fld = get_uint (cptr, 8, AMASK, &sta);
-    if (sta != SCPE_OK) return sta;
+    if (sta != SCPE_OK)
+        return sta;
     fld = fld & EPCMASK;
     }
 else fld = 0;
 sta = rim_load (fileref, fld);
-if (sta != SCPE_OK) return sta;
+if (sta != SCPE_OK)
+    return sta;
 if ((sim_switches & SWMASK ('B')) || match_ext (fnam, "BIN"))
     return blk_load (fileref, fld);
 return SCPE_OK;
@@ -435,7 +450,8 @@ int32 cflag, i, j, sp, inst, disp, ma;
 inst = val[0];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 if (sw & SWMASK ('A')) {                                /* ASCII? */
-    if (inst > 0377) return SCPE_ARG;
+    if (inst > 0377)
+        return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
@@ -449,7 +465,8 @@ if (sw & SWMASK ('C')) {                                /* character? */
     fprintf (of, "%c", SIXTOASC (inst & 077));
     return SCPE_OK;
     }
-if (!(sw & SWMASK ('M'))) return SCPE_ARG;
+if (!(sw & SWMASK ('M')))
+    return SCPE_ARG;
 
 /* Instruction decode */
 
@@ -467,8 +484,10 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
 
         case I_V_IOT:                                   /* IOT */
             disp = (inst - opc_val[i]) & 017777;
-            if (disp == IA) fprintf (of, "%s I", opcode[i]);
-            else if (disp) fprintf (of, "%s %-o", opcode[i], disp);
+            if (disp == IA)
+                fprintf (of, "%s I", opcode[i]);
+            else if (disp)
+                fprintf (of, "%s %-o", opcode[i], disp);
             else fprintf (of, "%s", opcode[i]);
             break;
 
@@ -485,19 +504,24 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
 
         case I_V_OPR:                                   /* operates */
             sp = fprint_opr (of, inst & 017760, j, 0);
-            if (opcode[i]) fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            if (opcode[i])
+                fprintf (of, (sp? " %s": "%s"), opcode[i]);
             break;
 
         case I_V_SKP:                                   /* skips */
             sp = fprint_opr (of, inst & 007700, j, 0);
-            if (opcode[i]) sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
-            if (inst & IA) fprintf (of, sp? " I": "I");
+            if (opcode[i])
+                sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            if (inst & IA)
+                fprintf (of, sp? " I": "I");
             break;
 
         case I_V_SPC:                                   /* specials */
             sp = fprint_opr (of, inst & 007774, j, 0);
-            if (opcode[i]) sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
-            if (inst & IA) fprintf (of, sp? " I": "I");
+            if (opcode[i])
+                sp = fprintf (of, (sp? " %s": "%s"), opcode[i]);
+            if (inst & IA)
+                fprintf (of, sp? " I": "I");
             break;
 
         case I_V_SHF:                                   /* shifts */
@@ -556,15 +580,21 @@ char gbuf[CBUFSIZE];
 
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;
-for (i = 1; (i < 3) && (cptr[i] != 0); i++)
-    if (cptr[i] == 0) for (j = i + 1; j <= 3; j++) cptr[j] = 0;
+for (i = 1; (i < 3) && (cptr[i] != 0); i++) {
+    if (cptr[i] == 0) {
+        for (j = i + 1; j <= 3; j++)
+            cptr[j] = 0;
+        }
+    }
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (t_value) cptr[0];
     return SCPE_OK;
     }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = ((ASCTOSIX (cptr[0]) & 077) << 12) |
              ((ASCTOSIX (cptr[1]) & 077) << 6) |
               (ASCTOSIX (cptr[2]) & 077);
@@ -573,7 +603,8 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* sixbit string? */
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 val[0] = opc_val[i] & DMASK;                            /* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
@@ -588,8 +619,10 @@ switch (j) {                                            /* case on class */
             cptr = get_glyph (cptr, gbuf, 0);
             }
         d = get_uint (gbuf, 8, AMASK, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
-        if (d <= DAMASK) val[0] = val[0] | d;
+        if (r != SCPE_OK)
+            return SCPE_ARG;
+        if (d <= DAMASK)
+            val[0] = val[0] | d;
         else if (cflag && (((addr ^ d) & EPCMASK) == 0))
                 val[0] = val[0] | (d & DAMASK);
         else return SCPE_ARG;
@@ -598,7 +631,8 @@ switch (j) {                                            /* case on class */
     case I_V_SHF:                                       /* shift */
         cptr = get_glyph (cptr, gbuf, 0);
         d = get_uint (gbuf, 10, 9, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
+        if (r != SCPE_OK)
+            return SCPE_ARG;
         val[0] = val[0] | sc_enc[d];
         break;
 
@@ -616,14 +650,18 @@ switch (j) {                                            /* case on class */
                 }
             else {
                 d = get_sint (gbuf, &sign, &r);
-                if (r != SCPE_OK) return SCPE_ARG;
-                if (sign == 0) val[0] = val[0] + d;  
-                else if (sign < 0) val[0] = val[0] - d;
+                if (r != SCPE_OK)
+                    return SCPE_ARG;
+                if (sign == 0)
+                    val[0] = val[0] + d;  
+                else if (sign < 0)
+                    val[0] = val[0] - d;
                 else val[0] = val[0] | d;
                 }
             }
         break;
         }                                               /* end case */
-if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
+if (*cptr != 0)                                         /* junk at end? */
+    return SCPE_ARG;
 return SCPE_OK;
 }

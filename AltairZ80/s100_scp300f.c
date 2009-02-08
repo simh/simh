@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_scp300f.c 1902 2008-05-11 02:40:41Z hharte $                *
+ * $Id: s100_scp300f.c 1940 2008-06-13 05:28:57Z hharte $                *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -53,19 +53,24 @@
 #define DBG_PRINT(args)
 #endif
 
-#define PIO_MSG     0x01
-#define UART_MSG    0x02
-#define RTC_MSG     0x04
-#define MPCL_MSG    0x08
-#define ROM_MSG     0x10
-#define TRACE_MSG   0x80
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define PIO_MSG     (1 << 1)
+#define UART_MSG    (1 << 2)
+#define RTC_MSG     (1 << 3)
+#define ROM_MSG     (1 << 5)
+#define VERBOSE_MSG (1 << 7)
+#define IRQ_MSG     (1 << 8)
 
-#define SCP300F_MAX_DRIVES    1
-#define SCP300F_ROM_SIZE      (2048)
-#define SCP300F_ADDR_MASK     (SCP300F_ROM_SIZE - 1)
+#define SCP300F_MAX_DRIVES  1
+#define SCP300F_ROM_SIZE    (2048)
+#define SCP300F_ADDR_MASK   (SCP300F_ROM_SIZE - 1)
 
-#define UNIT_V_SCP300F_VERBOSE     (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_SCP300F_VERBOSE       (1 << UNIT_V_SCP300F_VERBOSE)
+#define SCP300F_IO_SIZE     (16)
+#define SCP300F_IO_MASK     (SCP300F_IO_SIZE - 1)
+
+#define UNIT_V_SCP300F_VERBOSE  (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
+#define UNIT_SCP300F_VERBOSE    (1 << UNIT_V_SCP300F_VERBOSE)
 
 typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
@@ -74,7 +79,7 @@ typedef struct {
     uint8 rom_enabled;
 } SCP300F_INFO;
 
-static SCP300F_INFO scp300f_info_data = { { 0xFF800, SCP300F_ROM_SIZE, 0xF0, 16 } };
+static SCP300F_INFO scp300f_info_data = { { 0xFF800, SCP300F_ROM_SIZE, 0xF0, SCP300F_IO_SIZE } };
 static SCP300F_INFO *scp300f_info = &scp300f_info_data;
 
 extern t_stat set_membase(UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -84,7 +89,6 @@ extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern uint32 PCX;
-extern REG *sim_PC;
 extern int32 find_unit_index (UNIT *uptr);
 
 static t_stat scp300f_reset(DEVICE *scp300f_dev);
@@ -95,36 +99,51 @@ static uint8 SCP300F_Write(const uint32 Addr, uint8 cData);
 static int32 scp300fdev(const int32 port, const int32 io, const int32 data);
 static int32 scp300f_mem(const int32 port, const int32 io, const int32 data);
 
-static int32 trace_level    = 0x00;     /* Disable all tracing by default */
-static int32 scp300f_sr     = 0x00;     /* Sense Switch Register */
+static int32 scp300f_sr = 0x00;     /* Sense Switch Register, 0=Monitor prompt, 1=disk boot */
 
 static UNIT scp300f_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_DISABLE, 0) }
 };
 
 static REG scp300f_reg[] = {
-    { HRDATA (TRACELEVEL,   trace_level,    16), },
     { HRDATA (SR,           scp300f_sr,     8), },
     { NULL }
 };
 
 static MTAB scp300f_mod[] = {
-    { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
-    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                      "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
+    { MTAB_XTD|MTAB_VDV,    0,                      "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
     /* quiet, no warning messages       */
-    { UNIT_SCP300F_VERBOSE, 0,                    "QUIET",    "QUIET",    NULL },
+    { UNIT_SCP300F_VERBOSE, 0,                      "QUIET",    "QUIET",    NULL },
     /* verbose, show warning messages   */
     { UNIT_SCP300F_VERBOSE, UNIT_SCP300F_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
     { 0 }
 };
+
+#define TRACE_PRINT(level, args)    if(scp300f_dev.dctrl & level) { \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB scp300f_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "PIO",    PIO_MSG },
+    { "UART",   UART_MSG },
+    { "RTC",    RTC_MSG },
+    { "ROM",    ROM_MSG },
+    { "VERBOSE",VERBOSE_MSG },
+    { "IRQ",    IRQ_MSG },
+    { NULL,     0 }
+};
+
 
 DEVICE scp300f_dev = {
     "SCP300F", scp300f_unit, scp300f_reg, scp300f_mod,
     SCP300F_MAX_DRIVES, 10, 31, 1, SCP300F_MAX_DRIVES, SCP300F_MAX_DRIVES,
     NULL, NULL, &scp300f_reset,
     NULL, NULL, NULL,
-    &scp300f_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &scp300f_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    scp300f_dt, NULL, "SCP Support Board SCP300F"
 };
 
 /* Reset routine */
@@ -132,7 +151,7 @@ static t_stat scp300f_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    TRACE_PRINT(TRACE_MSG, ("SCP300F: Reset." NLP));
+    TRACE_PRINT(VERBOSE_MSG, ("SCP300F: Reset." NLP));
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &scp300fdev, TRUE);
@@ -163,6 +182,7 @@ static uint8 scp300f_ram[SCP300F_ROM_SIZE];
  * ; This software is not copyrighted.
  *
  * This was assembled from source (MON.ASM) using 86DOS ASM.COM running under Windows XP.
+ * It is configured for a Cromemco 16FDC disk controller.
  */
 static uint8 scp300f_rom[SCP300F_ROM_SIZE] = {
     0xFC, 0x33, 0xC0, 0x8E, 0xD0, 0x8E, 0xD8, 0x8E, 0xC0, 0xBF, 0x9C, 0x01, 0xB9, 0x0E, 0x00, 0xF3,
@@ -285,14 +305,14 @@ static uint8 scp300f_rom[SCP300F_ROM_SIZE] = {
     0x37, 0x0D, 0x0A, 0x0A, 0x53, 0x43, 0x50, 0x20, 0x38, 0x30, 0x38, 0x36, 0x20, 0x4D, 0x6F, 0x6E,
     0x69, 0x74, 0x6F, 0x72, 0x20, 0x31, 0x2E, 0x35, 0x0D, 0x8A, 0x5E, 0x20, 0x45, 0x72, 0x72, 0x6F,
     0x72, 0x0D, 0x8A, 0x08, 0x20, 0x88, 0x57, 0xB0, 0x01, 0xE6, 0x02, 0xB0, 0x84, 0xE6, 0x00, 0xB0,
-    0x7F, 0xE6, 0x04, 0xB6, 0x21, 0xB0, 0xD0, 0xE6, 0x30, 0xD4, 0x0A, 0xD4, 0x0A, 0xD4, 0x0A, 0xD4,
-    0x0A, 0x80, 0xF6, 0x10, 0x8A, 0xC6, 0xE6, 0x34, 0xBF, 0x00, 0x02, 0xB0, 0x0F, 0xE6, 0x30, 0xE4,
-    0x34, 0xD0, 0xC8, 0x73, 0xFA, 0xE4, 0x30, 0x24, 0x98, 0x75, 0xDA, 0xB0, 0x01, 0xE6, 0x32, 0x8A,
-    0xC6, 0x0C, 0x80, 0xE6, 0x34, 0xB2, 0x33, 0xB0, 0x8C, 0xE6, 0x30, 0xEB, 0x02, 0xEC, 0xAA, 0xE4,
-    0x34, 0xD0, 0xC8, 0x73, 0xF8, 0xE4, 0x30, 0x24, 0x9C, 0x75, 0xBA, 0xC7, 0x06, 0xB2, 0x01, 0x00,
-    0x00, 0xC7, 0x06, 0xB4, 0x01, 0x00, 0x02, 0x5F, 0xE9, 0x8F, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0xEA, 0x00, 0x00, 0x80, 0xFF, 0x0D, 0x00, 0x68, 0x00, 0xA0, 0x01, 0x40, 0x03, 0x78, 0x04, 0x00
+    0x7F, 0xE6, 0x04, 0xB6, 0x21, 0xB0, 0x30, 0xE6, 0x34, 0xB9, 0xC4, 0xAA, 0xD4, 0x0A, 0xD4, 0x0A,
+    0xE2, 0xFA, 0xB0, 0xD0, 0xE6, 0x30, 0xD4, 0x0A, 0xD4, 0x0A, 0xD4, 0x0A, 0xD4, 0x0A, 0x80, 0xF6,
+    0x10, 0x8A, 0xC6, 0xE6, 0x34, 0xBF, 0x00, 0x02, 0xB0, 0x0F, 0xE6, 0x30, 0xE4, 0x34, 0xD0, 0xC8,
+    0x73, 0xFA, 0xE4, 0x30, 0x24, 0x98, 0x75, 0xDA, 0xB0, 0x01, 0xE6, 0x32, 0x8A, 0xC6, 0x0C, 0x80,
+    0xE6, 0x34, 0xB2, 0x33, 0xB0, 0x8C, 0xE6, 0x30, 0xEB, 0x02, 0xEC, 0xAA, 0xE4, 0x34, 0xD0, 0xC8,
+    0x73, 0xF8, 0xE4, 0x30, 0x24, 0x9C, 0x75, 0xBA, 0xC7, 0x06, 0xB2, 0x01, 0x00, 0x00, 0xC7, 0x06,
+    0xB4, 0x01, 0x00, 0x02, 0x5F, 0xE9, 0x82, 0xFE, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xEA, 0x00, 0x00, 0x80, 0xFF, 0x0D, 0x00, 0x68, 0x00, 0xA0, 0x01, 0x40, 0x03, 0x78, 0x04, 0xFF
 };
 
  static int32 scp300f_mem(const int32 Addr, const int32 write, const int32 data)
@@ -347,7 +367,7 @@ static uint8 SCP300F_Read(const uint32 Addr)
 {
     uint8 cData = 0xFF;
 
-    switch(Addr & 0xF) {
+    switch(Addr & SCP300F_IO_MASK) {
         case SCP300F_MPIC_0:
         case SCP300F_MPIC_1:
             TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " Master 8259 DATA RD[%02x]: not implemented." NLP, PCX, Addr));
@@ -364,7 +384,7 @@ static uint8 SCP300F_Read(const uint32 Addr)
             break;
         case SCP300F_UART_DATA:     /* UART is handled by the 2SIO, if this gets called, then the 2SIO was not */
         case SCP300F_UART_STATUS:   /* configured properly. */
-            TRACE_PRINT(TRACE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD[%02x]: UART not configured properly." NLP, PCX, Addr));
+            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD[%02x]: UART not configured properly." NLP, PCX, Addr));
             break;
         case SCP300F_PIO_DATA:
             TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " PIO DATA RD[%02x]: not implemented." NLP, PCX, Addr));
@@ -372,11 +392,16 @@ static uint8 SCP300F_Read(const uint32 Addr)
         case SCP300F_PIO_STATUS:
             TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " PIO STATUS RD[%02x]: not implemented." NLP, PCX, Addr));
             break;
+        case SCP300F_EPROM_DIS:
+            TRACE_PRINT(ROM_MSG, ("SCP300F: " ADDRESS_FORMAT " EPROM DIS RD: EPROM Disabled." NLP, PCX));
+            scp300f_info->rom_enabled = 0;
+            break;
         case SCP300F_SENSE_SW:      /* Sense Switch */
             cData = scp300f_sr;
+            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD: Sense Switch=0x%02x" NLP, PCX, cData));
             break;
         default:
-            TRACE_PRINT(TRACE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD[%02x]: not Implemented." NLP, PCX, Addr));
+            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD[%02x]: not Implemented." NLP, PCX, Addr));
             break;
     }
 
@@ -387,7 +412,7 @@ static uint8 SCP300F_Read(const uint32 Addr)
 static uint8 SCP300F_Write(const uint32 Addr, uint8 cData)
 {
 
-    switch(Addr & 0xF) {
+    switch(Addr & SCP300F_IO_MASK) {
         case SCP300F_MPIC_0:
         case SCP300F_MPIC_1:
             TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " Master 8259 DATA WR[%02x]=%02x: not implemented." NLP, PCX, Addr, cData));
@@ -412,11 +437,15 @@ static uint8 SCP300F_Write(const uint32 Addr, uint8 cData)
         case SCP300F_PIO_STATUS:
             TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to PIO STATUS." NLP, PCX, Addr));
             break;
+        case SCP300F_EPROM_DIS:
+            TRACE_PRINT(ROM_MSG, ("SCP300F: " ADDRESS_FORMAT " EPROM DIS WR: EPROM Disabled." NLP, PCX));
+            scp300f_info->rom_enabled = 0;
+            break;
         case SCP300F_SENSE_SW:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to SR." NLP, PCX, Addr));
+            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to SR." NLP, PCX, Addr));
             break;
         default:
-            TRACE_PRINT(TRACE_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented." NLP, PCX, Addr, cData));
+            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented." NLP, PCX, Addr, cData));
             break;
     }
 

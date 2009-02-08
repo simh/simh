@@ -49,13 +49,15 @@
 /* Byte write macros for system registers */
 
 #define ODD_IGN(cur) \
-    if ((access == WRITEB) && (pa & 1)) return SCPE_OK
+    if ((access == WRITEB) && (pa & 1)) \
+        return SCPE_OK
 #define ODD_WO(cur) \
-    if ((access == WRITEB) && (pa & 1)) cur = cur << 8
+    if ((access == WRITEB) && (pa & 1)) \
+        cur = cur << 8
 #define ODD_MRG(prv,cur) \
-    if (access == WRITEB) cur = \
-        ((pa & 1)? (((prv) & 0377) | ((cur) & 0177400)) : \
-        (((prv) & 0177400) | ((cur) & 0377)))
+    if (access == WRITEB) \
+        cur =((pa & 1)? (((prv) & 0377) | ((cur) & 0177400)) : \
+                        (((prv) & 0177400) | ((cur) & 0377)))
 
 int32 SR = 0;                                           /* switch register */
 int32 DR = 0;                                           /* display register */
@@ -328,8 +330,10 @@ t_stat REG_wr (int32 data, int32 pa, int32 access)
 {
 int32 reg = pa & 07;
 
-if (access == WRITE) R[reg] = data;
-else if (pa & 1) R[reg] = (R[reg] & 0377) | (data << 8);
+if (access == WRITE)
+    R[reg] = data;
+else if (pa & 1)
+    R[reg] = (R[reg] & 0377) | (data << 8);
 else R[reg] = (R[reg] & ~0377) | data;
 return SCPE_OK;
 }
@@ -680,14 +684,19 @@ switch ((pa >> 1) & 017) {                              /* decode pa<4:1> */
 
     case 004:                                           /* MAINT */
         *data = MAINT | MAINT_NOFPA | MAINT_BPOK | (UNIBUS? MAINT_U: MAINT_Q);
-        if (CPUT (CPUT_53)) *data |= MAINT_KDJD | MAINT_POROM;
-        if (CPUT (CPUT_73)) *data |= MAINT_KDJA | MAINT_POODT;
-        if (CPUT (CPUT_73B|CPUT_83|CPUT_84)) *data |= MAINT_KDJB | MAINT_POROM;
-        if (CPUT (CPUT_93|CPUT_94)) *data |= MAINT_KDJE | MAINT_POROM;
+        if (CPUT (CPUT_53))
+            *data |= MAINT_KDJD | MAINT_POROM;
+        if (CPUT (CPUT_73))
+            *data |= MAINT_KDJA | MAINT_POODT;
+        if (CPUT (CPUT_73B|CPUT_83|CPUT_84))
+            *data |= MAINT_KDJB | MAINT_POROM;
+        if (CPUT (CPUT_93|CPUT_94))
+            *data |= MAINT_KDJE | MAINT_POROM;
         return SCPE_OK;
 
     case 005:                                           /* Hit/miss */
-        if (CPUT (CPUT_73B)) *data = 0;                 /* must be 0 for 73B */
+        if (CPUT (CPUT_73B))                            /* must be 0 for 73B */
+            *data = 0;
         else *data = HITMISS | 010;                     /* must be nz for 11/8X */
         return SCPE_OK;
 
@@ -812,12 +821,15 @@ switch ((pa >> 1) & 03) {                               /* decode pa<2:1> */
     case 0:                                             /* CSR */
         ODD_MRG (JCSR, data);
         JCSR = (JCSR & ~CSRJB_WR) | (data & CSRJB_WR);
-        if (JCSR & CSRJ_LTCI) clk_fie = 1;              /* force LTC int enb? */
+        if (JCSR & CSRJ_LTCI)                           /* force LTC int enb? */
+            clk_fie = 1;
         else clk_fie = 0;
-        if (JCSR & CSRJ_LTCD) clk_fnxm = 1;             /* force LTC reg nxm? */
+        if (JCSR & CSRJ_LTCD)                           /* force LTC reg nxm? */
+            clk_fnxm = 1;
         else clk_fnxm = 0;
         t = CSRJ_LTCSEL (JCSR);                         /* get freq sel */
-        if (t) clk_tps = clk_tps_map[t];
+        if (t)
+            clk_tps = clk_tps_map[t];
         else clk_tps = clk_default;
         return SCPE_OK;
 
@@ -900,12 +912,15 @@ switch ((pa >> 1) & 03) {                               /* decode pa<2:1> */
     case 0:                                             /* CSR */
         ODD_MRG (JCSR, data);
         JCSR = (JCSR & ~CSRJE_WR) | (data & CSRJE_WR);
-        if (JCSR & CSRJ_LTCI) clk_fie = 1;              /* force LTC int enb? */
+        if (JCSR & CSRJ_LTCI)                           /* force LTC int enb? */
+            clk_fie = 1;
         else clk_fie = 0;
-        if (JCSR & CSRJ_LTCD) clk_fnxm = 1;             /* force LTC reg nxm? */
+        if (JCSR & CSRJ_LTCD)                           /* force LTC reg nxm? */
+            clk_fnxm = 1;
         else clk_fnxm = 0;
         t = CSRJ_LTCSEL (JCSR);                         /* get freq sel */
-        if (t) clk_tps = clk_tps_map[t];
+        if (t)
+            clk_tps = clk_tps_map[t];
         else clk_tps = clk_default;
         return SCPE_OK;
 
@@ -1016,9 +1031,11 @@ int32 bit;
 
 if (toy_state == 0) {
     curr = time (NULL);                                 /* get curr time */
-    if (curr == (time_t) -1) return 0;                  /* error? */
+    if (curr == (time_t) -1)                            /* error? */
+        return 0;
     ctm = localtime (&curr);                            /* decompose */
-    if (ctm == NULL) return 0;                          /* error? */
+    if (ctm == NULL)                                    /* error? */
+        return 0;
     toy_data[TOY_HSEC] = 0x50;
     toy_data[TOY_SEC] = toy_set (ctm->tm_sec);
     toy_data[TOY_MIN] = toy_set (ctm->tm_min);
@@ -1069,12 +1086,16 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr != NULL) return SCPE_ARG;
-if (val >= MOD_MAX) return SCPE_IERR;
-if (val == (int32) cpu_model) return SCPE_OK;
+if (cptr != NULL)
+    return SCPE_ARG;
+if (val >= MOD_MAX)
+    return SCPE_IERR;
+if (val == (int32) cpu_model)
+    return SCPE_OK;
 if (MEMSIZE > cpu_tab[val].maxm)
     cpu_set_size (uptr, cpu_tab[val].maxm, NULL, NULL);
-if (MEMSIZE > cpu_tab[val].maxm) return SCPE_INCOMP;
+if (MEMSIZE > cpu_tab[val].maxm)
+    return SCPE_INCOMP;
 cpu_model = val;
 cpu_type = 1u << cpu_model;
 cpu_opt = cpu_tab[cpu_model].std;
@@ -1090,8 +1111,9 @@ uint32 i, all_opt;
 fprintf (st, "%s", cpu_tab[cpu_model].name);
 all_opt = cpu_tab[cpu_model].opt;
 for (i = 0; opt_name[2 * i] != NULL; i++) {
-    if ((all_opt >> i) & 1) fprintf (st, ", %s",
-        ((cpu_opt >> i) & 1)? opt_name[2 * i]: opt_name[(2 * i) + 1]);
+    if ((all_opt >> i) & 1)
+        fprintf (st, ", %s",
+                ((cpu_opt >> i) & 1)? opt_name[2 * i]: opt_name[(2 * i) + 1]);
     }   
 return SCPE_OK;
 }
@@ -1100,16 +1122,20 @@ return SCPE_OK;
 
 t_stat cpu_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val & cpu_tab[cpu_model].opt) == 0) return SCPE_ARG;
+if (cptr)
+    return SCPE_ARG;
+if ((val & cpu_tab[cpu_model].opt) == 0)
+    return SCPE_ARG;
 cpu_opt = cpu_opt | val;
 return SCPE_OK;
 }
 
 t_stat cpu_clr_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val & cpu_tab[cpu_model].opt) == 0) return SCPE_ARG;
+if (cptr)
+    return SCPE_ARG;
+if ((val & cpu_tab[cpu_model].opt) == 0)
+    return SCPE_ARG;
 cpu_opt = cpu_opt & ~val;
 return SCPE_OK;
 }
@@ -1122,15 +1148,20 @@ int32 mc = 0;
 uint32 i, clim;
 uint16 *nM;
 
-if ((val <= 0) || (val > (int32) cpu_tab[cpu_model].maxm) ||
-    ((val & 07777) != 0)) return SCPE_ARG;
-for (i = val; i < MEMSIZE; i = i + 2) mc = mc | M[i >> 1];
+if ((val <= 0) ||
+    (val > (int32) cpu_tab[cpu_model].maxm) ||
+    ((val & 07777) != 0))
+    return SCPE_ARG;
+for (i = val; i < MEMSIZE; i = i + 2)
+    mc = mc | M[i >> 1];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
 nM = (uint16 *) calloc (val >> 1, sizeof (uint16));
-if (nM == NULL) return SCPE_MEM;
+if (nM == NULL)
+    return SCPE_MEM;
 clim = (((t_addr) val) < MEMSIZE)? val: MEMSIZE;
-for (i = 0; i < clim; i = i + 2) nM[i >> 1] = M[i >> 1];
+for (i = 0; i < clim; i = i + 2)
+    nM[i >> 1] = M[i >> 1];
 free (M);
 M = nM;
 MEMSIZE = val;
@@ -1146,7 +1177,8 @@ t_stat cpu_set_bus (int32 opt)
 DEVICE *dptr;
 uint32 i, mask;
 
-if (opt & BUS_U) mask = DEV_UBUS;                       /* Unibus variant? */
+if (opt & BUS_U)                                        /* Unibus variant? */
+    mask = DEV_UBUS;
 else if (MEMSIZE <= UNIMEMSIZE)                         /* 18b Qbus devices? */
     mask = DEV_QBUS | DEV_Q18;
 else mask = DEV_QBUS;                                   /* must be 22b */
@@ -1155,7 +1187,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         !(dptr->flags & DEV_DIS) &&                     /* enabled? */
         ((dptr->flags & mask) == 0)) {                  /* not allowed? */
         printf ("Disabling %s\n", sim_dname (dptr));
-        if (sim_log) fprintf (sim_log, "Disabling %s\n", sim_dname (dptr));
+        if (sim_log)
+            fprintf (sim_log, "Disabling %s\n", sim_dname (dptr));
         dptr->flags = dptr->flags | DEV_DIS;
         }
     }
@@ -1172,7 +1205,8 @@ CCR = 0;
 HITMISS = 0;
 CPUERR = 0;
 MEMERR = 0;
-if (!CPUT (CPUT_J)) MAINT = 0;
+if (!CPUT (CPUT_J))
+    MAINT = 0;
 MBRK = 0;
 WCS = 0;
 if (CPUT (CPUT_JB|CPUT_JE))
@@ -1186,8 +1220,10 @@ UCSR = 0;
 uba_last = 0;
 DR = 0;
 toy_state = 0;
-for (i = 0; i < UBM_LNT_LW; i++) ub_map[i] = 0;
-for (i = 0; i < TOY_LNT; i++) toy_data[i] = 0;
+for (i = 0; i < UBM_LNT_LW; i++)
+    ub_map[i] = 0;
+for (i = 0; i < TOY_LNT; i++)
+    toy_data[i] = 0;
 return SCPE_OK;
 }
 

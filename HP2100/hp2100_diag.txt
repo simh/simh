@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2008-05-10
+                             Last update: 2008-08-07
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -55,7 +55,8 @@ The results of the diagnostic runs are summarized below:
 102103  Memory Expansion Unit                    1830  3.2-3  Passed
 102103  Semiconductor Memory Microcoded 21MX     1644    -    No simulation
 103301  Time Base Generator                      1830  3.2-3  Passed
-103115  12936 Privileged Interrupt               1643    -    No simulation
+103115  12936 Privileged Interrupt               1643  3.8-1  Passed
+143300  12620 Breadboard Interface/Priv Int      1813  3.8-1  Passed
 103105  12908/12978 WCS 256 Word                 1502    -    No simulation
 103023  13197 WCS 1024 Word                      1640    -    No simulation
 103207  12889 Hardwired Serial Interface         1717    -    No simulation
@@ -114,7 +115,7 @@ The following stand-alone diagnostics were run for devices not supported by the
 Part Number   DSN    Diagnostic Name                       Code  Vers.  Result
 -----------  ------  ------------------------------------  ----  -----  ----------
 13207-16001  101217  2000/Access Comm Processor for 21MX   1728  3.2-3  Passed
-20433-?????    --    HP 3030 Magnetic Tape Subsystem        --     -    Not tested
+20433-60001    --    HP 3030 Magnetic Tape Subsystem        --     -    Not tested
 22682-16017  177777  HP 2100 Fixed Head Disc/Drum (277x)   1612  3.3-0  Passed
 24197-60001    --    12875 Processor Interconnect Cable     B    3.7-1  Passed
 24203-60001    --    HP2100A Cartridge Disc Memory (2871)   A    3.3-0  Partial
@@ -536,7 +537,7 @@ CONFIGURATION:  sim> set CPU 2116
 
                 HALT instruction 102074
 
-                sim> deposit S 040000
+                sim> deposit S 000000
                 sim> reset
                 sim> go
 
@@ -552,6 +553,61 @@ TEST REPORT:    H0. START DMA DIAGNOSTIC
                 HALT instruction 102077
 
 TEST RESULT:    Passed.
+
+
+
+----------------------------------------------
+DSN 101105 - Direct Memory Access (2114/15/16)
+----------------------------------------------
+
+TESTED DEVICE:  DMA0 (hp2100_cpu.c)
+
+CONFIGURATION:  sim> set CPU 2114
+                sim> set CPU 16K
+                sim> set LPS diag
+
+                sim> deposit 003612 004036
+
+                sim> deposit S 000014
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> reset
+                sim> go
+
+TEST REPORT:    H0. START DMA DIAGNOSTIC
+
+                HALT instruction 102027
+
+                sim> reset
+                sim> go
+
+                H77. END DIAGNOSTIC
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+TEST NOTES:     Diagnostic tapes 24322-16001 Revs. 1431 and 1502 have a bug in
+                Test 17.  Test 17 checks byte unpacking for output transfers on
+                2115 and 2116 computers.  The documentation says that it is not
+                performed on 2114 computers.  The prolog for Test 17 does check
+                if packing is supported, and if not, it skips the test.
+
+                However, the target of the skip is not the entry to Test 20 but
+                is instead the short version of Test 17.  When DMA channel 2 is
+                tested in Test 17, it fails with:
+
+                  E53. D2 FLG CLR
+                  E71. D2 OUT. GOOD=000001, BAD=000000
+
+                ...because there is no DMA channel 2 on the 2114.
+
+                We work around this problem by setting the jump target to Test
+                20 with "deposit 003612 004036".
 
 
 
@@ -991,6 +1047,87 @@ TEST REPORT:    TBG DIAGNOSTIC, DSN = 103301
                 H030 TEST 10 IN PROGRESS
                 H030 TEST 11 IN PROGRESS
                 H030 TEST 12 IN PROGRESS
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------
+DSN 103115 - Privileged Interrupt
+---------------------------------
+
+TESTED DEVICE:  PIF (hp2100_pif.c)
+
+CONFIGURATION:  sim> set PIF 12936A
+                sim> set LPT DEV=44
+
+                sim> deposit S 004414
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102070
+
+                sim> deposit S 000037
+                sim> go
+
+                HALT instruction 102074
+
+                sim> deposit S 000000
+                sim> go
+
+TEST REPORT:    12936 PRIVILEGED INTERRUPT CARD DIAGNOSTIC
+                H032 PRESS PRESET(EXT), RUN
+
+                HALT instruction 102032
+
+                sim> reset
+                sim> go
+
+                PASS 000001
+
+                HALT instruction 102077
+
+TEST RESULT:    Passed.
+
+
+
+-------------------------------------
+DSN 143300 - General Purpose Register
+-------------------------------------
+
+TESTED DEVICE:  PIF (hp2100_pif.c)
+
+CONFIGURATION:  sim> set PIF 12620A
+
+                sim> deposit S 000037
+                sim> reset
+                sim> go 100
+
+                HALT instruction 102074
+
+                sim> deposit S 001000
+                sim> go
+
+TEST REPORT:    GENERAL PURPOSE REGISTER DIAGNOSTIC,  DSN 143300
+
+                HALT instruction 102075
+
+                sim> deposit A 000001
+                sim> deposit S 000000
+                sim> go
+
+                H024 PRESS PRESET (EXT&INT),RUN
+
+                HALT instruction 102024
+
+                sim> reset
+                sim> go
+
+                H025 BASIC I-O COMPLETED
+
                 PASS 000001
 
                 HALT instruction 102077
@@ -2228,7 +2365,7 @@ TEST NOTES:     Steps 4, 8, and 10 test the protected cylinder bit.  Step 7
 DSN 112200 - 9-Track Magnetic Tape (7970B, 13181)
 -------------------------------------------------
 
-DEVICE:         MS (hp2100_ms.c)
+TESTED DEVICE:  MS (hp2100_ms.c)
 
 CONFIGURATION:  sim> detach MSC0
                 sim> set MSC 13181A
@@ -2389,7 +2526,7 @@ TEST NOTES:     Test 23 verifies the LRCC and CRCC values obtained from the
 DSN 112200 - 9-Track Magnetic Tape (7970E, 13183)
 -------------------------------------------------
 
-DEVICE:         MS (hp2100_ms.c)
+TESTED DEVICE:  MS (hp2100_ms.c)
 
 CONFIGURATION:  sim> detach MSC0
                 sim> set MSC 13183A
@@ -2769,9 +2906,8 @@ TEST REPORT:    (none)
 
 TEST RESULT:    Not tested.
 
-TEST NOTES:     The limited documentation available for this unit suggests that
-                the diagnostic is HP product number 20433, but no copy of this
-                diagnostic has been found.
+TEST NOTES:     No copy of the diagnostic (HP product number 20433) has been
+                found.
 
 
 

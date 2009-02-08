@@ -1,6 +1,6 @@
 /* sim_sock.c: OS-dependent socket routines
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -146,7 +146,8 @@ struct sockaddr_in name;
 int32 sta;
 
 newsock = sim_create_sock ();                           /* create socket */
-if (newsock == INVALID_SOCKET) return newsock;          /* socket error? */
+if (newsock == INVALID_SOCKET)                          /* socket error? */
+    return newsock;
 
 name.sin_family = AF_INET;                              /* name socket */
 name.sin_port = htons ((unsigned short) port);          /* insert port */
@@ -171,7 +172,8 @@ struct sockaddr_in name;
 int32 sta;
 
 newsock = sim_create_sock ();                           /* create socket */
-if (newsock == INVALID_SOCKET) return newsock;          /* socket error? */
+if (newsock == INVALID_SOCKET)                          /* socket error? */
+    return newsock;
 
 name.sin_family = AF_INET;                              /* name socket */
 name.sin_port = htons ((unsigned short) port);          /* insert port */
@@ -204,7 +206,8 @@ size_t size;
 SOCKET newsock;
 struct sockaddr_in clientname;
 
-if (master == 0) return INVALID_SOCKET;                 /* not attached? */
+if (master == 0)                                        /* not attached? */
+    return INVALID_SOCKET;
 size = sizeof (clientname);
 newsock = accept (master, (struct sockaddr *) &clientname, &size);
 if (newsock == INVALID_SOCKET) {                        /* error? */
@@ -233,10 +236,13 @@ FD_ZERO (rw_p);
 FD_ZERO (er_p);
 FD_SET (sock, rw_p);
 FD_SET (sock, er_p);
-if (rd) select ((int) sock + 1, rw_p, NULL, er_p, &tz);
+if (rd)
+    select ((int) sock + 1, rw_p, NULL, er_p, &tz);
 else select ((int) sock + 1, NULL, rw_p, er_p, &tz);
-if (FD_ISSET (sock, rw_p)) return 1;
-if (FD_ISSET (sock, er_p)) return -1;
+if (FD_ISSET (sock, rw_p))
+    return 1;
+if (FD_ISSET (sock, er_p))
+    return -1;
 return 0;
 }
 
@@ -245,10 +251,12 @@ int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes)
 int32 rbytes, err;
 
 rbytes = recv (sock, buf, nbytes, 0);
-if (rbytes == 0) return -1;                             /* disconnect */
+if (rbytes == 0)                                        /* disconnect */
+    return -1;
 if (rbytes == SOCKET_ERROR) {
     err = WSAGetLastError ();
-    if (err == WSAEWOULDBLOCK) return 0;                /* no data */
+    if (err == WSAEWOULDBLOCK)                          /* no data */
+        return 0;
     printf ("Sockets: read error %d\n", err);
     return -1;
     }
@@ -299,12 +307,15 @@ int32 sim_setnonblock (SOCKET sock)
 int32 fl, sta;
 
 fl = fcntl (sock, F_GETFL,0);                           /* get flags */
-if (fl == -1) return SOCKET_ERROR;
+if (fl == -1)
+    return SOCKET_ERROR;
 sta = fcntl (sock, F_SETFL, fl | O_NONBLOCK);           /* set nonblock */
-if (sta == -1) return SOCKET_ERROR;
+if (sta == -1)
+    return SOCKET_ERROR;
 #if !defined (macintosh) && !defined (__EMX__)          /* Unix only */
 sta = fcntl (sock, F_SETOWN, getpid());                 /* set ownership */
-if (sta == -1) return SOCKET_ERROR;
+if (sta == -1)
+    return SOCKET_ERROR;
 #endif
 return 0;
 }

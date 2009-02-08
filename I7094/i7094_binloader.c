@@ -1,6 +1,6 @@
 /* i7094_binloader.c: IBM 7094 simulator interface
 
-   Copyright (c) 2006, David G. Pitts
+   Copyright (c) 2008, David G. Pitts
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -115,7 +115,7 @@ binloader (FILE *fd, char *file, int loadpt)
       char *op = inbuf;
       int i;
 
-      if (*op == IBSYSSYM)	/* End of object marker */
+      if (*op == IBSYSSYM)	                            /* End of object marker */
          break;
 
       for (i = 0; i < WORDPERREC; i++)
@@ -125,7 +125,8 @@ binloader (FILE *fd, char *file, int loadpt)
 	t_uint64 ldata;
 
 	otag = *op++;
-	if (otag == ' ') break;
+	if (otag == ' ')
+        break;
 	strncpy (item, op, CHARWORD);
 	item[CHARWORD] = '\0';
 #ifdef WIN32
@@ -185,7 +186,8 @@ binloader (FILE *fd, char *file, int loadpt)
 #ifdef DEBUGLOADER
 	    fprintf (lfd, "   PC = %05o\n", PC);
 #endif
-	    if (transfer) goto GOSTART;
+	    if (transfer)
+            goto GOSTART;
 	    break;
 
 	case RELXFER_TAG:
@@ -196,7 +198,8 @@ binloader (FILE *fd, char *file, int loadpt)
 #ifdef DEBUGLOADER
 	    fprintf (lfd, "   PC = %05o\n", PC);
 #endif
-	    if (transfer) goto GOSTART;
+	    if (transfer)
+            goto GOSTART;
 	    break;
 
 	default: ;

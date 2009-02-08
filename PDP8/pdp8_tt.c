@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -153,7 +153,8 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         return (AC | tti_unit.buf);                     /* return buffer */
 
     case 5:                                             /* KIE */
-        if (AC & 1) int_enable = int_enable | (INT_TTI+INT_TTO);
+        if (AC & 1)
+            int_enable = int_enable | (INT_TTI+INT_TTO);
         else int_enable = int_enable & ~(INT_TTI+INT_TTO);
         int_req = INT_UPDATE;                           /* update interrupts */
         return AC;
@@ -175,8 +176,10 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
-if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
+if (c & SCPE_BREAK)                                     /* break? */
+    uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 uptr->pos = uptr->pos + 1;
 dev_done = dev_done | INT_TTI;                          /* set done */

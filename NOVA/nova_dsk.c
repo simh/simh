@@ -222,7 +222,8 @@ if (pulse & 1) {                                        /* read or write? */
     DEV_SET_BUSY( INT_DSK ) ;
     DEV_UPDATE_INTR ;
     t = sector_map[dsk_da & DSK_MMASK] - GET_SECTOR (dsk_time);
-    if (t < 0) t = t + DSK_NUMSC;
+    if (t < 0)
+        t = t + DSK_NUMSC;
     sim_activate (&dsk_unit, t * dsk_time);             /* activate */
     }
 return rval;
@@ -249,7 +250,8 @@ da = dsk_da * DSK_NUMWD;                                /* calc disk addr */
 if (uptr->FUNC == iopS) {                               /* read? */
     for (i = 0; i < DSK_NUMWD; i++) {                   /* copy sector */
         pa = MapAddr (0, (dsk_ma + i) & AMASK);         /* map address */
-        if (MEM_ADDR_OK (pa)) M[pa] = fbuf[da + i];
+        if (MEM_ADDR_OK (pa))
+            M[pa] = fbuf[da + i];
         }
     dsk_ma = (dsk_ma + DSK_NUMWD) & AMASK;
     }
@@ -313,7 +315,8 @@ uint32 ds_bytes = DSK_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
-    if (p >= DSK_NUMDK) p = DSK_NUMDK - 1;
+    if (p >= DSK_NUMDK)
+        p = DSK_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) | (p << UNIT_V_PLAT);
     }
 uptr->capac = UNIT_GETP (uptr->flags) * DSK_DKSIZE;     /* set capacity */
@@ -325,8 +328,10 @@ return attach_unit (uptr, cptr);
 
 t_stat dsk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val < 0) return SCPE_IERR;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (val < 0)
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = UNIT_GETP (val) * DSK_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;

@@ -1,6 +1,6 @@
 /* lgp_sys.c: LGP-30 simulator interface
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -108,8 +108,10 @@ while ((c = fgetc (fi)) != EOF) {
     else flex = ascii_to_flex[c & 0x7F];
     if ((flex == FLEX_CR) || (flex == FLEX_DEL) ||
         (flex == FLEX_UC) || (flex == FLEX_LC) ||
-        (flex == FLEX_BS) || (flex < 0)) continue;
-    if (flex == FLEX_CSTOP) return SCPE_OK;
+        (flex == FLEX_BS) || (flex < 0))
+        continue;
+    if (flex == FLEX_CSTOP)
+        return SCPE_OK;
     *wd = (*wd << 4) | ((flex >> 2) & 0xF);
     }
 return SCPE_FMT;
@@ -125,10 +127,12 @@ n1 = (wd >> 12) & 0xF;
 n2 = (wd >> 8) & 0xF;
 n3 = (wd >> 4) & 0xF;
 n4 = wd & 0xF;
-if ((n2 > 9) || (n4 > 9)) return SCPE_ARG;
+if ((n2 > 9) || (n4 > 9))
+    return SCPE_ARG;
 tr = (n1 * 10) + n2;
 sc = (n3 * 10) + n4;
-if ((tr >= NTK_30) || (sc >= NSC_30)) return SCPE_ARG;
+if ((tr >= NTK_30) || (sc >= NSC_30))
+    return SCPE_ARG;
 *ad = (tr * NSC_30) + sc;
 return SCPE_OK;
 }
@@ -141,7 +145,8 @@ uint32 wd, origin, amod, csum, cnt, tr, sc, ad, cmd;
 
 origin = amod = 0;
 for (;;) {                                              /* until stopped */
-    if (load_getw (fi, &wd)) break;                     /* get ctrl word */
+    if (load_getw (fi, &wd))                            /* get ctrl word */
+        break;
     cmd = (wd >> 28) & 0xF;                             /* get <0:3> */
     switch (cmd) {                                      /* decode <0:3> */
 
@@ -149,22 +154,28 @@ for (;;) {                                              /* until stopped */
             return SCPE_FMT;
 
         case 0x3:                                       /* ; start fill */
-            if (load_geta (wd, &origin)) return SCPE_FMT; /* origin = addr */
+            if (load_geta (wd, &origin))                /* origin = addr */
+                return SCPE_FMT;
             break;
 
         case 0x4:                                       /* / set modifier */
-            if (load_geta (wd, &amod)) return SCPE_FMT; /* modifier = addr */
+            if (load_geta (wd, &amod))                  /* modifier = addr */
+                return SCPE_FMT;
             break;
 
         case 0x5:                                       /* . transfer */
-            if (load_geta (wd, &PC)) return SCPE_FMT;   /* PC = addr */
+            if (load_geta (wd, &PC))                    /* PC = addr */
+                return SCPE_FMT;
             return SCPE_OK;                             /* done! */
 
         case 0x6:                                       /* hex words */
-            if (load_geta (wd, &cnt)) return SCPE_FMT;  /* count = addr */
-            if ((cnt == 0) || (cnt > 63)) return SCPE_FMT;
+            if (load_geta (wd, &cnt))                   /* count = addr */
+                return SCPE_FMT;
+            if ((cnt == 0) || (cnt > 63))
+                return SCPE_FMT;
             while (cnt--) {                             /* fill hex words */
-                if (load_getw (fi, &wd)) return SCPE_FMT;
+                if (load_getw (fi, &wd))
+                    return SCPE_FMT;
                 Write (origin, wd);
                 origin = (origin + 1) & AMASK;
                 }
@@ -175,22 +186,27 @@ for (;;) {                                              /* until stopped */
             tr = (wd >> 8) & 0xFF;                      /* hex track */
             sc = wd & 0xFF;                             /* hex sector */
             if ((cnt == 0) || (cnt > 0x7FF) ||          /* validate */
-                (tr >= NTK_30) || (sc >= NSC_30)) return SCPE_ARG;
+                (tr >= NTK_30) || (sc >= NSC_30))
+                return SCPE_ARG;
             ad = (tr * NSC_30) + sc;                    /* decimal addr */
             for (csum = 0; cnt; cnt--) {                /* fill words */
-                if (load_getw (fi, &wd)) return SCPE_FMT;
+                if (load_getw (fi, &wd))
+                    return SCPE_FMT;
                 Write (ad, wd);
                 csum = (csum + wd) & MMASK;
                 ad = (ad + 1) & AMASK;
                 }
             if (!(sim_switches & SWMASK ('N'))) {       /* unless -n, csum */
-                if (load_getw (fi, &wd)) return SCPE_FMT;
-/*              if ((csum ^wd) & MMASK) return SCPE_CSUM; */
+                if (load_getw (fi, &wd))
+                    return SCPE_FMT;
+/*              if ((csum ^wd) & MMASK)
+                    return SCPE_CSUM; */
                 }
             break;
 
         case 0x0: case 0x8:                             /* instructions */
-            if (load_geta (wd, &ad)) return SCPE_FMT;   /* get address */
+            if (load_geta (wd, &ad))                    /* get address */
+                return SCPE_FMT;
             if ((wd & 0x00F00000) != 0x00900000)        /* if not x, */
                 ad = (ad + amod) & AMASK;               /* modify */
             wd = (wd & (SIGN|I_OP)) + (ad << I_V_EA);   /* instruction */
@@ -265,22 +281,26 @@ uint32 inst, op, ea;
 
 inst = val[0];
 if (sw & SWMASK ('A')) {                                /* alphabetic? */
-    if ((uptr == NULL) || !(uptr->flags & UNIT_ATT)) return SCPE_ARG;
+    if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
+        return SCPE_ARG;
     if (uptr->flags & UNIT_FLEX) {                      /* Flex file? */
         c = flex_to_ascii[inst];                        /* get ASCII equiv */
-        if (c <= 0) return SCPE_ARG;
+        if (c <= 0)
+            return SCPE_ARG;
         }
     else c = inst & 0x7F;                               /* ASCII file */
     fputc (c, of);
     return SCPE_OK;
     }
 
-if (uptr && (uptr != &cpu_unit)) return SCPE_ARG;       /* must be CPU */
+if (uptr && (uptr != &cpu_unit))                        /* must be CPU */
+    return SCPE_ARG;
 if ((sw & SWMASK ('M')) &&                              /* symbolic decode? */
     ((inst & ~(SIGN|I_OP|I_EA)) == 0)) {
 	op = I_GETOP (inst);
     ea = I_GETEA (inst);
-    if (inst & SIGN) fputc ('-', of);
+    if (inst & SIGN)
+        fputc ('-', of);
     fprintf (of, "%c ", opcode[op]);
     lgp_fprint_addr (of, sim_devices[0], ea);
     return SCPE_OK;
@@ -314,33 +334,41 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 int32 i, c;
 char *tptr;
 
-while (isspace (*cptr)) cptr++;                         /* absorb spaces */
+while (isspace (*cptr))                                 /* absorb spaces */
+    cptr++;
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) {
-    if ((uptr == NULL) || !(uptr->flags & UNIT_ATT)) return SCPE_ARG;
+    if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
+        return SCPE_ARG;
     if (uptr->flags & UNIT_FLEX) {                      /* Flex file? */        
         c = ascii_to_flex[*cptr & 0x7F];                /* get Flex equiv */
-        if (c < 0) return SCPE_ARG;
+        if (c < 0)
+            return SCPE_ARG;
         val[0] = ((c >> 1) | (c << 5)) & 0x3F;          /* transpose */
         }
     else val[0] = *cptr & 0x7F;                         /* ASCII file */
     return SCPE_OK;
     }   
 
-if (uptr && (uptr != &cpu_unit)) return SCPE_ARG;       /* must be CPU */
-if (!parse_sym_m (cptr, val, sw)) return SCPE_OK;       /* symbolic parse? */
+if (uptr && (uptr != &cpu_unit))                        /* must be CPU */
+    return SCPE_ARG;
+if (!parse_sym_m (cptr, val, sw))                       /* symbolic parse? */
+    return SCPE_OK;
 if ((sw & SWMASK ('L')) ||                              /* LGP hex? */
     ((cpu_unit.flags & UNIT_LGPH_D) && !(sw & SWMASK ('H')))) {
     val[0] = 0;
     while (isspace (*cptr)) cptr++;                     /* absorb spaces */
     for (i = 0; i < 8; i++) {
         c = *cptr++;                                    /* get char */
-        if (c == 0) return SCPE_OK;
-        if (islower (c)) c = toupper (c);
+        if (c == 0)
+            return SCPE_OK;
+        if (islower (c))
+            c = toupper (c);
         if (tptr = strchr (hex_decode, c))
             val[0] = (val[0] << 4) | (tptr - hex_decode);
         else return SCPE_ARG;
         }
-    if (*cptr == 0) return SCPE_OK;
+    if (*cptr == 0)
+        return SCPE_OK;
     }
 return SCPE_ARG;
 }
@@ -358,7 +386,8 @@ if (*cptr == '-') {
     }
 else sgn = 0;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
-if (gbuf[1] != 0) return SCPE_ARG;
+if (gbuf[1] != 0)
+    return SCPE_ARG;
 if (tptr = strchr (opcode, gbuf[0]))
     val[0] = ((tptr - opcode) << I_V_OP) | sgn;         /* merge opcode */
 else return SCPE_ARG;
@@ -367,6 +396,7 @@ ea = lgp_parse_addr (sim_devices[0], gbuf, &tptr);
 if ((tptr == gbuf) || (*tptr != 0) || (ea > AMASK))
     return SCPE_ARG;
 val[0] = val[0] | (ea << I_V_EA);                       /* merge address */
-if (*cptr != 0) return SCPE_2MARG;
+if (*cptr != 0)
+    return SCPE_2MARG;
 return SCPE_OK;
 }

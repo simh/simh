@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Jul-08    RMS     Added missing A magtape modifier (from Van Snyder)
+                        Fixed tape indicator implementation (from Bob Abeles)
+                        Fixed bug in ZA and ZS (from Bob Abeles)
    07-Jul-07    RMS     Removed restriction on load-mode binary tape
    28-Jun-07    RMS     Added support for SS overlap modifiers
    22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
@@ -165,7 +168,8 @@ typedef struct {
                             reason = STOP_INVBR; \
                             break; \
                             } \
-                        if (cpu_unit.flags & XSA) BS = IS; \
+                        if (cpu_unit.flags & XSA) \
+                            BS = IS; \
                         else BS = BA + 0; \
                         PCQ_ENTRY; \
                         IS = AS;
@@ -220,7 +224,8 @@ extern t_stat write_line (int32 ilnt, int32 mod);
 extern t_stat inq_io (int32 flag, int32 mod);
 extern t_stat mt_io (int32 unit, int32 flag, int32 mod);
 extern t_stat dp_io (int32 fnc, int32 flag, int32 mod);
-extern t_stat mt_func (int32 unit, int32 mod);
+extern t_stat mt_func (int32 unit, int32 flag, int32 mod);
+extern t_bool mt_testind (void);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
 extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
@@ -488,12 +493,23 @@ static const int32 cry_table[100] = {
 
 /* Legal modifier tables */
 
-static const int32 r_mod[] = { BCD_C, -1 };
-static const int32 p_mod[] = { BCD_C, -1 };
-static const int32 w_mod[] = { BCD_S, BCD_SQUARE, -1 };
-static const int32 ss_mod[] = { BCD_ONE, BCD_TWO, BCD_FOUR, BCD_EIGHT,
-    BCD_DOLLAR, BCD_DECIMAL, BCD_SQUARE, -1 };
-static const int32 mtf_mod[] = { BCD_B, BCD_E, BCD_M, BCD_R, BCD_U, -1 };
+static const int32 r_mod[] = {
+    BCD_C, -1
+    };
+static const int32 p_mod[] = {
+    BCD_C, -1
+    };
+static const int32 w_mod[] = {
+    BCD_S, BCD_SQUARE, -1
+    };
+static const int32 ss_mod[] = {
+    BCD_ONE, BCD_TWO, BCD_FOUR, BCD_EIGHT,
+    BCD_DOLLAR, BCD_DECIMAL, BCD_SQUARE, -1
+    };
+static const int32 mtf_mod[] = {
+    BCD_A, BCD_B, BCD_E,
+    BCD_M, BCD_R, BCD_U, -1
+    };
 
 t_stat sim_instr (void)
 {
@@ -509,8 +525,10 @@ t_stat reason, r1, r2;
 /* Restore saved state */
 
 IS = saved_IS;
-if (as_err) AS = AS | BA;                               /* flag bad addresses */
-if (bs_err) BS = BS | BA;
+if (as_err)                                             /* flag bad addresses */
+    AS = AS | BA;
+if (bs_err)
+    BS = BS | BA;
 as_err = bs_err = 0;                                    /* reset error flags */
 reason = 0;
 
@@ -525,7 +543,8 @@ while (reason == 0) {                                   /* loop until halted */
 
     saved_IS = IS;                                      /* commit prev instr */
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ()) break;
+        if (reason = sim_process_event ())
+            break;
         }
 
     if (sim_brk_summ && sim_brk_test (IS, SWMASK ('E'))) { /* breakpoint? */
@@ -568,17 +587,20 @@ while (reason == 0) {                                   /* loop until halted */
         reason = STOP_NXI;                              /* illegal inst? */
         break;
         }
-    if (op == OP_SAR) BS = AS;                          /* SAR? save ASTAR */
+    if (op == OP_SAR)                                   /* SAR? save ASTAR */
+        BS = AS;
     PP (IS);
 
-    if ((t = M[IS]) & WM) goto CHECK_LENGTH;            /* I-1: WM? 1 char inst */
+    if ((t = M[IS]) & WM)                               /* I-1: WM? 1 char inst */
+        goto CHECK_LENGTH;
     D = ioind = t;                                      /* could be D char, % */
     AS = hun_table[t];                                  /* could be A addr */
     PP (IS);                                            /* if %xy, BA is set */
 
     if ((t = M[IS]) & WM) {                             /* I-2: WM? 2 char inst */
         AS = AS | BA;                                   /* ASTAR bad */
-        if (!(flags & MLS)) BS = AS;
+        if (!(flags & MLS))
+            BS = AS;
         goto CHECK_LENGTH;
         }
     D = dev = t;                                        /* could be D char, dev */
@@ -587,11 +609,13 @@ while (reason == 0) {                                   /* loop until halted */
 
     if ((t = M[IS]) & WM) {                             /* I-3: WM? 3 char inst */
         AS = AS | BA;                                   /* ASTAR bad */
-        if (!(flags & MLS)) BS = AS;
+        if (!(flags & MLS))
+            BS = AS;
         goto CHECK_LENGTH;
         }
     D = unit = t;                                       /* could be D char, unit */
-    if (unit == BCD_ZERO) unit = 0;                     /* convert unit to binary */
+    if (unit == BCD_ZERO)                               /* convert unit to binary */
+        unit = 0;
     AS = AS + one_table[t];                             /* finish A addr */
     xa = (AS >> V_INDEX) & M_INDEX;                     /* get index reg */
     if (xa && (ioind != BCD_PERCNT) && (cpu_unit.flags & XSA)) { /* indexed? */
@@ -599,10 +623,12 @@ while (reason == 0) {                                   /* loop until halted */
             one_table[M[xa + 2] & CHAR];
         AS = (AS & INDEXMASK) % MAXMEMSIZE;
         }
-    if (!(flags & MLS)) BS = AS;                        /* not MLS? B = A */
+    if (!(flags & MLS))                                 /* not MLS? B = A */
+        BS = AS;
     PP (IS);
 
-    if ((t = M[IS]) & WM) goto CHECK_LENGTH;            /* I-4: WM? 4 char inst */
+    if ((t = M[IS]) & WM)                               /* I-4: WM? 4 char inst */
+        goto CHECK_LENGTH;
     if ((op == OP_B) && (t == BCD_BLANK))               /* BR + space? */
          goto CHECK_LENGTH;
     D = t;                                              /* could be D char */
@@ -631,14 +657,17 @@ while (reason == 0) {                                   /* loop until halted */
         }
     PP (IS);
 
-    if (flags & NOWM) goto CHECK_LENGTH;                /* I-7: SWM? done */
-    if ((t = M[IS]) & WM) goto CHECK_LENGTH;            /* WM? 7 char inst */
+    if (flags & NOWM)                                   /* I-7: SWM? done */
+        goto CHECK_LENGTH;
+    if ((t = M[IS]) & WM)                               /* WM? 7 char inst */
+        goto CHECK_LENGTH;
     D = t;                                              /* last char is D */
     while (((t = M[IS]) & WM) == 0) {                   /* I-8: repeats until WM */
         D = t;                                          /* last char is D */
         PP (IS);
         }
-    if (reason) break;                                  /* addr err on last? */
+    if (reason)                                         /* addr err on last? */
+        break;
 
 CHECK_LENGTH:
     if ((flags & BREQ) && ADDR_ERR (BS)) {              /* valid B? */
@@ -652,7 +681,8 @@ CHECK_LENGTH:
     ilnt = IS - saved_IS;                               /* get lnt */
     if (hst_lnt) {                                      /* history enabled? */
         hst_p = (hst_p + 1);                            /* next entry */
-        if (hst_p >= hst_lnt) hst_p = 0;
+        if (hst_p >= hst_lnt)
+            hst_p = 0;
         hst[hst_p].is = saved_IS;                       /* save IS */
         hst[hst_p].ilnt = ilnt;
         for (i = 0; (i < MAX_L) && (i < ilnt); i++)
@@ -661,9 +691,11 @@ CHECK_LENGTH:
     if (DEBUG_PRS (cpu_dev)) {
         fprint_val (sim_deb, saved_IS, 10, 5, PV_RSPC);
         fprintf (sim_deb, ": " );
-        for (i = 0; i < sim_emax; i++) sim_eval[i] = 0;
+        for (i = 0; i < sim_emax; i++)
+            sim_eval[i] = 0;
         for (i = 0, k = saved_IS; i < sim_emax; i++, k++) {
-            if (cpu_ex (&sim_eval[i], k, &cpu_unit, 0) != SCPE_OK) break;
+            if (cpu_ex (&sim_eval[i], k, &cpu_unit, 0) != SCPE_OK)
+                break;
             }
         fprint_sym (sim_deb, saved_IS, sim_eval, &cpu_unit, SWMASK('M'));
         fprintf (sim_deb, "\n" );
@@ -756,18 +788,22 @@ CHECK_LENGTH:
         do {
             wm = M[AS];
             M[BS] = M[AS] & ((BS != bsave)? CHAR: DIGIT);/* copy char */
-            MM (AS); MM (BS);                           /* decr pointers */
+            MM (AS);                                    /* decr pointers */
+            MM (BS);
             } while ((wm & WM) == 0);                   /* stop on A WM */
-        if (reason) break;                              /* addr err? stop */
+        if (reason)                                     /* addr err? stop */
+            break;
         do {
             PP (BS);                                    /* adv B */
             t = M[BS];                                  /* get B, cant be WM */
             if ((t == BCD_ZERO) || (t == BCD_COMMA)) {
-                if (qzero) M[BS] = 0;
+                if (qzero)
+                    M[BS] = 0;
                 }
             else if ((t == BCD_BLANK) || (t == BCD_MINUS)) ;
             else if (((t == BCD_DECIMAL) && (cpu_unit.flags & EPE)) ||
-                 (t <= BCD_NINE)) qzero = 0;
+                (t <= BCD_NINE))
+                qzero = 0;
             else qzero = 1;
             } while (BS < bsave);
         PP (BS);                                        /* BS end is B+1 */
@@ -800,18 +836,33 @@ CHECK_LENGTH:
 */
 
     case OP_B:                                          /* branch */
-        if (ilnt == 4) { BRANCH; }                      /* uncond branch? */
+        if (ilnt == 4) {                                /* uncond branch? */
+            BRANCH;
+            }
         else if (ilnt == 5) {                           /* branch on ind? */
-            if (ind[D]) { BRANCH; }                     /* test indicator */
-            if (ind_table[D]) ind[D] = 0;               /* reset if needed */
+            if (D == IN_END) {                          /* tape indicator */
+                if (mt_testind ()) {                    /* test, reset */
+                    BRANCH;
+                    }
+                else break;
+                }
+            if (ind[D]) {                               /* test indicator */
+                BRANCH;
+                }
+            if (ind_table[D])                           /* reset if needed */
+                ind[D] = 0;
             }
         else {                                          /* branch char eq */
             if (ADDR_ERR (BS)) {                        /* validate B addr */
                 reason = STOP_INVB;
                 break;
                 }
-            if ((M[BS] & CHAR) == D) { BRANCH; }        /* char equal? */
-            else { MM (BS); }
+            if ((M[BS] & CHAR) == D) {                  /* char equal? */
+                BRANCH;
+                }
+            else {
+                MM (BS);
+                }
             }
         break;
 
@@ -832,14 +883,21 @@ CHECK_LENGTH:
 
     case OP_BWZ:                                        /* branch wm or zone */
         if (((D & 1) && (M[BS] & WM)) ||                /* d1? test wm */
-            ((D & 2) && ((M[BS] & ZONE) == (D & ZONE)))) /* d2? test zone */
-                { BRANCH; }
-        else { MM (BS); }                               /* decr pointer */
+            ((D & 2) && ((M[BS] & ZONE) == (D & ZONE)))) { /* d2? test zone */
+            BRANCH;
+            }
+        else {                                          /* decr pointer */
+            MM (BS);
+            }
         break;
 
     case OP_BBE:                                        /* branch if bit eq */
-        if (M[BS] & D & CHAR) { BRANCH; }               /* any bits set? */
-        else { MM (BS); }                               /* decr pointer */
+        if (M[BS] & D & CHAR) {                         /* any bits set? */
+            BRANCH;
+            }
+        else {                                          /* decr pointer */
+            MM (BS);
+            }
         break;
 
 /* Arithmetic instructions                              A check     B check
@@ -860,19 +918,24 @@ CHECK_LENGTH:
    5,6          invalid B-address
    7            normal
    8+           normal + ignored modifier
+
+   Despite their names, ZA and ZS are not arithmetic instructions, but copies
+   with zone stripping.  The adder is not used, so BCD conversions do not occur.
 */
 
     case OP_ZA: case OP_ZS:                             /* zero and add/sub */
         a = i = 0;                                      /* clear flags */
         do {
-            if (a & WM) wm = M[BS] = (M[BS] & WM) | BCD_ZERO;
+            if (a & WM)                                 /* A word mark? */
+                wm = M[BS] = (M[BS] & WM) | BCD_ZERO;
             else {
                 a = M[AS];                              /* get A char */
-                t = (a & CHAR)? bin_to_bcd[a & DIGIT]: 0;
-                wm = M[BS] = (M[BS] & WM) | t;          /* move digit */
+                t = a & DIGIT;                          /* zap zone bits */
+                wm = M[BS] = (M[BS] & WM) | t;          /* store digit */
                 MM (AS);
                 }
-            if (i == 0) i = M[BS] = M[BS] |
+            if (i == 0)
+                i = M[BS] = M[BS] |
                 ((((a & ZONE) == BBIT) ^ (op == OP_ZS))? BBIT: ZONE);
             MM (BS);
             } while ((wm & WM) == 0);                   /* stop on B WM */
@@ -888,16 +951,18 @@ CHECK_LENGTH:
         t = bcd_to_bin[b & DIGIT] + (qsign? 10 - t: t); /* sum A + B */
         carry = (t >= 10);                              /* get carry */
         b = (b & ~DIGIT) | sum_table[t];                /* get result */
-        if (qsign && ((b & BBIT) == 0)) b = b | ZONE;   /* normalize sign */
+        if (qsign && ((b & BBIT) == 0))                 /* normalize sign */
+            b = b | ZONE;
         M[BS] = b;                                      /* store result */
         MM (BS);
         if (b & WM) {                                   /* b wm? done */
-            if (qsign && (carry == 0)) M[bsave] =       /* compl, no carry? */
-                WM + ((b & ZONE) ^ ABIT) + sum_table[10 - t];
+            if (qsign && (carry == 0))                  /* compl, no carry? */
+                M[bsave] = WM + ((b & ZONE) ^ ABIT) + sum_table[10 - t];
             break;
             }
         do {
-            if (a & WM) a = WM;                         /* A WM? char = 0 */
+            if (a & WM)                                 /* A WM? char = 0 */
+                a = WM;
             else {
                 a = M[AS];                              /* else get A */
                 MM (AS);
@@ -914,7 +979,8 @@ CHECK_LENGTH:
             else M[BS] = (b & WM) + sum_table[t];       /* normal add */
             MM (BS);
             } while ((b & WM) == 0);                    /* stop on B WM */
-        if (reason) break;                              /* address err? */
+        if (reason)                                     /* address err? */
+            break;
         if (qsign && (carry == 0)) {                    /* recompl, no carry? */
             M[bsave] = M[bsave] ^ ABIT;                 /* XOR sign */
             for (carry = 1; bsave != BS; --bsave) {     /* rescan */
@@ -940,7 +1006,8 @@ CHECK_LENGTH:
                 ind[IN_HGH] = col_table[b & CHAR] > col_table [a & CHAR];
                 ind[IN_LOW] = ind[IN_HGH] ^ 1;
                 }
-            MM (AS); MM (BS);                           /* decr pointers */
+            MM (AS);                                /* decr pointers */
+            MM (BS);
             } while ((wm & WM) == 0);                   /* stop on A, B WM */
         if ((a & WM) && !(b & WM)) {                    /* short A field? */
             ind[IN_EQU] = ind[IN_LOW] = 0;
@@ -974,72 +1041,104 @@ CHECK_LENGTH:
 */
 
     case OP_R:                                          /* read */
-        if (reason = iomod (ilnt, D, r_mod)) break;     /* valid modifier? */
+        if (reason = iomod (ilnt, D, r_mod))            /* valid modifier? */
+            break;
         reason = read_card (ilnt, D);                   /* read card */
         BS = CDR_BUF + CDR_WIDTH;
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
         break;
 
     case OP_W:                                          /* write */
-        if (reason = iomod (ilnt, D, w_mod)) break;     /* valid modifier? */
+        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+            break;
         reason = write_line (ilnt, D);                  /* print line */
         BS = LPT_BUF + LPT_WIDTH;
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
         break;
 
     case OP_P:                                          /* punch */
-        if (reason = iomod (ilnt, D, p_mod)) break;     /* valid modifier? */
+        if (reason = iomod (ilnt, D, p_mod))            /* valid modifier? */
+            break;
         reason = punch_card (ilnt, D);                  /* punch card */
         BS = CDP_BUF + CDP_WIDTH;
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
         break;
 
     case OP_WR:                                         /* write and read */
-        if (reason = iomod (ilnt, D, w_mod)) break;     /* valid modifier? */
+        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+            break;
         reason = write_line (ilnt, D);                  /* print line */
         r1 = read_card (ilnt, D);                       /* read card */
         BS = CDR_BUF + CDR_WIDTH;
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
-        if (reason == SCPE_OK) reason = r1;             /* merge errors */
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
+        if (reason == SCPE_OK)                          /* merge errors */
+            reason = r1;
         break;
 
     case OP_WP:                                         /* write and punch */
-        if (reason = iomod (ilnt, D, w_mod)) break;     /* valid modifier? */
+        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+            break;
         reason = write_line (ilnt, D);                  /* print line */
         r1 = punch_card (ilnt, D);                      /* punch card */
         BS = CDP_BUF + CDP_WIDTH;
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
-        if (reason == SCPE_OK) reason = r1;             /* merge errors */
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
+        if (reason == SCPE_OK)                          /* merge errors */
+            reason = r1;
         break;
 
     case OP_RP:                                         /* read and punch */
-        if (reason = iomod (ilnt, D, NULL)) break;      /* valid modifier? */
+        if (reason = iomod (ilnt, D, NULL))             /* valid modifier? */
+            break;
         reason = read_card (ilnt, D);                   /* read card */
         r1 = punch_card (ilnt, D);                      /* punch card */
         BS = CDP_BUF + CDP_WIDTH;  
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
-        if (reason == SCPE_OK) reason = r1;             /* merge errors */
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
+        if (reason == SCPE_OK)                          /* merge errors */
+            reason = r1;
         break;
 
     case OP_WRP:                                        /* write, read, punch */
-        if (reason = iomod (ilnt, D, w_mod)) break;     /* valid modifier? */
+        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+            break;
         reason = write_line (ilnt, D);                  /* print line */
         r1 = read_card (ilnt, D);                       /* read card */
         r2 = punch_card (ilnt, D);                      /* punch card */
         BS = CDP_BUF + CDP_WIDTH;
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
-        if (reason == SCPE_OK) reason = (r1 == SCPE_OK)? r2: r1;
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
+        if (reason == SCPE_OK)                          /* merge errors */
+            reason = (r1 == SCPE_OK)? r2: r1;
         break;
 
     case OP_SS:                                         /* select stacker */
-        if (reason = iomod (ilnt, D, ss_mod)) break;    /* valid modifier? */
-        if (reason = select_stack (D)) break;           /* sel stack, error? */
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
+        if (reason = iomod (ilnt, D, ss_mod))           /* valid modifier? */
+            break;
+        if (reason = select_stack (D))                  /* sel stack, error? */
+            break;
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
         break;
 
     case OP_CC:                                         /* carriage control */
-        if (reason = carriage_control (D)) break;       /* car ctrl, error? */
-        if ((ilnt == 4) || (ilnt == 5)) { BRANCH; }     /* check for branch */
+        if (reason = carriage_control (D))              /* car ctrl, error? */
+            break;
+        if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
+            BRANCH;
+            }
         break;
 
 /* MTF - magtape functions - must be at least 4 characters
@@ -1053,10 +1152,17 @@ CHECK_LENGTH:
 */
 
     case OP_MTF:                                        /* magtape function */
-        if (ilnt < 4) reason = STOP_INVL;               /* too short? */
-        else if (ioind != BCD_PERCNT) reason = STOP_INVA;
-        else if (reason = iomod (ilnt, D, mtf_mod)) break; /* valid modifier? */
-        reason = mt_func (unit, D);                     /* mt func, error? */
+        if (ilnt < 4)                                   /* too short? */
+            reason = STOP_INVL;
+        else if (ioind != BCD_PERCNT)                   /* valid dev addr? */
+            reason = STOP_INVA;
+        else if (reason = iomod (ilnt, D, mtf_mod))     /* valid modifier? */
+            break;
+        if (dev == IO_MT)                               /* BCD? */
+            reason = mt_func (unit, 0, D);
+        else if (dev == IO_MTB)                         /* binary? */
+            reason = mt_func (unit, MD_BIN, D);
+        else reason = STOP_INVA;                        /* wrong device */
         break;                                          /* can't branch */
 
     case OP_RF: case OP_PF:                             /* read, punch feed */
@@ -1121,27 +1227,32 @@ CHECK_LENGTH:
         switch (b & CHAR) {                             /* case on B char */
 
         case BCD_ASTER:                                 /* * */
-            if (!qbody || qdollar || !(cpu_unit.flags & EPE)) break;
+            if (!qbody || qdollar || !(cpu_unit.flags & EPE))
+                break;
             qaster = 1;                                 /* flag */
             goto A_CYCLE;                               /* take A cycle */
 
         case BCD_DOLLAR:                                /* $ */
-            if (!qbody || qaster || !(cpu_unit.flags & EPE)) break;
+            if (!qbody || qaster || !(cpu_unit.flags & EPE))
+                break;
             qdollar = 1;                                /* flag */
             goto A_CYCLE;                               /* take A cycle */
 
         case BCD_ZERO:                                  /* 0 */
             if (qawm) {                                 /* left status? */
-                if (!qzero) M[BS] = M[BS] | WM;         /* first? set WM */
+                if (!qzero)                             /* first? set WM */
+                    M[BS] = M[BS] | WM;
                 qzero = 1;                              /* flag suppress */
                 break;
                 }
-            if (!qzero) t = t | WM;                     /* body, first? WM */
+            if (!qzero)                                 /* body, first? WM */
+                t = t | WM;
             qzero = 1;                                  /* flag suppress */
             goto A_CYCLE;                               /* take A cycle */
 
         case BCD_BLANK:                                 /* blank */
-            if (qawm) break;                            /* left status? */
+            if (qawm)                                   /* left status? */
+                break;
         A_CYCLE:
             M[BS] = t;                                  /* copy char */
             if (a & WM) {                               /* end of A field? */
@@ -1157,11 +1268,13 @@ CHECK_LENGTH:
             break;
 
         case BCD_C: case BCD_R: case BCD_MINUS:         /* C, R, - */
-            if (!qsign && !qbody) M[BS] = BCD_BLANK;    /* + & status? blank */
+            if (!qsign && !qbody)                       /* + & status? blank */
+                M[BS] = BCD_BLANK;
             break;
 
         case BCD_COMMA:                                 /* , */
-            if (!qbody) M[BS] = BCD_BLANK;              /* status? blank */
+            if (!qbody)                                 /* status? blank */
+                M[BS] = BCD_BLANK;
             break;
 
         case BCD_AMPER:                                 /* & */
@@ -1172,8 +1285,10 @@ CHECK_LENGTH:
         MM (BS);                                        /* decr B pointer */
         } while ((b & WM) == 0);                        /* stop on B WM */
 
-    if (reason) break;                                  /* address err? */
-    if (!qzero) break;                                  /* rescan? */
+    if (reason)                                         /* address err? */
+        break;
+    if (!qzero)                                         /* rescan? */
+        break;
 
 /* Edit pass 2 - from left to right, suppressing zeroes */
 
@@ -1193,7 +1308,8 @@ CHECK_LENGTH:
             break;
 
         case BCD_BLANK:                                 /* blank */
-            if (qaster) M[BS] = BCD_ASTER;              /* if EPE *, repl */
+            if (qaster)                                 /* if EPE *, repl */
+                M[BS] = BCD_ASTER;
             break;
 
         case BCD_DECIMAL:                               /* . */
@@ -1216,7 +1332,8 @@ CHECK_LENGTH:
         BS++;                                           /* BS = addr WM + 1 */
         break;
         }
-    if (qdecimal && qzero) qdollar = 0;                 /* no digits? clr $ */
+    if (qdecimal && qzero)                              /* no digits? clr $ */
+        qdollar = 0;
 
 /* Edit pass 3 (extended print only) - from right to left */
 
@@ -1268,7 +1385,8 @@ CHECK_LENGTH:
             MM (AS);                                    /* decr pointers */
             MM (BS);
             } while ((a & WM) == 0);                    /* until A WM */
-        if (reason) break;                              /* address err? */
+        if (reason)                                     /* address err? */
+            break;
         M[BS] = BCD_ZERO;                               /* zero hi prod */
         MM (BS);                                        /* addr low mpyr */
         sign = ((M[asave] & ZONE) == BBIT) ^ ((M[BS] & ZONE) == BBIT);
@@ -1300,7 +1418,8 @@ CHECK_LENGTH:
         MM (BS);                                        /* adv mpyr ptr */
         } while ((b & WM) == 0);                        /* until mpyr done */
     M[lowprd] = M[lowprd] | ZONE;                       /* assume + */
-    if (sign) M[lowprd] = M[lowprd] & ~ABIT;            /* if minus, B only */
+    if (sign)                                           /* if minus, B only */
+        M[lowprd] = M[lowprd] & ~ABIT;
     break;      
 
 /* Divide.  Comments from the PDP-10 based simulator by Len Fehskens.
@@ -1342,11 +1461,13 @@ CHECK_LENGTH:
         ahigh = -1;
         do {
             a = M[AS];                                  /* get dvr char */
-            if ((a & CHAR) != BCD_ZERO) ahigh = AS;     /* mark non-zero */
+            if ((a & CHAR) != BCD_ZERO)                 /* mark non-zero */
+                ahigh = AS;
             MM (AS);
             }
         while ((a & WM) == 0);
-        if (reason) break;                              /* address err? */
+        if (reason)                                     /* address err? */
+            break;
         if (ahigh < 0) {                                /* div by zero? */
             ind[IN_OVF] = 1;                            /* set ovf indic */
             qs = bsave = BS;                            /* quo, dividend */
@@ -1354,7 +1475,8 @@ CHECK_LENGTH:
                 b = M[bsave];                           /* find end divd */
                 PP (bsave);                             /* marked by zone */
                 } while ((b & ZONE) == 0);
-            if (reason) break;                          /* address err? */
+            if (reason)                                 /* address err? */
+                break;
             if (ADDR_ERR (qs)) {                        /* address err? */
                 reason = STOP_WRAP;                     /* address wrap? */
                 break;
@@ -1391,7 +1513,8 @@ CHECK_LENGTH:
         bsave++;                                        /* adv divd, quo */
         qs++;
         } while ((b & ZONE) == 0);                      /* until B sign */
-    if (reason) break;                                  /* address err? */
+    if (reason)                                         /* address err? */
+        break;
 
 /* At this point,
 
@@ -1452,9 +1575,13 @@ CHECK_LENGTH:
 
     case OP_CS:                                         /* clear storage */
         t = (BS / 100) * 100;                           /* lower bound */
-        while (BS >= t) M[BS--] = 0;                    /* clear region */
-        if (BS < 0) BS = BS + MEMSIZE;                  /* wrap if needed */
-        if (ilnt == 7) { BRANCH; }                      /* branch variant? */
+        while (BS >= t)                                 /* clear region */
+            M[BS--] = 0;
+        if (BS < 0)                                     /* wrap if needed */
+            BS = BS + MEMSIZE;
+        if (ilnt == 7) {                                /* branch variant? */
+            BRANCH;
+            }
         break;
 
 /* Modify address instruction                           A check    B check
@@ -1481,7 +1608,8 @@ CHECK_LENGTH:
         M[BS + 3] = (M[BS + 3] & WM) | store_addr_u (t);
         M[BS + 2] = (M[BS + 2] & (WM + ZONE)) | store_addr_t (t);
         M[BS + 1] = (M[BS + 1] & WM) | store_addr_h (t);
-        if (((a % 4000) + (b % 4000)) >= 4000) BS = BS + 2; /* carry? */
+        if (((a % 4000) + (b % 4000)) >= 4000)          /* carry? */
+            BS = BS + 2;
         break;
 
 /* Store address instructions                           A-check     B-check
@@ -1514,7 +1642,8 @@ CHECK_LENGTH:
 /* HALT - unless length = 4 (branch), no validity checking; all lengths ok */
 
     case OP_H:                                          /* halt */
-        if (ilnt == 4) hb_pend = 1;                     /* set pending branch */
+        if (ilnt == 4)                                  /* set pending branch */
+            hb_pend = 1;
         reason = STOP_HALT;                             /* stop simulator */
         saved_IS = IS;                                  /* commit instruction */
         break;
@@ -1617,7 +1746,8 @@ void div_sign (int32 dvrc, int32 dvdc, int32 qp, int32 rp)
 int32 sign = dvrc & ZONE;                               /* divisor sign */
 
 M[rp] = M[rp] | ZONE;                                   /* assume rem pos */
-if (sign == BBIT) M[rp] = M[rp] & ~ABIT;                /* if dvr -, rem - */
+if (sign == BBIT)                                       /* if dvr -, rem - */
+    M[rp] = M[rp] & ~ABIT;
 M[qp] = M[qp] | ZONE;                                   /* assume quo + */
 if (((dvdc & ZONE) == BBIT) ^ (sign == BBIT))           /* dvr,dvd diff? */
     M[qp] = M[qp] & ~ABIT;                              /* make quo - */
@@ -1636,10 +1766,13 @@ return;
 
 t_stat iomod (int32 ilnt, int32 mod, const int32 *tptr)
 {
-if ((ilnt != 2) && (ilnt != 5) && (ilnt < 8)) return SCPE_OK;
-if (tptr == NULL) return STOP_INVM;
+if ((ilnt != 2) && (ilnt != 5) && (ilnt < 8))
+    return SCPE_OK;
+if (tptr == NULL)
+    return STOP_INVM;
 do {
-    if (mod == *tptr++) return SCPE_OK;
+    if (mod == *tptr++)
+        return SCPE_OK;
     } while (*tptr >= 0);
 return STOP_INVM;
 }
@@ -1655,9 +1788,12 @@ return STOP_INVM;
 
 t_stat iodisp (int32 dev, int32 unit, int32 flag, int32 mod)
 {
-if (dev == IO_INQ) return inq_io (flag, mod);           /* inq terminal? */
-if (dev == IO_DP) return dp_io (unit, flag, mod);       /* disk pack? */
-if (dev == IO_MT) return mt_io (unit, flag, mod);       /* magtape? */
+if (dev == IO_INQ)                                      /* inq terminal? */
+    return inq_io (flag, mod);
+if (dev == IO_DP)                                       /* disk pack? */
+    return dp_io (unit, flag, mod);
+if (dev == IO_MT)                                       /* magtape? */
+    return mt_io (unit, flag, mod);
 if (dev == IO_MTB)                                      /* binary magtape? */
     return mt_io (unit, flag | MD_BIN, mod);
 return STOP_NXD;                                        /* not implemented */
@@ -1670,17 +1806,19 @@ t_stat cpu_reset (DEVICE *dptr)
 int32 i;
 
 for (i = 0; i < 64; i++) {                              /* clr indicators */
-    if ((i < IN_SSB) || (i > IN_SSG)) ind[i] = 0;       /* except SSB-SSG */
+    if ((i < IN_SSB) || (i > IN_SSG))                   /* except SSB-SSG */
+        ind[i] = 0;
     }
 ind[IN_UNC] = 1;                                        /* ind[0] always on */
 AS = 0;                                                 /* clear AS */
-BS = 0;                                                 /* clear BS *
+BS = 0;                                                 /* clear BS */
 as_err = 1;
-bs_err = 1;/
+bs_err = 1;
 D = 0;                                                  /* clear D */
 hb_pend = 0;                                            /* no halt br */
 pcq_r = find_reg ("ISQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1690,8 +1828,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & (WM + CHAR);
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[addr] & (WM + CHAR);
 return SCPE_OK;
 }
 
@@ -1699,7 +1839,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 M[addr] = val & (WM + CHAR);
 return SCPE_OK;
 }
@@ -1713,12 +1854,15 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val % 1000) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
-if (MEMSIZE > 4000) cpu_unit.flags = cpu_unit.flags | MA;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
+if (MEMSIZE > 4000)
+    cpu_unit.flags = cpu_unit.flags | MA;
 else cpu_unit.flags = cpu_unit.flags & ~MA;
 return SCPE_OK;
 }
@@ -1731,12 +1875,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].ilnt = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].ilnt = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -1745,7 +1891,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -1763,14 +1910,17 @@ InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "IS     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
@@ -1802,7 +1952,8 @@ return SCPE_OK;
 
 t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (conv_old) fputs ("Old (pre-3.5-1) conversions\n", st);
+if (conv_old)
+    fputs ("Old (pre-3.5-1) conversions\n", st);
 else fputs ("New conversions\n", st);
 return SCPE_OK;
 }

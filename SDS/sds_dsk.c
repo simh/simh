@@ -1,6 +1,6 @@
 /* sds_dsk.c: SDS 940 moving head disk simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -157,24 +157,29 @@ switch (fnc) {                                          /* case on function */
 
     case IO_CONN:                                       /* connect */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != dsk_dib.chan) return SCPE_IERR;   /* wrong chan? */
+        if (new_ch != dsk_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
         dsk_op = inst;                                  /* save instr */
         dsk_bptr = dsk_blnt = 0;                        /* init ptrs */
-        for (i = 0; i < DSK_NUMWD; i++) dsk_buf[i] = 0; /* clear buffer */
+        for (i = 0; i < DSK_NUMWD; i++)                 /* clear buffer */
+            dsk_buf[i] = 0;
         xfr_req = xfr_req & ~XFR_DSK;                   /* clr xfr flg */
         sim_activate (&dsk_unit, dsk_stime);            /* activate */
         break;
 
     case IO_EOM1:                                       /* EOM mode 1 */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != dsk_dib.chan) return SCPE_IERR;   /* wrong chan? */
-        if (inst & 07600) CRETIOP;                      /* inv inst? */
+        if (new_ch != dsk_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
+        if (inst & 07600)                               /* inv inst? */
+            CRETIOP;
         alert = POT_DSK;                                /* alert */
         break;
 
     case IO_DISC:                                       /* disconnect */
         dsk_end_op (0);                                 /* normal term */
-        if (inst & DEV_OUT) return dsk_fill (inst);     /* fill write */
+        if (inst & DEV_OUT)
+            return dsk_fill (inst);                     /* fill write */
         break;
 
     case IO_WREOR:                                      /* write eor */
@@ -183,7 +188,8 @@ switch (fnc) {                                          /* case on function */
 
     case IO_SKS:                                        /* SKS */
         new_ch = I_GETSKCH (inst);                      /* sks chan */
-        if (new_ch != dsk_dib.chan) return SCPE_IERR;   /* wrong chan? */
+        if (new_ch != dsk_dib.chan)
+            return SCPE_IERR;   /* wrong chan? */
         t = I_GETSKCND (inst);                          /* sks cond */
         if (((t == 000) && !sim_is_active (&dsk_unit) &&/* 10026: ready  */
              (dsk_unit.flags & UNIT_ATT)) ||
@@ -198,7 +204,8 @@ switch (fnc) {                                          /* case on function */
     case IO_READ:
         xfr_req = xfr_req & ~XFR_DSK;                   /* clr xfr req */
         if (dsk_bptr >= dsk_blnt) {                     /* no more data? */
-            if (r = dsk_read_buf (inst)) return r;      /* read sector */
+            if (r = dsk_read_buf (inst))                /* read sector */
+                return r;
             }
         dsk_wptr = dsk_bptr >> 2;                       /* word pointer */
         dsk_byte = dsk_bptr & 03;                       /* byte in word */
@@ -212,7 +219,8 @@ switch (fnc) {                                          /* case on function */
     case IO_WRITE:
         xfr_req = xfr_req & ~XFR_DSK;                   /* clr xfr req */
         if (dsk_bptr >= (DSK_NUMWD * 4)) {              /* full? */
-            if (r = dsk_write_buf (inst)) return r;     /* write sector */
+            if (r = dsk_write_buf (inst))               /* write sector */
+                return r;
             }
         dsk_wptr = dsk_bptr >> 2;                       /* word pointer */
         dsk_buf[dsk_wptr] = ((dsk_buf[dsk_wptr] << 6) | (*dat & 077)) & DMASK;
@@ -240,11 +248,13 @@ t_stat pot_dsk (uint32 num, uint32 *dat)
 {
 int32 st;
 
-if (sim_is_active (&dsk_unit)) return STOP_IONRDY;      /* busy? wait */
+if (sim_is_active (&dsk_unit))                          /* busy? wait */
+    return STOP_IONRDY;
 dsk_da = (*dat) & DSK_AMASK;                            /* save dsk addr */
 st = abs (DSK_GETTR (dsk_da) -                          /* calc seek time */
      (dsk_unit.cyl & DSK_M_TR)) * dsk_stime;
-if (st == 0) st = dsk_stime;                            /* min time */
+if (st == 0                                             /* min time */
+        ) st = dsk_stime;
 sim_activate (&dsk_unit, st);                           /* set timer */
 dsk_unit.cyl = dsk_unit.cyl | DSK_SIP;                  /* seeking */
 return SCPE_OK;
@@ -256,7 +266,8 @@ t_stat dsk_svc (UNIT *uptr)
 {
 if (uptr->cyl & DSK_SIP) {                              /* end seek? */
     uptr->cyl = DSK_GETTR (dsk_da);                     /* on cylinder */
-    if (dsk_op) sim_activate (&dsk_unit, dsk_stime);    /* sched r/w */
+    if (dsk_op)                                         /* sched r/w */
+        sim_activate (&dsk_unit, dsk_stime);
     }
 else {
     xfr_req = xfr_req | XFR_DSK;                        /* set xfr req */
@@ -282,7 +293,8 @@ if (ferror (dsk_unit.fileref)) {                        /* error? */
     dsk_end_op (CHF_ERR | CHF_EOR);                     /* disk error */
     return SCPE_IOERR;
     }
-for ( ; awc < DSK_NUMWD; awc++) dsk_buf[awc] = 0;
+for ( ; awc < DSK_NUMWD; awc++)
+    dsk_buf[awc] = 0;
 pkts = DSK_GETPKT (dsk_buf[0]);                         /* get packets */
 dsk_blnt = pkts * DSK_PKTWD * 4;                        /* new buf size */
 dsk_bptr = 0;                                           /* init bptr */
@@ -317,7 +329,8 @@ if (ferror (dsk_unit.fileref)) {                        /* error? */
     }
 dsk_bptr = 0;                                           /* init bptr */
 dsk_da = (dsk_da + 1) & DSK_AMASK;                      /* incr disk addr */
-for (i = 0; i < DSK_NUMWD; i++) dsk_buf[i] = 0;         /* clear buffer */
+for (i = 0; i < DSK_NUMWD; i++)                         /* clear buffer */
+    dsk_buf[i] = 0;
 return SCPE_OK;
 }
 
@@ -332,7 +345,8 @@ int32 pktend = (dsk_bptr + ((DSK_PKTWD * 4) - 1)) &     /* end pkt */
     ~((DSK_PKTWD * 4) - 1);
 int32 pkts = pktend / (DSK_PKTWD * 4);                  /* # packets */
 
-if (dsk_bptr == 0) return SCPE_OK;                      /* no fill? */
+if (dsk_bptr == 0)                                      /* no fill? */
+    return SCPE_OK;
 for ( ; dsk_bptr < pktend; dsk_bptr++) {                /* fill packet */
     int32 dsk_wptr = dsk_bptr >> 2;
     dsk_buf[dsk_wptr] = (dsk_buf[dsk_wptr] << 6) & DMASK;
@@ -346,7 +360,8 @@ return dsk_write_buf (dev);                             /* write sec */
 
 void dsk_end_op (uint32 fl)
 {
-if (fl) chan_set_flag (dsk_dib.chan, fl);               /* set flags */
+if (fl)                                                 /* set flags */
+    chan_set_flag (dsk_dib.chan, fl);
 dsk_op = 0;                                             /* clear op */
 xfr_req = xfr_req & ~XFR_DSK;                           /* clear xfr */
 sim_cancel (&dsk_unit);                                 /* stop */
@@ -371,6 +386,7 @@ dsk_bptr = dsk_blnt = 0;
 xfr_req = xfr_req & ~XFR_DSK;                           /* clr xfr req */
 sim_cancel (&dsk_unit);                                 /* deactivate */
 dsk_unit.cyl = 0;
-for (i = 0; i < DSK_NUMWD; i++) dsk_buf[i] = 0;         /* clear buffer */
+for (i = 0; i < DSK_NUMWD; i++)                         /* clear buffer */
+    dsk_buf[i] = 0;
 return SCPE_OK;
 }

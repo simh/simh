@@ -34,15 +34,6 @@
    21-Oct-02    RMS     Recoded for compatibility with 21MX microcode algorithms
 
 
-   Implementation note: The 2100/1000-M/E Fast FORTRAN Processor (FFP) and 1000
-   F-Series Floating Point Processor (FPP) simulations require that the host
-   compiler support 64-bit integers and the HAVE_INT64 symbol be defined during
-   compilation.  If this symbol is defined, two-word floating-point operations
-   are handled in the FPP code, and this module is not used.  If it is not
-   defined, then FFP and FPP operations are not available, and this module
-   provides the floating-point support.
-
-
    The HP2100 uses a unique binary floating point format:
 
      15 14                                         0
@@ -79,9 +70,20 @@
      inputs may cause the packup code to produce the wrong sign.
    - "Unclean" zeros (zero fraction, non-zero exponent) are processed
      like normal operands.
+
+   Implementation notes:
+
+    1. The 2100/1000-M/E Fast FORTRAN Processor (FFP) and 1000 F-Series Floating
+       Point Processor (FPP) simulations require that the host compiler support
+       64-bit integers and the HAVE_INT64 symbol be defined during compilation.
+       If this symbol is defined, two-word floating-point operations are handled
+       in the FPP code, and this module is not used.  If it is not defined, then
+       FFP and FPP operations are not available, and this module provides the
+       floating-point support.
 */
 
 #include "hp2100_defs.h"
+#include "hp2100_cpu.h"
 #include "hp2100_cpu1.h"
 #include "hp2100_fp.h"
 
@@ -121,8 +123,6 @@ struct ufp {                                            /* unpacked fp */
                         (((uint32) DMASK32) << (32 - (s))): 0)) & DMASK32
 
 #define FR_NEG(v)       ((~(v) + 1) & DMASK32)
-
-extern uint16 ABREG[2];
 
 uint32 UnpackFP (struct ufp *fop, uint32 opnd);
 void NegFP (struct ufp *fop);

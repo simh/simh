@@ -25,6 +25,9 @@
 
    CPU3         Fast FORTRAN and Double Integer instructions
 
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
+   05-Aug-08    JDB     Updated mp_dms_jmp calling sequence
    27-Feb-08    JDB     Added DBI self-test instruction
    23-Oct-07    JDB     Fixed unsigned-divide bug in .DDI
    17-Oct-07    JDB     Fixed unsigned-multiply bug in .DMP
@@ -55,10 +58,6 @@
 #else                                                   /* int64 support unavailable */
 #include "hp2100_fp.h"
 #endif                                                  /* end of int64 support */
-
-
-t_stat cpu_ffp (uint32 IR, uint32 intrq);               /* Fast FORTRAN Processor */
-t_stat cpu_dbi (uint32 IR, uint32 intrq);               /* Double-Integer instructions */
 
 
 /* Fast FORTRAN Processor.
@@ -108,37 +107,38 @@ t_stat cpu_dbi (uint32 IR, uint32 intrq);               /* Double-Integer instru
    almost all use .ENTR.  Supporting the latter even on systems that do not
    support the former still allows such systems to boot.
 
-   Notes:
+   Implementation notes:
 
-     1. The "$SETP" instruction is sometimes listed as ".SETP" in the
-        documentation.
+    1. The "$SETP" instruction is sometimes listed as ".SETP" in the
+       documentation.
 
-     2. Extended-precision arithmetic routines (e.g., .XMPY) exist on the
-        1000-F, but they are assigned instruction codes in the single-precision
-        floating-point module range.  They are replaced by several double
-        integer instructions, which we dispatch to the double integer handler.
+    2. Extended-precision arithmetic routines (e.g., .XMPY) exist on the 1000-F,
+       but they are assigned instruction codes in the single-precision
+       floating-point module range.  They are replaced by several double integer
+       instructions, which we dispatch to the double integer handler.
 
-     3. The software implementation of ..MAP supports 1-, 2-, or 3-dimensional
-        arrays, designated by setting A = -1, 0, and +1, respectively.  The
-        firmware implementation supports only 2- and 3-dimensional access.
+    3. The software implementation of ..MAP supports 1-, 2-, or 3-dimensional
+       arrays, designated by setting A = -1, 0, and +1, respectively.  The
+       firmware implementation supports only 2- and 3-dimensional access.
 
-     4. The documentation for ..MAP for the 2100 FFP shows A = 0 or -1 for two
-        or three dimensions, respectively, but the 1000 FFP shows A = 0 or +1.
-        The firmware actually only checks the LSB of A.
+    4. The documentation for ..MAP for the 2100 FFP shows A = 0 or -1 for two or
+       three dimensions, respectively, but the 1000 FFP shows A = 0 or +1.  The
+       firmware actually only checks the LSB of A.
 
-     5. The .DFER and .XFER implementations for the 2100 FFP return X+4 and Y+4
-        in the A and B registers, whereas the 1000 FFP returns X+3 and Y+3.
+    5. The .DFER and .XFER implementations for the 2100 FFP return X+4 and Y+4
+       in the A and B registers, whereas the 1000 FFP returns X+3 and Y+3.
 
-     6. The .XFER implementation for the 2100 FFP returns to P+2, whereas the
-        1000 implementation returns to P+1.
+    6. The .XFER implementation for the 2100 FFP returns to P+2, whereas the
+       1000 implementation returns to P+1.
 
-     7. The firmware implementations of DBLE, .BLE, and DDINT clear the overflow
-        flag.  The software implementations do not change overflow.
+    7. The firmware implementations of DBLE, .BLE, and DDINT clear the overflow
+       flag.  The software implementations do not change overflow.
 
-     8. The M/E-Series FFP arithmetic instructions (.XADD, etc.) return negative
-        infinity on negative overflow and positive infinity on positive
-        overflow.  The equivalent F-Series instructions return positive infinity
-        on both.
+    8. The M/E-Series FFP arithmetic instructions (.XADD, etc.) return negative
+       infinity on negative overflow and positive infinity on positive overflow.
+       The equivalent F-Series instructions return positive infinity on both.
+
+    9. The protected memory lower bound for the .GOTO instruction is 2.
 
    Additional references:
     - DOS/RTE Relocatable Library Reference Manual (24998-90001, Oct-1981)
@@ -181,9 +181,6 @@ t_stat reason = SCPE_OK;
 int32 i;
 
 #endif                                                  /* end of int64 support */
-
-if ((cpu_unit.flags & UNIT_FFP) == 0)                   /* FFP option installed? */
-    return stop_inst;
 
 entry = IR & 037;                                       /* mask to entry point */
 
@@ -425,7 +422,7 @@ switch (entry) {                                        /* decode IR<4:0> */
             break;
             }
 
-        mp_dms_jmp (MA);                                /* validate jump addr */
+        mp_dms_jmp (MA, 2);                             /* validate jump addr */
         PCQ_ENTRY;                                      /* record last PC */
         PC = MA;                                        /* jump */
         BR = op[0].word;                                /* (for 2100 FFP compat) */
@@ -609,25 +606,25 @@ return reason;
    floating-point processor and the Fast FORTRAN Processor ranges.  They are
    dispatched from those respective simulators for processing here.
 
-   Notes:
+   Implementation notes:
 
-     1. Opcodes 105335-105337 are NOPs in the microcode.  They generate
-        unimplemented instructions stops under simulation.
+    1. Opcodes 105335-105337 are NOPs in the microcode.  They generate
+       unimplemented instructions stops under simulation.
 
-     2. This is an implementation of Revision 2 of the microcode, which was
-        released as ROM part numbers 93585-80003, 93585-80005, and 93585-80001
-        (Revision 1 substituted -80002 for -80005).
+    2. This is an implementation of Revision 2 of the microcode, which was
+       released as ROM part numbers 93585-80003, 93585-80005, and 93585-80001
+       (Revision 1 substituted -80002 for -80005).
 
-     3. The F-Series firmware executes .DMP and .DDI/.DDIR by floating the
-        32-bit double integer to a 48-bit extended-precision number, calling the
-        FPP to execute the extended-precision multiply/divide, and then fixing
-        the product to a 32-bit double integer.  We simulate these directly with
-        64- or 32-bit integer arithmetic.
+    3. The F-Series firmware executes .DMP and .DDI/.DDIR by floating the 32-bit
+       double integer to a 48-bit extended-precision number, calling the FPP to
+       execute the extended-precision multiply/divide, and then fixing the
+       product to a 32-bit double integer.  We simulate these directly with 64-
+       or 32-bit integer arithmetic.
 
    Additional references:
     - 93585A Microcode Source (93585-18002 Rev. 2005)
     - 93585A Double Integer Instructions Installation and Reference Manual
-      (93585-90007)
+             (93585-90007)
 */
 
 static const OP_PAT op_dbi[16] = {
@@ -643,9 +640,6 @@ OP din;
 OPS op;
 uint32 entry, t;
 t_stat reason = SCPE_OK;
-
-if ((cpu_unit.flags & UNIT_DBI) == 0)                   /* DBI option installed? */
-    return stop_inst;
 
 entry = IR & 017;                                       /* mask to entry point */
 

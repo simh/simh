@@ -226,21 +226,30 @@ static const int32 sw_int_mask[IPL_SMAX] = {
     0xE000, 0xC000, 0x8000                              /* C - E */
     };
 
-if (hlt_pin) return IPL_HLTPIN;                         /* hlt pin int */
-if ((ipl < IPL_MEMERR) && mem_err) return IPL_MEMERR;   /* mem err int */
-if ((ipl < IPL_CRDERR) && crd_err) return IPL_CRDERR;   /* crd err int */
-if ((ipl < IPL_CLKINT) && tmr_int) return IPL_CLKINT;   /* clock int */
+if (hlt_pin)                                            /* hlt pin int */
+    return IPL_HLTPIN;
+if ((ipl < IPL_MEMERR) && mem_err)                      /* mem err int */
+    return IPL_MEMERR;
+if ((ipl < IPL_CRDERR) && crd_err)                      /* crd err int */
+    return IPL_CRDERR;
+if ((ipl < IPL_CLKINT) && tmr_int)                      /* clock int */
+    return IPL_CLKINT;
 uba_eval_int ();                                        /* update UBA */
 for (i = IPL_HMAX; i >= IPL_HMIN; i--) {                /* chk hwre int */
-    if (i <= ipl) return 0;                             /* at ipl? no int */
-    if (nexus_req[i - IPL_HMIN]) return i;              /* req != 0? int */
+    if (i <= ipl)                                       /* at ipl? no int */
+        return 0;
+    if (nexus_req[i - IPL_HMIN])                        /* req != 0? int */
+        return i;
     }
 if ((ipl < IPL_TTINT) && (tti_int || tto_int))          /* console int */
     return IPL_TTINT;
-if (ipl >= IPL_SMAX) return 0;                          /* ipl >= sw max? */
-if ((t = SISR & sw_int_mask[ipl]) == 0) return 0;       /* eligible req */
+if (ipl >= IPL_SMAX)                                    /* ipl >= sw max? */
+    return 0;
+if ((t = SISR & sw_int_mask[ipl]) == 0)
+    return 0;       /* eligible req */
 for (i = IPL_SMAX; i > ipl; i--) {                      /* check swre int */
-    if ((t >> i) & 1) return i;                         /* req != 0? int */
+    if ((t >> i) & 1)                                    /* req != 0? int */
+        return i;
     }
 return 0;
 }
@@ -406,7 +415,7 @@ switch (rg) {
             ((wcs_addr + WCSA_CTR_INC) & WCSA_CTR);
         if ((wcs_addr & WCSA_CTR) == WCSA_CTR_MAX)
             wcs_addr = (wcs_addr & ~WCSA_ADDR) |
-            ((wcs_addr + 1) & WCSA_ADDR);
+                       ((wcs_addr + 1) & WCSA_ADDR);
         break;
 
     case MT_RXCS:                                       /* RXCS */
@@ -437,15 +446,19 @@ switch (rg) {
     case MT_SBIER:                                      /* SBIER */
         sbi_er = (sbi_er & ~SBIER_WR) | (val & SBIER_WR);
         sbi_er = sbi_er & ~(val & SBIER_W1C);
-        if (val & SBIER_TMO) sbi_er = sbi_er & ~SBIER_TMOW1C;
-        if (val & SBIER_IBTMO) sbi_er = sbi_er & ~SBIER_IBTW1C;
+        if (val & SBIER_TMO)
+            sbi_er = sbi_er & ~SBIER_TMOW1C;
+        if (val & SBIER_IBTMO)
+            sbi_er = sbi_er & ~SBIER_IBTW1C;
         if ((sbi_er & SBIER_CRDIE) && (sbi_er & SBIER_CRD))
             crd_err = 1;
         else crd_err = 0;
         break;
 
     case MT_SBIQC:                                      /* SBIQC */
-        if (val & SBIQC_MBZ) { RSVD_OPND_FAULT; }
+        if (val & SBIQC_MBZ) {
+            RSVD_OPND_FAULT;
+            }
         WriteLP (val, 0);
         WriteLP (val + 4, 0);
         break;
@@ -521,8 +534,8 @@ void sbi_set_tmo (int32 pa)
 {
 if ((sbi_er & SBIER_TMO) == 0) {                        /* not yet set? */
     sbi_tmo = pa >> 2;                                  /* save addr */
-    if (mchk_ref == REF_V) sbi_tmo |= SBITMO_VIRT |     /* virt? add mode */
-        (PSL_GETCUR (PSL) << SBITMO_V_MODE);
+    if (mchk_ref == REF_V)                              /* virt? add mode */
+        sbi_tmo |= SBITMO_VIRT | (PSL_GETCUR (PSL) << SBITMO_V_MODE);
     sbi_er |= SBIER_TMO;                                /* set tmo flag */
     }
 else sbi_er |= SBIER_MULT;                              /* yes, multiple */
@@ -533,7 +546,8 @@ return;
 
 void sbi_set_errcnf (void)
 {
-if (sbi_er & SBIER_CNF) sbi_er |= SBIER_MULT;
+if (sbi_er & SBIER_CNF)
+    sbi_er |= SBIER_MULT;
 else sbi_er |= SBIER_CNF;
 MACH_CHECK (MCHK_RD_F);
 return;
@@ -604,9 +618,11 @@ if (slptr = strchr (gbuf, '/')) {                       /* found slash? */
     *slptr = 0;                                         /* zero in string */
     }
 dptr = find_unit (gbuf, &uptr);                         /* find device */
-if ((dptr == NULL) || (uptr == NULL)) return SCPE_ARG;
+if ((dptr == NULL) || (uptr == NULL))
+    return SCPE_ARG;
 dibp = (DIB *) dptr->ctxt;                              /* get DIB */
-if (dibp == NULL) return SCPE_ARG;
+if (dibp == NULL)
+    return SCPE_ARG;
 unitno = (int32) (uptr - dptr->units);
 r5v = 0;
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
@@ -614,9 +630,11 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/r5:", 4) == 0) ||
     (strncmp (regptr, "/r5=", 4) == 0)) {
     r5v = (int32) get_uint (regptr + 4, 16, LMASK, &r);
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
-else if (*regptr != 0) return SCPE_ARG;
+else if (*regptr != 0)
+    return SCPE_ARG;
 for (i = 0; boot_tab[i].name != NULL; i++) {
     if (strcmp (dptr->name, boot_tab[i].name) == 0) {
         R[0] = boot_tab[i].code;
@@ -647,7 +665,8 @@ printf ("Loading boot code from vmb.exe\n");
 if (sim_log) fprintf (sim_log, 
     "Loading boot code from vmb.exe\n");
 r = load_cmd (0, "-O vmb.exe 200");
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 SP = PC = 512;
 return SCPE_OK;
 }
@@ -703,20 +722,24 @@ t_stat build_nexus_tab (DEVICE *dptr, DIB *dibp)
 {
 uint32 idx;
 
-if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR;
+if ((dptr == NULL) || (dibp == NULL))
+    return SCPE_IERR;
 idx = dibp->ba;
-if (idx >= NEXUS_NUM) return SCPE_IERR;
+if (idx >= NEXUS_NUM)
+    return SCPE_IERR;
 if ((nexusR[idx] && dibp->rd &&                         /* conflict? */
     (nexusR[idx] != dibp->rd)) ||
     (nexusW[idx] && dibp->wr &&
     (nexusW[idx] != dibp->wr))) {
     printf ("Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
-    if (sim_log) fprintf (sim_log,
-        "Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
+    if (sim_log)
+        fprintf (sim_log, "Nexus %s conflict at %d\n", sim_dname (dptr), dibp->ba);
     return SCPE_STOP;
     }
-if (dibp->rd) nexusR[idx] = dibp->rd;                   /* set rd dispatch */
-if (dibp->wr) nexusW[idx] = dibp->wr;                   /* set wr dispatch */
+if (dibp->rd)                                           /* set rd dispatch */
+    nexusR[idx] = dibp->rd;
+if (dibp->wr)                                           /* set wr dispatch */
+    nexusW[idx] = dibp->wr;
 return SCPE_OK;
 }
 

@@ -1,6 +1,6 @@
 /* pdp1_dcs.c: PDP-1D terminal multiplexor simulator
 
-   Copyright (c) 2006, Robert M Supnik
+   Copyright (c) 2006-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    dcs          Type 630 data communications subsystem
+
+   19-Nov-2008  RMS     Revised for common TMXR show routines
 
    This module implements up to 32 individual serial interfaces.
 */
@@ -54,8 +56,6 @@ t_stat dcso_svc (UNIT *uptr);
 t_stat dcs_reset (DEVICE *dptr);
 t_stat dcs_attach (UNIT *uptr, char *cptr);
 t_stat dcs_detach (UNIT *uptr);
-t_stat dcs_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dcs_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dcs_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
 void dcs_reset_ln (int32 ln);
 void dcs_scan_next (t_bool unlk);
@@ -67,8 +67,6 @@ void dcs_scan_next (t_bool unlk);
    dcs_reg      DCS register list
    dcs_mod      DCS modifiers list
 */
-
-REG dcs_nlreg = { DRDATA (NLINES, DCS_NUMLIN, 6), PV_LEFT };
 
 UNIT dcs_unit = { UDATA (&dcsi_svc, UNIT_ATTABLE, 0) };
 
@@ -85,15 +83,16 @@ REG dcs_reg[] = {
 MTAB dcs_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "SBSLVL", "SBSLVL",
       &dev_set_sbs, &dev_show_sbs, (void *) &dcs_sbs },
-    { MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-      &dcs_vlines, NULL, &dcs_nlreg },
+    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+      &dcs_vlines, &tmxr_show_lines, (void *) &dcs_desc },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &dcs_desc },
-    { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &dcs_summ },
+      &tmxr_dscln, NULL, (void *) &dcs_desc },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &dcs_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &dcs_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dcs_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &dcs_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dcs_desc },
     { 0 }
     };
 
@@ -184,7 +183,8 @@ int32 pls = (inst >> 6) & 077;
 
 if (dcs_dev.flags & DEV_DIS)                            /* disabled? */
     return (stop_inst << IOT_V_REASON) | dat;           /* illegal inst */
-if (pls & 020) dat = 0;                                 /* pulse 20? clr IO */
+if (pls & 020)                                          /* pulse 20? clr IO */
+    dat = 0;
 
 switch (pls & 057) {                                    /* case IR<6,8:11> */
 
@@ -239,8 +239,10 @@ t_stat dcsi_svc (UNIT *uptr)
 {
 int32 ln, c, out;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
-if (dcs_dev.flags & DEV_DIS) return SCPE_OK;
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
+if (dcs_dev.flags & DEV_DIS)
+    return SCPE_OK;
 sim_activate (uptr, tmxr_poll);                         /* continue poll */
 ln = tmxr_poll_conn (&dcs_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
@@ -250,7 +252,8 @@ tmxr_poll_rx (&dcs_desc);                               /* poll for input */
 for (ln = 0; ln < DCS_NUMLIN; ln++) {                   /* loop thru lines */
     if (dcs_ldsc[ln].conn) {                            /* connected? */
         if (c = tmxr_getc_ln (&dcs_ldsc[ln])) {         /* get char */
-            if (c & SCPE_BREAK) c = 0;                  /* break? */
+            if (c & SCPE_BREAK)                         /* break? */
+                c = 0;
             else c = sim_tt_inpcvt (c, TT_GET_MODE (dcsl_unit[ln].flags)|TTUF_KSR);
             dcs_buf[ln] = c;                            /* save char */
             dcs_flg[ln] = 1;                            /* set line flag */
@@ -274,11 +277,13 @@ t_stat dcso_svc (UNIT *uptr)
 int32 c;
 uint32 ln = uptr - dcsl_unit;                           /* line # */
 
-if (dcs_dev.flags & DEV_DIS) return SCPE_OK;
+if (dcs_dev.flags & DEV_DIS)
+    return SCPE_OK;
 if (dcs_ldsc[ln].conn) {                                /* connected? */
     if (dcs_ldsc[ln].xmte) {                            /* xmt enabled? */
         c = sim_tt_outcvt (dcs_buf[ln] & 0177, TT_GET_MODE (uptr->flags));
-        if (c >= 0) tmxr_putc_ln (&dcs_ldsc[ln], c);    /* output char */
+        if (c >= 0)                                     /* output char */
+            tmxr_putc_ln (&dcs_ldsc[ln], c);
         tmxr_poll_tx (&dcs_desc);                       /* poll xmt */
         }
     else {                                              /* buf full */
@@ -298,8 +303,10 @@ void dcs_scan_next (t_bool unlk)
 {
 int32 i;
 
-if (unlk) iosta &= ~IOS_DCS;                            /* unlock? */
-else if (iosta & IOS_DCS) return;                       /* no, locked? */
+if (unlk)                                               /* unlock? */
+    iosta &= ~IOS_DCS;
+else if (iosta & IOS_DCS)                               /* no, locked? */
+    return;
 for (i = 0; i < DCS_LINES; i++) {                       /* scan flags */
     dcs_scan = (dcs_scan + 1) & DCS_LINE_MASK;          /* next flag */
     if (dcs_flg[dcs_scan] != 0) {                       /* flag set? */
@@ -323,7 +330,8 @@ else dcsl_dev.flags = dcsl_dev.flags & ~DEV_DIS;
 if (dcs_unit.flags & UNIT_ATT)                          /* master att? */
     sim_activate_abs (&dcs_unit, tmxr_poll);            /* activate */
 else sim_cancel (&dcs_unit);                            /* else stop */
-for (i = 0; i < DCS_LINES; i++) dcs_reset_ln (i);       /* reset lines */
+for (i = 0; i < DCS_LINES; i++)                         /* reset lines */
+    dcs_reset_ln (i);
 dcs_send = 0;
 dcs_scan = 0;
 iosta &= ~IOS_DCS;                                      /* clr intr req */
@@ -337,7 +345,8 @@ t_stat dcs_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = tmxr_attach (&dcs_desc, uptr, cptr);                /* attach */
-if (r != SCPE_OK) return r;                             /* error */
+if (r != SCPE_OK)                                       /* error */
+    return r;
 sim_activate_abs (uptr, tmxr_poll);                     /* start poll */
 return SCPE_OK;
 }
@@ -350,40 +359,10 @@ int32 i;
 t_stat r;
 
 r = tmxr_detach (&dcs_desc, uptr);                      /* detach */
-for (i = 0; i < DCS_LINES; i++) dcs_ldsc[i].rcve = 0;   /* disable rcv */
+for (i = 0; i < DCS_LINES; i++)                         /* disable rcv */
+    dcs_ldsc[i].rcve = 0;
 sim_cancel (uptr);                                      /* stop poll */
 return r;
-}
-
-/* Show summary processor */
-
-t_stat dcs_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < DCS_LINES; i++) t = t + (dcs_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat dcs_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < DCS_LINES; i++) t = t + (dcs_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < DCS_LINES; i++) {
-        if (dcs_ldsc[i].conn) {
-            if (val) tmxr_fconns (st, &dcs_ldsc[i], i);
-            else tmxr_fstats (st, &dcs_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
-return SCPE_OK;
 }
 
 /* Change number of lines */
@@ -393,12 +372,16 @@ t_stat dcs_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 newln, i, t;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newln = get_uint (cptr, 10, DCS_LINES, &r);
-if ((r != SCPE_OK) || (newln == DCS_NUMLIN)) return r;
-if (newln == 0) return SCPE_ARG;
+if ((r != SCPE_OK) || (newln == DCS_NUMLIN))
+    return r;
+if (newln == 0)
+    return SCPE_ARG;
 if (newln < DCS_LINES) {
-    for (i = newln, t = 0; i < DCS_NUMLIN; i++) t = t | dcs_ldsc[i].conn;
+    for (i = newln, t = 0; i < DCS_NUMLIN; i++)
+        t = t | dcs_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
             return SCPE_OK;
     for (i = newln; i < DCS_NUMLIN; i++) {

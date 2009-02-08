@@ -1,6 +1,6 @@
 /* sim_tape.c: simulator tape support library
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   08-Jun-08    JDB     Fixed signed/unsigned warning in sim_tape_set_fmt
    23-Jan-07    JDB     Fixed backspace over gap at BOT
    22-Jan-07    RMS     Fixed bug in P7B format read reclnt rev (found by Rich Cornwell)
    15-Dec-06    RMS     Added support for small capacity tapes
@@ -99,12 +100,14 @@ t_stat r;
 
 if (sim_switches & SWMASK ('F')) {                      /* format spec? */
     cptr = get_glyph (cptr, gbuf, 0);                   /* get spec */
-    if (*cptr == 0) return SCPE_2FARG;                  /* must be more */
+    if (*cptr == 0)                                     /* must be more */
+        return SCPE_2FARG;
     if (sim_tape_set_fmt (uptr, 0, gbuf, NULL) != SCPE_OK)
         return SCPE_ARG;
     }
 r = attach_unit (uptr, cptr);                           /* attach unit */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 switch (MT_GET_FMT (uptr)) {                            /* case on format */
 
     case MTUF_F_TPC:                                    /* TPC */
@@ -138,11 +141,13 @@ uint32 f = MT_GET_FMT (uptr);
 t_stat r;
 
 r = detach_unit (uptr);                                 /* detach unit */
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 switch (f) {                                            /* case on format */
 
     case MTUF_F_TPC:                                    /* TPC */
-        if (uptr->filebuf) free (uptr->filebuf);        /* free map */
+        if (uptr->filebuf)                              /* free map */
+            free (uptr->filebuf);
         uptr->filebuf = NULL;
         uptr->hwmark = 0;
         break;
@@ -183,7 +188,8 @@ t_mtrlnt sbc;
 t_tpclnt tpcbc;
 
 MT_CLR_PNU (uptr);
-if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;   /* not attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return MTSE_UNATT;
 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set tape pos */
 switch (f) {                                            /* switch on fmt */
 
@@ -200,7 +206,8 @@ switch (f) {                                            /* switch on fmt */
                 return MTSE_EOM;
                 }
             uptr->pos = uptr->pos + sizeof (t_mtrlnt);  /* spc over rec lnt */
-            if (*bc == MTR_TMK) return MTSE_TMK;        /* tape mark? */
+            if (*bc == MTR_TMK)                         /* tape mark? */
+                return MTSE_TMK;
             if (*bc == MTR_FHGAP) {                     /* half gap? */
                 uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /* half space fwd */
                 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* resync */
@@ -224,7 +231,8 @@ switch (f) {                                            /* switch on fmt */
             return MTSE_EOM;
             }
         uptr->pos = uptr->pos + sizeof (t_tpclnt);      /* spc over reclnt */
-        if (tpcbc == TPC_TMK) return MTSE_TMK;          /* tape mark? */
+        if (tpcbc == TPC_TMK)                           /* tape mark? */
+            return MTSE_TMK;
         uptr->pos = uptr->pos + ((tpcbc + 1) & ~1);     /* spc over record */
         break;
 
@@ -236,16 +244,20 @@ switch (f) {                                            /* switch on fmt */
                 return sim_tape_ioerr (uptr);
                 }
             if (feof (uptr->fileref)) {                 /* eof? */
-                if (sbc == 0) return MTSE_EOM;          /* no data? eom */
+                if (sbc == 0)                           /* no data? eom */
+                    return MTSE_EOM;
                 break;                                  /* treat like eor */
                 }
-            if ((sbc != 0) && (c & P7B_SOR)) break;     /* next record? */
-            if ((c & P7B_DPAR) != P7B_EOF) all_eof = 0;
+            if ((sbc != 0) && (c & P7B_SOR))            /* next record? */
+                break;
+            if ((c & P7B_DPAR) != P7B_EOF)
+                all_eof = 0;
             }
         *bc = sbc;                                      /* save rec lnt */
         sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
         uptr->pos = uptr->pos + sbc;                    /* spc over record */
-        if (all_eof) return MTSE_TMK;                   /* tape mark? */
+        if (all_eof)                                    /* tape mark? */
+            return MTSE_TMK;
         break;
 
     default:
@@ -286,8 +298,10 @@ t_mtrlnt sbc;
 t_tpclnt tpcbc;
 
 MT_CLR_PNU (uptr);
-if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;   /* not attached? */
-if (sim_tape_bot (uptr)) return MTSE_BOT;               /* at BOT? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return MTSE_UNATT;
+if (sim_tape_bot (uptr))                                /* at BOT? */
+    return MTSE_BOT;
 switch (f) {                                            /* switch on fmt */
 
     case MTUF_F_STD: case MTUF_F_E11:
@@ -297,10 +311,13 @@ switch (f) {                                            /* switch on fmt */
             sbc = MTR_L (*bc);
             if (ferror (uptr->fileref))                 /* error? */
                 return sim_tape_ioerr (uptr);
-            if (feof (uptr->fileref)) return MTSE_EOM;  /* eof? */
+            if (feof (uptr->fileref))                   /* eof? */
+                return MTSE_EOM;
             uptr->pos = uptr->pos - sizeof (t_mtrlnt);  /* spc over rec lnt */
-            if (*bc == MTR_EOM) return MTSE_EOM;        /* eom? */
-            if (*bc == MTR_TMK) return MTSE_TMK;        /* tape mark? */
+            if (*bc == MTR_EOM)                         /* eom? */
+                return MTSE_EOM;
+            if (*bc == MTR_TMK)                         /* tape mark? */
+                return MTSE_TMK;
             if ((*bc & MTR_M_RHGAP) == MTR_RHGAP) {     /* half gap? */
                 uptr->pos = uptr->pos + sizeof (t_mtrlnt) / 2;  /* half space rev */
                 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* resync */
@@ -323,9 +340,11 @@ switch (f) {                                            /* switch on fmt */
         *bc = tpcbc;                                    /* save rec lnt */
         if (ferror (uptr->fileref))                     /* error? */
             return sim_tape_ioerr (uptr);
-        if (feof (uptr->fileref)) return MTSE_EOM;      /* eof? */
+        if (feof (uptr->fileref))                       /* eof? */
+            return MTSE_EOM;
         uptr->pos = ppos;                               /* spc over record */
-        if (*bc == MTR_TMK) return MTSE_TMK;            /* tape mark? */
+        if (*bc == MTR_TMK)                             /* tape mark? */
+            return MTSE_TMK;
         sim_fseek (uptr->fileref, uptr->pos + sizeof (t_tpclnt), SEEK_SET);
         break;
 
@@ -335,14 +354,18 @@ switch (f) {                                            /* switch on fmt */
             sim_fread (&c, sizeof (uint8), 1, uptr->fileref);
             if (ferror (uptr->fileref))                 /* error? */
                 return sim_tape_ioerr (uptr);
-            if (feof (uptr->fileref)) return MTSE_EOM;  /* eof? */
-            if ((c & P7B_DPAR) != P7B_EOF) all_eof = 0;
-            if (c & P7B_SOR) break;                     /* start of record? */
+            if (feof (uptr->fileref))                   /* eof? */
+                return MTSE_EOM;
+            if ((c & P7B_DPAR) != P7B_EOF)
+                all_eof = 0;
+            if (c & P7B_SOR)                            /* start of record? */
+                break;
             }
         uptr->pos = uptr->pos - sbc;                    /* update position */
         *bc = sbc;                                      /* save rec lnt */
         sim_fseek (uptr->fileref, uptr->pos, SEEK_SET); /* for read */
-        if (all_eof) return MTSE_TMK;                   /* tape mark? */
+        if (all_eof)                                    /* tape mark? */
+            return MTSE_TMK;
         break;
 
     default:
@@ -381,21 +404,24 @@ t_addr opos;
 t_stat st;
 
 opos = uptr->pos;                                       /* old position */
-if (st = sim_tape_rdlntf (uptr, &tbc)) return st;       /* read rec lnt */
+if (st = sim_tape_rdlntf (uptr, &tbc))                  /* read rec lnt */
+    return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max) {                                        /* rec out of range? */
     MT_SET_PNU (uptr);
     uptr->pos = opos;
     return MTSE_INVRL;
     }
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);        /* read record */
+i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
 if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     uptr->pos = opos;
     return sim_tape_ioerr (uptr);
     }
-for ( ; i < rbc; i++) buf[i] = 0;                       /* fill with 0's */
-if (f == MTUF_F_P7B) buf[0] = buf[0] & P7B_DPAR;        /* p7b? strip SOR */
+for ( ; i < rbc; i++)                                   /* fill with 0's */
+    buf[i] = 0;
+if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
+    buf[0] = buf[0] & P7B_DPAR;
 return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
 }
 
@@ -427,14 +453,18 @@ uint32 f = MT_GET_FMT (uptr);
 t_mtrlnt i, rbc, tbc;
 t_stat st;
 
-if (st = sim_tape_rdlntr (uptr, &tbc)) return st;       /* read rec lnt */
+if (st = sim_tape_rdlntr (uptr, &tbc))                  /* read rec lnt */
+    return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
-if (rbc > max) return MTSE_INVRL;                       /* rec out of range? */
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);        /* read record */
+if (rbc > max)                                          /* rec out of range? */
+    return MTSE_INVRL;
+i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
 if (ferror (uptr->fileref))                             /* error? */
     return sim_tape_ioerr (uptr);
-for ( ; i < rbc; i++) buf[i] = 0;                       /* fill with 0's */
-if (f == MTUF_F_P7B) buf[0] = buf[0] & P7B_DPAR;        /* p7b? strip SOR */
+for ( ; i < rbc; i++)                                   /* fill with 0's */
+    buf[i] = 0;
+if (f == MTUF_F_P7B)                                    /* p7b? strip SOR */
+    buf[0] = buf[0] & P7B_DPAR;
 return (MTR_F (tbc)? MTSE_RECE: MTSE_OK);
 }
 
@@ -462,9 +492,12 @@ t_mtrlnt sbc;
 
 MT_CLR_PNU (uptr);
 sbc = MTR_L (bc);
-if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;   /* not attached? */
-if (sim_tape_wrp (uptr)) return MTSE_WRP;               /* write prot? */
-if (sbc == 0) return MTSE_OK;                           /* nothing to do? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return MTSE_UNATT;
+if (sim_tape_wrp (uptr))                                /* write prot? */
+    return MTSE_WRP;
+if (sbc == 0)                                           /* nothing to do? */
+    return MTSE_OK;
 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
 switch (f) {                                            /* case on format */
 
@@ -501,8 +534,10 @@ return MTSE_OK;
 t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat)
 {
 MT_CLR_PNU (uptr);
-if ((uptr->flags & UNIT_ATT) == 0) return MTSE_UNATT;   /* not attached? */
-if (sim_tape_wrp (uptr)) return MTSE_WRP;               /* write prot? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
+    return MTSE_UNATT;
+if (sim_tape_wrp (uptr))                                /* write prot? */
+    return MTSE_WRP;
 sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);         /* set pos */
 sim_fwrite (&dat, sizeof (t_mtrlnt), 1, uptr->fileref);
 if (ferror (uptr->fileref)) {                           /* error? */
@@ -528,7 +563,8 @@ return sim_tape_wrdata (uptr, MTR_TMK);
 
 t_stat sim_tape_wreom (UNIT *uptr)
 {
-if (MT_GET_FMT (uptr) == MTUF_F_P7B) return MTSE_FMT;   /* cant do P7B */
+if (MT_GET_FMT (uptr) == MTUF_F_P7B)                    /* cant do P7B */
+    return MTSE_FMT;
 return sim_tape_wrdata (uptr, MTR_EOM);
 }
 
@@ -838,10 +874,12 @@ return MTSE_IOERR;
 
 t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 f;
+uint32 f;
 
-if (uptr == NULL) return SCPE_IERR;
-if (cptr == NULL) return SCPE_ARG;
+if (uptr == NULL)
+    return SCPE_IERR;
+if (cptr == NULL)
+    return SCPE_ARG;
 for (f = 0; f < MTUF_N_FMT; f++) {
     if (fmts[f].name && (strcmp (cptr, fmts[f].name) == 0)) {
         uptr->flags = (uptr->flags & ~MTUF_FMT) |
@@ -858,7 +896,8 @@ t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 int32 f = MT_GET_FMT (uptr);
 
-if (fmts[f].name) fprintf (st, "%s format", fmts[f].name);
+if (fmts[f].name)
+    fprintf (st, "%s format", fmts[f].name);
 else fprintf (st, "invalid format");
 return SCPE_OK;
 }
@@ -871,12 +910,15 @@ t_addr tpos;
 t_tpclnt bc;
 uint32 i, objc;
 
-if ((uptr == NULL) || (uptr->fileref == NULL)) return 0;
+if ((uptr == NULL) || (uptr->fileref == NULL))
+    return 0;
 for (objc = 0, tpos = 0;; ) {
     sim_fseek (uptr->fileref, tpos, SEEK_SET);
     i = sim_fread (&bc, sizeof (t_tpclnt), 1, uptr->fileref);
-    if (i == 0) break;
-    if (map) map[objc] = tpos;
+    if (i == 0)
+        break;
+    if (map)
+        map[objc] = tpos;
     objc++;
     tpos = tpos + ((bc + 1) & ~1) + sizeof (t_tpclnt);
     }
@@ -891,14 +933,16 @@ t_addr sim_tape_tpc_fnd (UNIT *uptr, t_addr *map)
 uint32 lo, hi, p;
 
 
-if (map == NULL) return 0;
+if (map == NULL)
+    return 0;
 lo = 0;
 hi = uptr->hwmark - 1;
 do {
     p = (lo + hi) >> 1;
     if (uptr->pos == map[p])
         return ((p == 0)? map[p]: map[p - 1]);
-    else if (uptr->pos < map[p]) hi = p - 1;
+    else if (uptr->pos < map[p])
+        hi = p - 1;
     else lo = p + 1;
     }
 while (lo <= hi);
@@ -913,10 +957,13 @@ extern uint32 sim_taddr_64;
 t_addr cap;
 t_stat r;
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_ARG;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_ARG;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 cap = (t_addr) get_uint (cptr, 10, sim_taddr_64? 2000000: 2000, &r);
-if (r != SCPE_OK) return SCPE_ARG;
+if (r != SCPE_OK)
+    return SCPE_ARG;
 uptr->capac = cap * ((t_addr) 1000000);
 return SCPE_OK;
 }

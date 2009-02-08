@@ -1,6 +1,6 @@
 /* pdp18b_cpu.c: 18b PDP CPU simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -404,7 +404,8 @@ t_stat Ia (int32 ma, int32 *ea, t_bool jmp);
 int32 Incr_addr (int32 addr);
 int32 Jms_word (int32 t);
 #if defined (PDP15)
-#define INDEX(i,x)      if (!memm && ((i) & I_IDX)) x = ((x) + XR) & DMASK
+#define INDEX(i,x)      if (!memm && ((i) & I_IDX)) \
+                            x = ((x) + XR) & DMASK
 int32 Prot15 (int32 ma, t_bool bndchk);
 int32 Reloc15 (int32 ma, int32 acc);
 int32 RelocXVM (int32 ma, int32 acc);
@@ -583,7 +584,8 @@ int32 iot_data, device, pulse;
 int32 last_IR;
 t_stat reason;
 
-if (build_dev_tab ()) return SCPE_STOP;                 /* build, chk tables */
+if (build_dev_tab ())                                   /* build, chk tables */
+    return SCPE_STOP;
 PC = PC & AMASK;                                        /* clean variables */
 LAC = LAC & LACMASK;
 MQ = MQ & DMASK;
@@ -602,7 +604,8 @@ while (reason == 0) {                                   /* loop until halted */
     int32 link_init, fill;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ()) break;
+        if (reason = sim_process_event ())
+            break;
         api_int = api_eval (&int_pend);                 /* eval API */
         }
 
@@ -677,7 +680,8 @@ while (reason == 0) {                                   /* loop until halted */
 
     if (api_int && !ion_defer) {                        /* API intr? */
         int32 i, lvl = api_int - 1;                     /* get req level */
-        if (hst_lnt) cpu_intr_hist (HIST_API, lvl);     /* record */
+        if (hst_lnt)                                    /* record */
+            cpu_intr_hist (HIST_API, lvl);
         api_act = api_act | (API_ML0 >> lvl);           /* set level active */
         if (lvl >= API_HLVL) {                          /* software req? */
             MA = ACH_SWRE + lvl - API_HLVL;             /* vec = 40:43 */
@@ -708,7 +712,8 @@ while (reason == 0) {                                   /* loop until halted */
     if (int_pend && ion && !ion_defer &&                /* int pending, enabled? */
         !(api_enb && (api_act & API_MASKPI))) {         /* API off or not masking PI? */
         PCQ_ENTRY;                                      /* save old PC */
-        if (hst_lnt) cpu_intr_hist (HIST_PI, 0);        /* record */
+        if (hst_lnt)                                    /* record */
+            cpu_intr_hist (HIST_PI, 0);
         MB = Jms_word (usmd);                           /* save state */
         ion = 0;                                        /* interrupts off */
         ion_defer = 2;                                  /* free instruction */
@@ -730,7 +735,8 @@ while (reason == 0) {                                   /* loop until halted */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
 		}
-    if (!usmd_defer) usmd = usmd_buf;                   /* no IOT? load usmd */
+    if (!usmd_defer)                                    /* no IOT? load usmd */
+        usmd = usmd_buf;
     else usmd_defer = 0;                                /* cancel defer */
 
 #endif                                                  /* PDP-9/PDP-15 */
@@ -739,17 +745,22 @@ while (reason == 0) {                                   /* loop until halted */
 
     xct_count = 0;                                      /* track nested XCT's */
     MA = PC;                                            /* fetch at PC */
-    if (Read (MA, &IR, FE)) continue;                   /* fetch instruction */
+    if (Read (MA, &IR, FE))                             /* fetch instruction */
+        continue;
     PC = Incr_addr (PC);                                /* increment PC */
 
     xct_instr:                                          /* label for API, XCT */
-    if (hst_lnt) cpu_inst_hist (MA, IR);                /* history? */
-    if (ion_defer) ion_defer = ion_defer - 1;           /* count down defer */
-    if (sim_interval) sim_interval = sim_interval - 1;
+    if (hst_lnt)                                        /* history? */
+        cpu_inst_hist (MA, IR);
+    if (ion_defer)                                      /* count down defer */
+        ion_defer = ion_defer - 1;
+    if (sim_interval)
+        sim_interval = sim_interval - 1;
 
 #if defined (PDP15)                                     /* PDP15 */
 
-    if (memm) MA = (MA & B_EPCMASK) | (IR & B_DAMASK);  /* bank mode dir addr */
+    if (memm)                                           /* bank mode dir addr */
+        MA = (MA & B_EPCMASK) | (IR & B_DAMASK);
     else MA = (MA & P_EPCMASK) | (IR & P_DAMASK);       /* page mode dir addr */
 
 #else                                                   /* others */
@@ -763,17 +774,20 @@ while (reason == 0) {                                   /* loop until halted */
 /* LAC: opcode 20 */
 
     case 011:                                           /* LAC, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 010:                                           /* LAC, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
+        if (Read (MA, &MB, RD))
+            break;
         LAC = (LAC & LINK) | MB;
         break;
 
 /* DAC: opcode 04 */
 
     case 003:                                           /* DAC, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 002:                                           /* DAC, dir */
         INDEX (IR, MA);
         Write (MA, LAC & DMASK, WR);
@@ -782,7 +796,8 @@ while (reason == 0) {                                   /* loop until halted */
 /* DZM: opcode 14 */
 
     case 007:                                           /* DZM, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 006:                                           /* DZM, direct */
         INDEX (IR, MA);
         Write (MA, 0, WR);
@@ -791,32 +806,39 @@ while (reason == 0) {                                   /* loop until halted */
 /* AND: opcode 50 */
 
     case 025:                                           /* AND, ind */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 024:                                           /* AND, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
+        if (Read (MA, &MB, RD))
+            break;
         LAC = LAC & (MB | LINK);
         break;
 
 /* XOR: opcode 24 */
 
     case 013:                                           /* XOR, ind */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 012:                                           /* XOR, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
+        if (Read (MA, &MB, RD))
+            break;
         LAC = LAC ^ MB;
         break;
 
 /* ADD: opcode 30 */
 
     case 015:                                           /* ADD, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 014:                                           /* ADD, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
+        if (Read (MA, &MB, RD))
+            break;
         t = (LAC & DMASK) + MB;
-        if (t > DMASK) t = (t + 1) & DMASK;             /* end around carry */
+        if (t > DMASK)                                  /* end around carry */
+            t = (t + 1) & DMASK;
         if (((~LAC ^ MB) & (LAC ^ t)) & SIGN)           /* overflow? */
             LAC = LINK | t;                             /* set link */
         else LAC = (LAC & LINK) | t;
@@ -825,43 +847,54 @@ while (reason == 0) {                                   /* loop until halted */
 /* TAD: opcode 34 */
 
     case 017:                                           /* TAD, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 016:                                           /* TAD, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
+        if (Read (MA, &MB, RD))
+            break;
         LAC = (LAC + MB) & LACMASK;
         break;
 
 /* ISZ: opcode 44 */
 
     case 023:                                           /* ISZ, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 022:                                           /* ISZ, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
+        if (Read (MA, &MB, RD))
+            break;
         MB = (MB + 1) & DMASK;
-        if (Write (MA, MB, WR)) break;
-        if (MB == 0) PC = Incr_addr (PC);
+        if (Write (MA, MB, WR))
+            break;
+        if (MB == 0)
+            PC = Incr_addr (PC);
         break;
 
 /* SAD: opcode 54 */
 
     case 027:                                           /* SAD, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 026:                                           /* SAD, dir */
         INDEX (IR, MA);
-        if (Read (MA, &MB, RD)) break;
-        if ((LAC & DMASK) != MB) PC = Incr_addr (PC);
+        if (Read (MA, &MB, RD))
+            break;
+        if ((LAC & DMASK) != MB)
+            PC = Incr_addr (PC);
         break;
 
 /* XCT: opcode 40 */
 
     case 021:                                           /* XCT, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 020:                                           /* XCT, dir  */
         INDEX (IR, MA);
         if ((api_usmd | usmd) && (xct_count != 0)) {    /* chained and usmd? */
-            if (usmd) prvn = trap_pending = 1;          /* trap if usmd */
+            if (usmd)                                   /* trap if usmd */
+                prvn = trap_pending = 1;
             break;                                      /* nop if api_usmd */
             }
         if (xct_count >= xct_max) {                     /* too many XCT's? */
@@ -872,7 +905,8 @@ while (reason == 0) {                                   /* loop until halted */
 #if defined (PDP9)
         ion_defer = 1;                                  /* defer intr */
 #endif
-        if (Read (MA, &IR, FE)) break;                  /* fetch inst, mm err? */
+        if (Read (MA, &IR, FE))                         /* fetch inst, mm err? */
+            break;
         goto xct_instr;                                 /* go execute */
 
 /* CAL: opcode 00 - api_usmd records whether usmd = 1 at start of API cycle
@@ -888,7 +922,8 @@ while (reason == 0) {                                   /* loop until halted */
         MA = 020;                                       /* MA = abs 20 */
         ion_defer = 1;                                  /* "free instruction" */
 #else                                                   /* others */
-        if (memm) MA = 020;                             /* if ext, abs 20 */
+        if (memm)                                       /* if ext, abs 20 */
+            MA = 020;
         else MA = (PC & B_EPCMASK) | 020;               /* else bank-rel 20 */
 #endif
 #if defined (PDP9) || defined (PDP15)
@@ -902,7 +937,8 @@ while (reason == 0) {                                   /* loop until halted */
             }
 #endif
         if (IR & I_IND) {                               /* indirect? */
-            if (Ia (MA, &MA, 0)) break;
+            if (Ia (MA, &MA, 0))
+                break;
             }
         PCQ_ENTRY;
         MB = Jms_word (api_usmd | t);                   /* save state */
@@ -913,22 +949,26 @@ while (reason == 0) {                                   /* loop until halted */
 /* JMS: opcode 010 - api_usmd records whether usmd = 1 at start of API cycle */
 
     case 005:                                           /* JMS, indir */
-        if (Ia (MA, &MA, 0)) break;
+        if (Ia (MA, &MA, 0))
+            break;
     case 004:                                           /* JMS, dir */
         INDEX (IR, MA);
         PCQ_ENTRY;
 #if defined (PDP15)                                     /* PDP15 */
-        if (!usmd) ion_defer = 1;                       /* "free instruction" */
+        if (!usmd)                                      /* "free instruction" */
+            ion_defer = 1;
 #endif
         MB = Jms_word (api_usmd | usmd);                /* save state */
-        if (Write (MA, MB, WR)) break;
+        if (Write (MA, MB, WR))
+            break;
         PC = Incr_addr (MA) & AMASK;
         break;
 
 /* JMP: opcode 60 */
 
     case 031:                                           /* JMP, indir */
-        if (Ia (MA, &MA, 1)) break;
+        if (Ia (MA, &MA, 1))
+            break;
         INDEX (IR, MA);
         PCQ_ENTRY;                                      /* save old PC */
         PC = MA & AMASK;
@@ -948,7 +988,8 @@ while (reason == 0) {                                   /* loop until halted */
                     sim_idle (0, FALSE);                /* we're idle */
                 }
             else if (((MA ^ (PC - 1)) & AMASK) == 0) {  /* 2) JMP *? */
-                if (iof) reason = STOP_LOOP;            /*    iof? inf loop */
+                if (iof)                                /*    iof? inf loop */
+                    reason = STOP_LOOP;
                 else sim_idle (0, FALSE);               /*    ion? idle */                
                 }
             }                                           /* end idle */
@@ -967,51 +1008,63 @@ while (reason == 0) {                                   /* loop until halted */
         case 0:                                         /* nop */
             break;
         case 1:                                         /* SMA */
-            if ((LAC & SIGN) != 0) skp = 1;
+            if ((LAC & SIGN) != 0)
+                skp = 1;
             break;
         case 2:                                         /* SZA */
-            if ((LAC & DMASK) == 0) skp = 1;
+            if ((LAC & DMASK) == 0)
+                skp = 1;
             break;
         case 3:                                         /* SZA | SMA */
             if (((LAC & DMASK) == 0) || ((LAC & SIGN) != 0))
                 skp = 1; 
             break;
         case 4:                                         /* SNL */
-            if (LAC >= LINK) skp = 1;
+            if (LAC >= LINK)
+                skp = 1;
             break;
         case 5:                                         /* SNL | SMA */
-            if (LAC >= SIGN) skp = 1;
+            if (LAC >= SIGN)
+                skp = 1;
             break;
         case 6:                                         /* SNL | SZA */
-            if ((LAC >= LINK) || (LAC == 0)) skp = 1;
+            if ((LAC >= LINK) || (LAC == 0))
+                skp = 1;
             break;
         case 7:                                         /* SNL | SZA | SMA */
-            if ((LAC >= SIGN) || (LAC == 0)) skp = 1;
+            if ((LAC >= SIGN) || (LAC == 0))
+                skp = 1;
             break;
         case 010:                                       /* SKP */
             skp = 1;
             break;
         case 011:                                       /* SPA */
-            if ((LAC & SIGN) == 0) skp = 1;
+            if ((LAC & SIGN) == 0)
+                skp = 1;
             break;
         case 012:                                       /* SNA */
-            if ((LAC & DMASK) != 0) skp = 1;
+            if ((LAC & DMASK) != 0)
+                skp = 1;
             break;
         case 013:                                       /* SNA & SPA */
             if (((LAC & DMASK) != 0) && ((LAC & SIGN) == 0))
                 skp = 1;
             break;
         case 014:                                       /* SZL */
-            if (LAC < LINK) skp = 1;
+            if (LAC < LINK)
+                skp = 1;
             break;
         case 015:                                       /* SZL & SPA */
-            if (LAC < SIGN) skp = 1;
+            if (LAC < SIGN)
+                skp = 1;
             break;
         case 016:                                       /* SZL & SNA */
-            if ((LAC < LINK) && (LAC != 0)) skp = 1;
+            if ((LAC < LINK) && (LAC != 0))
+                skp = 1;
             break;
         case 017:                                       /* SZL & SNA & SPA */
-            if ((LAC < SIGN) && (LAC != 0)) skp = 1;
+            if ((LAC < SIGN) && (LAC != 0))
+                skp = 1;
             break;
             }                                           /* end switch skips */
 
@@ -1067,7 +1120,8 @@ while (reason == 0) {                                   /* loop until halted */
 
         if (IR & 0000004) {                             /* OAS */
 #if defined (PDP9) || defined (PDP15)
-            if (usmd) prvn = trap_pending = 1;          /* trap if usmd */
+            if (usmd)                                   /* trap if usmd */
+                prvn = trap_pending = 1;
             else if (!api_usmd)                         /* nop if api_usmd */
 #endif
                 LAC = LAC | SR;
@@ -1076,7 +1130,7 @@ while (reason == 0) {                                   /* loop until halted */
         switch (((IR >> 8) & 04) | ((IR >> 3) & 03)) {  /* decode IR<7,13:14> */
         case 1:                                         /* RAL */
             LAC = ((LAC << 1) | (LAC >> 18)) & LACMASK;
-                break;
+            break;
         case 2:                                         /* RAR */
             LAC = ((LAC >> 1) | (LAC << 18)) & LACMASK;
             break;
@@ -1104,10 +1158,13 @@ while (reason == 0) {                                   /* loop until halted */
             }                                           /* end switch rotate */
 
         if (IR & 0000040) {                             /* HLT */
-            if (usmd) prvn = trap_pending = 1;          /* trap if usmd */
-            else if (!api_usmd) reason = STOP_HALT;     /* nop if api_usmd */
+            if (usmd)                                   /* trap if usmd */
+                prvn = trap_pending = 1;
+            else if (!api_usmd)                         /* nop if api_usmd */
+                reason = STOP_HALT;
             }
-        if (skp) PC = Incr_addr (PC);                   /* if skip, inc PC */
+        if (skp)                                        /* if skip, inc PC */
+            PC = Incr_addr (PC);
         break;                                          /* end OPR */
 
 /* EAE: opcode 64 
@@ -1121,25 +1178,33 @@ while (reason == 0) {                                   /* loop until halted */
    down to zero; the read SC command compensates. */
 
     case 033: case 032:                                 /* EAE */
-        if (cpu_unit.flags & UNIT_NOEAE) break;         /* disabled? */
+        if (cpu_unit.flags & UNIT_NOEAE)                /* disabled? */
+            break;
         if (IR & 0020000)                               /* IR<4>? AC0 to L */
             LAC = ((LAC << 1) & LINK) | (LAC & DMASK);
-        if (IR & 0010000) MQ = 0;                       /* IR<5>? clear MQ */
+        if (IR & 0010000)                               /* IR<5>? clear MQ */
+            MQ = 0;
         if ((IR & 0004000) && (LAC & SIGN))             /* IR<6> and minus? */
             eae_ac_sign = LINK;                         /* set eae_ac_sign */
         else eae_ac_sign = 0;                           /* if not, unsigned */
-        if (IR & 0002000) MQ = (MQ | LAC) & DMASK;      /* IR<7>? or AC */
-        else if (eae_ac_sign) LAC = LAC ^ DMASK;        /* if not, |AC| */
-        if (IR & 0001000) LAC = LAC & LINK;             /* IR<8>? clear AC */
+        if (IR & 0002000)                               /* IR<7>? or AC */
+            MQ = (MQ | LAC) & DMASK;
+        else if (eae_ac_sign)                           /* if not, |AC| */
+            LAC = LAC ^ DMASK;
+        if (IR & 0001000)                               /* IR<8>? clear AC */
+            LAC = LAC & LINK;
         link_init = LAC & LINK;                         /* link temporary */
         fill = link_init? DMASK: 0;                     /* fill = link */
         esc = IR & 077;                                 /* get eff SC */
         switch ((IR >> 6) & 07) {                       /* case on IR<9:11> */
 
         case 0:                                         /* setup */
-            if (IR & 04) MQ = MQ ^ DMASK;               /* IR<15>? ~MQ */
-            if (IR & 02) LAC = LAC | MQ;                /* IR<16>? or MQ */
-            if (IR & 01) LAC = LAC | ((-SC) & 077);     /* IR<17>? or SC */
+            if (IR & 04)                                /* IR<15>? ~MQ */
+                MQ = MQ ^ DMASK;
+            if (IR & 02)                                /* IR<16>? or MQ */
+                LAC = LAC | MQ;
+            if (IR & 01)                                /* IR<17>? or SC */
+                LAC = LAC | ((-SC) & 077);
             break;
 
 /* Multiply uses a shift and add algorithm.  The PDP-15, unlike prior
@@ -1147,13 +1212,16 @@ while (reason == 0) {                                   /* loop until halted */
    of the result sign. */
 
         case 1:                                         /* multiply */
-            if (Read (PC, &MB, FE)) break;              /* get next word */
+            if (Read (PC, &MB, FE))                     /* get next word */
+                break;
             PC = Incr_addr (PC);                        /* increment PC */
-            if (eae_ac_sign) MQ = MQ ^ DMASK;           /* EAE AC sign? ~MQ */
+            if (eae_ac_sign)                            /* EAE AC sign? ~MQ */
+                MQ = MQ ^ DMASK;
             LAC = LAC & DMASK;                          /* clear link */
             SC = esc;                                   /* init SC */
             do {                                        /* loop */
-                if (MQ & 1) LAC = LAC + MB;             /* MQ<17>? add */
+                if (MQ & 1)                             /* MQ<17>? add */
+                    LAC = LAC + MB;
                 MQ = (MQ >> 1) | ((LAC & 1) << 17);
                 LAC = LAC >> 1;                         /* shift AC'MQ right */
                 SC = (SC - 1) & 077;                    /* decrement SC */
@@ -1170,13 +1238,15 @@ while (reason == 0) {                                   /* loop until halted */
 
 /* Divide uses a non-restoring divide.  Divide uses a subtract and shift
    algorithm.  The quotient is generated in true form.  The PDP-15, unlike
-   prior implementations, factors IR<6> (signed multiply) into the calculation
+   prior implementations, factors IR<6> (signed divide) into the calculation
    of the result sign. */
 
         case 3:                                         /* divide */
-            if (Read (PC, &MB, FE)) break;              /* get next word */
+            if (Read (PC, &MB, FE))                     /* get next word */
+                break;
             PC = Incr_addr (PC);                        /* increment PC */
-            if (eae_ac_sign) MQ = MQ ^ DMASK;           /* EAE AC sign? ~MQ */
+            if (eae_ac_sign)                            /* EAE AC sign? ~MQ */
+                MQ = MQ ^ DMASK;
             if ((LAC & DMASK) >= MB) {                  /* overflow? */
                 LAC = (LAC - MB) | LINK;                /* set link */
                 break;
@@ -1185,16 +1255,19 @@ while (reason == 0) {                                   /* loop until halted */
             t = 0;                                      /* init loop */
             SC = esc;                                   /* init SC */
             do {                                        /* loop */
-                if (t) LAC = (LAC + MB) & LACMASK;
+                if (t)
+                    LAC = (LAC + MB) & LACMASK;
                 else LAC = (LAC - MB) & LACMASK;
                 t = (LAC >> 18) & 1;                    /* quotient bit */
-                if (SC > 1) LAC =                       /* skip if last */
-                    ((LAC << 1) | (MQ >> 17)) & LACMASK;
+                if (SC > 1)                             /* skip if last */
+                     LAC =((LAC << 1) | (MQ >> 17)) & LACMASK;
                 MQ = ((MQ << 1) | (t ^ 1)) & DMASK;     /* shift in quo bit */
                 SC = (SC - 1) & 077;                    /* decrement SC */
                 } while (SC != 0);                      /* until SC = 0 */
-            if (t) LAC = (LAC + MB) & LACMASK;
-            if (eae_ac_sign) LAC = LAC ^ DMASK;         /* sgn rem = sgn divd */
+            if (t)
+                LAC = (LAC + MB) & LACMASK;
+            if (eae_ac_sign)                            /* sgn rem = sgn divd */
+                LAC = LAC ^ DMASK;
 #if defined (PDP15)
             if ((IR & 0004000) && (eae_ac_sign ^ link_init))
 #else
@@ -1209,13 +1282,15 @@ while (reason == 0) {                                   /* loop until halted */
 
         case 4:                                         /* normalize */
 #if defined (PDP15)
-            if (!usmd) ion_defer = 2;                   /* free instructions */
+            if (!usmd)                                  /* free instructions */
+                ion_defer = 2;
 #endif
             for (SC = esc; ((LAC & SIGN) == ((LAC << 1) & SIGN)); ) {
                 LAC = (LAC << 1) | ((MQ >> 17) & 1);
                 MQ = (MQ << 1) | (link_init >> 18);
                 SC = (SC - 1) & 077;
-                if (SC == 0) break;
+                if (SC == 0)
+                    break;
                 }
             LAC = link_init | (LAC & DMASK);            /* trim AC, restore L */
             MQ = MQ & DMASK;                            /* trim MQ */
@@ -1228,8 +1303,8 @@ while (reason == 0) {                                   /* loop until halted */
                 LAC = ((fill << (18 - esc)) | (LAC >> esc)) & LACMASK;
                 }
             else {
-                if (esc < 36) MQ =
-                    ((fill << (36 - esc)) | (LAC >> (esc - 18))) & DMASK;
+                if (esc < 36)
+                     MQ = ((fill << (36 - esc)) | (LAC >> (esc - 18))) & DMASK;
                 else MQ = fill;
                 LAC = link_init | fill;
                 }
@@ -1238,13 +1313,12 @@ while (reason == 0) {                                   /* loop until halted */
 
         case 6:                                         /* long left shift */
             if (esc < 18) {
-                LAC = link_init |
-                    (((LAC << esc) | (MQ >> (18 - esc))) & DMASK);
+                LAC = link_init | (((LAC << esc) | (MQ >> (18 - esc))) & DMASK);
                 MQ = ((MQ << esc) | (fill >> (18 - esc))) & DMASK;
                 }
             else {
-                if (esc < 36) LAC = link_init | 
-                     (((MQ << (esc - 18)) | (fill >> (36 - esc))) & DMASK);
+                if (esc < 36)
+                    LAC = link_init | (((MQ << (esc - 18)) | (fill >> (36 - esc))) & DMASK);
                 else LAC = link_init | fill;
                 MQ = fill;
                 }
@@ -1252,8 +1326,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
 
         case 7:                                         /* AC left shift */
-            if (esc < 18) LAC = link_init |
-                (((LAC << esc) | (fill >> (18 - esc))) & DMASK);
+            if (esc < 18)
+                LAC = link_init | (((LAC << esc) | (fill >> (18 - esc))) & DMASK);
             else LAC = link_init | fill;
             SC = 0;                                     /* clear step count */
             break;
@@ -1281,7 +1355,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
         case 005:                                       /* AXS */
             XR = (XR + t) & DMASK;
-            if (SEXT (XR) >= SEXT (LR)) PC = Incr_addr (PC);
+            if (SEXT (XR) >= SEXT (LR))
+                PC = Incr_addr (PC);
             break;
         case 006:                                       /* PXL */
             LR = XR;
@@ -1357,12 +1432,14 @@ while (reason == 0) {                                   /* loop until halted */
 #endif
         if ((api_usmd | usmd) &&                        /* user, not XVM UIOT? */
             (!XVM || !(MMR & MM_UIOT))) {
-            if (usmd) prvn = trap_pending = 1;          /* trap if user */
+            if (usmd)                                   /* trap if user */
+                prvn = trap_pending = 1;
             break;                                      /* nop if api_usmd */
             }
         device = (IR >> 6) & 077;                       /* device = IR<6:11> */
         pulse = IR & 067;                               /* pulse = IR<12:17> */
-        if (IR & 0000010) LAC = LAC & LINK;             /* clear AC? */
+        if (IR & 0000010)                               /* clear AC? */
+            LAC = LAC & LINK;
         iot_data = LAC & DMASK;                         /* AC unchanged */
 
 /* PDP-4 system IOT's */
@@ -1371,8 +1448,10 @@ while (reason == 0) {                                   /* loop until halted */
         switch (device) {                               /* decode IR<6:11> */
 
         case 0:                                         /* CPU and clock */
-            if (pulse == 002) ion = 0;                  /* IOF */
-            else if (pulse == 042) ion = ion_defer = 1; /* ION */
+            if (pulse == 002)                           /* IOF */
+                ion = 0;
+            else if (pulse == 042)                      /* ION */
+                ion = ion_defer = 1;
             else iot_data = clk (device, pulse, iot_data);
             break;
 #endif
@@ -1383,24 +1462,31 @@ while (reason == 0) {                                   /* loop until halted */
         switch (device) {                               /* decode IR<6:11> */
 
         case 0:                                         /* CPU and clock */
-            if (pulse == 002) ion = 0;                  /* IOF */
-            else if (pulse == 042) ion = ion_defer = 1; /* ION */
+            if (pulse == 002)                           /* IOF */
+                ion = 0;
+            else if (pulse == 042)                      /* ION */
+                ion = ion_defer = 1;
             else if (pulse == 062)                      /* ITON */
                 usmd = usmd_buf = ion = ion_defer = 1;
             else iot_data = clk (device, pulse, iot_data);
             break;
 
         case 033:                                       /* CPU control */
-            if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
-            else if (pulse == 002) reset_all (1);       /* CAF - skip CPU */
+            if ((pulse == 001) || (pulse == 041))
+                PC = Incr_addr (PC);
+            else if (pulse == 002)                      /* CAF - skip CPU */
+                reset_all (1);
             break;
 
         case 077:                                       /* extended memory */
-            if ((pulse == 001) && memm) PC = Incr_addr (PC);
-            else if (pulse == 002) memm = 1;            /* EEM */
+            if ((pulse == 001) && memm)
+                PC = Incr_addr (PC);
+            else if (pulse == 002)                      /* EEM */
+                memm = 1;
             else if (pulse == 042)                      /* EMIR */
                 memm = emir_pending = 1;                /* ext on, restore */
-            else if (pulse == 004) memm = 0;            /* LEM */
+            else if (pulse == 004)                      /* LEM */
+                memm = 0;
             break;
 #endif
 
@@ -1412,8 +1498,10 @@ while (reason == 0) {                                   /* loop until halted */
         switch (device) {                               /* decode IR<6:11> */
  
        case 000:                                       /* CPU and clock */
-            if (pulse == 002) ion = 0;                  /* IOF */
-            else if (pulse == 042) ion = 1;             /* ION */
+            if (pulse == 002)                           /* IOF */
+                ion = 0;
+            else if (pulse == 042)                      /* ION */
+                ion = ion_defer = 1;
             else iot_data = clk (device, pulse, iot_data);
             break;
 
@@ -1423,11 +1511,14 @@ while (reason == 0) {                                   /* loop until halted */
                     PC = Incr_addr (PC);
                 else if ((pulse == 041) && nexm)        /* MPSNE */
                     PC = Incr_addr (PC);
-                else if (pulse == 002) prvn = 0;        /* MPCV */
-                else if (pulse == 042) usmd_buf = 1;    /* MPEU */
+                else if (pulse == 002)                  /* MPCV */
+                    prvn = 0;
+                else if (pulse == 042)                  /* MPEU */
+                    usmd_buf = 1;
                 else if (pulse == 004)                  /* MPLD */
                     BR = LAC & BRMASK;
-                else if (pulse == 044) nexm = 0;        /* MPCNE */
+                else if (pulse == 044)                  /* MPCNE */
+                    nexm = 0;
                 }
             else reason = stop_inst;
             break;
@@ -1438,12 +1529,14 @@ while (reason == 0) {                                   /* loop until halted */
             break;
 
         case 033:                                       /* CPU control */
-            if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
+            if ((pulse == 001) || (pulse == 041))
+                PC = Incr_addr (PC);
             else if (pulse == 002) {                    /* CAF */
                 reset_all (1);                          /* reset all exc CPU */
                 cpu_caf ();                             /* CAF to CPU */
                 }
-            else if (pulse == 044) rest_pending = 1;    /* DBR */
+            else if (pulse == 044)                      /* DBR */
+                rest_pending = 1;
             if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
                 int32 t = api_ffo[api_act & 0377];
                 api_act = api_act & ~(API_ML0 >> t);
@@ -1451,7 +1544,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
 
         case 055:                                       /* API control */
-            if (cpu_unit.flags & UNIT_NOAPI) reason = stop_inst;
+            if (cpu_unit.flags & UNIT_NOAPI)
+                reason = stop_inst;
             else if (pulse == 001) {                    /* SPI */
                 if (((LAC & SIGN) && api_enb) ||
                     ((LAC & 0377) > api_act))
@@ -1469,11 +1563,14 @@ while (reason == 0) {                                   /* loop until halted */
             break;
 
         case 077:                                       /* extended memory */
-            if ((pulse == 001) && memm) PC = Incr_addr (PC);
-            else if (pulse == 002) memm = 1;            /* EEM */
+            if ((pulse == 001) && memm)
+                PC = Incr_addr (PC);
+            else if (pulse == 002)                      /* EEM */
+                memm = 1;
             else if (pulse == 042)                      /* EMIR */
                 memm = emir_pending = 1;                /* ext on, restore */
-            else if (pulse == 004) memm = 0;            /* LEM */
+            else if (pulse == 004)                      /* LEM */
+                memm = 0;
             break;
 #endif
 
@@ -1485,8 +1582,10 @@ while (reason == 0) {                                   /* loop until halted */
         switch (device) {                               /* decode IR<6:11> */
 
         case 000:                                       /* CPU and clock */
-            if (pulse == 002) ion = 0;                  /* IOF */
-            else if (pulse == 042) ion = 1;             /* ION */
+            if (pulse == 002)                           /* IOF */
+                ion = 0;
+            else if (pulse == 042)                      /* ION */
+                ion = ion_defer = 1;
             else if (XVM && (pulse == 022))             /* ORMM/RDMM */
                 iot_data = MMR;
             else if (XVM && (pulse == 024))             /* LDMM */
@@ -1501,15 +1600,18 @@ while (reason == 0) {                                   /* loop until halted */
                     PC = Incr_addr (PC);
                 else if ((pulse == 041) && nexm)        /* MPSNE */
                     PC = Incr_addr (PC);
-                else if (pulse == 002) prvn = 0;        /* MPCV */
+                else if (pulse == 002)                  /* MPCV */
+                    prvn = 0;
                 else if (pulse == 042)                  /* MPEU */
                      usmd_buf = 1;
                 else if (XVM && (pulse == 062))         /* RDCLK */
                     iot_data = clk_task_upd (TRUE);
-                else if (pulse == 004) BR = LAC & t;    /* MPLD */
+                else if (pulse == 004)                  /* MPLD */
+                    BR = LAC & t;
                 else if (RELOC && (pulse == 024))       /* MPLR */
                     RR = LAC & t;
-                else if (pulse == 044) nexm = 0;        /* MPCNE */
+                else if (pulse == 044)                  /* MPCNE */
+                    nexm = 0;
                 }
             else reason = stop_inst;
             break;
@@ -1520,12 +1622,14 @@ while (reason == 0) {                                   /* loop until halted */
             break;
 
         case 033:                                       /* CPU control */
-            if ((pulse == 001) || (pulse == 041)) PC = Incr_addr (PC);
+            if ((pulse == 001) || (pulse == 041))
+                PC = Incr_addr (PC);
             else if (pulse == 002) {                    /* CAF */
                 reset_all (2);                          /* reset all exc CPU, FP15 */
                 cpu_caf ();                             /* CAF to CPU */
                 }
-            else if (pulse == 044) rest_pending = 1;    /* DBR */
+            else if (pulse == 044)                      /* DBR */
+                rest_pending = 1;
             if (((cpu_unit.flags & UNIT_NOAPI) == 0) && (pulse & 004)) {
                 int32 t = api_ffo[api_act & 0377];
                 api_act = api_act & ~(API_ML0 >> t);
@@ -1533,7 +1637,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
 
         case 055:                                       /* API control */
-            if (cpu_unit.flags & UNIT_NOAPI) reason = stop_inst;
+            if (cpu_unit.flags & UNIT_NOAPI)
+                reason = stop_inst;
             else if (pulse == 001) {                    /* SPI */
                 if (((LAC & SIGN) && api_enb) ||
                     ((LAC & 0377) > api_act))
@@ -1548,16 +1653,21 @@ while (reason == 0) {                                   /* loop until halted */
                 api_req = api_req | ((LAC >> 8) & 017);
                 api_act = api_act | (LAC & 0377);
                 }
-            else if (pulse == 021) ion_inh = 0;         /* ENB */
-            else if (pulse == 022) ion_inh = 1;         /* INH */
+            else if (pulse == 021)                      /* ENB */
+                ion_inh = 0;
+            else if (pulse == 022)                      /* INH */
+                ion_inh = 1;
             break;
 
         case 077:                                       /* bank addressing */
             if ((pulse == 041) || ((pulse == 061) && memm))
                  PC = Incr_addr (PC);                   /* SKP15, SBA */
-            else if (pulse == 042) rest_pending = 1;    /* RES */
-            else if (pulse == 062) memm = 0;            /* DBA */
-            else if (pulse == 064) memm = 1;            /* EBA */
+            else if (pulse == 042)                      /* RES */
+                rest_pending = 1;
+            else if (pulse == 062)                      /* DBA */
+                memm = 0;
+            else if (pulse == 064)                      /* EBA */
+                memm = 1;
             break;
 #endif
 
@@ -1571,8 +1681,10 @@ while (reason == 0) {                                   /* loop until halted */
             }                                           /* end switch device */
 
         LAC = LAC | (iot_data & DMASK);
-        if (iot_data & IOT_SKP) PC = Incr_addr (PC);
-        if (iot_data >= IOT_REASON) reason = iot_data >> IOT_V_REASON;
+        if (iot_data & IOT_SKP)
+            PC = Incr_addr (PC);
+        if (iot_data >= IOT_REASON)
+            reason = iot_data >> IOT_V_REASON;
         api_int = api_eval (&int_pend);                 /* eval API */
         break;                                          /* end case IOT */
         }                                               /* end switch opcode */
@@ -1596,19 +1708,23 @@ int32 i, hi;
 
 *pend = 0;                                              /* assume no intr */
 #if defined (PDP15)                                     /* PDP15 only */
-if (ion_inh) return 0;                                  /* inhibited? */
+if (ion_inh)                                            /* inhibited? */
+    return 0;
 #endif
 for (i = 0; i < API_HLVL+1; i++) {                      /* any intr? */
-    if (int_hwre[i]) *pend = 1;
+    if (int_hwre[i])
+        *pend = 1;
     }
-if (api_enb == 0) return 0;                             /* off? no req */
+if (api_enb == 0)                                       /* off? no req */
+    return 0;
 api_req = api_req & ~(API_ML0|API_ML1|API_ML2|API_ML3); /* clr req<0:3> */
 for (i = 0; i < API_HLVL; i++) {                        /* loop thru levels */
     if (int_hwre[i])                                    /* req on level? */
         api_req = api_req | (API_ML0 >> i);             /* set api req */
     }
 hi = api_ffo[api_req & 0377];                           /* find hi req */
-if (hi < api_ffo[api_act & 0377]) return (hi + 1);
+if (hi < api_ffo[api_act & 0377])
+    return (hi + 1);
 return 0;
 }
 
@@ -1638,7 +1754,8 @@ return d;
 t_stat Read (int32 ma, int32 *dat, int32 cyc)
 {
 ma = ma & AMASK;
-if (MEM_ADDR_OK (ma)) *dat = M[ma] & DMASK;
+if (MEM_ADDR_OK (ma))
+    *dat = M[ma] & DMASK;
 else *dat = 0;
 return MM_OK;
 }
@@ -1646,7 +1763,8 @@ return MM_OK;
 t_stat Write (int32 ma, int32 dat, int32 cyc)
 {
 ma = ma & AMASK;
-if (MEM_ADDR_OK (ma)) M[ma] = dat & DMASK;
+if (MEM_ADDR_OK (ma))
+    M[ma] = dat & DMASK;
 return MM_OK;
 }
 
@@ -1662,10 +1780,12 @@ if ((ma & B_DAMASK & ~07) == 010) {                     /* autoindex? */
     }
 else sta = Read (ma, &t, DF);                           /* fetch indirect */
 if (jmp) {                                              /* jmp i? */
-    if (emir_pending && (((t >> 16) & 1) == 0)) memm = 0;
+    if (emir_pending && (((t >> 16) & 1) == 0))
+        memm = 0;
     emir_pending = rest_pending = 0;
     }
-if (memm) *ea = t & IAMASK;                             /* extend? 15b ia */
+if (memm)                                               /* extend? 15b ia */
+    *ea = t & IAMASK;
 else *ea = (ma & B_EPCMASK) | (t & B_DAMASK);           /* bank-rel ia */
 return sta;
 }
@@ -1712,7 +1832,8 @@ if (usmd) {                                             /* user mode? */
         return MM_ERR;
         }
     }
-if (MEM_ADDR_OK (ma)) *dat = M[ma] & DMASK;             /* valid mem? ok */
+if (MEM_ADDR_OK (ma))                                   /* valid mem? ok */
+    *dat = M[ma] & DMASK;
 else {
     *dat = 0;                                           /* set flag, no trap */
     nexm = 1;
@@ -1733,7 +1854,8 @@ if (usmd) {
         return MM_ERR;
         }
     }
-if (MEM_ADDR_OK (ma)) M[ma] = dat & DMASK;              /* valid mem? ok */
+if (MEM_ADDR_OK (ma))                                   /* valid mem? ok */
+    M[ma] = dat & DMASK;
 else nexm = 1;                                          /* set flag, no trap */
 return MM_OK;
 }
@@ -1751,7 +1873,8 @@ if ((ma & B_DAMASK & ~07) == 010) {                     /* autoindex? */
     }
 else sta = Read (ma, &t, DF);
 if (jmp) {                                              /* jmp i? */
-    if (emir_pending && (((t >> 16) & 1) == 0)) memm = 0;
+    if (emir_pending && (((t >> 16) & 1) == 0))
+        memm = 0;
     if (rest_pending) {                                 /* restore pending? */
         LAC = ((t << 1) & LINK) | (LAC & DMASK);        /* restore L */
         memm = (t >> 16) & 1;                           /* restore extend */
@@ -1759,7 +1882,8 @@ if (jmp) {                                              /* jmp i? */
         }
     emir_pending = rest_pending = 0;
     }
-if (memm) *ea = t & IAMASK;                             /* extend? 15b ia */
+if (memm)                                               /* extend? 15b ia */
+    *ea = t & IAMASK;
 else *ea = (ma & B_EPCMASK) | (t & B_DAMASK);           /* bank-rel ia */
 return sta;
 }
@@ -1794,8 +1918,10 @@ t_stat Read (int32 ma, int32 *dat, int32 cyc)
 int32 pa;
 
 if (usmd) {                                             /* user mode? */
-    if (XVM) pa = RelocXVM (ma, REL_R);                 /* XVM relocation? */
-    else if (RELOC) pa = Reloc15 (ma, REL_R);           /* PDP-15 relocation? */
+    if (XVM)                                            /* XVM relocation? */
+        pa = RelocXVM (ma, REL_R);
+    else if (RELOC)                                     /* PDP-15 relocation? */
+        pa = Reloc15 (ma, REL_R);
     else pa = Prot15 (ma, cyc == FE);                   /* PDP-15 prot, fetch only */
     if (pa < 0) {                                       /* error? */
         *dat = 0;
@@ -1803,7 +1929,8 @@ if (usmd) {                                             /* user mode? */
         }
     }
 else pa = ma & AMASK;                                   /* no prot or reloc */
-if (MEM_ADDR_OK (pa)) *dat = M[pa] & DMASK;             /* valid mem? ok */
+if (MEM_ADDR_OK (pa))                                   /* valid mem? ok */
+    *dat = M[pa] & DMASK;
 else {
     nexm = 1;                                           /* set flag, no trap */
     *dat = 0;
@@ -1816,13 +1943,17 @@ t_stat Write (int32 ma, int32 dat, int32 cyc)
 int32 pa;
 
 if (usmd) {                                             /* user mode? */
-    if (XVM) pa = RelocXVM (ma, REL_W);                 /* XVM relocation? */
-    else if (RELOC) pa = Reloc15 (ma, REL_W);           /* PDP-15 relocation? */
+    if (XVM)                                            /* XVM relocation? */
+        pa = RelocXVM (ma, REL_W);
+    else if (RELOC)                                     /* PDP-15 relocation? */
+        pa = Reloc15 (ma, REL_W);
     else pa = Prot15 (ma, cyc != DF);                   /* PDP-15 prot, !defer */
-    if (pa < 0) return MM_ERR;                          /* error? */
+    if (pa < 0)                                         /* error? */
+        return MM_ERR;
     }
 else pa = ma & AMASK;                                   /* no prot or reloc */
-if (MEM_ADDR_OK (pa)) M[pa] = dat & DMASK;              /* valid mem? ok */
+if (MEM_ADDR_OK (pa))                                   /* valid mem? ok */
+    M[pa] = dat & DMASK;
 else nexm = 1;                                          /* set flag, no trap */
 return MM_OK;
 }
@@ -1852,14 +1983,16 @@ if (rest_pending) {                                     /* restore pending? */
 gmode = MM_GETGM (MMR);                                 /* get G_mode */
 if (usmd && XVM && gmode)                               /* XVM user mode? */
     *ea = t & g_mask[gmode];                            /* mask ia to size */
-else if ((ma & damask & ~07) == 010) *ea = t & DMASK;   /* autoindex? */
+else if ((ma & damask & ~07) == 010)                    /* autoindex? */
+    *ea = t & DMASK;
 else *ea = (PC & BLKMASK) | (t & IAMASK);               /* within 32K */
 return sta;
 }
 
 t_stat Incr_addr (int32 ma)
 {
-if (memm) return ((ma & B_EPCMASK) | ((ma + 1) & B_DAMASK));
+if (memm)
+    return ((ma & B_EPCMASK) | ((ma + 1) & B_DAMASK));
 return ((ma & P_EPCMASK) | ((ma + 1) & P_DAMASK));
 }
 
@@ -1867,7 +2000,8 @@ return ((ma & P_EPCMASK) | ((ma + 1) & P_DAMASK));
 
 int32 Jms_word (int32 t)
 {
-if (usmd && XVM && (MMR & MM_GM)) return PC;
+if (usmd && XVM && (MMR & MM_GM))
+    return PC;
 return (((LAC & LINK) >> 1) | ((memm & 1) << 16) |
     ((t & 1) << 15) | (PC & IAMASK));
 }
@@ -1896,12 +2030,14 @@ int32 pa;
 
 ma = ma & AMASK;                                        /* 17b addressing */
 if (ma > (BR | 0377)) {                                 /* boundary viol? */
-    if (rc != REL_C) prvn = trap_pending = 1;           /* set flag, trap */
+    if (rc != REL_C)                                    /* set flag, trap */
+        prvn = trap_pending = 1;
     return -1;
     }
 pa = (ma + RR) & AMASK;                                 /* relocate address */
 if (!MEM_ADDR_OK (pa)) {                                /* nxm? */
-    if (rc != REL_C) nexm = prvn = trap_pending = 1;    /* set flags, trap */
+    if (rc != REL_C)                                    /* set flags, trap */
+        nexm = prvn = trap_pending = 1;
     return -1;
     }
 return pa;
@@ -1917,7 +2053,8 @@ static const int32 slr_lnt[4] = { MM_SLR_L0, MM_SLR_L1, MM_SLR_L2, MM_SLR_L3 };
 
 gmode = MM_GETGM (MMR);                                 /* get G_mode */
 slr = MM_GETSLR (MMR);                                  /* get segment length */
-if (MMR & MM_RDIS) pa = ma;                             /* reloc disabled? */
+if (MMR & MM_RDIS)                                      /* reloc disabled? */
+    pa = ma;
 else if ((MMR & MM_SH) &&                               /* shared enabled and */
     (ma >= g_base[gmode]) &&                            /* >= shared base and */
     (ma < (g_base[gmode] + slr_lnt[slr]))) {            /* < shared end? */
@@ -1932,13 +2069,15 @@ else if ((MMR & MM_SH) &&                               /* shared enabled and */
 	}
 else {
     if (ma > (BR | 0377)) {                             /* normal reloc, viol? */
-        if (rc != REL_C) prvn = trap_pending = 1;       /* set flag, trap */
+        if (rc != REL_C)                                /* set flag, trap */
+            prvn = trap_pending = 1;
         return -1;
         }
     pa = (RR + ma) & DMASK;                             /* relocate address */
     }
 if (!MEM_ADDR_OK (pa)) {                                /* nxm? */
-    if (rc != REL_C) nexm = prvn = trap_pending = 1;    /* set flags, trap */
+    if (rc != REL_C)                                    /* set flags, trap */
+        nexm = prvn = trap_pending = 1;
     return -1;
     }
 return pa;
@@ -1965,7 +2104,8 @@ memm = memm_init;
 nexm = prvn = trap_pending = 0;
 emir_pending = rest_pending = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1988,13 +2128,18 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 #if defined (PDP15)
 if (usmd && (sw & SWMASK ('V'))) {
-    if (XVM) addr = RelocXVM (addr, REL_C);
-    else if (RELOC) addr = Reloc15 (addr, REL_C);
-    if ((int32) addr < 0) return STOP_MME;
+    if (XVM)
+        addr = RelocXVM (addr, REL_C);
+    else if (RELOC)
+        addr = Reloc15 (addr, REL_C);
+    if ((int32) addr < 0)
+        return STOP_MME;
     }
 #endif
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & DMASK;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[addr] & DMASK;
 return SCPE_OK;
 }
 
@@ -2004,12 +2149,16 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 #if defined (PDP15)
 if (usmd && (sw & SWMASK ('V'))) {
-    if (XVM) addr = RelocXVM (addr, REL_C);
-    else if (RELOC) addr = Reloc15 (addr, REL_C);
-    if ((int32) addr < 0) return STOP_MME;
+    if (XVM)
+        addr = RelocXVM (addr, REL_C);
+    else if (RELOC)
+        addr = Reloc15 (addr, REL_C);
+    if ((int32) addr < 0)
+        return STOP_MME;
     }
 #endif
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 M[addr] = val & DMASK;
 return SCPE_OK;
 }
@@ -2023,11 +2172,13 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }
 
@@ -2040,14 +2191,19 @@ DIB *dibp;
 uint32 newdev;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
-if (uptr == NULL) return SCPE_IERR;
+if (cptr == NULL)
+    return SCPE_ARG;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 newdev = get_uint (cptr, 8, DEV_MAX - 1, &r);           /* get new */
-if ((r != SCPE_OK) || (newdev == dibp->dev)) return r;
+if ((r != SCPE_OK) || (newdev == dibp->dev))
+    return r;
 dibp->dev = newdev;                                     /* store */
 return SCPE_OK;
 }
@@ -2059,13 +2215,17 @@ t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr;
 DIB *dibp;
 
-if (uptr == NULL) return SCPE_IERR;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 fprintf (st, "devno=%02o", dibp->dev);
-if (dibp->num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
+if (dibp->num > 1)
+    fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
 return SCPE_OK;
 }
 
@@ -2101,15 +2261,16 @@ for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
 for (i = p =  0; (dptr = sim_devices[i]) != NULL; i++) {        /* add devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* enabled? */
-        if (dibp->iors) dev_iors[p++] = dibp->iors;     /* if IORS, add */
+        if (dibp->iors)                                 /* if IORS, add */
+            dev_iors[p++] = dibp->iors;
         for (j = 0; j < dibp->num; j++) {               /* loop thru disp */
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
                     printf ("%s device number conflict at %02o\n",
-                        sim_dname (dptr), dibp->dev + j);
-                    if (sim_log) fprintf (sim_log,
-                        "%s device number conflict at %02o\n",
-                        sim_dname (dptr), dibp->dev + j);
+                            sim_dname (dptr), dibp->dev + j);
+                    if (sim_log)
+                        fprintf (sim_log, "%s device number conflict at %02o\n",
+                                 sim_dname (dptr), dibp->dev + j);
                     return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
@@ -2128,12 +2289,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -2142,7 +2305,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -2160,14 +2324,17 @@ InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC      L AC      MQ      IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(di++) % hst_lnt];                         /* entry pointer */
@@ -2206,7 +2373,8 @@ else hst[hst_p].ir1 = word;
 hst[hst_p].lac = LAC;
 hst[hst_p].mq = MQ;
 hst_p = (hst_p + 1);
-if (hst_p >= hst_lnt) hst_p = 0;
+if (hst_p >= hst_lnt)
+    hst_p = 0;
 return;
 }
 
@@ -2216,12 +2384,13 @@ int32 j;
 
 hst[hst_p].pc = PC | flag;
 hst[hst_p].ir = 0;
-for (j = 0; j < API_HLVL+1; j++) hst[hst_p].ir = 
-    (hst[hst_p].ir << HIST_V_LVL) | (int_hwre[j] & HIST_M_LVL);
+for (j = 0; j < API_HLVL+1; j++)
+    hst[hst_p].ir = (hst[hst_p].ir << HIST_V_LVL) | (int_hwre[j] & HIST_M_LVL);
 hst[hst_p].ir1 = 0;
 hst[hst_p].lac = 0;
 hst[hst_p].mq = lvl;
 hst_p = (hst_p + 1);
-if (hst_p >= hst_lnt) hst_p = 0;
+if (hst_p >= hst_lnt)
+    hst_p = 0;
 return;
 }

@@ -1,6 +1,6 @@
 /* pdp1_clk.c: PDP-1D clock simulator
 
-   Copyright (c) 2006, Robert M. Supnik
+   Copyright (c) 2006-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -98,7 +98,8 @@ return clk_cntr + incr;
 
 t_stat clk_svc (UNIT *uptr)
 {
-if (clk_dev.flags & DEV_DIS) return SCPE_OK;            /* disabled? */
+if (clk_dev.flags & DEV_DIS)                            /* disabled? */
+    return SCPE_OK;
 tmxr_poll = sim_rtcn_calb (CLK_TPS, TMR_CLK);           /* calibrate clock */
 sim_activate (&clk_unit, tmxr_poll);                    /* reactivate unit */
 clk_cntr = clk_cntr + CLK_CNTS;                         /* incr counter */

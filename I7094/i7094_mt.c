@@ -1,6 +1,6 @@
 /* i7094_mt.c: IBM 7094 magnetic tape simulator
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -447,14 +447,18 @@ uint32 u = unit & 017;
 
 if ((ch >= NUM_CHAN) || (cmd == 0) || (cmd >= CHSL_NUM))
     return SCPE_IERR;                                   /* invalid arg? */
-if (mt_dev[ch].flags & DEV_DIS) return STOP_NXDEV;      /* disabled? */
-if ((u == 0) || (u > MT_NUMDR)) return STOP_NXDEV;      /* valid unit? */
+if (mt_dev[ch].flags & DEV_DIS)                         /* disabled? */
+    return STOP_NXDEV;
+if ((u == 0) || (u > MT_NUMDR))                         /* valid unit? */
+    return STOP_NXDEV;
 uptr = mt_dev[ch].units + u;                            /* get unit ptr */
-if (uptr->flags & UNIT_DIS) return STOP_NXDEV;          /* disabled? */
+if (uptr->flags & UNIT_DIS)                             /* disabled? */
+    return STOP_NXDEV;
 if (mt_unit[ch] || sim_is_active (uptr))                /* ctrl or unit busy? */
     return ERR_STALL;                                   /* stall */
 if (QCHRONO (ch, u)) {                                  /* Chronolog clock? */
-    if (cmd != CHSL_RDS) return STOP_ILLIOP;            /* only reads */
+    if (cmd != CHSL_RDS)                                /* only reads */
+        return STOP_ILLIOP;
     sim_activate (uptr, mt_tword);                      /* responds quickly */
     }
 else {                                                  /* real tape */
@@ -462,8 +466,9 @@ else {                                                  /* real tape */
         return SCPE_UNATT;
     if (sim_tape_wrp (uptr) && mt_will_wrt[cmd])        /* unit wrp && write? */
         return STOP_WRP;
-    if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-        ">>%s%d %s, pos = %d\n", mt_dev[ch].name, u, sel_name[cmd], uptr->pos);
+    if (DEBUG_PRS (mt_dev[ch]))
+        fprintf (sim_deb, ">>%s%d %s, pos = %d\n",
+                 mt_dev[ch].name, u, sel_name[cmd], uptr->pos);
 
     switch (cmd) {                                      /* case on cmd */
 
@@ -504,10 +509,12 @@ int32 k, u;
 uint8 by, *xb;
 UNIT *uptr;
 
-if (ch >= NUM_CHAN) return SCPE_IERR;                   /* invalid chan? */
+if (ch >= NUM_CHAN)                                     /* invalid chan? */
+    return SCPE_IERR;
 xb = mtxb[ch];                                          /* get xfer buf */
 u = mt_unit[ch] & 017;
-if ((xb == NULL) || (u > MT_NUMDR)) return SCPE_IERR;   /* invalid args? */
+if ((xb == NULL) || (u > MT_NUMDR))                     /* invalid args? */
+    return SCPE_IERR;
 uptr = mt_dev[ch].units + u;                            /* get unit */
 mt_chob[ch] = val & DMASK;                              /* save word from chan */
 mt_chob_v[ch] = 1;                                      /* set valid */
@@ -518,14 +525,19 @@ if (uptr->UST == (CHSL_WRS|CHSL_2ND)) {                 /* data write? */
          k = k - 6) {
         by = (uint8) ((val >> k) & 077);                /* get byte */
         if ((mt_unit[ch] & 020) == 0) {                 /* BCD? */
-            if (by == 0) by = BCD_ZERO;                 /* cvt bin 0 */
-            else if (by & 020) by = by ^ 040;           /* invert zones */
-            if (!odd_par[by]) by = by | 0100;           /* even parity */
+            if (by == 0)                                /* cvt bin 0 */
+                by = BCD_ZERO;
+            else if (by & 020)                          /* invert zones */
+                by = by ^ 040;
+            if (!odd_par[by])                           /* even parity */
+                by = by | 0100;
             }
-        else if (odd_par[by]) by = by | 0100;           /* bin, odd par */
+        else if (odd_par[by])                           /* bin, odd par */
+            by = by | 0100;
         xb[mt_bptr[ch]++] = by;                         /* put in buffer */
         }
-    if (eorfl) return mt_rec_end (uptr);                /* EOR? write rec */
+    if (eorfl)
+        return mt_rec_end (uptr);                /* EOR? write rec */
     return SCPE_OK;
     }
 return SCPE_IERR;
@@ -541,7 +553,8 @@ t_uint64 dat;
 t_mtrlnt bc;
 t_stat r;
 
-if (xb == NULL) return SCPE_IERR;                       /* valid buffer? */
+if (xb == NULL)                                         /* valid buffer? */
+    return SCPE_IERR;
 u = uptr - mt_dev[ch].units;
 switch (uptr->UST) {                                    /* case on state */
 
@@ -550,14 +563,17 @@ switch (uptr->UST) {                                    /* case on state */
             bc = chrono_rd (xb, MT_MAXFR);              /* read clock */
         else {                                          /* real tape */
             r = sim_tape_rdrecf (uptr, xb, &bc, MT_MAXFR); /* read record */
-            if (r = mt_map_err (uptr, r)) return r;     /* map status */
-            if (mt_unit[ch] == 0) return SCPE_OK;       /* disconnected? */
+            if (r = mt_map_err (uptr, r))               /* map status */
+                return r;
+            if (mt_unit[ch] == 0)                       /* disconnected? */
+                return SCPE_OK;
             }                                           /* end else Chrono */
         if (!ch6_qconn (ch, mt_unit[ch])) {             /* chan disconnected? */
             mt_unit[ch] = 0;                            /* clr ctrl busy */
             return SCPE_OK;
             }
-        for (i = bc; i < (bc + 6); i++) xb[i] = 0;      /* extra 0's */
+        for (i = bc; i < (bc + 6); i++)                 /* extra 0's */
+            xb[i] = 0;
         mt_bptr[ch] = 0;                                /* set ptr, lnt */
         mt_blnt[ch] = bc;
         uptr->UST = CHSL_RDS|CHSL_2ND;                  /* next state */
@@ -568,8 +584,10 @@ switch (uptr->UST) {                                    /* case on state */
         for (i = 0, dat = 0; i < 6; i++) {              /* proc 6 bytes */
             by = xb[mt_bptr[ch]++] & 077;               /* get next byte */
             if ((mt_unit[ch] & 020) == 0) {             /* BCD? */
-                if (by == BCD_ZERO) by = 0;             /* cvt BCD 0 */
-                else if (by & 020) by = by ^ 040;       /* invert zones */
+                if (by == BCD_ZERO)                     /* cvt BCD 0 */
+                    by = 0;
+                else if (by & 020)                      /* invert zones */
+                    by = by ^ 040;
                 }
             dat = (dat << 6) | ((t_uint64) by);
             }
@@ -590,9 +608,10 @@ switch (uptr->UST) {                                    /* case on state */
             sim_activate (uptr, mt_tshort);             /* sched next record */
             }
         else mt_unit[ch] = 0;                           /* clr ctrl busy */
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d RDS complete, pos = %d, %s\n",
-            mt_dev[ch].name, u, uptr->pos, mt_unit[ch]? "continuing": "disconnecting");
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d RDS complete, pos = %d, %s\n",
+                     mt_dev[ch].name, u, uptr->pos,
+                     mt_unit[ch]? "continuing": "disconnecting");
         return SCPE_OK;
 
     case CHSL_WRS:                                      /* write start */
@@ -611,7 +630,8 @@ switch (uptr->UST) {                                    /* case on state */
     case CHSL_WRS|CHSL_2ND:                             /* write word */
         if (!ch6_qconn (ch, mt_unit[ch]))               /* disconnected? */
             return mt_rec_end (uptr);                   /* write record */
-        if (mt_chob_v[ch]) mt_chob_v[ch] = 0;           /* valid? clear */
+        if (mt_chob_v[ch])                              /* valid? clear */
+            mt_chob_v[ch] = 0;
         else ind_ioc = 1;                               /* no, io check */
         ch6_req_wr (ch, mt_unit[ch]);                   /* request channel */
         sim_activate (uptr, mt_tword);                  /* next word */
@@ -623,35 +643,41 @@ switch (uptr->UST) {                                    /* case on state */
             sim_activate (uptr, mt_tshort);             /* sched next record */
             }
         else mt_unit[ch] = 0;                           /* clr ctrl busy */
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d WRS complete, pos = %d, %s\n",
-            mt_dev[ch].name, u, uptr->pos, mt_unit[ch]? "continuing": "disconnecting");
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d WRS complete, pos = %d, %s\n",
+                     mt_dev[ch].name, u, uptr->pos,
+                     mt_unit[ch]? "continuing": "disconnecting");
         return SCPE_OK;
 
     case CHSL_BSR:                                      /* backspace rec */
         r = sim_tape_sprecr (uptr, &bc);                /* space backwards */
         mt_unit[ch] = 0;                                /* clr ctrl busy */
         ch6_end_nds (ch);                               /* disconnect */
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d BSR complete, pos = %d\n", mt_dev[ch].name, u, uptr->pos);
-        if (r == MTSE_TMK) return SCPE_OK;              /* allow tape mark */
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d BSR complete, pos = %d\n",
+                     mt_dev[ch].name, u, uptr->pos);
+        if (r == MTSE_TMK)                              /* allow tape mark */
+            return SCPE_OK;
         return mt_map_err (uptr, r);
 
     case CHSL_BSF:                                      /* backspace file */
         while ((r = sim_tape_sprecr (uptr, &bc)) == MTSE_OK) ;
         mt_unit[ch] = 0;                                /* clr ctrl busy */
         ch6_end_nds (ch);                               /* disconnect */
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d BSF complete, pos = %d\n", mt_dev[ch].name, u, uptr->pos);
-        if (r == MTSE_TMK) return SCPE_OK;              /* allow tape mark */
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d BSF complete, pos = %d\n",
+                     mt_dev[ch].name, u, uptr->pos);
+        if (r == MTSE_TMK)                              /* allow tape mark */
+            return SCPE_OK;
         return mt_map_err (uptr, r);                    /* map others */
 
     case CHSL_WEF:                                      /* write eof */
         r = sim_tape_wrtmk (uptr);                      /* write tape mark */
         mt_unit[ch] = 0;                                /* clr ctrl busy */
         ch6_end_nds (ch);                               /* disconnect */
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d WEF complete, pos = %d\n", mt_dev[ch].name, u, uptr->pos);
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d WEF complete, pos = %d\n",
+                     mt_dev[ch].name, u, uptr->pos);
         return mt_map_err (uptr, r);
 
     case CHSL_REW: case CHSL_RUN:                       /* rewind, unload */
@@ -663,14 +689,16 @@ switch (uptr->UST) {                                    /* case on state */
 
     case CHSL_REW | CHSL_2ND:
         sim_tape_rewind (uptr);
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d REW complete, pos = %d\n", mt_dev[ch].name, u, uptr->pos);
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d REW complete, pos = %d\n",
+                     mt_dev[ch].name, u, uptr->pos);
         return SCPE_OK;
 
     case CHSL_RUN | CHSL_2ND:
         sim_tape_detach (uptr);
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d RUN complete, pos = %d\n", mt_dev[ch].name, u, uptr->pos);
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d RUN complete, pos = %d\n",
+                     mt_dev[ch].name, u, uptr->pos);
         return SCPE_OK;
 
     case CHSL_SDN:
@@ -679,8 +707,9 @@ switch (uptr->UST) {                                    /* case on state */
         else uptr->flags = uptr->flags | MTUF_LDN;
         mt_unit[ch] = 0;                                /* clr ctrl busy */
         ch6_end_nds (ch);                               /* disconnect */
-        if (DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-            ">>%s%d SDN complete, pos = %d\n", mt_dev[ch].name, u, uptr->pos);
+        if (DEBUG_PRS (mt_dev[ch]))
+            fprintf (sim_deb, ">>%s%d SDN complete, pos = %d\n",
+                     mt_dev[ch].name, u, uptr->pos);
         return SCPE_OK;
 
     default:
@@ -699,9 +728,11 @@ uint8 *xb = mtxb[ch];
 t_stat r;
 
 if (mt_bptr[ch]) {                                      /* any data? */
-    if (xb == NULL) return SCPE_IERR;
+    if (xb == NULL)
+        return SCPE_IERR;
     r = sim_tape_wrrecf (uptr, xb, mt_bptr[ch]);        /* write record */
-    if (r = mt_map_err (uptr, r)) return r;             /* map error */
+    if (r = mt_map_err (uptr, r))                       /* map error */
+        return r;
     }
 uptr->UST = CHSL_WRS|CHSL_3RD;                          /* next state */
 sim_cancel (uptr);                                      /* cancel current */
@@ -717,8 +748,9 @@ uint32 ch = uptr->UCH;
 uint32 u = mt_unit[ch];
 uint32 up = uptr - mt_dev[ch].units;
 
-if ((st != MTSE_OK) && DEBUG_PRS (mt_dev[ch])) fprintf (sim_deb,
-    ">>%s%d status = %s, pos = %d\n", mt_dev[ch].name, up, tape_stat[st], uptr->pos);
+if ((st != MTSE_OK) && DEBUG_PRS (mt_dev[ch]))
+    fprintf (sim_deb, ">>%s%d status = %s, pos = %d\n",
+             mt_dev[ch].name, up, tape_stat[st], uptr->pos);
 
 switch (st) {
 
@@ -773,10 +805,13 @@ uint32 j;
 REG *rptr;
 UNIT *uptr;
 
-if (mtxb[ch] == NULL) mtxb[ch] = (uint8 *) calloc (MT_MAXFR + 6, sizeof (uint8));
-if (mtxb[ch] == NULL) return SCPE_MEM;                  /* allocate buffer */
+if (mtxb[ch] == NULL)
+    mtxb[ch] = (uint8 *) calloc (MT_MAXFR + 6, sizeof (uint8));
+if (mtxb[ch] == NULL)                                   /* allocate buffer */
+    return SCPE_MEM;
 rptr = find_reg ("BUF", NULL, dptr);                    /* update reg ptr */
-if (rptr == NULL) return SCPE_IERR;
+if (rptr == NULL)
+    return SCPE_IERR;
 rptr->loc = (void *) mtxb[ch];
 mt_unit[ch] = 0;                                        /* clear busy */
 mt_bptr[ch] = 0;                                        /* clear buf ptrs */

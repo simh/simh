@@ -1,6 +1,6 @@
 /* lgp_defs.h: LGP simulator definitions 
 
-   Copyright (c) 2004-2005, Robert M. Supnik
+   Copyright (c) 2004-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

@@ -1,6 +1,6 @@
 /* sim_timer.h: simulator timer library headers
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -36,6 +36,9 @@
 
 #define SIM_IDLE_CAL    10                              /* ms to calibrate */
 #define SIM_IDLE_MAX    10                              /* max granularity idle */
+#define SIM_IDLE_STMIN  10                              /* min sec for stability */
+#define SIM_IDLE_STDFLT 20                              /* dft sec for stability */
+#define SIM_IDLE_STMAX  600                             /* max sec for stability */
 
 #define SIM_THROT_WINIT 1000                            /* cycles to skip */
 #define SIM_THROT_WST   10000                           /* initial wait */

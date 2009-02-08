@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -344,7 +344,8 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ()) break;
+        if (reason = sim_process_event ())
+            break;
         }
 
     if (int_req > INT_PENDING) {                        /* interrupt? */
@@ -388,21 +389,25 @@ while (reason == 0) {                                   /* loop until halted */
         int32 ea;
 
         hst_p = (hst_p + 1);                            /* next entry */
-        if (hst_p >= hst_lnt) hst_p = 0;
+        if (hst_p >= hst_lnt)
+            hst_p = 0;
         hst[hst_p].pc = MA | HIST_PC;                   /* save PC, IR, LAC, MQ */
         hst[hst_p].ir = IR;
         hst[hst_p].lac = LAC;
         hst[hst_p].mq = MQ;
         if (IR < 06000) {                               /* mem ref? */
-            if (IR & 0200) ea = (MA & 077600) | (IR & 0177);
+            if (IR & 0200)
+                ea = (MA & 077600) | (IR & 0177);
             else ea = IF | (IR & 0177);                 /* direct addr */
             if (IR & 0400) {                            /* indirect? */
                 if (IR < 04000) {                       /* mem operand? */
-                    if ((ea & 07770) != 00010) ea = DF | M[ea];
+                    if ((ea & 07770) != 00010)
+                        ea = DF | M[ea];
                     else ea = DF | ((M[ea] + 1) & 07777);
                     }
                 else {                                  /* no, jms/jmp */
-                    if ((ea & 07770) != 00010) ea = IB | M[ea];
+                    if ((ea & 07770) != 00010)
+                        ea = IB | M[ea];
                     else ea = IB | ((M[ea] + 1) & 07777);
                     }
                 }
@@ -427,14 +432,16 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 
     case 002:                                           /* AND, indir, zero */
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
         LAC = LAC & (M[MA] | 010000);
         break;
 
     case 003:                                           /* AND, indir, curr */
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
         LAC = LAC & (M[MA] | 010000);
         break;
@@ -453,14 +460,16 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 
     case 006:                                           /* TAD, indir, zero */
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
         LAC = (LAC + M[MA]) & 017777;
         break;
 
     case 007:                                           /* TAD, indir, curr */
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
         LAC = (LAC + M[MA]) & 017777;
         break;
@@ -470,31 +479,39 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
     case 010:                                           /* ISZ, dir, zero */
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
         M[MA] = MB = (M[MA] + 1) & 07777;               /* field must exist */
-        if (MB == 0) PC = (PC + 1) & 07777;
+        if (MB == 0)
+            PC = (PC + 1) & 07777;
         break;
 
     case 011:                                           /* ISZ, dir, curr */
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
         M[MA] = MB = (M[MA] + 1) & 07777;               /* field must exist */
-        if (MB == 0) PC = (PC + 1) & 07777;
+        if (MB == 0)
+            PC = (PC + 1) & 07777;
         break;
 
     case 012:                                           /* ISZ, indir, zero */
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
         MB = (M[MA] + 1) & 07777;
-        if (MEM_ADDR_OK (MA)) M[MA] = MB;
-        if (MB == 0) PC = (PC + 1) & 07777;
+        if (MEM_ADDR_OK (MA))
+            M[MA] = MB;
+        if (MB == 0)
+            PC = (PC + 1) & 07777;
         break;
 
     case 013:                                           /* ISZ, indir, curr */
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
         MB = (M[MA] + 1) & 07777;
-        if (MEM_ADDR_OK (MA)) M[MA] = MB;
-        if (MB == 0) PC = (PC + 1) & 07777;
+        if (MEM_ADDR_OK (MA))
+            M[MA] = MB;
+        if (MB == 0)
+            PC = (PC + 1) & 07777;
         break;
 
 /* Opcode 3, DCA */
@@ -513,17 +530,21 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 
     case 016:                                           /* DCA, indir, zero */
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
-        if (MEM_ADDR_OK (MA)) M[MA] = LAC & 07777;
+        if (MEM_ADDR_OK (MA))
+            M[MA] = LAC & 07777;
         LAC = LAC & 010000;
         break;
 
     case 017:                                           /* DCA, indir, curr */
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
-        if ((MA & 07770) != 00010) MA = DF | M[MA];     /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = DF | M[MA];
         else MA = DF | (M[MA] = (M[MA] + 1) & 07777);   /* incr before use */
-        if (MEM_ADDR_OK (MA)) M[MA] = LAC & 07777;
+        if (MEM_ADDR_OK (MA))
+            M[MA] = LAC & 07777;
         LAC = LAC & 010000;
         break;
 
@@ -553,7 +574,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             UF = UB;                                    /* change UF */
             int_req = int_req | INT_NO_CIF_PENDING;     /* clr intr inhibit */
             MA = IF | MA;
-            if (MEM_ADDR_OK (MA)) M[MA] = PC;
+            if (MEM_ADDR_OK (MA))
+                M[MA] = PC;
             }
         PC = (MA + 1) & 07777;
         break;
@@ -574,7 +596,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             UF = UB;                                    /* change UF */
             int_req = int_req | INT_NO_CIF_PENDING;     /* clr intr inhibit */
             MA = IF | MA;
-            if (MEM_ADDR_OK (MA)) M[MA] = PC;
+            if (MEM_ADDR_OK (MA))
+                M[MA] = PC;
             }
         PC = (MA + 1) & 07777;
         break;
@@ -582,7 +605,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
     case 022:                                           /* JMS, indir, zero */
         PCQ_ENTRY;
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
-        if ((MA & 07770) != 00010) MA = M[MA];          /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = M[MA];
         else MA = (M[MA] = (M[MA] + 1) & 07777);        /* incr before use */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -597,7 +621,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             UF = UB;                                    /* change UF */
             int_req = int_req | INT_NO_CIF_PENDING;     /* clr intr inhibit */
             MA = IF | MA;
-            if (MEM_ADDR_OK (MA)) M[MA] = PC;
+            if (MEM_ADDR_OK (MA))
+                M[MA] = PC;
             }
         PC = (MA + 1) & 07777;
         break;
@@ -605,7 +630,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
     case 023:                                           /* JMS, indir, curr */
         PCQ_ENTRY;
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
-        if ((MA & 07770) != 00010) MA = M[MA];          /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = M[MA];
         else MA = (M[MA] = (M[MA] + 1) & 07777);        /* incr before use */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -620,7 +646,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             UF = UB;                                    /* change UF */
             int_req = int_req | INT_NO_CIF_PENDING;     /* clr intr inhibit */
             MA = IF | MA;
-            if (MEM_ADDR_OK (MA)) M[MA] = PC;
+            if (MEM_ADDR_OK (MA))
+                M[MA] = PC;
             }
         PC = (MA + 1) & 07777;
         break;
@@ -686,7 +713,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
     case 026:                                           /* JMP, indir, zero */
         PCQ_ENTRY;
         MA = IF | (IR & 0177);                          /* dir addr, page zero */
-        if ((MA & 07770) != 00010) MA = M[MA];          /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = M[MA];
         else MA = (M[MA] = (M[MA] + 1) & 07777);        /* incr before use */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -705,7 +733,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
     case 027:                                           /* JMP, indir, curr */
         PCQ_ENTRY;
         MA = (MA & 077600) | (IR & 0177);               /* dir addr, curr page */
-        if ((MA & 07770) != 00010) MA = M[MA];          /* indirect; autoinc? */
+        if ((MA & 07770) != 00010)                      /* indirect; autoinc? */
+            MA = M[MA];
         else MA = (M[MA] = (M[MA] + 1) & 07777);        /* incr before use */
         if (UF) {                                       /* user mode? */
             tsc_ir = IR;                                /* save instruction */
@@ -774,7 +803,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             break;
             }                                           /* end switch opers */
 
-        if (IR & 01) LAC = (LAC + 1) & 017777;          /* IAC */
+        if (IR & 01)                                    /* IAC */
+            LAC = (LAC + 1) & 017777;
         switch ((IR >> 1) & 07) {                       /* decode IR<8:10> */
         case 0:                                         /* nop */
             break;
@@ -817,35 +847,44 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                 PC = (PC + 1) & 07777;
                 break;
             case 2:                                     /* SNL */
-                if (LAC >= 010000) PC = (PC + 1) & 07777;
+                if (LAC >= 010000)
+                    PC = (PC + 1) & 07777;
                 break;
             case 3:                                     /* SZL */
-                if (LAC < 010000) PC = (PC + 1) & 07777;
+                if (LAC < 010000)
+                    PC = (PC + 1) & 07777;
                 break;
             case 4:                                     /* SZA */
-                if ((LAC & 07777) == 0) PC = (PC + 1) & 07777;
+                if ((LAC & 07777) == 0)
+                    PC = (PC + 1) & 07777;
                 break;
             case 5:                                     /* SNA */
-                if ((LAC & 07777) != 0) PC = (PC + 1) & 07777;
+                if ((LAC & 07777)
+                    != 0) PC = (PC + 1) & 07777;
                 break;
             case 6:                                     /* SZA | SNL */
                 if ((LAC == 0) || (LAC >= 010000))
                     PC = (PC + 1) & 07777;
                 break;
             case 7:                                     /* SNA & SZL */
-                if ((LAC != 0) && (LAC < 010000)) PC = (PC + 1) & 07777;
+                if ((LAC != 0) && (LAC < 010000))
+                    PC = (PC + 1) & 07777;
                 break;
             case 010:                                   /* SMA */
-                if ((LAC & 04000) != 0) PC = (PC + 1) & 07777;
+                if ((LAC & 04000) != 0)
+                    PC = (PC + 1) & 07777;
                 break;
             case 011:                                   /* SPA */
-                if ((LAC & 04000) == 0) PC = (PC + 1) & 07777;
+                if ((LAC & 04000) == 0)
+                    PC = (PC + 1) & 07777;
                 break;
             case 012:                                   /* SMA | SNL */
-                if (LAC >= 04000) PC = (PC + 1) & 07777;
+                if (LAC >= 04000)
+                    PC = (PC + 1) & 07777;
                 break;
             case 013:                                   /* SPA & SZL */
-                if (LAC < 04000) PC = (PC + 1) & 07777;
+                if (LAC < 04000)
+                    PC = (PC + 1) & 07777;
                 break;
             case 014:                                   /* SMA | SZA */
                 if (((LAC & 04000) != 0) || ((LAC & 07777) == 0))
@@ -853,24 +892,29 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                 break;
             case 015:                                   /* SPA & SNA */
                 if (((LAC & 04000) == 0) && ((LAC & 07777) != 0))
-                        PC = (PC + 1) & 07777;
+                    PC = (PC + 1) & 07777;
                 break;
             case 016:                                   /* SMA | SZA | SNL */
-                if ((LAC >= 04000) || (LAC == 0)) PC = (PC + 1) & 07777;
+                if ((LAC >= 04000) || (LAC == 0))
+                    PC = (PC + 1) & 07777;
                 break;
             case 017:                                   /* SPA & SNA & SZL */
-                if ((LAC < 04000) && (LAC != 0)) PC = (PC + 1) & 07777;
+                if ((LAC < 04000) && (LAC != 0))
+                    PC = (PC + 1) & 07777;
                 break;
                 }                                       /* end switch skips */
-            if (IR & 0200) LAC = LAC & 010000;          /* CLA */
+            if (IR & 0200)                              /* CLA */
+                LAC = LAC & 010000;
             if ((IR & 06) && UF) {                      /* user mode? */
                 int_req = int_req | INT_UF;             /* request intr */
                 tsc_ir = IR;                            /* save instruction */
                 tsc_cdf = 0;                            /* clear flag */
                 }
             else {
-                if (IR & 04) LAC = LAC | OSR;           /* OSR */
-                if (IR & 02) reason = STOP_HALT;        /* HLT */
+                if (IR & 04)                            /* OSR */
+                    LAC = LAC | OSR;
+                if (IR & 02)                            /* HLT */
+                    reason = STOP_HALT;
                 }
             break;
             }                                           /* end if group 2 */
@@ -885,12 +929,14 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 */
 
         temp = MQ;                                      /* group 3 */
-        if (IR & 0200) LAC = LAC & 010000;              /* CLA */
+        if (IR & 0200)                                  /* CLA */
+            LAC = LAC & 010000;
         if (IR & 0020) {                                /* MQL */
             MQ = LAC & 07777;
             LAC = LAC & 010000;
             }
-        if (IR & 0100) LAC = LAC | temp;                /* MQA */
+        if (IR & 0100)                                  /* MQA */
+            LAC = LAC | temp;
         if ((IR & 0056) && (cpu_unit.flags & UNIT_NOEAE)) {
             reason = stop_inst;                         /* EAE not present */
             break;
@@ -949,7 +995,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
    x0010 - x0017, it is autoincremented.
 */
 
-        if (emode == 0) gtf = 0;                        /* mode A? clr gtf */
+        if (emode == 0)                                 /* mode A? clr gtf */
+            gtf = 0;
         switch ((IR >> 1) & 027) {                      /* decode IR<6,8:10> */
 
         case 020:                                       /* mode A, B: SCA */
@@ -961,7 +1008,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         case 021:                                       /* mode B: DAD */
             if (emode) {
                 MA = IF | PC;
-                if ((MA & 07770) != 00010) MA = DF | M[MA];   /* indirect; autoinc? */
+                if ((MA & 07770) != 00010)              /* indirect; autoinc? */
+                    MA = DF | M[MA];
                 else MA = DF | (M[MA] = (M[MA] + 1) & 07777); /* incr before use */
                 MQ = MQ + M[MA];
                 MA = DF | ((MA + 1) & 07777);
@@ -985,11 +1033,14 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         case 022:                                       /* mode B: DST */
             if (emode) {
                 MA = IF | PC;
-                if ((MA & 07770) != 00010) MA = DF | M[MA];   /* indirect; autoinc? */
+                if ((MA & 07770) != 00010)              /* indirect; autoinc? */
+                    MA = DF | M[MA];
                 else MA = DF | (M[MA] = (M[MA] + 1) & 07777); /* incr before use */
-                if (MEM_ADDR_OK (MA)) M[MA] = MQ & 07777;
+                if (MEM_ADDR_OK (MA))
+                    M[MA] = MQ & 07777;
                 MA = DF | ((MA + 1) & 07777);
-                if (MEM_ADDR_OK (MA))  M[MA] = LAC & 07777;
+                if (MEM_ADDR_OK (MA))
+                    M[MA] = LAC & 07777;
                 PC = (PC + 1) & 07777;
                 break;
                 }
@@ -997,7 +1048,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         case 002:                                       /* MUY */
             MA = IF | PC;
             if (emode) {                                /* mode B: defer */
-                if ((MA & 07770) != 00010) MA = DF | M[MA];   /* indirect; autoinc? */
+                if ((MA & 07770) != 00010)              /* indirect; autoinc? */
+                    MA = DF | M[MA];
                 else MA = DF | (M[MA] = (M[MA] + 1) & 07777); /* incr before use */
                 }
             temp = (MQ * M[MA]) + (LAC & 07777);
@@ -1008,12 +1060,14 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             break;
 
         case 023:                                       /* mode B: SWBA */
-            if (emode) break;
+            if (emode)
+                break;
             LAC = LAC | SC;                             /* mode A: SCA then */
         case 003:                                       /* DVI */
             MA = IF | PC;
             if (emode) {                                /* mode B: defer */
-                if ((MA & 07770) != 00010) MA = DF | M[MA];   /* indirect; autoinc? */
+                if ((MA & 07770) != 00010)              /* indirect; autoinc? */
+                    MA = DF | M[MA];
                 else MA = DF | (M[MA] = (M[MA] + 1) & 07777); /* incr before use */
                 }
             if ((LAC & 07777) >= M[MA]) {               /* overflow? */
@@ -1032,7 +1086,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
 
         case 024:                                       /* mode B: DPSZ */
             if (emode) {
-                if (((LAC | MQ) & 07777) == 0) PC = (PC + 1) & 07777;
+                if (((LAC | MQ) & 07777) == 0)
+                    PC = (PC + 1) & 07777;
                 break;
                 }
             LAC = LAC | SC;                             /* mode A: SCA then */
@@ -1057,7 +1112,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             LAC = LAC | SC;                             /* mode A: SCA then */
         case 5:                                         /* SHL */
             SC = (M[IF | PC] & 037) + (emode ^ 1);      /* shift+1 if mode A */
-            if (SC > 25) temp = 0;                      /* >25? result = 0 */
+            if (SC > 25)                                /* >25? result = 0 */
+                temp = 0;
             else temp = ((LAC << 12) | MQ) << SC;       /* <=25? shift LAC:MQ */
             LAC = (temp >> 12) & 017777;
             MQ = temp & 07777;
@@ -1076,9 +1132,12 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         case 6:                                         /* ASR */
             SC = (M[IF | PC] & 037) + (emode ^ 1);      /* shift+1 if mode A */
             temp = ((LAC & 07777) << 12) | MQ;          /* sext from AC0 */
-            if (LAC & 04000) temp = temp | ~037777777;
-            if (emode && (SC != 0)) gtf = (temp >> (SC - 1)) & 1;
-            if (SC > 25) temp = (LAC & 04000)? -1: 0;
+            if (LAC & 04000)
+                temp = temp | ~037777777;
+            if (emode && (SC != 0))
+                gtf = (temp >> (SC - 1)) & 1;
+            if (SC > 25)
+                temp = (LAC & 04000)? -1: 0;
             else temp = temp >> SC;
             LAC = (temp >> 12) & 017777;
             MQ = temp & 07777;
@@ -1097,8 +1156,10 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         case 7:                                         /* LSR */
             SC = (M[IF | PC] & 037) + (emode ^ 1);      /* shift+1 if mode A */
             temp = ((LAC & 07777) << 12) | MQ;          /* clear link */
-            if (emode && (SC != 0)) gtf = (temp >> (SC - 1)) & 1;
-            if (SC > 24) temp = 0;                      /* >24? result = 0 */
+            if (emode && (SC != 0))
+                gtf = (temp >> (SC - 1)) & 1;
+            if (SC > 24)                                /* >24? result = 0 */
+                temp = 0;
             else temp = temp >> SC;                     /* <=24? shift AC:MQ */
             LAC = (temp >> 12) & 07777;
             MQ = temp & 07777;
@@ -1118,7 +1179,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
         if (UF) {                                       /* privileged? */
             int_req = int_req | INT_UF;                 /* request intr */
             tsc_ir = IR;                                /* save instruction */
-            if ((IR & 07707) == 06201) tsc_cdf = 1;     /* set/clear flag */
+            if ((IR & 07707) == 06201)                  /* set/clear flag */
+                tsc_cdf = 1;
             else tsc_cdf = 0;
             break;
             }
@@ -1131,7 +1193,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             switch (pulse) {                            /* decode IR<9:11> */
 
             case 0:                                     /* SKON */
-                if (int_req & INT_ION) PC = (PC + 1) & 07777;
+                if (int_req & INT_ION)
+                    PC = (PC + 1) & 07777;
                 int_req = int_req & ~INT_ION;
                 break;
 
@@ -1144,7 +1207,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                 break;
 
             case 3:                                     /* SRQ */
-                if (int_req & INT_ALL) PC = (PC + 1) & 07777;
+                if (int_req & INT_ALL)
+                    PC = (PC + 1) & 07777;
                 break;
 
             case 4:                                     /* GTF */
@@ -1164,7 +1228,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                 break;
 
             case 6:                                     /* SGT */
-                if (gtf) PC = (PC + 1) & 07777;
+                if (gtf)
+                    PC = (PC + 1) & 07777;
                 break;
 
             case 7:                                     /* CAF */
@@ -1224,7 +1289,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                     break;
 
                 case 5:                                 /* SINT */
-                    if (int_req & INT_UF) PC = (PC + 1) & 07777;
+                    if (int_req & INT_UF)
+                        PC = (PC + 1) & 07777;
                     break;
 
                 case 6:                                 /* CUF */
@@ -1252,7 +1318,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
                 break;
 
             case 2:                                     /* SPL */
-                if (int_req & INT_PWR) PC = (PC + 1) & 07777;
+                if (int_req & INT_PWR)
+                    PC = (PC + 1) & 07777;
                 break;
 
             case 3:                                     /* CAL */
@@ -1269,7 +1336,8 @@ switch ((IR >> 7) & 037) {                              /* decode IR<0:4> */
             if (dev_tab[device]) {                      /* dev present? */
                 iot_data = dev_tab[device] (IR, iot_data);
                 LAC = (LAC & 010000) | (iot_data & 07777);
-                if (iot_data & IOT_SKP) PC = (PC + 1) & 07777;
+                if (iot_data & IOT_SKP)
+                    PC = (PC + 1) & 07777;
                 if (iot_data >= IOT_REASON)
                     reason = iot_data >> IOT_V_REASON;
                 }
@@ -1298,7 +1366,8 @@ int_req = (int_req & ~INT_ION) | INT_NO_CIF_PENDING;
 saved_DF = IB = saved_PC & 070000;
 UF = UB = gtf = emode = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1308,8 +1377,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & 07777;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[addr] & 07777;
 return SCPE_OK;
 }
 
@@ -1317,7 +1388,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 M[addr] = val & 07777;
 return SCPE_OK;
 }
@@ -1331,11 +1403,13 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }
 
@@ -1348,14 +1422,19 @@ DIB *dibp;
 uint32 newdev;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
-if (uptr == NULL) return SCPE_IERR;
+if (cptr == NULL)
+    return SCPE_ARG;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 newdev = get_uint (cptr, 8, DEV_MAX - 1, &r);           /* get new */
-if ((r != SCPE_OK) || (newdev == dibp->dev)) return r;
+if ((r != SCPE_OK) || (newdev == dibp->dev))
+    return r;
 dibp->dev = newdev;                                     /* store */
 return SCPE_OK;
 }
@@ -1367,13 +1446,17 @@ t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr;
 DIB *dibp;
 
-if (uptr == NULL) return SCPE_IERR;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 fprintf (st, "devno=%02o", dibp->dev);
-if (dibp->num > 1) fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
+if (dibp->num > 1)
+    fprintf (st, "-%2o", dibp->dev + dibp->num - 1);
 return SCPE_OK;
 }
 
@@ -1395,7 +1478,8 @@ static const uint8 std_dev[] = {
     000, 010, 020, 021, 022, 023, 024, 025, 026, 027
     };
 
-for (i = 0; i < DEV_MAX; i++) dev_tab[i] = NULL;        /* clr table */
+for (i = 0; i < DEV_MAX; i++)                           /* clr table */
+    dev_tab[i] = NULL;
 for (i = 0; i < ((uint32) sizeof (std_dev)); i++)       /* std entries */
     dev_tab[std_dev[i]] = &bad_dev;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
@@ -1405,10 +1489,10 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* add devices */
             if (dibp->dsp[j]) {                         /* any dispatch? */
                 if (dev_tab[dibp->dev + j]) {           /* already filled? */
                     printf ("%s device number conflict at %02o\n",
-                        sim_dname (dptr), dibp->dev + j);
-                    if (sim_log) fprintf (sim_log,
-                        "%s device number conflict at %02o\n",
-                        sim_dname (dptr), dibp->dev + j);
+                            sim_dname (dptr), dibp->dev + j);
+                    if (sim_log)
+                        fprintf (sim_log, "%s device number conflict at %02o\n",
+                                 sim_dname (dptr), dibp->dev + j);
                      return TRUE;
                     }
                 dev_tab[dibp->dev + j] = dibp->dsp[j];  /* fill */
@@ -1427,12 +1511,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -1441,7 +1527,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -1459,26 +1546,31 @@ InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC     L AC    MQ    ea     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_PC) {                              /* instruction? */
         l = (h->lac >> 12) & 1;                         /* link */
         fprintf (st, "%05o  %o %04o  %04o  ", h->pc & ADDRMASK, l, h->lac & 07777, h->mq);
-        if (h->ir < 06000) fprintf (st, "%05o  ", h->ea);
+        if (h->ir < 06000)
+            fprintf (st, "%05o  ", h->ea);
         else fprintf (st, "       ");
         sim_eval = h->ir;
         if ((fprint_sym (st, h->pc & ADDRMASK, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %04o", h->ir);
-        if (h->ir < 04000) fprintf (st, "  [%04o]", h->opnd);
+        if (h->ir < 04000)
+            fprintf (st, "  [%04o]", h->opnd);
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */
     }                                                   /* end for */

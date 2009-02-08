@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -132,31 +132,37 @@ t_stat r;
 extern int32 cctlnt, cctptr, cct[CCT_LNT];
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
+if ((*cptr != 0) || (flag != 0))
+    return SCPE_ARG;
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
     mask = 0;
     if (*cptr == '(') {                                 /* repeat count? */
         cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */
         rpt = get_uint (gbuf, 10, CCT_LNT, &r);         /* repeat count */
-        if (r != SCPE_OK) return SCPE_FMT;
+        if (r != SCPE_OK)
+            return SCPE_FMT;
         }
     else rpt = 1;
     while (*cptr != 0) {                                /* get col no's */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
         col = get_uint (gbuf, 10, 12, &r);              /* column number */
-        if (r != SCPE_OK) return SCPE_FMT;
+        if (r != SCPE_OK)
+            return SCPE_FMT;
         mask = mask | (1 << col);                       /* set bit */
         }
     for ( ; rpt > 0; rpt--) {                           /* store vals */
-        if (ptr >= CCT_LNT) return SCPE_FMT;
+        if (ptr >= CCT_LNT)
+            return SCPE_FMT;
         cctbuf[ptr++] = mask;
         }
     }
-if (ptr == 0) return SCPE_FMT;
+if (ptr == 0)
+    return SCPE_FMT;
 cctlnt = ptr;
 cctptr = 0;
-for (rpt = 0; rpt < cctlnt; rpt++) cct[rpt] = cctbuf[rpt];
+for (rpt = 0; rpt < cctlnt; rpt++)
+    cct[rpt] = cctbuf[rpt];
 return SCPE_OK;
 }
 
@@ -182,8 +188,10 @@ extern int32 hun_table[64], ten_table[64], one_table[64];
 
 addr = hun_table[dig[0] & CHAR] + ten_table[dig[1]] + one_table[dig[2]];
 xa = (addr >> V_INDEX) & M_INDEX;
-if (xa) fprintf (of, " %d,%d", addr & ADDRMASK, ((xa - (X1 >> V_INDEX)) / 5) + 1);
-else if (addr >= MAXMEMSIZE) fprintf (of, " %d*", addr & ADDRMASK);
+if (xa)
+    fprintf (of, " %d,%d", addr & ADDRMASK, ((xa - (X1 >> V_INDEX)) / 5) + 1);
+else if (addr >= MAXMEMSIZE)
+    fprintf (of, " %d*", addr & ADDRMASK);
 else fprintf (of, " %d", addr);
 return;
 }
@@ -197,9 +205,10 @@ t_bool use_h = sw & SWMASK ('F');
 
 fprintf (of, "DCW @%c", bcd2ascii (op, use_h));         /* assume it's data */
 for (i = 1; i < sim_emax; i++) {
-        if (val[i] & WM) break;
-        fprintf (of, "%c", bcd2ascii (val[i], use_h));
-        }
+    if (val[i] & WM)
+        break;
+    fprintf (of, "%c", bcd2ascii (val[i], use_h));
+    }
 fprintf (of, "@");
 return -(i - 1);                                        /* return # chars */
 }
@@ -230,7 +239,8 @@ extern int32 op_table[64], len_table[9];
 if (sw & SWMASK ('C')) {                                /* character? */
     t = val[0];
     if (uptr->flags & UNIT_BCD) {
-        if (t & WM) fputc (wmch, of);
+        if (t & WM)
+            fputc (wmch, of);
         fputc (bcd2ascii (t & CHAR, use_h), of);
         }
     else fprintf (of, FMTASC (t & 0177));
@@ -250,23 +260,31 @@ if (sw & SWMASK ('S')) {                                /* string? */
     i = 0;
     do {
         t = val[i++];
-        if (t & WM) fputc (wmch, of);
+        if (t & WM)
+            fputc (wmch, of);
         fputc (bcd2ascii (t & CHAR, use_h), of);
         } while ((i < LINE_LNT) && ((val[i] & WM) == 0));
     return -(i - 1);
     }
-if ((sw & SWMASK ('M')) == 0) return SCPE_ARG;
+if ((sw & SWMASK ('M')) == 0)
+    return SCPE_ARG;
 
-if ((val[0] & WM) == 0) return STOP_NOWM;               /* WM under op? */
+if ((val[0] & WM) == 0)                                 /* WM under op? */
+    return STOP_NOWM;
 op = val[0]& CHAR;                                      /* isolate op */
-if (opcode[op] == NULL) return dcw (of, op, val, sw);   /* invalid op */
+if (opcode[op] == NULL)                                 /* invalid op */
+    return dcw (of, op, val, sw);
 flags = op_table[op];                                   /* get flags */
 for (ilnt = 1; ilnt < sim_emax; ilnt++) {               /* find inst lnt */
-    if (val[ilnt] & WM) break;
+    if (val[ilnt] & WM)
+        break;
     }
-if ((flags & (NOWM | HNOP)) && (ilnt > 7)) ilnt = 7;    /* cs, swm, h, nop? */
-else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK)) ilnt = 4;
-else if ((ilnt > 8) && (op != OP_NOP)) ilnt = 8;        /* cap length */
+if ((flags & (NOWM | HNOP)) && (ilnt > 7))              /* cs, swm, h, nop? */
+    ilnt = 7;
+else if ((op == OP_B) && (ilnt > 4) && (val[4] == BCD_BLANK))
+    ilnt = 4;
+else if ((ilnt > 8) && (op != OP_NOP))                  /* cap length */
+    ilnt = 8;
 if (ilnt == 3) {                                        /* lnt = 3? */
     fprintf (of, "DSA");                                /* assume DSA */
     fprint_addr (of, val);                              /* print addr */
@@ -283,7 +301,8 @@ if (ilnt > 2) {                                         /* A address? */
             bcd2ascii (val[3], sw));
     else fprint_addr (of, &val[1]);
 	}
-if (ilnt > 5) fprint_addr (of, &val[4]);                /* B address? */
+if (ilnt > 5)                                           /* B address? */
+    fprint_addr (of, &val[4]);
 if ((ilnt == 2) || (ilnt == 5) || (ilnt == 8))          /* d character? */
     fprintf (of, " '%c", bcd2ascii (val[ilnt - 1], use_h));
 return -(ilnt - 1);                                     /* return # chars */
@@ -299,14 +318,17 @@ char gbuf[CBUFSIZE];
 
 cptr = get_glyph (cptr, gbuf, ',');                     /* get address */
 addr = get_uint (gbuf, 10, MAXMEMSIZE, &r);
-if (r != SCPE_OK) return SCPE_ARG;
+if (r != SCPE_OK)
+    return SCPE_ARG;
 if (*cptr != 0) {                                       /* more? */
     cptr = get_glyph (cptr, gbuf, ' ');
     index = get_uint (gbuf, 10, 3, &r);
-    if ((r != SCPE_OK) || (index == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (index == 0))
+        return SCPE_ARG;
     }
 else index = 0;
-if (*cptr != 0) return SCPE_ARG;
+if (*cptr != 0)
+    return SCPE_ARG;
 val[0] = store_addr_h (addr);
 val[1] = store_addr_t (addr) | (index << V_ZONE);
 val[2] = store_addr_u (addr);
@@ -317,8 +339,9 @@ return SCPE_OK;
 
 t_stat get_io (char *cptr, t_value *val)
 {
-if ((cptr[0] != '%') || (cptr[3] != 0) || !isalnum (cptr[1]) ||
-    !isalnum (cptr[2])) return SCPE_ARG;
+if ((cptr[0] != '%') || (cptr[3] != 0) ||
+    !isalnum (cptr[1]) || !isalnum (cptr[2]))
+    return SCPE_ARG;
 val[0] = BCD_PERCNT;
 val[1] = ascii2bcd (cptr[1]);
 val[2] = ascii2bcd (cptr[2]);
@@ -352,24 +375,30 @@ if ((sw & SWMASK ('C')) || (sw & SWMASK ('S')) || (*cptr == wmch) ||
         wm_seen = 0;
         for (i = 0; (i < sim_emax) && (*cptr != 0); ) {
             t = *cptr++;                                /* get character */
-            if (cflag && (wm_seen == 0) && (t == wmch)) wm_seen = WM;
+            if (cflag && (wm_seen == 0) && (t == wmch))
+                wm_seen = WM;
             else if (uptr->flags & UNIT_BCD) {
-                if (t < 040) return SCPE_ARG;
+                if (t < 040)
+                    return SCPE_ARG;
                 val[i++] = ascii2bcd (t) | wm_seen;
                 wm_seen = 0;
                 }
             else val[i++] = t;
 			}
-        if ((i == 0) || wm_seen) return SCPE_ARG;
+        if ((i == 0) || wm_seen)
+            return SCPE_ARG;
         return -(i - 1);
         }
 
-if (cflag == 0) return SCPE_ARG;                        /* CPU only */
+if (cflag == 0)                                         /* CPU only */
+    return SCPE_ARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (op = 0; op < 64; op++) {                           /* look it up */
-    if (opcode[op] && strcmp (gbuf, opcode[op]) == 0) break;
+    if (opcode[op] && strcmp (gbuf, opcode[op]) == 0)
+        break;
     }
-if (op >= 64) return SCPE_ARG;                          /* successful? */
+if (op >= 64)                                           /* successful? */
+    return SCPE_ARG;
 val[0] = op | WM;                                       /* store opcode */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get addr or d */
 if (((op_table[op] && IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
@@ -389,8 +418,10 @@ if ((gbuf[0] == '\'') || (gbuf[0] == '"')) {            /* d character? */
     val[ilnt] = ascii2bcd (t);                          /* save D char */
     ilnt = ilnt + 1;
     }
-else if (gbuf[0] != 0) return SCPE_ARG;                 /* not done? */
-if ((op_table[op] & len_table[ilnt]) == 0) return STOP_INVL;
+else if (gbuf[0] != 0)                                  /* not done? */
+    return SCPE_ARG;
+if ((op_table[op] & len_table[ilnt]) == 0)
+    return STOP_INVL;
 return -(ilnt - 1);
 }
 
@@ -398,8 +429,10 @@ return -(ilnt - 1);
 
 int32 bcd2ascii (int32 c, t_bool use_h)
 {
-if (conv_old) return bcd_to_ascii_old[c];
-else if (use_h) return bcd_to_ascii_h[c];
+if (conv_old)
+    return bcd_to_ascii_old[c];
+else if (use_h)
+    return bcd_to_ascii_h[c];
 else return bcd_to_ascii_a[c];
 }
 
@@ -407,6 +440,7 @@ else return bcd_to_ascii_a[c];
 
 int32 ascii2bcd (int32 c)
 {
-if (conv_old) return ascii_to_bcd_old[c];
+if (conv_old)
+    return ascii_to_bcd_old[c];
 else return ascii_to_bcd[c];
 }

@@ -1,6 +1,6 @@
 /* sds_stddev.c: SDS 940 standard devices
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -232,7 +232,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:                                       /* connect */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != ptr_dib.chan) return SCPE_IERR;   /* inv conn? err */
+        if (new_ch != ptr_dib.chan)                     /* inv conn? err */
+            return SCPE_IERR;
         ptr_sor = 1;                                    /* start of rec */
         xfr_req = xfr_req & ~XFR_PTR;                   /* clr xfr flag */
         sim_activate (&ptr_unit, ptr_unit.wait);        /* activate */
@@ -275,7 +276,8 @@ if ((ptr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
 if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
     ptr_set_err ();                                     /* yes, err, disc */
     if (feof (ptr_unit.fileref)) {                      /* end of file? */
-        if (ptr_stopioe) printf ("PTR end of file\n");
+        if (ptr_stopioe)
+            printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");                      /* I/O error */
@@ -354,7 +356,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != ptp_dib.chan) return SCPE_IERR;   /* inv conn? err */
+        if (new_ch != ptp_dib.chan)                     /* inv conn? err */
+            return SCPE_IERR;
         ptp_ldr = (inst & CHC_NLDR)? 0: 1;              /* leader? */
         xfr_req = xfr_req & ~XFR_PTP;                   /* clr xfr flag */
         sim_activate (&ptp_unit, ptp_unit.wait);        /* activate */
@@ -392,7 +395,8 @@ t_stat r = SCPE_OK;
 
 if (ptp_ldr) {                                          /* need leader? */
     for (i = 0; i < 12; i++) {                          /* punch leader */
-        if (r = ptp_out (0)) break;
+        if (r = ptp_out (0))
+            break;
         }
     }
 ptp_ldr = 0;                                            /* clear flag */
@@ -463,7 +467,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:                                       /* connect */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != tti_dib.chan) return SCPE_IERR;   /* inv conn? err */
+        if (new_ch != tti_dib.chan)                     /* inv conn? err */
+            return SCPE_IERR;
         xfr_req = xfr_req & ~XFR_TTI;                   /* clr xfr flag */
         break;
 
@@ -494,14 +499,17 @@ t_stat tti_svc (UNIT *uptr)
 int32 temp;
 
 sim_activate (&tti_unit, tti_unit.wait);                /* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
-if (temp & SCPE_BREAK) return SCPE_OK;                  /* ignore break */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
+    return temp;
+if (temp & SCPE_BREAK)                                  /* ignore break */
+    return SCPE_OK;
 temp = temp & 0177;
 tti_unit.pos = tti_unit.pos + 1;
 if (ascii_to_sds[temp] >= 0) {
     tti_unit.buf = ascii_to_sds[temp];                  /* internal rep */
     sim_putchar (temp);                                 /* echo */
-    if (temp == '\r') sim_putchar ('\n');               /* lf after cr */
+    if (temp == '\r')                                   /* lf after cr */
+        sim_putchar ('\n');
     xfr_req = xfr_req | XFR_TTI;                        /* set xfr flag */
     }
 else sim_putchar (007);                                 /* ding! */
@@ -539,7 +547,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != tto_dib.chan) return SCPE_IERR;   /* inv conn? err */
+        if (new_ch != tto_dib.chan)                     /* inv conn? err */
+            return SCPE_IERR;
         xfr_req = xfr_req & ~XFR_TTO;                   /* clr xfr flag */
         sim_activate (&tto_unit, tto_unit.wait);        /* activate */
         break;
@@ -573,9 +582,12 @@ t_stat tto_svc (UNIT *uptr)
 int32 asc;
 t_stat r;
 
-if (uptr->buf == TT_CR) asc = '\r';                     /* control chars? */
-else if (uptr->buf == TT_BS) asc = '\b';
-else if (uptr->buf == TT_TB) asc = '\t';
+if (uptr->buf == TT_CR)                                 /* control chars? */
+    asc = '\r';
+else if (uptr->buf == TT_BS)
+    asc = '\b';
+else if (uptr->buf == TT_TB)
+    asc = '\t';
 else asc = sds_to_ascii[uptr->buf];                     /* translate */
 if ((r = sim_putchar_s (asc)) != SCPE_OK) {             /* output; error? */
     sim_activate (uptr, uptr->wait);                    /* retry */

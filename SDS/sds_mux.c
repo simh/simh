@@ -1,6 +1,6 @@
 /* sds_mux.c: SDS 940 terminal multiplexor simulator
 
-   Copyright (c) 2001-2006, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mux          terminal multiplexor
 
+   19-Nov-08    RMS     Revixed for common TMXR show routines
    29-Dec-06    RMS     Revised to use console conversion routines
    29-Jun-05    RMS     Added SET MUXLn DISCONNECT
    21-Jun-05    RMS     Fixed bug in SHOW CONN/STATS
@@ -136,8 +137,6 @@ void mux_scan_next (void);
 
 DIB mux_dib = { -1, DEV3_GMUX, 0, NULL, &mux };
 
-REG mux_nlreg = { DRDATA (NLINES, MUX_NUMLIN, 6), PV_LEFT };
-
 UNIT mux_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), MUX_INIT_POLL };
 
 REG mux_reg[] = {
@@ -152,15 +151,16 @@ REG mux_reg[] = {
     };
 
 MTAB mux_mod[] = {
-    { MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-      &mux_vlines, NULL, &mux_nlreg },
+    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+      &mux_vlines, tmxr_show_lines, (void *) &mux_desc },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &mux_desc },
-    { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &mux_summ },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &mux_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &mux_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &mux_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &mux_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &mux_desc },
     { 0 }
     };
 
@@ -255,14 +255,16 @@ switch (fnc) {
 
     case IO_CONN:                                       /* connect */
         if ((PROJ_GENIE && (inst == 000230001)) ||      /* set alert */
-           (!PROJ_GENIE && (inst == 020277777))) alert = POT_MUX;
+           (!PROJ_GENIE && (inst == 020277777)))
+           alert = POT_MUX;
         else CRETINS;
         break;
 
     case IO_SKS:                                        /* skip */
         if (PROJ_GENIE && ((inst & 077770077) == 004030001)) {
             ln = SKG_CHAN (inst);                       /* get line */
-            if (!sim_is_active (&muxl_unit[ln])) *dat = 1;
+            if (!sim_is_active (&muxl_unit[ln]))
+                *dat = 1;
             }
         else if (!PROJ_GENIE && ((inst & 077776000) == 024076000)) {
             ln = SKS_CHAN (inst);                       /* get line */
@@ -326,7 +328,8 @@ else {                                                  /* enabled */
         mux_xbuf[ln] = chr;                             /* store char */
         sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
         }
-    if (*dat & POT_XMI) mux_sta[ln] = mux_sta[ln] | MUX_SXIE;
+    if (*dat & POT_XMI)
+        mux_sta[ln] = mux_sta[ln] | MUX_SXIE;
     else mux_sta[ln] = mux_sta[ln] & ~MUX_SXIE;
     mux_sta[ln] = mux_sta[ln] | MUX_SLNE;               /* line is enabled */
     mux_ldsc[ln].rcve = 1;
@@ -344,7 +347,8 @@ t_stat muxi_svc (UNIT *uptr)
 {
 int32 ln, c, t;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
 t = sim_rtcn_calb (mux_tps, TMR_MUX);                   /* calibrate */
 sim_activate (uptr, t);                                 /* continue poll */
 ln = tmxr_poll_conn (&mux_desc);                        /* look for connect */
@@ -363,7 +367,8 @@ for (ln = 0; ln < MUX_NUMLIN; ln++) {                   /* loop thru lines */
             if (mux_sta[ln] & MUX_SCHP)                 /* already got one? */
                 mux_sta[ln] = mux_sta[ln] | MUX_SOVR;   /* overrun */
             else mux_sta[ln] = mux_sta[ln] | MUX_SCHP;  /* char pending */
-            if (c & SCPE_BREAK) c = 0;                  /* break? */
+            if (c & SCPE_BREAK)                         /* break? */
+                c = 0;
             else c = sim_tt_inpcvt (c, TT_GET_MODE (muxl_unit[ln].flags));
             mux_rbuf[ln] = c;                           /* save char */
             MUX_SETFLG (ln, MUX_FRCV);                  /* set rcv flag */
@@ -385,7 +390,8 @@ uint32 ln = uptr - muxl_unit;                           /* line # */
 if (mux_ldsc[ln].conn) {                                /* connected? */
     if (mux_ldsc[ln].xmte) {                            /* xmt enabled? */
         c = sim_tt_outcvt (mux_xbuf[ln], TT_GET_MODE (muxl_unit[ln].flags));
-        if (c >= 0) tmxr_putc_ln (&mux_ldsc[ln], c);    /* output char */
+        if (c >= 0)                                     /* output char */
+            tmxr_putc_ln (&mux_ldsc[ln], c);
         tmxr_poll_tx (&mux_desc);                       /* poll xmt */
         }
     else {                                              /* buf full */
@@ -407,7 +413,8 @@ void mux_scan_next (void)
 {
 int32 i;
 
-if (mux_slck) return;                                   /* locked? */
+if (mux_slck)                                           /* locked? */
+    return;
 for (i = 0; i < MUX_SCANMAX; i++) {                     /* scan flags */
     mux_scan = (mux_scan + 1) & MUX_SCANMASK;           /* next flag */
     if (mux_flags[mux_scan]) {                          /* flag set? */
@@ -435,8 +442,10 @@ if (mux_unit.flags & UNIT_ATT) {                        /* master att? */
         }
     }
 else sim_cancel (&mux_unit);                            /* else stop */
-for (i = 0; i < MUX_LINES; i++) mux_reset_ln (i);
-for (i = 0; i < MUX_FLAGS; i++) MUX_CLRINT (i);         /* clear all ints */
+for (i = 0; i < MUX_LINES; i++)
+    mux_reset_ln (i);
+for (i = 0; i < MUX_FLAGS; i++)                         /* clear all ints */
+    MUX_CLRINT (i);
 return SCPE_OK;
 }
 
@@ -448,7 +457,8 @@ t_stat r;
 int32 t;
 
 r = tmxr_attach (&mux_desc, uptr, cptr);                /* attach */
-if (r != SCPE_OK) return r;                             /* error */
+if (r != SCPE_OK)                                       /* error */
+    return r;
 t = sim_rtcn_init (mux_unit.wait, TMR_MUX);
 sim_activate (uptr, t);                                 /* start poll */
 return SCPE_OK;
@@ -462,40 +472,10 @@ int32 i;
 t_stat r;
 
 r = tmxr_detach (&mux_desc, uptr);                      /* detach */
-for (i = 0; i < MUX_LINES; i++) mux_ldsc[i].rcve = 0;   /* disable rcv */
+for (i = 0; i < MUX_LINES; i++)                         /* disable rcv */
+    mux_ldsc[i].rcve = 0;
 sim_cancel (uptr);                                      /* stop poll */
 return r;
-}
-
-/* Show summary processor */
-
-t_stat mux_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < MUX_LINES; i++) t = t + (mux_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat mux_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < MUX_LINES; i++) t = t + (mux_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < MUX_LINES; i++) {
-        if (mux_ldsc[i].conn) {
-            if (val) tmxr_fconns (st, &mux_ldsc[i], i);
-            else tmxr_fstats (st, &mux_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
-return SCPE_OK;
 }
 
 /* Change number of lines */
@@ -505,12 +485,16 @@ t_stat mux_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 newln, i, t;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newln = get_uint (cptr, 10, MUX_LINES, &r);
-if ((r != SCPE_OK) || (newln == MUX_NUMLIN)) return r;
-if (newln == 0) return SCPE_ARG;
+if ((r != SCPE_OK) || (newln == MUX_NUMLIN))
+    return r;
+if (newln == 0)
+    return SCPE_ARG;
 if (newln < MUX_NUMLIN) {
-    for (i = newln, t = 0; i < MUX_NUMLIN; i++) t = t | mux_ldsc[i].conn;
+    for (i = newln, t = 0; i < MUX_NUMLIN; i++)
+        t = t | mux_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
             return SCPE_OK;
     for (i = newln; i < MUX_NUMLIN; i++) {
@@ -538,7 +522,8 @@ void mux_reset_ln (int32 ln)
 {
 int32 flg = ln * MUX_FLAGS;
 
-if (mux_ldsc[ln].conn) mux_sta[ln] = MUX_SCRO | MUX_SDSR;
+if (mux_ldsc[ln].conn)
+    mux_sta[ln] = MUX_SCRO | MUX_SDSR;
 else mux_sta[ln] = 0;
 sim_cancel (&muxl_unit[ln]);
 mux_flags[flg + MUX_FRCV] = 0;

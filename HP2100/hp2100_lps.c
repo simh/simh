@@ -1,6 +1,6 @@
 /* hp2100_lps.c: HP 2100 12653A/2767 line printer simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   lps          12653A 2767 line printer
+   LPS          12653A 2767 line printer
                 12566B microcircuit interface with loopback diagnostic connector
 
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    10-May-07    RMS     Added UNIT_TEXT flag
    11-Jan-07    JDB     CLC cancels I/O event if DIAG (jumper W9 in "A" pos)
                         Added ioCRS state to I/O decoders
@@ -49,6 +50,12 @@
    21-Nov-00    RMS     Fixed flag, fbf power up state
                         Added command flop
    15-Oct-00    RMS     Added variable device number support
+
+   References:
+   - 2767A Line Printer Operating and Service Manual (02767-90002, Oct-1973)
+   - 12566B, 12566B-001, 12566B-002, 12566B-003 Microcircuit Interface Kits
+     Operating and Service Manual (12566-90015, Apr-1976)
+
 
    This module simulates two different devices.  In "diagnostic mode," it
    simulates a 12566B microcircuit interface card with a loopback connector and
@@ -102,11 +109,6 @@
      ATT LPS <file>   --> paper loaded
      DET LPS          --> paper out
 
-   References:
-   - 2767A Line Printer Operating and Service Manual (02767-90002, Oct-1973)
-   - 12566B, 12566B-001, 12566B-002, 12566B-003 Microcircuit Interface Kits
-     Operating and Service Manual (12566-90015, Apr-1976)
-
    The following implemented behaviors have been inferred from secondary sources
    (diagnostics, operating system drivers, etc.), due to absent or contradictory
    authoritative information; future correction may be needed:
@@ -142,9 +144,9 @@
 #define UNIT_POWEROFF   (1 << UNIT_V_POWEROFF)
 #define UNIT_OFFLINE    (1 << UNIT_V_OFFLINE)
 
-extern uint32 PC;
-extern uint32 dev_cmd[2], dev_ctl[2], dev_flg[2], dev_fbf[2], dev_srq[2];
-extern FILE *sim_deb;
+FLIP_FLOP lps_control = CLEAR;
+FLIP_FLOP lps_flag = CLEAR;
+FLIP_FLOP lps_flagbuf = CLEAR;
 
 int32 lps_ccnt = 0;                                     /* character count */
 int32 lps_lcnt = 0;                                     /* line count */
@@ -188,7 +190,7 @@ const TIMESET lps_times[2] = {
     };
 
 DEVICE lps_dev;
-int32 lpsio (int32 inst, int32 IR, int32 dat);
+uint32 lpsio (uint32 select_code, IOSIG signal, uint32 data);
 t_stat lps_svc (UNIT *uptr);
 t_stat lps_reset (DEVICE *dptr);
 t_stat lps_restart (UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -205,7 +207,7 @@ t_stat lps_show_timing (FILE *st, UNIT *uptr, int32 val, void *desc);
    lps_reg      LPS register list
 */
 
-DIB lps_dib = { LPS, 0, 0, 0, 0, 0, &lpsio };
+DIB lps_dib = { LPS, &lpsio };
 
 UNIT lps_unit = {
     UDATA (&lps_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_DISABLE+UNIT_TEXT, 0)
@@ -215,11 +217,9 @@ REG lps_reg[] = {
     { ORDATA (BUF, lps_unit.buf, 16) },
     { ORDATA (STA, lps_sta, 16) },
     { ORDATA (POWER, lps_power, 2), REG_RO },
-    { FLDATA (CMD, lps_dib.cmd, 0) },
-    { FLDATA (CTL, lps_dib.ctl, 0) },
-    { FLDATA (FLG, lps_dib.flg, 0) },
-    { FLDATA (FBF, lps_dib.fbf, 0) },
-    { FLDATA (SRQ, lps_dib.srq, 0) },
+    { FLDATA (CTL, lps_control, 0) },
+    { FLDATA (FLG, lps_flag, 0) },
+    { FLDATA (FBF, lps_flagbuf, 0) },
     { DRDATA (CCNT, lps_ccnt, 7), PV_LEFT },
     { DRDATA (LCNT, lps_lcnt, 7), PV_LEFT },
     { DRDATA (POS, lps_unit.pos, T_ADDR_W), PV_LEFT },
@@ -259,120 +259,172 @@ DEVICE lps_dev = {
     &lps_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
     };
 
-/* IO instructions */
 
-int32 lpsio (int32 inst, int32 IR, int32 dat)
+/* I/O signal handler */
+
+uint32 lpsio (uint32 select_code, IOSIG signal, uint32 data)
 {
-int32 dev, sched;
+const t_bool clf = (signal > ioCLF);
+const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+int32 sched;
 
-dev = IR & I_DEVMASK;                                   /* get device no */
-switch (inst) {                                         /* case on opcode */
+switch (base_signal) {                                  /* dispatch base I/O signal */
 
-    case ioFLG:                                         /* flag clear/set */
-        if ((IR & I_HC) == 0) { setFSR (dev); }         /* STF */
+    case ioCLF:                                         /* clear flag flip-flop */
+        lps_flag = lps_flagbuf = CLEAR;
         break;
 
-    case ioSFC:                                         /* skip flag clear */
-        if (FLG (dev) == 0) PC = (PC + 1) & VAMASK;
+
+    case ioSTF:                                         /* set flag flip-flop */
+    case ioENF:                                         /* enable flag */
+        lps_flag = lps_flagbuf = SET;
         break;
 
-    case ioSFS:                                         /* skip flag set */
-        if (FLG (dev) != 0) PC = (PC + 1) & VAMASK;
+
+    case ioSFC:                                         /* skip if flag is clear */
+        setstdSKF (lps);
         break;
 
-    case ioOTX:                                         /* output */
-        if (DEBUG_PRS (lps_dev))
-            fprintf (sim_deb, ">>LPS OTx: Character %06o output\n", dat);
-        lps_unit.buf = dat;
+
+    case ioSFS:                                         /* skip if flag is set */
+        setstdSKF (lps);
         break;
 
-    case ioLIX:                                         /* load */
-        dat = 0;                                        /* default sta = 0 */
-    case ioMIX:                                         /* merge */
-        if ((lps_unit.flags & UNIT_DIAG) == 0) {        /* real lpt? */
-            if (lps_power == LPS_ON) {                  /* power on? */
+
+    case ioIOI:                                             /* I/O data input */
+        if ((lps_unit.flags & UNIT_DIAG) == 0) {            /* real lpt? */
+            if (lps_power == LPS_ON) {                      /* power on? */
                 if (((lps_unit.flags & UNIT_ATT) == 0) ||   /* paper out? */
                     (lps_unit.flags & UNIT_OFFLINE) ||      /* offline? */
                     sim_is_active (&lps_unit)) lps_sta = LPS_BUSY;
-                else lps_sta = 0;
+
+                else
+                    lps_sta = 0;
                 }
-            else lps_sta = LPS_PWROFF;
+
+            else
+                lps_sta = LPS_PWROFF;
             }
-        dat = dat | lps_sta;                            /* diag, rtn status */
+
+        data = lps_sta;                                     /* diag, rtn status */
+
         if (DEBUG_PRS (lps_dev))
-            fprintf (sim_deb, ">>LPS LIx: Status %06o returned\n", dat);
+            fprintf (sim_deb, ">>LPS LIx: Status %06o returned\n", data);
         break;
 
+
+    case ioIOO:                                         /* I/O data output */
+        if (DEBUG_PRS (lps_dev))
+            fprintf (sim_deb, ">>LPS OTx: Character %06o output\n", data);
+
+        lps_unit.buf = data;
+        break;
+
+
+    case ioPOPIO:                                       /* power-on preset to I/O */
+        lps_flag = lps_flagbuf = SET;                   /* set flag and flag buffer */
+        lps_unit.buf = 0;                               /* clear output buffer */
+                                                        /* fall into CRS handler */
+
     case ioCRS:                                         /* control reset */
-        clrCTL (dev);                                   /* clear control */
-        clrCMD (dev);                                   /* clear command */
+        lps_control = CLEAR;                            /* clear control */
         sim_cancel (&lps_unit);                         /* deactivate unit */
         break;
 
-    case ioCTL:                                         /* control clear/set */
-        if (IR & I_CTL) {                               /* CLC */
-            clrCTL (dev);                               /* clear control */
-            if (lps_unit.flags & UNIT_DIAG) {           /* diagnostic mode? */
-                clrCMD (dev);                           /* clear command (jumper W9-A) */
-                if (IR & I_HC)                          /* clear flag too? */
-                    sim_cancel (&lps_unit);             /* prevent FLG/SRQ */
-                }
+
+    case ioCLC:                                         /* clear control flip-flop */
+        lps_control = CLEAR;
+
+        if ((lps_unit.flags & UNIT_DIAG) && clf)        /* diagnostic mode and clearing flag? */
+           sim_cancel (&lps_unit);                      /* prevent FLG/SRQ */
+        break;
+
+
+    case ioSTC:                                         /* set control flip-flop */
+        lps_control = SET;                              /* set control */
+
+        if (lps_unit.flags & UNIT_DIAG) {               /* diagnostic? */
+            lps_sta = lps_unit.buf;                     /* loop back data */
+            sim_activate (&lps_unit, 2);                /* schedule flag */
             }
-        else {                                          /* STC */
-            setCTL (dev);                               /* set ctl */
-            setCMD (dev);                               /* set cmd */
-            if (lps_unit.flags & UNIT_DIAG) {           /* diagnostic? */
-                lps_sta = lps_unit.buf;                 /* loop back data */
-                sim_activate (&lps_unit, 2);            /* schedule flag */
+
+        else {                                          /* real lpt, sched */
+            if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
+                ">>LPS STC: Character %06o scheduled for line %d, column %d, ",
+                lps_unit.buf, lps_lcnt + 1, lps_ccnt + 1);
+
+            if ((lps_unit.buf != '\f') &&
+                (lps_unit.buf != '\n') &&
+                (lps_unit.buf != '\r')) {               /* normal char */
+                lps_ccnt = lps_ccnt + 1;                /* incr char counter */
+                if (lps_ccnt % LPS_ZONECNT == 0)        /* end of zone? */
+                    sched = lps_ptime;                  /* print zone */
+                else
+                    sched = lps_ctime;                  /* xfer char */
                 }
-            else {                                      /* real lpt, sched */
-                if (DEBUG_PRS (lps_dev)) fprintf (sim_deb,
-                    ">>LPS STC: Character %06o scheduled for line %d, column %d, ",
-                    lps_unit.buf, lps_lcnt + 1, lps_ccnt + 1);
-                if ((lps_unit.buf != '\f') &&
-                    (lps_unit.buf != '\n') &&
-                    (lps_unit.buf != '\r')) {           /* normal char */
-                    lps_ccnt = lps_ccnt + 1;            /* incr char counter */
-                    if (lps_ccnt % LPS_ZONECNT == 0)    /* end of zone? */
-                        sched = lps_ptime;              /* print zone */
-                    else sched = lps_ctime;             /* xfer char */
+
+            else {                                      /* print cmd */
+                if (lps_ccnt % LPS_ZONECNT == 0)        /* last zone printed? */
+                    sched = lps_ctime;                  /* yes, so just char time */
+                else
+                    sched = lps_ptime;                  /* no, so print needed */
+
+                lps_ccnt = 0;                           /* reset char counter */
+
+                if (lps_unit.buf == '\n') {             /* line advance */
+                    lps_lcnt = (lps_lcnt + 1) % LPS_PAGELNT;
+
+                    if (lps_lcnt > 0)
+                        sched = sched + lps_stime;
+                    else
+                        sched = sched +                 /* allow for perf skip */
+                        lps_stime * (LPS_FORMLNT - LPS_PAGELNT);
                     }
-                else {                                  /* print cmd */
-                    if (lps_ccnt % LPS_ZONECNT == 0)    /* last zone printed? */
-                        sched = lps_ctime;              /* yes, so just char time */
-                    else sched = lps_ptime;             /* no, so print needed */
-                    lps_ccnt = 0;                       /* reset char counter */
-                    if (lps_unit.buf == '\n') {         /* line advance */
-                        lps_lcnt = (lps_lcnt + 1) % LPS_PAGELNT;
-                        if (lps_lcnt > 0) sched = sched + lps_stime;
-                        else sched = sched +            /* allow for perf skip */
-                            lps_stime * (LPS_FORMLNT - LPS_PAGELNT);
-                        }
-                    else if (lps_unit.buf == '\f') {    /* form advance */
-                        sched = sched + lps_stime * (LPS_FORMLNT - lps_lcnt);
-                        lps_lcnt = 0;
-                        }
+
+                else if (lps_unit.buf == '\f') {        /* form advance */
+                    sched = sched + lps_stime * (LPS_FORMLNT - lps_lcnt);
+                    lps_lcnt = 0;
                     }
-                sim_activate (&lps_unit, sched);
-                if (DEBUG_PRS (lps_dev))
-                    fprintf (sim_deb, "time = %d\n", sched);
                 }
+
+            sim_activate (&lps_unit, sched);
+
+            if (DEBUG_PRS (lps_dev))
+                fprintf (sim_deb, "time = %d\n", sched);
             }
         break;
 
-    default:
-        break;
-        }
 
-if (IR & I_HC) { clrFSR (dev); }                        /* H/C option */
-return dat;
+    case ioSIR:                                         /* set interrupt request */
+        setstdPRL (select_code, lps);                   /* set standard PRL signal */
+        setstdIRQ (select_code, lps);                   /* set standard IRQ signal */
+        setstdSRQ (select_code, lps);                   /* set standard SRQ signal */
+        break;
+
+
+    case ioIAK:                                         /* interrupt acknowledge */
+        lps_flagbuf = CLEAR;
+        break;
+
+
+    default:                                            /* all other signals */
+        break;                                          /*   are ignored */
+    }
+
+
+if (signal > ioCLF)                                     /* multiple signals? */
+    lpsio (select_code, ioCLF, 0);                      /* issue CLF */
+else if (signal > ioSIR)                                /* signal affected interrupt status? */
+    lpsio (select_code, ioSIR, 0);                      /* set interrupt request */
+
+return data;
 }
+
 
 /* Unit service */
 
 t_stat lps_svc (UNIT *uptr)
 {
-int32 dev;
 int32 c = uptr->buf & 0177;
 
 if (lps_power == LPS_TURNING_ON) {                      /* printer warmed up? */
@@ -382,10 +434,8 @@ if (lps_power == LPS_TURNING_ON) {                      /* printer warmed up? */
         fputs (">>LPS svc: Power state is ON\n", sim_deb);
     return SCPE_OK;                                     /* done */
     }
-dev = lps_dib.devno;                                    /* get dev no */
 if (uptr->flags & UNIT_DIAG) {                          /* diagnostic? */
-    clrCMD (dev);                                       /* clear cmd */
-    setFSR (dev);                                       /* set flag, fbf */
+    lpsio (lps_dib.devno, ioENF, 0);                    /* set flag */
     return SCPE_OK;                                     /* done */
     }
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
@@ -394,8 +444,9 @@ else if (uptr->flags & UNIT_OFFLINE)                    /* offline? */
     return IORETURN (lps_stopioe, STOP_OFFLINE);
 else if (uptr->flags & UNIT_POWEROFF)                   /* powered off? */
     return IORETURN (lps_stopioe, STOP_PWROFF);
-clrCMD (dev);                                           /* clear cmd */
-setFSR (dev);                                           /* set flag, fbf */
+
+lpsio (lps_dib.devno, ioENF, 0);                        /* set flag */
+
 if (((c < ' ') || (c > '_')) &&                         /* non-printing char? */
     (c != '\f') && (c != '\n') && (c != '\r')) {
         if (DEBUG_PRS (lps_dev))
@@ -427,16 +478,20 @@ if (ferror (uptr->fileref)) {
 return SCPE_OK;
 }
 
-/* Reset routine - called from SCP, flags in DIB */
+/* Reset routine */
 
 t_stat lps_reset (DEVICE *dptr)
 {
-lps_dib.cmd = lps_dib.ctl = 0;                          /* clear cmd, ctl */
-lps_dib.flg = lps_dib.fbf = lps_dib.srq = 1;            /* set flg, fbf, srq */
-lps_sta = lps_unit.buf = 0;
-lps_power = LPS_ON;                                     /* power is on */
+if (sim_switches & SWMASK ('P')) {                      /* PON reset? */
+    lps_power = LPS_ON;                                 /* power is on */
+    lps_set_timing (NULL, lps_timing, NULL, NULL);      /* init timing set */
+    }
+
+lpsio (lps_dib.devno, ioPOPIO, 0);                      /* send POPIO signal */
+
+lps_sta = 0;                                            /* clear status */
 sim_cancel (&lps_unit);                                 /* deactivate unit */
-lps_set_timing (NULL, lps_timing, NULL, NULL);          /* init timing set */
+
 return SCPE_OK;
 }
 
@@ -456,7 +511,7 @@ return SCPE_OK;
 
 t_stat lps_restart (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-if (lps_dib.cmd && lps_dib.ctl && !sim_is_active (uptr))
+if (lps_control && !sim_is_active (uptr))
     sim_activate (uptr, 0);                             /* reschedule I/O */
 return SCPE_OK;
 }

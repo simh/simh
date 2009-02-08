@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2007, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -238,12 +238,14 @@ switch (op) {                                           /* case on op */
 
     case OP_RN:                                         /* read numeric */
         r = cdr_read ();                                /* fill reader buf */
-        if (r != SCPE_OK) return r;                     /* error? */
+        if (r != SCPE_OK)                               /* error? */
+            return r;
         for (i = 0; i < CD_LEN; i++) {                  /* transfer to mem */
             cdc = cdr_to_num[cdr_buf[i]];               /* translate */
             if (cdc < 0) {                              /* invalid? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                if (io_stop)                            /* set return status */
+                    sta = STOP_INVCHR;
                 cdc = 0;
                 }
             M[pa] = cdc;                                /* store digit */
@@ -253,12 +255,14 @@ switch (op) {                                           /* case on op */
 
     case OP_RA:                                         /* read alphameric */
         r = cdr_read ();                                /* fill reader buf */
-        if (r != SCPE_OK) return r;                     /* error? */
+        if (r != SCPE_OK)                               /* error? */
+            return r;
         for (i = 0; i < CD_LEN; i++) {                  /* transfer to mem */
             cdc = cdr_to_alp[cdr_buf[i]];               /* translate */
             if (cdc < 0) {                              /* invalid? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                if (io_stop)                            /* set return status */
+                    sta = STOP_INVCHR;
                 cdc = 0;
                 };
             M[pa] = (M[pa] & FLAG) | (cdc & DIGIT);     /* store 2 digits */
@@ -286,9 +290,11 @@ if ((cdr_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
     return SCPE_UNATT;
     }
 
-for (i = 0; i < CD_LEN + 2; i++) cdr_buf[i] = ' ';      /* clear buffer */
+for (i = 0; i < CD_LEN + 2; i++)                        /* clear buffer */
+    cdr_buf[i] = ' ';
 fgets (cdr_buf, CD_LEN + 2, cdr_unit.fileref);          /* read card */
-if (feof (cdr_unit.fileref)) return STOP_NOCD;          /* eof? */
+if (feof (cdr_unit.fileref))                            /* eof? */
+    return STOP_NOCD;
 if (ferror (cdr_unit.fileref)) {                        /* error? */
     ind[IN_RDCHK] = 1;                                  /* set read check */
     perror ("CDR I/O error");
@@ -297,7 +303,8 @@ if (ferror (cdr_unit.fileref)) {                        /* error? */
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 getc (cdr_unit.fileref);                                /* see if more */
-if (feof (cdr_unit.fileref)) ind[IN_LAST] = 1;          /* eof? set last */
+if (feof (cdr_unit.fileref))                            /* eof? set last */
+    ind[IN_LAST] = 1;
 fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET);       /* "backspace" */
 return SCPE_OK;
 }
@@ -332,7 +339,8 @@ old_io_stop = io_stop;
 io_stop = 1;
 r = cdr (OP_RN, 0, 0, 0);                               /* read card @ 0 */
 io_stop = old_io_stop;
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 saved_PC = BOOT_START;
 return SCPE_OK;
 }
@@ -391,7 +399,8 @@ t_stat r;
 ncd = ndig / CD_LEN;                                    /* number of cards */
 while (ncd-- >= 0) {                                    /* until done */
     len = (ncd >= 0)? CD_LEN: (ndig % CD_LEN);          /* card length */
-    if (len == 0) break;
+    if (len == 0)
+        break;
     for (i = 0; i < len; i++) {                         /* one card */
         d = M[pa] & (FLAG | DIGIT);                     /* get char */
         if (dump && (d == FLAG)) cdc = '-';             /* dump? F+0 is diff */
@@ -404,7 +413,8 @@ while (ncd-- >= 0) {                                    /* until done */
         PP (pa);                                        /* incr mem addr */
         }
     r = cdp_write (len);                                /* punch card */
-    if (r != SCPE_OK) return r;                         /* error? */
+    if (r != SCPE_OK)                                   /* error? */
+        return r;
     }
 return SCPE_OK;
 }
@@ -418,7 +428,8 @@ if ((cdp_unit.flags & UNIT_ATT) == 0) {                 /* attached? */
     return SCPE_UNATT;
     }
 
-while ((len > 0) && (cdp_buf[len - 1] == ' ')) --len;   /* trim spaces */
+while ((len > 0) && (cdp_buf[len - 1] == ' '))          /* trim spaces */
+    --len;
 cdp_buf[len] = '\n';                                    /* newline, null */
 cdp_buf[len + 1] = 0;
 

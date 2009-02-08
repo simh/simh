@@ -265,8 +265,10 @@ t_stat tti_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 00:                                            /* tti csr */
-        if (PA & 1) return SCPE_OK;
-        if ((data & CSR_IE) == 0) CLR_INT (TTI);
+        if (PA & 1)
+            return SCPE_OK;
+        if ((data & CSR_IE) == 0)
+            CLR_INT (TTI);
         else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
             SET_INT (TTI);
         tti_csr = (tti_csr & ~TTICSR_RW) | (data & TTICSR_RW);
@@ -286,12 +288,15 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
-if (c & SCPE_BREAK) uptr->buf = 0;                      /* break? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
+if (c & SCPE_BREAK)                                     /* break? */
+    uptr->buf = 0;
 else uptr->buf = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags));
 uptr->pos = uptr->pos + 1;
 tti_csr = tti_csr | CSR_DONE;
-if (tti_csr & CSR_IE) SET_INT (TTI);
+if (tti_csr & CSR_IE)
+    SET_INT (TTI);
 return SCPE_OK;
 }
 
@@ -329,15 +334,18 @@ t_stat tto_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 00:                                            /* tto csr */
-        if (PA & 1) return SCPE_OK;
-        if ((data & CSR_IE) == 0) CLR_INT (TTO);
+        if (PA & 1)
+            return SCPE_OK;
+        if ((data & CSR_IE) == 0)
+            CLR_INT (TTO);
         else if ((tto_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
             SET_INT (TTO);
         tto_csr = (tto_csr & ~TTOCSR_RW) | (data & TTOCSR_RW);
         return SCPE_OK;
 
     case 01:                                            /* tto buf */
-        if ((PA & 1) == 0) tto_unit.buf = data & 0377;
+        if ((PA & 1) == 0)
+            tto_unit.buf = data & 0377;
         tto_csr = tto_csr & ~CSR_DONE;
         CLR_INT (TTO);
         sim_activate (&tto_unit, tto_unit.wait);
@@ -362,7 +370,8 @@ if (c >= 0) {
         }
     }
 tto_csr = tto_csr | CSR_DONE;
-if (tto_csr & CSR_IE) SET_INT (TTO);
+if (tto_csr & CSR_IE)
+    SET_INT (TTO);
 uptr->pos = uptr->pos + 1;
 return SCPE_OK;
 }
@@ -397,21 +406,26 @@ return SCPE_OK;
 
 t_stat clk_rd (int32 *data, int32 PA, int32 access)
 {
-if (clk_fnxm) return SCPE_NXM;                          /* not there??? */
-if (CPUT (HAS_LTCM)) *data = clk_csr & CLKCSR_IMP;      /* monitor bit? */
+if (clk_fnxm)                                           /* not there??? */
+    return SCPE_NXM;
+if (CPUT (HAS_LTCM))                                    /* monitor bit? */
+    *data = clk_csr & CLKCSR_IMP;
 else *data = clk_csr & (CLKCSR_IMP & ~CSR_DONE);        /* no, just IE */
 return SCPE_OK;
 }
 
 t_stat clk_wr (int32 data, int32 PA, int32 access)
 {
-if (clk_fnxm) return SCPE_NXM;                          /* not there??? */
-if (PA & 1) return SCPE_OK;
+if (clk_fnxm)                                           /* not there??? */
+    return SCPE_NXM;
+if (PA & 1)
+    return SCPE_OK;
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
 if (CPUT (HAS_LTCM) && ((data & CSR_DONE) == 0))        /* monitor bit? */
     clk_csr = clk_csr & ~CSR_DONE;                      /* clr if zero */
 if ((((clk_csr & CSR_IE) == 0) && !clk_fie) ||          /* unless IE+DONE */
-    ((clk_csr & CSR_DONE) == 0)) CLR_INT (CLK);         /* clr intr */
+    ((clk_csr & CSR_DONE) == 0))                        /* clr intr */
+    CLR_INT (CLK);
 return SCPE_OK;
 }
 
@@ -422,7 +436,8 @@ t_stat clk_svc (UNIT *uptr)
 int32 t;
 
 clk_csr = clk_csr | CSR_DONE;                           /* set done */
-if ((clk_csr & CSR_IE) || clk_fie) SET_INT (CLK);
+if ((clk_csr & CSR_IE) || clk_fie)
+    SET_INT (CLK);
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
 sim_activate (&clk_unit, t);                            /* reactivate unit */
 tmr_poll = t;                                           /* set timer poll */
@@ -434,7 +449,8 @@ return SCPE_OK;
 
 int32 clk_inta (void)
 {
-if (CPUT (CPUT_24)) clk_csr = clk_csr & ~CSR_DONE;
+if (CPUT (CPUT_24))
+    clk_csr = clk_csr & ~CSR_DONE;
 return clk_dib.vec;
 }
 
@@ -452,7 +468,8 @@ return (t? t - 1: wait);
 
 t_stat clk_reset (DEVICE *dptr)
 {
-if (CPUT (HAS_LTCR)) clk_fie = clk_fnxm = 0;            /* reg there? */
+if (CPUT (HAS_LTCR))                                    /* reg there? */
+    clk_fie = clk_fnxm = 0;
 else clk_fie = clk_fnxm = 1;                            /* no, BEVENT */
 clk_tps = clk_default;                                  /* set default tps */
 clk_csr = CSR_DONE;                                     /* set done */
@@ -468,8 +485,10 @@ return SCPE_OK;
 
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val != 50) && (val != 60)) return SCPE_IERR;
+if (cptr)
+    return SCPE_ARG;
+if ((val != 50) && (val != 60))
+    return SCPE_IERR;
 clk_tps = clk_default = val;
 return SCPE_OK;
 }

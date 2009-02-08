@@ -25,6 +25,8 @@
 
    CPU4         Floating Point Processor and Scientific Instruction Set
 
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    18-Mar-08    JDB     Fixed B register return bug in /CMRT
    01-Dec-06    JDB     Substitutes FPP for firmware FP if HAVE_INT64
 
@@ -47,12 +49,6 @@
 #if defined (HAVE_INT64)                                /* int64 support available */
 
 #include "hp2100_fp1.h"
-
-
-t_stat cpu_fpp (uint32 IR, uint32 intrq);               /* Floating Point Processor */
-t_stat cpu_sis (uint32 IR, uint32 intrq);               /* Scientific Instruction Set */
-
-extern t_stat cpu_dbi (uint32 IR, uint32 intrq);         /* Double-Integer instructions */
 
 
 /* Floating-Point Processor.
@@ -256,13 +252,10 @@ uint16 opcode, rtn_addr, stk_ptr;
 uint32 entry;
 t_stat reason = SCPE_OK;
 
-if ((cpu_unit.flags & UNIT_FP) == 0)                    /* FP option installed? */
-    return stop_inst;
-
 if (UNIT_CPU_MODEL == UNIT_1000_F)                      /* F-Series? */
-    opcode = (uint16) (IR & 0377);                       /* yes, use full opcode */
+    opcode = (uint16) (IR & 0377);                      /* yes, use full opcode */
 else
-    opcode = (uint16) (IR & 0160);                       /* no, use 6 SP FP opcodes */
+    opcode = (uint16) (IR & 0160);                      /* no, use 6 SP FP opcodes */
 
 entry = opcode & 0177;                                  /* map to <6:0> */
 
@@ -602,9 +595,6 @@ static const OP two_over_ln2 = { { 0056125, 0016624, 0127404 } };   /* 2.0 / ln(
 
 static const OP t_one  = { { 0040000, 0000000, 0000000, 0000002 } };   /* DEY 1.0 */
 
-
-if (UNIT_CPU_MODEL != UNIT_1000_F)                      /* F-Series? */
-    return stop_inst;
 
 entry = IR & 017;                                       /* mask to entry point */
 

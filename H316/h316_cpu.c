@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2007, Robert M. Supnik
+   Copyright (c) 1999-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -393,7 +393,8 @@ int32 Operate (int32 MB, int32 AR);
 
 /* Restore register state */
 
-if (devtab_init ()) return SCPE_STOP;                   /* init tables */
+if (devtab_init ())                                     /* init tables */
+    return SCPE_STOP;
 AR = saved_AR & DMASK;                                  /* restore reg */
 BR = saved_BR & DMASK;
 XR = saved_XR & DMASK;
@@ -405,7 +406,8 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
 if (sim_interval <= 0) {                                /* check clock queue */
-    if (reason = sim_process_event ()) break;
+    if (reason = sim_process_event ())
+        break;
     }
 
 /* Channel breaks (DMA and DMC) */
@@ -416,9 +418,11 @@ if (chan_req) {                                         /* channel request? */
     for (i = 0, ch = chan_req; ch != 0; i++, ch = ch >> 1) {
         if (ch & 1) {                                   /* req on chan i? */
             dev = chan_map[i];                          /* get dev for chan */
-            if (iotab[dev] == &undio) return SCPE_IERR;
+            if (iotab[dev] == &undio)
+                return SCPE_IERR;
             chan_req = chan_req & ~(1 << i);            /* clear req */
-            if (Q_DMA (i)) st = dma_ad[i];              /* DMA? */
+            if (Q_DMA (i))                              /* DMA? */
+                st = dma_ad[i];
             else {                                      /* DMC */
                 dmcad = DMC_BASE + ((i - DMC_V_DMC1) << 1);
                 st = Read (dmcad);                      /* DMC ctrl word */
@@ -426,14 +430,18 @@ if (chan_req) {                                         /* channel request? */
             ad = st & X_AMASK;                          /* get curr addr */
             if (st & DMA_IN) {                          /* input? */
                 t = iotab[dev] (ioINA, 0, 0, dev);      /* input word */
-                if ((t & IOT_SKIP) == 0) return STOP_DMAER;
-                if ((r = t >> IOT_V_REASON) != 0) return r;
+                if ((t & IOT_SKIP) == 0)
+                    return STOP_DMAER;
+                if ((r = t >> IOT_V_REASON) != 0)
+                    return r;
                 Write (ad, t & DMASK);                  /* write to mem */
                 }
             else {                                      /* no, output */
                 t = iotab[dev] (ioOTA, 0, Read (ad), dev);      /* output word */
-                if ((t & IOT_SKIP) == 0) return STOP_DMAER;
-                if (r = (t >> IOT_V_REASON)) return r;
+                if ((t & IOT_SKIP) == 0)
+                    return STOP_DMAER;
+                if (r = (t >> IOT_V_REASON))
+                    return r;
                 }
             if (Q_DMA (i)) {                            /* DMA? */
                 dma_ad[i] = (dma_ad[i] & DMA_IN) | ((ad + 1) & X_AMASK);
@@ -441,7 +449,8 @@ if (chan_req) {                                         /* channel request? */
                 if (dma_wc[i] == 0) {                   /* done? */
                     dma_eor[i] = 1;                     /* set end of range */
                     t = iotab[dev] (ioEND, 0, 0, dev);  /* send end range */
-                    if ((r = t >> IOT_V_REASON) != 0) return r;
+                    if ((r = t >> IOT_V_REASON) != 0)
+                        return r;
                     }
                 }
             else {                                      /* DMC */
@@ -450,7 +459,8 @@ if (chan_req) {                                         /* channel request? */
                 end = Read (dmcad + 1);                 /* get end */
                 if (((ad ^ end) & X_AMASK) == 0) {      /* start == end? */
                     t = iotab[dev] (ioEND, 0, 0, dev);  /* send end range */
-                    if ((r = t >> IOT_V_REASON) != 0) return r;
+                    if ((r = t >> IOT_V_REASON) != 0)
+                        return r;
                     }                                   /* end if end range */
                 }                                       /* end else DMC */
             }                                           /* end if chan i */
@@ -462,7 +472,8 @@ if (chan_req) {                                         /* channel request? */
 
 if ((dev_int & (INT_PEND|INT_NMI|dev_enb)) > INT_PEND) {/* int req? */
     pme = ext;                                          /* save extend */
-    if (cpu_unit.flags & UNIT_EXT) ext = 1;             /* ext opt? extend on */
+    if (cpu_unit.flags & UNIT_EXT)                      /* ext opt? extend on */
+        ext = 1;
     dev_int = dev_int & ~INT_ON;                        /* intr off */
     MB = 0120000 | M_INT;                               /* inst = JST* 63 */
     }
@@ -485,7 +496,8 @@ dev_int = dev_int & ~INT_START;                         /* clr start button int 
 sim_interval = sim_interval - 1;
 if (hst_lnt) {                                          /* instr hist? */
     hst_p = (hst_p + 1);                                /* next entry */
-    if (hst_p >= hst_lnt) hst_p = 0;
+    if (hst_p >= hst_lnt)
+        hst_p = 0;
     hst[hst_p].pc = Y | HIST_PC | (C? HIST_C: 0);       /* fill slots */
     hst[hst_p].ir = MB;
     hst[hst_p].ar = AR;
@@ -498,14 +510,17 @@ if (hst_lnt) {                                          /* instr hist? */
 switch (I_GETOP (MB)) {                                 /* case on <1:6> */
 
     case 001: case 021: case 041: case 061:             /* JMP */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         PCQ_ENTRY;                                      /* save PC */
         PC = NEWA (PC, Y);                              /* set new PC */
-        if (extoff_pending) ext = extoff_pending = 0;   /* cond ext off */
+        if (extoff_pending)                             /* cond ext off */
+            ext = extoff_pending = 0;
         break;
 
     case 002: case 022: case 042: case 062:             /* LDA */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         if (dp) {                                       /* double prec? */
             AR = Read (Y & ~1);                         /* get doubleword */
             BR = Read (Y | 1);
@@ -515,12 +530,14 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         break;
 
     case 003: case 023: case 043: case 063:             /* ANA */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         AR = AR & Read (Y);
         break;
 
     case 004: case 024: case 044: case 064:             /* STA */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         Write (Y, AR);                                  /* store A */
         if (dp) {                                       /* double prec? */
             Write (Y | 1, BR);                          /* store B */
@@ -529,12 +546,14 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         break;
 
     case 005: case 025: case 045: case 065:             /* ERA */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         AR = AR ^ Read (Y);
         break;
 
     case 006: case 026: case 046: case 066:             /* ADD */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         if (dp) {                                       /* double prec? */
             t1 = GETDBL_S (AR, BR);                     /* get A'B */
             t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
@@ -546,7 +565,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         break;
 
     case 007: case 027: case 047: case 067:             /* SUB */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         if (dp) {                                       /* double prec? */
             t1 = GETDBL_S (AR, BR);                     /* get A'B */
             t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
@@ -558,7 +578,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         break;
 
     case 010: case 030: case 050: case 070:             /* JST */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         MB = NEWA (Read (Y), PC);                       /* merge old PC */
         Write (Y, MB);
         PCQ_ENTRY;
@@ -566,39 +587,48 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         break;
 
     case 011: case 031: case 051: case 071:             /* CAS */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         MB = Read (Y);
-        if (AR == MB) PC = NEWA (PC, PC + 1);
-        else if (SEXT (AR) < SEXT (MB)) PC = NEWA (PC, PC + 2);
+        if (AR == MB)
+            PC = NEWA (PC, PC + 1);
+        else if (SEXT (AR) < SEXT (MB))
+            PC = NEWA (PC, PC + 2);
         break;
 
     case 012: case 032: case 052: case 072:             /* IRS */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         MB = (Read (Y) + 1) & DMASK;                    /* incr, rewrite */
         Write (Y, MB);
-        if (MB == 0) PC = NEWA (PC, PC + 1);            /* skip if zero */
+        if (MB == 0)                                    /* skip if zero */
+            PC = NEWA (PC, PC + 1);
         break;
 
     case 013: case 033: case 053: case 073:             /* IMA */
-        if (reason = Ea (MB, &Y)) break;                /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         MB = Read (Y);
         Write (Y, AR);                                  /* A to mem */
         AR = MB;                                        /* mem to A */
         break;
 
     case 015: case 055:                                 /* STX */
-        if (reason = Ea (MB & ~IDX, &Y)) break;         /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         Write (Y, XR);                                  /* store XR */
         break;
 
     case 035: case 075:                                 /* LDX */
-        if (reason = Ea (MB & ~IDX, &Y)) break;         /* eff addr */
+        if (reason = Ea (MB, &Y))                       /* eff addr */
+            break;
         XR = Read (Y);                                  /* load XR */
         break;
 
     case 016: case 036: case 056: case 076:             /* MPY */
         if (cpu_unit.flags & UNIT_HSA) {                /* installed? */
-            if (reason = Ea (MB, &Y)) break;            /* eff addr */
+            if (reason = Ea (MB, &Y))                   /* eff addr */
+                break;
             t1 = SEXT (AR) * SEXT (Read (Y));
             PUTDBL_S (t1);
             sc = 0;
@@ -608,14 +638,16 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
 
     case 017: case 037: case 057: case 077:             /* DIV */
         if (cpu_unit.flags & UNIT_HSA) {                /* installed? */
-            if (reason = Ea (MB, &Y)) break;            /* eff addr */
+            if (reason = Ea (MB, &Y))                   /* eff addr */
+                break;
             t2 = SEXT (Read (Y));                       /* divr */
             if (t2) {                                   /* divr != 0? */
                 t1 = GETDBL_S (SEXT (AR), BR);          /* get A'B signed */
                 BR = (t1 % t2) & DMASK;                 /* remainder */
                 t1 = t1 / t2;                           /* quotient */
                 AR = t1 & DMASK;
-                if ((t1 > MMASK) || (t1 < (-SIGN))) C = 1;
+                if ((t1 > MMASK) || (t1 < (-SIGN)))
+                    C = 1;
                 else C = 0;
                 sc = 0;
                 }
@@ -636,15 +668,18 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         dev = MB & DEVMASK;
         t2 = iotab[dev] (ioSKS, I_GETFNC (MB), AR, dev);
         reason = t2 >> IOT_V_REASON;
-        if (t2 & IOT_SKIP) PC = NEWA (PC, PC + 1);      /* skip? */
+        if (t2 & IOT_SKIP)                              /* skip? */
+            PC = NEWA (PC, PC + 1);
         break;
 
     case 054:                                           /* INA */
         dev = MB & DEVMASK;
-        if (MB & INCLRA) AR = 0;
+        if (MB & INCLRA)
+            AR = 0;
         t2 = iotab[dev] (ioINA, I_GETFNC (MB & ~INCLRA), AR, dev);
         reason = t2 >> IOT_V_REASON;
-        if (t2 & IOT_SKIP) PC = NEWA (PC, PC + 1);      /* skip? */
+        if (t2 & IOT_SKIP)                              /* skip? */
+            PC = NEWA (PC, PC + 1);
         AR = t2 & DMASK;                                /* data */
         break;
 
@@ -652,30 +687,35 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         dev = MB & DEVMASK;
         t2 = iotab[dev] (ioOTA, I_GETFNC (MB), AR, dev);
         reason = t2 >> IOT_V_REASON;
-        if (t2 & IOT_SKIP) PC = NEWA (PC, PC + 1);      /* skip? */
+        if (t2 & IOT_SKIP)                              /* skip? */
+            PC = NEWA (PC, PC + 1);
         break;
 
 /* Control */
 
     case 000:
         if ((MB & 1) == 0) {                            /* HLT */
-            if ((reason = sim_process_event ()) != SCPE_OK) break;
+            if ((reason = sim_process_event ()) != SCPE_OK)
+                break;
             reason = STOP_HALT;
             break;
             }
         if (MB & m14) {                                 /* SGL, DBL */
-            if (cpu_unit.flags & UNIT_HSA) dp = (MB & m15)? 1: 0;
+            if (cpu_unit.flags & UNIT_HSA)
+                dp = (MB & m15)? 1: 0;
             else reason = stop_inst;
             }
         if (MB & m13) {                                 /* DXA, EXA */
-            if (!(cpu_unit.flags & UNIT_EXT)) reason = stop_inst;
+            if (!(cpu_unit.flags & UNIT_EXT))
+                reason = stop_inst;
             else if (MB & m15) {                        /* EXA */
                 ext = 1;
                 extoff_pending = 0;                     /* DXA */
                 }
             else extoff_pending = 1;
             }
-        if (MB & m12) CLR_INT (INT_MPE);                /* RMP */
+        if (MB & m12)                                   /* RMP */
+            CLR_INT (INT_MPE);
         if (MB & m11) {                                 /* SCA, INK */
             if (MB & m15)                               /* INK */
                 AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 037);
@@ -732,22 +772,26 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
     case 020:
         C = 0;                                          /* clear C */
         sc = 0;                                         /* clear sc */
-        if ((t1 = (-MB) & SHFMASK) == 0) break;         /* shift count */
+        if ((t1 = (-MB) & SHFMASK) == 0)                /* shift count */
+            break;
         switch (I_GETFNC (MB)) {                        /* case shift fnc */
 
         case 000:                                       /* LRL */
-            if (t1 > 32) ut = 0;                        /* >32? all 0 */
+            if (t1 > 32)                                /* >32? all 0 */
+                ut = 0;
             else {
                 ut = GETDBL_U (AR, BR);                 /* get A'B */
                 C = (ut >> (t1 - 1)) & 1;               /* C = last out */
-                if (t1 == 32) ut = 0;                   /* =32? all 0 */
+                if (t1 == 32)                           /* =32? all 0 */
+                    ut = 0;
                 else ut = ut >> t1;                      /* log right */
                 }
             PUTDBL_U (ut);                              /* store A,B */
             break;
 
         case 001:                                       /* LRS */
-            if (t1 > 31) t1 = 31;                       /* limit to 31 */
+            if (t1 > 31)                                /* limit to 31 */
+                t1 = 31;
             t2 = GETDBL_S (SEXT (AR), BR);              /* get A'B signed */
             C = (t2 >> (t1 - 1)) & 1;                   /* C = last out */
             t2 = t2 >> t1;                              /* arith right */
@@ -763,7 +807,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 003:                                       /* "long right arot" */
-            if (reason = stop_inst) break;              /* stop on undef? */
+            if (reason = stop_inst)                     /* stop on undef? */
+                break;
             for (t2 = 0; t2 < t1; t2++) {               /* bit by bit */
                 C = BR & 1;                             /* C = last out */
                 BR = (BR & SIGN) | ((AR & 1) << 14) |
@@ -773,7 +818,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 004:                                       /* LGR */
-            if (t1 > 16) AR = 0;                        /* > 16? all 0 */
+            if (t1 > 16)                                /* > 16? all 0 */
+                AR = 0;
             else {
                 C = (AR >> (t1 - 1)) & 1;               /* C = last out */
                 AR = (AR >> t1) & DMASK;                /* log right */
@@ -781,7 +827,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 005:                                       /* ARS */
-            if (t1 > 16) t1 = 16;                       /* limit to 16 */
+            if (t1 > 16)                                /* limit to 16 */
+                t1 = 16;
             C = ((SEXT (AR)) >> (t1 - 1)) & 1;          /* C = last out */
             AR = ((SEXT (AR)) >> t1) & DMASK;           /* arith right */
             break; 
@@ -793,7 +840,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 007:                                       /* "short right arot" */
-            if (reason = stop_inst) break;              /* stop on undef? */
+            if (reason = stop_inst)                     /* stop on undef? */
+                break;
             for (t2 = 0; t2 < t1; t2++) {               /* bit by bit */
                 C = AR & 1;                             /* C = last out */
                 AR = ((AR & SIGN) | (C << 15)) | (AR >> 1);
@@ -801,18 +849,21 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 010:                                       /* LLL */
-            if (t1 > 32) ut = 0;                        /* > 32? all 0 */
+            if (t1 > 32)                                /* > 32? all 0 */
+                ut = 0;
             else {
                 ut = GETDBL_U (AR, BR);                 /* get A'B */
                 C = (ut >> (32 - t1)) & 1;              /* C = last out */
-                if (t1 == 32) ut = 0;                   /* =32? all 0 */
+                if (t1 == 32)                           /* =32? all 0 */
+                    ut = 0;
                 else ut = ut << t1;                     /* log left */
                 }
             PUTDBL_U (ut);                              /* store A,B */
             break;
 
         case 011:                                       /* LLS */
-            if (t1 > 31) t1 = 31;                       /* limit to 31 */
+            if (t1 > 31)                                /* limit to 31 */
+                t1 = 31;
             t2 = GETDBL_S (SEXT (AR), BR);              /* get A'B */
             t3 = t2 << t1;                              /* "arith" left */
             PUTDBL_S (t3);                              /* store A'B */
@@ -829,7 +880,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 013:                                       /* "long left arot" */
-            if (reason = stop_inst) break;              /* stop on undef? */
+            if (reason = stop_inst)                     /* stop on undef? */
+                break;
             for (t2 = 0; t2 < t1; t2++) {               /* bit by bit */
                 AR = (AR << 1) | ((BR >> 14) & 1);
                 BR = (BR & SIGN) | ((BR << 1) & MMASK) |
@@ -840,7 +892,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 014:                                       /* LGL */
-            if (t1 > 16) AR = 0;                        /* > 16? all 0 */
+            if (t1 > 16)                                /* > 16? all 0 */
+                AR = 0;
             else {
                 C = (AR >> (16 - t1)) & 1;              /* C = last out */
                 AR = (AR << t1) & DMASK;                /* log left */
@@ -848,7 +901,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 015:                                       /* ALS */
-            if (t1 > 16) t1 = 16;                       /* limit to 16 */
+            if (t1 > 16)                                /* limit to 16 */
+                t1 = 16;
             t2 = SEXT (AR);                             /* save AR */
             AR = (AR << t1) & DMASK;                    /* "arith" left */
             if ((t2 >> (16 - t1)) !=                    /* shf out + sgn */
@@ -862,7 +916,8 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             break;
 
         case 017:                                       /* "short left arot" */
-            if (reason = stop_inst) break;              /* stop on undef? */
+            if (reason = stop_inst)                     /* stop on undef? */
+                break;
             for (t2 = 0; t2 < t1; t2++) {               /* bit by bit */
                 if ((AR & SIGN) != ((AR << 1) & SIGN)) C = 1;
                 AR = ((AR << 1) | (AR >> 15)) & DMASK;
@@ -883,38 +938,54 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             ((MB & 000040) && AR) ||                    /* SNZ */
             ((MB & 000100) && (AR & 1)) ||              /* SLN */
             ((MB & 000200) && (TST_INTREQ (INT_MPE))) || /* SPS */
-            ((MB & 000400) && (AR & SIGN))) skip = 1;   /* SMI */
-        if ((MB & 001000) == 0) skip = skip ^ 1;        /* reverse? */
+            ((MB & 000400) && (AR & SIGN)))             /* SMI */
+            skip = 1;
+        if ((MB & 001000) == 0)                         /* reverse? */
+            skip = skip ^ 1;
         PC = NEWA (PC, PC + skip);
         break;
 
 /* Operate */
 
     case 060:
-        if (MB == 0140024) AR = AR ^ SIGN;              /* CHS */
-        else if (MB == 0140040) AR = 0;                 /* CRA */
-        else if (MB == 0140100) AR = AR & ~SIGN;        /* SSP */
-        else if (MB == 0140200) C = 0;                  /* RCB */
+        if (MB == 0140024)                              /* CHS */
+            AR = AR ^ SIGN;
+        else if (MB == 0140040)                         /* CRA */
+            AR = 0;
+        else if (MB == 0140100)                         /* SSP */
+            AR = AR & ~SIGN;
+        else if (MB == 0140200)                         /* RCB */
+            C = 0;
         else if (MB == 0140320) {                       /* CSA */
             C = (AR & SIGN) >> 15;
             AR = AR & ~SIGN;
             }
-        else if (MB == 0140401) AR = AR ^ DMASK;        /* CMA */
+        else if (MB == 0140401)                         /* CMA */
+            AR = AR ^ DMASK;
         else if (MB == 0140407) {                       /* TCA */
             AR = (-AR) & DMASK;
             sc = 0;
             }
-        else if (MB == 0140500) AR = AR | SIGN;         /* SSM */
-        else if (MB == 0140600) C = 1;                  /* SCB */
-        else if (MB == 0141044) AR = AR & 0177400;      /* CAR */
-        else if (MB == 0141050) AR = AR & 0377;         /* CAL */
-        else if (MB == 0141140) AR = AR >> 8;           /* ICL */
-        else if (MB == 0141206) AR = Add16 (AR, 1);     /* AOA */
-        else if (MB == 0141216) AR = Add16 (AR, C);     /* ACA */
-        else if (MB == 0141240) AR = (AR << 8) & DMASK; /* ICR */
+        else if (MB == 0140500)                         /* SSM */
+            AR = AR | SIGN;
+        else if (MB == 0140600)                         /* SCB */
+            C = 1;
+        else if (MB == 0141044)                         /* CAR */
+            AR = AR & 0177400;
+        else if (MB == 0141050)                         /* CAL */
+            AR = AR & 0377;
+        else if (MB == 0141140)                         /* ICL */
+            AR = AR >> 8;
+        else if (MB == 0141206)                         /* AOA */
+            AR = Add16 (AR, 1);
+        else if (MB == 0141216)                         /* ACA */
+            AR = Add16 (AR, C);
+        else if (MB == 0141240)                         /* ICR */
+            AR = (AR << 8) & DMASK;
         else if (MB == 0141340)                         /* ICA */
             AR = ((AR << 8) | (AR >> 8)) & DMASK;
-        else if (reason = stop_inst) break;
+        else if (reason = stop_inst)
+            break;
         else AR = Operate (MB, AR);                     /* undefined */
         break;
         }                                               /* end case op */
@@ -967,7 +1038,8 @@ if (hst_lnt) {                                          /* history? */
     hst[hst_p].ea = Y;
     hst[hst_p].opnd = Read (Y);
     }
-if (i >= ind_max) return STOP_IND;                      /* too many ind? */
+if (i >= ind_max)
+    return STOP_IND;                                    /* too many ind? */
 return SCPE_OK;
 }
 
@@ -986,7 +1058,8 @@ int32 Add16 (int32 v1, int32 v2)
 {
 int32 r = v1 + v2;
 
-if (((v1 ^ ~v2) & (v1 ^ r)) & SIGN) C = 1;
+if (((v1 ^ ~v2) & (v1 ^ r)) & SIGN)
+    C = 1;
 else C = 0;
 return (r & DMASK);
 }
@@ -995,7 +1068,8 @@ int32 Add31 (int32 v1, int32 v2)
 {
 int32 r = v1 + v2;
 
-if (((v1 ^ ~v2) & (v1 ^ r)) & DP_SIGN) C = 1;
+if (((v1 ^ ~v2) & (v1 ^ r)) & DP_SIGN)
+    C = 1;
 else C = 0;
 return r;
 }
@@ -1028,7 +1102,8 @@ switch (inst) {                                         /* case on opcode */
 
     case ioINA:                                         /* INA */
         if ((fnc >= 011) && (fnc <= 014)) {
-            if (dma_eor[ch]) return dat;                /* end range? nop */
+            if (dma_eor[ch])                            /* end range? nop */
+                return dat;
             return IOSKIP (0100000 | dma_wc[ch]);       /* return range */
             }
         else return IOBADFNC (dat);
@@ -1121,7 +1196,8 @@ setaz = (MB & (m8+m15)) == (m8+m15);                    /* m8xm15*/
 eiki7 = (MB & m15) && (C || !(MB & m13));               /* cin */
 aleg = eastl? AR: 0;                                    /* a input */
 bleg = easbm? 0: DMASK;                                 /* b input */
-if (jamkn) D = aleg ^ bleg;                             /* jammin? xor */
+if (jamkn)                                              /* jammin? xor */
+    D = aleg ^ bleg;
 else D = (aleg + bleg + eiki7) & DMASK;                 /* else add */
 
 /* Possible repeat at end of tlate - special t2, repeat tlate */
@@ -1150,13 +1226,20 @@ cbitl = (MB & (m9+m11)) == m9;                          /* m9x!m11 */
 cbite = (MB & (m8+m9)) == (m8+m9);                      /* m8xm9 */
 cbitg = (MB & (m10+m12)) == (m10+m12);                  /* m10xm12 */
 
-if (clatr) ARx = 0;                                     /* clear A */
-if (cla1r) ARx = ARx & ~SIGN;                           /* clear A1 */
-if (edahs) ARx = ARx | (D & 0177400);                   /* D hi to A hi */
-if (edals) ARx = ARx | (D & 0000377);                   /* D lo to A lo */
-if (etahs) ARx = ARx | ((D << 8) & 0177400);            /* D lo to A hi */
-if (etals) ARx = ARx | ((D >> 8) & 0000377);            /* D hi to A lo */
-if (eda1r) ARx = ARx | (D & SIGN);                      /* D1 to A1 */
+if (clatr)                                              /* clear A */
+    ARx = 0;
+if (cla1r)                                              /* clear A1 */
+    ARx = ARx & ~SIGN;
+if (edahs)                                              /* D hi to A hi */
+    ARx = ARx | (D & 0177400);
+if (edals)                                              /* D lo to A lo */
+    ARx = ARx | (D & 0000377);
+if (etahs)                                              /* D lo to A hi */
+    ARx = ARx | ((D << 8) & 0177400);
+if (etals)                                              /* D hi to A lo */
+    ARx = ARx | ((D >> 8) & 0000377);
+if (eda1r)                                              /* D1 to A1 */
+    ARx = ARx | (D & SIGN);
 if (cbitl) {                                            /* ovflo to C */
 
 /* Overflow calculation.  Cases:
@@ -1171,11 +1254,13 @@ if (cbitl) {                                            /* ovflo to C */
 */
 
     if (!jamkn &&
-           ((bleg && !eiki7 && (D == 0077777)) ||
-            (!bleg && eiki7 && (D == 0100000)))) C = 1;
-        else C = 0;
-        }
-if (cbite || (cbitg && (D & SIGN))) C = 1;              /* C = 1 */
+        ((bleg && !eiki7 && (D == 0077777)) ||
+        (!bleg && eiki7 && (D == 0100000))))
+        C = 1;
+    else C = 0;
+    }
+if (cbite || (cbitg && (D & SIGN)))                     /* C = 1 */
+    C = 1;
 return ARx;
 }
 
@@ -1191,10 +1276,12 @@ dp = 0;
 ext = pme = extoff_pending = 0;
 dev_int = dev_int & ~(INT_PEND|INT_NMI);
 dev_enb = 0;
-for (i = 0; i < DMA_MAX; i++) dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
+for (i = 0; i < DMA_MAX; i++)
+    dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
 chan_req = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1206,10 +1293,13 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 int32 d;
 
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (addr == 0) d = saved_XR;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (addr == 0)
+    d = saved_XR;
 else d = M[addr];
-if (vptr != NULL) *vptr = d & DMASK;
+if (vptr != NULL)
+    *vptr = d & DMASK;
 return SCPE_OK;
 }
 
@@ -1217,8 +1307,10 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (addr == 0) saved_XR = val & DMASK;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (addr == 0)
+    saved_XR = val & DMASK;
 else M[addr] = val & DMASK;
 return SCPE_OK;
 }
@@ -1227,7 +1319,8 @@ return SCPE_OK;
 
 t_stat cpu_set_noext (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (MEMSIZE > (NX_AMASK + 1)) return SCPE_ARG;
+if (MEMSIZE > (NX_AMASK + 1))
+    return SCPE_ARG;
 return SCPE_OK;
 }
 
@@ -1239,11 +1332,13 @@ uint32 i;
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0) ||
     (((cpu_unit.flags & UNIT_EXT) == 0) && (val > (NX_AMASK + 1))))
         return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }
 
@@ -1252,9 +1347,11 @@ t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc)
 uint32 i, newmax;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newmax = get_uint (cptr, 10, DMA_MAX, &r);              /* get new max */
-if ((r != SCPE_OK) || (newmax == dma_nch)) return r;    /* err or no chg? */
+if ((r != SCPE_OK) || (newmax == dma_nch))              /* err or no chg? */
+    return r;
 dma_nch = newmax;                                       /* set new max */
 for (i = newmax; i < DMA_MAX; i++) {                    /* reset chan */
     dma_ad[i] = dma_wc[i] = dma_eor[i] = 0;
@@ -1267,7 +1364,8 @@ return SCPE_OK;
 
 t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (dma_nch) fprintf (st, "DMA channels = %d", dma_nch);
+if (dma_nch)
+    fprintf (st, "DMA channels = %d", dma_nch);
 else fprintf (st, "no DMA channels");
 return SCPE_OK;
 }
@@ -1276,7 +1374,8 @@ return SCPE_OK;
 
 t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if ((val < 0) || (val >= DMA_MAX)) return SCPE_IERR;
+if ((val < 0) || (val >= DMA_MAX))
+    return SCPE_IERR;
 fputs ((dma_ad[val] & DMA_IN)? "Input": "Output", st);
 fprintf (st, ", addr = %06o, count = %06o, ", dma_ad[val] & X_AMASK, dma_wc[val]);
 fprintf (st, "end of range %s\n", (dma_eor[val]? "set": "clear"));
@@ -1290,11 +1389,14 @@ t_stat io_set_iobus (UNIT *uptr, int32 val, char *cptr, void *desc)
 DEVICE *dptr;
 DIB *dibp;
 
-if (val || cptr || (uptr == NULL)) return SCPE_IERR;
+if (val || cptr || (uptr == NULL))
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 dibp->chan = 0;
 return SCPE_OK;
 }
@@ -1306,14 +1408,19 @@ DIB *dibp;
 uint32 newc;
 t_stat r;
 
-if ((cptr == NULL) || (uptr == NULL)) return SCPE_IERR;
+if ((cptr == NULL) || (uptr == NULL))
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-if (dma_nch == 0) return SCPE_NOFNC;
+if (dibp == NULL)
+    return SCPE_IERR;
+if (dma_nch == 0)
+    return SCPE_NOFNC;
 newc = get_uint (cptr, 10, DMA_MAX, &r);                /* get new */
-if ((r != SCPE_OK) || (newc == 0) || (newc > dma_nch)) return SCPE_ARG;
+if ((r != SCPE_OK) || (newc == 0) || (newc > dma_nch))
+    return SCPE_ARG;
 dibp->chan = (newc - DMA_MIN) + DMA_V_DMA1 + 1;         /* store */
 return SCPE_OK;
 }
@@ -1325,14 +1432,19 @@ DIB *dibp;
 uint32 newc;
 t_stat r;
 
-if ((cptr == NULL) || (uptr == NULL)) return SCPE_IERR;
+if ((cptr == NULL) || (uptr == NULL))
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-if (!(cpu_unit.flags & UNIT_DMC)) return SCPE_NOFNC;
+if (dibp == NULL)
+    return SCPE_IERR;
+if (!(cpu_unit.flags & UNIT_DMC))
+    return SCPE_NOFNC;
 newc = get_uint (cptr, 10, DMC_MAX, &r);                /* get new */
-if ((r != SCPE_OK) || (newc == 0)) return SCPE_ARG;
+if ((r != SCPE_OK) || (newc == 0))
+    return SCPE_ARG;
 dibp->chan = (newc - DMC_MIN) + DMC_V_DMC1 + 1;         /* store */
 return SCPE_OK;
 }
@@ -1344,12 +1456,16 @@ t_stat io_show_chan (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr;
 DIB *dibp;
 
-if (uptr == NULL) return SCPE_IERR;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-if (dibp->chan == 0) fprintf (st, "IO bus");
+if (dibp == NULL)
+    return SCPE_IERR;
+if (dibp->chan == 0)
+    fprintf (st, "IO bus");
 else if (dibp->chan < (DMC_V_DMC1 + 1))
     fprintf (st, "DMA channel %d", dibp->chan);
 else fprintf (st, "DMC channel %d", dibp->chan - DMC_V_DMC1);
@@ -1364,19 +1480,22 @@ DEVICE *dptr;
 DIB *dibp;
 uint32 i, j, dno, chan;
 
-for (i = 0; i < DEV_MAX; i++) iotab[i] = NULL;
-for (i = 0; i < (DMA_MAX + DMC_MAX); i++) chan_map[i] = 0;
+for (i = 0; i < DEV_MAX; i++)
+    iotab[i] = NULL;
+for (i = 0; i < (DMA_MAX + DMC_MAX); i++)
+    chan_map[i] = 0;
 for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
-    if ((dibp == NULL) || (dptr->flags & DEV_DIS)) continue; /* exist, enabled? */
+    if ((dibp == NULL) || (dptr->flags & DEV_DIS))      /* exist, enabled? */
+        continue;
     dno = dibp->dev;                                    /* device number */
     for (j = 0; j < dibp->num; j++) {                   /* repeat for slots */
         if (iotab[dno + j]) {                           /* conflict? */
             printf ("%s device number conflict, devno = %02o\n",
-                sim_dname (dptr), dno + j);
-            if (sim_log) fprintf (sim_log,
-                "%s device number conflict, devno = %02o\n",
-                sim_dname (dptr), dno + j);
+                    sim_dname (dptr), dno + j);
+            if (sim_log)
+                fprintf (sim_log, "%s device number conflict, devno = %02o\n",
+                         sim_dname (dptr), dno + j);
             return TRUE;
             }
         iotab[dno + j] = dibp->io;                      /* set I/O routine */
@@ -1385,33 +1504,34 @@ for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
         chan = dibp->chan - 1;
         if ((chan < DMC_V_DMC1) && (chan >= dma_nch)) {
             printf ("%s configured for DMA channel %d\n",
-                sim_dname (dptr), chan + 1);
-            if (sim_log) fprintf (sim_log,
-                "%s configured for DMA channel %d\n",
-                sim_dname (dptr), chan + 1);
+                    sim_dname (dptr), chan + 1);
+            if (sim_log)
+                fprintf (sim_log, "%s configured for DMA channel %d\n",
+                         sim_dname (dptr), chan + 1);
             return TRUE;
             }
         if ((chan >= DMC_V_DMC1) && !(cpu_unit.flags & UNIT_DMC)) {
             printf ("%s configured for DMC, option disabled\n",
-                sim_dname (dptr));
-            if (sim_log) fprintf (sim_log, 
-                "%s configured for DMC, option disabled\n",
-                sim_dname (dptr));
+                     sim_dname (dptr));
+            if (sim_log)
+                fprintf (sim_log, "%s configured for DMC, option disabled\n",
+                         sim_dname (dptr));
             return TRUE;
             }
         if (chan_map[chan]) {                           /* channel conflict? */
             printf ("%s DMA/DMC channel conflict, devno = %02o\n",
-                sim_dname (dptr), dno);
-            if (sim_log) fprintf (sim_log,
-                "%s DMA/DMC channel conflict, devno = %02o\n",
-                sim_dname (dptr), dno);
+                    sim_dname (dptr), dno);
+            if (sim_log)
+                fprintf (sim_log, "%s DMA/DMC channel conflict, devno = %02o\n",
+                         sim_dname (dptr), dno);
             return TRUE;
             }
         chan_map[chan] = dno;                           /* channel back map */
         }
     }                                                   /* end for */
 for (i = 0; i < DEV_MAX; i++) {                         /* fill in blanks */
-    if (iotab[i] == NULL) iotab[i] = &undio;
+    if (iotab[i] == NULL)
+        iotab[i] = &undio;
     }
 return FALSE;
 }
@@ -1424,12 +1544,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -1438,7 +1560,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -1459,14 +1582,17 @@ static uint8 has_opnd[16] = {
     0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1
     };
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC     C A       B       X       ea     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
@@ -1474,14 +1600,16 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         cr = (h->pc & HIST_C)? 1: 0;                    /* carry */
         fprintf (st, "%05o  %o %06o  %06o  %06o  ",
             h->pc & X_AMASK, cr, h->ar, h->br, h->xr);
-        if (h->pc & HIST_EA) fprintf (st, "%05o  ", h->ea);
+        if (h->pc & HIST_EA)
+            fprintf (st, "%05o  ", h->ea);
         else fprintf (st, "       ");
         sim_eval = h->ir;
         if ((fprint_sym (st, h->pc & X_AMASK, &sim_eval,
             &cpu_unit, SWMASK ('M'))) > 0)
             fprintf (st, "(undefined) %06o", h->ir);
         op = I_GETOP (h->ir) & 017;                     /* base op */
-        if (has_opnd[op]) fprintf (st, "  [%06o]", h->opnd);
+        if (has_opnd[op])
+            fprintf (st, "  [%06o]", h->opnd);
         fputc ('\n', st);                               /* end line */
         }                                               /* end else instruction */
     }                                                   /* end for */

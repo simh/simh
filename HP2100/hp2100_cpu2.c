@@ -1,6 +1,6 @@
 /* hp2100_cpu2.c: HP 2100/1000 FP/DMS/EIG/IOP instructions
 
-   Copyright (c) 2005-2006, Robert M. Supnik
+   Copyright (c) 2005-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,11 @@
    CPU2         Floating-point, dynamic mapping, extended, and I/O processor
                 instructions
 
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
+   05-Aug-08    JDB     Updated mp_dms_jmp calling sequence
+                        Fixed DJP, SJP, and UJP jump target validation
+   30-Jul-08    JDB     RVA/B conditionally updates dms_vr before returning value
    19-Dec-06    JDB     DMS self-test now executes as NOP on 1000-M
    01-Dec-06    JDB     Substitutes FPP for firmware FP if HAVE_INT64
    26-Sep-06    JDB     Moved from hp2100_cpu1.c to simplify extensions
@@ -54,16 +59,6 @@
 
 #include "hp2100_fp.h"
 
-t_stat cpu_fp  (uint32 IR, uint32 intrq);               /* Firmware Floating Point */
-
-#endif                                                  /* int64 support unavailable */
-
-t_stat cpu_dms (uint32 IR, uint32 intrq);               /* Dynamic mapping system */
-t_stat cpu_eig (uint32 IR, uint32 intrq);               /* Extended instruction group */
-t_stat cpu_iop (uint32 IR, uint32 intrq);               /* 2000 I/O Processor */
-
-
-#if !defined (HAVE_INT64)                               /* int64 support unavailable */
 
 /* Single-Precision Floating Point Instructions
 
@@ -119,9 +114,6 @@ t_stat cpu_fp (uint32 IR, uint32 intrq)
 t_stat reason = SCPE_OK;
 OPS op;
 uint32 entry;
-
-if ((cpu_unit.flags & UNIT_FP) == 0)                    /* FP option installed? */
-    return stop_inst;
 
 entry = (IR >> 4) & 017;                                /* mask to entry point */
 
@@ -210,21 +202,24 @@ return reason;
    corresponding instruction, although the 105xxx form is the documented
    instruction code.
 
-   Notes:
+   Implementation notes:
 
-     1. Instruction code 10x700 will execute the XMM instruction, although
-        10x720 is the documented instruction value.
+    1. Instruction code 10x700 will execute the XMM instruction, although 10x720
+       is the documented instruction value.
 
-     2. Instruction code 10x701 will complement the A or B register, as
-        indicated, on 1000-E and F-Series machines.  This instruction is a NOP
-        on M-Series machines.
+    2. Instruction code 10x701 will complement the A or B register, as
+       indicated, on 1000-E and F-Series machines.  This instruction is a NOP on
+       M-Series machines.
 
-     3. The DMS privilege violation rules are:
-        - load map and CTL5 set (XMM, XMS, XM*, SY*, US*, PA*, PB*)
-        - load state or fence and UMAP set (JRS, DJP, DJS, SJP, SJS, UJP, UJS, LF*)
+    3. The DMS privilege violation rules are:
+       - load map and CTL5 set (XMM, XMS, XM*, SY*, US*, PA*, PB*)
+       - load state or fence and UMAP set (JRS, DJP, DJS, SJP, SJS, UJP, UJS, LF*)
 
-     4. The 1000 manual is incorrect in stating that M*I, M*W, XS* are
-        privileged.
+    4. The 1000 manual is incorrect in stating that M*I, M*W, XS* are
+       privileged.
+
+    5. The protected memory lower bound for the DJP, SJP, UJP, and JRS
+       instructions is 2.
 */
 
 static const OP_PAT op_dms[32] = {
@@ -244,9 +239,6 @@ t_stat reason = SCPE_OK;
 OPS op;
 uint32 entry, absel;
 uint32 i, t, mapi, mapj;
-
-if ((cpu_unit.flags & UNIT_DMS) == 0)                   /* DMS option installed? */
-    return stop_inst;
 
 absel = (IR & I_AB)? 1: 0;                              /* get A/B select */
 entry = IR & 037;                                       /* mask to entry point */
@@ -390,7 +382,7 @@ switch (entry) {                                        /* decode IR<3:0> */
             dms_enb = 1;
             if (op[0].word & 0040000) dms_ump = UMAP;   /* set/clr usr */
             }
-        mp_dms_jmp (op[1].word);                        /* mpck jmp target */
+        mp_dms_jmp (op[1].word, 2);                     /* mpck jmp target */
         PCQ_ENTRY;                                      /* save old PC */
         PC = op[1].word;                                /* jump */
         ion_defer = 1;                                  /* defer intr */
@@ -473,16 +465,16 @@ switch (entry) {                                        /* decode IR<3:0> */
         break;
 
     case 031:                                           /* RVA, RVB 10x731 (OP_N) */
-        ABREG[absel] = dms_vr;                          /* save viol */
+        ABREG[absel] = dms_upd_vr (err_PC);             /* return updated violation register */
         break;
 
     case 032:                                           /* DJP 105732 (OP_A) */
         if (dms_ump) dms_viol (err_PC, MVI_PRV);        /* priv viol if prot */
-        mp_dms_jmp (op[0].word);                        /* validate jump addr */
-        PCQ_ENTRY;                                      /* save curr PC */
-        PC = op[0].word;                                /* new PC */
         dms_enb = 0;                                    /* disable map */
         dms_ump = SMAP;
+        mp_dms_jmp (op[0].word, 2);                     /* validate jump addr */
+        PCQ_ENTRY;                                      /* save curr PC */
+        PC = op[0].word;                                /* new PC */
         ion_defer = 1;
         break;
 
@@ -498,11 +490,11 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 034:                                           /* SJP 105734 (OP_A) */
         if (dms_ump) dms_viol (err_PC, MVI_PRV);        /* priv viol if prot */
-        mp_dms_jmp (op[0].word);                        /* validate jump addr */
-        PCQ_ENTRY;                                      /* save curr PC */
-        PC = op[0].word;                                /* jump */
         dms_enb = 1;                                    /* enable system */
         dms_ump = SMAP;
+        mp_dms_jmp (op[0].word, 2);                     /* validate jump addr */
+        PCQ_ENTRY;                                      /* save curr PC */
+        PC = op[0].word;                                /* jump */
         ion_defer = 1;                                  /* defer intr */
         break;
 
@@ -519,11 +511,11 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 036:                                           /* UJP 105736 (OP_A) */
         if (dms_ump) dms_viol (err_PC, MVI_PRV);        /* priv viol if prot */
-        mp_dms_jmp (op[0].word);                        /* validate jump addr */
-        PCQ_ENTRY;                                      /* save curr PC */
-        PC = op[0].word;                                /* jump */
         dms_enb = 1;                                    /* enable user */
         dms_ump = UMAP;
+        mp_dms_jmp (op[0].word, 2);                     /* validate jump addr */
+        PCQ_ENTRY;                                      /* save curr PC */
+        PC = op[0].word;                                /* jump */
         ion_defer = 1;                                  /* defer intr */
         break;
 
@@ -586,11 +578,13 @@ return reason;
    corresponding instruction, although the 105xxx form is the documented
    instruction code.
 
-   Notes:
+   Implementation notes:
 
-     1. The LBT, SBT, MBT, and MVW instructions are used as part of the 2100 IOP
-        implementation.  When so called, the MBT and MVW instructions have the
-        additional restriction that the count must be positive.
+    1. The LBT, SBT, MBT, and MVW instructions are used as part of the 2100 IOP
+       implementation.  When so called, the MBT and MVW instructions have the
+       additional restriction that the count must be positive.
+
+    2. The protected memory lower bound for the JLY and JPY instructions is 0.
 */
 
 static const OP_PAT op_eig[32] = {
@@ -714,7 +708,7 @@ switch (entry) {                                        /* decode IR<4:0> */
         break;
 
     case 022:                                           /* JLY 105762 (OP_A) */
-        mp_dms_jmp (op[0].word);                        /* validate jump addr */
+        mp_dms_jmp (op[0].word, 0);                     /* validate jump addr */
         PCQ_ENTRY;
         YR = PC;                                        /* ret addr to YR */
         PC = op[0].word;                                /* jump */
@@ -805,7 +799,7 @@ switch (entry) {                                        /* decode IR<4:0> */
 
     case 032:                                           /* JPY 105772 (OP_C) */
         op[0].word = (op[0].word + YR) & VAMASK;        /* index, no indir */
-        mp_dms_jmp (op[0].word);                        /* validate jump addr */
+        mp_dms_jmp (op[0].word, 0);                     /* validate jump addr */
         PCQ_ENTRY;
         PC = op[0].word;                                /* jump */
         break;
@@ -923,14 +917,14 @@ return reason;
    loaded directly with an OTA/B 05.  Also, the 1000 implementation did not
    offer the MBYTE, MWORD, SBYTE, and LBYTE instructions because the equivalent
    instructions from the standard Extended Instruction Group were used instead.
+
    Note that the 2100 MBYTE and MWORD instructions operate slightly differently
    from the 1000 MBT and MVW instructions.  Specifically, the move count is
    signed on the 2100 and unsigned on the 1000.  A negative count on the 2100
    results in a NOP.
 
-   The simulator remaps the 2100 instructions to the 1000 codes.  The four EIG equivalents
-   are dispatched to the EIG simulator.  The rest are handled here.  Note that the MBT and
-   MVW instructions operate slightly differently on the 2100; they are
+   The simulator remaps the 2100 instructions to the 1000 codes.  The four EIG
+   equivalents are dispatched to the EIG simulator.  The rest are handled here.
 
    Additional reference:
    - HP 2000 Computer System Sources and Listings Documentation
@@ -950,9 +944,6 @@ t_stat reason = SCPE_OK;
 OPS op;
 uint32 entry;
 uint32 hp, tp, i, t, wc, MA;
-
-if ((cpu_unit.flags & UNIT_IOP) == 0)                   /* IOP option installed? */
-    return stop_inst;
 
 if (UNIT_CPU_TYPE == UNIT_TYPE_2100) {                  /* 2100 IOP? */
     if ((IR >= 0105020) && (IR <= 0105057))             /* remap LAI */

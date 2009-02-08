@@ -1,6 +1,6 @@
 /* pdp8_ct.c: PDP-8 cassette tape simulator
 
-   Copyright (c) 2006-2007, Robert M Supnik
+   Copyright (c) 2006-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -244,11 +244,13 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         break;
 
     case 1:                                             /* KSDR */
-        if (ct_df) AC |= IOT_SKP;
+        if (ct_df)
+            AC |= IOT_SKP;
         break;
 
     case 2:                                             /* KSEN */
-        if (srb & SRB_ALLERR) AC |= IOT_SKP;
+        if (srb & SRB_ALLERR)
+            AC |= IOT_SKP;
         break;
 
     case 3:                                             /* KSBF */
@@ -308,7 +310,8 @@ if ((ct_sra & SRA_ENAB) && (uptr->flags & UNIT_ATT)) {  /* enabled, att? */
         ct_db = 0;
         }
     ct_srb &= ~SRB_BEOT;                                /* tape in motion */
-    if (fnc == SRA_REW) ct_srb |= SRB_REW;              /* rew? set flag */
+    if (fnc == SRA_REW)                                 /* rew? set flag */
+        ct_srb |= SRB_REW;
     if ((fnc != SRA_REW) && !(flg & OP_WRI)) {          /* read cmd? */
         t_mtrlnt t;
         t_stat st;
@@ -357,7 +360,8 @@ switch (fnc) {                                          /* case on function */
     case SRA_CRC:                                       /* CRC */
         if ((uptr->FNC & SRA_M_FNC) != SRA_CRC)         /* if not CRC */
             uptr->FNC = SRA_CRC;                        /* start CRC seq */
-        if (!ct_write) return ct_db;                    /* read? AC <- buf */
+        if (!ct_write)                                  /* read? AC <- buf */
+            return ct_db;
         break;
 
     default:
@@ -392,7 +396,8 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case SRA_READ:                                      /* read start */
         st = sim_tape_rdrecf (uptr, ct_xb, &ct_blnt, CT_MAXFR); /* get rec */
-        if (st == MTSE_RECE) ct_srb |= SRB_CRC;         /* rec in err? */
+        if (st == MTSE_RECE)                            /* rec in err? */
+            ct_srb |= SRB_CRC;
         else if (st != MTSE_OK) {                       /* other error? */
             r = ct_map_err (uptr, st);                  /* map error */
             break;
@@ -405,13 +410,15 @@ switch (uptr->FNC) {                                    /* case on function */
         return SCPE_OK;
 
     case SRA_READ|SRA_2ND:                              /* read char */
-        if (!ct_read_char ()) break;                    /* read, overrun? */
+        if (!ct_read_char ())                           /* read, overrun? */
+            break;
         ct_set_df (TRUE);                               /* set data flag */
         sim_activate (uptr, ct_ctime);                  /* sched next char */
         return SCPE_OK;
 
     case SRA_WRITE:                                     /* write start */
-        for (i = 0; i < CT_MAXFR; i++) ct_xb[i] = 0;    /* clear buffer */
+        for (i = 0; i < CT_MAXFR; i++)                  /* clear buffer */
+            ct_xb[i] = 0;
         uptr->FNC |= SRA_2ND;                           /* next state */
         sim_activate (uptr, ct_ctime);                  /* sched next char */
         return SCPE_OK;
@@ -439,7 +446,8 @@ switch (uptr->FNC) {                                    /* case on function */
     case SRA_CRC|SRA_2ND:                               /* second read CRC */
         if (ct_bptr != ct_blnt) {                       /* partial read? */
             crc = ct_crc (ct_xb, ct_bptr);              /* actual CRC */
-            if (crc != 0) ct_srb |= SRB_CRC;            /* must be zero */
+            if (crc != 0)                               /* must be zero */
+                ct_srb |= SRB_CRC;
             }
          break;                                         /* read done */
 
@@ -490,7 +498,8 @@ if (uptr == NULL) {                                     /* unit specified? */
     if ((uptr == NULL) && (ct_sra & SRA_ENAB))          /* none busy? */
         uptr = ct_dev.units + GET_UNIT (ct_sra);        /* use sel unit */
     }
-else if (ct_srb & SRB_EOF) uptr->UST |= UST_GAP;        /* save gap */
+else if (ct_srb & SRB_EOF)                              /* save gap */
+    uptr->UST |= UST_GAP;
 if (uptr) {                                             /* any unit? */
     ct_srb &= ~(SRB_WLK|SRB_EMP|SRB_RDY);               /* clear dyn flags */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* unattached? */
@@ -501,7 +510,8 @@ if (uptr) {                                             /* any unit? */
     if (sim_tape_wrp (uptr) || (ct_srb & SRB_REW))      /* locked or rew? */
         ct_srb |= SRB_WLK;                              /* set locked */
     }
-if (ct_sra & SRA_ENAB) srb = ct_srb;                    /* can TA see TU60? */
+if (ct_sra & SRA_ENAB)                                  /* can TA see TU60? */
+    srb = ct_srb;
 else srb = 0;                                           /* no */
 if ((ct_sra & SRA_IE) &&                                /* int enabled? */
     (ct_df || (srb & (SRB_ALLERR|SRB_RDY))))            /* any flag? */
@@ -514,9 +524,11 @@ return srb;
 
 void ct_set_df (t_bool timchk)
 {
-if (ct_df && timchk) ct_srb |= SRB_TIM;                 /* flag still set? */
+if (ct_df && timchk)                                    /* flag still set? */
+    ct_srb |= SRB_TIM;
 ct_df = 1;                                              /* set data flag */
-if (ct_sra & SRA_IE) int_req |= INT_CT;                 /* if ie, int req */
+if (ct_sra & SRA_IE)                                    /* if ie, int req */
+    int_req |= INT_CT;
 return;
 }
 
@@ -542,7 +554,8 @@ UNIT *uptr;
 
 for (u = 0; u < CT_NUMDR; u++) {                        /* loop thru units */
     uptr = ct_dev.units + u;
-    if (sim_is_active (uptr)) return uptr;
+    if (sim_is_active (uptr))
+        return uptr;
     }
 return NULL;
 }
@@ -557,7 +570,8 @@ crc = 0;
 for (i = 0; i < cnt; i++) {
     crc = crc ^ (((uint32) buf[i]) << 8);
     for (j = 0; j < 8; j++) {
-        if (crc & 1) crc = (crc >> 1) ^ 0xA001;
+        if (crc & 1)
+            crc = (crc >> 1) ^ 0xA001;
         else crc = crc >> 1;
         }
     }
@@ -582,7 +596,8 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         ct_srb |= SRB_CRC;                              /* set crc err */
-        if (ct_stopioe) return SCPE_IOERR;
+        if (ct_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
@@ -626,8 +641,10 @@ for (u = 0; u < CT_NUMDR; u++) {                        /* loop thru units */
     sim_cancel (uptr);                                  /* cancel activity */
     sim_tape_reset (uptr);                              /* reset tape */
     }
-if (ct_xb == NULL) ct_xb = (uint8 *) calloc (CT_MAXFR + 2, sizeof (uint8));
-if (ct_xb == NULL) return SCPE_MEM;
+if (ct_xb == NULL)
+    ct_xb = (uint8 *) calloc (CT_MAXFR + 2, sizeof (uint8));
+if (ct_xb == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -638,7 +655,8 @@ t_stat ct_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 ct_updsta (NULL);
 uptr->UST = 0;
 return r;
@@ -650,7 +668,8 @@ t_stat ct_detach (UNIT* uptr)
 {
 t_stat r;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* check attached */
+if (!(uptr->flags & UNIT_ATT))                          /* check attached */
+    return SCPE_OK;
 r = sim_tape_detach (uptr);
 ct_updsta (NULL);
 uptr->UST = 0;
@@ -705,7 +724,8 @@ extern uint16 M[];
 
 if ((ct_dib.dev != DEV_CT) || unitno)                   /* only std devno */
      return STOP_NOTSTD;
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }

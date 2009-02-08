@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -157,14 +157,17 @@ char *cvptr, gbuf[CBUFSIZE];
 CTAB *ctptr;
 t_stat r;
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_2FARG;
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph_nc (cptr, gbuf, ',');              /* get modifier */
-    if (cvptr = strchr (gbuf, '=')) *cvptr++ = 0;       /* = value? */
+    if (cvptr = strchr (gbuf, '='))                     /* = value? */
+        *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if (ctptr = find_ctab (set_con_tab, gbuf)) {        /* match? */
         r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
-        if (r != SCPE_OK) return r;
+        if (r != SCPE_OK)
+            return r;
         }
     else return SCPE_NOPARAM;
     }
@@ -201,12 +204,14 @@ DEVICE *dptr = sim_devices[0];
 int32 val, rdx;
 t_stat r;
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_2FARG;
 if (dptr->dradix == 16) rdx = 16;
 else rdx = 8;
 val = (int32) get_uint (cptr, rdx, 0177, &r);
 if ((r != SCPE_OK) ||
-    ((val == 0) && (flag & KMAP_NZ))) return SCPE_ARG;
+    ((val == 0) && (flag & KMAP_NZ)))
+    return SCPE_ARG;
 *(cons_kmap[flag & KMAP_MASK]) = val;
 return SCPE_OK;
 }
@@ -229,12 +234,14 @@ DEVICE *dptr = sim_devices[0];
 uint32 val, rdx;
 t_stat r;
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_2FARG;
 if (dptr->dradix == 16) rdx = 16;
 else rdx = 8;
 val = (uint32) get_uint (cptr, rdx, 0xFFFFFFFF, &r);
 if ((r != SCPE_OK) ||
-    ((val & 0x00002400) == 0)) return SCPE_ARG;
+    ((val & 0x00002400) == 0))
+    return SCPE_ARG;
 sim_tt_pchar = val;
 return SCPE_OK;
 }
@@ -255,13 +262,17 @@ t_stat sim_set_logon (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* need arg */
+if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
+    return SCPE_2FARG;
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
-if (*cptr != 0) return SCPE_2MARG;                      /* now eol? */
+if (*cptr != 0)                                         /* now eol? */
+    return SCPE_2MARG;
 sim_set_logoff (0, NULL);                               /* close cur log */
 sim_log = sim_fopen (gbuf, "a");                        /* open log */
-if (sim_log == NULL) return SCPE_OPENERR;               /* error? */
-if (!sim_quiet) printf ("Logging to file \"%s\"\n", gbuf);
+if (sim_log == NULL)                                    /* error? */
+    return SCPE_OPENERR;
+if (!sim_quiet)
+    printf ("Logging to file \"%s\"\n", gbuf);
 fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);    /* start of log */
 return SCPE_OK;
 }
@@ -270,9 +281,12 @@ return SCPE_OK;
 
 t_stat sim_set_logoff (int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
-if (sim_log == NULL) return SCPE_OK;                    /* no log? */
-if (!sim_quiet) printf ("Log file closed\n");
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+if (sim_log == NULL)                                    /* no log? */
+    return SCPE_OK;
+if (!sim_quiet)
+    printf ("Log file closed\n");
 fprintf (sim_log, "Log file closed\n");                 /* close log */
 fclose (sim_log);
 sim_log = NULL;
@@ -283,8 +297,10 @@ return SCPE_OK;
 
 t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;
-if (sim_log) fputs ("Logging enabled\n", st);
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
+if (sim_log)
+    fputs ("Logging enabled\n", st);
 else fputs ("Logging disabled\n", st);
 return SCPE_OK;
 }
@@ -295,24 +311,32 @@ t_stat sim_set_debon (int32 flag, char *cptr)
 {
 char *tptr, gbuf[CBUFSIZE];
 
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* too few arguments? */
+if ((cptr == NULL) || (*cptr == 0))                     /* too few arguments? */
+    return SCPE_2FARG;
 tptr = get_glyph (cptr, gbuf, 0);                       /* get file name */
-if (*tptr != 0) return SCPE_2MARG;                      /* now eol? */
+if (*tptr != 0)                                         /* now eol? */
+    return SCPE_2MARG;
 sim_set_deboff (0, NULL);                               /* close cur debug */
 if (strcmp (gbuf, "LOG") == 0) {                        /* debug to log? */
-    if (sim_log == NULL) return SCPE_ARG;               /* any log? */
+    if (sim_log == NULL)                                /* any log? */
+        return SCPE_ARG;
     sim_deb = sim_log;
     }
-else if (strcmp (gbuf, "STDOUT") == 0) sim_deb = stdout; /* debug to stdout? */
-else if (strcmp (gbuf, "STDERR") == 0) sim_deb = stderr; /* debug to stderr? */
+else if (strcmp (gbuf, "STDOUT") == 0)                  /* debug to stdout? */
+    sim_deb = stdout;
+else if (strcmp (gbuf, "STDERR") == 0)                  /* debug to stderr? */
+    sim_deb = stderr;
 else {
     cptr = get_glyph_nc (cptr, gbuf, 0);                /* reparse */
     sim_deb = sim_fopen (gbuf, "a");                    /* open debug */
-    if (sim_deb == NULL) return SCPE_OPENERR;           /* error? */
+    if (sim_deb == NULL)                                /* error? */
+        return SCPE_OPENERR;
     sim_deb_close = 1;                                  /* need close */
     }
-if (!sim_quiet) printf ("Debug output to \"%s\"\n", gbuf);
-if (sim_log) fprintf (sim_log, "Debug output to \"%s\"\n", gbuf);
+if (!sim_quiet)
+    printf ("Debug output to \"%s\"\n", gbuf);
+if (sim_log)
+    fprintf (sim_log, "Debug output to \"%s\"\n", gbuf);
 return SCPE_OK;
 }
 
@@ -320,11 +344,16 @@ return SCPE_OK;
 
 t_stat sim_set_deboff (int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
-if (sim_deb == NULL) return SCPE_OK;                    /* no log? */
-if (!sim_quiet) printf ("Debug output disabled\n");
-if (sim_log) fprintf (sim_log, "Debug output disabled\n");
-if (sim_deb_close) fclose (sim_deb);                    /* close if needed */
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+if (sim_deb == NULL)                                    /* no log? */
+    return SCPE_OK;
+if (!sim_quiet)
+    printf ("Debug output disabled\n");
+if (sim_log)
+    fprintf (sim_log, "Debug output disabled\n");
+if (sim_deb_close)                                      /* close if needed */
+    fclose (sim_deb);
 sim_deb_close = 0;
 sim_deb = NULL;
 return SCPE_OK;
@@ -334,8 +363,10 @@ return SCPE_OK;
 
 t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;
-if (sim_deb) fputs ("Debug output enabled\n", st);
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
+if (sim_deb)
+    fputs ("Debug output enabled\n", st);
 else fputs ("Debug output disabled\n", st);
 return SCPE_OK;
 }
@@ -344,8 +375,10 @@ return SCPE_OK;
 
 t_stat sim_set_telnet (int32 flg, char *cptr)
 {
-if ((cptr == NULL) || (*cptr == 0)) return SCPE_2FARG;  /* too few arguments? */
-if (sim_con_tmxr.master) return SCPE_ALATT;             /* already open? */
+if ((cptr == NULL) || (*cptr == 0))                     /* too few arguments? */
+    return SCPE_2FARG;
+if (sim_con_tmxr.master)                                /* already open? */
+    return SCPE_ALATT;
 return tmxr_open_master (&sim_con_tmxr, cptr);          /* open master socket */
 }
 
@@ -353,8 +386,10 @@ return tmxr_open_master (&sim_con_tmxr, cptr);          /* open master socket */
 
 t_stat sim_set_notelnet (int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* too many arguments? */
-if (sim_con_tmxr.master == 0) return SCPE_OK;           /* ignore if already closed */
+if (cptr && (*cptr != 0))                               /* too many arguments? */
+    return SCPE_2MARG;
+if (sim_con_tmxr.master == 0)                           /* ignore if already closed */
+    return SCPE_OK;
 return tmxr_close_master (&sim_con_tmxr);               /* close master socket */
 }
 
@@ -362,7 +397,8 @@ return tmxr_close_master (&sim_con_tmxr);               /* close master socket *
 
 t_stat sim_show_telnet (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
 {
-if (cptr && (*cptr != 0)) return SCPE_2MARG;
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
 if (sim_con_tmxr.master == 0)
     fprintf (st, "Connected to console window\n");
 else if (sim_con_ldsc.conn == 0)
@@ -382,10 +418,12 @@ t_stat sim_check_console (int32 sec)
 {
 int32 c, i;
 
-if (sim_con_tmxr.master == 0) return SCPE_OK;           /* not Telnet? done */
+if (sim_con_tmxr.master == 0)                           /* not Telnet? done */
+    return SCPE_OK;
 if (sim_con_ldsc.conn) {                                /* connected? */
     tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
-    if (sim_con_ldsc.conn) return SCPE_OK;              /* still connected? */
+    if (sim_con_ldsc.conn)                              /* still connected? */
+        return SCPE_OK;
     }
 for (i = 0; i < sec; i++) {                             /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
@@ -397,7 +435,8 @@ for (i = 0; i < sec; i++) {                             /* loop */
         return SCPE_OK;                                 /* ready to proceed */
         }
     c = sim_os_poll_kbd ();                             /* check for stop char */
-    if ((c == SCPE_STOP) || stop_cpu) return SCPE_STOP;
+    if ((c == SCPE_STOP) || stop_cpu)
+        return SCPE_STOP;
     if ((i % 10) == 0) {                                /* Status every 10 sec */
         printf ("Waiting for console Telnet connection\n");
         fflush (stdout);
@@ -416,7 +455,8 @@ int32 c;
 c = sim_os_poll_kbd ();                                 /* get character */
 if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))     /* ^E or not Telnet? */
     return c;                                           /* in-window */
-if (sim_con_ldsc.conn == 0) return SCPE_LOST;           /* no Telnet conn? */
+if (sim_con_ldsc.conn == 0)                              /* no Telnet conn? */
+    return SCPE_LOST;
 tmxr_poll_rx (&sim_con_tmxr);                           /* poll for input */
 if (c = tmxr_getc_ln (&sim_con_ldsc))                   /* any char? */ 
     return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
@@ -427,10 +467,12 @@ return SCPE_OK;
 
 t_stat sim_putchar (int32 c)
 {
-if (sim_log) fputc (c, sim_log);                        /* log file? */
+if (sim_log)                                            /* log file? */
+    fputc (c, sim_log);
 if (sim_con_tmxr.master == 0)                           /* not Telnet? */
     return sim_os_putchar (c);                          /* in-window version */
-if (sim_con_ldsc.conn == 0) return SCPE_LOST;           /* no Telnet conn? */
+if (sim_con_ldsc.conn == 0)                             /* no Telnet conn? */
+    return SCPE_LOST;
 tmxr_putc_ln (&sim_con_ldsc, c);                        /* output char */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return SCPE_OK;
@@ -443,8 +485,10 @@ t_stat r;
 if (sim_log) fputc (c, sim_log);                        /* log file? */
 if (sim_con_tmxr.master == 0)                           /* not Telnet? */
     return sim_os_putchar (c);                          /* in-window version */
-if (sim_con_ldsc.conn == 0) return SCPE_LOST;           /* no Telnet conn? */
-if (sim_con_ldsc.xmte == 0) r = SCPE_STALL;             /* xmt disabled? */
+if (sim_con_ldsc.conn == 0)                             /* no Telnet conn? */
+    return SCPE_LOST;
+if (sim_con_ldsc.xmte == 0)                             /* xmt disabled? */
+    r = SCPE_STALL;
 else r = tmxr_putc_ln (&sim_con_ldsc, c);               /* no, Telnet output */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return r;                                               /* return status */
@@ -459,8 +503,10 @@ uint32 md = mode & TTUF_M_MODE;
 if (md != TTUF_MODE_8B) {
     c = c & 0177;
     if (md == TTUF_MODE_UC) {
-        if (islower (c)) c = toupper (c);
-        if (mode & TTUF_KSR) c = c | 0200;
+        if (islower (c))
+            c = toupper (c);
+        if (mode & TTUF_KSR)
+            c = c | 0200;
         }
     }
 else c = c & 0377;
@@ -476,7 +522,8 @@ uint32 md = mode & TTUF_M_MODE;
 if (md != TTUF_MODE_8B) {
     c = c & 0177;
     if (md == TTUF_MODE_UC) {
-        if (islower (c)) c = toupper (c);
+        if (islower (c))
+            c = toupper (c);
         if ((mode & TTUF_KSR) && (c >= 0140))
             return -1;
         }
@@ -531,10 +578,12 @@ IOSB iosb;
 $DESCRIPTOR (terminal_device, "tt");
 
 status = sys$assign (&terminal_device, &tty_chan, 0, 0);
-if (status != SS$_NORMAL) return SCPE_TTIERR;
+if (status != SS$_NORMAL)
+    return SCPE_TTIERR;
 status = sys$qiow (EFN, tty_chan, IO$_SENSEMODE, &iosb, 0, 0,
     &cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return SCPE_TTIERR;
 run_mode = cmd_mode;
 run_mode.stat = cmd_mode.stat | TT$M_NOECHO & ~(TT$M_HOSTSYNC | TT$M_TTSYNC);
 run_mode.stat2 = cmd_mode.stat2 | TT2$M_PASTHRU;
@@ -548,7 +597,8 @@ IOSB iosb;
 
 status = sys$qiow (EFN, tty_chan, IO$_SETMODE, &iosb, 0, 0,
     &run_mode, sizeof (run_mode), 0, 0, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return SCPE_TTIERR;
 return SCPE_OK;
 }
 
@@ -559,7 +609,8 @@ IOSB iosb;
 
 status = sys$qiow (EFN, tty_chan, IO$_SETMODE, &iosb, 0, 0,
     &cmd_mode, sizeof (cmd_mode), 0, 0, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return SCPE_TTIERR;
 return SCPE_OK;
 }
 
@@ -578,15 +629,18 @@ SENSE_BUF sense;
 term[0] = 0; term[1] = 0;
 status = sys$qiow (EFN, tty_chan, IO$_SENSEMODE | IO$M_TYPEAHDCNT, &iosb,
     0, 0, &sense, 8, 0, term, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTIERR;
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return SCPE_TTIERR;
 if (sense.sense_count == 0) return SCPE_OK;
 term[0] = 0; term[1] = 0;
 status = sys$qiow (EFN, tty_chan,
     IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
     &iosb, 0, 0, buf, 1, 0, term, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_OK;
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return SCPE_OK;
 if (buf[0] == sim_int_char) return SCPE_STOP;
-if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
+if (sim_brk_char && (buf[0] == sim_brk_char))
+    return SCPE_BREAK;
 return (buf[0] | SCPE_KFLAG);
 }
 
@@ -599,7 +653,8 @@ IOSB iosb;
 c = out;
 status = sys$qiow (EFN, tty_chan, IO$_WRITELBLK | IO$M_NOFORMAT,
     &iosb, 0, 0, &c, 1, 0, 0, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) return SCPE_TTOERR;
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return SCPE_TTOERR;
 return SCPE_OK;
 }
 
@@ -619,14 +674,16 @@ t_stat sim_ttinit (void)
 {
 std_input = GetStdHandle (STD_INPUT_HANDLE);
 if ((std_input == INVALID_HANDLE_VALUE) ||
-    !GetConsoleMode (std_input, &saved_mode)) return SCPE_TTYERR;
+    !GetConsoleMode (std_input, &saved_mode))
+    return SCPE_TTYERR;
 return SCPE_OK;
 }
  
 t_stat sim_ttrun (void)
 {
 if (!GetConsoleMode(std_input, &saved_mode) ||
-    !SetConsoleMode(std_input, RAW_MODE)) return SCPE_TTYERR;
+    !SetConsoleMode(std_input, RAW_MODE))
+    return SCPE_TTYERR;
 if (sim_log) {
     fflush (sim_log);
     _setmode (_fileno (sim_log), _O_BINARY);
@@ -655,17 +712,22 @@ t_stat sim_os_poll_kbd (void)
 {
 int c;
 
-if (!_kbhit ()) return SCPE_OK;
+if (!_kbhit ())
+    return SCPE_OK;
 c = _getch ();
-if ((c & 0177) == sim_del_char) c = 0177;
-if ((c & 0177) == sim_int_char) return SCPE_STOP;
-if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
+if ((c & 0177) == sim_del_char)
+    c = 0177;
+if ((c & 0177) == sim_int_char)
+    return SCPE_STOP;
+if (sim_brk_char && ((c & 0177) == sim_brk_char))
+    return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
 t_stat sim_os_putchar (int32 c)
 {
-if (c != 0177) _putch (c);
+if (c != 0177)
+    _putch (c);
 return SCPE_OK;
 }
 
@@ -713,12 +775,16 @@ switch (c = _read_kbd(0,0,0)) {                         /* EMX has _read_kbd */
         break;
         }
 #else
-if (!kbhit ()) return SCPE_OK;
+if (!kbhit ())
+    return SCPE_OK;
 c = getch();
 #endif
-if ((c & 0177) == sim_del_char) c = 0177;
-if ((c & 0177) == sim_int_char) return SCPE_STOP;
-if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
+if ((c & 0177) == sim_del_char)
+    c = 0177;
+if ((c & 0177) == sim_int_char)
+    return SCPE_STOP;
+if (sim_brk_char && ((c & 0177) == sim_brk_char))
+    return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
@@ -891,11 +957,14 @@ t_stat sim_os_poll_kbd (void)
 {
 int c;
 
-if (!ps_kbhit ()) return SCPE_OK;
+if (!ps_kbhit ())
+    return SCPE_OK;
 c = ps_getch();
-if ((c & 0177) == sim_del_char) c = 0177;
+if ((c & 0177) == sim_del_char)
+    c = 0177;
 if ((c & 0177) == sim_int_char) return SCPE_STOP;
-if (sim_brk_char && ((c & 0177) == sim_brk_char)) return SCPE_BREAK;
+if (sim_brk_char && ((c & 0177) == sim_brk_char))
+    return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
@@ -925,9 +994,12 @@ t_stat sim_ttinit (void)
 {
 cmdfl = fcntl (0, F_GETFL, 0);                          /* get old flags  and status */
 runfl = cmdfl | FNDELAY;
-if (ioctl (0, TIOCGETP, &cmdtty) < 0) return SCPE_TTIERR;
-if (ioctl (0, TIOCGETC, &cmdtchars) < 0) return SCPE_TTIERR;
-if (ioctl (0, TIOCGLTC, &cmdltchars) < 0) return SCPE_TTIERR;
+if (ioctl (0, TIOCGETP, &cmdtty) < 0)
+    return SCPE_TTIERR;
+if (ioctl (0, TIOCGETC, &cmdtchars) < 0)
+    return SCPE_TTIERR;
+if (ioctl (0, TIOCGLTC, &cmdltchars) < 0)
+    return SCPE_TTIERR;
 runtty = cmdtty;                                        /* initial run state */
 runtty.sg_flags = cmdtty.sg_flags & ~(ECHO|CRMOD) | CBREAK;
 runtchars.t_intrc = sim_int_char;                       /* interrupt */
@@ -949,9 +1021,12 @@ t_stat sim_ttrun (void)
 {
 runtchars.t_intrc = sim_int_char;                       /* in case changed */
 fcntl (0, F_SETFL, runfl);                              /* non-block mode */
-if (ioctl (0, TIOCSETP, &runtty) < 0) return SCPE_TTIERR;
-if (ioctl (0, TIOCSETC, &runtchars) < 0) return SCPE_TTIERR;
-if (ioctl (0, TIOCSLTC, &runltchars) < 0) return SCPE_TTIERR;
+if (ioctl (0, TIOCSETP, &runtty) < 0)
+    return SCPE_TTIERR;
+if (ioctl (0, TIOCSETC, &runtchars) < 0)
+    return SCPE_TTIERR;
+if (ioctl (0, TIOCSLTC, &runltchars) < 0)
+    return SCPE_TTIERR;
 nice (10);                                              /* lower priority */
 return SCPE_OK;
 }
@@ -960,9 +1035,12 @@ t_stat sim_ttcmd (void)
 {
 nice (-10);                                             /* restore priority */
 fcntl (0, F_SETFL, cmdfl);                              /* block mode */
-if (ioctl (0, TIOCSETP, &cmdtty) < 0) return SCPE_TTIERR;
-if (ioctl (0, TIOCSETC, &cmdtchars) < 0) return SCPE_TTIERR;
-if (ioctl (0, TIOCSLTC, &cmdltchars) < 0) return SCPE_TTIERR;
+if (ioctl (0, TIOCSETP, &cmdtty) < 0)
+    return SCPE_TTIERR;
+if (ioctl (0, TIOCSETC, &cmdtchars) < 0)
+    return SCPE_TTIERR;
+if (ioctl (0, TIOCSLTC, &cmdltchars) < 0)
+    return SCPE_TTIERR;
 return SCPE_OK;
 }
 
@@ -978,7 +1056,8 @@ unsigned char buf[1];
 
 status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
-if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
+if (sim_brk_char && (buf[0] == sim_brk_char))
+    return SCPE_BREAK;
 else return (buf[0] | SCPE_KFLAG);
 }
 
@@ -1003,8 +1082,10 @@ static int prior_norm = 1;
 
 t_stat sim_ttinit (void)
 {
-if (!isatty (fileno (stdin))) return SCPE_OK;           /* skip if !tty */
-if (tcgetattr (0, &cmdtty) < 0) return SCPE_TTIERR;     /* get old flags */
+if (!isatty (fileno (stdin)))                           /* skip if !tty */
+    return SCPE_OK;
+if (tcgetattr (0, &cmdtty) < 0)                         /* get old flags */
+    return SCPE_TTIERR;
 runtty = cmdtty;
 runtty.c_lflag = runtty.c_lflag & ~(ECHO | ICANON);     /* no echo or edit */
 runtty.c_oflag = runtty.c_oflag & ~OPOST;               /* no output edit */
@@ -1043,9 +1124,11 @@ return SCPE_OK;
 
 t_stat sim_ttrun (void)
 {
-if (!isatty (fileno (stdin))) return SCPE_OK;           /* skip if !tty */
+if (!isatty (fileno (stdin)))                           /* skip if !tty */
+    return SCPE_OK;
 runtty.c_cc[VINTR] = sim_int_char;                      /* in case changed */
-if (tcsetattr (0, TCSAFLUSH, &runtty) < 0) return SCPE_TTIERR;
+if (tcsetattr (0, TCSAFLUSH, &runtty) < 0)
+    return SCPE_TTIERR;
 if (prior_norm) {                                       /* at normal pri? */
     errno =     0;
     nice (10);                                          /* try to lower pri */
@@ -1056,13 +1139,15 @@ return SCPE_OK;
 
 t_stat sim_ttcmd (void)
 {
-if (!isatty (fileno (stdin))) return SCPE_OK;           /* skip if !tty */
+if (!isatty (fileno (stdin)))                           /* skip if !tty */
+    return SCPE_OK;
 if (!prior_norm) {                                      /* priority down? */
     errno =     0;
     nice (-10);                                         /* try to raise pri */
     prior_norm = (errno == 0);                          /* if no error, done */
     }
-if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0) return SCPE_TTIERR;
+if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0)
+    return SCPE_TTIERR;
 return SCPE_OK;
 }
 
@@ -1078,7 +1163,8 @@ unsigned char buf[1];
 
 status = read (0, buf, 1);
 if (status != 1) return SCPE_OK;
-if (sim_brk_char && (buf[0] == sim_brk_char)) return SCPE_BREAK;
+if (sim_brk_char && (buf[0] == sim_brk_char))
+    return SCPE_BREAK;
 else return (buf[0] | SCPE_KFLAG);
 }
 

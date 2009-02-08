@@ -233,8 +233,9 @@ switch ((PA >> 1) & 03) {
         pclk_unit.wait = xtim[rv];                      /* new delay */
         if ((pclk_csr & CSR_GO) == 0) {                 /* stopped? */
             sim_cancel (&pclk_unit);                    /* cancel */
-            if (data & CSR_FIX) pclk_tick ();           /* fix? tick */
-             }
+            if (data & CSR_FIX)                         /* fix? tick */
+                pclk_tick ();
+            }
         else if (((old_csr & CSR_GO) == 0) ||           /* run 0 -> 1? */
                  (rv != CSR_GETRATE (old_csr))) {       /* rate change? */
             sim_cancel (&pclk_unit);                    /* cancel */
@@ -267,8 +268,10 @@ if (pclk_ctr == 0) {                                    /* reached zero? */
     if (pclk_csr & CSR_DONE)                            /* done already set? */
         pclk_csr = pclk_csr | CSR_ERR;                  /* set error */
     else pclk_csr = pclk_csr | CSR_DONE;                /* else set done */
-    if (pclk_csr & CSR_IE) SET_INT (PCLK);              /* if IE, set int */
-    if (pclk_csr & CSR_MODE) pclk_ctr = pclk_csb;       /* if rpt, reload */
+    if (pclk_csr & CSR_IE)                              /* if IE, set int */
+        SET_INT (PCLK);
+    if (pclk_csr & CSR_MODE)                            /* if rpt, reload */
+        pclk_ctr = pclk_csb;
     else {
         pclk_csb = 0;                                   /* else clr ctr */
         pclk_csr = pclk_csr & ~CSR_GO;                  /* and clr go */
@@ -284,7 +287,8 @@ t_stat pclk_svc (UNIT *uptr)
 int32 rv;
 
 pclk_tick ();                                           /* tick clock */
-if ((pclk_csr & CSR_GO) == 0) return SCPE_OK;           /* done? */
+if ((pclk_csr & CSR_GO) == 0)                           /* done? */
+    return SCPE_OK;
 rv = CSR_GETRATE (pclk_csr);                            /* get rate */
 sim_activate (&pclk_unit, sim_rtcn_calb (rate[rv], TMR_PCLK));
 return SCPE_OK;
@@ -307,7 +311,8 @@ return SCPE_OK;
 
 t_stat pclk_set_line (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val == UNIT_LINE50HZ) rate[2] = 50;
+if (val == UNIT_LINE50HZ)
+    rate[2] = 50;
 else rate[2] = 60;
 return SCPE_OK;
 }

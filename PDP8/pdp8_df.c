@@ -1,6 +1,6 @@
 /* pdp8_df.c: DF32 fixed head disk simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -184,7 +184,8 @@ if (pulse & 6) {                                        /* DMAR, DMAW */
     df_da = df_da | AC;                                 /* disk addr |= AC */
     df_unit.FUNC = pulse & ~1;                          /* save function */
     t = (df_da & DF_WMASK) - GET_POS (df_time);         /* delta to new loc */
-    if (t < 0) t = t + DF_NUMWD;                        /* wrap around? */
+    if (t < 0)                                          /* wrap around? */
+        t = t + DF_NUMWD;
     sim_activate (&df_unit, t * df_time);               /* schedule op */
     AC = 0;                                             /* clear AC */
     }
@@ -224,13 +225,17 @@ int32 pulse = IR & 07;
 
 UPDATE_PCELL;                                           /* update photocell */
 if (pulse & 1) {                                        /* DFSE */
-    if ((df_sta & DFS_ERR) == 0) AC = AC | IOT_SKP;
+    if ((df_sta & DFS_ERR) == 0)
+        AC = AC | IOT_SKP;
     }
 if (pulse & 2) {                                        /* DFSC */
-    if (pulse & 4) AC = AC & ~07777;                    /* for DMAC */
-    else if (df_done) AC = AC | IOT_SKP;
+    if (pulse & 4)                                      /* for DMAC */
+        AC = AC & ~07777;
+    else if (df_done)
+        AC = AC | IOT_SKP;
     }
-if (pulse & 4) AC = AC | df_da;                         /* DMAC */
+if (pulse & 4)                                          /* DMAC */
+    AC = AC | df_da;
 return AC;
 }
 
@@ -281,7 +286,8 @@ do {
 if ((M[DF_WC] != 0) && ((df_sta & DFS_ERR) == 0))       /* more to do? */
     sim_activate (&df_unit, df_time);                   /* sched next */
 else {
-    if (uptr->FUNC != DF_READ) da = (da - 1) & 0377777;
+    if (uptr->FUNC != DF_READ)
+        da = (da - 1) & 0377777;
     df_done = 1;                                        /* done */
     int_req = int_req | INT_DF;                         /* update int req */
     }
@@ -353,7 +359,8 @@ uint32 ds_bytes = DF_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
-    if (p >= DF_NUMDK) p = DF_NUMDK - 1;
+    if (p >= DF_NUMDK)
+        p = DF_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) |
          (p << UNIT_V_PLAT);
     }
@@ -365,8 +372,10 @@ return attach_unit (uptr, cptr);
 
 t_stat df_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val < 0) return SCPE_IERR;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (val < 0)
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = UNIT_GETP (val) * DF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;

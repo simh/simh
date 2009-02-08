@@ -1,6 +1,6 @@
 /* pdp11_ta.c: PDP-11 cassette tape simulator
 
-   Copyright (c) 2007, Robert M Supnik
+   Copyright (c) 2007-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -235,11 +235,13 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         ta_cs = (ta_cs & ~TACS_W) | (data & TACS_W);    /* merge new */
         if ((data & CSR_GO) && !ta_busy ())             /* go, not busy? */
             ta_go ();                                   /* start operation */
-        if (ta_cs & TACS_ILBS) ta_cs &= ~TACS_TR;       /* ILBS inhibits TR */
+        if (ta_cs & TACS_ILBS)                          /* ILBS inhibits TR */
+            ta_cs &= ~TACS_TR;
         break;
 
     case 1:                                             /* TADB */
-        if (PA & 1) break;                              /* ignore odd byte */
+        if (PA & 1)                                     /* ignore odd byte */
+            break;
         ta_odb = data;                                  /* return byte */
         ta_cs &= ~TACS_TR;                              /* clear tra req */
         break;
@@ -296,9 +298,9 @@ if ((fnc != TACS_REW) && !(flg & OP_WRI)) {             /* spc/read cmd? */
         if (uptr->UST)                                  /* skip file gap */
             sim_tape_rdrecr (uptr, ta_xb, &t, TA_MAXFR);
         else sim_tape_rdrecf (uptr, ta_xb, &t, TA_MAXFR);
-        if (DEBUG_PRS (ta_dev)) fprintf (sim_deb,
-            ">>TA skip gap: op=%o, old_sta = %o, pos=%d\n",
-            fnc, uptr->UST, uptr->pos);
+        if (DEBUG_PRS (ta_dev))
+            fprintf (sim_deb, ">>TA skip gap: op=%o, old_sta = %o, pos=%d\n",
+                     fnc, uptr->UST, uptr->pos);
         }
     }
 else uptr->UST = 0;
@@ -332,7 +334,8 @@ switch (uptr->FNC) {                                    /* case on function */
 
     case TACS_READ:                                     /* read start */
         st = sim_tape_rdrecf (uptr, ta_xb, &ta_blnt, TA_MAXFR); /* get rec */
-        if (st == MTSE_RECE) ta_cs |= TACS_ERR|TACS_CRC; /* rec in err? */
+        if (st == MTSE_RECE)                            /* rec in err? */
+            ta_cs |= TACS_ERR|TACS_CRC;
         else if (st != MTSE_OK) {                       /* other error? */
             r = ta_map_err (uptr, st);                  /* map error */
             break;
@@ -365,12 +368,14 @@ switch (uptr->FNC) {                                    /* case on function */
     case TACS_READ|TACS_3RD:                            /* second read CRC */
         if (ta_bptr != ta_blnt) {                       /* partial read? */
             crc = ta_crc (ta_xb, ta_bptr + 2);          /* actual CRC */
-            if (crc != 0) ta_cs |= TACS_ERR|TACS_CRC;   /* must be zero */
+            if (crc != 0)                               /* must be zero */
+                ta_cs |= TACS_ERR|TACS_CRC;
             }
          break;                                         /* read done */
 
     case TACS_WRITE:                                    /* write start */
-        for (i = 0; i < TA_MAXFR; i++) ta_xb[i] = 0;    /* clear buffer */
+        for (i = 0; i < TA_MAXFR; i++)                  /* clear buffer */
+            ta_xb[i] = 0;
         ta_set_tr ();                                   /* set tra req */
         uptr->FNC |= TACS_2ND;                          /* next state */
         sim_activate (uptr, ta_ctime);                  /* sched next char */
@@ -438,9 +443,9 @@ switch (uptr->FNC) {                                    /* case on function */
 
 ta_cs |= TACS_RDY;                                      /* set ready */
 ta_updsta (uptr);                                       /* update status */
-if (DEBUG_PRS (ta_dev)) fprintf (sim_deb,
-    ">>TA done: op=%o, status = %o, pos=%d\n",
-    uptr->FNC, ta_cs, uptr->pos);
+if (DEBUG_PRS (ta_dev))
+    fprintf (sim_deb, ">>TA done: op=%o, status = %o, pos=%d\n",
+             uptr->FNC, ta_cs, uptr->pos);
 return r;
 }
 
@@ -452,8 +457,10 @@ if (uptr == NULL) {                                     /* unit specified? */
     if ((uptr = ta_busy ()) == NULL)                    /* use busy */
         uptr = ta_dev.units + GET_UNIT (ta_cs);         /* use sel unit */
     }
-else if (ta_cs & TACS_EOF) uptr->UST |= UST_GAP;        /* save EOF */
-if (uptr->flags & UNIT_ATT) ta_cs &= ~TACS_EMP;         /* attached? */
+else if (ta_cs & TACS_EOF)                              /* save EOF */
+    uptr->UST |= UST_GAP;
+if (uptr->flags & UNIT_ATT)                             /* attached? */
+    ta_cs &= ~TACS_EMP;
 else ta_cs |= TACS_EMP|TACS_RDY;                        /* no, empty, ready */
 if ((ta_cs & TACS_IE) &&                                /* int enabled? */
     (ta_cs & (TACS_TR|TACS_RDY)))                       /* req or ready? */
@@ -466,9 +473,11 @@ return ta_cs;
 
 void ta_set_tr (void)
 {
-if (ta_cs & TACS_TR) ta_cs |= (TACS_ERR|TACS_TIM);      /* flag still set? */
+if (ta_cs & TACS_TR)                                    /* flag still set? */
+    ta_cs |= (TACS_ERR|TACS_TIM);
 else ta_cs |= TACS_TR;                                  /* set xfr req */
-if (ta_cs & TACS_IE) SET_INT (TA);                      /* if ie, int req */
+if (ta_cs & TACS_IE)                                    /* if ie, int req */
+    SET_INT (TA);
 return;
 }
 
@@ -481,7 +490,8 @@ UNIT *uptr;
 
 for (u = 0; u < TA_NUMDR; u++) {                        /* loop thru units */
     uptr = ta_dev.units + u;
-    if (sim_is_active (uptr)) return uptr;
+    if (sim_is_active (uptr))
+        return uptr;
     }
 return NULL;
 }
@@ -496,7 +506,8 @@ crc = 0;
 for (i = 0; i < cnt; i++) {
     crc = crc ^ (((uint32) buf[i]) << 8);
     for (j = 0; j < 8; j++) {
-        if (crc & 1) crc = (crc >> 1) ^ 0xA001;
+        if (crc & 1)
+            crc = (crc >> 1) ^ 0xA001;
         else crc = crc >> 1;
         }
     }
@@ -521,7 +532,8 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         ta_cs |= TACS_ERR|TACS_CRC;                     /* set crc err */
-        if (ta_stopioe) return SCPE_IOERR;
+        if (ta_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
@@ -564,8 +576,10 @@ for (u = 0; u < TA_NUMDR; u++) {                        /* loop thru units */
     sim_cancel (uptr);                                  /* cancel activity */
     sim_tape_reset (uptr);                              /* reset tape */
     }
-if (ta_xb == NULL) ta_xb = (uint8 *) calloc (TA_MAXFR + 2, sizeof (uint8));
-if (ta_xb == NULL) return SCPE_MEM;
+if (ta_xb == NULL)
+    ta_xb = (uint8 *) calloc (TA_MAXFR + 2, sizeof (uint8));
+if (ta_xb == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -576,7 +590,8 @@ t_stat ta_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 ta_updsta (NULL);
 uptr->UST = 0;
 return r;
@@ -588,7 +603,8 @@ t_stat ta_detach (UNIT* uptr)
 {
 t_stat r;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* check attached */
+if (!(uptr->flags & UNIT_ATT))                          /* check attached */
+    return SCPE_OK;
 r = sim_tape_detach (uptr);
 ta_updsta (NULL);
 uptr->UST = 0;

@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   11-Jul-08    RMS     Added IO mode flag for boot (from Bob Abeles)
    28-Jun-07    RMS     Defined character code for tape mark
    14-Nov-04    RMS     Added column binary support
    27-Oct-04    RMS     Added maximum instruction length
@@ -247,6 +248,7 @@
 #define MD_NORM         0                               /* normal (move) */
 #define MD_WM           1                               /* word mark (load) */
 #define MD_BIN          2                               /* binary */
+#define MD_BOOT         4                               /* boot read */
 
 /* Indicator characters */
 

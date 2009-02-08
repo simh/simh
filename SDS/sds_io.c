@@ -1,6 +1,6 @@
 /* sds_io.c: SDS 940 I/O simulator
 
-   Copyright (c) 2001-2005, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -259,7 +259,8 @@ int32 ch, dev;
 ch = (inst & 000200000)? CHAN_W: CHAN_Y;                /* get chan# */
 dev = chan_uar[ch] & DEV_MASK;                          /* get dev # */
 if (chan_cnt[ch] <= chan_cpw[ch]) {                     /* buffer empty? */
-    if (dev == 0) return STOP_INVIOP;                   /* no device? dead */
+    if (dev == 0)                                       /* no device? dead */
+        return STOP_INVIOP;
     return STOP_IONRDY;                                 /* hang until full */
     }
 *dat = chan_war[ch];                                    /* get data */
@@ -275,13 +276,15 @@ int32 ch, dev;
 ch = (inst & 000200000)? CHAN_W: CHAN_Y;                /* get chan# */
 dev = chan_uar[ch] & DEV_MASK;                          /* get dev # */
 if (chan_cnt[ch] != 0) {                                /* buffer full? */
-    if (dev == 0) return STOP_INVIOP;                   /* no device? dead */
+    if (dev == 0)                                       /* no device? dead */
+        return STOP_INVIOP;
     return STOP_IONRDY;                                 /* hang until full */
     }
 chan_war[ch] = dat;                                     /* get data */
 chan_cnt[ch] = chan_cpw[ch] + 1;                        /* buffer full */
 if (chan_flag[ch] & CHF_OWAK) {                         /* output wake? */
-    if (VLD_DEV (dev, ch)) SET_XFR (dev, ch);           /* wake channel */
+    if (VLD_DEV (dev, ch))                              /* wake channel */
+        SET_XFR (dev, ch);
     chan_flag[ch] = chan_flag[ch] & ~CHF_OWAK;          /* clear wake */
     }
 return SCPE_OK;
@@ -292,7 +295,8 @@ t_stat op_pin (uint32 *dat)
 uint32 al = alert;                                      /* local copy */
 
 alert = 0;                                              /* clear alert */
-if ((al == 0) || (dev_alt[al].pin == NULL)) CRETIOP;    /* inv alert? */
+if ((al == 0) || (dev_alt[al].pin == NULL))             /* inv alert? */
+    CRETIOP;
 return dev_alt[al].pin (al, dat);                       /* PIN from dev */
 }
 
@@ -301,7 +305,8 @@ t_stat op_pot (uint32 dat)
 uint32 al = alert;                                      /* local copy */
 
 alert = 0;                                              /* clear alert */
-if ((al == 0) || (dev_alt[al].pot == NULL)) CRETIOP;    /* inv alert? */
+if ((al == 0) || (dev_alt[al].pot == NULL))             /* inv alert? */
+    CRETIOP;
 return dev_alt[al].pot (al, &dat);                      /* POT to dev */
 }
 
@@ -319,19 +324,23 @@ switch (mod) {
 
     case 0:                                             /* IO control */
         if (dev) {                                      /* new dev? */
-            if (ch_dev) CRETIOP;                        /* chan act? err */
-            if (INV_DEV (dev, ch)) CRETDEV;             /* inv dev? err */
+            if (ch_dev)                                 /* chan act? err */
+                CRETIOP;
+            if (INV_DEV (dev, ch))                      /* inv dev? err */
+                CRETDEV;
             chan_war[ch] = chan_cnt[ch] = 0;            /* init chan */
             chan_flag[ch] = chan_dcr[ch] = 0;
             chan_mode[ch] = chan_uar[ch] = 0;
-            if (ch >= CHAN_E) chan_mode[ch] = CHM_CE;
+            if (ch >= CHAN_E)
+                chan_mode[ch] = CHM_CE;
             if (r = dev_dsp[dev][ch] (IO_CONN, inst, NULL)) /* connect */
                 return r;
             if ((inst & I_IND) || (ch >= CHAN_C)) {     /* C-H? alert ilc */
                 alert = POT_ILCY + ch;
                 chan_mar[ch] = chan_wcr[ch] = 0;
                 }
-            if (chan_flag[ch] & CHF_24B) chan_cpw[ch] = 0; /* 24B? 1 ch/wd */
+            if (chan_flag[ch] & CHF_24B)                /* 24B? 1 ch/wd */
+                chan_cpw[ch] = 0;
             else if (chan_flag[ch] & CHF_12B)           /* 12B? 2 ch/wd */
                 chan_cpw[ch] = CHC_GETCPW (inst) & 1;
             else chan_cpw[ch] = CHC_GETCPW (inst);      /* 6b, 1-4 ch/wd */
@@ -345,7 +354,8 @@ switch (mod) {
     case 1:                                             /* buf control */
         if (QAILCE (alert)) {                           /* ilce alerted? */
             ch = alert - POT_ILCY;                      /* derive chan */
-            if (ch >= CHAN_E) inst = inst | CHM_CE;     /* DACC? ext */
+            if (ch >= CHAN_E)                           /* DACC? ext */
+                inst = inst | CHM_CE;
             chan_mode[ch] = inst;                       /* save mode */
             chan_mar[ch] = (CHM_GETHMA (inst) << 14) |  /* get hi mar */
                 (chan_mar[ch] & CHI_M_MA);
@@ -353,7 +363,8 @@ switch (mod) {
                 (chan_wcr[ch] & CHI_M_WC);
             }
         else if (dev) {                                 /* dev EOM */
-            if (INV_DEV (dev, ch)) CRETDEV;             /* inv dev? err */
+            if (INV_DEV (dev, ch))                      /* inv dev? err */
+                CRETDEV;
             return dev_dsp[dev][ch] (IO_EOM1, inst, NULL);
             }
         else {                                          /* chan EOM */
@@ -362,8 +373,10 @@ switch (mod) {
                 alert = POT_ILCY + ch;
                 chan_mar[ch] = chan_wcr[ch] = 0;
                 }
-            else if (inst == 002000) alert = POT_ADRY + ch; /* alert addr */
-            else if (inst == 001000) alert = POT_DCRY + ch; /* alert DCR */
+            else if (inst == 002000)                    /* alert addr */
+                alert = POT_ADRY + ch;
+            else if (inst == 001000)                    /* alert DCR */
+                alert = POT_DCRY + ch;
             else if (inst == 004000) {                  /* term output */
                 if (ch_dev & DEV_OUT) {                 /* to output dev? */
                     if (chan_cnt[ch] || (chan_flag[ch] & CHF_ILCE)) /* busy, DMA? */
@@ -381,25 +394,38 @@ switch (mod) {
     case 2:                                             /* internal */
         if (ch >= CHAN_E) {                             /* EOD? */
             if (inst & 00300) {                         /* set EM? */
-                if (inst & 00100) EM2 = inst & 07;
-                if (inst & 00200) EM3 = (inst >> 3) & 07;
+                if (inst & 00100)
+                    EM2 = inst & 07;
+                if (inst & 00200)
+                    EM3 = (inst >> 3) & 07;
                 set_dyn_map ();
                 }
             break;
             }                                           /* end if EOD */
-        if (inst & 00001) OV = 0;                       /* clr OV */
-        if (inst & 00002) ion = 1;                      /* ion */
-        else if (inst & 00004) ion = 0;                 /* iof */
-        if ((inst & 00010) && (((X >> 1) ^ X) & EXPS)) OV = 1;
-        if (inst & 00020) alert = POT_SYSI;             /* alert sys int */
-        if (inst & 00100) rtc_pie = 1;                  /* arm clk pls */
-        else if (inst & 00200) rtc_pie = 0;             /* disarm pls */
-        if ((inst & 01400) == 01400) alert = POT_RL4;   /* alert RL4 */
-        else if (inst & 00400) alert = POT_RL1;         /* alert RL1 */
-        else if (inst & 01000) alert = POT_RL2;         /* alert RL2 */
+        if (inst & 00001)                               /* clr OV */
+            OV = 0;
+        if (inst & 00002)                               /* ion */
+            ion = 1;
+        else if (inst & 00004)                          /* iof */
+            ion = 0;
+        if ((inst & 00010) && (((X >> 1) ^ X) & EXPS))
+            OV = 1;
+        if (inst & 00020)                               /* alert sys int */
+            alert = POT_SYSI;
+        if (inst & 00100)                               /* arm clk pls */
+            rtc_pie = 1;
+        else if (inst & 00200)                          /* disarm pls */
+            rtc_pie = 0;
+        if ((inst & 01400) == 01400)                    /* alert RL4 */
+            alert = POT_RL4;
+        else if (inst & 00400)                          /* alert RL1 */
+            alert = POT_RL1;
+        else if (inst & 01000)                          /* alert RL2 */
+            alert = POT_RL2;
         if (inst & 02000) {                             /* nml to mon */
             nml_mode = usr_mode = 0;
-            if (inst & 00400) mon_usr_trap = 1;
+            if (inst & 00400)
+                mon_usr_trap = 1;
             }
         break;
 
@@ -424,21 +450,24 @@ uint32 dev = inst & DEV_MASK;                           /* get dev # */
 *dat = 0;
 if ((ch == 4) && !(inst & 037774)) {                    /* EM test */
     if (((inst & 0001) && (EM2 != 2)) ||
-        ((inst & 0002) && (EM3 != 3))) *dat = 1;
+        ((inst & 0002) && (EM3 != 3)))
+        *dat = 1;
     return SCPE_OK;
     }
 switch (mod) {
 
     case 1:                                             /* ch, dev */
         if (dev) {                                      /* device */
-            if (INV_DEV (dev, ch)) CRETDEV;             /* inv dev? err */
+            if (INV_DEV (dev, ch))                      /* inv dev? err */
+                CRETDEV;
             dev_dsp[dev][ch] (IO_SKS, inst, dat);       /* do test */
             }
         else {                                          /* channel */
             if (((inst & 04000) && (chan_uar[ch] == 0)) ||
                 ((inst & 02000) && (chan_wcr[ch] == 0)) ||
                 ((inst & 01000) && ((chan_flag[ch] & CHF_ERR) == 0)) ||
-                ((inst & 00400) && (chan_flag[ch] & CHF_IREC))) *dat = 1;
+                ((inst & 00400) && (chan_flag[ch] & CHF_IREC)))
+                *dat = 1;
             }
         break;
 
@@ -457,12 +486,14 @@ switch (mod) {
             ((inst & 00200) && ((bpt & 004) == 0)) ||
             ((inst & 00400) && ((bpt & 010) == 0)) ||
             ((inst & 01000) && (chan_uar[CHAN_W] == 0)) ||
-            ((inst & 02000) && (chan_uar[CHAN_Y] == 0))) *dat = 1;
+            ((inst & 02000) && (chan_uar[CHAN_Y] == 0)))
+            *dat = 1;
         break;
 
     case 3:                                             /* special */
         dev = I_GETDEV3 (inst);                         /* special device */
-        if (dev3_dsp[dev]) dev3_dsp[dev] (IO_SKS, inst, dat);       
+        if (dev3_dsp[dev])
+            dev3_dsp[dev] (IO_SKS, inst, dat);       
         else CRETINS;
         }                                               /* end case */
 
@@ -547,8 +578,10 @@ t_stat r = SCPE_OK;
 if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
     if (INV_DEV (dev, ch)) CRETIOP;                     /* can't read? */
     r = dev_dsp[dev][ch] (IO_READ, dev, &dat);          /* read data */
-    if (r) chan_flag[ch] = chan_flag[ch] | CHF_ERR;     /* error? */
-    if (chan_flag[ch] & CHF_24B) chan_war[ch] = dat;    /* 24B? */
+    if (r)                                              /* error? */
+        chan_flag[ch] = chan_flag[ch] | CHF_ERR;
+    if (chan_flag[ch] & CHF_24B)                        /* 24B? */
+        chan_war[ch] = dat;
     else if (chan_flag[ch] & CHF_12B)                   /* 12B? */
         chan_war[ch] = ((chan_war[ch] << 12) | (dat & 07777)) & DMASK;
     else chan_war[ch] = ((chan_war[ch] << 6) | (dat & 077)) & DMASK;
@@ -563,15 +596,18 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
                 if ((tfnc != CHM_COMP) && (chan_mode[ch] & CHM_ZC))
                     int_req = int_req | int_zc[ch];     /* zwc interrupt */
                 if (tfnc == CHM_IOSD) {                 /* IOSD? also EOR */
-                    if (chan_mode[ch] & CHM_ER) int_req = int_req | int_er[ch];
+                    if (chan_mode[ch] & CHM_ER)
+                        int_req = int_req | int_er[ch];
                     dev_disc (ch, dev);                 /* disconnect */
                     }                                   /* end if IOSD */
                 }                                       /* end if wcr == 0 */
             }                                           /* end if ilce on */
         else {                                          /* interlace off */
-            if (TST_EOR (ch)) return chan_eor (ch);     /* eor? */
+            if (TST_EOR (ch))                           /* eor? */
+                return chan_eor (ch);
             if (tfnc == CHM_COMP) {                     /* C: EOW, intr */
-                if (ion) int_req = int_req | int_zc[ch];
+                if (ion)
+                    int_req = int_req | int_zc[ch];
                 }
             else if (tfnc & CHM_SGNL)                   /* Sx: error */
                 chan_flag[ch] = chan_flag[ch] | CHF_ERR;
@@ -580,7 +616,8 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
         }                                               /* end if full */
     }                                                   /* end if xfr */
 if (TST_EOR (ch)) {                                     /* end record? */
-    if (tfnc == CHM_COMP) chan_flush_war (ch);          /* C: fill war */
+    if (tfnc == CHM_COMP)                               /* C: fill war */
+        chan_flush_war (ch);
     else if (chan_cnt[ch]) {                            /* RX, CX: fill? */
         chan_flush_war (ch);                            /* fill war */
         if (chan_flag[ch] & CHF_ILCE)                   /* ilce on? store */
@@ -606,7 +643,8 @@ void chan_flush_war (int32 ch)
 int32 i = (chan_cpw[ch] - chan_cnt[ch]) + 1;
 
 if (i) {
-    if (chan_flag[ch] & CHF_24B) chan_war[ch] = 0;
+    if (chan_flag[ch] & CHF_24B)
+        chan_war[ch] = 0;
     else if (chan_flag[ch] & CHF_12B)
         chan_war[ch] = (chan_war[ch] << 12) & DMASK;
     else chan_war[ch] = (chan_war[ch] << (i * 6)) & DMASK;
@@ -637,7 +675,8 @@ uint32 tfnc = CHM_GETFNC (chan_mode[ch]);
 t_stat r = SCPE_OK;
 
 if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
-    if (INV_DEV (dev, ch)) CRETIOP;                     /* invalid dev? */
+    if (INV_DEV (dev, ch))                              /* invalid dev? */
+        CRETIOP;
     if (chan_cnt[ch] == 0) {                            /* buffer empty? */
         if (chan_flag[ch] & CHF_ILCE) {                 /* interlace on? */
             chan_war[ch] = ReadP (chan_mar[ch]);
@@ -647,13 +686,15 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
             }
         else {                                          /* ilce off */
             CLR_XFR (dev, ch);                          /* cant xfr */
-            if (TST_EOR (dev)) return chan_eor (ch);    /* EOR? */
+            if (TST_EOR (dev))                          /* EOR? */
+                return chan_eor (ch);
             chan_flag[ch] = chan_flag[ch] | CHF_ERR;    /* rate err */
             return SCPE_OK;
             }                                           /* end else ilce */
         }                                               /* end if cnt */
     chan_cnt[ch] = chan_cnt[ch] - 1;                    /* decr cnt */
-    if (chan_flag[ch] & CHF_24B) dat = chan_war[ch];    /* 24B? */
+    if (chan_flag[ch] & CHF_24B)                        /* 24B? */
+        dat = chan_war[ch];
     else if (chan_flag[ch] & CHF_12B) {                 /* 12B? */
         dat = (chan_war[ch] >> 12) & 07777;             /* get halfword */
         chan_war[ch] = (chan_war[ch] << 12) & DMASK;    /* remove from war */
@@ -663,13 +704,15 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
         chan_war[ch] = (chan_war[ch] << 6) & DMASK;     /* remove from war */
         }
     r = dev_dsp[dev][ch] (IO_WRITE, dev, &dat);         /* write */
-    if (r) chan_flag[ch] = chan_flag[ch] | CHF_ERR;     /* error? */
+    if (r)                                              /* error? */
+        chan_flag[ch] = chan_flag[ch] | CHF_ERR;
     if (chan_cnt[ch] == 0) {                            /* buf empty? */
         if (chan_flag[ch] & CHF_ILCE) {                 /* ilce on? */
             if (chan_wcr[ch] == 0) {                    /* wc now 0? */
                 chan_flag[ch] = chan_flag[ch] & ~CHF_ILCE; /* ilc off */
                 if (tfnc == CHM_COMP) {                 /* compatible? */
-                    if (ion) int_req = int_req | int_zc[ch];
+                    if (ion)
+                        int_req = int_req | int_zc[ch];
                     dev_disc (ch, dev);                 /* disconnnect */
                     }                                   /* end if comp */
                 else {                                  /* extended */
@@ -691,10 +734,12 @@ if (dev && TST_XFR (dev, ch)) {                         /* ready to xfr? */
             chan_flag[ch] = chan_flag[ch] & ~CHF_TOP;   /* clear TOP */
             dev_wreor (ch, dev);                        /* write EOR */
             }
-        else if (ion) int_req = int_req | int_zc[ch];   /* no TOP, EOW intr */
+        else if (ion)                                   /* no TOP, EOW intr */
+            int_req = int_req | int_zc[ch];
         }                                               /* end if cnt */
    }                                                    /* end if xfr */
-if (TST_EOR (ch)) return chan_eor (ch);                 /* eor rcvd? */
+if (TST_EOR (ch))                                       /* eor rcvd? */
+    return chan_eor (ch);
 return r;
 }
 
@@ -734,13 +779,15 @@ return SCPE_OK;
 t_stat dev_disc (uint32 ch, uint32 dev)
 {
 chan_uar[ch] = 0;                                       /* disconnect */
-if (dev_dsp[dev][ch]) return dev_dsp[dev][ch] (IO_DISC, dev, NULL);
+if (dev_dsp[dev][ch])
+    return dev_dsp[dev][ch] (IO_DISC, dev, NULL);
 return SCPE_OK;
 }
 
 t_stat dev_wreor (uint32 ch, uint32 dev)
 {
-if (dev_dsp[dev][ch]) return dev_dsp[dev][ch] (IO_WREOR, dev, NULL);
+if (dev_dsp[dev][ch])
+    return dev_dsp[dev][ch] (IO_WREOR, dev, NULL);
 chan_flag[ch] = chan_flag[ch] | CHF_EOR;                /* set eor */
 return SCPE_OK;
 }
@@ -756,9 +803,11 @@ t_stat r;
 for (i = 0; i < NUM_CHAN; i++) {                        /* loop thru */
     dev = chan_uar[i] & DEV_MASK;                       /* get dev */
     if ((dev && TST_XFR (dev, i)) || TST_EOR (i)) {     /* chan active? */
-        if (dev & DEV_OUT) r = chan_write (i);          /* write */
+        if (dev & DEV_OUT)                              /* write */
+            r = chan_write (i);
         else r = chan_read (i);                         /* read */
-        if (r) return r;
+        if (r)
+            return r;
         }
     }
 return SCPE_OK;
@@ -772,7 +821,8 @@ int32 i, dev;
 
 for (i = 0; i < NUM_CHAN; i++) {
     dev = chan_uar[i] & DEV_MASK;
-    if ((dev && TST_XFR (dev, i)) || TST_EOR (i)) return 1;
+    if ((dev && TST_XFR (dev, i)) || TST_EOR (i))
+        return 1;
     }
 return 0;
 }
@@ -794,7 +844,8 @@ return;
 
 void chan_set_flag (int32 ch, uint32 fl)
 {
-if ((ch >= 0) && (ch < NUM_CHAN)) chan_flag[ch] = chan_flag[ch] | fl;
+if ((ch >= 0) && (ch < NUM_CHAN))
+    chan_flag[ch] = chan_flag[ch] | fl;
 return;
 }
 
@@ -802,7 +853,8 @@ return;
 
 void chan_set_uar (int32 ch, uint32 dev)
 {
-if ((ch >= 0) && (ch < NUM_CHAN)) chan_uar[ch] = dev & DEV_MASK;
+if ((ch >= 0) && (ch < NUM_CHAN))
+    chan_uar[ch] = dev & DEV_MASK;
 return;
 }
 
@@ -810,7 +862,8 @@ return;
 
 void chan_disc (int32 ch)
 {
-if ((ch >= 0) && (ch < NUM_CHAN)) chan_uar[ch] = 0;
+if ((ch >= 0) && (ch < NUM_CHAN))
+    chan_uar[ch] = 0;
 return;
 }
 
@@ -843,15 +896,20 @@ DEVICE *dptr;
 DIB *dibp;
 int32 i;
 
-if (sptr == NULL) return SCPE_ARG;                      /* valid args? */
-if (uptr == NULL) return SCPE_IERR;
+if (sptr == NULL)                                        /* valid args? */
+    return SCPE_ARG;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 for (i = 0; i < NUM_CHAN; i++) {                        /* match input */
     if (strcmp (sptr, chname[i]) == 0) {                /* find string */
-        if (val && !(val & (1 << i))) return SCPE_ARG;  /* legal? */
+        if (val && !(val & (1 << i)))                   /* legal? */
+            return SCPE_ARG;
         dibp->chan = i;                                 /* store new */
         return SCPE_OK;
         }
@@ -864,11 +922,14 @@ t_stat show_chan (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr;
 DIB *dibp;
 
-if (uptr == NULL) return SCPE_IERR;
+if (uptr == NULL)
+    return SCPE_IERR;
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 fprintf (st, "channel=%s", chname[dibp->chan]);
 return SCPE_OK;
 }
@@ -896,21 +957,24 @@ for (i = 0; i < NUM_CHAN; i++) {
 
 for (i = 0; dptr = sim_devices[i]; i++) {               /* loop thru devices */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
-    if ((dibp == NULL) || (dptr->flags & DEV_DIS)) continue; /* exist, enabled? */
+    if ((dibp == NULL) || (dptr->flags & DEV_DIS))      /* exist, enabled? */
+        continue;
     ch = dibp->chan;                                    /* get channel */
     dev = dibp->dev;                                    /* get device num */
-    if (ch < 0) dev3_dsp[dev] = dibp->iop;              /* special device */
+    if (ch < 0)                                         /* special device */
+        dev3_dsp[dev] = dibp->iop;
     else {
-        if (dibp->tplt == NULL) return TRUE;            /* must have template */
+        if (dibp->tplt == NULL)                         /* must have template */
+            return TRUE;
         for (tplp = dibp->tplt; tplp->num; tplp++) {    /* loop thru templates */
             for (j = 0; j < tplp->num; j++) {           /* repeat as needed */
                 doff = dev + tplp->off + j;             /* get offset dnum */
                 if (dev_map[doff][ch]) {                /* slot in use? */
                     printf ("Device number conflict, chan = %s, devno = %02o\n",
-                        chname[ch], doff);
-                    if (sim_log) fprintf (sim_log,
-                        "Device number conflict, chan = %s, dev = %02o\n",
-                        chname[ch], doff);
+                            chname[ch], doff);
+                    if (sim_log)
+                        fprintf (sim_log, "Device number conflict, chan = %s, dev = %02o\n",
+                                 chname[ch], doff);
                     return TRUE;
                     }
                 dev_map[doff][ch] = dibp->xfr;          /* set xfr flag */

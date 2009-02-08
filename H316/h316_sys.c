@@ -1,6 +1,6 @@
 /* h316_sys.c: Honeywell 316/516 simulator interface
 
-   Copyright (c) 1999-2005, Robert M Supnik
+   Copyright (c) 1999-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -239,7 +239,8 @@ int32 cflag, i, j, inst, disp;
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 inst = val[0];
 if (sw & SWMASK ('A')) {                                /* ASCII? */
-    if (inst > 0377) return SCPE_ARG;
+    if (inst > 0377)
+        return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
@@ -248,7 +249,8 @@ if (sw & SWMASK ('C')) {                                /* characters? */
     fprintf (of, FMTASC (inst & 0177));
     return SCPE_OK;
     }
-if (!(sw & SWMASK ('M'))) return SCPE_ARG;
+if (!(sw & SWMASK ('M')))
+    return SCPE_ARG;
 
 /* Instruction decode */
 
@@ -266,11 +268,13 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             disp = inst & DISP;                         /* displacement */
             fprintf (of, "%s ", opcode[i]);             /* opcode */
             if (inst & SC) {                            /* current sector? */
-                if (cflag) fprintf (of, "%-o", (addr & PAGENO) | disp);
+                if (cflag)
+                    fprintf (of, "%-o", (addr & PAGENO) | disp);
                 else fprintf (of, "C %-o", disp);
                 }
             else fprintf (of, "%-o", disp);             /* sector zero */
-            if ((j == I_V_MRF) && (inst & IDX)) fprintf (of, ",1");
+            if ((j == I_V_MRF) && (inst & IDX))
+                fprintf (of, ",1");
             break;
 
         case I_V_IOT:                                   /* I/O */
@@ -315,12 +319,14 @@ char gbuf[CBUFSIZE];
 cflag = (uptr == NULL) || (uptr == &cpu_unit);
 while (isspace (*cptr)) cptr++;                         /* absorb spaces */
 if ((sw & SWMASK ('A')) || ((*cptr == '\'') && cptr++)) { /* ASCII char? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (t_value) cptr[0] & 0177;
     return SCPE_OK;
     }
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
-    if (cptr[0] == 0) return SCPE_ARG;                  /* must have 1 char */
+    if (cptr[0] == 0)                                   /* must have 1 char */
+        return SCPE_ARG;
     val[0] = (((t_value) cptr[0] & 0177) << 8) |
               ((t_value) cptr[1] & 0177);
     return SCPE_OK;
@@ -330,7 +336,8 @@ if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* char string? */
 
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; (opcode[i] != NULL) && (strcmp (opcode[i], gbuf) != 0) ; i++) ;
-if (opcode[i] == NULL) return SCPE_ARG;
+if (opcode[i] == NULL)
+    return SCPE_ARG;
 val[0] = opc_val[i] & DMASK;                            /* get value */
 j = (opc_val[i] >> I_V_FL) & I_M_FL;                    /* get class */
 
@@ -342,14 +349,16 @@ switch (j) {                                            /* case on class */
     case I_V_IOT:                                       /* IOT */
         cptr = get_glyph (cptr, gbuf, 0);               /* get pulse+dev */
         d = get_uint (gbuf, 8, 01777, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
+        if (r != SCPE_OK)
+            return SCPE_ARG;
         val[0] = val[0] | d;
         break;
 
     case I_V_SHF:                                       /* shift */
         cptr = get_glyph (cptr, gbuf, 0);               /* get shift count */
         d = get_uint (gbuf, 8, SHFMASK, &r);
-        if (r != SCPE_OK) return SCPE_ARG;
+        if (r != SCPE_OK)
+            return SCPE_ARG;
         val[0] = val[0] | (-d & SHFMASK);               /* store 2's comp */
         break;
 
@@ -363,16 +372,21 @@ switch (j) {                                            /* case on class */
             cptr = get_glyph (cptr, gbuf, ',');
             }
         d = get_uint (gbuf, 8, X_AMASK, &r);            /* construe as addr */
-        if (r != SCPE_OK) return SCPE_ARG;
-        if (d <= DISP) val[0] = val[0] | d;             /* fits? */
+        if (r != SCPE_OK)
+            return SCPE_ARG;
+        if (d <= DISP)                                  /* fits? */
+            val[0] = val[0] | d;
         else if (cflag && !k && (((addr ^ d) & PAGENO) == 0))
             val[0] = val[0] | (d & DISP) | SC;
         else return SCPE_ARG;
-        if ((j == I_V_MRX) || (*cptr == 0)) break;      /* indexed? */
+        if ((j == I_V_MRX) || (*cptr == 0))             /* indexed? */
+            break;
         cptr = get_glyph (cptr, gbuf, 0);
         d = get_uint (gbuf, 8, 1, &r);                  /* get tag */
-        if (r != SCPE_OK) return SCPE_ARG;
-        if (d) val[0] = val[0] | IDX;                   /* or in index */
+        if (r != SCPE_OK)
+            return SCPE_ARG;
+        if (d)                                          /* or in index */
+            val[0] = val[0] | IDX;
         break;
 
     case I_V_SK0: case I_V_SK1:                         /* skips */
@@ -388,6 +402,7 @@ switch (j) {                                            /* case on class */
         break;
         }                                               /* end case */
 
-if (*cptr != 0) return SCPE_ARG;                        /* junk at end? */
+if (*cptr != 0)                                         /* junk at end? */
+    return SCPE_ARG;
 return SCPE_OK;
 }

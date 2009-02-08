@@ -571,7 +571,7 @@ switch (code) {                                         /* decode IR<5:7> */
         if ((dev_busy & INT_DKP) == 0)			        /* if device is not busy */
         dkp_ussc = AC ;				                    /* save unit, sect */
         if (((dtype == TYPE_6099) ||			        /* (BKR: don't forget 6097) */
-         (dtype == TYPE_6097) ||                        /* for 6099 and 6103 */
+             (dtype == TYPE_6097) ||                    /* for 6099 and 6103 */
              (dtype == TYPE_6103)) &&                   /* if data<0> set, */
             (AC & 010000) )
         dkp_diagmode = 1;			                    /* set diagnostic mode */
@@ -597,9 +597,12 @@ switch (pulse) {                                        /* decode IR<8:9> */
         DEV_UPDATE_INTR ;                               /*  update ints */
         if (dkp_diagmode) {                             /* in diagnostic mode? */
             dkp_diagmode = 0;                           /* reset it     */
-            if (dtype == TYPE_6097) dkp_ussc = 010001;  /* (BKR - quad floppy) */
-            if (dtype == TYPE_6099) dkp_ussc = 010002;  /* return size bits */
-            if (dtype == TYPE_6103) dkp_ussc = 010003;  /* for certain types */
+            if (dtype == TYPE_6097)                     /* (BKR - quad floppy) */
+                dkp_ussc = 010001;
+            if (dtype == TYPE_6099)                     /* return size bits */
+                dkp_ussc = 010002;
+            if (dtype == TYPE_6103)                     /* for certain types */
+                dkp_ussc = 010003;
             } 
         else {                                          /* normal mode ... */
             if (dkp_go (pulse))                         /* do command	*/
@@ -638,7 +641,7 @@ switch (pulse) {                                        /* decode IR<8:9> */
              *  start of this procedure and before our 'P' handler.   BKR
              */
             if (dkp_go(pulse))
-                    break;                              /* no error - do not set done and status  */
+                break;                                  /* no error - do not set done and status  */
             }
 
         DEV_SET_DONE( INT_DKP ) ;                       /*  set done	*/
@@ -905,10 +908,12 @@ do  {
     if (uptr->FUNC == FCCY_READ) {                      /* read? */
             awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr->fileref);
             for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
-            if (err = ferror (uptr->fileref)) break;
+            if (err = ferror (uptr->fileref))
+                break;
             for (dx = 0; dx < DKP_NUMWD; dx++) {            /* loop thru buffer */
                 pa = MapAddr (dkp_map, (dkp_ma & AMASK));
-                if (MEM_ADDR_OK (pa)) M[pa] = tbuf[dx];
+                if (MEM_ADDR_OK (pa))
+                    M[pa] = tbuf[dx];
                 dkp_ma = (dkp_ma + 1) & AMASK;
                 }
         }
@@ -919,7 +924,8 @@ do  {
                 dkp_ma = (dkp_ma + 1) & AMASK;
                 }
             fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;
+            if (err = ferror (uptr->fileref))
+                break;
             }
 
     if (err != 0) {
@@ -989,8 +995,10 @@ t_stat   r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;    /* restore capac */
 r = attach_unit (uptr, cptr);                           /* attach */
-if ((r != SCPE_OK) || !(uptr->flags & UNIT_AUTO)) return r;
-if ((p = sim_fsize (uptr->fileref)) == 0) return SCPE_OK; /* get file size */
+if ((r != SCPE_OK) || !(uptr->flags & UNIT_AUTO))
+    return r;
+if ((p = sim_fsize (uptr->fileref)) == 0)               /* get file size */
+    return SCPE_OK;
 for (i = 0; drv_tab[i].sect != 0; i++) {
     if (p <= (drv_tab[i].size * (int32) sizeof (uint16))) {
         uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
@@ -1005,7 +1013,8 @@ return SCPE_OK;
 
 t_stat dkp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = drv_tab[GET_DTYPE (val)].size;
 return SCPE_OK;
 }
@@ -1077,7 +1086,8 @@ t_stat dkp_boot (int32 unitno, DEVICE *dptr)
 {
 int32   i;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = (uint16) boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = (uint16) boot_rom[i];
 saved_PC = BOOT_START;
 SR = 0100000 + DEV_DKP;
 return SCPE_OK;

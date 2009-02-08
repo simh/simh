@@ -97,7 +97,8 @@ uint32 i, j, start, size, origin;
 
 if ((fl_unit.flags & UNIT_ATT) == 0)                    /* floppy attached? */
     return SCPE_UNATT;
-if (*cptr == 0) return SCPE_2FARG;
+if (*cptr == 0)
+    return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get file name */
 if (!rtfile_parse (gbuf, file_name))                    /* legal file name? */
     return SCPE_ARG;
@@ -135,23 +136,29 @@ file_name[0] = file_name[1] = file_name[2] = 0;         /* zero file name */
 for (i = 0; i < 2; i++) {                               /* 6 characters */
     for (j = 0; j < 3; j++) {
         c = *pntr;
-        if ((c == '.') || (c == 0)) d = 0;              /* fill if . or end */
+        if ((c == '.') || (c == 0))                     /* fill if . or end */
+            d = 0;
         else {
-            if ((d = rtfile_ator50 (c)) == 0) return FALSE;
+            if ((d = rtfile_ator50 (c)) == 0)
+                return FALSE;
             pntr++;
             }
         file_name[i] = (file_name[i] * 050) + d;        /* merge into name */
         }
     }
-if (file_name[0] == 0) return FALSE;                    /* no name? lose */
+if (file_name[0] == 0)                                  /* no name? lose */
+    return FALSE;
 while ((c = *pntr++) != '.') {                          /* scan for . */
-    if (c == 0) return TRUE;                            /* end? done */
+    if (c == 0)                                         /* end? done */
+        return TRUE;
     }
 for (i = 0; i < 3; i++) {                               /* 3 characters */
     c = *pntr;
-    if (c == 0) d = 0;                                  /* fill if end */
+    if (c == 0)                                         /* fill if end */
+        d = 0;
     else {
-        if ((d = rtfile_ator50 (c)) == 0) return FALSE;
+        if ((d = rtfile_ator50 (c)) == 0)
+            return FALSE;
         pntr++;
         }
     file_name[2] = (file_name[2] * 050) + d;            /* merge into ext */
@@ -179,8 +186,7 @@ uint32 rtfile_lookup (uint16 *file_name, uint32 *start)
 uint16 dirseg[DS_SIZE];
 uint32 segnum, dirent;
 
-for (segnum = 1;                                        /* loop thru segments */
-     (segnum != 0) && (segnum <= DS_MAX);
+for (segnum = 1; (segnum != 0) && (segnum <= DS_MAX);   /* loop thru segments */
      segnum = dirseg[DS_NEXT]) {
     if (!rtfile_read ((segnum * 2) + 4, 2, dirseg))     /* read segment */
         return 0;                                       /* error? */

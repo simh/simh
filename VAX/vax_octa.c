@@ -254,21 +254,27 @@ switch (opc) {
         r = op_cvthi (opnd, &flg, opc) & BMASK;         /* convert */
         h_write_b (spec, va, r, acc);                   /* write result */
         CC_IIZZ_B (r);                                  /* set cc's */
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     case CVTHW:
         r = op_cvthi (opnd, &flg, opc) & WMASK;         /* convert */
         h_write_w (spec, va, r, acc);                   /* write result */
         CC_IIZZ_W (r);                                  /* set cc's */
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     case CVTHL: case CVTRHL:
         r = op_cvthi (opnd, &flg, opc) & LMASK;         /* convert */
         h_write_l (spec, va, r, acc);                   /* write result */
         CC_IIZZ_L (r);                                  /* set cc's */
-        if (flg) { V_INTOV; }
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
 /* CVTFH
@@ -421,11 +427,14 @@ switch (opc) {
             Read (opnd[12], L_BYTE, WA);                /* prove write */
             Read ((opnd[12] + 15) & LMASK, L_BYTE, WA);
             }
-        if (opnd[9] >= 0) R[opnd[9]] = temp;            /* store 1st */
+        if (opnd[9] >= 0)                               /* store 1st */
+            R[opnd[9]] = temp;
         else Write (opnd[10], temp, L_LONG, WA);
         h_write_o (spec, va, r_octa, acc);              /* write 2nd */
         CC_IIZZ_FP (r);                                 /* set cc's */
-        if (flg) { V_INTOV; }                           /* int ovflo? */
+        if (flg) {
+            V_INTOV;
+            }
         break;
 
     default:
@@ -442,8 +451,10 @@ return cc;
 
 int32 op_tsth (int32 val)
 {
-if (val & H_EXP) return val;                            /* non-zero? */
-if (val & FPSIGN) RSVD_OPND_FAULT;                      /* reserved? */
+if (val & H_EXP)                                        /* non-zero? */
+    return val;
+if (val & FPSIGN)                                       /* reserved? */
+    RSVD_OPND_FAULT;
 return 0;                                               /* clean 0 */
 }
 
@@ -456,11 +467,15 @@ int32 r;
 
 h_unpackh (hf1, &a);                                    /* unpack op1 */
 h_unpackh (hf2, &b);                                    /* unpack op2 */
-if (a.sign != b.sign) return (a.sign? CC_N: 0);         /* opp signs? */
-if (a.exp != b.exp) r = a.exp - b.exp;                  /* cmp exp */
+if (a.sign != b.sign)                                   /* opp signs? */
+    return (a.sign? CC_N: 0);
+if (a.exp != b.exp)                                     /* cmp exp */
+    r = a.exp - b.exp;
 else r = qp_cmp (&a.frac, &b.frac);                     /* if =, cmp frac */
-if (r < 0) return (a.sign? 0: CC_N);                    /* !=, maybe set N */
-if (r > 0) return (a.sign? CC_N: 0);
+if (r < 0)                                              /* !=, maybe set N */
+    return (a.sign? 0: CC_N);
+if (r > 0)
+    return (a.sign? CC_N: 0);
 return CC_Z;                                            /* =, set Z */
 }
 
@@ -498,17 +513,21 @@ static uint32 maxv[4] = { 0x7F, 0x7FFF, 0x7FFFFFFF, 0x7FFFFFFF };
 *flg = 0;                                               /* clear ovflo */
 h_unpackh (hf, &a);                                     /* unpack */
 ubexp = a.exp - H_BIAS;                                 /* unbiased exp */
-if ((a.exp == 0) || (ubexp < 0)) return 0;              /* true zero or frac? */
+if ((a.exp == 0) || (ubexp < 0))                        /* true zero or frac? */
+    return 0;
 if (ubexp <= UH_V_NM) {                                 /* exp in range? */
     qp_rsh (&a.frac, UH_V_NM - ubexp);                  /* leave rnd bit */
-    if (lnt == 03) qp_inc (&a.frac);                    /* if CVTR, round */
+    if (lnt == 03)                                      /* if CVTR, round */
+        qp_inc (&a.frac);
     qp_rsh (&a.frac, 1);                                /* now justified */
     if (a.frac.f3 || a.frac.f2 || a.frac.f1 ||
-        (a.frac.f0 > (maxv[lnt] + (a.sign? 1: 0)))) *flg = CC_V;
+        (a.frac.f0 > (maxv[lnt] + (a.sign? 1: 0))))
+        *flg = CC_V;
     }
 else {
     *flg = CC_V;                                        /* always ovflo */
-    if (ubexp > (UH_V_NM + 32)) return 0;               /* in ext range? */
+    if (ubexp > (UH_V_NM + 32))                         /* in ext range? */
+        return 0;
     qp_lsh (&a.frac, ubexp - UH_V_NM - 1);              /* no rnd bit */
     }
 return (a.sign? NEG (a.frac.f0): a.frac.f0);            /* return lo frac */
@@ -560,7 +579,8 @@ UFPH a, b;
 
 h_unpackh (&opnd[0], &a);                               /* unpack s1, s2 */
 h_unpackh (&opnd[4], &b);
-if (sub) a.sign = a.sign ^ FPSIGN;                      /* sub? -s1 */
+if (sub)                                                /* sub? -s1 */
+    a.sign = a.sign ^ FPSIGN;
 vax_hadd (&a, &b);                                      /* do add */
 return h_rpackh (&a, hflt);                             /* round and pack */
 }
@@ -604,7 +624,8 @@ int32 deg = opnd[4];
 int32 ptr = opnd[5];
 int32 i, wd[4], res[4];
 
-if (deg > 31) RSVD_OPND_FAULT;                          /* deg > 31? fault */
+if (deg > 31)                                           /* deg > 31? fault */
+    RSVD_OPND_FAULT;
 h_unpackh (&opnd[0], &a);                               /* unpack arg */
 wd[0] = Read (ptr, L_LONG, RD);                         /* get C0 */
 wd[1] = Read (ptr + 4, L_LONG, RD);
@@ -679,12 +700,14 @@ if ((a->exp < b->exp) ||                                /* |s1| < |s2|? */
 ediff = a->exp - b->exp;                                /* exp diff */
 if (a->sign ^ b->sign) {                                /* eff sub? */
     qp_neg (&b->frac);                                  /* negate fraction */
-    if (ediff) qp_rsh_s (&b->frac, ediff, 1);           /* denormalize */
+    if (ediff)                                          /* denormalize */
+        qp_rsh_s (&b->frac, ediff, 1);
     qp_add (&a->frac, &b->frac);                        /* "add" frac */
     h_normh (a);                                        /* normalize */
     }
 else {
-    if (ediff) qp_rsh (&b->frac, ediff);                /* add, denormalize */
+    if (ediff)                                          /* add, denormalize */
+        qp_rsh (&b->frac, ediff);
     if (qp_add (&a->frac, &b->frac)) {                  /* add frac, carry? */
         qp_rsh (&a->frac, 1);                           /* renormalize */
         a->frac.f3 = a->frac.f3 | UH_NM_H;              /* add norm bit */
@@ -710,10 +733,12 @@ if ((a->exp == 0) || (b->exp == 0)) {                   /* zero argument? */
 a->sign = a->sign ^ b->sign;                            /* sign of result */
 a->exp = a->exp + b->exp - H_BIAS;                      /* add exponents */
 for (i = 0; i < 128; i++) {                             /* quad precision */
-    if (a->frac.f0 & 1) c = qp_add (&accum, &b->frac);  /* mplr low? add */
+    if (a->frac.f0 & 1)                                 /* mplr low? add */
+        c = qp_add (&accum, &b->frac);
     else c = 0;
     qp_rsh (&accum, 1);                                 /* shift result */
-    if (c) accum.f3 = accum.f3 | UH_NM_H;               /* add carry out */
+    if (c)                                              /* add carry out */
+        accum.f3 = accum.f3 | UH_NM_H;
     qp_rsh (&a->frac, 1);                               /* shift mplr */
     }
 a->frac = accum;                                        /* result */
@@ -736,7 +761,8 @@ void vax_hmod (UFPH *a, int32 *intgr, int32 *flg)
 {
 UQP ifr;
 
-if (a->exp <= H_BIAS) *intgr = *flg = 0;                /* 0 or <1? int = 0 */
+if (a->exp <= H_BIAS)                                   /* 0 or <1? int = 0 */
+    *intgr = *flg = 0;
 else if (a->exp <= (H_BIAS + 128)) {                    /* in range? */
     ifr = a->frac;
     qp_rsh (&ifr, 128 - (a->exp - H_BIAS));             /* separate integer */
@@ -746,7 +772,8 @@ else if (a->exp <= (H_BIAS + 128)) {                    /* in range? */
         *flg = CC_V;
     else *flg = 0;
     *intgr = ifr.f0;
-    if (a->sign) *intgr = -*intgr;                      /* -? comp int */
+    if (a->sign)                                        /* -? comp int */
+        *intgr = -*intgr;
     qp_lsh (&a->frac, a->exp - H_BIAS);                 /* excise integer */
     a->exp = H_BIAS;
     }
@@ -770,8 +797,10 @@ void vax_hdiv (UFPH *a, UFPH *b)
 int32 i;
 UQP quo = { 0, 0, 0, 0 };
 
-if (a->exp == 0) FLT_DZRO_FAULT;                        /* divr = 0? */
-if (b->exp == 0) return;                                /* divd = 0? */
+if (a->exp == 0)                                        /* divr = 0? */
+    FLT_DZRO_FAULT;
+if (b->exp == 0)                                        /* divd = 0? */
+    return; 
 b->sign = b->sign ^ a->sign;                            /* result sign */
 b->exp = b->exp - a->exp + H_BIAS + 1;                  /* unbiased exp */
 qp_rsh (&a->frac, 1);                                   /* allow 1 bit left */
@@ -793,14 +822,22 @@ return;
 
 int32 qp_cmp (UQP *a, UQP *b)
 {
-if (a->f3 < b->f3) return -1;                           /* compare hi */
-if (a->f3 > b->f3) return +1;
-if (a->f2 < b->f2) return -1;                           /* hi =, compare mid1 */
-if (a->f2 > b->f2) return +1;
-if (a->f1 < b->f1) return -1;                           /* mid1 =, compare mid2 */
-if (a->f1 > b->f1) return +1;
-if (a->f0 < b->f0) return -1;                           /* mid2 =, compare lo */
-if (a->f0 > b->f0) return +1;
+if (a->f3 < b->f3)                                      /* compare hi */
+    return -1;
+if (a->f3 > b->f3)
+    return +1;
+if (a->f2 < b->f2)                                      /* hi =, compare mid1 */
+    return -1;
+if (a->f2 > b->f2)
+    return +1;
+if (a->f1 < b->f1)                                      /* mid1 =, compare mid2 */
+    return -1;
+if (a->f1 > b->f1)
+    return +1;
+if (a->f0 < b->f0)                                      /* mid2 =, compare lo */
+    return -1;
+if (a->f0 > b->f0)
+    return +1;
 return 0;                                               /* all equal */
 }
 
@@ -855,18 +892,22 @@ uint32 cryin;
 
 cryin = 1;
 a->f0 = (~a->f0 + cryin) & LMASK;
-if (a->f0 != 0) cryin = 0;
+if (a->f0 != 0)
+    cryin = 0;
 a->f1 = (~a->f1 + cryin) & LMASK;
-if (a->f1 != 0) cryin = 0;
+if (a->f1 != 0)
+    cryin = 0;
 a->f2 = (~a->f2 + cryin) & LMASK;
-if (a->f2 != 0) cryin = 0;
+if (a->f2 != 0)
+    cryin = 0;
 a->f3 = (~a->f3 + cryin) & LMASK;
 return;
 }
 
 void qp_lsh (UQP *r, uint32 sc)
 {
-if (sc >= 128) r->f3 = r->f2 = r->f1 = r->f0 = 0;       /* > 127? result 0 */
+if (sc >= 128)                                          /* > 127? result 0 */
+    r->f3 = r->f2 = r->f1 = r->f0 = 0;
 else if (sc >= 96) {                                    /* [96,127]? */
     r->f3 = (r->f0 << (sc - 96)) & LMASK;
     r->f2 = r->f1 = r->f0 = 0;
@@ -904,7 +945,8 @@ return;
 
 void qp_rsh (UQP *r, uint32 sc)
 {
-if (sc >= 128) r->f3 = r->f2 = r->f1 = r->f0 = 0;       /* > 127? result 0 */
+if (sc >= 128)                                          /* > 127? result 0 */
+    r->f3 = r->f2 = r->f1 = r->f0 = 0;
 else if (sc >= 96) {                                    /* [96,127]? */
     r->f0 = (r->f3 >> (sc - 96)) & LMASK;
     r->f1 = r->f2 = r->f3 = 0;
@@ -966,7 +1008,8 @@ r->sign = hi & FPSIGN;                                  /* get sign */
 r->exp = FD_GETEXP (hi);                                /* get exponent */
 r->frac.f0 = r->frac.f1 = 0;                            /* low bits 0 */
 if (r->exp == 0) {                                      /* exp = 0? */
-    if (r->sign) RSVD_OPND_FAULT;                       /* if -, rsvd op */
+    if (r->sign)                                        /* if -, rsvd op */
+        RSVD_OPND_FAULT;
     r->frac.f2 = r->frac.f3 = 0;                        /* else 0 */
     return;
     }
@@ -982,7 +1025,8 @@ r->sign = hi & FPSIGN;                                  /* get sign */
 r->exp = G_GETEXP (hi);                                 /* get exponent */
 r->frac.f0 = r->frac.f1 = 0;                            /* low bits 0 */
 if (r->exp == 0) {                                      /* exp = 0? */
-    if (r->sign) RSVD_OPND_FAULT;                       /* if -, rsvd op */
+    if (r->sign)                                        /* if -, rsvd op */
+        RSVD_OPND_FAULT;
     r->frac.f2 = r->frac.f3 = 0;                        /* else 0 */
     return;
     }
@@ -997,7 +1041,8 @@ void h_unpackh (int32 *hflt, UFPH *r)
 r->sign = hflt[0] & FPSIGN;                             /* get sign */
 r->exp = H_GETEXP (hflt[0]);                            /* get exponent */
 if (r->exp == 0) {                                      /* exp = 0? */
-    if (r->sign) RSVD_OPND_FAULT;                       /* if -, rsvd op */
+    if (r->sign)                                        /* if -, rsvd op */
+        RSVD_OPND_FAULT;
     r->frac.f0 = r->frac.f1 = 0;                        /* else 0 */
     r->frac.f2 = r->frac.f3 = 0;
     return;
@@ -1019,12 +1064,13 @@ static int32 normtab[6] = { 1, 2, 4, 8, 16, 32};
 
 if ((r->frac.f0 == 0) && (r->frac.f1 == 0) &&
     (r->frac.f2 == 0) && (r->frac.f3 == 0)) {           /* if fraction = 0 */
-        r->sign = r->exp = 0;                           /* result is 0 */
-        return;
-        }
+    r->sign = r->exp = 0;                               /* result is 0 */
+    return;
+    }
 while ((r->frac.f3 & UH_NM_H) == 0) {                   /* normalized? */
     for (i = 0; i < 5; i++) {                           /* find first 1 */
-        if (r->frac.f3 & normmask[i]) break;
+        if (r->frac.f3 & normmask[i])
+            break;
         }
     qp_lsh (&r->frac, normtab[i]);                      /* shift frac */
     r->exp = r->exp - normtab[i];                       /* decr exp */
@@ -1037,20 +1083,25 @@ int32 h_rpackfd (UFPH *r, int32 *rh)
 static UQP f_round = { 0, 0, 0, UH_FRND };
 static UQP d_round = { 0, 0, UH_DRND, 0 };
 
-if (rh) *rh = 0;                                        /* assume 0 */
-if ((r->frac.f3 == 0) && (r->frac.f2 == 0)) return 0;   /* frac = 0? done */
+if (rh)                                                 /* assume 0 */
+    *rh = 0;
+if ((r->frac.f3 == 0) && (r->frac.f2 == 0))             /* frac = 0? done */
+    return 0;
 qp_add (&r->frac, rh? &d_round: &f_round);
 if ((r->frac.f3 & UH_NM_H) == 0) {                      /* carry out? */
     qp_rsh (&r->frac, 1);                               /* renormalize */
     r->exp = r->exp + 1;
     }
-if (r->exp > (int32) FD_M_EXP) FLT_OVFL_FAULT;          /* ovflo? fault */
+if (r->exp > (int32) FD_M_EXP)                          /* ovflo? fault */
+    FLT_OVFL_FAULT;
 if (r->exp <= 0) {                                      /* underflow? */
-    if (PSL & PSW_FU) FLT_UNFL_FAULT;                   /* fault if fu */
+    if (PSL & PSW_FU)                                   /* fault if fu */
+        FLT_UNFL_FAULT;
     return 0;                                           /* else 0 */
     }
 qp_rsh (&r->frac, FD_GUARD);                            /* remove guard */
-if (rh) *rh = WORDSWAP (r->frac.f2);
+if (rh)
+    *rh = WORDSWAP (r->frac.f2);
 return r->sign | (r->exp << FD_V_EXP) |
     (WORDSWAP (r->frac.f3) & ~(FD_HB | FPSIGN | FD_EXP));
 }
@@ -1060,15 +1111,18 @@ int32 h_rpackg (UFPH *r, int32 *rh)
 static UQP g_round = { 0, 0, UH_GRND, 0 };
 
 *rh = 0;                                                /* assume 0 */
-if ((r->frac.f3 == 0) && (r->frac.f2 == 0)) return 0;   /* frac = 0? done */
+if ((r->frac.f3 == 0) && (r->frac.f2 == 0))             /* frac = 0? done */
+    return 0;
 qp_add (&r->frac, &g_round);                            /* round */
 if ((r->frac.f3 & UH_NM_H) == 0) {                      /* carry out? */
     qp_rsh (&r->frac, 1);                               /* renormalize */
     r->exp = r->exp + 1;
     }
-if (r->exp > (int32) G_M_EXP) FLT_OVFL_FAULT;           /* ovflo? fault */
+if (r->exp > (int32) G_M_EXP)                           /* ovflo? fault */
+    FLT_OVFL_FAULT;
 if (r->exp <= 0) {                                      /* underflow? */
-    if (PSL & PSW_FU) FLT_UNFL_FAULT;                   /* fault if fu */
+    if (PSL & PSW_FU)                                   /* fault if fu */
+        FLT_UNFL_FAULT;
     return 0;                                           /* else 0 */
     }
 qp_rsh (&r->frac, G_GUARD);                             /* remove guard */
@@ -1083,14 +1137,17 @@ static UQP h_round = { UH_HRND, 0, 0, 0 };
 
 hflt[0] = hflt[1] = hflt[2] = hflt[3] = 0;              /* assume 0 */
 if ((r->frac.f3 == 0) && (r->frac.f2 == 0) &&           /* frac = 0? done */
-    (r->frac.f1 == 0) && (r->frac.f0 == 0)) return 0;
+    (r->frac.f1 == 0) && (r->frac.f0 == 0))
+    return 0;
 if (qp_add (&r->frac, &h_round)) {                      /* round, carry out? */
     qp_rsh (&r->frac, 1);                               /* renormalize */
     r->exp = r->exp + 1;
     }
-if (r->exp > (int32) H_M_EXP) FLT_OVFL_FAULT;           /* ovflo? fault */
+if (r->exp > (int32) H_M_EXP)                           /* ovflo? fault */
+    FLT_OVFL_FAULT;
 if (r->exp <= 0) {                                      /* underflow? */
-    if (PSL & PSW_FU) FLT_UNFL_FAULT;                   /* fault if fu */
+    if (PSL & PSW_FU)                                   /* fault if fu */
+        FLT_UNFL_FAULT;
     return 0;                                           /* else 0 */
     }
 qp_rsh (&r->frac, H_GUARD);                             /* remove guard */
@@ -1106,7 +1163,8 @@ void h_write_b (int32 spec, int32 va, int32 val, int32 acc)
 {
 int32 rn;
 
-if (spec > (GRN | nPC)) Write (va, val, L_BYTE, WA);
+if (spec > (GRN | nPC))
+    Write (va, val, L_BYTE, WA);
 else {
     rn = spec & 0xF;
     R[rn] = (R[rn] & ~BMASK) | val;
@@ -1118,7 +1176,8 @@ void h_write_w (int32 spec, int32 va, int32 val, int32 acc)
 {
 int32 rn;
 
-if (spec > (GRN | nPC)) Write (va, val, L_WORD, WA);
+if (spec > (GRN | nPC))
+    Write (va, val, L_WORD, WA);
 else {
     rn = spec & 0xF;
     R[rn] = (R[rn] & ~WMASK) | val;
@@ -1128,7 +1187,8 @@ return;
 
 void h_write_l (int32 spec, int32 va, int32 val, int32 acc)
 {
-if (spec > (GRN | nPC)) Write (va, val, L_LONG, WA);
+if (spec > (GRN | nPC))
+    Write (va, val, L_LONG, WA);
 else R[spec & 0xF] = val;
 return;
 }
@@ -1145,7 +1205,8 @@ if (spec > (GRN | nPC)) {
     }
 else {
     rn = spec & 0xF;
-    if (rn >= nSP) RSVD_ADDR_FAULT;
+    if (rn >= nSP)
+        RSVD_ADDR_FAULT;
     R[rn] = vl;
     R[rn + 1] = vh;
     }
@@ -1166,7 +1227,8 @@ if (spec > (GRN | nPC)) {
     }
 else {
     rn = spec & 0xF;
-    if (rn >= nAP) RSVD_ADDR_FAULT;
+    if (rn >= nAP)
+        RSVD_ADDR_FAULT;
     R[rn] = val[0];
     R[rn + 1] = val[1];
     R[rn + 2] = val[2];

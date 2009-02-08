@@ -1,6 +1,6 @@
 /* pdp8_tsc.c: PDP-8 ETOS timesharing option board (TSC8-75)
 
-   Copyright (c) 2003-2005, Robert M Supnik
+   Copyright (c) 2003-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -118,7 +118,8 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
 
     case 3:                                             /* ECDF */
         AC = AC | ((tsc_ir >> 3) & 07);                 /* read "ERIOT"<6:8> */
-        if (tsc_cdf) AC = AC | IOT_SKP;                 /* if cdf, skip */
+        if (tsc_cdf)                                    /* if cdf, skip */
+            AC = AC | IOT_SKP;
         tsc_cdf = 0;
         break;
 

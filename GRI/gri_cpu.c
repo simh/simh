@@ -421,7 +421,8 @@ ao_update ();                                           /* update AO */
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ()) break;
+        if (reason = sim_process_event ())
+            break;
         }
 
     if (bkp) {                                          /* breakpoint? */
@@ -435,7 +436,8 @@ while (reason == 0) {                                   /* loop until halted */
         int32 i, vec;
         t = dev_done & ISR;                             /* find hi pri */
         for (i = 15; i >= 0; i--) {
-            if ((t >> i) & 1) break;
+            if ((t >> i) & 1)
+                break;
 			}
         if ((i < 0) || ((vec = vec_map[i]) < 0)) {      /* undefined? */
             reason = STOP_ILLINT;                       /* stop */
@@ -471,7 +473,8 @@ while (reason == 0) {                                   /* loop until halted */
     else if (dst == U_FSK) {                            /* skip func? */
         t = dev_tab[src].SF (op & ~1);                  /* issue SF */
         reason = t >> SF_V_REASON;
-        if ((t ^ op) & 1) SC = SC + 2;                  /* skip? */
+        if ((t ^ op) & 1)                               /* skip? */
+            SC = SC + 2;
         SC = (SC + 1) & AMASK;                          /* incr SC */
         }
 
@@ -555,7 +558,8 @@ while (reason == 0) {                                   /* loop until halted */
                 MA = IDX_ADD (MA);                      /* index? */
                 SC = (SC + 1) & AMASK;                  /* incr SC again */
                 t = (M[MA] + 1) & DMASK;                /* autoinc */
-                if (MEM_ADDR_OK (MA)) M[MA] = t;
+                if (MEM_ADDR_OK (MA))
+                    M[MA] = t;
                 MA = IDX_ADD (t);                       /* index? */
                 reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
                 break;
@@ -569,7 +573,8 @@ while (reason == 0) {                                   /* loop until halted */
             case MEM_IDF:                               /* immediate defer */
                 MA = SC;                                /* get ind addr */
                 t = (M[MA] + 1) & DMASK;                /* autoinc */
-                if (MEM_ADDR_OK (MA)) M[MA] = t;
+                if (MEM_ADDR_OK (MA))
+                    M[MA] = t;
                 MA = IDX_ADD (t);                       /* index? */
                 SC = (SC + 1) & AMASK;                  /* incr SC again */
                 reason = bus_op (src, op & BUS_FNC, dst); /* xmt and modify */
@@ -592,30 +597,35 @@ t_stat bus_op (uint32 src, uint32 op, uint32 dst)
 uint32 t, old_t;
 
 t = dev_tab[src].Src (src);                             /* get src */
-if (op & BUS_COM) t = t ^ DMASK;                        /* complement? */
+if (op & BUS_COM)                                       /* complement? */
+    t = t ^ DMASK;
 switch (op & BUS_FNC) {                                 /* case op */
 
     case BUS_P1:                                        /* plus 1 */
         t = t + 1;                                      /* do add */
-        if (t & CBIT) MSR = MSR | MSR_BOV;              /* set cry out */
+        if (t & CBIT)                                   /* set cry out */
+            MSR = MSR | MSR_BOV;
         else MSR = MSR & ~MSR_BOV;
         break;
 
     case BUS_L1:                                        /* left 1 */
         t = (t << 1) | ((MSR & MSR_L)? 1: 0);           /* rotate */
-        if (t & CBIT) MSR = MSR | MSR_L;                /* set link out */
+        if (t & CBIT)                                   /* set link out */
+            MSR = MSR | MSR_L;
         else MSR = MSR & ~MSR_L;
         break;
 
     case BUS_R1:                                        /* right 1 */
         old_t = t;
         t = (t >> 1) | ((MSR & MSR_L)? SIGN: 0);        /* rotate */
-        if (old_t & 1) MSR = MSR | MSR_L;               /* set link out */
+        if (old_t & 1)                                  /* set link out */
+            MSR = MSR | MSR_L;
         else MSR = MSR & ~MSR_L;
         break;
         }                                               /* end case op */
 
-if (dst == thwh) DR = t & DMASK;                        /* display dst? */
+if (dst == thwh)                                        /* display dst? */
+    DR = t & DMASK;
 return dev_tab[dst].Dst (dst, t & DMASK);               /* store dst */
 }
 
@@ -670,7 +680,8 @@ switch (op & 3) {                                       /* FOM link */
         break;
         }
 
-if (op & 4) return STOP_HALT;                           /* HALT */
+if (op & 4)                                             /* HALT */
+    return STOP_HALT;
 return SCPE_OK;
 }
 
@@ -678,7 +689,8 @@ uint32 zero_sf (uint32 op)
 {
 if ((op & 010) ||                                       /* power always ok */
     ((op & 4) && (MSR & MSR_L)) ||                      /* link set? */
-    ((op & 2) && (MSR & MSR_BOV))) return 1;            /* BOV set? */
+    ((op & 2) && (MSR & MSR_BOV)))                      /* BOV set? */
+    return 1;
 return 0;
 }
 
@@ -691,7 +703,8 @@ return IR;
 
 t_stat ir_fo (uint32 op)
 {
-if (op & 2) bkp = 1;
+if (op & 2)
+    bkp = 1;
 return SCPE_OK;
 }
 
@@ -723,8 +736,10 @@ return SCPE_OK;
 
 t_stat isr_fo (uint32 op)
 {
-if (op & ISR_ON) dev_done = (dev_done | INT_ON) & ~INT_NODEF;
-if (op & ISR_OFF) dev_done = dev_done & ~INT_ON;
+if (op & ISR_ON)
+    dev_done = (dev_done | INT_ON) & ~INT_NODEF;
+if (op & ISR_OFF)
+    dev_done = dev_done & ~INT_ON;
 return SCPE_OK;
 }
 
@@ -750,7 +765,8 @@ return M[MA];
 t_stat mem_wr (uint32 dst, uint32 dat)
 {
 
-if (MEM_ADDR_OK (MA)) M[MA] = dat;
+if (MEM_ADDR_OK (MA))
+    M[MA] = dat;
 return SCPE_OK;
 }
 
@@ -814,7 +830,8 @@ switch (af) {
         break;
         }
 
-if ((AX + AY) & CBIT) MSR = MSR | MSR_AOV;              /* always calc AOV */
+if ((AX + AY) & CBIT)                                   /* always calc AOV */
+    MSR = MSR | MSR_AOV;
 else MSR = MSR & ~MSR_AOV;
 if (SIGN & ((AX ^ (AX + AY)) & (~AX ^ AY)))             /* always calc SOV */
     MSR = MSR | MSR_SOV;
@@ -824,7 +841,8 @@ return AO;
 
 uint32 ax_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_AO) return AX;
+if (cpu_unit.flags & UNIT_AO)
+    return AX;
 else return 0;
 }
 
@@ -840,7 +858,8 @@ return stop_opr;
 
 uint32 ay_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_AO) return AY;
+if (cpu_unit.flags & UNIT_AO)
+    return AY;
 else return 0;
 }
 
@@ -856,7 +875,8 @@ return stop_opr;
 
 uint32 ao_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_AO) return ao_update ();
+if (cpu_unit.flags & UNIT_AO)
+    return ao_update ();
 else return 0;
 }
 
@@ -876,7 +896,8 @@ uint32 ao_sf (uint32 op)
 if (!(cpu_unit.flags & UNIT_AO))                        /* not installed? */
     return (stop_opr << SF_V_REASON);
 if (((op & 2) && (MSR & MSR_AOV)) ||                    /* arith carry? */
-    ((op & 4) && (MSR & MSR_SOV))) return 1;            /* arith overflow? */
+    ((op & 4) && (MSR & MSR_SOV)))                      /* arith overflow? */
+    return 1;
 return 0;
 }
 
@@ -908,7 +929,8 @@ switch (op) {
 
     case EAO_ARS:                                       /* arith right? */
         t = 0;                                          /* shift limiter */
-        if (AX & SIGN) MSR = MSR | MSR_L;               /* L = sign */
+        if (AX & SIGN)                                  /* L = sign */
+            MSR = MSR | MSR_L;
         else MSR = MSR & ~MSR_L;
         do {                                            /* shift one bit */
             AY = ((AY >> 1) | (AX << 15)) & DMASK;
@@ -938,7 +960,8 @@ return SCPE_OK;
 
 uint32 xr_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_GRI99) return XR;
+if (cpu_unit.flags & UNIT_GRI99)
+    return XR;
 else return 0;
 }
 
@@ -955,7 +978,8 @@ return stop_opr;
 
 uint32 atrp_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_GRI99) return TRP;
+if (cpu_unit.flags & UNIT_GRI99)
+    return TRP;
 else return 0;
 }
 
@@ -972,7 +996,8 @@ return stop_opr;
 
 uint32 bsw_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_BSWPK) return BSW;
+if (cpu_unit.flags & UNIT_BSWPK)
+    return BSW;
 else return 0;
 }
 
@@ -989,7 +1014,8 @@ return stop_opr;
 
 uint32 bpk_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_BSWPK) return BPK;
+if (cpu_unit.flags & UNIT_BSWPK)
+    return BPK;
 else return 0;
 }
 
@@ -1006,7 +1032,8 @@ return stop_opr;
 
 uint32 gr_rd (uint32 src)
 {
-if (cpu_unit.flags & UNIT_GPR) return GR[src - U_GR];
+if (cpu_unit.flags & UNIT_GPR)
+    return GR[src - U_GR];
 else return 0;
 }
 
@@ -1032,10 +1059,12 @@ ISR = 0;
 MSR = 0;
 MA = IR = 0;
 BSW = BPK = 0;
-for (i = 0; i < 6; i++) GR[i] = 0;
+for (i = 0; i < 6; i++)
+    GR[i] = 0;
 dev_done = dev_done & ~INT_PENDING;
 scq_r = find_reg ("SCQ", NULL, dptr);
-if (scq_r) scq_r->qptr = 0;
+if (scq_r)
+    scq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1045,8 +1074,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & DMASK;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[addr] & DMASK;
 return SCPE_OK;
 }
 
@@ -1054,7 +1085,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 M[addr] = val & DMASK;
 return SCPE_OK;
 }
@@ -1066,10 +1098,12 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }

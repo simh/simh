@@ -2192,27 +2192,31 @@ static void i86op_opc80_byte_RM_IMM(PC_ENV *m)
       destval = fetch_data_byte(m,destoffset);
       imm  =  fetch_byte_imm(m);
       destval = (*opc80_byte_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_byte(m,destoffset,destval);
+      if (rh != 7)
+          store_data_byte(m,destoffset,destval);
       break;
     case 1:
       destoffset=decode_rm01_address(m,rl);
       destval = fetch_data_byte(m,destoffset);
       imm  =  fetch_byte_imm(m);
       destval = (*opc80_byte_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_byte(m,destoffset,destval);
+      if (rh != 7)
+          store_data_byte(m,destoffset,destval);
       break;
     case 2:
       destoffset=decode_rm10_address(m,rl);
       destval = fetch_data_byte(m,destoffset);
       imm  =  fetch_byte_imm(m);
       destval = (*opc80_byte_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_byte(m,destoffset,destval);
+      if (rh != 7)
+          store_data_byte(m,destoffset,destval);
       break;
     case 3:   /* register to register */
       destreg  = DECODE_RM_BYTE_REGISTER(m,rl);
       imm  =  fetch_byte_imm(m);
       destval = (*opc80_byte_operation[rh])(m, *destreg, imm);
-      if (rh != 7) *destreg = destval;
+      if (rh != 7)
+          *destreg = destval;
       break;
        }
    DECODE_CLEAR_SEGOVR(m);
@@ -2251,27 +2255,31 @@ static void i86op_opc81_word_RM_IMM(PC_ENV *m)
       destval = fetch_data_word(m,destoffset);
       imm  =  fetch_word_imm(m);
       destval = (*opc81_word_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_word(m,destoffset,destval);
+      if (rh != 7)
+          store_data_word(m,destoffset,destval);
       break;
     case 1:
       destoffset=decode_rm01_address(m,rl);
       destval = fetch_data_word(m,destoffset);
       imm  =  fetch_word_imm(m);
       destval = (*opc81_word_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_word(m,destoffset,destval);
+      if (rh != 7)
+          store_data_word(m,destoffset,destval);
       break;
     case 2:
       destoffset=decode_rm10_address(m,rl);
       destval = fetch_data_word(m,destoffset);
       imm  =  fetch_word_imm(m);
       destval = (*opc81_word_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_word(m,destoffset,destval);
+      if (rh != 7)
+          store_data_word(m,destoffset,destval);
       break;
     case 3:   /* register to register */
       destreg  = DECODE_RM_WORD_REGISTER(m,rl);
       imm  =  fetch_word_imm(m);
       destval = (*opc81_word_operation[rh])(m, *destreg, imm);
-      if (rh != 7) *destreg = destval;
+      if (rh != 7)
+          *destreg = destval;
       break;
        }
    DECODE_CLEAR_SEGOVR(m);
@@ -2313,27 +2321,31 @@ static void i86op_opc82_byte_RM_IMM(PC_ENV *m)
       destval = fetch_data_byte(m,destoffset);
       imm  = fetch_byte_imm(m);
       destval = (*opc82_byte_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_byte(m,destoffset,destval);
+      if (rh != 7)
+          store_data_byte(m,destoffset,destval);
       break;
     case 1:
       destoffset=decode_rm01_address(m,rl);
       destval = fetch_data_byte(m,destoffset);
       imm  =  fetch_byte_imm(m);
       destval = (*opc82_byte_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_byte(m,destoffset,destval);
+      if (rh != 7)
+          store_data_byte(m,destoffset,destval);
       break;
     case 2:
       destoffset=decode_rm10_address(m,rl);
       destval = fetch_data_byte(m,destoffset);
       imm  =  fetch_byte_imm(m);
       destval = (*opc82_byte_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_byte(m,destoffset,destval);
+      if (rh != 7)
+          store_data_byte(m,destoffset,destval);
       break;
     case 3:   /* register to register */
       destreg  = DECODE_RM_BYTE_REGISTER(m,rl);
       imm  =  fetch_byte_imm(m);
       destval = (*opc82_byte_operation[rh])(m, *destreg, imm);
-      if (rh != 7) *destreg = destval;
+      if (rh != 7)
+          *destreg = destval;
       break;
        }
    DECODE_CLEAR_SEGOVR(m);
@@ -2375,27 +2387,31 @@ static void i86op_opc83_word_RM_IMM(PC_ENV *m)
       destval = fetch_data_word(m,destoffset);
       imm  = (int8)fetch_byte_imm(m);
       destval = (*opc83_word_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_word(m,destoffset,destval);
+      if (rh != 7)
+          store_data_word(m,destoffset,destval);
       break;
     case 1:
       destoffset=decode_rm01_address(m,rl);
       destval = fetch_data_word(m,destoffset);
       imm  =  (int8)fetch_byte_imm(m);
       destval = (*opc83_word_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_word(m,destoffset,destval);
+      if (rh != 7)
+          store_data_word(m,destoffset,destval);
       break;
     case 2:
       destoffset=decode_rm10_address(m,rl);
       destval = fetch_data_word(m,destoffset);
       imm  =  (int8) fetch_byte_imm(m);
       destval = (*opc83_word_operation[rh])(m, destval, imm);
-      if (rh != 7) store_data_word(m,destoffset,destval);
+      if (rh != 7)
+          store_data_word(m,destoffset,destval);
       break;
     case 3:   /* register to register */
       destreg  = DECODE_RM_WORD_REGISTER(m,rl);
       imm  = (int8) fetch_byte_imm(m);
       destval = (*opc83_word_operation[rh])(m, *destreg, imm);
-      if (rh != 7) *destreg = destval;
+      if (rh != 7)
+          *destreg = destval;
       break;
        }
    DECODE_CLEAR_SEGOVR(m);
@@ -3160,7 +3176,8 @@ static void i86op_cmps_byte(PC_ENV *m)
            m->R_CX -= 1;
            m->R_SI += inc;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)==0) break;
+           if (ACCESS_FLAG(m,F_ZF)==0)
+               break;
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPE;
        }
@@ -3176,7 +3193,8 @@ static void i86op_cmps_byte(PC_ENV *m)
            m->R_CX -= 1;
            m->R_SI += inc;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)) break;  /* zero flag set means equal */
+           if (ACCESS_FLAG(m,F_ZF))
+               break;  /* zero flag set means equal */
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPNE;
        }
@@ -3212,7 +3230,8 @@ static void i86op_cmps_word(PC_ENV *m)
            m->R_CX -= 1;
            m->R_SI += inc;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)==0) break;
+           if (ACCESS_FLAG(m,F_ZF)==0)
+               break;
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPE;
        }
@@ -3228,7 +3247,8 @@ static void i86op_cmps_word(PC_ENV *m)
            m->R_CX -= 1;
            m->R_SI += inc;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)) break;  /* zero flag set means equal */
+           if (ACCESS_FLAG(m,F_ZF))
+               break;  /* zero flag set means equal */
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPNE;
        }
@@ -3392,7 +3412,8 @@ static void i86op_scas_byte(PC_ENV *m)
            cmp_byte(m, m->R_AL,val2);
            m->R_CX -= 1;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)==0) break;
+           if (ACCESS_FLAG(m,F_ZF)==0)
+               break;
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPE;
        }
@@ -3406,7 +3427,8 @@ static void i86op_scas_byte(PC_ENV *m)
            cmp_byte(m, m->R_AL,val2);
            m->R_CX -= 1;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)) break;  /* zero flag set means equal */
+           if (ACCESS_FLAG(m,F_ZF))
+               break;  /* zero flag set means equal */
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPNE;
        }
@@ -3438,7 +3460,8 @@ static void i86op_scas_word(PC_ENV *m)
            cmp_word(m,m->R_AX,val2);
            m->R_CX -= 1;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)==0) break;
+           if (ACCESS_FLAG(m,F_ZF)==0)
+               break;
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPE;
        }
@@ -3452,7 +3475,8 @@ static void i86op_scas_word(PC_ENV *m)
            cmp_word(m, m->R_AX,val2);
            m->R_CX -= 1;
            m->R_DI += inc;
-           if (ACCESS_FLAG(m,F_ZF)) break;  /* zero flag set means equal */
+           if (ACCESS_FLAG(m,F_ZF))
+               break;  /* zero flag set means equal */
         }
       m->sysmode &= ~SYSMODE_PREFIX_REPNE;
        }
@@ -4117,7 +4141,8 @@ static void sys_fatal(int error, char *fmt, ...)
 static void i86op_aam(PC_ENV *m)
 {   uint8 a;
     a = fetch_byte_imm(m);  /* this is a stupid encoding. */
-    if (a != 10) sys_fatal(0,"error decoding aam" NLP);
+    if (a != 10)
+        sys_fatal(0,"error decoding aam" NLP);
     /* note the type change here --- returning AL and AH in AX. */
     m->R_AX = aam_word(m,m->R_AL);
     DECODE_CLEAR_SEGOVR(m);

@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2007, Robert M Supnik
+   Copyright (c) 2002-2008, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -1003,15 +1003,18 @@ int32 cidx = rq_map_pa ((uint32) PA);
 MSC *cp = rq_ctxmap[cidx];
 DEVICE *dptr = rq_devmap[cidx];
 
-if (cidx < 0) return SCPE_IERR;
+if (cidx < 0)
+    return SCPE_IERR;
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 0:                                             /* IP */
         *data = 0;                                      /* reads zero */
-        if (cp->csta == CST_S3_PPB) rq_step4 (cp);      /* waiting for poll? */
+        if (cp->csta == CST_S3_PPB)                     /* waiting for poll? */
+            rq_step4 (cp);
         else if (cp->csta == CST_UP) {                  /* if up */
-            if (DEBUG_PRD (dptr)) fprintf (sim_deb,
-                ">>RQ%c: poll started, PC=%X\n", 'A' + cp->cnum, OLDPC);
+            if (DEBUG_PRD (dptr))
+                fprintf (sim_deb, ">>RQ%c: poll started, PC=%X\n",
+                         'A' + cp->cnum, OLDPC);
             cp->pip = 1;                                /* poll host */
             sim_activate (dptr->units + RQ_QUEUE, rq_qtime);
             }
@@ -1031,13 +1034,15 @@ int32 cidx = rq_map_pa ((uint32) PA);
 MSC *cp = rq_ctxmap[cidx];
 DEVICE *dptr = rq_devmap[cidx];
 
-if (cidx < 0) return SCPE_IERR;
+if (cidx < 0)
+    return SCPE_IERR;
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 0:                                             /* IP */
         rq_reset (rq_devmap[cidx]);                     /* init device */
-        if (DEBUG_PRD (dptr)) fprintf (sim_deb,
-            ">>RQ%c: initialization started\n", 'A' + cp->cnum);
+        if (DEBUG_PRD (dptr))
+            fprintf (sim_deb, ">>RQ%c: initialization started\n",
+                     'A' + cp->cnum);
         break;
 
     case 1:                                             /* SA */
@@ -1085,11 +1090,14 @@ cp->cq.ioff = SA_COMM_CI;                               /* set intr offset */
 cp->cq.ba = cp->comm + cp->rq.lnt;                      /* set cmd q base */
 cp->cq.lnt = SA_S1H_CQ (cp->s1dat) << 2;                /* get cmd q len */
 cp->cq.idx = cp->rq.idx = 0;                            /* clear q idx's */
-if (cp->prgi) base = cp->comm + SA_COMM_QQ;
+if (cp->prgi)
+    base = cp->comm + SA_COMM_QQ;
 else base = cp->comm + SA_COMM_CI;
 lnt = cp->comm + cp->cq.lnt + cp->rq.lnt - base;        /* comm lnt */
-if (lnt > SA_COMM_MAX) lnt = SA_COMM_MAX;               /* paranoia */
-for (i = 0; i < (lnt >> 1); i++) zero[i] = 0;           /* clr buffer */
+if (lnt > SA_COMM_MAX)                                  /* paranoia */
+    lnt = SA_COMM_MAX;
+for (i = 0; i < (lnt >> 1); i++)                        /* clr buffer */
+    zero[i] = 0;
 if (Map_WriteW (base, lnt, zero))                       /* zero comm area */
     return rq_fatal (cp, PE_QWE);                       /* error? */
 cp->sa = SA_S4 | (RQ_UQPM << SA_S4C_V_MOD) |            /* send step 4 */
@@ -1131,7 +1139,8 @@ if (cp->csta < CST_UP) {                                /* still init? */
             else {
                 cp->s1dat = cp->saw;                    /* save data */
                 dibp->vec = (cp->s1dat & SA_S1H_VEC) << 2; /* get vector */
-                if (dibp->vec) dibp->vec = dibp->vec + VEC_Q; /* if nz, bias */
+                if (dibp->vec)                          /* if nz, bias */
+                    dibp->vec = dibp->vec + VEC_Q;
                 cp->sa = SA_S2 | SA_S2C_PT | SA_S2C_EC (cp->s1dat);
                 cp->csta = CST_S2;                      /* now in step 2 */
                 rq_init_int (cp);                       /* intr if req */
@@ -1161,18 +1170,20 @@ if (cp->csta < CST_UP) {                                /* still init? */
         break;
 
     case CST_S3_PPA:                                    /* need purge test */
-        if (cp->saw) rq_fatal (cp, PE_PPF);             /* data not zero? */
+        if (cp->saw)                                    /* data not zero? */
+            rq_fatal (cp, PE_PPF);
         else cp->csta = CST_S3_PPB;                     /* wait for poll */
         break;
 
     case CST_S4:                                        /* need S4 reply */
         if (cp->saw & SA_S4H_GO) {                      /* go set? */
-            if (DEBUG_PRD (dptr)) fprintf (sim_deb,
-                ">>RQ%c: initialization complete\n", 'A' + cp->cnum);
+            if (DEBUG_PRD (dptr))
+                fprintf (sim_deb, ">>RQ%c: initialization complete\n", 'A' + cp->cnum);
             cp->csta = CST_UP;                          /* we're up */
             cp->sa = 0;                                 /* clear SA */
             sim_activate (dptr->units + RQ_TIMER, tmr_poll * clk_tps);
-            if ((cp->saw & SA_S4H_LF) && cp->perr) rq_plf (cp, cp->perr);
+            if ((cp->saw & SA_S4H_LF)
+                && cp->perr) rq_plf (cp, cp->perr);
             cp->perr = 0;
 			}
         break;
@@ -1183,15 +1194,18 @@ if (cp->csta < CST_UP) {                                /* still init? */
 
 for (i = 0; i < RQ_NUMDR; i++) {                        /* chk unit q's */
     nuptr = dptr->units + i;                            /* ptr to unit */
-    if (nuptr->cpkt || (nuptr->pktq == 0)) continue;
+    if (nuptr->cpkt || (nuptr->pktq == 0))
+        continue;
     pkt = rq_deqh (cp, &nuptr->pktq);                   /* get top of q */
-    if (!rq_mscp (cp, pkt, FALSE)) return SCPE_OK;      /* process */
+    if (!rq_mscp (cp, pkt, FALSE))                      /* process */
+        return SCPE_OK;
     }
 if ((pkt == 0) && cp->pip) {                            /* polling? */
-    if (!rq_getpkt (cp, &pkt)) return SCPE_OK;          /* get host pkt */
+    if (!rq_getpkt (cp, &pkt))                          /* get host pkt */
+        return SCPE_OK;
     if (pkt) {                                          /* got one? */
         if (DEBUG_PRD (dptr)) {
-                fprintf (sim_deb, ">>RQ%c: cmd=%04X, mod=%04X, unit=%d, ",
+            fprintf (sim_deb, ">>RQ%c: cmd=%04X, mod=%04X, unit=%d, ",
                 'A' + cp->cnum, cp->pak[pkt].d[CMD_OPC],
                 cp->pak[pkt].d[CMD_MOD], cp->pak[pkt].d[CMD_UN]);
             fprintf (sim_deb, "bc=%04X%04X, ma=%04X%04X, lbn=%04X%04X\n",
@@ -1203,11 +1217,13 @@ if ((pkt == 0) && cp->pip) {                            /* polling? */
             return rq_fatal (cp, PE_PIE);               /* no, term thread */
         cnid = GETP (pkt, UQ_HCTC, CID);                /* get conn ID */
         if (cnid == UQ_CID_MSCP) {                      /* MSCP packet? */
-            if (!rq_mscp (cp, pkt, TRUE)) return SCPE_OK; /* proc, q non-seq */
+            if (!rq_mscp (cp, pkt, TRUE))               /* proc, q non-seq */
+                return SCPE_OK;
             }
         else if (cnid == UQ_CID_DUP) {                  /* DUP packet? */
             rq_putr (cp, pkt, OP_END, 0, ST_CMD | I_OPCD, RSP_LNT, UQ_TYP_SEQ);
-            if (!rq_putpkt (cp, pkt, TRUE)) return SCPE_OK; /* ill cmd */
+            if (!rq_putpkt (cp, pkt, TRUE))             /* ill cmd */
+                return SCPE_OK;
             }
         else return rq_fatal (cp, PE_ICI);              /* no, term thread */
         }                                               /* end if pkt */
@@ -1215,9 +1231,11 @@ if ((pkt == 0) && cp->pip) {                            /* polling? */
     }                                                   /* end if pip */
 if (cp->rspq) {                                         /* resp q? */
     pkt = rq_deqh (cp, &cp->rspq);                      /* get top of q */
-    if (!rq_putpkt (cp, pkt, FALSE)) return SCPE_OK;    /* send to host */
+    if (!rq_putpkt (cp, pkt, FALSE))                    /* send to host */
+        return SCPE_OK;
     }                                                   /* end if resp q */
-if (pkt) sim_activate (uptr, rq_qtime);                 /* more to do? */
+if (pkt)                                                /* more to do? */
+    sim_activate (uptr, rq_qtime);
 return SCPE_OK;                                         /* done */
 }
 
@@ -1236,7 +1254,8 @@ for (i = 0; i < RQ_NUMDR; i++) {                        /* poll */
     if ((nuptr->flags & UNIT_ATP) &&                    /* ATN pending? */
         (nuptr->flags & UNIT_ATT) &&                    /* still online? */
         (cp->cflgs & CF_ATN)) {                         /* wanted? */
-        if (!rq_una (cp, i)) return SCPE_OK;
+        if (!rq_una (cp, i))
+            return SCPE_OK;
         }
     nuptr->flags = nuptr->flags & ~UNIT_ATP;
     }
@@ -1337,7 +1356,8 @@ if (uptr = rq_getucb (cp, lu)) {                        /* get unit */
     if (tpkt) {                                         /* found target? */
         uint32 tcmd = GETP (tpkt, CMD_OPC, OPC);        /* get opcode */
         rq_putr (cp, tpkt, tcmd | OP_END, 0, ST_ABO, RSP_LNT, UQ_TYP_SEQ);
-        if (!rq_putpkt (cp, tpkt, TRUE)) return ERR;
+        if (!rq_putpkt (cp, tpkt, TRUE))
+            return ERR;
         }
     }                                                   /* end if unit */
 rq_putr (cp, pkt, cmd | OP_END, 0, ST_SUC, ABO_LNT, UQ_TYP_SEQ);
@@ -1410,11 +1430,13 @@ if (cp->pak[pkt].d[CMD_MOD] & MD_NXU) {                 /* next unit? */
 if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
         sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
-    else if (uptr->flags & UNIT_ONL) sts = ST_SUC;      /* online */
+    else if (uptr->flags & UNIT_ONL)                    /* online */
+        sts = ST_SUC;
     else sts = ST_AVL;                                  /* avail */
     rq_putr_unit (cp, pkt, uptr, lu, FALSE);            /* fill unit fields */
     dtyp = GET_DTYPE (uptr->flags);                     /* get drive type */
-    if (drv_tab[dtyp].rcts) rbpar = 1;                  /* ctrl bad blk? */
+    if (drv_tab[dtyp].rcts)                             /* ctrl bad blk? */
+        rbpar = 1;
     else rbpar = 0;                                     /* fill geom, bblk */
     cp->pak[pkt].d[GUS_TRK] = drv_tab[dtyp].sect;
     cp->pak[pkt].d[GUS_GRP] = drv_tab[dtyp].tpg;
@@ -1608,13 +1630,16 @@ if ((uptr->flags & UNIT_ONL) == 0)                      /* not online? */
 if ((cmd != OP_ACC) && (cmd != OP_ERS) &&               /* 'real' xfer */
     (cp->pak[pkt].d[RW_BAL] & 1))                       /* odd address? */
     return (ST_HST | SB_HST_OA);                        /* host buf odd */
-if (bc & 1) return (ST_HST | SB_HST_OC);                /* odd byte cnt? */
-if (bc & 0xF0000000) return (ST_CMD | I_BCNT);          /* 'reasonable' bc? */
+if (bc & 1)                                             /* odd byte cnt? */
+    return (ST_HST | SB_HST_OC);
+if (bc & 0xF0000000)                                    /* 'reasonable' bc? */
+    return (ST_CMD | I_BCNT);
 /* if (lbn & 0xF0000000) return (ST_CMD | I_LBN);       /* 'reasonable' lbn? */
 if (lbn >= maxlbn) {                                    /* accessing RCT? */
     if (lbn >= (maxlbn + drv_tab[dtyp].rcts))           /* beyond copy 1? */
         return (ST_CMD | I_LBN);                        /* lbn err */
-    if (bc != RQ_NUMBY) return (ST_CMD | I_BCNT);       /* bc must be 512 */
+    if (bc != RQ_NUMBY)                                 /* bc must be 512 */
+        return (ST_CMD | I_BCNT);
     }
 else if ((lbn + ((bc + (RQ_NUMBY - 1)) / RQ_NUMBY)) > maxlbn)
     return (ST_CMD | I_BCNT);                           /* spiral to RCT */
@@ -1644,7 +1669,8 @@ uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
 t_addr da = ((t_addr) bl) * RQ_NUMBY;                   /* disk addr */
 
-if ((cp == NULL) || (pkt == 0)) return STOP_RQ;         /* what??? */
+if ((cp == NULL) || (pkt == 0))                         /* what??? */
+    return STOP_RQ;
 tbc = (bc > RQ_MAXFR)? RQ_MAXFR: bc;                    /* trim cnt to max */
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
@@ -1669,9 +1695,11 @@ if ((cmd == OP_ERS) || (cmd == OP_WR)) {                /* write op? */
 
 if (cmd == OP_ERS) {                                    /* erase? */
     wwc = ((tbc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
-    for (i = 0; i < wwc; i++) rqxb[i] = 0;              /* clr buf */
+    for (i = 0; i < wwc; i++)                           /* clr buf */
+        rqxb[i] = 0;
     err = sim_fseek (uptr->fileref, da, SEEK_SET);      /* set pos */
-    if (!err) sim_fwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
+    if (!err)
+        sim_fwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
     err = ferror (uptr->fileref);                       /* end if erase */
     }
 
@@ -1679,9 +1707,11 @@ else if (cmd == OP_WR) {                                /* write? */
     t = Map_ReadW (ba, tbc, rqxb);                      /* fetch buffer */
     if (abc = tbc - t) {                                /* any xfer? */
         wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
-        for (i = (abc >> 1); i < wwc; i++) rqxb[i] = 0;
+        for (i = (abc >> 1); i < wwc; i++)
+            rqxb[i] = 0;
         err = sim_fseek (uptr->fileref, da, SEEK_SET);
-        if (!err) sim_fwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
+        if (!err)
+            sim_fwrite (rqxb, sizeof (int16), wwc, uptr->fileref);
         err = ferror (uptr->fileref);
         }
     if (t) {                                            /* nxm? */
@@ -1697,7 +1727,8 @@ else {
     err = sim_fseek (uptr->fileref, da, SEEK_SET);      /* set pos */
     if (!err) {
         i = sim_fread (rqxb, sizeof (int16), tbc >> 1, uptr->fileref);
-        for ( ; i < (tbc >> 1); i++) rqxb[i] = 0;       /* fill */
+        for ( ; i < (tbc >> 1); i++)                    /* fill */
+            rqxb[i] = 0;
         err = ferror (uptr->fileref);
         }
     if ((cmd == OP_RD) && !err) {                       /* read? */
@@ -1741,7 +1772,8 @@ bl = bl + ((tbc + (RQ_NUMBY - 1)) / RQ_NUMBY);          /* incr blk # */
 PUTP32 (pkt, RW_WBAL, ba);                              /* update pkt */
 PUTP32 (pkt, RW_WBCL, bc);
 PUTP32 (pkt, RW_WBLL, bl);
-if (bc) sim_activate (uptr, rq_xtime);                  /* more? resched */
+if (bc)                                                 /* more? resched */
+    sim_activate (uptr, rq_xtime);
 else rq_rw_end (cp, uptr, 0, ST_SUC);                   /* done! */
 return SCPE_OK;
 }
@@ -1765,7 +1797,8 @@ cp->pak[pkt].d[RW_WBCH] = 0;
 cp->pak[pkt].d[RW_WBLL] = 0;
 cp->pak[pkt].d[RW_WBLH] = 0;
 rq_putr (cp, pkt, cmd | OP_END, flg, sts, RW_LNT_D, UQ_TYP_SEQ); /* fill pkt */
-if (!rq_putpkt (cp, pkt, TRUE)) return ERR;             /* send pkt */
+if (!rq_putpkt (cp, pkt, TRUE))                         /* send pkt */
+    return ERR;
 if (uptr->pktq)                                         /* more to do? */
     sim_activate (dptr->units + RQ_QUEUE, rq_qtime);    /* activate thread */
 return OK;
@@ -1778,13 +1811,16 @@ t_bool rq_dte (MSC *cp, UNIT *uptr, uint32 err)
 int32 pkt, tpkt;
 uint32 lu, dtyp, lbn, ccyl, csurf, csect, t;
 
-if ((cp->cflgs & CF_THS) == 0) return OK;               /* logging? */
-if (!rq_deqf (cp, &pkt)) return ERR;                    /* get log pkt */
+if ((cp->cflgs & CF_THS) == 0)                          /* logging? */
+    return OK;
+if (!rq_deqf (cp, &pkt))                                /* get log pkt */
+    return ERR;
 tpkt = uptr->cpkt;                                      /* rw pkt */
 lu = cp->pak[tpkt].d[CMD_UN];                           /* unit # */
 lbn = GETP32 (tpkt, RW_WBLL);                           /* recent LBN */
 dtyp = GET_DTYPE (uptr->flags);                         /* drv type */
-if (drv_tab[dtyp].flgs & RQDF_SDI) t = 0;               /* SDI? ovhd @ end */
+if (drv_tab[dtyp].flgs & RQDF_SDI)                      /* SDI? ovhd @ end */
+    t = 0;
 else t = (drv_tab[dtyp].xbn + drv_tab[dtyp].dbn) /      /* ovhd cylinders */
     (drv_tab[dtyp].sect * drv_tab[dtyp].surf);
 ccyl = t + (lbn / drv_tab[dtyp].cyl);                   /* curr real cyl */
@@ -1827,8 +1863,10 @@ t_bool rq_hbe (MSC *cp, UNIT *uptr)
 {
 int32 pkt, tpkt;
 
-if ((cp->cflgs & CF_THS) == 0) return OK;               /* logging? */
-if (!rq_deqf (cp, &pkt)) return ERR;                    /* get log pkt */
+if ((cp->cflgs & CF_THS) == 0)                          /* logging? */
+    return OK;
+if (!rq_deqf (cp, &pkt))                                /* get log pkt */
+    return ERR;
 tpkt = uptr->cpkt;                                      /* rw pkt */
 cp->pak[pkt].d[ELP_REFL] = cp->pak[tpkt].d[CMD_REFL];   /* copy cmd ref */
 cp->pak[pkt].d[ELP_REFH] = cp->pak[tpkt].d[CMD_REFH];
@@ -1854,7 +1892,8 @@ t_bool rq_plf (MSC *cp, uint32 err)
 {
 int32 pkt;
 
-if (!rq_deqf (cp, &pkt)) return ERR;                    /* get log pkt */
+if (!rq_deqf (cp, &pkt))                                /* get log pkt */
+    return ERR;
 cp->pak[pkt].d[ELP_REFL] = 0;                           /* ref = 0 */
 cp->pak[pkt].d[ELP_REFH] = 0;
 cp->pak[pkt].d[ELP_UN] = 0;                             /* no unit */
@@ -1880,8 +1919,10 @@ int32 pkt;
 uint32 lu = cp->ubase + un;
 UNIT *uptr = rq_getucb (cp, lu);
 
-if (uptr == NULL) return OK;                            /* huh? */
-if (!rq_deqf (cp, &pkt)) return ERR;                    /* get log pkt */
+if (uptr == NULL)                                       /* huh? */
+    return OK;
+if (!rq_deqf (cp, &pkt))                                /* get log pkt */
+    return ERR;
 cp->pak[pkt].d[RSP_REFL] = 0;                           /* ref = 0 */
 cp->pak[pkt].d[RSP_REFH] = 0;
 cp->pak[pkt].d[RSP_UN] = lu;
@@ -1901,7 +1942,8 @@ return rq_putpkt (cp, pkt, TRUE);
 
 t_bool rq_deqf (MSC *cp, int32 *pkt)
 {
-if (cp->freq == 0) return rq_fatal (cp, PE_NSR);        /* no free pkts?? */
+if (cp->freq == 0)                                      /* no free pkts?? */
+    return rq_fatal (cp, PE_NSR);
 cp->pbsy = cp->pbsy + 1;                                /* cnt busy pkts */
 *pkt = cp->freq;                                        /* head of list */
 cp->freq = cp->pak[cp->freq].link;                      /* next */
@@ -1912,13 +1954,15 @@ int32 rq_deqh (MSC *cp, int32 *lh)
 {
 int32 ptr = *lh;                                        /* head of list */
 
-if (ptr) *lh = cp->pak[ptr].link;                       /* next */
+if (ptr)                                                /* next */
+    *lh = cp->pak[ptr].link;
 return ptr;
 }
 
 void rq_enqh (MSC *cp, int32 *lh, int32 pkt)
 {
-if (pkt == 0) return;                                   /* any pkt? */
+if (pkt == 0)                                           /* any pkt? */
+    return;
 cp->pak[pkt].link = *lh;                                /* link is old lh */
 *lh = pkt;                                              /* pkt is new lh */
 return;
@@ -1926,12 +1970,15 @@ return;
 
 void rq_enqt (MSC *cp, int32 *lh, int32 pkt)
 {
-if (pkt == 0) return;                                   /* any pkt? */
+if (pkt == 0)                                           /* any pkt? */
+    return;
 cp->pak[pkt].link = 0;                                  /* it will be tail */
-if (*lh == 0) *lh = pkt;                                /* if empty, enqh */
+if (*lh == 0)                                           /* if empty, enqh */
+    *lh = pkt;
 else {
     uint32 ptr = *lh;                                   /* chase to end */
-    while (cp->pak[ptr].link) ptr = cp->pak[ptr].link;
+    while (cp->pak[ptr].link)
+        ptr = cp->pak[ptr].link;
     cp->pak[ptr].link = pkt;                            /* enq at tail */
     }
 return;
@@ -1945,12 +1992,14 @@ t_bool rq_getpkt (MSC *cp, int32 *pkt)
 {
 uint32 addr, desc;
 
-if (!rq_getdesc (cp, &cp->cq, &desc)) return ERR;       /* get cmd desc */
+if (!rq_getdesc (cp, &cp->cq, &desc))                   /* get cmd desc */
+    return ERR;
 if ((desc & UQ_DESC_OWN) == 0) {                        /* none */
     *pkt = 0;                                           /* pkt = 0 */
     return OK;                                          /* no error */
     }
-if (!rq_deqf (cp, pkt)) return ERR;                     /* get cmd pkt */
+if (!rq_deqf (cp, pkt))                                 /* get cmd pkt */
+    return ERR;
 cp->hat = 0;                                            /* dsbl hst timer */
 addr = desc & UQ_ADDR;                                  /* get Q22 addr */
 if (Map_ReadW (addr + UQ_HDR_OFF, RQ_PKT_SIZE, cp->pak[*pkt].d))
@@ -1968,13 +2017,16 @@ t_bool rq_putpkt (MSC *cp, int32 pkt, t_bool qt)
 uint32 addr, desc, lnt, cr;
 DEVICE *dptr = rq_devmap[cp->cnum];
 
-if (pkt == 0) return OK;                                /* any packet? */
-if (DEBUG_PRD (dptr)) fprintf (sim_deb,
-    ">>RQ%c: rsp=%04X, sts=%04X\n", 'A' + cp->cnum,
-    cp->pak[pkt].d[RSP_OPF], cp->pak[pkt].d[RSP_STS]);
-if (!rq_getdesc (cp, &cp->rq, &desc)) return ERR;       /* get rsp desc */
+if (pkt == 0)                                           /* any packet? */
+    return OK;
+if (DEBUG_PRD (dptr))
+    fprintf (sim_deb, ">>RQ%c: rsp=%04X, sts=%04X\n", 'A' + cp->cnum,
+             cp->pak[pkt].d[RSP_OPF], cp->pak[pkt].d[RSP_STS]);
+if (!rq_getdesc (cp, &cp->rq, &desc))                   /* get rsp desc */
+    return ERR;
 if ((desc & UQ_DESC_OWN) == 0) {                        /* not valid? */
-    if (qt) rq_enqt (cp, &cp->rspq, pkt);               /* normal? q tail */
+    if (qt)                                             /* normal? q tail */
+        rq_enqt (cp, &cp->rspq, pkt);
     else rq_enqh (cp, &cp->rspq, pkt);                  /* resp q call */
     sim_activate (dptr->units + RQ_QUEUE, rq_qtime);    /* activate q thrd */
     return OK;
@@ -1991,7 +2043,8 @@ if (Map_WriteW (addr + UQ_HDR_OFF, lnt, cp->pak[pkt].d))
     return rq_fatal (cp, PE_PWE);                       /* write pkt */
 rq_enqh (cp, &cp->freq, pkt);                           /* pkt is free */
 cp->pbsy = cp->pbsy - 1;                                /* decr busy cnt */
-if (cp->pbsy == 0) cp->hat = cp->htmo;                  /* idle? strt hst tmr */
+if (cp->pbsy == 0)                                      /* idle? strt hst tmr */
+    cp->hat = cp->htmo;
 return rq_putdesc (cp, &cp->rq, desc);                  /* release desc */
 }
 
@@ -2025,13 +2078,15 @@ d[1] = (newd >> 16) & 0xFFFF;
 if (Map_WriteW (addr, 4, d))                            /* store desc */
     return rq_fatal (cp, PE_QWE);                       /* err? dead */
 if (desc & UQ_DESC_F) {                                 /* was F set? */
-    if (ring->lnt <= 4) rq_ring_int (cp, ring);         /* lnt = 1? intr */
+    if (ring->lnt <= 4)                                 /* lnt = 1? intr */
+        rq_ring_int (cp, ring);
     else {                                              /* prv desc */
         prva = ring->ba + ((ring->idx - 4) & (ring->lnt - 1));
         if (Map_ReadW (prva, 4, d))                     /* read prv */
             return rq_fatal (cp, PE_QRE);
         prvd = ((uint32) d[0]) | (((uint32) d[1]) << 16);
-        if (prvd & UQ_DESC_OWN) rq_ring_int (cp, ring);
+        if (prvd & UQ_DESC_OWN)
+            rq_ring_int (cp, ring);
         }
     }
 ring->idx = (ring->idx + 4) & (ring->lnt - 1);
@@ -2048,7 +2103,8 @@ UNIT *uptr;
 if ((lu < cp->ubase) || (lu >= (cp->ubase + RQ_NUMDR)))
     return NULL;
 uptr = dptr->units + (lu % RQ_NUMDR);
-if (uptr->flags & UNIT_DIS) return NULL;
+if (uptr->flags & UNIT_DIS)
+    return NULL;
 return uptr;
 }
 
@@ -2107,7 +2163,8 @@ return;
 void rq_init_int (MSC *cp)
 {
 if ((cp->s1dat & SA_S1H_IE) &&                          /* int enab & */
-    (cp->s1dat & SA_S1H_VEC)) rq_setint (cp);           /* ved set? int */
+    (cp->s1dat & SA_S1H_VEC))                           /* ved set? int */
+    rq_setint (cp);
 return;
 }
 
@@ -2119,7 +2176,8 @@ uint32 iadr = cp->comm + ring->ioff;                    /* addr intr wd */
 uint16 flag = 1;
 
 Map_WriteW (iadr, 2, &flag);                            /* write flag */
-if (cp->s1dat & SA_S1H_VEC) rq_setint (cp);             /* if enb, intr */
+if (cp->s1dat & SA_S1H_VEC)                             /* if enb, intr */
+    rq_setint (cp);
 return;
 }
 
@@ -2193,7 +2251,8 @@ t_stat rq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 dtyp = GET_DTYPE (uptr->flags);                  /* get drive type */
 
-if (drv_tab[dtyp].flgs & RQDF_RO) return SCPE_NOFNC;    /* not on read only */
+if (drv_tab[dtyp].flgs & RQDF_RO)                       /* not on read only */
+    return SCPE_NOFNC;
 return SCPE_OK;
 }
 
@@ -2203,8 +2262,10 @@ t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 uint32 dtyp = GET_DTYPE (uptr->flags);                  /* get drive type */
 
-if (drv_tab[dtyp].flgs & RQDF_RO) fprintf (st, "read only");
-else if (uptr->flags & UNIT_WPRT) fprintf (st, "write locked");
+if (drv_tab[dtyp].flgs & RQDF_RO)
+    fprintf (st, "read only");
+else if (uptr->flags & UNIT_WPRT)
+    fprintf (st, "write locked");
 else fprintf (st, "write enabled");
 return SCPE_OK;
 }
@@ -2219,11 +2280,14 @@ t_stat r;
 
 if ((val < 0) || ((val != RA8U_DTYPE) && cptr))
     return SCPE_ARG;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 if (cptr) {
     cap = (uint32) get_uint (cptr, 10, 0xFFFFFFFF, &r);
-    if ((sim_switches & SWMASK ('L')) == 0) cap = cap * 1954;
-    if ((r != SCPE_OK) || (cap < RA8U_MINC) || (cap >= max)) return SCPE_ARG;
+    if ((sim_switches & SWMASK ('L')) == 0)
+        cap = cap * 1954;
+    if ((r != SCPE_OK) || (cap < RA8U_MINC) || (cap >= max))
+        return SCPE_ARG;
     drv_tab[val].lbn = cap;
     }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
@@ -2247,8 +2311,10 @@ MSC *cp = rq_ctxmap[uptr->cnum];
 t_stat r;
 
 r = attach_unit (uptr, cptr);
-if (r != SCPE_OK) return r;
-if (cp->csta == CST_UP) uptr->flags = uptr->flags | UNIT_ATP;
+if (r != SCPE_OK)
+    return r;
+if (cp->csta == CST_UP)
+    uptr->flags = uptr->flags | UNIT_ATP;
 return SCPE_OK;
 }
 
@@ -2259,7 +2325,8 @@ t_stat rq_detach (UNIT *uptr)
 t_stat r;
 
 r = detach_unit (uptr);                                 /* detach unit */
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP);     /* clr onl, atn pend */
 uptr->uf = 0;                                           /* clr unit flgs */
 return SCPE_OK;
@@ -2275,9 +2342,11 @@ MSC *cp;
 DIB *dibp = (DIB *) dptr->ctxt;
 
 for (i = 0, cidx = -1; i < RQ_NUMCT; i++) {             /* find ctrl num */
-    if (rq_devmap[i] == dptr) cidx = i;
+    if (rq_devmap[i] == dptr)
+        cidx = i;
     }
-if (cidx < 0) return SCPE_IERR;                         /* not found??? */
+if (cidx < 0)                                           /* not found??? */
+    return SCPE_IERR;
 cp = rq_ctxmap[cidx];                                   /* get context */
 cp->cnum = cidx;                                        /* init index */
 
@@ -2291,7 +2360,8 @@ cp->csta = CST_S1;                                      /* init stage 1 */
 cp->s1dat = 0;                                          /* no S1 data */
 dibp->vec = 0;                                          /* no vector */
 cp->comm = 0;                                           /* no comm region */
-if (UNIBUS) cp->sa = SA_S1 | SA_S1C_DI | SA_S1C_MP;     /* Unibus? */
+if (UNIBUS)                                             /* Unibus? */
+    cp->sa = SA_S1 | SA_S1C_DI | SA_S1C_MP;
 else cp->sa = SA_S1 | SA_S1C_Q22 | SA_S1C_DI | SA_S1C_MP; /* init SA val */
 cp->cflgs = CF_RPL;                                     /* ctrl flgs off */
 cp->htmo = RQ_DHTMO;                                    /* default timeout */
@@ -2301,9 +2371,11 @@ cp->rq.ba = cp->rq.lnt = cp->rq.idx = 0;                /* clr rsp ring */
 cp->credits = (RQ_NPKTS / 2) - 1;                       /* init credits */
 cp->freq = 1;                                           /* init free list */
 for (i = 0; i < RQ_NPKTS; i++) {                        /* all pkts free */
-    if (i) cp->pak[i].link = (i + 1) & RQ_M_NPKTS;
+    if (i)
+        cp->pak[i].link = (i + 1) & RQ_M_NPKTS;
     else cp->pak[i].link = 0;
-    for (j = 0; j < RQ_PKT_SIZE_W; j++) cp->pak[i].d[j] = 0;
+    for (j = 0; j < RQ_PKT_SIZE_W; j++)
+        cp->pak[i].d[j] = 0;
     }
 cp->rspq = 0;                                           /* no q'd rsp pkts */
 cp->pbsy = 0;                                           /* all pkts free */
@@ -2317,8 +2389,10 @@ for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
     uptr->uf = 0;                                       /* clr unit flags */
     uptr->cpkt = uptr->pktq = 0;                        /* clr pkt q's */
     }
-if (rqxb == NULL) rqxb = (uint16 *) calloc (RQ_MAXFR >> 1, sizeof (uint16));
-if (rqxb == NULL) return SCPE_MEM;
+if (rqxb == NULL)
+    rqxb = (uint16 *) calloc (RQ_MAXFR >> 1, sizeof (uint16));
+if (rqxb == NULL)
+    return SCPE_MEM;
 return auto_config (0, 0);                              /* run autoconfig */
 }
 
@@ -2405,7 +2479,8 @@ extern int32 saved_PC;
 extern uint16 *M;
 DIB *dibp = (DIB *) dptr->ctxt;
 
-for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & 3;
 M[BOOT_CSR >> 1] = dibp->ba & DMASK;
 saved_PC = BOOT_ENTRY;
@@ -2513,7 +2588,8 @@ if (cp->csta != CST_UP) {
     return SCPE_OK;
     }
 if (val & RQ_SH_RI) {
-    if (cp->pip) fprintf (st, "Polling in progress, host timer = %d\n", cp->hat);
+    if (cp->pip)
+        fprintf (st, "Polling in progress, host timer = %d\n", cp->hat);
     else fprintf (st, "Host timer = %d\n", cp->hat);
     fprintf (st, "Command ");
     rq_show_ring (st, &cp->cq);
@@ -2523,8 +2599,10 @@ if (val & RQ_SH_RI) {
 if (val & RQ_SH_FR) {
     if (pkt = cp->freq) {
         for (i = 0; pkt != 0; i++, pkt = cp->pak[pkt].link) {
-            if (i == 0) fprintf (st, "Free queue = %d", pkt);
-            else if ((i % 16) == 0) fprintf (st, ",\n %d", pkt);
+            if (i == 0)
+                fprintf (st, "Free queue = %d", pkt);
+            else if ((i % 16) == 0)
+                fprintf (st, ",\n %d", pkt);
             else fprintf (st, ", %d", pkt);
             }
         fprintf (st, "\n");

@@ -563,14 +563,20 @@ t_stat ch_op_ds (uint32 ch, uint32 ds, uint32 unit)
 {
 t_stat r;
 
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid arg? */
-if (ch_dev[ch].flags & DEV_DIS) return STOP_NXCHN;      /* disabled? stop */
-if (ch_dev[ch].flags & DEV_7909) return STOP_7909;      /* 7909? stop */
-if (ch_dso[ch]) return ERR_STALL;                       /* DS in use? */
-if (ch_ndso[ch] == CHSL_WEF) return ERR_STALL;          /* NDS = WEF? */
+if (ch >= NUM_CHAN)                                     /* invalid arg? */
+    return STOP_NXCHN;
+if (ch_dev[ch].flags & DEV_DIS)                         /* disabled? stop */
+    return STOP_NXCHN;
+if (ch_dev[ch].flags & DEV_7909)                        /* 7909? stop */
+    return STOP_7909;
+if (ch_dso[ch])                                         /* DS in use? */
+    return ERR_STALL;
+if (ch_ndso[ch] == CHSL_WEF)                            /* NDS = WEF? */
+    return ERR_STALL;
 if (ch_sta[ch] == CHXS_IDLE) {                          /* chan idle? */
     r = ch6_sel (ch, ds, unit, CH6S_DSW);               /* select device */
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
 ch_dso[ch] = ds;                                        /* set command, unit */
 ch_dsu[ch] = unit;
@@ -593,15 +599,21 @@ t_stat ch_op_nds (uint32 ch, uint32 nds, uint32 unit)
 DEVICE *dptr;
 t_stat r;
 
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid arg? */
-if (ch_dev[ch].flags & DEV_DIS) return STOP_NXCHN;      /* disabled? stop */
-if (ch_dev[ch].flags & DEV_7909) return STOP_7909;      /* 7909? stop */
-if (ch_ndso[ch]) return ERR_STALL;                      /* NDS in use? */
+if (ch >= NUM_CHAN)                                     /* invalid arg? */
+    return STOP_NXCHN;
+if (ch_dev[ch].flags & DEV_DIS)                         /* disabled? stop */
+    return STOP_NXCHN;
+if (ch_dev[ch].flags & DEV_7909)                        /* 7909? stop */
+    return STOP_7909;
+if (ch_ndso[ch])                                        /* NDS in use? */
+    return ERR_STALL;
 if (ch_dso[ch] && (dptr = ch_find_dev (ch, ch_dsu[ch])) /* DS, cd or lpt? */
-    && (dptr->flags & DEV_CDLP)) return ERR_STALL;
+    && (dptr->flags & DEV_CDLP))
+    return ERR_STALL;
 if (ch_sta[ch] == CHXS_IDLE) {                          /* chan idle? */
     r = ch6_sel (ch, nds, unit, CH6S_NDS);              /* select device */
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
 ch_ndso[ch] = nds;                                      /* set command, unit */
 ch_ndsu[ch] = unit;
@@ -616,7 +628,8 @@ return SCPE_OK;
 
 t_stat ch6_end_ds (uint32 ch)
 {
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid arg? */
+if (ch >= NUM_CHAN)                                     /* invalid arg? */
+    return STOP_NXCHN;
 ch_dso[ch] = ch_dsu[ch] = 0;                            /* no data select */
 if (ch_ndso[ch]) {                                      /* stacked non-data sel? */
     sim_activate (ch_dev[ch].units, 0);                 /* immediate poll */
@@ -633,7 +646,8 @@ return SCPE_OK;
 
 t_stat ch6_end_nds (uint32 ch)
 {
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid arg? */
+if (ch >= NUM_CHAN)                                     /* invalid arg? */
+    return STOP_NXCHN;
 ch_ndso[ch] = ch_ndsu[ch] = 0;                          /* no non-data select */
 if (ch_dso[ch]) {                                       /* stacked data sel? */
     sim_activate (ch_dev[ch].units, 0);                 /* immediate poll */
@@ -651,12 +665,15 @@ DEVICE *dptr;
 DIB *dibp;
 t_stat r;
 
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid arg? */
+if (ch >= NUM_CHAN)                                     /* invalid arg? */
+    return STOP_NXCHN;
 dptr = ch_find_dev (ch, unit);                          /* find device */
-if (dptr == NULL) return STOP_NXDEV;                    /* invalid device? */
+if (dptr == NULL)                                       /* invalid device? */
+    return STOP_NXDEV;
 dibp = (DIB *) dptr->ctxt;
 r = dibp->chsel (ch, sel, unit);                        /* select device */
-if (r == SCPE_OK) ch_sta[ch] = sta;                     /* set status */
+if (r == SCPE_OK)                                       /* set status */
+    ch_sta[ch] = sta;
 return r;
 }
 
@@ -667,7 +684,8 @@ t_stat ch6_svc (UNIT *uptr)
 uint32 ch = uptr - &ch_unit[0];                         /* get channel */
 t_stat r;
 
-if (ch >= NUM_CHAN) return SCPE_IERR;                   /* invalid chan? */
+if (ch >= NUM_CHAN)                                     /* invalid chan? */
+    return SCPE_IERR;
 switch (ch_sta[ch]) {                                   /* case on state */
 
     case CH6S_PDS:                                      /* polling for ds */
@@ -693,16 +711,22 @@ return r;
 
 DEVICE *ch_find_dev (uint32 ch, uint32 unit)
 {
-if (ch >= NUM_CHAN) return NULL;                        /* invalid arg? */
-if (ch_dev[ch].flags & (DEV_7909|DEV_7289)) return ch2dev[ch];
+if (ch >= NUM_CHAN)                                     /* invalid arg? */
+    return NULL;
+if (ch_dev[ch].flags & (DEV_7909|DEV_7289))
+    return ch2dev[ch];
 unit = unit & 0777;
 if (((unit >= U_MTBCD) && (unit <= (U_MTBCD + MT_NUMDR))) ||
     ((unit >= U_MTBIN) && (unit <= (U_MTBIN + MT_NUMDR))))
     return ch2dev[ch];
-if (ch != 0) return NULL;
-if (unit == U_CDR) return &cdr_dev;
-if (unit == U_CDP) return &cdp_dev;
-if ((unit == U_LPBCD) || (unit == U_LPBIN)) return &lpt_dev;
+if (ch != 0)
+    return NULL;
+if (unit == U_CDR)
+    return &cdr_dev;
+if (unit == U_CDP)
+    return &cdp_dev;
+if ((unit == U_LPBCD) || (unit == U_LPBIN))
+    return &lpt_dev;
 return NULL;
 }
 
@@ -717,17 +741,21 @@ t_uint64 ir;
 t_stat r;
 
 clc = clc | data_base;                                  /* add A/B select */
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid argument? */
-if (ch_dev[ch].flags & DEV_DIS) return STOP_NXCHN;      /* disabled? stop */
+if (ch >= NUM_CHAN)                                     /* invalid argument? */
+    return STOP_NXCHN;
+if (ch_dev[ch].flags & DEV_DIS)                         /* disabled? stop */
+    return STOP_NXCHN;
 if (ch_dev[ch].flags & DEV_7909) {                      /* 7909? */
-    if (ch_sta[ch] != CHXS_IDLE) return ERR_STALL;      /* must be idle */
+    if (ch_sta[ch] != CHXS_IDLE)                        /* must be idle */
+            return ERR_STALL;
     if (reset) {                                        /* RDCx? */
         ch_cnd[ch] = 0;                                 /* clear conditions */
         ch_clc[ch] = clc;                               /* set clc */
         }
     else {                                              /* SDCx */
         if (BIT_TST (chtr_enab, CHTR_V_TWT + ch) &&     /* pending trap? */
-            (ch_flags[ch] & CHF_TWT)) return ERR_STALL;
+            (ch_flags[ch] & CHF_TWT))
+            return ERR_STALL;
         ch_clc[ch] = ch_ca[ch] & CHAMASK;               /* finish WTR, TWT */
         }
     ch_flags[ch] &= ~CHF_CLR_7909;                      /* clear flags, not IP */
@@ -737,7 +765,8 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909? */
     }
                                                         /* 7607, 7289 */
 if (reset) {                                            /* reset? */
-    if (ch_sta[ch] == CHXS_DSX) ch_sta[ch] = CH6S_DSW;
+    if (ch_sta[ch] == CHXS_DSX)
+        ch_sta[ch] = CH6S_DSW;
     ch_flags[ch] &= ~(CHF_LDW|CHF_EOR|CHF_TRC|CHF_CMD);
     ch_idf[ch] = 0;
     }
@@ -764,7 +793,8 @@ switch (ch_sta[ch]) {                                   /* case on chan state */
         if (ch_dev[ch].flags & DEV_7289) {              /* drum channel? */
             ir = ReadP (clc);                           /* read addr */
             ch_clc[ch] = CHAINC (clc);                  /* incr chan pc */
-            if (r = ch9_wr (ch, ir, 0)) return r;       /* write to dev */
+            if (r = ch9_wr (ch, ir, 0))                 /* write to dev */
+                return r;
             }
         else ch_clc[ch] = clc;                          /* set clc */
         return ch6_new_cmd (ch, TRUE);                  /* start channel */
@@ -784,7 +814,8 @@ return SCPE_OK;
 
 t_stat ch_op_store (uint32 ch, t_uint64 *dat)
 {
-if ((ch >= NUM_CHAN) || (ch_dev[ch].flags & DEV_DIS)) return STOP_NXCHN;
+if ((ch >= NUM_CHAN) || (ch_dev[ch].flags & DEV_DIS))
+    return STOP_NXCHN;
 if (ch_dev[ch].flags & DEV_7909)
     *dat = (((t_uint64) ch_ca[ch] & CHAMASK) << INST_V_DEC) |
         (((t_uint64) ch_clc[ch] & CHAMASK) << INST_V_ADDR);
@@ -803,11 +834,13 @@ return SCPE_OK;
 
 t_stat ch_op_store_diag (uint32 ch, t_uint64 *dat)
 {
-if ((ch >= NUM_CHAN) || (ch_dev[ch].flags & DEV_DIS)) return STOP_NXCHN;
-if (ch_flags[ch] & DEV_7289) *dat = ind_ioc? SIGN: 0;
-else if (ch_flags[ch] & DEV_7909) *dat =
-    (((t_uint64) (ch_lcc[ch] & CHF_M_LCC)) << CHF_V_LCC) | 
-    (ch_flags[ch] & CHF_SDC_7909);
+if ((ch >= NUM_CHAN) || (ch_dev[ch].flags & DEV_DIS))
+    return STOP_NXCHN;
+if (ch_flags[ch] & DEV_7289)
+    *dat = ind_ioc? SIGN: 0;
+else if (ch_flags[ch] & DEV_7909)
+    *dat = (((t_uint64) (ch_lcc[ch] & CHF_M_LCC)) << CHF_V_LCC) | 
+        (ch_flags[ch] & CHF_SDC_7909);
 else *dat = 0;
 return SCPE_OK;
 }
@@ -821,18 +854,23 @@ t_stat ch_op_reset (uint32 ch, t_bool ch7909)
 {
 DEVICE *dptr;
 
-if (ch >= NUM_CHAN) return STOP_NXCHN;                  /* invalid argument? */
-if (ch_dev[ch].flags & DEV_DIS) return SCPE_OK;         /* disabled? ok */
+if (ch >= NUM_CHAN)                                     /* invalid argument? */
+    return STOP_NXCHN;
+if (ch_dev[ch].flags & DEV_DIS)                         /* disabled? ok */
+    return SCPE_OK;
 if (ch_dev[ch].flags & DEV_7909) {                      /* 7909? */
-    if (!ch7909) return SCPE_OK;                        /* wrong reset is NOP */
+    if (!ch7909)                                        /* wrong reset is NOP */
+        return SCPE_OK;
     dptr = ch2dev[ch];                                  /* get device */
     }
 else {                                                  /* 7607, 7289 */
-    if (ch7909) return STOP_NT7909;                     /* wrong reset is err */
+    if (ch7909)                                         /* wrong reset is err */
+        return STOP_NT7909;
     dptr = ch_find_dev (ch, ch_ndsu[ch]);               /* find device */
     }
 ch_reset (&ch_dev[ch]);                                 /* reset channel */
-if (dptr && dptr->reset) dptr->reset (dptr);            /* reset device */
+if (dptr && dptr->reset)                                /* reset device */
+    dptr->reset (dptr);
 return SCPE_OK;
 }
 
@@ -847,9 +885,11 @@ t_stat ch_proc (uint32 ch)
 {
 t_stat r;
 
-if (ch >= NUM_CHAN) return SCPE_IERR;                   /* bad channel? */
+if (ch >= NUM_CHAN)                                     /* bad channel? */
+    return SCPE_IERR;
 ch_req &= ~REQ_CH (ch);                                 /* clear request */
-if (ch_dev[ch].flags & DEV_DIS) return SCPE_IERR;       /* disabled? */
+if (ch_dev[ch].flags & DEV_DIS)                         /* disabled? */
+    return SCPE_IERR;
 if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
 
     t_uint64 sr;
@@ -889,15 +929,18 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
     case CH9_TCM:                                       /* transfer on cond */
         csel = CH9D_COND (ch_wc[ch]);
         mask = CH9D_MASK (ch_wc[ch]);
-        if (csel == 7) xfr = (mask == 0);               /* C = 7? mask mbz */
+        if (csel == 7)                                  /* C = 7? mask mbz */
+            xfr = (mask == 0);
         else {                                          /* C = 0..6 */
-            if (csel == 0) tval = ch_cnd[ch];           /* C = 0? test cond */
+            if (csel == 0)                              /* C = 0? test cond */
+                tval = ch_cnd[ch];
             else tval = (uint32) (ch_ar[ch] >> (6 * (6 - csel))) & 077;
             if (ch_wc[ch] & CH9D_B11)
                 xfr = ((tval & mask) == mask);
             else xfr = (tval == mask);
             }
-        if (xfr) ch_clc[ch] = ch_ca[ch] & CHAMASK;      /* change CLC */
+        if (xfr)                                         /* change CLC */
+            ch_clc[ch] = ch_ca[ch] & CHAMASK;
         break;
 
     case CH9_LIP:                                       /* leave interrupt */
@@ -945,7 +988,8 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
         break;
 
     case CH9_XMT:                                       /* transmit */
-        if (ch_wc[ch] == 0) break;
+        if (ch_wc[ch] == 0)
+            break;
         sr = ReadP (ch_clc[ch]);                        /* next word */
         WriteP (ch_ca[ch], sr);
         ch_clc[ch] = CHAINC (ch_clc[ch]);               /* incr pointers */
@@ -955,7 +999,8 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
         return SCPE_OK;
 
     case CH9_SNS:                                       /* sense */
-        if (r = ch9_sel (ch, CHSL_SNS)) return r;       /* send sense to dev */
+        if (r = ch9_sel (ch, CHSL_SNS))                 /* send sense to dev */
+            return r;
         ch_flags[ch] |= CHF_PRD;                        /* prepare to read */
         break;                                          /* next command */
 
@@ -970,12 +1015,14 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
             }
         ch_flags[ch] &= ~CHF_EOR;                       /* clear end */
         if (ch_op[ch] == CH9_CTLR) {                    /* CTLR? */
-            if (r = ch9_sel (ch, CHSL_RDS)) return r;   /* send read sel */
+            if (r = ch9_sel (ch, CHSL_RDS))             /* send read sel */
+                return r;
             ch_flags[ch] |= CHF_PRD;                    /* prep to read */
             ch_idf[ch] = 0;
             }
         else if (ch_op[ch] == CH9_CTLW) {               /* CTLW? */
-            if (r = ch9_sel (ch, CHSL_WRS)) return r;   /* end write sel */
+            if (r = ch9_sel (ch, CHSL_WRS))             /* end write sel */
+                return r;
             ch_flags[ch] |= CHF_PWR;                    /* prep to write */
             }
         break;
@@ -984,7 +1031,8 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
         if ((ch_wc[ch] == 0) || (ch_flags[ch] & CHF_EOR)) { /* wc == 0 or EOR? */
             if (ch_flags[ch] & (CHF_PRD|CHF_PWR|CHF_RDS|CHF_WRS)) {
                 ch_flags[ch] &= ~(CHF_PRD|CHF_PWR|CHF_RDS|CHF_WRS);
-                if (r = ch9_wr (ch, 0, CH9DF_STOP)) return r; /* send stop */
+                if (r = ch9_wr (ch, 0, CH9DF_STOP))     /* send stop */
+                    return r;
                 }
             if (ch_flags[ch] & CHF_EOR) {               /* EOR? */
                 ch_flags[ch] &= ~CHF_EOR;               /* clear flag */
@@ -997,13 +1045,16 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
         return ch9_wr_getw (ch);                        /* no, write */
 
     case CH9_CPYP:                                      /* anything to do? */
-        if (ch_wc[ch] == 0) break;                      /* (new, wc = 0) next */
+        if (ch_wc[ch] == 0)                             /* (new, wc = 0) next */
+            break;
         if (ch_flags[ch] & CHF_EOR)                     /* end? */
             ch_flags[ch] &= ~CHF_EOR;                   /* ignore */
         else if (ch_flags[ch] & CHF_RDS)                /* read? */
             ch9_rd_putw (ch);
-        else if (r = ch9_wr_getw (ch)) return r;        /* no, write */
-        if (ch_wc[ch] == 0) break;                      /* done? get next */
+        else if (r = ch9_wr_getw (ch))                  /* no, write */
+            return r;
+        if (ch_wc[ch] == 0)                             /* done? get next */
+            break;
         return SCPE_OK;                                 /* more to do */
             
     default:
@@ -1015,7 +1066,8 @@ if (ch_dev[ch].flags & DEV_7909) {                      /* 7909 */
 
 else if (ch_flags[ch] & CHF_RDS) {                      /* 7607 read? */
 
-    if (ch_sta[ch] != CHXS_DSX) return ch6_end_ds (ch); /* chan exec? no, disc */
+    if (ch_sta[ch] != CHXS_DSX)                         /* chan exec? no, disc */
+        return ch6_end_ds (ch);
     switch (ch_op[ch] & CH6_OPMASK) {                   /* switch on op */
 
     case CH6_TCH:                                       /* transfer */
@@ -1024,19 +1076,22 @@ else if (ch_flags[ch] & CHF_RDS) {                      /* 7607 read? */
 
     case CH6_IOCD:                                      /* IOCD */
         if (ch_wc[ch]) {                                /* wc > 0? */
-            if (ch6_rd_putw (ch)) return SCPE_OK;       /* store; more? cont */
+            if (ch6_rd_putw (ch))                       /* store; more? cont */
+                return SCPE_OK;
             }
         return ch6_end_ds (ch);                         /* no, disconnect */
 
     case CH6_IOCP:                                      /* IOCP */
         if (ch_wc[ch]) {                                /* wc > 0? */
-            if (ch6_rd_putw (ch)) return SCPE_OK;       /* store; more? cont */
+            if (ch6_rd_putw (ch))                       /* store; more? cont */
+                return SCPE_OK;
             }
         return ch6_new_cmd (ch, FALSE);                 /* unpack new cmd */
 
     case CH6_IOCT:                                      /* IOCT */
         if (ch_wc[ch]) {                                /* wc > 0? */
-            if (ch6_rd_putw (ch)) return SCPE_OK;       /* store; more? cont */
+            if (ch6_rd_putw (ch))                       /* store; more? cont */
+                return SCPE_OK;
             }
         return ch6_ioxt (ch);                           /* unstall or disc */
 
@@ -1095,7 +1150,8 @@ else if (ch_flags[ch] & CHF_RDS) {                      /* 7607 read? */
 
 else {                                                  /* 7607 write */
 
-    if (ch_sta[ch] != CHXS_DSX) return ch6_end_ds (ch); /* chan exec? no, disc */
+    if (ch_sta[ch] != CHXS_DSX)                         /* chan exec? no, disc */
+        return ch6_end_ds (ch);
     switch (ch_op[ch] & CH6_OPMASK) {                   /* switch on op */
 
     case CH6_TCH:                                       /* transfer */
@@ -1104,39 +1160,49 @@ else {                                                  /* 7607 write */
 
     case CH6_IOCD:                                      /* IOCD */
         if (ch_wc[ch]) {                                /* wc > 0? */
-            if (r = ch6_wr_getw (ch, TRUE)) return r;   /* send wd to dev; err? */
-            if (ch_wc[ch]) return SCPE_OK;              /* more to do? */
+            if (r = ch6_wr_getw (ch, TRUE))             /* send wd to dev; err? */
+                return r;
+            if (ch_wc[ch])                              /* more to do? */
+                return SCPE_OK;
             }
         return ch6_end_ds (ch);                         /* disconnect */
 
     case CH6_IOCP:                                      /* IOCP */
     case CH6_IOSP:                                      /* IOSP */
         if (ch_wc[ch]) {                                /* wc > 0? */
-            if (r = ch6_wr_getw (ch, FALSE)) return r;  /* send wd to dev; err? */
-            if (ch_wc[ch]) return SCPE_OK;              /* more to do? */
+            if (r = ch6_wr_getw (ch, FALSE))            /* send wd to dev; err? */
+                return r;
+            if (ch_wc[ch])                              /* more to do? */
+                return SCPE_OK;
             }
         return ch6_new_cmd (ch, FALSE);                 /* get next cmd */
 
     case CH6_IOCT:                                      /* IOCT */
     case CH6_IOST:                                      /* IOST */
         if (ch_wc[ch]) {                                /* wc > 0? */
-            if (r = ch6_wr_getw (ch, FALSE)) return r;  /* send wd to dev; err? */
-            if (ch_wc[ch]) return SCPE_OK;              /* more to do? */
+            if (r = ch6_wr_getw (ch, FALSE))            /* send wd to dev; err? */
+                return r;
+            if (ch_wc[ch])                              /* more to do? */
+                return SCPE_OK;
             }
         return ch6_ioxt (ch);                           /* get next cmd */
 
     case CH6_IORP:                                      /* IORP */
         if (!(ch_flags[ch] & CHF_EOR) && ch_wc[ch]) {   /* not EOR? (cdp, lpt) */
-            if (r = ch6_wr_getw (ch, TRUE)) return r;   /* send wd to dev; err? */
-            if (ch_wc[ch]) return SCPE_OK;              /* more to do? */
+            if (r = ch6_wr_getw (ch, TRUE))             /* send wd to dev; err? */
+                return r;
+            if (ch_wc[ch])                              /* more to do? */
+                return SCPE_OK;
             }
         ch_flags[ch] = ch_flags[ch] & ~CHF_EOR;         /* clear EOR */
         return ch6_new_cmd (ch, FALSE);                 /* get next cmd */
 
     case CH6_IORT:                                      /* IORT */
         if (!(ch_flags[ch] & CHF_EOR) && ch_wc[ch]) {   /* not EOR? (cdp, lpt) */
-            if (r = ch6_wr_getw (ch, TRUE)) return r;   /* send wd to dev; err? */
-            if (ch_wc[ch]) return SCPE_OK;              /* more to do? */
+            if (r = ch6_wr_getw (ch, TRUE))             /* send wd to dev; err? */
+                return r;
+            if (ch_wc[ch])                              /* more to do? */
+                return SCPE_OK;
             }
         ch_flags[ch] = ch_flags[ch] & ~CHF_EOR;         /* clear EOR */
         return ch6_ioxt (ch);                           /* unstall or disc */
@@ -1153,7 +1219,8 @@ else {                                                  /* 7607 write */
 
 t_bool ch6_rd_putw (uint32 ch)
 {
-if (ch_idf[ch] & CH6DF_EOR) ch_flags[ch] |= CHF_EOR;    /* eor from dev? */
+if (ch_idf[ch] & CH6DF_EOR)                             /* eor from dev? */
+    ch_flags[ch] |= CHF_EOR;
 else ch_flags[ch] = ch_flags[ch] & ~CHF_EOR;            /* set/clr chan eor */
 ch_idf[ch] = 0;                                         /* clear eor, valid */
 if (ch_wc[ch]) {                                        /* wc > 0? */
@@ -1181,7 +1248,8 @@ if (ch_wc[ch]) {
     ch_wc[ch] = ch_wc[ch] - 1;
     }
 else ch_ar[ch] = 0;
-if (eorz && (ch_wc[ch] == 0)) eorfl = 1;                /* eor on wc = 0? */
+if (eorz && (ch_wc[ch] == 0))                           /* eor on wc = 0? */
+    eorfl = 1;
 else eorfl = 0;
 dptr = ch_find_dev (ch, ch_dsu[ch]);                    /* find device */
 if (dptr &&                                             /* valid device? */
@@ -1217,13 +1285,15 @@ if ((ir & CHI_IND) && (ch_wc[ch] ||                     /* indirect? */
     t_uint64 sr = ReadP (ch_ca[ch] & AMASK);            /* read indirect */
     ch_ca[ch] = ((uint32) sr) & ((cpu_model & I_CT)? PAMASK: AMASK);
     }
-if (hst_ch) cpu_ent_hist (ch_clc[ch] | ((ch + 1) << HIST_V_CH), ch_ca[ch], ir, 0);
+if (hst_ch)
+    cpu_ent_hist (ch_clc[ch] | ((ch + 1) << HIST_V_CH), ch_ca[ch], ir, 0);
 ch_clc[ch] = (ch_clc[ch] + 1) & AMASK;                  /* incr chan pc */
 
 switch (op) {                                           /* case on opcode */
 
     case CH6_IOCD:                                      /* IOCD */
-        if (ch_wc[ch] == 0) ch6_end_ds (ch);            /* wc 0? end now */
+        if (ch_wc[ch] == 0)                             /* wc 0? end now */
+            ch6_end_ds (ch);
         break;
 
     case CH6_IOST:                                      /* IOST */
@@ -1231,7 +1301,8 @@ switch (op) {                                           /* case on opcode */
             ch_req |= REQ_CH (ch);
     case CH6_IOCT:                                      /* IOCT */
         if (ch_wc[ch] == 0) {                           /* wc 0? */
-            if (ch_ld) ch6_end_ds (ch);                 /* load? end now */
+            if (ch_ld)                                  /* load? end now */
+                ch6_end_ds (ch);
             else ch_req |= REQ_CH (ch);                 /* else immed ch req */
             }
         break;
@@ -1240,7 +1311,8 @@ switch (op) {                                           /* case on opcode */
         if (ch_flags[ch] & CHF_EOR)                     /* EOR set? immed ch req */
             ch_req |= REQ_CH (ch);
     case CH6_IOCP:                                      /* IOCP */
-        if (ch_wc[ch] == 0) ch_req |= REQ_CH (ch);      /* wc 0? immed ch req */
+        if (ch_wc[ch] == 0)                             /* wc 0? immed ch req */
+            ch_req |= REQ_CH (ch);
         break;
 
     case CH6_IORT:                                      /* IORT */
@@ -1286,13 +1358,16 @@ uint32 i, op;
 if (ch_wc[ch] == 0) {                                   /* wc = 0? */
     uint32 ccnt = 5;                                    /* allow 5 for CPU */
     for (i = 0; i < NUM_CHAN; i++) {                    /* test channels */
-        if (ch_sta[ch] != CHXS_DSX) continue;           /* idle? skip */
+        if (ch_sta[ch] != CHXS_DSX)                     /* idle? skip */
+            continue;
         op = ch_op[ch] & ~1;                            /* get op */
         ccnt++;                                         /* 1 per active ch */
         if ((op == CH6_IOCP) || (op == CH6_IORP) ||     /* 1 per proceed */
-            (op == CH6_IOSP)) ccnt++;
+            (op == CH6_IOSP))
+            ccnt++;
         }
-    if (ccnt <= 11) return;                             /* <= 11? ok */
+    if (ccnt <= 11)                                     /* <= 11? ok */
+        return;
     }
 ch_flags[ch] = ch_flags[ch] & ~CHF_EOR;                 /* clear eor */
 return;
@@ -1305,9 +1380,11 @@ return;
 t_stat ch6_req_rd (uint32 ch, uint32 unit, t_uint64 val, uint32 fl)
 {
 if (ch6_qconn (ch, unit)) {                             /* ch conn to caller? */
-    if (ch_idf[ch] & CH6DF_VLD) ind_ioc = 1;            /* overrun? */
+    if (ch_idf[ch] & CH6DF_VLD)                         /* overrun? */
+        ind_ioc = 1;
     ch_idf[ch] = CH6DF_VLD;                             /* set ar valid */
-    if (fl) ch_idf[ch] |= CH6DF_EOR;                    /* set eor if requested */
+    if (fl)                                             /* set eor if requested */
+        ch_idf[ch] |= CH6DF_EOR;
     ch_req |= REQ_CH (ch);                              /* request chan */
     ch_flags[ch] |= CHF_RDS;
     ch_ar[ch] = val & DMASK;                            /* save data */
@@ -1353,7 +1430,8 @@ return 0;
 t_bool ch6_qconn (uint32 ch, uint32 unit)
 {
 if ((ch < NUM_CHAN) &&                                  /* valid chan */
-    (ch_dsu[ch] == unit)) return TRUE;                  /* for right unit? */
+    (ch_dsu[ch] == unit))                               /* for right unit? */
+    return TRUE;
 return FALSE;
 }
 
@@ -1392,9 +1470,11 @@ t_stat ch9_sel (uint32 ch, uint32 sel)
 DEVICE *dptr = ch2dev[ch];
 DIB *dibp;
 
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp && dibp->chsel) return dibp->chsel (ch, sel, 0);
+if (dibp && dibp->chsel)
+    return dibp->chsel (ch, sel, 0);
 return SCPE_IERR;
 }
 
@@ -1405,9 +1485,11 @@ t_stat ch9_wr (uint32 ch, t_uint64 dat, uint32 fl)
 DEVICE *dptr = ch2dev[ch];
 DIB *dibp;
 
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp && dibp->write) return dibp->write (ch, dat, fl);
+if (dibp && dibp->write)
+    return dibp->write (ch, dat, fl);
 return SCPE_IERR;
 }
 
@@ -1470,7 +1552,8 @@ switch (ch_op[ch]) {                                    /* check initial cond */
         if (ch_flags[ch] & (CHF_PRD|CHF_PWR|CHF_RDS|CHF_WRS))
             ch9_eval_int (ch, CHINT_SEQC);              /* not during data */
         ch_flags[ch] &= ~CHF_EOR;
-        if (ch_wc[ch] & CH9D_NST) ch_req |= REQ_CH (ch); /* N set? proc in chan */
+        if (ch_wc[ch] & CH9D_NST)                       /* N set? proc in chan */
+            ch_req |= REQ_CH (ch);
         else return ch9_sel (ch, CHSL_CTL);             /* sel, dev sets ch_req! */
         break;
 
@@ -1485,8 +1568,10 @@ switch (ch_op[ch]) {                                    /* check initial cond */
     case CH9_CPYP:
         if ((ch_flags[ch] & (CHF_PRD|CHF_PWR|CHF_RDS|CHF_WRS)) == 0)
             ch9_eval_int (ch, CHINT_SEQC);              /* not unless data */
-        if (ch_flags[ch] & CHF_PRD) ch_flags[ch] |= CHF_RDS;
-        else if (ch_flags[ch] & CHF_PWR) ch_flags[ch] |= CHF_WRS;
+        if (ch_flags[ch] & CHF_PRD)
+            ch_flags[ch] |= CHF_RDS;
+        else if (ch_flags[ch] & CHF_PWR)
+            ch_flags[ch] |= CHF_WRS;
         ch_flags[ch] &= ~(CHF_EOR|CHF_PRD|CHF_PWR);
         if ((ch_op[ch] == CH9_CPYP) && (ch_wc[ch] == 0))
             ch_req |= REQ_CH (ch);                      /* CPYP x,,0? */
@@ -1515,7 +1600,8 @@ return SCPE_OK;
 t_stat ch9_req_rd (uint32 ch, t_uint64 val)
 {
 if (ch < NUM_CHAN) {                                    /* valid chan? */
-    if (ch_idf[ch] & CH9DF_VLD) ch9_set_ioc (ch);       /* prev still valid? io chk */
+    if (ch_idf[ch] & CH9DF_VLD)                         /* prev still valid? io chk */
+        ch9_set_ioc (ch);
     ch_idf[ch] = CH9DF_VLD;                             /* set ar valid */
     ch_req |= REQ_CH (ch);                              /* request chan */
     ch_ar[ch] = val & DMASK;                            /* save data */
@@ -1527,7 +1613,8 @@ return SCPE_OK;
 
 void ch9_set_atn (uint32 ch)
 {
-if (ch < NUM_CHAN) ch9_eval_int (ch, CHINT_ATN1);
+if (ch < NUM_CHAN)
+    ch9_eval_int (ch, CHINT_ATN1);
 return;
 }
 
@@ -1557,7 +1644,8 @@ return;
 
 t_bool ch9_qconn (uint32 ch)
 {
-if ((ch < NUM_CHAN) && (ch_sta[ch] == CHXS_DSX)) return TRUE;
+if ((ch < NUM_CHAN) && (ch_sta[ch] == CHXS_DSX))
+    return TRUE;
 return FALSE;
 }
 
@@ -1600,7 +1688,8 @@ t_bool ch_qidle (void)
 uint32 i;
 
 for (i = 0; i < NUM_CHAN; i++) {
-    if (ch_sta[i] != CHXS_IDLE) return FALSE;
+    if (ch_sta[i] != CHXS_IDLE)
+        return FALSE;
     }
 return TRUE;
 }
@@ -1645,7 +1734,8 @@ if (!chtr_inht && !chtr_inhi && chtr_enab) {
             }                                           /* end if BIT_TST */
         }                                               /* end for */
     }                                                   /* end if !chtr_inht */
-if (decr) *decr = 0;
+if (decr)
+    *decr = 0;
 return 0;
 }
 
@@ -1655,7 +1745,8 @@ t_stat ch_reset (DEVICE *dptr)
 {
 uint32 ch = dptr - &ch_dev[0];                          /* get channel */
 
-if (ch == CH_A) ch2dev[ch] = &mt_dev[0];                /* channel A fixed */
+if (ch == CH_A)                                         /* channel A fixed */
+    ch2dev[ch] = &mt_dev[0];
 ch_sta[ch] = 0;
 ch_flags[ch] = 0;
 ch_idf[ch] = 0;
@@ -1682,9 +1773,12 @@ t_stat ch_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr;
 
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
-if (dptr->flags & DEV_7909) fputs ("7909", st);
-else if (dptr->flags & DEV_7289) fputs ("7289", st);
+if (dptr == NULL)
+    return SCPE_IERR;
+if (dptr->flags & DEV_7909)
+    fputs ("7909", st);
+else if (dptr->flags & DEV_7289)
+    fputs ("7289", st);
 else fputs ("7607", st);
 return SCPE_OK;
 }
@@ -1698,15 +1792,19 @@ char gbuf[CBUFSIZE];
 uint32 i, ch;
 
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 ch = dptr - &ch_dev[0];
-if ((ch == 0) || !(dptr->flags & DEV_DIS)) return SCPE_ARG;
-if (cptr == NULL) cptr = "TAPE";
+if ((ch == 0) || !(dptr->flags & DEV_DIS))
+    return SCPE_ARG;
+if (cptr == NULL)
+    cptr = "TAPE";
 get_glyph (cptr, gbuf, 0);
 for (i = 0; dev_table[i].name; i++) {
     if (strcmp (dev_table[i].name, gbuf) == 0) {
         dptr1 = ch_map_flags (ch, dev_table[i].flags);
-        if (!dptr1 || !(dptr1->flags & DEV_DIS)) return SCPE_ARG;
+        if (!dptr1 || !(dptr1->flags & DEV_DIS))
+            return SCPE_ARG;
         dptr->flags &= ~(DEV_DIS|DEV_7909|DEV_7289|DEV_7750|DEV_7631);
         dptr->flags |= dev_table[i].flags;
         dptr1->flags &= ~DEV_DIS;
@@ -1721,10 +1819,14 @@ return SCPE_ARG;
 
 DEVICE *ch_map_flags (uint32 ch, int32 fl)
 {
-if (fl & DEV_7289) return &drm_dev;
-if (!(fl & DEV_7909)) return &mt_dev[ch];
-if (fl & DEV_7631) return &dsk_dev;
-if (fl & DEV_7750) return &com_dev;
+if (fl & DEV_7289)
+    return &drm_dev;
+if (!(fl & DEV_7909))
+    return &mt_dev[ch];
+if (fl & DEV_7631)
+    return &dsk_dev;
+if (fl & DEV_7750)
+    return &com_dev;
 return NULL;
 }
 
@@ -1735,7 +1837,8 @@ void ch_set_map (void)
 uint32 i;
 
 for (i = 0; i < NUM_CHAN; i++) {
-    if (ch_dev[i].flags & DEV_DIS) ch2dev[i] = NULL;
+    if (ch_dev[i].flags & DEV_DIS)
+        ch2dev[i] = NULL;
     else ch2dev[i] = ch_map_flags (i, ch_dev[i].flags);
     }
 return;
@@ -1750,15 +1853,19 @@ UNIT *uptr1;
 uint32 i, ch;
 
 dptr = find_dev_from_unit (uptr);
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 ch = dptr - &ch_dev[0];
-if ((ch == 0) || (dptr->flags & DEV_DIS) || (cptr != NULL)) return SCPE_ARG;
+if ((ch == 0) || (dptr->flags & DEV_DIS) || (cptr != NULL))
+    return SCPE_ARG;
 dptr1 = ch2dev[ch];
-if (dptr1 == NULL) return SCPE_IERR;
+if (dptr1 == NULL)
+    return SCPE_IERR;
 if (dptr1->units) {
     for (i = 0; i < dptr1->numunits; i++) {
         uptr1 = dptr1->units + i;
-        if (dptr1->detach) dptr1->detach (uptr1);
+        if (dptr1->detach)
+            dptr1->detach (uptr1);
         else detach_unit (uptr1);
         }
     }

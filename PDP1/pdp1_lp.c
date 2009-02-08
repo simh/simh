@@ -1,6 +1,6 @@
 /* pdp1_lp.c: PDP-1 line printer simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -179,7 +179,8 @@ else {
     iosta = iosta | IOS_PNT;                            /* print */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* attached? */
         return IORETURN (lpt_stopioe, SCPE_UNATT);
-    if (lpt_ovrpr) fputc ('\r', uptr->fileref);         /* overprint? */
+    if (lpt_ovrpr)                                      /* overprint? */
+        fputc ('\r', uptr->fileref);
     fputs (lpt_buf, uptr->fileref);                     /* print buffer */
     uptr->pos = ftell (uptr->fileref);                  /* update position */
     if (ferror (uptr->fileref)) {                       /* test error */
@@ -188,7 +189,8 @@ else {
         return SCPE_IOERR;
         }
     lpt_bptr = 0;
-    for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0;    /* clear buffer */
+    for (i = 0; i <= LPT_BSIZE; i++)                    /* clear buffer */
+        lpt_buf[i] = 0;
     lpt_ovrpr = 1;                                      /* set overprint */
     }
 return SCPE_OK;
@@ -201,7 +203,8 @@ t_stat lpt_reset (DEVICE *dptr)
 int32 i;
 
 lpt_bptr = 0;                                           /* clear buffer ptr */
-for (i = 0; i <= LPT_BSIZE; i++) lpt_buf[i] = 0;        /* clear buffer */
+for (i = 0; i <= LPT_BSIZE; i++)                        /* clear buffer */
+    lpt_buf[i] = 0;
 lpt_spc = 0;                                            /* clear state */
 lpt_ovrpr = 0;                                          /* clear overprint */
 cpls = cpls & ~CPLS_LPT;

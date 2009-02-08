@@ -1,6 +1,6 @@
 /* id_fd.c: Interdata floppy disk simulator
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -214,8 +214,10 @@ switch (op) {                                           /* case IO op */
         return BY;                                      /* byte only */
 
     case IO_RD:                                         /* read */
-        if (fd_sta & (STA_IDL | STA_BSY)) return fd_db; /* idle, busy? */
-        if (fd_bptr < FD_NUMBY) fd_db = fdxb[fd_bptr++];/* get byte */
+        if (fd_sta & (STA_IDL | STA_BSY))               /* idle, busy? */
+            return fd_db;
+        if (fd_bptr < FD_NUMBY)                         /* get byte */
+            fd_db = fdxb[fd_bptr++];
         if (fd_bptr >= FD_NUMBY) {                      /* buf end? */
             if (ctab[fnc] & C_RD) {                     /* disk read? */
                 sched_seek (uptr, uptr->LRN + 1);       /* sched read */
@@ -234,7 +236,7 @@ switch (op) {                                           /* case IO op */
             break;
             }
         if (fd_bptr < FD_NUMBY)                         /* if room, */
-                fdxb[fd_bptr++] = fd_db = dat;          /* store byte */
+            fdxb[fd_bptr++] = fd_db = dat;              /* store byte */
         if (fd_bptr >= FD_NUMBY) {                      /* buf end? */
             if (ctab[fnc] & C_WD) {                     /* disk write? */
                 sched_seek (uptr, uptr->LRN + 1);       /* sched write */
@@ -248,8 +250,10 @@ switch (op) {                                           /* case IO op */
 
     case IO_SS:                                         /* status */
         t = fd_sta & STA_MASK;                          /* get status */
-        if ((uptr->flags & UNIT_ATT) == 0) t = t | STA_DU;
-        if (t & SET_EX) t = t | STA_EX;                 /* test for ex */
+        if ((uptr->flags & UNIT_ATT) == 0)
+            t = t | STA_DU;
+        if (t & SET_EX)                                 /* test for ex */
+            t = t | STA_EX;
         return t;
 
     case IO_OC:                                         /* command */
@@ -260,7 +264,8 @@ switch (op) {                                           /* case IO op */
         uptr = fd_dev.units + u;
         if (fnc == FNC_STOP) {                          /* stop? */
             uptr->FNC = uptr->FNC | FNC_STOPPING;       /* flag stop */
-            if (sim_is_active (uptr)) break;            /* busy? cont */
+            if (sim_is_active (uptr))                   /* busy? cont */
+                break;
             if (ctab[GET_FNC (uptr->FNC)] & C_WD) {     /* write? */
                 sched_seek (uptr, uptr->LRN + 1);       /* sched write */
                 fd_sta = fd_sta | STA_BSY;              /* set busy */
@@ -275,14 +280,17 @@ switch (op) {                                           /* case IO op */
                 fd_es[u][1] = u;                        /* init ext sta */
                 }
             else fd_sta = (fd_sta & ~STA_IDL) | STA_BSY;
-            if (fnc == FNC_BOOT) t = LRN_BOOT;          /* boot? fixed sec */
-            else if (fd_wdv) t = fd_lrn;                /* valid data? use */
+            if (fnc == FNC_BOOT)                        /* boot? fixed sec */
+                t = LRN_BOOT;
+            else if (fd_wdv)                            /* valid data? use */
+                t = fd_lrn;
             else t = uptr->LRN;                         /* use prev */
             fd_wdv = 0;                                 /* data invalid */
             fd_bptr = 0;                                /* init buffer */
             uptr->FNC = fnc;                            /* save function */
             uptr->LRN = t;                              /* save LRN */
-            if (ctab[fnc] & C_RD) sched_seek (uptr, t); /* seek now? */
+            if (ctab[fnc] & C_RD)                       /* seek now? */
+                sched_seek (uptr, t);
             else sim_activate (uptr, fd_ctime);         /* start cmd */
             }
         break;
@@ -313,8 +321,10 @@ switch (fnc) {                                          /* case on function */
 
     case FNC_BOOT:                                      /* boot, buf empty */
     case FNC_RD:                                        /* read, buf empty */
-        if (uptr->FNC & FNC_STOPPING) break;            /* stopped? */
-        if (fd_dte (uptr, FALSE)) return SCPE_OK;       /* xfr error? */
+        if (uptr->FNC & FNC_STOPPING)                   /* stopped? */
+            break;
+        if (fd_dte (uptr, FALSE))                       /* xfr error? */
+            return SCPE_OK;
         da = GET_DA (uptr->LRN);                        /* get disk addr */
         for (i = 0; i < FD_NUMBY; i++)                  /* read sector */
             fdxb[i] = fbuf[da + i];
@@ -329,7 +339,8 @@ switch (fnc) {                                          /* case on function */
         break;
 
     case FNC_WR: case FNC_DEL:                          /* write block */
-        if (fd_dte (uptr, TRUE)) return SCPE_OK;        /* xfr error? */
+        if (fd_dte (uptr, TRUE))                        /* xfr error? */
+            return SCPE_OK;
         if (fd_bptr) {                                  /* any transfer? */
             da = GET_DA (uptr->LRN);                    /* get disk addr */
             for (i = fd_bptr; i < FD_NUMBY; i++)        /* pad sector */
@@ -345,7 +356,7 @@ switch (fnc) {                                          /* case on function */
             }
         break;
 
-    case FNC_RSTA:                                              /* read status */
+    case FNC_RSTA:                                      /* read status */
         if (uptr->flags & UNIT_WPRT)                    /* wr protected? */
             fd_es[u][0] = fd_es[u][0] | ES0_WRP;
         if (GET_TRK (uptr->LRN) == 0)                   /* on track 0? */
@@ -354,11 +365,13 @@ switch (fnc) {                                          /* case on function */
             fd_es[u][0] = fd_es[u][0] | ES0_FLT;        /* set err */
             fd_es[u][1] = fd_es[u][1] | ES1_NRDY;
 			}
-        for (i = 0; i < ES_SIZE; i++) fdxb[i] = fd_es[u][i];    /* copy to buf */
-        for (i = ES_SIZE; i < FD_NUMBY; i++) fdxb[i] = 0;
+        for (i = 0; i < ES_SIZE; i++)                   /* copy to buf */
+            fdxb[i] = fd_es[u][i];
+        for (i = ES_SIZE; i < FD_NUMBY; i++)
+            fdxb[i] = 0;
         break;
 
-    case FNC_RDID:                                              /* read ID */
+    case FNC_RDID:                                      /* read ID */
         if ((uptr->flags & UNIT_BUF) == 0) {            /* not attached? */
             fd_done (u, STA_ERR, ES0_ERR | ES0_FLT, ES1_NRDY);
             return SCPE_OK;
@@ -387,7 +400,8 @@ if (uptr->FNC & FNC_STOPPING) {                         /* stopping? */
     sim_activate (uptr, fd_ctime);                      /* schedule */
     }   
 fd_sta = fd_sta & ~STA_BSY;                             /* clear busy */
-if (fd_arm) SET_INT (v_FD);                             /* if armed, int */
+if (fd_arm)                                             /* if armed, int */
+    SET_INT (v_FD);
 return SCPE_OK;
 }
 
@@ -397,8 +411,10 @@ void sched_seek (UNIT *uptr, int32 newlrn)
 {
 int32 diff = newlrn - uptr->LRN;                        /* LRN diff */
 
-if (diff < 0) diff = -diff;                             /* ABS */
-if (diff < 10) diff = 10;                               /* MIN 10 */
+if (diff < 0)                                           /* ABS */
+    diff = -diff;
+if (diff < 10)
+    diff = 10;                                          /* MIN 10 */
 sim_activate (uptr, diff * fd_stime);                   /* schedule */
 return;
 }
@@ -408,7 +424,8 @@ return;
 void fd_done (uint32 u, uint32 nsta, uint32 nes0, uint32 nes1)
 {
 fd_sta = (fd_sta | STA_IDL | nsta) & ~STA_BSY;          /* set idle */
-if (fd_arm) SET_INT (v_FD);                             /* if armed, int */
+if (fd_arm)                                             /* if armed, int */
+    SET_INT (v_FD);
 fd_es[u][0] = fd_es[u][0] | nes0;                       /* set ext state */
 fd_es[u][1] = fd_es[u][1] | nes1;
 return;
@@ -444,7 +461,8 @@ uint32 i, wrk;
 for (i = 0; i < cnt; i++) {
     wrk = crc ^ dat;
     crc = (crc << 1) & DMASK16;
-    if (wrk & SIGN16) crc = ((crc ^ 0x1020) + 1) & DMASK16;
+    if (wrk & SIGN16)
+        crc = ((crc ^ 0x1020) + 1) & DMASK16;
     dat = (dat << 1) & DMASK16;
     }
 return crc;
@@ -498,7 +516,8 @@ t_stat fd_boot (int32 unitno, DEVICE *dptr)
 extern uint32 PC, dec_flgs;
 extern uint16 decrom[];
 
-if (decrom[0xD5] & dec_flgs) return SCPE_NOFNC;         /* AL defined? */
+if (decrom[0xD5] & dec_flgs)                            /* AL defined? */
+    return SCPE_NOFNC;
 IOWriteBlk (BOOT_START, BOOT_LEN, boot_rom);            /* copy boot */
 IOWriteB (AL_DEV, fd_dib.dno);                          /* set dev no */
 IOWriteB (AL_IOC, 0x86 + (unitno << CMD_V_UNIT));       /* set dev cmd, unit num */

@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: s100_disk2.c 1771 2008-01-09 07:10:46Z hharte $                  *
+ * $Id: s100_disk2.c 1995 2008-07-15 03:59:13Z hharte $                  *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -49,13 +49,15 @@
 
 #include "sim_imd.h"
 
-#define SEEK_MSG    0x01
-#define BUG_MSG     0x02
-#define CMD_MSG     0x04
-#define RD_DATA_MSG 0x08
-#define WR_DATA_MSG 0x10
-#define STATUS_MSG  0x20
-#define VERBOSE_MSG 0x80
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define SEEK_MSG    (1 << 1)
+#define CMD_MSG     (1 << 2)
+#define RD_DATA_MSG (1 << 3)
+#define WR_DATA_MSG (1 << 4)
+#define STATUS_MSG  (1 << 5)
+#define IRQ_MSG     (1 << 6)
+#define VERBOSE_MSG (1 << 7)
 
 #define DISK2_MAX_DRIVES    4
 
@@ -104,6 +106,17 @@ typedef struct {
 static DISK2_INFO disk2_info_data = { { 0x0, 0, 0xC8, 2 } };
 static DISK2_INFO *disk2_info = &disk2_info_data;
 
+/* Default geometry for a 20MB hard disk. */
+#define C20MB_NTRACKS   243
+#define C20MB_NHEADS    8
+#define C20MB_NSECTORS  11
+#define C20MB_SECTSIZE  1024
+
+static int32 ntracks      = C20MB_NTRACKS;
+static int32 nheads       = C20MB_NHEADS;
+static int32 nsectors     = C20MB_NSECTORS;
+static int32 sectsize     = C20MB_SECTSIZE;
+
 extern uint32 PCX;
 extern REG *sim_PC;
 extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -112,16 +125,13 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 extern int32 selchan_dma(uint8 *buf, uint32 len);
 extern int32 find_unit_index(UNIT *uptr);
-
-/* These are needed for DMA.  PIO Mode has not been implemented yet. */
-extern void PutBYTEWrapper(const uint32 Addr, const uint32 Value);
-extern uint8 GetBYTEWrapper(const uint32 Addr);
+extern void raise_ss1_interrupt(uint8 intnum);
 
 #define UNIT_V_DISK2_WLK        (UNIT_V_UF + 0) /* write locked                             */
 #define UNIT_DISK2_WLK          (1 << UNIT_V_DISK2_WLK)
 #define UNIT_V_DISK2_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_DISK2_VERBOSE      (1 << UNIT_V_DISK2_VERBOSE)
-#define DISK2_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
+#define DISK2_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
 #define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
 #define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
 #define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
@@ -129,13 +139,12 @@ extern uint8 GetBYTEWrapper(const uint32 Addr);
 static t_stat disk2_reset(DEVICE *disk2_dev);
 static t_stat disk2_attach(UNIT *uptr, char *cptr);
 static t_stat disk2_detach(UNIT *uptr);
+static void raise_disk2_interrupt(void);
 
 static int32 disk2dev(const int32 port, const int32 io, const int32 data);
 
 static uint8 DISK2_Read(const uint32 Addr);
 static uint8 DISK2_Write(const uint32 Addr, uint8 cData);
-
-static int32 trace_level    = 0;        /* Disable all tracing by default */
 
 static UNIT disk2_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, DISK2_CAPACITY) },
@@ -145,7 +154,15 @@ static UNIT disk2_unit[] = {
 };
 
 static REG disk2_reg[] = {
-    { HRDATA (TRACELEVEL,   trace_level,           16), },
+    { DRDATA (NTRACKS,    ntracks,             10), },
+    { DRDATA (NHEADS,     nheads,              8), },
+    { DRDATA (NSECTORS,   nsectors,            8), },
+    { DRDATA (SECTSIZE,   sectsize,            11), },
+    { HRDATA (SEL_DRIVE,  disk2_info_data.sel_drive, 3), },
+    { HRDATA (CYL,        disk2_info_data.cyl,       8), },
+    { HRDATA (HEAD,       disk2_info_data.head,      8), },
+    { HRDATA (SECTOR,     disk2_info_data.sector,    8), },
+
     { NULL }
 };
 
@@ -160,13 +177,30 @@ static MTAB disk2_mod[] = {
     { 0 }
 };
 
+#define TRACE_PRINT(level, args)    if(disk2_dev.dctrl & level) {   \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB disk2_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "SEEK",   SEEK_MSG },
+    { "CMD",    CMD_MSG },
+    { "RDDATA", RD_DATA_MSG },
+    { "WRDATA", WR_DATA_MSG },
+    { "STATUS", STATUS_MSG },
+    { "IRQ",    IRQ_MSG },
+    { "VERBOSE",VERBOSE_MSG },
+    { NULL,     0 }
+};
+
 DEVICE disk2_dev = {
     "DISK2", disk2_unit, disk2_reg, disk2_mod,
     DISK2_MAX_DRIVES, 10, 31, 1, DISK2_MAX_DRIVES, DISK2_MAX_DRIVES,
     NULL, NULL, &disk2_reset,
     NULL, &disk2_attach, &disk2_detach,
-    &disk2_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &disk2_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    disk2_dt, NULL, "Compupro Hard Disk Controller DISK2"
 };
 
 /* Reset routine */
@@ -193,7 +227,7 @@ static t_stat disk2_attach(UNIT *uptr, char *cptr)
     t_stat r = SCPE_OK;
     DISK2_DRIVE_INFO *pDrive;
     char header[4];
-    unsigned int i = 0;
+    int i = 0;
 
     i = find_unit_index(uptr);
     if (i == -1) {
@@ -204,10 +238,10 @@ static t_stat disk2_attach(UNIT *uptr, char *cptr)
     pDrive->ready = 1;
     disk2_info->write_fault = 1;
     pDrive->track = 5;
-    pDrive->ntracks = 243;
-    pDrive->nheads = 8;
-    pDrive->nsectors = 11;
-    pDrive->sectsize = 1024;
+    pDrive->ntracks = ntracks;
+    pDrive->nheads = nheads;
+    pDrive->nsectors = nsectors;
+    pDrive->sectsize = sectsize;
 
     r = attach_unit(uptr, cptr);    /* attach unit  */
     if ( r != SCPE_OK)              /* error?       */
@@ -254,7 +288,8 @@ static t_stat disk2_attach(UNIT *uptr, char *cptr)
         if (uptr->flags & UNIT_DISK2_VERBOSE)
             printf("--------------------------------------------------------\n");
         disk2_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_DISK2_VERBOSE));
-        if (uptr->flags & UNIT_DISK2_VERBOSE) printf("\n");
+        if (uptr->flags & UNIT_DISK2_VERBOSE)
+            printf("\n");
     } else {
         disk2_info->drive[i].imd = NULL;
     }
@@ -415,11 +450,11 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                         }
                         /* See FIXME above... that might be why this does not work properly... */
                         if(disk2_info->cyl != pDrive->track) { /* problem, should not happen, see above */
-                            TRACE_PRINT(BUG_MSG, ("DISK2: " ADDRESS_FORMAT " READ_DATA: cyl=%d, track=%d" NLP,
+                            TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " READ_DATA: cyl=%d, track=%d" NLP,
                                 PCX, disk2_info->cyl, pDrive->track));
                             pDrive->track = disk2_info->cyl; /* update track */
                         }
-                        fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
+                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
                         for(i=0;i<pDrive->nsectors;i++) {
                             /* Read sector */
                             fread(sdata.raw, (pDrive->sectsize + 3), 1, (pDrive->uptr)->fileref);
@@ -453,12 +488,12 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             printf("DISK2: " ADDRESS_FORMAT " WRITE_DATA: head_sel != head" NLP, PCX);
                         }
                         if(disk2_info->cyl != pDrive->track) { /* problem, should not happen, see above */
-                            TRACE_PRINT(BUG_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_DATA = 0x%02x, cyl=%d, track=%d" NLP,
+                            TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_DATA = 0x%02x, cyl=%d, track=%d" NLP,
                                 PCX, cData, disk2_info->cyl, pDrive->track));
                             pDrive->track = disk2_info->cyl; /* update track */
                        }
 
-                        fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
+                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
                         for(i=0;i<pDrive->nsectors;i++) {
                             /* Read sector */
                             file_offset = ftell((pDrive->uptr)->fileref);
@@ -474,7 +509,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                 }
 
                                 selchan_dma(sdata.u.data, pDrive->sectsize);
-                                fseek((pDrive->uptr)->fileref, file_offset+3, SEEK_SET);
+                                sim_fseek((pDrive->uptr)->fileref, file_offset+3, SEEK_SET);
                                 fwrite(sdata.u.data, (pDrive->sectsize), 1, (pDrive->uptr)->fileref);
                                 break;
                             }
@@ -496,7 +531,7 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
 
                         i = disk2_info->hdr_sector;
                         selchan_dma(sdata.raw, 3);
-                        fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * (pDrive->sectsize + 3) * pDrive->nsectors) + (i * (pDrive->sectsize + 3)), SEEK_SET);
+                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * (pDrive->sectsize + 3) * pDrive->nsectors) + (i * (pDrive->sectsize + 3)), SEEK_SET);
                         fwrite(sdata.raw, 3, 1, (pDrive->uptr)->fileref);
 
                         disk2_info->hdr_sector++;
@@ -508,15 +543,17 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                     case DISK2_CMD_READ_HEADER:
                         track_offset = pDrive->track * pDrive->nheads * pDrive->nsectors * (pDrive->sectsize + 3);
                         TRACE_PRINT(CMD_MSG, ("DISK2: " ADDRESS_FORMAT " READ_HEADER Command" NLP, PCX));
-                        fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
+                        sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
                         fread(sdata.raw, 3, 1, (pDrive->uptr)->fileref);
                         selchan_dma(sdata.raw, 3);
+
                         break;
                     default:
                         printf("DISK2: " ADDRESS_FORMAT " Unknown CMD=%d" NLP, PCX, disk2_info->ctl_op);
                         break;
                 }
 
+                raise_disk2_interrupt();
                 disk2_info->ctl_attn = 0;
             }
 
@@ -572,3 +609,12 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
     return (result);
 }
 
+#define SS1_VI1_INT         1   /* DISK2/DISK3 interrupts tied to VI1 */
+
+static void raise_disk2_interrupt(void)
+{
+    TRACE_PRINT(IRQ_MSG, ("DISK2: " ADDRESS_FORMAT " Interrupt" NLP, PCX));
+
+    raise_ss1_interrupt(SS1_VI1_INT);
+
+}

@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
-   Copyright (c) 2006, J. David Bryan
    Copyright (c) 2008, Holger Veit
+   Copyright (c) 2006-2008, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    30-Apr-08    JDB     Updated SIGNAL code from Holger
    24-Apr-08    HV      Implemented SIGNAL
    20-Apr-08    JDB     Updated comments
@@ -51,9 +53,6 @@
 
 #include "hp2100_fp1.h"
 
-
-t_stat cpu_vis (uint32 IR, uint32 intrq);                /* Vector Instruction Set */
-t_stat cpu_signal (uint32 IR, uint32 intrq);             /* SIGNAL/1000 Instructions */
 
 static const OP zero   = { { 0, 0, 0, 0, 0 } };          /* DEC 0.0D0 */
 
@@ -372,9 +371,6 @@ OP_PAT pattern;
 OPSIZE opsize;
 t_bool debug = DEBUG_PRI (cpu_dev, DEB_VIS);
 
-if ((cpu_unit.flags & UNIT_VIS) == 0)                    /* VIS option installed? */
-    return stop_inst;
-
 opsize = (IR & 004000) ? fp_t : fp_f;                    /* double or single precision */
 entry = IR & 017;                                        /* mask to entry point */
 pattern = op_vis[entry];
@@ -383,7 +379,7 @@ if (entry==0) {                                          /* retrieve sub opcode 
     ret = ReadOp (PC, in_s);                             /* get it */
     subcode = ret.word;
     if (subcode & 0100000)                               /* special property of ucode */
-        subcode = AR;                                    /*   for reentry */  
+        subcode = AR;                                    /*   for reentry */
     PC = (PC + 1) & VAMASK;                              /* bump to real argument list */
     pattern = (subcode & 0400) ? OP_AAKAKK : OP_AKAKAKK; /* scalar or vector operation */
 }
@@ -451,13 +447,13 @@ switch (entry) {                                         /* decode IR<3:0> */
        reason = cpu_ema_eres(&rtn,op[2].word,PC,debug);  /* handle the ERES instruction */
        PC = rtn;
        if (debug)
-           fprintf (sim_deb, 
+           fprintf (sim_deb,
                     ">>CPU VIS: return .ERES: AR = %06o, BR = %06o, rtn=%s\n",
                     AR, BR, PC==op[0].word ? "error" : "good");
        break;
 
    case 015:                                             /* .ESEG (OP_(A)A) */
-       reason = cpu_ema_eseg(&rtn,IR,op[0].word,debug);  /* handle the ESEG instruction */ 
+       reason = cpu_ema_eseg(&rtn,IR,op[0].word,debug);  /* handle the ESEG instruction */
        PC = rtn;
        if (debug)
            fprintf (sim_deb,
@@ -470,7 +466,7 @@ switch (entry) {                                         /* decode IR<3:0> */
        PC = rtn;
        if (debug)
            fprintf (sim_deb, ">>CPU VIS: return .VSET: AR = %06o BR = %06o, rtn=%s\n",
-                    AR, BR, 
+                    AR, BR,
                     rtn==rtn1 ? "error" : (rtn==(rtn1+1) ? "hard" : "easy") );
        break;
 
@@ -561,10 +557,10 @@ static void sig_btrfy(uint32 re,uint32 im,OP wr,OP wi,uint32 k, uint32 n2)
  * v(k)-------->o-->o----> v(k)
  *               \ /
  *                x
- *               / \ 
+ *               / \
  * v(k+N/2)---->o-->o----> v(k+N/2)
  *           Wn   -1
- * 
+ *
  */
 
 OP p1,p2,p3,p4;
@@ -610,7 +606,7 @@ if (rev < idx) return;                             /* avoid swapping same pair t
 idx *= sz;                                         /* adjust for element size */
 rev *= sz;                                         /* (REAL*4 vs COMPLEX*8) */
 
-v1r = ReadOp(re+idx, fp_f);                        /* read 1st element */ 
+v1r = ReadOp(re+idx, fp_f);                        /* read 1st element */
 v1i = ReadOp(im+idx, fp_f);
 v2r = ReadOp(re+rev, fp_f);                        /* read 2nd element */
 v2i = ReadOp(im+rev, fp_f);
@@ -652,8 +648,6 @@ uint32 entry, v, idx1, idx2;
 int32 exc, exd;
 
 t_bool debug = DEBUG_PRI (cpu_dev, DEB_SIG);
-if ((cpu_unit.flags & UNIT_SIGNAL) == 0)           /* SIGNAL option installed? */
-    return stop_inst;
 
 entry = IR & 017;                                  /* mask to entry point */
 
@@ -685,7 +679,7 @@ switch (entry) {                                   /* decode IR<3:0> */
         sig_bitrev(op[1].word, op[1].word+2, op[2].word-1, op[3].word, 4);
         PC = op[0].word & VAMASK;
         break;
-        
+
     case 001:                                      /* BTRFY (OP_AAFFKK) */
         /* BTRFY - butterfly operation
          *   JSB BTRFY
@@ -696,7 +690,7 @@ switch (entry) {                                   /* decode IR<3:0> */
          *   DEF node,I    index of 1st op (1 based)
          *   DEF lmax,I    offset to 2nd op (0 based) */
         sig_btrfy(op[1].word, op[1].word+2,
-                  op[2], op[3], 
+                  op[2], op[3],
                   2*(op[4].word-1), 2*op[5].word);
         PC = op[0].word & VAMASK;
         break;
@@ -724,17 +718,17 @@ switch (entry) {                                   /* decode IR<3:0> */
         sig_cmul(&m1, &m2, wr, wi, c, d);         /* (WR,WI) * (c,d) */
         c = sig_scadd(000, TRUE, p1, p2);         /* 0.5*(p1+p2) */
         d = sig_scadd(020, TRUE, p3, p4);         /* 0.5*(p3-p4) */
-        (void)fp_exec(000, &p1, c, m1);           /* VR[idx1] := 0.5*(p1+p2) + real(W*(c,d)) */   
-        WriteOp(RE(v + idx1), p1, fp_f); 
+        (void)fp_exec(000, &p1, c, m1);           /* VR[idx1] := 0.5*(p1+p2) + real(W*(c,d)) */
+        WriteOp(RE(v + idx1), p1, fp_f);
         (void)fp_exec(000, &p2, d, m2);           /* VI[idx1] := 0.5*(p3-p4) + imag(W*(c,d)) */
-        WriteOp(IM(v + idx1), p2, fp_f);  
+        WriteOp(IM(v + idx1), p2, fp_f);
         (void)fp_exec(020, &p1, c, m1);           /* VR[idx2] := 0.5*(p1+p2) - imag(W*(c,d)) */
-        WriteOp(RE(v + idx2), p1, fp_f);  
+        WriteOp(RE(v + idx2), p1, fp_f);
         (void)fp_exec(020, &p2, d, m2);           /* VI[idx2] := 0.5*(p3-p4) - imag(W*(c,d)) */
-        WriteOp(IM(v + idx2), p2, fp_f);  
+        WriteOp(IM(v + idx2), p2, fp_f);
         PC = op[0].word & VAMASK;
-        break;        
-        
+        break;
+
     case 003:                                      /* PRSCR (OP_AAFFKK) */
         /* PRSCR unscramble for phasor MPY
          *   JSB PRSCR
@@ -754,18 +748,18 @@ switch (entry) {                                   /* decode IR<3:0> */
         p3 = ReadOp(IM(v + idx1), fp_f);          /* VI[idx1] */
         p4 = ReadOp(IM(v + idx2), fp_f);          /* VI[idx2] */
         c = sig_scadd(020, FALSE, p1, p2);        /* p1-p2 */
-        d = sig_scadd(000, FALSE, p3, p4);        /* p3+p4 */ 
+        d = sig_scadd(000, FALSE, p3, p4);        /* p3+p4 */
         sig_cmul(&m1,&m2, wr, wi, c, d);          /* (WR,WI) * (c,d) */
         c = sig_scadd(000, FALSE, p1, p2);        /* p1+p2 */
         d = sig_scadd(020, FALSE, p3,p4);         /* p3-p4 */
         (void)fp_exec(020, &p1, c, m2);           /* VR[idx1] := (p1-p2) - imag(W*(c,d)) */
-        WriteOp(RE(v + idx1), p1, fp_f);  
-        (void)fp_exec(000, &p2, d, m1);           /* VI[idx1] := (p3-p4) + real(W*(c,d)) */   
-        WriteOp(IM(v + idx1), p2, fp_f); 
+        WriteOp(RE(v + idx1), p1, fp_f);
+        (void)fp_exec(000, &p2, d, m1);           /* VI[idx1] := (p3-p4) + real(W*(c,d)) */
+        WriteOp(IM(v + idx1), p2, fp_f);
         (void)fp_exec(000, &p1, c, m2);           /* VR[idx2] := (p1+p2) + imag(W*(c,d)) */
-        WriteOp(RE(v + idx2), p1, fp_f);  
+        WriteOp(RE(v + idx2), p1, fp_f);
         (void)fp_exec(020, &p2, m1, d);           /* VI[idx2] := imag(W*(c,d)) - (p3-p4) */
-        WriteOp(IM(v + idx2), p2, fp_f);  
+        WriteOp(IM(v + idx2), p2, fp_f);
         PC = op[0].word & VAMASK;
         break;
 
@@ -788,7 +782,7 @@ switch (entry) {                                   /* decode IR<3:0> */
         PC = op[0].word & VAMASK;
         break;
 
-    
+
     case 005:                                      /* BTRF1 (OP_AAAFFKK) */
         /* BTRF1 - butterfly operation with real*4 vectors
          *   JSB BTRF1
@@ -804,7 +798,7 @@ switch (entry) {                                   /* decode IR<3:0> */
                   op[5].word-1, op[6].word);
         PC = op[0].word & VAMASK;
         break;
-        
+
     case 006:                                      /* .CADD (OP_AAA) */
         /* .CADD Complex addition
          *   JSB .CADD
@@ -814,7 +808,7 @@ switch (entry) {                                   /* decode IR<3:0> */
          * complex addition is: (a+bi) + (c+di) => (a+c) + (b+d)i */
         sig_caddsub(000,op);
         break;
-        
+
     case 007:                                      /* .CSUB (OP_AAA) */
         /* .CSUB Complex subtraction
          *   JSB .CSUB
@@ -841,7 +835,7 @@ switch (entry) {                                   /* decode IR<3:0> */
         WriteOp(RE(op[0].word), p1, fp_f);         /* write real result */
         WriteOp(IM(op[0].word), p2, fp_f);         /* write imag result */
         break;
-    
+
     case 011:                                      /* .CDIV (OP_AAA) */
         /* .CDIV Complex division
          * call:
@@ -875,7 +869,7 @@ switch (entry) {                                   /* decode IR<3:0> */
         (void)fp_exec(070, &p3, NOP, p2);          /* p3 := (b-ad/c)/(c+dd/c) == (bc-ad)/cc+dd) */
         WriteOp(IM(op[0].word), p3, fp_f);         /* Write imag result */
         break;
-        
+
     case 012:                                      /* CONJG (OP_AAA) */
         /* CONJG build A-Bi from A+Bi
          * call:
@@ -889,7 +883,7 @@ switch (entry) {                                   /* decode IR<3:0> */
         WriteOp(RE(op[1].word), a, fp_f);          /* write real */
         WriteOp(IM(op[1].word), b, fp_f);          /* write imag */
         break;
-        
+
     case 013:                                      /* ..CCM (OP_A) */
         /* ..CCM complement complex
          * call
@@ -905,7 +899,7 @@ switch (entry) {                                   /* decode IR<3:0> */
         WriteOp(RE(v), a, fp_f);                   /* write real */
         WriteOp(IM(v), b, fp_f);                   /* write imag */
         break;
-        
+
     case 014:                                       /* AIMAG (OP_AA) */
         /* AIMAG return the imaginary part in AB
          *   JSB AIMAG
@@ -924,7 +918,7 @@ switch (entry) {                                   /* decode IR<3:0> */
          *   DEF result,I  complex number
          *   DEF repart,I  real value
          *   DEF impart,I  imaginary value */
-        WriteOp(RE(op[1].word), op[2], fp_f);       /* write real part */           
+        WriteOp(RE(op[1].word), op[2], fp_f);       /* write real part */
         WriteOp(IM(op[1].word), op[3], fp_f);       /* write imag part */
         break;
 

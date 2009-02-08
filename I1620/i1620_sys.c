@@ -1,6 +1,6 @@
 /* i1620_sys.c: IBM 1620 simulator interface
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -127,31 +127,37 @@ t_stat r;
 extern int32 cct_lnt, cct_ptr, cct[CCT_LNT];
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
-if ((*cptr != 0) || (flag != 0)) return SCPE_ARG;
+if ((*cptr != 0) || (flag != 0))
+    return SCPE_ARG;
 ptr = 0;
 for ( ; (cptr = fgets (cbuf, CBUFSIZE, fileref)) != NULL; ) { /* until eof */
     mask = 0;
     if (*cptr == '(') {                                 /* repeat count? */
         cptr = get_glyph (cptr + 1, gbuf, ')');         /* get 1st field */
         rpt = get_uint (gbuf, 10, CCT_LNT, &r);         /* repeat count */
-        if (r != SCPE_OK) return SCPE_FMT;
+        if (r != SCPE_OK)
+            return SCPE_FMT;
         }
     else rpt = 1;
     while (*cptr != 0) {                                /* get col no's */
         cptr = get_glyph (cptr, gbuf, ',');             /* get next field */
         col = get_uint (gbuf, 10, 12, &r);              /* column number */
-        if (r != SCPE_OK) return SCPE_FMT;
+        if (r != SCPE_OK)
+            return SCPE_FMT;
         mask = mask | (1 << col);                       /* set bit */
         }
     for ( ; rpt > 0; rpt--) {                           /* store vals */
-        if (ptr >= CCT_LNT) return SCPE_FMT;
+        if (ptr >= CCT_LNT)
+            return SCPE_FMT;
         cctbuf[ptr++] = mask;
         }
     }
-if (ptr == 0) return SCPE_FMT;
+if (ptr == 0)
+    return SCPE_FMT;
 cct_lnt = ptr;
 cct_ptr = 0;
-for (rpt = 0; rpt < cct_lnt; rpt++) cct[rpt] = cctbuf[rpt];
+for (rpt = 0; rpt < cct_lnt; rpt++)
+    cct[rpt] = cctbuf[rpt];
 return SCPE_OK;
 }
 
@@ -286,7 +292,8 @@ if ((cpu_unit.flags & IF_IDX) && flg) {                 /* indexing? */
             idx = idx | (1 << i);
         dig[ADDR_LEN - 2 - i] = dig[ADDR_LEN - 2 - i] & ~FLAG;
         }
-    if (idx) fprintf (of, "(%d)", idx);                 /* print */
+    if (idx)                                            /* print */
+        fprintf (of, "(%d)", idx);
     }
 return;
 }
@@ -312,10 +319,12 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
 int32 pmp, qmp, i, c, d, any;
 uint32 op, qv, opfl;
 
-if (uptr == NULL) uptr = &cpu_unit;
+if (uptr == NULL)
+    uptr = &cpu_unit;
 if (sw & SWMASK ('C')) {                                /* character? */
     if (uptr->flags & UNIT_BCD) {
-        if (addr & 1) return SCPE_ARG;                  /* must be even */
+        if (addr & 1)                                   /* must be even */
+            return SCPE_ARG;
         c = ((val[0] & DIGIT) << 4) | (val[1] & DIGIT);
         if (alp_to_cdp[c] > 0)
             fprintf (of, "%c", alp_to_cdp[c]);
@@ -325,9 +334,11 @@ if (sw & SWMASK ('C')) {                                /* character? */
     else fprintf (of, FMTASC (val[0] & 0177));
     return SCPE_OK;
     }
-if ((uptr->flags & UNIT_BCD) == 0) return SCPE_ARG;     /* CPU or disk? */
+if ((uptr->flags & UNIT_BCD) == 0)                      /* CPU or disk? */
+    return SCPE_ARG;
 if (sw & SWMASK ('D')) {                                /* dump? */
-    for (i = d = 0; i < LINE_LNT; i++) d = d | val[i];
+    for (i = d = 0; i < LINE_LNT; i++)
+        d = d | val[i];
     if (d & FLAG) {                                     /* any flags? */
         for (i = 0; i < LINE_LNT; i++)                  /* print flags */
             fprintf (of, (val[i] & FLAG)? "_": " ");
@@ -338,10 +349,12 @@ if (sw & SWMASK ('D')) {                                /* dump? */
     return -(i - 1);
     }
 if (sw & SWMASK ('S')) {                                /* string? */
-    if (addr & 1) return SCPE_ARG;                      /* must be even */
+    if (addr & 1)                                       /* must be even */
+        return SCPE_ARG;
     for (i = 0; i < LINE_LNT; i = i + 2) {
         c = ((val[i] & DIGIT) << 4) | (val[i + 1] & DIGIT);
-        if (alp_to_cdp[c] < 0) break;
+        if (alp_to_cdp[c] < 0)
+            break;
         fprintf (of, "%c", alp_to_cdp[c]);
         }
     if (i == 0) {
@@ -350,24 +363,32 @@ if (sw & SWMASK ('S')) {                                /* string? */
         }
     return -(i - 1);
     }
-if ((sw & SWMASK ('M')) == 0) return SCPE_ARG;
+if ((sw & SWMASK ('M')) == 0)
+    return SCPE_ARG;
 
-if (addr & 1) return SCPE_ARG;                          /* must be even */
+if (addr & 1)                                           /* must be even */
+    return SCPE_ARG;
 op = ((val[0] & DIGIT) * 10) + (val[1] & DIGIT);        /* get opcode */
 for (i = qv = pmp = qmp = 0; i < ADDR_LEN; i++) {       /* test addr */
-    if (val[I_P + i]) pmp = 1;
-    if (val[I_Q + i]) qmp = 1;
+    if (val[I_P + i])
+        pmp = 1;
+    if (val[I_Q + i])
+        qmp = 1;
     qv = (qv * 10) + (val[I_Q + i] & DIGIT);
     }
-if ((val[0] | val[1]) & FLAG) pmp = qmp = 1;            /* flags force */
+if ((val[0] | val[1]) & FLAG)                           /* flags force */
+    pmp = qmp = 1;
 for (i = 0; opcode[i].str != NULL; i++) {               /* find opcode */
     opfl = opcode[i].opv & 0xFF0000;
     if ((op == (opcode[i].opv & 0xFF)) &&
         ((qv == opcode[i].qv) ||
-        ((opfl != I_1E) && (opfl != I_0E)))) break;
+        ((opfl != I_1E) && (opfl != I_0E))))
+        break;
     }
-if (opcode[i].str == NULL) return SCPE_ARG;
-if (I_GETQP (opfl) == I_M_QNP) qmp = 0;                 /* Q no print? */
+if (opcode[i].str == NULL)
+    return SCPE_ARG;
+if (I_GETQP (opfl) == I_M_QNP)                          /* Q no print? */
+    qmp = 0;
 
 fprintf (of, opcode[i].str);                            /* print opcode */
 if (I_GETPP (opfl) == I_M_PP)                           /* P required? */
@@ -383,7 +404,8 @@ else if ((I_GETQP (opfl) == I_M_QCP) && (pmp || qmp))   /* Q opt & needed? */
     fprint_addr (of, ',', &val[I_Q], 0);
 for (i = any = 0; i < INST_LEN; i++) {                  /* print rem flags */
     if (val[i] & FLAG) {
-        if (!any) fputc (',', of);
+        if (!any)
+            fputc (',', of);
         any = 1;
         fprintf (of, "%d", i);
         }
@@ -399,7 +421,8 @@ int32 i, sign = 0, addr, index;
 static int32 idx_tst[ADDR_LEN] = { 0, 4, 2, 1, 0 };
 char *tptr;
 
-if (*cptr == '+') cptr++;                               /* +? skip */
+if (*cptr == '+')                                       /* +? skip */
+    cptr++;
 else if (*cptr == '-') {                                /* -? skip, flag */
     sign = 1;
     cptr++;
@@ -414,16 +437,20 @@ if ((cpu_unit.flags & IF_IDX) && (flg & I_M_QX) &&      /* index allowed? */
         index = strtoul (cptr = tptr + 1, &tptr, 10);   /* get index */
         if (errno || (cptr == tptr) || (index > 7))     /* err or too big? */
             return SCPE_ARG;
-        if (*tptr++ != ')') return SCPE_ARG;
+        if (*tptr++ != ')')
+            return SCPE_ARG;
         }
 else index = 0;
-if (*tptr != 0) return SCPE_ARG;                        /* all done? */
+if (*tptr != 0)                                         /* all done? */
+    return SCPE_ARG;
 for (i = ADDR_LEN - 1; i >= 0; i--) {                   /* cvt addr to dig */
     val[i] = (addr & 0xF) | ((index & idx_tst[i])? FLAG: 0);
     addr = addr >> 4;
     }
-if (sign) val[ADDR_LEN - 1] = val[ADDR_LEN - 1] | FLAG; /* set sign */
-if (flg & I_M_QM) val[0] = val[0] | FLAG;               /* set immediate */
+if (sign)                                               /* set sign */
+    val[ADDR_LEN - 1] = val[ADDR_LEN - 1] | FLAG;
+if (flg & I_M_QM)                                       /* set immediate */
+    val[0] = val[0] | FLAG;
 return SCPE_OK;
 }
 
@@ -445,13 +472,17 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 int32 i, qv, opfl, last;
 char t, la, *fptr, gbuf[CBUFSIZE];
 
-while (isspace (*cptr)) cptr++;                         /* absorb spaces */
+while (isspace (*cptr))                                 /* absorb spaces */
+    cptr++;
 if ((sw & SWMASK ('C')) || ((*cptr == '\'') && cptr++)) { /* character? */
-    if ((t = *cptr & 0x7F) == 0) return SCPE_ARG;       /* get char */
+    if ((t = *cptr & 0x7F) == 0)                        /* get char */
+        return SCPE_ARG;
     if (uptr->flags & UNIT_BCD) {                       /* BCD? */
-        if (addr & 1) return SCPE_ARG;
+        if (addr & 1)
+            return SCPE_ARG;
         t = cdr_to_alp[t];                              /* convert */
-        if (t < 0) return SCPE_ARG;                     /* invalid? */
+        if (t < 0)                                      /* invalid? */
+            return SCPE_ARG;
         val[0] = (t >> 4) & DIGIT;                      /* store */
         val[1] = t & DIGIT;
         return -1;
@@ -460,26 +491,33 @@ if ((sw & SWMASK ('C')) || ((*cptr == '\'') && cptr++)) { /* character? */
     return SCPE_OK;
     }
 
-if ((uptr->flags & UNIT_BCD) == 0) return SCPE_ARG;     /* CPU or disk? */
+if ((uptr->flags & UNIT_BCD) == 0)                      /* CPU or disk? */
+    return SCPE_ARG;
 if ((sw & SWMASK ('S')) || ((*cptr == '"') && cptr++)) { /* string? */
-    if (addr & 1) return SCPE_ARG;                      /* must be even */
+    if (addr & 1)                                       /* must be even */
+        return SCPE_ARG;
     for (i = 0; (i < sim_emax) && (*cptr != 0); i = i + 2) {
         t = *cptr++ & 0x7F;                             /* get character */
         t = cdr_to_alp[t];                              /* convert */
-        if (t < 0) return SCPE_ARG;                     /* invalid? */
+        if (t < 0)                                      /* invalid? */
+            return SCPE_ARG;
         val[i] = (t >> 4) & DIGIT;                      /* store */
         val[i + 1] = t & DIGIT;
         }
-    if (i == 0) return SCPE_ARG;                        /* final check */
+    if (i == 0)                                         /* final check */
+        return SCPE_ARG;
     return -(i - 1);
     }
 
-if (addr & 1) return SCPE_ARG;                          /* even addr? */
+if (addr & 1)                                           /* even addr? */
+    return SCPE_ARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get opcode */
 for (i = 0; opcode[i].str != NULL; i++) {               /* look it up */
-    if (strcmp (gbuf, opcode[i].str) == 0) break;
+    if (strcmp (gbuf, opcode[i].str) == 0)
+        break;
     }
-if (opcode[i].str == NULL) return SCPE_ARG;             /* successful? */
+if (opcode[i].str == NULL)                              /* successful? */
+    return SCPE_ARG;
 opfl = opcode[i].opv & 0xFF0000;                        /* get flags */
 val[0] = (opcode[i].opv & 0xFF) / 10;                   /* store opcode */
 val[1] = (opcode[i].opv & 0xFF) % 10;
@@ -492,10 +530,11 @@ for (i = ADDR_LEN - 1; i >= 0; i--) {                   /* set P,Q fields */
 
 cptr = get_glyph (cptr, gbuf, ',');                     /* get P field */
 if (gbuf[0]) {                                          /* any? */
-    if (parse_addr (gbuf, &val[I_P], (I_GETPP (opfl)?
-        I_M_QX: 0))) return SCPE_ARG;
+    if (parse_addr (gbuf, &val[I_P], (I_GETPP (opfl)? I_M_QX: 0)))
+        return SCPE_ARG;
     }
-else if (I_GETPP (opfl) == I_M_PP) return SCPE_ARG;
+else if (I_GETPP (opfl) == I_M_PP)
+    return SCPE_ARG;
 
 if (I_GETQP (opfl) != I_M_QNP) {                        /* Q field allowed? */
     cptr = get_glyph (cptr, gbuf, ',');                 /* get Q field */
@@ -503,25 +542,31 @@ if (I_GETQP (opfl) != I_M_QNP) {                        /* Q field allowed? */
         if (parse_addr (gbuf, &val[I_Q], I_GETQF (opfl)))
             return SCPE_ARG;
         }
-    else if (I_GETQP (opfl) == I_M_QP) return SCPE_ARG;
+    else if (I_GETQP (opfl) == I_M_QP)
+        return SCPE_ARG;
     }
 
 cptr = get_glyph (cptr, fptr = gbuf, ' ');              /* get flag field */
 last = -1;                                              /* none yet */
 while (t = *fptr++) {                                   /* loop through */
-    if ((t < '0') || (t > '9')) return SCPE_ARG;        /* must be digit */
+    if ((t < '0') || (t > '9'))                         /* must be digit */
+        return SCPE_ARG;
     t = t - '0';                                        /* convert */
     if (t == 1) {                                       /* ambiguous? */
         la = *fptr++;                                   /* get next */
-        if (la == '0') t = 10;                          /* 10? */
-        else if ((la == '1') && (*fptr == 0)) t = 11;   /* 11 & end field? */
+        if (la == '0')                                  /* 10? */
+            t = 10;
+        else if ((la == '1') && (*fptr == 0))           /* 11 & end field? */
+            t = 11;
         else --fptr;                                    /* dont lookahead */
         }
-    if (t <= last) return SCPE_ARG;                     /* in order? */
+    if (t <= last)                                      /* in order? */
+        return SCPE_ARG;
     val[t] = val[t] | FLAG;                             /* set flag */
     last = t;                                           /* continue */
     }
 
-if (*cptr != 0) return SCPE_ARG;
+if (*cptr != 0)
+    return SCPE_ARG;
 return -(INST_LEN - 1);
 }

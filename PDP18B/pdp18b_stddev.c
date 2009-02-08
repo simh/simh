@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -406,11 +406,13 @@ DEVICE tto_dev = {
 int32 clk (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {                                      /* CLSF */
-    if (TST_INT (CLK)) dat = dat | IOT_SKP;
+    if (TST_INT (CLK))
+        dat = dat | IOT_SKP;
     }
 if (pulse & 004) {                                      /* CLON/CLOF */
     CLR_INT (CLK);                                      /* clear flag */
-    if (pulse & 040) clk_state = 1;                     /* CLON */
+    if (pulse & 040)                                    /* CLON */
+        clk_state = 1;
     else clk_state = 0;                                 /* CLOF */
     }
 return dat;
@@ -430,7 +432,8 @@ clk_task_upd (FALSE);                                   /* update task timer */
 #endif
 if (clk_state) {                                        /* clock on? */
     M[7] = (M[7] + 1) & DMASK;                          /* incr counter */
-    if (M[7] == 0) SET_INT (CLK);                       /* ovrflo? set flag */
+    if (M[7] == 0)                                      /* ovrflo? set flag */
+        SET_INT (CLK);
     }
 return SCPE_OK;
 }
@@ -451,13 +454,15 @@ uint32 cur = sim_grtime ();
 uint32 old = clk_task_timer;
 double usec10;
 
-if (cur > clk_task_last) delta = cur - clk_task_last;
+if (cur > clk_task_last)
+    delta = cur - clk_task_last;
 else delta = clk_task_last - cur;
 usec10 = ((((double) delta) * 100000.0) /
     (((double) tmxr_poll) * ((double) clk_tps)));
 iusec10 = (int32) usec10;
 val = (clk_task_timer + iusec10) & DMASK;
-if (clr) clk_task_timer = 0;
+if (clr)
+    clk_task_timer = 0;
 else clk_task_timer = val;
 clk_task_last = cur;
 return ((int32) val);
@@ -494,8 +499,10 @@ return SCPE_OK;
 
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val != 50) && (val != 60)) return SCPE_IERR;
+if (cptr)
+    return SCPE_ARG;
+if ((val != 50) && (val != 60))
+    return SCPE_IERR;
 clk_tps = val;
 return SCPE_OK;
 }
@@ -526,7 +533,8 @@ return SCPE_OK;
 int32 ptr (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {                                      /* RSF */
-    if (TST_INT (PTR)) dat = dat | IOT_SKP;
+    if (TST_INT (PTR))
+        dat = dat | IOT_SKP;
     }
 if (pulse & 002) {                                      /* RRB, RCF */
     CLR_INT (PTR);                                      /* clear flag */
@@ -563,7 +571,8 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
     ptr_err = 1;                                        /* set error */
 #endif
     if (feof (ptr_unit.fileref)) {
-        if (ptr_stopioe) printf ("PTR end of file\n");
+        if (ptr_stopioe)
+            printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
@@ -585,7 +594,8 @@ else if (temp & 0200) {                                 /* binary */
     ptr_state = ptr_state - 6;
     ptr_unit.buf = ptr_unit.buf | ((temp & 077) << ptr_state);
     }
-if (ptr_state == 0) SET_INT (PTR);                      /* if done, set flag */
+if (ptr_state == 0)                                     /* if done, set flag */
+    SET_INT (PTR);
 else sim_activate (&ptr_unit, ptr_unit.wait);           /* else restart */
 ptr_unit.pos = ptr_unit.pos + 1;
 return SCPE_OK;
@@ -626,7 +636,8 @@ t_stat ptr_attach (UNIT *uptr, char *cptr)
 t_stat reason;
 
 reason = attach_unit (uptr, cptr);
-if (reason != SCPE_OK) return reason;
+if (reason != SCPE_OK)
+    return reason;
 ptr_err = 0;                                             /* attach clrs error */
 ptr_unit.flags = ptr_unit.flags & ~(UNIT_RASCII|UNIT_KASCII);
 if (sim_switches & SWMASK ('A'))
@@ -655,7 +666,8 @@ int32 word, bits, st, ch;
 
 word = st = bits = 0;
 do {
-    if ((ch = getc (uptr->fileref)) == EOF) return -1;
+    if ((ch = getc (uptr->fileref)) == EOF)
+        return -1;
     uptr->pos = uptr->pos + 1;
     if (ch & 0200) {
         word = (word << 6) | (ch & 077);
@@ -663,7 +675,8 @@ do {
         st++;
         }
     } while (st < 3);
-if (hi != NULL) *hi = bits;
+if (hi != NULL)
+    *hi = bits;
 return word;
 }
 
@@ -672,16 +685,19 @@ t_stat ptr_rim_load (UNIT *uptr, int32 origin)
 int32 bits, val;
 
 for (;;) {                                              /* word loop */
-    if ((val = ptr_getw (uptr, &bits)) < 0) return SCPE_FMT;
+    if ((val = ptr_getw (uptr, &bits)) < 0)
+        return SCPE_FMT;
     if (bits & 1) {                                     /* end of tape? */
         if ((val & 0760000) == OP_JMP) {
             PC = ((origin - 1) & 060000) | (val & 017777);
             return SCPE_OK;
             }
-        else if (val == OP_HLT) return STOP_HALT;
+        else if (val == OP_HLT)
+            return STOP_HALT;
         break;
         }
-    else if (MEM_ADDR_OK (origin)) M[origin++] = val;
+    else if (MEM_ADDR_OK (origin))
+        M[origin++] = val;
     }
 return SCPE_FMT;
 }
@@ -840,12 +856,15 @@ extern int32 sim_switches;
 if (sim_switches & SWMASK ('H'))                        /* hardware RIM load? */
     return ptr_rim_load (&ptr_unit, ASW);
 #endif
-if (ptr_dib.dev != DEV_PTR) return STOP_NONSTD;         /* non-std addr? */
-if (MEMSIZE < 8192) mask = 0767777;                     /* 4k? */
+if (ptr_dib.dev != DEV_PTR)                             /* non-std addr? */
+    return STOP_NONSTD;
+if (MEMSIZE < 8192)                                     /* 4k? */
+    mask = 0767777;
 else mask = 0777777;
 for (i = 0; i < BOOT_LEN; i++) {
     wd = boot_rom[i];
-    if ((wd >= 0040000) && (wd < 0640000)) wd = wd & mask;
+    if ((wd >= 0040000) && (wd < 0640000))
+        wd = wd & mask;
     M[(BOOT_START & mask) + i] = wd;
     }
 PC = ((sim_switches & SWMASK ('F'))? BOOT_FPC: BOOT_RPC) & mask;
@@ -868,9 +887,11 @@ return ptr_rim_load (&ptr_unit, ASW);
 int32 ptp (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {                                      /* PSF */
-    if (TST_INT (PTP)) dat = dat | IOT_SKP;
+    if (TST_INT (PTP))
+        dat = dat | IOT_SKP;
     }
-if (pulse & 002) CLR_INT (PTP);                         /* PCF */
+if (pulse & 002)                                        /* PCF */
+    CLR_INT (PTP);
 if (pulse & 004) {                                      /* PSA, PSB, PLS */
     CLR_INT (PTP);                                      /* clear flag */
     ptp_unit.buf = (pulse & 040)?                       /* load punch buf */
@@ -933,7 +954,8 @@ t_stat ptp_attach (UNIT *uptr, char *cptr)
 t_stat reason;
 
 reason = attach_unit (uptr, cptr);
-if (reason != SCPE_OK) return reason;
+if (reason != SCPE_OK)
+    return reason;
 ptp_err = 0;
 ptp_unit.flags = ptp_unit.flags & ~UNIT_PASCII;
 if (sim_switches & SWMASK ('A'))
@@ -955,13 +977,15 @@ return detach_unit (uptr);
 int32 tti (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {                                      /* KSF */
-    if (TST_INT (TTI)) dat = dat | IOT_SKP;
+    if (TST_INT (TTI))
+        dat = dat | IOT_SKP;
     }
 if (pulse & 002) {                                      /* KRS/KRB */
     CLR_INT (TTI);                                      /* clear flag */
     dat = dat | tti_unit.buf & TTI_MASK;                /* return buffer */
 #if defined (PDP15)
-    if (pulse & 020) tti_fdpx = 1;                      /* KRS? */
+    if (pulse & 020)                                    /* KRS? */
+        tti_fdpx = 1;
     else tti_fdpx = 0;                                  /* no, KRB */
 #endif
     }
@@ -984,9 +1008,11 @@ if (tti_2nd) {                                          /* char waiting? */
     tti_2nd = 0;                                        /* not waiting */
     }
 else {
-    if ((in = sim_poll_kbd ()) < SCPE_KFLAG) return in;
+    if ((in = sim_poll_kbd ()) < SCPE_KFLAG)
+        return in;
     c = asc_to_baud[in & 0177];                         /* translate char */
-    if (c == 0) return SCPE_OK;                         /* untranslatable? */
+    if (c == 0)                                         /* untranslatable? */
+        return SCPE_OK;
     if ((c & TTI_BOTH) ||                               /* case insensitive? */
         (((c & TTI_FIGURES)? 1: 0) == tty_shift))       /* right case? */
         uptr->buf = c & TTI_MASK;
@@ -1012,9 +1038,11 @@ else {
 int32 c, out;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
 out = c & 0177;                                         /* mask echo to 7b */
-if (c & SCPE_BREAK) c = 0;                              /* break? */
+if (c & SCPE_BREAK)                                     /* break? */
+    c = 0;
 else c = sim_tt_inpcvt (c, TT_GET_MODE (uptr->flags) | TTUF_KSR);
 if ((uptr->flags & TTUF_HDX) && !tti_fdpx && out &&     /* half duplex and */
     ((out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags) | TTUF_KSR)) >= 0)) {
@@ -1054,9 +1082,11 @@ return SCPE_OK;
 int32 tto (int32 dev, int32 pulse, int32 dat)
 {
 if (pulse & 001) {                                      /* TSF */
-    if (TST_INT (TTO)) dat = dat | IOT_SKP;
+    if (TST_INT (TTO))
+        dat = dat | IOT_SKP;
     }
-if (pulse & 002) CLR_INT (TTO);                         /* clear flag */
+if (pulse & 002)                                        /* clear flag */
+    CLR_INT (TTO);
 if (pulse & 004) {                                      /* load buffer */
     sim_activate (&tto_unit, tto_unit.wait);            /* activate unit */
     tto_unit.buf = dat & TTO_MASK;                      /* load buffer */

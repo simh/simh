@@ -129,7 +129,8 @@ int32 rn = opnd[1];
 int32 ea, by;
 
 if (rn >= 0) {                                          /* register? */
-    if (((uint32) pos) > 31) RSVD_OPND_FAULT;           /* pos > 31? fault */
+    if (((uint32) pos) > 31)                            /* pos > 31? fault */
+        RSVD_OPND_FAULT;
     return (R[rn] >> pos) & 1;                          /* get bit */
     }
 ea = opnd[2] + (pos >> 3);                              /* base byte addr */
@@ -145,7 +146,8 @@ int32 rn = opnd[1];
 int32 ea, by, bit;
 
 if (rn >= 0) {                                          /* register? */
-    if (((uint32) pos) > 31) RSVD_OPND_FAULT;           /* pos > 31? fault */
+    if (((uint32) pos) > 31)                            /* pos > 31? fault */
+        RSVD_OPND_FAULT;
     bit = (R[rn] >> pos) & 1;                           /* get bit */
     R[rn] = newb? (R[rn] | (1u << pos)): (R[rn] & ~(1u << pos));
     return bit;
@@ -177,21 +179,27 @@ int32 rn = opnd[2];
 uint32 wd = opnd[3];
 int32 ba, wd1 = 0;
 
-if (size == 0) return 0;                                /* size 0? field = 0 */
-if (size > 32) RSVD_OPND_FAULT;                         /* size > 32? fault */
+if (size == 0)                                          /* size 0? field = 0 */
+    return 0;
+if (size > 32)                                          /* size > 32? fault */
+    RSVD_OPND_FAULT;
 if (rn >= 0) {                                          /* register? */
-    if (((uint32) pos) > 31) RSVD_OPND_FAULT;           /* pos > 31? fault */
+    if (((uint32) pos) > 31)                            /* pos > 31? fault */
+        RSVD_OPND_FAULT;
     if (((pos + size) > 32) && (rn >= nSP))             /* span 2 reg, PC? */
         RSVD_ADDR_FAULT;                                /* fault */
-    if (pos) wd = (wd >> pos) | (((uint32) vfldrp1) << (32 - pos));
+    if (pos)
+        wd = (wd >> pos) | (((uint32) vfldrp1) << (32 - pos));
     }
 else {
     ba = wd + (pos >> 3);                               /* base byte addr */
     pos = (pos & 07) | ((ba & 03) << 3);                /* bit offset */
     ba = ba & ~03;                                      /* lw align base */
     wd = Read (ba, L_LONG, RA);                         /* read field */
-    if ((size + pos) > 32) wd1 = Read (ba + 4, L_LONG, RA);
-    if (pos) wd = (wd >> pos) | (((uint32) wd1) << (32 - pos));
+    if ((size + pos) > 32)
+        wd1 = Read (ba + 4, L_LONG, RA);
+    if (pos)
+        wd = (wd >> pos) | (((uint32) wd1) << (32 - pos));
     }
 return wd & byte_mask[size];
 }
@@ -215,12 +223,16 @@ int32 size = opnd[2];
 int32 rn = opnd[3];
 int32 val, mask, ba, wd, wd1;
 
-if (size == 0) return;                                  /* size = 0? done */
-if (size > 32) RSVD_OPND_FAULT;                         /* size > 32? fault */
+if (size == 0)                                          /* size = 0? done */
+    return;
+if (size > 32)                                          /* size > 32? fault */
+    RSVD_OPND_FAULT;
 if (rn >= 0) {                                          /* in registers? */
-    if (((uint32) pos) > 31) RSVD_OPND_FAULT;           /* pos > 31? fault */
+    if (((uint32) pos) > 31)                            /* pos > 31? fault */
+        RSVD_OPND_FAULT;
     if ((pos + size) > 32) {                            /* span two reg? */
-        if (rn >= nSP) RSVD_ADDR_FAULT;                 /* if PC, fault */
+        if (rn >= nSP)                                  /* if PC, fault */
+            RSVD_ADDR_FAULT;
         mask = byte_mask[pos + size - 32];              /* insert fragment */
         val = ins >> (32 - pos);
         R[rn + 1] = (vfldrp1 & ~mask) | (val & mask);
@@ -253,7 +265,10 @@ int32 op_ffs (uint32 wd, int32 size)
 {
 int32 i;
 
-for (i = 0; wd; i++, wd = wd >> 1) if (wd & 1) return i;
+for (i = 0; wd; i++, wd = wd >> 1) {
+    if (wd & 1)
+        return i;
+    }
 return size;
 }
 
@@ -345,7 +360,8 @@ int32 addr = opnd[1];
 int32 mask, stklen, tsp, wd;
 
 mask = Read (addr, L_WORD, RA);                         /* get proc mask */
-if (mask & CALL_MBZ) RSVD_OPND_FAULT;                   /* test mbz */
+if (mask & CALL_MBZ)                                    /* test mbz */
+    RSVD_OPND_FAULT;
 stklen = rcnt[mask & 077] + rcnt[(mask >> 6) & 077] + (gs? 24: 20);
 Read (SP - stklen, L_BYTE, WA);                         /* wchk stk */
 if (gs) {
@@ -372,7 +388,8 @@ wd = ((SP & CALL_M_SPA) << CALL_V_SPA) | (gs << CALL_V_S) |
     ((mask & CALL_MASK) << CALL_V_MASK) | (PSL & 0xFFE0);
 Write (tsp - 16, wd, L_LONG, WA);                       /* push spa/s/mask/psw */
 Write (tsp - 20, 0, L_LONG, WA);                        /* push cond hdlr */
-if (gs) AP = SP;                                        /* update AP */
+if (gs)                                                 /* update AP */
+    AP = SP;
 else AP = opnd[0];
 SP = FP = tsp - 20;                                     /* update FP, SP */
 PSL = (PSL & ~(PSW_DV | PSW_FU | PSW_IV)) |             /* update PSW */
@@ -388,7 +405,8 @@ int32 spamask, stklen, newpc, nargs;
 int32 tsp = FP;
 
 spamask = Read (tsp + 4, L_LONG, RA);                   /* spa/s/mask/psw */
-if (spamask & PSW_MBZ) RSVD_OPND_FAULT;                 /* test mbz */
+if (spamask & PSW_MBZ)                                  /* test mbz */
+    RSVD_OPND_FAULT;
 stklen = rcnt[(spamask >> CALL_V_MASK) & 077] +
     rcnt[(spamask >> (CALL_V_MASK + 6)) & 077] + ((spamask & CALL_S)? 23: 19);
 Read (tsp + stklen, L_BYTE, RA);                        /* rchk stk end */
@@ -426,7 +444,8 @@ void op_pushr (int32 *opnd, int32 acc)
 int32 mask = opnd[0] & 0x7FFF;
 int32 stklen, tsp;
 
-if (mask == 0) return;
+if (mask == 0)
+    return;
 stklen = rcnt[(mask >> 7) & 0177] + rcnt[mask & 0177] +
     ((mask & 0x4000)? 4: 0);
 Read (SP - stklen, L_BYTE, WA);                         /* wchk stk end */
@@ -455,7 +474,8 @@ void op_popr (int32 *opnd, int32 acc)
 int32 mask = opnd[0] & 0x7FFF;
 int32 stklen;
 
-if (mask == 0) return;
+if (mask == 0)
+    return;
 stklen = rcnt[(mask >> 7) & 0177] + rcnt[mask & 0177] +
     ((mask & 0x4000)? 4: 0);
 Read (SP + stklen - 1, L_BYTE, RA);                     /* rchk stk end */
@@ -473,7 +493,8 @@ POPR_POP (10);
 POPR_POP (11);
 POPR_POP (12);
 POPR_POP (13);
-if (mask & 0x4000) SP = Read (SP, L_LONG, RA);          /* if pop SP, no inc */
+if (mask & 0x4000)                                      /* if pop SP, no inc */
+    SP = Read (SP, L_LONG, RA);
 return;
 }
 
@@ -552,12 +573,14 @@ p = Read (e + 4, L_LONG, RA);                           /* p <- (e+4) */
 CC_CMP_L (s, p);                                        /* set cc's */
 if (e != p) {                                           /* queue !empty? */
     Read (s + 4, L_LONG, WA);                           /* wchk (s+4) */
-    if (opnd[1] < 0) Read (opnd[2], L_LONG, WA);        /* wchk dest */
+    if (opnd[1] < 0)                                    /* wchk dest */
+        Read (opnd[2], L_LONG, WA);
     Write (p, s, L_LONG, WA);                           /* (p) <- s */
     Write (s + 4, p, L_LONG, WA);                       /* (s+4) <- p */
     }
 else cc = cc | CC_V;                                    /* else set v */
-if (opnd[1] >= 0) R[opnd[1]] = e;                       /* store result */
+if (opnd[1] >= 0)                                       /* store result */
+    R[opnd[1]] = e;
 else Write (opnd[2], e, L_LONG, WA);
 return cc;
 }
@@ -598,14 +621,18 @@ int32 h = opnd[1];
 int32 d = opnd[0];
 int32 a, t;
 
-if ((h == d) || ((h | d) & 07)) RSVD_OPND_FAULT;        /* h, d quad align? */
+if ((h == d) || ((h | d) & 07))                         /* h, d quad align? */
+    RSVD_OPND_FAULT;
 Read (d, L_BYTE, WA);                                   /* wchk ent */
 a = Read (h, L_LONG, WA);                               /* a <- (h), wchk */
-if (a & 06) RSVD_OPND_FAULT;                            /* chk quad align */
-if (a & 01) return CC_C;                                /* busy, cc = 0001 */
+if (a & 06)                                             /* chk quad align */
+    RSVD_OPND_FAULT;
+if (a & 01)                                             /* busy, cc = 0001 */
+    return CC_C;
 Write (h, a | 1, L_LONG, WA);                           /* get interlock */
 a = a + h;                                              /* abs addr of a */
-if (Test (a, WA, &t) < 0) Write (h, a - h, L_LONG, WA); /* wtst a, rls if err */
+if (Test (a, WA, &t) < 0)                               /* wtst a, rls if err */
+    Write (h, a - h, L_LONG, WA);
 Write (a + 4, d - a, L_LONG, WA);                       /* (a+4) <- d-a, flt ok */
 Write (d, a - d, L_LONG, WA);                           /* (d) <- a-d */
 Write (d + 4, h - d, L_LONG, WA);                       /* (d+4) <- h-d */
@@ -619,19 +646,24 @@ int32 h = opnd[1];
 int32 d = opnd[0];
 int32 a, c, t;
 
-if ((h == d) || ((h | d) & 07)) RSVD_OPND_FAULT;        /* h, d quad align? */
+if ((h == d) || ((h | d) & 07))                         /* h, d quad align? */
+    RSVD_OPND_FAULT;
 Read (d, L_BYTE, WA);                                   /* wchk ent */
 a = Read (h, L_LONG, WA);                               /* a <- (h), wchk */
-if (a == 0) return op_insqhi (opnd, acc);               /* if empty, ins hd */
-if (a & 06) RSVD_OPND_FAULT;                            /* chk quad align */
-if (a & 01) return CC_C;                                /* busy, cc = 0001 */
+if (a == 0)                                             /* if empty, ins hd */
+    return op_insqhi (opnd, acc);
+if (a & 06)                                             /* chk quad align */
+    RSVD_OPND_FAULT;
+if (a & 01)                                             /* busy, cc = 0001 */
+    return CC_C;
 Write (h, a | 1, L_LONG, WA);                           /* acquire interlock */
 c = Read (h + 4, L_LONG, RA) + h;                       /* c <- (h+4) + h */
 if (c & 07) {                                           /* c quad aligned? */
     Write (h, a, L_LONG, WA);                           /* release interlock */
     RSVD_OPND_FAULT;                                    /* fault */
     }
-if (Test (c, WA, &t) < 0) Write (h, a, L_LONG, WA);     /* wtst c, rls if err */
+if (Test (c, WA, &t) < 0)                               /* wtst c, rls if err */
+    Write (h, a, L_LONG, WA);
 Write (c, d - c, L_LONG, WA);                           /* (c) <- d-c, flt ok */
 Write (d, h - d, L_LONG, WA);                           /* (d) <- h-d */
 Write (d + 4, c - d, L_LONG, WA);                       /* (d+4) <- c-d */
@@ -671,14 +703,18 @@ int32 op_remqhi (int32 *opnd, int32 acc)
 int32 h = opnd[0];
 int32 ar, a, b, t;
 
-if (h & 07) RSVD_OPND_FAULT;                            /* h quad aligned? */
+if (h & 07)                                             /* h quad aligned? */
+    RSVD_OPND_FAULT;
 if (opnd[1] < 0) {                                      /* mem destination? */
-    if (h == opnd[2]) RSVD_OPND_FAULT;                  /* hdr = dst? */
+    if (h == opnd[2])                                   /* hdr = dst? */
+        RSVD_OPND_FAULT;
     Read (opnd[2], L_LONG, WA);                         /* wchk dst */
     }
 ar = Read (h, L_LONG, WA);                              /* ar <- (h) */
-if (ar & 06) RSVD_OPND_FAULT;                           /* a quad aligned? */
-if (ar & 01) return CC_V | CC_C;                        /* busy, cc = 0011 */
+if (ar & 06)                                            /* a quad aligned? */
+    RSVD_OPND_FAULT;
+if (ar & 01)                                            /* busy, cc = 0011 */
+    return CC_V | CC_C;
 a = ar + h;                                             /* abs addr of a */
 if (ar) {                                               /* queue not empty? */
     Write (h, ar | 1, L_LONG, WA);                      /* acquire interlock */
@@ -694,9 +730,11 @@ if (ar) {                                               /* queue not empty? */
     Write (b + 4, h - b, L_LONG, WA);                   /* (b+4) <- h-b, flt ok */
     Write (h, b - h, L_LONG, WA);                       /* (h) <- b-h, rls int */
     }
-if (opnd[1] >= 0) R[opnd[1]] = a;                       /* store result */
+if (opnd[1] >= 0)                                       /* store result */
+    R[opnd[1]] = a;
 else Write (opnd[2], a, L_LONG, WA);
-if (ar == 0) return CC_Z | CC_V;                        /* empty, cc = 0110 */
+if (ar == 0)                                            /* empty, cc = 0110 */
+    return CC_Z | CC_V;
 return (b == h)? CC_Z: 0;                               /* if b = h, q empty */
 }
 
@@ -705,14 +743,18 @@ int32 op_remqti (int32 *opnd, int32 acc)
 int32 h = opnd[0];
 int32 ar, b, c, t;
 
-if (h & 07) RSVD_OPND_FAULT;                            /* h quad aligned? */
+if (h & 07)                                             /* h quad aligned? */
+    RSVD_OPND_FAULT;
 if (opnd[1] < 0) {                                      /* mem destination? */
-    if (h == opnd[2]) RSVD_OPND_FAULT;                  /* hdr = dst? */
+    if (h == opnd[2])                                   /* hdr = dst? */
+        RSVD_OPND_FAULT;
     Read (opnd[2], L_LONG, WA);                         /* wchk dst */
     }
 ar = Read (h, L_LONG, WA);                              /* a <- (h) */
-if (ar & 06) RSVD_OPND_FAULT;                           /* a quad aligned? */
-if (ar & 01) return CC_V | CC_C;                        /* busy, cc = 0011 */
+if (ar & 06)                                            /* a quad aligned? */
+    RSVD_OPND_FAULT;
+if (ar & 01)                                            /* busy, cc = 0011 */
+    return CC_V | CC_C;
 if (ar) {                                               /* queue not empty */
     Write (h, ar | 1, L_LONG, WA);                      /* acquire interlock */
     c = Read (h + 4, L_LONG, RA);                       /* c <- (h+4) */
@@ -739,9 +781,11 @@ if (ar) {                                               /* queue not empty */
     Write (h, ar, L_LONG, WA);                          /* release interlock */
     }
 else c = h;                                             /* empty, result = h */
-if (opnd[1] >= 0) R[opnd[1]] = c;                       /* store result */
+if (opnd[1] >= 0)                                       /* store result */
+    R[opnd[1]] = c;
 else Write (opnd[2], c, L_LONG, WA);
-if (ar == 0) return CC_Z | CC_V;                        /* empty, cc = 0110 */
+if (ar == 0)                                            /* empty, cc = 0110 */
+    return CC_Z | CC_V;
 return 0;                                               /* q can't be empty */
 }
 
@@ -786,7 +830,8 @@ if (PSL & PSL_FPD) {                                    /* FPD set? */
     SETPC (fault_PC + STR_GETDPC (R[0]));               /* reset PC */
     fill = STR_GETCHR (R[0]);                           /* get fill */
     R[2] = R[2] & STR_LNMASK;                           /* mask lengths */
-    if (R[4] > 0) R[4] = R[4] & STR_LNMASK;
+    if (R[4] > 0)
+        R[4] = R[4] & STR_LNMASK;
     }
 else {
     R[1] = opnd[1];                                     /* src addr */
@@ -831,7 +876,8 @@ switch (R[5] & MVC_M_STATE) {                           /* case on state */
 
     case MVC_FRWD:                                      /* move forward */
         mlnt[0] = (4 - R[3]) & 3;                       /* length to align */
-        if (mlnt[0] > R[2]) mlnt[0] = R[2];             /* cant exceed total */
+        if (mlnt[0] > R[2])                             /* cant exceed total */
+            mlnt[0] = R[2];
         mlnt[1] = (R[2] - mlnt[0]) & ~03;               /* aligned length */
         mlnt[2] = R[2] - mlnt[0] - mlnt[1];             /* tail */
         for (i = 0; i < 3; i++) {                       /* head, align, tail */
@@ -848,7 +894,8 @@ switch (R[5] & MVC_M_STATE) {                           /* case on state */
 
     case MVC_BACK:                                      /* move backward */
         mlnt[0] = R[3] & 03;                            /* length to align */
-        if (mlnt[0] > R[2]) mlnt[0] = R[2];             /* cant exceed total */
+        if (mlnt[0] > R[2])                             /* cant exceed total */
+            mlnt[0] = R[2];
         mlnt[1] = (R[2] - mlnt[0]) & ~03;               /* aligned length */
         mlnt[2] = R[2] - mlnt[0] - mlnt[1];             /* tail */
         for (i = 0; i < 3; i++) {                       /* head, align, tail */
@@ -866,17 +913,19 @@ switch (R[5] & MVC_M_STATE) {                           /* case on state */
 
     case MVC_FILL:                                      /* fill */
     FILL:
-        if (R[4] <= 0) break;                           /* any fill? */
+        if (R[4] <= 0)                                  /* any fill? */
+            break;
         R[5] = R[5] | MVC_FILL;                         /* set state */
         mlnt[0] = (4 - R[3]) & 3;                       /* length to align */
-        if (mlnt[0] > R[4]) mlnt[0] = R[4];             /* cant exceed total */
+        if (mlnt[0] > R[4])                             /* cant exceed total */
+            mlnt[0] = R[4];
         mlnt[1] = (R[4] - mlnt[0]) & ~03;               /* aligned length */
         mlnt[2] = R[4] - mlnt[0] - mlnt[1];             /* tail */
         for (i = 0; i < 3; i++) {                       /* head, align, tail */
             lnt = looplnt[i];                           /* length for loop */
             fill = fill & BMASK;                        /* fill for loop */
-            if (lnt == L_LONG) fill = 
-                (((uint32) fill) << 24) | (fill << 16) | (fill << 8) | fill;
+            if (lnt == L_LONG)
+                fill = (((uint32) fill) << 24) | (fill << 16) | (fill << 8) | fill;
             for (j = 0; j < mlnt[i]; j = j + lnt, sim_interval--) {
                 Write (R[3], fill, lnt, WA);            /* write fill */
                 R[3] = R[3] + lnt;                      /* inc dst addr */
@@ -942,11 +991,14 @@ else {
     }
 R[2] = R[2] & STR_LNMASK;                               /* mask src2len */
 for (s1 = s2 = 0; ((R[0] | R[2]) & STR_LNMASK) != 0; sim_interval--) {
-    if (R[0] & STR_LNMASK) s1 = Read (R[1], L_BYTE, RA);        /* src1? read */
+    if (R[0] & STR_LNMASK)                              /* src1? read */
+        s1 = Read (R[1], L_BYTE, RA);
     else s1 = fill;                                     /* no, use fill */
-    if (R[2]) s2 = Read (R[3], L_BYTE, RA);             /* src2? read */
+    if (R[2])                                           /* src2? read */
+        s2 = Read (R[3], L_BYTE, RA);
     else s2 = fill;                                     /* no, use fill */
-    if (s1 != s2) break;                                /* src1 = src2? */
+    if (s1 != s2)                                       /* src1 = src2? */
+        break;
     if (R[0] & STR_LNMASK) {                            /* if src1, decr */
         R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
         R[1] = R[1] + 1;
@@ -990,7 +1042,8 @@ else {
     }
 for ( ; (R[0] & STR_LNMASK) != 0; sim_interval-- ) {    /* loop thru string */
     c = Read (R[1], L_BYTE, RA);                        /* get src byte */
-    if ((c == match) ^ skpc) break;                     /* match & locc? */
+    if ((c == match) ^ skpc)                            /* match & locc? */
+        break;
     R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
     R[1] = R[1] + 1;                                    /* incr src1adr */
     }
@@ -1031,7 +1084,8 @@ else {
 for ( ; (R[0] & STR_LNMASK) != 0; sim_interval-- ) {    /* loop thru string */
     c = Read (R[1], L_BYTE, RA);                        /* get byte */
     t = Read (R[3] + c, L_BYTE, RA);                    /* get table ent */
-    if (((t & mask) != 0) ^ spanc) break;               /* test vs instr */
+    if (((t & mask) != 0) ^ spanc)                      /* test vs instr */
+        break;
     R[0] = (R[0] & ~STR_LNMASK) | ((R[0] - 1) & STR_LNMASK);
     R[1] = R[1] + 1;
     }
@@ -1065,9 +1119,12 @@ int32 acc;
 in_ie = 1;                                              /* flag int/exc */
 CLR_TRAPS;                                              /* clear traps */
 newpc = ReadLP ((SCBB + vec) & PAMASK);                 /* read new PC */
-if (ei < 0) newpc = newpc | 1;                          /* severe? on istk */
-if (newpc & 2) ABORT (STOP_ILLVEC);                     /* bad flags? */
-if (oldpsl & PSL_IS) newpsl = PSL_IS;                   /* on int stk? */
+if (ei < 0)                                             /* severe? on istk */
+    newpc = newpc | 1;
+if (newpc & 2)                                          /* bad flags? */
+    ABORT (STOP_ILLVEC);
+if (oldpsl & PSL_IS)                                    /* on int stk? */
+    newpsl = PSL_IS;
 else {
     STK[oldcur] = SP;                                   /* no, save cur stk */
     if (newpc & 1) {                                    /* to int stk? */
@@ -1083,9 +1140,9 @@ if (ei > 0)                                             /* if int, new IPL */
     PSL = cpu_psl_ipl_idle (newpsl | (ipl << PSL_V_IPL));
 else PSL = cpu_psl_ipl_idle (newpsl |                   /* exc, old IPL/1F */
     ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV));
-if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
-    ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
-    PC, oldpsl, oldsp, vec, PSL, SP);
+if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
+    fprintf (sim_deb, ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
+             PC, oldpsl, oldsp, vec, PSL, SP);
 acc = ACC_MASK (KERN);                                  /* new mode is kernel */
 Write (SP - 4, oldpsl, L_LONG, WA);                     /* push old PSL */
 Write (SP - 8, PC, L_LONG, WA);                         /* push old PC */
@@ -1106,9 +1163,11 @@ int32 mode = opc & PSL_M_MODE;
 int32 cur = PSL_GETCUR (PSL);
 int32 tsp, newpc, acc, sta;
 
-if (PSL & PSL_IS) ABORT (STOP_CHMFI);
+if (PSL & PSL_IS)
+    ABORT (STOP_CHMFI);
 newpc = ReadLP ((SCBB + SCB_CHMK + (mode << 2)) & PAMASK);
-if (cur < mode) mode = cur;                             /* only inward */
+if (cur < mode)                                         /* only inward */
+    mode = cur;
 STK[cur] = SP;                                          /* save stack */
 tsp = STK[mode];                                        /* get new stk */
 acc = ACC_MASK (mode);                                  /* set new mode */
@@ -1161,7 +1220,8 @@ int32 oldcur = PSL_GETCUR (PSL);
 int32 newipl, i;
 
 if ((newpsl & PSL_MBZ) ||                               /* rule 8 */
-    (newcur < oldcur)) RSVD_OPND_FAULT;                 /* rule 1 */
+    (newcur < oldcur))                                  /* rule 1 */
+    RSVD_OPND_FAULT;
 if (newcur) {                                           /* to esu, skip 2,4,7 */
     if ((newpsl & (PSL_IS | PSL_IPL)) ||                /* rules 3,5 */
         (newcur > PSL_GETPRV (newpsl)))                 /* rule 6 */
@@ -1172,26 +1232,31 @@ else {                                                  /* to k, skip 3,5,6 */
     if ((newpsl & PSL_IS) &&                            /* setting IS? */
        (((PSL & PSL_IS) == 0) || (newipl == 0)))        /* test rules 2,4 */
         RSVD_OPND_FAULT;                                /* else skip 2,4 */
-    if (newipl > PSL_GETIPL (PSL)) RSVD_OPND_FAULT;     /* test rule 7 */
+    if (newipl > PSL_GETIPL (PSL))                      /* test rule 7 */
+        RSVD_OPND_FAULT;
     }                                                   /* end if kernel */
 if (newpsl & PSL_CM) {                                  /* setting cmode? */
-    if (BadCmPSL (newpsl)) RSVD_OPND_FAULT;             /* validate PSL */
-    for (i = 0; i < 7; i++) R[i] = R[i] & WMASK;        /* mask R0-R6, PC */
+    if (BadCmPSL (newpsl))                              /* validate PSL */
+        RSVD_OPND_FAULT;
+    for (i = 0; i < 7; i++)                             /* mask R0-R6, PC */
+        R[i] = R[i] & WMASK;
     newpc = newpc & WMASK;
     }
 SP = SP + 8;                                            /* pop stack */
-if (PSL & PSL_IS) IS = SP;                              /* save stack */
+if (PSL & PSL_IS)                                       /* save stack */
+    IS = SP;
 else STK[oldcur] = SP;
-if (DEBUG_PRI (cpu_dev, LOG_CPU_R)) fprintf (sim_deb,
-    ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
-    PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
+if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
+    fprintf (sim_deb, ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+             PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
 PSL = cpu_psl_ipl_idle ((PSL & PSL_TP) | (newpsl & ~CC_MASK)); /* set PSL */
-if (PSL & PSL_IS) SP = IS;                              /* set new stack */
+if (PSL & PSL_IS)                                       /* set new stack */
+    SP = IS;
 else {
     SP = STK[newcur];                                   /* if ~IS, chk AST */
     if (newcur >= ASTLVL) {
-        if (DEBUG_PRI (cpu_dev, LOG_CPU_R)) fprintf (sim_deb,
-            ">>REI: AST delivered\n");
+        if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
+            fprintf (sim_deb, ">>REI: AST delivered\n");
         SISR = SISR | SISR_2;
         }
     }
@@ -1205,7 +1270,8 @@ void op_ldpctx (int32 acc)
 {
 int32 newpc, newpsl, pcbpa, t;
 
-if (PSL & PSL_CUR) RSVD_INST_FAULT;                     /* must be kernel */
+if (PSL & PSL_CUR)                                      /* must be kernel */
+    RSVD_INST_FAULT;
 pcbpa = PCBB & PAMASK;                                  /* phys address */
 KSP = ReadLP (pcbpa);                                   /* restore stk ptrs */
 ESP = ReadLP (pcbpa + 4);
@@ -1249,10 +1315,11 @@ pme = (t >> 31) & 1;                                    /* restore PME */
 
 zap_tb (0);                                             /* clear process TB */
 set_map_reg ();
-if (DEBUG_PRI (cpu_dev, LOG_CPU_P)) fprintf (sim_deb,
-    ">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
-    PC, PSL, SP, newpc, newpsl, KSP);
-if (PSL & PSL_IS) IS = SP;                              /* if istk, */
+if (DEBUG_PRI (cpu_dev, LOG_CPU_P))
+    fprintf (sim_deb, ">>LDP: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
+             PC, PSL, SP, newpc, newpsl, KSP);
+if (PSL & PSL_IS)                                       /* if istk, */
+    IS = SP;
 PSL = PSL & ~PSL_IS;                                    /* switch to kstk */
 SP = KSP - 8;
 Write (SP, newpc, L_LONG, WA);                          /* push PC, PSL */
@@ -1266,13 +1333,15 @@ void op_svpctx (int32 acc)
 {
 int32 savpc, savpsl, pcbpa;
 
-if (PSL & PSL_CUR) RSVD_INST_FAULT;                     /* must be kernel */
+if (PSL & PSL_CUR)                                      /* must be kernel */
+    RSVD_INST_FAULT;
 savpc = Read (SP, L_LONG, RA);                          /* pop PC, PSL */
 savpsl = Read (SP + 4, L_LONG, RA);
-if (DEBUG_PRI (cpu_dev, LOG_CPU_P)) fprintf (sim_deb,
-    ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
-    PC, PSL, SP, savpc, savpsl);
-if (PSL & PSL_IS) SP = SP + 8;                          /* int stack? */
+if (DEBUG_PRI (cpu_dev, LOG_CPU_P))
+    fprintf (sim_deb, ">>SVP: PC=%08x, PSL=%08x, SP=%08x, oPC=%08x, oPSL=%08x\n",
+             PC, PSL, SP, savpc, savpsl);
+if (PSL & PSL_IS)                                       /* int stack? */
+    SP = SP + 8;
 else {
     KSP = SP + 8;                                       /* pop kernel stack */
     SP = IS;                                            /* switch to int stk */
@@ -1319,7 +1388,8 @@ int32 ba = opnd[2];
 int32 prv = PSL_GETPRV (PSL);
 int32 acc, sta, sta1;
 
-if (prv > mode) mode = prv;                             /* maximize mode */
+if (prv > mode)                                         /* maximize mode */
+    mode = prv;
 acc = ACC_MASK (mode) << (rw? TLB_V_WACC: 0);           /* set acc mask */
 Test (ba, acc, &sta);                                   /* probe */
 switch (sta) {                                          /* case on status */
@@ -1366,13 +1436,16 @@ int32 val = opnd[0];
 int32 prn = opnd[1];
 int32 cc;
 
-if (PSL & PSL_CUR) RSVD_INST_FAULT;                     /* must be kernel */
-if (prn > 63) RSVD_OPND_FAULT;                          /* reg# > 63? fault */
+if (PSL & PSL_CUR)                                      /* must be kernel */
+    RSVD_INST_FAULT;
+if (prn > 63)                                           /* reg# > 63? fault */
+    RSVD_OPND_FAULT;
 CC_IIZZ_L (val);                                        /* set cc's */
 switch (prn) {                                          /* case on reg # */
 
     case MT_KSP:                                        /* KSP */
-        if (PSL & PSL_IS) KSP = val;                    /* on IS? store KSP */
+        if (PSL & PSL_IS)                               /* on IS? store KSP */
+            KSP = val;
         else SP = val;                                  /* else store SP */
         break;
 
@@ -1381,7 +1454,8 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_IS:                                         /* IS */
-        if (PSL & PSL_IS) SP = val;                     /* on IS? store SP */
+        if (PSL & PSL_IS)                               /* on IS? store SP */
+            SP = val;
         else IS = val;                                  /* else store IS */
         break;
 
@@ -1442,12 +1516,14 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_ASTLVL:                                     /* ASTLVL */
-        if (val > AST_MAX) RSVD_OPND_FAULT;             /* > 4? fault */
+        if (val > AST_MAX)                              /* > 4? fault */
+            RSVD_OPND_FAULT;
         ASTLVL = val;
         break;
 
     case MT_SIRR:                                       /* SIRR */
-        if ((val > 0xF) || (val == 0)) RSVD_OPND_FAULT;
+        if ((val > 0xF) || (val == 0))
+            RSVD_OPND_FAULT;
         SISR = SISR | (1 << val);                       /* set bit in SISR */
         break;
 
@@ -1466,7 +1542,8 @@ switch (prn) {                                          /* case on reg # */
         break;
 
     case MT_TBCHK:                                      /* TBCHK */
-        if (chk_tb_ent (val)) cc = cc | CC_V;
+        if (chk_tb_ent (val))
+            cc = cc | CC_V;
         break;
 
     case MT_PME:                                        /* PME */
@@ -1486,8 +1563,10 @@ int32 op_mfpr (int32 *opnd)
 int32 prn = opnd[0];
 int32 val;
 
-if (PSL & PSL_CUR) RSVD_INST_FAULT;                     /* must be kernel */
-if (prn > 63) RSVD_OPND_FAULT;                          /* reg# > 63? fault */
+if (PSL & PSL_CUR)                                      /* must be kernel */
+    RSVD_INST_FAULT;
+if (prn > 63)                                           /* reg# > 63? fault */
+    RSVD_OPND_FAULT;
 switch (prn) {                                          /* case on reg# */
 
     case MT_KSP:                                        /* KSP */

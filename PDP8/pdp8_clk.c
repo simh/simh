@@ -1,6 +1,6 @@
 /* pdp8_clk.c: PDP-8 real-time clock simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -117,7 +117,8 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         return AC;
 
     case 5:                                             /* CLLE */
-        if (AC & 1) int_enable = int_enable | INT_CLK;  /* test AC<11> */
+        if (AC & 1)                                     /* test AC<11> */
+            int_enable = int_enable | INT_CLK;
         else int_enable = int_enable & ~INT_CLK;
         int_req = INT_UPDATE;                           /* update interrupts */
         return AC;
@@ -168,8 +169,10 @@ return SCPE_OK;
 
 t_stat clk_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val != 50) && (val != 60)) return SCPE_IERR;
+if (cptr)
+    return SCPE_ARG;
+if ((val != 50) && (val != 60))
+    return SCPE_IERR;
 clk_tps = val;
 return SCPE_OK;
 }

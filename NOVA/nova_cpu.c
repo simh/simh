@@ -240,7 +240,8 @@
 #define INCA(x)         (((x) + 1) & AMASK)
 #define DECA(x)         (((x) - 1) & AMASK)
 #define SEXT(x)         (((x) & SIGN)? ((x) | ~DMASK): (x))
-#define STK_CHECK(x,y)  if (((x) & 0377) < (y)) int_req = int_req | INT_STK
+#define STK_CHECK(x,y)  if (((x) & 0377) < (y)) \
+                            int_req = int_req | INT_STK
 #define IND_STEP(x)     M[x] & A_IND;  /* return next level indicator */ \
                         if ( ((x) <= AUTO_TOP) && ((x) >= AUTO_INC) )    \
                             if ( (x) < AUTO_DEC )    \
@@ -422,7 +423,8 @@ t_stat reason;
 
 /* Restore register state */
 
-if (build_devtab () != SCPE_OK) return SCPE_IERR;       /* build dispatch */
+if (build_devtab () != SCPE_OK)                         /* build dispatch */
+    return SCPE_IERR;
 PC = saved_PC & AMASK;                                  /* load local PC */
 C = C & CBIT;
 mask_out (pimask);                                      /* reset int system */
@@ -433,7 +435,8 @@ reason = 0;
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if ( (reason = sim_process_event ()) ) break;
+        if ( (reason = sim_process_event ()) )
+            break;
         }
 
     if (int_req > INT_PENDING) {                        /* interrupt or exception? */
@@ -561,22 +564,28 @@ while (reason == 0) {                                   /* loop until halted */
             INCREMENT_PC ;
             break;
         case 2:                                         /* SZC */
-            if (src < CBIT) INCREMENT_PC ;
+            if (src < CBIT)
+                INCREMENT_PC ;
             break;
         case 3:                                         /* SNC */
-            if (src >= CBIT) INCREMENT_PC ;
+            if (src >= CBIT)
+                INCREMENT_PC ;
             break;
         case 4:                                         /* SZR */
-            if ((src & DMASK) == 0) INCREMENT_PC ;
+            if ((src & DMASK) == 0)
+                INCREMENT_PC ;
             break;
         case 5:                                         /* SNR */
-            if ((src & DMASK) != 0) INCREMENT_PC ;
+            if ((src & DMASK) != 0)
+                INCREMENT_PC ;
             break;
         case 6:                                         /* SEZ */
-            if (src <= CBIT) INCREMENT_PC ;
+            if (src <= CBIT)
+                INCREMENT_PC ;
             break;
         case 7:                                         /* SBN */
-            if (src > CBIT) INCREMENT_PC ;
+            if (src > CBIT)
+                INCREMENT_PC ;
             break;
             }                                           /* end switch skip */
         if ((IR & I_NLD) == 0) {                        /* load? */
@@ -595,15 +604,18 @@ while (reason == 0) {                                   /* loop until halted */
         case 0:                                         /* page zero */
             break;
         case 1:                                         /* PC relative */
-            if (MA & DISPSIGN) MA = 0177400 | MA;
+            if (MA & DISPSIGN)
+                MA = 0177400 | MA;
             MA = (MA + PC - 1) & AMASK;
             break;
         case 2:                                         /* AC2 relative */
-            if (MA & DISPSIGN) MA = 0177400 | MA;
+            if (MA & DISPSIGN)
+                MA = 0177400 | MA;
             MA = (MA + AC[2]) & AMASK;
             break;
         case 3:                                         /* AC3 relative */
-            if (MA & DISPSIGN) MA = 0177400 | MA;
+            if (MA & DISPSIGN)
+                MA = 0177400 | MA;
             MA = (MA + AC[3]) & AMASK;
             break;
             }                                           /* end switch mode */
@@ -633,13 +645,17 @@ while (reason == 0) {                                   /* loop until halted */
             break;
         case 002:                                       /* ISZ */
             src = (M[MA] + 1) & DMASK;
-            if (MEM_ADDR_OK(MA)) M[MA] = src;
-            if (src == 0) INCREMENT_PC ;
+            if (MEM_ADDR_OK(MA))
+                M[MA] = src;
+            if (src == 0)
+                INCREMENT_PC ;
             break;
         case 003:                                       /* DSZ */
             src = (M[MA] - 1) & DMASK;
-            if (MEM_ADDR_OK(MA)) M[MA] = src;
-            if (src == 0) INCREMENT_PC ;
+            if (MEM_ADDR_OK(MA))
+                M[MA] = src;
+            if (src == 0)
+                INCREMENT_PC ;
             break;
         case 004:                                       /* LDA 0 */
             AC[0] = M[MA];
@@ -654,16 +670,20 @@ while (reason == 0) {                                   /* loop until halted */
             AC[3] = M[MA];
             break;
         case 010:                                       /* STA 0 */
-            if (MEM_ADDR_OK(MA)) M[MA] = AC[0];
+            if (MEM_ADDR_OK(MA))
+                M[MA] = AC[0];
             break;
         case 011:                                       /* STA 1 */
-            if (MEM_ADDR_OK(MA)) M[MA] = AC[1];
+            if (MEM_ADDR_OK(MA))
+                M[MA] = AC[1];
             break;
         case 012:                                       /* STA 2 */
-            if (MEM_ADDR_OK(MA)) M[MA] = AC[2];
+            if (MEM_ADDR_OK(MA))
+                M[MA] = AC[2];
             break;
         case 013:                                       /* STA 3 */
-            if (MEM_ADDR_OK(MA)) M[MA] = AC[3];
+            if (MEM_ADDR_OK(MA))
+                M[MA] = AC[3];
             break;
             }                                           /* end switch */
         }                                               /* end mem ref */
@@ -713,8 +733,10 @@ while (reason == 0) {                                   /* loop until halted */
 
             case ioNIO:                                 /* frame ptr */
                 if (cpu_unit.flags & UNIT_STK) {
-                    if (pulse == iopN) FP = AC[dstAC] & AMASK ;
-                    if (pulse == iopC) AC[dstAC] = FP & AMASK ;
+                    if (pulse == iopN)
+                        FP = AC[dstAC] & AMASK ;
+                    if (pulse == iopC)
+                        AC[dstAC] = FP & AMASK ;
                     }
                 break;
 
@@ -726,15 +748,20 @@ while (reason == 0) {                                   /* loop until halted */
                 else if (cpu_unit.flags & UNIT_STK)  /*  if Nova 3 this is really a SAV... 2007-Jun-01, BKR  */
                     {
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[0];
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[1];
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[2];
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = FP;
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = FP;
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) | (AC[3] & AMASK);
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = (C >> 1) | (AC[3] & AMASK);
                     AC[3] = FP = SP & AMASK;  
                     STK_CHECK (SP, 5);
                     }
@@ -746,8 +773,10 @@ while (reason == 0) {                                   /* loop until halted */
 
             case ioDOA:                                 /* stack ptr */
                 if (cpu_unit.flags & UNIT_STK) {
-                    if (pulse == iopN) SP = AC[dstAC] & AMASK;
-                    if (pulse == iopC) AC[dstAC] = SP & AMASK;
+                    if (pulse == iopN)
+                        SP = AC[dstAC] & AMASK;
+                    if (pulse == iopC)
+                        AC[dstAC] = SP & AMASK;
                     }
                 break;
 
@@ -755,13 +784,15 @@ while (reason == 0) {                                   /* loop until halted */
                 if (cpu_unit.flags & UNIT_STK) {
                     if (pulse == iopN) {                /* push (PSHA) */
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[dstAC];
                         STK_CHECK (SP, 1);
                         }
                     if ((pulse == iopS) &&              /* Nova 4 pshn (PSHN) */
                         (cpu_unit.flags & UNIT_BYT)) {
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[dstAC];
                         if ( (SP & 0xFFFF) > (M[042] & 0xFFFF) )
                             {
                             int_req = int_req | INT_STK ;
@@ -787,15 +818,20 @@ while (reason == 0) {                                   /* loop until halted */
                 else if (cpu_unit.flags & UNIT_STK)  /*  if Nova 3 this is really a SAV... 2007-Jun-01, BKR  */
                     {
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[0];
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[1];
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[2];
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = FP;
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = FP;
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) | (AC[3] & AMASK);
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = (C >> 1) | (AC[3] & AMASK);
                     AC[3] = FP = SP & AMASK;  
                     STK_CHECK (SP, 5);
                     }
@@ -805,15 +841,20 @@ while (reason == 0) {                                   /* loop until halted */
                 if (cpu_unit.flags & UNIT_STK) {
                     if (pulse == iopN) {                /* save */
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[0];
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[1];
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[2];
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = FP;
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = FP;
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) | (AC[3] & AMASK);
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = (C >> 1) | (AC[3] & AMASK);
                         AC[3] = FP = SP & AMASK;  
                         STK_CHECK (SP, 5);
                         }
@@ -838,15 +879,20 @@ while (reason == 0) {                                   /* loop until halted */
                         int32 frameSz = M[PC] ;
                         PC = INCA (PC) ;
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[0];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[0];
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[1];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[1];
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = AC[2];
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = AC[2];
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = FP;
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = FP;
                         SP = INCA (SP);
-                        if (MEM_ADDR_OK (SP)) M[SP] = (C >> 1) | (AC[3] & AMASK);
+                        if (MEM_ADDR_OK (SP))
+                            M[SP] = (C >> 1) | (AC[3] & AMASK);
                         AC[3] = FP = SP & AMASK ;
                         SP = (SP + frameSz) & AMASK ;
                         if (SP > M[042])
@@ -922,7 +968,8 @@ while (reason == 0) {                                   /* loop until halted */
                 else if ((dstAC == 3) && (cpu_unit.flags & UNIT_STK))  /*  if Nova 3 this is really a PSHA... 2007-Jun-01, BKR  */
                     {
                     SP = INCA (SP);
-                    if (MEM_ADDR_OK (SP)) M[SP] = AC[dstAC];
+                    if (MEM_ADDR_OK (SP))
+                        M[SP] = AC[dstAC];
                     STK_CHECK (SP, 1);
                     }
                 break;
@@ -990,7 +1037,8 @@ while (reason == 0) {                                   /* loop until halted */
         else if (dev_table[device].routine) {           /* normal device */
             iodata = dev_table[device].routine (pulse, code, AC[dstAC]);
             reason = iodata >> IOT_V_REASON;
-            if (code & 1) AC[dstAC] = iodata & 0177777;
+            if (code & 1)
+                AC[dstAC] = iodata & 0177777;
             }
 
 /* bkr, 2007-May-30
@@ -1055,7 +1103,8 @@ dev_disable = 0;
 pwr_low = 0;
 AMASK = 077777 ;                                        /* 32KW mode */
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1065,8 +1114,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & DMASK;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[addr] & DMASK;
 return SCPE_OK;
 }
 
@@ -1074,7 +1125,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 M[addr] = val & DMASK;
 return SCPE_OK;
 }
@@ -1088,11 +1140,13 @@ t_addr i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }
 

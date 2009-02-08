@@ -25,6 +25,9 @@
 
    dci,dco    DC11 terminal input/output
 
+   19-Nov-2008  RMS     Revised for common TMXR show routines
+                        Revised to autoconfigure vectors
+
    The simulator supports both hardwired and modem-like behavior.  If modem
    control is not enabled, carrier detect, ring, and carrier change are
    never set.
@@ -126,11 +129,7 @@ t_stat dci_svc (UNIT *uptr);
 t_stat dco_svc (UNIT *uptr);
 t_stat dcx_attach (UNIT *uptr, char *cptr);
 t_stat dcx_detach (UNIT *uptr);
-t_stat dcx_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dcx_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dcx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dcx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dcx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
 void dcx_enbdis (int32 dis);
 void dci_clr_int (int32 ln);
 void dci_set_int (int32 ln);
@@ -166,19 +165,20 @@ REG dci_reg[] = {
     };
 
 MTAB dci_mod[] = {
-    { UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &dcx_summ },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &dcx_desc },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &dcx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &dcx_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dcx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &dcx_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dcx_desc },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      &set_vec, &dcx_show_vec, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "lines", "LINES",
-      &dcx_set_lines, &dcx_show_lines },
+    { MTAB_XTD|MTAB_VDV, 1, "VECTOR", NULL,
+      &set_vec, &show_vec_mux, (void *) &dcx_desc },
+    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+      &dcx_set_lines, &tmxr_show_lines, (void *) &dcx_desc },
     { 0 }
     };
 
@@ -187,7 +187,7 @@ DEVICE dci_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
     NULL, &dcx_attach, &dcx_detach,
-    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dci_dib, DEV_FLTA | DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* DCO data structures
@@ -423,7 +423,8 @@ if (dcx_ldsc[ln].conn) {                                /* connected? */
     if (dcx_ldsc[ln].xmte) {                            /* tx enabled? */
         TMLN *lp = &dcx_ldsc[ln];                       /* get line */
         c = sim_tt_outcvt (dco_buf[ln], TT_GET_MODE (dco_unit[ln].flags));
-        if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
+        if (c >= 0)                                     /* output char */
+            tmxr_putc_ln (lp, c);
         tmxr_poll_tx (&dcx_desc);                       /* poll xmt */
         }
     else {
@@ -554,43 +555,12 @@ sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
-/* Show summary processor */
-
-t_stat dcx_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < DCX_LINES; i++) t = t + (dcx_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat dcx_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < DCX_LINES; i++) t = t + (dcx_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < DCX_LINES; i++) {
-        if (dcx_ldsc[i].conn) { 
-            if (val) tmxr_fconns (st, &dcx_ldsc[i], i);
-            else tmxr_fstats (st, &dcx_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
-return SCPE_OK;
-}
-
 /* Enable/disable device */
 
 void dcx_enbdis (int32 dis)
 {
 if (dis) {
-    dci_dev.flags = dco_dev.flags | DEV_DIS;
+    dci_dev.flags = dci_dev.flags | DEV_DIS;
     dco_dev.flags = dco_dev.flags | DEV_DIS;
     }
 else {
@@ -600,13 +570,6 @@ else {
 return;
 }
 
-/* SHOW VECTOR processor */
-
-t_stat dcx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-return show_vec (st, uptr, dcx_desc.lines * 2, desc);
-}
-
 /* Change number of lines */
 
 t_stat dcx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -614,12 +577,16 @@ t_stat dcx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 newln, i, t;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newln = get_uint (cptr, 10, DCX_LINES, &r);
-if ((r != SCPE_OK) || (newln == dcx_desc.lines)) return r;
-if (newln == 0) return SCPE_ARG;
+if ((r != SCPE_OK) || (newln == dcx_desc.lines))
+    return r;
+if (newln == 0)
+    return SCPE_ARG;
 if (newln < dcx_desc.lines) {
-    for (i = newln, t = 0; i < dcx_desc.lines; i++) t = t | dcx_ldsc[i].conn;
+    for (i = newln, t = 0; i < dcx_desc.lines; i++)
+        t = t | dcx_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
         return SCPE_OK;
     for (i = newln; i < dcx_desc.lines; i++) {
@@ -640,12 +607,4 @@ else {
 dcx_desc.lines = newln;
 dci_dib.lnt = newln * 010;                             /* upd IO page lnt */
 return auto_config (dci_dev.name, newln);              /* auto config */
-}
-
-/* Show number of lines */
-
-t_stat dcx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-fprintf (st, "lines=%d", dcx_desc.lines);
-return SCPE_OK;
 }

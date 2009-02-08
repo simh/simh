@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -417,7 +417,8 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 1:                                             /* TSSR */
         if (PA & 1) {                                   /* TSDBX */
-            if (UNIBUS) return SCPE_OK;                 /* not in TS11 */
+            if (UNIBUS)                                 /* not in TS11 */
+                return SCPE_OK;
             if (tssr & TSSR_SSR) {                      /* ready? */
                 tsdbx = data;                           /* save */
                 if (data & TSDBX_BOOT) {
@@ -427,7 +428,8 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
                 }
             else tssr = tssr | TSSR_RMR;                /* no, err */
             }
-        else if (access == WRITE) ts_reset (&ts_dev);   /* reset */
+        else if (access == WRITE)                       /* reset */
+            ts_reset (&ts_dev);
         break;
         }
 
@@ -483,7 +485,8 @@ t_mtrlnt tbc;
 
 do {
     fc = (fc - 1) & DMASK;                              /* decr wc */
-    if (upd) msgrfc = fc;
+    if (upd)
+        msgrfc = fc;
     if (st = sim_tape_sprecf (uptr, &tbc))              /* space rec fwd, err? */
         return ts_map_status (st);                      /* map status */
     msgxs0 = msgxs0 | XS0_MOT;                          /* tape has moved */
@@ -498,7 +501,8 @@ t_mtrlnt tbc;
 t_bool tmkprv = FALSE;
 
 msgrfc = fc;
-if (sim_tape_bot (uptr) && (wchopt & WCH_ENB)) tmkprv = TRUE;
+if (sim_tape_bot (uptr) && (wchopt & WCH_ENB))
+    tmkprv = TRUE;
 do {
     st = sim_tape_sprecf (uptr, &tbc);                  /* space rec fwd */
     if (st == MTSE_TMK) {                               /* tape mark? */
@@ -509,7 +513,8 @@ do {
                 XS0_TMK | XS0_LET, TC2));
         tmkprv = TRUE;                                  /* flag tmk */
         }
-    else if (st != MTSE_OK) return ts_map_status (st);
+    else if (st != MTSE_OK)
+        return ts_map_status (st);
     else tmkprv = FALSE;                                /* not a tmk */
     msgxs0 = msgxs0 | XS0_MOT;                          /* tape has moved */
     } while (msgrfc != 0);
@@ -523,7 +528,8 @@ t_mtrlnt tbc;
 
 do {
     fc = (fc - 1) & DMASK;                              /* decr wc */
-    if (upd) msgrfc = fc;
+    if (upd)
+        msgrfc = fc;
     if (st = sim_tape_sprecr (uptr, &tbc))              /* space rec rev, err? */
         return ts_map_status (st);                      /* map status */
     msgxs0 = msgxs0 | XS0_MOT;                          /* tape has moved */
@@ -548,7 +554,8 @@ do {
                 XS0_TMK | XS0_LET, TC2));
         tmkprv = TRUE;                                  /* flag tmk */
         }
-    else if (st != MTSE_OK) return ts_map_status (st);
+    else if (st != MTSE_OK)
+        return ts_map_status (st);
     else tmkprv = FALSE;                                /* not a tmk */
     msgxs0 = msgxs0 | XS0_MOT;                          /* tape has moved */
     } while (msgrfc != 0);
@@ -563,8 +570,10 @@ int32 wa;
 
 msgrfc = fc;
 st = sim_tape_rdrecf (uptr, tsxb, &tbc, MT_MAXFR);      /* read rec fwd */
-if (st != MTSE_OK) return ts_map_status (st);           /* error? */
-if (fc == 0) fc = 0200000;                              /* byte count */
+if (st != MTSE_OK)                                      /* error? */
+    return ts_map_status (st);
+if (fc == 0)                                            /* byte count */
+    fc = 0200000;
 tsba = (cmdadh << 16) | cmdadl;                         /* buf addr */
 wbc = (tbc > fc)? fc: tbc;                              /* cap buf size */
 msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
@@ -588,8 +597,10 @@ else {
         }
     msgrfc = (msgrfc - (wbc - t)) & DMASK;              /* update fc */
     }
-if (msgrfc) return (XTC (XS0_RLS, TC2));                /* buf too big? */
-if (tbc > wbc) return (XTC (XS0_RLL, TC2));             /* rec too big? */
+if (msgrfc)                                             /* buf too big? */
+    return (XTC (XS0_RLS, TC2));
+if (tbc > wbc)                                          /* rec too big? */
+    return (XTC (XS0_RLL, TC2));
 return 0;
 }
 
@@ -601,8 +612,10 @@ int32 wa;
 
 msgrfc = fc;
 st = sim_tape_rdrecr (uptr, tsxb, &tbc, MT_MAXFR);      /* read rec rev */
-if (st != MTSE_OK) return ts_map_status (st);           /* error? */
-if (fc == 0) fc = 0200000;                              /* byte count */
+if (st != MTSE_OK)                                      /* error? */
+    return ts_map_status (st);
+if (fc == 0)                                            /* byte count */
+    fc = 0200000;
 tsba = (cmdadh << 16) | cmdadl + fc;                    /* buf addr */
 wbc = (tbc > fc)? fc: tbc;                              /* cap buf size */
 msgxs0 = msgxs0 | XS0_MOT;                              /* tape has moved */
@@ -615,8 +628,10 @@ for (i = wbc; i > 0; i--) {                             /* copy buffer */
         }
     msgrfc = (msgrfc - 1) & DMASK;
     }
-if (msgrfc) return (XTC (XS0_RLS, TC2));                /* buf too big? */
-if (tbc > wbc) return (XTC (XS0_RLL, TC2));             /* rec too big? */
+if (msgrfc)                                             /* buf too big? */
+    return (XTC (XS0_RLS, TC2));
+if (tbc > wbc)                                          /* rec too big? */
+    return (XTC (XS0_RLL, TC2));
 return 0;
 }
 
@@ -627,7 +642,8 @@ uint32 wa;
 t_stat st;
 
 msgrfc = fc;
-if (fc == 0) fc = 0200000;                              /* byte count */
+if (fc == 0)                                            /* byte count */
+    fc = 0200000;
 tsba = (cmdadh << 16) | cmdadl;                         /* buf addr */
 if (cmdhdr & CMD_SWP) {                                 /* swapped? */
     for (i = 0; i < fc; i++) {                          /* copy mem to buf */
@@ -703,13 +719,15 @@ if (ts_bcmd) {                                          /* boot? */
         tssr = ts_updtssr (tssr | TSSR_SSR);
         }
     else tssr = ts_updtssr (tssr | TSSR_SSR | TC3);
-    if (cmdhdr & CMD_IE) SET_INT (TS);
+    if (cmdhdr & CMD_IE)
+        SET_INT (TS);
     return SCPE_OK;
     }
 
 if (!(cmdhdr & CMD_ACK)) {                              /* no acknowledge? */
     tssr = ts_updtssr (tssr | TSSR_SSR);                /* set rdy, int */
-    if (cmdhdr & CMD_IE) SET_INT (TS);
+    if (cmdhdr & CMD_IE)
+        SET_INT (TS);
     ts_ownc = ts_ownm = 0;                              /* CPU owns all */
     return SCPE_OK;
     }
@@ -741,15 +759,15 @@ if ((fnc_flg[fnc] & FLG_MO) &&                          /* mot+(vck|!att)? */
     }
 if ((fnc_flg[fnc] & FLG_WR) &&                          /* write? */
     sim_tape_wrp (uptr)) {                              /* write lck? */
-        ts_endcmd (TC3, XS0_WLE | XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
-        return SCPE_OK;
-        }
+    ts_endcmd (TC3, XS0_WLE | XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
+    return SCPE_OK;
+    }
 if ((((fnc == FNC_READ) && (mod == 1)) ||               /* read rev */
      ((fnc == FNC_POS) && (mod & 1))) &&                /* space rev */
      sim_tape_bot (uptr)) {                             /* BOT? */
-        ts_endcmd (TC3, XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
-        return SCPE_OK;
-        }
+    ts_endcmd (TC3, XS0_NEF, MSG_ACK | MSG_MNEF | MSG_CFAIL);
+    return SCPE_OK;
+    }
 if ((fnc_flg[fnc] & FLG_AD) && (cmdadh & ADDRTEST)) {   /* buf addr > 22b? */
     ts_endcmd (TC3, XS0_ILA, MSG_ACK | MSG_MILL | MSG_CFAIL);
     return SCPE_OK;
@@ -759,7 +777,8 @@ st0 = st1 = 0;
 switch (fnc) {                                          /* case on func */
 
     case FNC_INIT:                                      /* init */
-        if (!sim_tape_bot (uptr)) msgxs0 = msgxs0 | XS0_MOT;    /* set if tape moves */
+        if (!sim_tape_bot (uptr))                       /* set if tape moves */
+            msgxs0 = msgxs0 | XS0_MOT;
         sim_tape_rewind (uptr);                         /* rewind */
     case FNC_WSSM:                                      /* write mem */
     case FNC_GSTA:                                      /* get status */
@@ -781,8 +800,8 @@ switch (fnc) {                                          /* case on func */
             }
         for (i = 0; i < (bc / 2); i++)                  /* copy packet */
             tswchp[i] = cpy_buf[i];
-        if ((wchlnt < ((MSG_PLNT - 1) * 2)) || (wchadh & 0177700) ||
-            (wchadl & 1)) ts_endcmd (TSSR_NBA | TC3, 0, 0);
+        if ((wchlnt < ((MSG_PLNT - 1) * 2)) || (wchadh & 0177700) || (wchadl & 1))
+            ts_endcmd (TSSR_NBA | TC3, 0, 0);
         else {
             msgxs2 = msgxs2 | XS2_XTF | 1;
             tssr = ts_updtssr (tssr & ~TSSR_NBA);
@@ -795,12 +814,14 @@ switch (fnc) {                                          /* case on func */
 
         case 00:                                        /* msg buf rls */
             tssr = ts_updtssr (tssr | TSSR_SSR);        /* set SSR */
-            if (wchopt & WCH_ERI) SET_INT (TS);
+            if (wchopt & WCH_ERI)
+                SET_INT (TS);
             ts_ownc = 0; ts_ownm = 1;                   /* keep msg */
             break;
 
         case 01:                                        /* rewind and unload */
-            if (!sim_tape_bot (uptr)) msgxs0 = msgxs0 | XS0_MOT; /* if tape moves */
+            if (!sim_tape_bot (uptr))                   /* if tape moves */
+                msgxs0 = msgxs0 | XS0_MOT;
             sim_tape_detach (uptr);                     /* unload */
             ts_endcmd (TC0, 0, MSG_ACK | MSG_CEND);
             break;
@@ -814,7 +835,8 @@ switch (fnc) {                                          /* case on func */
             return SCPE_OK;
 
         case 04:                                        /* rewind */
-            if (!sim_tape_bot (uptr)) msgxs0 = msgxs0 | XS0_MOT; /* if tape moves */
+            if (!sim_tape_bot (uptr))                   /* if tape moves */
+                msgxs0 = msgxs0 | XS0_MOT;
             sim_tape_rewind (uptr);
             ts_endcmd (TC0, XS0_BOT, MSG_ACK | MSG_CEND);
             break;
@@ -927,7 +949,8 @@ return SCPE_OK;
 int32 ts_updtssr (int32 t)
 {
 t = (t & ~TSSR_EMA) | ((tsba >> (16 - TSSR_V_EMA)) & TSSR_EMA);
-if (ts_unit.flags & UNIT_ATT) t = t & ~TSSR_OFL;
+if (ts_unit.flags & UNIT_ATT)
+    t = t & ~TSSR_OFL;
 else t = t | TSSR_OFL;
 return (t & ~TSSR_MBZ);
 }
@@ -937,14 +960,16 @@ int32 ts_updxs0 (int32 t)
 t = (t & ~(XS0_ONL | XS0_WLK | XS0_BOT | XS0_IE)) | XS0_PET;
 if (ts_unit.flags & UNIT_ATT) {
     t = t | XS0_ONL;
-    if (sim_tape_wrp (&ts_unit)) t = t | XS0_WLK;
+    if (sim_tape_wrp (&ts_unit))
+        t = t | XS0_WLK;
     if (sim_tape_bot (&ts_unit))
         t = (t | XS0_BOT) & ~XS0_EOT;
     if (sim_tape_eot (&ts_unit))
         t = (t | XS0_EOT) & ~XS0_BOT;
     }
 else t = t & ~XS0_EOT;
-if (cmdhdr & CMD_IE) t = t | XS0_IE;
+if (cmdhdr & CMD_IE)
+    t = t | XS0_IE;
 return t;
 }
 
@@ -972,7 +997,8 @@ void ts_endcmd (int32 tc, int32 xs0, int32 msg)
 int32 i, t;
 
 msgxs0 = ts_updxs0 (msgxs0 | xs0);                      /* update XS0 */
-if (wchxopt & WCHX_HDS) msgxs4 = msgxs4 | XS4_HDS;      /* update XS4 */
+if (wchxopt & WCHX_HDS)                                 /* update XS4 */
+    msgxs4 = msgxs4 | XS4_HDS;
 if (msg && !(tssr & TSSR_NBA)) {                        /* send end pkt */
     msghdr = msg;
     msglnt = wchlnt - 4;                                /* exclude hdr, bc */
@@ -987,7 +1013,8 @@ if (msg && !(tssr & TSSR_NBA)) {                        /* send end pkt */
         }
     }
 tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
-if (cmdhdr & CMD_IE) SET_INT (TS);
+if (cmdhdr & CMD_IE)
+    SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
 if (DEBUG_PRS (ts_dev))
     fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=%d\n",
@@ -1007,13 +1034,18 @@ ts_ownc = ts_ownm = 0;
 ts_bcmd = 0;
 ts_qatn = 0;
 tssr = ts_updtssr (TSSR_NBA | TSSR_SSR);
-for (i = 0; i < CMD_PLNT; i++) tscmdp[i] = 0;
-for (i = 0; i < WCH_PLNT; i++) tswchp[i] = 0;
-for (i = 0; i < MSG_PLNT; i++) tsmsgp[i] = 0;
+for (i = 0; i < CMD_PLNT; i++)
+    tscmdp[i] = 0;
+for (i = 0; i < WCH_PLNT; i++)
+    tswchp[i] = 0;
+for (i = 0; i < MSG_PLNT; i++)
+    tsmsgp[i] = 0;
 msgxs0 = ts_updxs0 (XS0_VCK);
 CLR_INT (TS);
-if (tsxb == NULL) tsxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
-if (tsxb == NULL) return SCPE_MEM;
+if (tsxb == NULL)
+    tsxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
+if (tsxb == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -1024,9 +1056,11 @@ t_stat ts_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);                       /* attach unit */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 tssr = tssr & ~TSSR_OFL;                                /* clr offline */
-if ((tssr & TSSR_NBA) || !(wchopt & WCH_EAI)) return r; /* attn msg? */
+if ((tssr & TSSR_NBA) || !(wchopt & WCH_EAI))           /* attn msg? */
+    return r;
 if (ts_ownm) {                                          /* own msg buf? */
     ts_endcmd (TC1, 0, MSG_MATN | MSG_CATN);            /* send attn */
     SET_INT (TS);                                       /* set interrupt */
@@ -1042,11 +1076,14 @@ t_stat ts_detach (UNIT* uptr)
 {
 t_stat r;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
 r = sim_tape_detach (uptr);                             /* detach unit */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)
+    return r;                                           /* error? */
 tssr = tssr | TSSR_OFL;                                 /* set offline */
-if ((tssr & TSSR_NBA) || !(wchopt & WCH_EAI)) return r; /* attn msg? */
+if ((tssr & TSSR_NBA) || !(wchopt & WCH_EAI))           /* attn msg? */
+    return r;
 if (ts_ownm) {                                          /* own msg buf? */
     ts_endcmd (TC1, 0, MSG_MATN | MSG_CATN);            /* send attn */
     SET_INT (TS);                                       /* set interrupt */

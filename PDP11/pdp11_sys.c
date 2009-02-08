@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Nov-08    RMS     Moved I/O support routines to I/O library
    15-May-08    RMS     Added KE11-A, DC11 support
                         Renamed DL11
    04-Feb-08    RMS     Modified to allow -A, -B use with 8b devices
@@ -255,54 +256,6 @@ do {                                                    /* block loop */
     csum = csum + d;                                    /* add in */
     } while ((csum & 0377) == 0);                       /* result mbz */
 return SCPE_CSUM;
-}
-
-/* Factory bad block table creation routine
-
-   This routine writes a DEC standard 044 compliant bad block table on the
-   last track of the specified unit.  The bad block table consists of 10
-   repetitions of the same table, formatted as follows:
-
-        words 0-1       pack id number
-        words 2-3       cylinder/sector/surface specifications
-         :
-        words n-n+1     end of table (-1,-1)
-
-   Inputs:
-        uptr    =       pointer to unit
-        sec     =       number of sectors per surface
-        wds     =       number of words per sector
-   Outputs:
-        sta     =       status code
-*/
-
-t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds)
-{
-int32 i, da;
-uint16 *buf;
-
-if ((sec < 2) || (wds < 16))
-    return SCPE_ARG;
-if ((uptr->flags & UNIT_ATT) == 0)
-    return SCPE_UNATT;
-if (uptr->flags & UNIT_RO)
-    return SCPE_RO;
-if (!get_yn ("Create bad block table on last track? [N]", FALSE))
-    return SCPE_OK;
-da = (uptr->capac - (sec * wds)) * sizeof (uint16);
-if (fseek (uptr->fileref, da, SEEK_SET))
-    return SCPE_IOERR;
-if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
-    return SCPE_MEM;
-buf[0] = buf[1] = 012345u;
-buf[2] = buf[3] = 0;
-for (i = 4; i < wds; i++) buf[i] = 0177777u;
-for (i = 0; (i < sec) && (i < 10); i++)
-    fxwrite (buf, sizeof (uint16), wds, uptr->fileref);
-free (buf);
-if (ferror (uptr->fileref))
-    return SCPE_IOERR;
-return SCPE_OK;
 }
 
 /* Symbol tables */
@@ -621,7 +574,8 @@ if (sw & SWMASK ('B')) {                                /* byte? */
     fprintf (of, "%o", c1);
     return 0;
     }
-if (bflag) return SCPE_ARG;                             /* 16b only */
+if (bflag)                                              /* 16b only */
+    return SCPE_ARG;
 
 if (sw & SWMASK ('C')) {                                /* character? */
     c1 = val[0] & 0177;
@@ -631,7 +585,8 @@ if (sw & SWMASK ('C')) {                                /* character? */
     return -1;
     }
 if (sw & SWMASK ('R')) {                                /* radix 50? */
-    if (val[0] > 0174777) return SCPE_ARG;              /* max value */
+    if (val[0] > 0174777)                               /* max value */
+        return SCPE_ARG;
     c3 = val[0] % 050;
     c2 = (val[0] / 050) % 050;
     c1 = val[0] / (050 * 050);
@@ -639,7 +594,8 @@ if (sw & SWMASK ('R')) {                                /* radix 50? */
             r50_to_asc[c2], r50_to_asc[c3]);
     return -1;
     }
-if (!(sw & SWMASK ('M'))) return SCPE_ARG;
+if (!(sw & SWMASK ('M')))
+    return SCPE_ARG;
 
 inst = val[0] | ((FPS << (I_V_L - FPS_V_L)) & I_L) |
     ((FPS << (I_V_D - FPS_V_D)) & I_D);                 /* inst + fp mode */
@@ -763,7 +719,8 @@ int32 get_reg (char *cptr, const char *strings[], char mchar)
 {
 int32 i;
 
-if (*(cptr + 2) != mchar) return -1;
+if (*(cptr + 2) != mchar)
+    return -1;
 for (i = 0; i < 8; i++) {
     if (strncmp (cptr, strings[i], 2) == 0)
         return i;
@@ -856,7 +813,8 @@ if (strncmp (cptr, "-(", 2) == 0) {                     /* autodecrement? */
     pflag = pflag | A_MIN;
     cptr++;
     }
-else if ((cptr = get_addr (cptr, &disp, &pflag)) == NULL) return 1;
+else if ((cptr = get_addr (cptr, &disp, &pflag)) == NULL)
+    return 1;
 if (*cptr == '(') {                                     /* register index? */
     pflag = pflag | A_PAR;
     if ((reg = get_reg (cptr + 1, rname, ')')) < 0)
@@ -984,7 +942,8 @@ if (sw & SWMASK ('B')) {                                /* byte? */
         (val[0] & ~0377) | by;
     return 0;
     }
-if (bflag) return SCPE_ARG;
+if (bflag)
+    return SCPE_ARG;
 
 if ((sw & SWMASK ('C')) || ((*cptr == '"') && cptr++)) { /* ASCII string? */
     if (cptr[0] == 0)                                   /* must have 1 char */
@@ -1029,7 +988,8 @@ switch (j) {                                            /* case on class */
         if ((tptr == NULL) || (*tptr != 0))
             return SCPE_ARG;
         if ((pflag & A_REL) == 0) {
-            if (cflag) disp = (disp - addr) & 0177777;
+            if (cflag)
+                disp = (disp - addr) & 0177777;
             else return SCPE_ARG;
             }
         if ((disp & 1) || (disp > 0400) && (disp < 0177402))
@@ -1039,14 +999,16 @@ switch (j) {                                            /* case on class */
 
     case I_V_SOB:                                       /* sob */
         cptr = get_glyph (cptr, gbuf, ',');             /* get glyph */
-        if ((reg = get_reg (gbuf, rname, 0)) < 0) return SCPE_ARG;
+        if ((reg = get_reg (gbuf, rname, 0)) < 0)
+            return SCPE_ARG;
         val[0] = val[0] | (reg << 6);
         cptr = get_glyph (cptr, gbuf, 0);               /* get address */
         tptr = get_addr (gbuf, &disp, &pflag);          /* parse */
         if ((tptr == NULL) || (*tptr != 0))
             return SCPE_ARG;
         if ((pflag & A_REL) == 0) {
-            if (cflag) disp = (disp - addr) & 0177777;
+            if (cflag)
+                disp = (disp - addr) & 0177777;
             else return SCPE_ARG;
             }
         if ((disp & 1) || ((disp > 2) && (disp < 0177604)))

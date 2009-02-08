@@ -440,7 +440,7 @@ static t_bool readCardImage (   FILE    *fp,
     int    c1, c2, c3, col;
 
     if (DEBUG_PRS (cr_dev))
-        fprintf (sim_deb, "readCardImage pos %d\n", ftell (fp));
+        fprintf (sim_deb, "readCardImage pos %d\n", (int) ftell (fp));
     /* get card header bytes */
     c1 = fgetc (fp);
     c2 = fgetc (fp);

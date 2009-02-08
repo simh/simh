@@ -51,6 +51,7 @@
 #define CHIP_TYPE_8080          0
 #define CHIP_TYPE_Z80           1
 #define CHIP_TYPE_8086          2
+#define MAX_CHIP_TYPE           CHIP_TYPE_8086
 
 /* simulator stop codes */
 #define STOP_HALT       0   /* HALT                                             */
@@ -70,31 +71,13 @@
 #define UNIT_CPU_MMU            (1 << UNIT_CPU_V_MMU)
 #define UNIT_CPU_V_STOPONHALT   (UNIT_V_UF+5)               /* stop simulation on HALT                      */
 #define UNIT_CPU_STOPONHALT     (1 << UNIT_CPU_V_STOPONHALT)
-
-#ifdef CPUSWITCHER
 #define UNIT_CPU_V_SWITCHER     (UNIT_V_UF+6)               /* switcher 8086 <--> 8080/Z80 enabled          */
 #define UNIT_CPU_SWITCHER       (1 << UNIT_CPU_V_SWITCHER)
-#endif
 
 #define UNIX_PLATFORM (defined (__linux) || defined(__NetBSD__) \
     || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__))
 
-#define ADDRESS_FORMAT      "[0x%05x]"
-#define PC_FORMAT           "\n" ADDRESS_FORMAT " "
-#define MESSAGE_1(p1)                \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX);                    printMessage()
-#define MESSAGE_2(p1,p2)             \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2);                 printMessage()
-#define MESSAGE_3(p1,p2,p3)          \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3);              printMessage()
-#define MESSAGE_4(p1,p2,p3,p4)       \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4);           printMessage()
-#define MESSAGE_5(p1,p2,p3,p4,p5)    \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5);        printMessage()
-#define MESSAGE_6(p1,p2,p3,p4,p5,p6) \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5,p6);     printMessage()
-#define MESSAGE_7(p1,p2,p3,p4,p5,p6,p7) \
-    sprintf(messageBuffer,PC_FORMAT p1,PCX,p2,p3,p4,p5,p6,p7);  printMessage()
+#define ADDRESS_FORMAT          "[0x%05x]"
 
 /* use NLP for new line printing while the simulation is running */
 #if UNIX_PLATFORM
@@ -102,10 +85,6 @@
 #else
 #define NLP "\n"
 #endif
-
-#define TRACE_PRINT(level, args)    if(trace_level & level) {   \
-                                        printf args;            \
-                                    }
 
 #if defined (__MWERKS__) && defined (macintosh)
 #define __FUNCTION__ __FILE__

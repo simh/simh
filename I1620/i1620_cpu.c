@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2006, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -463,8 +463,10 @@ t_stat reason;
 /* Restore saved state */
 
 PC = saved_PC;
-if ((cpu_unit.flags & IF_IA) == 0) iae = 0;
-if ((cpu_unit.flags & IF_IDX) == 0) idxe = idxb = 0;
+if ((cpu_unit.flags & IF_IA) == 0)
+    iae = 0;
+if ((cpu_unit.flags & IF_IDX) == 0)
+    idxe = idxb = 0;
 upd_ind ();                                             /* update indicators */
 reason = 0;
 
@@ -474,7 +476,8 @@ while (reason == 0) {                                   /* loop until halted */
 
     saved_PC = PC;                                      /* commit prev instr */
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ()) break;
+        if (reason = sim_process_event ())
+            break;
         }
 
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
@@ -507,7 +510,8 @@ while (reason == 0) {                                   /* loop until halted */
     qla = ADDR_A (PC, I_QL);                            /* Q last addr */
     if (flags & IF_VPA) {                               /* need P? */
         reason = get_addr (pla, 5, TRUE, &PAR);         /* get P addr */
-        if (reason != SCPE_OK) break;                   /* stop if error */
+        if (reason != SCPE_OK)                          /* stop if error */
+            break;
         }
     if (flags & (IF_VQA | IF_4QA | IF_NQX)) {           /* need Q? */
         reason = get_addr (qla,                         /* get Q addr */
@@ -519,11 +523,13 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         }
-    else if (flags & IF_IMM) QAR = qla;                 /* immediate? */
+    else if (flags & IF_IMM)                             /* immediate? */
+        QAR = qla;
 
     if (hst_lnt) {                                      /* history enabled? */
         hst_p = (hst_p + 1);                            /* next entry */
-        if (hst_p >= hst_lnt) hst_p = 0;
+        if (hst_p >= hst_lnt)
+            hst_p = 0;
         hst[hst_p].vld = 1;
         hst[hst_p].pc = PC;     
         for (i = 0; i < INST_LEN; i++)
@@ -662,7 +668,8 @@ while (reason == 0) {                                   /* loop until halted */
         if ((ind[t] != 0) ^ (op == OP_BNI)) {           /* ind value correct? */
             BRANCH (PAR);                               /* branch */
             }
-        if (ind_table[t] > 0) ind[t] = 0;               /* reset if needed */
+        if (ind_table[t] > 0)                           /* reset if needed */
+            ind[t] = 0;
         break;
 
 /* Add/subtract/compare - P,Q are valid */
@@ -670,22 +677,28 @@ while (reason == 0) {                                   /* loop until halted */
     case OP_A:
     case OP_AM:
         reason = add_field (PAR, QAR, FALSE, TRUE, 0, &sta); /* add, store */
-        if (sta == ADD_CARRY) ind[IN_OVF] = 1;          /* cout => ovflo */
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (sta == ADD_CARRY)                           /* cout => ovflo */
+            ind[IN_OVF] = 1;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         break;
 
     case OP_S:
     case OP_SM:
         reason = add_field (PAR, QAR, TRUE, TRUE, 0, &sta); /* sub, store */
-        if (sta == ADD_CARRY) ind[IN_OVF] = 1;          /* cout => ovflo */
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (sta == ADD_CARRY)                           /* cout => ovflo */
+            ind[IN_OVF] = 1;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         break;
 
     case OP_C:
     case OP_CM:
         reason = add_field (PAR, QAR, TRUE, FALSE, 0, &sta); /* sub, nostore */
-        if (sta == ADD_CARRY) ind[IN_OVF] = 1;          /* cout => ovflo */
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (sta == ADD_CARRY)                           /* cout => ovflo */
+            ind[IN_OVF] = 1;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         break;
 
 /* Multiply - P,Q are valid */
@@ -733,7 +746,7 @@ while (reason == 0) {                                   /* loop until halted */
         reason = div_field (PAR, QAR, &t);              /* divide */
         ind[IN_EZ] = t;                                 /* set indicator */
         if ((reason == STOP_OVERFL) && !ar_stop)        /* ovflo stop? */
-                reason = SCPE_OK;                       /* no */
+            reason = SCPE_OK;                           /* no */
         break;
 
 /* Edit special feature instructions */
@@ -810,7 +823,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 0, &sta);
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         BRANCH (PAR);                                   /* branch to P */
         break;
 
@@ -821,7 +835,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 3, &sta);
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         BRANCH (PAR);                                   /* branch to P */
         break;
 
@@ -834,7 +849,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 0, &sta);
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
 			}
@@ -847,7 +863,8 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         reason = add_field (GET_IDXADDR (idx), QAR, FALSE, TRUE, 3, &sta);
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         if ((ind[IN_EZ] == 0) && (sta == ADD_NOCRY)) {  /* ~z, ~c, ~sign chg? */
             BRANCH (PAR);                               /* branch */
 			}
@@ -936,30 +953,36 @@ while (reason == 0) {                                   /* loop until halted */
     case OP_DTO:
         reason = dec_to_oct (PAR, QAR, &t);             /* convert */
         ind[IN_EZ] = t;                                 /* set indicator */
-        if (ar_stop && ind[IN_OVF]) reason = STOP_OVERFL;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_OVERFL;
         break;
 
 /* Floating point special feature instructions */
 
     case OP_FADD:
         reason = fp_add (PAR, QAR, FALSE);              /* add */
-        if (ar_stop && ind[IN_EXPCHK]) reason = STOP_EXPCHK;
+        if (ar_stop && ind[IN_EXPCHK])
+            reason = STOP_EXPCHK;
         break;
 
     case OP_FSUB:
         reason = fp_add (PAR, QAR, TRUE);               /* subtract */
-        if (ar_stop && ind[IN_EXPCHK]) reason = STOP_EXPCHK;
+        if (ar_stop && ind[IN_EXPCHK])
+            reason = STOP_EXPCHK;
         break;
 
     case OP_FMUL:
         reason = fp_mul (PAR, QAR);                     /* multiply */
-        if (ar_stop && ind[IN_EXPCHK]) reason = STOP_EXPCHK;
+        if (ar_stop && ind[IN_EXPCHK])
+            reason = STOP_EXPCHK;
         break;
 
     case OP_FDIV:
         reason = fp_div (PAR, QAR);                     /* divide */
-        if (ar_stop && ind[IN_OVF]) reason = STOP_FPDVZ;
-        if (ar_stop && ind[IN_EXPCHK]) reason = STOP_EXPCHK;
+        if (ar_stop && ind[IN_OVF])
+            reason = STOP_FPDVZ;
+        if (ar_stop && ind[IN_EXPCHK])
+            reason = STOP_EXPCHK;
         break;
 
     case OP_FSL:
@@ -1014,7 +1037,8 @@ int32 d, d1;
 
 d = M[ad] & DIGIT;                                      /* get 1st digit */
 d1 = M[ADDR_A (ad, 1)] & DIGIT;                         /* get 2nd digit */
-if (BAD_DIGIT (d) || BAD_DIGIT (d1)) return -1;         /* bad? error */
+if (BAD_DIGIT (d) || BAD_DIGIT (d1))                    /* bad? error */
+    return -1; 
 return ((d * 10) + d1);                                 /* cvt to binary */
 }
 
@@ -1040,7 +1064,8 @@ t_stat get_addr (uint32 alast, int32 lnt, t_bool indexok, uint32 *reta)
 uint8 indir;
 int32 cnt, idx, idxa, idxv, addr;
 
-if (iae) indir = FLAG;                                  /* init indirect */
+if (iae)                                                /* init indirect */
+    indir = FLAG;
 else indir = 0;
 
 cnt = 0;                                                /* count depth */
@@ -1054,13 +1079,16 @@ do {
         if (cvt_addr (idxa, ADDR_LEN, TRUE, &idxv))     /* cvt idx reg */
             return STOP_INVPDG;
         addr = addr + idxv;                             /* add in index */
-        if (addr < 0) addr = addr + 100000;             /* -? 10's comp */
+        if (addr < 0)                                   /* -? 10's comp */
+            addr = addr + 100000;
         }
-    if (addr >= (int32) MEMSIZE) return STOP_INVPAD;    /* invalid addr? */
+    if (addr >= (int32) MEMSIZE)                        /* invalid addr? */
+        return STOP_INVPAD;
     alast = addr;                                       /* new address */
     lnt = ADDR_LEN;                                     /* std len */
     } while (indir && (cnt++ < ind_max));
-if (cnt > ind_max) return STOP_INVPIA;                  /* indir too deep? */
+if (cnt > ind_max)                                      /* indir too deep? */
+    return STOP_INVPIA;
 *reta = addr;                                           /* return address */
 return SCPE_OK;
 }
@@ -1080,15 +1108,18 @@ t_stat cvt_addr (uint32 alast, int32 lnt, t_bool signok, int32 *val)
 {
 int32 sign = 0, addr = 0, t;
 
-if (signok && (M[alast] & FLAG)) sign = 1;              /* signed? */
+if (signok && (M[alast] & FLAG))                        /* signed? */
+    sign = 1;
 alast = alast - lnt;                                    /* find start */
 do {
     PP (alast);                                         /* incr mem addr */
     t = M[alast] & DIGIT;                               /* get digit */
-    if (BAD_DIGIT (t)) return STOP_INVDIG;              /* bad? error */
+    if (BAD_DIGIT (t))                                  /* bad? error */
+        return STOP_INVDIG;
     addr = (addr * 10) + t;                             /* cvt to bin */
     } while (--lnt > 0);
-if (sign) *val = -addr;                                 /* minus? */
+if (sign)                                               /* minus? */
+    *val = -addr;
 else *val = addr;
 return SCPE_OK;
 }
@@ -1107,9 +1138,11 @@ t_stat get_idx (uint32 aidx)
 {
 int32 i, idx;
 
-if (idxe == 0) return -1;                               /* indexing off? */
+if (idxe == 0)                                          /* indexing off? */
+    return -1;
 for (i = idx = 0; i < 3; i++) {                         /* 3 flags worth */
-    if (M[aidx] & FLAG) idx = idx | (1 << i);           /* test flag */
+    if (M[aidx] & FLAG)                                 /* test flag */
+        idx = idx | (1 << i);
     MM (aidx);                                          /* next digit */
     }
 return idx;
@@ -1125,8 +1158,10 @@ ind[IN_ANYCHK] = ind[IN_RDCHK] | ind[IN_WRCHK] |        /* ANYCHK = all chks */
     ind[IN_MBREVEN] | ind[IN_MBRODD] |
     ind[IN_PRCHK] | ind[IN_DACH];
 ind[IN_IXN] = ind[IN_IXA] = ind[IN_IXB] = 0;            /* clr index indics */
-if (!idxe) ind[IN_IXN] = 1;                             /* off? */
-else if (!idxb) ind[IN_IXA] = 1;                        /* on, band A? */
+if (!idxe)                                              /* off? */
+    ind[IN_IXN] = 1;
+else if (!idxb)                                         /* on, band A? */
+    ind[IN_IXA] = 1;
 else ind[IN_IXB] = 1;                                   /* no, band B */
 return;
 }
@@ -1142,8 +1177,10 @@ uint8 t;
 
 do {
     t = M[d] = M[s] & (FLAG | DIGIT);                   /* copy src to dst */
-    MM (d); MM (s);                                     /* decr mem addrs */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    MM (d);                                             /* decr mem addrs */
+    MM (s);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while (((t & FLAG) == 0) || (cnt <= skp));        /* until flag */
 return SCPE_OK;
 }
@@ -1156,10 +1193,13 @@ uint32 cnt = 0;
 
 while ((M[s] & REC_MARK) != REC_MARK) {                 /* until rec mark */
     M[d] = M[s] & (FLAG | DIGIT);                       /* copy src to dst */
-    PP (d); PP (s);                                     /* incr mem addrs */
-    if (cnt++ >= MEMSIZE) return STOP_RWRAP;            /* (stop runaway) */
+    PP (d);                                             /* incr mem addrs */
+    PP (s);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     }
-if (cpy) M[d] = M[s] & (FLAG | DIGIT);                  /* copy rec mark */
+if (cpy)                                                /* copy rec mark */
+    M[d] = M[s] & (FLAG | DIGIT);
 return SCPE_OK;
 }
 
@@ -1173,7 +1213,8 @@ M[d] = M[s] & (FLAG | DIGIT);                           /* preserve sign */
 MM (d); MM (s);                                         /* decr mem addrs */
 for (i = 0; i < ADDR_LEN - 2; i++) {                    /* copy 3 digits */
     M[d] = M[s] & DIGIT;                                /* without flags */
-    MM (d); MM (s);                                     /* decr mem addrs */
+    MM (d);                                             /* decr mem addrs */
+    MM (s);
     }
 M[d] = (M[s] & DIGIT) | FLAG;                           /* set flag on last */
 return SCPE_OK;
@@ -1187,9 +1228,11 @@ uint32 cnt = 0;
 
 M[d] = M[s] & DIGIT;                                    /* first w/o flag */
 do {
-    MM (d); MM (s);                                     /* decr mem addrs */
+    MM (d);                                             /* decr mem addrs */
+    MM (s);
     M[d] = M[s] & (FLAG | DIGIT);                       /* copy src to dst */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while ((M[d] & FLAG) == 0);                       /* until src flag */
 return SCPE_OK;
 }
@@ -1211,7 +1254,8 @@ do {
     s = ADDR_S (s, 2);
     t = M[d] & FLAG;                                    /* save dst flag */
     M[d] = M[s] & (FLAG | DIGIT);                       /* copy src to dst */
-    if (cnt >= MEMSIZE) return STOP_FWRAP;              /* (stop runaway) */
+    if (cnt >= MEMSIZE)                                 /* (stop runaway) */
+        return STOP_FWRAP;
     cnt = cnt + 2;
     } while (t == 0);                                   /* until dst flag */
 M[d] = M[d] | FLAG;                                     /* set flag at end */
@@ -1234,7 +1278,8 @@ do {
     t = M[s];                                           /* get src digit */
     M[d] = t & DIGIT;                                   /* move to dst, no flag */
     M[d - 1] = 7;                                       /* set zone */
-    if (cnt >= MEMSIZE) return STOP_FWRAP;              /* (stop runaway) */
+    if (cnt >= MEMSIZE)                                 /* (stop runaway) */
+        return STOP_FWRAP;
     cnt = cnt + 2;
     } while ((t & FLAG) == 0);                          /* until src flag */
 return SCPE_OK;
@@ -1274,28 +1319,36 @@ dst = M[d] & DIGIT;                                     /* 1st digits */
 src = M[s] & DIGIT;
 if (BAD_DIGIT (dst) || BAD_DIGIT (src))                 /* bad digit? */
      return STOP_INVDIG;
-if (comp) src = 10 - src;                               /* complement? */
+if (comp)                                               /* complement? */
+    src = 10 - src;
 res = add_one_digit (dst, src, &cry);                   /* add */
-if (sto) M[d] = (M[d] & FLAG) | res;                    /* store */
+if (sto)                                                /* store */
+    M[d] = (M[d] & FLAG) | res;
 MM (d); MM (s);                                         /* decr mem addrs */
 do {
     dst = M[d] & DIGIT;                                 /* get dst digit */
     dst_f = M[d] & FLAG;                                /* get dst flag */
-    if (src_f) src = 0;                                 /* src done? src = 0 */
+    if (src_f)                                          /* src done? src = 0 */
+        src = 0;
     else {
         src = M[s] & DIGIT;                             /* get src digit */
-        if (cnt >= skp) src_f = M[s] & FLAG;            /* get src flag */
+        if (cnt >= skp)                                 /* get src flag */
+            src_f = M[s] & FLAG;
         MM (s);                                         /* decr src addr */
         }
     if (BAD_DIGIT (dst) || BAD_DIGIT (src))             /* bad digit? */
         return STOP_INVDIG;
-    if (comp) src = 9 - src;                            /* complement? */
+    if (comp)                                           /* complement? */
+        src = 9 - src;
     res = add_one_digit (dst, src, &cry);               /* add */
-    if (sto) M[d] = dst_f | res;                        /* store */
+    if (sto)                                            /* store */
+        M[d] = dst_f | res;
     MM (d);                                             /* decr dst addr */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while (dst_f == 0);                               /* until dst done */
-if (!src_f) ind[IN_OVF] = 1;                            /* !src done? ovf */
+if (!src_f)                                             /* !src done? ovf */
+    ind[IN_OVF] = 1;
 if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
     ind[IN_HP] = ind[IN_HP] ^ 1;                        /* flip indicator */
     if (sto) {                                          /* storing? */
@@ -1310,8 +1363,10 @@ if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
     *sta = ADD_SIGNC;                                   /* sign changed */
     return SCPE_OK;     
     }                                                   /* end if recomp */
-if (ind[IN_EZ]) ind[IN_HP] = 0;                         /* res = 0? clr HP */
-if (!comp && cry) *sta = ADD_CARRY;                     /* set status */
+if (ind[IN_EZ])                                         /* res = 0? clr HP */
+    ind[IN_HP] = 0;
+if (!comp && cry)                                       /* set status */
+    *sta = ADD_CARRY;
 return SCPE_OK;
 }
 
@@ -1330,8 +1385,10 @@ else *cry = 0;                                          /* else no carry */
 if (cpu_unit.flags & IF_MII)                            /* Model 2? */
     res = sum_table[dst + src];                         /* "hardware" */
 else res = M[ADD_TABLE + (dst * 10) + src];             /* table lookup */
-if (res & FLAG) *cry = 1;                               /* carry out? */
-if (res & DIGIT) ind[IN_EZ] = 0;                        /* nz? clr ind */
+if (res & FLAG)                                         /* carry out? */
+    *cry = 1;
+if (res & DIGIT)                                        /* nz? clr ind */
+    ind[IN_EZ] = 0;
 return res & DIGIT;
 }
 
@@ -1369,14 +1426,19 @@ pro = PROD_AREA + PROD_AREA_LEN - 1;                    /* product ptr */
 do {
     mpyd = M[mpy] & DIGIT;                              /* multiplier digit */
     mpyf = (M[mpy] & FLAG) && (cnt != 0);               /* last digit flag */
-    if (BAD_DIGIT (mpyd)) return STOP_INVDIG;           /* bad? */
+    if (BAD_DIGIT (mpyd))                               /* bad? */
+        return STOP_INVDIG;
     r = mul_one_digit (mpyd, mpc, pro, mpyf);           /* prod += mpc*mpy_dig */
-    if (r != SCPE_OK) return r;                         /* error? */
-    MM (mpy); MM (pro);                                 /* decr mpyr, prod addrs */
-    if (cnt++ > MEMSIZE) return STOP_FWRAP;             /* (stop runaway) */
+    if (r != SCPE_OK)                                   /* error? */
+        return r;
+    MM (mpy);                                           /* decr mpyr, prod addrs */
+    MM (pro);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while ((mpyf == 0) || (cnt <= 1));                /* until mpyr flag */
 
-if (ind[IN_EZ]) ind[IN_HP] = 0;                         /* res = 0? clr HP */
+if (ind[IN_EZ])                                         /* res = 0? clr HP */
+    ind[IN_HP] = 0;
 M[PROD_AREA + PROD_AREA_LEN - 1] |= sign;               /* set final sign */
 return SCPE_OK;
 }
@@ -1422,32 +1484,42 @@ do {
     prwp = prop;                                        /* product working ptr */
     mpcd = M[mpcp] & DIGIT;                             /* multiplicand digit */
     mpcf = M[mpcp] & FLAG;                              /* multiplicand flag */
-    if (BAD_DIGIT (mpcd)) return STOP_INVDIG;           /* bad? */
+    if (BAD_DIGIT (mpcd))                               /* bad? */
+        return STOP_INVDIG;
     mpta = mptb + (mpcd * 10);                          /* mpy table 10's digit */
     cry = 0;                                            /* init carry */
     mptd = M[mpta] & DIGIT;                             /* mpy table digit */
-    if (BAD_DIGIT (mptd)) return STOP_INVDIG;           /* bad? */
+    if (BAD_DIGIT (mptd))                               /* bad? */
+        return STOP_INVDIG;
     prod = M[prwp] & DIGIT;                             /* product digit */
-    if (BAD_DIGIT (prod)) return STOP_INVDIG;           /* bad? */
+    if (BAD_DIGIT (prod))                               /* bad? */
+        return STOP_INVDIG;
     M[prwp] = add_one_digit (prod, mptd, &cry);         /* add mpy tbl to prod */
     MM (prwp);                                          /* decr working ptr */
     mptd = M[mpta + 1] & DIGIT;                         /* mpy table digit */
-    if (BAD_DIGIT (mptd)) return STOP_INVDIG;           /* bad? */
+    if (BAD_DIGIT (mptd))                               /* bad? */
+        return STOP_INVDIG;
     prod = M[prwp] & DIGIT;                             /* product digit */
-    if (BAD_DIGIT (prod)) return STOP_INVDIG;           /* bad? */
+    if (BAD_DIGIT (prod))                               /* bad? */
+        return STOP_INVDIG;
     M[prwp] = add_one_digit (prod, mptd, &cry);         /* add mpy tbl to prod */
     cryc = 0;                                           /* (stop runaway) */
     while (cry) {                                       /* propagate carry */
         MM (prwp);                                      /* decr working ptr */
         prod = M[prwp] & DIGIT;                         /* product digit */
-        if (BAD_DIGIT (prod)) return STOP_INVDIG;       /* bad? */
+        if (BAD_DIGIT (prod))                           /* bad? */
+            return STOP_INVDIG;
         M[prwp] = add_one_digit (prod, 0, &cry);        /* add cry */
-        if (cryc++ > MEMSIZE) return STOP_FWRAP;
+        if (cryc++ > MEMSIZE)
+            return STOP_FWRAP;
         }
-    MM (mpcp); MM (prop);                               /* decr mpc, prod ptrs */
-    if (mpcc++ > MEMSIZE) return STOP_FWRAP;
+    MM (mpcp);                                          /* decr mpc, prod ptrs */
+    MM (prop);
+    if (mpcc++ > MEMSIZE)
+        return STOP_FWRAP;
     } while ((mpcf == 0) || (mpcc <= 1));               /* until mpcf flag */
-if (last) M[prop] = M[prop] | FLAG;                     /* flag high product */
+if (last)                                               /* flag high product */
+    M[prop] = M[prop] | FLAG;
 return SCPE_OK;
 }
 
@@ -1601,7 +1673,8 @@ ind[IN_HP] = (quos == 0);                               /* set indicators */
 
 do {
     r = div_one_digit (dvd, dvr, 10, &quod, &quop);     /* dev quo digit */
-    if (r != SCPE_OK) return r;                         /* error? */
+    if (r != SCPE_OK)                                   /* error? */
+        return r;
 
 /* Store quotient digit and advance current dividend pointer */
 
@@ -1614,13 +1687,15 @@ do {
         first = FALSE;
         }
     else M[quop] = quod;                                /* store quo digit */
-    if (quod) *ez = 0;                                  /* if nz, clr ind */
+    if (quod)                                           /* if nz, clr ind */
+        *ez = 0;
     PP (dvd);                                           /* incr dvd ptr */
     } while (dvd != (PROD_AREA + PROD_AREA_LEN));       /* until end prod */
 
 /* Division done.  Set signs of quo, rem, set flag on high order remainder */
 
-if (*ez) ind[IN_HP] = 0;                                /* res = 0? clr HP */
+if (*ez)                                                /* res = 0? clr HP */
+    ind[IN_HP] = 0;
 M[PROD_AREA + PROD_AREA_LEN - 1] |= dvds;               /* remainder sign */
 M[quop] = M[quop] | quos;                               /* quotient sign */
 PP (quop);                                              /* high remainder */
@@ -1659,20 +1734,26 @@ for (qd = 0; qd < max; qd++) {                          /* devel quo dig */
     cry = 1;                                            /* carry in = 1 */
     do {                                                /* sub dvr fm dvd */
         dvdd = M[dvdp] & DIGIT;                         /* dividend digit */
-        if (BAD_DIGIT (dvdd)) return STOP_INVDIG;       /* bad? */
+        if (BAD_DIGIT (dvdd))                           /* bad? */
+            return STOP_INVDIG;
         dvrd = M[dvrp] & DIGIT;                         /* divisor digit */
         dvrf = M[dvrp] & FLAG;                          /* divisor flag */
-        if (BAD_DIGIT (dvrd)) return STOP_INVDIG;       /* bad? */
+        if (BAD_DIGIT (dvrd))                           /* bad? */
+            return STOP_INVDIG;
         M[dvdp] = add_one_digit (dvdd, 9 - dvrd, &cry); /* sub */
-        MM (dvdp); MM (dvrp);                           /* decr ptrs */
-        if (cnt++ > MEMSIZE) return STOP_FWRAP;         /* (stop runaway) */
+        MM (dvdp);                                      /* decr ptrs */
+        MM (dvrp);
+        if (cnt++ >= MEMSIZE)                           /* (stop runaway) */
+            return STOP_FWRAP;
         } while ((dvrf == 0) || (cnt <= 1));            /* until dvr flag */
     if (!cry) {                                         /* !cry = borrow */
         dvdd = M[dvdp] & DIGIT;                         /* borrow digit */
-        if (BAD_DIGIT (dvdd)) return STOP_INVDIG;       /* bad? */
+        if (BAD_DIGIT (dvdd))                           /* bad? */
+            return STOP_INVDIG;
         M[dvdp] = add_one_digit (dvdd, 9, &cry);        /* sub */
         }
-    if (!cry) break;                                    /* !cry = negative */
+    if (!cry)                                           /* !cry = negative */
+        break;
     }
 
 /* Add back the divisor to correct for the negative result */
@@ -1686,13 +1767,16 @@ do {
     dvrd = M[dvrp] & DIGIT;                             /* divisor digit */
     dvrf = M[dvrp] & FLAG;                              /* divisor flag */
     M[dvdp] = add_one_digit (dvdd, dvrd, &cry);         /* add */
-    MM (dvdp); MM (dvrp); cnt++;                        /* decr ptrs */
+    MM (dvdp);                                          /* decr ptrs */
+    MM (dvrp);
+    cnt++;
     } while ((dvrf == 0) || (cnt <= 1));                /* until dvr flag */
 if (cry) {                                              /* carry out? */
     dvdd = M[dvdp] & DIGIT;                             /* borrow digit */
     M[dvdp] = add_one_digit (dvdd, 0, &cry);            /* add */
     }
-if (quop != NULL) *quop = dvdp;                         /* set quo addr */
+if (quop != NULL)                                       /* set quo addr */
+    *quop = dvdp;
 *quod = qd;                                             /* set quo digit */
 return SCPE_OK;
 }
@@ -1718,9 +1802,12 @@ ind[IN_EZ] = 1;                                         /* assume result zero */
 do {
     t = M[s];                                           /* get src */
     M[d] = (M[d] & FLAG) | ((M[d] | t) & 07);           /* OR src to dst */
-    if (M[d] & DIGIT) ind[IN_EZ] = 0;                   /* nz dig? clr ind */
-    MM (d); MM (s);                                     /* decr pointers */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    if (M[d] & DIGIT)                                   /* nz dig? clr ind */
+        ind[IN_EZ] = 0;
+    MM (d);                                             /* decr pointers */
+    MM (s);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while (((t & FLAG) == 0) || (cnt <= 1));          /* until src flag */
 return SCPE_OK;
 }
@@ -1734,9 +1821,12 @@ ind[IN_EZ] = 1;                                         /* assume result zero */
 do {
     t = M[s];                                           /* get src */
     M[d] = (M[d] & FLAG) | ((M[d] & t) & 07);           /* AND src to dst */
-    if (M[d] & DIGIT) ind[IN_EZ] = 0;                   /* nz dig? clr ind */
-    MM (d); MM (s);                                     /* decr pointers */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    if (M[d] & DIGIT)                                   /* nz dig? clr ind */
+        ind[IN_EZ] = 0;
+    MM (d);                                             /* decr pointers */
+    MM (s);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while (((t & FLAG) == 0) || (cnt <= 1));          /* until src flag */
 return SCPE_OK;
 }
@@ -1750,9 +1840,12 @@ ind[IN_EZ] = 1;                                         /* assume result zero */
 do {
     t = M[s];                                           /* get src */
     M[d] = (M[d] & FLAG) | ((M[d] ^ t) & 07);           /* XOR src to dst */
-    if (M[d] & DIGIT) ind[IN_EZ] = 0;                   /* nz dig? clr ind */
-    MM (d); MM (s);                                     /* decr pointers */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    if (M[d] & DIGIT)                                   /* nz dig? clr ind */
+        ind[IN_EZ] = 0;
+    MM (d);                                             /* decr pointers */
+    MM (s);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while (((t & FLAG) == 0) || (cnt <= 1));          /* until src flag */
 return SCPE_OK;
 }
@@ -1766,9 +1859,12 @@ ind[IN_EZ] = 1;                                         /* assume result zero */
 do {
     t = M[s];                                           /* get src */
     M[d] = (t & FLAG) | ((t ^ 07) & 07);                /* comp src to dst */
-    if (M[d] & DIGIT) ind[IN_EZ] = 0;                   /* nz dig? clr ind */
-    MM (d); MM (s);                                     /* decr pointers */
-    if (cnt++ >= MEMSIZE) return STOP_FWRAP;            /* (stop runaway) */
+    if (M[d] & DIGIT)                                   /* nz dig? clr ind */
+        ind[IN_EZ] = 0;
+    MM (d);                                             /* decr pointers */
+    MM (s);
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while ((t & FLAG) == 0);                          /* until src flag */
 return SCPE_OK;
 }
@@ -1803,18 +1899,22 @@ do {
     sd = M[s] & DIGIT;                                  /* src digit */
     sf = M[s] & FLAG;                                   /* src flag */
     r = mul_one_digit (sd, tbl, PROD_AREA + PROD_AREA_LEN - 1, sf);
-    if (r != SCPE_OK) return r;                         /* err? */
+    if (r != SCPE_OK)                                   /* err? */
+        return r;
     MM (s);                                             /* decr src addr */
     MM (tbl);                                           /* skip 1st tbl dig */
     tblc = 0;                                           /* count */
     do {
         tf = M[tbl] & FLAG;                             /* get next */
         MM (tbl);                                       /* decr ptr */
-        if (tblc++ > MEMSIZE) return STOP_FWRAP;
+        if (tblc++ > MEMSIZE)
+            return STOP_FWRAP;
         } while (tf == 0);                              /* until flag */
-    if (cnt++ > MEMSIZE) return STOP_FWRAP;             /* (stop runaway) */
+    if (cnt++ >= MEMSIZE)                               /* (stop runaway) */
+        return STOP_FWRAP;
     } while (sf == 0);
-if (ind[IN_EZ]) ind[IN_HP] = 0;                         /* res = 0? clr HP */
+if (ind[IN_EZ])                                         /* res = 0? clr HP */
+    ind[IN_HP] = 0;
 M[PROD_AREA + PROD_AREA_LEN - 1] |= sign;               /* set sign */
 return SCPE_OK;
 }
@@ -1848,7 +1948,8 @@ ind[IN_HP] = (sign == 0);
 for ( ;; ) {
     r = div_one_digit (PROD_AREA + PROD_AREA_LEN - 1,   /* divide */
         tbl, 8, &octd, NULL);
-    if (r != SCPE_OK) return r;                         /* error? */
+    if (r != SCPE_OK)                                   /* error? */
+        return r;
     if (first) {                                        /* first pass? */
         if (octd >= 8) {                                /* overflow? */
             ind[IN_OVF] = 1;                            /* set indicator */
@@ -1858,20 +1959,25 @@ for ( ;; ) {
         first = FALSE;
         }
     else M[d] = octd;                                   /* store quo digit */
-    if (octd) *ez = 0;                                  /* if nz, clr ind */
+    if (octd)                                           /* if nz, clr ind */
+        *ez = 0;
     PP (tbl);                                           /* incr tbl addr */
-    if ((M[tbl] & REC_MARK) == REC_MARK) break;         /* record mark? */
+    if ((M[tbl] & REC_MARK) == REC_MARK)                /* record mark? */
+        break;
     PP (tbl);                                           /* skip flag */
-    if ((M[tbl] & REC_MARK) == REC_MARK) break;         /* record mark? */
+    if ((M[tbl] & REC_MARK) == REC_MARK)                /* record mark? */
+        break;
     do {                                                /* look for F, rec mk */
         PP (tbl);
         t = M[tbl];
         } while (((t & FLAG) == 0) && ((t & REC_MARK) != REC_MARK));
     MM (tbl);                                           /* step back one */
     PP (d);                                             /* incr quo addr */
-    if (ctr++ > MEMSIZE) return STOP_FWRAP;             /* (stop runaway) */
+    if (ctr++ > MEMSIZE)                                /* (stop runaway) */
+        return STOP_FWRAP;
     }
-if (*ez) ind[IN_HP] = 0;                                /* res = 0? clr HP */
+if (*ez)                                                /* res = 0? clr HP */
+    ind[IN_HP] = 0;
 M[d] = M[d] | sign;                                     /* set result sign */   
 return SCPE_OK;
 }
@@ -1885,16 +1991,20 @@ static t_bool one_time = TRUE;
 
 PR1 = IR2 = 1;                                          /* invalidate PR1,IR2 */
 ind[0] = 0;
-for (i = IN_SW4 + 1; i < NUM_IND; i++) ind[i] = 0;      /* init indicators */
-if (cpu_unit.flags & IF_IA) iae = 1;                    /* indirect enabled? */
+for (i = IN_SW4 + 1; i < NUM_IND; i++)                  /* init indicators */
+    ind[i] = 0;
+if (cpu_unit.flags & IF_IA)                             /* indirect enabled? */
+    iae = 1;
 else iae = 0;
 idxe = idxb = 0;                                        /* indexing off */
 pcq_r = find_reg ("PCQ", NULL, dptr);                   /* init old PC queue */
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');            /* init breakpoints */
 upd_ind ();                                             /* update indicators */
-if (one_time) cpu_set_table (&cpu_unit, 1, NULL, NULL); /* set default tables */
+if (one_time)                                           /* set default tables */
+    cpu_set_table (&cpu_unit, 1, NULL, NULL);
 one_time = FALSE;
 return SCPE_OK;
 }
@@ -1903,8 +2013,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[addr] & (FLAG | DIGIT);
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[addr] & (FLAG | DIGIT);
 return SCPE_OK;
 }
 
@@ -1912,7 +2024,8 @@ return SCPE_OK;
 
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 M[addr] = val & (FLAG | DIGIT);
 return SCPE_OK;
 }
@@ -1926,11 +2039,13 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val % 1000) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }
 
@@ -1938,8 +2053,9 @@ return SCPE_OK;
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val) cpu_unit.flags = (cpu_unit.flags & (UNIT_SCP | UNIT_BCD | MII_OPT)) |
-    IF_DIV | IF_IA | IF_EDT;
+if (val)
+    cpu_unit.flags = (cpu_unit.flags & (UNIT_SCP | UNIT_BCD | MII_OPT)) |
+        IF_DIV | IF_IA | IF_EDT;
 else cpu_unit.flags = cpu_unit.flags & (UNIT_SCP | UNIT_BCD | MI_OPT);
 return SCPE_OK;
 }
@@ -1950,7 +2066,8 @@ t_stat cpu_set_opt1 (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (cpu_unit.flags & IF_MII) {
     printf ("Feature is standard on 1620 Model 2\n");
-    if (sim_log) fprintf (sim_log, "Feature is standard on 1620 Model 2\n");
+    if (sim_log)
+        fprintf (sim_log, "Feature is standard on 1620 Model 2\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;
@@ -1962,7 +2079,8 @@ t_stat cpu_set_opt2 (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (!(cpu_unit.flags & IF_MII)) {
     printf ("Feature is not available on 1620 Model 1\n");
-    if (sim_log) fprintf (sim_log, "Feature is not available on 1620 Model 1\n");
+    if (sim_log)
+        fprintf (sim_log, "Feature is not available on 1620 Model 1\n");
     return SCPE_NOFNC;
     }
 return SCPE_OK;
@@ -1972,7 +2090,8 @@ return SCPE_OK;
 
 t_stat cpu_set_save (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (saved_PC & 1) return SCPE_NOFNC;
+if (saved_PC & 1)
+    return SCPE_NOFNC;
 PR1 = saved_PC;
 return SCPE_OK;
 }
@@ -2000,12 +2119,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].vld = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].vld = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -2014,7 +2135,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -2032,14 +2154,17 @@ InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */

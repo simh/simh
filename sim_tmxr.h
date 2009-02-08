@@ -1,6 +1,6 @@
 /* sim_tmxr.h: terminal multiplexor definitions
 
-   Copyright (c) 2001-2005, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,10 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   20-Nov-08    RMS     Added three new standardized SHOW routines
+   27-May-08    JDB     Added lnorder to TMXR structure,
+                        added tmxr_set_lnorder and tmxr_set_lnorder
+   14-May-08    JDB     Added dptr to TMXR structure
    04-Jan-04    RMS     Changed TMXR ldsc to be pointer to linedesc array
                         Added tmxr_linemsg, logging (from Mark Pizzolato)
    29-Dec-03    RMS     Added output stall support, increased buffer size
@@ -72,6 +76,8 @@ struct tmxr {
     int32               port;                           /* listening port */
     SOCKET              master;                         /* master socket */
     TMLN                *ldsc;                          /* line descriptors */
+    int32               *lnorder;                       /* line connection order */
+    DEVICE              *dptr;                          /* multiplexer device */
     };
 
 typedef struct tmxr TMXR;
@@ -98,6 +104,11 @@ t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 tmxr_rqln (TMLN *lp);
 int32 tmxr_tqln (TMLN *lp);
+t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif
 

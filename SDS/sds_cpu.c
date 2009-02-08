@@ -1,6 +1,6 @@
 /* sds_cpu.c: SDS 940 CPU simulator
 
-   Copyright (c) 2001-2007, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -365,7 +365,8 @@ t_stat reason, tr;
 
 /* Restore register state */
 
-if (io_init ()) return SCPE_STOP;                       /* init IO; conflict? */
+if (io_init ())                                         /* init IO; conflict? */
+    return SCPE_STOP;
 reason = 0;
 xfr_req = xfr_req & ~1;                                 /* <0> reserved */
 int_req = int_req & ~1;                                 /* <0> reserved */
@@ -384,13 +385,15 @@ while (reason == 0) {                                   /* loop until halted */
         }
 
     if (sim_interval <= 0) {                            /* event queue? */
-        if (reason = sim_process_event ()) break;       /* process */
+        if (reason = sim_process_event ())              /* process */
+            break;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         }
 
     if (chan_req) {                                     /* channel request? */
-        if (reason = chan_process ()) break;            /* process */
+        if (reason = chan_process ())                   /* process */
+            break;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         }
@@ -405,7 +408,8 @@ while (reason == 0) {                                   /* loop until halted */
         tinst = ReadP (pa);                             /* get inst */
         save_mode = usr_mode;                           /* save mode */
         usr_mode = 0;                                   /* switch to mon */
-        if (hst_lnt) inst_hist (tinst, P, HIST_INT);    /* record inst */
+        if (hst_lnt)                                    /* record inst */
+            inst_hist (tinst, P, HIST_INT);
         if (pa != VEC_RTCP) {                           /* normal intr? */
             tr = one_inst (tinst, P, save_mode);        /* exec intr inst */
             if (tr) {                                   /* stop code? */
@@ -436,11 +440,14 @@ while (reason == 0) {                                   /* loop until halted */
         P = (P + 1) & VA_MASK;                          /* incr PC */
         if (reason == SCPE_OK) {                        /* fetch ok? */
             ion_defer = 0;                              /* clear ion */
-            if (hst_lnt) inst_hist (inst, save_P, HIST_XCT);
+            if (hst_lnt)
+                inst_hist (inst, save_P, HIST_XCT);
             reason = one_inst (inst, save_P, usr_mode); /* exec inst */
             if (reason > 0) {                           /* stop code? */
-                if (reason != STOP_HALT) P = save_P;
-                if (reason == STOP_IONRDY) reason = 0;
+                if (reason != STOP_HALT)
+                    P = save_P;
+                if (reason == STOP_IONRDY)
+                    reason = 0;
                 }
             }                                           /* end if r == 0 */
         if (reason < 0) {                               /* mm (fet or ex)? */
@@ -454,7 +461,8 @@ while (reason == 0) {                                   /* loop until halted */
             save_mode = usr_mode;                       /* save mode */
             usr_mode = 0;                               /* switch to mon */
             mon_usr_trap = 0;
-            if (hst_lnt) inst_hist (tinst, save_P, HIST_TRP);
+            if (hst_lnt)
+                inst_hist (tinst, save_P, HIST_TRP);
             tr = one_inst (tinst, save_P, save_mode);   /* trap inst */
             if (tr) {                                   /* stop code? */
                 usr_mode = save_mode;                   /* restore mode */
@@ -498,7 +506,8 @@ if (inst & I_POP) {                                     /* POP? */
             }
         else {                                          /* normal POP */
             dat = (OV << 23) | dat;                     /* ov in <0> */
-            if (r = Write (0, dat)) return r;
+            if (r = Write (0, dat))
+                return r;
             }
         }               
     else {                                              /* mon mode */
@@ -516,170 +525,234 @@ switch (op) {                                           /* case on opcode */
 /* Loads and stores */
 
     case LDA:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &A)) return r;                /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &A))                          /* get operand */
+            return r;
         break;
 
     case LDB:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &B)) return r;                /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &B))                          /* get operand */
+            return r;
         break;
 
     case LDX:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &X)) return r;                /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &X))                          /* get operand */
+            return r;
         break;
 
     case STA:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Write (va, A)) return r;                /* write operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Write (va, A))                          /* write operand */
+            return r;
         break;
 
     case STB:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Write (va, B)) return r;                /* write operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Write (va, B))                          /* write operand */
+            return r;
         break;
 
     case STX:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Write (va, X)) return r;                /* write operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Write (va, X))                          /* write operand */
+            return r;
         break;
 
     case EAX:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
         if (nml_mode || usr_mode)                       /* normal or user? */
             X = (X & ~VA_MASK) | (va & VA_MASK);        /* only 14b */
         else X = (X & ~XVA_MASK) | (va & XVA_MASK);     /* mon, 15b */
         break;
 
     case XMA:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (r = Write (va, A)) return r;                /* write A */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (r = Write (va, A))                          /* write A */
+            return r;
         A = dat;                                        /* load A */
         break;
 
 /* Arithmetic and logical */
 
     case ADD:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         A = Add24 (A, dat, 0);                          /* add */
         break;
 
     case ADC:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         OV = 0;                                         /* clear overflow */
         A = Add24 (A, dat, X >> 23);                    /* add with carry */
         break;
 
     case SUB:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         A = Add24 (A, dat ^ DMASK, 1);                  /* subtract */
         break;
 
     case SUC:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         OV = 0;                                         /* clear overflow */
         A = Add24 (A, dat ^ DMASK, X >> 23);            /* sub with carry */
         break;
 
     case ADM:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         dat = AddM24 (dat, A);                          /* mem + A */
-        if (r = Write (va, dat)) return r;              /* rewrite */
+        if (r = Write (va, dat))                        /* rewrite */
+            return r;
         break;
 
     case MIN:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         dat = AddM24 (dat, 1);                          /* mem + 1 */
-        if (r = Write (va, dat)) return r;              /* rewrite */
+        if (r = Write (va, dat))                        /* rewrite */
+            return r;
         break;
 
     case MUL:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         Mul48 (A, dat);                                 /* multiply */
         break;
 
     case DIV:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         Div48 (A, B, dat);                              /* divide */
         break;
 
     case ETR:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         A = A & dat;                                    /* and */
         break;
 
     case MRG:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         A = A | dat;                                    /* or */
         break;
 
     case EOR:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         A = A ^ dat;                                    /* xor */
         break;
 
 /* Skips */
 
     case SKE:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (A == dat) P = (P + 1) & VA_MASK;            /* if A = op, skip */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (A == dat)                                   /* if A = op, skip */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKG:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (SXT (A) > SXT (dat)) P = (P + 1) & VA_MASK; /* if A > op, skip */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (SXT (A) > SXT (dat))                        /* if A > op, skip */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKM:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (((A ^ dat) & B) == 0) P = (P + 1) & VA_MASK; /* if A = op masked */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (((A ^ dat) & B) == 0)                       /* if A = op masked */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKA:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if ((A & dat) == 0) P = (P + 1) & VA_MASK;      /* if !(A & op), skip */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if ((A & dat) == 0)                             /* if !(A & op), skip */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKB:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if ((B & dat) == 0) P = (P + 1) & VA_MASK;      /* if !(B & op), skip */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if ((B & dat) == 0)                             /* if !(B & op), skip */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKN:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (dat & SIGN) P = (P + 1) & VA_MASK;          /* if op < 0, skip */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (dat & SIGN)                                 /* if op < 0, skip */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKR:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         dat = AddM24 (dat, DMASK);                      /* decr operand */
-        if (r = Write (va, dat)) return r;              /* rewrite operand */
-        if (dat & SIGN) P = (P + 1) & VA_MASK;          /* if op < 0, skip */
+        if (r = Write (va, dat))                        /* rewrite */
+            return r;
+        if (dat & SIGN)                                 /* if op < 0, skip */
+            P = (P + 1) & VA_MASK;
         break;
 
     case SKD:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         if (SXT_EXP (B) < SXT_EXP (dat)) {              /* B < dat? */
             X = (dat - B) & DMASK;                      /* X = dat - B */
             P = (P + 1) & VA_MASK;                      /* skip */
@@ -693,65 +766,81 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case HLT:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
         return STOP_HALT;                               /* halt CPU */
 
     case EXU:
         exu_cnt = exu_cnt + 1;                          /* count chained EXU */
-        if (exu_cnt > exu_lim) return STOP_EXULIM;      /* too many? */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (exu_cnt > exu_lim)                          /* too many? */
+            return STOP_EXULIM;
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         inst = dat;
         goto EXU_LOOP;
  
    case BRU:
         if (nml_mode && (inst & I_IND)) api_dismiss (); /* normal BRU*, dism */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* test dest access */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         PCQ_ENTRY;
         P = va & VA_MASK;                               /* branch */
         break;
 
     case BRX:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
         X = (X + 1) & DMASK;                            /* incr X */
         if (X & I_IND) {                                /* bit 9 set? */
-            if (r = Read (va, &dat)) return r;          /* test dest access */
+            if (r = Read (va, &dat))                    /* test dest access */
+                return r;
             PCQ_ENTRY;
             P = va & VA_MASK;                           /* branch */
             }
         break;
 
     case BRM:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
         dat = (EM3 << 18) | (EM2 << 15) | pc;           /* form return word */
         if (!nml_mode && !usr_mode)                     /* monitor mode? */
             dat = dat | (mode << 23) | (OV << 21);
         else dat = dat | (OV << 23);                    /* normal or user */
-        if (r = Write (va, dat)) return r;              /* write ret word */
+        if (r = Write (va, dat))                        /* write ret word */
+            return r;
         PCQ_ENTRY;
         P = (va + 1) & VA_MASK;                         /* branch */
         break;
 
     case BRR:
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         PCQ_ENTRY;
         P = (dat + 1) & VA_MASK;                        /* branch */
         if (!nml_mode && !usr_mode) {                   /* monitor mode? */
             OV = OV | ((dat >> 21) & 1);                /* restore OV */
             if ((va & VA_USR) | (dat & I_USR)) {        /* mode change? */
                 usr_mode = 1;
-                if (mon_usr_trap) return MM_MONUSR;
+                if (mon_usr_trap)
+                    return MM_MONUSR;
                 }
             }
         else OV = OV | ((dat >> 23) & 1);               /* restore OV */
         break;
 
     case BRI:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
         api_dismiss ();                                 /* dismiss hi api */
         PCQ_ENTRY;
         P = dat & VA_MASK;                              /* branch */
@@ -759,7 +848,8 @@ switch (op) {                                           /* case on opcode */
             OV = (dat >> 21) & 1;                       /* restore OV */
             if ((va & VA_USR) | (dat & I_USR)) {        /* mode change? */
                 usr_mode = 1;
-                if (mon_usr_trap) return MM_MONUSR;
+                if (mon_usr_trap)
+                    return MM_MONUSR;
                 }
             }
         else OV = (dat >> 23) & 1;                      /* restore OV */
@@ -772,25 +862,35 @@ switch (op) {                                           /* case on opcode */
         old_B = B;
         old_X = X;
         if (inst & 000001211) {                         /* A change? */
-            if (inst & 01000) dat = (~old_A + 1) & DMASK; /* CNA */
+            if (inst & 01000)
+                dat = (~old_A + 1) & DMASK; /* CNA */
             else dat = 0;
-            if (inst & 00200) dat = dat | old_X;
-            if (inst & 00010) dat = dat | old_B;
-            if (inst & 00100) A = (A & ~EXPMASK) | (dat & EXPMASK);
+            if (inst & 00200)
+                dat = dat | old_X;
+            if (inst & 00010)
+                dat = dat | old_B;
+            if (inst & 00100)
+                A = (A & ~EXPMASK) | (dat & EXPMASK);
             else A = dat;
             }
         if (inst & 000000046) {                         /* B change? */
-            if (inst & 00040) dat = old_X;
+            if (inst & 00040)
+                dat = old_X;
             else dat = 0;
-            if (inst & 00004) dat = dat | old_A;
-            if (inst & 00100) B = (B & ~EXPMASK) | (dat & EXPMASK);
+            if (inst & 00004)
+                dat = dat | old_A;
+            if (inst & 00100)
+                B = (B & ~EXPMASK) | (dat & EXPMASK);
             else B = dat;
             }
         if (inst & 020000420) {                         /* X change? */
-            if (inst & 00400) dat = old_A;
+            if (inst & 00400)
+                dat = old_A;
             else dat = 0;
-            if (inst & 00020) dat = dat | old_B;
-            if (inst & 00100) X = SXT_EXP (dat) & DMASK;
+            if (inst & 00020)
+                dat = dat | old_B;
+            if (inst & 00100)
+                X = SXT_EXP (dat) & DMASK;
             else X = dat;
             }
         break;
@@ -798,27 +898,34 @@ switch (op) {                                           /* case on opcode */
 /* Overflow instruction */
 
     case OVF:
-        if ((inst & 0100) & OV) P = (P + 1) & VA_MASK;
-        if (inst & 0001) OV = 0;
-        if ((inst & 0010) && (((X >> 1) ^ X) & EXPS)) OV = 1;
+        if ((inst & 0100) & OV)
+            P = (P + 1) & VA_MASK;
+        if (inst & 0001)
+            OV = 0;
+        if ((inst & 0010) && (((X >> 1) ^ X) & EXPS))
+            OV = 1;
         break;
 
 /* Shifts */
 
     case RSH:
-        if (r = EaSh (inst, &va)) return r;             /* decode eff addr */
+        if (r = EaSh (inst, &va))                       /* decode eff addr */
+            return r;
         shf_op = I_GETSHFOP (va);                       /* get eff op */
         sc = va & I_SHFMSK;                             /* get eff count */
         switch (shf_op) {                               /* case on sub-op */
         case 00:                                        /* right arithmetic */
-            if (sc) ShfR48 (sc, (A & SIGN)? DMASK: 0);
+            if (sc)
+                ShfR48 (sc, (A & SIGN)? DMASK: 0);
             break;
         case 04:                                        /* right cycle */
             sc = sc % 48;                               /* mod 48 */
-            if (sc) RotR48 (sc);
+            if (sc)
+                RotR48 (sc);
             break;
         case 05:                                        /* right logical */
-            if (sc) ShfR48 (sc, 0);
+            if (sc)
+                ShfR48 (sc, 0);
             break;
         default:
             CRETINS;                                    /* invalid inst */
@@ -827,23 +934,28 @@ switch (op) {                                           /* case on opcode */
         break;
 
     case LSH:
-        if (r = EaSh (inst, &va)) return r;             /* decode eff addr */
+        if (r = EaSh (inst, &va))                       /* decode eff addr */
+            return r;
         shf_op = I_GETSHFOP (va);                       /* get eff op */
         sc = va & I_SHFMSK;                             /* get eff count */
         switch (shf_op) {                               /* case on sub-op */
         case 00:                                        /* left arithmetic */
             dat = A;                                    /* save sign */
-            if (sc > 48) sc = 48;
+            if (sc > 48)
+                sc = 48;
             for (i = 0; i < sc; i++) {                  /* loop */
                 A = ((A << 1) | (B >> 23)) & DMASK;
                 B = (B << 1) & DMASK;
-                if ((A ^ dat) & SIGN) OV = 1;
+                if ((A ^ dat) & SIGN)
+                    OV = 1;
                 }
             break;
         case 02:                                        /* normalize */
-            if (sc > 48) sc = 48;
+            if (sc > 48)
+                sc = 48;
             for (i = 0; i < sc; i++) {                  /* until max count */
-                if ((A ^ (A << 1)) & SIGN) break;
+                if ((A ^ (A << 1)) & SIGN)
+                    break;
                 A = ((A << 1) | (B >> 23)) & DMASK;
                 B = (B << 1) & DMASK;
                 }
@@ -851,12 +963,15 @@ switch (op) {                                           /* case on opcode */
             break;
         case 04:                                        /* left cycle */
             sc = sc % 48;                               /* mod 48 */
-            if (sc) RotR48 (48 - sc);                   /* rotate */
+            if (sc)                                     /* rotate */
+                RotR48 (48 - sc);
             break;
         case 06:                                        /* cycle normalize */
-            if (sc > 48) sc = 48;
+            if (sc > 48)
+                sc = 48;
             for (i = 0; i < sc; i++) {                  /* until max count */
-                if ((A ^ (A << 1)) & SIGN) break;
+                if ((A ^ (A << 1)) & SIGN)
+                    break;
                 old_A = A;                              /* cyclic shift */
                 A = ((A << 1) | (B >> 23)) & DMASK;
                 B = ((B << 1) | (old_A >> 23)) & DMASK;
@@ -872,57 +987,79 @@ switch (op) {                                           /* case on opcode */
 /* I/O instructions */
 
     case MIW: case MIY:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (r = op_miwy (inst, dat)) return r;          /* process inst */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (r = op_miwy (inst, dat))                    /* process inst */
+            return r;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         break;
 
     case WIM: case YIM:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = op_wyim (inst, &dat)) return r;         /* process inst */
-        if (r = Write (va, dat)) return r;              /* write result */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = op_wyim (inst, &dat))                   /* process inst */
+            return r;
+        if (r = Write (va, dat))
+            return r;                                   /* write result */
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         break;
 
     case EOM: case EOD:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = op_eomd (inst)) return r;               /* process inst */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = op_eomd (inst))                         /* process inst */
+            return r;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         ion_defer = 1;
         break;
 
     case POT:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = Read (va, &dat)) return r;              /* get operand */
-        if (r = op_pot (dat)) return r;                 /* process inst */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = Read (va, &dat))                        /* get operand */
+            return r;
+        if (r = op_pot (dat))                           /* process inst */
+            return r;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         break;
 
     case PIN:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = Ea (inst, &va)) return r;               /* decode eff addr */
-        if (r = op_pin (&dat)) return r;                /* process inst */
-        if (r = Write (va, dat)) return r;              /* write result */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = Ea (inst, &va))                         /* decode eff addr */
+            return r;
+        if (r = op_pin (&dat))                          /* process inst */
+            return r;
+        if (r = Write (va, dat))                        /* write result */
+            return r;
         int_reqhi = api_findreq ();                     /* recalc int req */
         chan_req = chan_testact ();                     /* recalc chan act */
         break;
 
     case SKS:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* priv inst */
-        if (r = op_sks (inst, &dat)) return r;          /* process inst */
-        if (dat) P = (P + 1) & VA_MASK;
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
+        if (r = op_sks (inst, &dat))                    /* process inst */
+            return r;
+        if (dat)
+            P = (P + 1) & VA_MASK;
         break;
 
     default:
-        if (!nml_mode && usr_mode) return MM_PRVINS;    /* usr? priv viol */
+        if (!nml_mode && usr_mode)                      /* priv inst */
+            return MM_PRVINS;
         CRETINS;                                        /* invalid inst */
         break;
         }
@@ -940,13 +1077,16 @@ uint32 va = wd & XVA_MASK;                              /* initial va */
 t_stat r;
 
 for (i = 0; i < ind_lim; i++) {                         /* count indirects */
-    if (wd & I_IDX) va = (va & VA_USR) | ((va + X) & VA_MASK);
+    if (wd & I_IDX)
+        va = (va & VA_USR) | ((va + X) & VA_MASK);
     *addr = va;
     if ((wd & I_IND) == 0) {                            /* end of ind chain? */
-        if (hst_lnt) hst[hst_p].ea = *addr;             /* record */
+        if (hst_lnt)                                    /* record */
+            hst[hst_p].ea = *addr;
         return SCPE_OK;
         }
-    if (r = Read (va, &wd)) return r;                   /* read ind; fails? */
+    if (r = Read (va, &wd))                             /* read ind; fails? */
+        return r;
     va = (va & VA_USR) | (wd & XVA_MASK);
     }
 return STOP_INDLIM;                                     /* too many indirects */
@@ -963,14 +1103,17 @@ t_stat r;
 
 for (i = 0; i < ind_lim; i++) {                         /* count indirects */
     if ((wd & I_IND) == 0) {                            /* end of ind chain? */
-        if (wd & I_IDX) *addr = (va & (VA_MASK & ~I_SHFMSK)) |
-            ((va + X) & I_SHFMSK);                      /* 9b indexing */
+        if (wd & I_IDX)                                 /* 9b indexing */
+            *addr = (va & (VA_MASK & ~I_SHFMSK)) | ((va + X) & I_SHFMSK);
         else *addr = va & VA_MASK;
-        if (hst_lnt) hst[hst_p].ea = *addr;             /* record */
+        if (hst_lnt)                                    /* record */
+            hst[hst_p].ea = *addr;
         return SCPE_OK;
         }
-    if (wd & I_IDX) va = (va & VA_USR) | ((va + X) & VA_MASK);
-    if (r = Read (va, &wd)) return r;                   /* read ind; fails? */
+    if (wd & I_IDX)
+        va = (va & VA_USR) | ((va + X) & VA_MASK);
+    if (r = Read (va, &wd))                             /* read ind; fails? */
+        return r;
     va = (va & VA_USR) | (wd & XVA_MASK);
     }
 return STOP_INDLIM;                                     /* too many indirects */
@@ -984,20 +1127,24 @@ uint32 pgn, map, pa;
 
 if (nml_mode) {                                         /* normal? */
     va = va & VA_MASK;                                  /* ignore user */
-    if (va < 020000) pa = va;                           /* first 8K: 1 for 1 */
-    else if (va < 030000) pa = va + em2_dyn;            /* next 4K: ext EM2 */
+    if (va < 020000)                                    /* first 8K: 1 for 1 */
+        pa = va;
+    else if (va < 030000)                               /* next 4K: ext EM2 */
+        pa = va + em2_dyn;
     else pa = va + em3_dyn;                             /* next 4K: ext EM3 */
     }
 else if (usr_mode || (va & VA_USR)) {                   /* user mapping? */
     pgn = VA_GETPN (va);                                /* get page no */
     map = usr_map[pgn];                                 /* get map entry */
-    if (map == MAP_PROT) return MM_NOACC;               /* prot? no access */
+    if (map == MAP_PROT)                                /* prot? no access */
+        return MM_NOACC;
     pa = (map & ~MAP_PROT) | (va & VA_POFF);            /* map address */
     }
 else {
     pgn = VA_GETPN (va);                                /* mon, get page no */
     map = mon_map[pgn];                                 /* get map entry */
-    if (map & MAP_PROT) return MM_NOACC;                /* prot? no access */
+    if (map & MAP_PROT)
+        return MM_NOACC;                                /* prot? no access */
     pa = map | (va & VA_POFF);                          /* map address */
     }
 *dat = M[pa];                                           /* return word */
@@ -1012,15 +1159,18 @@ uint32 pgn, map, pa;
 
 if (nml_mode) {                                         /* normal? */
     va = va & VA_MASK;                                  /* ignore user */
-    if (va < 020000) pa = va;                           /* first 8K: 1 for 1 */
-    else if (va < 030000) pa = va + em2_dyn;            /* next 4K: ext EM2 */
+    if (va < 020000)                                    /* first 8K: 1 for 1 */
+        pa = va;
+    else if (va < 030000)                               /* next 4K: ext EM2 */
+        pa = va + em2_dyn;
     else pa = va + em3_dyn;                             /* next 4K: ext EM3 */
     }
 else if (usr_mode || (va & VA_USR)) {                   /* user mapping? */
     pgn = VA_GETPN (va);                                /* get page no */
     map = usr_map[pgn];                                 /* get map entry */
     if (map & MAP_PROT) {                               /* protected page? */
-        if (map == MAP_PROT) return MM_NOACC;           /* zero? no access */
+        if (map == MAP_PROT)                            /* zero? no access */
+            return MM_NOACC;
         else return MM_WRITE;                           /* else, write prot */
         }
     pa = map | (va & VA_POFF);                          /* map address */
@@ -1028,10 +1178,12 @@ else if (usr_mode || (va & VA_USR)) {                   /* user mapping? */
 else {
     pgn = VA_GETPN (va);                                /* mon, get page no */
     map = mon_map[pgn];                                 /* get map entry */
-    if (map & MAP_PROT) return MM_NOACC;                /* prot? no access */
+    if (map & MAP_PROT)                                 /* prot? no access */
+        return MM_NOACC;
     pa = map | (va & VA_POFF);                          /* map address */
     }
-if (MEM_ADDR_OK (pa)) M[pa] = dat;
+if (MEM_ADDR_OK (pa))
+    M[pa] = dat;
 return SCPE_OK;
 }
 
@@ -1042,20 +1194,29 @@ uint32 RelocC (int32 va, int32 sw)
 uint32 nml = nml_mode, usr = usr_mode;
 uint32 pa, pgn, map;
 
-if (sw & SWMASK ('N')) nml = 1;                         /* -n: normal */
-else if (sw & SWMASK ('X')) nml = usr = 0;              /* -x: mon */
-else if (sw & SWMASK ('U')) nml = 0, usr = 1;           /* -u: user */
-else if (!(sw & SWMASK ('V'))) return va;               /* -v: curr */
+if (sw & SWMASK ('N'))                                  /* -n: normal */
+    nml = 1; 
+else if (sw & SWMASK ('X'))                             /* -x: mon */
+    nml = usr = 0;
+else if (sw & SWMASK ('U')) {                           /* -u: user */
+    nml = 0;
+    usr = 1;
+    }
+else if (!(sw & SWMASK ('V')))                          /* -v: curr */
+    return va;
 set_dyn_map ();
 if (nml) {                                              /* normal? */
-    if (va < 020000) pa = va;                           /* first 8K: 1 for 1 */
-    else if (va < 030000) pa = va + em2_dyn;            /* next 4K: ext EM2 */
+    if (va < 020000)                                    /* first 8K: 1 for 1 */
+        pa = va;
+    else if (va < 030000)                               /* next 4K: ext EM2 */
+        pa = va + em2_dyn;
     else pa = va + em3_dyn;                             /* next 4K: ext EM3 */
     }
 else {
     pgn = VA_GETPN (va);                                /* get page no */
     map = usr? usr_map[pgn]: mon_map[pgn];              /* get map entry */
-    if (map == MAP_PROT) return MAXMEMSIZE + 1;         /* no access page? */
+    if (map == MAP_PROT)                                /* no access page? */
+        return MAXMEMSIZE + 1;
     pa = (map & ~MAP_PROT) | (va & VA_POFF);            /* map address */
     }
 return pa;
@@ -1066,16 +1227,19 @@ return pa;
 uint32 Add24 (uint32 s1, uint32 s2, uint32 cin)
 {
 uint32 t = s1 + s2 + cin;                               /* add with carry in */
-if (t > DMASK) X = X | SIGN;                            /* carry to X<0> */
+if (t > DMASK)                                          /* carry to X<0> */
+    X = X | SIGN;
 else X = X & ~SIGN;
-if (((s1 ^ ~s2) & (s1 ^ t)) & SIGN) OV = 1;             /* overflow */
+if (((s1 ^ ~s2) & (s1 ^ t))                             /* overflow */
+        & SIGN) OV = 1;
 return t & DMASK;
 }
 
 uint32 AddM24 (uint32 s1, uint32 s2)
 {
 uint32 t = s1 + s2;                                     /* add */
-if (((s1 ^ ~s2) & (s1 ^ t)) & SIGN) OV = 1;             /* overflow */
+if (((s1 ^ ~s2) & (s1 ^ t)) & SIGN)                     /* overflow */
+    OV = 1;
 return t & DMASK;
 }
 
@@ -1102,7 +1266,8 @@ if ((s1 ^ s2) & SIGN) {
     B = ((B ^ DMASK) + 1) & DMASK;
     A = ((A ^ DMASK) + (B == 0)) & DMASK;
     }
-else if (A & SIGN) OV = 1;
+else if (A & SIGN)
+    OV = 1;
 return;
 }
 
@@ -1126,7 +1291,8 @@ if (TSTS (dvdh)) {                                      /* dvd < 0? */
     }
 if ((dvdh > dvr) ||                                     /* divide fail? */
    ((dvdh == dvr) && dvdl) ||
-   ((dvdh == dvr) && !TSTS (ar ^ m))) OV = 1;
+   ((dvdh == dvr) && !TSTS (ar ^ m)))
+   OV = 1;
 dvdh = (dvdh - dvr) & DMASK;                            /* initial sub */
 for (i = 0; i < 23; i++) {                              /* 23 iterations */
     quo = (quo << 1) | ((dvdh >> 23) ^ 1);              /* quo bit = ~sign */
@@ -1137,11 +1303,14 @@ for (i = 0; i < 23; i++) {                              /* 23 iterations */
     else dvdh = (dvdh + dvr) & DMASK;                   /* sign was -, add */
     }
 quo = quo << 1;                                         /* shift quo */
-if (dvdh & SIGN) dvdh = (dvdh + dvr) & DMASK;           /* last op -? restore */
+if (dvdh & SIGN)                                        /* last op -? restore */
+    dvdh = (dvdh + dvr) & DMASK;
 else quo = quo | 1;                                     /* +, set quo bit */
-if (TSTS (ar ^ m)) A = NEG (quo);                       /* sign of quo */
+if (TSTS (ar ^ m))                                      /* sign of quo */
+    A = NEG (quo);
 else A = quo;                                           /* A = quo */
-if (TSTS (ar)) B = NEG (dvdh);                          /* sign of rem */
+if (TSTS (ar))                                          /* sign of rem */
+    B = NEG (dvdh);
 else B = dvdh;                                          /* B = rem */
 return;
 }
@@ -1164,7 +1333,8 @@ return;
 
 void ShfR48 (uint32 sc, uint32 sgn)
 {
-if (sc >= 48) A = B = sgn;
+if (sc >= 48)
+    A = B = sgn;
 if (sc >= 24) {
     sc = sc - 24;
     B = ((A >> sc) | (sgn << (24 - sc))) & DMASK;
@@ -1228,8 +1398,10 @@ mon_map[4] = ((EM2 & 07) << 12);
 mon_map[5] = ((EM2 & 07) << 12) + (1 << VA_V_PN);
 mon_map[6] = (RL4 << 5) & MAP_PAGE;
 mon_map[7] = (RL4 << 11) & MAP_PAGE;
-if (mon_map[6] == 0) mon_map[6] = MAP_PROT;
-if (mon_map[7] == 0) mon_map[7] = MAP_PROT;
+if (mon_map[6] == 0)
+    mon_map[6] = MAP_PROT;
+if (mon_map[7] == 0)
+    mon_map[7] = MAP_PROT;
 return;
 }
 
@@ -1241,7 +1413,8 @@ uint32 i, t;
 
 t = (int_req & ~1) & api_mask[api_lvlhi];               /* unmasked int */
 for (i = 31; t && (i > 0); i--) {                       /* find highest */
-    if ((t >> i) & 1) return i;
+    if ((t >> i) & 1)
+        return i;
     }
 return 0;                                               /* none */
 }
@@ -1284,7 +1457,8 @@ api_lvl = 0;
 api_lvlhi = 0;
 alert = 0;
 pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
@@ -1297,9 +1471,12 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 uint32 pa;
 
 pa = RelocC (addr, sw);
-if (pa > MAXMEMSIZE) return SCPE_REL;
-if (pa >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = M[pa] & DMASK;
+if (pa > MAXMEMSIZE)
+    return SCPE_REL;
+if (pa >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = M[pa] & DMASK;
 return SCPE_OK;
 }
 
@@ -1310,8 +1487,10 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 uint32 pa;
 
 pa = RelocC (addr, sw);
-if (pa > MAXMEMSIZE) return SCPE_REL;
-if (pa >= MEMSIZE) return SCPE_NXM;
+if (pa > MAXMEMSIZE)
+    return SCPE_REL;
+if (pa >= MEMSIZE)
+    return SCPE_NXM;
 M[pa] = val & DMASK;
 return SCPE_OK;
 }
@@ -1325,11 +1504,13 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 037777) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
+for (i = val; i < MEMSIZE; i++)
+    mc = mc | M[i];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE; i++) M[i] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE; i++)
+    M[i] = 0;
 return SCPE_OK;
 }
 
@@ -1342,9 +1523,11 @@ extern DEVICE drm_dev, mux_dev, muxl_dev;
 extern UNIT drm_unit, mux_unit;
 extern DIB mux_dib;
 
-if ((cpu_unit.flags & UNIT_GENIE) == (uint32) val) return SCPE_OK;
+if ((cpu_unit.flags & UNIT_GENIE) == (uint32) val)
+    return SCPE_OK;
 if ((drm_unit.flags & UNIT_ATT) ||                      /* attached? */
-    (mux_unit.flags & UNIT_ATT)) return SCPE_NOFNC;     /* can't do it */
+    (mux_unit.flags & UNIT_ATT))                        /* can't do it */
+    return SCPE_NOFNC;
 if (val) {                                              /* Genie? */
     drm_dev.flags = drm_dev.flags & ~DEV_DIS;           /* enb drum */
     mux_dev.flags = mux_dev.flags & ~DEV_DIS;           /* enb mux */
@@ -1367,7 +1550,8 @@ return SCPE_OK;
 
 t_stat rtc_svc (UNIT *uptr)
 {
-if (rtc_pie) int_req = int_req | INT_RTCP;              /* set pulse intr */
+if (rtc_pie)                                            /* set pulse intr */
+    int_req = int_req | INT_RTCP;
 sim_activate (&rtc_unit, sim_rtcn_calb (rtc_tps, TMR_RTC)); /* reactivate */
 return SCPE_OK;
 }
@@ -1380,14 +1564,20 @@ uint32 op, dat, val, va;
 t_stat r;
 
 op = I_GETOP (inst);                                    /* get opcode */
-if (op == MIN) val = 1;                                 /* incr */
-else if (op == SKR) val = DMASK;                        /* decr */
+if (op == MIN)                                          /* incr */
+    val = 1;
+else if (op == SKR)                                     /* decr */
+    val = DMASK;
 else return STOP_RTCINS;                                /* can't do it */
-if (r = Ea (inst, &va)) return r;                       /* decode eff addr */
-if (r = Read (va, &dat)) return r;                      /* get operand */
+if (r = Ea (inst, &va))                                 /* decode eff addr */
+    return r;
+if (r = Read (va, &dat))                                /* get operand */
+    return r;
 dat = AddM24 (dat, val);                                /* mem +/- 1 */
-if (r = Write (va, dat)) return r;                      /* rewrite */
-if (dat == 0) int_req = int_req | INT_RTCS;             /* set clk sync int */
+if (r = Write (va, dat))                                /* rewrite */
+    return r;
+if (dat == 0)                                           /* set clk sync int */
+    int_req = int_req | INT_RTCS;
 return SCPE_OK;
 }
 
@@ -1404,8 +1594,10 @@ return SCPE_OK;
 
 t_stat rtc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val != 50) && (val != 60)) return SCPE_IERR;
+if (cptr)
+    return SCPE_ARG;
+if ((val != 50) && (val != 60))
+    return SCPE_IERR;
 rtc_tps = val;
 return SCPE_OK;
 }
@@ -1423,7 +1615,8 @@ return SCPE_OK;
 void inst_hist (uint32 ir, uint32 pc, uint32 tp)
 {
 hst_p = (hst_p + 1);                                    /* next entry */
-if (hst_p >= hst_lnt) hst_p = 0;
+if (hst_p >= hst_lnt)
+    hst_p = 0;
 hst[hst_p].typ = tp | (OV << 4);
 hst[hst_p].pc = pc;
 hst[hst_p].ir = ir;
@@ -1442,12 +1635,14 @@ int32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].typ = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].typ = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (int32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -1456,7 +1651,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -1475,14 +1671,17 @@ extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 static char *cyc[] = { "   ", "   ", "INT", "TRP" };
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "CYC PC    OV A        B        X        EA      IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(++di) % hst_lnt];                         /* entry pointer */
@@ -1490,7 +1689,8 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         ov = (h->typ >> 4) & 1;                         /* overflow */
         fprintf (st, "%s %05o %o  %08o %08o %08o ", cyc[h->typ & 3],
             h->pc, ov, h->a, h->b, h->x);
-        if (h->ea & HIST_NOEA) fprintf (st, "      ");
+        if (h->ea & HIST_NOEA)
+            fprintf (st, "      ");
         else fprintf (st, "%05o ", h->ea);
         sim_eval = h->ir;
         if ((fprint_sym (st, h->pc, &sim_eval, &cpu_unit, SWMASK ('M'))) > 0)

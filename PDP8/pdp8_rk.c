@@ -1,6 +1,6 @@
 /* pdp8_rk.c: RK8E cartridge disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -222,18 +222,21 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         case RKX_CLC:                                   /* clear control */
             rk_cmd = rk_busy = 0;                       /* clear registers */
             rk_ma = rk_da = 0;
-            for (i = 0; i < RK_NUMDR; i++) sim_cancel (&rk_unit[i]);
+            for (i = 0; i < RK_NUMDR; i++)
+                sim_cancel (&rk_unit[i]);
             break;
 
         case RKX_CLD:                                   /* reset drive */
-            if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
+            if (rk_busy != 0)
+                rk_sta = rk_sta | RKS_BUSY;
             else rk_go (RKC_SEEK, 0);                   /* seek to 0 */
             break;
             }                                           /* end switch AC */
         break;
 
     case 3:                                             /* DLAG */
-        if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
+        if (rk_busy != 0)
+            rk_sta = rk_sta | RKS_BUSY;
         else {
             rk_da = AC;                                 /* load disk addr */
             rk_go (GET_FUNC (rk_cmd), GET_CYL (rk_cmd, rk_da));
@@ -241,19 +244,23 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         break;
 
     case 4:                                             /* DLCA */
-        if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
+        if (rk_busy != 0)
+            rk_sta = rk_sta | RKS_BUSY;
         else rk_ma = AC;                                /* load curr addr */
         break;
 
     case 5:                                             /* DRST */
         uptr = rk_dev.units + GET_DRIVE (rk_cmd);       /* selected unit */
         rk_sta = rk_sta & ~(RKS_HMOV + RKS_NRDY);       /* clear dynamic */
-        if ((uptr->flags & UNIT_ATT) == 0) rk_sta = rk_sta | RKS_NRDY;
-        if (sim_is_active (uptr)) rk_sta = rk_sta | RKS_HMOV;
+        if ((uptr->flags & UNIT_ATT) == 0)
+            rk_sta = rk_sta | RKS_NRDY;
+        if (sim_is_active (uptr))
+            rk_sta = rk_sta | RKS_HMOV;
         return rk_sta;
 
     case 6:                                             /* DLDC */
-        if (rk_busy != 0) rk_sta = rk_sta | RKS_BUSY;
+        if (rk_busy != 0)
+            rk_sta = rk_sta | RKS_BUSY;
         else {
             rk_cmd = AC;                                /* load command */
             rk_sta = 0;                                 /* clear status */
@@ -282,8 +289,10 @@ void rk_go (int32 func, int32 cyl)
 int32 t;
 UNIT *uptr;
 
-if (func == RKC_RALL) func = RKC_READ;                  /* all? use standard */
-if (func == RKC_WALL) func = RKC_WRITE;
+if (func == RKC_RALL)                                   /* all? use standard */
+    func = RKC_READ;
+if (func == RKC_WALL)
+func = RKC_WRITE;
 uptr = rk_dev.units + GET_DRIVE (rk_cmd);               /* selected unit */
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     rk_sta = rk_sta | RKS_DONE | RKS_NRDY | RKS_STAT;
@@ -359,17 +368,20 @@ if ((uptr->FUNC == RKC_WRITE) && (uptr->flags & UNIT_WPRT)) {
 pa = GET_MEX (rk_cmd) | rk_ma;                          /* phys address */
 da = GET_DA (rk_cmd, rk_da) * RK_NUMWD * sizeof (int16);/* disk address */
 swc = wc = (rk_cmd & RKC_HALF)? RK_NUMWD / 2: RK_NUMWD; /* get transfer size */
-if ((wc1 = ((rk_ma + wc) - 010000)) > 0) wc = wc - wc1; /* if wrap, limit */
+if ((wc1 = ((rk_ma + wc) - 010000)) > 0)                /* if wrap, limit */
+    wc = wc - wc1;
 err = fseek (uptr->fileref, da, SEEK_SET);              /* locate sector */
 
 if ((uptr->FUNC == RKC_READ) && (err == 0) && MEM_ADDR_OK (pa)) { /* read? */
     awc = fxread (&M[pa], sizeof (int16), wc, uptr->fileref);
-    for ( ; awc < wc; awc++) M[pa + awc] = 0;           /* fill if eof */
+    for ( ; awc < wc; awc++)                            /* fill if eof */
+        M[pa + awc] = 0;
     err = ferror (uptr->fileref);
     if ((wc1 > 0) && (err == 0))  {                     /* field wraparound? */
         pa = pa & 070000;                               /* wrap phys addr */
         awc = fxread (&M[pa], sizeof (int16), wc1, uptr->fileref);
-        for ( ; awc < wc1; awc++) M[pa + awc] = 0;      /* fill if eof */
+        for ( ; awc < wc1; awc++)                       /* fill if eof */
+            M[pa + awc] = 0;
         err = ferror (uptr->fileref);
         }
     }
@@ -441,8 +453,10 @@ t_stat rk_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 saved_PC;
 
-if (rk_dib.dev != DEV_RK) return STOP_NOTSTD;           /* only std devno */
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+if (rk_dib.dev != DEV_RK)                               /* only std devno */
+    return STOP_NOTSTD;
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 M[BOOT_UNIT] = (unitno & RK_M_NUMDR) << 1;
 saved_PC = BOOT_START;
 return SCPE_OK;

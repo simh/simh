@@ -1,6 +1,6 @@
 /* id_ttp.c: Interdata PASLA console interface
 
-   Copyright (c) 2000-2007, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -151,8 +151,10 @@ switch (op) {                                           /* case IO op */
         if (xmt) t = ttp_sta & STA_XMT;                 /* xmt? just busy */
         else {                                          /* rcv */
             t = ttp_sta & STA_RCV;                      /* get static */
-            if (!ttp_kchp) t = t | STA_BSY;             /* no char? busy */
-            if (t & SET_EX) t = t | STA_EX;             /* test for ex */
+            if (!ttp_kchp)                              /* no char? busy */
+                t = t | STA_BSY;
+            if (t & SET_EX)                             /* test for ex */
+                t = t | STA_EX;
             }
         return t;
 
@@ -179,10 +181,13 @@ int32 c, out;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_poll));   /* continue poll */
 ttp_sta = ttp_sta & ~STA_FR;                            /* clear break */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
 ttp_sta = ttp_sta & ~STA_PF;                            /* clear parity err */
-if (ttp_kchp) ttp_sta = ttp_sta | STA_OVR;              /* overrun? */
-if (ttp_karm) SET_INT (v_TTP);
+if (ttp_kchp)                                           /* overrun? */
+    ttp_sta = ttp_sta | STA_OVR;
+if (ttp_karm)
+    SET_INT (v_TTP);
 if (c & SCPE_BREAK) {                                   /* break? */
     ttp_sta = ttp_sta | STA_FR;                         /* framing error */
     uptr->buf = 0;                                      /* no character */
@@ -197,7 +202,8 @@ else {
     ttp_kchp = 1;                                       /* char pending */
     if (ttp_cmd & CMD_ECHO) {
         out = sim_tt_outcvt (out, TT_GET_MODE (uptr->flags));
-        if (c >= 0) sim_putchar (out);
+        if (c >= 0)
+            sim_putchar (out);
         ttp_unit[TTO].pos = ttp_unit[TTO].pos + 1;
         }
     }
@@ -219,7 +225,8 @@ if (c >= 0) {
         }
     }
 ttp_sta = ttp_sta & ~STA_BSY;                           /* not busy */
-if (ttp_tarm) SET_INT (v_TTP + 1);                      /* set intr */
+if (ttp_tarm)                                           /* set intr */
+    SET_INT (v_TTP + 1);
 uptr->pos = uptr->pos + 1;                              /* incr count */
 return SCPE_OK;
 }
@@ -228,7 +235,8 @@ return SCPE_OK;
 
 t_stat ttp_reset (DEVICE *dptr)
 {
-if (dptr->flags & DEV_DIS) sim_cancel (&ttp_unit[TTI]);
+if (dptr->flags & DEV_DIS)
+    sim_cancel (&ttp_unit[TTI]);
 else sim_activate_abs (&ttp_unit[TTI], KBD_WAIT (ttp_unit[TTI].wait, lfc_poll));
 sim_cancel (&ttp_unit[TTO]);
 CLR_INT (v_TTP);                                        /* clear int */
@@ -247,7 +255,8 @@ return SCPE_OK;
 t_stat ttp_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 ttp_unit[TTO].flags = (ttp_unit[TTO].flags & ~TT_MODE) | val;
-if (val == TT_MODE_7P) val = TT_MODE_7B;
+if (val == TT_MODE_7P)
+    val = TT_MODE_7B;
 ttp_unit[TTI].flags = (ttp_unit[TTI].flags & ~TT_MODE) | val;
 return SCPE_OK;
 }
@@ -256,9 +265,11 @@ return SCPE_OK;
 
 t_stat ttp_set_break (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (ttp_dev.flags & DEV_DIS) return SCPE_NOFNC;
+if (ttp_dev.flags & DEV_DIS)
+    return SCPE_NOFNC;
 ttp_sta = ttp_sta | STA_FR;
-if (ttp_karm) SET_INT (v_TTP);                          /* if armed, intr */
+if (ttp_karm)                                           /* if armed, intr */
+    SET_INT (v_TTP);
 sim_cancel (&ttp_unit[TTI]);                            /* restart TT poll */
 sim_activate (&ttp_unit[TTI], ttp_unit[TTI].wait);
 return SCPE_OK;

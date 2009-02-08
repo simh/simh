@@ -1,6 +1,6 @@
 /* id_idc.c: Interdata MSM/IDC disk controller simulator
 
-   Copyright (c) 2001-2006, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -375,7 +375,8 @@ switch (op) {                                           /* case IO op */
 
     case IO_SS:                                         /* status */
         t = idc_sta & STC_MASK;                         /* get status */
-        if (t & SETC_EX) t = t | STA_EX;                /* test for EX */
+        if (t & SETC_EX)                                /* test for EX */
+            t = t | STA_EX;
         return t;
 
     case IO_OC:                                         /* command */
@@ -437,13 +438,15 @@ uint32 id (uint32 dev, uint32 op, uint32 dat)
 uint32 t, u, f;
 UNIT *uptr;
 
-if (dev == idc_dib.dno) return idc (dev, op, dat);      /* controller? */
+if (dev == idc_dib.dno)                                 /* controller? */
+    return idc (dev, op, dat);
 u = (dev - idc_dib.dno - o_ID0) / o_ID0;                /* get unit num */
 uptr = idc_dev.units + u;                               /* get unit ptr */
 switch (op) {                                           /* case IO op */
 
     case IO_ADR:                                        /* select */
-        if (idc_sta & STC_IDL) idc_svun = u;            /* idle? save unit */
+        if (idc_sta & STC_IDL)                          /* idle? save unit */
+            idc_svun = u;
         return BY;                                      /* byte only */
 
     case IO_RD:                                         /* read data */
@@ -463,7 +466,8 @@ switch (op) {                                           /* case IO op */
             (sim_is_active (uptr)? STD_NRDY: 0) |
             (uptr->STD & STD_UST);
         else t = STD_NRDY | STD_OFFL;                   /* off = X'09' */
-        if (t & SETD_EX) t = t | STA_EX;                /* test for ex */
+        if (t & SETD_EX)                                /* test for ex */
+            t = t | STA_EX;
         return t;
 
     case IO_OC:                                         /* command */
@@ -475,7 +479,8 @@ switch (op) {                                           /* case IO op */
         if ((f == 0) ||                                 /* if nop, */
             (f == CMDX_MASK) ||                         /* 0x30, */
             !(idc_sta & STC_IDL) ||                     /* !idle, */
-            sim_is_active (uptr)) break;                /* unit busy, ignore */
+            sim_is_active (uptr))                       /* unit busy, ignore */
+            break;
         uptr->FNC = f | CMC_DRV;                        /* save cmd */
         idc_sta = idc_sta & ~STC_IDL;                   /* clr idle */
         sim_activate (uptr, idc_ctime);                 /* schedule */
@@ -509,7 +514,8 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
                 SET_INT (v_IDC + u + 1);                /* req intr */
             else idd_sirq |= (1 << (v_IDC + u + 1));    /* def intr */
             }
-        if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;
+        if ((uptr->flags & UNIT_ATT) == 0)
+            return SCPE_OK;
         if (((f & CMDX_MASK) == 0) &&                   /* seek? */
             (f & (CMD_SK | CMD_RST))) {
             if (idd_dcy[u] >= drv_tab[dtype].cyl)       /* bad cylinder? */
@@ -527,7 +533,8 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
                 sim_activate (uptr, idc_ctime);
             }
         else if (f >= CMDF_SCY) {                       /* tag? */
-            if (f & CMDF_SHD) uptr->HD = idd_db & HD_MASK;
+            if (f & CMDF_SHD)
+                uptr->HD = idd_db & HD_MASK;
             else if (f & CMDF_SCY) {
                 if (idd_db >= drv_tab[dtype].cyl)       /* bad cylinder? */
                     uptr->STD = uptr->STD | STD_SKI;    /* set seek inc */
@@ -535,7 +542,8 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
                 }
             }
         else if (f & (CMD_SK | CMD_RST)) {              /* seek? */
-            if (f == CMD_RST) idd_dcy[u] = 0;           /* restore? */
+            if (f == CMD_RST)                           /* restore? */
+                idd_dcy[u] = 0;
             if (idd_dcy[u] >= drv_tab[dtype].cyl) {     /* bad cylinder? */
                 uptr->STD = uptr->STD | STD_SKI;        /* set seek inc */
                 idd_dcy[u] = uptr->CYL;                 /* no motion */
@@ -544,8 +552,10 @@ if (uptr->FNC & CMC_DRV) {                              /* drive cmd? */
             else {                                      /* cylinder ok */
                 uptr->STD = uptr->STD & ~STD_SKI;       /* clr seek inc */
                 diff = idd_dcy[u] - uptr->CYL;
-                if (diff < 0) diff = -diff;             /* ABS cyl diff */
-                else if (diff == 0) diff = 1;           /* must be nz */
+                if (diff < 0)                           /* ABS cyl diff */
+                    diff = -diff;
+                else if (diff == 0)                     /* must be nz */
+                    diff = 1;
                 sim_activate (uptr, diff * idc_stime);
                 }
             }
@@ -564,10 +574,12 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
 #endif
     case CMC_RD:                                        /* read */
         if (sch_actv (idc_dib.sch, idc_dib.dno)) {      /* sch transfer? */
-            if (idc_dter (uptr, idc_1st)) return SCPE_OK; /* dte? done */
-            if (r = idc_rds (uptr)) return r;           /* read sec, err? */
+            if (idc_dter (uptr, idc_1st))               /* dte? done */
+                return SCPE_OK;
+            if (r = idc_rds (uptr))                     /* read sec, err? */
+                return r;
             idc_1st = 0;
-            t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY);      /* write mem */
+            t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
                 sim_activate (uptr, idc_rtime);         /* reschedule */
                 return SCPE_OK;
@@ -577,12 +589,14 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
         idc_sta = idc_sta | STC_DTE;                    /* cant work */
         break;
 
-    case CMC_WR:                                                /* write */
+    case CMC_WR:                                        /* write */
         if (sch_actv (idc_dib.sch, idc_dib.dno)) {      /* sch transfer? */
-            if (idc_dter (uptr, idc_1st)) return SCPE_OK; /* dte? done */
+            if (idc_dter (uptr, idc_1st))               /* dte? done */
+                return SCPE_OK;
             idc_bptr = sch_rdmem (idc_dib.sch, idcxb, IDC_NUMBY); /* read mem */
             idc_db = idcxb[idc_bptr - 1];               /* last byte */
-            if (r = idc_wds (uptr)) return r;           /* write sec, err? */
+            if (r = idc_wds (uptr))                     /* write sec, err? */
+                return r;
             idc_1st = 0;
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       
                 sim_activate (uptr, idc_rtime);         /* reschedule */
@@ -649,7 +663,8 @@ if (ferror (uptr->fileref)) {                           /* error? */
     idc_done (STC_DTE);
     return SCPE_IOERR;
     }
-for ( ; i < IDC_NUMBY; i++) idcxb[i] = 0;               /* fill with 0's */
+for ( ; i < IDC_NUMBY; i++)                             /* fill with 0's */
+    idcxb[i] = 0;
 return SCPE_OK;
 }
 
@@ -704,7 +719,8 @@ if (hd >= drv_tab[dtype].surf) {                        /* bad head? */
 sa = GET_SA (cy, hd, sc, dtype);                        /* curr disk addr */
 fseek (uptr->fileref, sa * IDC_NUMBY, SEEK_SET);        /* seek to pos */
 idc_sec = (idc_sec + 1) & SC_MASK;                      /* incr disk addr */
-if (idc_sec == 0) uptr->HD = uptr->HD + 1;
+if (idc_sec == 0)
+    uptr->HD = uptr->HD + 1;
 return FALSE;
 }
 
@@ -713,10 +729,12 @@ return FALSE;
 void idc_done (uint32 flg)
 {
 idc_sta = (idc_sta | STC_IDL | flg) & ~STA_BSY;         /* set flag, idle */
-if (idc_arm) SET_INT (v_IDC);                           /* if armed,  intr */
+if (idc_arm)                                            /* if armed,  intr */
+    SET_INT (v_IDC);
 int_req[l_IDC] = int_req[l_IDC] | idd_sirq;             /* restore drv ints */
 idd_sirq = 0;                                           /* clear saved */
-if (flg) sch_stop (idc_dib.sch);                        /* if err, stop sch */
+if (flg)                                                /* if err, stop sch */
+    sch_stop (idc_dib.sch);
 return;
 }
 
@@ -760,10 +778,13 @@ t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);                           /* attach unit */
-if (r != SCPE_OK) return r;                             /* error? */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 uptr->CYL = 0;
-if ((uptr->flags & UNIT_AUTO) == 0) return SCPE_OK;     /* autosize? */
-if ((p = ftell (uptr->fileref)) == 0) return SCPE_OK;
+if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
+    return SCPE_OK;
+if ((p = ftell (uptr->fileref)) == 0)
+    return SCPE_OK;
 for (i = 0; drv_tab[i].surf != 0; i++) {
     if (p <= drv_tab[i].size) {
         uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (i << UNIT_V_DTYPE);
@@ -778,7 +799,8 @@ return SCPE_OK;
 
 t_stat idc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = drv_tab[GET_DTYPE (val)].size;
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* i7094_clk.c: IBM 7094 clock
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -70,7 +70,8 @@ if ((clk_dev.flags & DEV_DIS) == 0) {                   /* clock enabled? */
     ctr = ReadP (CLK_CTR);
     ctr = (ctr + 1) & DMASK;                            /* increment */
     WriteP (CLK_CTR, ctr);
-    if ((ctr & MMASK) == 0) chtr_clk = 1;               /* overflow? req trap */
+    if ((ctr & MMASK) == 0)                             /* overflow? req trap */
+        chtr_clk = 1;
     sim_activate (uptr, sim_rtcn_calb (CLK_TPS, TMR_CLK)); /* reactivate unit */
     }
 return SCPE_OK;
@@ -84,10 +85,12 @@ time_t curtim;
 t_uint64 ctr;
 struct tm *tptr;
 
-if (bufsiz < 12) return 0;
+if (bufsiz < 12)
+    return 0;
 curtim = time (NULL);                                   /* get time */
 tptr = localtime (&curtim);                             /* decompose */
-if (tptr == NULL) return 0;                             /* error? */
+if (tptr == NULL)                                       /* error? */
+    return 0;
 
 buf[0] = bcd_2d (tptr->tm_mon + 1, buf + 1);
 buf[2] = bcd_2d (tptr->tm_mday, buf + 3);
@@ -107,9 +110,12 @@ uint8 d1, d2;
 
 d1 = n / 10;
 d2 = n % 10;
-if (d1 == 0) d1 = BCD_ZERO;
-if (d2 == 0) d2 = BCD_ZERO;
-if (b2 != NULL) *b2 = d2;
+if (d1 == 0)
+    d1 = BCD_ZERO;
+if (d2 == 0)
+    d2 = BCD_ZERO;
+if (b2 != NULL)
+    *b2 = d2;
 return d1;
 }
 
@@ -118,7 +124,8 @@ return d1;
 t_stat clk_reset (DEVICE *dptr)
 {
 chtr_clk = 0;
-if (clk_dev.flags & DEV_DIS) sim_cancel (&clk_unit);
+if (clk_dev.flags & DEV_DIS)
+    sim_cancel (&clk_unit);
 else sim_activate (&clk_unit, sim_rtcn_init (clk_unit.wait, TMR_CLK));
 return SCPE_OK;
 }

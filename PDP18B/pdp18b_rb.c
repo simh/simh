@@ -1,6 +1,6 @@
 /* pdp18b_rb.c: RB09 fixed head disk simulator
 
-   Copyright (c) 2003-2005, Robert M Supnik
+   Copyright (c) 2003-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -147,27 +147,34 @@ int32 rb71 (int32 dev, int32 pulse, int32 AC)
 int32 tow, t, sb = pulse & 060;
 
 if (pulse & 001) {
-    if (sb == 000) rb_sta = rb_sta &                    /* DBCF */
-        ~(RBS_ERR | RBS_EFLGS | RBS_DON);
+    if (sb == 000)                                      /* DBCF */
+        rb_sta = rb_sta & ~(RBS_ERR | RBS_EFLGS | RBS_DON);
     if ((sb == 020) && (rb_sta & (RBS_ERR | RBS_DON)))
         AC = AC | IOT_SKP;                              /* DBSF */
-    if (sb == 040) rb_sta = 0;                          /* DBCS */
+    if (sb == 040)                                      /* DBCS */
+        rb_sta = 0;
     }
 if (pulse & 002) {
-    if (sb == 000) AC = AC | rb_make_da (rb_da);        /* DBRD */
-    if (sb == 020) AC = AC | rb_sta;                    /* DBRS */
-    if (sb == 040) rb_ma = AC & AMASK;                  /* DBLM */
+    if (sb == 000)                                      /* DBRD */
+        AC = AC | rb_make_da (rb_da);
+    if (sb == 020)                                      /* DBRS */
+        AC = AC | rb_sta;
+    if (sb == 040)                                      /* DBLM */
+        rb_ma = AC & AMASK;
     }
 if (pulse & 004) {
-    if (sb == 000) rb_da = rb_set_da (AC, rb_da);       /* DBLD */
-    if (sb == 020) rb_wc = AC & 0177777;                /* DBLW */
+    if (sb == 000)                                      /* DBLD */
+        rb_da = rb_set_da (AC, rb_da);
+    if (sb == 020)                                      /* DBLW */
+        rb_wc = AC & 0177777;
     if (sb == 040) {                                    /* DBLS */
         rb_sta = (rb_sta & RBS_XOR) ^ (AC & ~RBS_MBZ);
         if (rb_sta & RBS_BSY) {                         /* busy set? */
             if (!sim_is_active (&rb_unit)) {            /* schedule */
                 tow = rb_da % (RB_NUMSC * RB_NUMWD);
                 t = tow - GET_POS (rb_time);
-                if (t < 0) t = t + (RB_NUMSC * RB_NUMWD);
+                if (t < 0)
+                    t = t + (RB_NUMSC * RB_NUMWD);
                 sim_activate (&rb_unit, t * rb_time);
                 }
             }
@@ -220,7 +227,8 @@ int32 d, i, r;
 
 for (r = 0, i = 1; bcd != 0; bcd = bcd >> 4) {          /* while nz */
     d = bcd & 0xF;                                      /* bcd digit */
-    if (d >= 10) return -1;                             /* invalid? */
+    if (d >= 10)                                        /* invalid? */
+        return -1;
     r = r + (d * i);                                    /* insert bin */
     i = i * 10;
     }
@@ -248,8 +256,9 @@ do {
             break;
             }
         else {                                          /* not locked */
-                fbuf[rb_da] = M[rb_ma];                 /* write word */
-            if (((t_addr) rb_da) >= uptr->hwmark) uptr->hwmark = rb_da + 1;
+            fbuf[rb_da] = M[rb_ma];                     /* write word */
+            if (((t_addr) rb_da) >= uptr->hwmark)
+                uptr->hwmark = rb_da + 1;
             }
         }
     else if (MEM_ADDR_OK (rb_ma))                       /* read, valid addr? */
@@ -257,7 +266,8 @@ do {
     rb_wc = (rb_wc + 1) & 0177777;                      /* incr word count */
         rb_ma = (rb_ma + 1) & AMASK;                    /* incr mem addr */
     rb_da = rb_da + 1;                                  /* incr disk addr */
-    if (rb_da > RB_SIZE) rb_da = 0;                     /* disk wraparound? */
+    if (rb_da > RB_SIZE)                                /* disk wraparound? */
+        rb_da = 0;
     } while ((rb_wc != 0) && (rb_burst != 0));          /* brk if wc, no brst */
 
 if ((rb_wc != 0) && ((rb_sta & RBS_ERR) == 0))          /* more to do? */
@@ -271,8 +281,10 @@ return SCPE_OK;
 int32 rb_updsta (int32 new)
 {
 rb_sta = (rb_sta | new) & ~(RBS_ERR | RBS_MBZ);         /* clear err, mbz */
-if (rb_sta & RBS_EFLGS) rb_sta = rb_sta | RBS_ERR;      /* error? */
-if (rb_sta & RBS_DON) rb_sta = rb_sta & ~RBS_BSY;       /* done? clear busy */
+if (rb_sta & RBS_EFLGS)                                 /* error? */
+    rb_sta = rb_sta | RBS_ERR;
+if (rb_sta & RBS_DON)                                   /* done? clear busy */
+    rb_sta = rb_sta & ~RBS_BSY;
 if ((rb_sta & (RBS_ERR | RBS_DON)) && (rb_sta & RBS_IE))
      SET_INT (RB);                                      /* set or clr intr */
 else CLR_INT (RB);

@@ -1,6 +1,6 @@
 /* lgp_stddev.c: LGP-30 standard devices
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
    tto          typewriter output (printer and punch)
    ptr          high speed reader
    ptpp         high speed punch
+
+   26-Nov-2008  RMS     Changed encode character from # to !
 */
 
 #include "lgp_defs.h"
@@ -103,7 +105,7 @@ const int32 ascii_to_flex[128] = {
     061, 021, 062, 066, 006, 035, 031, 043,
     041, 072, 015, 075, 055, 051, 037, 076,
     047, 011, 001, 033, -1 , 027, 022, 007,
-    - 1, 071, 005, 065, 025, 045, 052, 056,
+    -1,  071, 005, 065, 025, 045, 052, 056,
     061, 021, 062, 066, 006, 035, 031, 043,
     041, 072, 015, 075, 055, 051, 037, 076,
     047, 011, 001, -1 , 014, -1 , 036, 077
@@ -309,7 +311,8 @@ switch (dev) {                                          /* case on device */
         break;
 
     case DEV_TT:                                        /* tti/ttr */
-        if (Q_MANI) sim_putchar ('`');                  /* manual input? */
+        if (Q_MANI)                                     /* manual input? */
+            sim_putchar ('`');
         else sim_activate (&tti_unit[1], tt_wait);      /* no, must be ttr */
         break;
         }
@@ -318,13 +321,15 @@ return;
 
 t_stat op_i (uint32 dev, uint32 ch, uint32 sh4)
 {
-if (Q_LGP21 && out_strt) return STOP_STALL;             /* LGP-21? must be idle */
+if (Q_LGP21 && out_strt)                                /* LGP-21? must be idle */
+    return STOP_STALL;
 if (!inp_strt) {                                        /* input started? */
     inp_strt = 1;                                       /* no, set start */
     inp_done = 0;                                       /* clear done */
     A = shift_in (A, ch, sh4);
     tti_rdy = ptr_rdy = 0;                              /* no input */
-    if (Q_LGP21 || Q_INPT) op_i_strt (dev);             /* LGP-21 or PTR? start */
+    if (Q_LGP21 || Q_INPT)                              /* LGP-21 or PTR? start */
+        op_i_strt (dev);
     }
 switch (dev) {                                          /* case on device */
 
@@ -364,7 +369,8 @@ t_stat tti_svc (UNIT *uptr)
 int32 c, flex;
 
 sim_activate (uptr, tt_wait);                           /* continue poll */
-if ((c = sim_poll_kbd ()) < SCPE_KFLAG) return c;       /* no char or error? */
+if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
+    return c;
 flex = ascii_to_flex[c & 0x1FF];                        /* cvt to flex */
 if (flex > 0) {                                         /* it's a typewriter... */
     write_tto (flex);                                   /* always echos */
@@ -373,7 +379,8 @@ if (flex > 0) {                                         /* it's a typewriter... 
     }
 else write_tto ('\a');                                  /* don't echo bad */
 if (Q_MANI && (flex > 0) && flex_inp_valid[flex]) {     /* wanted, valid? */
-    if (flex == FLEX_CSTOP) inp_done = 1;               /* conditional stop? */
+    if (flex == FLEX_CSTOP)                             /* conditional stop? */
+        inp_done = 1;
     else tti_rdy = 1;                                   /* no, set ready */
     tti_buf = flex;                                     /* save char */
     uptr->pos = uptr->pos + 1;
@@ -387,9 +394,11 @@ t_stat ttr_svc (UNIT *uptr)
 {
 t_stat r;
 
-if (r = read_reader (uptr, ttr_stopioe, (int32 *) &tti_buf)) return r;
+if (r = read_reader (uptr, ttr_stopioe, (int32 *) &tti_buf))
+    return r;
 if (!(uptr->flags & UNIT_NOCS) &&                       /* cstop enable? */
-    (tti_buf == FLEX_CSTOP)) inp_done = 1;              /* cond stop? */
+    (tti_buf == FLEX_CSTOP))                            /* cond stop? */
+    inp_done = 1;
 else {
     tti_rdy = 1;                                        /* no, set ready */
     sim_activate (uptr, tt_wait);                       /* cont reading */
@@ -406,8 +415,10 @@ t_stat ptr_svc (UNIT *uptr)
 {
 t_stat r;
 
-if (r = read_reader (uptr, ptr_stopioe, &uptr->buf)) return r;
-if (uptr->buf == FLEX_CSTOP) inp_done = 1;              /* cond stop? */
+if (r = read_reader (uptr, ptr_stopioe, &uptr->buf))
+    return r;
+if (uptr->buf == FLEX_CSTOP)                            /* cond stop? */
+    inp_done = 1;
 else {
     ptr_rdy = 1;                                        /* no, set ready */
     sim_activate (uptr, uptr->wait);                    /* cont reading */
@@ -490,7 +501,8 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
 do {
     if ((ch = getc (uptr->fileref)) == EOF) {           /* read char */
         if (feof (uptr->fileref)) {                     /* err or eof? */
-            if (stop) printf ("Reader end of file\n");
+            if (stop)
+                printf ("Reader end of file\n");
             else return SCPE_OK;
             }
         else perror ("Reader I/O error");
@@ -499,12 +511,13 @@ do {
         }
     if (uptr->flags & UNIT_FLEX)                        /* transposed flex? */
         flex = ((ch << 1) | (ch >> 5)) & 0x3F;          /* undo 612345 */
-    else if (ch == '#') {                               /* encoded? */
+    else if (ch == '!') {                               /* encoded? */
         int32 d1 = getc (uptr->fileref);                /* get 2 digits */
         int32 d2 = getc (uptr->fileref);
         if ((d1 == EOF) || (d2 == EOF)) {               /* error? */
             if (feof (uptr->fileref)) {                 /* eof? */
-                if (stop) printf ("Reader end of file\n");
+                if (stop)
+                    printf ("Reader end of file\n");
                 else return SCPE_OK;
                 }
             else perror ("Reader I/O error");
@@ -526,13 +539,17 @@ t_stat write_tto (int32 flex)
 int32 ch;
 t_stat r;
 
-if (flex == FLEX_UC) tto_uc = 1;                        /* UC? set state */
-else if (flex == FLEX_LC) tto_uc = 0;                   /* LC? set state */
+if (flex == FLEX_UC)                                    /* UC? set state */
+    tto_uc = 1;
+else if (flex == FLEX_LC)                               /* LC? set state */
+    tto_uc = 0;
 else {
-    if (flex == FLEX_BS) ch = '\b';                     /* backspace? */
+    if (flex == FLEX_BS)                                /* backspace? */
+        ch = '\b';
     else ch = flex_to_ascii[flex | (tto_uc << 6)];      /* cvt flex to ascii */
     if (ch > 0) {                                       /* legit? */
-        if (r = sim_putchar_s (ch)) return r;           /* write char */
+        if (r = sim_putchar_s (ch))                     /* write char */
+            return r;
         tto_unit[0].pos = tto_unit[0].pos + 1;
         if (flex == FLEX_CR) {                          /* cr? */
             sim_putchar ('\n');                         /* add lf */
@@ -550,8 +567,9 @@ int32 c, sta;
 if (uptr->flags & UNIT_FLEX)                            /* transposed flex? */
     c = ((flex >> 1) | (flex << 5)) & 0x3F;             /* reorder to 612345 */
 else c = flex_to_ascii[flex];                           /* convert to ASCII */
-if (c >= 0) sta = fputc (c, uptr->fileref);             /* valid? */
-else sta = fprintf (uptr->fileref, "#%02d", flex);      /* no, encode */
+if (c >= 0)                                             /* valid? */
+    sta = fputc (c, uptr->fileref);
+else sta = fprintf (uptr->fileref, "!%02d", flex);      /* no, encode */
 if (sta == EOF) {                                       /* error? */
     perror ("Punch I/O error");                         /* error? */
     clearerr (uptr->fileref);
@@ -601,7 +619,8 @@ t_stat tap_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-if ((r = attach_unit (uptr,cptr)) != SCPE_OK) return r;
+if ((r = attach_unit (uptr,cptr)) != SCPE_OK)
+    return r;
 if ((sim_switches & SWMASK ('F')) ||
     ((uptr->flags & UNIT_FLEX_D) && !(sim_switches & SWMASK ('A'))))
         uptr->flags = uptr->flags | UNIT_FLEX;
@@ -613,7 +632,8 @@ return SCPE_OK;
 
 t_stat tap_attable (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATTABLE) return SCPE_OK;
+if (uptr->flags & UNIT_ATTABLE)
+    return SCPE_OK;
 return SCPE_NOFNC;
 }
 
@@ -622,7 +642,8 @@ return SCPE_NOFNC;
 t_stat tti_rdrss (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if (val) {
-    if ((tti_unit[1].flags & UNIT_ATT) == 0) return SCPE_UNATT;
+    if ((tti_unit[1].flags & UNIT_ATT) == 0)
+        return SCPE_UNATT;
     sim_activate (&tti_unit[1], tt_wait);
     }
 else sim_cancel (&tti_unit[1]);
@@ -636,15 +657,18 @@ t_stat punch_feed (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 cnt;
 t_stat r;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if ((uptr->flags & UNIT_ATT) == 0)
+    return SCPE_UNATT;
 if (cptr) {
     cnt = (int32) get_uint (cptr, 10, 512, &r);
-    if ((r != SCPE_OK) || (cnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (cnt == 0))
+        return SCPE_ARG;
     }
 else cnt = 10;
 while (cnt-- > 0) {
     r = write_punch (uptr, 0);
-    if (r != SCPE_OK) return r;
+    if (r != SCPE_OK)
+        return r;
     }
 return SCPE_OK;
 }
@@ -653,7 +677,9 @@ return SCPE_OK;
 
 t_stat send_start (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (inp_strt) inp_done = 1;
-else if (out_strt) out_done = 1;
+if (inp_strt)
+    inp_done = 1;
+else if (out_strt)
+    out_done = 1;
 return SCPE_OK;
 }

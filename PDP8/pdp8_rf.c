@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -197,7 +197,8 @@ if (pulse & 6) {                                        /* DMAR, DMAW */
     rf_da = rf_da | AC;                                 /* DAR<8:19> |= AC */
     rf_unit.FUNC = pulse & ~1;                          /* save function */
     t = (rf_da & RF_WMASK) - GET_POS (rf_time);         /* delta to new loc */
-    if (t < 0) t = t + RF_NUMWD;                        /* wrap around? */
+    if (t < 0)                                          /* wrap around? */
+        t = t + RF_NUMWD;
     sim_activate (&rf_unit, t * rf_time);               /* schedule op */
     AC = 0;                                             /* clear AC */
     }
@@ -242,13 +243,17 @@ int32 pulse = IR & 07;
 
 UPDATE_PCELL;                                           /* update photocell */
 if (pulse & 1) {                                        /* DFSE */
-    if (rf_sta & RFS_ERR) AC = AC | IOT_SKP;
+    if (rf_sta & RFS_ERR)
+        AC = AC | IOT_SKP;
     }
 if (pulse & 2) {                                        /* DFSC */
-    if (pulse & 4) AC = AC & ~07777;                    /* for DMAC */
-    else if (rf_done) AC = AC | IOT_SKP;
+    if (pulse & 4)                                      /* for DMAC */
+        AC = AC & ~07777;
+    else if (rf_done)
+        AC = AC | IOT_SKP;
     }
-if (pulse & 4) AC = AC | (rf_da & 07777);               /* DMAC */
+if (pulse & 4)                                          /* DMAC */
+    AC = AC | (rf_da & 07777);
 return AC;
 }
 
@@ -281,7 +286,8 @@ switch (pulse) {                                        /* decode IR<9:11> */
         break;
         }                                               /* end switch */
 
-if ((uint32) rf_da >= rf_unit.capac) rf_sta = rf_sta | RFS_NXD;
+if ((uint32) rf_da >= rf_unit.capac)
+    rf_sta = rf_sta | RFS_NXD;
 else rf_sta = rf_sta & ~RFS_NXD;
 RF_INT_UPDATE;
 return AC;
@@ -325,7 +331,8 @@ do {
             rf_sta = rf_sta | RFS_WLS;
         else {                                          /* not locked */
             fbuf[rf_da] = M[pa];						/* write word */
-            if (((uint32) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;
+            if (((uint32) rf_da) >= uptr->hwmark)
+                uptr->hwmark = rf_da + 1;
             }
         }
     rf_da = (rf_da + 1) & 03777777;                     /* incr disk addr */
@@ -394,7 +401,8 @@ t_stat rf_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 sim_switches, saved_PC;
 
-if (rf_dib.dev != DEV_RF) return STOP_NOTSTD;           /* only std devno */
+if (rf_dib.dev != DEV_RF)                               /* only std devno */
+    return STOP_NOTSTD;
 if (sim_switches & SWMASK ('D')) {
     for (i = 0; i < DM4_LEN; i = i + 2)
         M[dm4_rom[i]] = dm4_rom[i + 1];
@@ -417,7 +425,8 @@ uint32 ds_bytes = RF_DKSIZE * sizeof (int16);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
-    if (p >= RF_NUMDK) p = RF_NUMDK - 1;
+    if (p >= RF_NUMDK)
+        p = RF_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) |
         (p << UNIT_V_PLAT);
     }
@@ -429,8 +438,10 @@ return attach_unit (uptr, cptr);
 
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val < 0) return SCPE_IERR;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (val < 0)
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;

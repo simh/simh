@@ -1,6 +1,6 @@
 /* pdp11_cis.c: PDP-11 CIS optional instruction set simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    This module simulates the PDP-11 commercial instruction set (CIS).
 
+   16-Oct-08    RMS     Fixed overflow bug in ASHx (Word/NibbleLShift)
+                        Fixed bug in DIVx (LntDstr calculation)
    30-May-06    RMS     Added interrupt tests to character instructions
                         Added 11/44 stack probe test to MOVCx (only)
    22-May-06    RMS     Fixed bug in decode table (found by John Dundas)
@@ -430,14 +432,16 @@ switch (op) {                                           /* case on opcode */
             if (R[1] < R[3]) {                          /* backwards? */
                 for (i = 0; R[0] && R[2]; ) {           /* move loop */
                     t = ReadB (((R[1] - 1) & 0177777) | dsenable);
-                    if (op & 2) t = ReadB (((R[5] + t) & 0177777) | dsenable);
+                    if (op & 2)
+                        t = ReadB (((R[5] + t) & 0177777) | dsenable);
                     WriteB (t, ((R[3] - 1) & 0177777) | dsenable);
                     R[0]--;
                     R[1] = (R[1] - 1) & 0177777;
                     R[2]--;
                     R[3] = (R[3] - 1) & 0177777;
                     if ((++i >= INT_TEST) && R[0] && R[2]) {
-                        if (cis_int_test (i, old_PC, &st)) return st;
+                        if (cis_int_test (i, old_PC, &st))
+                            return st;
                         i = 0;
                         }
                     }                                   /* end for lnts */
@@ -447,14 +451,16 @@ switch (op) {                                           /* case on opcode */
             else {                                      /* forward */
                 for (i = 0; R[0] && R[2]; ) {           /* move loop */
                     t = ReadB ((R[1] & 0177777) | dsenable);
-                    if (op & 2) t = ReadB (((R[5] + t) & 0177777) | dsenable);
+                    if (op & 2)
+                        t = ReadB (((R[5] + t) & 0177777) | dsenable);
                     WriteB (t, (R[3] & 0177777) | dsenable);
                     R[0]--;
                     R[1] = (R[1] + 1) & 0177777;
                     R[2]--;
                     R[3] = (R[3] + 1) & 0177777;
                     if ((++i >= INT_TEST) && R[0] && R[2]) {
-                        if (cis_int_test (i, old_PC, &st)) return st;
+                        if (cis_int_test (i, old_PC, &st))
+                            return st;
                         i = 0;
                         }
                     }                                   /* end for lnts */
@@ -514,7 +520,8 @@ switch (op) {                                           /* case on opcode */
                     R[2]--;
                     R[3] = (R[3] - 1) & 0177777;
                     if ((++i >= INT_TEST) && R[0] && R[2]) {
-                        if (cis_int_test (i, old_PC, &st)) return st;
+                        if (cis_int_test (i, old_PC, &st))
+                            return st;
                         i = 0;
                         }
                     }                                   /* end for lnts */
@@ -528,7 +535,8 @@ switch (op) {                                           /* case on opcode */
                     R[2]--;
                     R[3] = (R[3] + 1) & 0177777;
                     if ((++i >= INT_TEST) && R[0] && R[2]) {
-                        if (cis_int_test (i, old_PC, &st)) return st;
+                        if (cis_int_test (i, old_PC, &st))
+                            return st;
                         i = 0;
                         }
                     }                                   /* end for lnts */
@@ -557,7 +565,8 @@ switch (op) {                                           /* case on opcode */
             R[j] = ReadW (addr | dsenable);
             R[j + 1] = ReadW (((addr + 2) & 0177777) | dsenable);
             }
-        if (rn >= limit) R[rn] = (R[rn] + limit) & 0177777;
+        if (rn >= limit)
+            R[rn] = (R[rn] + limit) & 0177777;
         return SCPE_OK;
 
 /* LOCC, SKPC, LOCCI, SKPCI 
@@ -590,11 +599,13 @@ switch (op) {                                           /* case on opcode */
         R[4] = R[4] & 0377;                             /* match character */
         for (i = 0; R[0] != 0;) {                       /* loop */
             c = ReadB (R[1] | dsenable);                /* get char */
-            if ((c == R[4]) ^ (op & 1)) break;          /* = + LOC, != + SKP? */
+            if ((c == R[4]) ^ (op & 1))                 /* = + LOC, != + SKP? */
+                break;
             R[0]--;                                     /* decr count, */
             R[1] = (R[1] + 1) & 0177777;                /* incr addr */
             if ((++i >= INT_TEST) && R[0]) {            /* test for intr? */
-                if (cis_int_test (i, old_PC, &st)) return st;
+                if (cis_int_test (i, old_PC, &st))
+                    return st;
                 i = 0;
                 }
             }
@@ -643,11 +654,13 @@ switch (op) {                                           /* case on opcode */
         for (i = 0; R[0] != 0;) {                       /* loop */
             t = ReadB (R[1] | dsenable);                /* get char as index */
             c = ReadB (((R[5] + t) & 0177777) | dsenable);
-            if (((c & R[4]) != 0) ^ (op & 1)) break;    /* != + SCN, = + SPN? */
+            if (((c & R[4]) != 0) ^ (op & 1))           /* != + SCN, = + SPN? */
+                break;
             R[0]--;                                     /* decr count, */
             R[1] = (R[1] + 1) & 0177777;                /* incr addr */
             if ((++i >= INT_TEST) && R[0]) {            /* test for intr? */
-                if (cis_int_test (i, old_PC, &st)) return st;
+                if (cis_int_test (i, old_PC, &st))
+                    return st;
                 i = 0;
                 }
             }
@@ -701,11 +714,14 @@ switch (op) {                                           /* case on opcode */
         R[4] = R[4] & 0377;                             /* mask fill */
         c = t = 0;
         for (i = 0; (R[0] || R[2]); ) {                 /* until cnts == 0 */
-            if (R[0]) c = ReadB (R[1] | dsenable);      /* get src1 or fill */
+            if (R[0])                                   /* get src1 or fill */
+                c = ReadB (R[1] | dsenable);
             else c = R[4];
-            if (R[2]) t = ReadB (R[3] | dsenable);      /* get src2 or fill */
+            if (R[2])                                   /* get src2 or fill */
+                t = ReadB (R[3] | dsenable);
             else t = R[4];
-            if (c != t) break;                          /* if diff, done */
+            if (c != t)                                 /* if diff, done */
+                break;
             if (R[0]) {                                 /* if more src1 */
                 R[0]--;                                 /* decr count, */
                 R[1] = (R[1] + 1) & 0177777;            /* incr addr */
@@ -715,7 +731,8 @@ switch (op) {                                           /* case on opcode */
                 R[3] = (R[3] + 1) & 0177777;            /* incr addr */
                 }
             if ((++i >= INT_TEST) && (R[0] || R[2])) {  /* test for intr? */
-                if (cis_int_test (i, old_PC, &st)) return st;
+                if (cis_int_test (i, old_PC, &st))
+                    return st;
                 i = 0;
                 }
             }
@@ -781,10 +798,12 @@ switch (op) {                                           /* case on opcode */
                 t = ReadB (((R[3] + i) & 0177777) | dsenable);
                 match = (c == t);                       /* end for substring */
                 }
-            if (match) break;                           /* exit if match */
+            if (match)                                  /* exit if match */
+                break;
             R[0]--;                                     /* on to next char */
             R[1] = (R[1] + 1) & 0177777;
-            if (cis_int_test (i, old_PC, &st)) return st;
+            if (cis_int_test (i, old_PC, &st))
+                return st;
             }
         if (!match) {                                   /* if no match */
             R[1] = (R[1] + R[0]) & 0177777;
@@ -820,7 +839,8 @@ switch (op) {                                           /* case on opcode */
     case 0150: case 0151: case 0170: case 0171:
         ReadDstr (A1, &src1, op);                       /* get source1 */
         ReadDstr (A2, &src2, op);                       /* get source2 */
-        if (op & 1) src1.sign = src1.sign ^ 1;          /* sub? invert sign */
+        if (op & 1)                                     /* sub? invert sign */
+            src1.sign = src1.sign ^ 1;
         if (src1.sign ^ src2.sign) {                    /* opp signs?  sub */
             if (CmpDstr (&src1, &src2) < 0) {           /* src1 < src2? */
                 SubDstr (&src1, &src2, &dst);           /* src2 - src1 */
@@ -951,8 +971,10 @@ switch (op) {                                           /* case on opcode */
         if (src1.sign != src2.sign) N = src1.sign;
         else {
             t = CmpDstr (&src1, &src2);                 /* compare strings */
-            if (t < 0) N = (src1.sign? 0: 1);
-            else if (t > 0) N = (src1.sign? 1: 0);
+            if (t < 0)
+                N = (src1.sign? 0: 1);
+            else if (t > 0)
+                N = (src1.sign? 1: 0);
             else Z = 1;
             }
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
@@ -989,8 +1011,10 @@ switch (op) {                                           /* case on opcode */
             src1.val[0] = src1.val[0] & ~0xF;           /* clear sign */
             }                                           /* end right shift */
         else if (shift) {                               /* left shift? */
-            if (WordLshift (&src1, shift / 8)) V = 1;   /* do word shifts */
-            if (NibbleLshift (&src1, shift % 8)) V = 1;
+            if (WordLshift (&src1, shift / 8))          /* do word shifts */
+                V = 1;
+            if (NibbleLshift (&src1, shift % 8))        /* do nibble shifts */
+                V = 1;
             }                                           /* end left shift */
         WriteDstr (A2, &src1, op);                      /* store result */
         if ((op & INLINE) == 0)                         /* if reg, clr reg */
@@ -1015,7 +1039,8 @@ switch (op) {                                           /* case on opcode */
         ReadDstr (A1, &src1, PACKED);                   /* get source */
         V = C = 0;                                      /* init cc's */
         WriteDstr (A2, &src1, NUMERIC);                 /* write dest */
-        if ((op & INLINE) == 0) R[0] = R[1] = 0;        /* if reg, clr reg */
+        if ((op & INLINE) == 0)                         /* if reg, clr reg */
+            R[0] = R[1] = 0;
         return SCPE_OK;
 
 /* CVTNP, CVTNPI
@@ -1036,7 +1061,8 @@ switch (op) {                                           /* case on opcode */
         ReadDstr (A1, &src1, NUMERIC);                  /* get source */
         V = C = 0;                                      /* init cc's */
         WriteDstr (A2, &src1, PACKED);                  /* write dest */
-        if ((op & INLINE) == 0) R[0] = R[1] = 0;        /* if reg, clr reg */
+        if ((op & INLINE) == 0)                         /* if reg, clr reg */
+            R[0] = R[1] = 0;
         return SCPE_OK;
 
 /* CVTNL, CVTPL, CVTNLI, CVTPLI
@@ -1060,12 +1086,15 @@ switch (op) {                                           /* case on opcode */
         for (i = (DSTRLNT * 8) - 1; i > 0; i--) {       /* loop thru digits */
             digit = (src1.val[i / 8] >> ((i % 8) * 4)) & 0xF;
             if (digit || result || V) {                 /* skip initial 0's */
-                if (result >= MAXDVAL) V = 1;
+                if (result >= MAXDVAL)
+                    V = 1;
                 result = (result * 10) + digit;
-                if (result < digit) V = 1;
+                if (result < digit)
+                    V = 1;
                 }                                       /* end if */
             }                                           /* end for */
-        if (src1.sign) result = (~result + 1) & 0xFFFFFFFF;
+        if (src1.sign)
+            result = (~result + 1) & 0xFFFFFFFF;
         N = GET_SIGN_L (result);
         Z = GET_Z (result);
         V = V | (N ^ src1.sign);                        /* overflow if +2**31 */
@@ -1105,7 +1134,8 @@ switch (op) {                                           /* case on opcode */
         result = (A2ADR << 16) | A2LNT;                 /* op in VAX format */
     CVTLx:
         dst = Dstr0;                                    /* clear result */
-        if (dst.sign = GET_SIGN_L (result)) result = (~result + 1) & 0xFFFFFFFF;
+        if (dst.sign = GET_SIGN_L (result))
+            result = (~result + 1) & 0xFFFFFFFF;
         for (i = 1; (i < (DSTRLNT * 8)) && result; i++) {
             digit = result % 10;
             result = result / 10;
@@ -1157,13 +1187,18 @@ if (flag & PACKED) {                                    /* packed? */
     end = lnt / 2;                                      /* last byte */
     for (i = 0; i <= end; i++) {                        /* loop thru string */
         c = ReadB (((dscr[1] + end - i) & 0177777) | dsenable);
-        if (i == 0) t = c & 0xF;                        /* save sign */
-        if ((i == end) && ((lnt & 1) == 0)) c = c & 0xF;
-        if (c >= 0xA0) c = c & 0xF;                     /* check hi digit */
-        if ((c & 0xF) >= 0xA) c = c & 0xF0;             /* check lo digit */    
+        if (i == 0)                                     /* save sign */
+            t = c & 0xF;
+        if ((i == end) && ((lnt & 1) == 0))
+            c = c & 0xF;
+        if (c >= 0xA0)                                  /* check hi digit */
+            c = c & 0xF;
+        if ((c & 0xF) >= 0xA)                           /* check lo digit */   
+            c = c & 0xF0; 
         src->val[i / 4] = src->val[i / 4] | (c << ((i % 4) * 8));
         }                                               /* end for */
-    if ((t == 0xB) || (t == 0xD)) src->sign = 1;        /* if -, set sign */
+    if ((t == 0xB) || (t == 0xD))                       /* if -, set sign */
+        src->sign = 1;
     src->val[0] = src->val[0] & ~0xF;                   /* clear sign */
     }                                                   /* end packed */
 else {                                                  /* numeric */
@@ -1179,7 +1214,8 @@ else {                                                  /* numeric */
             src->sign = c >> 7;                         /* set sign */
             }
         c = c & 0xF;                                    /* get digit */
-        if (c > 9) c = 0;                               /* range check */
+        if (c > 9)                                      /* range check */
+            c = 0;
         src->val[i / 8] = src->val[i / 8] | (c << ((i % 8) * 4));
         }                                               /* end for */
     }                                                   /* end numeric */
@@ -1225,17 +1261,22 @@ mask = 0;                                               /* can't ovflo */
 Z = 1;                                                  /* assume all 0's */
 limit = lnt / 8;                                        /* limit for test */
 for (i = 0; i < DSTRLNT; i++) {                         /* loop thru value */
-    if (i == limit) mask = masktab[lnt % 8];            /* at limit, get mask */
-    else if (i > limit) mask = 0xFFFFFFFF;              /* beyond, all ovflo */
-    if (dst->val[i] & mask) V = 1;                      /* test for ovflo */
-    if (dst->val[i] = dst->val[i] & ~mask) Z = 0;       /* test nz */
+    if (i == limit)                                     /* at limit, get mask */
+        mask = masktab[lnt % 8];
+    else if (i > limit)                                 /* beyond, all ovflo */
+        mask = 0xFFFFFFFF;
+    if (dst->val[i] & mask)                             /* test for ovflo */
+        V = 1;
+    if (dst->val[i] = dst->val[i] & ~mask)              /* test nz */
+        Z = 0;
     }
 dst->sign = dst->sign & ~unsignedtab[type] & ~(Z & ~V);
 N = dst->sign & ~Z;                                     /* N = sign, if ~zero */
 
 if (flag & PACKED) {                                    /* packed? */
     end = lnt / 2;                                      /* end of string */
-    if (type == UP) dst->val[0] = dst->val[0] | 0xF;
+    if (type == UP)
+        dst->val[0] = dst->val[0] | 0xF;
     else dst->val[0] = dst->val[0] | 0xC | dst->sign;
     for (i = 0; i <= end; i++) {                        /* store string */
         c = (dst->val[i / 4] >> ((i % 4) * 8)) & 0xFF;
@@ -1335,7 +1376,8 @@ void SubDstr (DSTR *s1, DSTR *s2, DSTR *ds)
 int32 i;
 DSTR compl;
 
-for (i = 0; i < DSTRLNT; i++) compl.val[i] = 0x99999999 - s1->val[i];
+for (i = 0; i < DSTRLNT; i++)
+    compl.val[i] = 0x99999999 - s1->val[i];
 AddDstr (&compl, s2, ds, 1);                            /* s1 + ~s2 + 1 */
 return;
 }
@@ -1353,8 +1395,10 @@ int32 CmpDstr (DSTR *s1, DSTR *s2)
 int32 i;
 
 for (i = DSTRMAX; i >=0; i--) {
-    if (s1->val[i] > s2->val[i]) return 1;
-    if (s1->val[i] < s2->val[i]) return -1;
+    if (s1->val[i] > s2->val[i])
+        return 1;
+    if (s1->val[i] < s2->val[i])
+        return -1;
     }
 return 0;
 }
@@ -1372,7 +1416,10 @@ int32 TestDstr (DSTR *dsrc)
 {
 int32 i;
 
-for (i = DSTRMAX; i >= 0; i--) if (dsrc->val[i]) return (i + 1);
+for (i = DSTRMAX; i >= 0; i--) {
+    if (dsrc->val[i])
+        return (i + 1);
+    }
 dsrc->sign = 0;
 return 0;
 }
@@ -1388,9 +1435,11 @@ int32 LntDstr (DSTR *dsrc, int32 nz)
 {
 int32 i;
 
-if (nz == 0) return 0;
-for (i = 7; i > 0; i--) {
-    if ((dsrc->val[nz - 1] >> (i * 4)) & 0xF) break;
+if (nz == 0)
+    return 0;
+for (i = 7; i >= 0; i--) {
+    if ((dsrc->val[nz - 1] >> (i * 4)) & 0xF)
+        break;
     }
 return ((nz - 1) * 8) + i;
 }
@@ -1411,7 +1460,8 @@ void CreateTable (DSTR *dsrc, DSTR mtable[10])
 int32 (i);
 
 mtable[1] = *dsrc;
-for (i = 2; i < 10; i++) AddDstr (&mtable[1], &mtable[i-1], &mtable[i], 0);
+for (i = 2; i < 10; i++)
+    AddDstr (&mtable[1], &mtable[i-1], &mtable[i], 0);
 return;
 }
 
@@ -1428,7 +1478,8 @@ int32 i;
 
 if (sc) {
     for (i = 0; i < DSTRLNT; i++) {
-        if ((i + sc) < DSTRLNT) dsrc->val[i] = dsrc->val[i + sc];
+        if ((i + sc) < DSTRLNT)
+            dsrc->val[i] = dsrc->val[i + sc];
         else dsrc->val[i] = 0;
         }
     }
@@ -1449,9 +1500,12 @@ int32 i, c;
 c = 0;
 if (sc) {
     for (i = DSTRMAX; i >= 0; i--) {
-        if (i > (DSTRMAX - sc)) c = c | dsrc->val[i];
-        if ((i - sc) >= 0) dsrc->val[i] = dsrc->val[i - sc];
-        else dsrc->val[i] = 0;
+        if (i >= sc)
+            dsrc->val[i] = dsrc->val[i - sc];
+        else {
+            c |= dsrc->val[i];
+            dsrc->val[i] = 0;
+            }
         }
     }
 return c;
@@ -1467,14 +1521,13 @@ return c;
 
 uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
-int32 i, s, rs, nc;
+int32 i, s, nc;
 
 if (s = sc * 4) {
-    rs = 32 - s;
     for (i = DSTRMAX; i >= 0; i--) {
-        nc = dsrc->val[i];
+        nc = (dsrc->val[i] << (32 - s)) & 0xFFFFFFFF;
         dsrc->val[i] = ((dsrc->val[i] >> s) |
-            (cin << rs)) & 0xFFFFFFFF;
+            cin) & 0xFFFFFFFF;
         cin = nc;
         }
     return cin;
@@ -1491,18 +1544,17 @@ return 0;
 
 uint32 NibbleLshift (DSTR *dsrc, int32 sc)
 {
-int32 i, s, rs;
-uint32 sv_val, cout;
+int32 i, s;
+uint32 nc, cin;
 
-cout = 0;
+cin = 0;
 if (s = sc * 4) {
-    rs = 32 - s;
     for (i = 0; i < DSTRLNT; i++) {
-        sv_val = dsrc->val[i];
-        dsrc->val[i] = ((dsrc->val[i] << s) | cout) & 0xFFFFFFFF;
-        cout = sv_val >> rs;
+        nc = dsrc->val[i] >> (32 - s);
+        dsrc->val[i] = ((dsrc->val[i] << s) | cin) & 0xFFFFFFFF;
+        cin = nc;
         }
-    return cout;
+    return cin;
     }
 return 0;
 }

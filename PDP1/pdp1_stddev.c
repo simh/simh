@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2006, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -299,14 +299,16 @@ if (dev == 0030) {                                      /* RRB */
     iosta = iosta & ~IOS_PTR;                           /* clear status */
     return ptr_unit.buf;                                /* return data */
     }
-if (dev == 0002) ptr_state = 18;                        /* RPB, mode = binary */
+if (dev == 0002)                                        /* RPB, mode = binary */
+    ptr_state = 18;
 else if (sim_is_active (&ptr_unit)) {                   /* RPA, running? */
     sim_cancel (&ptr_unit);                             /* stop reader */
     return dat;
     }
 else ptr_state = 0;                                     /* mode = alpha */
 ptr_unit.buf = 0;                                       /* clear buffer */
-if (inst & IO_WAIT) ptr_wait = 1;                       /* set ptr wait */
+if (inst & IO_WAIT)                                     /* set ptr wait */
+    ptr_wait = 1;
 else ptr_wait = 0;                                      /* from IR<5> */
 if (GEN_CPLS (inst)) {                                  /* comp pulse? */
     ios = 0;
@@ -324,8 +326,10 @@ t_stat ptr_svc (UNIT *uptr)
 int32 temp;
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* attached? */
-    if (ptr_wait) ptr_wait = ioh = 0;                   /* if wait, clr ioh */
-    if ((cpls & CPLS_PTR) || ptr_stopioe) return SCPE_UNATT;
+    if (ptr_wait)                                       /* if wait, clr ioh */
+        ptr_wait = ioh = 0;
+    if ((cpls & CPLS_PTR) || ptr_stopioe)
+        return SCPE_UNATT;
     return SCPE_OK;
     }
 if ((uptr->flags & UNIT_ASCII) && (ptr_state == 0))     /* ASCII mode, alpha read? */
@@ -333,16 +337,19 @@ if ((uptr->flags & UNIT_ASCII) && (ptr_state == 0))     /* ASCII mode, alpha rea
 else if ((temp = getc (uptr->fileref)) != EOF)          /* no, get raw char */
     uptr->pos = uptr->pos + 1;                          /* if not eof, count */
 if (temp == EOF) {                                      /* end of file? */
-    if (ptr_wait) ptr_wait = ioh = 0;                   /* if wait, clr ioh */
+    if (ptr_wait)                                       /* if wait, clr ioh */
+        ptr_wait = ioh = 0;
     if (feof (uptr->fileref)) {
-        if ((cpls & CPLS_PTR) || ptr_stopioe) printf ("PTR end of file\n");
+        if ((cpls & CPLS_PTR) || ptr_stopioe)
+            printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
     clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
-if (ptr_state == 0) uptr->buf = temp & 0377;            /* alpha */
+if (ptr_state == 0)                                     /* alpha */
+    uptr->buf = temp & 0377;
 else if (temp & 0200) {                                 /* binary */
     ptr_state = ptr_state - 6;
     uptr->buf = uptr->buf | ((temp & 077) << ptr_state);
@@ -384,10 +391,13 @@ else {
             return FIODEC_STOP;                         /* return STOP */
         uptr->pos = uptr->pos + 1;                      /* count char */
         c = c & 0177;                                   /* cut to 7b */
-        if (c == '\n') c = '\r';                        /* NL -> CR */
-        else if (c == '\r') continue;                   /* ignore CR */
+        if (c == '\n')                                  /* NL -> CR */
+            c = '\r';
+        else if (c == '\r')                             /* ignore CR */
+            continue;
         in = ascii_to_fiodec[c];                        /* convert char */
-        if ((in == 0) && (c != ' ')) continue;          /* ignore unknowns */       
+        if ((in == 0) && (c != ' '))                    /* ignore unknowns */   
+            continue;    
         if ((in & BOTH) || ((in & UC) == ptr_uc))       /* case match? */
             in = in & TT_WIDTH;                         /* cut to 6b */
         else {                                          /* no, case shift */
@@ -434,7 +444,8 @@ int32 ptr_getw (UNIT *uptr)
 int32 i, tmp, word;
 
 for (i = word = 0; i < 3;) {
-    if ((tmp = getc (uptr->fileref)) == EOF) return -1;
+    if ((tmp = getc (uptr->fileref)) == EOF)
+        return -1;
     uptr->pos = uptr->pos + 1;
     if (tmp & 0200) {
         word = (word << 6) | (tmp & 077);
@@ -450,11 +461,13 @@ int32 origin, val;
 int32 fld = TA & EPCMASK;
 
 for (;;) {
-    if ((val = ptr_getw (&ptr_unit)) < 0) return SCPE_FMT;
+    if ((val = ptr_getw (&ptr_unit)) < 0)
+        return SCPE_FMT;
     if (((val & 0760000) == OP_DIO) ||                  /* DIO? */
         ((val & 0760000) == OP_DAC)) {                  /* hack - Macro1 err */
         origin = val & DAMASK;
-        if ((val = ptr_getw (&ptr_unit)) < 0) return SCPE_FMT;
+        if ((val = ptr_getw (&ptr_unit)) < 0)
+            return SCPE_FMT;
         M[fld | origin] = val;
         }
     else if ((val & 0760000) == OP_JMP) {               /* JMP? */
@@ -548,14 +561,19 @@ if (tti_hold & CW) {                                    /* char waiting? */
     tti_hold = 0;                                       /* not waiting */
     }
 else {
-    if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp;
-    if (temp & SCPE_BREAK) return SCPE_OK;              /* ignore break */
+    if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
+        return temp;
+    if (temp & SCPE_BREAK)                              /* ignore break */
+        return SCPE_OK;
     temp = temp & 0177;
-    if (temp == 0177) temp = '\b';                      /* rubout? bs */
+    if (temp == 0177)                                   /* rubout? bs */
+        temp = '\b';
     sim_putchar (temp);                                 /* echo */
-    if (temp == '\r') sim_putchar ('\n');               /* cr? add nl */
+    if (temp == '\r')                                   /* cr? add nl */
+        sim_putchar ('\n');
     in = ascii_to_fiodec[temp];                         /* translate char */
-    if (in == 0) return SCPE_OK;                        /* no xlation? */
+    if (in == 0)                                        /* no xlation? */
+        return SCPE_OK;
     if ((in & BOTH) || ((in & UC) == (tty_uc & UC)))
         tty_buf = in & TT_WIDTH;
     else {                                              /* must shift */
@@ -576,8 +594,10 @@ t_stat tto_svc (UNIT *uptr)
 int32 c;
 t_stat r;
 
-if (tty_buf == FIODEC_UC) tty_uc = UC;                  /* upper case? */
-else if (tty_buf == FIODEC_LC) tty_uc = 0;              /* lower case? */
+if (tty_buf == FIODEC_UC)                               /* upper case? */
+    tty_uc = UC;
+else if (tty_buf == FIODEC_LC)                          /* lower case? */
+    tty_uc = 0;
 else {
     c = fiodec_to_ascii[tty_buf | tty_uc];              /* translate */
     if (c && ((r = sim_putchar_s (c)) != SCPE_OK)) {    /* output; error? */

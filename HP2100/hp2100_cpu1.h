@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   11-Sep-08    JDB     Moved microcode function prototypes here
    30-Apr-08    JDB     Corrected OP_AFF to OP_AAFF for SIGNAL/1000
                         Removed unused operand patterns
    23-Feb-08    HV      Added more OP_* for SIGNAL/1000 and VIS
@@ -36,7 +37,7 @@
 #define _HP2100_CPU1_H_
 
 
-/* Register print encoding. */
+/* Register print encoding */
 
 #define REG_COUNT       9                               /* count of print flags */
 
@@ -51,10 +52,11 @@
 #define REG_P_REL       (1 << 8)                        /* print P register as relative */
 
 
-/* Operand processing encoding. */
+/* Operand processing encoding */
 
 /* Base operand types.  Note that all address encodings must be grouped together
-   after OP_ADR. */
+   after OP_ADR.
+*/
 
 #define OP_NUL          0                               /* no operand */
 #define OP_IAR          1                               /* 1-word int in A reg */
@@ -85,7 +87,7 @@
 #define OP_V_F7         (6 * OP_N_FLAGS)                /* 7th operand field */
 #define OP_V_F8         (7 * OP_N_FLAGS)                /* 8th operand field */
 
-/* Operand processing patterns. */
+/* Operand processing patterns */
 
 #define OP_N            (OP_NUL << OP_V_F1)
 #define OP_I            (OP_IAR << OP_V_F1)
@@ -233,13 +235,14 @@
 typedef enum { in_s, in_d, fp_f, fp_x, fp_t, fp_e, fp_a } OPSIZE;
 
 
-/* Conversion from operand size to word count. */
+/* Conversion from operand size to word count */
 
 #define TO_COUNT(s)     ((s == fp_a) ? 0 : (uint32) (s + (s < fp_f)))
 
 
 /* HP in-memory representation of a packed floating-point number.
-   Actual value will use two, three, four, or five words, as needed. */
+   Actual value will use two, three, four, or five words, as needed.
+*/
 
 typedef uint16 FPK[5];
 
@@ -264,13 +267,43 @@ typedef OP OPS[OP_N_F];                                 /* operand array */
 typedef uint32 OP_PAT;                                  /* operand pattern */
 
 
-/* Microcode dispatcher functions. */
+/* Microcode dispatcher functions (grouped by cpu module number) */
 
-t_stat cpu_eau   (uint32 IR, uint32 intrq);                 /* EAU group simulator */
-t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap);  /* UIG group 0 dispatcher */
-t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap);  /* UIG group 1 dispatcher */
+extern t_stat cpu_ds      (uint32 IR, uint32 intrq);                /* [0] Distributed System stub */
+extern t_stat cpu_user    (uint32 IR, uint32 intrq);                /* [0] User firmware dispatcher */
+extern t_stat cpu_user_20 (uint32 IR, uint32 intrq);                /* [0] Module 20 user microprograms stub */
 
-/* Microcode helper functions. */
+extern t_stat cpu_eau   (uint32 IR, uint32 intrq);                  /* [1] EAU group simulator */
+extern t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap);   /* [1] UIG group 0 dispatcher */
+extern t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap);   /* [1] UIG group 1 dispatcher */
+
+#if !defined (HAVE_INT64)                                           /* int64 support unavailable */
+extern t_stat cpu_fp  (uint32 IR, uint32 intrq);                    /* [2] Firmware Floating Point */
+#endif
+extern t_stat cpu_dms (uint32 IR, uint32 intrq);                    /* [2] Dynamic mapping system */
+extern t_stat cpu_eig (uint32 IR, uint32 intrq);                    /* [2] Extended instruction group */
+extern t_stat cpu_iop (uint32 IR, uint32 intrq);                    /* [2] 2000 I/O Processor */
+
+extern t_stat cpu_ffp (uint32 IR, uint32 intrq);                    /* [3] Fast FORTRAN Processor */
+extern t_stat cpu_dbi (uint32 IR, uint32 intrq);                    /* [3] Double-Integer instructions */
+
+#if defined (HAVE_INT64)                                            /* int64 support available */
+extern t_stat cpu_fpp (uint32 IR, uint32 intrq);                    /* [4] Floating Point Processor */
+extern t_stat cpu_sis (uint32 IR, uint32 intrq);                    /* [4] Scientific Instruction Set */
+#endif
+
+extern t_stat cpu_rte_vma (uint32 IR, uint32 intrq);                /* [5] RTE-6 VMA */
+extern t_stat cpu_rte_ema (uint32 IR, uint32 intrq);                /* [5] RTE-IV EMA */
+
+extern t_stat cpu_rte_os (uint32 IR, uint32 intrq, uint32 iotrap);  /* [6] RTE-6 OS */
+
+#if defined (HAVE_INT64)                                            /* int64 support available */
+extern t_stat cpu_vis    (uint32 IR, uint32 intrq);                 /* [7] Vector Instruction Set */
+extern t_stat cpu_signal (uint32 IR, uint32 intrq);                 /* [7] SIGNAL/1000 Instructions */
+#endif
+
+
+/* Microcode helper functions */
 
 OP     ReadOp  (uint32 va, OPSIZE precision);               /* generalized operand read */
 void   WriteOp (uint32 va, OP operand, OPSIZE precision);   /* generalized operand write */

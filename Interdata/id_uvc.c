@@ -1,6 +1,6 @@
 /* id_uvc.c: Interdata universal clock
 
-   Copyright (c) 2001-2007, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -190,7 +190,8 @@ switch (op) {                                           /* case IO op */
 
     case IO_RD:                                         /* read */
         t = pic_rd_cic ();                              /* get cic */
-        if (pic_rdp) t = t & DMASK8;                    /* 2nd? get lo */
+        if (pic_rdp)                                    /* 2nd? get lo */
+            t = t & DMASK8;
         else t = (t >> 8) & DMASK8;                     /* 1st? get hi */
         pic_rdp = pic_rdp ^ 1;                          /* flip byte ptr */
         return t;
@@ -201,7 +202,8 @@ switch (op) {                                           /* case IO op */
         break;
 
     case IO_WD:                                         /* write */
-        if (pic_wdp) pic_db = (pic_db & 0xFF00) | dat;
+        if (pic_wdp)
+            pic_db = (pic_db & 0xFF00) | dat;
         else pic_db = (pic_db & 0xFF) | (dat << 8);
         pic_wdp = pic_wdp ^ 1;                          /* flip byte ptr */
         break;
@@ -222,7 +224,8 @@ switch (op) {                                           /* case IO op */
             pic_ovf = 0;                                /* clear flag */
             sim_cancel (&pic_unit);                     /* stop clock */
             pic_rdp = pic_wdp = 0;                      /* init ptrs */
-            if (pic_ric & PIC_RATE) pic_sched (TRUE);   /* any rate? */
+            if (pic_ric & PIC_RATE)                     /* any rate? */
+                pic_sched (TRUE);
             }                                           /* end if start */
         break;
         }                                               /* end case */
@@ -236,16 +239,20 @@ t_stat pic_svc (UNIT *uptr)
 {
 t_bool rate_chg = FALSE;
 
-if (pic_cnti) pic_cic = 0;                              /* one shot? */
+if (pic_cnti)                                           /* one shot? */
+    pic_cic = 0;
 pic_cic = pic_cic - pic_decr;                           /* decrement */
 if (pic_cic <= 0) {                                     /* overflow? */
-    if (pic_wdp) pic_ovf = 1;                           /* broken wr? set flag */
-    if (pic_arm) SET_INT (v_PIC);                       /* if armed, intr */
+    if (pic_wdp)                                        /* broken wr? set flag */
+        pic_ovf = 1;
+    if (pic_arm)                                        /* if armed, intr */
+        SET_INT (v_PIC);
     if (GET_RATE (pic_ric) != GET_RATE (pic_db))        /* rate change? */
         rate_chg = TRUE;
     pic_ric = pic_db;                                   /* new ric */
     pic_cic = GET_CTR (pic_ric);                        /* new cic */
-    if ((pic_ric & PIC_RATE) == 0) return SCPE_OK;
+    if ((pic_ric & PIC_RATE) == 0)
+        return SCPE_OK;
     }
 pic_sched (rate_chg);
 return SCPE_OK;
@@ -269,14 +276,16 @@ if (!(pic_unit.flags & UNIT_DIAG) &&                    /* not diag? */
     ((intv_usec % 1000) == 0)) {                        /* 1ms multiple? */
         pic_cnti = 0;                                   /* clr mode */
         pic_decr = pic_usec[3 - r];                     /* set decrement */
-        if (strt) t = sim_rtcn_init (pic_time[3], TMR_PIC);     /* init or */
+        if (strt)                                       /* init or */
+            t = sim_rtcn_init (pic_time[3], TMR_PIC);
         else t = sim_rtcn_calb (PIC_TPS, TMR_PIC);      /* calibrate */
         }
 else {
     pic_cnti = 1;                                       /* set mode */
     pic_decr = 1;                                       /* decr = 1 */
     t = pic_time[r] * intv;                             /* interval */
-    if (t == 1) t++;                                    /* for diagn */
+    if (t == 1)                                         /* for diagn */
+        t++;
     }
 sim_activate (&pic_unit, t);                            /* activate */
 return;
@@ -290,7 +299,8 @@ if (sim_is_active (&pic_unit) && pic_cnti) {            /* running, one shot? */
     uint32 delta = sim_grtime () - pic_save;            /* interval */
     uint32 tm = pic_time[pic_map[GET_RATE (pic_ric)]];  /* ticks/intv */
     delta = delta / tm;                                 /* ticks elapsed */
-    if (delta >= ((uint32) pic_cic)) return 0;          /* cap value */
+    if (delta >= ((uint32) pic_cic))                    /* cap value */
+        return 0;
     return pic_cic - delta;
     }
 return pic_cic;
@@ -357,8 +367,10 @@ return SCPE_OK;
 
 t_stat lfc_set_freq (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr) return SCPE_ARG;
-if ((val != 100) && (val != 120)) return SCPE_IERR;
+if (cptr)
+    return SCPE_ARG;
+if ((val != 100) && (val != 120))
+    return SCPE_IERR;
 lfc_tps = val;
 return SCPE_OK;
 }

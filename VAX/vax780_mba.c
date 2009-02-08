@@ -275,7 +275,8 @@ if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? 
     sbi_set_errcnf ();                                  /* err confirmation */
     return SCPE_OK;
     }
-if (mb >= MBA_NUM) return SCPE_NXM;                     /* valid? */
+if (mb >= MBA_NUM)                                      /* valid? */
+    return SCPE_NXM;
 rtype = MBA_RTYPE (pa);                                 /* get reg type */
 
 switch (rtype) {                                        /* case on type */
@@ -325,12 +326,15 @@ switch (rtype) {                                        /* case on type */
         break;
 
     case MBART_EXT:                                     /* external */
-        if (!mbregR[mb]) return SCPE_NXM;               /* device there? */
+        if (!mbregR[mb])                                /* device there? */
+            return SCPE_NXM;
         drv = MBA_EXTDRV (pa);                          /* get dev num */
         ofs = MBA_EXTOFS (pa);                          /* get reg offs */
         r = mbregR[mb] (val, ofs, drv);                 /* call device */
-        if (r == MBE_NXD) mba_upd_sr (MBASR_NFD, 0, mb);/* nx drive? */
-        else if (r == MBE_NXR) return SCPE_NXM;         /* nx reg? */
+        if (r == MBE_NXD)                               /* nx drive? */
+            mba_upd_sr (MBASR_NFD, 0, mb);
+        else if (r == MBE_NXR)                          /* nx reg? */
+            return SCPE_NXM;
         *val |= (mba_sr[mb] & ~WMASK);                  /* upper 16b from SR */
         if (DEBUG_PRI (mba_dev[mb], MBA_DEB_RRD))
             fprintf (sim_deb, ">>MBA%d: drv %d ext reg %d read, value = %X\n", mb, drv, ofs, *val);
@@ -364,7 +368,8 @@ if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? 
     sbi_set_errcnf ();                                  /* err confirmation */
     return SCPE_OK;
     }
-if (mb >= MBA_NUM) return SCPE_NXM;                     /* valid? */
+if (mb >= MBA_NUM)                                      /* valid? */
+    return SCPE_NXM;
 rtype = MBA_RTYPE (pa);                                 /* get reg type */
 
 switch (rtype) {                                        /* case on type */
@@ -382,7 +387,8 @@ switch (rtype) {                                        /* case on type */
                 mba_reset (&mba_dev[mb]);               /* reset MBA */
             if ((val & MBACR_ABORT) &&
                 (mba_sr[mb] & MBASR_DTBUSY)) {
-                if (mbabort[mb]) mbabort[mb] ();        /* abort? */
+                if (mbabort[mb])                        /* abort? */
+                    mbabort[mb] ();
                 mba_upd_sr (MBASR_DTABT, 0, mb);
                 }
             if ((val & MBACR_MNT) &&
@@ -390,7 +396,8 @@ switch (rtype) {                                        /* case on type */
                 mba_upd_sr (MBASR_PGE, 0, mb);          /* mnt & xfer? */
                 val = val & ~MBACR_MNT;
                 }
-            if ((val & MBACR_IE) == 0) mba_clr_int (mb);
+            if ((val & MBACR_IE) == 0)
+                mba_clr_int (mb);
             mba_cr[mb] = (mba_cr[mb] & ~MBACR_WR) |
                 (val & MBACR_WR);
             break;
@@ -424,7 +431,8 @@ switch (rtype) {                                        /* case on type */
         break;
 
     case MBART_EXT:                                     /* external */
-        if (!mbregW[mb]) return SCPE_NXM;               /* device there? */
+        if (!mbregW[mb])                                /* device there? */
+            return SCPE_NXM;
         drv = MBA_EXTDRV (pa);                          /* get dev num */
         ofs = MBA_EXTOFS (pa);                          /* get reg offs */
         cs1dt = (ofs == MBA_CS1) && (val & CSR_GO) &&   /* starting xfr? */
@@ -434,8 +442,10 @@ switch (rtype) {                                        /* case on type */
             break;
             }
         r = mbregW[mb] (val & WMASK, ofs, drv);         /* write dev reg */
-        if (r == MBE_NXD) mba_upd_sr (MBASR_NFD, 0, mb);/* nx drive? */
-        else if (r == MBE_NXR) return SCPE_NXM;         /* nx reg? */
+        if (r == MBE_NXD)                               /* nx drive? */
+            mba_upd_sr (MBASR_NFD, 0, mb);
+        else if (r == MBE_NXR)                          /* nx reg? */
+            return SCPE_NXM;
         if (cs1dt && (r == SCPE_OK))                    /* did dt start? */     
             mba_sr[mb] = (mba_sr[mb] | MBASR_DTBUSY) & ~MBASR_W1C;
         if (DEBUG_PRI (mba_dev[mb], MBA_DEB_RWR))
@@ -470,18 +480,22 @@ int32 mba_rdbufW (uint32 mb, int32 bc, uint16 *buf)
 int32 i, j, ba, mbc, pbc;
 uint32 pa, dat;
 
-if (mb >= MBA_NUM) return 0;                            /* valid MBA? */
+if (mb >= MBA_NUM)                                      /* valid MBA? */
+    return 0;
 ba = mba_va[mb];                                        /* get virt addr */
 mbc = (MBABC_WR + 1) - mba_bc[mb];                      /* get Mbus bc */
-if (bc > mbc) bc = mbc;                                 /* use smaller */
+if (bc > mbc)                                           /* use smaller */
+    bc = mbc;
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!mba_map_addr (ba + i, &pa, mb)) break;         /* page inv? */
+    if (!mba_map_addr (ba + i, &pa, mb))                /* page inv? */
+        break;
     if (!ADDR_IS_MEM (pa)) {                            /* NXM? */
         mba_upd_sr (MBASR_RTMO, 0, mb);
         break;
         }
     pbc = VA_PAGSIZE - VA_GETOFF (pa);                  /* left in page */
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
+        pbc = bc - i;
     if (DEBUG_PRI (mba_dev[mb], MBA_DEB_XFR))
         fprintf (sim_deb, ">>MBA%d: read, pa = %X, bc = %X\n", mb, pa, pbc);
     if ((pa | pbc) & 1) {                               /* aligned word? */
@@ -516,18 +530,22 @@ int32 mba_wrbufW (uint32 mb, int32 bc, uint16 *buf)
 int32 i, j, ba, mbc, pbc;
 uint32 pa, dat;
 
-if (mb >= MBA_NUM) return 0;                            /* valid MBA? */
+if (mb >= MBA_NUM)                                      /* valid MBA? */
+    return 0;
 ba = mba_va[mb];                                        /* get virt addr */
 mbc = (MBABC_WR + 1) - mba_bc[mb];                      /* get Mbus bc */
-if (bc > mbc) bc = mbc;                                 /* use smaller */
+if (bc > mbc)                                           /* use smaller */
+    bc = mbc;
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!mba_map_addr (ba + i, &pa, mb)) break;         /* page inv? */
+    if (!mba_map_addr (ba + i, &pa, mb))                /* page inv? */
+        break;
     if (!ADDR_IS_MEM (pa)) {                            /* NXM? */
         mba_upd_sr (MBASR_RTMO, 0, mb);
         break;
         }
     pbc = VA_PAGSIZE - VA_GETOFF (pa);                  /* left in page */
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
+        pbc = bc - i;
     if (DEBUG_PRI (mba_dev[mb], MBA_DEB_XFR))
         fprintf (sim_deb, ">>MBA%d: write, pa = %X, bc = %X\n", mb, pa, pbc);
     if ((pa | pbc) & 1) {                               /* aligned word? */
@@ -563,12 +581,15 @@ int32 mba_chbufW (uint32 mb, int32 bc, uint16 *buf)
 int32 i, j, ba, mbc, pbc;
 uint32 pa, dat, cmp;
 
-if (mb >= MBA_NUM) return 0;                            /* valid MBA? */
+if (mb >= MBA_NUM)                                      /* valid MBA? */
+    return 0;
 ba = mba_va[mb];                                        /* get virt addr */
 mbc = (MBABC_WR + 1) - mba_bc[mb];                      /* get Mbus bc */
-if (bc > mbc) bc = mbc;                                 /* use smaller */
+if (bc > mbc)                                           /* use smaller */
+    bc = mbc;
 for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
-    if (!mba_map_addr (ba + i, &pa, mb)) break;         /* page inv? */
+    if (!mba_map_addr (ba + i, &pa, mb))                /* page inv? */
+        break;
     if (!ADDR_IS_MEM (pa)) {                            /* NXM? */
         mba_upd_sr (MBASR_RTMO, 0, mb);
         break;
@@ -576,10 +597,12 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (pa);                  /* left in page */
     if (DEBUG_PRI (mba_dev[mb], MBA_DEB_XFR))
         fprintf (sim_deb, ">>MBA%d: check, pa = %X, bc = %X\n", mb, pa, pbc);
-    if (pbc > (bc - i)) pbc = bc - i;                   /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
+        pbc = bc - i;
     for (j = 0; j < pbc; j++, pa++) {                   /* byte by byte */
         cmp = ReadB (pa);
-        if ((i + j) & 1) dat = (*buf++ >> 8) & BMASK;
+        if ((i + j) & 1)
+            dat = (*buf++ >> 8) & BMASK;
         else dat = *buf & BMASK;
         if (cmp != dat) {
             mba_upd_sr ((j & 1)? MBASR_WCEU: MBASR_WCEL, 0, mb);
@@ -618,7 +641,8 @@ return;
 
 void mba_upd_ata (uint32 mb, uint32 val)
 {
-if (val) mba_upd_sr (MBASR_ATA, 0, mb);
+if (val)
+    mba_upd_sr (MBASR_ATA, 0, mb);
 else mba_upd_sr (0, MBASR_ATA, mb);
 return;
 }
@@ -633,7 +657,8 @@ return;
 
 int32 mba_get_bc (uint32 mb)
 {
-if (mb >= MBA_NUM) return 0;
+if (mb >= MBA_NUM)
+    return 0;
 return (MBABC_WR + 1) - mba_bc[mb];
 }
 
@@ -641,7 +666,8 @@ void mba_set_int (uint32 mb)
 {
 DIB *dibp;
 
-if (mb >= MBA_NUM) return;
+if (mb >= MBA_NUM)
+    return;
 dibp = (DIB *) mba_dev[mb].ctxt;
 if (dibp)
     nexus_req[dibp->vloc >> 5] |= (1u << (dibp->vloc & 0x1F));
@@ -652,7 +678,8 @@ void mba_clr_int (uint32 mb)
 {
 DIB *dibp;
 
-if (mb >= MBA_NUM) return;
+if (mb >= MBA_NUM)
+    return;
 dibp = (DIB *) mba_dev[mb].ctxt;
 if (dibp)
     nexus_req[dibp->vloc >> 5] &= ~(1u << (dibp->vloc & 0x1F));
@@ -661,9 +688,12 @@ return;
 
 void mba_upd_sr (uint32 set, uint32 clr, uint32 mb)
 {
-if (mb >= MBA_NUM) return;
-if (set & MBASR_ABORTS) set |= (MBASR_DTCMP|MBASR_DTABT);
-if (set & (MBASR_DTCMP|MBASR_DTABT)) mba_sr[mb] &= ~MBASR_DTBUSY;
+if (mb >= MBA_NUM)
+    return;
+if (set & MBASR_ABORTS)
+    set |= (MBASR_DTCMP|MBASR_DTABT);
+if (set & (MBASR_DTCMP|MBASR_DTABT))
+    mba_sr[mb] &= ~MBASR_DTBUSY;
 mba_sr[mb] = (mba_sr[mb] | set) & ~clr;
 if ((set & MBASR_INTR) && (mba_cr[mb] & MBACR_IE))
     mba_set_int (mb);
@@ -680,9 +710,11 @@ int32 i, mb;
 DIB *dibp;
 
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 mb = dibp->ba - TR_MBA0;
-if ((mb < 0) || (mb >= MBA_NUM)) return SCPE_IERR;
+if ((mb < 0) || (mb >= MBA_NUM))
+    return SCPE_IERR;
 mba_cnf[mb] = 0;
 mba_cr[mb] &= MBACR_MNT;
 mba_sr[mb] = 0;
@@ -691,9 +723,11 @@ mba_va[mb] = 0;
 mba_dr[mb] = 0;
 mba_smr[mb] = 0;
 if (sim_switches & SWMASK ('P')) {
-    for (i = 0; i < MBA_NMAPR; i++) mba_map[mb][i] = 0;
+    for (i = 0; i < MBA_NMAPR; i++)
+        mba_map[mb][i] = 0;
     }
-if (mbabort[mb]) mbabort[mb] ();                        /* reset device */
+if (mbabort[mb])                                        /* reset device */
+    mbabort[mb] ();
 return SCPE_OK;
 }
 
@@ -704,9 +738,11 @@ t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc)
 DEVICE *dptr = find_dev_from_unit (uptr);
 DIB *dibp;
 
-if (dptr == NULL) return SCPE_IERR;
+if (dptr == NULL)
+    return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+if (dibp == NULL)
+    return SCPE_IERR;
 fprintf (st, "Massbus adapter %d", dibp->ba);
 return SCPE_OK;
 }
@@ -715,8 +751,10 @@ return SCPE_OK;
 
 void mba_set_enbdis (uint32 mb, t_bool dis)
 {
-if (mb >= MBA_NUM) return;                              /* valid MBA? */
-if (dis) mba_dev[mb].flags |= DEV_DIS;
+if (mb >= MBA_NUM)                                      /* valid MBA? */
+    return;
+if (dis)
+    mba_dev[mb].flags |= DEV_DIS;
 else mba_dev[mb].flags &= ~DEV_DIS;
 return;
 }
@@ -741,9 +779,11 @@ t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp)
 {
 uint32 idx;
 
-if ((dptr == NULL) || (dibp == NULL)) return SCPE_IERR; /* validate args */
+if ((dptr == NULL) || (dibp == NULL))                   /* validate args */
+    return SCPE_IERR;
 idx = dibp->ba;                                         /* Mbus # */
-if (idx >= MBA_NUM) return SCPE_STOP;
+if (idx >= MBA_NUM)
+    return SCPE_STOP;
 if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbregR[idx] != dibp->rd)) ||
     (mbregW[idx] && dibp->wr &&
@@ -751,15 +791,18 @@ if ((mbregR[idx] && dibp->rd &&                         /* conflict? */
     (mbabort[idx] && dibp->ack[0] &&
     (mbabort[idx] != dibp->ack[0]))) {
         printf ("Massbus %s assignment conflict at %d\n",
-            sim_dname (dptr), dibp->ba);
-        if (sim_log) fprintf (sim_log,
-            "Massbus %s assignment conflict at %d\n",
-            sim_dname (dptr), dibp->ba);
+                sim_dname (dptr), dibp->ba);
+        if (sim_log)
+            fprintf (sim_log, "Massbus %s assignment conflict at %d\n",
+                     sim_dname (dptr), dibp->ba);
         return SCPE_STOP;
         }
-if (dibp->rd) mbregR[idx] = dibp->rd;                   /* set rd dispatch */
-if (dibp->wr) mbregW[idx] = dibp->wr;                   /* set wr dispatch */
-if (dibp->ack[0]) mbabort[idx] = dibp->ack[0];          /* set abort dispatch */
+if (dibp->rd)                                           /* set rd dispatch */
+    mbregR[idx] = dibp->rd;
+if (dibp->wr)                                           /* set wr dispatch */
+    mbregW[idx] = dibp->wr;
+if (dibp->ack[0])                                       /* set abort dispatch */
+    mbabort[idx] = dibp->ack[0];
 return SCPE_OK;
 }
 

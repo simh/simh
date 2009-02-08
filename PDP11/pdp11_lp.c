@@ -1,6 +1,6 @@
 /* pdp11_lp.c: PDP-11 line printer simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -123,7 +123,8 @@ DEVICE lpt_dev = {
 
 t_stat lpt_rd (int32 *data, int32 PA, int32 access)
 {
-if ((PA & 02) == 0) *data = lpt_csr & LPTCSR_IMP;       /* csr */
+if ((PA & 02) == 0)                                     /* csr */
+    *data = lpt_csr & LPTCSR_IMP;
 else *data = lpt_unit.buf;                              /* buffer */
 return SCPE_OK;
 }
@@ -131,14 +132,17 @@ return SCPE_OK;
 t_stat lpt_wr (int32 data, int32 PA, int32 access)
 {
 if ((PA & 02) == 0) {                                   /* csr */
-    if (PA & 1) return SCPE_OK;
-    if ((data & CSR_IE) == 0) CLR_INT (LPT);
+    if (PA & 1)
+        return SCPE_OK;
+    if ((data & CSR_IE) == 0)
+        CLR_INT (LPT);
     else if ((lpt_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
         SET_INT (LPT);
     lpt_csr = (lpt_csr & ~LPTCSR_RW) | (data & LPTCSR_RW);
     }
-else {
-    if ((PA & 1) == 0) lpt_unit.buf = data & 0177;      /* buffer */
+else {                                                  /* buffer */
+    if ((PA & 1) == 0)
+        lpt_unit.buf = data & 0177;
     lpt_csr = lpt_csr & ~CSR_DONE;
     CLR_INT (LPT);
     if ((lpt_unit.buf == 015) || (lpt_unit.buf == 014) ||
@@ -151,7 +155,8 @@ return SCPE_OK;
 t_stat lpt_svc (UNIT *uptr)
 {
 lpt_csr = lpt_csr | CSR_ERR | CSR_DONE;
-if (lpt_csr & CSR_IE) SET_INT (LPT);
+if (lpt_csr & CSR_IE)
+    SET_INT (LPT);
 if ((uptr->flags & UNIT_ATT) == 0)
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 fputc (uptr->buf & 0177, uptr->fileref);
@@ -169,7 +174,8 @@ t_stat lpt_reset (DEVICE *dptr)
 {
 lpt_unit.buf = 0;
 lpt_csr = CSR_DONE;
-if ((lpt_unit.flags & UNIT_ATT) == 0) lpt_csr = lpt_csr | CSR_ERR;
+if ((lpt_unit.flags & UNIT_ATT) == 0)
+    lpt_csr = lpt_csr | CSR_ERR;
 CLR_INT (LPT);
 sim_cancel (&lpt_unit);                                 /* deactivate unit */
 return SCPE_OK;
@@ -181,7 +187,8 @@ t_stat reason;
 
 lpt_csr = lpt_csr & ~CSR_ERR;
 reason = attach_unit (uptr, cptr);
-if ((lpt_unit.flags & UNIT_ATT) == 0) lpt_csr = lpt_csr | CSR_ERR;
+if ((lpt_unit.flags & UNIT_ATT) == 0)
+    lpt_csr = lpt_csr | CSR_ERR;
 return reason;
 }
 

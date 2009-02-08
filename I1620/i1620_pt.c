@@ -1,6 +1,6 @@
 /* i1620_pt.c: IBM 1621/1624 paper tape reader/punch simulator
 
-   Copyright (c) 2002-2005, Robert M Supnik
+   Copyright (c) 2002-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -222,14 +222,16 @@ switch (op) {                                           /* case on op */
     case OP_RN:                                         /* read numeric */
         for (i = 0; i < MEMSIZE; i++) {                 /* (stop runaway) */
             r = ptr_read (&ptc, TRUE);                  /* read frame */
-            if (r != SCPE_OK) return r;                 /* error? */
+            if (r != SCPE_OK)                           /* error? */
+                return r;
             if (ptc & PT_EL) {                          /* end record? */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 return sta;                             /* done */
                 }
             if (bad_par[ptc]) {                         /* bad parity? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                if (io_stop)                            /* set return status */
+                    sta = STOP_INVCHR;
                 M[pa] = 0;                              /* store zero */
                 }
             else M[pa] = ptr_to_num[ptc];               /* translate, store */
@@ -240,7 +242,8 @@ switch (op) {                                           /* case on op */
     case OP_RA:                                         /* read alphameric */
         for (i = 0; i < MEMSIZE; i = i + 2) {           /* (stop runaway) */
             r = ptr_read (&ptc, TRUE);                  /* read frame */
-            if (r != SCPE_OK) return r;                 /* error? */
+            if (r != SCPE_OK)                           /* error? */
+                return r;
             if (ptc & PT_EL) {                          /* end record? */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 M[pa - 1] = 0;
@@ -249,7 +252,8 @@ switch (op) {                                           /* case on op */
             mc = ptr_to_alp[ptc];                       /* translate */
             if (bad_par[ptc] || (mc < 0)) {             /* bad par or char? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                if (io_stop)                            /* set return status */
+                    sta = STOP_INVCHR;
                 mc = 0;                                 /* store blank */
                 }
             M[pa] = (M[pa] & FLAG) | (mc & DIGIT);      /* store 2 digits */
@@ -273,7 +277,8 @@ uint32 i;
 uint8 ptc;
 t_stat r, sta;
 
-if ((cpu_unit.flags & IF_BIN) == 0) return STOP_INVIO;
+if ((cpu_unit.flags & IF_BIN) == 0)
+    return STOP_INVIO;
 
 sta = SCPE_OK;
 switch (op) {                                           /* case on op */
@@ -281,7 +286,8 @@ switch (op) {                                           /* case on op */
     case OP_RA:                                         /* read alphameric */
         for (i = 0; i < MEMSIZE; i = i + 2) {           /* (stop runaway) */
             r = ptr_read (&ptc, FALSE);                 /* read frame */
-            if (r != SCPE_OK) return r;                 /* error? */
+            if (r != SCPE_OK)                           /* error? */
+                return r;
             if (ptc & PT_EL) {                          /* end record? */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 M[pa - 1] = 0;
@@ -289,7 +295,8 @@ switch (op) {                                           /* case on op */
                 }
             if (bad_par[ptc]) {                         /* bad parity? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
-                if (io_stop) sta = STOP_INVCHR;         /* set return status */
+                if (io_stop)                            /* set return status */
+                    sta = STOP_INVCHR;
                 }
             M[pa] = (M[pa] & FLAG) | (ptc & 07);        /* store 2 digits */
             M[pa - 1] = (M[pa - 1] & FLAG) |
@@ -358,7 +365,8 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 int32 i;
 extern int32 saved_PC;
 
-for (i = 0; i < BOOT_LEN; i++) M[BOOT_START + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[BOOT_START + i] = boot_rom[i];
 saved_PC = BOOT_START;
 return SCPE_OK;
 }
@@ -397,7 +405,8 @@ switch (op) {                                           /* decode op */
                 CRETIOE (io_stop, STOP_INVCHR);
                 }
             r = ptp_write (ptc);                        /* write char */
-            if (r != SCPE_OK) return r;                 /* error? */
+            if (r != SCPE_OK)                           /* error? */
+                return r;
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
         break;          
@@ -428,9 +437,11 @@ switch (op) {                                           /* decode op */
             if ((d & REC_MARK) == REC_MARK)             /* 8-2 char? */
                 return ptp_write (PT_EL);               /* end record */
             ptc = ((z & 06) << 5) | ((z & 01) << 3) | (d & 07);
-            if (bad_par[ptc]) ptc = ptc | PT_C;         /* set parity */
+            if (bad_par[ptc])                           /* set parity */
+                ptc = ptc | PT_C;
             r = ptp_write (ptc);                        /* write char */
-            if (r != SCPE_OK) return r;                 /* error? */
+            if (r != SCPE_OK)                           /* error? */
+                return r;
             pa = ADDR_A (pa, 2);                        /* incr mem addr */
             }
         break;          
@@ -457,7 +468,8 @@ for (i = 0; i < MEMSIZE; i++) {                         /* stop runaway */
        ((d & REC_MARK) == REC_MARK))                    /* write: rec mark? */
         return ptp_write (PT_EL);                       /* end record */
     r = ptp_write (num_to_ptp[d]);                      /* write */
-    if (r != SCPE_OK) return r;                         /* error? */
+    if (r != SCPE_OK)                                   /* error? */
+        return r;
     PP (pa);                                            /* incr mem addr */
     }
 return STOP_RWRAP;

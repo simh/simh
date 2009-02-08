@@ -1,6 +1,6 @@
 /* i1620_dp.c: IBM 1311 disk simulator
 
-   Copyright (c) 2002-2005, Robert M. Supnik
+   Copyright (c) 2002-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -150,7 +150,8 @@ int32 drv, sa, sec, psec, cnt, qwc, qnr, t;
 UNIT *uptr;
 t_stat r;
 
-if (pa & 1) return STOP_INVDCF;                         /* dcf must be even */
+if (pa & 1)                                             /* dcf must be even */
+    return STOP_INVDCF;
 ind[IN_DACH] = ind[IN_DWLR] = 0;                        /* clr indicators */
 ind[IN_DERR] = ind[IN_DCYO] = 0;
 sa = ADDR_A (pa, DCF_SEC);                              /* ptr to sector */
@@ -159,7 +160,8 @@ if (((dp_unit[0].flags & UNIT_DIS) == 0) &&             /* only drive 0? */
      (dp_unit[2].flags & UNIT_DIS) &&
      (dp_unit[3].flags & UNIT_DIS)) drv = 0;            /* ignore drv select */
 else drv = (((M[pa] & 1)? M[pa]: M[sa]) & 0xE) >> 1;    /* drive # */
-if (drv >= DP_NUMDR) return STOP_INVDRV;                /* invalid? */
+if (drv >= DP_NUMDR)                                    /* invalid? */
+    return STOP_INVDRV;
 uptr = dp_dev.units + drv;                              /* get unit ptr */
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* attached? */
     ind[IN_DERR] = 1;                                   /* no, error */
@@ -170,7 +172,8 @@ sec = dp_cvt_bcd (sa, DCF_SEC_LEN);                     /* cvt sector */
 if ((sec < 0) || (sec >= (DP_NUMDR * DP_TOTSC)))        /* bad sector? */
     return STOP_INVDSC;
 if (op == OP_K) {                                       /* seek? */
-    if (f1 != FNC_SEEK) return STOP_INVFNC;             /* really? */
+    if (f1 != FNC_SEEK)                                 /* really? */
+        return STOP_INVFNC;
     uptr->CYL = (sec / (DP_NUMSF * DP_NUMSC)) %         /* set cyl # */
         DP_NUMCY;
     return SCPE_OK;                                     /* done! */
@@ -178,13 +181,17 @@ if (op == OP_K) {                                       /* seek? */
 
 cnt = dp_cvt_bcd (ADDR_A (pa, DCF_CNT), DCF_CNT_LEN);   /* get count */
 t = dp_cvt_bcd (ADDR_A (pa, DCF_ADR), DCF_ADR_LEN);     /* get address */
-if ((t < 0) || (t & 1)) return STOP_INVDBA;             /* bad address? */
+if ((t < 0) || (t & 1))                                 /* bad address? */
+    return STOP_INVDBA;
 dp_ba = t;                                              /* save addr */
 
-if (f1 >= FNC_WRI) return STOP_INVFNC;                  /* invalid func? */
-if (op == OP_RN) qwc = f1 & FNC_WCH;                    /* read? set wch */
+if (f1 >= FNC_WRI)                                      /* invalid func? */
+    return STOP_INVFNC;
+if (op == OP_RN)                                        /* read? set wch */
+    qwc = f1 & FNC_WCH;
 else if (op == OP_WN) {                                 /* write? */
-    if (op & FNC_WCH) return STOP_INVFNC;               /* cant check */
+    if (op & FNC_WCH)                                   /* cant check */
+        return STOP_INVFNC;
     f1 = f1 + FNC_WRI;                                  /* offset fnc */
     }
 else return STOP_INVFNC;                                /* not R or W */
@@ -193,9 +200,11 @@ qnr = f1 & FNC_NRL;                                     /* no rec check? */
 switch (f1 & ~(FNC_WCH | FNC_NRL)) {                    /* case on function */
 
     case FNC_SEC:                                       /* read sectors */
-        if (cnt <= 0) return STOP_INVDCN;               /* bad count? */
+        if (cnt <= 0)                                   /* bad count? */
+            return STOP_INVDCN;
         psec = dp_fndsec (uptr, sec, TRUE);             /* find sector */
-        if (psec < 0) CRETIOE (dp_stop, STOP_DACERR);   /* error? */
+        if (psec < 0)                                   /* error? */
+            CRETIOE (dp_stop, STOP_DACERR);
         do {                                            /* loop on count */
             if (r = dp_rdsec (uptr, psec, qnr, qwc))    /* read sector */
                 break;
@@ -216,12 +225,16 @@ switch (f1 & ~(FNC_WCH | FNC_NRL)) {                    /* case on function */
         break;                                          /* done, clean up */        
 
     case FNC_SEC + FNC_WRI:                             /* write */
-        if (cnt <= 0) return STOP_INVDCN;               /* bad count? */
+        if (cnt <= 0)                                   /* bad count? */
+            return STOP_INVDCN;
         psec = dp_fndsec (uptr, sec, FALSE);            /* find sector */
-        if (psec < 0) CRETIOE (dp_stop, STOP_DACERR);   /* error? */
+        if (psec < 0)                                   /* error? */
+            CRETIOE (dp_stop, STOP_DACERR);
         do {                                            /* loop on count */
-            if (r = dp_tstgm (M[dp_ba], qnr)) break;    /* start with gm? */
-            if (r = dp_wrsec (uptr, psec, qnr)) break;  /* write data */
+            if (r = dp_tstgm (M[dp_ba], qnr))           /* start with gm? */
+                break;
+            if (r = dp_wrsec (uptr, psec, qnr))         /* write data */
+                break;
             sec++; psec++;                              /* next sector */
             } while ((--cnt > 0) &&
               ((r = dp_nexsec (uptr, sec, psec, FALSE)) == SCPE_OK));
@@ -232,9 +245,12 @@ switch (f1 & ~(FNC_WCH | FNC_NRL)) {                    /* case on function */
                 return STOP_WRADIS;
         psec = dp_trkop (drv, sec);                     /* start of track */
         for (cnt = 0; cnt < DP_NUMSC; cnt++) {          /* full track */
-            if (r = dp_tstgm (M[dp_ba], qnr)) break;    /* start with gm? */
-            if (r = dp_wradr (uptr, psec, qnr)) break;  /* write addr */
-            if (r = dp_wrsec (uptr, psec, qnr)) break;  /* write data */
+            if (r = dp_tstgm (M[dp_ba], qnr))           /* start with gm? */
+                break;
+            if (r = dp_wradr (uptr, psec, qnr))         /* write addr */
+                break;
+            if (r = dp_wrsec (uptr, psec, qnr))         /* write data */
+                break;
             psec = dp_trkop (drv, sec) + ((psec + 1) % DP_NUMSC);
             }
         break;                                          /* done, clean up */
@@ -250,7 +266,8 @@ if ((r == SCPE_OK) && !qnr) {                           /* eor check? */
         }
     }
 if ((r != SCPE_OK) &&                                   /* error? */
-    (dp_stop || !ind[IN_DERR])) return r;               /* iochk or stop? */
+    (dp_stop || !ind[IN_DERR]))                         /* iochk or stop? */
+    return r;
 return SCPE_OK;                                         /* continue */
 }
 
@@ -282,7 +299,8 @@ for (i = 0; i < DP_ADDR; i++) {                         /* copy/check addr */
             }
         }
     else M[dp_ba] = ad & (FLAG | DIGIT);                /* store digit */
-    if (dp_tstgm (*ap, qnr)) return STOP_WRLERR;        /* grp mrk on disk? */
+    if (dp_tstgm (*ap, qnr))                            /* grp mrk on disk? */
+        return STOP_WRLERR;
     ap++; PP (dp_ba);                                   /* adv ptrs */
     }
 return SCPE_OK;
@@ -306,7 +324,8 @@ for (i = 0; i < DP_DATA; i++) {                         /* copy data */
             }
         }
     else M[dp_ba] = *ap & (FLAG | DIGIT);               /* flag + digit */
-    if (dp_tstgm (*ap, qnr)) return STOP_WRLERR;        /* grp mrk on disk? */
+    if (dp_tstgm (*ap, qnr))                            /* grp mrk on disk? */
+        return STOP_WRLERR;
     ap++; PP (dp_ba);                                   /* adv ptrs */
     }
 return SCPE_OK;
@@ -322,7 +341,8 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da;             /* buf ptr */
 
 for (i = 0; i < DP_ADDR; i++) {                         /* copy address */
     *ap = M[dp_ba] & (FLAG | DIGIT);                    /* flag + digit */
-    if (da >= uptr->hwmark) uptr->hwmark = da + 1;
+    if (da >= uptr->hwmark)
+        uptr->hwmark = da + 1;
     if (dp_tstgm (*ap, qnr)) {                          /* grp mrk fm mem? */
         dp_fill (uptr, da + 1, DP_NUMCH - i - 1);       /* fill addr+data */
         return STOP_WRLERR;                             /* error */
@@ -342,7 +362,8 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da;             /* buf ptr */
 
 for (i = 0; i < DP_DATA; i++) {                         /* copy data */
     *ap = M[dp_ba] & (FLAG | DIGIT);                    /* get character */
-    if (da >= uptr->hwmark) uptr->hwmark = da + 1;
+    if (da >= uptr->hwmark)
+        uptr->hwmark = da + 1;
     if (dp_tstgm (*ap, qnr)) {                          /* grp mrk fm mem? */
         dp_fill (uptr, da + 1, DP_DATA - i - 1);        /* fill data */ 
         return STOP_WRLERR;                             /* error */
@@ -362,10 +383,12 @@ int32 da = psec * DP_NUMCH;                             /* char number */
 uint8 *ap = ((uint8 *) uptr->filebuf) + da;             /* buf ptr */
 int32 dskad, i;
 
-if (dp_zeroad (ap)) return psec;                        /* addr zero? ok */
+if (dp_zeroad (ap))                                     /* addr zero? ok */
+    return psec;
 dskad = dp_cvt_ad (ap);                                 /* cvt addr */
 if (dskad == sec) {                                     /* match? */
-    if (rd || ((*ap & FLAG) == 0)) return psec;         /* read or !wprot? */
+    if (rd || ((*ap & FLAG) == 0))                      /* read or !wprot? */
+        return psec;
     ind[IN_DACH] = ind[IN_DERR] = 1;                    /* no match */
     return -1;
     }           
@@ -373,10 +396,12 @@ psec = psec - (psec % DP_NUMSC);                        /* sector 0 */
 for (i = 0; i < DP_NUMSC; i++, psec++) {                /* check track */
     da = psec * DP_NUMCH;                               /* char number */
     ap = ((uint8 *) uptr->filebuf) + da;                /* word pointer */
-    if (dp_zeroad (ap)) continue;                       /* no implicit match */
+    if (dp_zeroad (ap))                                 /* no implicit match */
+        continue;
     dskad = dp_cvt_ad (ap);                             /* cvt addr */
     if (dskad == sec) {                                 /* match? */
-        if (rd || ((*ap & FLAG) == 0)) return psec;     /* read or !wprot? */
+        if (rd || ((*ap & FLAG) == 0))                  /* read or !wprot? */
+            return psec;
         ind[IN_DACH] = ind[IN_DERR] = 1;                /* no match */
         return -1;
         }
@@ -395,10 +420,12 @@ uint8 *ap = ((uint8 *) uptr->filebuf) + da;             /* buf ptr */
 int32 dskad;
 
 if (ctrk) {                                             /* not trk zero? */
-    if (dp_zeroad (ap)) return SCPE_OK;                 /* addr zero? ok */
+    if (dp_zeroad (ap))                                 /* addr zero? ok */
+        return SCPE_OK;
     dskad = dp_cvt_ad (ap);                             /* cvt addr */
     if ((dskad == sec) &&                               /* match? */
-       (rd || ((*ap & FLAG) == 0))) return SCPE_OK;     /* read or !wprot? */
+       (rd || ((*ap & FLAG) == 0)))                     /* read or !wprot? */
+       return SCPE_OK;
     ind[IN_DACH] = ind[IN_DERR] = 1;                    /* no, error */
     return STOP_DACERR;
     }
@@ -413,7 +440,8 @@ t_bool dp_zeroad (uint8 *ap)
 int32 i;
 
 for (i = 0; i < DP_ADDR; i++, ap++) {                   /* loop thru addr */
-    if (*ap & DIGIT) return FALSE;                      /* nonzero? lose */
+    if (*ap & DIGIT)                                    /* nonzero? lose */
+        return FALSE;
     }
 return TRUE;                                            /* all zeroes */
 }
@@ -438,7 +466,8 @@ uint8 c;
 
 for (i = r = 0; i < DP_ADDR; i++, ap++) {               /* loop thru addr */
     c = *ap & DIGIT;                                    /* get digit */
-    if (BAD_DIGIT (c)) return -1;                       /* bad digit? */
+    if (BAD_DIGIT (c))                                  /* bad digit? */
+        return -1;
     r = (r * 10) + c;                                   /* bcd to binary */
     }
 return r;
@@ -463,7 +492,8 @@ int32 r;
 
 for (r = 0; len > 0; len--) {                           /* loop thru char */
     c = M[ad] & DIGIT;                                  /* get digit */
-    if (BAD_DIGIT (c)) return -1;                       /* invalid? */
+    if (BAD_DIGIT (c))                                  /* invalid? */
+        return -1;
     r = (r * 10) + c;                                   /* cvt to bin */
     PP (ad);                                            /* next digit */
     }
@@ -476,7 +506,8 @@ void dp_fill (UNIT *uptr, uint32 da, int32 cnt)
 {
 while (cnt-- > 0) {                                     /* fill with zeroes*/
     *(((uint8 *) uptr->filebuf) + da) = 0;
-    if (da >= uptr->hwmark) uptr->hwmark = da + 1;
+    if (da >= uptr->hwmark)
+        uptr->hwmark = da + 1;
     da++;
     }
 return;
@@ -488,7 +519,8 @@ t_stat dp_reset (DEVICE *dptr)
 {
 int32 i;
 
-for (i = 0; i < DP_NUMDR; i++) dp_unit[i].CYL = 0;      /* reset cylinder */
+for (i = 0; i < DP_NUMDR; i++)                          /* reset cylinder */
+    dp_unit[i].CYL = 0;
 ind[IN_DACH] = ind[IN_DWLR] = 0;                        /* clr indicators */
 ind[IN_DERR] = ind[IN_DCYO] = 0;
 return SCPE_OK;

@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2007, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -114,7 +114,8 @@ int32 i, t, wm, sup;
 char *bcd2asc;
 static char lbuf[LPT_WIDTH + 1];                        /* + null */
 
-if ((lpt_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT; /* attached? */
+if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
+    return SCPE_UNATT;
 wm = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_SQUARE);
 sup = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_S);
 ind[IN_LPT] = 0;                                        /* clear error */
@@ -123,14 +124,18 @@ if (conv_old)                                           /* get print chain */
 else bcd2asc = pch_table[GET_PCHAIN (lpt_unit.flags)];
 for (i = 0; i < LPT_WIDTH; i++) {                       /* convert print buf */
     t = M[LPT_BUF + i];
-    if (wm) lbuf[i] = (t & WM)? '1': ' ';               /* wmarks -> 1 or sp */
+    if (wm)                                             /* wmarks -> 1 or sp */
+        lbuf[i] = (t & WM)? '1': ' ';
     else lbuf[i] = bcd2asc[t & CHAR];                   /* normal */
     }
 lbuf[LPT_WIDTH] = 0;                                    /* trailing null */
-for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--) lbuf[i] = 0;
+for (i = LPT_WIDTH - 1; (i >= 0) && (lbuf[i] == ' '); i--)
+    lbuf[i] = 0;
 fputs (lbuf, lpt_unit.fileref);                         /* write line */
-if (lines) space (lines, lflag);                        /* cc action? do it */
-else if (sup == 0) space (1, FALSE);                    /* default? 1 line */
+if (lines)                                              /* cc action? do it */
+    space (lines, lflag); 
+else if (sup == 0)                                      /* default? 1 line */
+    space (1, FALSE);
 else {
     fputc ('\r', lpt_unit.fileref);                     /* sup -> overprint */
     lpt_unit.pos = ftell (lpt_unit.fileref);            /* update position */
@@ -140,7 +145,8 @@ if (ferror (lpt_unit.fileref)) {                        /* error? */
     ind[IN_LPT] = 1;
     perror ("Line printer I/O error");
     clearerr (lpt_unit.fileref);
-    if (iochk) return SCPE_IOERR;
+    if (iochk)
+        return SCPE_IOERR;
     }
 return SCPE_OK;
 }
@@ -165,7 +171,8 @@ mod = mod & DIGIT;                                      /* isolate value */
 switch (action) {
 
     case 0:                                             /* to channel now */
-        if ((mod == 0) || (mod > 12) || CHP (mod, cct[cctptr])) return SCPE_OK;
+        if ((mod == 0) || (mod > 12) || CHP (mod, cct[cctptr]))
+            return SCPE_OK;
         for (i = 1; i < cctlnt + 1; i++) {              /* sweep thru cct */
             if (CHP (mod, cct[(cctptr + i) % cctlnt]))
                 return space (i, TRUE);
@@ -181,11 +188,13 @@ switch (action) {
         return SCPE_OK;
 
     case 2:                                             /* space now */
-        if (mod <= 3) return space (mod, FALSE);
+        if (mod <= 3)
+            return space (mod, FALSE);
         return SCPE_OK;
 
     case 3:                                             /* to channel after */
-        if ((mod == 0) || (mod > 12)) return SCPE_OK;   /* check channel */
+        if ((mod == 0) || (mod > 12))                   /* check channel */
+            return SCPE_OK;
         ind[IN_CC9] = ind[IN_CC12] = 0;
         for (i = 1; i < cctlnt + 1; i++) {              /* sweep thru cct */
             if (CHP (mod, cct[(cctptr + i) % cctlnt])) {
@@ -211,12 +220,14 @@ t_stat space (int32 count, int32 sflag)
 {
 int32 i;
 
-if ((lpt_unit.flags & UNIT_ATT) == 0) return SCPE_UNATT;
+if ((lpt_unit.flags & UNIT_ATT) == 0)
+    return SCPE_UNATT;
 cctptr = (cctptr + count) % cctlnt;                     /* adv cct, mod lnt */
 if (sflag && CHP (0, cct[cctptr]))                      /* skip, top of form? */
     fputs ("\n\f", lpt_unit.fileref);                   /* nl, ff */
 else {
-    for (i = 0; i < count; i++) fputc ('\n', lpt_unit.fileref);
+    for (i = 0; i < count; i++)
+        fputc ('\n', lpt_unit.fileref);
     }
 lpt_unit.pos = ftell (lpt_unit.fileref);                /* update position */
 ind[IN_CC9] = CHP (9, cct[cctptr]) != 0;                /* set indicators */

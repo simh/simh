@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -438,7 +438,8 @@ update_tucs (0, drv);                                   /* update status */
 switch (j) {                                            /* decode PA<4:1> */
 
     case 000:                                           /* MTCS1 */
-        if (fmtr != 0) *data = tucs1 & ~CS1_DRV;
+        if (fmtr != 0)
+            *data = tucs1 & ~CS1_DRV;
         else *data = tucs1;
         break;
 
@@ -526,7 +527,8 @@ if (reg_in_fmtr1[j] && ((tucs1 & CS1_DONE) == 0)) {     /* formatter busy? */
 switch (j) {                                            /* decode PA<4:1> */
 
     case 000:                                           /* MTCS1 */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
         if (data & CS1_TRE) {                           /* error clear? */
             tucs1 = tucs1 & ~CS1_TRE;                   /* clr CS1<TRE> */
             tucs2 = tucs2 & ~CS2_ERR;                   /* clr CS2<15:8> */
@@ -544,67 +546,79 @@ switch (j) {                                            /* decode PA<4:1> */
                 cs1f = CS1_SC;                          /* req interrupt */
                 }
             else if (tucs1 & CS1_GO) {                  /* busy? */
-                if (tucs1 & CS1_DONE) set_tuer (ER_RMR);
+                if (tucs1 & CS1_DONE)
+                    set_tuer (ER_RMR);
                 else tucs2 = tucs2 | CS2_PGE;
                 }
             else {
                 tucs1 = (tucs1 & ~CS1_DRV) | (data & CS1_DRV);
-                if (tucs1 & CS1_GO) tu_go (drv);
+                if (tucs1 & CS1_GO)
+                    tu_go (drv);
                 }
             }
         break;  
 
     case 001:                                           /* MTWC */
-        if (access == WRITEB) data = (PA & 1)?
-            (tuwc & 0377) | (data << 8): (tuwc & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (tuwc & 0377) | (data << 8): (tuwc & ~0377) | data;
         tuwc = data;
         break;
 
     case 002:                                           /* MTBA */
-        if (access == WRITEB) data = (PA & 1)?
-            (tuba & 0377) | (data << 8): (tuba & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (tuba & 0377) | (data << 8): (tuba & ~0377) | data;
         tuba = data & ~BA_MBZ;
         break;
 
     case 003:                                           /* MTFC */
-        if (access == WRITEB) data = (PA & 1)?
-            (tufc & 0377) | (data << 8): (tufc & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (tufc & 0377) | (data << 8): (tufc & ~0377) | data;
         tufc = data;
         tutc = tutc | TC_FCS;                           /* set fc flag */
         break;
 
     case 004:                                           /* MTCS2 */
-        if ((access == WRITEB) && (PA & 1)) data = data << 8;
-        if (data & CS2_CLR) tu_reset (&tu_dev);         /* init? */
+        if ((access == WRITEB) && (PA & 1))
+            data = data << 8;
+        if (data & CS2_CLR)                             /* init? */
+            tu_reset (&tu_dev);
         else {
             if ((data & ~tucs2) & (CS2_PE | CS2_MXF))
                 cs1f = CS1_SC;                          /* diagn intr */
-            if (access == WRITEB) data = (tucs2 &       /* merge data */
-                ((PA & 1)? 0377: 0177400)) | data;
+            if (access == WRITEB)                       /* merge data */
+                data = (tucs2 & ((PA & 1)? 0377: 0177400)) | data;
             tucs2 = (tucs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR | CS2_OR;
             }
         break;
 
     case 007:                                           /* MTAS */
-        if ((access == WRITEB) && (PA & 1)) break;
-        if (data & AS_U0) tufs = tufs & ~FS_ATA;
+        if ((access == WRITEB) && (PA & 1))
+            break;
+        if (data & AS_U0)
+            tufs = tufs & ~FS_ATA;
         break;
 
     case 011:                                           /* MTDB */
-        if (access == WRITEB) data = (PA & 1)?
-            (tudb & 0377) | (data << 8): (tudb & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (tudb & 0377) | (data << 8): (tudb & ~0377) | data;
         tudb = data;
         break;
 
     case 012:                                           /* MTMR */
-        if (access == WRITEB) data = (PA & 1)?
-            (tumr & 0377) | (data << 8): (tumr & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (tumr & 0377) | (data << 8): (tumr & ~0377) | data;
         tumr = (tumr & ~MR_RW) | (data & MR_RW);
         break;
 
     case 015:                                           /* MTTC */
-        if (access == WRITEB) data = (PA & 1)?
-            (tutc & 0377) | (data << 8): (tutc & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?
+                   (tutc & 0377) | (data << 8): (tutc & ~0377) | data;
         tutc = (tutc & ~TC_RW) | (data & TC_RW) | TC_SAC;
         drv = GET_DRV (tutc);
         break;
@@ -635,9 +649,9 @@ UNIT *uptr;
 fnc = GET_FNC (tucs1);                                  /* get function */
 den = GET_DEN (tutc);                                   /* get density */
 uptr = tu_dev.units + drv;                              /* get unit */
-if (DEBUG_PRS (tu_dev)) fprintf (sim_deb,
-    ">>TU%d STRT: fnc=%s, cs1=%06o, cs2=%06o, ba=%06o, wc=%06o, fc=%06o, fs=%06o, er=%06o, pos=%d\n",
-    drv, tu_fname[fnc], tucs1, tucs2, tuba, tuwc, tufc, tufs, tuer, uptr->pos);
+if (DEBUG_PRS (tu_dev))
+    fprintf (sim_deb, ">>TU%d STRT: fnc=%s, cs1=%06o, cs2=%06o, ba=%06o, wc=%06o, fc=%06o, fs=%06o, er=%06o, pos=%d\n",
+             drv, tu_fname[fnc], tucs1, tucs2, tuba, tuwc, tufc, tufs, tuer, uptr->pos);
 if ((fnc != FNC_FCLR) &&                                /* not clear & err */
     ((tufs & FS_ERR) || sim_is_active (uptr))) {        /* or in motion? */
     set_tuer (ER_ILF);                                  /* set err, ATN */
@@ -728,7 +742,8 @@ switch (fnc) {                                          /* case on function */
             set_tuer (ER_FER);
             break;
             }
-        if (uptr->UDENS == UD_UNK) uptr->UDENS = den;   /* set dens */
+        if (uptr->UDENS == UD_UNK)                      /* set dens */
+            uptr->UDENS = den;
         uptr->USTAT = 0;
         goto GO_XFER;
 
@@ -757,7 +772,8 @@ switch (fnc) {                                          /* case on function */
             set_tuer (ER_FER);
             break;
             }
-        if (uptr->UDENS == UD_UNK) uptr->UDENS = den;   /* set dens */
+        if (uptr->UDENS == UD_UNK)                      /* set dens */
+            uptr->UDENS = den;
         uptr->USTAT = 0;
         tucs1 = tucs1 & ~CS1_DONE;                      /* clear done */
     GO_XFER:
@@ -822,7 +838,8 @@ switch (fnc) {                                          /* case on function */
                 break;
                 }
             } while ((tufc != 0) && !sim_tape_eot (uptr));
-        if (tufc) set_tuer (ER_FCE);
+        if (tufc)
+            set_tuer (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         tufs = tufs | FS_ATA;
         break;
@@ -835,7 +852,8 @@ switch (fnc) {                                          /* case on function */
                 break;
                 }
             } while (tufc != 0);
-        if (tufc) set_tuer (ER_FCE);
+        if (tufc)
+            set_tuer (ER_FCE);
         else tutc = tutc & ~TC_FCS;
         tufs = tufs | FS_ATA;
         break;
@@ -872,7 +890,8 @@ switch (fnc) {                                          /* case on function */
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
         TXFR (ba, wc, 0);                               /* validate transfer */
         if (st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR)) { /* read fwd */
-            if (st == MTSE_TMK) set_tuer (ER_FCE);      /* TMK also sets FCE */
+            if (st == MTSE_TMK)                         /* TMK also sets FCE */
+                set_tuer (ER_FCE);
             r = tu_map_err (uptr, st, 1);               /* map error */
             break;                                      /* done */
             }
@@ -880,10 +899,13 @@ switch (fnc) {                                          /* case on function */
             if ((i == 0) || NEWPAGE (ba10 + i, 0)) {    /* map new page */
                 MAPM (ba10 + i, mpa10, 0);
                 }
-            for (k = 0; k < 4; k++) v[k] = xbuf[j++];
+            for (k = 0; k < 4; k++)
+                v[k] = xbuf[j++];
             val = (v[0] << 28) | (v[1] << 20) | (v[2] << 12) | (v[3] << 4);
-            if (fmt == TC_10C) val = val | ((d10) xbuf[j++] & 017);
-            if (fnc == FNC_READF) M[mpa10] = val;       /* read? store */
+            if (fmt == TC_10C)
+                val = val | ((d10) xbuf[j++] & 017);
+            if (fnc == FNC_READF)                       /* read? store */
+                M[mpa10] = val;
             else if (M[mpa10] != val) {                 /* wchk, mismatch? */
                 tucs2 = tucs2 | CS2_WCE;                /* flag, stop */
                 break;
@@ -893,7 +915,8 @@ switch (fnc) {                                          /* case on function */
         tufc = tbc & 0177777;
         tuwc = (tuwc + (i << 1)) & 0177777;
         ba = ba + (i << 2);
-        if (tuwc) set_tuer (ER_FCE);                    /* short record? */
+        if (tuwc)                                       /* short record? */
+            set_tuer (ER_FCE);
         break;
 
     case FNC_WRITE:                                     /* write */
@@ -907,15 +930,18 @@ switch (fnc) {                                          /* case on function */
             xbuf[j++] = (uint8) ((val >> 20) & 0377);
             xbuf[j++] = (uint8) ((val >> 12) & 0377);
             xbuf[j++] = (uint8) ((val >> 4) & 0377);
-            if (fmt == TC_10C) xbuf[j++] = (uint8) (val & 017);
+            if (fmt == TC_10C)
+                xbuf[j++] = (uint8) (val & 017);
             mpa10 = mpa10 + 1;
             }                                           /* end for */
-        if (j < fc) fc = j;                             /* short record? */
+        if (j < fc)                                     /* short record? */
+            fc = j;
         if (st = sim_tape_wrrecf (uptr, xbuf, fc))      /* write rec, err? */
             r = tu_map_err (uptr, st, 1);               /* map error */
         else {
             tufc = (tufc + fc) & 0177777;
-            if (tufc == 0) tutc = tutc & ~TC_FCS;
+            if (tufc == 0)
+                tutc = tutc & ~TC_FCS;
             tuwc = (tuwc + (i << 1)) & 0177777;
             ba = ba + (i << 2);
             }
@@ -926,19 +952,23 @@ switch (fnc) {                                          /* case on function */
         tufc = 0;                                       /* clear frame count */
         TXFR (ba, wc, 1);                               /* validate xfer rev */
         if (st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR)) { /* read rev */
-            if (st == MTSE_TMK) set_tuer (ER_FCE);      /* TMK also sets FCE */
+            if (st == MTSE_TMK)                         /* TMK also sets FCE */
+                set_tuer (ER_FCE);
             r = tu_map_err (uptr, st, 1);               /* map error */
             break;                                      /* done */
             }
-        for (i = 0; i < 4; i++) xbuf[i] = 0;
+        for (i = 0; i < 4; i++)
+            xbuf[i] = 0;
         for (i = 0, j = tbc + 4; (i < wc10) && (j >= 4); i++) {
             if ((i == 0) || NEWPAGE (ba10 - i, PAG_M_OFF)) { /* map page */
                 MAPM (ba10 - i, mpa10, UMAP_RRV);
                 }
             val = ((fmt == TC_10C)? (((d10) xbuf [--j]) & 017): 0);
-            for (k = 0; k < 4; i++) v[k] = xbuf[--j];
+            for (k = 0; k < 4; i++)
+                v[k] = xbuf[--j];
             val = val | (v[0] << 4) | (v[1] << 12) | (v[2] << 20) | (v[3] << 28);
-            if (fnc == FNC_READR) M[mpa10] = val;       /* read? store */
+            if (fnc == FNC_READR)                       /* read? store */
+                M[mpa10] = val;
             else if (M[mpa10] != val) {                 /* wchk, mismatch? */
                 tucs2 = tucs2 | CS2_WCE;                /* flag, stop */
                 break;
@@ -948,18 +978,20 @@ switch (fnc) {                                          /* case on function */
         tufc = tbc & 0177777;
         tuwc = (tuwc + (i << 1)) & 0177777;
         ba = ba - (i << 2);
-        if (tuwc) set_tuer (ER_FCE);                    /* short record? */
+        if (tuwc)                                       /* short record? */
+            set_tuer (ER_FCE);
         break;
         }                                               /* end case */
 
 tucs1 = (tucs1 & ~CS1_UAE) | ((ba >> (16 - CS1_V_UAE)) & CS1_UAE);
 tuba = ba & 0177777;                                    /* update mem addr */
 tucs1 = tucs1 & ~CS1_GO;                                /* clear go */
-if (fnc >= FNC_XFER) update_tucs (CS1_DONE, drv);       /* data xfer? */
+if (fnc >= FNC_XFER)                                    /* data xfer? */
+    update_tucs (CS1_DONE, drv);
 else update_tucs (CS1_SC, drv);                         /* no, set attn */
-if (DEBUG_PRS (tu_dev)) fprintf (sim_deb,
-    ">>TU%d DONE: fnc=%s, cs1=%06o, cs2=%06o, ba=%06o, wc=%06o, fc=%06o, fs=%06o, er=%06o, pos=%d\n",
-    drv, tu_fname[fnc], tucs1, tucs2, tuba, tuwc, tufc, tufs, tuer, uptr->pos);
+if (DEBUG_PRS (tu_dev))
+    fprintf (sim_deb, ">>TU%d DONE: fnc=%s, cs1=%06o, cs2=%06o, ba=%06o, wc=%06o, fc=%06o, fs=%06o, er=%06o, pos=%d\n",
+             drv, tu_fname[fnc], tucs1, tucs2, tuba, tuwc, tufc, tufs, tuer, uptr->pos);
 return SCPE_OK;
 }
 
@@ -991,24 +1023,33 @@ if (GET_FMTR (tucs2) == 0) {                            /* formatter present? */
     tufs = (tufs & ~FS_DYN) | FS_FPR;
     if (tu_unit[drv].flags & UNIT_ATT) {
         tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
-        if (tu_unit[drv].UDENS == TC_1600) tufs = tufs | FS_PE;
-        if (sim_tape_wrp (&tu_unit[drv])) tufs = tufs | FS_WRL;
+        if (tu_unit[drv].UDENS == TC_1600)
+            tufs = tufs | FS_PE;
+        if (sim_tape_wrp (&tu_unit[drv]))
+            tufs = tufs | FS_WRL;
         if (!act) {
-            if (sim_tape_bot (&tu_unit[drv])) tufs = tufs | FS_BOT;
-            if (sim_tape_eot (&tu_unit[drv])) tufs = tufs | FS_EOT;
+            if (sim_tape_bot (&tu_unit[drv]))
+                tufs = tufs | FS_BOT;
+            if (sim_tape_eot (&tu_unit[drv]))
+                tufs = tufs | FS_EOT;
             }
         }
-    if (tuer) tufs = tufs | FS_ERR;
+    if (tuer)
+        tufs = tufs | FS_ERR;
     }
 else tufs = 0;
 tucs1 = (tucs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ)) | CS1_DVA | flag;
-if (tucs2 & CS2_ERR) tucs1 = tucs1 | CS1_TRE | CS1_SC;
-else if (tucs1 & CS1_TRE) tucs1 = tucs1 | CS1_SC;
-if (tufs & FS_ATA) tucs1 = tucs1 | CS1_SC;
+if (tucs2 & CS2_ERR)
+    tucs1 = tucs1 | CS1_TRE | CS1_SC;
+else if (tucs1 & CS1_TRE)
+    tucs1 = tucs1 | CS1_SC;
+if (tufs & FS_ATA)
+    tucs1 = tucs1 | CS1_SC;
 if (tuiff || ((tucs1 & CS1_SC) && (tucs1 & CS1_DONE) && (tucs1 & CS1_IE)))
     int_req = int_req | INT_TU;
 else int_req = int_req & ~INT_TU;
-if ((tucs1 & CS1_DONE) && tufs && !act) tufs = tufs | FS_RDY;
+if ((tucs1 & CS1_DONE) && tufs && !act)
+    tufs = tufs | FS_RDY;
 return;
 }
 
@@ -1030,7 +1071,8 @@ switch (st) {
     case MTSE_FMT:                                      /* illegal fmt */
     case MTSE_UNATT:                                    /* not attached */
         set_tuer (ER_NXF);                              /* can't execute */
-        if (qdt) tucs1 = tucs1 | CS1_TRE;               /* data xfr? set TRE */
+        if (qdt)                                        /* data xfr? set TRE */
+            tucs1 = tucs1 | CS1_TRE;
     case MTSE_OK:                                       /* no error */
         return SCPE_IERR;
 
@@ -1040,23 +1082,28 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         set_tuer (ER_VPE);                              /* flag error */
-        if (qdt) tucs1 = tucs1 | CS1_TRE;               /* data xfr? set TRE */
-        if (tu_stopioe) return SCPE_IOERR;
+        if (qdt)                                        /* data xfr? set TRE */
+            tucs1 = tucs1 | CS1_TRE;
+        if (tu_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
         set_tuer (ER_VPE);                              /* flag error */
-        if (qdt) tucs1 = tucs1 | CS1_TRE;               /* data xfr? set TRE */
+        if (qdt)                                        /* data xfr? set TRE */
+            tucs1 = tucs1 | CS1_TRE;
         return SCPE_MTRLNT;
 
     case MTSE_RECE:                                     /* record in error */
         set_tuer (ER_CRC);                              /* set crc err */
-        if (qdt) tucs1 = tucs1 | CS1_TRE;               /* data xfr? set TRE */
+        if (qdt)                                        /* data xfr? set TRE */
+            tucs1 = tucs1 | CS1_TRE;
         break;
 
     case MTSE_EOM:                                      /* end of medium */
         set_tuer (ER_OPI);                              /* incomplete */
-        if (qdt) tucs1 = tucs1 | CS1_TRE;               /* data xfr? set TRE */
+        if (qdt)                                        /* data xfr? set TRE */
+            tucs1 = tucs1 | CS1_TRE;
         break;
 
     case MTSE_BOT:                                      /* reverse into BOT */
@@ -1064,7 +1111,8 @@ switch (st) {
 
     case MTSE_WRP:                                      /* write protect */
         set_tuer (ER_NXF);                              /* can't execute */
-        if (qdt) tucs1 = tucs1 | CS1_TRE;               /* data xfr? set TRE */
+        if (qdt)                                        /* data xfr? set TRE */
+            tucs1 = tucs1 | CS1_TRE;
         break;
         }
 
@@ -1085,7 +1133,8 @@ tuwc = 0;
 tufc = 0;
 tuer = 0;
 tufs = FS_FPR | FS_RDY;
-if (sim_switches & SWMASK ('P')) tutc = 0;              /* powerup? clr TC */
+if (sim_switches & SWMASK ('P'))                        /* powerup? clr TC */
+    tutc = 0;
 else tutc = tutc & ~TC_FCS;                             /* no, clr <fcs> */
 tuiff = 0;                                              /* clear CSTB INTR */
 int_req = int_req & ~INT_TU;                            /* clear interrupt */
@@ -1095,8 +1144,10 @@ for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
     sim_cancel (uptr);                                  /* cancel activity */
     uptr->USTAT = 0;
     }
-if (xbuf == NULL) xbuf = (uint8 *) calloc (MT_MAXFR + 4, sizeof (uint8));
-if (xbuf == NULL) return SCPE_MEM;
+if (xbuf == NULL)
+    xbuf = (uint8 *) calloc (MT_MAXFR + 4, sizeof (uint8));
+if (xbuf == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -1108,7 +1159,8 @@ int32 drv = uptr - tu_dev.units;
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->USTAT = 0;                                        /* clear unit status */
 uptr->UDENS = UD_UNK;                                   /* unknown density */
 tufs = tufs | FS_ATA | FS_SSC;                          /* set attention */
@@ -1124,7 +1176,8 @@ t_stat tu_detach (UNIT* uptr)
 {
 int32 drv = uptr - tu_dev.units;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
 if (sim_is_active (uptr)) {                             /* unit active? */
     sim_cancel (uptr);                                  /* cancel operation */
     tuer = tuer | ER_UNS;                               /* set formatter error */

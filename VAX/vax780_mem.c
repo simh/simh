@@ -1,6 +1,6 @@
 /* vax780_mem.c: VAX 11/780 memory controllers
 
-   Copyright (c) 2004-2005, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -185,7 +185,8 @@ switch (ofs) {
         break;
 
     case MCRD_OF:                                       /* CR D */
-        if (!extmem) return SCPE_NXM;                   /* MS780E only */
+        if (!extmem)                                    /* MS780E only */
+            return SCPE_NXM;
         *val = mcr_d[mctl] & MCRC_E_RD;
         break;
 
@@ -228,7 +229,8 @@ switch (ofs) {
         break;
 
     case MCRD_OF:                                       /* CR D */
-        if (!extmem) return SCPE_NXM;                   /* MS780E only */
+        if (!extmem)                                    /* MS780E only */
+            return SCPE_NXM;
         mcr_d[mctl] = ((mcr_d[mctl] & ~MCRC_WR) | (val & MCRC_WR)) &
             ~(val & MCRC_E_W1C);
         break;

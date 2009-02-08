@@ -1,6 +1,6 @@
 /* pdp18b_mt.c: 18b PDP magnetic tape simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    mt           (PDP-9) TC59 magtape
                 (PDP-15) TC59D magtape
 
+   14-Nov-08    RMS     Replaced mt_log with standard debug facility
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    18-Mar-05    RMS     Added attached test to detach routine
@@ -126,12 +127,12 @@
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
+extern FILE *sim_deb;
 
 int32 mt_cu = 0;                                        /* command/unit */
 int32 mt_sta = 0;                                       /* status register */
 int32 mt_time = 10;                                     /* record latency */
 int32 mt_stopioe = 1;                                   /* stop on error */
-int32 mt_log = 0;
 uint8 *mtxb = NULL;                                     /* transfer buffer */
 
 DEVICE mt_dev;
@@ -177,7 +178,6 @@ REG mt_reg[] = {
     { URDATA (UST, mt_unit[0].USTAT, 8, 16, 0, MT_NUMDR, 0) },
     { URDATA (POS, mt_unit[0].pos, 10, T_ADDR_W, 0,
               MT_NUMDR, PV_LEFT | REG_RO) },
-    { FLDATA (LOG, mt_log, 0), REG_HIDDEN },
     { ORDATA (DEVNO, mt_dib.dev, 6), REG_HRO },
     { NULL }
     };
@@ -199,7 +199,7 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     NULL, &mt_attach, &mt_detach,
-    &mt_dib, DEV_DISABLE
+    &mt_dib, DEV_DISABLE | DEV_DEBUG
     };
 
 /* IOT routine */
@@ -221,13 +221,15 @@ if (pulse & 01) {
     else if ((sb == 040) && (mt_sta & (STA_ERR | STA_DON))) /* MTSF */
         dat = IOT_SKP | dat;
     }
-if ((pulse & 06) && mt_log)
-    printf ("[MT%d: IOT=%o, AC=%o, sta=%o]\n",
-       GET_UNIT (mt_cu), 0707300 + pulse, dat, mt_sta);
+if ((pulse & 06) && DEBUG_PRS (mt_dev))
+    fprintf (sim_deb, "[MT%d: IOT=%o, AC=%o, sta=%o]\n",
+             GET_UNIT (mt_cu), 0707300 + pulse, dat, mt_sta);
 if (pulse & 02) {
-    if (sb == 000) dat = dat | (mt_cu & 0777700);       /* MTRC */
+    if (sb == 000)                                      /* MTRC */
+        dat = dat | (mt_cu & 0777700);
     else if (sb == 020) {                               /* MTAF, MTLC */
-        if (!mt_busy ()) mt_cu = mt_sta = 0;            /* if not busy, clr */
+        if (!mt_busy ())                                /* if not busy, clr */
+            mt_cu = mt_sta = 0;
         mt_sta = mt_sta & ~(STA_ERR | STA_DON);         /* clear flags */
         }
     else if (sb == 040) dat = dat | mt_sta;             /* MTRS */
@@ -243,7 +245,8 @@ if (pulse & 04) {
             ((uptr->flags & UNIT_ATT) == 0))
             mt_sta = mt_sta | STA_ILL | STA_ERR;        /* set illegal op */
         else {
-            if (f == FN_REWIND) uptr->USTAT = STA_REW;  /* rewind? */
+            if (f == FN_REWIND)                         /* rewind? */
+                uptr->USTAT = STA_REW;
             else mt_sta = uptr->USTAT = 0;              /* no, clear status */
             sim_activate (uptr, mt_time);               /* start io */
             }
@@ -275,10 +278,13 @@ wc = WC_SIZE - (M[MT_WC] & WC_MASK);                    /* word count is 12b */
 
 if (uptr->USTAT & STA_REW) {                            /* rewind? */
     sim_tape_rewind (uptr);                             /* rewind tape */
-    if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_BOT;
+    if (uptr->flags & UNIT_ATT)
+        uptr->USTAT = STA_BOT;
     else uptr->USTAT = 0;
-    if (u == GET_UNIT (mt_cu)) mt_updcsta (uptr, STA_DON);
-    if (mt_log) printf ("[MT%d: rewind complete, sta=%o]\n", u, mt_sta);
+    if (u == GET_UNIT (mt_cu))
+        mt_updcsta (uptr, STA_DON);
+    if (DEBUG_PRS (mt_dev))
+        fprintf (sim_deb, "[MT%d: rewind complete, sta=%o]\n", u, mt_sta);
     return SCPE_OK;
     }
 
@@ -293,14 +299,16 @@ switch (f) {                                            /* case on function */
     case FN_READ:                                       /* read */
     case FN_CMPARE:                                     /* read/compare */
         st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR);      /* read rec */
-        if (st == MTSE_RECE) mt_sta = mt_sta | STA_PAR | STA_ERR; /* rec in err? */
+        if (st == MTSE_RECE)                            /* rec in err? */
+            mt_sta = mt_sta | STA_PAR | STA_ERR;
         else if (st != MTSE_OK) {                       /* other error? */
             mt_sta = mt_sta | STA_RLE | STA_ERR;        /* set RLE flag */
             r = mt_map_err (uptr, st);                  /* map error */
             break;
             }
         cbc = PACKED (mt_cu)? wc * 3: wc * 2;           /* expected bc */
-        if (tbc != cbc) mt_sta = mt_sta | STA_RLE | STA_ERR;    /* wrong size? */
+        if (tbc != cbc)                                 /* wrong size? */
+            mt_sta = mt_sta | STA_RLE | STA_ERR;
         if (tbc < cbc) {                                /* record small? */
             cbc = tbc;                                  /* use smaller */
             wc = PACKED (mt_cu)? ((tbc + 2) / 3): ((tbc + 1) / 2);
@@ -320,7 +328,8 @@ switch (f) {                                            /* case on function */
                 c2 = mtxb[p++];
                 c = (c1 << 8) | c2;
                 }
-            if ((f == FN_READ) && MEM_ADDR_OK (xma)) M[xma] = c;
+            if ((f == FN_READ) && MEM_ADDR_OK (xma))
+                M[xma] = c;
             else if ((f == FN_CMPARE) && (c != (M[xma] &
                 (PACKED (mt_cu)? DMASK: 0177777)))) {
                 mt_updcsta (uptr, STA_CPE);
@@ -384,8 +393,9 @@ switch (f) {                                            /* case on function */
 if (!passed_eot && sim_tape_eot (uptr))                 /* just passed EOT? */
     uptr->USTAT = uptr->USTAT | STA_EOT;
 mt_updcsta (uptr, STA_DON);                             /* set done */
-if (mt_log) printf ("MT%d: fnc=%d done, ma=%o, wc=%o, sta=%o]\n",
-    u, f, M[MT_CA], M[MT_WC], mt_sta);
+if (DEBUG_PRS (mt_dev))
+    fprintf (sim_deb, "MT%d: fnc=%d done, ma=%o, wc=%o, sta=%o]\n",
+             u, f, M[MT_CA], M[MT_WC], mt_sta);
 return r;
 }
 
@@ -393,8 +403,7 @@ return r;
 
 int32 mt_updcsta (UNIT *uptr, int32 news)
 {
-mt_sta = (mt_sta & ~(STA_DYN | STA_CLR)) |
-    (uptr->USTAT & STA_DYN) | news;
+mt_sta = (mt_sta & ~(STA_DYN | STA_CLR)) | (uptr->USTAT & STA_DYN) | news;
 if ((mt_sta & (STA_ERR | STA_DON)) && (mt_cu & CU_IE))
     SET_INT (MTA);
 else CLR_INT (MTA);                                     /* int request */
@@ -435,7 +444,8 @@ switch (st) {
 
     case MTSE_IOERR:                                    /* IO error */
         mt_sta = mt_sta | STA_PAR | STA_ERR;            /* set par err */
-        if (mt_stopioe) return SCPE_IOERR;
+        if (mt_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
@@ -475,12 +485,15 @@ for (u = 0; u < MT_NUMDR; u++) {                        /* loop thru units */
     uptr = mt_dev.units + u;
     sim_tape_reset (uptr);                              /* reset tape */
     sim_cancel (uptr);                                  /* cancel activity */
-    if (uptr->flags & UNIT_ATT) uptr->USTAT = STA_BOT;
+    if (uptr->flags & UNIT_ATT)
+        uptr->USTAT = STA_BOT;
     else uptr->USTAT = 0;
     }
 mt_updcsta (&mt_unit[0], 0);                            /* update status */
-if (mtxb == NULL) mtxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
-if (mtxb == NULL) return SCPE_MEM;
+if (mtxb == NULL)
+    mtxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
+if (mtxb == NULL)
+    return SCPE_MEM;
 return SCPE_OK;
 }
 
@@ -498,7 +511,8 @@ t_stat mt_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->USTAT = STA_BOT;
 mt_updcsta (mt_dev.units + GET_UNIT (mt_cu), 0);        /* update status */
 return r;
@@ -508,8 +522,10 @@ return r;
 
 t_stat mt_detach (UNIT* uptr)
 {
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;          /* attached? */
-if (!sim_is_active (uptr)) uptr->USTAT = 0;
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+if (!sim_is_active (uptr))
+    uptr->USTAT = 0;
 mt_updcsta (mt_dev.units + GET_UNIT (mt_cu), 0);        /* update status */
 return sim_tape_detach (uptr);
 }

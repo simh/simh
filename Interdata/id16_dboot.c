@@ -1,6 +1,6 @@
 /* id16_dboot.c: Interdata 16b simulator disk bootstrap
 
-   Copyright (c) 2000-2006, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -343,7 +343,8 @@ for (i = typ = 0; dboot_tab[i].name != NULL; i++) {
         break;
         }
     }
-if (typ == 0) return SCPE_NOFNC;
+if (typ == 0)
+    return SCPE_NOFNC;
 
 IOWriteBlk (DBOOT_BEG, DBOOT_LEN, dboot_rom);           /* copy boot */
 IOWriteB (AL_DEV, pt_dib.dno);                          /* bin input dev */

@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2007, Robert M Supnik
+   Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Nov-08    RMS     Moved I/O support routines to I/O library
    29-Apr-07    RMS     Modified model-specific reserved operand check macros
                         to reflect 780 microcode patches (found by Naoki Hamada)
    29-Oct-06    RMS     Added clock coscheduler function
@@ -222,6 +223,8 @@
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        8                               /* lines per DZV mux */
 #define VH_MUXES        4                               /* max # of DHQ muxes */
+#define DLX_LINES       16                              /* max # of KL11/DL11's */
+#define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
@@ -427,13 +430,6 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat auto_config (char *name, int32 num);
-
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
@@ -448,5 +444,7 @@ t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
 int32 clk_cosched (int32 wait);
+
+#include "pdp11_io_lib.h"
 
 #endif

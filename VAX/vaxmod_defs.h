@@ -239,6 +239,8 @@
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        4                               /* lines per DZV mux */
 #define VH_MUXES        4                               /* max # of DHQ muxes */
+#define DLX_LINES       16                              /* max # of KL11/DL11's */
+#define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 #define AUTO_LNT        34                              /* autoconfig ranks */
 
@@ -464,13 +466,8 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat auto_config (char *name, int32 num);
-
 int32 clk_cosched (int32 wait);
+
+#include "pdp11_io_lib.h"
 
 #endif

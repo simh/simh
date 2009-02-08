@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -191,15 +191,19 @@ sb = pulse & 060;                                       /* subopcode */
 if (pulse & 01) {
     if ((sb == 000) && (rf_sta & (RFS_ERR | RFS_DON)))  /* DSSF */
         dat = IOT_SKP | dat;
-    else if (sb == 020) rf_reset (&rf_dev);             /* DSCC */
+    else if (sb == 020)                                 /* DSCC */
+        rf_reset (&rf_dev);
     else if (sb == 040) {                               /* DSCF */
-        if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;         /* busy inhibits */
+        if (RF_BUSY)                                    /* busy inhibits */
+            rf_sta = rf_sta | RFS_PGE;
         else rf_sta = rf_sta & ~(RFS_FNC | RFS_IE);     /* clear func */
         }
     }
 if (pulse & 02) {
-    if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;             /* busy sets PGE */
-    else if (sb == 000) dat = dat | rf_dbuf;            /* DRBR */
+    if (RF_BUSY)                                        /* busy sets PGE */
+        rf_sta = rf_sta | RFS_PGE;
+    else if (sb == 000)                                 /* DRBR */
+        dat = dat | rf_dbuf;
     else if (sb == 020)                                 /* DRAL */
         dat = dat | (rf_da & DMASK);
     else if (sb == 040)                                 /* DSFX */
@@ -208,15 +212,18 @@ if (pulse & 02) {
         dat = dat | (rf_da >> 18) | ((rf_sta & RFS_NED)? 010: 0);
     }
 if (pulse & 04) {
-    if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;             /* busy sets PGE */
-    else if (sb == 000) rf_dbuf = dat & DMASK;          /* DLBR */
+    if (RF_BUSY)                                        /* busy sets PGE */
+        rf_sta = rf_sta | RFS_PGE;
+    else if (sb == 000)                                 /* DLBR */
+        rf_dbuf = dat & DMASK;
     else if (sb == 020)                                 /* DLAL */
         rf_da = (rf_da & ~DMASK) | (dat & DMASK);
     else if (sb == 040) {                               /* DSCN */
         rf_sta = rf_sta & ~RFS_DON;                     /* clear done */
         if (GET_FNC (rf_sta) != FN_NOP) {
             t = (rf_da & RF_WMASK) - GET_POS (rf_time); /* delta to new */
-            if (t < 0) t = t + RF_NUMWD;                /* wrap around? */
+            if (t < 0)                                  /* wrap around? */
+                t = t + RF_NUMWD;
             sim_activate (&rf_unit, t * rf_time);       /* schedule op */
             }
         }
@@ -235,15 +242,18 @@ int32 rf72 (int32 dev, int32 pulse, int32 dat)
 int32 sb = pulse & 060;
 
 if (pulse & 02) {
-    if (sb == 000) dat = dat | GET_POS (rf_time) |      /* DLOK */
-        (sim_is_active (&rf_unit)? 0400000: 0);
+    if (sb == 000)                                      /* DLOK */
+        dat = dat | GET_POS (rf_time) |
+            (sim_is_active (&rf_unit)? 0400000: 0);
     else if (sb == 040) {                               /* DSCD */
-        if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;         /* busy inhibits */
+        if (RF_BUSY)                                    /* busy inhibits */
+            rf_sta = rf_sta | RFS_PGE;
         else rf_sta = rf_sta & RFS_FR;
         rf_updsta (0);
         }
     else if (sb == 060) {                               /* DSRS */
-        if (RF_BUSY) rf_sta = rf_sta | RFS_PGE;         /* busy sets PGE */
+        if (RF_BUSY)                                    /* busy sets PGE */
+            rf_sta = rf_sta | RFS_PGE;
         dat = dat | rf_updsta (0);
         }
     }
@@ -285,7 +295,8 @@ do {
             }
         else {                                          /* not locked */
             fbuf[rf_da] = M[pa];						/* write word */
-            if (((uint32) rf_da) >= uptr->hwmark) uptr->hwmark = rf_da + 1;
+            if (((uint32) rf_da) >= uptr->hwmark)
+                uptr->hwmark = rf_da + 1;
             }
         }
     rf_da = rf_da + 1;                                  /* incr disk addr */
@@ -302,7 +313,8 @@ return SCPE_OK;
 int32 rf_updsta (int32 new)
 {
 rf_sta = (rf_sta | new) & ~(RFS_ERR | RFS_CLR);
-if (rf_sta & RFS_EFLGS) rf_sta = rf_sta | RFS_ERR;
+if (rf_sta & RFS_EFLGS)
+    rf_sta = rf_sta | RFS_ERR;
 if ((rf_sta & (RFS_ERR | RFS_DON)) && (rf_sta & RFS_IE))
      SET_INT (RF);
 else CLR_INT (RF);
@@ -335,7 +347,8 @@ uint32 ds_bytes = RF_DKSIZE * sizeof (int32);
 
 if ((uptr->flags & UNIT_AUTO) && (sz = sim_fsize_name (cptr))) {
     p = (sz + ds_bytes - 1) / ds_bytes;
-    if (p >= RF_NUMDK) p = RF_NUMDK - 1;
+    if (p >= RF_NUMDK)
+        p = RF_NUMDK - 1;
     uptr->flags = (uptr->flags & ~UNIT_PLAT) |
         (p << UNIT_V_PLAT);
     }
@@ -347,8 +360,10 @@ return attach_unit (uptr, cptr);
 
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (val < 0) return SCPE_IERR;
-if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+if (val < 0)
+    return SCPE_IERR;
+if (uptr->flags & UNIT_ATT)
+    return SCPE_ALATT;
 uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;

@@ -1,6 +1,6 @@
 /* pdp11_pt.c: PC11 paper tape reader/punch simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -190,8 +190,10 @@ t_stat ptr_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 0:                                             /* ptr csr */
-        if (PA & 1) return SCPE_OK;
-        if ((data & CSR_IE) == 0) CLR_INT (PTR);
+        if (PA & 1)
+            return SCPE_OK;
+        if ((data & CSR_IE) == 0)
+            CLR_INT (PTR);
         else if (((ptr_csr & CSR_IE) == 0) && (ptr_csr & (CSR_ERR | CSR_DONE)))
             SET_INT (PTR);
         if (data & CSR_GO) {
@@ -223,7 +225,8 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)
     return IORETURN (ptr_stopioe, SCPE_UNATT);
 if ((temp = getc (ptr_unit.fileref)) == EOF) {
     if (feof (ptr_unit.fileref)) {
-        if (ptr_stopioe) printf ("PTR end of file\n");
+        if (ptr_stopioe)
+            printf ("PTR end of file\n");
         else return SCPE_OK;
         }
     else perror ("PTR I/O error");
@@ -242,7 +245,8 @@ t_stat ptr_reset (DEVICE *dptr)
 {
 ptr_unit.buf = 0;
 ptr_csr = 0;
-if ((ptr_unit.flags & UNIT_ATT) == 0) ptr_csr = ptr_csr | CSR_ERR;
+if ((ptr_unit.flags & UNIT_ATT) == 0)
+    ptr_csr = ptr_csr | CSR_ERR;
 CLR_INT (PTR);
 sim_cancel (&ptr_unit);
 return SCPE_OK;
@@ -253,7 +257,8 @@ t_stat ptr_attach (UNIT *uptr, char *cptr)
 t_stat reason;
 
 reason = attach_unit (uptr, cptr);
-if ((ptr_unit.flags & UNIT_ATT) == 0) ptr_csr = ptr_csr | CSR_ERR;
+if ((ptr_unit.flags & UNIT_ATT) == 0)
+    ptr_csr = ptr_csr | CSR_ERR;
 else ptr_csr = ptr_csr & ~CSR_ERR;
 return reason;
 }
@@ -287,15 +292,18 @@ t_stat ptp_wr (int32 data, int32 PA, int32 access)
 switch ((PA >> 1) & 01) {                               /* decode PA<1> */
 
     case 0:                                             /* ptp csr */
-        if (PA & 1) return SCPE_OK;
-        if ((data & CSR_IE) == 0) CLR_INT (PTP);
+        if (PA & 1)
+            return SCPE_OK;
+        if ((data & CSR_IE) == 0)
+            CLR_INT (PTP);
         else if (((ptp_csr & CSR_IE) == 0) && (ptp_csr & (CSR_ERR | CSR_DONE)))
             SET_INT (PTP);
         ptp_csr = (ptp_csr & ~PTPCSR_RW) | (data & PTPCSR_RW);
         return SCPE_OK;
 
     case 1:                                             /* ptp buf */
-        if ((PA & 1) == 0) ptp_unit.buf = data & 0377;
+        if ((PA & 1) == 0)
+            ptp_unit.buf = data & 0377;
         ptp_csr = ptp_csr & ~CSR_DONE;
         CLR_INT (PTP);
         if (ptp_unit.flags & UNIT_ATT)                  /* file to write? */
@@ -312,7 +320,8 @@ return SCPE_NXM;                                        /* can't get here */
 t_stat ptp_svc (UNIT *uptr)
 {
 ptp_csr = ptp_csr | CSR_ERR | CSR_DONE;
-if (ptp_csr & CSR_IE) SET_INT (PTP);
+if (ptp_csr & CSR_IE)
+    SET_INT (PTP);
 if ((ptp_unit.flags & UNIT_ATT) == 0)
     return IORETURN (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {
@@ -331,7 +340,8 @@ t_stat ptp_reset (DEVICE *dptr)
 {
 ptp_unit.buf = 0;
 ptp_csr = CSR_DONE;
-if ((ptp_unit.flags & UNIT_ATT) == 0) ptp_csr = ptp_csr | CSR_ERR;
+if ((ptp_unit.flags & UNIT_ATT) == 0)
+    ptp_csr = ptp_csr | CSR_ERR;
 CLR_INT (PTP);
 sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
@@ -342,7 +352,8 @@ t_stat ptp_attach (UNIT *uptr, char *cptr)
 t_stat reason;
 
 reason = attach_unit (uptr, cptr);
-if ((ptp_unit.flags & UNIT_ATT) == 0) ptp_csr = ptp_csr | CSR_ERR;
+if ((ptp_unit.flags & UNIT_ATT) == 0)
+    ptp_csr = ptp_csr | CSR_ERR;
 else ptp_csr = ptp_csr & ~CSR_ERR;
 return reason;
 }

@@ -1,6 +1,6 @@
 /* pdp11_rx.c: RX11/RX01 floppy disk simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -275,7 +275,8 @@ switch ((PA >> 1) & 1) {                                /* decode PA<1> */
                 }                                       /* end switch func */
             return SCPE_OK;
             }                                           /* end if GO */
-        if ((data & RXCS_IE) == 0) CLR_INT (RX);
+        if ((data & RXCS_IE) == 0)
+            CLR_INT (RX);
         else if ((rx_csr & (RXCS_DONE + RXCS_IE)) == RXCS_DONE)
             SET_INT (RX);
         rx_csr = (rx_csr & ~RXCS_RW) | (data & RXCS_RW);
@@ -331,7 +332,8 @@ switch (rx_state) {                                     /* case on state */
         return SCPE_IERR;                               /* done */
 
     case EMPTY:                                         /* empty buffer */
-        if (rx_bptr >= RX_NUMBY) rx_done (0, 0);        /* done all? */
+        if (rx_bptr >= RX_NUMBY)                        /* done all? */
+            rx_done (0, 0);
         else {
             rx_dbr = rx_buf[rx_bptr];                   /* get next */
             rx_bptr = rx_bptr + 1;
@@ -342,7 +344,8 @@ switch (rx_state) {                                     /* case on state */
     case FILL:                                          /* fill buffer */
         rx_buf[rx_bptr] = rx_dbr;                       /* write next */
         rx_bptr = rx_bptr + 1;
-        if (rx_bptr < RX_NUMBY) rx_csr = rx_csr | RXCS_TR; /* more? set xfer */
+        if (rx_bptr < RX_NUMBY)                         /* more? set xfer */
+            rx_csr = rx_csr | RXCS_TR;
         else rx_done (0, 0);                            /* else done */
         break;
 
@@ -374,7 +377,8 @@ switch (rx_state) {                                     /* case on state */
             break;
             }
         da = CALC_DA (rx_track, rx_sector);             /* get disk address */
-        if (func == RXCS_WRDEL) rx_esr = rx_esr | RXES_DD; /* del data? */
+        if (func == RXCS_WRDEL)                         /* del data? */
+            rx_esr = rx_esr | RXES_DD;
         if (func == RXCS_READ) {                        /* read? */
             for (i = 0; i < RX_NUMBY; i++)
                 rx_buf[i] = fbuf[da + i];
@@ -387,7 +391,8 @@ switch (rx_state) {                                     /* case on state */
             for (i = 0; i < RX_NUMBY; i++)              /* write */
                 fbuf[da + i] = rx_buf[i];
             da = da + RX_NUMBY;
-            if (da > uptr->hwmark) uptr->hwmark = da;
+            if (da > uptr->hwmark)
+                uptr->hwmark = da;
             }
         rx_done (0, 0);                                 /* done */
         break;
@@ -411,7 +416,8 @@ switch (rx_state) {                                     /* case on state */
         for (i = 0; i < RX_NUMBY; i++)                  /* read sector */
             rx_buf[i] = fbuf[da + i];
         rx_done (RXES_ID, 0);                           /* set done */
-        if ((rx_unit[1].flags & UNIT_ATT) == 0) rx_ecode = 0020;
+        if ((rx_unit[1].flags & UNIT_ATT) == 0)
+            rx_ecode = 0020;
         break;
         }                                               /* end case state */
 
@@ -432,8 +438,10 @@ if (rx_csr & RXCS_IE) SET_INT (RX);                     /* if ie, intr */
 rx_esr = (rx_esr | esr_flags) & ~RXES_DRDY;
 if (rx_unit[drv].flags & UNIT_ATT)
     rx_esr = rx_esr | RXES_DRDY;
-if (new_ecode > 0) rx_csr = rx_csr | RXCS_ERR;          /* test for error */
-if (new_ecode < 0) return;                              /* don't update? */
+if (new_ecode > 0)                                      /* test for error */
+    rx_csr = rx_csr | RXCS_ERR;
+if (new_ecode < 0)                                      /* don't update? */
+    return;
 rx_ecode = new_ecode;                                   /* update ecode */
 rx_dbr = rx_esr;                                        /* update RXDB */
 return;
@@ -451,7 +459,8 @@ rx_track = rx_sector = 0;                               /* clear addr */
 rx_state = IDLE;                                        /* ctrl idle */
 CLR_INT (RX);                                           /* clear int req */
 sim_cancel (&rx_unit[1]);                               /* cancel drive 1 */
-if (dptr->flags & DEV_DIS) sim_cancel (&rx_unit[0]);    /* disabled? */
+if (dptr->flags & DEV_DIS)                              /* disabled? */
+    sim_cancel (&rx_unit[0]);
 else if (rx_unit[0].flags & UNIT_BUF)  {                /* attached? */
     rx_state = INIT_COMPLETE;                           /* yes, sched init */
     sim_activate (&rx_unit[0], rx_swait * abs (1 - rx_unit[0].TRACK));
@@ -510,7 +519,8 @@ int32 i;
 extern int32 saved_PC;
 extern uint16 *M;
 
-for (i = 0; i < BOOT_LEN; i++) M[(BOOT_START >> 1) + i] = boot_rom[i];
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
 M[BOOT_CSR >> 1] = rx_dib.ba & DMASK;
 saved_PC = BOOT_ENTRY;

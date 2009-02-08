@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   08-Jun-08    JDB     Quieted bogus gcc warning in fp_exec
    10-May-08    JDB     Fixed uninitialized return in fp_accum when setting
    19-Mar-08    JDB     Reworked "complement" to avoid inlining bug in gcc-4.x
    01-Dec-06    JDB     Reworked into generalized multiple-precision ops for FPP
@@ -1082,6 +1083,13 @@ return;
    operation opcode and returned to the caller.  Pass NULL for both of the
    operands if only the result precision is wanted.  Pass NULL for the result if
    only the operand precisions are wanted.
+
+   Implementation note:
+
+    1. gcc-4.3.0 complains at -O3 that operand_l/r may not be initialized.
+       Because of the mask, the switch statement covers all cases, but gcc
+       doesn't realize this.  The "default" case is redundant but eliminates the
+       warning.
 */
 
 void fp_prec (uint16 opcode, OPSIZE *operand_l, OPSIZE *operand_r, OPSIZE *result)
@@ -1109,6 +1117,7 @@ if (operand_l && operand_r) {                           /* want operand precisio
             break;
 
         case 0120:                                      /* flt/accum as float */
+        default:                                        /* keeps compiler quiet for uninit warning */
             *operand_l = int_size;                      /* first op is integer */
             *operand_r = fp_a;                          /* second op is always null */
             break;

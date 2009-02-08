@@ -1,6 +1,6 @@
 /* sds_mt.c: SDS 940 magnetic tape simulator
 
-   Copyright (c) 2001-2006, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -193,18 +193,21 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:                                       /* connect */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != mt_dib.chan) return SCPE_IERR;    /* wrong chan? */
+        if (new_ch != mt_dib.chan)                      /* wrong chan? */
+            return SCPE_IERR;
         if (mt_gap) {                                   /* in gap? */
             mt_gap = 0;                                 /* clr gap flg */
             sim_cancel (uptr);                          /* cancel timer */
             }
-        else if (sim_is_active (uptr)) CRETIOP;         /* busy? */
+        else if (sim_is_active (uptr))                  /* busy? */
+            CRETIOP;
         uptr->eotf = 0;                                 /* clr eot flag */      
         mt_eof = 0;                                     /* clr eof flag */
         mt_skip = 0;                                    /* clr skp flag */
         mt_bptr = mt_blnt = 0;                          /* init buffer */
         if ((inst & DEV_MTS)? (CHC_GETCPW (inst) < 2):  /* scn & cpw<3? */
-            (inst & CHC_REV)) return STOP_INVIOP;       /* rw & rev? */
+            (inst & CHC_REV))                           /* rw & rev? */
+            return STOP_INVIOP;
         mt_inst = inst;                                 /* save inst */
         if ((inst & DEV_MTS) && !(inst && DEV_OUT))     /* scanning? */
             chan_set_flag (mt_dib.chan, CHF_SCAN);      /* set chan flg */
@@ -214,7 +217,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_EOM1:                                       /* EOM mode 1 */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != mt_dib.chan) CRETIOP;             /* wrong chan? */
+        if (new_ch != mt_dib.chan)                      /* wrong chan? */
+            CRETIOP;
         t = inst & 07670;                               /* get command */
         if ((t == 04010) && !sim_is_active (uptr)) {    /* rewind? */
             sim_tape_rewind (uptr);                     /* rewind unit */
@@ -222,27 +226,31 @@ switch (fnc) {                                          /* case function */
             uptr->botf = 1;                             /* set bot */
             }
         else if ((t == 03610) && sim_is_active (uptr) &&/* skip rec? */
-            ((mt_inst & DEV_OUT) == 0)) mt_skip = 1;    /* set flag */
+            ((mt_inst & DEV_OUT) == 0))
+            mt_skip = 1;    /* set flag */
         else CRETINS;
         break;
 
     case IO_DISC:                                       /* disconnect */
         sim_cancel (uptr);                              /* no more xfr's */
         if (inst & DEV_OUT) {                           /* write? */
-            if (r = mt_wrend (inst)) return r;          /* end record */
+            if (r = mt_wrend (inst))                    /* end record */
+                return r;
             }
         break;
 
     case IO_WREOR:                                      /* write eor */
         chan_set_flag (mt_dib.chan, CHF_EOR);           /* set eor flg */
-        if (r = mt_wrend (inst)) return r;              /* end record */
+        if (r = mt_wrend (inst))                        /* end record */
+            return r;
         mt_gap = 1;                                     /* in gap */
         sim_activate (uptr, mt_gtime);                  /* start timer */        
         break;
 
     case IO_SKS:                                        /* SKS */
         new_ch = I_GETSKCH (inst);                      /* get chan # */
-        if (new_ch != mt_dib.chan) return SCPE_IERR;    /* wrong chan? */
+        if (new_ch != mt_dib.chan)                      /* wrong chan? */
+            return SCPE_IERR;
         if ((inst & (DEV_OUT | DEV_MTS)) == 0) {        /* not sks 1n? */
             t = I_GETSKCND (inst);                      /* get skip cond */
             switch (t) {                                /* case sks cond */
@@ -281,22 +289,27 @@ switch (fnc) {                                          /* case function */
         xfr_req = xfr_req & ~XFR_MT0;                   /* clr xfr flag */
         if (mt_blnt == 0) {                             /* first read? */
             r = mt_readrec (uptr);                      /* get data */
-            if ((r != SCPE_OK) || (mt_blnt == 0)) return r; /* err, inv reclnt? */
+            if ((r != SCPE_OK) || (mt_blnt == 0))       /* err, inv reclnt? */
+                return r;
             }
         uptr->botf = 0;                                 /* off BOT */
-        if (mt_inst & CHC_REV) chr = mtxb[--mt_bptr] & 077; /* get next rev */
+        if (mt_inst & CHC_REV)                          /* get next rev */
+            chr = mtxb[--mt_bptr] & 077;
         else chr = mtxb[mt_bptr++] & 077;               /* get next fwd */
-        if (!(mt_inst & CHC_BIN)) chr = bcd_to_sds[chr];/* bcd? */
+        if (!(mt_inst & CHC_BIN))                       /* bcd? */
+            chr = bcd_to_sds[chr];
         *dat = chr & 077;                               /* give to chan */
         if ((mt_inst & CHC_REV)? (mt_bptr <= 0):        /* rev or fwd, */
-            (mt_bptr >= mt_blnt)) mt_readend (uptr);    /* recd done? */
+            (mt_bptr >= mt_blnt))                       /* recd done? */
+            mt_readend (uptr);
         break;
 
     case IO_WRITE:                                      /* write */
         uptr->botf = 0;                                 /* off BOT */
         chr = (*dat) & 077;
         xfr_req = xfr_req & ~XFR_MT0;                   /* clr xfr flag */
-        if (!(mt_inst & CHC_BIN)) chr = sds_to_bcd[chr];/* bcd? */
+        if (!(mt_inst & CHC_BIN))                       /* bcd? */
+            chr = sds_to_bcd[chr];
         if (mt_bptr < MT_MAXFR) mtxb[mt_bptr++] = chr;  /* insert in buf */
         break;
 
@@ -315,7 +328,8 @@ if (mt_gap) {                                           /* gap timeout */
     mt_gap = 0;                                         /* clr gap flg */
     chan_disc (mt_dib.chan);                            /* disc chan */
     }
-else if (mt_skip) mt_readend (uptr);                    /* skip record */
+else if (mt_skip)                                       /* skip record */
+    mt_readend (uptr);
 else {                                                  /* normal xfr */
     xfr_req = xfr_req | XFR_MT0;                        /* set xfr req */
     sim_activate (uptr, mt_ctime);                      /* reactivate */
@@ -350,9 +364,12 @@ if (st == MTSE_TMK) {                                   /* tape mark? */
     }
 if (st != MTSE_OK) {                                    /* other error? */
     mt_set_err (uptr);                                  /* err, disc */
-    if (st == MTSE_IOERR) return SCPE_IOERR;            /* IO error? */
-    if (st == MTSE_INVRL) return SCPE_MTRLNT;           /* inv rec lnt? */
-    if (st == MTSE_EOM) uptr->eotf = 1;                 /* eom? set eot */
+    if (st == MTSE_IOERR)                               /* IO error? */
+        return SCPE_IOERR;
+    if (st == MTSE_INVRL)                               /* inv rec lnt? */
+        return SCPE_MTRLNT;
+    if (st == MTSE_EOM)                                 /* eom? set eot */
+        uptr->eotf = 1;
     return SCPE_OK;
     }
 mt_blnt = tbc;                                          /* set buf lnt */
@@ -366,7 +383,8 @@ void mt_readend (UNIT *uptr)
 sim_cancel (uptr);                                      /* stop timer */
 mt_skip = 0;                                            /* clr skp flg */
 chan_set_flag (mt_dib.chan, CHF_EOR);                   /* end record */
-if (mt_eof) chan_disc (mt_dib.chan);                    /* EOF? */
+if (mt_eof)                                             /* EOF? */
+    chan_disc (mt_dib.chan);
 else {
     mt_gap = 1;                                         /* no, in gap */
     sim_activate (uptr, mt_gtime);                      /* start timer */
@@ -383,7 +401,8 @@ t_mtrlnt tbc;
 t_stat st;
 
 sim_cancel (uptr);                                      /* no more xfr's */
-if (mt_bptr == 0) return SCPE_OK;                       /* buf empty? */
+if (mt_bptr == 0)                                       /* buf empty? */
+    return SCPE_OK;
 if (!(uptr->flags & UNIT_ATT)) {                        /* attached? */
     mt_set_err (uptr);                                  /* no, err, disc */
     return SCPE_UNATT;
@@ -407,8 +426,10 @@ else {
         uptr->eotf = 1;
     }
 mt_bptr = 0;
-if (st != MTSE_OK) mt_set_err (uptr);                   /* error? */
-if (st == MTSE_IOERR) return SCPE_IOERR;
+if (st != MTSE_OK)                                      /* error? */
+    mt_set_err (uptr);
+if (st == MTSE_IOERR)
+    return SCPE_IOERR;
 return SCPE_OK;
 }
 
@@ -451,7 +472,8 @@ t_stat mt_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->botf = 1;
 uptr->eotf = 0;
 return SCPE_OK;
@@ -469,7 +491,8 @@ t_stat mt_boot (int32 unitno, DEVICE *dptr)
 {
 extern uint32 P, M[];
 
-if (unitno) return SCPE_ARG;                            /* only unit 0 */
+if (unitno)                                             /* only unit 0 */
+    return SCPE_ARG;
 M[0] = 077777771;                                       /* -7B */
 M[1] = 007100000;                                       /* LDX 0 */
 M[2] = 000203610;                                       /* EOM 3610B */

@@ -581,21 +581,12 @@ enum {
     I_SETcc
 };
 
-#define MAX_INSLEN 11
-
-/* max length of any instruction, register name etc. */
-#if MAX_INSLEN > 9      /* MAX_INSLEN defined in insnsi.h */
-#define MAX_KEYWORD MAX_INSLEN
-#else
-#define MAX_KEYWORD 9
-#endif
-
 struct itemplate {
-    int opcode;                /* the token, passed from "parser.c" */
-    int operands;              /* number of operands */
-    long opd[3];               /* bit flags for operand types */
-    const char *code;          /* the code it assembles to */
-    unsigned long flags;           /* some flags */
+    int opcode;             /* the token, passed from "parser.c" */
+    int operands;           /* number of operands */
+    long opd[3];            /* bit flags for operand types */
+    const char *code;       /* the code it assembles to */
+    unsigned long flags;    /* some flags */
 };
 
 /*

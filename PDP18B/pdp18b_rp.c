@@ -1,6 +1,6 @@
 /* pdp18b_rp.c: RP15/RP02 disk pack simulator
 
-   Copyright (c) 1993-2005, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -225,8 +225,10 @@ if (pulse & 01) {
         dat = IOT_SKP | dat;
     }
 if (pulse & 02) {
-    if (sb == 000) dat = dat | rp_sta;                  /* DPOSA */
-    else if (sb == 020) dat = dat | rp_stb;             /* DPOSB */
+    if (sb == 000)                                      /* DPOSA */
+        dat = dat | rp_sta;
+    else if (sb == 020)                                 /* DPOSB */
+        dat = dat | rp_stb;
     }
 if (pulse & 04) {
     if (rp_busy) {                                      /* busy? */
@@ -235,9 +237,12 @@ if (pulse & 04) {
         }
     else if (sb == 000) {                               /* DPLA */
         rp_da = dat & DMASK;
-        if (GET_SECT (rp_da) >= RP_NUMSC) rp_updsta (STA_NXS, 0);
-        if (GET_SURF (rp_da) >= RP_NUMSF) rp_updsta (STA_NXF, 0);
-        if (GET_CYL (rp_da) >= RP_NUMCY) rp_updsta (STA_NXC, 0);
+        if (GET_SECT (rp_da) >= RP_NUMSC)
+            rp_updsta (STA_NXS, 0);
+        if (GET_SURF (rp_da) >= RP_NUMSF)
+            rp_updsta (STA_NXF, 0);
+        if (GET_CYL (rp_da) >= RP_NUMCY)
+            rp_updsta (STA_NXC, 0);
         }
     else if (sb == 020) {                               /* DPCS */
         rp_sta = rp_sta & ~(STA_HNF | STA_DON);
@@ -245,8 +250,10 @@ if (pulse & 04) {
             STB_TME | STB_PGE | STB_EOP);
         rp_updsta (0, 0);
         }
-    else if (sb == 040) rp_ma = dat & DMASK;            /* DPCA */
-    else if (sb == 060) rp_wc = dat & DMASK;            /* DPWC */
+    else if (sb == 040)                                 /* DPCA */
+        rp_ma = dat & DMASK;
+    else if (sb == 060)                                 /* DPWC */
+        rp_wc = dat & DMASK;
     }
 return dat;
 }
@@ -260,14 +267,18 @@ UNIT *uptr;
 
 sb = pulse & 060;
 if (pulse & 01) {
-    if (sb == 020) dat = IOT_SKP | dat;                 /* DPSN */
+    if (sb == 020)                                      /* DPSN */
+        dat = IOT_SKP | dat;
     }
 if (pulse & 02) {
     if (sb == 000)                                      /* DPOU */
         dat = dat | rp_unit[GET_UNIT (rp_sta)].CYL;
-    else if (sb == 020) dat = dat | rp_da;              /* DPOA */
-    else if (sb == 040) dat = dat | rp_ma;              /* DPOC */
-    else if (sb == 060) dat = dat | rp_wc;              /* DPOW */
+    else if (sb == 020)                                 /* DPOA */
+        dat = dat | rp_da;
+    else if (sb == 040)                                 /* DPOC */
+        dat = dat | rp_ma;
+    else if (sb == 060)                                 /* DPOW */
+        dat = dat | rp_wc;
     }
 if (pulse & 04) {
     if (rp_busy) {                                      /* busy? */
@@ -356,9 +367,12 @@ if ((f == FN_WRITE) && (uptr->flags & UNIT_WPRT)) {     /* write locked? */
     return SCPE_OK;
     }
 
-if (GET_SECT (rp_da) >= RP_NUMSC) rp_updsta (STA_NXS, 0);
-if (GET_SURF (rp_da) >= RP_NUMSF) rp_updsta (STA_NXF, 0);
-if (GET_CYL (rp_da) >= RP_NUMCY) rp_updsta (STA_NXC, 0);
+if (GET_SECT (rp_da) >= RP_NUMSC)
+    rp_updsta (STA_NXS, 0);
+if (GET_SURF (rp_da) >= RP_NUMSF)
+    rp_updsta (STA_NXF, 0);
+if (GET_CYL (rp_da) >= RP_NUMCY)
+    rp_updsta (STA_NXC, 0);
 if (rp_sta & (STA_NXS | STA_NXF | STA_NXC)) {           /* or bad disk addr? */
     rp_updsta (STA_DON, STB_SUFU);                      /* done, unsafe */
     return SCPE_OK;
@@ -380,7 +394,8 @@ err = fseek (uptr->fileref, da * sizeof (int), SEEK_SET);
 
 if ((f == FN_READ) && (err == 0)) {                     /* read? */
     awc = fxread (&M[pa], sizeof (int32), wc, uptr->fileref);
-    for ( ; awc < wc; awc++) M[pa + awc] = 0;
+    for ( ; awc < wc; awc++)
+        M[pa + awc] = 0;
     err = ferror (uptr->fileref);
     }
 
@@ -396,8 +411,10 @@ if ((f == FN_WRITE) && (err == 0)) {                    /* write? */
 if ((f == FN_WRCHK) && (err == 0)) {                    /* write check? */
     for (i = 0; (err == 0) && (i < wc); i++)  {
         awc = fxread (&comp, sizeof (int32), 1, uptr->fileref);
-        if (awc == 0) comp = 0;
-        if (comp != M[pa + i]) rp_updsta (0, STB_WCE);
+        if (awc == 0)
+            comp = 0;
+        if (comp != M[pa + i])
+            rp_updsta (0, STB_WCE);
         }
     err = ferror (uptr->fileref);
     }
@@ -406,7 +423,8 @@ rp_wc = (rp_wc + wc) & DMASK;                           /* final word count */
 rp_ma = (rp_ma + wc) & DMASK;                           /* final mem addr */
 da = (da + wc + (RP_NUMWD - 1)) / RP_NUMWD;             /* final sector num */
 cyl = da / (RP_NUMSC * RP_NUMSF);                       /* get cyl */
-if (cyl >= RP_NUMCY) cyl = RP_NUMCY - 1;
+if (cyl >= RP_NUMCY)
+    cyl = RP_NUMCY - 1;
 surf = (da % (RP_NUMSC * RP_NUMSF)) / RP_NUMSC;         /* get surface */
 sect = (da % (RP_NUMSC * RP_NUMSF)) % RP_NUMSC;         /* get sector */
 rp_da = (cyl << DA_V_CYL) | (surf << DA_V_SURF) | (sect << DA_V_SECT);
@@ -431,17 +449,22 @@ UNIT *uptr;
 uptr = rp_dev.units + GET_UNIT (rp_sta);
 rp_sta = (rp_sta & ~(STA_DYN | STA_ERR)) | newa;
 rp_stb = (rp_stb & ~STB_DYN) | newb;
-if (uptr->flags & UNIT_WPRT) rp_sta = rp_sta | STA_SUWP;
-if ((uptr->flags & UNIT_ATT) == 0) rp_stb = rp_stb | STB_SUFU | STB_SUNR;
+if (uptr->flags & UNIT_WPRT)
+    rp_sta = rp_sta | STA_SUWP;
+if ((uptr->flags & UNIT_ATT) == 0)
+    rp_stb = rp_stb | STB_SUFU | STB_SUNR;
 else if (sim_is_active (uptr)) {
     f = (uptr->FUNC) & STA_M_FUNC;
     if ((f == FN_SEEK) || (f == FN_RECAL))
         rp_stb = rp_stb | STB_SUSU | STB_SUNR;
     }
-else if (uptr->CYL >= RP_NUMCY) rp_sta = rp_sta | STA_SUSI;
-if ((rp_sta & STA_EFLGS) || (rp_stb & STB_EFLGS)) rp_sta = rp_sta | STA_ERR;
+else if (uptr->CYL >= RP_NUMCY)
+    rp_sta = rp_sta | STA_SUSI;
+if ((rp_sta & STA_EFLGS) || (rp_stb & STB_EFLGS))
+    rp_sta = rp_sta | STA_ERR;
 if (((rp_sta & (STA_ERR | STA_DON)) && (rp_sta & STA_IED)) ||
-    ((rp_stb & STB_ATTN) && (rp_sta & STA_IEA))) SET_INT (RP);
+    ((rp_stb & STB_ATTN) && (rp_sta & STA_IEA)))
+    SET_INT (RP);
 else CLR_INT (RP);
 return;
 }

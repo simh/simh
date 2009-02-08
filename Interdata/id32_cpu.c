@@ -1,6 +1,6 @@
 /* id32_cpu.c: Interdata 32b CPU simulator
 
-   Copyright (c) 2000-2007, Robert M. Supnik
+   Copyright (c) 2000-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -197,11 +197,15 @@ typedef struct {
                         ((int32) ((x) & 0x7FFF)))
 #define SEXT15(x)       (((x) & 0x4000)? ((int32) ((x) | ~0x3FFF)): \
                         ((int32) ((x) & 0x3FFF)))
-#define CC_GL_16(x)     if ((x) & SIGN16) cc = CC_L; \
-                        else if (x) cc = CC_G; \
+#define CC_GL_16(x)     if ((x) & SIGN16) \
+                            cc = CC_L; \
+                        else if (x) \
+                            cc = CC_G; \
                         else cc = 0
-#define CC_GL_32(x)     if ((x) & SIGN32) cc = CC_L; \
-                        else if (x) cc = CC_G; \
+#define CC_GL_32(x)     if ((x) & SIGN32) \
+                            cc = CC_L; \
+                        else if (x) \
+                            cc = CC_G; \
                         else cc = 0
 #define BUILD_PSW(x)    (((PSW & ~CC_MASK) | (x)) & PSW_MASK)
 #define NEG(x)          ((~(x) + 1) & DMASK32)
@@ -614,7 +618,8 @@ int abortval;
 
 /* Restore register state */
 
-if (devtab_init ()) return SCPE_STOP;                   /* check conflicts */
+if (devtab_init ())                                     /* check conflicts */
+    return SCPE_STOP;
 if (cpu_unit.flags & (UNIT_DPFP | UNIT_832)) {
     fp_in_hwre = 1;                                     /* fp in hwre */
     dec_flgs = 0;                                       /* all instr ok */
@@ -623,7 +628,8 @@ else {
     fp_in_hwre = 0;                                     /* fp in ucode */
     dec_flgs = OP_DPF;                                  /* sp only */
     }
-if (cpu_unit.flags & UNIT_8RS) psw_reg_mask = 7;        /* 8 register sets */
+if (cpu_unit.flags & UNIT_8RS)                          /* 8 register sets */
+    psw_reg_mask = 7;
 else psw_reg_mask = 1;                                  /* 2 register sets */
 int_eval ();                                            /* eval interrupts */
 cc = newPSW (PSW & PSW_MASK);                           /* split PSW, eval wait */
@@ -642,7 +648,8 @@ reason = 0;
 abortval = setjmp (save_env);                           /* set abort hdlr */
 if (abortval != 0) {                                    /* mem mgt abort? */
     qevent = qevent | EV_MAC;                           /* set MAC intr */
-    if (cpu_unit.flags & UNIT_832) PC = oPC;            /* 832? restore PC */
+    if (cpu_unit.flags & UNIT_832)                      /* 832? restore PC */
+        PC = oPC;
     }
 
 /* Event handling */
@@ -657,7 +664,8 @@ while (reason == 0) {                                   /* loop until halted */
     int32 sr, st;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ()) break;
+        if (reason = sim_process_event ())
+            break;
         int_eval ();
         }
 
@@ -679,7 +687,8 @@ while (reason == 0) {                                   /* loop until halted */
             else if (cc == 0) {                         /* ready, no err? */
                 if (blk_io.dfl & BL_RD) {               /* read? */
                     t = dev_tab[dev] (dev, IO_RD, 0);   /* get byte */
-                    if ((t == 0) && (blk_io.dfl & BL_LZ)) continue;
+                    if ((t == 0) && (blk_io.dfl & BL_LZ))
+                        continue;
                     blk_io.dfl = blk_io.dfl & ~BL_LZ;   /* non-zero seen */
                     WriteB (blk_io.cur, t, VW);         /* write mem */
                     }
@@ -731,7 +740,8 @@ while (reason == 0) {                                   /* loop until halted */
     ityp = drom & OP_MASK;                              /* instruction type */
 
     if ((drom == 0) || (drom & dec_flgs)) {             /* not in model? */
-        if (stop_inst) reason = STOP_RSRV;              /* stop or */
+        if (stop_inst)                                  /* stop or */
+            reason = STOP_RSRV;
         else cc = exception (ILOPSW, cc, 0);            /* exception */
         continue;
         }
@@ -755,7 +765,8 @@ while (reason == 0) {                                   /* loop until halted */
     case OP_RI1:                                        /* reg-imm 1 */
         ir2 = ReadH ((PC + 2) & VAMASK, VE);            /* fetch immed */
         opnd = SEXT16 (ir2);                            /* sign extend */
-        if (r2) opnd = (opnd + R[r2]) & DMASK32;        /* index calculation */
+        if (r2)                                         /* index calculation */
+            opnd = (opnd + R[r2]) & DMASK32;
         PC = (PC + 4) & VAMASK;                         /* increment PC */
         break;
 
@@ -763,7 +774,8 @@ while (reason == 0) {                                   /* loop until halted */
         ir2 = ReadH ((PC + 2) & VAMASK, VE);            /* fetch imm hi */
         ir3 = ReadH ((PC + 4) & VAMASK, VE);            /* fetch imm lo */
         opnd = (ir2 << 16) | ir3;                       /* 32b immediate */
-        if (r2) opnd = (opnd + R[r2]) & DMASK32;        /* index calculation */
+        if (r2)                                         /* index calculation */
+            opnd = (opnd + R[r2]) & DMASK32;
         PC = (PC + 6) & VAMASK;                         /* increment PC */
         break;
 
@@ -782,17 +794,21 @@ while (reason == 0) {                                   /* loop until halted */
             ea = (ir2 & 0xFF) << 16;                    /* shift to place */
             ir3 = ReadH ((PC + 4) & VAMASK, VE);        /* fetch addr lo */
             ea = ea | ir3;                              /* finish addr */
-            if (rx2) ea = ea + R[rx2];                  /* index calc 2 */
+            if (rx2)                                    /* index calc 2 */
+                ea = ea + R[rx2];
             PC = (PC + 6) & VAMASK;                     /* increment PC */
             }
-        if (r2) ea = ea + R[r2];                        /* index calculation */
+        if (r2)                                         /* index calculation */
+            ea = ea + R[r2];
         ea = ea & VAMASK;
-        if (ityp == OP_RXF) opnd = ReadF (ea, VR);      /* get fw operand? */
+        if (ityp == OP_RXF)                             /* get fw operand? */
+            opnd = ReadF (ea, VR);
         else if (ityp == OP_RXH) {                      /* get hw operand? */
             t = ReadH (ea, VR);                         /* read halfword */
             opnd = SEXT16 (t);                          /* sign extend */
             }
-        else if (ityp == OP_RXB) opnd = ReadB (ea, VR); /* get byte opnd? */
+        else if (ityp == OP_RXB)                        /* get byte opnd? */
+            opnd = ReadB (ea, VR);
         else opnd = ea;                                 /* just address */
         break;
 
@@ -809,9 +825,11 @@ while (reason == 0) {                                   /* loop until halted */
         hst[hst_p].ea = ea;
         hst[hst_p].opnd = opnd;
         hst_p = hst_p + 1;
-        if (hst_p >= hst_lnt) hst_p = 0;
+        if (hst_p >= hst_lnt)
+            hst_p = 0;
         }
-    if (qevent & EV_MAC) continue;                      /* MAC abort on fetch? */
+    if (qevent & EV_MAC)                                /* MAC abort on fetch? */
+        continue; 
     switch (op) {                                       /* case on opcode */
 
 /* Load/store instructions */
@@ -1007,22 +1025,26 @@ while (reason == 0) {                                   /* loop until halted */
     case 0xF5:                                          /* CI - RI2 */
         rslt = (R[r1] - opnd) & DMASK32;                /* result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (R[r1] < opnd) cc = cc | CC_C;               /* set C if borrow */
-        if (((R[r1] ^ opnd) & (~opnd ^ rslt)) & SIGN32) cc = cc | CC_V;
+        if (R[r1] < opnd)                               /* set C if borrow */
+            cc = cc | CC_C;
+        if (((R[r1] ^ opnd) & (~opnd ^ rslt)) & SIGN32)
+            cc = cc | CC_V;
         break;
 
     case 0xD4:                                          /* CLB - RXB */
         t = R[r1] & DMASK8;
         rslt = (t - opnd) & DMASK16;                    /* result */
         CC_GL_16 (rslt);                                /* set G,L 16b */
-        if (t < opnd) cc = cc | CC_C;                   /* set C if borrow */
+        if (t < opnd)                                   /* set C if borrow */
+            cc = cc | CC_C;
         break;
 
     case 0x12:                                          /* CHVR - RR */
         t = cc & CC_C;                                  /* save C */
         R[r1] = (SEXT16 (opnd & DMASK16)) & DMASK32;    /* result */
         CC_GL_32 (R[r1]);                               /* set G, L */
-        if (R[r1] != opnd) cc = cc | CC_V;              /* wont fit? set V */
+        if (R[r1] != opnd)                              /* wont fit? set V */
+            cc = cc | CC_V;
         cc = cc | t;                                    /* restore C */
         break;
 
@@ -1033,7 +1055,8 @@ while (reason == 0) {                                   /* loop until halted */
     case 0x90:                                          /* SRHLS - NO */
         rslt = (R[r1] & DMASK16) >> opnd;               /* result */
         CC_GL_16 (rslt);                                /* set G,L 16b */
-        if (opnd && (((R[r1] & DMASK16) >> (opnd - 1)) & 1)) cc = cc | CC_C;
+        if (opnd && (((R[r1] & DMASK16) >> (opnd - 1)) & 1))
+            cc = cc | CC_C;
         R[r1] = (R[r1] & ~DMASK16) | rslt;              /* store result */
         break;
 
@@ -1042,7 +1065,8 @@ while (reason == 0) {                                   /* loop until halted */
     case 0x91:                                          /* SLHLS - NO */
         rslt = R[r1] << opnd;                           /* result */
         CC_GL_16 (rslt & DMASK16);                      /* set G,L 16b */
-        if (opnd && (rslt & 0x10000)) cc = cc | CC_C;   /* set C if shft out */
+        if (opnd && (rslt & 0x10000))                   /* set C if shft out */
+            cc = cc | CC_C;
         R[r1] = (R[r1] & ~DMASK16) | (rslt & DMASK16);  /* store result */
         break;
 
@@ -1050,7 +1074,8 @@ while (reason == 0) {                                   /* loop until halted */
         opnd = opnd & 0xF;                              /* shift count */
         rslt = (SEXT16 (R[r1]) >> opnd) & DMASK16;      /* result */
         CC_GL_16 (rslt);                                /* set G,L 16b */
-        if (opnd && ((R[r1] >> (opnd - 1)) & 1)) cc = cc | CC_C;
+        if (opnd && ((R[r1] >> (opnd - 1)) & 1))
+            cc = cc | CC_C;
         R[r1] = (R[r1] & ~DMASK16) | rslt;              /* store result */
         break;
 
@@ -1059,7 +1084,8 @@ while (reason == 0) {                                   /* loop until halted */
         rslt = R[r1] << opnd;                           /* raw result */
         R[r1] = (R[r1] & ~MMASK16) | (rslt & MMASK16);
         CC_GL_16 (R[r1] & DMASK16);                     /* set G,L 16b */
-        if (opnd && (rslt & SIGN16)) cc = cc | CC_C;    /* set C if shft out */
+        if (opnd && (rslt & SIGN16))                    /* set C if shft out */
+            cc = cc | CC_C;
         break;
 
     case 0xEC:                                          /* SRL - RI1 */
@@ -1067,7 +1093,8 @@ while (reason == 0) {                                   /* loop until halted */
     case 0x10:                                          /* SRLS - NO */
         rslt = R[r1] >> opnd;                           /* result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (opnd && ((R[r1] >> (opnd - 1)) & 1)) cc = cc | CC_C;
+        if (opnd && ((R[r1] >> (opnd - 1)) & 1))
+            cc = cc | CC_C;
         R[r1] = rslt;                                   /* store result */
         break;
 
@@ -1076,7 +1103,8 @@ while (reason == 0) {                                   /* loop until halted */
     case 0x11:                                          /* SLLS - NO */
         rslt = (R[r1] << opnd) & DMASK32;               /* result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (opnd && ((R[r1] << (opnd - 1)) & SIGN32)) cc = cc | CC_C;
+        if (opnd && ((R[r1] << (opnd - 1)) & SIGN32))
+            cc = cc | CC_C;
         R[r1] = rslt;                                   /* store result */
         break;
 
@@ -1084,7 +1112,8 @@ while (reason == 0) {                                   /* loop until halted */
         opnd = opnd & 0x1F;                             /* shift count */
         rslt = (SEXT32 (R[r1]) >> opnd) & DMASK32;      /* result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (opnd && ((R[r1] >> (opnd - 1)) & 1)) cc = cc | CC_C;
+        if (opnd && ((R[r1] >> (opnd - 1)) & 1))
+            cc = cc | CC_C;
         R[r1] = rslt;                                   /* store result */
         break;
 
@@ -1093,20 +1122,21 @@ while (reason == 0) {                                   /* loop until halted */
         rslt = (R[r1] << opnd) & DMASK32;               /* raw result */
         R[r1] = (R[r1] & SIGN32) | (rslt & MMASK32);    /* arith result */
         CC_GL_32 (R[r1]);                               /* set G,L */
-        if (opnd && (rslt & SIGN32)) cc = cc | CC_C;    /* set C if shft out */
+        if (opnd && (rslt & SIGN32))                    /* set C if shft out */
+            cc = cc | CC_C;
         break;
 
     case 0xEA:                                          /* RRL - RI1 */
         opnd = opnd & 0x1F;                             /* shift count */
-        if (opnd) R[r1] = (R[r1] >> opnd) |             /* if cnt > 0 */
-            ((R[r1] << (32 - opnd)) & DMASK32);         /* rotate */
+        if (opnd)                                       /* if cnt > 0 */
+            R[r1] = (R[r1] >> opnd) | ((R[r1] << (32 - opnd)) & DMASK32);
         CC_GL_32 (R[r1]);                               /* set G,L */
         break;
 
     case 0xEB:                                          /* RLL - RI1 */
         opnd = opnd & 0x1F;                             /* shift count */
-        if (opnd) R[r1] = ((R[r1] << opnd) & DMASK32) | /* if cnt > 0 */
-            (R[r1] >> (32 - opnd));                     /* rotate */
+        if (opnd)
+            R[r1] = ((R[r1] << opnd) & DMASK32) | (R[r1] >> (32 - opnd));
         CC_GL_32 (R[r1]);                               /* set G,L */
         break;
 
@@ -1116,7 +1146,8 @@ while (reason == 0) {                                   /* loop until halted */
         t = 1u << (15 - (R[r1] & 0xF));                 /* bit mask in HW */
         ea = (ea + ((R[r1] >> 3) & ~1)) & VAMASK;       /* HW location */
         opnd = ReadH (ea, VR);                          /* read HW */
-        if (opnd & t) cc = CC_G;                        /* test bit */
+        if (opnd & t)                                   /* test bit */
+            cc = CC_G;
         else cc = 0;
         break;
 
@@ -1125,7 +1156,8 @@ while (reason == 0) {                                   /* loop until halted */
         ea = (ea + ((R[r1] >> 3) & ~1)) & VAMASK;       /* HW location */
         opnd = ReadH (ea, VR);                          /* read HW */
         WriteH (ea, opnd | t, VW);                      /* set bit, rewr */
-        if (opnd & t) cc = CC_G;                        /* test bit */
+        if (opnd & t)                                   /* test bit */
+            cc = CC_G;
         else cc = 0;
         break;
 
@@ -1134,7 +1166,8 @@ while (reason == 0) {                                   /* loop until halted */
         ea = (ea + ((R[r1] >> 3) & ~1)) & VAMASK;       /* HW location */
         opnd = ReadH (ea, VR);                          /* read HW */
         WriteH (ea, opnd & ~t, VW);                     /* clr bit, rewr */
-        if (opnd & t) cc = CC_G;                        /* test bit */
+        if (opnd & t)                                   /* test bit */
+            cc = CC_G;
         else cc = 0;
         break;
 
@@ -1143,7 +1176,8 @@ while (reason == 0) {                                   /* loop until halted */
         ea = (ea + ((R[r1] >> 3) & ~1)) & VAMASK;       /* HW location */
         opnd = ReadH (ea, VR);                          /* read HW */
         WriteH (ea, opnd ^ t, VW);                      /* com bit, rewr */
-        if (opnd & t) cc = CC_G;                        /* test bit */
+        if (opnd & t)                                   /* test bit */
+            cc = CC_G;
         else cc = 0;
         break;
 
@@ -1157,8 +1191,10 @@ while (reason == 0) {                                   /* loop until halted */
     case 0xFA:                                          /* AI - RI2 */
         rslt = (R[r1] + opnd) & DMASK32;                /* result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (rslt < opnd) cc = cc | CC_C;                /* set C if carry */
-        if (((~R[r1] ^ opnd) & (R[r1] ^ rslt)) & SIGN32) cc = cc | CC_V;
+        if (rslt < opnd)                                /* set C if carry */
+            cc = cc | CC_C;
+        if (((~R[r1] ^ opnd) & (R[r1] ^ rslt)) & SIGN32)
+            cc = cc | CC_V;
         R[r1] = rslt;
         break;
 
@@ -1166,16 +1202,20 @@ while (reason == 0) {                                   /* loop until halted */
         rslt = (R[r1] + opnd) & DMASK32;                /* result */
         WriteF (ea, rslt, VW);                          /* write result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (rslt < opnd) cc = cc | CC_C;                /* set C if carry */
-        if (((~R[r1] ^ opnd) & (R[r1] ^ rslt)) & SIGN32) cc = cc | CC_V;
+        if (rslt < opnd)                                /* set C if carry */
+            cc = cc | CC_C;
+        if (((~R[r1] ^ opnd) & (R[r1] ^ rslt)) & SIGN32)
+            cc = cc | CC_V;
         break;
 
     case 0x61:                                          /* AHM - RXH */
         rslt = (R[r1] + opnd) & DMASK16;                /* result */
         WriteH (ea, rslt, VW);                          /* write result */
         CC_GL_16 (rslt);                                /* set G,L 16b */
-        if (rslt < (opnd & DMASK16)) cc = cc | CC_C;    /* set C if carry */
-        if (((~R[r1] ^ opnd) & (R[r1] ^ rslt)) & SIGN16) cc = cc | CC_V;
+        if (rslt < (opnd & DMASK16))                    /* set C if carry */
+            cc = cc | CC_C;
+        if (((~R[r1] ^ opnd) & (R[r1] ^ rslt)) & SIGN16)
+            cc = cc | CC_V;
         break;
 
     case 0x0B:                                          /* SR - RR */
@@ -1186,8 +1226,10 @@ while (reason == 0) {                                   /* loop until halted */
     case 0xFB:                                          /* SI - RI2 */
         rslt = (R[r1] - opnd) & DMASK32;                /* result */
         CC_GL_32 (rslt);                                /* set G,L */
-        if (R[r1] < opnd) cc = cc | CC_C;               /* set C if borrow */
-        if (((R[r1] ^ opnd) & (~opnd ^ rslt)) & SIGN32) cc = cc | CC_V;
+        if (R[r1] < opnd)                               /* set C if borrow */
+            cc = cc | CC_C;
+        if (((R[r1] ^ opnd) & (~opnd ^ rslt)) & SIGN32)
+            cc = cc | CC_V;
         R[r1] = rslt;
         break;
 
@@ -1219,7 +1261,8 @@ while (reason == 0) {                                   /* loop until halted */
             t = 0;                                      /* no cout */
             if (mpy & 1) {                              /* cond add */
                 rslt = (rslt + mpc) & DMASK32;
-                if (rslt < mpc) t = SIGN32;
+                if (rslt < mpc)
+                    t = SIGN32;
                 }
             rlo = (rlo >> 1) | ((rslt & 1) << 31);      /* shift result */
             rslt = (rslt >> 1) | t;
@@ -1271,8 +1314,10 @@ while (reason == 0) {                                   /* loop until halted */
                     t = t | 1;                          /* set quo bit */
                     }
                 }
-            if (quos & SIGN32) t = NEG (t);             /* res -? neg quo */
-            if (R[r1] & SIGN32) rslt = NEG (rslt);      /* adj rem sign */
+            if (quos & SIGN32)                          /* res -? neg quo */
+                t = NEG (t);
+            if (R[r1] & SIGN32)                         /* adj rem sign */
+                rslt = NEG (rslt); 
             if (t && ((t ^ quos) & SIGN32)) {           /* res sign wrong? */
                 if (PSW & PSW_AFI)                      /* if enabled, */
                     cc = exception (AFIPSW, cc, 0);     /* exception */
@@ -1409,7 +1454,8 @@ while (reason == 0) {                                   /* loop until halted */
 
     case 0xE3:                                          /* SCP - RXH */
         opnd = opnd & DMASK16;                          /* zero ext operand */
-        if (opnd & CCW32_B1) t = ea + CCB32_B1C;        /* point to buf */
+        if (opnd & CCW32_B1)                            /* point to buf */
+            t = ea + CCB32_B1C;
         else t = ea + CCB32_B0C;
         sr = ReadH (t & VAMASK, VR);                    /* get count */
         sr = SEXT16 (sr);                               /* sign extend */
@@ -1430,27 +1476,30 @@ while (reason == 0) {                                   /* loop until halted */
     case 0x18:                                          /* LPSWR - RR */
         PCQ_ENTRY;                                      /* effective branch */
         PC = R[(r2 + 1) & 0xF] & VAMASK;                /* new PC (old reg set) */
-        if (DEBUG_PRI (cpu_dev, LOG_CPU_C)) fprintf (sim_deb,
-            ">>LPSWR: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
-            pcq[pcq_p], BUILD_PSW (cc), PC, opnd);
+        if (DEBUG_PRI (cpu_dev, LOG_CPU_C))
+            fprintf (sim_deb, ">>LPSWR: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
+                     pcq[pcq_p], BUILD_PSW (cc), PC, opnd);
         cc = newPSW (opnd);                             /* new PSW */
-        if (PSW & PSW_SQI) cc = testsysq (cc);          /* test for q */
+        if (PSW & PSW_SQI)                              /* test for q */
+            cc = testsysq (cc);
         break;
 
     case 0xC2:                                          /* LPSW - RXF */
         PCQ_ENTRY;                                      /* effective branch */
         PC = ReadF ((ea + 4) & VAMASK, VR) & VAMASK;    /* new PC */
-        if (DEBUG_PRI (cpu_dev, LOG_CPU_C)) fprintf (sim_deb,
-            ">>LPSW: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
-            pcq[pcq_p], BUILD_PSW (cc), PC, opnd);
+        if (DEBUG_PRI (cpu_dev, LOG_CPU_C))
+            fprintf (sim_deb, ">>LPSW: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
+                     pcq[pcq_p], BUILD_PSW (cc), PC, opnd);
         cc = newPSW (opnd);                             /* new PSW */
-        if (PSW & PSW_SQI) cc = testsysq (cc);          /* test for q */
+        if (PSW & PSW_SQI)                              /* test for q */
+            cc = testsysq (cc);
         break;
 
     case 0x95:                                          /* EPSR - NO */
         R[r1] = BUILD_PSW (cc);                         /* save PSW */
         cc = newPSW (R[r2]);                            /* load new PSW */
-        if (PSW & PSW_SQI) cc = testsysq (cc);          /* test for q */
+        if (PSW & PSW_SQI)                              /* test for q */
+            cc = testsysq (cc);
         break;  
 
     case 0x64:                                          /* ATL - RX */
@@ -1467,7 +1516,8 @@ while (reason == 0) {                                   /* loop until halted */
         opnd = opnd & DMASK16;                          /* zero ext opnd */
         t = (R[r1] & 0x3F) ^ opnd;
         for (i = 0; i < 6; i++) {
-            if (t & 1) t = (t >> 1) ^ 0x0F01;
+            if (t & 1)
+                t = (t >> 1) ^ 0x0F01;
             else t = t >> 1;
             }
         WriteH (ea, t, VW);
@@ -1477,7 +1527,8 @@ while (reason == 0) {                                   /* loop until halted */
         opnd = opnd & DMASK16;                          /* zero ext opnd */
         t = (R[r1] & 0xFF) ^ opnd;
         for (i = 0; i < 8; i++) {
-            if (t & 1) t = (t >> 1) ^ 0xA001;
+            if (t & 1)
+                t = (t >> 1) ^ 0xA001;
             else t = t >> 1;
             }
         WriteH (ea, t, VW);
@@ -1486,7 +1537,8 @@ while (reason == 0) {                                   /* loop until halted */
     case 0xE7:                                          /* TLATE - RXF */
         t = (opnd + ((R[r1] & DMASK8) << 1)) & VAMASK;  /* table entry */
         rslt = ReadH (t, VR);                           /* get entry */
-        if (rslt & SIGN16) R[r1] = rslt & DMASK8;       /* direct xlate? */
+        if (rslt & SIGN16)                              /* direct xlate? */
+            R[r1] = rslt & DMASK8;
         else {
             PCQ_ENTRY;                                  /* branch */
             PC = rslt << 1;
@@ -1550,7 +1602,8 @@ while (reason == 0) {                                   /* loop until halted */
             t = 0;
             cc = CC_V;
             }
-        if (OP_TYPE (op) != OP_RR) WriteB (ea, t, VW);  /* RX or RR? */
+        if (OP_TYPE (op) != OP_RR)                      /* RX or RR? */
+            WriteB (ea, t, VW);
         else R[r2] = t & DMASK8;
         int_eval ();                                    /* re-eval intr */
         break;
@@ -1572,7 +1625,8 @@ while (reason == 0) {                                   /* loop until halted */
             t = 0;
             cc = CC_V;
             }
-        if (OP_TYPE (op) != OP_RR) WriteH (ea, t, VW);  /* RX or RR? */
+        if (OP_TYPE (op) != OP_RR)                      /* RX or RR? */
+            WriteH (ea, t, VW);
         else R[r2] = t & DMASK16;
         int_eval ();                                    /* re-eval intr */
         break;
@@ -1585,7 +1639,8 @@ while (reason == 0) {                                   /* loop until halted */
             t = dev_tab[dev] (dev, IO_SS, 0);           /* get status */
             }
         else t = STA_EX;                                /* no */
-        if (OP_TYPE (op) != OP_RR) WriteB (ea, t, VW);  /* RX or RR? */
+        if (OP_TYPE (op) != OP_RR)                      /* RX or RR? */
+            WriteB (ea, t, VW);
         else R[r2] = t & DMASK8;
         cc = t & 0xF;
         int_eval ();                                    /* re-eval intr */
@@ -1608,7 +1663,8 @@ while (reason == 0) {                                   /* loop until halted */
             if (OP_TYPE (op) != OP_RR)
                 lim = ReadF ((ea + 4) & VAMASK, VR);
             else lim = R[(r2 + 1) & 0xF];
-            if (opnd > lim) cc = 0;                     /* start > end? */
+            if (opnd > lim)                             /* start > end? */
+                cc = 0;
             else {                                      /* no, start I/O */
                 dev_tab[dev] (dev, IO_ADR, 0);          /* select dev */
                 blk_io.dfl = dev;                       /* set status block */
@@ -1627,7 +1683,8 @@ while (reason == 0) {                                   /* loop until halted */
             if (OP_TYPE (op) != OP_RR)
                 lim = ReadF ((ea + 4) & VAMASK, VR);
             else lim = R[(r2 + 1) & 0xF];
-            if (opnd > lim) cc = 0;                     /* start > end? */
+            if (opnd > lim)                             /* start > end? */
+                cc = 0;
             else {                                      /* no, start I/O */
                 dev_tab[dev] (dev, IO_ADR, 0);          /* select dev */
                 blk_io.dfl = dev | BL_RD;               /* set status block */
@@ -1643,7 +1700,8 @@ while (reason == 0) {                                   /* loop until halted */
         dev = ReadB (AL_DEV, P);                        /* get device */
         t = ReadB (AL_IOC, P);                          /* get command */
         if (DEV_ACC (dev)) {                            /* dev exist? */
-            if (AL_BUF > ea) cc = 0;                    /* start > end? */
+            if (AL_BUF > ea)                            /* start > end? */
+                cc = 0;
             else {                                      /* no, start I/O */
                 dev_tab[dev] (dev, IO_ADR, 0);          /* select dev */
                 dev_tab[dev] (dev, IO_OC, t);           /* start dev */
@@ -1676,9 +1734,11 @@ uint32 rs = PSW_GETREG (val);                           /* register set */
 R = &GREG[rs * 16];                                     /* set register set */
 PSW = val & PSW_MASK;                                   /* store PSW */
 int_eval ();                                            /* update intreq */
-if (PSW & PSW_WAIT) qevent = qevent | EV_WAIT;          /* wait state? */
+if (PSW & PSW_WAIT)                                     /* wait state? */
+    qevent = qevent | EV_WAIT;
 else qevent = qevent & ~EV_WAIT;
-if (PSW & PSW_EXI) SET_ENB (v_DS);                      /* enable/disable */
+if (PSW & PSW_EXI)                                      /* enable/disable */
+    SET_ENB (v_DS);
 else CLR_ENB (v_DS);                                    /* console intr */
 return PSW & CC_MASK;
 }
@@ -1700,9 +1760,9 @@ else {
     GREG[14] = oldPSW;                                  /* 7/32, PSW to set 0 14 */
     GREG[15] = oldPC;                                   /* PC to set 0 15 */
     }
-if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
-    ">>Exc %X: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
-    loc, oldPC, oldPSW, PC, PSW | cc | flg);
+if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
+    fprintf (sim_deb, ">>Exc %X: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
+             loc, oldPC, oldPSW, PC, PSW | cc | flg);
 return cc | flg;                                        /* return CC */
 }
 
@@ -1715,7 +1775,8 @@ int32 usd = ReadH (qb + Q32_USD, P);                    /* get use count */
 
 if (usd) {                                              /* entries? */
     cc = exception (SQTPSW, cc, 0);                     /* take sysq exc */
-    if (cpu_unit.flags & UNIT_832) R[13] = qb;          /* R13 = sys q addr */
+    if (cpu_unit.flags & UNIT_832)                      /* R13 = sys q addr */
+        R[13] = qb;
     else GREG[13] = qb;
     }
 return cc;
@@ -1730,18 +1791,21 @@ uint32 slt, usd, wra, t;
 t = ReadF (ea, VR);                                     /* slots/used */
 slt = (t >> 16) & DMASK16;                              /* # slots */
 usd = t & DMASK16;                                      /* # used */
-if (usd >= slt) return CC_V;                            /* list full? */
+if (usd >= slt)                                         /* list full? */
+    return CC_V;
 usd = (usd + 1) & DMASK16;                              /* inc # used */
 WriteH (ea + Q32_USD, usd, VW);                         /* rewrite */
 if (flg) {                                              /* ABL? */
     wra = ReadH ((ea + Q32_BOT) & VAMASK, VR);          /* get bottom */
     t = wra + 1;                                        /* adv bottom */
-    if (t >= slt) t = 0;                                /* wrap if necc */
+    if (t >= slt)                                       /* wrap if necc */
+        t = 0;
     WriteH ((ea + Q32_BOT) & VAMASK, t, VW);            /* rewrite bottom */
     }
 else {
     wra = ReadH ((ea + Q32_TOP) & VAMASK, VR);          /* ATL, get top */
-    if (wra == 0) wra = (slt - 1) & DMASK16;            /* wrap if necc */
+    if (wra == 0)
+        wra = (slt - 1) & DMASK16;                      /* wrap if necc */
     else wra = wra - 1;                                 /* dec top */
     WriteH ((ea + Q32_TOP) & VAMASK, wra, VW);          /* rewrite top */
     }
@@ -1758,23 +1822,27 @@ uint32 slt, usd, rda, t;
 t = ReadF (ea, VR);                                     /* get slots/used */
 slt = (t >> 16) & DMASK16;                              /* # slots */
 usd = t & DMASK16;                                      /* # used */
-if (usd == 0) return CC_V;                              /* empty? */
+if (usd == 0)                                           /* empty? */
+    return CC_V;
 usd = usd - 1;                                          /* dec used */
 WriteH (ea + Q32_USD, usd, VW);                         /* rewrite */
 if (flg) {                                              /* RBL? */
     rda = ReadH ((ea + Q32_BOT) & VAMASK, VR);          /* get bottom */
-    if (rda == 0) rda = (slt - 1) & DMASK16;            /* wrap if necc */
+    if (rda == 0)                                       /* wrap if necc */
+        rda = (slt - 1) & DMASK16;
     else rda = rda - 1;                                 /* dec bottom */
     WriteH ((ea + Q32_BOT) & VAMASK, rda, VW);          /* rewrite bottom */
     }
 else {
     rda = ReadH ((ea + Q32_TOP) & VAMASK, VR);          /* RTL, get top */
     t = rda + 1;                                        /* adv top */
-    if (t >= slt) t = 0;                                /* wrap if necc */
+    if (t >= slt)                                       /* wrap if necc */
+        t = 0;
     WriteH ((ea + Q32_TOP) & VAMASK, t, VW);            /* rewrite top */
     }
 R[r1] = ReadF ((ea + Q32_BASE + (rda * Q32_SLNT)) & VAMASK, VR); /* read slot */
-if (usd) return CC_G;
+if (usd)
+    return CC_G;
 else return 0;
 }
 
@@ -1792,9 +1860,9 @@ newPSW (0x2800);                                        /* new PSW */
 R[0] = oldPSW;                                          /* save old PSW */
 R[1] = PC;                                              /* save PC */
 R[2] = dev;                                             /* set dev # */
-if (DEBUG_PRI (cpu_dev, LOG_CPU_I)) fprintf (sim_deb,
-    ">>Int %X: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
-    dev, PC, oldPSW, vec, 0x2800);
+if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
+    fprintf (sim_deb, ">>Int %X: oPC = %X, oPSW = %X, nPC = %X, nPSW = %X\n",
+             dev, PC, oldPSW, vec, 0x2800);
 if (DEV_ACC (dev)) {                                    /* dev exist? */
     hw = dev_tab[dev] (dev, IO_ADR, 0);                 /* select, get hw */
     R[3] = st = dev_tab[dev] (dev, IO_SS, 0);           /* sense status */
@@ -1853,7 +1921,8 @@ if (ccw & CCW32_FST) {                                  /* fast mode? */
         }                                               /* end if bufc <= 0 */
     }                                                   /* end fast */
 else {                                                  /* slow mode */
-    if (ccw & CCW32_B1) ccwb = ccwa + CCB32_B1C;        /* which buf? */
+    if (ccw & CCW32_B1)                                 /* which buf? */
+        ccwb = ccwa + CCB32_B1C;
     else ccwb = ccwa + CCB32_B0C;
     t = ReadH (ccwb, VR);                               /* get count */
     bufc = SEXT16 (t);                                  /* sign ext */
@@ -1894,7 +1963,8 @@ else {                                                  /* slow mode */
         t = t ^ by;                                     /* start LRC */
         if (ccw & CCW32_CRC) {                          /* CRC? */
             for (i = 0; i < 8; i++) {
-                if (t & 1) t = (t >> 1) ^ 0xA001;
+                if (t & 1)
+                    t = (t >> 1) ^ 0xA001;
                 else t = t >> 1;
                 }
             }
@@ -1922,7 +1992,8 @@ int t;
 switch (op) {
 
     case IO_ADR:                                        /* select */
-        if (!drmod) drpos = srpos = 0;                  /* norm mode? clr */
+        if (!drmod)                                     /* norm mode? clr */
+            drpos = srpos = 0;
         return BY;                                      /* byte only */
 
     case IO_OC:                                         /* command */
@@ -1931,13 +2002,15 @@ switch (op) {
             drmod = 1;
             drpos = srpos = 0;                          /* init cntrs */
             }
-        else if (op == 0x80) drmod = 0;                 /* x80 = norm */
+        else if (op == 0x80)                            /* x80 = norm */
+            drmod = 0;
         break;
 
     case IO_WD:                                         /* write */
         if (drpos < 4) 
             DR = (DR & ~(DMASK8 << (drpos * 8))) | (dat << (drpos * 8));
-        else if (drpos == 4) DRX = dat;
+        else if (drpos == 4)
+            DRX = dat;
         drpos = (drpos + 1) & 0x7;
         break;
 
@@ -1996,11 +2069,15 @@ seg = VA_GETSEG (va);                                   /* get seg num */
 off = VA_GETOFF (va);                                   /* get offset */
 mapr = ReadF ((base + (seg << 2)) & VAMASK, rel);       /* get seg reg */
 lim = GET_SRL (mapr);                                   /* get limit */
-if (off >= lim) return CC_C;                            /* limit viol? */
-if ((mapr & SR_PRS) == 0) return CC_V;                  /* not present? */
+if (off >= lim)                                         /* limit viol? */
+    return CC_C; 
+if ((mapr & SR_PRS) == 0)                               /* not present? */
+    return CC_V;
 *pa = off + (mapr & SRF_MASK);                          /* translate */
-if (mapr & (SR_WRP | SR_WPI)) return CC_G;              /* write prot? */
-if (mapr & SR_EXP) return CC_L;                         /* exec prot? */
+if (mapr & (SR_WRP | SR_WPI))                           /* write prot? */
+    return CC_G;
+if (mapr & SR_EXP)                                      /* exec prot? */
+    return CC_L;
 return 0;                                               /* ok */
 }
 
@@ -2030,7 +2107,8 @@ if ((PSW & PSW_REL) == 0) {                             /* reloc off? */
         }
     else val = M[loc >> 2];                             /* get mem word */
     }
-else if (rel == 0) val = M[loc >> 2];                   /* phys ref? */
+else if (rel == 0)                                      /* phys ref? */
+    val = M[loc >> 2];
 else {
     uint32 pa = Reloc (loc, rel);                       /* relocate */
     val = M[pa >> 2];
@@ -2049,7 +2127,8 @@ if ((PSW & PSW_REL) == 0) {                             /* reloc off? */
         }
     else val = M[loc >> 2];                             /* get mem word */
     }
-else if (rel == 0) val = M[loc >> 2];                   /* phys ref? */
+else if (rel == 0)                                      /* phys ref? */
+    val = M[loc >> 2];
 else {
     uint32 pa = Reloc (loc, rel);                       /* relocate */
     val = M[pa >> 2];
@@ -2068,7 +2147,8 @@ if ((PSW & PSW_REL) == 0) {                             /* reloc off? */
         }
     else val = M[loc >> 2];                             /* get mem word */
     }
-else if (rel == 0) val = M[loc >> 2];                   /* phys ref? */
+else if (rel == 0)                                      /* phys ref? */
+    val = M[loc >> 2];
 else {
     uint32 pa = Reloc (loc, rel);                       /* relocate */
     val = M[pa >> 2];
@@ -2093,9 +2173,10 @@ if ((PSW & PSW_REL) == 0) {                             /* reloc off? */
             }
         }
     }
-else if (rel != 0) pa = Reloc (loc, rel);               /* !phys? relocate */
-if (MEM_ADDR_OK (pa)) M[pa >> 2] = 
-    (M[pa >> 2] & ~(DMASK8 << sc)) | (val << sc);
+else if (rel != 0)                                      /* !phys? relocate */
+    pa = Reloc (loc, rel);
+if (MEM_ADDR_OK (pa))
+    M[pa >> 2] = (M[pa >> 2] & ~(DMASK8 << sc)) | (val << sc);
 return;
 }
 
@@ -2116,10 +2197,11 @@ if ((PSW & PSW_REL) == 0) {                             /* reloc off? */
             }
         }
     }
-else if (rel != 0) pa = Reloc (loc, rel);               /* !phys? relocate */
-if (MEM_ADDR_OK (pa)) M[pa >> 2] = (loc & 2)?
-    ((M[pa >> 2] & ~DMASK16) | val):
-    ((M[pa >> 2] & DMASK16) | (val << 16));
+else if (rel != 0)                                      /* !phys? relocate */
+    pa = Reloc (loc, rel);
+if (MEM_ADDR_OK (pa))
+    M[pa >> 2] = (loc & 2)? ((M[pa >> 2] & ~DMASK16) | val):
+                            ((M[pa >> 2] & DMASK16) | (val << 16));
 return;
 }
 
@@ -2143,8 +2225,10 @@ if ((PSW & PSW_REL) == 0) {                             /* reloc off? */
             }
         }
     }
-else if (rel != 0) pa = Reloc (loc, rel);               /* !phys? relocate */
-if (MEM_ADDR_OK (pa)) M[pa >> 2] = val & DMASK32;
+else if (rel != 0)                                      /* !phys? relocate */
+    pa = Reloc (loc, rel);
+if (MEM_ADDR_OK (pa))
+    M[pa >> 2] = val & DMASK32;
 return;
 }
 
@@ -2190,10 +2274,13 @@ DR = 0;                                                 /* clear display */
 drmod = 0;
 blk_io.dfl = blk_io.cur = blk_io.end = 0;               /* no block I/O */
 sim_brk_types = sim_brk_dflt = SWMASK ('E');            /* init bkpts */
-if (M == NULL) M = (uint32 *) calloc (MAXMEMSIZE32 >> 2, sizeof (uint32));
-if (M == NULL) return SCPE_MEM;
+if (M == NULL)
+    M = (uint32 *) calloc (MAXMEMSIZE32 >> 2, sizeof (uint32));
+if (M == NULL)
+    return SCPE_MEM;
 pcq_r = find_reg ("PCQ", NULL, dptr);                   /* init PCQ */
-if (pcq_r) pcq_r->qptr = 0;
+if (pcq_r)
+    pcq_r->qptr = 0;
 else return SCPE_IERR;
 return SCPE_OK;
 }
@@ -2204,10 +2291,13 @@ t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
 if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
     int32 cc = RelocT (addr, MAC_BASE, P, &addr);
-    if (cc & (CC_C | CC_V)) return SCPE_NXM;
+    if (cc & (CC_C | CC_V))
+        return SCPE_NXM;
 	}
-if (addr >= MEMSIZE) return SCPE_NXM;
-if (vptr != NULL) *vptr = IOReadH (addr);
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
+if (vptr != NULL)
+    *vptr = IOReadH (addr);
 return SCPE_OK;
 }
 
@@ -2217,9 +2307,11 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 {
 if ((sw & SWMASK ('V')) && (PSW & PSW_REL)) {
     int32 cc = RelocT (addr, MAC_BASE, P, &addr);
-    if (cc & (CC_C | CC_V)) return SCPE_NXM;
+    if (cc & (CC_C | CC_V))
+        return SCPE_NXM;
 	}
-if (addr >= MEMSIZE) return SCPE_NXM;
+if (addr >= MEMSIZE)
+    return SCPE_NXM;
 IOWriteH (addr, val);
 return SCPE_OK;
 }
@@ -2233,11 +2325,13 @@ uint32 i;
 
 if ((val <= 0) || (val > MAXMEMSIZE32) || ((val & 0xFFFF) != 0))
     return SCPE_ARG;
-for (i = val; i < MEMSIZE; i = i + 4) mc = mc | M[i >> 2];
+for (i = val; i < MEMSIZE; i = i + 4)
+    mc = mc | M[i >> 2];
 if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
     return SCPE_OK;
 MEMSIZE = val;
-for (i = MEMSIZE; i < MAXMEMSIZE32; i = i + 4) M[i >> 2] = 0;
+for (i = MEMSIZE; i < MAXMEMSIZE32; i = i + 4)
+     M[i >> 2] = 0;
 return SCPE_OK;
 }
 
@@ -2250,8 +2344,10 @@ REG *rptr;
 int32 i;
 
 rptr = find_reg ("R0", NULL, &cpu_dev);
-if (rptr == NULL) return;
-for (i = 0; i < 16; i++, rptr++) rptr->loc = (void *) (rbase + i);
+if (rptr == NULL)
+    return;
+for (i = 0; i < 16; i++, rptr++)
+    rptr->loc = (void *) (rbase + i);
 return;
 }
 
@@ -2259,7 +2355,8 @@ return;
 
 t_stat cpu_set_consint (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (PSW & PSW_EXI) SET_INT (v_DS);
+if (PSW & PSW_EXI)
+    SET_INT (v_DS);
 return SCPE_OK;
 }
 
@@ -2271,12 +2368,14 @@ uint32 i, lnt;
 t_stat r;
 
 if (cptr == NULL) {
-    for (i = 0; i < hst_lnt; i++) hst[i].pc = 0;
+    for (i = 0; i < hst_lnt; i++)
+        hst[i].pc = 0;
     hst_p = 0;
     return SCPE_OK;
     }
 lnt = (uint32) get_uint (cptr, 10, HIST_MAX, &r);
-if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN))) return SCPE_ARG;
+if ((r != SCPE_OK) || (lnt && (lnt < HIST_MIN)))
+    return SCPE_ARG;
 hst_p = 0;
 if (hst_lnt) {
     free (hst);
@@ -2285,7 +2384,8 @@ if (hst_lnt) {
     }
 if (lnt) {
     hst = (InstHistory *) calloc (lnt, sizeof (InstHistory));
-    if (hst == NULL) return SCPE_MEM;
+    if (hst == NULL)
+        return SCPE_MEM;
     hst_lnt = lnt;
     }
 return SCPE_OK;
@@ -2303,21 +2403,25 @@ InstHistory *h;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 
-if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
+if (hst_lnt == 0)                                       /* enabled? */
+    return SCPE_NOFNC;
 if (cptr) {
     lnt = (int32) get_uint (cptr, 10, hst_lnt, &r);
-    if ((r != SCPE_OK) || (lnt == 0)) return SCPE_ARG;
+    if ((r != SCPE_OK) || (lnt == 0))
+        return SCPE_ARG;
     }
 else lnt = hst_lnt;
 di = hst_p - lnt;                                       /* work forward */
-if (di < 0) di = di + hst_lnt;
+if (di < 0)
+    di = di + hst_lnt;
 fprintf (st, "PC     r1       operand  ea     IR\n\n");
 for (k = 0; k < lnt; k++) {                             /* print specified */
     h = &hst[(di++) % hst_lnt];                         /* entry pointer */
     if (h->pc & HIST_PC) {                              /* instruction? */
         fprintf (st, "%06X %08X %08X ", h->pc & VAMASK32, h->r1, h->opnd);
         op = (h->ir1 >> 8) & 0xFF;
-        if (OP_TYPE (op) >= OP_RX) fprintf (st, "%06X ", h->ea);
+        if (OP_TYPE (op) >= OP_RX)
+            fprintf (st, "%06X ", h->ea);
         else fprintf (st, "       ");
         sim_eval[0] = h->ir1;
         sim_eval[1] = h->ir2;

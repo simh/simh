@@ -1,6 +1,6 @@
 /* hp2100_cpu6.c: HP 1000 RTE-6/VM OS instructions
 
-   Copyright (c) 2006-2007, J. David Bryan
+   Copyright (c) 2006-2008, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    CPU6         RTE-6/VM OS instructions
 
+   18-Sep-08    JDB     Corrected .SIP debug formatting
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    27-Nov-07    JDB     Implemented OS instructions
    26-Sep-06    JDB     Created
 
@@ -136,70 +140,82 @@ enum vctr_offsets { dms_offset = 0,                     /* DMS status */
    * These mnemonics are recognized by symbolic examine/deposit but are not
      official HP mnemonics.
 
-   Notes:
+   Implementation notes:
 
-     1. The microcode differentiates between interrupt processing and normal
-        execution of the "dual use" instructions by testing the CPU flag.
-        Interrupt vectoring sets the flag; a normal instruction fetch clears it.
-        Under simulation, interrupt vectoring is indicated by the value of the
-        "iotrap" parameter (0 = normal instruction, 1 = trap cell instruction).
+    1. The microcode differentiates between interrupt processing and normal
+       execution of the "dual use" instructions by testing the CPU flag.
+       Interrupt vectoring sets the flag; a normal instruction fetch clears it.
+       Under simulation, interrupt vectoring is indicated by the value of the
+       "iotrap" parameter (0 = normal instruction, 1 = trap cell instruction).
 
-     2. The operand patterns for .ENTN and .ENTC normally would be coded as
-        "OP_A", as each takes a single address as a parameter.  However, because
-        they might also be executed from a trap cell, we cannot assume that P+1
-        is an address, or we might cause a DM abort when trying to resolve
-        indirects.  Therefore, "OP_A" handling is done within each routine, once
-        the type of use is determined.
+    2. The operand patterns for .ENTN and .ENTC normally would be coded as
+       "OP_A", as each takes a single address as a parameter.  However, because
+       they might also be executed from a trap cell, we cannot assume that P+1
+       is an address, or we might cause a DM abort when trying to resolve
+       indirects.  Therefore, "OP_A" handling is done within each routine, once
+       the type of use is determined.
 
-     3. The microcode for .ENTC, .ENTN, .FNW, .LLS, .TICK, and .TNAM explicitly
-        checks for interrupts during instruction execution.  In addition, the
-        .STIO, .CPM, and .LLS instructions implicitly check for interrupts
-        during parameter indirect resolution.  Because the simulator calculates
-        interrupt requests only between instructions, this behavior is not
-        simulated.
+    3. The microcode for .ENTC, .ENTN, .FNW, .LLS, .TICK, and .TNAM explicitly
+       checks for interrupts during instruction execution.  In addition, the
+       .STIO, .CPM, and .LLS instructions implicitly check for interrupts during
+       parameter indirect resolution.  Because the simulator calculates
+       interrupt requests only between instructions, this behavior is not
+       simulated.
 
-     4. The microcode executes certain I/O instructions (e.g., CLF 0) by
-        building the instruction in the IR and executing an IOG micro-order.  We
-        simulate this behavior by calling the "iogrp" handler with the
-        appropriate instruction, rather than manipulating the I/O system
-        directly, so that we will remain unaffected by any future changes to the
-        underlying I/O simulation structure.
+    4. The microcode executes certain I/O instructions (e.g., CLF 0) by building
+       the instruction in the IR and executing an IOG micro-order.  We simulate
+       this behavior by calling the "iogrp" handler with the appropriate
+       instruction, rather than manipulating the I/O system directly, so that we
+       will remain unaffected by any future changes to the underlying I/O
+       simulation structure.
 
-     5. The $OTST and .DSPI microcode uses features (reading the RPL switches
-        and boot loader ROM data, loading the display register) that are not
-        simulated.  The remaining functions of the $OTST instruction are
-        provided.  The .DSPI instruction is a NOP or unimplemented instruction
-        stop.
+    5. The $OTST and .DSPI microcode uses features (reading the RPL switches and
+       boot loader ROM data, loading the display register) that are not
+       simulated.  The remaining functions of the $OTST instruction are
+       provided. The .DSPI instruction is a NOP or unimplemented instruction
+       stop.
 
-     6. The microcode detects a privileged system and takes some additional
-        actions if one is found.  We provide simulations of these actions.
-        However, at the current time, the simulator does not provide a
-        privileged interrupt fence card, so this code is untested.
+    6. Because of the volume of calls to the OS firmware, debug printouts
+       attempt to write only one line per instruction invocation.  This means
+       that calling and returned register values are printed separately, with a
+       newline added at the end of execution.  However, many instructions can MP
+       or DM abort, either intentionally or due to improper use.  That would
+       leave debug lines without the required trailing newlines.
 
-     7. Because of the volume of calls to the OS firmware, debug printouts
-        attempt to write only one line per instruction invocation.  This means
-        that calling and returned register values are printed separately, with a
-        newline added at the end of execution.  However, many instructions can
-        MP or DM abort, either intentionally or due to improper use.  That would
-        leave debug lines without the required trailing newlines.
+       There are two ways to address this: either we could replace the CPU's
+       setjmp buffer with one that points to a routine that adds the missing
+       newline, or we can add a semaphore that is tested on entry to see if it
+       is already set, implying a longjmp occurred, and then add the newline if
+       so.  The latter would add the newline when the MP trap cell instruction
+       was entered or when the next user-level instruction was executed.
+       However, the merged-line problem would still exist if some other module
+       generated intervening debug printouts.  So we do the former.  This does
+       mean that this routine must be changed if the MP abort mechanism is
+       changed.
 
-        There are two ways to address this: either we could replace the CPU's
-        setjmp buffer with one that points to a routine that adds the missing
-        newline, or we can add a semaphore that is tested on entry to see if it
-        is already set, implying a longjmp occurred, and then add the newline if
-        so.  The latter would add the newline when the MP trap cell instruction
-        was entered or when the next user-level instruction was executed.
-        However, the merged-line problem would still exist if some other module
-        generated intervening debug printouts.  So we do the former.  This does
-        mean that this routine must be changed if the MP abort mechanism is
-        changed.
+    7. The $LIBX instruction is executed to complete either a privileged or
+       reentrant execution.  In the former case, the privileged nest counter
+       ($PVCN) is decremented.  In the latter, $PVCN decrement is attempted but
+       the write will trap with an MP violation, as reentrant routines execute
+       with the interrupt system on.  RTE will then complete the release of
+       memory allocated for the original $LIBR call.
 
-     8. The $LIBX instruction is executed to complete either a privileged or
-        reentrant execution.  In the former case, the privileged nest counter
-        ($PVCN) is decremented.  In the latter, $PVCN decrement is attempted but
-        the write will trap with an MP violation, as reentrant routines execute
-        with the interrupt system on.  RTE will then complete the release of
-        memory allocated for the original $LIBR call.
+    8. The documentation for the .SIP and .YLD instructions is misleading in
+       several places.  Comments in the RTE $SIP source file say that .SIP
+       doesn't return if a "known" interrupt is pending.  Actually, .SIP always
+       returns, either to P+1 for no pending interrupt, or to P+2 if one is
+       pending.  There is no check for "known" interrupt handlers.  The
+       microcode source comments say that the interrupting select code is
+       returned in the B register.  Actually, the B register is unchanged.  The
+       RTE Tech Specs say that .SIP "services any pending system interrupts."
+       Actually, .SIP only checks for interrupts; no servicing is performed.
+
+       For .YLD, the microcode comments say that two parameters are passed: the
+       new P value, and the interrupting select code.  Actually, only the new P
+       value is passed.
+
+       The .SIP and .YLD simulations follow the actual microcode rather than the
+       documentation.
 
    Additional references:
     - RTE-6/VM OS Microcode Source (92084-18831, revision 8).
@@ -330,22 +346,22 @@ else
    Note that the OS flag enables the .IRT instruction trace for all cases except
    a TBG interrupt.
 
-   The firmware self-test instruction (105355) is always allowed, regardless of
-   the UNIT_VMAOS setting.  This is because RTE-6/VM will always test for the
-   presence of OS and VMA firmware on E/F-Series machines.  If the firmware is
-   not present, then these instructions are NOPs and return to P+1.  RTE will
-   then HLT 21.  This means that RTE-6/VM will not run on an E/F-Series machine
-   without the OS and VMA firmware.
+   The default (user microcode) dispatcher will allow the firmware self-test
+   instruction (105355) to execute as NOP.  This is because RTE-6/VM will always
+   test for the presence of OS and VMA firmware on E/F-Series machines.  If the
+   firmware is not present, then these instructions will return to P+1, and RTE
+   will then HLT 21.  This means that RTE-6/VM will not run on an E/F-Series
+   machine without the OS and VMA firmware.
 
    Howwever, RTE allows the firmware instructions to be disabled for debugging
    purposes.  If the firmware is present and returns to P+2 but sets the X
    register to 0, then RTE will use software equivalents.  We enable this
    condition when the OS firmware is enabled (SET CPU VMA), the OS debug flag is
    set (SET CPU DEBUG=OS), but debug output has been disabled (SET CONSOLE
-   NODEBUG). That is:
+   NODEBUG).  That is:
 
                  OS     Debug
-     Firmware   Flag    Output   Tracing   Self-Test Instruction
+     Firmware   Debug   Output   Tracing   Self-Test Instruction
      ========   =====   ======   =======   =====================
      disabled     x       x        off     NOP
      enabled    clear     x        off     X = revision code
@@ -372,10 +388,6 @@ jmp_buf mp_handler;
 int abortval;
 t_bool debug_print;
 static t_bool tbg_tick = FALSE;                         /* set if processing TBG interrupt */
-
-if ((IR != 0105355) &&                                  /* allow self-test with OS disabled */
-    (cpu_unit.flags & UNIT_VMAOS) == 0)                 /* VMA/OS option installed? */
-    return stop_inst;
 
 entry = IR & 017;                                       /* mask to entry point */
 pattern = op_os[entry];                                 /* get operand pattern */
@@ -411,7 +423,7 @@ switch (entry) {                                        /* decode IR<3:0> */
 
     case 000:                                           /* $LIBR 105340 (OP_A) */
         if ((op[0].word != 0) ||                        /* reentrant call? */
-            (CTL (PRO) && (ReadW (dummy) != 0))) {      /* or priv call + MP on + priv sys? */
+            (mp_control && (ReadW (dummy) != 0))) {     /* or priv call + MP on + priv sys? */
             if (dms_ump) {                              /* called from user map? */
                 dms_viol (err_PC, MVI_PRV);             /* privilege violation */
                 }
@@ -422,8 +434,8 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         else {                                          /* privileged call */
-            if (CTL (PRO)) {                            /* memory protect on? */
-                clrCTL (PRO);                           /* turn it off */
+            if (mp_control) {                           /* memory protect on? */
+                mp_control = CLEAR;                     /* turn it off */
                 reason = iogrp (CLF_0, iotrap);         /* turn interrupt system off */
                 WriteW (mptfl, 1);                      /* show MP is off */
                 save_area = ReadW (xsusp);              /* get addr of P save area */
@@ -636,7 +648,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                                                         /* P+0 return for no pending IRQ */
         if (debug_print)                                /* debugging? */
             fprintf (sim_deb,                           /* print return registers */
-                     "CIR = %02o, return = P+%d",
+                     ", CIR = %02o, return = P+%d",
                      intrq, PC - (err_PC + 1));
         break;
 
@@ -739,25 +751,22 @@ switch (entry) {                                        /* decode IR<3:0> */
             }
 
         else {                                          /* self-test instruction */
-            if (cpu_unit.flags & UNIT_VMAOS) {          /* VMA/OS option installed? */
-                YR = 0000000;                           /* RPL switch (not implemented) */
-                AR = 0000000;                           /* LDR [B] (not implemented) */
-                SR = 0102077;                           /* test passed code */
-                PC = (PC + 1) & VAMASK;                 /* P+1 return for firmware OK */
+            YR = 0000000;                               /* RPL switch (not implemented) */
+            AR = 0000000;                               /* LDR [B] (not implemented) */
+            SR = 0102077;                               /* test passed code */
+            PC = (PC + 1) & VAMASK;                     /* P+1 return for firmware OK */
 
-                if ((cpu_dev.dctrl & DEB_OS) &&         /* OS debug flag set, */
-                    (sim_deb == NULL))                  /* but debugging disabled? */
-                    XR = 0;                             /* rev = 0 means RTE won't use ucode */
-                else
-                    XR = 010;                           /* firmware revision 10B = 8 */
-                }
+            if ((cpu_dev.dctrl & DEB_OS) &&             /* OS debug flag set, */
+                (sim_deb == NULL))                      /* but debugging disabled? */
+                XR = 0;                                 /* rev = 0 means RTE won't use ucode */
+            else
+                XR = 010;                               /* firmware revision 10B = 8 */
 
             if (debug_print)                            /* debugging? */
                 fprint_regs (",", REG_X | REG_P_REL,    /* print return registers */
                              err_PC + 1);
             }
-
-        break;                                          /* self-test is NOP if no firmware */
+        break;
 
     case 016:                                           /* .ENTC/$DEV 105356 (OP_N) */
         if (iotrap) {                                   /* in trap cell? */

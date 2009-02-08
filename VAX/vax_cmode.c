@@ -125,7 +125,8 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 src2 = RdMemW ((R[6] + 2) & WMASK);     /* new PSW */
                 R[6] = (R[6] + 4) & WMASK;
                 cc = src2 & CC_MASK;                    /* update cc, T */
-                if (src2 & PSW_T) PSL = PSL | PSW_T;
+                if (src2 & PSW_T)
+                    PSL = PSL | PSW_T;
                 else PSL = PSL & ~PSW_T;
                 CMODE_JUMP (src);                       /* update PC */
                 break;
@@ -137,8 +138,11 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             break;                                      /* end case 0000xx */
 
         case 001:                                       /* JMP */
-            if (dstreg) CMODE_FAULT (CMODE_ILLI);       /* mode 0 illegal */
-            else { CMODE_JUMP (GeteaW (dstspec)); }
+            if (dstreg)                                 /* mode 0 illegal */
+                CMODE_FAULT (CMODE_ILLI);
+            else {
+                CMODE_JUMP (GeteaW (dstspec));
+                }
             break;
 
         case 002:                                       /* 0002xx */
@@ -156,15 +160,18 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 CMODE_FAULT (CMODE_RSVI);
                 break;
                 }
-            if (IR < 000260) cc = cc & ~(IR & CC_MASK); /* clear CC */
+            if (IR < 000260)                            /* clear CC */
+                cc = cc & ~(IR & CC_MASK);
             else cc = cc | (IR & CC_MASK);              /* set CC */
             break;
 
         case 003:                                       /* SWAB */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = ((src & BMASK) << 8) | ((src >> 8) & BMASK);
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_B ((dst & BMASK));
             break;
@@ -178,188 +185,254 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             break;
 
         case 010: case 011:                             /* BNE */
-            if ((cc & CC_Z) == 0) { BRANCH_F (IR); } 
+            if ((cc & CC_Z) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 012: case 013:                             /* BNE */
-            if ((cc & CC_Z) == 0) { BRANCH_B (IR); }
+            if ((cc & CC_Z) == 0) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 014: case 015:                             /* BEQ */
-            if (cc & CC_Z) { BRANCH_F (IR); } 
+            if (cc & CC_Z) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 016: case 017:                             /* BEQ */
-            if (cc & CC_Z) { BRANCH_B (IR); }
+            if (cc & CC_Z) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 020: case 021:                             /* BGE */
-            if (CC_XOR_NV (cc) == 0) { BRANCH_F (IR); } 
+            if (CC_XOR_NV (cc) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 022: case 023:                             /* BGE */
-            if (CC_XOR_NV (cc) == 0) { BRANCH_B (IR); }
+            if (CC_XOR_NV (cc) == 0) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 024: case 025:                             /* BLT */
-            if (CC_XOR_NV (cc)) { BRANCH_F (IR); }
+            if (CC_XOR_NV (cc)) {
+                BRANCH_F (IR);
+                }
             break;
 
         case 026: case 027:                             /* BLT */
-            if (CC_XOR_NV (cc)) { BRANCH_B (IR); }
+            if (CC_XOR_NV (cc)) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 030: case 031:                             /* BGT */
-            if (((cc & CC_Z) || CC_XOR_NV (cc)) == 0) { BRANCH_F (IR); } 
+            if (((cc & CC_Z) || CC_XOR_NV (cc)) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 032: case 033:                             /* BGT */
-            if (((cc & CC_Z) || CC_XOR_NV (cc)) == 0) { BRANCH_B (IR); }
+            if (((cc & CC_Z) || CC_XOR_NV (cc)) == 0) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 034: case 035:                             /* BLE */
-            if ((cc & CC_Z) || CC_XOR_NV (cc)) { BRANCH_F (IR); } 
+            if ((cc & CC_Z) || CC_XOR_NV (cc)) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 036: case 037:                             /* BLE */
-            if ((cc & CC_Z) || CC_XOR_NV (cc)) { BRANCH_B (IR); }
+            if ((cc & CC_Z) || CC_XOR_NV (cc)) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 040: case 041: case 042: case 043:         /* JSR */
         case 044: case 045: case 046: case 047:
-            if (dstreg) CMODE_FAULT (CMODE_ILLI);       /* mode 0 illegal */
+            if (dstreg) {                               /* mode 0 illegal */
+                CMODE_FAULT (CMODE_ILLI);
+                }
             else {
                 srcspec = srcspec & 07;                 /* get reg num */
                 dst = GeteaW (dstspec);                 /* get dst addr */
                 src = RdRegW (srcspec);                 /* get src reg */
                 WrMemW (src, (R[6] - 2) & WMASK);       /* -(sp) <- r */
                 R[6] = (R[6] - 2) & WMASK;
-                if (srcspec != 7) WrRegW (PC, srcspec); /* r <- PC */
+                if (srcspec != 7)                       /* r <- PC */
+                    WrRegW (PC, srcspec);
                 CMODE_JUMP (dst);                       /* PC <- dst */
                 }
             break;                                      /* end JSR */
 
         case 050:                                       /* CLR */
-            if (dstreg) WrRegW (0, dstspec);
+            if (dstreg)
+                WrRegW (0, dstspec);
             else WrMemW (0, GeteaW (dstspec));
             cc = CC_Z;
             break;
 
         case 051:                                       /* COM */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = src ^ WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
             cc = cc | CC_C;
             break;
 
         case 052:                                       /* INC */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src + 1) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZP_W (dst);
-            if (dst == 0100000) cc = cc | CC_V;
+            if (dst == 0100000)
+                cc = cc | CC_V;
             break;
 
         case 053:                                       /* DEC */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src - 1) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZP_W (dst);
-            if (dst == 077777) cc = cc | CC_V;
+            if (dst == 077777)
+                cc = cc | CC_V;
             break;
 
         case 054:                                       /* NEG */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (-src) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if (dst == 0100000) cc = cc | CC_V;
-            if (dst) cc = cc | CC_C;
+            if (dst == 0100000)
+                cc = cc | CC_V;
+            if (dst)
+                cc = cc | CC_C;
             break;
 
         case 055:                                       /* ADC */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src + (cc & CC_C)) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if ((src == 077777) && (dst == 0100000)) cc = cc | CC_V;
-            if ((src == 0177777) && (dst == 0)) cc = cc | CC_C;
+            if ((src == 077777) && (dst == 0100000))
+                cc = cc | CC_V;
+            if ((src == 0177777) && (dst == 0))
+                cc = cc | CC_C;
             break;
 
         case 056:                                       /* SBC */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src - (cc & CC_C)) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if ((src == 0100000) && (dst == 077777)) cc = cc | CC_V;
-            if ((src == 0) && (dst == 0177777)) cc = cc | CC_C;
+            if ((src == 0100000) && (dst == 077777))
+                cc = cc | CC_V;
+            if ((src == 0) && (dst == 0177777))
+                cc = cc | CC_C;
             break;
 
         case 057:                                       /* TST */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemW (GeteaW (dstspec));
             CC_IIZZ_W (src);
             break;
 
         case 060:                                       /* ROR */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src >> 1) | ((cc & CC_C)? WSIGN: 0);
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if (src & 1) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & 1)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 061:                                       /* ROL */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = ((src << 1) | ((cc & CC_C)? 1: 0)) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if (src & WSIGN) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & WSIGN)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 062:                                       /* ASR */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src & WSIGN) | (src >> 1);
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if (src & 1) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & 1)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 063:                                       /* ASL */
-            if (dstreg) src = RdRegW (dstspec);
+            if (dstreg)
+                src = RdRegW (dstspec);
             else src = RdMemMW (ea = GeteaW (dstspec));
             dst = (src << 1) & WMASK;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZZ_W (dst);
-            if (src & WSIGN) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & WSIGN)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 065:                                       /* MFPI */
-            if (dstreg) dst = RdRegW (dstspec);         /* "mov dst,-(sp)" */
+            if (dstreg)                                 /* "mov dst,-(sp)" */
+                dst = RdRegW (dstspec);
             else dst = RdMemW (GeteaW (dstspec));
             WrMemW (dst, (R[6] - 2) & WMASK);
             R[6] = (R[6] - 2) & WMASK;
@@ -370,14 +443,16 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             dst = RdMemW (R[6] & WMASK);                /* "mov (sp)+,dst" */
             R[6] = (R[6] + 2) & WMASK;
             recq[recqptr++] = RQ_REC (AIN|RW, 6);
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, (GeteaW (dstspec) & WMASK));
             CC_IIZP_W (dst);
             break;
 
         case 067:                                       /* SXT */
             dst = (cc & CC_N)? 0177777: 0;
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, GeteaW (dstspec));
             CC_IIZP_W (dst);
             break;
@@ -398,62 +473,79 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
 */
 
     case 001:                                           /* MOV */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) WrRegW (src, dstspec);
+        if (dstreg)
+            WrRegW (src, dstspec);
         else WrMemW (src, GeteaW (dstspec));
         CC_IIZP_W (src);
         break;
 
     case 002:                                           /* CMP */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) src2 = RdRegW (dstspec);
+        if (dstreg)
+            src2 = RdRegW (dstspec);
         else src2 = RdMemW (GeteaW (dstspec));
         dst = (src - src2) & WMASK;
         CC_IIZZ_W (dst);
-        if (((src ^ src2) & (~src2 ^ dst)) & WSIGN) cc = cc | CC_V;
-        if (src < src2) cc = cc | CC_C;
+        if (((src ^ src2) & (~src2 ^ dst)) & WSIGN)
+            cc = cc | CC_V;
+        if (src < src2)
+            cc = cc | CC_C;
         break;
 
     case 003:                                           /* BIT */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) src2 = RdRegW (dstspec);
+        if (dstreg)
+            src2 = RdRegW (dstspec);
         else src2 = RdMemW (GeteaW (dstspec));
         dst = src2 & src;
         CC_IIZP_W (dst);
         break;
 
     case 004:                                           /* BIC */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) src2 = RdRegW (dstspec);
+        if (dstreg)
+            src2 = RdRegW (dstspec);
         else src2 = RdMemMW (ea = GeteaW (dstspec));
         dst = src2 & ~src;
-        if (dstreg) WrRegW (dst, dstspec);
+        if (dstreg)
+            WrRegW (dst, dstspec);
         else WrMemW (dst, ea);
         CC_IIZP_W (dst);
         break;
 
     case 005:                                           /* BIS */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) src2 = RdRegW (dstspec);
+        if (dstreg)
+            src2 = RdRegW (dstspec);
         else src2 = RdMemMW (ea = GeteaW (dstspec));
         dst = src2 | src;
-        if (dstreg) WrRegW (dst, dstspec);
+        if (dstreg)
+            WrRegW (dst, dstspec);
         else WrMemW (dst, ea);
         CC_IIZP_W (dst);
         break;
 
     case 006:                                           /* ADD */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) src2 = RdRegW (dstspec);
+        if (dstreg)
+            src2 = RdRegW (dstspec);
         else src2 = RdMemMW (ea = GeteaW (dstspec));
         dst = (src2 + src) & WMASK;
-        if (dstreg) WrRegW (dst, dstspec);
+        if (dstreg)
+            WrRegW (dst, dstspec);
         else WrMemW (dst, ea);
         CC_ADD_W (dst, src, src2);
         break;
@@ -479,20 +571,25 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
         switch ((IR >> 9) & 07)  {                      /* decode IR<11:9> */
 
         case 0:                                         /* MUL */
-            if (dstreg) src2 = RdRegW (dstspec);        /* get src2 */
+            if (dstreg)                                 /* get src2 */
+                src2 = RdRegW (dstspec);
             else src2 = RdMemW (GeteaW (dstspec));
             src = RdRegW (srcspec);                     /* get src */
-            if (src2 & WSIGN) src2 = src2 | ~WMASK;     /* sext src, src2 */
-            if (src & WSIGN) src = src | ~WMASK;
+            if (src2 & WSIGN)                           /* sext src, src2 */
+                src2 = src2 | ~WMASK;
+            if (src & WSIGN)
+                src = src | ~WMASK;
             dst = src * src2;                           /* multiply */
             WrRegW ((dst >> 16) & WMASK, srcspec);      /* high 16b */
             WrRegW (dst & WMASK, srcspec | 1);          /* low 16b */
             CC_IIZZ_L (dst & LMASK);
-            if ((dst > 077777) || (dst < -0100000)) cc = cc | CC_C;
+            if ((dst > 077777) || (dst < -0100000))
+                cc = cc | CC_C;
             break;
 
         case 1:                                         /* DIV */
-            if (dstreg) src2 = RdRegW (dstspec);        /* get src2 */
+            if (dstreg)                                 /* get src2 */
+                src2 = RdRegW (dstspec);
             else src2 = RdMemW (GeteaW (dstspec));
             t = RdRegW (srcspec);
             src = (((uint32) t) << 16) | RdRegW (srcspec | 1);
@@ -504,8 +601,10 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 cc = CC_V;                              /* overflow */
                 break;                                  /* done */
                 }
-            if (src2 & WSIGN) src2 = src2 | ~WMASK;     /* sext src, src2 */
-            if (t & WSIGN) src = src | ~LMASK;
+            if (src2 & WSIGN)                           /* sext src, src2 */
+                src2 = src2 | ~WMASK;
+            if (t & WSIGN)
+                src = src | ~LMASK;
             dst = src / src2;                           /* divide */
             if ((dst > 077777) || (dst < -0100000)) {   /* out of range? */
                 cc = CC_V;                              /* overflow */
@@ -517,11 +616,13 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             break;
 
         case 2:                                         /* ASH */
-            if (dstreg) src2 = RdRegW (dstspec);        /* get src2 */
+            if (dstreg)                                 /* get src2 */
+                src2 = RdRegW (dstspec);
             else src2 = RdMemW (GeteaW (dstspec));
             src2 = src2 & 077;
             src = RdRegW (srcspec);                     /* get src */
-            if (sign = ((src & WSIGN)? 1: 0)) src = src | ~WMASK;
+            if (sign = ((src & WSIGN)? 1: 0))
+                src = src | ~WMASK;
             if (src2 == 0) {                            /* [0] */
                 dst = src;                              /* result */
                 oc = 0;                                 /* last bit out */
@@ -530,12 +631,14 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 dst = src << src2;
                 i = (src >> (16 - src2)) & WMASK;
                 oc = (i & 1)? CC_C: 0;
-                if ((dst & WSIGN)? (i != WMASK): (i != 0)) oc = oc | CC_V;
+                if ((dst & WSIGN)? (i != WMASK): (i != 0))
+                    oc = oc | CC_V;
                 }
             else if (src2 <= 31) {                      /* [16,31] */
                 dst = 0;
                 oc = ((src << (src2 - 16)) & 1)? CC_C: 0;
-                if (src) oc = oc | CC_V;
+                if (src)
+                    oc = oc | CC_V;
                 }
             else if (src2 == 32) {                      /* [32] = -32 */
                 dst = -sign;
@@ -551,7 +654,8 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             break;
 
         case 3:                                         /* ASHC */
-            if (dstreg) src2 = RdRegW (dstspec);        /* get src2 */
+            if (dstreg)                                 /* get src2 */
+                src2 = RdRegW (dstspec);
             else src2 = RdMemW (GeteaW (dstspec));
             src2 = src2 & 077;
             t = RdRegW (srcspec);
@@ -565,7 +669,8 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 dst = ((uint32) src) << src2;
                 i = ((src >> (32 - src2)) | (-sign << src2)) & LMASK;
                 oc = (i & 1)? CC_C: 0;
-                if ((dst & LSIGN)? (i != LMASK): (i != 0)) oc = oc | CC_V;
+                if ((dst & LSIGN)? (i != LMASK): (i != 0))
+                    oc = oc | CC_V;
                 }
             else if (src2 == 32) {                      /* [32] = -32 */
                 dst = -sign;
@@ -583,10 +688,12 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
 
         case 4:                                         /* XOR */
             src = RdRegW (srcspec);                     /* get src */
-            if (dstreg) src2 = RdRegW (dstspec);        /* get dst */
+            if (dstreg)                                 /* get dst */
+                src2 = RdRegW (dstspec);
             else src2 = RdMemMW (ea = GeteaW (dstspec));
             dst = src2 ^ src;
-            if (dstreg) WrRegW (dst, dstspec);          /* result */
+            if (dstreg)                                 /* result */
+                WrRegW (dst, dstspec);
             else WrMemW (dst, ea);
             CC_IIZP_W (dst);
             break;
@@ -609,67 +716,99 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
     case 010:
         switch ((IR >> 6) & 077) {                      /* decode IR<11:6> */
         case 000: case 001:                             /* BPL */
-            if ((cc & CC_N) == 0) { BRANCH_F (IR); } 
+            if ((cc & CC_N) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 002: case 003:                             /* BPL */
-            if ((cc & CC_N) == 0) { BRANCH_B (IR); }
+            if ((cc & CC_N) == 0) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 004: case 005:                             /* BMI */
-            if (cc & CC_N) { BRANCH_F (IR); } 
+            if (cc & CC_N) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 006: case 007:                             /* BMI */
-            if (cc & CC_N) { BRANCH_B (IR); }
+            if (cc & CC_N) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 010: case 011:                             /* BHI */
-            if ((cc & (CC_C | CC_Z)) == 0) { BRANCH_F (IR); } 
+            if ((cc & (CC_C | CC_Z)) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 012: case 013:                             /* BHI */
-            if ((cc & (CC_C | CC_Z)) == 0) { BRANCH_B (IR); }
+            if ((cc & (CC_C | CC_Z)) == 0) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 014: case 015:                             /* BLOS */
-            if (cc & (CC_C | CC_Z)) { BRANCH_F (IR); } 
+            if (cc & (CC_C | CC_Z)) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 016: case 017:                             /* BLOS */
-            if (cc & (CC_C | CC_Z)) { BRANCH_B (IR); }
+            if (cc & (CC_C | CC_Z)) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 020: case 021:                             /* BVC */
-            if ((cc & CC_V) == 0) { BRANCH_F (IR); } 
+            if ((cc & CC_V) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 022: case 023:                             /* BVC */
-            if ((cc & CC_V) == 0) { BRANCH_B (IR); }
+            if ((cc & CC_V) == 0) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 024: case 025:                             /* BVS */
-            if (cc & CC_V) { BRANCH_F (IR); } 
+            if (cc & CC_V) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 026: case 027:                             /* BVS */
-            if (cc & CC_V) { BRANCH_B (IR); }
+            if (cc & CC_V) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 030: case 031:                             /* BCC */
-            if ((cc & CC_C) == 0) { BRANCH_F (IR); } 
+            if ((cc & CC_C) == 0) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 032: case 033:                             /* BCC */
-            if ((cc & CC_C) == 0) { BRANCH_B (IR); }
+            if ((cc & CC_C) == 0) {
+                BRANCH_B (IR); 
+                }
             break;
 
         case 034: case 035:                             /* BCS */
-            if (cc & CC_C) { BRANCH_F (IR); } 
+            if (cc & CC_C) {
+                BRANCH_F (IR);
+                } 
             break;
 
         case 036: case 037:                             /* BCS */
-            if (cc & CC_C) { BRANCH_B (IR); }
+            if (cc & CC_C) {
+                BRANCH_B (IR);
+                }
             break;
 
         case 040: case 041: case 042: case 043:         /* EMT */
@@ -681,126 +820,165 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             break;
 
         case 050:                                       /* CLRB */
-            if (dstreg) WrRegB (0, dstspec);
+            if (dstreg)
+                WrRegB (0, dstspec);
             else WrMemB (0, GeteaB (dstspec));
             cc = CC_Z;
             break;
 
         case 051:                                       /* COMB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = src ^ BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
             cc = cc | CC_C;
             break;
 
         case 052:                                       /* INCB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src + 1) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZP_B (dst);
-            if (dst == 0200) cc = cc | CC_V;
+            if (dst == 0200)
+                cc = cc | CC_V;
             break;
 
         case 053:                                       /* DECB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src - 1) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg) 
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZP_B (dst);
-            if (dst == 0177) cc = cc | CC_V;
+            if (dst == 0177)
+                cc = cc | CC_V;
             break;
 
         case 054:                                       /* NEGB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (-src) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if (dst == 0200) cc = cc | CC_V;
-            if (dst) cc = cc | CC_C;
+            if (dst == 0200)
+                cc = cc | CC_V;
+            if (dst)
+                cc = cc | CC_C;
             break;
 
         case 055:                                       /* ADCB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src + (cc & CC_C)) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if ((src == 0177) && (dst == 0200)) cc = cc | CC_V;
-            if ((src == 0377) && (dst == 0)) cc = cc | CC_C;
+            if ((src == 0177) && (dst == 0200))
+                cc = cc | CC_V;
+            if ((src == 0377) && (dst == 0))
+                cc = cc | CC_C;
             break;
 
         case 056:                                       /* SBCB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src - (cc & CC_C)) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if ((src == 0200) && (dst == 0177)) cc = cc | CC_V;
-            if ((src == 0) && (dst == 0377)) cc = cc | CC_C;
+            if ((src == 0200) && (dst == 0177))
+                cc = cc | CC_V;
+            if ((src == 0) && (dst == 0377))
+                cc = cc | CC_C;
             break;
 
         case 057:                                       /* TSTB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemB (GeteaB (dstspec));
             CC_IIZZ_B (src);
             break;
 
         case 060:                                       /* RORB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src >> 1) | ((cc & CC_C)? BSIGN: 0);
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if (src & 1) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & 1)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 061:                                       /* ROLB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = ((src << 1) | ((cc & CC_C)? 1: 0)) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if (src & BSIGN) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & BSIGN)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 062:                                       /* ASRB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src >> 1) | (src & BSIGN);
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if (src & 1) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & 1)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 063:                                       /* ASLB */
-            if (dstreg) src = RdRegB (dstspec);
+            if (dstreg)
+                src = RdRegB (dstspec);
             else src = RdMemMB (ea = GeteaB (dstspec));
             dst = (src << 1) & BMASK;
-            if (dstreg) WrRegB (dst, dstspec);
+            if (dstreg)
+                WrRegB (dst, dstspec);
             else WrMemB (dst, ea);
             CC_IIZZ_B (dst);
-            if (src & BSIGN) cc = cc | CC_C;
-            if (CC_XOR_NC (cc)) cc = cc | CC_V;
+            if (src & BSIGN)
+                cc = cc | CC_C;
+            if (CC_XOR_NC (cc))
+                cc = cc | CC_V;
             break;
 
         case 065:                                       /* MFPD */
-            if (dstreg) dst = RdRegW (dstspec);         /* "mov dst,-(sp)" */
+            if (dstreg)                                 /* "mov dst,-(sp)" */
+                dst = RdRegW (dstspec);
             else dst = RdMemW (GeteaW (dstspec));
             WrMemW (dst, (R[6] - 2) & WMASK);
             R[6] = (R[6] - 2) & WMASK;
@@ -811,7 +989,8 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             dst = RdMemW (R[6] & WMASK);                /* "mov (sp)+,dst" */
             R[6] = (R[6] + 2) & WMASK;
             recq[recqptr++] = RQ_REC (AIN|RW, 6);
-            if (dstreg) WrRegW (dst, dstspec);
+            if (dstreg)
+                WrRegW (dst, dstspec);
             else WrMemW (dst, (GeteaW (dstspec) & WMASK));
             CC_IIZP_W (dst);
             break;
@@ -828,66 +1007,85 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
 */
 
     case 011:                                           /* MOVB */
-        if (srcreg) src = RdRegB (srcspec);
+        if (srcreg)
+            src = RdRegB (srcspec);
         else src = RdMemB (GeteaB (srcspec));
-        if (dstreg) WrRegW ((src & BSIGN)? (0xFF00 | src): src, dstspec);
+        if (dstreg)
+            WrRegW ((src & BSIGN)? (0xFF00 | src): src, dstspec);
         else WrMemB (src, GeteaB (dstspec));
         CC_IIZP_B (src);
         break;
 
     case 012:                                           /* CMPB */
-        if (srcreg) src = RdRegB (srcspec);
+        if (srcreg)
+            src = RdRegB (srcspec);
         else src = RdMemB (GeteaB (srcspec));
-        if (dstreg) src2 = RdRegB (dstspec);
+        if (dstreg)
+            src2 = RdRegB (dstspec);
         else src2 = RdMemB (GeteaB (dstspec));
         dst = (src - src2) & BMASK;
         CC_IIZZ_B (dst);
-        if (((src ^ src2) & (~src2 ^ dst)) & BSIGN) cc = cc | CC_V;
-        if (src < src2) cc = cc | CC_C;
+        if (((src ^ src2) & (~src2 ^ dst)) & BSIGN)
+            cc = cc | CC_V;
+        if (src < src2)
+            cc = cc | CC_C;
         break;
 
     case 013:                                           /* BITB */
-        if (srcreg) src = RdRegB (srcspec);
+        if (srcreg)
+            src = RdRegB (srcspec);
         else src = RdMemB (GeteaB (srcspec));
-        if (dstreg) src2 = RdRegB (dstspec);
+        if (dstreg)
+            src2 = RdRegB (dstspec);
         else src2 = RdMemB (GeteaB (dstspec));
         dst = src2 & src;
         CC_IIZP_B (dst);
         break;
 
     case 014:                                           /* BICB */
-        if (srcreg) src = RdRegB (srcspec);
+        if (srcreg)
+            src = RdRegB (srcspec);
         else src = RdMemB (GeteaB (srcspec));
-        if (dstreg) src2 = RdRegB (dstspec);
+        if (dstreg)
+            src2 = RdRegB (dstspec);
         else src2 = RdMemMB (ea = GeteaB (dstspec));
         dst = src2 & ~src;
-        if (dstreg) WrRegB (dst, dstspec);
+        if (dstreg)
+            WrRegB (dst, dstspec);
         else WrMemB (dst, ea);
         CC_IIZP_B (dst);
         break;
 
     case 015:                                           /* BISB */
-        if (srcreg) src = RdRegB (srcspec);
+        if (srcreg)
+            src = RdRegB (srcspec);
         else src = RdMemB (GeteaB (srcspec));
-        if (dstreg) src2 = RdRegB (dstspec);
+        if (dstreg)
+            src2 = RdRegB (dstspec);
         else src2 = RdMemMB (ea = GeteaB (dstspec));
         dst = src2 | src;
-        if (dstreg) WrRegB (dst, dstspec);
+        if (dstreg)
+            WrRegB (dst, dstspec);
         else WrMemB (dst, ea);
         CC_IIZP_B (dst);
         break;
 
     case 016:                                           /* SUB */
-        if (srcreg) src = RdRegW (srcspec);
+        if (srcreg)
+            src = RdRegW (srcspec);
         else src = RdMemW (GeteaW (srcspec));
-        if (dstreg) src2 = RdRegW (dstspec);
+        if (dstreg)
+            src2 = RdRegW (dstspec);
         else src2 = RdMemMW (ea = GeteaW (dstspec));
         dst = (src2 - src) & WMASK;
-        if (dstreg) WrRegW (dst, dstspec);
+        if (dstreg)
+            WrRegW (dst, dstspec);
         else WrMemW (dst, ea);
         CC_IIZZ_W (dst);
-        if (((src ^ src2) & (~src ^ dst)) & WSIGN) cc = cc | CC_V;
-        if (src2 < src) cc = cc | CC_C;
+        if (((src ^ src2) & (~src ^ dst)) & WSIGN)
+            cc = cc | CC_V;
+        if (src2 < src)
+            cc = cc | CC_C;
         break;
 
     default:
@@ -915,11 +1113,13 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
 
     default:                                            /* can't get here */
     case 1:                                             /* (R) */
-        if (reg == 7) return (PC & WMASK);
+        if (reg == 7)
+            return (PC & WMASK);
         else return (R[reg] & WMASK);
 
     case 2:                                             /* (R)+ */
-        if (reg == 7) PC = ((adr = PC) + 2) & WMASK;
+        if (reg == 7)
+            PC = ((adr = PC) + 2) & WMASK;
         else {
             R[reg] = ((adr = R[reg]) + 2) & WMASK;
             recq[recqptr++] = RQ_REC (AIN|RW, reg);
@@ -927,7 +1127,8 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
         return adr;
 
     case 3:                                             /* @(R)+ */
-        if (reg == 7) PC = ((adr = PC) + 2) & WMASK;
+        if (reg == 7)
+            PC = ((adr = PC) + 2) & WMASK;
         else {
             R[reg] = ((adr = R[reg]) + 2) & WMASK;
             recq[recqptr++] = RQ_REC (AIN|RW, reg);
@@ -935,7 +1136,8 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
         return RdMemW (adr);
 
     case 4:                                             /* -(R) */
-        if (reg == 7) adr = PC = (PC - 2) & WMASK;
+        if (reg == 7)
+            adr = PC = (PC - 2) & WMASK;
         else {
             adr = R[reg] = (R[reg] - 2) & WMASK;
             recq[recqptr++] = RQ_REC (ADC|RW, reg);
@@ -943,7 +1145,8 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
         return adr;
 
     case 5:                                             /* @-(R) */
-        if (reg == 7) adr = PC = (PC - 2) & WMASK;
+        if (reg == 7)
+            adr = PC = (PC - 2) & WMASK;
         else {
             adr = R[reg] = (R[reg] - 2) & WMASK;
             recq[recqptr++] = RQ_REC (ADC|RW, reg);
@@ -953,13 +1156,15 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
     case 6:                                             /* d(r) */
         adr = RdMemW (PC);
         PC = (PC + 2) & WMASK;
-        if (reg == 7) return ((PC + adr) & WMASK);
+        if (reg == 7)
+            return ((PC + adr) & WMASK);
         else return ((R[reg] + adr) & WMASK);
 
     case 7:                                             /* @d(R) */
         adr = RdMemW (PC);
         PC = (PC + 2) & WMASK;
-        if (reg == 7) adr = (PC + adr) & WMASK;
+        if (reg == 7)
+            adr = (PC + adr) & WMASK;
         else adr = (R[reg] + adr) & WMASK;
         return RdMemW (adr);
         }                                               /* end switch */
@@ -974,11 +1179,13 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
 
     default:                                            /* can't get here */
     case 1:                                             /* (R) */
-        if (reg == 7) return (PC & WMASK);
+        if (reg == 7)
+            return (PC & WMASK);
         else return (R[reg] & WMASK);
 
     case 2:                                             /* (R)+ */
-        if (reg == 7) PC = ((adr = PC) + 2) & WMASK;
+        if (reg == 7)
+            PC = ((adr = PC) + 2) & WMASK;
         else if (reg == 6) {
             R[reg] = ((adr = R[reg]) + 2) & WMASK;
             recq[recqptr++] = RQ_REC (AIN|RW, reg);
@@ -990,7 +1197,8 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
         return adr;
 
     case 3:                                             /* @(R)+ */
-        if (reg == 7) PC = ((adr = PC) + 2) & WMASK;
+        if (reg == 7)
+            PC = ((adr = PC) + 2) & WMASK;
         else {
             R[reg] = ((adr = R[reg]) + 2) & WMASK;
             recq[recqptr++] = RQ_REC (AIN|RW, reg);
@@ -998,7 +1206,8 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
         return RdMemW (adr);
 
     case 4:                                             /* -(R) */
-        if (reg == 7) adr = PC = (PC - 2) & WMASK;
+        if (reg == 7)
+            adr = PC = (PC - 2) & WMASK;
         else if (reg == 6) {
             adr = R[reg] = (R[reg] - 2) & WMASK;
             recq[recqptr++] = RQ_REC (ADC|RW, reg);
@@ -1010,7 +1219,8 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
         return adr;
 
     case 5:                                             /* @-(R) */
-        if (reg == 7) adr = PC = (PC - 2) & WMASK;
+        if (reg == 7)
+            adr = PC = (PC - 2) & WMASK;
         else {
             adr = R[reg] = (R[reg] - 2) & WMASK;
             recq[recqptr++] = RQ_REC (ADC|RW, reg);
@@ -1020,13 +1230,15 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
     case 6:                                             /* d(r) */
         adr = RdMemW (PC);
         PC = (PC + 2) & WMASK;
-        if (reg == 7) return ((PC + adr) & WMASK);
+        if (reg == 7)
+            return ((PC + adr) & WMASK);
         else return ((R[reg] + adr) & WMASK);
 
     case 7:                                             /* @d(R) */
         adr = RdMemW (PC);
         PC = (PC + 2) & WMASK;
-        if (reg == 7) adr = (PC + adr) & WMASK;
+        if (reg == 7)
+            adr = (PC + adr) & WMASK;
         else adr = (R[reg] + adr) & WMASK;
         return RdMemW (adr);
         }                                               /* end switch */
@@ -1038,7 +1250,8 @@ int32 RdMemW (int32 a)
 {
 int32 acc = ACC_MASK (USER);
 
-if (a & 1) CMODE_FAULT (CMODE_ODD);
+if (a & 1)
+    CMODE_FAULT (CMODE_ODD);
 return Read (a, L_WORD, RA);
 }
 
@@ -1046,7 +1259,8 @@ int32 RdMemMW (int32 a)
 {
 int32 acc = ACC_MASK (USER);
 
-if (a & 1) CMODE_FAULT (CMODE_ODD);
+if (a & 1)
+    CMODE_FAULT (CMODE_ODD);
 return Read (a, L_WORD, WA);
 }
 
@@ -1054,33 +1268,40 @@ void WrMemW (int32 d, int32 a)
 {
 int32 acc = ACC_MASK (USER);
 
-if (a & 1) CMODE_FAULT (CMODE_ODD);
+if (a & 1)
+    CMODE_FAULT (CMODE_ODD);
 Write (a, d, L_WORD, WA);
 return;
 }
 
 int32 RdRegB (int32 rn)
 {
-if (rn == 7) return (PC & BMASK);
+if (rn == 7)
+    return (PC & BMASK);
 else return (R[rn] & BMASK);
 }
 
 int32 RdRegW (int32 rn)
 {
-if (rn == 7) return (PC & WMASK);
+if (rn == 7)
+    return (PC & WMASK);
 else return (R[rn] & WMASK);
 }
 
 void WrRegB (int32 val, int32 rn)
 {
-if (rn == 7) { CMODE_JUMP ((PC & ~BMASK) | val); }
+if (rn == 7) {
+    CMODE_JUMP ((PC & ~BMASK) | val);
+    }
 else R[rn] = (R[rn] & ~BMASK) | val;
 return;
 }
 
 void WrRegW (int32 val, int32 rn)
 {
-if (rn == 7) { CMODE_JUMP (val); }
+if (rn == 7) {
+    CMODE_JUMP (val);
+    }
 else R[rn] = val;
 return;
 }

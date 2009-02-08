@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added KE11A, DC11 support
    02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
    25-Jan-08    RMS     Added RC11, KG11A support (from John Dundas)
@@ -575,6 +576,8 @@ typedef struct pdp_dib DIB;
 #define IOLN_KE         020
 #define IOBA_TC         (IOPAGEBASE + 017340)           /* TC11 */
 #define IOLN_TC         012
+#define IOBA_QDSS       (IOPAGEBASE + 017400)           /* QDSS */
+#define IOLN_QDSS       002
 #define IOBA_RK         (IOPAGEBASE + 017400)           /* RK11 */
 #define IOLN_RK         020
 #define IOBA_RC         (IOPAGEBASE + 017440)           /* RC11/RS64 */
@@ -823,14 +826,6 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
-t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_addr (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat auto_config (char *name, int32 nctrl);
-t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
-
 int32 mba_rdbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_wrbufW (uint32 mbus, int32 bc, uint16 *buf);
 int32 mba_chbufW (uint32 mbus, int32 bc, uint16 *buf);
@@ -843,5 +838,7 @@ void mba_set_enbdis (uint32 mb, t_bool dis);
 t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 int32 clk_cosched (int32 wait);
+
+#include "pdp11_io_lib.h"
 
 #endif

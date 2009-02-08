@@ -143,8 +143,10 @@ t_stat fei_svc (UNIT *uptr)
 int32 temp;
 
 sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
-if (temp & SCPE_BREAK) return SCPE_OK;                  /* ignore break */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
+    return temp;
+if (temp & SCPE_BREAK)                                  /* ignore break */
+    return SCPE_OK;
 uptr->buf = temp & 0177;
 uptr->pos = uptr->pos + 1;
 M[FE_CTYIN] = uptr->buf | FE_CVALID;                    /* put char in mem */

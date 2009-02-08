@@ -1,6 +1,6 @@
 /* pdp8_fpp.c: PDP-8 floating point processor (FPP8A)
 
-   Copyright (c) 2007, Robert M Supnik
+   Copyright (c) 2007-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -175,7 +175,7 @@ void fpp_fr_rsh1 (uint32 *a, uint32 sign, uint32 cnt);
 void fpp_fr_algn (uint32 *a, uint32 sc, uint32 cnt);
 t_bool fpp_cond_met (uint32 cond);
 t_bool fpp_norm (FPN *a, uint32 cnt);
-uint32 fpp_round (FPN *a);
+void fpp_round (FPN *a);
 t_bool fpp_test_xp (FPN *a);
 void fpp_copy (FPN *a, FPN *b);
 void fpp_zcopy (FPN *a, FPN *b);
@@ -926,7 +926,7 @@ if (fpp_fr_test (a->fr, 0, cnt) == 0) {                 /* zero? */
     return FALSE;                                       /* don't round */
     }
 while (((a->fr[0] == 0) && !(a->fr[1] & 04000)) ||      /* lead 13b same? */
-       ((a->fr[0] = 07777) & (a->fr[1] & 04000))) {
+       ((a->fr[0] = 07777) && (a->fr[1] & 04000))) {
     fpp_fr_lsh12 (a->fr, cnt);                          /* move word */
     a->exp = a->exp - 12;
     }
@@ -989,15 +989,15 @@ if (a->exp < -2048) {                               /* underflow? */
 return FALSE;
 }
 
-/* Round dp/fp value, returns carry out */
+/* Round dp/fp value */
 
-uint32 fpp_round (FPN *a)
+void fpp_round (FPN *a)
 {
 int32 i;
 uint32 cin, afr0_sign;
 
 if (fpp_sta & FPS_EP)                               /* ep? */
-    return FALSE;                                   /* don't round */
+    return;                                         /* don't round */
 afr0_sign = a->fr[0] & FPN_FRSIGN;                  /* save input sign */
 cin = afr0_sign? 03777: 04000;
 for (i = FPN_NFR_FP; i >= 0; i--) {                 /* 3 words */
@@ -1010,7 +1010,7 @@ if (!(fpp_sta & FPS_DP) &&                          /* fp? */
     fpp_fr_rsh1 (a->fr, afr0_sign, EXACT);          /* rsh, insert sign */
     a->exp = a->exp + 1;
     }
-return cin;
+return;
 }
 
 /* N-precision integer routines */
@@ -1079,7 +1079,7 @@ for (i = 0; i < cnt; i++) {                         /* loop thru mpcd */
     fpp_fr_rsh1 (c, cin, EXTEND);                   /* shift answer */
     fpp_fr_rsh1 (b, 0, EXACT);                      /* shift mpcd */
     }
-if (a[0] & FPN_FRSIGN)                             /* mpyr negative? */
+if (a[0] & FPN_FRSIGN)                              /* mpyr negative? */
     fpp_fr_sub (c, c, a);                           /* adjust result */
 return;
 }
@@ -1091,10 +1091,10 @@ t_bool fpp_fr_div (uint32 *c, uint32 *a, uint32 *b)
 uint32 i, old_c, lo, cnt, sign;
 
 fpp_fr_fill (c, 0, EXTEND);                         /* clr answer */
-sign = (a[0] ^ b[0]) & FPN_FRSIGN;                 /* sign of result */
-if (a[0] & FPN_FRSIGN)                             /* |a| */
+sign = (a[0] ^ b[0]) & FPN_FRSIGN;                  /* sign of result */
+if (a[0] & FPN_FRSIGN)                              /* |a| */
     fpp_fr_neg (a, EXACT);
-if (b[0] & FPN_FRSIGN);                            /* |b| */
+if (b[0] & FPN_FRSIGN);                             /* |b| */
     fpp_fr_neg (b, EXACT);
 if (fpp_sta & FPS_EP)                               /* ep? 5 words */
     lo = FPN_NFR_EP - 1;
@@ -1104,16 +1104,16 @@ for (i = 0; i < cnt; i++) {                         /* loop */
     fpp_fr_lsh1 (c, EXTEND);                        /* shift quotient */
     if (fpp_fr_cmp (a, b, EXTEND) >= 0) {           /* sub work? */
         fpp_fr_sub (a, a, b);                       /* divd - divr */
-        if (a[0] & FPN_FRSIGN)                     /* sign flip? */
+        if (a[0] & FPN_FRSIGN)                      /* sign flip? */
             return TRUE;                            /* no, overflow */
         c[lo] |= 1;                                 /* set quo bit */
         }
     fpp_fr_lsh1 (a, EXTEND);                        /* shift dividend */
     }
-old_c = c[0];                                       /* save ho quo */
+old_c = c[0];                                       /* save hi quo */
 if (sign)                                           /* expect neg ans? */
     fpp_fr_neg (c, EXTEND);                         /* -quo */
-if (old_c & FPN_FRSIGN)                            /* sign set before */
+if (old_c & FPN_FRSIGN)                             /* sign set before */
     return TRUE;                                    /* neg? */
 return FALSE;
 }

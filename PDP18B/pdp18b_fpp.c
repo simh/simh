@@ -1,6 +1,6 @@
 /* pdp18b_fpp.c: FP15 floating point processor simulator
 
-   Copyright (c) 2003-2006, Robert M Supnik
+   Copyright (c) 2003-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -231,12 +231,14 @@ if (fpp_dev.flags & DEV_DIS)                            /* disabled? */
 fir = ir & 07777;                                       /* save subop + mods */
 ma = PC;                                                /* fetch next word */
 PC = Incr_addr (PC);
-if (Read (ma, &ar, RD)) return fp15_exc (FP_MM);        /* error? MM exc */
+if (Read (ma, &ar, RD))                                 /* error? MM exc */
+    return fp15_exc (FP_MM);
 fop = FI_GETOP (fir);                                   /* get subopcode */
 if ((ar & SIGN) &&                                      /* indirect? */
    ((fop == FOP_ST) || !(ir & FI_NOLOAD))) {            /* store or load? */
     ma = ar & AMASK;                                    /* fetch indirect */
-    if (Read (ma, &ar, RD)) return fp15_exc (FP_MM);
+    if (Read (ma, &ar, RD))
+        return fp15_exc (FP_MM);
     }
 fma.exp = SEXT18 (fma.exp);                             /* sext exponents */
 fmb.exp = SEXT18 (fmb.exp);
@@ -246,7 +248,8 @@ switch (fop) {                                          /* case on subop */
         break;
 
     case FOP_SUB:                                       /* subtract */
-        if (sta = fp15_opnd (fir, ar, &fmb)) break;     /* fetch op to FMB */
+        if (sta = fp15_opnd (fir, ar, &fmb))            /* fetch op to FMB */
+            break;
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_fadd (fir, &fma, &fmb, 1);       /* yes, fp sub */
         else sta = fp15_iadd (fir, &fma, &fmb, 1);      /* no, int sub */
@@ -254,20 +257,24 @@ switch (fop) {                                          /* case on subop */
 
     case FOP_RSUB:                                      /* reverse sub */
         fmb = fma;                                      /* FMB <- FMA */
-        if (sta = fp15_opnd (fir, ar, &fma)) break;     /* fetch op to FMA */
+        if (sta = fp15_opnd (fir, ar, &fma))            /* fetch op to FMA */
+            break;
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_fadd (fir, &fma, &fmb, 1);       /* yes, fp sub */
         else sta = fp15_iadd (fir, &fma, &fmb, 1);      /* no, int sub */
         break;
 
     case FOP_MUL:                                       /* multiply */
-        if (sta = fp15_opnd (fir, ar, &fmb)) break;     /* fetch op to FMB */
+        if (sta = fp15_opnd (fir, ar, &fmb))            /* fetch op to FMB */
+            break;
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_fmul (fir, &fma, &fmb);          /* yes, fp mul */
         else sta = fp15_imul (fir, &fma, &fmb);         /* no, int mul */
         break;
 
     case FOP_DIV:                                       /* divide */
+        if (sta = fp15_opnd (fir, ar, &fmb))            /* fetch op to FMB */
+            break;
         if (sta = fp15_opnd (fir, ar, &fmb)) break;     /* fetch op to FMB */
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_fdiv (fir, &fma, &fmb);          /* yes, fp div */
@@ -276,14 +283,16 @@ switch (fop) {                                          /* case on subop */
 
     case FOP_RDIV:                                      /* reverse divide */
         fmb = fma;                                      /* FMB <- FMA */
-        if (sta = fp15_opnd (fir, ar, &fma)) break;     /* fetch op to FMA */
+        if (sta = fp15_opnd (fir, ar, &fma))            /* fetch op to FMA */
+            break;
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_fdiv (fir, &fma, &fmb);          /* yes, fp div */
         else sta = fp15_idiv (fir, &fma, &fmb);         /* no, int div */
         break;
 
     case FOP_LD:                                        /* load */
-        if (sta = fp15_opnd (fir, ar, &fma)) break;     /* fetch op to FMA */
+        if (sta = fp15_opnd (fir, ar, &fma))            /* fetch op to FMA */
+            break;
         fp15_asign (fir, &fma);                         /* modify A sign */
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_norm (ir, &fma, NULL, 0);        /* norm, no round */
@@ -295,19 +304,22 @@ switch (fop) {                                          /* case on subop */
         break;
 
     case FOP_FLT:                                       /* float */
-        if (sta = fp15_opnd (fir, ar, &fma)) break;     /* fetch op to FMA */
+        if (sta = fp15_opnd (fir, ar, &fma))            /* fetch op to FMA */
+            break;
         fma.exp = 35;
         fp15_asign (fir, &fma);                         /* adjust A sign */
         sta = fp15_norm (ir, &fma, NULL, 0);            /* norm, no found */
         break;
 
     case FOP_FIX:                                       /* fix */
-        if (sta = fp15_opnd (fir, ar, &fma)) break;     /* fetch op to FMA */
+        if (sta = fp15_opnd (fir, ar, &fma))            /* fetch op to FMA */
+            break;
         sta = fp15_fix (fir, &fma);                     /* fix */
         break;
 
     case FOP_LFMQ:                                      /* load FMQ */
-        if (sta = fp15_opnd (fir, ar, &fma)) break;     /* fetch op to FMA */
+        if (sta = fp15_opnd (fir, ar, &fma))            /* fetch op to FMA */
+            break;
         dp_swap (&fma, &fmq);                           /* swap FMA, FMQ */
         fp15_asign (fir, &fma);                         /* adjust A sign */
         if (fir & FI_FP)                                /* fp? */
@@ -320,14 +332,16 @@ switch (fop) {                                          /* case on subop */
             sta = Write (ar, dat, WR);
             }
         else {                                          /* no, load */
-            if (sta = Read (ar, &dat, RD)) break;
+            if (sta = Read (ar, &dat, RD))
+                break;
             fguard = (dat >> JEA_V_GUARD) & 1;
             jea = dat & JEA_EAMASK;
             }
         break;
 
     case FOP_ADD:                                       /* add */
-        if (sta = fp15_opnd (fir, ar, &fmb)) break;     /* fetch op to FMB */
+        if (sta = fp15_opnd (fir, ar, &fmb))            /* fetch op to FMB */
+            break;
         if (fir & FI_FP)                                /* fp? */
             sta = fp15_fadd (fir, &fma, &fmb, 0);       /* yes, fp add */
         else sta = fp15_iadd (fir, &fma, &fmb, 0);      /* no, int add */
@@ -361,12 +375,16 @@ t_stat fp15_opnd (int32 ir, int32 addr, UFP *fpn)
 int32 i, numwd, wd[3];
 
 fguard = 0;                                             /* clear guard */
-if (ir & FI_NOLOAD) return FP_OK;                       /* no load? */
-if (ir & FI_FP) numwd = 2;                              /* fp? at least 2 */
+if (ir & FI_NOLOAD)                                     /* no load? */
+    return FP_OK;
+if (ir & FI_FP)                                         /* fp? at least 2 */
+    numwd = 2;
 else numwd = 1;                                         /* else at least 1 */
-if (ir & FI_DP) numwd = numwd + 1;                      /* dp? 1 more */
+if (ir & FI_DP)                                         /* dp? 1 more */
+    numwd = numwd + 1;
 for (i = 0; i < numwd; i++) {                           /* fetch words */
-    if (Read (addr, &wd[i], RD)) return FP_MM;
+    if (Read (addr, &wd[i], RD))
+        return FP_MM;
     addr = (addr + 1) & AMASK;
     }
 if (ir & FI_FP) {                                       /* fp? */
@@ -406,7 +424,8 @@ t_stat sta;
 
 fguard = 0;                                             /* clear guard */
 if (ir & FI_FP) {                                       /* fp? */
-    if (sta = fp15_norm (ir, a, NULL, 0)) return sta;   /* normalize */
+    if (sta = fp15_norm (ir, a, NULL, 0))               /* normalize */
+        return sta;
     if (ir & FI_DP) {                                   /* dp? */
         wd[0] = a->exp & DMASK;                         /* exponent */
         wd[1] = (a->sign << 17) | a->hi;                /* hi frac */
@@ -422,8 +441,10 @@ if (ir & FI_FP) {                                       /* fp? */
                 a->exp = a->exp + 1;
                 }
             }
-        if (a->exp > 0377) return FP_OVF;               /* sp ovf? */
-        if (a->exp < -0400) return FP_UNF;              /* sp unf? */
+        if (a->exp > 0377)                              /* sp ovf? */
+            return FP_OVF;
+        if (a->exp < -0400)                             /* sp unf? */
+            return FP_UNF;
         wd[0] = (a->exp & 0777) | (a->lo & UFP_FL_SMASK); /* low frac'exp */
         wd[1] = (a->sign << 17) | a->hi;                /* hi frac */
         numwd = 2;                                      /* 2 words */
@@ -444,14 +465,17 @@ else {
         numwd = 2;                                      /* 2 words */
         }
     else {                                              /* single */
-        if (a->hi || (a->lo & SIGN)) return FP_OVF;     /* check int ovf */
-        if (a->sign) wd[0] = fmb.lo;                    /* neg? store FMB */
+        if (a->hi || (a->lo & SIGN))                    /* check int ovf */
+            return FP_OVF;
+        if (a->sign)                                    /* neg? store FMB */
+            wd[0] = fmb.lo;
         else wd[0] = a->lo;                             /* pos, store FMA */
         numwd = 1;                                      /* 1 word */
         }
     }
 for (i = 0; i < numwd; i++) {                           /* store words */
-    if (Write (addr, wd[i], WR)) return FP_MM;
+    if (Write (addr, wd[i], WR))
+        return FP_MM;
     addr = (addr + 1) & AMASK;
     }
 return FP_OK;
@@ -464,7 +488,8 @@ return FP_OK;
 t_stat fp15_iadd (int32 ir, UFP *a, UFP *b, t_bool sub)
 {
 fmq.hi = fmq.lo = 0;                                    /* clear FMQ */
-if (a->sign ^ b->sign ^ sub) dp_sub (a, b);             /* eff subtract? */
+if (a->sign ^ b->sign ^ sub)                            /* eff subtract? */
+    dp_sub (a, b);
 else {
     dp_add (a, b);                                      /* no, add */   
     if (a->hi & UFP_FH_CARRY) {                         /* carry out? */
@@ -483,7 +508,8 @@ t_stat fp15_imul (int32 ir, UFP *a, UFP *b)
 a->sign = a->sign ^ b->sign;                            /* sign of result */
 dp_mul (a, b);                                          /* a'FMQ <- a * b */
 dp_swap (a, &fmq);                                      /* swap a, FMQ */
-if (fmq.hi | fmq.lo) return FP_OVF;                     /* FMQ != 0? ovf */
+if (fmq.hi | fmq.lo)                                    /* FMQ != 0? ovf */
+    return FP_OVF;
 fp15_asign (ir, a);                                     /* adjust A sign */
 return FP_OK;
 }
@@ -507,8 +533,10 @@ int32 i, sc;
 a->sign = a->sign ^ b->sign;                            /* sign of result */
 fmq.hi = fmq.lo = 0;                                    /* clear quotient */
 a->exp = 0;                                             /* clear a exp */
-if ((b->hi | b->lo) == 0) return FP_DIV;                /* div by 0? */
-if ((a->hi | a->lo) == 0) return FP_OK;                 /* div into 0? */
+if ((b->hi | b->lo) == 0)                               /* div by 0? */
+    return FP_DIV;
+if ((a->hi | a->lo) == 0)                               /* div into 0? */
+    return FP_OK;
 while (((a->hi & UFP_FH_NORM) == 0) &&                  /* normalize divd */
     ((b->hi & UFP_FH_NORM) == 0)) {                     /* and divr */
     dp_lsh_1 (a, NULL);                                 /* lsh divd, divr */
@@ -527,7 +555,8 @@ for (i = 0; i <= sc; i++) {                             /* n+1 steps */
     dp_lsh_1 (&fmq, NULL);                              /* left shift quo */
     if (dp_cmp (a, b) >= 0) {                           /* sub work? */
         dp_sub (a, b);                                  /* a -= b */
-        if (i == 0) a->exp = a->exp + 1;                /* first step? */
+        if (i == 0)                                     /* first step? */
+            a->exp = a->exp + 1;
         fmq.lo = fmq.lo | 1;                            /* set quo bit */
         }
     dp_lsh_1 (a, NULL);                                 /* left shift divd */
@@ -555,12 +584,14 @@ if (((a->hi | a->lo) == 0) || (ediff < -35)) {          /* a = 0 or "small"? */
     a->sign = a->sign ^ sub;                            /* or -b if sub */
     }
 else if (((b->hi | b->lo) != 0) && (ediff <= 35)) {     /* b!=0 && ~"small"? */
-    if (ediff > 0) dp_dnrm_r (ir, b, ediff);            /* |a| > |b|? dnorm b */
+    if (ediff > 0)                                      /* |a| > |b|? dnorm b */
+        dp_dnrm_r (ir, b, ediff);
     else if (ediff < 0) {                               /* |a| < |b|? */
         a->exp = b->exp;                                /* b exp is rslt */
         dp_dnrm_r (ir, a, -ediff);                      /* denorm A */
         }
-    if (a->sign ^ b->sign ^ sub) dp_sub (a, b);         /* eff sub? */
+    if (a->sign ^ b->sign ^ sub)                        /* eff sub? */
+        dp_sub (a, b);
     else {                                              /* eff add */
         dp_add (a, b);                                  /* add */
         if (a->hi & UFP_FH_CARRY) {                     /* carry out? */
@@ -596,14 +627,16 @@ int32 i;
 a->sign = a->sign ^ b->sign;                            /* sign of result */
 a->exp = a->exp - b->exp;                               /* exp of result */
 fmq.hi = fmq.lo = 0;                                    /* clear quotient */
-if (!(b->hi & UFP_FH_NORM)) return FP_DIV;              /* divr not norm? */
+if (!(b->hi & UFP_FH_NORM))                             /* divr not norm? */
+    return FP_DIV;
 if (a->hi | a->lo) {                                    /* divd non-zero? */
     fp15_norm (0, a, NULL, 0);                          /* normalize divd */
     for (i = 0; (fmq.hi & UFP_FH_NORM) == 0; i++) {     /* until quo */
         dp_lsh_1 (&fmq, NULL);                          /* left shift quo */
         if (dp_cmp (a, b) >= 0) {                       /* sub work? */
             dp_sub (a, b);                              /* a = a - b */
-            if (i == 0) a->exp = a->exp + 1;
+            if (i == 0)
+                a->exp = a->exp + 1;
             fmq.lo = fmq.lo | 1;                        /* set quo bit */
             }
         dp_lsh_1 (a, NULL);                             /* left shift divd */
@@ -622,14 +655,17 @@ t_stat fp15_fix (int32 ir, UFP *a)
 int32 i;
 
 fmq.hi = fmq.lo = 0;                                    /* clear FMQ */
-if (a->exp > 35) return FP_OVF;                         /* exp > 35? ovf */
-if (a->exp < 0) a->hi = a->lo = 0;                      /* exp <0 ? rslt 0 */
+if (a->exp > 35)                                        /* exp > 35? ovf */
+    return FP_OVF;
+if (a->exp < 0)                                         /* exp <0 ? rslt 0 */
+    a->hi = a->lo = 0;
 else {
     for (i = a->exp; i < 35; i++)                       /* denorm frac */
         dp_rsh_1 (a, &fmq);
     if (fmq.hi & UFP_FH_NORM) {                         /* last out = 1? */
         fguard = 1;                                     /* set guard */
-        if (!(ir & FI_NORND)) dp_inc (a);               /* round */
+        if (!(ir & FI_NORND))                           /* round */
+            dp_inc (a);
         }
     }
 fp15_asign (ir, a);                                     /* adjust A sign */
@@ -676,10 +712,14 @@ return;
 
 int32 dp_cmp (UFP *a, UFP *b)
 {
-if (a->hi < b->hi) return -1;
-if (a->hi > b->hi) return +1;
-if (a->lo < b->lo) return -1;
-if (a->lo > b->lo) return +1;
+if (a->hi < b->hi)
+    return -1;
+if (a->hi > b->hi) 
+    return +1;
+if (a->lo < b->lo)
+    return -1;
+if (a->lo > b->lo)
+    return +1;
 return 0;
 }
 
@@ -692,13 +732,15 @@ int32 i;
 fmq.hi = a->hi;                                         /* FMQ <- a */
 fmq.lo = a->lo;
 a->hi = a->lo = 0;                                      /* a <- 0 */
-if ((fmq.hi | fmq.lo) == 0) return;
+if ((fmq.hi | fmq.lo) == 0)
+    return;
 if ((b->hi | b->lo) == 0) {
     fmq.hi = fmq.lo = 0;
     return;
     }
 for (i = 0; i < 35; i++) {                              /* 35 iterations */
-    if (fmq.lo & 1) dp_add (a, b);                      /* FMQ<35>? a += b */
+    if (fmq.lo & 1)                                     /* FMQ<35>? a += b */
+        dp_add (a, b);
     dp_rsh_1 (a, &fmq);                                 /* rsh a'FMQ */
     }
 return;         
@@ -738,8 +780,10 @@ void dp_dnrm_r (int32 ir, UFP *a, int32 sc)
 {
 int32 i;
 
-if (sc <= 0) return;                                    /* legit? */
-for (i = 0; i < sc; i++) dp_rsh_1 (a, &fmq);            /* dnorm to fmq */
+if (sc <= 0)                                            /* legit? */
+    return;
+for (i = 0; i < sc; i++)                                /* dnorm to fmq */
+    dp_rsh_1 (a, &fmq);
 if (!(ir & FI_NORND) && (fmq.hi & UFP_FH_NORM))         /* round & fmq<1>? */
     dp_inc (a);                                         /* incr a */
 return;
@@ -820,8 +864,10 @@ if (rnd && b && (b->hi & UFP_FH_NORM)) {                /* rounding? */
             }
         }
     }
-if (a->exp > (int32) 0377777) return FP_OVF;            /* overflow? */
-if (a->exp < (int32) -0400000) return FP_UNF;           /* underflow? */
+if (a->exp > (int32) 0377777)                           /* overflow? */
+    return FP_OVF;
+if (a->exp < (int32) -0400000)                          /* underflow? */
+    return FP_UNF;
 return FP_OK;
 }
 
@@ -831,12 +877,14 @@ t_stat fp15_exc (t_stat sta)
 {
 int32 ma, mb;
 
-if (sta == FP_MM) trap_pending = 0;                     /* if mm, kill trap */
+if (sta == FP_MM)                                       /* if mm, kill trap */
+    trap_pending = 0;
 ma = (jea & JEA_EAMASK) + sta - 1;                      /* JEA address */
 PCQ_ENTRY;                                              /* record branch */
 PC = Incr_addr (PC);                                    /* PC+1 for "JMS" */
 mb = Jms_word (usmd);                                   /* form JMS word */
-if (Write (ma, mb, WR)) return SCPE_OK;                 /* store */
+if (Write (ma, mb, WR))                                 /* store */
+    return SCPE_OK;
 PC = (ma + 1) & IAMASK;                                 /* new PC */
 return SCPE_OK;
 }

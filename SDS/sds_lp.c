@@ -1,6 +1,6 @@
 /* sds_lp.c: SDS 940 line printer simulator
 
-   Copyright (c) 2001-2007, Robert M. Supnik
+   Copyright (c) 2001-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          line printer
 
+   24-Nov-08    RMS     Fixed loss of carriage control position on space op
    19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
 */
@@ -62,7 +63,8 @@ DEVICE lpt_dev;
 t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
-t_stat lpt_crctl (int32 ch);
+t_stat lpt_crctl (UNIT *uptr, int32 ch);
+t_stat lpt_space (UNIT *uptr, int32 cnt);
 t_stat lpt_status (UNIT *uptr);
 t_stat lpt_bufout (UNIT *uptr);
 void lpt_end_op (int32 fl);
@@ -136,8 +138,10 @@ switch (fnc) {                                          /* case function */
 
     case IO_CONN:                                       /* connect */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != lpt_dib.chan) return SCPE_IERR;   /* wrong chan? */
-        for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = 0; /* clr buffer */
+        if (new_ch != lpt_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
+        for (i = 0; i < LPT_WIDTH; i++)                 /* clr buffer */
+            lpt_buf[i] = 0;
         lpt_bptr = 0;                                   /* clr buf ptr */
         lpt_err = 0;                                    /* err = 0 */
         xfr_req = xfr_req & ~XFR_LPT;                   /* clr xfr flag */
@@ -147,7 +151,8 @@ switch (fnc) {                                          /* case function */
 
     case IO_EOM1:                                       /* EOM mode 1 */
         new_ch = I_GETEOCH (inst);                      /* get new chan */
-        if (new_ch != lpt_dib.chan) CRETIOP;            /* wrong chan? */
+        if (new_ch != lpt_dib.chan)                     /* wrong chan? */
+            CRETIOP;
         if (inst & 0400) {                              /* space? */
             lpt_spc = inst;                             /* save instr */
             lpt_sta = lpt_sta | SET_SPC;                /* need space */
@@ -167,17 +172,20 @@ switch (fnc) {                                          /* case function */
 
     case IO_SKS:                                        /* SKS */
         new_ch = I_GETSKCH (inst);                      /* sks chan */
-        if (new_ch != lpt_dib.chan) return SCPE_IERR;   /* wrong chan? */
+        if (new_ch != lpt_dib.chan)                     /* wrong chan? */
+            return SCPE_IERR;
         t = I_GETSKCND (inst);                          /* sks cond */
         if (((t == 020) && (!CHP (7, lpt_cct[lpt_ccp]))) || /* 14062: !ch 7 */
             ((t == 010) && (lpt_unit.flags & UNIT_ATT)) ||  /* 12062: !online */
-            (t == 004) && !lpt_err) *dat = 1;           /* 11062: !err */
+            (t == 004) && !lpt_err)                     /* 11062: !err */
+            *dat = 1;
         break;
 
     case IO_WRITE:                                      /* write */
         asc = sds_to_ascii[(*dat) & 077];               /* convert data */
         xfr_req = xfr_req & ~XFR_LPT;                   /* clr xfr flag */
-        if (lpt_bptr < LPT_WIDTH) lpt_buf[lpt_bptr++] = asc;/* store data */
+        if (lpt_bptr < LPT_WIDTH)                       /* store data */
+            lpt_buf[lpt_bptr++] = asc;
         lpt_sta = lpt_sta | SET_XFR;                    /* need xfr */
         sim_activate (&lpt_unit, lpt_ctime);            /* start ch timer */
         break;
@@ -194,13 +202,9 @@ return SCPE_OK;
 t_stat lpt_svc (UNIT *uptr)
 {
 t_stat r = SCPE_OK;
-static const char *lpt_stabl[] = {
-    "\r", "\n", "\n\n", "\n\n\n",
-    "\n\n\n\n", "\n\n\n\n\n",
-    "\n\n\n\n\n\n", "\n\n\n\n\n\n\n"
-    };
 
-if (lpt_sta & SET_XFR) chan_set_ordy (lpt_dib.chan);    /* need lpt xfr? */
+if (lpt_sta & SET_XFR)                                  /* need lpt xfr? */
+    chan_set_ordy (lpt_dib.chan);
 if (lpt_sta & SET_EOR) {                                /* printing? */
     chan_set_flag (lpt_dib.chan, CHF_EOR);              /* set eor flg */
     r = lpt_bufout (uptr);                              /* output buf */
@@ -209,8 +213,8 @@ if (lpt_sta & SET_SPC) {                                /* spacing? */
     if (uptr->flags & UNIT_ATT) {                       /* attached? */
         int32 ln = LPT_GETLN (lpt_spc);                 /* get lines, ch */
         if (lpt_spc & 0200)                             /* n lines? */
-            fputs (lpt_stabl[ln], uptr->fileref);       /* upspace */
-        else lpt_crctl (ln);                            /* carriage ctl */
+            lpt_space (uptr, ln);                       /* upspace */
+        else lpt_crctl (uptr, ln);                      /* carriage ctl */
         }
     r = lpt_status (uptr);                              /* update status */
     }
@@ -257,7 +261,8 @@ return SCPE_OK;
 
 void lpt_end_op (int32 fl)
 {
-if (fl) chan_set_flag (lpt_dib.chan, fl);               /* set flags */
+if (fl)                                                 /* set flags */
+    chan_set_flag (lpt_dib.chan, fl);
 xfr_req = xfr_req & ~XFR_LPT;                           /* clear xfr */
 sim_cancel (&lpt_unit);                                 /* stop */
 if (fl & CHF_ERR) {                                     /* error? */
@@ -269,23 +274,40 @@ return;
 
 /* Carriage control */
 
-t_stat lpt_crctl (int32 ch)
+t_stat lpt_crctl (UNIT *uptr, int32 ch)
 {
 int32 i, j;
 
 if ((ch == 1) && CHP (ch, lpt_cct[0])) {                /* top of form? */
-    fputs ("\f\n", lpt_unit.fileref);                   /* ff + nl */
+    fputs ("\f\n", uptr->fileref);                      /* ff + nl */
     lpt_ccp = 0;                                        /* top of page */
     return SCPE_OK;
     }
 for (i = 1; i < lpt_ccl + 1; i++) {                     /* sweep thru cct */
-    lpt_ccp = (lpt_ccp + 1) %lpt_ccl;                   /* adv pointer */
+    lpt_ccp = (lpt_ccp + 1) % lpt_ccl;                  /* adv pointer */
     if (CHP (ch, lpt_cct[lpt_ccp])) {                   /* chan punched? */
-        for (j = 0; j < i; j++) fputc ('\n', lpt_unit.fileref);
+        for (j = 0; j < i; j++)
+            fputc ('\n', uptr->fileref);
         return SCPE_OK;
         }
     }
 return STOP_CCT;                                        /* runaway channel */
+}
+
+/* Spacing */
+
+t_stat lpt_space (UNIT *uptr, int32 cnt)
+{
+int32 i;
+
+if (cnt == 0)
+     fputc ('\r', uptr->fileref);
+else {
+    for (i = 0; i < cnt; i++)
+        fputc ('\n', uptr->fileref);
+    lpt_ccp = (lpt_ccp + cnt) % lpt_ccl;
+    }
+return SCPE_OK;
 }
 
 /* Reset routine */

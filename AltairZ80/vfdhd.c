@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: vfdhd.c 1773 2008-01-11 05:46:19Z hharte $                       *
+ * $Id: vfdhd.c 1995 2008-07-15 03:59:13Z hharte $                       *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -50,24 +50,29 @@
 
 #include "sim_imd.h"
 
+/* #define DBG_MSG */
+
 #ifdef DBG_MSG
 #define DBG_PRINT(args) printf args
 #else
 #define DBG_PRINT(args)
 #endif
 
-#define SEEK_MSG    0x01
-#define ORDERS_MSG  0x02
-#define CMD_MSG     0x04
-#define RD_DATA_MSG 0x08
-#define WR_DATA_MSG 0x10
-#define STATUS_MSG  0x20
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define SEEK_MSG    (1 << 1)
+#define CMD_MSG     (1 << 2)
+#define RD_DATA_MSG (1 << 3)
+#define WR_DATA_MSG (1 << 4)
+#define STATUS_MSG  (1 << 5)
+#define ORDERS_MSG  (1 << 7)
 
 static void VFDHD_Command(void);
 
 #define VFDHD_MAX_DRIVES    4
 
 #define VFDHD_SECTOR_LEN    275
+#define VFDHD_RAW_LEN       (40 + VFDHD_SECTOR_LEN + 128)
 
 typedef union {
     struct {
@@ -81,7 +86,7 @@ typedef union {
         uint8 ecc_valid;    /* 0xAA indicates ECC is being used. */
         uint8 postamble[128];
     } u;
-    uint8 raw[VFDHD_SECTOR_LEN];
+    uint8 raw[VFDHD_RAW_LEN];
 
 } SECTOR_FORMAT;
 
@@ -119,7 +124,6 @@ typedef struct {
     uint8 read;
     uint8 ecc_enable;
     uint8 precomp;
-
     uint8 floppy_sel;
     uint8 controller_busy;
     uint8 motor_on;
@@ -155,8 +159,7 @@ static int32 vfdhddev(const int32 port, const int32 io, const int32 data);
 static uint8 VFDHD_Read(const uint32 Addr);
 static uint8 VFDHD_Write(const uint32 Addr, uint8 cData);
 
-static int32 trace_level = FALSE;
-static int32 hdSize                 = 5;
+static int32 hdSize = 5;
 
 static UNIT vfdhd_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, VFDHD_CAPACITY) },
@@ -166,20 +169,35 @@ static UNIT vfdhd_unit[] = {
 };
 
 static REG vfdhd_reg[] = {
-    { HRDATA (TRACELEVEL,   trace_level,           16), },
-    { DRDATA (HDSIZE,   hdSize,                10),             },
+    { DRDATA (HDSIZE, hdSize, 10), },
     { NULL }
 };
 
 static MTAB vfdhd_mod[] = {
-    { MTAB_XTD|MTAB_VDV,            0,                  "IOBASE",   "IOBASE", &set_iobase, &show_iobase, NULL },
-    { UNIT_VFDHD_WLK,                0,                  "WRTENB",   "WRTENB", NULL  },
-    { UNIT_VFDHD_WLK,                UNIT_VFDHD_WLK,      "WRTLCK",   "WRTLCK", NULL  },
+    { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE", &set_iobase, &show_iobase, NULL },
+    { UNIT_VFDHD_WLK,       0,                  "WRTENB",   "WRTENB", NULL  },
+    { UNIT_VFDHD_WLK,       UNIT_VFDHD_WLK,     "WRTLCK",   "WRTLCK", NULL  },
     /* quiet, no warning messages       */
-    { UNIT_VFDHD_VERBOSE,            0,                  "QUIET",    "QUIET", NULL   },
+    { UNIT_VFDHD_VERBOSE,   0,                  "QUIET",    "QUIET", NULL   },
     /* verbose, show warning messages   */
-    { UNIT_VFDHD_VERBOSE,            UNIT_VFDHD_VERBOSE,  "VERBOSE",  "VERBOSE", NULL },
+    { UNIT_VFDHD_VERBOSE,   UNIT_VFDHD_VERBOSE, "VERBOSE",  "VERBOSE", NULL },
     { 0 }
+};
+
+#define TRACE_PRINT(level, args)    if(vfdhd_dev.dctrl & level) {   \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB vfdhd_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "SEEK",   SEEK_MSG },
+    { "CMD",    CMD_MSG },
+    { "RDDATA", RD_DATA_MSG },
+    { "WRDATA", WR_DATA_MSG },
+    { "STATUS", STATUS_MSG },
+    { "ORDERS", ORDERS_MSG },
+    { NULL,     0 }
 };
 
 DEVICE vfdhd_dev = {
@@ -187,8 +205,8 @@ DEVICE vfdhd_dev = {
     VFDHD_MAX_DRIVES, 10, 31, 1, VFDHD_MAX_DRIVES, VFDHD_MAX_DRIVES,
     NULL, NULL, &vfdhd_reset,
     NULL, &vfdhd_attach, &vfdhd_detach,
-    &vfdhd_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &vfdhd_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    vfdhd_dt, NULL, "Vector Graphic FD-HD Controller VFDHD"
 };
 
 /* Reset routine */
@@ -265,7 +283,8 @@ static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
         if (uptr->flags & UNIT_VFDHD_VERBOSE)
             printf("--------------------------------------------------------\n");
         vfdhd_info->drive[i].imd = diskOpen((uptr->fileref), (uptr->flags & UNIT_VFDHD_VERBOSE));
-        printf("\n");
+        if (uptr->flags & UNIT_VFDHD_VERBOSE)
+            printf("\n");
     } else {
         vfdhd_info->drive[i].imd = NULL;
     }
@@ -321,10 +340,12 @@ static t_stat vfdhd_detach(UNIT *uptr)
     }
 
     DBG_PRINT(("Detach VFDHD%d\n", i));
-    diskClose(vfdhd_info->drive[i].imd);
+    r = diskClose(&vfdhd_info->drive[i].imd);
+    if (r != SCPE_OK)
+        return r;
 
     r = detach_unit(uptr);  /* detach unit */
-    if ( r != SCPE_OK)
+    if (r != SCPE_OK)
         return r;
 
     return SCPE_OK;
@@ -400,6 +421,10 @@ static uint8 VFDHD_Read(const uint32 Addr)
             break;
         case FDHD_DATA:
 /*          DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " RD Data" NLP, PCX)); */
+            if(vfdhd_info->datacount+40 >= VFDHD_RAW_LEN) {
+                TRACE_PRINT(ERROR_MSG, ("VFDHD: " ADDRESS_FORMAT " Illegal data count %d." NLP, PCX, vfdhd_info->datacount));
+                vfdhd_info->datacount = 0;
+            }
             cData = sdata.raw[vfdhd_info->datacount+40];
 
             vfdhd_info->datacount++;
@@ -424,7 +449,7 @@ static uint8 VFDHD_Write(const uint32 Addr, uint8 cData)
 
     switch(Addr & 0x3) {
         case FDHD_CTRL_STATUS0:
-            vfdhd_info->sel_drive = cData & 3;
+            vfdhd_info->sel_drive = cData & 0x03;
             vfdhd_info->head = (cData >> 2) & 0x7;
             vfdhd_info->step = (cData >> 5) & 1;
             vfdhd_info->direction = (cData >> 6) & 1;
@@ -474,11 +499,23 @@ static uint8 VFDHD_Write(const uint32 Addr, uint8 cData)
             DBG_PRINT(("VFDHD: " ADDRESS_FORMAT " WR Data" NLP, PCX));
 #ifdef USE_VGI
             if(vfdhd_info->sel_drive > 0) { /* Floppy */
+                if(vfdhd_info->datacount >= VFDHD_RAW_LEN) {
+                    TRACE_PRINT(ERROR_MSG, ("VFDHD: " ADDRESS_FORMAT " Illegal data count %d." NLP, PCX, vfdhd_info->datacount));
+                    vfdhd_info->datacount = 0;
+                }
                 sdata.raw[vfdhd_info->datacount] = cData;
             } else { /* Hard */
+                if(vfdhd_info->datacount+10 >= VFDHD_RAW_LEN) {
+                    TRACE_PRINT(ERROR_MSG, ("VFDHD: " ADDRESS_FORMAT " Illegal data count %d." NLP, PCX, vfdhd_info->datacount));
+                    vfdhd_info->datacount = 0;
+                }
                 sdata.raw[vfdhd_info->datacount+10] = cData;
             }
 #else
+            if((vfdhd_info->datacount-13 >= VFDHD_RAW_LEN) || (vfdhd_info->datacount < 13)) {
+                TRACE_PRINT(ERROR_MSG, ("VFDHD: " ADDRESS_FORMAT " Illegal data count %d." NLP, PCX, vfdhd_info->datacount));
+                vfdhd_info->datacount = 13;
+            }
             sdata.u.data[vfdhd_info->datacount-13] = cData;
 #endif /* USE_VGI */
 
@@ -556,7 +593,7 @@ static void VFDHD_Command(void)
 
                 /* Checksum everything except the sync byte */
                 for(i=1;i<269;i++) {
-                    checksum = adc(checksum, sdata.raw[i]);
+                    checksum = adc(checksum, sdata.raw[i+40]);
                 }
 
                 sdata.u.checksum = checksum & 0xFF;
@@ -566,7 +603,7 @@ static void VFDHD_Command(void)
                 if(pDrive->uptr->fileref == NULL) {
                     printf(".fileref is NULL!" NLP);
                 } else {
-                    fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                    sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
                     fread(&sdata.u.sync, 274, /*VFDHD_SECTOR_LEN,*/ 1, (pDrive->uptr)->fileref);
 
                     memset(&sdata.u.preamble, 0, 40);
@@ -631,7 +668,7 @@ static void VFDHD_Command(void)
                         pDrive->track,
                         vfdhd_info->head,
                         vfdhd_info->sector));
-                    fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
+                    sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
                     fwrite(&sdata.u.sync, VFDHD_SECTOR_LEN, 1, (pDrive->uptr)->fileref);
 #else

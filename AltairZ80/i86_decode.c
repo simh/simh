@@ -26,8 +26,6 @@
 
 extern uint32 GetBYTEExtended(register uint32 Addr);
 extern void PutBYTEExtended(register uint32 Addr, const register uint32 Value);
-extern char messageBuffer[];
-extern void printMessage(void);
 extern int32 AX_S;      /* AX register (8086)                           */
 extern int32 BX_S;      /* BX register (8086)                           */
 extern int32 CX_S;      /* CX register (8086)                           */
@@ -39,10 +37,10 @@ extern int32 SS_S;      /* SS register (8086)                           */
 extern int32 DI_S;      /* DI register (8086)                           */
 extern int32 SI_S;      /* SI register (8086)                           */
 extern int32 BP_S;      /* BP register (8086)                           */
-extern int32 SP8086_S;  /* SP register (8086)                           */
+extern int32 SPX_S;     /* SP register (8086)                           */
 extern int32 IP_S;      /* IP register (8086)                           */
 extern int32 FLAGS_S;   /* flags register (8086)                        */
-extern int32 PC_S;      /* PC register (8080/Z80/8086), 20 bit          */
+extern int32 PCX_S;     /* PC register (8086), 20 bit                   */
 extern int32 sim_interval;
 extern uint32 PCX;      /* external view of PC                          */
 extern uint32 sim_brk_summ;
@@ -51,6 +49,7 @@ extern UNIT cpu_unit;
 void i86_intr_raise(PC_ENV *m,uint8 intrnum);
 void cpu8086reset(void);
 t_stat sim_instr_8086(void);
+void cpu8086_intr(uint8 intrnum);
 
 /* $Log: $
  * Revision 0.05  1992/04/12  23:16:42  hudgens
@@ -121,13 +120,18 @@ void i86_intr_raise(PC_ENV *m,uint8 intrnum)
 
 static PC_ENV cpu8086;
 
+void cpu8086_intr(uint8 intrnum)
+{
+    i86_intr_raise(&cpu8086, intrnum);
+}
+
 static void setViewRegisters(void) {
     FLAGS_S = cpu8086.R_FLG;
     AX_S = cpu8086.R_AX;
     BX_S = cpu8086.R_BX;
     CX_S = cpu8086.R_CX;
     DX_S = cpu8086.R_DX;
-    SP8086_S = cpu8086.R_SP;
+    SPX_S = cpu8086.R_SP;
     BP_S = cpu8086.R_BP;
     SI_S = cpu8086.R_SI;
     DI_S = cpu8086.R_DI;
@@ -144,7 +148,7 @@ static void setCPURegisters(void) {
     cpu8086.R_BX = BX_S;
     cpu8086.R_CX = CX_S;
     cpu8086.R_DX = DX_S;
-    cpu8086.R_SP = SP8086_S;
+    cpu8086.R_SP = SPX_S;
     cpu8086.R_BP = BP_S;
     cpu8086.R_SI = SI_S;
     cpu8086.R_DI = DI_S;
@@ -185,30 +189,34 @@ static uint32 getFullPC(void) {
     return cpu8086.R_IP + (cpu8086.R_CS << 4);
 }
 
+extern int32 switch_cpu_now; /* hharte */
+
 t_stat sim_instr_8086(void) {
     t_stat reason = SCPE_OK;
     uint8 op1;
     int32 newIP;
     setCPURegisters();
     intr = 0;
-    newIP = PC_S - 16 * CS_S;
-    if ((0 <= newIP) && (newIP <= 0xffff)) cpu8086.R_IP = newIP;
+    newIP = PCX_S - 16 * CS_S;
+    switch_cpu_now = TRUE; /* hharte */
+    if ((0 <= newIP) && (newIP <= 0xffff))
+        cpu8086.R_IP = newIP;
     else {
-        if (CS_S != ((PC_S & 0xf0000) >> 4)) {
-            cpu8086.R_CS = (PC_S & 0xf0000) >> 4;
-            if (cpu_unit.flags & UNIT_CPU_VERBOSE) {
-                MESSAGE_2("Segment register CS set to %04x", cpu8086.R_CS);
-            }
+        if (CS_S != ((PCX_S & 0xf0000) >> 4)) {
+            cpu8086.R_CS = (PCX_S & 0xf0000) >> 4;
+            if (cpu_unit.flags & UNIT_CPU_VERBOSE)
+                printf("CPU: " ADDRESS_FORMAT " Segment register CS set to %04x" NLP, PCX, cpu8086.R_CS);
         }
-        cpu8086.R_IP = PC_S & 0xffff;
+        cpu8086.R_IP = PCX_S & 0xffff;
     }
-    while (TRUE) {                          /* loop until halted    */
-        if (sim_interval <= 0) {            /* check clock queue    */
+    while (switch_cpu_now == TRUE) {                        /* loop until halted    */
+        if (sim_interval <= 0) {                            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_os_poll_kbd()) == SCPE_STOP)   /* poll on platforms without reliable signalling */
+            if ((reason = sim_os_poll_kbd()) == SCPE_STOP)  /* poll on platforms without reliable signalling */
                 break;
 #endif
-            if ( (reason = sim_process_event()) ) break;
+            if ( (reason = sim_process_event()) )
+                break;
         }
         if (sim_brk_summ && sim_brk_test(getFullPC(), SWMASK('E'))) {   /* breakpoint?      */
             reason = STOP_IBKPT;                                        /* stop simulation  */
@@ -217,7 +225,7 @@ t_stat sim_instr_8086(void) {
         PCX = getFullPC();
         op1 = GetBYTEExtended((((uint32)cpu8086.R_CS<<4) + cpu8086.R_IP) & 0xFFFFF);
         if (sim_brk_summ && sim_brk_test(op1, (1u << SIM_BKPT_V_SPC) | SWMASK('I'))) {  /* instruction breakpoint?  */
-            reason = STOP_IBKPT;                                /* stop simulation          */
+            reason = STOP_IBKPT;                                                        /* stop simulation          */
             break;
         }
         sim_interval--;
@@ -240,17 +248,27 @@ t_stat sim_instr_8086(void) {
             /* [JCE] Reversed the sense of this ACCESS_FLAG; it's set for interrupts
             enabled, not interrupts blocked i.e. either not blockable (intr 0 or 2)
             or the IF flag not set so interrupts not blocked */
-                /* hharte: if a segment override exists, then treat that as "atomic" and do not handle
-                 * an interrupt until the override is cleared.
-                 * Not sure if this is the way an 8086 really works, need to find out for sure.
-                 * Also, what about the REPE prefix?
-                 */
-                if((cpu8086.sysmode & SYSMODE_SEGMASK) == 0) {
-                    i86_intr_handle(&cpu8086);
-                }
+            /* hharte: if a segment override exists, then treat that as "atomic" and do not handle
+             * an interrupt until the override is cleared.
+             * Not sure if this is the way an 8086 really works, need to find out for sure.
+             * Also, what about the REPE prefix?
+             */
+            if ((cpu8086.sysmode & SYSMODE_SEGMASK) == 0) {
+                i86_intr_handle(&cpu8086);
+            }
         }
     }
-    PC_S = (reason == STOP_HALT) | (reason == STOP_OPCODE) ? PCX : getFullPC();
+    /* It we stopped processing instructions because of a switch to the other
+     * CPU, then fixup the reason code.
+     */
+    if (switch_cpu_now == FALSE) {
+        reason = SCPE_OK;
+        PCX += 2;
+        PCX_S = PCX;
+    } else {
+        PCX_S = (reason == STOP_HALT) | (reason == STOP_OPCODE) ? PCX : getFullPC();
+    }
+
     setViewRegisters();
     return reason;
 }

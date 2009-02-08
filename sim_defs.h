@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Added inlining support
    28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
    18-Jun-07    RMS     Added UNIT_IDLE flag
@@ -161,15 +162,9 @@ typedef uint32          t_addr;
 #define T_ADDR_W        32
 #endif                                                  /* end 64b address */
 
-/* Inlining */
+/* Stubs for inlining */
 
-#if defined (__GNUC__)                                  /* GCC */
-#define SIM_INLINE inline
-#elif defined (_MSC_VER)                                /* Microsoft C Compilers */
-#define SIM_INLINE __inline
-#else                                                   /* default */
 #define SIM_INLINE
-#endif
 
 /* System independent definitions */
 

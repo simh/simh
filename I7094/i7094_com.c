@@ -1,6 +1,6 @@
 /* i7094_com.c: IBM 7094 7750 communications interface simulator
 
-   Copyright (c) 2005-2006, Robert M Supnik
+   Copyright (c) 2005-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    com          7750 controller
    coml         7750 lines
+
+   19-Nov-2008  RMS     Revised for common TMXR show routines
 
    This module implements an abstract simulator for the IBM 7750 communications
    computer as used by the CTSS system.  The 7750 supports up to 112 lines;
@@ -221,8 +223,6 @@ t_stat comto_svc (UNIT *uptr);
 t_stat com_reset (DEVICE *dptr);
 t_stat com_attach (UNIT *uptr, char *cptr);
 t_stat com_detach (UNIT *uptr);
-t_stat com_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat com_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat com_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat com_show_freeq (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat com_show_inq (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -285,11 +285,12 @@ REG com_reg[] = {
     };
 
 MTAB com_mod[] = {
-    { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &com_summ },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &com_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &com_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &com_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &com_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &com_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, COMR_FQ, "FREEQ", NULL,
       NULL, &com_show_ctrl, 0 },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, COMR_IQ, "INQ", NULL,
@@ -311,7 +312,7 @@ DEVICE com_dev = {
     &com_dib, DEV_NET | DEV_DIS
     };
 
-/* COMLL data structures
+/* COML data structures
 
    coml_dev     COML device descriptor
    coml_unit    COML unit descriptor
@@ -360,11 +361,11 @@ MTAB coml_mod[] = {
     { UNIT_K35+UNIT_2741, UNIT_K35 , "KSR-35", "KSR-35", NULL },
 //  { UNIT_K35+UNIT_2741, UNIT_2741, "2741",   "2741", NULL },
     { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &com_desc },
+      &tmxr_dscln, NULL, (void *) &com_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
-      &tmxr_set_log, &tmxr_show_log, &com_desc },
+      &tmxr_set_log, &tmxr_show_log, (void*) &com_desc },
     { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
-      &tmxr_set_nolog, NULL, &com_desc },
+      &tmxr_set_nolog, NULL, (void *) &com_desc },
     { 0 }
     };
 
@@ -419,7 +420,8 @@ return SCPE_OK;
 
 t_stat com_chwr (uint32 ch, t_uint64 val, uint32 stopf)
 {
-if (stopf) com_stop = 1;
+if (stopf)
+    com_stop = 1;
 else {
     com_chob = val;                                     /* store data */
     com_chob_v = 1;                                     /* set valid */
@@ -437,8 +439,10 @@ switch (com_sta) {                                      /* case on state */
 
     case CHSL_SNS:                                      /* prepare data */
         com_sns &= ~COMS_DYN;                           /* clear dynamic flags */
-        if (com_free.head) com_set_sns (COMS_INBF);     /* free space? */
-        if (com_inpq.head) com_set_sns (COMS_DATR);     /* pending input? */
+        if (com_free.head)                              /* free space? */
+            com_set_sns (COMS_INBF);
+        if (com_inpq.head)                              /* pending input? */
+            com_set_sns (COMS_DATR);
         com_buf[0] = (com_sns >> 24) & DMASK;           /* buffer is 2 words */
         com_buf[1] = (com_sns << 12) & DMASK;
         com_bptr = 0;
@@ -455,11 +459,13 @@ switch (com_sta) {                                      /* case on state */
             return SCPE_OK;
             }
         dat = com_buf[com_bptr++];                      /* get word */
-        if (!com_stop) ch9_req_rd (com_ch, dat);        /* send wd to chan */
+        if (!com_stop)                                  /* send wd to chan */
+            ch9_req_rd (com_ch, dat);
         break;
 
     case CHSL_SNS|CHSL_3RD:                             /* 3rd state */
-        if (com_qdone (com_ch)) return SCPE_OK;         /* done? exit */
+        if (com_qdone (com_ch))                         /* done? exit */
+            return SCPE_OK;
         com_sta = CHSL_SNS;                             /* repeat sequence */
         break;
         }
@@ -479,18 +485,22 @@ t_uint64 dat;
 switch (com_sta) {                                      /* case on state */
 
     case CHSL_RDS:                                      /* read start */
-        for (i = 0; i < COM_BUFSIZ; i++) com_buf[i] = 0; /* clear chan buf */
+        for (i = 0; i < COM_BUFSIZ; i++)                /* clear chan buf */
+            com_buf[i] = 0;
         com_buf[0] = com_msgn;                          /* 1st char is msg num */
         com_msgn = (com_msgn + 1) & 03777;              /* incr msg num */
         for (i = 1, j = 0; i < COMI_12BMAX; i++) {      /* fill buffer */
             ent = com_gethd_free (&com_inpq);           /* get next entry */
-            if (ent == 0) break;                        /* q empty, done */
-            if ((i % 3) == 0) j++;                      /* next word? */
+            if (ent == 0)                               /* q empty, done */
+                break;
+            if ((i % 3) == 0)                           /* next word? */
+                j++;
             com_buf[j] = (com_buf[j] << 12) |           /* pack data */
                 ((t_uint64) (com_pkt[ent].data & 07777));
             }
         for (k = i % 3; k < 3; k++) {                   /* fill with EOM */
-            if (k == 0) j++;                            /* next word? */
+            if (k == 0)                                 /* next word? */
+                j++;
             com_buf[j] = (com_buf[j] << 12) | COMI_EOM;
             }
         com_bptr = 0;                                   /* init buf ptr */
@@ -503,7 +513,8 @@ switch (com_sta) {                                      /* case on state */
             com_end (com_ch, 0, CHSL_RDS|CHSL_3RD);     /* end, next state */
         else {                                          /* more to do */
             dat = com_buf[com_bptr++];                  /* get word */
-            if (!com_stop) ch9_req_rd (com_ch, dat);    /* give to channel */
+            if (!com_stop)                              /* give to channel */
+                ch9_req_rd (com_ch, dat);
             }
         break;
 
@@ -514,7 +525,8 @@ switch (com_sta) {                                      /* case on state */
         break;
 
     case CHSL_WRS:                                      /* write start */
-        for (i = 0; i < COM_BUFSIZ; i++) com_buf[i] = 0; /* clear chan buf */
+        for (i = 0; i < COM_BUFSIZ; i++)                /* clear chan buf */
+            com_buf[i] = 0;
         com_bptr = 0;                                   /* init buf ptr */
         com_sta = CHSL_WRS|CHSL_2ND;                    /* next state */
         ch_req |= REQ_CH (com_ch);                      /* request channel */
@@ -533,13 +545,16 @@ switch (com_sta) {                                      /* case on state */
             ln = COMO_GETLN (dat);                      /* line number */
             if (ln >= (COM_TLINES + COM_LBASE))         /* invalid line? */
                 return STOP_INVLIN;
-            if (dat & COMO_CTLRST) return STOP_INVMSG;  /* char must be 0 */
-            if (ln >= COM_LBASE) com_reset_ln (ln - COM_LBASE);
+            if (dat & COMO_CTLRST)                      /* char must be 0 */
+                return STOP_INVMSG;
+            if (ln >= COM_LBASE)
+                com_reset_ln (ln - COM_LBASE);
             com_end (com_ch, 0, CHSL_WRS|CHSL_4TH);     /* end, last state */
             }
         else {                                          /* data message */
             ccnt = (((uint32) dat >> 12) & 07777) + 1;  /* char count plus EOM */
-            if (dat & COMO_LIN12B) ccnt = ccnt << 1;    /* 12b? double */
+            if (dat & COMO_LIN12B)                      /* 12b? double */
+                ccnt = ccnt << 1;
             com_blim = (ccnt + 6 + 5) / 6;              /* buffer limit */
             if ((com_blim == 1) || (com_blim >= COMO_BMAX))
                 return STOP_INVMSG;
@@ -560,9 +575,11 @@ switch (com_sta) {                                      /* case on state */
                 (ln >= COM_LBASE)) {
                 uln = ln - COM_LBASE;                   /* unit number */
                 for (i = 2, j = 0; i < COMO_12BMAX; i++) { /* unpack 12b char */
-                    if ((i % 3) == 0) j++;
+                    if ((i % 3) == 0)
+                        j++;
                     chr = (uint16) (com_buf[j] >> ((2 - (i % 3)) * 12)) & 07777;
-                    if (chr == COMO_EOM12B) break;      /* EOM? */
+                    if (chr == COMO_EOM12B)             /* EOM? */
+                        break;
                     if (!com_new_puttl (&com_outq[uln], chr))
                         return STOP_NOOFREE;            /* append to outq */
                     }
@@ -570,7 +587,8 @@ switch (com_sta) {                                      /* case on state */
                 }
             com_end (com_ch, 0, CHSL_WRS|CHSL_4TH);     /* end, last state */
             }
-        else if (!com_stop) ch_req |= REQ_CH (com_ch);  /* request channel */
+        else if (!com_stop)                             /* request channel */
+            ch_req |= REQ_CH (com_ch);
         break;
 
     case CHSL_WRS|CHSL_4TH:                             /* buffer done */
@@ -596,14 +614,19 @@ t_stat r;
 
 sim_activate (uptr, uptr->wait);                        /* continue poll */
 c = sim_poll_kbd ();                                    /* get character */
-if (c && !(c & (SCPE_BREAK|SCPE_KFLAG))) return c;      /* error? */
-if (!com_enab || (c & SCPE_BREAK)) return SCPE_OK;      /* !enab, break? done */
+if (c && !(c & (SCPE_BREAK|SCPE_KFLAG)))                /* error? */
+    return c;
+if (!com_enab || (c & SCPE_BREAK))                      /* !enab, break? done */
+    return SCPE_OK;
 if (coml_unit[COM_MLINES].NEEDID)                       /* ID needed? */
     return com_send_id (COM_MLINES);
 if ((c & SCPE_KFLAG) && ((c = c & 0177) != 0)) {        /* char input? */
-    if (r = com_queue_in (COM_MLINES, c)) return r;
-    if (sim_tt_outcvt (c, TT_MODE_7P) >= 0) sim_putchar (c);
-    if (c == '\r') sim_putchar ('\n');
+    if (r = com_queue_in (COM_MLINES, c))
+        return r;
+    if (sim_tt_outcvt (c, TT_MODE_7P) >= 0)
+        sim_putchar (c);
+    if (c == '\r')
+        sim_putchar ('\n');
     }
 return com_test_atn (com_ch);                           /* set ATN if input */
 }
@@ -618,10 +641,12 @@ t_stat comi_svc (UNIT *uptr)
 int32 c, ln, t;
 t_stat r;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
 t = sim_rtcn_calb (com_tps, TMR_COM);                   /* calibrate */
 sim_activate (uptr, t);                                 /* continue poll */
-if (!com_enab) return SCPE_OK;                          /* not enabled? exit */
+if (!com_enab)                                          /* not enabled? exit */
+    return SCPE_OK;
 ln = tmxr_poll_conn (&com_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     com_ldsc[ln].rcve = 1;                              /* rcv enabled */ 
@@ -631,11 +656,13 @@ if (ln >= 0) {                                          /* got one? */
 tmxr_poll_rx (&com_desc);                               /* poll for input */
 for (ln = 0; ln < COM_MLINES; ln++) {                   /* loop thru mux */
     if (com_ldsc[ln].conn) {                            /* connected? */
-        if (coml_unit[ln].NEEDID) return com_send_id (ln);
+        if (coml_unit[ln].NEEDID)
+            return com_send_id (ln);
         c = tmxr_getc_ln (&com_ldsc[ln]);               /* get char */
         if (c) {                                        /* any char? */
             c = c & 0177;                               /* mask to 7b */
-            if (r = com_queue_in (ln, c)) return r;     /* queue char, err? */
+            if (r = com_queue_in (ln, c))               /* queue char, err? */
+                return r;
             if (com_ldsc[ln].xmte) {                    /* output enabled? */
                 if (sim_tt_outcvt (c, TT_MODE_7P) >= 0) /* echo char */
                     tmxr_putc_ln (&com_ldsc[ln], c);
@@ -664,8 +691,10 @@ uint32 c, c1;
 if (com_outq[COM_MLINES].head == 0)                     /* no more characters? */
     return com_send_ccmp (COM_MLINES);                  /* free any remaining */
 c = com_queue_out (COM_MLINES, &c1);                    /* get character, cvt */
-if (c) sim_putchar (c);                                 /* printable? output */
-if (c1) sim_putchar (c1);                               /* second char? output */
+if (c)                                                  /* printable? output */
+    sim_putchar (c);
+if (c1)                                                 /* second char? output */
+    sim_putchar (c1);
 sim_activate (uptr, uptr->wait);                        /* next char */
 if (com_not_ret[COM_MLINES] >= COMI_CMAX)               /* completion needed? */
     return com_send_ccmp (COM_MLINES);                  /* generate msg */
@@ -684,8 +713,10 @@ if (com_outq[ln].head == 0)                             /* no more characters? *
 if (com_ldsc[ln].conn) {                                /* connected? */
     if (com_ldsc[ln].xmte) {                            /* output enabled? */
         c = com_queue_out (ln, &c1);                    /* get character, cvt */
-        if (c) tmxr_putc_ln (&com_ldsc[ln], c);         /* printable? output */
-        if (c1) tmxr_putc_ln (&com_ldsc[ln], c1);       /* print second */
+        if (c)                                          /* printable? output */
+            tmxr_putc_ln (&com_ldsc[ln], c);
+        if (c1)                                         /* print second */
+            tmxr_putc_ln (&com_ldsc[ln], c1);
         }                                               /* end if */
     tmxr_poll_tx (&com_desc);                           /* poll xmt */
     sim_activate (uptr, uptr->wait);                    /* next char */
@@ -720,16 +751,20 @@ t_stat com_queue_in (uint32 ln, uint32 c)
 {
 uint16 out;
 
-if (c == com_intr) out = COMI_INTR;
-else if (c == com_quit) out = COMI_QUIT;
+if (c == com_intr)
+    out = COMI_INTR;
+else if (c == com_quit)
+    out = COMI_QUIT;
 else {
     if (coml_unit[ln].flags & UNIT_K35) {               /* KSR-35? */
-        if (islower (c)) c = toupper (c);               /* convert LC to UC */
+        if (islower (c))                                /* convert LC to UC */
+            c = toupper (c);
         }
     else c |= (com_epar[c]? COMI_PARITY: 0);            /* add even parity */
     out = (~c) & 0377;                                  /* 1's complement */
     }
-if (!com_inp_msg (ln, out)) return STOP_NOIFREE;        /* input message */
+if (!com_inp_msg (ln, out))                             /* input message */
+    return STOP_NOIFREE;
 return SCPE_OK;
 }
 
@@ -741,7 +776,8 @@ uint32 c, ent, raw;
 
 *c1 = 0;                                                /* assume non-printing */
 ent = com_gethd_free (&com_outq[ln]);                   /* get character */
-if (ent == 0) return 0;                                 /* nothing? */
+if (ent == 0)                                           /* nothing? */
+    return 0;
 raw = com_pkt[ent].data;                                /* get 12b character */
 com_not_ret[ln]++;
 if (raw == COMO_BITRPT) {                               /* insert delay? */
@@ -750,7 +786,8 @@ if (raw == COMO_BITRPT) {                               /* insert delay? */
     }
 c = (~raw >> 1) & 0177;                                 /* remove start, parity */
 if (c >= 040) {                                         /* printable? */
-    if (c == 0177) return 0;                            /* DEL? ignore */
+    if (c == 0177)                                      /* DEL? ignore */
+        return 0;
     if ((coml_unit[ln].flags & UNIT_K35) && islower (c))        /* KSR-35 LC? */
         c = toupper (c);                                /* cvt to UC */
     return c;
@@ -795,7 +832,8 @@ t_stat com_send_ccmp (uint32 ln)
 uint32 t;
 
 if (t = com_not_ret[ln]) {                              /* chars not returned? */
-    if (t > COMI_CMAX) t = COMI_CMAX;                   /* limit to max */
+    if (t > COMI_CMAX)                                  /* limit to max */
+        t = COMI_CMAX;
     com_not_ret[ln] -= t;                               /* keep count */
     if (!com_inp_msg (ln, COMI_COMP (t)))               /* gen completion msg */
         return STOP_NOIFREE;
@@ -807,7 +845,8 @@ return SCPE_OK;
 
 void com_skip_outc (uint32 ln)
 {
-if (com_gethd_free (&com_outq[ln])) com_not_ret[ln]++;  /* count it */
+if (com_gethd_free (&com_outq[ln]))                     /* count it */
+    com_not_ret[ln]++;
 return;
 }
 
@@ -815,7 +854,8 @@ return;
 
 t_uint64 com_getob (uint32 ch)
 {
-if (com_chob_v) com_chob_v = 0;                         /* valid? clear */
+if (com_chob_v)                                         /* valid? clear */
+    com_chob_v = 0;
 else if (!com_stop) {                                   /* not stopped? */
     ch9_set_ioc (com_ch);                               /* IO check */
     com_set_sns (COMS_ITMO);                            /* set sense bit */
@@ -827,7 +867,8 @@ return com_chob;
 
 t_stat com_test_atn (uint32 ch)
 {
-if (com_inpq.head) ch9_set_atn (ch);
+if (com_inpq.head)
+    ch9_set_atn (ch);
 return SCPE_OK;
 }
 
@@ -885,7 +926,8 @@ uint16 ent;
 
 if ((ent = lh->head) != 0) {
     lh->head = com_pkt[ent].next;
-    if (lh->head == 0) lh->tail = 0;
+    if (lh->head == 0)
+        lh->tail = 0;
     }
 else lh->tail = 0;
 return ent;
@@ -895,7 +937,8 @@ return ent;
 
 void com_puttl (LISTHD *lh, uint16 ent)
 {
-if (lh->tail == 0) lh->head = ent;
+if (lh->tail == 0)
+    lh->head = ent;
 else com_pkt[lh->tail].next = ent;
 com_pkt[ent].next = 0;
 lh->tail = ent;
@@ -927,9 +970,12 @@ void com_set_sns (t_uint64 stat)
 {
 com_sns |= stat;
 com_sns &= ~(COMS_PCHK|COMS_DCHK|COMS_EXCC);
-if (com_sns & COMS_PALL) com_sns |= COMS_PCHK;
-if (com_sns & COMS_DALL) com_sns |= COMS_DCHK;
-if (com_sns & COMS_EALL) com_sns |= COMS_EXCC;
+if (com_sns & COMS_PALL)
+    com_sns |= COMS_PCHK;
+if (com_sns & COMS_DALL)
+    com_sns |= COMS_DCHK;
+if (com_sns & COMS_EALL)
+    com_sns |= COMS_EXCC;
 return;
 }
 
@@ -963,7 +1009,8 @@ com_chob_v = 0;
 com_stop = 0;
 com_bptr = 0;
 com_blim = 0;
-for (i = 0; i < COM_BUFSIZ; i++) com_buf[i] = 0;
+for (i = 0; i < COM_BUFSIZ; i++)
+    com_buf[i] = 0;
 com_inpq.head = 0;                                      /* init queues */
 com_inpq.tail = 0;
 for (i = 0; i < COM_TLINES; i++) {
@@ -991,7 +1038,8 @@ t_stat com_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = tmxr_attach (&com_desc, uptr, cptr);                /* attach */
-if (r != SCPE_OK) return r;                             /* error */
+if (r != SCPE_OK)                                       /* error */
+    return r;
 sim_rtcn_init (uptr->wait, TMR_COM);
 sim_activate (uptr, 100);                               /* quick poll */
 return SCPE_OK;
@@ -1005,40 +1053,10 @@ uint32 i;
 t_stat r;
 
 r = tmxr_detach (&com_desc, uptr);                      /* detach */
-for (i = 0; i < COM_MLINES; i++) com_ldsc[i].rcve = 0;  /* disable rcv */
+for (i = 0; i < COM_MLINES; i++)                        /* disable rcv */
+    com_ldsc[i].rcve = 0;
 sim_cancel (uptr);                                      /* stop poll */
 return r;
-}
-
-/* Show summary processor */
-
-t_stat com_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-uint32 i, t;
-
-for (i = t = 0; i < COM_MLINES; i++) t = t + (com_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat com_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-uint32 i, t;
-
-for (i = t = 0; i < COM_MLINES; i++) t = t + (com_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < COM_MLINES; i++) {
-        if (com_ldsc[i].conn)  {
-            if (val) tmxr_fconns (st, &com_ldsc[i], i);
-            else tmxr_fstats (st, &com_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
-return SCPE_OK;
 }
 
 /* Reset an individual line */
@@ -1048,7 +1066,8 @@ void com_reset_ln (uint32 ln)
 while (com_gethd_free (&com_outq[ln])) ;
 com_not_ret[ln] = 0;
 sim_cancel (&coml_unit[ln]);
-if ((ln < COM_MLINES) && (com_ldsc[ln].conn == 0)) coml_unit[ln].CONN = 0;
+if ((ln < COM_MLINES) && (com_ldsc[ln].conn == 0))
+    coml_unit[ln].CONN = 0;
 return;
 }
 
@@ -1061,8 +1080,10 @@ uint32 i, next;
 next = lh->head;
 for (i = 0; i < COM_PKTSIZ; i++) {
     if (next == 0) {
-        if (i == 0) fprintf (st, "%s is empty\n", name);
-        else if (i == 1) fprintf (st, "%s has 1 entry\n", name);
+        if (i == 0)
+            fprintf (st, "%s is empty\n", name);
+        else if (i == 1)
+            fprintf (st, "%s has 1 entry\n", name);
         else fprintf (st, "%s had %d entries\n", name, i);
         return i;
         }
@@ -1078,7 +1099,8 @@ uint32 c;
 
 fprintf (st, "%03o", ch);
 c = (~ch) & 0177;
-if (((ch & 07400) == 0) && (c >= 040) && (c != 0177)) fprintf (st, "[%c]", c);
+if (((ch & 07400) == 0) && (c >= 040) && (c != 0177))
+    fprintf (st, "[%c]", c);
 return;
 }
 
@@ -1095,7 +1117,8 @@ uint32 entc, ln, i, next;
 if (entc = com_show_qsumm (st, &com_inpq, "Input queue")) {
     for (i = 0, next = com_inpq.head; next != 0;
          i++, next = com_pkt[next].next) {
-        if ((i % 4) == 0) fprintf (st, "%d:\t", i);
+        if ((i % 4) == 0)
+            fprintf (st, "%d:\t", i);
         ln = com_pkt[next].data;
         next = com_pkt[next].next;
         if (next == 0) {
@@ -1106,7 +1129,8 @@ if (entc = com_show_qsumm (st, &com_inpq, "Input queue")) {
         com_show_char (st, com_pkt[next].data);
         fputc ((((i % 4) == 3)? '\n': '\t'), st);
         }
-    if (i % 4) fputc ('\n', st);
+    if (i % 4)
+        fputc ('\n', st);
     }
 return SCPE_OK;
 }           
@@ -1121,11 +1145,13 @@ sprintf (name, "Output queue %d", ln);
 if (entc = com_show_qsumm (st, &com_outq[ln], name)) {
     for (i = 0, next = com_outq[ln].head; next != 0;
          i++, next = com_pkt[next].next) {
-        if ((i % 8) == 0) fprintf (st, "%d:\t", i);
+        if ((i % 8) == 0)
+            fprintf (st, "%d:\t", i);
         com_show_char (st, com_pkt[next].data >> 1);
         fputc ((((i % 8) == 7)? '\n': '\t'), st);
         }
-    if (i % 8) fputc ('\n', st);
+    if (i % 8)
+        fputc ('\n', st);
     }
 return SCPE_OK;
 }
@@ -1141,9 +1167,13 @@ return SCPE_OK;
 
 t_stat com_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (!com_enab) fprintf (st, "Controller is not initialized\n");
-if (val & COMR_FQ) com_show_freeq (st, uptr, 1, desc);
-if (val & COMR_IQ) com_show_inq (st, uptr, 1, desc);
-if (val & COMR_OQ) com_show_aoutq (st, uptr, 1, desc);
+if (!com_enab)
+    fprintf (st, "Controller is not initialized\n");
+if (val & COMR_FQ)
+    com_show_freeq (st, uptr, 1, desc);
+if (val & COMR_IQ)
+    com_show_inq (st, uptr, 1, desc);
+if (val & COMR_OQ)
+    com_show_aoutq (st, uptr, 1, desc);
 return SCPE_OK;
 }

@@ -1,6 +1,6 @@
 /* pdp11_dl.c: PDP-11 multiple terminal interface simulator
 
-   Copyright (c) 1993-2006, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    dli,dlo      DL11 terminal input/output
 
+   19-Nov-2008  RMS     Revised for common TMXR show routines
+                        Revised to autoconfigure vectors
    20-May-2008  RMS     Added modem control support
 */
 
@@ -93,11 +95,7 @@ t_stat dli_svc (UNIT *uptr);
 t_stat dlo_svc (UNIT *uptr);
 t_stat dlx_attach (UNIT *uptr, char *cptr);
 t_stat dlx_detach (UNIT *uptr);
-t_stat dlx_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dlx_show (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat dlx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat dlx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
 void dlx_enbdis (int32 dis);
 void dli_clr_int (int32 ln, uint32 wd);
 void dli_set_int (int32 ln, uint32 wd);
@@ -134,19 +132,20 @@ REG dli_reg[] = {
     };
 
 MTAB dli_mod[] = {
-    { UNIT_ATT, UNIT_ATT, "summary", NULL, NULL, &dlx_summ },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
       &tmxr_dscln, NULL, &dlx_desc },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &dlx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &dlx_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dlx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &dlx_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &dlx_desc },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      &set_vec, &dlx_show_vec, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "lines", "LINES",
-      &dlx_set_lines, &dlx_show_lines },
+    { MTAB_XTD|MTAB_VDV, 1, "VECTOR", NULL,
+      &set_vec, &show_vec_mux, (void *) &dlx_desc },
+    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+      &dlx_set_lines, &tmxr_show_lines, (void *) &dlx_desc },
     { 0 }
     };
 
@@ -155,7 +154,7 @@ DEVICE dli_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, &dlx_attach, &dlx_detach,
-    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dli_dib, DEV_FLTA | DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* DLO data structures
@@ -258,7 +257,8 @@ TMLN *lp = &dlx_ldsc[ln];
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
     case 00:                                            /* tti csr */
-        if (PA & 1) return SCPE_OK;                     /* odd byte RO */
+        if (PA & 1)                                     /* odd byte RO */
+            return SCPE_OK;
         if ((data & CSR_IE) == 0)
             dli_clr_int (ln, DLI_RCI);
         else if ((dli_csr[ln] & (CSR_DONE + CSR_IE)) == CSR_DONE)
@@ -298,7 +298,8 @@ switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
         return SCPE_OK;
 
     case 02:                                            /* tto csr */
-        if (PA & 1) return SCPE_OK;
+        if (PA & 1)
+            return SCPE_OK;
         if ((data & CSR_IE) == 0)
             dlo_clr_int (ln);
         else if ((dlo_csr[ln] & (CSR_DONE + CSR_IE)) == CSR_DONE)
@@ -324,7 +325,8 @@ t_stat dli_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
 sim_activate (uptr, tmxr_poll);                         /* continue poll */
 ln = tmxr_poll_conn (&dlx_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? rcv enb */
@@ -376,7 +378,8 @@ if (dlx_ldsc[ln].conn) {                                /* connected? */
     if (dlx_ldsc[ln].xmte) {                            /* tx enabled? */
         TMLN *lp = &dlx_ldsc[ln];                       /* get line */
         c = sim_tt_outcvt (dlo_buf[ln], TT_GET_MODE (dlo_unit[ln].flags));
-        if (c >= 0) tmxr_putc_ln (lp, c);               /* output char */
+        if (c >= 0)                                     /* output char */
+            tmxr_putc_ln (lp, c);
         tmxr_poll_tx (&dlx_desc);                       /* poll xmt */
         }
     else {
@@ -426,7 +429,8 @@ return 0;
 void dlo_clr_int (int32 ln)
 {
 dlo_ireq &= ~(1 << ln);                                 /* clr xmit int */
-if (dlo_ireq == 0) CLR_INT (DLO);                       /* all clr? */
+if (dlo_ireq == 0)                                      /* all clr? */
+    CLR_INT (DLO);
 else SET_INT (DLO);                                     /* no, set intr */
 return;
 }
@@ -490,7 +494,8 @@ t_stat dlx_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = tmxr_attach (&dlx_desc, uptr, cptr);                /* attach */
-if (r != SCPE_OK) return r;                             /* error */
+if (r != SCPE_OK)                                       /* error */
+    return r;
 sim_activate (uptr, tmxr_poll);                         /* start poll */
 return SCPE_OK;
 }
@@ -509,43 +514,12 @@ sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
 
-/* Show summary processor */
-
-t_stat dlx_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < DLX_LINES; i++) t = t + (dlx_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat dlx_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < DLX_LINES; i++) t = t + (dlx_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < DLX_LINES; i++) {
-        if (dlx_ldsc[i].conn) { 
-            if (val) tmxr_fconns (st, &dlx_ldsc[i], i);
-            else tmxr_fstats (st, &dlx_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
-return SCPE_OK;
-}
-
 /* Enable/disable device */
 
 void dlx_enbdis (int32 dis)
 {
 if (dis) {
-    dli_dev.flags = dlo_dev.flags | DEV_DIS;
+    dli_dev.flags = dli_dev.flags | DEV_DIS;
     dlo_dev.flags = dlo_dev.flags | DEV_DIS;
     }
 else {
@@ -555,13 +529,6 @@ else {
 return;
 }
 
-/* SHOW VECTOR processor */
-
-t_stat dlx_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-return show_vec (st, uptr, dlx_desc.lines * 2, desc);
-}
-
 /* Change number of lines */
 
 t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -569,12 +536,16 @@ t_stat dlx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 newln, i, t;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newln = get_uint (cptr, 10, DLX_LINES, &r);
-if ((r != SCPE_OK) || (newln == dlx_desc.lines)) return r;
-if (newln == 0) return SCPE_ARG;
+if ((r != SCPE_OK) || (newln == dlx_desc.lines))
+    return r;
+if (newln == 0)
+    return SCPE_ARG;
 if (newln < dlx_desc.lines) {
-    for (i = newln, t = 0; i < dlx_desc.lines; i++) t = t | dlx_ldsc[i].conn;
+    for (i = newln, t = 0; i < dlx_desc.lines; i++)
+        t = t | dlx_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
         return SCPE_OK;
     for (i = newln; i < dlx_desc.lines; i++) {
@@ -595,12 +566,4 @@ else {
 dlx_desc.lines = newln;
 dli_dib.lnt = newln * 010;                             /* upd IO page lnt */
 return auto_config (dli_dev.name, newln);              /* auto config */
-}
-
-/* Show number of lines */
-
-t_stat dlx_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-fprintf (st, "lines=%d", dlx_desc.lines);
-return SCPE_OK;
 }

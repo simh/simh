@@ -1,6 +1,6 @@
 /* id_mt.c: Interdata magnetic tape simulator
 
-   Copyright (c) 2001-2006, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -186,7 +186,8 @@ switch (op) {                                           /* case IO op */
         return BY;                                      /* byte only */
 
     case IO_RD:                                         /* read data */
-        if (mt_xfr) mt_sta = mt_sta | STA_BSY;          /* xfr? set busy */
+        if (mt_xfr)                                     /* xfr? set busy */
+            mt_sta = mt_sta | STA_BSY;
         return mt_db;                                   /* return data */
 
     case IO_WD:                                         /* write data */
@@ -204,7 +205,8 @@ switch (op) {                                           /* case IO op */
         if (uptr->flags & UNIT_ATT)                     /* attached? */
             t = mt_sta | (uptr->UST & STA_UFLGS);       /* yes, unit status */
         else t = mt_sta | STA_DU;                       /* no, dev unavail */
-        if (t & SET_EX) t = t | STA_EX;                 /* test for ex */
+        if (t & SET_EX)                                 /* test for ex */
+            t = t | STA_EX;
         return t;
 
     case IO_OC:                                         /* command */
@@ -217,7 +219,8 @@ switch (op) {                                           /* case IO op */
         if (((uptr->flags & UNIT_ATT) == 0) ||          /* ignore if unatt */
             bad_cmd[f] ||                               /* or bad cmd */
            (((f == MTC_WR) || (f == MTC_WEOF)) &&       /* or write */
-            sim_tape_wrp (uptr))) break;                /* and protected */
+            sim_tape_wrp (uptr)))                       /* and protected */
+            break;
         for (i = 0; i < MT_NUMDR; i++) {                /* check other drvs */
             if (sim_is_active (&mt_unit[i]) &&          /* active? */
                 (mt_unit[i].UCMD != MTC_REW)) {         /* not rewind? */
@@ -228,7 +231,8 @@ switch (op) {                                           /* case IO op */
         if (sim_is_active (uptr) &&                     /* unit active? */
            !(uptr->UCMD & (MTC_STOP1 | MTC_STOP2)))     /* not stopping? */
             break;                                      /* ignore */
-        if ((f == MTC_WR) || (f == MTC_REW)) mt_sta = 0;/* write, rew: bsy=0 */
+        if ((f == MTC_WR) || (f == MTC_REW))            /* write, rew: bsy=0 */
+            mt_sta = 0;
         else mt_sta = STA_BSY;                          /* bsy=1,nmtn,eom,err=0 */
         mt_bptr = mt_blnt = 0;                          /* not yet started */
         if ((f == MTC_RD) || (f == MTC_WR))             /* data xfr? */
@@ -271,7 +275,8 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     uptr->UST = 0;                                      /* set status */
     mt_xfr = 0;                                         /* clr op flags */
     mt_sta = STA_ERR | STA_EOM;                         /* set status */
-    if (mt_arm[u]) SET_INT (v_MT + u);                  /* interrupt */
+    if (mt_arm[u])                                      /* interrupt */
+        SET_INT (v_MT + u);
     return IORETURN (mt_stopioe, SCPE_UNATT);
     }
 
@@ -279,14 +284,16 @@ if (uptr->UCMD & MTC_STOP2) {                           /* stop, gen NMTN? */
     uptr->UCMD = 0;                                     /* clr cmd */
     uptr->UST = uptr->UST | STA_NMTN;                   /* set nmtn */
     mt_xfr = 0;                                         /* clr xfr */
-    if (mt_arm[u]) SET_INT (v_MT + u);                  /* set intr */
+    if (mt_arm[u])                                      /* set intr */
+        SET_INT (v_MT + u);
     return SCPE_OK;
     }
 
 if (uptr->UCMD & MTC_STOP1) {                           /* stop, gen EOM? */
     uptr->UCMD = uptr->UCMD | MTC_STOP2;                /* clr cmd */
     mt_sta = (mt_sta & ~STA_BSY) | STA_EOM;             /* clr busy, set eom */
-    if (mt_arm[u]) SET_INT (v_MT + u);                  /* set intr */
+    if (mt_arm[u])                                      /* set intr */
+        SET_INT (v_MT + u);
     sim_activate (uptr, mt_rtime);                      /* schedule */
     return SCPE_OK;
     }
@@ -299,7 +306,8 @@ switch (uptr->UCMD) {                                   /* case on function */
         uptr->UCMD = 0;                                 /* clr cmd */
         uptr->UST = STA_NMTN | STA_EOT;                 /* update status */
         mt_sta = mt_sta & ~STA_BSY;                     /* don't set EOM */
-        if (mt_arm[u]) SET_INT (v_MT + u);              /* interrupt */
+        if (mt_arm[u])                                  /* interrupt */
+            SET_INT (v_MT + u);
         return SCPE_OK;
 
 /* For read, busy = 1 => buffer empty
@@ -313,7 +321,8 @@ switch (uptr->UCMD) {                                   /* case on function */
     case MTC_RD:                                        /* read */
         if (mt_blnt == 0) {                             /* first time? */
             st = sim_tape_rdrecf (uptr, mtxb, &tbc, MT_MAXFR); /* read rec */
-            if (st == MTSE_RECE) mt_sta = mt_sta | STA_ERR;    /* rec in err? */
+            if (st == MTSE_RECE)                        /* rec in err? */
+                mt_sta = mt_sta | STA_ERR;
             else if (st != SCPE_OK) {                   /* other error? */
                 r = mt_map_err (uptr, st);              /* map error */
                 if (sch_actv (mt_dib.sch, dev))         /* if sch, stop */
@@ -335,7 +344,8 @@ switch (uptr->UCMD) {                                   /* case on function */
                 mt_sta = mt_sta | STA_ERR;              /* read overrun */
             mt_db = mtxb[mt_bptr++];                    /* get next byte */
             mt_sta = mt_sta & ~STA_BSY;                 /* !busy = buf full */
-            if (mt_arm[u]) SET_INT (v_MT + u);          /* set intr */
+            if (mt_arm[u])                              /* set intr */
+                SET_INT (v_MT + u);
             sim_activate (uptr, mt_wtime);              /* reschedule */
             return SCPE_OK;
             }
@@ -351,7 +361,8 @@ switch (uptr->UCMD) {                                   /* case on function */
             if (mt_bptr < MT_MAXFR)                     /* if room */
                 mtxb[mt_bptr++] = mt_db;                /* store in buf */
             mt_sta = mt_sta & ~STA_BSY;                 /* !busy = buf emp */
-            if (mt_arm[u]) SET_INT (v_MT + u);          /* set intr */
+            if (mt_arm[u])                              /* set intr */
+                SET_INT (v_MT + u);
             sim_activate (uptr, mt_wtime);              /* reschedule */
             return SCPE_OK;
             }
@@ -366,14 +377,16 @@ switch (uptr->UCMD) {                                   /* case on function */
         if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         mt_sta = mt_sta | STA_EOF;                      /* set eof */
-        if (mt_arm[u]) SET_INT (v_MT + u);              /* interrupt */
+        if (mt_arm[u])                                  /* set intr */
+            SET_INT (v_MT + u);
         break;
 
     case MTC_SKFF:                                      /* skip file fwd */
         while ((st = sim_tape_sprecf (uptr, &tbc)) == MTSE_OK) ;
         if (st == MTSE_TMK) {                           /* stopped by tmk? */
             mt_sta = mt_sta | STA_EOF;                  /* set eof */
-            if (mt_arm[u]) SET_INT (v_MT + u);          /* set intr */
+            if (mt_arm[u])                              /* set intr */
+                SET_INT (v_MT + u);
             }
         else r = mt_map_err (uptr, st);                 /* map error */
         break;
@@ -382,7 +395,8 @@ switch (uptr->UCMD) {                                   /* case on function */
         while ((st = sim_tape_sprecr (uptr, &tbc)) == MTSE_OK) ;
         if (st == MTSE_TMK) {                           /* stopped by tmk? */
             mt_sta = mt_sta | STA_EOF;                  /* set eof */
-            if (mt_arm[u]) SET_INT (v_MT + u);          /* set intr */
+            if (mt_arm[u])                              /* set intr */
+                SET_INT (v_MT + u);
             }
         else r = mt_map_err (uptr, st);                 /* map error */
         break;
@@ -416,12 +430,14 @@ switch (st) {
 
     case MTSE_TMK:                                      /* end of file */
         mt_sta = mt_sta | STA_EOF;                      /* set eof */
-        if (mt_arm[u]) SET_INT (v_MT + u);              /* set intr */
+        if (mt_arm[u])                                  /* set intr */
+            SET_INT (v_MT + u);
         break;
 
     case MTSE_IOERR:                                    /* IO error */
         mt_sta = mt_sta | STA_ERR;                      /* set err */
-        if (mt_stopioe) return SCPE_IOERR;
+        if (mt_stopioe)
+            return SCPE_IOERR;
         break;
 
     case MTSE_INVRL:                                    /* invalid rec lnt */
@@ -473,9 +489,11 @@ int32 u = uptr - mt_dev.units;
 t_stat r;
 
 r = sim_tape_attach (uptr, cptr);
-if (r != SCPE_OK) return r;
+if (r != SCPE_OK)
+    return r;
 uptr->UST = STA_EOT;
-if (mt_arm[u]) SET_INT (v_MT + u);
+if (mt_arm[u])
+    SET_INT (v_MT + u);
 return r;
 }
 
@@ -486,10 +504,13 @@ t_stat mt_detach (UNIT* uptr)
 int32 u = uptr - mt_dev.units;
 t_stat r;
 
-if (!(uptr->flags & UNIT_ATT)) return SCPE_OK;
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_OK;
 r = sim_tape_detach (uptr);
-if (r != SCPE_OK) return r;
-if (mt_arm[u]) SET_INT (v_MT + u);
+if (r != SCPE_OK)
+    return r;
+if (mt_arm[u])
+    SET_INT (v_MT + u);
 uptr->UST = 0;
 return SCPE_OK;
 }
@@ -511,7 +532,8 @@ extern uint16 decrom[];
 extern DIB sch_dib;
 uint32 sch_dev;
 
-if (decrom[0xD5] & dec_flgs) return SCPE_NOFNC;         /* AL defined? */
+if (decrom[0xD5] & dec_flgs)                            /* AL defined? */
+    return SCPE_NOFNC;
 sim_tape_rewind (&mt_unit[unitno]);                     /* rewind */
 sch_dev = sch_dib.dno + mt_dib.sch;                     /* sch dev # */
 IOWriteBlk (BOOT_START, BOOT_LEN, boot_rom);            /* copy boot */

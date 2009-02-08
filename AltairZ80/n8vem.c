@@ -1,6 +1,6 @@
 /*************************************************************************
  *                                                                       *
- * $Id: n8vem.c 1902 2008-05-11 02:40:41Z hharte $                       *
+ * $Id: n8vem.c 1995 2008-07-15 03:59:13Z hharte $                       *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
  * http://www.hartetec.com                                               *
@@ -54,17 +54,16 @@
 #define DBG_PRINT(args)
 #endif
 
-#define PIO_MSG     0x01
-#define UART_MSG    0x02
-#define RTC_MSG     0x04
-#define MPCL_MSG    0x08
-#define ROM_MSG     0x10
-#define TRACE_MSG   0x80
+/* Debug flags */
+#define ERROR_MSG   (1 << 0)
+#define PIO_MSG     (1 << 1)
+#define UART_MSG    (1 << 2)
+#define RTC_MSG     (1 << 3)
+#define MPCL_MSG    (1 << 4)
+#define ROM_MSG     (1 << 5)
+#define VERBOSE_MSG (1 << 7)
 
 #define N8VEM_MAX_DRIVES    2
-
-#define UNIT_V_N8VEM_VERBOSE     (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
-#define UNIT_N8VEM_VERBOSE       (1 << UNIT_V_N8VEM_VERBOSE)
 
 typedef struct {
     PNP_INFO    pnp;    /* Plug and Play */
@@ -101,7 +100,6 @@ static uint8 N8VEM_Write(const uint32 Addr, uint8 cData);
 static int32 n8vemdev(const int32 port, const int32 io, const int32 data);
 static int32 n8vem_mem(const int32 port, const int32 io, const int32 data);
 
-static int32 trace_level    = 0x00;     /* Disable all tracing by default */
 static int32 save_rom       = 0x00;     /* When set to 1, saves ROM back to file on disk at detach time */
 static int32 save_ram       = 0x00;     /* When set to 1, saves RAM back to file on disk at detach time */
 static int32 n8vem_pio1a    = 0x00;     /* 8255 PIO1A IN Port */
@@ -123,7 +121,6 @@ static UNIT n8vem_unit[] = {
 };
 
 static REG n8vem_reg[] = {
-    { HRDATA (TRACELEVEL,   trace_level,           16), },
     { HRDATA (SAVEROM,      save_rom,               1), },
     { HRDATA (SAVERAM,      save_ram,               1), },
     { HRDATA (PIO1A,        n8vem_pio1a,            8), },
@@ -136,11 +133,22 @@ static REG n8vem_reg[] = {
 static MTAB n8vem_mod[] = {
     { MTAB_XTD|MTAB_VDV,    0,                  "MEMBASE",  "MEMBASE",  &set_membase, &show_membase, NULL },
     { MTAB_XTD|MTAB_VDV,    0,                  "IOBASE",   "IOBASE",   &set_iobase, &show_iobase, NULL },
-    /* quiet, no warning messages       */
-    { UNIT_N8VEM_VERBOSE, 0,                    "QUIET",    "QUIET",    NULL },
-    /* verbose, show warning messages   */
-    { UNIT_N8VEM_VERBOSE, UNIT_N8VEM_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
     { 0 }
+};
+
+#define TRACE_PRINT(level, args)    if(n8vem_dev.dctrl & level) {   \
+                                       printf args;                 \
+                                    }
+
+/* Debug Flags */
+static DEBTAB n8vem_dt[] = {
+    { "ERROR",  ERROR_MSG },
+    { "PIO",    PIO_MSG },
+    { "UART",   UART_MSG },
+    { "RTC",    RTC_MSG },
+    { "ROM",    ROM_MSG },
+    { "VERBOSE",VERBOSE_MSG },
+    { NULL,     0 }
 };
 
 DEVICE n8vem_dev = {
@@ -148,8 +156,8 @@ DEVICE n8vem_dev = {
     N8VEM_MAX_DRIVES, 10, 31, 1, N8VEM_MAX_DRIVES, N8VEM_MAX_DRIVES,
     NULL, NULL, &n8vem_reset,
     &n8vem_boot, &n8vem_attach, &n8vem_detach,
-    &n8vem_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    &n8vem_info_data, (DEV_DISABLE | DEV_DIS | DEV_DEBUG), ERROR_MSG,
+    n8vem_dt, NULL, "Single-Board Computer N8VEM"
 };
 
 /* Reset routine */
@@ -157,7 +165,7 @@ static t_stat n8vem_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    TRACE_PRINT(TRACE_MSG, ("N8VEM: Reset." NLP));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reset." NLP));
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &n8vemdev, TRUE);
@@ -188,7 +196,7 @@ static t_stat n8vem_reset(DEVICE *dptr)
 
 static t_stat n8vem_boot(int32 unitno, DEVICE *dptr)
 {
-    TRACE_PRINT(TRACE_MSG, ("N8VEM: Boot." NLP));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Boot." NLP));
 
     /* Clear the RAM and ROM mapping registers */
     n8vem_info->mpcl_ram = 0;
@@ -218,7 +226,7 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
     /* Determine length of this disk */
     uptr->capac = sim_fsize(uptr->fileref);
 
-    TRACE_PRINT(TRACE_MSG, ("N8VEM: Attach %s." NLP, i == 0 ? "ROM" : "RAM"));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Attach %s." NLP, i == 0 ? "ROM" : "RAM"));
 
     if(i == 0) { /* Attaching ROM */
         n8vem_info->rom_attached = TRUE;
@@ -228,9 +236,10 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
 
         if(uptr->capac > 0) {
             /* Only read in enough of the file to fill the ROM. */
-            if(uptr->capac > N8VEM_ROM_SIZE) uptr->capac = N8VEM_ROM_SIZE;
+            if (uptr->capac > N8VEM_ROM_SIZE)
+                uptr->capac = N8VEM_ROM_SIZE;
 
-            printf("Reading %d bytes into ROM.\n", uptr->capac);
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into ROM.\n", uptr->capac));
             fread((void *)(n8vem_info->rom), uptr->capac, 1, uptr->fileref);
         }
     } else { /* attaching RAM */
@@ -239,9 +248,10 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
 
         if(uptr->capac > 0) {
             /* Only read in enough of the file to fill the RAM. */
-            if(uptr->capac > N8VEM_RAM_SIZE) uptr->capac = N8VEM_RAM_SIZE;
+            if(uptr->capac > N8VEM_RAM_SIZE)
+                uptr->capac = N8VEM_RAM_SIZE;
 
-            printf("Reading %d bytes into RAM.\n", uptr->capac);
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into RAM.\n", uptr->capac));
             fread((void *)(n8vem_info->ram), uptr->capac, 1, uptr->fileref);
         }
     }
@@ -260,21 +270,21 @@ static t_stat n8vem_detach(UNIT *uptr)
         return (SCPE_IERR);
     }
 
-    TRACE_PRINT(TRACE_MSG, ("N8VEM: Detach %s." NLP, i == 0 ? "ROM" : "RAM"));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Detach %s." NLP, i == 0 ? "ROM" : "RAM"));
 
     /* rewind to the beginning of the file. */
-    fseek(uptr->fileref, 0, SEEK_SET);
+    sim_fseek(uptr->fileref, 0, SEEK_SET);
 
     if(i == 0) { /* ROM */
         /* Save the ROM back to disk if SAVEROM is set. */
         if(save_rom == 1) {
-            printf("Writing %d bytes into ROM image.\n", N8VEM_ROM_SIZE);
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Writing %d bytes into ROM image.\n", N8VEM_ROM_SIZE));
             fwrite((void *)(n8vem_info->rom), N8VEM_ROM_SIZE, 1, uptr->fileref);
         }
     } else { /* RAM */
         /* Save the RAM back to disk if SAVERAM is set. */
         if(save_ram == 1) {
-            printf("Writing %d bytes into RAM image.\n", N8VEM_RAM_SIZE);
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Writing %d bytes into RAM image.\n", N8VEM_RAM_SIZE));
             fwrite((void *)(n8vem_info->ram), N8VEM_RAM_SIZE, 1, uptr->fileref);
         }
     }
@@ -419,7 +429,7 @@ static uint8 N8VEM_Read(const uint32 Addr)
             TRACE_PRINT(MPCL_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: MPCL_ROM not Implemented." NLP, PCX));
             break;
         default:
-            TRACE_PRINT(TRACE_MSG, ("N8VEM: " ADDRESS_FORMAT " RD[%02x]: not Implemented." NLP, PCX, Addr));
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: " ADDRESS_FORMAT " RD[%02x]: not Implemented." NLP, PCX, Addr));
             break;
     }
 
@@ -477,7 +487,7 @@ static uint8 N8VEM_Write(const uint32 Addr, uint8 cData)
             n8vem_info->mpcl_rom = cData;
             break;
         default:
-            TRACE_PRINT(TRACE_MSG, ("N8VEM: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented." NLP, PCX, Addr, cData));
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented." NLP, PCX, Addr, cData));
             break;
     }
 

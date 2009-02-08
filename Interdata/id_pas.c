@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2007, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Oct-06    RMS     Synced PASLA to clock
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -111,8 +112,6 @@ t_stat paso_svc (UNIT *uptr);
 t_stat pas_reset (DEVICE *dptr);
 t_stat pas_attach (UNIT *uptr, char *cptr);
 t_stat pas_detach (UNIT *uptr);
-t_stat pas_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
-t_stat pas_show (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 pas_par (int32 cmd, int32 c);
 t_stat pas_vlines (UNIT *uptr, int32 val, char *cptr, void *desc);
 void pas_reset_ln (int32 i);
@@ -129,8 +128,6 @@ DIB pas_dib = { d_PAS, -1, v_PAS, pas_tplte, &pas, &pas_ini };
 
 UNIT pas_unit = { UDATA (&pasi_svc, UNIT_ATTABLE|UNIT_IDLE, 0), 0 };
 
-REG pas_nlreg = { DRDATA (NLINES, PAS_ENAB, 6), PV_LEFT };
-
 REG pas_reg[] = {
     { BRDATA (STA, pas_sta, 16, 8, PAS_LINES) },
     { BRDATA (CMD, pas_cmd, 16, 16, PAS_LINES) },
@@ -146,17 +143,18 @@ REG pas_reg[] = {
     };
 
 MTAB pas_mod[] = {
-    { MTAB_XTD | MTAB_VDV | MTAB_VAL, 0, "lines", "LINES",
-      &pas_vlines, NULL, &pas_nlreg },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &pas_desc },
-    { UNIT_ATT, UNIT_ATT, "connections", NULL, NULL, &pas_summ },
+      &tmxr_dscln, NULL, (void *) &pas_desc },
+    { UNIT_ATT, UNIT_ATT, "summary", NULL,
+      NULL, &tmxr_show_summ, (void *) &pas_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &pas_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &pas_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &pas_show, NULL },
+      NULL, &tmxr_show_cstat, (void *) &pas_desc },
     { MTAB_XTD|MTAB_VDV, 0, "DEVNO", "DEVNO",
       &set_dev, &show_dev, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
+      &pas_vlines, &tmxr_show_lines, (void *) &pas_desc },
     { 0 }
     };
 
@@ -273,10 +271,12 @@ switch (op) {                                           /* case IO op */
             }
         else {
             t = pas_sta[ln] & STA_RCV;                  /* get static */
-            if (!pas_rchp[ln]) t = t | STA_BSY;         /* no char? busy */
+            if (!pas_rchp[ln])                          /* no char? busy */
+                t = t | STA_BSY;
             if (pas_ldsc[ln].conn == 0)                 /* not connected? */
                 t = t | STA_BSY | STA_EX;               /* = !dsr */
-            if (t & SET_EX) t = t | STA_EX;             /* test for ex */
+            if (t & SET_EX)                             /* test for ex */
+                t = t | STA_EX;
             }
         return t;
 
@@ -296,7 +296,8 @@ switch (op) {                                           /* case IO op */
                 tmxr_linemsg (&pas_ldsc[ln], "\r\nLine hangup\r\n");
                 tmxr_reset_ln (&pas_ldsc[ln]);          /* reset line */
                 pas_sta[ln] = pas_sta[ln] | STA_CROF;   /* no carrier */
-                if (pas_rarm[ln]) SET_INT (v_PAS + ln + ln);
+                if (pas_rarm[ln])
+                    SET_INT (v_PAS + ln + ln);
                 }
             }
         break;
@@ -315,7 +316,8 @@ t_stat pasi_svc (UNIT *uptr)
 {
 int32 ln, c, out;
 
-if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;      /* attached? */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
 sim_activate (uptr, lfc_poll);                          /* continue poll */
 ln = tmxr_poll_conn (&pas_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
@@ -323,7 +325,8 @@ if (ln >= 0) {                                          /* got one? */
         ((pas_cmd[ln] & CMD_DTR) == 0))                 /* & !dtr? */
         pas_sta[ln] = pas_sta[ln] | STA_RING | STA_CROF; /* set ring, no cd */
     else pas_sta[ln] = pas_sta[ln] & ~STA_CROF;         /* just answer */
-    if (pas_rarm[ln]) SET_INT (v_PAS + ln + ln);        /* interrupt */
+    if (pas_rarm[ln])                                   /* interrupt */
+        SET_INT (v_PAS + ln + ln);
     pas_ldsc[ln].rcve = 1;                              /* rcv enabled */ 
     }
 tmxr_poll_rx (&pas_desc);                               /* poll for input */
@@ -331,8 +334,10 @@ for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
     if (pas_ldsc[ln].conn) {                            /* connected? */
         if (c = tmxr_getc_ln (&pas_ldsc[ln])) {         /* any char? */
             pas_sta[ln] = pas_sta[ln] & ~(STA_FR | STA_PF);
-            if (pas_rchp[ln]) pas_sta[ln] = pas_sta[ln] | STA_OVR;
-            if (pas_rarm[ln]) SET_INT (v_PAS + ln + ln);
+            if (pas_rchp[ln])
+                pas_sta[ln] = pas_sta[ln] | STA_OVR;
+            if (pas_rarm[ln])
+                SET_INT (v_PAS + ln + ln);
             if (c & SCPE_BREAK) {                       /* break? */
                 pas_sta[ln] = pas_sta[ln] | STA_FR;     /* framing error */
                 pas_rbuf[ln] = 0;                       /* no character */
@@ -347,7 +352,8 @@ for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
                 if ((pas_cmd[ln] & CMD_ECHO) && pas_ldsc[ln].xmte) {
                     TMLN *lp = &pas_ldsc[ln];           /* get line */
                     out = sim_tt_outcvt (out, TT_GET_MODE (pasl_unit[ln].flags));
-                    if (out >= 0) tmxr_putc_ln (lp, out); /* output char */
+                    if (out >= 0)                       /* output char */
+                        tmxr_putc_ln (lp, out);
                     tmxr_poll_tx (&pas_desc);           /* poll xmt */
                     }
                 }                                       /* end else normal */
@@ -355,7 +361,8 @@ for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
         }                                               /* end if conn */
     else if ((pas_sta[ln] & STA_CROF) == 0) {           /* not conn, was conn? */
         pas_sta[ln] = pas_sta[ln] | STA_CROF;           /* no carrier */
-        if (pas_rarm[ln]) SET_INT (v_PAS + ln + ln);    /* intr */
+        if (pas_rarm[ln])                               /* intr */
+            SET_INT (v_PAS + ln + ln);
         }
     }                                                   /* end for */
 return SCPE_OK;
@@ -386,7 +393,8 @@ if (pas_ldsc[ln].conn) {                                /* connected? */
         }
     }
 pas_sta[ln] = pas_sta[ln] & ~STA_BSY;                   /* not busy */
-if (pas_xarm[ln]) SET_INT (v_PASX + ln + ln);           /* set intr */
+if (pas_xarm[ln])                                       /* set intr */
+    SET_INT (v_PASX + ln + ln);
 return SCPE_OK;
 }
 
@@ -461,7 +469,8 @@ else {
 if (pas_unit.flags & UNIT_ATT)                          /* master att? */
     sim_activate_abs (&pas_unit, lfc_poll);             /* cosched with clock */
 else sim_cancel (&pas_unit);                            /* else stop */
-for (i = 0; i < PAS_LINES; i++) pas_reset_ln (i);
+for (i = 0; i < PAS_LINES; i++)
+    pas_reset_ln (i);
 return SCPE_OK;
 }
 
@@ -472,7 +481,8 @@ t_stat pas_attach (UNIT *uptr, char *cptr)
 t_stat r;
 
 r = tmxr_attach (&pas_desc, uptr, cptr);                /* attach */
-if (r != SCPE_OK) return r;                             /* error */
+if (r != SCPE_OK)                                       /* error */
+    return r;
 sim_activate_abs (uptr, 100);                           /* quick poll */
 return SCPE_OK;
 }
@@ -485,40 +495,10 @@ int32 i;
 t_stat r;
 
 r = tmxr_detach (&pas_desc, uptr);                      /* detach */
-for (i = 0; i < PAS_LINES; i++) pas_ldsc[i].rcve = 0;   /* disable rcv */
+for (i = 0; i < PAS_LINES; i++)                         /* disable rcv */
+    pas_ldsc[i].rcve = 0;
 sim_cancel (uptr);                                      /* stop poll */
 return r;
-}
-
-/* Show summary processor */
-
-t_stat pas_summ (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < PAS_LINES; i++) t = t + (pas_ldsc[i].conn != 0);
-if (t == 1) fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
-return SCPE_OK;
-}
-
-/* SHOW CONN/STAT processor */
-
-t_stat pas_show (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-int32 i, t;
-
-for (i = t = 0; i < PAS_LINES; i++) t = t + (pas_ldsc[i].conn != 0);
-if (t) {
-    for (i = 0; i < PAS_LINES; i++) {
-        if (pas_ldsc[i].conn) {
-            if (val) tmxr_fconns (st, &pas_ldsc[i], i);
-            else tmxr_fstats (st, &pas_ldsc[i], i);
-            }
-        }
-    }
-else fprintf (st, "all disconnected\n");
-return SCPE_OK;
 }
 
 /* Change number of lines */
@@ -528,12 +508,16 @@ t_stat pas_vlines (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 newln, i, t;
 t_stat r;
 
-if (cptr == NULL) return SCPE_ARG;
+if (cptr == NULL)
+    return SCPE_ARG;
 newln = get_uint (cptr, 10, PAS_LINES, &r);
-if ((r != SCPE_OK) || (newln == PAS_ENAB)) return r;
-if (newln == 0) return SCPE_ARG;
+if ((r != SCPE_OK) || (newln == PAS_ENAB))
+    return r;
+if (newln == 0)
+    return SCPE_ARG;
 if (newln < PAS_ENAB) {
-    for (i = newln, t = 0; i < PAS_ENAB; i++) t = t | pas_ldsc[i].conn;
+    for (i = newln, t = 0; i < PAS_ENAB; i++)
+        t = t | pas_ldsc[i].conn;
     if (t && !get_yn ("This will disconnect users; proceed [N]?", FALSE))
         return SCPE_OK;
     for (i = newln; i < PAS_ENAB; i++) {

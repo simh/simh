@@ -1,6 +1,6 @@
 /* i1401_iq.c: IBM 1407 inquiry terminal
 
-   Copyright (c) 1993-2005, Robert M. Supnik
+   Copyright (c) 1993-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -93,33 +93,40 @@ ind[IN_INC] = 0;                                        /* clear inq clear */
 switch (mod) {                                          /* case on mod */
 
     case BCD_R:                                         /* input */
-/*      if (ind[IN_INR] == 0) return SCPE_OK;           /* return if no req */
+/*      if (ind[IN_INR] == 0)                           /* return if no req */
+            return SCPE_OK;
         ind[IN_INR] = 0;                                /* clear req */
         puts_tty ("[Enter]\r\n");                       /* prompt */
         for (i = 0; M[BS] != (BCD_GRPMRK + WM); i++) {  /* until GM + WM */
             while (((t = sim_poll_kbd ()) == SCPE_OK) ||
                     (t & SCPE_BREAK)) {
-                if (stop_cpu) return SCPE_STOP;         /* interrupt? */
+                if (stop_cpu)                           /* interrupt? */
+                    return SCPE_STOP;
                 }
-            if (t < SCPE_KFLAG) return t;               /* if not char, err */
+            if (t < SCPE_KFLAG)                         /* if not char, err */
+                return t;
             t = t & 0177;
-            if ((t == '\r') || (t == '\n')) break;
+            if ((t == '\r') || (t == '\n'))
+                break;
             if (t == inq_char) {                        /* cancel? */
                 ind[IN_INC] = 1;                        /* set indicator */
                 puts_tty ("\r\n[Canceled]\r\n");
                 return SCPE_OK;
                 }
-            if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
+            if (i && ((i % INQ_WIDTH) == 0))
+                puts_tty ("\r\n");
             sim_putchar (t);                            /* echo */
             if (flag == MD_WM) {                        /* word mark mode? */
-                if ((t == '~') && (wm_seen == 0)) wm_seen = WM;
+                if ((t == '~') && (wm_seen == 0))
+                    wm_seen = WM;
                 else {
                     M[BS] = wm_seen | ascii2bcd (t);
                     wm_seen = 0;
                     }
                 }
             else M[BS] = (M[BS] & WM) | ascii2bcd (t);
-            if (!wm_seen) BS++;
+            if (!wm_seen)
+                BS++;
             if (ADDR_ERR (BS)) {
                 BS = BA | (BS % MAXMEMSIZE);
                 return STOP_NXM;
@@ -132,11 +139,14 @@ switch (mod) {                                          /* case on mod */
     case BCD_W:                                         /* output */
         for (i = 0; (t = M[BS++]) != (BCD_GRPMRK + WM); i++) {
             if ((flag == MD_WM) && (t & WM)) {
-                if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
-                if (conv_old) sim_putchar ('~');
+                if (i && ((i % INQ_WIDTH) == 0))
+                    puts_tty ("\r\n");
+                if (conv_old)
+                    sim_putchar ('~');
                 else sim_putchar ('`');
                 }
-            if (i && ((i % INQ_WIDTH) == 0)) puts_tty ("\r\n");
+            if (i && ((i % INQ_WIDTH) == 0))
+                puts_tty ("\r\n");
             sim_putchar (bcd2ascii (t & CHAR, use_h));
             if (ADDR_ERR (BS)) {
                 BS = BA | (BS % MAXMEMSIZE);
@@ -160,8 +170,10 @@ t_stat inq_svc (UNIT *uptr)
 int32 temp;
 
 sim_activate (&inq_unit, inq_unit.wait);                /* continue poll */
-if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) return temp; /* no char or error? */
-if ((temp & 0177) == inq_char) ind[IN_INR] = 1;         /* set indicator */
+if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
+    return temp;
+if ((temp & 0177) == inq_char)                          /* set indicator */
+    ind[IN_INR] = 1;
 return SCPE_OK;
 }
 
@@ -169,8 +181,10 @@ return SCPE_OK;
 
 void puts_tty (char *cptr)
 {
-if (cptr == NULL) return;
-while (*cptr != 0) sim_putchar (*cptr++);
+if (cptr == NULL)
+    return;
+while (*cptr != 0)
+    sim_putchar (*cptr++);
 return;
 }
 

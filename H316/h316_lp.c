@@ -1,6 +1,6 @@
 /* h316_lp.c: Honeywell 316/516 line printer
 
-   Copyright (c) 1999-2007, Robert M. Supnik
+   Copyright (c) 1999-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -161,11 +161,13 @@ switch (inst) {                                         /* case on opcode */
             lpt_prdn = 0;                               /* clear pr done */
             lpt_wdpos = 0;                              /* init scan pos */
             lpt_eor = 0;
-            if (ch >= 0) lpt_dma = 1;                   /* try for DMA/DMC */
+            if (ch >= 0)                                /* try for DMA/DMC */
+                lpt_dma = 1;
             else lpt_dma = 0;
             if (!sim_is_active (&lpt_unit)) {
                 lpt_rdy = 1;
-                if (lpt_dma) SET_CH_REQ (ch);
+                if (lpt_dma)
+                    SET_CH_REQ (ch);
                 }
             CLR_INT (INT_LPT);                          /* clear int */
             break;
@@ -175,7 +177,8 @@ switch (inst) {                                         /* case on opcode */
             lpt_wdpos = 0;                              /* init scan pos */
             lpt_eor = 0;
             lpt_dma = 0;                                /* IO bus */
-            if (!sim_is_active (&lpt_unit)) lpt_rdy = 1;
+            if (!sim_is_active (&lpt_unit))
+                lpt_rdy = 1;
             CLR_INT (INT_LPT);                          /* clear int */
             break;
 
@@ -188,43 +191,53 @@ switch (inst) {                                         /* case on opcode */
         switch (fnc) {                                  /* case on fnc */
 
         case 000:                                       /* if xfer rdy */
-            if (lpt_rdy) return IOSKIP (dat);
+            if (lpt_rdy)
+                return IOSKIP (dat);
             break;
 
         case 002:                                       /* if !alarm */
-            if (lpt_unit.flags & UNIT_ATT) return IOSKIP (dat);
+            if (lpt_unit.flags & UNIT_ATT)
+                return IOSKIP (dat);
             break;
 
         case 003:                                       /* if odd col */
-            if (lpt_crpos) return IOSKIP (dat);
+            if (lpt_crpos)
+                return IOSKIP (dat);
             break;
 
         case 004:                                       /* if !interrupt */
-            if (!TST_INTREQ (INT_LPT)) return IOSKIP (dat);
+            if (!TST_INTREQ (INT_LPT))
+                return IOSKIP (dat);
             break;
 
         case 011:                                       /* if line printed */
-            if (lpt_prdn) return IOSKIP (dat);
+            if (lpt_prdn)
+                return IOSKIP (dat);
             break;
 
         case 012:                                       /* if !shuttling */
-            if (!(lpt_svcst & LPT_SVCSH)) return IOSKIP (dat);
+            if (!(lpt_svcst & LPT_SVCSH))
+                return IOSKIP (dat);
             break;
 
         case 013:
-            if (lpt_prdn && !(lpt_svcst & LPT_SVCSH)) return IOSKIP (dat);
+            if (lpt_prdn && !(lpt_svcst & LPT_SVCSH))
+                return IOSKIP (dat);
             break;
 
         case 014:                                       /* if !advancing */
-            if (!(lpt_svcst & LPT_SVCPA)) return IOSKIP (dat);
+            if (!(lpt_svcst & LPT_SVCPA))
+                return IOSKIP (dat);
             break;
 
         case 015:
-            if (lpt_prdn && !(lpt_svcst & LPT_SVCPA)) return IOSKIP (dat);
+            if (lpt_prdn && !(lpt_svcst & LPT_SVCPA))
+                return IOSKIP (dat);
             break;
 
         case 016:
-            if (!(lpt_svcst & (LPT_SVCSH | LPT_SVCPA))) return IOSKIP (dat);
+            if (!(lpt_svcst & (LPT_SVCSH | LPT_SVCPA)))
+                return IOSKIP (dat);
             break;
 
         case 017:
@@ -238,12 +251,14 @@ switch (inst) {                                         /* case on opcode */
         break;
 
     case ioOTA:                                         /* OTA */
-        if (fnc) return IOBADFNC (dat);                 /* only fnc 0 */
+        if (fnc)                                        /* only fnc 0 */
+            return IOBADFNC (dat);
         if (lpt_rdy) {                                  /* xfer ready? */
             lpt_rdy = 0;                                /* clear xfer */
             chr = (dat >> (lpt_crpos? 0: 8)) & 077;     /* get 6b char */
             if (chr == lpt_drpos) {                     /* match drum pos? */
-                if (chr < 040) chr = chr | 0100;
+                if (chr < 040)
+                    chr = chr | 0100;
                 lpt_buf[2 * lpt_wdpos + lpt_crpos] = chr;
                 }
             lpt_wdpos++;                                /* adv scan pos */
@@ -287,24 +302,26 @@ static const char *lpt_cc[] = {
 if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return IORETURN (lpt_stopioe, SCPE_UNATT);
 if (lpt_dma) {                                          /* DMA/DMC? */
-    if (lpt_eor) SET_INT (INT_LPT);                     /* end range? intr */
+    if (lpt_eor)                                        /* end range? intr */
+        SET_INT (INT_LPT);
     else {
         lpt_rdy = 1;                                    /* set ready */
         SET_CH_REQ (ch);                                /* get more data */
         }
     }
 else lpt_rdy = 1;                                       /* IO, continue scan */
-if (lpt_dma && lpt_eor) SET_INT (INT_LPT);              /* end of range? */
 if (lpt_svcst & LPT_SVCSH) {                            /* shuttling? */
     SET_INT (INT_LPT);                                  /* interrupt */
     if (lpt_crpos == 0) {                               /* done shuttling? */
         for (i = LPT_WIDTH - 1; i >= 0; i--)  {         /* backscan for blanks */
-            if (lpt_buf[i] != ' ') break; 
+            if (lpt_buf[i] != ' ')
+                break; 
             }
         lpt_buf[i + 1] = 0;
         fputs (lpt_buf, uptr->fileref);                 /* output buf */
         uptr->pos = ftell (uptr->fileref);              /* update pos */
-        for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = ' '; /* clear buf */
+        for (i = 0; i < LPT_WIDTH; i++)                 /* clear buf */
+            lpt_buf[i] = ' ';
         lpt_prdn = 1;                                   /* print done */
         }
     }
@@ -329,7 +346,8 @@ lpt_rdy = 0;                                            /* not rdy to xfer */
 lpt_prdn = 1;                                           /* printing done */
 lpt_eor = 0;
 lpt_dma = 0;
-for (i = 0; i < LPT_WIDTH; i++) lpt_buf[i] = ' ';       /* clear buffer */
+for (i = 0; i < LPT_WIDTH; i++)                         /* clear buffer */
+    lpt_buf[i] = ' ';
 lpt_buf[LPT_WIDTH] = 0;
 CLR_INT (INT_LPT);                                      /* clear int, enb */
 CLR_ENB (INT_LPT);

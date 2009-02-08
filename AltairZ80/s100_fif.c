@@ -1,4 +1,4 @@
-/*  $Id: s100_fif.c 1773 2008-01-11 05:46:19Z hharte $
+/*  $Id: s100_fif.c 1995 2008-07-15 03:59:13Z hharte $
 
     IMSAI FIF Disk Controller by Ernie Price
 
@@ -53,8 +53,6 @@ extern uint8 GetBYTEWrapper(const uint32 Addr);
 extern void  PutBYTEWrapper(const uint32 Addr, const uint32 Value);
 
 extern uint32 PCX;
-extern char messageBuffer[];
-extern void printMessage(void);
 
 /* global data on status */
 
@@ -112,7 +110,7 @@ DEVICE fif_dev = {
     NULL, NULL, &fif_reset,
     NULL, NULL, NULL,
     &fif_info_data, (DEV_DISABLE | DEV_DIS), 0,
-    NULL, NULL, NULL
+    NULL, NULL, "IMSAI FIF"
 };
 
 static void resetDSKWarningFlags(void) {
@@ -148,7 +146,7 @@ static t_stat fif_reset(DEVICE *dptr)
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
     resetDSKWarningFlags();
-    current_disk    = NUM_OF_DSK;
+    current_disk = NUM_OF_DSK;
 
     if(dptr->flags & DEV_DIS) {
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &fif_io, TRUE);
@@ -216,7 +214,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
     if (current_disk >= NUM_OF_DSK) {
         if (hasVerbose() && (warnDSK11 < warnLevelDSK)) {
             warnDSK11++;
-/*03*/      MESSAGE_2("Attempt disk io on illegal disk %d - ignored.", current_disk + 1);
+/*03*/      printf("FIF%i: " ADDRESS_FORMAT " Attempt disk io on illegal disk %d - ignored." NLP, current_disk, PCX, current_disk);
         }
         return 0;               /* no drive selected - can do nothing */
     }
@@ -224,7 +222,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
     if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
         if ( (current_disk_flags & UNIT_DSK_VERBOSE) && (warnAttached[current_disk] < warnLevelDSK) ) {
             warnAttached[current_disk]++;
-/*02*/MESSAGE_2("Attempt to select unattached DSK%d - ignored.", current_disk);
+/*02*/printf("FIF%i: " ADDRESS_FORMAT " Attempt to select unattached FIF%d - ignored." NLP, current_disk, PCX, current_disk);
         }
         current_disk = NUM_OF_DSK;
         return 2;
@@ -240,7 +238,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
             /*Sleep(250); */
             memset(blanksec, 0, SEC_SZ);
             addr = dsc->track * SPT;
-            fseek(cpx, addr * SEC_SZ, SEEK_SET);
+            sim_fseek(cpx, addr * SEC_SZ, SEEK_SET);
 
             /* write a track worth of sectors */
             for (kt=0; kt < SPT; kt++) {
@@ -250,7 +248,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
 
         case READ_SEC:
             addr = (dsc->track * SPT) + dsc->sector - 1;
-            fseek(cpx, addr * SEC_SZ, SEEK_SET);
+            sim_fseek(cpx, addr * SEC_SZ, SEEK_SET);
             fread(blanksec, 1, SEC_SZ, cpx);
             addr = dsc->addr_l + (dsc->addr_h << 8); /* no assumption on endianness */
             for (kt = 0; kt < SEC_SZ; kt++) {
@@ -260,7 +258,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
 
         case WRITE_SEC:
             addr = (dsc->track * SPT) + dsc->sector - 1;
-            fseek(cpx, addr * SEC_SZ, SEEK_SET);
+            sim_fseek(cpx, addr * SEC_SZ, SEEK_SET);
             addr = dsc->addr_l + (dsc->addr_h << 8); /* no assumption on endianness */
             for (kt = 0; kt < SEC_SZ; kt++) {
                 blanksec[kt] = GetBYTEWrapper(addr++);
@@ -280,7 +278,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
 
 */
 static void getdesc(uint16 addr) {
-    int32 x;
+    uint32 x;
     uint8 *p1 = (uint8*)&mydesc;
 
     for (x = 0; x < sizeof(mydesc); x++) {
@@ -364,9 +362,10 @@ static void xferi(int32 addr, char *dst, int32 lth)
 }
 
 #if !defined (_WIN32)
-static void strupr(char *fn) { /* psco added */
+static void strupr(char *fn) {
     while (*fn) {
-        if (('a' <= *fn) && (*fn <= 'z')) *fn -= 'a' - 'A';
+        if (('a' <= *fn) && (*fn <= 'z'))
+            *fn -= 'a' - 'A';
         fn++;
     }
 }

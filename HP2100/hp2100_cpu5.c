@@ -1,8 +1,8 @@
 /* hp2100_cpu5.c: HP 1000 RTE-6/VM VMA and RTE-IV EMA instructions
 
-   Copyright (c) 2006, J. David Bryan
    Copyright (c) 2007-2008, Holger Veit
-   
+   Copyright (c) 2006-2008, J. David Bryan
+
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
    to deal in the Software without restriction, including without limitation
@@ -26,6 +26,10 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
+   05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
+   30-Jul-08    JDB     Redefined ABORT to pass address, moved def to hp2100_cpu.h
+   26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    01-May-08    HV      Fixed mapping bug in "cpu_ema_emap"
    21-Apr-08    JDB     Added EMA support from Holger
    25-Nov-07    JDB     Added TF fix from Holger
@@ -50,10 +54,6 @@
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 #include "hp2100_cpu1.h"
-
-
-t_stat cpu_rte_vma (uint32 IR, uint32 intrq);               /* RTE-6 VMA */
-t_stat cpu_rte_ema (uint32 IR, uint32 intrq);               /* RTE-IV EMA */
 
 
 /* RTE-6/VM Virtual Memory Area Instructions
@@ -92,17 +92,17 @@ t_stat cpu_rte_ema (uint32 IR, uint32 intrq);               /* RTE-IV EMA */
      .LBPR    105256   Map pointer in P+1
      .LBP     105257   Map pointer in A/B registers
 
-   Notes:
+   Implementation notes:
 
-     1. The opcodes 105243-247 are undocumented and do not appear to be used in
-        any HP software.
+    1. The opcodes 105243-247 are undocumented and do not appear to be used in
+       any HP software.
 
-     2. The opcode list in the CE Handbook incorrectly shows 105246 as ".MYAD -
-        multiply 2 signed integers."  The microcode listing shows that this
-        instruction was deleted, and the opcode is now a NOP.
+    2. The opcode list in the CE Handbook incorrectly shows 105246 as ".MYAD -
+       multiply 2 signed integers."  The microcode listing shows that this
+       instruction was deleted, and the opcode is now a NOP.
 
-     3. RTE-IV EMA and RTE-6 VMA instructions shared the same address space, so
-        a given machine could run one or the other, but not both.
+    3. RTE-IV EMA and RTE-6 VMA instructions shared the same address space, so a
+       given machine could run one or the other, but not both.
 
    Additional references:
     - RTE-6/VM VMA/EMA Microcode Source (92084-18828, revision 3).
@@ -129,23 +129,16 @@ static const uint32 page31  = 0076000;
 static const uint32 ptemiss = 0176000;
 
 /* frequent constants in paging */
-#define SUITMASK 0176000 
+#define SUITMASK 0176000
 #define NILPAGE  0176000
 #define PAGEIDX  0001777
 #define MSEGMASK 0076000
 #define RWPROT   0141777
 
-/* from scp.c */
-extern int32 sim_step;
-extern FILE* sim_log;
-
-/* MP abort handler */
-extern jmp_buf save_env;
-#define ABORT(val) longjmp (save_env, (val))
 
 /* microcode version of resolve(): allows a much higher # of indirection levels. Used for
    instance for LBP microcode diagnostics which will check > 100 levels.
- */ 
+ */
 #define VMA_INDMAX 200
 
 static t_stat vma_resolve (uint32 MA, uint32 *addr, t_bool debug)
@@ -155,7 +148,7 @@ uint32 faultma = MA;
 
 for (i = 0; (i < VMA_INDMAX) && (MA & I_IA); i++) { /* resolve multilevel */
     MA = ReadW (MA & VAMASK);                       /* follow address chain */
-    }   
+    }
 
 if (MA & I_IA) {
     if (debug)
@@ -169,20 +162,20 @@ return SCPE_OK;
 
 /* $LOC
    ASSEMBLER CALLING SEQUENCE:
- 
+
    $MTHK NOP             RETURN ADDRESS OF CALL (REDONE AFTER THIS ROUTINE)
          JSB $LOC
-   .DTAB OCT LGPG#       LOGICAL PAGE # AT WHICH THE NODE TO 
+   .DTAB OCT LGPG#       LOGICAL PAGE # AT WHICH THE NODE TO
   *                      BE MAPPED IN BELONGS  (0-31)
          OCT RELPG       RELATIVE PAGE OFFSET FROM BEGINING
   *                      OF PARTITION OF WHERE THAT NODE RESIDES.
   *                      (0 - 1023)
-         OCT RELBP       RELATIVE PAGE OFFSET FROM BEGINING OF 
+         OCT RELBP       RELATIVE PAGE OFFSET FROM BEGINING OF
   *                      PARTITION OF WHERE BASE PAGE RESIDES
   *                      (0 - 1023)
    CNODE DEF .CNOD       THIS IS THE ADDRESS OF CURRENT PATH # WORD
    .ORD  OCT XXXXX       THIS NODE'S LEAF # (IE PATH #)
-   .NOD# OCT XXXXX       THIS NODE'S ORDINAL # 
+   .NOD# OCT XXXXX       THIS NODE'S ORDINAL #
 */
 
 static t_stat cpu_vma_loc(OPS op,uint32 intrq,t_bool debug)
@@ -195,7 +188,7 @@ if ((mls & 0x8000) == 0) {                          /* this is not an MLS prog! 
     PC = err_PC;
     if (debug)
         fprintf(sim_deb,">>CPU VMA: cpu_vma_loc at P=%06o: not an MLS program\n", PC);
-    if (CTL (PRO)) ABORT (ABORT_PRO);               /* allow an MP abort */
+    if (mp_control) MP_ABORT (eqt+33);              /* allow an MP abort */
     return STOP_HALT;                               /* FATAL error! */
     }
 
@@ -204,7 +197,7 @@ if (pnod == 0) {                                    /* no pages? FATAL! */
     PC = err_PC;
     if (debug)
         fprintf(sim_deb,">>CPU VMA: cpu_vma_loc at P=%06o: no mem resident pages\n", PC);
-    if (CTL (PRO)) ABORT (ABORT_PRO);               /* allow an MP abort */
+    if (mp_control) MP_ABORT (eqt+33);              /* allow an MP abort */
     return STOP_HALT;
     }
 
@@ -216,20 +209,20 @@ lgpg = op[0].word;
 /* lets do some consistency checks, CPU halt if they fail */
 if (lstpg < lgpg || lgpg < fstpg) {                 /* assert LSTPG >= LGPG# >= FSTPG */
     PC = err_PC;
-    if (debug) 
+    if (debug)
         fprintf(sim_deb,
                 ">>CPU VMA: $LOC at P=%06o: failed check LSTPG >= LGPG# >= FSTPG\n",PC);
-    if (CTL (PRO)) ABORT (ABORT_PRO);               /* allow an MP abort */
+    if (mp_control) MP_ABORT (eqt+22);              /* allow an MP abort */
     return STOP_HALT;
     }
 
 relpg = op[1].word;
 if (pnod < relpg || relpg < (rotsz+1)) {            /* assert #PNOD >= RELPG >= ROTSZ+1 */
     PC = err_PC;
-    if (debug) 
+    if (debug)
         fprintf(sim_deb,
                 ">>CPU VMA: $LOC at %06o: failed check #PNOD >= RELPG >= ROTSZ+1\n",PC);
-    if (CTL (PRO)) ABORT (ABORT_PRO);               /* allow an MP abort */
+    if (mp_control) MP_ABORT (eqt+22);              /* allow an MP abort */
     return STOP_HALT;
     }
 
@@ -237,17 +230,17 @@ relbp = op[2].word;
 if (relbp != 0)                                     /* assert RELBP == 0 OR */
     if (pnod < relbp || relbp < (rotsz+1)) {        /* #PNOD >= RELBP >= ROTSZ+1 */
         PC = err_PC;
-        if (debug) 
+        if (debug)
             fprintf(sim_deb,
                     ">>CPU VMA: $LOC at P=%06o: failed check: #PNOD >= RELBP >= ROTSZ+1\n",PC);
-        if (CTL (PRO)) ABORT (ABORT_PRO);           /* allow an MP abort */
+        if (mp_control) MP_ABORT (eqt+22);          /* allow an MP abort */
         return STOP_HALT;
     }
 
 cnt = lstpg - lgpg + 1;                             /* #pages to map */
 pgs = pnod - relpg + 1;                             /* #pages from start node to end of code */
 if (pgs < cnt) cnt = pgs;                           /* ensure minimum, so not to map into EMA */
-    
+
 matloc  = ReadIO(xmata,UMAP);                       /* get MAT $LOC address */
 ptnpg  = ReadIO(matloc+3,SMAP) & 01777;             /* index to start phys pg */
 physpg = ptnpg + relpg;                             /* phys pg # of node */
@@ -267,7 +260,7 @@ while (cnt != 0) {
 
 dms_wmap(32,relbp+ptnpg);                           /* map base page again */
 WriteW(op[3].word,op[4].word);                      /* path# we are going to */
-    
+
 PC = (PC - 8) & DMASK;                              /* adjust PC to return address */
                                                     /* word before the $LOC microinstr. */
 PC = (ReadW(PC) - 1) & DMASK;                       /* but the call has to be rerun, */
@@ -279,8 +272,8 @@ return SCPE_OK;
 }
 
 /* map pte into last page
-   return FALSE if page fault, nil flag in PTE or suit mismatch 
-   return TRUE if suit match, physpg = physical page 
+   return FALSE if page fault, nil flag in PTE or suit mismatch
+   return TRUE if suit match, physpg = physical page
                 or page=0 -> last+1 page
 */
 static t_bool cpu_vma_ptevl(uint32 pagid,uint32* physpg)
@@ -310,9 +303,9 @@ if (mapr>0)
 
 /* do a safety check: first instr of $EMA$/$VMA$ must be a DST instr */
 if (ReadIO(ema+1,UMAP) != 0104400) {
-    if (debug) 
+    if (debug)
         fprintf(sim_deb, ">>CPU VMA: pg fault: no EMA/VMA user code present\n");
-    if (CTL (PRO)) ABORT (ABORT_PRO);               /* allow an MP abort */
+    if (mp_control) MP_ABORT (ema+1);               /* allow an MP abort */
     return STOP_HALT;                               /* FATAL: no EMA/VMA! */
     }
 
@@ -323,7 +316,7 @@ AR = (ptr >> 16) & DMASK;                           /* restore A, B */
 BR = ptr & DMASK;
 E = 0;                                              /* enforce E = 0 */
 if (debug)
-    fprintf(sim_deb, 
+    fprintf(sim_deb,
             ">>CPU VMA: Call pg fault OS exit, AR=%06o BR=%06o P=%06o\n",
             AR, BR, PC);
 return SCPE_OK;
@@ -359,8 +352,8 @@ return swapflag;                                    /* true for swap bit set */
 
     DLD PONTR       TRANSLATE 32 BIT POINTER TO 15
     JSB .LBP        BIT POINTER.
-    <RETURN - B = LOGICAL ADDRESS, A = PAGID> 
-    
+    <RETURN - B = LOGICAL ADDRESS, A = PAGID>
+
     32 bit pointer:
     ----------AR------------ -----BR-----
     15 14....10 9....4 3...0 15.10 9....0
@@ -372,7 +365,7 @@ return swapflag;                                    /* true for swap bit set */
                                    OOOOOO 10 bit OFFSET
 */
 
-static t_stat cpu_vma_lbp(uint32 ptr,uint32 aoffset,uint32 faultpc,uint32 intrq,t_bool debug) 
+static t_stat cpu_vma_lbp(uint32 ptr,uint32 aoffset,uint32 faultpc,uint32 intrq,t_bool debug)
 {
 uint32 pagid,offset,ptrl,pgidx,ptepg;
 uint16 p30,p31,suit;
@@ -390,12 +383,12 @@ if (ptr & 0x80000000) {                             /* is it a local reference? 
     if ((ptr&I_IA) && (reason = vma_resolve (ReadW (ptrl), &ptrl, debug)))
         return reason;                              /* yes, resolve indirect ref */
     BR = ptrl & VAMASK;                             /* address is local */
-    AR = (ptr >> 16) & DMASK;    
+    AR = (ptr >> 16) & DMASK;
     if (debug)
         fprintf(sim_deb,">>CPU VMA: cpu_vma_lbp: local ref AR=%06o BR=%06o\n",AR,BR);
     return SCPE_OK;
     }
-    
+
 pagid  = (ptr >> 10) & DMASK;                       /* extract page id (16 bit idx, incl suit*/
 offset = ptr & 01777;                               /* and offset */
 suit   = pagid & SUITMASK;                          /* suit of page */
@@ -406,12 +399,12 @@ if (!cpu_vma_mapte(&ptepg))                         /* map in PTE */
 
 /* ok, we have the PTE mapped to page31 */
 /* the microcode tries to reads two consecutive data pages into page30 and page31 */
-    
+
 /* read the 1st page value from PTE */
 p30 = ReadW(page31 | pgidx) ^ suit;
 if (!p30)                                           /* matched suit for 1st page */
     return cpu_vma_fault(pagid,page30,30,ptepg,faultab,faultpc,debug);
-    
+
 /* suit switch situation: 1st page is in last idx of PTE, then following page
  * must be in idx 0 of PTE */
 if (pgidx==01777) {                                 /* suit switch situation */
@@ -435,7 +428,7 @@ if (!p31) {                                         /* matched suit for 2nd page
 
     offset += 02000;                                /* adjust offset to last user map because */
                                                     /* the address requested page 76xxx */
-    } 
+    }
 else {
     dms_wmap(30+UMAP,p30);
     if (p30 & SUITMASK)
@@ -455,20 +448,20 @@ return SCPE_OK;
 /*  .PMAP
     ASSEMBLER CALLING SEQUENCE:
 
-    LDA UMAPR          (MSEG - 31) 
-    LDB PAGID          (0-65535) 
+    LDA UMAPR          (MSEG - 31)
+    LDB PAGID          (0-65535)
     JSB .PMAP          GO MAP IT IN
     <ERROR RETURN>     A-REG = REASON, NOTE 1
     <RETURN A=A+1, B=B+1,E=0 >> SEE NOTE 2>
 
-    NOTE 1 : IF BIT 15 OF A-REG SET, THEN ALL NORMAL BRANCHES TO THE 
-          $EMA$/$VMA$ CODE WILL BE CHANGED TO P+1 EXIT.  THE A-REG 
+    NOTE 1 : IF BIT 15 OF A-REG SET, THEN ALL NORMAL BRANCHES TO THE
+          $EMA$/$VMA$ CODE WILL BE CHANGED TO P+1 EXIT.  THE A-REG
           WILL BE THE REASON THE MAPPING WAS NOT SUCCESSFUL IF BIT 15
           OF THE A-REG WAS NOT SET.
-          THIS WAS DONE SO THAT A ROUTINE ($VMA$) CAN DO A MAPPING 
+          THIS WAS DONE SO THAT A ROUTINE ($VMA$) CAN DO A MAPPING
           WITHOUT THE POSSIBILITY OF BEING RE-CURRED.  IT IS USED
-          BY $VMA$ AND PSTVM IN THE PRIVLEDGED MODE. 
-    NOTE 2: E-REG WILL = 1 IF THE LAST+1 PAGE IS REQUESTED AND 
+          BY $VMA$ AND PSTVM IN THE PRIVLEDGED MODE.
+    NOTE 2: E-REG WILL = 1 IF THE LAST+1 PAGE IS REQUESTED AND
             MAPPED READ/WRITE PROTECTED ON A GOOD P+2 RETURN.
 */
 static t_stat cpu_vma_pmap(uint32 umapr,uint32 pagid, t_bool debug)
@@ -486,13 +479,13 @@ if (mapnm > 31) {                                   /* check for invalid map reg
     return SCPE_OK;                                 /* return exit PC+1 */
     }
 
-ptr = (umapr << 16) | (pagid & DMASK);              /* build the ptr argument for vma_fault */ 
+ptr = (umapr << 16) | (pagid & DMASK);              /* build the ptr argument for vma_fault */
 if (!cpu_vma_mapte(&pgpte)) {                       /* map the PTE */
     if (umapr & 0x8000) {
         XR = 65535;
         YR = ptemiss;
         if (debug)
-            fprintf(sim_deb, 
+            fprintf(sim_deb,
                     ">>CPU VMA: .PMAP pg fault&bit15: XR=%06o YR=%06o, exit P+1\n",
                     XR, YR);
         return SCPE_OK;                             /* use PC+1 error exit */
@@ -506,20 +499,20 @@ if (!cpu_vma_ptevl(pagid,&physpg)) {
         XR = pagid;
         YR = page31;
         if (debug)
-            fprintf(sim_deb, 
+            fprintf(sim_deb,
                     ">>CPU VMA: .PMAP pg map&bit15: XR=%06o YR=%06o, exit P+1\n",
                     XR, YR);
         return SCPE_OK;                             /* use PC+1 error exit*/
         }
     return cpu_vma_fault(pagid,page31,31,pgpte,ptr,PC-1,debug);   /* page not present */
     }
-    
+
 E = 1;
 if (physpg == 0)                                    /* last+1 page ? */
     physpg = RWPROT;                                /* yes, use page 1023 RW/Protected */
 else E = 0;                                         /* normal page to map */
 
-dms_wmap(mapnm+UMAP,physpg);                        /* map page to user page reg */ 
+dms_wmap(mapnm+UMAP,physpg);                        /* map page to user page reg */
 if (mapnm != 31)                                    /* unless already unmapped, */
     dms_wmap(31+UMAP,RWPROT);                       /* unmap PTE */
 
@@ -535,17 +528,17 @@ return SCPE_OK;
 /* array calc helper for .imar, .jmar, .imap, .jmap
    ij=in_s: 16 bit descriptors
    ij=in_d: 32 bit descriptors
-   
+
    This helper expects mainly the following arguments:
    dtbl: pointer to an array descriptor table
    atbl: pointer to the table of actual subscripts
-   
+
    where subscript table is the following:
    atbl-> DEF last_subscript,I      (point to single or double integer)
           ...
           DEF first subscript,I     (point to single or double integer)
 
-   where Descriptor_table is the following table:  
+   where Descriptor_table is the following table:
    dtbl-> DEC #dimensions
           DEC/DIN next-to-last dimension    (single or double integer)
           ...
@@ -626,7 +619,7 @@ while (ndim-- > 0) {
         dtbl++;
         }
     accu *= dx;                                     /* multiply */
-    }    
+    }
 
 din = ReadOp(dtbl,in_d);                            /* add base address */
 accu += din.dword;
@@ -651,9 +644,6 @@ OP dop0,dop1;
 uint32 pcsave = (PC+1) & VAMASK;                    /* save PC to check for redo in imap/jmap */
 t_bool debug = DEBUG_PRI (cpu_dev, DEB_VMA);
 
-if ((cpu_unit.flags & UNIT_VMAOS) == 0)             /* VMA/OS option installed? */
-    return cpu_rte_ema (IR, intrq);                 /* try EMA */
-    
 entry = IR & 017;                                   /* mask to entry point */
 pattern = op_vma[entry];                            /* get operand pattern */
 
@@ -673,7 +663,7 @@ if (debug) {                                            /* debugging? */
     }
 
 switch (entry) {                                    /* decode IR<3:0> */
-    
+
     case 000:                                       /* .PMAP 105240 (OP_N) */
         reason = cpu_vma_pmap(AR,BR,debug);         /* map pages */
         break;
@@ -715,14 +705,14 @@ switch (entry) {                                    /* decode IR<3:0> */
         break;
 
     case 010:                                       /* .IMAP 105250 (OP_A) */
-        dtbl = op[0].word;                              
+        dtbl = op[0].word;
         atbl = PC;
         if ((reason = cpu_vma_ijmar(in_s,dtbl,atbl,&ndim,intrq,debug)))   /* calc the virt address to AB */
             return reason;
         t32 = (AR << 16) | (BR & DMASK);
         if ((reason = cpu_vma_lbp(t32,0,PC-2,intrq,debug)))
             return reason;
-        if (PC==pcsave) 
+        if (PC==pcsave)
             PC = (PC+ndim) & VAMASK;                /* adjust PC: skip ndim subscript words */
         break;
 
@@ -752,8 +742,8 @@ switch (entry) {                                    /* decode IR<3:0> */
 
     case 014:                                       /* .LPXR 105254 (OP_AA) */
         dop0 = ReadOp(op[0].word,in_d);             /* get pointer from arg */
-        dop1 = ReadOp(op[1].word,in_d);     
-        t32 = dop0.dword + dop1.dword;              /* add offset to it */      
+        dop1 = ReadOp(op[1].word,in_d);
+        t32 = dop0.dword + dop1.dword;              /* add offset to it */
         reason = cpu_vma_lbp(t32,0,PC-3,intrq,debug);
         break;
 
@@ -773,7 +763,7 @@ switch (entry) {                                    /* decode IR<3:0> */
         reason = cpu_vma_lbp(t32,0,PC-1,intrq,debug);
         break;
     }
-    
+
 return reason;
 }
 
@@ -869,7 +859,7 @@ return TRUE;
  *        DEC -L(N)
  *        DEC D(N-1)
  *        DEC -L(N-1)  lower bound (n-1)st dim
- *        DEC D(N-2)   (n-2)st dim 
+ *        DEC D(N-2)   (n-2)st dim
  *        ...
  *        DEC D(1)     1st dim
  *        DEC -L(1)    lower bound 1st dim
@@ -891,7 +881,7 @@ if (cpu_ema_resolve(dtbl,atbl,&sum)) {                  /* calculate subscript *
 AR = 0x3230;                                            /* error condition: */
 BR = 0x454d;                                            /* AR = '20', BR = 'EM' */
 return SCPE_OK;                                         /* return via unmodified rtn */
-}   
+}
 
 /* implementation of VIS RTE-IVB EMA support
  * .ESEG microcode routine
@@ -942,7 +932,7 @@ for (i=0; i<BR; i++) {                                  /* loop over N entries *
     if ((pg & SIGN) || pg > emasz) pg |= 0140000;       /* write protect if outside */
     pg += phys;                                         /* adjust into EMA page range */
     WriteIO(umaps+lp+i, pg, UMAP);                      /* copy pg to user map */
-//printf("MAP val %oB to reg %d (addr=%oB)\n",pg,lp+i,umaps+lp+i);
+/* printf("MAP val %oB to reg %d (addr=%oB)\n",pg,lp+i,umaps+lp+i); */
     dms_wmap(UMAP+lp+i, pg);                            /* set DMS reg */
 }
 dms_wmap(UMAP+1,pg1);                                   /* restore map #1 */
@@ -1011,7 +1001,7 @@ for (i=0; i<vectors; i++) {                             /* copy vector addresses
          YR = (~YR + 1) & DMASK;                        /* make index positive */
     }
     if (imax < YR) imax = YR;                           /* set maximum index */
-    mseg += 04000;                                      /* incr mseg address by 2 more pages */ 
+    mseg += 04000;                                      /* incr mseg address by 2 more pages */
 }
 MA = ReadW(vin);                                        /* get N index into Y */
 resolve(MA, &MA, 0);
@@ -1022,7 +1012,7 @@ if (imax==0) goto easy;                                 /* easy case */
 AR = k / imax; AR++;                                    /* calculate K/IMAX */
 if (negflag) goto hard;                                 /* had a negative index? */
 if (YR > AR) goto hard;
-    
+
 easy:
 (*rtn)++;                                               /* return via exit 2 */
 AR = 0;
@@ -1033,7 +1023,7 @@ BR = 2 * op[4].word;                                    /* B = 2* vectors */
 return SCPE_OK;
 
 vi22:                                                   /* error condition */
-  AR=0x3232;                                            /* AR = '22' */ 
+  AR=0x3232;                                            /* AR = '22' */
   BR=0x5649;                                            /* BR = 'VI' */
   return SCPE_OK;                                       /* return via unmodified e->rtn */
 }
@@ -1103,7 +1093,7 @@ dms_wmap(UMAP+1,pg0);                                   /* map #0 into reg #1 */
 for (i=0; (base+i)<32; i++) {
     pg = i<e->npgs ? e->spmseg : 0140000;               /* write protect if outside */
     WriteIO(umaps+base+i, pg, UMAP);                    /* copy pg to user map */
-//printf("MAP val %d to reg %d (addr=%o)\n",pg,base+i,umaps+base+i);
+/* printf("MAP val %d to reg %d (addr=%o)\n",pg,base+i,umaps+base+i); */
     dms_wmap(UMAP+base+i, pg);                          /* set DMS reg */
     e->spmseg++;
 }
@@ -1137,7 +1127,7 @@ if ((e->ipgs % msegsz) != 0)                            /* non std MSEG? */
 if (e->npgs > msegsz) return FALSE;                     /* map more pages than MSEG sz? */
 eqt = ReadIO(xeqt,UMAP);
 emasz = ReadWA(eqt+28) & 01777;                         /* B EMA size in pages */
-if ((e->ipgs+e->npgs) > emasz) return FALSE;            /* outside EMA? */ 
+if ((e->ipgs+e->npgs) > emasz) return FALSE;            /* outside EMA? */
 if ((e->ipgs+msegsz) > emasz)                           /* if MSEG overlaps end of EMA */
     e->npgs = emasz - e->ipgs;                          /* only map until end of EMA */
 
@@ -1158,7 +1148,7 @@ e->ipgs = ipage;                                        /* S6 set the arguments 
 e->npgs = npgs;                                         /* S5 */
 
 AR = 0;
-xidex = ReadIO(idx,UMAP);                               
+xidex = ReadIO(idx,UMAP);
 if ((ipage & SIGN) ||                                   /* negative page displacement? */
     (npgs & SIGN) ||                                    /* negative # of pages? */
     xidex == 0 ||                                       /* no EMA? */
@@ -1171,7 +1161,7 @@ static t_bool cpu_ema_emat(EMA4* e)
 {
 uint32 xidex,idext0;
 uint32 curmseg,phys,msnum,lastpgs;
-    
+
 xidex = ReadIO(idx,UMAP);                               /* read ID extension */
 idext0 = ReadWA(xidex+0);                               /* get current segment */
 curmseg = idext0 >> 5;
@@ -1191,7 +1181,7 @@ return TRUE;                                            /* and everything done *
 
 /* .EMIO microcode routine, resolves element addr for EMA array
  * and maps the appropriate map segment
- * 
+ *
  *  Call:
  *    OCT 105250B
  *    DEF RTN          error return (rtn), good return is rtn+1
@@ -1209,7 +1199,7 @@ return TRUE;                                            /* and everything done *
  *        DEC -L(N)
  *        DEC D(N-1)
  *        DEC -L(N-1)  lower bound (n-1)st dim
- *        DEC D(N-2)   (n-2)st dim 
+ *        DEC D(N-2)   (n-2)st dim
  *        ...
  *        DEC D(1)     1st dim
  *        DEC -L(1)    lower bound 1st dim
@@ -1224,7 +1214,7 @@ uint32 mseg, bufpgs, npgs;
 EMA4 ema4, *e = &ema4;
 
 xidex = ReadIO(idx,UMAP);                               /* read ID extension */
-if (bufl & SIGN ||                                      /* buffer length negative? */ 
+if (bufl & SIGN ||                                      /* buffer length negative? */
     xidex==0) goto em16;                                /* no EMA declared? */
 
 idext1 = ReadWA(xidex+1);                               /* |logstrt mseg|d|physstrt ema| */
@@ -1232,7 +1222,7 @@ mseg = (idext1 >> 1) & MSEGMASK;                        /* get logical start MSE
 if (!cpu_ema_emas(dtbl,atbl,e)) goto em16;              /* resolve address */
 bufpgs = (bufl + e->offs) >> 10;                        /* # of pgs reqd for buffer */
 if ((bufl + e->offs) & 01777) bufpgs++;                 /* S11 add 1 if not at pg boundary */
-if ((bufpgs + e->pgoff) > e->emasz) goto em16;          /* exceeds EMA limit? */ 
+if ((bufpgs + e->pgoff) > e->emasz) goto em16;          /* exceeds EMA limit? */
 npgs = (e->msoff + bufl) >> 10;                         /* # of pgs reqd for MSEG */
 if ((e->msoff + bufl) & 01777) npgs++;                  /* add 1 if not at pg boundary */
 if (npgs < e->msegsz) {
@@ -1244,11 +1234,11 @@ if (npgs < e->msegsz) {
     e->ipgs = e->pgoff;                                 /* S6 page offset to reqd pg */
     if (!cpu_ema_mmap02(e)) goto em16;                  /* do nonstd mapping */
 }
-(*rtn)++;                                               /* return via good exit */ 
+(*rtn)++;                                               /* return via good exit */
 return SCPE_OK;
 
 em16:                                                   /* error condition */
-AR=0x3136;                                              /* AR = '16' */ 
+AR=0x3136;                                              /* AR = '16' */
 BR=0x454d;                                              /* BR = 'EM' */
 return SCPE_OK;                                         /* return via unmodified rtn */
 }
@@ -1271,7 +1261,7 @@ return SCPE_OK;                                         /* return via unmodified
  *        DEC -L(N)
  *        DEC D(N-1)
  *        DEC -L(N-1)  lower bound (n-1)st dim
- *        DEC D(N-2)   (n-2)st dim 
+ *        DEC D(N-2)   (n-2)st dim
  *        ...
  *        DEC D(1)     1st dim
  *        DEC -L(1)    lower bound 1st dim
@@ -1297,7 +1287,7 @@ if (xidex) {                                            /* is EMA declared? */
         if (pgoff > 1023) goto em15;                    /* overflow? */
         eqt = ReadIO(xeqt,UMAP);
         emasz = ReadWA(eqt+28) & 01777;                 /* EMA size in pages */
-        phys = idext1 & 01777;                          /* physical start pg of EMA */    
+        phys = idext1 & 01777;                          /* physical start pg of EMA */
         if (pgoff > emasz) goto em15;                   /* outside EMA range? */
 
         msgn = mseg >> 10;                              /* get # of 1st MSEG reg */
@@ -1306,7 +1296,7 @@ if (xidex) {                                            /* is EMA declared? */
         pg0 = dms_rmap(UMAP+0);                         /* read base page map# */
         pg1 = dms_rmap(UMAP+1);                         /* save map# 1 */
         dms_wmap(UMAP+1,pg0);                           /* map #0 into reg #1 */
-        
+
         WriteIO(umaps+msgn, phys, UMAP);                /* store 1st mapped pg in user map */
         dms_wmap(UMAP+msgn, phys);                      /* and set the map register */
         phys = (pgoff+1)==emasz ? 0140000 : phys+1;     /* protect 2nd map if end of EMA */
@@ -1314,11 +1304,11 @@ if (xidex) {                                            /* is EMA declared? */
         dms_wmap(UMAP+msgn+1, phys);                    /* and set the map register */
 
         dms_wmap(UMAP+1,pg1);                           /* restore map #1 */
-        
+
         idext0 = ReadWA(xidex+0) | 0100000;             /* set NS flag in id extension */
         WriteIO(xidex+0, idext0, SMAP);                 /* save back value */
         AR = 0;                                         /* was successful */
-        BR = mseg + offs;                               /* calculate log address */  
+        BR = mseg + offs;                               /* calculate log address */
         (*rtn)++;                                       /* return via good exit */
         return SCPE_OK;
     }
@@ -1331,7 +1321,7 @@ while (ndim > 0) {
     resolve (MA, &MA, 0);
     act = ReadW(MA);                                    /* A(N) */
     low = ReadW(dtbl++);                                /* -L(N) */
-    sub = SEXT(act) + SEXT(low);                        /* subscript */ 
+    sub = SEXT(act) + SEXT(low);                        /* subscript */
     if (sub & 0xffff8000) goto em15;                    /* overflow? */
     sum += sub;                                         /* accumulate */
     sz = ReadW(dtbl++);
@@ -1346,10 +1336,10 @@ BR = abase + sum;                                       /* add displacement */
 return SCPE_OK;
 
 em15:                                                   /* error condition */
-  AR=0x3135;                                            /* AR = '15' */ 
+  AR=0x3135;                                            /* AR = '15' */
   BR=0x454d;                                            /* BR = 'EM' */
   return SCPE_OK;                                       /* return via unmodified e->rtn */
-}   
+}
 
 t_stat cpu_rte_ema (uint32 IR, uint32 intrq)
 {
@@ -1358,9 +1348,6 @@ OPS op;
 OP_PAT pattern;
 uint32 entry, rtn;
 t_bool debug = DEBUG_PRI (cpu_dev, DEB_EMA);
-
-if ((cpu_unit.flags & UNIT_EMA) == 0)                   /* EMA option installed? */
-    return stop_inst;
 
 entry = IR & 017;                                       /* mask to entry point */
 pattern = op_ema[entry];                                /* get operand pattern */
@@ -1382,7 +1369,7 @@ if (debug) {                                            /* debugging? */
 switch (entry) {                                        /* decode IR<3:0> */
     case 000:                                           /* .EMIO 105240 (OP_A) */
         rtn = op[0].word;
-        reason = cpu_ema_emio(&rtn, op[1].word, 
+        reason = cpu_ema_emio(&rtn, op[1].word,
                               op[2].word, PC, debug);   /* handle the EMIO instruction */
         PC = rtn;
         if (debug)
@@ -1417,7 +1404,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                      AR, BR, PC==op[0].word?"error":"good");
         }
         break;
-        
+
     default:                                            /* others undefined */
         reason = stop_inst;
     }
