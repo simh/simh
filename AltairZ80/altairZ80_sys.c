@@ -1,6 +1,6 @@
 /*  altairz80_sys.c: MITS Altair system interface
 
-    Copyright (c) 2002-2008, Peter Schorn
+    Copyright (c) 2002-2010, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -76,6 +76,8 @@ extern DEVICE fpc_dev;
 extern int32 chiptype;
 extern long disasm (unsigned char *data, char *output, int segsize, long offset);
 
+void prepareMemoryAccessMessage(const t_addr loc);
+void prepareInstructionMessage(const t_addr loc, const uint32 op);
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 t_stat parse_sym(char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw);
 
@@ -123,11 +125,13 @@ DEVICE      *sim_devices[]  = {
     NULL
 };
 
-char memoryAccessMessage[80];
+static char memoryAccessMessage[256];
+static char instructionMessage[256];
 const char *sim_stop_messages[] = {
     "HALT instruction",
     "Breakpoint",
     memoryAccessMessage,
+    instructionMessage,
     "Invalid Opcode"
 };
 
@@ -347,6 +351,15 @@ static char *const MnemonicsXCB[256] = {
     "SET 7,B",      "SET 7,C",      "SET 7,D",      "SET 7,E",      "SET 7,H",      "SET 7,L",      "SET 7,(I%@h)", "SET 7,A"       /*  f8-ff   */
 };
 
+void prepareMemoryAccessMessage(const t_addr loc) {
+    sprintf(memoryAccessMessage, "Memory access breakpoint [%05xh]", loc);
+}
+
+void prepareInstructionMessage(const t_addr loc, const uint32 op) {
+    sprintf(instructionMessage, "Instruction \"%s\" breakpoint [%05xh]", chiptype == CHIP_TYPE_8080 ?  Mnemonics8080[op & 0xff] :
+            (chiptype == CHIP_TYPE_Z80 ? MnemonicsZ80[op & 0xff] : "???"), loc);
+}
+
 /*  Symbolic disassembler
 
     Inputs:
@@ -504,7 +517,7 @@ static int32 checkbase(char ch, const char *numString) {
 static int32 numok(char ch, const char **numString, const int32 minvalue,
         const int32 maxvalue, const int32 requireSign, int32 *result) {
     int32 sign = 1, value = 0, base;
-    if (requireSign)
+    if (requireSign) {
         if (ch == '+')
             ch = *(*numString)++;
         else if (ch == '-') {
@@ -513,6 +526,7 @@ static int32 numok(char ch, const char **numString, const int32 minvalue,
         }
         else
             return FALSE;
+    }
     if (!(base = checkbase(ch, *numString)))
         return FALSE;
     while (isxdigit(ch)) {

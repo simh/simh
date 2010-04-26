@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,12 +29,44 @@
 
 #define SIM_MAJOR       3
 #define SIM_MINOR       8
-#define SIM_PATCH       1
+#define SIM_PATCH       2
 #define SIM_DELTA       0
 
 /* V3.8 revision history
 
 patch   date            module(s) and fix(es)
+
+  2     tbd             h316_cpu.c:
+                        - fixed bugs in MPY, DIV introduced in 3.8-1
+
+                        i1401_cd.c:
+                        - fixed read stacker operation in column binary mode
+                        - fixed punch stacker operation (from Van Snyder)
+
+                       1401_cpu.c:
+                        - revised divide algorithm (from Van Snyder)
+
+                        i1401_mt.c:
+                        - added no rewind option (from Van Snyder)
+
+                        pdp11_rk.c:
+                        - fixed bug in read header (from Walter F Mueller)
+
+                        pdp11_rl.c:
+                        - added debug support
+
+                        pdp11_rq.c:
+                        - added RD32 support
+
+                        pdp8_fpp.c:
+                        - many bug fixes (all from Rick Murphy); now functional
+
+                        pdp8_sys.c:
+                        - added link to FPP
+
+                        vax_cpu.c:
+                        - added OLDVMS idle timer option
+                        - fixed bug in SET CPU IDLE
 
   1     08-Feb-09       scp.c:
                         - revised RESTORE unit logic for consistency

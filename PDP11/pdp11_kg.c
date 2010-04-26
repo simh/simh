@@ -1,6 +1,6 @@
 /* pdp11_kg.c - Communications Arithmetic Option KG11-A
 
-   Copyright (c) 2007-2008, John A. Dundas III
+   Copyright (c) 2007-2010, John A. Dundas III
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    kg           KG11-A Communications Arithmetic Option (M7251)
 
+   03-Jan-10    JAD     Eliminate gcc warnings
    08-Jan-08    JAD     First public release integrated with SIMH V3.7-3.
    09-Dec-07    JAD     SIMH-style debugging.
                         Finished validating against real hardware.
@@ -178,7 +179,7 @@ static t_stat set_units (UNIT *, int32, char *, void *);
 
 /* 16-bit rotate right */
 
-#define ROR(n,v)        (((v >> n) & DMASK) | (v << (16 - n)) & DMASK)
+#define ROR(n,v)        (((v >> n) & DMASK) | ((v << (16 - n)) & DMASK))
 
 /* 8-bit rotate right */
 

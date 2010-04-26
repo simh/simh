@@ -1,6 +1,6 @@
 /*  altairz80_sio.c: MITS Altair serial I/O card
 
-    Copyright (c) 2002-2008, Peter Schorn
+    Copyright (c) 2002-2010, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -105,8 +105,8 @@
 
 #define PORT_TABLE_SIZE     256                 /* size of port mapping table                   */
 #define SLEEP_ALLOWED_START_DEFAULT 100         /* default initial value for sleepAllowedCounter*/
+#define DEFAULT_TIMER_DELTA 100                 /* default value for timer delta in ms          */
 
-static t_stat sio_set_verbose       (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat simh_dev_set_timeron  (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat simh_dev_set_timeroff (UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat sio_reset(DEVICE *dptr);
@@ -154,6 +154,19 @@ extern UNIT cpu_unit;
 extern volatile int32 stop_cpu;
 extern int32 sim_interval;
 
+#define TRACE_PRINT(device, level, args)    if (device.dctrl & level) { \
+                                                printf args;            \
+                                            }
+
+/* Debug Flags */
+static DEBTAB generic_dt[] = {
+    { "IN",         IN_MSG      },
+    { "OUT",        OUT_MSG     },
+    { "CMD",        CMD_MSG     },
+    { "VERBOSE",    VERBOSE_MSG },
+    { NULL,         0           }
+};
+
 /* SIMH pseudo device status registers                                                                          */
 /* ZSDOS clock definitions                                                                                      */
 static time_t ClockZSDOSDelta       = 0;        /* delta between real clock and Altair clock                    */
@@ -168,12 +181,12 @@ static int32 setClockCPM3Adr        = 0;        /* address in M of 5 byte parame
 static int32 getClockCPM3Pos        = 0;        /* determines state for sending clock information               */
 static int32 daysCPM3SinceOrg       = 0;        /* days since 1 Jan 1978                                        */
 
-/* interrupt related                                                                                            */
+/* timer interrupt related                                                                                      */
 static uint32 timeOfNextInterrupt;              /* time when next interrupt is scheduled                        */
        int32 timerInterrupt         = FALSE;    /* timer interrupt pending                                      */
        int32 timerInterruptHandler  = 0x0fc00;  /* default address of interrupt handling routine                */
 static int32 setTimerInterruptAdrPos= 0;        /* determines state for receiving timerInterruptHandler         */
-static int32 timerDelta             = 100;      /* interrupt every 100 ms                                       */
+static int32 timerDelta             = DEFAULT_TIMER_DELTA;  /* interrupt every 100 ms                           */
 static int32 setTimerDeltaPos       = 0;        /* determines state for receiving timerDelta                    */
 
 /* stop watch and timer related                                                                                 */
@@ -270,7 +283,7 @@ static MTAB sio_mod[] = {
     { UNIT_SIO_BS,          0,                  "BS",       "BS",       NULL }, /* map delete to backspace                  */
     { UNIT_SIO_BS,          UNIT_SIO_BS,        "DEL",      "DEL",      NULL }, /* map backspace to delete                  */
     { UNIT_SIO_VERBOSE,     0,                  "QUIET",    "QUIET",    NULL }, /* quiet, no error messages                 */
-    { UNIT_SIO_VERBOSE,     UNIT_SIO_VERBOSE,   "VERBOSE",  "VERBOSE",  &sio_set_verbose },
+    { UNIT_SIO_VERBOSE,     UNIT_SIO_VERBOSE,   "VERBOSE",  "VERBOSE",  NULL },
                                                                                 /* verbose, display warning messages        */
     { UNIT_SIO_MAP,         0,                  "NOMAP",    "NOMAP",    NULL }, /*  disable character mapping               */
     { UNIT_SIO_MAP,         UNIT_SIO_MAP,       "MAP",      "MAP",      NULL }, /*  enable all character mapping            */
@@ -291,12 +304,16 @@ DEVICE sio_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &sio_reset,
     NULL, &sio_attach, &sio_detach,
-    NULL, 0, 0,
-    NULL, NULL, "Serial Input Output SIO"
+    NULL, DEV_DEBUG, 0,
+    generic_dt, NULL, "Serial Input Output SIO"
+};
+
+static MTAB ptpptr_mod[] = {
+    { 0 }
 };
 
 static UNIT ptr_unit = {
-    UDATA (NULL, UNIT_SEQ | UNIT_ATTABLE | UNIT_ROABLE, 0)
+    UDATA (NULL, UNIT_ATTABLE | UNIT_ROABLE, 0)
 };
 
 static REG ptr_reg[] = {
@@ -305,25 +322,25 @@ static REG ptr_reg[] = {
 };
 
 DEVICE ptr_dev = {
-    "PTR", &ptr_unit, ptr_reg, NULL,
+    "PTR", &ptr_unit, ptr_reg, ptpptr_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptr_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DISABLE, 0,
-    NULL, NULL, "Paper Tape Reader PTR"
+    NULL, (DEV_DISABLE | DEV_DEBUG), 0,
+    generic_dt, NULL, "Paper Tape Reader PTR"
 };
 
 static UNIT ptp_unit = {
-    UDATA (NULL, UNIT_SEQ + UNIT_ATTABLE, 0)
+    UDATA (NULL, UNIT_ATTABLE, 0)
 };
 
 DEVICE ptp_dev = {
-    "PTP", &ptp_unit, NULL, NULL,
+    "PTP", &ptp_unit, NULL, ptpptr_mod,
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ptp_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DISABLE, 0,
-    NULL, NULL, "Paper Tape Puncher PTP"
+    NULL, (DEV_DISABLE | DEV_DEBUG), 0,
+    generic_dt, NULL, "Paper Tape Puncher PTP"
 };
 
 /*  Synthetic device SIMH for communication
@@ -373,35 +390,17 @@ static MTAB simh_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if (simh_device.dctrl & level) {    \
-                                        printf args;                    \
-                                    }
-
-/* Debug Flags */
-static DEBTAB simh_dt[] = {
-    { "IN",         IN_MSG      },
-    { "OUT",        OUT_MSG     },
-    { "CMD",        CMD_MSG     },
-    { "VERBOSE",    VERBOSE_MSG },
-    { NULL,         0           }
-};
-
 DEVICE simh_device = {
     "SIMH", &simh_unit, simh_reg, simh_mod,
     1, 10, 31, 1, 16, 4,
     NULL, NULL, &simh_dev_reset,
     NULL, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
-    simh_dt, NULL, "Pseudo Device SIMH"
+    generic_dt, NULL, "Pseudo Device SIMH"
 };
 
 static void resetSIOWarningFlags(void) {
     warnUnattachedPTP = warnUnattachedPTR = warnPTREOF = warnUnassignedPort = 0;
-}
-
-static t_stat sio_set_verbose(UNIT *uptr, int32 value, char *cptr, void *desc) {
-    resetSIOWarningFlags();
-    return SCPE_OK;
 }
 
 static t_stat sio_attach(UNIT *uptr, char *cptr) {
@@ -439,6 +438,7 @@ static void pollConnection(void) {
 /* reset routines */
 static t_stat sio_reset(DEVICE *dptr) {
     int32 i;
+    TRACE_PRINT(sio_dev, VERBOSE_MSG, ("SIO: " ADDRESS_FORMAT " Reset" NLP, PCX));
     sio_unit.u3 = FALSE;                                    /* no character in terminal input buffer    */
     resetSIOWarningFlags();
     if (sio_unit.u4) {                                      /* is terminal input attached to a file?    */
@@ -454,6 +454,7 @@ static t_stat sio_reset(DEVICE *dptr) {
 }
 
 static t_stat ptr_reset(DEVICE *dptr) {
+    TRACE_PRINT(ptr_dev, VERBOSE_MSG, ("PTR: " ADDRESS_FORMAT " Reset" NLP, PCX));
     resetSIOWarningFlags();
     ptr_unit.u3 = FALSE;                                    /* End Of File not yet reached              */
     if (ptr_unit.flags & UNIT_ATT)                          /* attached?                                */
@@ -464,6 +465,7 @@ static t_stat ptr_reset(DEVICE *dptr) {
 }
 
 static t_stat ptp_reset(DEVICE *dptr) {
+    TRACE_PRINT(ptp_dev, VERBOSE_MSG, ("PTP: " ADDRESS_FORMAT " Reset" NLP, PCX));
     resetSIOWarningFlags();
     sim_map_resource(0x12, 1, RESOURCE_TYPE_IO, &sio1s, dptr->flags & DEV_DIS);
     sim_map_resource(0x13, 1, RESOURCE_TYPE_IO, &sio1d, dptr->flags & DEV_DIS);
@@ -625,17 +627,18 @@ static void voidSleep(void) {
 }
 
 /* generic status port for keyboard input / terminal output */
-int32 sio0s(const int32 port, const int32 io, const int32 data) {
+static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
     int32 ch, result;
     SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
     assert(spi.port == port);
     pollConnection();
     if (io == 0) { /* IN */
-        if (sio_unit.u4)                                    /* attached to a file?                      */
+        if (sio_unit.u4) {                                  /* attached to a file?                      */
             if (sio_unit.u5)                                /* EOF reached?                             */
                 sio_detach(&sio_unit);                      /* detach file and switch to keyboard input */
             else
                 return spi.sio_can_read | spi.sio_can_write;
+        }
         if (sio_unit.flags & UNIT_ATT) {                    /* attached to a port?                      */
             if (tmxr_rqln(&TerminalLines[spi.terminalLine]))
                 result = spi.sio_can_read;
@@ -664,13 +667,25 @@ int32 sio0s(const int32 port, const int32 io, const int32 data) {
         checkSleep();
         return spi.sio_can_write | spi.sio_cannot_read;
     }                                                       /* OUT follows, no fall-through from IN     */
-    if (spi.hasReset && (data == spi.sio_reset))            /* reset command                            */
+    if (spi.hasReset && (data == spi.sio_reset)) {          /* reset command                            */
         sio_unit.u3 = FALSE;                                /* indicate that no character is available  */
+        TRACE_PRINT(sio_dev, CMD_MSG,
+                    ("SIO: " ADDRESS_FORMAT " Command OUT(0x%03x) = 0x%02x" NLP, PCX, port, data));
+    }
     return 0x00;                                            /* ignored since OUT                        */
 }
 
+int32 sio0s(const int32 port, const int32 io, const int32 data) {
+    const int32 result = sio0sCore(port, io, data);
+    if ((io == 0) && (sio_dev.dctrl & IN_MSG))
+        printf("SIO_S: " ADDRESS_FORMAT " IN(0x%03x) = 0x%02x" NLP, PCX, port, result);
+    else if ((io)  && (sio_dev.dctrl & OUT_MSG))
+        printf("SIO_S: " ADDRESS_FORMAT " OUT(0x%03x) = 0x%02x" NLP, PCX, port, data);
+    return result;
+}
+
 /* generic data port for keyboard input / terminal output */
-int32 sio0d(const int32 port, const int32 io, const int32 data) {
+static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
     int32 ch;
     SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
     assert(spi.port == port);
@@ -705,14 +720,23 @@ int32 sio0d(const int32 port, const int32 io, const int32 data) {
     return 0x00;                                            /* ignored since OUT                        */
 }
 
+int32 sio0d(const int32 port, const int32 io, const int32 data) {
+    const int32 result = sio0dCore(port, io, data);
+    if ((io == 0) && (sio_dev.dctrl & IN_MSG))
+        printf("SIO_D: " ADDRESS_FORMAT " IN(0x%03x) = 0x%02x" NLP, PCX, port, result);
+    else if ((io)  && (sio_dev.dctrl & OUT_MSG))
+        printf("SIO_D: " ADDRESS_FORMAT " OUT(0x%03x) = 0x%02x" NLP, PCX, port, data);
+    return result;
+}
+
 /* PTR/PTP status port */
-int32 sio1s(const int32 port, const int32 io, const int32 data) {
+static int32 sio1sCore(const int32 port, const int32 io, const int32 data) {
     if (io == 0) {                                          /* IN                                       */
                                                             /* reset I bit iff PTR unit not attached or
                                                                 no more data available. O bit is always
                                                                 set since write always possible.        */
         if ((ptr_unit.flags & UNIT_ATT) == 0) {             /* PTR is not attached                      */
-            if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTR < warnLevelSIO)) {
+            if ((ptr_dev.dctrl & VERBOSE_MSG) && (warnUnattachedPTR < warnLevelSIO)) {
                 warnUnattachedPTR++;
 /*06*/          printf("PTR: " ADDRESS_FORMAT " Attempt to test status of unattached PTR[0x%02x]. 0x02 returned." NLP, PCX, port);
             }
@@ -722,24 +746,36 @@ int32 sio1s(const int32 port, const int32 io, const int32 data) {
                                                                 (SIO_CAN_WRITE and SIO_CAN_READ)        */
         return ptr_unit.u3 ? SIO_CAN_WRITE : (SIO_CAN_READ | SIO_CAN_WRITE);
     }                                                       /* OUT follows                              */
-    if (data == SIO_RESET)
+    if (data == SIO_RESET) {
         ptr_unit.u3 = FALSE;                                /* reset EOF indicator                      */
+        TRACE_PRINT(ptr_dev, CMD_MSG,
+                    ("PTR: " ADDRESS_FORMAT " Command OUT(0x%03x) = 0x%02x" NLP, PCX, port, data));
+    }
     return 0x00;                                            /* ignored since OUT                        */
 }
 
+int32 sio1s(const int32 port, const int32 io, const int32 data) {
+    const int32 result = sio1sCore(port, io, data);
+    if ((io == 0) && ((ptr_dev.dctrl & IN_MSG) || (ptp_dev.dctrl & IN_MSG)))
+        printf("PTP/PTR_S: " ADDRESS_FORMAT " IN(0x%02x) = 0x%02x" NLP, PCX, port, result);
+    else if ((io)  && ((ptr_dev.dctrl & OUT_MSG) || (ptp_dev.dctrl & OUT_MSG)))
+        printf("PTP/PTR_S: " ADDRESS_FORMAT " OUT(0x%02x) = 0x%02x" NLP, PCX, port, data);
+    return result;
+}
+
 /* PTR/PTP data port */
-int32 sio1d(const int32 port, const int32 io, const int32 data) {
+static int32 sio1dCore(const int32 port, const int32 io, const int32 data) {
     int32 ch;
     if (io == 0) {                                          /* IN                                       */
         if (ptr_unit.u3) {                                  /* EOF reached, no more data available      */
-            if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnPTREOF < warnLevelSIO)) {
+            if ((ptr_dev.dctrl & VERBOSE_MSG) && (warnPTREOF < warnLevelSIO)) {
                 warnPTREOF++;
 /*07*/          printf("PTR: " ADDRESS_FORMAT " PTR[0x%02x] attempted to read past EOF. 0x00 returned." NLP, PCX, port);
             }
             return 0x00;
         }
         if ((ptr_unit.flags & UNIT_ATT) == 0) {             /* not attached                             */
-            if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTR < warnLevelSIO)) {
+            if ((ptr_dev.dctrl & VERBOSE_MSG) && (warnUnattachedPTR < warnLevelSIO)) {
                 warnUnattachedPTR++;
 /*08*/          printf("PTR: " ADDRESS_FORMAT " Attempt to read from unattached PTR[0x%02x]. 0x00 returned." NLP, PCX, port);
             }
@@ -754,11 +790,20 @@ int32 sio1d(const int32 port, const int32 io, const int32 data) {
     if (ptp_unit.flags & UNIT_ATT)                          /* unit must be attached                    */
         putc(data, ptp_unit.fileref);
                                                             /* else ignore data                         */
-    else if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnattachedPTP < warnLevelSIO)) {
+    else if ((ptp_dev.dctrl & VERBOSE_MSG) && (warnUnattachedPTP < warnLevelSIO)) {
         warnUnattachedPTP++;
 /*09*/  printf("PTP: " ADDRESS_FORMAT " Attempt to output '0x%02x' to unattached PTP[0x%02x] - ignored." NLP, PCX, data, port);
     }
     return 0x00;                                            /* ignored since OUT                        */
+}
+
+int32 sio1d(const int32 port, const int32 io, const int32 data) {
+    const int32 result = sio1dCore(port, io, data);
+    if ((io == 0) && ((ptr_dev.dctrl & IN_MSG) || (ptp_dev.dctrl & IN_MSG)))
+        printf("PTP/PTR_D: " ADDRESS_FORMAT " IN(0x%02x) = 0x%02x" NLP, PCX, port, result);
+    else if ((io)  && ((ptr_dev.dctrl & OUT_MSG) || (ptp_dev.dctrl & OUT_MSG)))
+        printf("PTP/PTR_D: " ADDRESS_FORMAT " OUT(0x%02x) = 0x%02x" NLP, PCX, port, data);
+    return result;
 }
 
 static t_stat toBool(char tf, int *result) {
@@ -856,8 +901,8 @@ static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc) 
         printf("\n");
     port_table[position] = sip;
     sim_map_resource(sip.port, 1, RESOURCE_TYPE_IO, (sip.hasOUT ||
-        (sip.sio_can_read == 0) && (sip.sio_cannot_read == 0) &&
-        (sip.sio_can_write == 0)) ? &sio0d : &sio0s, FALSE);
+        ((sip.sio_can_read == 0) && (sip.sio_cannot_read == 0) &&
+        (sip.sio_can_write == 0))) ? &sio0d : &sio0s, FALSE);
     return SCPE_OK;
 }
 
@@ -888,9 +933,8 @@ static t_stat sio_dev_set_interruptoff(UNIT *uptr, int32 value, char *cptr, void
 }
 
 static t_stat sio_svc(UNIT *uptr) {
-    if (sio0s(0, 0, 0) & KBD_HAS_CHAR) {
+    if (sio0s(0, 0, 0) & KBD_HAS_CHAR)
         keyboardInterrupt = TRUE;
-    }
     if (sio_unit.flags & UNIT_SIO_INTERRUPT)
         sim_activate(&sio_unit, sio_unit.wait);             /* activate unit    */
     return SCPE_OK;
@@ -909,12 +953,10 @@ static void mapAltairPorts(void) {
 int32 nulldev(const int32 port, const int32 io, const int32 data) {
     if ((sio_unit.flags & UNIT_SIO_VERBOSE) && (warnUnassignedPort < warnLevelSIO)) {
         warnUnassignedPort++;
-        if (io == 0) {
+        if (io == 0)
             printf("SIO: " ADDRESS_FORMAT " Attempt to input from unassigned port 0x%04x - ignored." NLP, PCX, port);
-        }
-        else {
+        else
             printf("SIO: " ADDRESS_FORMAT " Attempt to output 0x%02x to unassigned port 0x%04x - ignored." NLP, PCX, data, port);
-        }
     }
     return io == 0 ? 0xff : 0;
 }
@@ -1063,7 +1105,7 @@ static t_stat simh_dev_reset(DEVICE *dptr) {
 }
 
 static void warnNoRealTimeClock(void) {
-    TRACE_PRINT(VERBOSE_MSG,
+    TRACE_PRINT(simh_device, VERBOSE_MSG,
                 ("SIMH: " ADDRESS_FORMAT " Sorry - no real time clock available." NLP, PCX));
 }
 
@@ -1078,20 +1120,32 @@ static t_stat simh_dev_set_timeron(UNIT *uptr, int32 value, char *cptr, void *de
 
 static t_stat simh_dev_set_timeroff(UNIT *uptr, int32 value, char *cptr, void *desc) {
     timerInterrupt = FALSE;
-    sim_cancel(&simh_unit);
+    if (rtc_avail)
+        sim_cancel(&simh_unit);
     return SCPE_OK;
 }
 
 static t_stat simh_svc(UNIT *uptr) {
-    uint32 n = sim_os_msec();
-    if (n >= timeOfNextInterrupt) {
+    uint32 now = sim_os_msec();
+    if (now >= timeOfNextInterrupt) {
         timerInterrupt = TRUE;
-        timeOfNextInterrupt += timerDelta;
-        if (n >= timeOfNextInterrupt)               /* time of next interrupt is not in the future  */
-            timeOfNextInterrupt = n + timerDelta;   /* make sure it is in the future!               */
+        if (timerDelta == 0)
+            timeOfNextInterrupt = now + DEFAULT_TIMER_DELTA;
+        else {
+            uint32 newTimeOfNextInterrupt = now + timerDelta - (now - timeOfNextInterrupt) % timerDelta;
+            if (newTimeOfNextInterrupt != timeOfNextInterrupt + timerDelta) {
+                TRACE_PRINT(simh_device, VERBOSE_MSG,
+                            ("SIMH: " ADDRESS_FORMAT " Timer interrupts skipped %i. Delta %i. Expect %i. Got %i." NLP, PCX,
+                             (newTimeOfNextInterrupt - timeOfNextInterrupt) / timerDelta - 1,
+                             timerDelta,
+                             timeOfNextInterrupt + timerDelta - now, newTimeOfNextInterrupt - now));
+            }
+            timeOfNextInterrupt = newTimeOfNextInterrupt;
+        }
     }
+    /* post condition: now < timeOfNextInterrupt */
     if (simh_unit.flags & UNIT_SIMH_TIMERON)
-        sim_activate(&simh_unit, simh_unit.wait);   /* activate unit                                */
+        sim_activate(&simh_unit, simh_unit.wait);   /* activate unit */
     return SCPE_OK;
 }
 
@@ -1175,7 +1229,7 @@ static int32 simh_in(const int32 port) {
 
         case getHostFilenamesCmd:
 #if UNIX_PLATFORM
-            if (globValid)
+            if (globValid) {
                 if (globPosNameList < globS.gl_pathc) {
                     if (!(result = globS.gl_pathv[globPosNameList][globPosName++])) {
                         globPosNameList++;
@@ -1187,13 +1241,13 @@ static int32 simh_in(const int32 port) {
                     lastCommand = 0;
                     globfree(&globS);
                 }
+            }
 #elif defined (_WIN32)
             if (globValid)
                 if (globFinished)
                     globValid = FALSE;
-                else if (firstPathCharacter <= lastPathSeparator) {
+                else if (firstPathCharacter <= lastPathSeparator)
                     result = cpmCommandLine[firstPathCharacter++];
-                }
                 else if (!(result = FindFileData.cFileName[globPosName++])) {
                     globPosName = firstPathCharacter = 0;
                     if (!FindNextFile(hFind, &FindFileData)) {
@@ -1296,7 +1350,7 @@ static int32 simh_in(const int32 port) {
                 result = getBankSelect();
             else {
                 result = 0;
-                TRACE_PRINT(VERBOSE_MSG,
+                TRACE_PRINT(simh_device, VERBOSE_MSG,
                             ("SIMH: " ADDRESS_FORMAT " Get selected bank ignored for non-banked memory." NLP, PCX));
             }
             lastCommand = 0;
@@ -1340,7 +1394,7 @@ static int32 simh_in(const int32 port) {
             break;
 
         default:
-            TRACE_PRINT(VERBOSE_MSG,
+            TRACE_PRINT(simh_device, VERBOSE_MSG,
                         ("SIMH: " ADDRESS_FORMAT " Undefined IN from SIMH pseudo device on port %03xh ignored." NLP,
                          PCX, port));
             result = lastCommand = 0;
@@ -1349,6 +1403,10 @@ static int32 simh_in(const int32 port) {
 }
 
 void do_SIMH_sleep(void) {
+    /* Do not sleep when timer interrupts are pending or are about to be created.
+     Otherwise there is the possibility that such interrupts are skipped. */
+    if ((simh_unit.flags & UNIT_SIMH_TIMERON) && rtc_avail && (sim_os_msec() + 1 >= timeOfNextInterrupt))
+        return;
 #if defined (_WIN32)
     if ((SIMHSleep / 1000) && !sio_unit.u4) /* time to sleep and SIO not attached to a file */
         Sleep(SIMHSleep / 1000);
@@ -1390,7 +1448,7 @@ static int32 simh_out(const int32 port, const int32 data) {
             if (cpu_unit.flags & UNIT_CPU_BANKED)
                 setBankSelect(data & BANKMASK);
             else {
-                TRACE_PRINT(VERBOSE_MSG,
+                TRACE_PRINT(simh_device, VERBOSE_MSG,
                             ("SIMH: " ADDRESS_FORMAT " Set selected bank to %i ignored for non-banked memory."
                              NLP, PCX, data & 3));
             }
@@ -1405,6 +1463,12 @@ static int32 simh_out(const int32 port, const int32 data) {
             else {
                 timerDelta |= (data << 8);
                 setTimerDeltaPos = lastCommand = 0;
+                if (timerDelta == 0) {
+                    timerDelta = DEFAULT_TIMER_DELTA;
+                    TRACE_PRINT(simh_device, VERBOSE_MSG,
+                                ("SIMH: " ADDRESS_FORMAT " Timer delta set to 0 ms ignored. Using %i ms instead."
+                                 NLP, PCX, DEFAULT_TIMER_DELTA));
+                }
             }
             break;
 
@@ -1420,7 +1484,7 @@ static int32 simh_out(const int32 port, const int32 data) {
             break;
 
         default:
-            TRACE_PRINT(CMD_MSG,
+            TRACE_PRINT(simh_device, CMD_MSG,
                 ("SIMH: " ADDRESS_FORMAT " CMD(0x%02x) <- %i (0x%02x, '%s')" NLP, PCX, port, data, data,
                 (0 <= data) && (data <= lastSIMHCommand) ? cmdNames[data] : "Unknown command"));
 
@@ -1435,7 +1499,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         createCPMCommandLine();
                         globError = glob(cpmCommandLine, GLOB_ERR, NULL, &globS);
                         if (globError) {
-                            TRACE_PRINT(VERBOSE_MSG,
+                            TRACE_PRINT(simh_device, VERBOSE_MSG,
                                         ("SIMH: " ADDRESS_FORMAT " Cannot expand '%s'. Error is %i."
                                          NLP, PCX, cpmCommandLine, globError));
                             globfree(&globS);
@@ -1451,7 +1515,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                         setLastPathSeparator();
                         hFind = FindFirstFile(cpmCommandLine, &FindFileData);
                         if (hFind == INVALID_HANDLE_VALUE) {
-                            TRACE_PRINT(VERBOSE_MSG,
+                            TRACE_PRINT(simh_device, VERBOSE_MSG,
                                         ("SIMH: " ADDRESS_FORMAT " Cannot expand '%s'. Error is %lu."
                                          NLP, PCX, cpmCommandLine, GetLastError()));
                             globValid = FALSE;
@@ -1465,21 +1529,18 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 case printTimeCmd:  /* print time */
-                    if (rtc_avail) {
+                    if (rtc_avail)
                         printf("SIMH: " ADDRESS_FORMAT " Current time in milliseconds = %d." NLP, PCX, sim_os_msec());
-                    }
-                    else {
+                    else
                         warnNoRealTimeClock();
-                    }
                     break;
 
                 case startTimerCmd: /* create a new timer on top of stack */
                     if (rtc_avail)
                         if (markTimeSP < TIMER_STACK_LIMIT)
                             markTime[markTimeSP++] = sim_os_msec();
-                        else {
+                        else
                             printf("SIMH: " ADDRESS_FORMAT " Timer stack overflow." NLP, PCX);
-                        }
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1490,15 +1551,14 @@ static int32 simh_out(const int32 port, const int32 data) {
                             uint32 delta = sim_os_msec() - markTime[--markTimeSP];
                             printf("SIMH: " ADDRESS_FORMAT " Timer stopped. Elapsed time in milliseconds = %d." NLP, PCX, delta);
                         }
-                        else {
+                        else
                             printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
-                        }
                     else
                         warnNoRealTimeClock();
                     break;
 
                 case resetPTRCmd:   /* reset ptr device */
-                    ptr_reset(NULL);
+                    ptr_reset(&ptr_dev);
                     break;
 
                 case attachPTRCmd:  /* attach ptr to the file with name at beginning of CP/M command line */
@@ -1569,9 +1629,8 @@ static int32 simh_out(const int32 port, const int32 data) {
                             uint32 delta = sim_os_msec() - markTime[markTimeSP - 1];
                             printf("SIMH: " ADDRESS_FORMAT " Timer running. Elapsed in milliseconds = %d." NLP, PCX, delta);
                         }
-                        else {
+                        else
                             printf("SIMH: " ADDRESS_FORMAT " No timer active." NLP, PCX);
-                        }
                     else
                         warnNoRealTimeClock();
                     break;
@@ -1622,7 +1681,7 @@ static int32 simh_out(const int32 port, const int32 data) {
                     break;
 
                 default:
-                    TRACE_PRINT(CMD_MSG,
+                    TRACE_PRINT(simh_device, CMD_MSG,
                                 ("SIMH: " ADDRESS_FORMAT " Unknown command (%i) to SIMH pseudo device on port %03xh ignored."
                                  NLP, PCX, data, port));
                 }
@@ -1635,13 +1694,13 @@ int32 simh_dev(const int32 port, const int32 io, const int32 data) {
     int32 result = 0;
     if (io == 0) {
         result = simh_in(port);
-        TRACE_PRINT(IN_MSG,
+        TRACE_PRINT(simh_device, IN_MSG,
             ("SIMH: " ADDRESS_FORMAT " IN(0x%02x) -> %i (0x%02x, '%c')" NLP, PCX, port, result, result,
             (32 <= (result & 0xff)) && ((result & 0xff) <= 127) ? (result & 0xff) : '?'));
 
     }
     else {
-        TRACE_PRINT(OUT_MSG,
+        TRACE_PRINT(simh_device, OUT_MSG,
             ("SIMH: " ADDRESS_FORMAT " OUT(0x%02x) <- %i (0x%02x, '%c')" NLP, PCX, port, data, data,
             (32 <= (data & 0xff)) && ((data & 0xff) <= 127) ? (data & 0xff) : '?'));
         simh_out(port, data);

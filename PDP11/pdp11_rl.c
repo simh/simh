@@ -1,6 +1,6 @@
 /* pdp11_rl.c: RL11 (RLV12) cartridge disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl           RL11(RLV12)/RL01/RL02 cartridge disk
 
+   10-Oct-09    RMS     Added debug support
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -192,6 +193,7 @@ extern uint32 cpu_opt;
 #define RLBAE_IMP       0000077                         /* implemented */
 
 extern int32 int_req[IPL_HLVL];
+extern FILE *sim_deb;
 
 uint16 *rlxb = NULL;                                    /* xfer buffer */
 int32 rlcs = 0;                                         /* control/status */
@@ -283,7 +285,7 @@ DEVICE rl_dev = {
     RL_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
     NULL, NULL, &rl_reset,
     &rl_boot, &rl_attach, NULL,
-    &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &rl_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS
     };
 
 /* I/O dispatch routines, I/O addresses 17774400 - 17774407
@@ -333,6 +335,9 @@ switch ((PA >> 1) & 07) {                               /* decode PA<2:1> */
         break;
         }                                               /* end switch */
 
+if (DEBUG_PRS (rl_dev))
+    fprintf (sim_deb, ">>RL read: reg%d=%o\n", (PA >> 1) & 07, *data);
+
 return SCPE_OK;
 }
 
@@ -340,6 +345,9 @@ t_stat rl_wr (int32 data, int32 PA, int32 access)
 {
 int32 curr, offs, newc, maxc;
 UNIT *uptr;
+
+if (DEBUG_PRS (rl_dev))
+    fprintf (sim_deb, ">>RL write: reg%d=%o\n", (PA >> 1) & 07, data);
 
 switch ((PA >> 1) & 07) {                               /* decode PA<2:1> */
 

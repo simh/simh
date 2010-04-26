@@ -152,6 +152,7 @@ extern t_stat set_iobase(UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat show_iobase(FILE *st, UNIT *uptr, int32 val, void *desc);
 extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
+extern int32 find_unit_index (UNIT *uptr);
 
 t_stat wd179x_svc (UNIT *uptr);
 
@@ -165,9 +166,6 @@ extern uint8 GetBYTEWrapper(const uint32 Addr);
 #define UNIT_WD179X_VERBOSE      (1 << UNIT_V_WD179X_VERBOSE)
 #define WD179X_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
 #define WD179X_CAPACITY_SSSD     (77*1*26*128)   /* Single-sided Single Density IBM Diskette1 */
-#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
-#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
-#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
 
 /* Write Track (format) Statemachine states */
 #define FMT_GAP1    1
@@ -197,7 +195,6 @@ extern uint8 GetBYTEWrapper(const uint32 Addr);
 
 static int32 wd179xdev(const int32 port, const int32 io, const int32 data);
 static t_stat wd179x_reset(DEVICE *dptr);
-int32 find_unit_index (UNIT *uptr);
 uint8 floorlog2(unsigned int n);
 
 WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 } };
@@ -278,8 +275,6 @@ static t_stat wd179x_reset(DEVICE *dptr)
     return SCPE_OK;
 }
 
-extern int32 find_unit_index (UNIT *uptr);
-
 void wd179x_external_restore(void)
 {
     WD179X_DRIVE_INFO    *pDrive;
@@ -330,8 +325,8 @@ t_stat wd179x_attach(UNIT *uptr, char *cptr)
     wd179x_info->drive[i].ready = 0;
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
-        if(strncmp(header, "IMD", 3)) {
+        char *rtn = fgets(header, 4, uptr->fileref);
+        if ((rtn != NULL) && strncmp(header, "IMD", 3)) {
             printf("WD179X: Only IMD disk images are supported\n");
             wd179x_info->drive[i].uptr = NULL;
             return SCPE_OPENERR;

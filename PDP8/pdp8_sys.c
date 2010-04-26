@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Mar-09    RMS     Added link to FPP
    24-Jun-08    RMS     Fixed bug in new rim loader (found by Don North)
    24-May-08    RMS     Fixed signed/unsigned declaration inconsistency
    03-Sep-07    RMS     Added FPP8 support
@@ -52,6 +53,7 @@
 extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
 extern DEVICE tsc_dev;
+extern DEVICE fpp_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tti_dev, tto_dev;
 extern DEVICE clk_dev, lpt_dev;
@@ -91,6 +93,7 @@ int32 sim_emax = 4;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &tsc_dev,
+    &fpp_dev,
     &clk_dev,
     &ptr_dev,
     &ptp_dev,

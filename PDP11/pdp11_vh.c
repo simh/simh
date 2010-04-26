@@ -1,6 +1,6 @@
 /* pdp11_vh.c: DHQ11 asynchronous terminal multiplexor simulator
 
-   Copyright (c) 2004-2008, John A. Dundas III
+   Copyright (c) 2004-2010, John A. Dundas III
    Portions derived from work by Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    vh		    DHQ11 asynch multiplexor for SIMH
 
+   03-Jan-10    JAD     Eliminate gcc warnings
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -258,13 +259,13 @@ static const int32 bitmask[4] = { 037, 077, 0177, 0377 };
 /* RX FIFO state */
 
 static int32	rbuf_idx[VH_MUXES]		= { 0 };/* index into vh_rbuf */
-static uint32   vh_rbuf[VH_MUXES][FIFO_SIZE]    = { 0 };
+static uint32   vh_rbuf[VH_MUXES][FIFO_SIZE]    = { { 0 } };
 
 /* TXQ state */
 
 #define	TXQ_SIZE	(16)
 static int32	txq_idx[VH_MUXES]		= { 0 };
-static uint32	vh_txq[VH_MUXES][TXQ_SIZE]	= { 0 };
+static uint32	vh_txq[VH_MUXES][TXQ_SIZE]	= { { 0 } };
 
 /* Need to extend the TMLN structure */
 
@@ -279,9 +280,9 @@ typedef struct {
 	uint16	txchar;		/* single character I/O */
 } TMLX;
 
-static TMLN vh_ldsc[VH_MUXES * VH_LINES] = { 0 };
+static TMLN vh_ldsc[VH_MUXES * VH_LINES] = { { 0 } };
 static TMXR vh_desc = { VH_MUXES * VH_LINES, 0, 0, vh_ldsc };
-static TMLX vh_parm[VH_MUXES * VH_LINES] = { 0 };
+static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
 
 /* Forward references */
 static t_stat vh_rd (int32 *data, int32 PA, int32 access);
@@ -675,7 +676,7 @@ static void vh_getc (	int32	vh	)
 
 	for (i = 0; i < VH_LINES; i++) {
 		lp = &vh_parm[(vh * VH_LINES) + i];
-		while (c = tmxr_getc_ln (lp->tmln)) {
+		while ((c = tmxr_getc_ln (lp->tmln)) != 0) {
 			if (c & SCPE_BREAK) {
 				fifo_put (vh, lp,
 					RBUF_FRAME_ERR | RBUF_PUTLINE (i));
@@ -786,7 +787,7 @@ static t_stat vh_wr (	int32	data,
 		if (access == WRITEB)
 			data = (PA & 1) ?
 				(vh_csr[vh] & 0377) | (data << 8) :
-				(vh_csr[vh] & ~0377) | data & 0377;
+				(vh_csr[vh] & ~0377) | (data & 0377);
 		if (data & CSR_MASTER_RESET) {
 			if ((vh_unit[vh].flags & UNIT_MODEDHU) && (data & CSR_SKIP))
 				data &= ~CSR_MASTER_RESET;
@@ -877,7 +878,7 @@ static t_stat vh_wr (	int32	data,
 		if (access == WRITEB)
 			data = (PA & 1) ?
 				(lp->lpr & 0377) | (data << 8) :
-				(lp->lpr & ~0377) | data & 0377;
+				(lp->lpr & ~0377) | (data & 0377);
 		/* Modify only if CSR<3:0> == 0 */
 		if (CSR_GETCHAN (vh_csr[vh]) != 0)
 			data &= ~LPR_DISAB_XRPT;
@@ -926,7 +927,7 @@ static t_stat vh_wr (	int32	data,
 		if (access == WRITEB)
 			data = (PA & 1) ?
 				(lp->lnctrl & 0377) | (data << 8) :
-				(lp->lnctrl & ~0377) | data & 0377;
+				(lp->lnctrl & ~0377) | (data & 0377);
 		/* catch the abort TX transition */
 		if (!(lp->lnctrl & LNCTRL_TX_ABORT) &&
 		     (data & LNCTRL_TX_ABORT)) {
@@ -993,7 +994,7 @@ static t_stat vh_wr (	int32	data,
 		if (access == WRITEB)
 			data = (PA & 1) ?
 				(lp->tbuf1 & 0377) | (data << 8) :
-				(lp->tbuf1 & ~0377) | data & 0377;
+				(lp->tbuf1 & ~0377) | (data & 0377);
 		lp->tbuf1 = data;
 		break;
 	case 6:		/* TBUFFAD2 */
@@ -1008,7 +1009,7 @@ static t_stat vh_wr (	int32	data,
 		if (access == WRITEB)
 			data = (PA & 1) ?
 				(lp->tbuf2 & 0377) | (data << 8) :
-				(lp->tbuf2 & ~0377) | data & 0377;
+				(lp->tbuf2 & ~0377) | (data & 0377);
 		lp->tbuf2 = data;
 		/* if starting a DMA, clear DMA_ERR */
 		if (vh_unit[vh].flags & UNIT_FASTDMA) {
@@ -1028,7 +1029,7 @@ static t_stat vh_wr (	int32	data,
 		if (access == WRITEB)
 			data = (PA & 1) ?
 				(lp->tbuffct & 0377) | (data << 8) :
-				(lp->tbuffct & ~0377) | data & 0377;
+				(lp->tbuffct & ~0377) | (data & 0377);
 		lp->tbuffct = data;
 		break;
 	default:

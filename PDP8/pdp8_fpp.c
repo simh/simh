@@ -1,6 +1,6 @@
 /* pdp8_fpp.c: PDP-8 floating point processor (FPP8A)
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,27 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    fpp          FPP8A floating point processor
+
+   03-Jan-10    RMS     Initialized variables statically, for VMS compiler
+   19-Apr-09    RHM     FPICL does not clear all command and status reg bits
+                            modify fpp_reset to conform with FPP
+   27-Mar-09    RHM     Fixed handling of Underflow fix (zero FAC on underflow)
+                        Implemented FPP division and multiplication algorithms
+                        FPP behavior on traps - FEXIT does not update APT
+                        Follow FPP settings for OPADD 
+                        Correct detection of DP add/sub overflow
+                        Detect and handle add/sub overshift
+                        Single-step mode made consistent with FPP
+                        Write calculation results prior to traps
+   24-Mar-09    RMS     Many fixes from Rick Murphy:
+                        Fix calculation of ATX shift amount
+                        Added missing () to read, write XR macros
+                        Fixed indirect address calculation
+                        Fixed == written as = in normalization
+                        Fixed off-by-one count bug in multiplication
+                        Removed extraneous ; in divide
+                        Fixed direction of compare in divide
+                        Fixed count direction bug in alignment
 
    Floating point formats:
 
@@ -85,8 +106,8 @@ extern UNIT cpu_unit;
 
 /* Index registers are in memory */
 
-#define fpp_read_xr(xr) fpp_read (fpp_xra + xr)
-#define fpp_write_xr(xr,d) fpp_write (fpp_xra +xr, d)
+#define fpp_read_xr(xr) fpp_read (fpp_xra + (xr))
+#define fpp_write_xr(xr,d) fpp_write (fpp_xra + (xr), d)
 
 /* Command register */
 
@@ -112,8 +133,7 @@ extern UNIT cpu_unit;
 #define FPS_IOVX        00200                           /* int ovf exit */
 #define FPS_FOVX        00100                           /* flt ovf exit */
 #define FPS_UNF         00040                           /* underflow */
-#define FPS_UNFX        00020                           /* undf exit */
-#define FPS_XXXM        00010                           /* FADDM/FMULM */
+#define FPS_XXXM        00020                           /* FADDM/FMULM */
 #define FPS_LOCK        (FPC_LOCK)                      /* lockout */
 #define FPS_EP          00004                           /* ext prec */
 #define FPS_PAUSE       00002                           /* paused */
@@ -124,24 +144,28 @@ extern UNIT cpu_unit;
 #define FPN_FRSIGN      04000
 #define FPN_NFR_FP      2                               /* std precision */
 #define FPN_NFR_EP      5                               /* ext precision */
+#define FPN_NFR_MDS     6                               /* mul/div precision */
 #define EXACT           (uint32)((fpp_sta & FPS_EP)? FPN_NFR_EP: FPN_NFR_FP)
 #define EXTEND          ((uint32) FPN_NFR_EP)
 
 typedef struct {
-    int32	exp;
-    uint32      fr[FPN_NFR_EP];
+    int32       exp;
+    uint32      fr[FPN_NFR_MDS+1];
     } FPN;
 
-uint32 fpp_apta;                                        /* APT pointer */
-uint32 fpp_aptsvf;                                      /* APT saved field */
-uint32 fpp_opa;                                         /* operand pointer */
-uint32 fpp_fpc;                                         /* FP PC */
-uint32 fpp_bra;                                         /* base reg pointer */
-uint32 fpp_xra;                                         /* indx reg pointer */
-uint32 fpp_cmd;                                         /* command */
-uint32 fpp_sta;                                         /* status */
-uint32 fpp_flag;                                        /* flag */
+uint32 fpp_apta = 0;                                    /* APT pointer */
+uint32 fpp_aptsvf = 0;                                  /* APT saved field */
+uint32 fpp_opa = 0;                                     /* operand pointer */
+uint32 fpp_fpc = 0;                                     /* FP PC */
+uint32 fpp_bra = 0;                                     /* base reg pointer */
+uint32 fpp_xra = 0;                                     /* indx reg pointer */
+uint32 fpp_cmd = 0;                                     /* command */
+uint32 fpp_sta = 0;                                     /* status */
+uint32 fpp_flag = 0;                                    /* flag */
 FPN fpp_ac;                                             /* FAC */
+uint32 fpp_ssf = 0;                                     /* single-step flag */
+uint32 fpp_last_lockbit = 0;                            /* last lockbit */
+
 static FPN fpp_zero = { 0, { 0, 0, 0, 0, 0 } };
 static FPN fpp_one = { 1, { 02000, 0, 0, 0, 0 } };
 
@@ -155,13 +179,13 @@ uint32 fpp_2wd_dir (uint32 ir);
 uint32 fpp_indir (uint32 ir);
 uint32 fpp_ad15 (uint32 hi);
 uint32 fpp_adxr (uint32 ir, uint32 base_ad);
-t_bool fpp_add (FPN *a, FPN *b, uint32 sub);
-t_bool fpp_mul (FPN *a, FPN *b);
-t_bool fpp_div (FPN *a, FPN *b);
+void fpp_add (FPN *a, FPN *b, uint32 sub);
+void fpp_mul (FPN *a, FPN *b);
+void fpp_div (FPN *a, FPN *b);
 t_bool fpp_imul (FPN *a, FPN *b);
-uint32 fpp_fr_add (uint32 *c, uint32 *a, uint32 *b);
-void fpp_fr_sub (uint32 *c, uint32 *a, uint32 *b);
-void fpp_fr_mul (uint32 *c, uint32 *a, uint32 *b);
+uint32 fpp_fr_add (uint32 *c, uint32 *a, uint32 *b, uint32 cnt);
+void fpp_fr_sub (uint32 *c, uint32 *a, uint32 *b, uint32 cnt);
+void fpp_fr_mul (uint32 *c, uint32 *a, uint32 *b, t_bool fix);
 t_bool fpp_fr_div (uint32 *c, uint32 *a, uint32 *b);
 uint32 fpp_fr_neg (uint32 *a, uint32 cnt);
 int32 fpp_fr_cmp (uint32 *a, uint32 *b, uint32 cnt);
@@ -214,6 +238,8 @@ REG fpp_reg[] = {
     { ORDATA (BRA, fpp_bra, 15) },
     { ORDATA (XRA, fpp_xra, 15) },
     { ORDATA (OPA, fpp_opa, 15) },
+    { ORDATA (SSF, fpp_ssf, 12) },
+    { ORDATA (LASTLOCK, fpp_last_lockbit, 12) },
     { FLDATA (FLAG, fpp_flag, 0) },
     { NULL }
     };
@@ -242,6 +268,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
     case 3:                                             /* FPCOM */
         if (!fpp_flag && !(fpp_sta & FPS_RUN)) {        /* flag clr, !run? */
             fpp_cmd = AC;                               /* load cmd */
+            fpp_last_lockbit = fpp_cmd & FPS_LOCK;      /* remember lock state */
             fpp_sta = (fpp_sta & ~FPC_STA) |            /* copy flags */
                 (fpp_cmd & FPC_STA);                    /* to status */
             }
@@ -251,16 +278,25 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         if (fpp_sta & FPS_RUN) {                        /* running? */
             if (fpp_sta & FPS_PAUSE)                    /* paused? */
                 fpp_fpc = (fpp_fpc - 1) & ADDRMASK;     /* decr FPC */
+            fpp_sta &= ~FPS_PAUSE;                      /* no longer paused */
             sim_cancel (&fpp_unit);                     /* stop execution */
             fpp_dump_apt (fpp_apta, FPS_HLTX);          /* dump APT */
+            fpp_ssf = 1;                                /* assume sstep */
             }
-        else sim_activate (&fpp_unit, 0);               /* single step */
+        else if (!fpp_flag)
+            fpp_ssf = 1;                                /* FPST sing steps */
+        if (fpp_sta & FPS_DVZX)                         /* fix diag timing */
+            fpp_sta |= FPS_HLTX;
         break;
 
     case 5:                                             /* FPST */
         if (!fpp_flag && !(fpp_sta & FPS_RUN)) {        /* flag clr, !run? */
+            if (fpp_ssf)
+                fpp_sta |= fpp_last_lockbit; 
+            fpp_sta &= ~FPS_HLTX;                       /* Clear halted */
             fpp_apta = (FPC_GETAPTF (fpp_cmd) << 12) | AC;
             fpp_load_apt (fpp_apta);                    /* load APT */
+            fpp_opa = fpp_fpc;
             sim_activate (&fpp_unit, 0);                /* start unit */
             return IOT_SKP | AC;
             }
@@ -278,7 +314,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
         if (fpp_flag) {                                 /* if flag set */
             uint32 old_sta = fpp_sta;
             fpp_flag = 0;                               /* clr flag, status */
-            fpp_sta = 0;
+            fpp_sta &= ~(FPS_DP|FPS_EP|FPS_TRPX|FPS_DVZX|FPS_IOVX|FPS_FOVX|FPS_UNF);
             int_req &= ~INT_FPP;                        /* clr int req */
             return IOT_SKP | old_sta;                   /* ret old status */
             }
@@ -296,8 +332,10 @@ int32 fpp56 (int32 IR, int32 AC)
 switch (IR & 07) {                                      /* decode IR<9:11> */
 
     case 7:                                             /* FPEP */
-        if ((AC & 04000) && !(fpp_sta & FPS_RUN))       /* if AC0, not run, */
+        if ((AC & 04000) && !(fpp_sta & FPS_RUN)) {     /* if AC0, not run, */
             fpp_sta = (fpp_sta | FPS_EP) & ~FPS_DP;     /* set ep */
+            AC = 0;
+            }
         break;
 
     default:
@@ -314,6 +352,7 @@ t_stat fpp_svc (UNIT *uptr)
 FPN x;
 uint32 ir, op, op2, op3, ad, ea, wd;
 uint32 i;
+int32 sc;
 
 fpp_ac.exp = SEXT12 (fpp_ac.exp);                       /* sext AC exp */
 do {                                                    /* repeat */
@@ -332,7 +371,11 @@ do {                                                    /* repeat */
             switch (op3) {                              /* case on subsubop */
 
             case 0:                                     /* FEXIT */
-                fpp_dump_apt (fpp_apta, 0);
+            /* if already trapped, don't update APT, just update status */
+                if (fpp_sta & (FPS_DVZX|FPS_IOVX|FPS_FOVX|FPS_UNF)) 
+                    fpp_sta |= FPS_HLTX;
+                else
+                    fpp_dump_apt (fpp_apta, 0);
                 break;
 
             case 1:                                     /* FPAUSE */
@@ -351,8 +394,7 @@ do {                                                    /* repeat */
                 if (!(fpp_sta & FPS_DP)) {              /* fp or ep only */
                     fpp_copy (&x, &fpp_ac);             /* copy AC */
                     fpp_norm (&x, EXACT);               /* do exact length */
-                    if (!fpp_test_xp (&x))              /* no trap? */
-                        fpp_copy (&fpp_ac, &x);         /* copy back */
+                    fpp_copy (&fpp_ac, &x);             /* copy back */
                     }
                 break;
 
@@ -360,8 +402,7 @@ do {                                                    /* repeat */
                 if (fpp_sta & FPS_EP) {                 /* if ep, */
                     fpp_copy (&x, &fpp_ac);             /* copy AC */
                     fpp_round (&x);                     /* round */
-                    if (!fpp_test_xp (&x))              /* no trap? */
-                        fpp_copy (&fpp_ac, &x);         /* copy back */
+                    fpp_copy (&fpp_ac, &x);             /* copy back */
                     }
                 fpp_sta &= ~(FPS_DP|FPS_EP);
                 break;
@@ -377,17 +418,22 @@ do {                                                    /* repeat */
             break;
 
         case 001:                                       /* ALN */
-            if (op3 != 0)                               /* if xr, */
+            if (op3 != 0) {                             /* if xr, */
                 wd = fpp_read_xr (op3);                 /* use val */
+                fpp_opa = fpp_xra + op3;
+                }
             else wd = 027;                              /* else 23 */
             if (!(fpp_sta & FPS_DP)) {                  /* fp or ep? */
-                int32 t = wd - fpp_ac.exp;              /* alignment */
-                fpp_ac.exp = SEXT12 (wd);               /* new exp */
-                wd = t & 07777;
+                sc = (SEXT12(wd) - fpp_ac.exp) & 07777; /* alignment */
+                sc = SEXT12 (sc);
+                fpp_ac.exp = SEXT12(wd);                /* new exp */
                 }
-            if (wd & 04000)                             /* left? */
-                fpp_fr_lshn (fpp_ac.fr, 04000 - wd, EXACT);
-            else fpp_fr_algn (fpp_ac.fr, wd, EXACT);
+            else sc = SEXT12 (wd);                      /* dp - simple cnt */
+            if (sc < 0)                                 /* left? */
+                fpp_fr_lshn (fpp_ac.fr,  -sc, EXACT);
+            else fpp_fr_algn (fpp_ac.fr, sc, EXACT);
+            if (fpp_fr_test (fpp_ac.fr, 0, EXACT) == 0) /* zero? */
+                fpp_ac.exp = 0;                         /* clean exp */
             break;
 
         case 002:                                       /* ATX */
@@ -395,10 +441,10 @@ do {                                                    /* repeat */
                 fpp_write_xr (op3, fpp_ac.fr[1]);       /* xr<-FAC<12:23> */
             else {
                 fpp_copy (&x, &fpp_ac);                 /* copy AC */
-                wd = (fpp_ac.exp - 027) & 07777;        /* shift amt */
-                if (wd & 04000)                         /* left? */
-                    fpp_fr_lshn (x.fr, 04000 - wd, EXACT);
-                else fpp_fr_algn (x.fr, wd, EXACT);
+                sc = 027 - x.exp;                       /* shift amt */
+                if (sc < 0)                             /* left? */
+                    fpp_fr_lshn (x.fr, -sc, EXACT);
+                else fpp_fr_algn (x.fr, sc, EXACT);
                 fpp_write_xr (op3, x.fr[1]);            /* xr<-val<12:23> */
                 }
             break;
@@ -411,10 +457,11 @@ do {                                                    /* repeat */
             x.exp = 027;                                /* standard exp */
             if (!(fpp_sta & FPS_DP)) {                  /* fp or ep? */
                 fpp_norm (&x, EXACT);                   /* normalize */
-                if (fpp_test_xp (&x))                   /* exception? */
-                    break;
                 }
             fpp_copy (&fpp_ac, &x);                     /* result to AC */
+            if (fpp_sta & FPS_DP)                       /* dp skips exp */
+                fpp_ac.exp = x.exp;                     /*  so force copy */
+            fpp_opa = fpp_xra + op3;
             break;
 
         case 004:                                       /* NOP */
@@ -431,12 +478,14 @@ do {                                                    /* repeat */
         case 010:                                       /* LDX */
             wd = fpp_ad15 (0);                          /* load XR immed */
             fpp_write_xr (op3, wd);
+            fpp_opa = fpp_xra + op3;
             break;
 
         case 011:                                       /* ADDX */
             wd = fpp_ad15 (0);
             wd = wd + fpp_read_xr (op3);                /* add to XR immed */
             fpp_write_xr (op3, wd);                     /* trims to 12b */
+            fpp_opa = fpp_xra + op3;
             break;
 
         default:
@@ -452,6 +501,9 @@ do {                                                    /* repeat */
     case 002:
         ea = fpp_2wd_dir (ir);
         fpp_read_op (ea, &fpp_ac);
+        if (fpp_sta & FPS_DP)
+            fpp_opa = ea + 1;
+        else fpp_opa = ea + 2;
         break;
 
     case 003:
@@ -480,13 +532,14 @@ do {                                                    /* repeat */
         case 012:                                       /* JSA */
             fpp_write (ad, 01030 + (fpp_fpc >> 12));    /* save return */
             fpp_write (ad + 1, fpp_fpc);                /* trims to 12b */
-            fpp_fpc = (ad + 2) & ADDRMASK;            
+            fpp_fpc = (ad + 2) & ADDRMASK;
+            fpp_opa = fpp_fpc - 1;
             break;
 
         case 013:                                       /* JSR */
             fpp_write (fpp_bra + 1, 01030 + (fpp_fpc >> 12));
             fpp_write (fpp_bra + 2, fpp_fpc);           /* trims to 12b */
-            fpp_fpc = ad;
+            fpp_opa = fpp_fpc = ad;
             break;
 
         default:
@@ -512,17 +565,18 @@ do {                                                    /* repeat */
         fpp_add (&fpp_ac, &x, 0);
         break;
 
-    case 010:                                           /* JNX */
+    case 010: {                                         /* JNX */
+        uint32 xrn = op2 & 07;
         ad = fpp_ad15 (op3);                            /* get 15b addr */
-        wd = fpp_read_xr (op2 & 07);                    /* read xr */
-        if (ir & 00100) {                               /* inc? */
+        wd = fpp_read_xr (xrn);                         /* read xr */
+        if (op2 & 010) {                                /* inc? */
             wd = (wd + 1) & 07777;
-            fpp_write_xr (op2 & 07, wd);                /* ++xr */
+            fpp_write_xr (xrn, wd);                     /* ++xr */
             }
         if (wd != 0)                                    /* xr != 0? */
             fpp_fpc = ad;                               /* jump */
         break;
-
+        }
     case 011:                                           /* FSUB */
         ea = fpp_1wd_dir (ir);
         fpp_read_op (ea, &x);
@@ -591,24 +645,24 @@ do {                                                    /* repeat */
         fpp_sta |= FPS_XXXM;
         ea = fpp_1wd_dir (ir);
         fpp_read_op (ea, &x);
-        if (!fpp_add (&x, &fpp_ac, 0))                  /* no trap? */
-            fpp_write_op (ea, &x);                      /* store result */
+        fpp_add (&x, &fpp_ac, 0);
+        fpp_write_op (ea, &x);                          /* store result */
         break;
         
     case 026:
         fpp_sta |= FPS_XXXM;
         ea = fpp_2wd_dir (ir);
         fpp_read_op (ea, &x);
-        if (!fpp_add (&x, &fpp_ac, 0))                  /* no trap? */
-            fpp_write_op (ea, &x);                      /* store result */
+        fpp_add (&x, &fpp_ac, 0);
+        fpp_write_op (ea, &x);                          /* store result */
         break;
 
     case 027:
         fpp_sta |= FPS_XXXM;
         ea = fpp_indir (ir);
         fpp_read_op (ea, &x);
-        if (!fpp_add (&x, &fpp_ac, 0))                  /* no trap? */
-            fpp_write_op (ea, &x);                      /* store result */
+        fpp_add (&x, &fpp_ac, 0);
+        fpp_write_op (ea, &x);                          /* store result */
         break;
 
     case 030:                                           /* IMUL/LEA */
@@ -649,6 +703,7 @@ do {                                                    /* repeat */
             fpp_sta = (fpp_sta | FPS_DP) & ~FPS_EP;     /* set dp */
             fpp_ac.fr[0] = (ea >> 12) & 07;
             fpp_ac.fr[1] = ea & 07777;
+            fpp_opa = ea;
             }
         break;
 
@@ -656,30 +711,35 @@ do {                                                    /* repeat */
         fpp_sta |= FPS_XXXM;
         ea = fpp_1wd_dir (ir);
         fpp_read_op (ea, &x);
-        if (!fpp_mul (&x, &fpp_ac))                     /* no trap? */
-            fpp_write_op (ea, &x);                      /* store result */
+        fpp_mul (&x, &fpp_ac);
+        fpp_write_op (ea, &x);                          /* store result */
         break;
         
     case 036:
         fpp_sta |= FPS_XXXM;
         ea = fpp_2wd_dir (ir);
         fpp_read_op (ea, &x);
-        if (!fpp_mul (&x, &fpp_ac))                     /* no trap? */
-            fpp_write_op (ea, &x);                      /* store result */
+        fpp_mul (&x, &fpp_ac);
+        fpp_write_op (ea, &x);                          /* store result */
         break;
 
     case 037:
         fpp_sta |= FPS_XXXM;
         ea = fpp_indir (ir);
         fpp_read_op (ea, &x);
-        if (!fpp_mul (&x, &fpp_ac))                     /* no trap? */
-            fpp_write_op (ea, &x);                      /* store result */
+        fpp_mul (&x, &fpp_ac);
+        fpp_write_op (ea, &x);                          /* store result */
         break;
         }                                               /* end sw op+mode */
 
+    if (fpp_ssf) {
+        fpp_dump_apt (fpp_apta, FPS_HLTX);              /* dump APT */
+        fpp_ssf = 0;
+        }
+
     if (sim_interval)
         sim_interval = sim_interval - 1;
-    } while ((sim_interval > 0) &&
+    } while ((sim_interval > 0) && 
              ((fpp_sta & (FPS_RUN|FPS_PAUSE|FPS_LOCK)) == (FPS_RUN|FPS_LOCK)));
 if ((fpp_sta & (FPS_RUN|FPS_PAUSE)) == FPS_RUN)
     sim_activate (uptr, 1);
@@ -696,7 +756,11 @@ uint32 ad;
 ad = fpp_bra + ((ir & 0177) * 3);                       /* base + 3*7b off */
 if (fpp_sta & FPS_DP)                                   /* dp? skip exp */
     ad = ad + 1;
-return ad & ADDRMASK;
+ad = ad & ADDRMASK;
+if (fpp_sta & FPS_DP)
+    fpp_opa = ad + 1;
+else fpp_opa = ad + 2;
+return ad;
 }
 
 uint32 fpp_2wd_dir (uint32 ir)
@@ -709,13 +773,18 @@ return fpp_adxr (ir, ad);                               /* do indexing */
 
 uint32 fpp_indir (uint32 ir)
 {
-uint32 ad, iad, wd1, wd2;
+uint32 ad, wd1, wd2;
 
 ad = fpp_bra + ((ir & 07) * 3);                         /* base + 3*3b off */
-iad = fpp_adxr (ir, ad);                                /* do indexing */
-wd1 = fpp_read (iad + 1);                               /* read wds 2,3 */
-wd2 = fpp_read (iad + 2);
-return ((wd1 & 07) << 12) | wd2;                        /* return addr */
+wd1 = fpp_read (ad + 1);                                /* bp+off points to */
+wd2 = fpp_read (ad + 2);
+ad = ((wd1 & 07) << 12) | wd2;                          /* indirect ptr */
+
+ad = fpp_adxr (ir, ad);                                 /* do indexing */
+if (fpp_sta & FPS_DP)
+    fpp_opa = ad + 1;
+else fpp_opa = ad + 2;
+return ad;
 }
 
 uint32 fpp_ad15 (uint32 hi)
@@ -738,8 +807,10 @@ if (ir & 0100) {                                        /* increment? */
     fpp_write_xr (xr, wd);
     }
 if (xr != 0) {                                          /* indexed? */
-    if (fpp_sta & FPS_EP) wd = wd * 6;                  /* scale by len */
-    else if (fpp_sta & FPS_DP) wd = wd * 2;
+    if (fpp_sta & FPS_EP)
+        wd = wd * 6;                                    /* scale by len */
+    else if (fpp_sta & FPS_DP)
+        wd = wd * 2;
     else wd = wd * 3;
     return (base_ad + wd) & ADDRMASK;                   /* return index */
     }
@@ -748,22 +819,28 @@ else return base_ad & ADDRMASK;                         /* return addr */
 
 /* Computation routines */
 
-/* Fraction/floating add - return true if overflow */
+/* Fraction/floating add */
 
-t_bool fpp_add (FPN *a, FPN *b, uint32 sub)
+void fpp_add (FPN *a, FPN *b, uint32 sub)
 {
 FPN x, y, z;
-uint32 ediff, c;
+uint32 c, ediff;
 
 fpp_zcopy (&x, a);                                      /* copy opnds */
 fpp_zcopy (&y, b);
 if (sub)                                                /* subtract? */
     fpp_fr_neg (y.fr, EXACT);                           /* neg B, exact */
 if (fpp_sta & FPS_DP) {                                 /* dp? */
-    fpp_fr_add (z.fr, x.fr, y.fr);                      /* z = a + b */
-    if ((~x.fr[0] ^ y.fr[0]) & (x.fr[0] ^ z.fr[0]) & FPN_FRSIGN) {
+    uint32 cout = fpp_fr_add (z.fr, x.fr, y.fr, EXTEND);/* z = a + b */
+    uint32 zsign = z.fr[0] & FPN_FRSIGN;
+    cout = (cout? 04000: 0);                            /* make sign bit */
+    /* overflow is indicated when signs are equal and overflow does not
+       match the result sign bit */
+    fpp_copy (a, &z);                                   /* result is z */
+    if (!((x.fr[0] ^ y.fr[0]) & FPN_FRSIGN) && (cout != zsign)) {
+        fpp_copy (a, &z);                               /* copy out result */
         fpp_dump_apt (fpp_apta, FPS_IOVX);              /* int ovf? */
-        return TRUE;
+        return;
         }
     }
 else {                                                  /* fp or ep */
@@ -778,11 +855,11 @@ else {                                                  /* fp or ep */
             y = z;
             }
         ediff = x.exp - y.exp;                          /* exp diff */
-        z.exp = x.exp;                                  /* result exp */
-        if (ediff <= (fpp_sta & FPS_EP)? 59: 24) {      /* any add? */
+        if (ediff <= (uint32) ((fpp_sta & FPS_EP)? 59: 24)) { /* any add? */
+            z.exp = x.exp;                              /* result exp */
             if (ediff != 0)                             /* any align? */
                 fpp_fr_algn (y.fr, ediff, EXTEND);      /* align, 60b */
-            c = fpp_fr_add (z.fr, x.fr, y.fr);          /* add fractions */
+            c = fpp_fr_add (z.fr, x.fr, y.fr, EXTEND);  /* add fractions */
             if ((((x.fr[0] ^ y.fr[0]) & FPN_FRSIGN) == 0) && /* same signs? */
                 (c ||                                   /* carry out? */
                 ((~x.fr[0] & z.fr[0] & FPN_FRSIGN)))) { /* + to - change? */
@@ -790,57 +867,66 @@ else {                                                  /* fp or ep */
                 z.exp = z.exp + 1;                      /* incr exp */
                 }                                       /* end same signs */
             }                                           /* end in range */
+            else z = x;                                 /* ovrshift */
         }                                               /* end ops != 0 */
     if (fpp_norm (&z, EXTEND))                          /* norm, !exact? */
         fpp_round (&z);                                 /* round */
-    if (fpp_test_xp (&z))                               /* ovf, unf? */
-        return TRUE;
+    fpp_copy (a, &z);                                   /* copy out */
+    fpp_test_xp (&z);                                   /* ovf, unf? */
     }                                                   /* end else */
-fpp_copy (a, &z);                                       /* result is z */
-return FALSE;
+return;
 }
 
-/* Fraction/floating multiply - return true if overflow */
+/* Fraction/floating multiply */
 
-t_bool fpp_mul (FPN *a, FPN *b)
+void fpp_mul (FPN *a, FPN *b)
 {
 FPN x, y, z;
 
 fpp_zcopy (&x, a);                                      /* copy opnds */
 fpp_zcopy (&y, b);
+if ((fpp_fr_test(y.fr, 0, EXACT-1) == 0) && (y.fr[EXACT-1] < 2)) {
+    y.exp = 0;
+    y.fr[EXACT-1] = 0;
+}
 if (fpp_sta & FPS_DP)                                   /* dp? */
-    fpp_fr_mul (z.fr, x.fr, y.fr);                      /* mult frac */
+    fpp_fr_mul (z.fr, x.fr, y.fr, TRUE);                /* mult frac */
 else {                                                  /* fp or ep */
+    fpp_norm (&x, EXACT);
+    fpp_norm (&y, EXACT);
     z.exp = x.exp + y.exp;                              /* add exp */
-    fpp_fr_mul (z.fr, x.fr, y.fr);                      /* mult frac */
+    fpp_fr_mul (z.fr, x.fr, y.fr, TRUE);                /* mult frac */
     if (fpp_norm (&z, EXTEND))                          /* norm, !exact? */
         fpp_round (&z);                                 /* round */
-    if (fpp_test_xp (&z))                               /* ovf, unf? */
-        return TRUE;
+    fpp_copy (a, &z);
+    if (z.exp > 2047)
+        fpp_dump_apt (fpp_apta, FPS_FOVX);              /* trap */
+    return;
     }
 fpp_copy (a, &z);                                       /* result is z */
-return FALSE;
+return;
 }
 
-/* Fraction/floating divide - return true if div by zero or overflow */
+/* Fraction/floating divide */
 
-t_bool fpp_div (FPN *a, FPN *b)
+void fpp_div (FPN *a, FPN *b)
 {
 FPN x, y, z;
 
 if (fpp_fr_test (b->fr, 0, EXACT) == 0) {               /* divisor 0? */
     fpp_dump_apt (fpp_apta, FPS_DVZX);                  /* error */
-    return TRUE;
+    return;
     }
 if (fpp_fr_test (a->fr, 0, EXACT) == 0)                 /* dividend 0? */
-    return FALSE;                                       /* quotient is 0 */
+    return;                                             /* quotient is 0 */
 fpp_zcopy (&x, a);                                      /* copy opnds */
 fpp_zcopy (&y, b);
 if (fpp_sta & FPS_DP) {                                 /* dp? */
     if (fpp_fr_div (z.fr, x.fr, y.fr)) {                /* fr div, ovflo? */
         fpp_dump_apt (fpp_apta, FPS_IOVX);              /* error */
-        return TRUE;
+        return;
         }
+    fpp_copy (a, &z);                                   /* result is z */
     }
 else {                                                  /* fp or ep */
     fpp_norm (&y, EXACT);                               /* norm divisor */
@@ -856,11 +942,15 @@ else {                                                  /* fp or ep */
         }
     if (fpp_norm (&z, EXTEND))                          /* norm, !exact? */
         fpp_round (&z);                                 /* round */
-    if (fpp_test_xp (&z))                               /* ovf, unf? */
-        return TRUE;
+    fpp_copy (a, &z);
+    if (z.exp > 2048) {                                /* underflow? */
+        if (fpp_cmd & FPC_UNFX) {                       /* trap? */
+            fpp_dump_apt (fpp_apta, FPS_UNF);
+            return;
+            }
+        }
     }
-fpp_copy (a, &z);                                       /* result is z */
-return FALSE;
+return;
 }
 
 /* Integer multiply - returns true if overflow */
@@ -872,15 +962,17 @@ FPN x, y, z;
 
 fpp_zcopy (&x, a);                                      /* copy args */
 fpp_zcopy (&y, b);
-fpp_fr_mul (z.fr, x.fr, y.fr);                          /* mult fracs */
+fpp_fr_mul (z.fr, x.fr, y.fr, FALSE);                   /* mult fracs */
+a->fr[0] = z.fr[1];                                     /* low 24b */
+a->fr[1] = z.fr[2];
+if ((a->fr[0] == 0) && (a->fr[1] == 0))                 /* fpp zeroes exp */
+    a->exp = 0;                                         /* even in dp mode */
 sext = (z.fr[2] & FPN_FRSIGN)? 07777: 0;
 if (((z.fr[0] | z.fr[1] | sext) != 0) &&                /* hi 25b == 0 */
     ((z.fr[0] & z.fr[1] & sext) != 07777)) {            /* or 777777774? */
     fpp_dump_apt (fpp_apta, FPS_IOVX);
     return TRUE;
     }
-a->fr[0] = z.fr[2];                                     /* low 24b */
-a->fr[1] = z.fr[3];
 return FALSE;
 }
 
@@ -926,7 +1018,7 @@ if (fpp_fr_test (a->fr, 0, cnt) == 0) {                 /* zero? */
     return FALSE;                                       /* don't round */
     }
 while (((a->fr[0] == 0) && !(a->fr[1] & 04000)) ||      /* lead 13b same? */
-       ((a->fr[0] = 07777) && (a->fr[1] & 04000))) {
+       ((a->fr[0] == 07777) && (a->fr[1] & 04000))) {
     fpp_fr_lsh12 (a->fr, cnt);                          /* move word */
     a->exp = a->exp - 12;
     }
@@ -967,6 +1059,8 @@ for (i = 0; i < FPN_NFR_EP; i++) {
         a->fr[i] = b->fr[i];
     else a->fr[i] = 0;
     }
+a->fr[i++] = 0;
+a->fr[i] = 0;
 return;
 }
 
@@ -979,9 +1073,8 @@ if (a->exp > 2047) {                                /* overflow? */
     return TRUE;
     }
 if (a->exp < -2048) {                               /* underflow? */
-    fpp_sta |= FPS_UNF;                             /* set flag */
-    if (fpp_sta & FPS_UNFX) {                       /* trap? */
-        fpp_dump_apt (fpp_apta, FPS_UNFX);
+    if (fpp_cmd & FPC_UNFX) {                       /* trap? */
+        fpp_dump_apt (fpp_apta, FPS_UNF);
         return TRUE;
         }
     fpp_copy (a, &fpp_zero);                        /* flush to 0 */
@@ -1015,13 +1108,14 @@ return;
 
 /* N-precision integer routines */
 
-/* Fraction add/sub - always carried out to 60b */
+/* Fraction add/sub */
 
-uint32 fpp_fr_add (uint32 *c, uint32 *a, uint32 *b)
+uint32 fpp_fr_add (uint32 *c, uint32 *a, uint32 *b, uint32 cnt)
+
 {
 uint32 i, cin;
 
-for (i = FPN_NFR_EP, cin = 0; i > 0; i--) {
+for (i = cnt, cin = 0; i > 0; i--) {
     c[i - 1] = a[i - 1] + b[i - 1] + cin;
     cin = (c[i - 1] >> 12) & 1;
     c[i - 1] = c[i - 1] & 07777;
@@ -1029,11 +1123,11 @@ for (i = FPN_NFR_EP, cin = 0; i > 0; i--) {
 return cin;
 }
 
-void fpp_fr_sub (uint32 *c, uint32 *a, uint32 *b)
+void fpp_fr_sub (uint32 *c, uint32 *a, uint32 *b, uint32 cnt)
 {
 uint32 i, cin;
 
-for (i = FPN_NFR_EP, cin = 0; i > 0; i--) {
+for (i = cnt, cin = 0; i > 0; i--) {
     c[i - 1] = a[i - 1] - b[i - 1] - cin;
     cin = (c[i - 1] >> 12) & 1;
     c[i - 1] = c[i - 1] & 07777;
@@ -1062,25 +1156,48 @@ return;
    If a-sign != c-sign, shift-in = result-sign
    */
 
-void fpp_fr_mul (uint32 *c, uint32 *a, uint32 *b)
+void fpp_fr_mul (uint32 *c, uint32 *a, uint32 *b, t_bool fix)
 {
-uint32 i, cnt, lo, c_old, cin;
+uint32 i, cnt, lo, wc, fill, b_sign;
 
-fpp_fr_fill (c, 0, EXTEND);                         /* clr answer */
+b_sign = b[0] & FPN_FRSIGN;                         /* remember b's sign */
+
+fpp_fr_fill (c, 0, FPN_NFR_MDS);                    /* clr answer */
 if (fpp_sta & FPS_EP)                               /* ep? */
-    lo = FPN_NFR_EP - 1;                            /* test <59> */
-else lo = FPN_NFR_FP - 1;                           /* sp, test <23> */
-cnt = (lo + 1) * 12;                                /* # iterations */
-for (i = 0; i < cnt; i++) {                         /* loop thru mpcd */
-    c_old = c[0];
-    if (b[lo] & 1)                                  /* mpcd bit set? */
-        fpp_fr_add (c, a, c);                       /* add mpyr */
-    cin = (((a[0] ^ c_old) & FPN_FRSIGN)? c[0]: a[0]) & FPN_FRSIGN;
-    fpp_fr_rsh1 (c, cin, EXTEND);                   /* shift answer */
-    fpp_fr_rsh1 (b, 0, EXACT);                      /* shift mpcd */
+    lo = FPN_NFR_EP;                                /* low order mpyr word */
+else  
+    lo = FPN_NFR_FP;                                /* low order mpyr word */
+
+if (fix)
+    fpp_fr_algn (a, 12, FPN_NFR_MDS + 1);           /* fill left with sign */
+wc = 2;                                             /* 3 words at start */
+fill = 0;
+cnt = lo * 12;                                      /* total steps */
+for (i = 0; i < cnt; i++) { 
+    if ((i % 12) == 0) {
+        wc++;                                       /* do another word */
+        lo--;                                       /* and next mpyr word */
+        fpp_fr_algn (c, 24, wc + 1);
+        c[wc] = 0;
+        c[0] = c[1] = fill;                         /* propagate sign */
+        }
+    if (b[lo] & FPN_FRSIGN)                         /* mpyr bit set? */
+        fpp_fr_add(c, a, c, wc);
+    fill = ((c[0] & FPN_FRSIGN) ? 07777 : 0);       /* remember sign */
+    fpp_fr_lsh1 (c, wc);                            /* shift the result */
+    fpp_fr_lsh1 (b + lo, 1);                        /* shift mpcd */
+    
     }
-if (a[0] & FPN_FRSIGN)                              /* mpyr negative? */
-    fpp_fr_sub (c, c, a);                           /* adjust result */
+
+if (!fix)                                           /* imul shifts result */
+    fpp_fr_rsh1 (c, c[0] & FPN_FRSIGN, EXACT + 1);  /* result is 1 wd right */
+if (b_sign) {                                       /* if mpyr was negative */
+    if (fix)
+        fpp_fr_lsh12 (a, FPN_NFR_MDS+1);            /* restore a */
+    fpp_fr_sub (c, c, a, EXACT);                    /* adjust result */
+    fpp_fr_sub (c, c, a, EXACT);
+    }
+
 return;
 }
 
@@ -1088,29 +1205,35 @@ return;
 
 t_bool fpp_fr_div (uint32 *c, uint32 *a, uint32 *b)
 {
-uint32 i, old_c, lo, cnt, sign;
+uint32 i, old_c, lo, cnt, sign, b_sign, addsub, limit;
+/* Number of words processed by each divide step */
+static uint32 limits[7] = {6, 6, 5, 4, 3, 3, 2};
 
-fpp_fr_fill (c, 0, EXTEND);                         /* clr answer */
+fpp_fr_fill (c, 0, FPN_NFR_MDS);                    /* clr answer */
 sign = (a[0] ^ b[0]) & FPN_FRSIGN;                  /* sign of result */
+b_sign = (b[0] & FPN_FRSIGN);
 if (a[0] & FPN_FRSIGN)                              /* |a| */
     fpp_fr_neg (a, EXACT);
-if (b[0] & FPN_FRSIGN);                             /* |b| */
-    fpp_fr_neg (b, EXACT);
-if (fpp_sta & FPS_EP)                               /* ep? 5 words */
-    lo = FPN_NFR_EP - 1;
-else lo = FPN_NFR_FP;                               /* fp, dp? 3 words */
+if (fpp_sta & FPS_EP)                               /* ep? 6 words */
+    lo = FPN_NFR_EP-1;
+else lo = FPN_NFR_FP-1;                             /* fp, dp? 3 words */
 cnt = (lo + 1) * 12;
+addsub = 04000;                                     /* setup first op */
 for (i = 0; i < cnt; i++) {                         /* loop */
-    fpp_fr_lsh1 (c, EXTEND);                        /* shift quotient */
-    if (fpp_fr_cmp (a, b, EXTEND) >= 0) {           /* sub work? */
-        fpp_fr_sub (a, a, b);                       /* divd - divr */
-        if (a[0] & FPN_FRSIGN)                      /* sign flip? */
-            return TRUE;                            /* no, overflow */
+    limit = limits[i / 12];                         /* how many wds this time */
+    fpp_fr_lsh1 (c, FPN_NFR_MDS);                   /* shift quotient */
+    if (addsub ^ b_sign)                            /* diff signs, subtr */
+        fpp_fr_sub (a, a, b, limit);                /* divd - divr */
+    else
+        fpp_fr_add (a, a, b, limit);                /* restore */
+    if (!(a[0] & FPN_FRSIGN)) {
         c[lo] |= 1;                                 /* set quo bit */
+        addsub = 04000;                             /* sign for nxt loop */
         }
-    fpp_fr_lsh1 (a, EXTEND);                        /* shift dividend */
+    else addsub = 0;
+    fpp_fr_lsh1 (a, limit);                         /* shift dividend */
     }
-old_c = c[0];                                       /* save hi quo */
+old_c = c[0];                                       /* save ho quo */
 if (sign)                                           /* expect neg ans? */
     fpp_fr_neg (c, EXTEND);                         /* -quo */
 if (old_c & FPN_FRSIGN)                             /* sign set before */
@@ -1126,7 +1249,7 @@ uint32 i, cin;
 
 for (i = cnt, cin = 1; i > 0; i--) {
     a[i - 1] = (~a[i - 1] + cin) & 07777;
-    cin = (a[i - 1] == 0);
+    cin = (cin != 0 && a[i - 1] == 0);
     }
 return cin;
 }
@@ -1244,7 +1367,7 @@ if (sc >= (cnt * 12)) {                             /* out of range? */
     return;
     }
 while (sc >= 12) {
-    for (i = cnt - 1; i > 0; i++)
+    for (i = cnt - 1; i > 0; i--)
         a[i] = a[i - 1];
     a[0] = sign;
     sc = sc - 12;
@@ -1263,7 +1386,6 @@ void fpp_read_op (uint32 ea, FPN *a)
 {
 uint32 i;
 
-fpp_opa = ea;
 if (!(fpp_sta & FPS_DP)) {
     a->exp = fpp_read (ea++);
     a->exp = SEXT12 (a->exp);
@@ -1277,7 +1399,7 @@ void fpp_write_op (uint32 ea, FPN *a)
 {
 uint32 i;
 
-fpp_opa = ea;
+fpp_opa = ea + 2;
 if (!(fpp_sta & FPS_DP))
     fpp_write (ea++, a->exp);
 for (i = 0; i < EXACT; i++)
@@ -1328,7 +1450,7 @@ fpp_fpc = ((wd0 & 07) << 12) | apt_read (ad++);
 if (FPC_GETFAST (fpp_cmd) != 017) {
     fpp_xra = ((wd0 & 00070) << 9) | apt_read (ad++);
     fpp_bra = ((wd0 & 00700) << 6) | apt_read (ad++);
-    ad++;
+    fpp_opa = ((wd0 & 07000) << 3) | apt_read (ad++);
     fpp_ac.exp = apt_read (ad++);
     for (i = 0; i < EXACT; i++)
         fpp_ac.fr[i] = apt_read (ad++);
@@ -1370,9 +1492,8 @@ return;
 t_stat fpp_reset (DEVICE *dptr)
 {
 sim_cancel (&fpp_unit);
-fpp_sta = 0;
-fpp_cmd = 0;
 fpp_flag = 0;
+fpp_last_lockbit = 0;
 int_req &= ~INT_FPP;
 if (sim_switches & SWMASK ('P')) {
     fpp_apta = 0;
@@ -1382,6 +1503,14 @@ if (sim_switches & SWMASK ('P')) {
     fpp_xra = 0;
     fpp_opa = 0;
     fpp_ac = fpp_zero;
+    fpp_ssf = 0;
+    fpp_sta = 0;
+    fpp_cmd = 0;
     }
+else {
+    fpp_sta &= ~(FPS_DP|FPS_EP|FPS_TRPX|FPS_DVZX|FPS_IOVX|FPS_FOVX|FPS_UNF);
+    fpp_cmd &= (FPC_DP|FPC_UNFX|FPC_IE);
+    }
+
 return SCPE_OK;
 }

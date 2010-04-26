@@ -1,6 +1,6 @@
 /* pdp11_cr.c: CR/CM/CD-11 card reader simulator
 
-   Copyright (c) 2005-2007, John A. Dundas III
+   Copyright (c) 2005-2010, John A. Dundas III
    Portions derived from work by Douglas W. Jones, jones@cs.uiowa.edu
    Portions derived from work by Robert M Supnik
 
@@ -87,6 +87,7 @@
 
   Revision History:
 
+   03-Jan-10    JAD     Eliminate gcc warnings
    01-Feb-07    RMS     Added PDP-10 support
    12-May-06    JAD     Modify the DEBUG code to use the SIMH DEBUG_x
                         macros.  Modify the UNIT structure to include

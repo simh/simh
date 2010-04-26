@@ -251,13 +251,19 @@ SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
 SDS_OPT = -I ${SDSD}
 
+SWTPD = SWTP
+SWTP = ${SWTPD}/swtp_cpu.c ${SWTPD}/swtp_dsk.c ${SWTPD}/swtp_sio.c \
+	${SWTPD}/swtp_sys.c
+SWTP_OPT = -I ${SWTPD}
+
+
 #
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
 	altair altairz80 gri i1620 i7094 ibm1130 id16 \
-	id32 sds lgp h316 
+	id32 sds lgp h316 swtp
 
 all : ${ALL}
 
@@ -400,3 +406,8 @@ sds : ${BIN}sds${EXE}
 
 ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} -o $@ ${LDFLAGS}
+
+swtp : ${BIN}swtp${EXE}
+
+${BIN}swtp${EXE} : ${SWTP} ${SIM}
+	${CC} ${SWTP} ${SIM} ${SWTP_OPT} -o $@ ${LDFLAGS}

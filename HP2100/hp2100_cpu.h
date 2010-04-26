@@ -1,6 +1,6 @@
 /* hp2100_cpu.h: HP 2100 CPU definitions
 
-   Copyright (c) 2005-2008, Robert M. Supnik
+   Copyright (c) 2005-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jan-10    RMS     Changed declarations of mp_control, mp_mefvv, for VMS compiler
    15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.c and hp2100_defs.h
    26-Jun-08    JDB     Added mp_control to CPU state externals
    24-Apr-08    JDB     Added calc_defer() prototype
@@ -285,10 +286,10 @@ extern uint32  dms_enb;
 extern uint32  dms_ump;
 extern uint32  dms_sr;
 extern uint32  dms_vr;
-extern uint32  mp_control;
+extern FLIP_FLOP  mp_control;
 extern uint32  mp_fence;
 extern uint32  mp_viol;
-extern uint32  mp_mevff;
+extern FLIP_FLOP  mp_mevff;
 extern uint32  iop_sp;
 extern t_bool  ion_defer;
 extern uint32  intaddr;

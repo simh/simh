@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2008, Peter Schorn
+    Copyright (c) 2002-2010, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -319,7 +319,7 @@ static t_stat dsk_boot(int32 unitno, DEVICE *dptr) {
 }
 
 static int32 dskseek(const UNIT *xptr) {
-    return fseek(xptr -> fileref, DSK_TRACSIZE * current_track[current_disk] +
+    return sim_fseek(xptr -> fileref, DSK_TRACSIZE * current_track[current_disk] +
         DSK_SECTSIZE * current_sector[current_disk], SEEK_SET);
 }
 
@@ -338,9 +338,9 @@ static void writebuf(void) {
             printf("DSK%i: " ADDRESS_FORMAT " fseek failed D%d T%d S%d" NLP, current_disk,
                    PCX, current_disk, current_track[current_disk], current_sector[current_disk]);
         }
-        rtn = fwrite(dskbuf, DSK_SECTSIZE, 1, uptr -> fileref);
-        if (rtn != 1) {
-            printf("DSK%i: " ADDRESS_FORMAT " fwrite failed T%d S%d Return=%d" NLP, current_disk,
+        rtn = sim_fwrite(dskbuf, 1, DSK_SECTSIZE, uptr -> fileref);
+        if (rtn != DSK_SECTSIZE) {
+            printf("DSK%i: " ADDRESS_FORMAT " sim_fwrite failed T%d S%d Return=%d" NLP, current_disk,
                    PCX, current_track[current_disk], current_sector[current_disk], rtn);
         }
     }
@@ -507,7 +507,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 /* Disk Data In/Out */
 
 int32 dsk12(const int32 port, const int32 io, const int32 data) {
-    int32 i;
+    int32 i, rtn;
     UNIT *uptr;
 
     if (current_disk >= NUM_OF_DSK) {
@@ -530,8 +530,21 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
                          PCX, current_disk, current_track[current_disk], current_sector[current_disk]));
             for (i = 0; i < DSK_SECTSIZE; i++)
                 dskbuf[i] = 0;
-            dskseek(uptr);
-            fread(dskbuf, DSK_SECTSIZE, 1, uptr -> fileref);
+            if (dskseek(uptr)) {
+                if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK12 < warnLevelDSK)) {
+                    warnDSK12++;
+                    printf("DSK%i: " ADDRESS_FORMAT " fseek error D%d T%d S%d" NLP, current_disk,
+                           PCX, current_disk, current_track[current_disk], current_sector[current_disk]);
+                }
+            }
+            rtn = sim_fread(dskbuf, 1, DSK_SECTSIZE, uptr -> fileref);
+            if (rtn != DSK_SECTSIZE) {
+                if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK12 < warnLevelDSK)) {
+                    warnDSK12++;
+                    printf("DSK%i: " ADDRESS_FORMAT " sim_fread error D%d T%d S%d" NLP, current_disk,
+                           PCX, current_disk, current_track[current_disk], current_sector[current_disk]);
+                }
+            }
             current_byte[current_disk] = 0;
         }
         return dskbuf[current_byte[current_disk]++] & 0xff;

@@ -165,7 +165,7 @@ static t_stat n8vem_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reset." NLP));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reset.\n"));
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &n8vemdev, TRUE);
@@ -196,7 +196,7 @@ static t_stat n8vem_reset(DEVICE *dptr)
 
 static t_stat n8vem_boot(int32 unitno, DEVICE *dptr)
 {
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Boot." NLP));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Boot.\n"));
 
     /* Clear the RAM and ROM mapping registers */
     n8vem_info->mpcl_ram = 0;
@@ -211,7 +211,7 @@ static t_stat n8vem_boot(int32 unitno, DEVICE *dptr)
 static t_stat n8vem_attach(UNIT *uptr, char *cptr)
 {
     t_stat r;
-    int32 i = 0;
+    int32 i = 0, rtn;
 
     i = find_unit_index(uptr);
 
@@ -226,7 +226,7 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
     /* Determine length of this disk */
     uptr->capac = sim_fsize(uptr->fileref);
 
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Attach %s." NLP, i == 0 ? "ROM" : "RAM"));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Attach %s.\n", i == 0 ? "ROM" : "RAM"));
 
     if(i == 0) { /* Attaching ROM */
         n8vem_info->rom_attached = TRUE;
@@ -239,8 +239,10 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
             if (uptr->capac > N8VEM_ROM_SIZE)
                 uptr->capac = N8VEM_ROM_SIZE;
 
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into ROM.\n", uptr->capac));
-            fread((void *)(n8vem_info->rom), uptr->capac, 1, uptr->fileref);
+            rtn = fread((void *)(n8vem_info->rom), uptr->capac, 1, uptr->fileref);
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into ROM."
+                                      " Result = %ssuccessful.\n",
+                                      uptr->capac, rtn == 1 ? "" : "not "));
         }
     } else { /* attaching RAM */
         /* Erase RAM */
@@ -251,8 +253,10 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
             if(uptr->capac > N8VEM_RAM_SIZE)
                 uptr->capac = N8VEM_RAM_SIZE;
 
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into RAM.\n", uptr->capac));
-            fread((void *)(n8vem_info->ram), uptr->capac, 1, uptr->fileref);
+            rtn = fread((void *)(n8vem_info->ram), uptr->capac, 1, uptr->fileref);
+            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into RAM."
+                                      " Result = %ssuccessful.\n",
+                                      uptr->capac, rtn == 1 ? "" : "not "));
         }
     }
     return r;
@@ -270,7 +274,7 @@ static t_stat n8vem_detach(UNIT *uptr)
         return (SCPE_IERR);
     }
 
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Detach %s." NLP, i == 0 ? "ROM" : "RAM"));
+    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Detach %s.\n", i == 0 ? "ROM" : "RAM"));
 
     /* rewind to the beginning of the file. */
     sim_fseek(uptr->fileref, 0, SEEK_SET);

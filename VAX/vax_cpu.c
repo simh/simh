@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          VAX central processor
 
+   24-Apr-10    RMS     Added OLDVMS idle timer option
+                        Fixed bug in SET CPU IDLE
    21-May-08    RMS     Removed inline support
    28-May-08    RMS     Inlined instruction prefetch, physical memory routines
    13-Aug-07    RMS     Fixed bug in read access g-format indexed specifiers
@@ -173,6 +175,8 @@
 #define UNIT_CONH       (1u << UNIT_V_CONH)
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
+#define VAX_IDLE_DFLT   1000
+#define OLD_IDLE_DFLT   200
 
 #define OPND_SIZE       16
 #define INST_SIZE       52
@@ -259,7 +263,7 @@ int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
 uint32 cpu_idle_ipl_mask = 0x8;                         /* idle if on IPL 3 */
 uint32 cpu_idle_type = 1;                               /* default to VMS */
-int32 cpu_idle_wait = 1000;                             /* for these cycles */
+int32 cpu_idle_wait = VAX_IDLE_DFLT;                    /* for these cycles */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
@@ -3377,15 +3381,17 @@ return more;
 struct os_idle {
     char        *name;
     uint32      mask;
+    int32       value;
     };
 
 static struct os_idle os_tab[] = {
-    { "VMS", 0x8 },
-    { "NETBSD", 0x2 },
-    { "ULTRIX", 0x2 },
-    { "OPENBSD", 0x1 },
-    { "32V", 0x1 },
-    { NULL, 0 }
+    { "VMS", 0x8, VAX_IDLE_DFLT },
+    { "NETBSD", 0x2, VAX_IDLE_DFLT },
+    { "ULTRIX", 0x2, VAX_IDLE_DFLT },
+    { "OPENBSD", 0x1, VAX_IDLE_DFLT },
+    { "32V", 0x1, VAX_IDLE_DFLT },
+    { "OLDVMS", 0xB, OLD_IDLE_DFLT },
+    { NULL, 0, 0 }
     };
 
 /* Set and show idle */
@@ -3399,7 +3405,8 @@ if (cptr != NULL) {
         if (strcmp (os_tab[i].name, cptr) == 0) {
             cpu_idle_type = i + 1;
             cpu_idle_ipl_mask = os_tab[i].mask;
-            return sim_set_idle (uptr, val, cptr, desc);
+            cpu_idle_wait = os_tab[i].value;
+            return sim_set_idle (uptr, val, NULL, desc);
             }
         }
     return SCPE_ARG;

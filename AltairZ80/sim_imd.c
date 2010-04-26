@@ -63,8 +63,11 @@
 #endif
 
 /* use NLP for new line printing while the simulation is running */
-#define UNIX_PLATFORM (defined (__linux) || defined(__NetBSD__) \
-|| defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__))
+#if defined (__linux) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__)
+#define UNIX_PLATFORM 1
+#else
+#define UNIX_PLATFORM 0
+#endif
 
 #if UNIX_PLATFORM
 #define NLP "\r\n"
@@ -72,7 +75,7 @@
 #define NLP "\n"
 #endif
 
-#if defined (__MWERKS__) && defined (macintosh)
+#if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
 #define __FUNCTION__ __FILE__
 #endif
 
@@ -174,7 +177,7 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
     do {
         DBG_PRINT(("start of track %d at file offset %ld" NLP, myDisk->ntracks, ftell(myDisk->file)));
 
-        fread(&imd, 1, 5, myDisk->file);
+        sim_fread(&imd, 1, 5, myDisk->file);
         if (feof(myDisk->file))
             break;
         sectorSize = 128 << imd.sectsize;
@@ -197,7 +200,10 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         myDisk->track[imd.cyl][imd.head].nsects = imd.nsects;
         myDisk->track[imd.cyl][imd.head].sectsize = sectorSize;
 
-        fread(sectorMap, 1, imd.nsects, myDisk->file);
+        if (sim_fread(sectorMap, 1, imd.nsects, myDisk->file) != imd.nsects) {
+            printf("SIM_IMD: Corrupt file [Sector Map]." NLP);
+            return (SCPE_OPENERR);
+        }
         myDisk->track[imd.cyl][imd.head].start_sector = imd.nsects;
         DBG_PRINT(("\tSector Map: "));
         for(i=0;i<imd.nsects;i++) {
@@ -209,7 +215,10 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         DBG_PRINT((", Start Sector=%d", myDisk->track[imd.cyl][imd.head].start_sector));
 
         if(sectorHeadwithFlags & IMD_FLAG_SECT_HEAD_MAP) {
-            fread(sectorHeadMap, 1, imd.nsects, myDisk->file);
+            if (sim_fread(sectorHeadMap, 1, imd.nsects, myDisk->file) != imd.nsects) {
+                printf("SIM_IMD: Corrupt file [Sector Head Map]." NLP);
+                return (SCPE_OPENERR);
+            }
             DBG_PRINT(("\tSector Head Map: "));
             for(i=0;i<imd.nsects;i++) {
                 DBG_PRINT(("%d ", sectorHeadMap[i]));
@@ -223,7 +232,10 @@ static t_stat diskParse(DISK_INFO *myDisk, uint32 isVerbose)
         }
 
         if(sectorHeadwithFlags & IMD_FLAG_SECT_CYL_MAP) {
-            fread(sectorCylMap, 1, imd.nsects, myDisk->file);
+            if (sim_fread(sectorCylMap, 1, imd.nsects, myDisk->file) != imd.nsects) {
+                printf("SIM_IMD: Corrupt file [Sector Cyl Map]." NLP);
+                return (SCPE_OPENERR);
+            }
             DBG_PRINT(("\tSector Cyl Map: "));
             for(i=0;i<imd.nsects;i++) {
                 DBG_PRINT(("%d ", sectorCylMap[i]));
@@ -541,7 +553,9 @@ t_stat sectRead(DISK_INFO *myDisk,
         case SECT_RECORD_NORM_DAM:      /* Normal Data with deleted address mark */
 
 /*          DBG_PRINT(("Uncompressed Data" NLP)); */
-            fread(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file);
+            if (sim_fread(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file) != myDisk->track[Cyl][Head].sectsize) {
+                printf("SIM_IMD[%s]: sim_fread error for SECT_RECORD_NORM_DAM." NLP, __FUNCTION__);
+            }
             *readlen = myDisk->track[Cyl][Head].sectsize;
             break;
         case SECT_RECORD_NORM_COMP_ERR: /* Compressed Normal Data */
@@ -641,7 +655,7 @@ t_stat sectWrite(DISK_INFO *myDisk,
     }
 
     fputc(sectRecordType, myDisk->file);
-    fwrite(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file);
+    sim_fwrite(buf, 1, myDisk->track[Cyl][Head].sectsize, myDisk->file);
     *writelen = myDisk->track[Cyl][Head].sectsize;
 
     return(SCPE_OK);
@@ -729,9 +743,9 @@ t_stat trackWrite(DISK_INFO *myDisk,
     track_header.sectsize = sectorLen;
 
     /* Forward to end of the file, write track header and sector map. */
-    fseek(myDisk->file, 0, SEEK_END);
-    fwrite(&track_header, sizeof(IMD_HEADER), 1, fileref);
-    fwrite(sectorMap, 1, numSectors, fileref);
+    sim_fseek(myDisk->file, 0, SEEK_END);
+    sim_fwrite(&track_header, 1, sizeof(IMD_HEADER), fileref);
+    sim_fwrite(sectorMap, 1, numSectors, fileref);
 
     /* Compute data length, and fill a sector buffer with the
      * sector record type as the first byte, and fill the sector
@@ -744,7 +758,7 @@ t_stat trackWrite(DISK_INFO *myDisk,
 
     /* For each sector on the track, write the record type and sector data. */
     for(i=0;i<numSectors;i++) {
-        fwrite(sectorData, 1, dataLen, fileref);
+        sim_fwrite(sectorData, 1, dataLen, fileref);
     }
 
     /* Flush the file, and free the sector buffer. */
@@ -756,3 +770,25 @@ t_stat trackWrite(DISK_INFO *myDisk,
 
     return(SCPE_OK);
 }
+
+/* Utility function to set the image type for a unit to the correct value.
+ * Prints an error message in case a CPT image is presented and returns
+ * SCPE_OPENERR in this case. Otherwise the return value is SCPE_OK
+ */
+t_stat assignDiskType(UNIT *uptr) {
+    t_stat result = SCPE_OK;
+    char header[4];
+    if (fgets(header, 4, uptr->fileref) == NULL)
+        uptr->u3 = IMAGE_TYPE_DSK;
+    else if (strncmp(header, "IMD", 3) == 0)
+        uptr->u3 = IMAGE_TYPE_IMD;
+    else if(strncmp(header, "CPT", 3) == 0) {
+        printf("CPT images not yet supported.\n");
+        uptr->u3 = IMAGE_TYPE_CPT;
+        result = SCPE_OPENERR;
+    }
+    else
+        uptr->u3 = IMAGE_TYPE_DSK;
+    return result;
+}
+

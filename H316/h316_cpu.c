@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2008, Robert M. Supnik
+   Copyright (c) 1999-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          H316/H516 CPU
 
+   10-Jan-10    RMS     Fixed bugs in LDX, STX introduced in 3.8-1 (from Theo Engel)
    28-Apr-07    RMS     Removed clock initialization
    03-Apr-06    RMS     Fixed bugs in LLL, LRL (from Theo Engel)
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
@@ -614,13 +615,13 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         break;
 
     case 015: case 055:                                 /* STX */
-        if (reason = Ea (MB, &Y))                       /* eff addr */
+        if (reason = Ea (MB & ~IDX, &Y))                /* eff addr */
             break;
         Write (Y, XR);                                  /* store XR */
         break;
 
     case 035: case 075:                                 /* LDX */
-        if (reason = Ea (MB, &Y))                       /* eff addr */
+        if (reason = Ea (MB & ~IDX, &Y))                /* eff addr */
             break;
         XR = Read (Y);                                  /* load XR */
         break;

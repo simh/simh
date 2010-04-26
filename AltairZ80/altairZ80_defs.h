@@ -1,6 +1,6 @@
 /*  altairz80_defs.h: MITS Altair simulator definitions
 
-    Copyright (c) 2002-2008, Peter Schorn
+    Copyright (c) 2002-2010, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -57,7 +57,8 @@
 #define STOP_HALT       0   /* HALT                                             */
 #define STOP_IBKPT      1   /* breakpoint   (program counter)                   */
 #define STOP_MEM        2   /* breakpoint   (memory access)                     */
-#define STOP_OPCODE     3   /* invalid operation encountered (8080, Z80, 8086)  */
+#define STOP_INSTR      3   /* breakpoint   (instruction access)                */
+#define STOP_OPCODE     4   /* invalid operation encountered (8080, Z80, 8086)  */
 
 #define UNIT_CPU_V_OPSTOP       (UNIT_V_UF+0)               /* stop on invalid operation                    */
 #define UNIT_CPU_OPSTOP         (1 << UNIT_CPU_V_OPSTOP)
@@ -74,8 +75,11 @@
 #define UNIT_CPU_V_SWITCHER     (UNIT_V_UF+6)               /* switcher 8086 <--> 8080/Z80 enabled          */
 #define UNIT_CPU_SWITCHER       (1 << UNIT_CPU_V_SWITCHER)
 
-#define UNIX_PLATFORM (defined (__linux) || defined(__NetBSD__) \
-    || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__))
+#if defined (__linux) || defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__) || defined (__APPLE__)
+#define UNIX_PLATFORM 1
+#else
+#define UNIX_PLATFORM 0
+#endif
 
 #define ADDRESS_FORMAT          "[0x%05x]"
 
@@ -86,7 +90,7 @@
 #define NLP "\n"
 #endif
 
-#if defined (__MWERKS__) && defined (macintosh)
+#if (defined (__MWERKS__) && defined (macintosh)) || defined(__DECC)
 #define __FUNCTION__ __FILE__
 #endif
 

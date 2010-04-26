@@ -7,7 +7,7 @@
 
    2005.03.08 - Started
 
- * (C) Copyright 2005, Brian Knittel.
+ * (C) Copyright 2005-2010, Brian Knittel.
  * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
  * RISK basis, there is no warranty of fitness for any purpose, and the rest of the
  * usual yada-yada. Please keep this notice and the copyright in any distributions
@@ -343,7 +343,7 @@ static void sca_flush (void)
 #endif
 
 		if (sca_sock != INVALID_SOCKET) {
-			nbytes = sim_write_sock(sca_sock, sca_sendbuf, sca_n2send);
+			nbytes = sim_write_sock(sca_sock, (char *) sca_sendbuf, sca_n2send);
 
 			if (nbytes == SOCKET_ERROR)
 				sca_socket_error();
@@ -655,7 +655,7 @@ static void sca_check_indata (void)
 
 #else
 												/* read socket; 0 is returned if no data is available */
-	nbytes = sim_read_sock(sca_sock, sca_rcvbuf, SCA_RCVBUF_SIZE);
+	nbytes = sim_read_sock(sca_sock, (char *) sca_rcvbuf, SCA_RCVBUF_SIZE);
 
 #endif
 

@@ -1,6 +1,6 @@
 /*  altairz80_net.c: networking capability
 
-    Copyright (c) 2002-2008, Peter Schorn
+    Copyright (c) 2002-2010, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -67,7 +67,7 @@ static struct {
     int32   outputPosRead;              /* position of next character to write to ioSocket                      */
     int32   outputPosWrite;             /* position of next character to append to output buffer                */
     int32   outputSize;                 /* number of characters in circular output buffer                       */
-} serviceDescriptor[MAX_CONNECTIONS+1] = {   /* serviceDescriptor[0] holds the information for a client          */
+} serviceDescriptor[MAX_CONNECTIONS + 1] = {    /* serviceDescriptor[0] holds the information for a client      */
 /*  stat    dat ms  ios in      inPR    inPW    inS out     outPR   outPW   outS */
     {0x32,  0x33, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}, /* client Z80 port 50 and 51  */
     {0x28,  0x29, 0,  0,  {0},    0,      0,      0,  {0},    0,      0,      0}, /* server Z80 port 40 and 41  */
@@ -290,7 +290,7 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
         return 0;
     net_svc(&net_unit);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
-        if (serviceDescriptor[i].Z80DataPort == port)
+        if (serviceDescriptor[i].Z80DataPort == port) {
             if (io == 0) {  /* IN   */
                 if (serviceDescriptor[i].inputSize == 0) {
                     printf("re-read from %i" NLP, port);
@@ -323,5 +323,6 @@ int32 netData(const int32 port, const int32 io, const int32 data) {
                                       (32 <= data) && (data <= 127) ? data : '?'));
                 return 0;
             }
+        }
     return 0;
 }

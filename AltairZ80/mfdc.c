@@ -130,9 +130,6 @@ static SECTOR_FORMAT sdata;
 #define UNIT_V_MFDC_VERBOSE     (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_MFDC_VERBOSE       (1 << UNIT_V_MFDC_VERBOSE)
 #define MFDC_CAPACITY           (77*16*MFDC_SECTOR_LEN) /* Default Micropolis Disk Capacity */
-#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
-#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
-#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
 
 static t_stat mfdc_reset(DEVICE *mfdc_dev);
 static t_stat mfdc_attach(UNIT *uptr, char *cptr);
@@ -237,7 +234,6 @@ t_stat mfdc_reset(DEVICE *dptr)
 /* Attach routine */
 t_stat mfdc_attach(UNIT *uptr, char *cptr)
 {
-    char header[4];
     t_stat r;
     unsigned int i = 0;
 
@@ -258,16 +254,10 @@ t_stat mfdc_attach(UNIT *uptr, char *cptr)
     uptr->u3 = IMAGE_TYPE_DSK;
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
-        if(!strcmp(header, "IMD")) {
-            uptr->u3 = IMAGE_TYPE_IMD;
-        } else if(!strcmp(header, "CPT")) {
-            printf("CPT images not yet supported\n");
-            uptr->u3 = IMAGE_TYPE_CPT;
+        r = assignDiskType(uptr);
+        if (r != SCPE_OK) {
             mfdc_detach(uptr);
-            return SCPE_OPENERR;
-        } else {
-            uptr->u3 = IMAGE_TYPE_DSK;
+            return r;
         }
     }
 
@@ -386,6 +376,7 @@ static uint8 MFDC_Read(const uint32 Addr)
 {
     uint8 cData;
     MFDC_DRIVE_INFO *pDrive;
+    int32 rtn;
 
     cData = 0x00;
 
@@ -482,10 +473,13 @@ static uint8 MFDC_Read(const uint32 Addr)
                         } else {
                             sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
-                            fread(sdata.raw, MFDC_SECTOR_LEN, 1, (pDrive->uptr)->fileref);
+                            rtn = sim_fread(sdata.raw, 1, MFDC_SECTOR_LEN, (pDrive->uptr)->fileref);
+                            if (rtn != MFDC_SECTOR_LEN)
 #else
-                            fread(sdata.u.data, 256, 1, (pDrive->uptr)->fileref);
+                            rtn = sim_fread(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
+                            if (rtn != 256)
 #endif /* USE_VGI */
+                                printf("%s: sim_fread error. Result = %d." NLP, __FUNCTION__, rtn);
                         }
                         break;
                     case IMAGE_TYPE_CPT:
@@ -603,9 +597,9 @@ static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
                             } else {
                                 sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
-                                fwrite(sdata.raw, MFDC_SECTOR_LEN, 1, (pDrive->uptr)->fileref);
+                                sim_fwrite(sdata.raw, 1, MFDC_SECTOR_LEN, (pDrive->uptr)->fileref);
 #else
-                                fwrite(sdata.u.data, 256, 1, (pDrive->uptr)->fileref);
+                                sim_fwrite(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
 #endif /* USE_VGI */
                             }
                             break;

@@ -1106,7 +1106,6 @@ uint8 shr_byte(PC_ENV *m, uint8 d, uint8 s)
 uint16 shr_word(PC_ENV *m, uint16 d, uint16 s)
 {
     uint32 cnt,res,cf,mask;
-    res = d;
     if (s < 16)
     {
         cnt = s % 16;

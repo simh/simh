@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2008, Robert M Supnik
+   Copyright (c) 2002-2010, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   14-Jan-09    JH      Added support for RD32 disc drive
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -127,7 +128,7 @@ extern int32 cpu_opt;
 #define UNIT_V_WLK      (UNIT_V_UF + 1)                 /* hwre write lock */
 #define UNIT_V_ATP      (UNIT_V_UF + 2)                 /* attn pending */
 #define UNIT_V_DTYPE    (UNIT_V_UF + 3)                 /* drive type */
-#define UNIT_M_DTYPE    0xF
+#define UNIT_M_DTYPE    0x1F
 #define UNIT_ONL        (1 << UNIT_V_ONL)
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_ATP        (1 << UNIT_V_ATP)
@@ -219,7 +220,7 @@ struct rqpkt {
    RD51 18      4       306     4       1       36*4    21600
    RD31 17      4       615     4       1       3*8     41560
    RD52 17      8       512     8       1       4*8     60480
-x  RD32 17      6       820     ?       ?       ?       83236
+   RD32 17      6       820     6       1       4*8     83204
 x  RD33 17      7       1170    ?       ?       ?       138565
    RD53 17      7       1024    7       1       5*8     138672
    RD54 17      15      1225    15      1       7*8     311200
@@ -505,6 +506,22 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RA71_MED        0x25641047
 #define RA71_FLGS       RQDF_SDI
 
+#define RD32_DTYPE      16
+#define RD32_SECT       17
+#define RD32_SURF       6
+#define RD32_CYL        820
+#define RD32_TPG        RD32_SURF
+#define RD32_GPC        1
+#define RD32_XBN        54
+#define RD32_DBN        48
+#define RD32_LBN        83204
+#define RD32_RCTS       4
+#define RD32_RCTC       8
+#define RD32_RBN        200
+#define RD32_MOD        15
+#define RD32_MED        0x25644020
+#define RD32_FLGS       0
+
 struct drvtyp {
     int32       sect;                                   /* sectors */
     int32       surf;                                   /* surfaces */
@@ -539,6 +556,7 @@ static struct drvtyp drv_tab[] = {
     { RQ_DRV (RA90), "RA90" }, { RQ_DRV (RA92), "RA92" },
     { RQ_DRV (RA8U), "RAUSER" }, { RQ_DRV (RA60), "RA60" },
     { RQ_DRV (RA81), "RA81" }, { RQ_DRV (RA71), "RA71" },
+    { RQ_DRV (RD32), "RD32" },
     { 0 }
     };
 
@@ -723,6 +741,8 @@ MTAB rq_mod[] = {
     { MTAB_XTD | MTAB_VUN, RX33_DTYPE, NULL, "RX33",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RD31_DTYPE, NULL, "RD31",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RD32_DTYPE, NULL, "RD32",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RD51_DTYPE, NULL, "RD51",
       &rq_set_type, NULL, NULL },

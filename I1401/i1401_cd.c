@@ -1,6 +1,6 @@
 /* i1401_cd.c: IBM 1402 card reader/punch
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,8 @@
    Cards are represented as ASCII text streams terminated by newlines.
    This allows cards to be created and edited as normal files.
 
+   24-Mar-09    RMS     Fixed read stacker operation in column binary mode
+                        Fixed punch stacker operation (from Van Snyder)
    28-Jun-07    RMS     Added support for SS overlap modifiers
    19-Jan-07    RMS     Added UNIT_TEXT flag
    20-Sep-05    RMS     Revised for new code tables, compatible colbinary treatment
@@ -59,10 +61,16 @@ extern int32 ind[64], ssa, iochk;
 extern int32 conv_old;
 
 int32 s1sel, s2sel, s4sel, s8sel;
-char rbuf[2 * CBUFSIZE];                                /* > CDR_WIDTH */
+char cdr_buf[(2 * CBUFSIZE) + 1];                       /* > CDR_WIDTH */
+char cdp_buf[(2 * CDP_WIDTH) + 1];                      /* + null */
+int32 cdp_buf_full = 0;                                 /* punch buf full? */
+
 t_stat cdr_svc (UNIT *uptr);
 t_stat cdr_boot (int32 unitno, DEVICE *dptr);
 t_stat cdr_attach (UNIT *uptr, char *cptr);
+t_stat cdp_attach (UNIT *uptr, char *cptr);
+t_stat cdp_detach (UNIT *uptr);
+t_stat cdp_npr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cd_reset (DEVICE *dptr);
 int32 bcd2asc (int32 c, UNIT *uptr);
 char colbin_to_bcd (uint32 cb);
@@ -85,7 +93,7 @@ REG cdr_reg[] = {
     { FLDATA (S2, s2sel, 0) },
     { DRDATA (POS, cdr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, cdr_unit.wait, 24), PV_LEFT },
-    { BRDATA (BUF, rbuf, 8, 8, CDR_WIDTH) },
+    { BRDATA (BUF, cdr_buf, 8, 8, CDR_WIDTH * 2) },
     { NULL }
     };
 
@@ -112,12 +120,17 @@ REG cdp_reg[] = {
     { FLDATA (S4, s4sel, 0) },
     { FLDATA (S8, s8sel, 0) },
     { DRDATA (POS, cdp_unit.pos, T_ADDR_W), PV_LEFT },
+    { BRDATA (BUF, cdp_buf, 8, 8, CDP_WIDTH * 2) },
+    { FLDATA (FULL, cdp_buf_full, 0) },
     { NULL }
     };
 
 MTAB cdp_mod[] = {
     { UNIT_PCH, 0,        "business set", "BUSINESS" },
     { UNIT_PCH, UNIT_PCH, "Fortran set", "FORTRAN" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, NULL, "NPR",
+      &cdp_npr, NULL },
+ 
     { 0 }
     };
 
@@ -125,7 +138,7 @@ DEVICE cdp_dev = {
     "CDP", &cdp_unit, cdp_reg, cdp_mod,
     1, 10, 31, 1, 8, 7,
     NULL, NULL, &cd_reset,
-    NULL, NULL, NULL
+    NULL, &cdp_attach, &cdp_detach
     };
 
 /* Stacker data structures
@@ -152,7 +165,7 @@ REG stack_reg[] = {
     };
 
 DEVICE stack_dev = {
-    "STKR", stack_unit, stack_reg, cdp_mod,
+    "STKR", stack_unit, stack_reg, NULL,
     5, 10, 31, 1, 8, 7,
     NULL, NULL, &cd_reset,
     NULL, NULL, NULL
@@ -178,9 +191,9 @@ if ((cdr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
     return SCPE_UNATT;
 ind[IN_READ] = ind[IN_LST] = s1sel = s2sel = 0;         /* default stacker */
 cbn = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_C);   /* col binary? */
-for (i = 0; i < 2 * CBUFSIZE; i++)                      /* clear extended buf */
-    rbuf[i] = 0;
-fgets (rbuf, (cbn)? 2 * CBUFSIZE: CBUFSIZE,             /* rd bin/char card */
+for (i = 0; i < (2 * CBUFSIZE) + 1; i++)                /* clear extended buf */
+    cdr_buf[i] = 0;
+fgets (cdr_buf, (cbn)? 2 * CBUFSIZE: CBUFSIZE,          /* rd bin/char card */
      cdr_unit.fileref);
 if (feof (cdr_unit.fileref))                            /* eof? */
     return STOP_NOCD;
@@ -202,12 +215,12 @@ if (ssa) {                                              /* if last cd on */
 if (cbn) {                                              /* column binary */
     for (i = 0; i < CDR_WIDTH; i++) {
         if (conv_old) {
-            c1 = ascii2bcd (rbuf[i]);
-            c2 = ascii2bcd (rbuf[CDR_WIDTH + i]);
+            c1 = ascii2bcd (cdr_buf[i]);
+            c2 = ascii2bcd (cdr_buf[CDR_WIDTH + i]);
             }
         else {
-            c1 = ascii2bcd (rbuf[2 * i]);
-            c2 = ascii2bcd (rbuf[(2 * i) + 1]);
+            c1 = ascii2bcd (cdr_buf[2 * i]);
+            c2 = ascii2bcd (cdr_buf[(2 * i) + 1]);
             }
         M[CD_CBUF1 + i] = (M[CD_CBUF1 + i] & WM) | c1;
         M[CD_CBUF2 + i] = (M[CD_CBUF2 + i] & WM) | c2;
@@ -216,8 +229,8 @@ if (cbn) {                                              /* column binary */
     }                                                   /* end if col bin */
 else {                                                  /* normal read */
     for (i = 0; i < CDR_WIDTH; i++) {                   /* cvt to BCD */
-        rbuf[i] = ascii2bcd (rbuf[i]);
-        M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | rbuf[i];
+        c1 = ascii2bcd (cdr_buf[i]);
+        M[CDR_BUF + i] = (M[CDR_BUF + i] & WM) | c1;
         }
     }
 M[CDR_BUF - 1] = 060;                                   /* mem mark */
@@ -228,12 +241,15 @@ return SCPE_OK;
 /* Card reader service.  If a stacker select is active, copy to the
    selected stacker.  Otherwise, copy to the normal stacker.  If the
    unit is unattached, simply exit.
+
+   The original card buffer (cdr_buf) has not been changed from its input
+   format (ASCII text), with its newline attached. There is a guaranteed
+   null at the end, because the buffer was zeroed prior to the read, and
+   is one character longer than the maximum string length.
 */
 
 t_stat cdr_svc (UNIT *uptr)
 {
-int32 i;
-
 if (s1sel)                                              /* stacker 1? */
     uptr = &stack_unit[1];
 else if (s2sel)                                         /* stacker 2? */
@@ -241,13 +257,7 @@ else if (s2sel)                                         /* stacker 2? */
 else uptr = &stack_unit[0];                             /* then default */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-for (i = 0; i < CDR_WIDTH; i++)
-    rbuf[i] = bcd2ascii (rbuf[i], uptr->flags & UNIT_PCH);
-for (i = CDR_WIDTH - 1; (i >= 0) && (rbuf[i] == ' '); i--)
-    rbuf[i] = 0;
-rbuf[CDR_WIDTH] = 0;                                    /* null at end */
-fputs (rbuf, uptr->fileref);                            /* write card */
-fputc ('\n', uptr->fileref);                            /* plus new line */
+fputs (cdr_buf, uptr->fileref);                         /* write card */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
     perror ("Card stacker I/O error");
@@ -262,23 +272,22 @@ return SCPE_OK;
 
    Modifiers have been checked by the caller
    C modifier is recognized (column binary is implemented)
+
+   - Run out any previously buffered card
+   - Clear stacker select
+   - Copy card from memory buffer to punch buffer
 */
 
 t_stat punch_card (int32 ilnt, int32 mod)
 {
 int32 i, cbn, c1, c2;
-static char pbuf[(2 * CDP_WIDTH) + 1];                  /* + null */
 t_bool use_h;
-UNIT *uptr;
+t_stat r;
 
-if (s8sel)                                              /* stack 8? */
-    uptr = &stack_unit[2];
-else if (s4sel)                                         /* stack 4? */
-    uptr = &stack_unit[4];
-else uptr = &cdp_unit;                                  /* normal output */
-if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
-    return SCPE_UNATT;
-use_h = uptr->flags & UNIT_PCH;
+r = cdp_npr (NULL, 0, NULL, NULL);                      /* write card */
+if (r != SCPE_OK)
+    return r;
+use_h = cdp_unit.flags & UNIT_PCH;
 ind[IN_PNCH] = s4sel = s8sel = 0;                       /* clear flags */
 cbn = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_C);   /* col binary? */
 
@@ -288,26 +297,46 @@ if (cbn) {                                              /* column binary */
         c1 = bcd2ascii (M[CD_CBUF1 + i] & CHAR, use_h);
         c2 = bcd2ascii (M[CD_CBUF2 + i] & CHAR, use_h);
         if (conv_old) {
-            pbuf[i] = c1;
-            pbuf[i + CDP_WIDTH] = c2;
+            cdp_buf[i] = c1;
+            cdp_buf[i + CDP_WIDTH] = c2;
             }
         else {
-            pbuf[2 * i] = c1;
-            pbuf[(2 * i) + 1] = c2;
+            cdp_buf[2 * i] = c1;
+            cdp_buf[(2 * i) + 1] = c2;
             }
         }
-    for (i = 2 * CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--)
-         pbuf[i] = 0;
-    pbuf[2 * CDP_WIDTH] = 0;                            /* trailing null */
+    for (i = (2 * CDP_WIDTH) - 1; (i >= 0) && (cdp_buf[i] == ' '); i--)
+         cdp_buf[i] = 0;
+    cdp_buf[2 * CDP_WIDTH] = 0;                         /* trailing null */
     }
 else {                                                  /* normal */
     for (i = 0; i < CDP_WIDTH; i++)
-        pbuf[i] = bcd2ascii (M[CDP_BUF + i] & CHAR, use_h);
-    for (i = CDP_WIDTH - 1; (i >= 0) && (pbuf[i] == ' '); i--)
-        pbuf[i] = 0;
-    pbuf[CDP_WIDTH] = 0;                                /* trailing null */
+        cdp_buf[i] = bcd2ascii (M[CDP_BUF + i] & CHAR, use_h);
+    for (i = CDP_WIDTH - 1; (i >= 0) && (cdp_buf[i] == ' '); i--)
+        cdp_buf[i] = 0;
+    cdp_buf[CDP_WIDTH] = 0;                             /* trailing null */
     }
-fputs (pbuf, uptr->fileref);                            /* output card */
+cdp_buf_full = 1;                                       /* card buffer full */
+return SCPE_OK;
+}
+
+/* Punch buffered card (also handles non-process runout button) */
+
+t_stat cdp_npr (UNIT *notused, int32 val, char *cptr, void *desc)
+{
+UNIT *uptr;
+
+if (cdp_buf_full == 0)                                  /* any card? */
+    return SCPE_OK;                                     /* no, done */
+cdp_buf_full = 0;                                       /* buf empty */
+if (s8sel)                                              /* stack 8? */
+    uptr = &stack_unit[2];
+else if (s4sel)                                         /* stack 4? */
+    uptr = &stack_unit[4];
+else uptr = &cdp_unit;                                  /* normal output */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_UNATT;
+fputs (cdp_buf, uptr->fileref);                         /* output card */
 fputc ('\n', uptr->fileref);                            /* plus new line */
 uptr->pos = ftell (uptr->fileref);                      /* update position */
 if (ferror (uptr->fileref)) {                           /* error? */
@@ -378,6 +407,26 @@ for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
 saved_IS = BOOT_START;
 return SCPE_OK;
+}
+
+/* Card punch attach */
+
+t_stat cdp_attach (UNIT *uptr, char *cptr)
+{
+cdp_buf_full = 0;
+return attach_unit (uptr, cptr);
+}
+
+/* Card punch detach */
+
+t_stat cdp_detach (UNIT *uptr)
+{
+t_stat r;
+
+r = cdp_npr (NULL, 0, NULL, NULL);
+if (r != SCPE_OK)
+    return r;
+return detach_unit (uptr);
 }
 
 /* Column binary to BCD

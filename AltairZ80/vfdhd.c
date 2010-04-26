@@ -146,9 +146,6 @@ extern uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_typ
 #define UNIT_V_VFDHD_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_VFDHD_VERBOSE      (1 << UNIT_V_VFDHD_VERBOSE)
 #define VFDHD_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
-#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
-#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
-#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
 
 static t_stat vfdhd_reset(DEVICE *vfdhd_dev);
 static t_stat vfdhd_attach(UNIT *uptr, char *cptr);
@@ -230,7 +227,6 @@ static t_stat vfdhd_reset(DEVICE *dptr)
 /* Attach routine */
 static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
 {
-    char header[4];
     t_stat r;
     unsigned int i = 0;
 
@@ -252,16 +248,10 @@ static t_stat vfdhd_attach(UNIT *uptr, char *cptr)
     }
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
-        if(!strcmp(header, "IMD")) {
-            uptr->u3 = IMAGE_TYPE_IMD;
-        } else if(!strcmp(header, "CPT")) {
-            printf("CPT images not yet supported\n");
-            uptr->u3 = IMAGE_TYPE_CPT;
+        r = assignDiskType(uptr);
+        if (r != SCPE_OK) {
             vfdhd_detach(uptr);
-            return SCPE_OPENERR;
-        } else {
-            uptr->u3 = IMAGE_TYPE_DSK;
+            return r;
         }
     } else {
         /* creating file, must be DSK format. */
@@ -542,6 +532,7 @@ static void VFDHD_Command(void)
 
     uint32 sec_offset;
     uint32 flags;
+    int32 rtn;
 
     pDrive = &(vfdhd_info->drive[vfdhd_info->sel_drive]);
 
@@ -604,7 +595,10 @@ static void VFDHD_Command(void)
                     printf(".fileref is NULL!" NLP);
                 } else {
                     sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
-                    fread(&sdata.u.sync, 274, /*VFDHD_SECTOR_LEN,*/ 1, (pDrive->uptr)->fileref);
+                    rtn = sim_fread(&sdata.u.sync, 1, 274, /*VFDHD_SECTOR_LEN,*/ (pDrive->uptr)->fileref);
+                    if (rtn != 274) {
+                        TRACE_PRINT(ERROR_MSG, ("VFDHD: " ADDRESS_FORMAT " READ: sim_fread error." NLP, PCX));
+                    }
 
                     memset(&sdata.u.preamble, 0, 40);
                     memset(&sdata.u.ecc, 0, 5); /* Clear out the ECC and ECC Valid bytes */
@@ -670,9 +664,9 @@ static void VFDHD_Command(void)
                         vfdhd_info->sector));
                     sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
 #ifdef USE_VGI
-                    fwrite(&sdata.u.sync, VFDHD_SECTOR_LEN, 1, (pDrive->uptr)->fileref);
+                    sim_fwrite(&sdata.u.sync, 1, VFDHD_SECTOR_LEN, (pDrive->uptr)->fileref);
 #else
-                    fwrite(sdata.u.data, 256, 1, (pDrive->uptr)->fileref);
+                    sim_fwrite(sdata.u.data, 1, 256, (pDrive->uptr)->fileref);
 #endif /* USE_VGI */
                 }
                 break;

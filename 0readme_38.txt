@@ -1,7 +1,7 @@
 Notes For V3.8
 
 
-The makefile now works for Linux and most Unix's. Howevr, for Solaris
+The makefile now works for Linux and most Unix's. However, for Solaris
 and MacOS, you must first export the OSTYPE environment variable:
 
 > export OSTYPE
@@ -48,6 +48,21 @@ Otherwise, you will get build errors.
 
 - Added support for 12620A/12936A privileged interrupt fence.
 - Added support for 12792C eight-channel asynchronous multiplexer.
+
+1.3 3.8-2
+
+1.3.1 1401
+
+- Added "no rewind" option to magtape boot.
+
+1.3.2 PDP-11
+
+- Added RD32 support to RQ
+- Added debug support to RL
+
+1.3.3 PDP-8
+
+- Added FPP support (many thanks to Rick Murphy for debugging the code)
 
 
 2. Bugs Fixed

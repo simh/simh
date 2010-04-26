@@ -85,6 +85,10 @@ typedef struct {
 #define IMD_MODE_FM(x)      (x <= IMD_MODE_250K_FM)
 #define IMD_MODE_MFM(x)     (x >= IMD_MODE_500K_MFM)
 
+#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
+#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
+#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
+
 typedef struct {
     uint8 mode;
     uint8 nsects;
@@ -121,3 +125,4 @@ extern t_stat trackWrite(DISK_INFO *myDisk,
                uint8 mode,
                uint8 fillbyte,
                uint32 *flags);
+extern t_stat assignDiskType(UNIT *uptr);

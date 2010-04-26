@@ -2,7 +2,7 @@
 
     IMSAI FIF Disk Controller by Ernie Price
 
-    Based on altairz80_dsk.c, Copyright (c) 2002-2008, Peter Schorn
+    Based on altairz80_dsk.c, Copyright (c) 2002-2010, Peter Schorn
 
     Plug-n-Play added by Howard M. Harte
 
@@ -197,6 +197,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
             addr;
     FILE    *cpx;
     UNIT    *uptr;
+    int32   rtn;
 
 #if 0
     printf("%02x %02x %02x %02x %02x %02x %02x %02x \n",
@@ -242,14 +243,19 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
 
             /* write a track worth of sectors */
             for (kt=0; kt < SPT; kt++) {
-                fwrite(blanksec, 1, sizeof(blanksec), cpx);
+                sim_fwrite(blanksec, 1, sizeof(blanksec), cpx);
             }
             break;
 
         case READ_SEC:
             addr = (dsc->track * SPT) + dsc->sector - 1;
             sim_fseek(cpx, addr * SEC_SZ, SEEK_SET);
-            fread(blanksec, 1, SEC_SZ, cpx);
+            rtn = sim_fread(blanksec, 1, SEC_SZ, cpx);
+            if ( (rtn != SEC_SZ) && (current_disk_flags & UNIT_DSK_VERBOSE) &&
+                (warnAttached[current_disk] < warnLevelDSK) ) {
+                warnAttached[current_disk]++;
+                printf("FIF%i: " ADDRESS_FORMAT " sim_fread error." NLP, current_disk, PCX);
+            }
             addr = dsc->addr_l + (dsc->addr_h << 8); /* no assumption on endianness */
             for (kt = 0; kt < SEC_SZ; kt++) {
                 PutBYTEWrapper(addr++, blanksec[kt]);
@@ -263,7 +269,7 @@ static int DoDiskOperation(desc_t *dsc, uint8 val)
             for (kt = 0; kt < SEC_SZ; kt++) {
                 blanksec[kt] = GetBYTEWrapper(addr++);
             }
-            fwrite(blanksec, 1, SEC_SZ, cpx);
+            sim_fwrite(blanksec, 1, SEC_SZ, cpx);
             break;
 
         default:
@@ -447,7 +453,7 @@ uint8 FTP(int32 BC, int32 DE)
 
         case 20:
             memset(temp, 0x1a, SEC_SZ);
-            retval = fread(temp, 1, SEC_SZ, myfile) ? 0 : 1;
+            retval = sim_fread(temp, 1, SEC_SZ, myfile) ? 0 : 1;
             xfero( DE, temp, SEC_SZ);
             if (retval)
             {

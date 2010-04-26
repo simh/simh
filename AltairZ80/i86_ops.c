@@ -108,7 +108,7 @@ extern uint32 in(const uint32 Port);
   So, without further ado, ...
 */
 
-extern char parity_tab[];
+extern uint8 parity_tab[];
 
 static void i86op_illegal_op(PC_ENV *m)
 {
@@ -3823,7 +3823,6 @@ static void i86op_ret_far(PC_ENV *m)
 static void i86op_int3(PC_ENV *m)
 {
     uint16 tmp;
-    tmp = (uint16) mem_access_word(m, 3 * 4);
     /* access the segment register */
     {
        tmp = m->R_FLG;
@@ -3855,7 +3854,6 @@ static void i86op_int_IMM(PC_ENV *m)
     uint16 tmp;
     uint8 intnum;
     intnum = fetch_byte_imm(m);
-    tmp = mem_access_word(m, intnum * 4);
     {
        tmp = m->R_FLG;
        push_word(m, tmp);
@@ -3886,7 +3884,6 @@ static void i86op_into(PC_ENV *m)
     uint16 tmp;
     if (ACCESS_FLAG(m,F_OF))
     {
-       tmp = mem_access_word(m, 4 * 4);
            {
           tmp = m->R_FLG;
           push_word(m, tmp);
@@ -4150,8 +4147,7 @@ static void i86op_aam(PC_ENV *m)
 
 /* opcode=0xd5*/
 static void i86op_aad(PC_ENV *m)
-{   uint8 a;
-    a = fetch_byte_imm(m);
+{
     m->R_AX = aad_word(m,m->R_AX);
     DECODE_CLEAR_SEGOVR(m);
 }
@@ -5050,22 +5046,19 @@ static void i86op_esc_coprocess_d8(PC_ENV *m)
 static void i86op_esc_coprocess_d9(PC_ENV *m)
 {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-    uint8  stkelem;
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
-        stkelem = (uint8) rl;
         break;
       }
     DECODE_CLEAR_SEGOVR(m);
@@ -5075,22 +5068,19 @@ static void i86op_esc_coprocess_d9(PC_ENV *m)
 static void i86op_esc_coprocess_da(PC_ENV *m)
 {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-    uint8  stkelem;
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
-        stkelem = (uint8) rl;
         break;
       }
     DECODE_CLEAR_SEGOVR(m);
@@ -5100,19 +5090,17 @@ static void i86op_esc_coprocess_da(PC_ENV *m)
 static void i86op_esc_coprocess_db(PC_ENV *m)
 {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-/*    uint8  stkelem;*/
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
         break;
@@ -5124,22 +5112,19 @@ static void i86op_esc_coprocess_db(PC_ENV *m)
 static void i86op_esc_coprocess_dc(PC_ENV *m)
 {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-    uint8  stkelem;
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
-        stkelem = (uint8) rl;
         break;
       }
     DECODE_CLEAR_SEGOVR(m);
@@ -5149,22 +5134,19 @@ static void i86op_esc_coprocess_dc(PC_ENV *m)
 static void i86op_esc_coprocess_dd(PC_ENV *m)
 {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-    uint8  stkelem;
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
-        stkelem = (uint8) rl;
         break;
       }
     DECODE_CLEAR_SEGOVR(m);
@@ -5174,22 +5156,19 @@ static void i86op_esc_coprocess_dd(PC_ENV *m)
 static void i86op_esc_coprocess_de(PC_ENV *m)
   {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-    uint8  stkelem;
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
-        stkelem = (uint8) rl;
         break;
       }
     DECODE_CLEAR_SEGOVR(m);
@@ -5199,22 +5178,19 @@ static void i86op_esc_coprocess_de(PC_ENV *m)
 static void i86op_esc_coprocess_df(PC_ENV *m)
   {
     uint16 mod,rl,rh;
-    uint16 destoffset;
-    uint8  stkelem;
     FETCH_DECODE_MODRM(m,mod,rh,rl);
     switch (mod)
       {
       case 0:
-        destoffset=decode_rm00_address(m,rl);
+        decode_rm00_address(m,rl);
         break;
       case 1:
-        destoffset=decode_rm01_address(m,rl);
+        decode_rm01_address(m,rl);
         break;
       case 2:
-        destoffset=decode_rm10_address(m,rl);
+        decode_rm10_address(m,rl);
         break;
       case 3:   /* register to register */
-        stkelem = (uint8) rl;
         break;
       }
     DECODE_CLEAR_SEGOVR(m);

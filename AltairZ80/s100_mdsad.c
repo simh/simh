@@ -42,6 +42,7 @@
 
 /*#define DBG_MSG*/
 #include "altairz80_defs.h"
+#include "sim_imd.h"
 
 #if defined (_WIN32)
 #include <windows.h>
@@ -160,8 +161,6 @@ static SECTOR_FORMAT sdata;
 #define UNIT_V_MDSAD_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages       */
 #define UNIT_MDSAD_VERBOSE      (1 << UNIT_V_MDSAD_VERBOSE)
 #define MDSAD_CAPACITY          (70*10*MDSAD_SECTOR_LEN)    /* Default North Star Disk Capacity */
-#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.                */
-#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.              */
 
 /* MDS-AD Controller Subcases */
 #define MDSAD_READ_ROM      0
@@ -325,8 +324,8 @@ t_stat mdsad_attach(UNIT *uptr, char *cptr)
     uptr->u3 = IMAGE_TYPE_DSK;
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
-        if(!strcmp(header, "CPT")) {
+        char *rtn = fgets(header, 4, uptr->fileref);
+        if((rtn != NULL) && (strncmp(header, "CPT", 3) == 0)) {
             printf("CPT images not yet supported\n");
             uptr->u3 = IMAGE_TYPE_CPT;
             mdsad_detach(uptr);
@@ -338,7 +337,7 @@ t_stat mdsad_attach(UNIT *uptr, char *cptr)
 
     if (uptr->flags & UNIT_MDSAD_VERBOSE)
         printf("MDSAD%d, attached to '%s', type=%s, len=%d\n", i, cptr,
-            uptr->u3 == uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
+            uptr->u3 == IMAGE_TYPE_CPT ? "CPT" : "DSK",
             uptr->capac);
 
     return SCPE_OK;
@@ -450,6 +449,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
     uint8 cData;
     uint8 ds;
     MDSAD_DRIVE_INFO *pDrive;
+    int32 rtn;
 
     cData = 0x00;
 
@@ -502,7 +502,7 @@ static uint8 MDSAD_Read(const uint32 Addr)
                             printf(".fileref is NULL!" NLP);
                         } else {
                             sim_fseek((pDrive->uptr)->fileref, sec_offset, SEEK_SET);
-                            fwrite(sdata.u.data, MDSAD_SECTOR_LEN, 1,
+                            sim_fwrite(sdata.u.data, 1, MDSAD_SECTOR_LEN,
                                 (pDrive->uptr)->fileref);
                         }
                         break;
@@ -735,8 +735,11 @@ static uint8 MDSAD_Read(const uint32 Addr)
                                     } else {
                                         sim_fseek((pDrive->uptr)->fileref,
                                             sec_offset, SEEK_SET);
-                                        fread(&sdata.u.data[0], MDSAD_SECTOR_LEN,
-                                            1, (pDrive->uptr)->fileref);
+                                        rtn = sim_fread(&sdata.u.data[0], 1, MDSAD_SECTOR_LEN,
+                                            (pDrive->uptr)->fileref);
+                                        if (rtn != MDSAD_SECTOR_LEN) {
+                                            TRACE_PRINT(ERROR_MSG, ("MDSAD: " ADDRESS_FORMAT " READ: sim_fread error." NLP, PCX));
+                                        }
                                     }
                                     break;
                                 case IMAGE_TYPE_CPT:

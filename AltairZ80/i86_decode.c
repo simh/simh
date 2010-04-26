@@ -86,7 +86,6 @@ static void i86_intr_handle(PC_ENV *m)
     if (intr & INTR_SYNCH)   /* raised by something */
     {
         intno = m->intno;
-        tmp = (uint16) mem_access_word(m, intno * 4);
         {
             tmp = m->R_FLG;
             push_word(m, tmp);

@@ -3,7 +3,7 @@
  * $Id: flashwriter2.c 1941 2008-06-13 05:31:03Z hharte $                *
  *                                                                       *
  * Copyright (c) 2007-2008 Howard M. Harte.                              *
- * http:/*www.hartetec.com                                               *
+ * http://www.hartetec.com                                               *
  *                                                                       *
  * Permission is hereby granted, free of charge, to any person obtaining *
  * a copy of this software and associated documentation files (the       *

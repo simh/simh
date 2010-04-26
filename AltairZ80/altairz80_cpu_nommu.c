@@ -1,6 +1,6 @@
 /*  altairz80_cpu_opt.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2008, Peter Schorn
+    Copyright (c) 2002-2010, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -2353,7 +2353,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xdd:      /* DD prefix */
                 CHECK_CPU_8080;
-                switch (op = RAM_PP(PC)) {
+                switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IX,BC */
                         IX &= ADDRMASK;
@@ -3019,7 +3019,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xed:      /* ED prefix */
                 CHECK_CPU_8080;
-                switch (op = RAM_PP(PC)) {
+                switch (RAM_PP(PC)) {
 
                     case 0x40:      /* IN B,(C) */
                         temp = in(LOW_REGISTER(BC));
@@ -3405,7 +3405,6 @@ t_stat sim_instr_nommu(void) {
                         break;
 
                     case 0xb0:      /* LDIR */
-                        acu = HIGH_REGISTER(AF);
                         BC &= ADDRMASK;
                         if (BC == 0)
                             BC = 0x10000;
@@ -3594,7 +3593,7 @@ t_stat sim_instr_nommu(void) {
 
             case 0xfd:      /* FD prefix */
                 CHECK_CPU_8080;
-                switch (op = RAM_PP(PC)) {
+                switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IY,BC */
                         IY &= ADDRMASK;

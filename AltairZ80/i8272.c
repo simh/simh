@@ -149,9 +149,6 @@ extern uint8 GetByteDMA(const uint32 Addr);
 #define UNIT_I8272_VERBOSE      (1 << UNIT_V_I8272_VERBOSE)
 #define I8272_CAPACITY          (77*2*16*256)   /* Default Micropolis Disk Capacity         */
 #define I8272_CAPACITY_SSSD     (77*1*26*128)   /* Single-sided Single Density IBM Diskette1 */
-#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
-#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
-#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
 
 /* Intel 8272 Commands */
 #define I8272_READ_TRACK            0x02
@@ -307,8 +304,8 @@ t_stat i8272_attach(UNIT *uptr, char *cptr)
     i8272_info->drive[i].ready = 0;
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
-        if(strncmp(header, "IMD", 3)) {
+        char *rtn = fgets(header, 4, uptr->fileref);
+        if((rtn != NULL) && strncmp(header, "IMD", 3)) {
             printf("I8272: Only IMD disk images are supported\n");
             i8272_info->drive[i].uptr = NULL;
             return SCPE_OPENERR;
@@ -414,8 +411,7 @@ uint8 I8272_Read(const uint32 Addr)
         return 0xFF;
     }
 
-    cData = 0x00;
-
+    /* the switch statement ensures that cData is set in all cases! */
     switch(Addr & 0x3) {
         case I8272_FDC_MSR:
             cData  = i8272_info->fdc_msr | I8272_MSR_RQM;

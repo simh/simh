@@ -193,9 +193,6 @@ extern uint8 GetByteDMA(const uint32 Addr);
 #define UNIT_V_DISK3_VERBOSE    (UNIT_V_UF + 1) /* verbose mode, i.e. show error messages   */
 #define UNIT_DISK3_VERBOSE      (1 << UNIT_V_DISK3_VERBOSE)
 #define DISK3_CAPACITY          (C20MB_NTRACKS*C20MB_NHEADS*C20MB_NSECTORS*C20MB_SECTSIZE)   /* Default Disk Capacity */
-#define IMAGE_TYPE_DSK          1               /* Flat binary "DSK" image file.            */
-#define IMAGE_TYPE_IMD          2               /* ImageDisk "IMD" image file.              */
-#define IMAGE_TYPE_CPT          3               /* CP/M Transfer "CPT" image file.          */
 
 static t_stat disk3_reset(DEVICE *disk3_dev);
 static t_stat disk3_attach(UNIT *uptr, char *cptr);
@@ -293,8 +290,7 @@ static t_stat disk3_attach(UNIT *uptr, char *cptr)
 {
     t_stat r = SCPE_OK;
     DISK3_DRIVE_INFO *pDrive;
-    char header[4];
-    unsigned int i = 0;
+    int i = 0;
 
     i = find_unit_index(uptr);
     if (i == -1) {
@@ -326,16 +322,10 @@ static t_stat disk3_attach(UNIT *uptr, char *cptr)
     uptr->u3 = IMAGE_TYPE_DSK;
 
     if(uptr->capac > 0) {
-        fgets(header, 4, uptr->fileref);
-        if(!strcmp(header, "IMD")) {
-            uptr->u3 = IMAGE_TYPE_IMD;
-        } else if(!strcmp(header, "CPT")) {
-            printf("CPT images not yet supported\n");
-            uptr->u3 = IMAGE_TYPE_CPT;
+        r = assignDiskType(uptr);
+        if (r != SCPE_OK) {
             disk3_detach(uptr);
-            return SCPE_OPENERR;
-        } else {
-            uptr->u3 = IMAGE_TYPE_DSK;
+            return r;
         }
     }
 
@@ -517,6 +507,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 uint32 file_offset;
                 uint32 xfr_count = 0;
                 uint8 *dataBuffer;
+                size_t rtn;
 
                 if(disk3_info->mode == DISK3_MODE_ABS) {
                     TRACE_PRINT(ERROR_MSG, ("DISK3: Absolute addressing not supported." NLP));
@@ -539,16 +530,19 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
 
                 if(disk3_info->iopb[DISK3_IOPB_ARG1] == 1) { /* Read */
-                    TRACE_PRINT(RD_DATA_MSG, ("DISK3[%d]: " ADDRESS_FORMAT "  READ @0x%05x T:%04d/S:%04d/#:%d" NLP,
-                        disk3_info->sel_drive,
-                        PCX,
-                        disk3_info->dma_addr,
-                        pDrive->cur_track,
-                        pDrive->cur_sect,
-                        pDrive->xfr_nsects
-                        ));
+                    rtn = sim_fread(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
 
-                    fread(dataBuffer, xfr_len, 1, (pDrive->uptr)->fileref);
+                    TRACE_PRINT(RD_DATA_MSG,
+                                ("DISK3[%d]: " ADDRESS_FORMAT "  READ @0x%05x T:%04d/S:%04d/#:%d %s" NLP,
+                                 disk3_info->sel_drive,
+                                 PCX,
+                                 disk3_info->dma_addr,
+                                 pDrive->cur_track,
+                                 pDrive->cur_sect,
+                                 pDrive->xfr_nsects,
+                                 rtn == (size_t)xfr_len ? "OK" : "NOK"
+                                 ));
+
 
                     /* Perform DMA Transfer */
                     for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
@@ -569,7 +563,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                         dataBuffer[xfr_count] = GetByteDMA(disk3_info->dma_addr + xfr_count);
                     }
 
-                    fwrite(dataBuffer, xfr_len, 1, (pDrive->uptr)->fileref);
+                    sim_fwrite(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
                 }
 
                 free(dataBuffer);
@@ -618,7 +612,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 memset(fmtBuffer, disk3_info->iopb[DISK3_IOPB_ARG2], data_len);
 
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
-                fwrite(fmtBuffer, data_len, 1, (pDrive->uptr)->fileref);
+                sim_fwrite(fmtBuffer, 1, data_len, (pDrive->uptr)->fileref);
 
                 free(fmtBuffer);
 

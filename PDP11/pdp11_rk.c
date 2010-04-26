@@ -1,6 +1,6 @@
 /* pdp11_rk.c: RK11/RKV11 cartridge disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rk           RK11/RKV11/RK05 cartridge disk
 
+   20-Mar-09    RMS     Fixed bug in read header (from Walter F Mueller)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface
@@ -533,7 +534,7 @@ if (wc && (err == 0)) {                                 /* seek ok? */
                     wc = i;                             /* trim transfer */
                     break;
                     }
-                rkxb[i] = (cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC);
+                rkxb[i] = ((cda / RK_NUMWD) / (RK_NUMSF * RK_NUMSC)) << RKDA_V_CYL;
                 cda = cda + RK_NUMWD;                   /* next sector */
                 }                                       /* end for wc */
             }                                           /* end if format */

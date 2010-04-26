@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Apr-10    RMS     Revised divide algorithm (from Van Snyder)
    11-Jul-08    RMS     Added missing A magtape modifier (from Van Snyder)
                         Fixed tape indicator implementation (from Bob Abeles)
                         Fixed bug in ZA and ZS (from Bob Abeles)
@@ -210,8 +211,8 @@ t_stat cpu_show_conv (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 store_addr_h (int32 addr);
 int32 store_addr_t (int32 addr);
 int32 store_addr_u (int32 addr);
-int32 div_add (int32 ap, int32 bp, int32 aend);
-int32 div_sub (int32 ap, int32 bp, int32 aend);
+int32 div_add (int32 ap, int32 bp);
+int32 div_sub (int32 ap, int32 bp);
 void div_sign (int32 dvrc, int32 dvdc, int32 qp, int32 rp);
 t_stat iomod (int32 ilnt, int32 mod, const int32 *tptr);
 t_stat iodisp (int32 dev, int32 unit, int32 flag, int32 mod);
@@ -518,7 +519,7 @@ int32 IS, ilnt, flags;
 int32 op, xa, t, wm, ioind, dev, unit;
 int32 a, b, i, k, asave, bsave;
 int32 carry, lowprd, sign, ps;
-int32 quo, ahigh, qs;
+int32 quo, qs;
 int32 qzero, qawm, qbody, qsign, qdollar, qaster, qdecimal;
 t_stat reason, r1, r2;
 
@@ -1432,19 +1433,16 @@ CHECK_LENGTH:
    - AS points to the low order divisor digit.
    - BS points to the high order dividend digit.
    - The low order dividend digit is identified by sign (zone) bits.
-   - To the left of the dividend is a zero field of length LS + 1.
-   The low quotient is at low dividend - LS - 1.  As BS points to the
-   high dividend, the low dividend is at BS + LD - 1, so the low
-   quotient is at BS + LD - LS - 2.  The longest possible quotient is
-   LD - LS + 1, so the first possible non-zero quotient bit will be
-   found as BS - 2.
+   - To the left of the dividend is a (zero) field of length LS + 1.
+   So the quotient starts as BS - LS - 1.
+   The divide process starts with a subdividend that begins at BS - LS
+   and ends at BS.  (Note that the subdividend is one digit wider than
+   the divisor, to allow for borrows during the divide process.)  This
+   means that non-zero digits in the "zero" field to the left of the
+   dividend CAN affect the divide.
 
-   This pointer calculation assumes that the divisor has no leading zeroes.
-   For each leading zero, the start of the quotient will be one position
-   further left.
-
-   Start by locating the high order non-zero digit of the divisor.  This
-   also tests for a divide by zero.
+   Start by computing the length of the divisor and testing for divide
+   by zero.
 
    Instruction lengths:
 
@@ -1458,17 +1456,17 @@ CHECK_LENGTH:
 
     case OP_DIV:
         asave = AS;
-        ahigh = -1;
-        do {
+        t = 0;                                          /* assume all 0's */
+        do {                                            /* scan divisor */
             a = M[AS];                                  /* get dvr char */
-            if ((a & CHAR) != BCD_ZERO)                 /* mark non-zero */
-                ahigh = AS;
+            if ((bcd_to_bin[a & DIGIT]) != 0)           /* mark non-zero */
+                t = 1;
             MM (AS);
             }
         while ((a & WM) == 0);
         if (reason)                                     /* address err? */
             break;
-        if (ahigh < 0) {                                /* div by zero? */
+        if (t == 0) {                                   /* div by zero? */
             ind[IN_OVF] = 1;                            /* set ovf indic */
             qs = bsave = BS;                            /* quo, dividend */
             do {
@@ -1485,15 +1483,15 @@ CHECK_LENGTH:
             BS = (BS - 2) - (asave - (AS + 1));         /* final bs */
             break;
             }
-        bsave = BS + (asave - ahigh);                   /* end subdivd */
-        qs = (BS - 2) - (ahigh - (AS + 1));             /* quo start */
+        bsave = BS;                                     /* end subdivd */
+        qs = BS - (asave - AS) - 1;                     /* quo start */
 
 /* Divide loop - done with subroutines to keep the code clean.
    In the loop,
         
-   asave =      low order divisor
-   bsave =      low order subdividend
-   qs   =       current quotient digit
+   asave =      low order divisor (constant)
+   bsave =      low order subdividend (increments)
+   qs   =       current quotient digit (increments)
 */
 
     do {
@@ -1504,11 +1502,13 @@ CHECK_LENGTH:
             }
         b = M[bsave];                                   /* save low divd */
         do {
-            t = div_sub (asave, bsave, ahigh);          /* subtract */
+            t = div_sub (asave, bsave);                 /* subtract */
             quo++;                                      /* incr quo digit */
             } while (t == 0);                           /* until borrow */
-        div_add (asave, bsave, ahigh);                  /* restore */
+        div_add (asave, bsave);                         /* restore */
         quo--;
+        if (quo > 9)                                    /* overflow? */
+            ind[IN_OVF] = 1;                            /* set ovf indic */
         M[qs] = (M[qs] & WM) | sum_table[quo];          /* store quo digit */
         bsave++;                                        /* adv divd, quo */
         qs++;
@@ -1695,7 +1695,7 @@ return bin_to_bcd[addr % 10] | (thous << (V_ZONE - 2));
 
 /* div_add - add string for divide */
 
-int32 div_add (int32 ap, int32 bp, int32 aend)
+int32 div_add (int32 ap, int32 bp)
 {
 int32 a, b, c, r;
 
@@ -1709,13 +1709,13 @@ do {
     M[bp] = sum_table[r];                               /* store result */
     ap--;
     bp--;
-    } while (ap >= aend);
+    } while ((a & WM) == 0);
 return c;
 }
 
 /* div_sub - substract string for divide */
 
-int32 div_sub (int32 ap, int32 bp, int32 aend)
+int32 div_sub (int32 ap, int32 bp)
 {
 int32 a, b, c, r;
 
@@ -1729,9 +1729,9 @@ do {
     M[bp] = sum_table[r + 10];                          /* store result */
     ap--;
     bp--;
-    } while (ap >= aend);
-b = M[bp] & CHAR;                                       /* borrow position */
-if (b && (b != BCD_ZERO)) {                             /* non-zero? */
+    } while ((a & WM) == 0);
+b = M[bp];                                              /* borrow position */
+if (bcd_to_bin[b & DIGIT] != 0) {                       /* non-zero? */
     r = bcd_to_bin[b & DIGIT] - c;                      /* subtract borrow */
     M[bp] = sum_table[r];                               /* store result */
     return 0;                                           /* subtract worked */

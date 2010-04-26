@@ -1,0 +1,100 @@
+SWTP 6800 Emulator
+=====================
+
+1. Background.
+
+	The Southwest Technical Products (SWTP) SWTP 6800 was announced 1n the 1976 SWTP Catalog, which boasted you could buy and build this powerful computer kit for only $395.  The kit consisted at that time of only the parts to build a case, power supply, mother board, CPU card, serial card with RS-232 or 20 ma loop interface, and memory card with 2048 *bytes* of static memory.  
+
+2. Hardware
+
+	We are simulating a fairly "loaded" SWTP 6800 from about 1978, with the following configuration:
+
+	device		simulates
+	name(s)
+
+	CPU		SWTP MP-A with Motorola 6080 CPU board, 62KB of RAM, 2K of EPROM with start boot ROM.
+	SIO		SWTP MP-S Dual Serial Interface Board. Port 1 is assumed to be connected to a serial "glass TTY" that is your terminal running the Simulator.
+	PTR		Second serial port of SIO is assumed to be connected to the paper tap reader/punch.
+	PTP		Second serial port of SIO is assumed to be connected to the paper tap reader/punch.
+	DSK		SWTP DC-4 Floppy Disk controller with up to four drives.
+
+2.1 The CPU Card (MP-A)
+
+	We allow you to select memory sizes, but be aware that some sample software requires the full 32K (i.e. FLEX).  We emulate the SWTP SWTBUG boot rom.
+
+	SET CPU ITRAP	Causes the simulator to halt if an invalid 8080 Opcode is detected.
+	SET CPU NOITRAP	Does not stop on an invalid Opcode.  This is how the real 6800 operates.
+	SET CPU MTRAP	Causes the simulator to halt if an invalid address is accessed.
+	SET CPU NOMTRAP	Does not stop on invalid address access.  This is how a real 6800 operates.
+	SET CPU 4K
+	SET CPU 8K
+	SET CPU 12K
+	SET CPU 16K
+	  ......
+	SET CPU 32K	All these set various CPU memory configurations.
+			The 2K EPROM at the high end of memory is always present and will always boot.
+	SET CPU MA000	Enable 8 K bytes of memory at $A000-$BFFF.  Otherwise, only 128 bytes re available at $A000.
+	SET CPU NOMA000	Enable only 128 bytes of memory at $A000.
+
+The SWTBUG EPROM maps to both addresses $E000-E3FF and $FC00-FFFF.  
+
+The real 6800, on receiving a HLT (Halt) instruction, freezes the processor and only an interrupt or CPU hardware reset will restore it.  The simulator is a lot nicer, it will halt but send you back to the simulator command line.
+
+CPU Registers include the following:
+
+	name	size	comments
+	
+	PC	16	Program Counter
+	A	8	Accumulator A
+	B	8	Accumulator B
+	IX	16	Index Register
+	C	1	Carry flag
+	Z	1	Zero Flag
+	H	1	Half-Carry flag
+	I	1	Interrupt flag
+	N	1	Negative flag
+	V	1	Overflao Flag
+
+
+2.2 The Serial I/O Card (MP-S)
+
+	This simple programmed I/O device provides 2 serial ports to the outside world, which could be hardware jumpered to support RS-232 plugs or a TTY current loop interface.  The standard I/O addresses assigned by SWTP was $8004-8005 for the first port, and $8006-8007 for the second. We follow this standard in the Simulator.
+
+	The simulator directs I/O to/from the first port to the screen. The second port reads from an attachable "tape reader" file on input, and writes to an attachable "punch file" on output.  These files are considered a simple stream of 8-bit bytes.  
+
+2.3 The Floppy Disk controller (DC4)
+
+	The SWTP DC4 is a simple programmed I/O interface to the SWTP MF-68 5-inch dual floppy drive, which was basically a pair of Shugart SA-400s with a power supply and buffer board builtin.  The controller supports neither interrupts nor DMA, so floppy access required the sustained attention of the CPU. The standard I/O addresses were $8018-801B, and we follow the standard.  Details on controlling this hardware are in the swtp_dsk.c source file.
+
+
+3. Sample Software
+
+	Running an SWTP 6800 in 1978 you would be running the FLEX Version 2.0 Operating System from Technical Systems Consultants, Inc.  
+
+3.1 CP/M Version 2.2
+
+	This version is a port of the standard FLEX Version 2.0 to the SWTP 6800.  
+
+	To boot FLEX:
+
+	sim> set cpu hex
+	sim> set cpu itrap
+	sim> set cpu mtrap
+	sim> att dsk 6800boot.dsk
+	sim> att dsk1 6800work.dsk
+	sim> set cpu MA000
+	sim> set dsk1 rw
+	sim> go 
+
+	$D		; Capital D causes SWTBUG to boot Flex
+	FLEX 2.0
+
+	DATE (MM,DD,YY)? 03,09,99  ; Must enter a date from last century!
+
+	+++		;Flex prompt!
+
+
+
+
+
+
