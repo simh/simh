@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   22-May-10    RMS     Added check for 64b definitions
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added KE11A, DC11 support
    02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
@@ -79,6 +80,10 @@
 
 #include "sim_defs.h"                                   /* simulator defns */
 #include <setjmp.h>
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "PDP-11 does not support 64b values!"
+#endif
 
 /* Architectural constants */
 

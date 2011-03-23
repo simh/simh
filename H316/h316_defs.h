@@ -1,6 +1,6 @@
 /* h316_defs.h: Honeywell 316/516 simulator definitions
 
-   Copyright (c) 1999-2008, Robert M. Supnik
+   Copyright (c) 1999-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Added check for 64b definitions
    15-Feb-05    RMS     Added start button interrupt
    01-Dec-04    RMS     Added double precision constants
    24-Oct-03    RMS     Added DMA/DMC support
@@ -33,6 +34,10 @@
 #define _H316_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "H316 does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 

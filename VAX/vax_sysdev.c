@@ -1,6 +1,6 @@
 /* vax_sysdev.c: VAX 3900 system-specific logic
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,7 @@
    cso          console storage output
    sysd         system devices (SSC miscellany)
 
+   23-Dec-10    RMS     Added power clear call to boot routine (from Mark Pizzolato)
    25-Oct-05    RMS     Automated CMCTL extended memory
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    10-Mar-05    RMS     Fixed bug in timer schedule routine (from Mark Hittinger)
@@ -275,6 +276,7 @@ extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
 extern uint32 sim_os_msec();
+extern void cpu_idle (void);
 
 /* ROM data structures
 
@@ -1556,6 +1558,7 @@ if (*rom == 0) {                                        /* no boot? */
     if (r != SCPE_OK)
         return r;
     }
+sysd_powerup ();
 return SCPE_OK;
 }
 

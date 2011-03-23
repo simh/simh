@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Added check for 64b addresses
    01-Feb-07    RMS     Added CD support
    29-Oct-06    RMS     Added clock coscheduling function
    29-Dec-03    RMS     Added Q18 definition for PDP11 compatibility
@@ -48,6 +49,10 @@
 #endif
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_ADDR64)
+#error "PDP-10 does not support 64b addresses!"
+#endif
 
 /* Digital Equipment Corporation's 36b family had six implementations:
 

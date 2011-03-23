@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01, RX28/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,9 +25,9 @@
 
    rx           RX8E/RX01, RX28/RX02 floppy disk
 
-   15-May-06    RMS     Fixed bug in autosize attach (reported by Dave Gesswein)
+   15-May-06    RMS     Fixed bug in autosize attach (Dave Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
-   05-Nov-03    RMS     Fixed bug in RX28 read status (found by Charles Dickman)
+   05-Nov-03    RMS     Fixed bug in RX28 read status (Charles Dickman)
    26-Oct-03    RMS     Cleaned up buffer copy code, fixed double density write
    25-Apr-03    RMS     Revised for extended file support
    14-Mar-03    RMS     Fixed variable size interaction with save/restore

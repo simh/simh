@@ -1,6 +1,6 @@
 /* pdp1_defs.h: 18b PDP simulator definitions
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Added check for 64b definitions
    21-Dec-06    RMS     Added 16-channel sequence break support
    22-Jul-05    RMS     Fixed definition of CPLS_DPY
    08-Feb-04    PLB     Added support for display
@@ -52,6 +53,10 @@
 #define _PDP1_DEFS_H_   0
 
 #include "sim_defs.h"
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "PDP-1 does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 

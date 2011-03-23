@@ -51,18 +51,27 @@ Otherwise, you will get build errors.
 
 1.3 3.8-2
 
-1.3.1 1401
+1.3.1 SCP and libraries
+
+- Added line history capability for *nix hosts.
+- Added "SHOW SHOW" and "SHOW <dev> SHOW" commands.
+
+1.3.2 1401
 
 - Added "no rewind" option to magtape boot.
 
-1.3.2 PDP-11
+1.3.3 PDP-11
 
 - Added RD32 support to RQ
 - Added debug support to RL
 
-1.3.3 PDP-8
+1.3.4 PDP-8
 
 - Added FPP support (many thanks to Rick Murphy for debugging the code)
+
+1.3.5 VAX-11/780
+
+- Added AUTORESTART switch support, and VMS REBOOT command support
 
 
 2. Bugs Fixed

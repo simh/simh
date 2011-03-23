@@ -1,6 +1,6 @@
 /* pdp8_ct.c: PDP-8 cassette tape simulator
 
-   Copyright (c) 2006-2008, Robert M Supnik
+   Copyright (c) 2006-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
 
    13-Aug-07    RMS     Fixed handling of BEOT
    06-Aug-07    RMS     Foward op at BOT skips initial file gap
-   30-May-2007  RMS     Fixed typo (from Norm Lastovica)
+   30-May-2007  RMS     Fixed typo (Norm Lastovica)
 
    Magnetic tapes are represented as a series of variable records
    of the form:

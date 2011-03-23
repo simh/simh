@@ -24,8 +24,6 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    mt           magtape simulator
-
-   16-Jul-10    RMS     Fixed handling of BSR, BSF (from Dave Pitts)
 */
 
 #include "i7094_defs.h"
@@ -46,7 +44,7 @@ uint32 mt_bptr[NUM_CHAN];
 uint32 mt_blnt[NUM_CHAN];
 t_uint64 mt_chob[NUM_CHAN];
 uint32 mt_chob_v[NUM_CHAN];
-uint32 mt_tshort = 2;                                   /* "a few microseconds" */
+uint32 mt_tshort = 2;
 uint32 mt_twef = 25000;                                 /* 50 msec */
 uint32 mt_tstart = 29000;                               /* 58 msec */
 uint32 mt_tstop = 10000;                                /* 20 msec */
@@ -476,6 +474,8 @@ else {                                                  /* real tape */
 
     case CHSL_RDS:
     case CHSL_WRS:
+    case CHSL_BSR:
+    case CHSL_BSF:                                      /* rd, wr, backspace */
         sim_activate (uptr, mt_tstart);                 /* schedule op */
         break;
 
@@ -483,10 +483,10 @@ else {                                                  /* real tape */
         sim_activate (uptr, mt_twef);                   /* schedule op */
         break;
 
-    case CHSL_BSR:
-    case CHSL_BSF:                                      /* backspace */
-    case CHSL_REW:
     case CHSL_RUN:
+        sim_activate (uptr, mt_tshort);                 /* schedule quick event */
+        break;
+    case CHSL_REW:
     case CHSL_SDN:                                      /* rew, rew/unl, set det */
         sim_activate (uptr, mt_tshort);                 /* schedule quick event */
         break;
@@ -537,7 +537,7 @@ if (uptr->UST == (CHSL_WRS|CHSL_2ND)) {                 /* data write? */
         xb[mt_bptr[ch]++] = by;                         /* put in buffer */
         }
     if (eorfl)
-        return mt_rec_end (uptr);                       /* EOR? write rec */
+        return mt_rec_end (uptr);                /* EOR? write rec */
     return SCPE_OK;
     }
 return SCPE_IERR;
@@ -649,15 +649,10 @@ switch (uptr->UST) {                                    /* case on state */
                      mt_unit[ch]? "continuing": "disconnecting");
         return SCPE_OK;
 
-    case CHSL_BSR: case CHSL_BSF:                       /* backspace */
-        uptr->UST = uptr->UST | CHSL_2ND;               /* set 2nd state */
-        sim_activate (uptr, mt_tstart);                 /* reactivate */
-        ch6_end_nds (ch);                               /* disconnect */
-        return SCPE_OK;
-
-    case CHSL_BSR|CHSL_2ND:                             /* backspace rec */
+    case CHSL_BSR:                                      /* backspace rec */
         r = sim_tape_sprecr (uptr, &bc);                /* space backwards */
         mt_unit[ch] = 0;                                /* clr ctrl busy */
+        ch6_end_nds (ch);                               /* disconnect */
         if (DEBUG_PRS (mt_dev[ch]))
             fprintf (sim_deb, ">>%s%d BSR complete, pos = %d\n",
                      mt_dev[ch].name, u, uptr->pos);
@@ -665,9 +660,10 @@ switch (uptr->UST) {                                    /* case on state */
             return SCPE_OK;
         return mt_map_err (uptr, r);
 
-    case CHSL_BSF|CHSL_2ND:                             /* backspace file */
+    case CHSL_BSF:                                      /* backspace file */
         while ((r = sim_tape_sprecr (uptr, &bc)) == MTSE_OK) ;
         mt_unit[ch] = 0;                                /* clr ctrl busy */
+        ch6_end_nds (ch);                               /* disconnect */
         if (DEBUG_PRS (mt_dev[ch]))
             fprintf (sim_deb, ">>%s%d BSF complete, pos = %d\n",
                      mt_dev[ch].name, u, uptr->pos);

@@ -1,6 +1,6 @@
 /* sim_sock.c: OS-dependent socket routines
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Jun-10    RMS     Fixed types in sim_accept_conn (from Mark Pizzolato)
    19-Nov-05    RMS     Added conditional for OpenBSD (from Federico G. Schwindt)
    16-Aug-05    RMS     Fixed spurious SIGPIPE signal error in Unix
    14-Apr-05    RMS     Added WSAEINPROGRESS test (from Tim Riker)
@@ -195,9 +196,10 @@ SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
 {
 int32 sta, err;
 #if defined (macintosh) || defined (__linux) || \
-    defined (__APPLE__) || defined (__OpenBSD__)
+    defined (__APPLE__) || defined (__OpenBSD__) || \
+    defined(__NetBSD__) || defined(__FreeBSD__)
 socklen_t size;
-#elif defined (_WIN32) || defined (__EMX__) ||\
+#elif defined (_WIN32) || defined (__EMX__) || \
      (defined (__ALPHA) && defined (__unix__))
 int size;
 #else 
@@ -216,7 +218,8 @@ if (newsock == INVALID_SOCKET) {                        /* error? */
         printf ("Sockets: accept error %d\n", err);
     return INVALID_SOCKET;
     }
-if (ipaddr != NULL) *ipaddr = ntohl (clientname.sin_addr.s_addr);
+if (ipaddr != NULL)
+    *ipaddr = ntohl (clientname.sin_addr.s_addr);
 
 sta = sim_setnonblock (newsock);                        /* set nonblocking */
 if (sta == SOCKET_ERROR)                                /* fcntl error? */

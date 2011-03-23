@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    ts           TS11/TSV05 magtape
 
+   22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
+                        (found by Mark Pizzolato)
    16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -733,9 +735,12 @@ if (!(cmdhdr & CMD_ACK)) {                              /* no acknowledge? */
     }
 fnc = GET_FNC (cmdhdr);                                 /* get fnc+mode */
 mod = GET_MOD (cmdhdr);
-if (DEBUG_PRS (ts_dev))
-    fprintf (sim_deb, ">>TS: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=%d\n",
-        fnc_name[fnc], mod, cmdadl, cmdlnt, ts_unit.pos);
+if (DEBUG_PRS (ts_dev)) {
+    fprintf (sim_deb, ">>TS: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=",
+        fnc_name[fnc], mod, cmdadl, cmdlnt);
+    fprint_val (sim_deb, ts_unit.pos, 10, T_ADDR_W, PV_LEFT);
+    fprintf (sim_deb, "\n");
+    }
 if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {           /* ~wr chr & nba? */
     ts_endcmd (TC3, 0, 0);                              /* error */
     return SCPE_OK;
@@ -1016,9 +1021,12 @@ tssr = ts_updtssr (tssr | tc | TSSR_SSR | (tc? TSSR_SC: 0));
 if (cmdhdr & CMD_IE)
     SET_INT (TS);
 ts_ownm = 0; ts_ownc = 0;
-if (DEBUG_PRS (ts_dev))
-    fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=%d\n",
-        msgxs0, GET_TC (tssr), msgrfc, ts_unit.pos);
+if (DEBUG_PRS (ts_dev)) {
+    fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=",
+        msgxs0, GET_TC (tssr), msgrfc);
+    fprint_val (sim_deb, ts_unit.pos, 10, T_ADDR_W, PV_LEFT);
+    fprintf (sim_deb, "\n");
+    }
 return;
 }
 

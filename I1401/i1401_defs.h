@@ -1,6 +1,6 @@
 /* i1401_defs.h: IBM 1401 simulator definitions
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-JUl-10    RMS     Added overlap indicator definitions
+   22-May-10    RMS     Added check for 64b definitions
    11-Jul-08    RMS     Added IO mode flag for boot (from Bob Abeles)
    28-Jun-07    RMS     Defined character code for tape mark
    14-Nov-04    RMS     Added column binary support
@@ -41,6 +43,10 @@
 #define _I1401_DEFS_H_  0
 
 #include "sim_defs.h"
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "1401 does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 
@@ -267,6 +273,7 @@
 #define IN_LPT          032                             /* printer error */
 #define IN_PRO          034                             /* process check */
 #define IN_DBY          036                             /* disk busy */
+#define IN_TBY          041                             /* tape busy */
 #define IN_END          042                             /* end indicator */
 #define IN_TAP          043                             /* tape error */
 #define IN_ACC          045                             /* access error */
@@ -282,6 +289,8 @@
 #define IN_SSE          065                             /* sense switch E */
 #define IN_SSF          066                             /* sense switch F */
 #define IN_SSG          067                             /* sense switch G */
+#define IN_RBY          070                             /* reader busy */
+#define IN_PBY          071                             /* punch busy */
 #define IN_READ         072                             /* reader error */
 
 #define CRETIOE(f,c)    return ((f)? (c): SCPE_OK)

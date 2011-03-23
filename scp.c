@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2009, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   13-Jan-11    MP      Added "SHOW SHOW" and "SHOW <dev> SHOW" commands
+   05-Jan-11    RMS     Fixed bug in deposit stride for numeric input (John Dundas)
+   23-Dec-10    RMS     Clarified some help messages (Mark Pizzolato)
+   08-Nov-10    RMS     Fixed handling of DO with no arguments (Dave Bryan)
+   22-May-10    RMS     Added *nix READLINE support (Mark Pizzolato)
    08-Feb-09    RMS     Fixed warnings in help printouts
    29-Dec-08    RMS     Fixed implementation of MTAB_NC
    24-Nov-08    RMS     Revised RESTORE unit logic for consistency
@@ -30,8 +35,8 @@
    17-Aug-08    RMS     Revert RUN/BOOT to standard, rather than powerup, reset
    25-Jul-08    JDB     DO cmd missing params now default to null string
    29-Jun-08    JDB     DO cmd sub_args now allows "\\" to specify literal backslash
-   31-Mar-08    RMS     Fixed bug in local/global register search (found by Mark Pizzolato)
-                        Fixed bug in restore of RO units (from Mark Pizzolato)
+   31-Mar-08    RMS     Fixed bug in local/global register search (Mark Pizzolato)
+                        Fixed bug in restore of RO units (Mark Pizzolato)
    06-Feb-08    RMS     Added SET/SHO/NO BR with default argument
    18-Jul-07    RMS     Modified match_ext for VMS ext;version support
    28-Apr-07    RMS     Modified sim_instr invocation to call sim_rtcn_init_all
@@ -47,52 +52,52 @@
    14-Feb-06    RMS     Upgraded save file format to V3.5
    18-Jan-06    RMS     Added fprint_stopped_gen
                         Added breakpoint spaces
-                        Fixed unaligned register access (found by Doug Carman)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+                        Fixed unaligned register access (Doug Carman)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    30-Aug-05    RMS     Revised to trim trailing spaces on file names
    25-Aug-05    RMS     Added variable default device support
    23-Aug-05    RMS     Added Linux line history support
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   01-May-05    RMS     Revised syntax for SET DEBUG (from Dave Bryan)
+   01-May-05    RMS     Revised syntax for SET DEBUG (Dave Bryan)
    22-Mar-05    JDB     Modified DO command to allow ten-level nesting
-   18-Mar-05    RMS     Moved DETACH tests into detach_unit (from Dave Bryan)
+   18-Mar-05    RMS     Moved DETACH tests into detach_unit (Dave Bryan)
                         Revised interface to fprint_sym, fparse_sym
-   07-Feb-05    RMS     Added ASSERT command (from Dave Bryan)
+   07-Feb-05    RMS     Added ASSERT command (Dave Bryan)
    02-Feb-05    RMS     Fixed bug in global register search
    26-Dec-04    RMS     Qualified SAVE examine, RESTORE deposit with SIM_SW_REST
    10-Nov-04    JDB     Fixed logging of errors from cmds in "do" file
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
-                        Renamed unit OFFLINE/ONLINE to DISABLED/ENABLED (from Dave Bryan)
-                        Revised to flush output files after simulation stop (from Dave Bryan)
+                        Renamed unit OFFLINE/ONLINE to DISABLED/ENABLED (Dave Bryan)
+                        Revised to flush output files after simulation stop (Dave Bryan)
    15-Oct-04    RMS     Fixed HELP to suppress duplicate descriptions
-   27-Sep-04    RMS     Fixed comma-separation options in set (from David Bryan)
+   27-Sep-04    RMS     Fixed comma-separation options in set (David Bryan)
    09-Sep-04    RMS     Added -p option for RESET
    13-Aug-04    RMS     Qualified RESTORE detach with SIM_SW_REST
-   17-Jul-04    RMS     Added ECHO command (from Dave Bryan)
+   17-Jul-04    RMS     Added ECHO command (Dave Bryan)
    12-Jul-04    RMS     Fixed problem ATTACHing to read only files
-                        (found by John Dundas)
+                        (John Dundas)
    28-May-04    RMS     Added SET/SHOW CONSOLE
    14-Feb-04    RMS     Updated SAVE/RESTORE (V3.2)
-                RMS     Added debug print routines (from Dave Hittner)
+                RMS     Added debug print routines (Dave Hittner)
                 RMS     Added sim_vm_parse_addr and sim_vm_fprint_addr
                 RMS     Added REG_VMAD support
                 RMS     Split out libraries
                 RMS     Moved logging function to SCP
                 RMS     Exposed step counter interface(s)
-                RMS     Fixed double logging of SHOW BREAK (found by Mark Pizzolato)
+                RMS     Fixed double logging of SHOW BREAK (Mark Pizzolato)
                 RMS     Fixed implementation of REG_VMIO
                 RMS     Added SET/SHOW DEBUG, SET/SHOW <device> DEBUG,
                         SHOW <device> MODIFIERS, SHOW <device> RADIX
                 RMS     Changed sim_fsize to take uptr argument
    29-Dec-03    RMS     Added Telnet console output stall support
    01-Nov-03    RMS     Cleaned up implicit detach on attach/restore
-                        Fixed bug in command line read while logging (found by Mark Pizzolato)
+                        Fixed bug in command line read while logging (Mark Pizzolato)
    01-Sep-03    RMS     Fixed end-of-file problem in dep, idep
                         Fixed error on trailing spaces in dep, idep
    15-Jul-03    RMS     Removed unnecessary test in reset_all
    15-Jun-03    RMS     Added register flag REG_VMIO
    25-Apr-03    RMS     Added extended address support (V3.0)
-                        Fixed bug in SAVE (found by Peter Schorn)
+                        Fixed bug in SAVE (Peter Schorn)
                         Added u5, u6 fields
                         Added logical name support
    03-Mar-03    RMS     Added sim_fsize
@@ -100,36 +105,36 @@
    08-Feb-03    RMS     Changed sim_os_sleep to void, match_ext to char*
                         Added multiple actions, .ini file support
                         Added multiple switch evaluations per line
-   07-Feb-03    RMS     Added VMS support for ! (from Mark Pizzolato)
+   07-Feb-03    RMS     Added VMS support for ! (Mark Pizzolato)
    01-Feb-03    RMS     Added breakpoint table extension, actions
    14-Jan-03    RMS     Added missing function prototypes
    10-Jan-03    RMS     Added attach/restore flag, dynamic memory size support,
                         case sensitive SET options
-   22-Dec-02    RMS     Added ! (OS command) feature (from Mark Pizzolato)
+   22-Dec-02    RMS     Added ! (OS command) feature (Mark Pizzolato)
    17-Dec-02    RMS     Added get_ipaddr
    02-Dec-02    RMS     Added EValuate command
    16-Nov-02    RMS     Fixed bug in register name match algorithm
-   13-Oct-02    RMS     Fixed Borland compiler warnings (found by Hans Pufal)
-   05-Oct-02    RMS     Fixed bugs in set_logon, ssh_break (found by David Hittner)
+   13-Oct-02    RMS     Fixed Borland compiler warnings (Hans Pufal)
+   05-Oct-02    RMS     Fixed bugs in set_logon, ssh_break (David Hittner)
                         Added support for fixed buffer devices
                         Added support for Telnet console, removed VT support
                         Added help <command>
-                        Added VMS file optimizations (from Robert Alan Byer)
+                        Added VMS file optimizations (Robert Alan Byer)
                         Added quiet mode, DO with parameters, GUI interface,
-                           extensible commands (from Brian Knittel)
+                           extensible commands (Brian Knittel)
                         Added device enable/disable commands
-   14-Jul-02    RMS     Fixed exit bug in do, added -v switch (from Brian Knittel)
+   14-Jul-02    RMS     Fixed exit bug in do, added -v switch (Brian Knittel)
    17-May-02    RMS     Fixed bug in fxread/fxwrite error usage (found by
                         Norm Lastovic)
    02-May-02    RMS     Added VT emulation interface, changed {NO}LOG to SET {NO}LOG
    22-Apr-02    RMS     Fixed laptop sleep problem in clock calibration, added
-                        magtape record length error (found by Jonathan Engdahl)
+                        magtape record length error (Jonathan Engdahl)
    26-Feb-02    RMS     Fixed initialization bugs in do_cmd, get_aval
-                        (found by Brian Knittel)
+                        (Brian Knittel)
    10-Feb-02    RMS     Fixed problem in clock calibration
    06-Jan-02    RMS     Moved device enable/disable to simulators
    30-Dec-01    RMS     Generalized timer packaged, added circular arrays
-   19-Dec-01    RMS     Fixed DO command bug (found by John Dundas)
+   19-Dec-01    RMS     Fixed DO command bug (John Dundas)
    07-Dec-01    RMS     Implemented breakpoint package
    05-Dec-01    RMS     Fixed bug in universal register logic
    03-Dec-01    RMS     Added read-only units, extended SET/SHOW, universal registers
@@ -144,7 +149,7 @@
                         Added special modifier print
    31-Aug-01    RMS     Changed int64 to t_int64 for Windoze (V2.7)
    18-Jul-01    RMS     Minor changes for Macintosh port
-   12-Jun-01    RMS     Fixed bug in big-endian I/O (found by Dave Conroy)
+   12-Jun-01    RMS     Fixed bug in big-endian I/O (Dave Conroy)
    27-May-01    RMS     Added multiple console support
    16-May-01    RMS     Added logging
    15-May-01    RMS     Added features from Tim Litt
@@ -182,6 +187,11 @@
 #include "sim_rev.h"
 #include <signal.h>
 #include <ctype.h>
+
+#if defined(HAVE_READLINE)
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif
 
 #define EX_D            0                               /* deposit */
 #define EX_E            1                               /* examine */
@@ -279,11 +289,13 @@ t_stat show_config (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_queue (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_time (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_mod_names (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat show_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_log_names (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_radix (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_logicals (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_modifiers (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat show_dev_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
@@ -322,6 +334,7 @@ void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
 char *read_line (char *ptr, int32 size, FILE *stream);
+char *read_line_p (char *prompt, char *ptr, int32 size, FILE *stream);
 REG *find_reg_glob (char *ptr, char **optr, DEVICE **gdptr);
 char *sim_trim_endspc (char *cptr);
 
@@ -393,7 +406,7 @@ static const char *sim_sa64 = "64b addresses";
 #else
 static const char *sim_sa64 = "32b addresses";
 #endif
-#if defined USE_NETWORK
+#if defined (USE_NETWORK) || defined (USE_SHARED)
 static const char *sim_snet = "Ethernet support";
 #else
 static const char *sim_snet = "no Ethernet";
@@ -539,17 +552,18 @@ static CTAB cmd_table[] = {
       "set <dev> DISABLED       disable device\n"
       "set <dev> DEBUG{=arg}    set device debug flags\n"
       "set <dev> NODEBUG={arg}  clear device debug flags\n"
-      "set <dev> arg{,arg...}   set device parameters\n"
+      "set <dev> arg{,arg...}   set device parameters (see show modifiers)\n"
       "set <unit> ENABLED       enable unit\n"
       "set <unit> DISABLED      disable unit\n"
-      "set <unit> arg{,arg...}  set unit parameters\n"
+      "set <unit> arg{,arg...}  set unit parameters (see show modifiers)\n"
       },
     { "SHOW", &show_cmd, 0,
       "sh{ow} br{eak} <list>    show breakpoints\n"
       "sh{ow} con{figuration}   show configuration\n"
       "sh{ow} cons{ole} {arg}   show console options\n"
       "sh{ow} dev{ices}         show devices\n"  
-      "sh{ow} m{odifiers}       show modifiers\n" 
+      "sh{ow} m{odifiers}       show modifiers for all devices\n" 
+      "sh{ow} s{how}            show SHOW commands for all devices\n" 
       "sh{ow} n{ames}           show logical names\n" 
       "sh{ow} q{ueue}           show event queue\n"  
       "sh{ow} ti{me}            show simulated time\n"
@@ -558,7 +572,8 @@ static CTAB cmd_table[] = {
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
       "sh{ow} <dev> MODIFIERS   show device modifiers\n"
-      "sh{ow} <dev} NAMES       show device logical name\n"
+      "sh{ow} <dev> NAMES       show device logical name\n"
+      "sh{ow} <dev> SHOW        show device SHOW commands\n"
       "sh{ow} <dev> {arg,...}   show device parameters\n"
       "sh{ow} <unit> {arg,...}  show unit parameters\n"  },
     { "DO", &do_cmd, 1,
@@ -669,12 +684,13 @@ else if (*argv[0]) {                                    /* sim name arg? */
     }
 
 while (stat != SCPE_EXIT) {                             /* in case exit */
-    printf ("sim> ");                                   /* prompt */
     if (cptr = sim_brk_getact (cbuf, CBUFSIZE))         /* pending action? */
-        printf ("%s\n", cptr);                          /* echo */
-    else if (sim_vm_read != NULL)                       /* sim routine? */
+        printf ("sim> %s\n", cptr);                     /* echo */
+    else if (sim_vm_read != NULL) {                     /* sim routine? */
+        printf ("sim> ");                               /* prompt */
         cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
-    else cptr = read_line (cbuf, CBUFSIZE, stdin);      /* read command line */
+        }
+    else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
     if (cptr == NULL)                                   /* ignore EOF */
         continue;
     if (*cptr == 0)                                     /* ignore blank */
@@ -863,7 +879,7 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
         }
     }                                                   /* end for */
 
-if (nargs <= 0)                                         /* need at least 1 */
+if ((nargs <= 0) || (do_arg [0] == NULL))               /* need at least 1 */
     return SCPE_2FARG;
 if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
     if (flag == 0)                                      /* cmd line file? */
@@ -1304,6 +1320,7 @@ static SHTAB show_glob_tab[] = {
     { "TIME", &show_time, 0 },
     { "MODIFIERS", &show_mod_names, 0 },
     { "NAMES", &show_log_names, 0 },
+    { "SHOW", &show_show_commands, 0 },
     { "VERSION", &show_version, 1 },
     { "CONSOLE", &sim_show_console, 0 },
     { "BREAK", &show_break, 0 },
@@ -1319,6 +1336,7 @@ static SHTAB show_dev_tab[] = {
     { "DEBUG", &show_dev_debug, 0 },
     { "MODIFIERS", &show_dev_modifiers, 0 },
     { "NAMES", &show_dev_logicals, 0 },
+    { "SHOW", &show_dev_show_commands, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -1634,7 +1652,7 @@ return SCPE_OK;
 
 t_stat show_dev_modifiers (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-int any, enb;
+int32 any, enb;
 MTAB *mptr;
 DEBTAB *dep;
 
@@ -1660,11 +1678,12 @@ if (!enb && (dptr->flags & DEV_DISABLE)) {
         fprintf (st, ", ENABLED, DISABLED");
     else fprintf (st, "%s\tENABLED, DISABLED", sim_dname (dptr));
     }
-if (any) fprintf (st, "\n");
+if (any)
+    fprintf (st, "\n");
 if ((dptr->flags & DEV_DEBUG) && dptr->debflags) {
     fprintf (st, "%s\tDEBUG=", sim_dname (dptr));
     for (dep = dptr->debflags; dep->name != NULL; dep++)
-        fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ","), dep->name);
+        fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
     fprintf (st, "\n");
     }
 return SCPE_OK;
@@ -1704,6 +1723,40 @@ if (mptr->disp)
 else fputs (mptr->pstring, st);
 if (flag && !((mptr->mask & MTAB_XTD) && (mptr->mask & MTAB_NMO)))
     fputc ('\n', st);
+return SCPE_OK;
+}
+
+/* Show show commands */
+
+t_stat show_show_commands (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr)
+{
+int32 i;
+DEVICE *dptr;
+
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
+    show_dev_show_commands (st, dptr, NULL, flag, cptr);
+return SCPE_OK;
+}
+
+t_stat show_dev_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+int32 any, enb;
+MTAB *mptr;
+
+any = enb = 0;
+if (dptr->modifiers) {
+    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
+        if ((!mptr->disp) || (!mptr->pstring))
+            continue;
+        if (any++)
+            fprintf (st, ", %s", mptr->pstring);
+        else fprintf (st, "SHOW %s\t%s", sim_dname (dptr), mptr->pstring);
+        }
+    }
+if (any)
+    fprintf (st, "\n");
 return SCPE_OK;
 }
 
@@ -3265,6 +3318,7 @@ if ((reason = parse_sym (cptr, addr, uptr, sim_eval, sim_switches)) > 0) {
     sim_eval[0] = get_uint (cptr, rdx, mask, &reason);
     if (reason != SCPE_OK)
         return reason;
+    reason = dfltinc;
     }
 count = (1 - reason + (dptr->aincr - 1)) / dptr->aincr;
 
@@ -3356,9 +3410,42 @@ return SCPE_OK;
 
 char *read_line (char *cptr, int32 size, FILE *stream)
 {
+return read_line_p (NULL, cptr, size, stream);
+}
+
+/* read_line_p          read line with prompt
+
+   Inputs:
+        prompt  =       pointer to prompt string
+        cptr    =       pointer to buffer
+        size    =       maximum size
+        stream  =       pointer to input stream
+   Outputs:
+        optr    =       pointer to first non-blank character
+                        NULL if EOF
+*/
+
+char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
+{
 char *tptr;
 
+#if defined(HAVE_READLINE)
+if (prompt) {                                           /* interactive? */
+    char *tmpc = readline (prompt);                     /* get cmd line */
+    if (tmpc == NULL)                                   /* bad result? */
+        cptr = NULL;
+    else {
+        strncpy (cptr, tmpc, size);                     /* copy result */
+        free (tmpc) ;                                   /* free temp */
+        }
+    }
+else cptr = fgets (cptr, size, stream);                 /* get cmd line */
+#else
+if (prompt)                                             /* interactive? */
+    printf ("%s", prompt);                              /* display prompt */
 cptr = fgets (cptr, size, stream);                      /* get cmd line */
+#endif
+
 if (cptr == NULL) {
     clearerr (stream);                                  /* clear error */
     return NULL;                                        /* ignore EOF */
@@ -3372,12 +3459,14 @@ for (tptr = cptr; tptr < (cptr + size); tptr++) {       /* remove cr or nl */
     }
 while (isspace (*cptr))                                 /* trim leading spc */
     cptr++;
-if (*cptr == ';') *cptr = 0;                            /* ignore comment */
+if (*cptr == ';')                                       /* ignore comment */
+    *cptr = 0;
 
 #if defined (HAVE_READLINE)
-add_history (cptr);
-
+if (prompt)
+    add_history (cptr);
 #endif
+
 return cptr;
 }
 

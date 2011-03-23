@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,13 +27,13 @@
 
    28-Apr-07    RMS     Removed clock initialization
    30-Oct-06    RMS     Added idle and infinite loop detection
-   30-Sep-06    RMS     Fixed SC value after DVI overflow (found by Don North)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   30-Sep-06    RMS     Fixed SC value after DVI overflow (Don North)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    06-Nov-04    RMS     Added =n to SHOW HISTORY
    31-Dec-03    RMS     Fixed bug in set_cpu_hist
    13-Oct-03    RMS     Added instruction history
-                        Added TSC8-75 support (from Bernhard Baehr)
+                        Added TSC8-75 support (Bernhard Baehr)
    12-Mar-03    RMS     Added logical name support
    04-Oct-02    RMS     Revamped device dispatching, added device number support
    06-Jan-02    RMS     Added device enable/disable routines

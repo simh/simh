@@ -1,6 +1,6 @@
 /* i7094_cpu1.c: IBM 7094 CPU complex instructions
 
-   Copyright (c) 2003-2010, Robert M. Supnik
+   Copyright (c) 2003-2008, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,9 +22,6 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
-
-   16-Jul-10    RMS     Fixed PSE and MSE user-mode protection (from Dave Pitts)
-                        Added SPUx, SPTx, SPRx
 */
 
 #include "i7094_defs.h"
@@ -46,8 +43,6 @@ extern uint32 mode_ttrap, mode_strap, mode_ctrap, mode_ftrap;
 extern uint32 mode_storn, mode_multi;
 extern uint32 chtr_pend, chtr_inht, chtr_inhi;
 extern uint32 ch_flags[NUM_CHAN];
-
-extern t_bool prot_trap (uint32 decr);
 
 typedef struct {                                        /* unpacked fp */
     uint32              s;                              /* sign: 0 +, 1 - */
@@ -284,8 +279,6 @@ switch (addr) {
         break;
 
     case 00005:                                         /* IOT */
-        if (prot_trap (0))                              /* user mode? */
-            break;
         if (ind_ioc)
             ind_ioc = 0;
         else PC = (PC + 1) & AMASK;
@@ -296,8 +289,6 @@ switch (addr) {
         break;
 
     case 00007:                                         /* ETM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
         if (cpu_model & I_9X)                           /* 709X only */
             mode_ttrap = 1;
         break;
@@ -333,7 +324,7 @@ switch (addr) {
         break;
 
     case 00140:                                         /* SLF */
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X)                       /* 709X only */
             SLT = 0;
         break;
 
@@ -348,12 +339,10 @@ switch (addr) {
             PC = (PC + 1) & AMASK;
         break;
 
-    case 001000: case 002000: case 003000: case 004000: /* BTT */
-    case 005000: case 060000: case 070000: case 010000:
-       if (prot_trap (0))                               /* user mode? */
-           break;
-       if (cpu_model & I_9X) {                          /* 709X only */
-             if (sel_trap (PC))                         /* sel trap? */
+    case 01000: case 02000: case 03000: case 04000:     /* BTT */
+    case 05000: case 06000: case 07000: case 10000:
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (sel_trap (PC))                          /* sel trap? */
                 break;
             ch = GET_U_CH (addr);                       /* get channel */
             if (ch_flags[ch] & CHF_BOT)                 /* BOT? */
@@ -364,41 +353,13 @@ switch (addr) {
 
     case 001350: case 002350: case 003350: case 004350: /* RICx */
     case 005350: case 006350: case 007350: case 010350:
-        if (prot_trap (0))                              /* user mode? */
-            break;
         ch = GET_U_CH (addr);                           /* get channel */
         return ch_op_reset (ch, 1);
 
     case 001352: case 002352: case 003352: case 004352: /* RDCx */
     case 005352: case 006352: case 007352: case 010352:
-        if (prot_trap (0))                              /* user mode? */
-            break;
         ch = GET_U_CH (addr);                           /* get channel */
         return ch_op_reset (ch, 0);
-
-    case 001341: case 002341: case 003341: case 004341: /* SPUx */
-    case 005341: case 006341: case 007341: case 010341:
-    case 001342: case 002342: case 003342: case 004342: /* SPUx 2 */
-    case 005342: case 006342: case 007342: case 010342:
-    case 001360: case 002360: case 003360: case 004360: /* SPTx */
-    case 005360: case 006360: case 007360: case 010360:
-    case 001361: case 002361: case 003361: case 004361: /* SPRx */
-    case 005361: case 006361: case 007361: case 010361:
-    case 001362: case 002362: case 003362: case 004362: /* SPRx 2 */
-    case 005362: case 006362: case 007362: case 010362:
-    case 001363: case 002363: case 003363: case 004363: /* SPRx 3 */
-    case 005363: case 006363: case 007363: case 010363:
-    case 001364: case 002364: case 003364: case 004364: /* SPRx 4 */
-    case 005364: case 006364: case 007364: case 010364:
-    case 001365: case 002365: case 003365: case 004365: /* SPRx 5 */
-    case 005365: case 006365: case 007365: case 010365:
-    case 001366: case 002366: case 003366: case 004366: /* SPRx 6 */
-    case 005366: case 006366: case 007366: case 010366:
-    case 001367: case 002367: case 003367: case 004367: /* SPRx 7 */
-    case 005367: case 006367: case 007367: case 010367:
-        if (prot_trap (0))                              /* user mode? */
-            break;
-        break;                                          /* no ops */
         }                                               /* end case */
 
 return SCPE_OK;
@@ -423,8 +384,6 @@ switch (addr) {
         break;
 
     case 00002:                                         /* EFTM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
         if (cpu_model & I_9X) {                         /* 709X only */
             mode_ftrap = 1;
             ind_mqo = 0;                                /* clears MQ ovf */
@@ -437,8 +396,6 @@ switch (addr) {
         break;
 
     case 00004:                                         /* LFTM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
         if (cpu_model & I_9X)                           /* 709X only */
             mode_ftrap = 0;
         break;
@@ -454,8 +411,6 @@ switch (addr) {
         break;
 
     case 00007:                                         /* LTM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
         if (cpu_model & I_9X)                           /* 709X only */
             mode_ttrap = 0;
         break;

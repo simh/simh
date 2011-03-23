@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2008, Robert M Supnik
+   Copyright (c) 2002-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,20 @@
 
    tq           TQK50 tape controller
 
+   14-Jan-11    MP      Various fixes discovered while exploring Ultrix issue:
+                        - Set UNIT_SXC flag when a tape mark is encountered 
+                          during forward motion read operations
+                        - Fixed logic which clears UNIT_SXC to check command 
+                          modifier
+                        - Added CMF_WR flag to tq_cmf entry for OP_WTM
+                        - Made non-immediate rewind positioning operations 
+                          take 2 seconds
+                        - Added UNIT_IDLE flag to tq units
+                        - Fixed debug output of tape file positions when they 
+                          are 64b
+                        - Added more debug output after positioning operations.
+                        - Added textual display of the command being performed
+   23-Dec-10    RMS     Fixed comments about register addresses
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    16-Feb-06    RMS     Revised for new magtape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
@@ -223,7 +237,6 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern UNIT cpu_unit;
 extern FILE *sim_deb;
 extern uint32 sim_taddr_64;
 
@@ -249,6 +262,7 @@ int32 tq_itime = 200;                                   /* init time, except */
 int32 tq_itime4 = 10;                                   /* stage 4 */
 int32 tq_qtime = 200;                                   /* queue time */
 int32 tq_xtime = 500;                                   /* transfer time */
+int32 tq_rwtime = 2000000;                              /* rewind time 2 sec (adjusted later) */
 int32 tq_typ = INIT_TYPE;                               /* device type */
 
 /* Command table - legal modifiers (low 16b) and flags (high 16b) */
@@ -280,7 +294,7 @@ static uint32 tq_cmf[64] = {
     CMF_SEQ|CMF_RW|CMF_WR|MD_CDL|MD_CSE|MD_IMM|         /* write */
             MD_CMP|MD_ERW|MD_SEC|MD_SER,
     0,                                                  /* 35 */
-    CMF_SEQ|MD_CDL|MD_CSE|MD_IMM,                       /* wr tape mark */
+    CMF_SEQ|CMF_WR|MD_CDL|MD_CSE|MD_IMM,                /* wr tape mark */
     CMF_SEQ|MD_CDL|MD_CSE|MD_IMM|MD_OBC|                /* reposition */
             MD_REV|MD_RWD|MD_DLE|
             MD_SCH|MD_SEC|MD_SER,
@@ -288,6 +302,37 @@ static uint32 tq_cmf[64] = {
     0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0
     };  
+
+static char *tq_cmdname[] = {
+    "",                                                 /*  0 */
+    "ABO",                                              /*  1 b: abort */
+    "GCS",                                              /*  2 b: get command status */
+    "GUS",                                              /*  3 b: get unit status */
+    "SCC",                                              /*  4 b: set controller char */
+    "","","",                                           /*  5-7 */
+    "AVL",                                              /*  8 b: available */
+    "ONL",                                              /*  9 b: online */
+    "SUC",                                              /* 10 b: set unit char */
+    "DAP",                                              /* 11 b: det acc paths - nop */
+    "","","","",                                        /* 12-15 */
+    "ACC",                                              /* 16 b: access */
+    "CCD",                                              /* 17 d: compare - nop */
+    "ERS",                                              /* 18 b: erase */
+    "FLU",                                              /* 19 d: flush - nop */
+    "","",                                              /* 20-21 */
+    "ERG",                                              /* 22 t: erase gap */
+    "","","","","","","","","",                         /* 23-31 */
+    "CMP",                                              /* 32 b: compare */
+    "RD",                                               /* 33 b: read */
+    "WR",                                               /* 34 b: write */
+    "",                                                 /* 35 */
+    "WTM",                                              /* 36 t: write tape mark */
+    "POS",                                              /* 37 t: reposition */
+    "","","","","","","","","",                         /* 38-46 */
+    "FMT",                                              /* 47 d: format */
+    "","","","","","","","","","","","","","","","",    /* 48-63 */
+    "AVA",                                              /* 64 b: unit now avail */
+    };
 
 /* Forward references */
 
@@ -369,12 +414,12 @@ DIB tq_dib = {
     };
 
 UNIT tq_unit[] = {
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_tmrsvc, UNIT_DIS, 0) },
-    { UDATA (&tq_quesvc, UNIT_DIS, 0) }
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
+    { UDATA (&tq_quesvc, UNIT_IDLE|UNIT_DIS, 0) }
     };
 
 #define TQ_TIMER        (TQ_NUMDR)
@@ -411,6 +456,7 @@ REG tq_reg[] = {
     { DRDATA (I4TIME, tq_itime4, 24), PV_LEFT + REG_NZ },
     { DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
     { DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
+    { DRDATA (RWTIME, tq_rwtime, 32), PV_LEFT + REG_NZ },
     { BRDATA (PKTS, tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
     { DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
     { DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
@@ -466,10 +512,10 @@ DEVICE tq_dev = {
     &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG
     };
 
-/* I/O dispatch routines, I/O addresses 17772150 - 17772152
+/* I/O dispatch routines, I/O addresses 17774500 - 17774502
 
-   17772150     IP      read/write
-   17772152     SA      read/write
+   17774500     IP      read/write
+   17774502     SA      read/write
 */
 
 t_stat tq_rd (int32 *data, int32 PA, int32 access)
@@ -643,13 +689,16 @@ if ((pkt == 0) && tq_pip) {                             /* polling? */
     if (pkt) {                                          /* got one? */
         if (DEBUG_PRS (tq_dev)) {
             UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
-            fprintf (sim_deb, ">>TQ: cmd=%04X, mod=%04X, unit=%d, ",
-                tq_pkt[pkt].d[CMD_OPC], tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN]);
+            fprintf (sim_deb, ">>TQ: cmd=%04X(%3s), mod=%04X, unit=%d, ",
+                tq_pkt[pkt].d[CMD_OPC], tq_cmdname[tq_pkt[pkt].d[CMD_OPC]&0x3f], tq_pkt[pkt].d[CMD_MOD], tq_pkt[pkt].d[CMD_UN]);
             fprintf (sim_deb, "bc=%04X%04X, ma=%04X%04X",
                 tq_pkt[pkt].d[RW_BCH], tq_pkt[pkt].d[RW_BCL],
                 tq_pkt[pkt].d[RW_BAH], tq_pkt[pkt].d[RW_BAL]);
-            if (up)
-                fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
+            if (up) {
+                fprintf (sim_deb, ", pos=");
+                fprint_val (sim_deb, up->pos, 10, T_ADDR_W, PV_LEFT);
+                fprintf (sim_deb, ", obj=%d\n", up->objp);
+                }
             else fprintf (sim_deb, "\n");
             fflush (sim_deb);
             }
@@ -734,7 +783,7 @@ else {                                                  /* valid cmd */
             }
 /*      if (tq_cmf[cmd] & MD_CDL)                       /* clr cch lost? */
 /*          uptr->flags = uptr->flags & ~UNIT_CDL; */
-        if (tq_cmf[cmd] & MD_CSE)                       /* clr ser exc? */
+        if ((mdf & MD_CSE) && (uptr->flags & UNIT_SXC)) /* clr ser exc? */
             uptr->flags = uptr->flags & ~UNIT_SXC;
         }
     switch (cmd) {
@@ -847,19 +896,19 @@ uint32 sts;
 UNIT *uptr;
 
 if (uptr = tq_getucb (lu)) {                            /* unit exist? */
-	if (uptr->flags & UNIT_SXC)                         /* ser exc pending? */
+    if (uptr->flags & UNIT_SXC)                         /* ser exc pending? */
         sts = ST_SXC;
-	else {
-		uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_TMK | UNIT_POL);
-		sim_tape_rewind (uptr);                         /* rewind */
-		uptr->uf = uptr->objp = 0;                      /* clr flags */
-		if (uptr->flags & UNIT_ATT) {                   /* attached? */
-			sts = ST_SUC;                               /* success */
-			if (mdf & MD_UNL)                           /* unload? */
+    else {
+        uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_TMK | UNIT_POL);
+        sim_tape_rewind (uptr);                         /* rewind */
+        uptr->uf = uptr->objp = 0;                      /* clr flags */
+        if (uptr->flags & UNIT_ATT) {                   /* attached? */
+            sts = ST_SUC;                               /* success */
+            if (mdf & MD_UNL)                           /* unload? */
                 tq_detach (uptr);
-			}
-		else sts = ST_OFL | SB_OFL_NV;                  /* no, offline */
-		}
+            }
+        else sts = ST_OFL | SB_OFL_NV;                  /* no, offline */
+        }
     }
 else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_AVL | OP_END, tq_efl (uptr), sts, AVL_LNT, UQ_TYP_SEQ);
@@ -1066,7 +1115,12 @@ if (uptr = tq_getucb (lu)) {                            /* unit exist? */
     sts = tq_mot_valid (uptr, OP_POS);                  /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
         uptr->cpkt = pkt;                               /* op in progress */
-        sim_activate (uptr, tq_xtime);                  /* activate */
+        tq_rwtime = 2 * tmr_poll * clk_tps;             /* 2 second rewind time */
+        if ((tq_pkt[pkt].d[CMD_MOD] & MD_RWD) &&        /* rewind? */
+            (!(tq_pkt[pkt].d[CMD_MOD] & MD_IMM)))       /* !immediate? */
+            sim_activate (uptr, tq_rwtime);             /* use 2 sec rewind execute time */
+        else                                            /* otherwise */
+            sim_activate (uptr, tq_xtime);              /* use normal execute time */
         return OK;                                      /* done */
         }
     }
@@ -1180,6 +1234,8 @@ switch (cmd) {                                          /* case on command */
             return tq_mot_err (uptr, tbc);              /* log, done */
             }
         if ((sts != ST_SUC) || (cmd == OP_ACC)) {       /* error or access? */
+            if (sts == ST_TMK)
+                uptr->flags = uptr->flags | UNIT_SXC;   /* set ser exc */
             PUTP32 (pkt, RW_BCL, 0);                    /* no bytes processed */
             break;
             }
@@ -1286,6 +1342,11 @@ switch (cmd) {                                          /* case on command */
             }
         PUTP32 (pkt, POS_RCL, skrec);                   /* #rec skipped */
         PUTP32 (pkt, POS_TMCL, sktmk);                  /* #tmk skipped */
+        if (DEBUG_PRS (tq_dev)) {
+            fprintf (sim_deb, ">>TQ: Position Done: mdf=%04X, nrec=%04X, ntmk=%04X, skrec=%04X, sktmk=%04X\n",
+                mdf, nrec, ntmk, skrec, sktmk);
+            fflush (sim_deb);
+            }
         break;
 
     default:
@@ -1690,8 +1751,11 @@ if (DEBUG_PRS (tq_dev)) {
     UNIT *up = tq_getucb (tq_pkt[pkt].d[CMD_UN]);
     fprintf (sim_deb, ">>TQ: rsp=%04X, sts=%04X",
         tq_pkt[pkt].d[RSP_OPF], tq_pkt[pkt].d[RSP_STS]);
-    if (up)
-        fprintf (sim_deb, ", pos=%d, obj=%d\n", up->pos, up->objp);
+    if (up) {
+        fprintf (sim_deb, ", pos=");
+        fprint_val (sim_deb, up->pos, 10, T_ADDR_W, PV_LEFT);
+        fprintf (sim_deb, ", obj=%d\n", up->objp);
+        }
     else fprintf (sim_deb, "\n");
     fflush (sim_deb);
     }
@@ -1816,6 +1880,7 @@ void tq_putr_unit (int32 pkt, UNIT *uptr, uint32 lu, t_bool all)
 {
 tq_pkt[pkt].d[ONL_MLUN] = lu;                           /* multi-unit */
 tq_pkt[pkt].d[ONL_UFL] = uptr->uf | TQ_WPH (uptr);      /* unit flags */
+tq_pkt[pkt].d[ONL_UFL] |= tq_efl (uptr);                /* end flags accordingly */
 tq_pkt[pkt].d[ONL_RSVL] = tq_pkt[pkt].d[ONL_RSVH] = 0;  /* reserved */
 tq_pkt[pkt].d[ONL_UIDA] = lu;                           /* UID low */
 tq_pkt[pkt].d[ONL_UIDB] = 0;

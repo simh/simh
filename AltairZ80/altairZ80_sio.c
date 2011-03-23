@@ -63,10 +63,11 @@
 #endif
 
 /* Debug flags */
-#define IN_MSG      (1 << 0)
-#define OUT_MSG     (1 << 1)
-#define CMD_MSG     (1 << 2)
-#define VERBOSE_MSG (1 << 3)
+#define IN_MSG              (1 << 0)
+#define OUT_MSG             (1 << 1)
+#define CMD_MSG             (1 << 2)
+#define VERBOSE_MSG         (1 << 3)
+#define BUFFER_EMPTY_MSG    (1 << 4)
 
 #define UNIT_V_SIO_ANSI     (UNIT_V_UF + 0)     /* ANSI mode, strip bit 8 on output             */
 #define UNIT_SIO_ANSI       (1 << UNIT_V_SIO_ANSI)
@@ -160,11 +161,12 @@ extern int32 sim_interval;
 
 /* Debug Flags */
 static DEBTAB generic_dt[] = {
-    { "IN",         IN_MSG      },
-    { "OUT",        OUT_MSG     },
-    { "CMD",        CMD_MSG     },
-    { "VERBOSE",    VERBOSE_MSG },
-    { NULL,         0           }
+    { "IN",             IN_MSG              },
+    { "OUT",            OUT_MSG             },
+    { "CMD",            CMD_MSG             },
+    { "VERBOSE",        VERBOSE_MSG         },
+    { "BUFFEREMPTY",    BUFFER_EMPTY_MSG    },
+    { NULL,             0                   }
 };
 
 /* SIMH pseudo device status registers                                                                          */
@@ -256,7 +258,7 @@ static UNIT sio_unit = {
     100000, /* wait                                                 */
     FALSE,  /* u3 = FALSE, no character available in buffer         */
     FALSE,  /* u4 = FALSE, terminal input is not attached to a file */
-    FALSE,  /* u5 = FALSE, terminal input has not yet reached EOF   */
+    0,      /* u5 = 0, not used                                     */
     0       /* u6 = 0, not used                                     */
 };
 
@@ -267,7 +269,6 @@ static REG sio_reg[] = {
     { DRDATA (WRNPTRE,  warnPTREOF,         32) },
     { DRDATA (WRUPORT,  warnUnassignedPort, 32) },
     { HRDATA (FILEATT,  sio_unit.u4,        8), REG_RO },   /* TRUE iff terminal input is attached to a file    */
-    { HRDATA (FILEEOF,  sio_unit.u5,        8), REG_RO },   /* TRUE iff terminal input file has reached EOF     */
     { HRDATA (TSTATUS,  sio_unit.u3,        8) },           /* TRUE iff a character available in sio_unit.buf   */
     { DRDATA (TBUFFER,  sio_unit.buf,       8) },           /* input buffer for one character                   */
     { DRDATA (KEYBDI,   keyboardInterrupt,          3), REG_RO  },
@@ -412,7 +413,6 @@ static t_stat sio_attach(UNIT *uptr, char *cptr) {
         return tmxr_attach(&altairTMXR, uptr, cptr);        /* attach mux                               */
     }
     sio_unit.u4 = TRUE;                                     /* terminal input is attached to a file     */
-    sio_unit.u5 = FALSE;                                    /* EOF not yet reached                      */
     return attach_unit(uptr, cptr);
 }
 
@@ -440,11 +440,10 @@ static t_stat sio_reset(DEVICE *dptr) {
     int32 i;
     TRACE_PRINT(sio_dev, VERBOSE_MSG, ("SIO: " ADDRESS_FORMAT " Reset" NLP, PCX));
     sio_unit.u3 = FALSE;                                    /* no character in terminal input buffer    */
+    sio_unit.buf = 0;
     resetSIOWarningFlags();
-    if (sio_unit.u4) {                                      /* is terminal input attached to a file?    */
+    if (sio_unit.u4)                                        /* is terminal input attached to a file?    */
         rewind(sio_unit.fileref);                           /* yes, rewind input                        */
-        sio_unit.u5 = FALSE;                                /* EOF not yet reached                      */
-    }
     else if (sio_unit.flags & UNIT_ATT)
         for (i = 0; i < TERMINALS; i++)
             if (TerminalLines[i].conn)
@@ -457,6 +456,7 @@ static t_stat ptr_reset(DEVICE *dptr) {
     TRACE_PRINT(ptr_dev, VERBOSE_MSG, ("PTR: " ADDRESS_FORMAT " Reset" NLP, PCX));
     resetSIOWarningFlags();
     ptr_unit.u3 = FALSE;                                    /* End Of File not yet reached              */
+    ptr_unit.buf = 0;
     if (ptr_unit.flags & UNIT_ATT)                          /* attached?                                */
         rewind(ptr_unit.fileref);
     sim_map_resource(0x12, 1, RESOURCE_TYPE_IO, &sio1s, dptr->flags & DEV_DIS);
@@ -629,15 +629,23 @@ static void voidSleep(void) {
 /* generic status port for keyboard input / terminal output */
 static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
     int32 ch, result;
-    SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
+    const SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
     assert(spi.port == port);
     pollConnection();
     if (io == 0) { /* IN */
         if (sio_unit.u4) {                                  /* attached to a file?                      */
-            if (sio_unit.u5)                                /* EOF reached?                             */
-                sio_detach(&sio_unit);                      /* detach file and switch to keyboard input */
-            else
+            if (sio_unit.u3)                                /* character available?                     */
                 return spi.sio_can_read | spi.sio_can_write;
+            ch = getc(sio_unit.fileref);
+            if (ch == EOF) {
+                sio_detach(&sio_unit);                      /* detach file and switch to keyboard input */
+                return spi.sio_cannot_read | spi.sio_can_write;
+            }
+            else {
+                sio_unit.u3 = TRUE;                         /* indicate character available             */
+                sio_unit.buf = ch;                          /* store character in buffer                */
+                return spi.sio_can_read | spi.sio_can_write;
+            }
         }
         if (sio_unit.flags & UNIT_ATT) {                    /* attached to a port?                      */
             if (tmxr_rqln(&TerminalLines[spi.terminalLine]))
@@ -658,19 +666,20 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
             if (ch == SCPE_STOP) {                          /* stop CPU in case ^E (default) was typed  */
                 stop_cpu = TRUE;
                 sim_interval = 0;                           /* detect stop condition as soon as possible*/
-                return spi.sio_can_write | spi.sio_cannot_read; /* do not consume stop character        */
+                return spi.sio_cannot_read | spi.sio_can_write; /* do not consume stop character        */
             }
             sio_unit.u3 = TRUE;                             /* indicate character available             */
             sio_unit.buf = ch;                              /* store character in buffer                */
             return spi.sio_can_read | spi.sio_can_write;
         }
         checkSleep();
-        return spi.sio_can_write | spi.sio_cannot_read;
+        return spi.sio_cannot_read | spi.sio_can_write;
     }                                                       /* OUT follows, no fall-through from IN     */
     if (spi.hasReset && (data == spi.sio_reset)) {          /* reset command                            */
-        sio_unit.u3 = FALSE;                                /* indicate that no character is available  */
+        if (!sio_unit.u4)                                   /* only reset for regular console I/O       */
+            sio_unit.u3 = FALSE;                            /* indicate that no character is available  */
         TRACE_PRINT(sio_dev, CMD_MSG,
-                    ("SIO: " ADDRESS_FORMAT " Command OUT(0x%03x) = 0x%02x" NLP, PCX, port, data));
+                    ("\tSIO_S: " ADDRESS_FORMAT " Command OUT(0x%03x) = 0x%02x" NLP, PCX, port, data));
     }
     return 0x00;                                            /* ignored since OUT                        */
 }
@@ -678,32 +687,23 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
 int32 sio0s(const int32 port, const int32 io, const int32 data) {
     const int32 result = sio0sCore(port, io, data);
     if ((io == 0) && (sio_dev.dctrl & IN_MSG))
-        printf("SIO_S: " ADDRESS_FORMAT " IN(0x%03x) = 0x%02x" NLP, PCX, port, result);
+        printf("\tSIO_S: " ADDRESS_FORMAT " IN(0x%03x) = 0x%02x" NLP, PCX, port, result);
     else if ((io)  && (sio_dev.dctrl & OUT_MSG))
-        printf("SIO_S: " ADDRESS_FORMAT " OUT(0x%03x) = 0x%02x" NLP, PCX, port, data);
+        printf("\tSIO_S: " ADDRESS_FORMAT " OUT(0x%03x) = 0x%02x" NLP, PCX, port, data);
     return result;
 }
 
 /* generic data port for keyboard input / terminal output */
 static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
     int32 ch;
-    SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
+    const SIO_PORT_INFO spi = lookupPortInfo(port, &ch);
     assert(spi.port == port);
     pollConnection();
     if (io == 0) { /* IN */
-        if (sio_unit.u4) {                                  /* attached to a file?                      */
-            if (sio_unit.u5) {                              /* EOF reached?                             */
-                sio_detach(&sio_unit);                      /* detach file and switch to keyboard input */
-                return CONTROLC_CHAR;                       /* this time return ^C after all            */
-            }
-            if ((ch = getc(sio_unit.fileref)) == EOF) {     /* end of file?                             */
-                sio_unit.u5 = TRUE;                         /* terminal input file has reached EOF      */
-                return CONTROLC_CHAR;                       /* result is ^C (= CP/M interrupt)          */
-            }
-            return mapCharacter(ch);                        /* return mapped character                  */
-        }
-        if (sio_unit.flags & UNIT_ATT)
+        if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))
             return mapCharacter(tmxr_getc_ln(&TerminalLines[spi.terminalLine]));
+        if ((!sio_unit.u3) && (sio_dev.dctrl & BUFFER_EMPTY_MSG))
+            printf("\tSIO_D: " ADDRESS_FORMAT " IN(0x%03x) for empty character buffer" NLP, PCX, port);
         sio_unit.u3 = FALSE;                                /* no character is available any more       */
         return mapCharacter(sio_unit.buf);                  /* return previous character                */
     }                                                       /* OUT follows, no fall-through from IN     */
@@ -720,12 +720,21 @@ static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
     return 0x00;                                            /* ignored since OUT                        */
 }
 
+static char* printable(char* result, int32 data, const int32 isIn) {
+    result[0] = 0;
+    data &= 0x7f;
+    if ((0x20 <= data) && (data < 0x7f))
+        sprintf(result, isIn ? " <-\"%c\"" : " ->\"%c\"", data);
+    return result;
+}
+
 int32 sio0d(const int32 port, const int32 io, const int32 data) {
+    char buffer[8];
     const int32 result = sio0dCore(port, io, data);
     if ((io == 0) && (sio_dev.dctrl & IN_MSG))
-        printf("SIO_D: " ADDRESS_FORMAT " IN(0x%03x) = 0x%02x" NLP, PCX, port, result);
-    else if ((io)  && (sio_dev.dctrl & OUT_MSG))
-        printf("SIO_D: " ADDRESS_FORMAT " OUT(0x%03x) = 0x%02x" NLP, PCX, port, data);
+        printf("\tSIO_D: " ADDRESS_FORMAT " IN(0x%03x) = 0x%02x%s" NLP, PCX, port, result, printable(buffer, result, TRUE));
+    else if ((io) && (sio_dev.dctrl & OUT_MSG))
+        printf("\tSIO_D: " ADDRESS_FORMAT " OUT(0x%03x) = 0x%02x%s" NLP, PCX, port, data, printable(buffer, data, FALSE));
     return result;
 }
 

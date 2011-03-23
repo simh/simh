@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

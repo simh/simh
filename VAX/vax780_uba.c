@@ -619,7 +619,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     if (!uba_map_addr (ba + i, &ma))                    /* page inv or NXM? */
         return (bc - i);
     pbc = VA_PAGSIZE - VA_GETOFF (ma);                  /* left in page */
-    if (pbc > (bc - i))                                  /* limit to rem xfr */
+    if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
     if (DEBUG_PRI (uba_dev, UBA_DEB_XFR))
         fprintf (sim_deb, ">>UBA: 8b read, ma = %X, bc = %X\n", ma, pbc);

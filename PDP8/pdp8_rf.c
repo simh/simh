@@ -1,6 +1,6 @@
 /* pdp8_rf.c: RF08 fixed head disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,8 @@
 
    rf           RF08 fixed head disk
 
-   15-May-06    RMS     Fixed bug in autosize attach (reported by Dave Gesswein)
-   07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
+   15-May-06    RMS     Fixed bug in autosize attach (Dave Gesswein)
+   07-Jan-06    RMS     Fixed unaligned register access bug (Doug Carman)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Oct-03    RMS     Cleaned up buffer copy code
    26-Jul-03    RMS     Fixed bug in set size routine

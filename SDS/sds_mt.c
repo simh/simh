@@ -227,7 +227,7 @@ switch (fnc) {                                          /* case function */
             }
         else if ((t == 03610) && sim_is_active (uptr) &&/* skip rec? */
             ((mt_inst & DEV_OUT) == 0))
-            mt_skip = 1;    /* set flag */
+            mt_skip = 1;                                /* set flag */
         else CRETINS;
         break;
 

@@ -1,6 +1,6 @@
 /* sim_timer.c: simulator timer library
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Dec-10    MP      Fixed clock resolution determination for Unix platforms
    22-Sep-08    RMS     Added "stability threshold" for idle routine
    27-May-08    RMS     Fixed bug in Linux idle routines (from Walter Mueller)
    18-Jun-07    RMS     Modified idle to exclude counted delays
@@ -298,19 +299,6 @@ return;
 
 uint32 sim_os_ms_sleep_init (void)
 {
-#if defined (_POSIX_SOURCE)                              /* POSIX-compliant */
-
-struct timespec treq;
-uint32 msec;
-
-if (clock_getres (CLOCK_REALTIME, &treq) != 0)
-    return 0;
-msec = (treq.tv_nsec + (NANOS_PER_MILLI - 1)) / NANOS_PER_MILLI;
-if (msec > SIM_IDLE_MAX) return 0;
-return msec;
-
-#else                                                   /* others */
-
 uint32 i, t1, t2, tot, tim;
 
 for (i = 0, tot = 0; i < sleep1Samples; i++) {
@@ -320,13 +308,9 @@ for (i = 0, tot = 0; i < sleep1Samples; i++) {
     tot += (t2 - t1);
     }
 tim = (tot + (sleep1Samples - 1)) / sleep1Samples;
-if (tim == 0)
-    tim = 1;
-else if (tim > SIM_IDLE_MAX)
+if (tim > SIM_IDLE_MAX)
     tim = 0;
 return tim;
-
-#endif
 }
 
 uint32 sim_os_ms_sleep (unsigned int milliseconds)

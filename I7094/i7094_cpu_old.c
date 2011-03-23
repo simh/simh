@@ -1,6 +1,6 @@
 /* i7094_cpu.c: IBM 7094 CPU simulator
 
-   Copyright (c) 2003-2010, Robert M. Supnik
+   Copyright (c) 2003-2007, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,6 @@
 
    cpu          7094 central processor
 
-   16-Jul-10    RMS     Fixed PSE, MSE user mode protection (found by Dave Pitts)
-                        Fixed issues in storage nullification mode
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added additional expanded core instructions
    17-Oct-06    RMS     Fixed the fix in halt IO wait loop
@@ -150,8 +148,6 @@
 
 #define HALT_IO_LIMIT   ((2 << 18) + 1)                 /* max wait to stop */
 
-#define EAMASK          (mode_storn? A704_MASK: AMASK)  /* eff addr mask */
-
 t_uint64 *M = NULL;                                     /* memory */
 t_uint64 AC = 0;                                        /* AC */
 t_uint64 MQ = 0;                                        /* MQ */
@@ -189,6 +185,7 @@ uint32 ht_pend = 0;                                     /* HTR pending */
 uint32 ht_addr = 0;                                     /* HTR address */
 uint32 stop_illop = 1;                                  /* stop on ill op */
 uint32 cpu_astop = 0;                                   /* address stop */
+static uint32 eamask = AMASK;                           /* (dynamic) addr mask */
 
 uint16 pcq[PCQ_SIZE] = { 0 };                           /* PC queue */
 int32 pcq_p = 0;                                        /* PC queue ptr */
@@ -622,6 +619,7 @@ t_bool tracing;
 ch_set_map ();                                          /* set dispatch map */
 if (!(cpu_model & (I_94|I_CT)))                         /* ~7094? MTM always on */
     mode_multi = 1;
+eamask = mode_storn? A704_MASK: AMASK;                  /* set eff addr mask */
 inst_base = inst_base & ~AMASK;                         /* A/B sel is 1b */
 data_base = data_base & ~AMASK;
 ind_reloc = ind_reloc & VA_BLK;                         /* canonical form */
@@ -686,7 +684,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             chtr_pend = chtr_eval (NULL);               /* re-evaluate */
             }
         oldPC = PC;                                     /* save current PC */
-        PC = (PC + 1) & EAMASK;                         /* increment PC */
+        PC = (PC + 1) & eamask;                         /* increment PC */
         if (!ReadI (oldPC, &IR))                        /* get inst; trap? */
             continue;
         }
@@ -697,7 +695,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
     XEC:
 
     tag = GET_TAG (IR);                                 /* get tag */
-    addr = (uint32) IR & EAMASK;                        /* get base addr */
+    addr = (uint32) IR & eamask;                        /* get base addr */
 
 /* Decrement format instructions */
 
@@ -790,15 +788,15 @@ while (reason == SCPE_OK) {                             /* loop until error */
             continue;
             }
         if (tag && (fl & I_X))                          /* tag and indexable? */
-            ea = (addr - get_xri (tag)) & EAMASK;       /* do indexing */
+            ea = (addr - get_xri (tag)) & eamask;       /* do indexing */
         else ea = addr;
         if (TST_IND (IR) && (fl & I_N)) {               /* indirect? */
             if (!ReadI (ea, &SR))                       /* get ind; trap? */
                 continue;
-            addr = (uint32) SR & EAMASK;                /* get address */
+            addr = (uint32) SR & eamask;                /* get address */
             tagi = GET_TAG (SR);                        /* get tag */
             if (tagi)                                   /* tag? */
-                ea = (addr - get_xri (tagi)) & EAMASK;  /* do indexing */
+                ea = (addr - get_xri (tagi)) & eamask;  /* do indexing */
             else ea = addr;
             }
         if ((fl & I_R) && !Read (ea, &SR))              /* read opnd; trap? */
@@ -903,7 +901,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 00054:                                     /* RFT */
             t = IR & RMASK;
             if ((SI & t) == 0)                          /* if ind off, skip */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 00055:                                     /* SIR */
@@ -913,7 +911,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 00056:                                     /* RNT */
             t = IR & RMASK;
             if ((SI & t) == t)                          /* if ind on, skip */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 00057:                                     /* RIR */
@@ -954,7 +952,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             sc = GET_CCNT (IR);
             SR = ea;
             while (sc) {
-                ea = (uint32) ((AC & 077) + SR) & EAMASK;
+                ea = (uint32) ((AC & 077) + SR) & eamask;
                 if (!Read (ea, &SR))
                     break;
                 AC = (AC & AC_S) | ((AC >> 6) & 0017777777777) |
@@ -1154,12 +1152,12 @@ while (reason == SCPE_OK) {                             /* loop until error */
             t2 = SR & MMASK;
             if (s1 ^ s2) {                              /* diff signs? */
                 if (s1)                                 /* AC < mem? skip 2 */
-                    PC = (PC + 2) & EAMASK;
+                    PC = (PC + 2) & eamask;
                 }
             else if (t1 == t2)                          /* equal? skip 1 */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             else if ((t1 < t2) ^ s1)                    /* AC < mem, AC +, or */
-                PC = (PC + 2) & EAMASK;                 /* AC > mem, AC -? */
+                PC = (PC + 2) & eamask;                 /* AC > mem, AC -? */
             break;
 
         case 00361:                                     /* ACL */
@@ -1210,7 +1208,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00444:                                     /* OFT */
             if ((SI & SR) == 0)                         /* skip if ind off */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 00445:                                     /* RIS */
@@ -1219,7 +1217,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00446:                                     /* ONT */
             if ((SI & SR) == SR)                        /* skip if ind on */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 00460:                                     /* LDA (704) */
@@ -1236,7 +1234,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00520:                                     /* ZET */
             if ((SR & MMASK) == 0)                      /* skip if M 1-35 = 0 */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 00522:                                     /* XEC */
@@ -1350,6 +1348,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00760:                                     /* PSE */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             reason = op_pse (ea);
             break;
 
@@ -1400,7 +1400,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 01054:                                     /* LFT */
             t = (IR & RMASK) << 18;
             if ((SI & t) == 0)                          /* if ind off, skip */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 01055:                                     /* SIL */
@@ -1410,7 +1410,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 01056:                                     /* LNT */
             t = (IR & RMASK) << 18;
             if ((SI & t) == t)                          /* if ind on, skip */
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 01057:                                     /* RIL */
@@ -1441,7 +1441,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             sc = GET_CCNT (IR);
             SR = ea;
             while (sc) {
-                ea = (uint32) ((MQ >> 30) + SR) & EAMASK;
+                ea = (uint32) ((MQ >> 30) + SR) & eamask;
                 if (!Read (ea, &SR))
                     break;
                 MQ = ((MQ << 6) & DMASK) | (MQ >> 30);
@@ -1485,7 +1485,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             sc = GET_CCNT (IR);
             SR = ea;
             while (sc) {
-                ea = (uint32) ((MQ >> 30) + SR) & EAMASK;
+                ea = (uint32) ((MQ >> 30) + SR) & eamask;
                 if (!Read (ea, &SR))
                     break;
                 MQ = ((MQ << 6) & DMASK) | (SR >> 30);
@@ -1587,9 +1587,9 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 01340:                                     /* LAS */
             t = AC & AC_MMASK;                          /* AC Q,P,1-35 */
             if (t < SR)
-                PC = (PC + 2) & EAMASK;
+                PC = (PC + 2) & eamask;
             else if (t == SR)
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 01400:                                     /* SBM */
@@ -1606,7 +1606,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 01520:                                     /* NZT */
             if ((SR & MMASK) != 0)
-                PC = (PC + 1) & EAMASK;
+                PC = (PC + 1) & eamask;
             break;
 
         case 01534:                                     /* LXD */
@@ -1639,7 +1639,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             SR = (AC & MMASK) | ((AC & AC_S)? SIGN: 0);
             if (!Write (ea, SR))
                 break;
-            Write ((ea + 1) & EAMASK, MQ);
+            Write ((ea + 1) & eamask, MQ);
             break;
 
         case 01620:                                     /* SLQ */
@@ -1687,6 +1687,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;                                      /* -xr -> AC decr */
 
         case 01760:                                     /* MSE */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             reason = op_mse (ea);
             break;
 
@@ -1699,11 +1701,11 @@ while (reason == SCPE_OK) {                             /* loop until error */
                 data_base = BCORE_BASE;
             else if (ea == 043) {                       /* IFT? */
                 if (inst_base == 0)
-                    PC = (PC + 1) & EAMASK;
+                    PC = (PC + 1) & eamask;
                 }
             else if (ea == 044) {                       /* EFT? */
                 if (data_base == 0)
-                    PC = (PC + 1) & EAMASK;
+                    PC = (PC + 1) & eamask;
                 }
             else if (stop_illop)
                 reason = STOP_ILLEG;
@@ -1965,9 +1967,9 @@ if (tag) {
             r = r | XR[2];
         if (tag & 4)
             r = r | XR[4];
-        return r & EAMASK;
+        return r & eamask;
         }
-    return XR[tag] & EAMASK;
+    return XR[tag] & eamask;
     }
 return 0;
 }
@@ -1992,9 +1994,9 @@ if (tag) {
         if (tag & 4)
             r = r | XR[4];
         put_xr (tag, r);
-        return r & EAMASK;
+        return r & eamask;
         }
-    return XR[tag] & EAMASK;
+    return XR[tag] & eamask;
     }
 return 0;
 }
@@ -2004,7 +2006,7 @@ return 0;
 void put_xr (uint32 tag, uint32 dat)
 {
 tag = tag & INST_M_TAG;
-dat = dat & EAMASK;
+dat = dat & eamask;
 
 if (tag) {
     if (mode_multi) {

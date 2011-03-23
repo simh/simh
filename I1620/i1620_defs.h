@@ -1,6 +1,6 @@
 /* i1620_defs.h: IBM 1620 simulator definitions
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    I am grateful to Al Kossow, the Computer History Museum, and the IBM Corporate
    Archives for their help in gathering documentation about the IBM 1620.
 
+   22-May-10    RMS     Added check for 64b definitions
    18-Oct-02    RMS     Fixed bug in ADDR_S macro (found by Hans Pufal)
 */
 
@@ -34,6 +35,10 @@
 #define _I1620_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "1620 does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 

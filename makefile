@@ -9,12 +9,36 @@ ifeq ($(WIN32),)
     ifneq (,$(findstring darwin,$(OSTYPE)))
       OS_CCDEFS = -D_GNU_SOURCE
     else
-      OS_CCDEFS = -lrt -lm -D_GNU_SOURCE
+      ifeq (librt,$(shell if test -e /usr/lib/librt.a; then echo librt; fi))
+        OS_CCDEFS = -lrt -lm -D_GNU_SOURCE
+      else
+        OS_CCDEFS = -lm -D_GNU_SOURCE
+      endif
     endif
   endif
-  CC = gcc -std=c99 -U__STRICT_ANSI__ -g $(OS_CCDEFS) -I .
-  ifeq ($(USE_NETWORK),)
-  else
+  ifeq (readline,$(shell if test -e /usr/lib/libreadline.a; then echo readline; fi))
+    # Use Locally installed and available readline support
+    ifeq (ncurses,$(shell if test -e /usr/lib/libncurses.a; then echo ncurses; fi))
+      READLINE_CCDEFS = -DHAVE_READLINE -lreadline -lncurses
+    else
+      READLINE_CCDEFS = -DHAVE_READLINE -lreadline
+    endif
+  endif
+  ifeq (pcap,$(shell if test -e /usr/lib/libpcap.a; then echo pcap; fi))
+    # Use Locally installed and available pcap support
+    NETWORK_CCDEFS = -DUSE_NETWORK -lpcap
+  endif
+  ifeq (tuntap,$(shell if test -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
+    # Provide support for Tap networking on Linux
+    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK
+  endif
+  ifeq (bsdtuntap,$(shell if test -e /usr/include/net/if_tun.h; then echo bsdtuntap; fi))
+    # Provide support for Tap networking
+    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
+  endif
+  CC = gcc -std=c99 -U__STRICT_ANSI__ -g $(OS_CCDEFS) -I . $(READLINE_CCDEFS) $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS)
+  ifneq ($(USE_NETWORK),)
+    # Assume built from tcpdump.org sources with default install target
     NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
   endif
 else
@@ -22,9 +46,8 @@ else
   LDFLAGS = -lm -lwsock32 -lwinmm
   CC = gcc -std=c99 -U__STRICT_ANSI__ -O2 -I.
   EXE = .exe
-  ifeq ($(USE_NETWORK),)
-  else
-    NETWORK_OPT = -DUSE_NETWORK -lwpcap -lpacket
+  ifneq ($(USE_NETWORK),)
+    NETWORK_OPT = -DUSE_SHARED
   endif
 endif
 
@@ -58,7 +81,7 @@ ECLIPSE = ${NOVAD}/eclipse_cpu.c ${NOVAD}/eclipse_tt.c ${NOVAD}/nova_sys.c \
 	${NOVAD}/nova_dkp.c ${NOVAD}/nova_dsk.c ${NOVAD}/nova_lp.c \
 	${NOVAD}/nova_mta.c ${NOVAD}/nova_plt.c ${NOVAD}/nova_pt.c \
 	${NOVAD}/nova_clk.c ${NOVAD}/nova_tt1.c ${NOVAD}/nova_qty.c
-ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE -DUSE_INT64 
+ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE 
 
 
 PDP18BD = PDP18B
@@ -135,7 +158,7 @@ PDP8 = ${PDP8D}/pdp8_cpu.c ${PDP8D}/pdp8_clk.c ${PDP8D}/pdp8_df.c \
 PDP8_OPT = -I ${PDP8D}
 
 
-H316D = H316
+H316D = h316
 H316 = ${H316D}/h316_stddev.c ${H316D}/h316_lp.c ${H316D}/h316_cpu.c \
 	${H316D}/h316_sys.c ${H316D}/h316_mt.c ${H316D}/h316_fhd.c \
 	${H316D}/h316_dp.c
@@ -251,7 +274,7 @@ SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
 SDS_OPT = -I ${SDSD}
 
-SWTPD = SWTP
+SWTPD = swtp
 SWTP = ${SWTPD}/swtp_cpu.c ${SWTPD}/swtp_dsk.c ${SWTPD}/swtp_sio.c \
 	${SWTPD}/swtp_sys.c
 SWTP_OPT = -I ${SWTPD}
@@ -269,9 +292,10 @@ all : ${ALL}
 
 clean :
 ifeq ($(WIN32),)
-	${RM} ${BIN}*
+	${RM} -r ${BIN}
 else
 	if exist BIN\*.exe del /q BIN\*.exe
+	if exist BIN rmdir BIN
 endif
 
 #

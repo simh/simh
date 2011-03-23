@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2010, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -36,27 +36,66 @@
 
 patch   date            module(s) and fix(es)
 
-  2     tbd             h316_cpu.c:
+  2     tbd             scp.c:
+                        - added *nix READLINE support (Mark Pizzolato)
+                        - fixed handling of DO with no arguments (Dave Bryan)
+                        - clarified some help messages (Mark Pizzolato)
+                        - added "SHOW SHOW" and "SHOW <dev> SHOW" commands (Mark Pizzolato)
+                        - fixed bug in deposit stride for numeric input (John Dundas)
+
+                        sim_console.c
+                        - added support for BREAK key on Windows (Mark Pizzolato)
+
+                        sim_ether.c
+                        - major revision (Dave Hittner and Mark Pizzolato)
+
+                        sim_tmxr.c:
+                        - made option negotiation more reliable (Mark Pizzolato)
+
+                        h316_cpu.c:
                         - fixed bugs in MPY, DIV introduced in 3.8-1
 
                         i1401_cd.c:
                         - fixed read stacker operation in column binary mode
-                        - fixed punch stacker operation (from Van Snyder)
+                        - fixed punch stacker operation (Van Snyder)
 
-                       1401_cpu.c:
-                        - revised divide algorithm (from Van Snyder)
+                        1401_cpu.c:
+                        - reverted multiple tape indicator implementation
+                        - fixed EOT indicator test not to clear indicator (Van Snyder)
+                        - fixed divide not to clear word marks in quotient (Van Snyder)
+                        - revised divide algorithm (Van Snyder)
 
                         i1401_mt.c:
-                        - added no rewind option (from Van Snyder)
+                        - reverted multiple tape indicator implementation
+                        - fixed END indicator test not to clear indicator (Van Snyder)
+                        - fixed backspace over tapemark not to set EOR (Van Snyder)
+                        - added no rewind option (Van Snyder)
 
                         pdp11_rk.c:
-                        - fixed bug in read header (from Walter F Mueller)
+                        - fixed bug in read header (Walter F Mueller)
 
                         pdp11_rl.c:
                         - added debug support
 
                         pdp11_rq.c:
                         - added RD32 support
+
+                        pdp11_tq.c:
+                        - set UNIT_SXC flag when a tape mark is encountered 
+                          during forward motion read operations
+                        - fixed logic which clears UNIT_SXC to check command modifier
+                        - added CMF_WR flag to tq_cmf entry for OP_WTM
+                        - made non-immediate rewind positioning operations take 2 seconds
+                        - added UNIT_IDLE flag to tq units.
+                        - fixed debug output of tape file positions when they are 64b
+                        - added more debug output after positioning operations
+                        - added textual display of the command being performed
+                        (All of the above from Mark Pizzolato)
+                        - fixed comments about register addresses
+                        
+                        pdp11_ts.c:
+                        - fixed t_addr printouts for 64b big-endian systems
+                          (from Mark Pizzolato)
 
                         pdp8_fpp.c:
                         - many bug fixes (all from Rick Murphy); now functional
@@ -65,32 +104,49 @@ patch   date            module(s) and fix(es)
                         - added link to FPP
 
                         vax_cpu.c:
-                        - added OLDVMS idle timer option
+                        - revised idle design (from Mark Pizzolato)
                         - fixed bug in SET CPU IDLE
+
+                        vax_cpu1.c:
+                        - revised idle design (from Mark Pizzolato)
+
+                        vax_syscm.c:
+                        - fixed t_addr printouts for 64b big-endian systems
+                          (from Mark Pizzolato)
+
+                        vax_sysdev.c:
+                        - added power clear call to boot routine (from Mark Pizzolato)
+
+                        vax780_sbi.c:
+                        - added AUTORESTART switch support (from Mark Pizzolato)
+
+                        vax780_stddev.c
+                        - added REBOOT support (from Mark Pizzolato)
+
 
   1     08-Feb-09       scp.c:
                         - revised RESTORE unit logic for consistency
-                        - "detach_all" ignores error status returns if shutting down (from Dave Bryan)
-                        - DO cmd missing params now default to null string (from Dave Bryan)
-                        - DO cmd sub_args now allows "\\" to specify literal backslash (from Dave Bryan)
+                        - "detach_all" ignores error status returns if shutting down (Dave Bryan)
+                        - DO cmd missing params now default to null string (Dave Bryan)
+                        - DO cmd sub_args now allows "\\" to specify literal backslash (Dave Bryan)
                         - decommitted MTAB_VAL
                         - fixed implementation of MTAB_NC
                         - fixed warnings in help printouts
 
                         sim_tape.c:
-                        - fixed signed/unsigned warning in sim_tape_set_fmt (from Dave Bryan)
+                        - fixed signed/unsigned warning in sim_tape_set_fmt (Dave Bryan)
 
                         sim_tmxr.c, sim_tmxr.h:
                         - added line connection order to tmxr_poll_conn,
-                          added tmxr_set_lnorder and tmxr_show_lnorder (from Dave Bryan)
-                        - print device and line to which connection was made (from Dave Bryan)
+                          added tmxr_set_lnorder and tmxr_show_lnorder (Dave Bryan)
+                        - print device and line to which connection was made (Dave Bryan)
                         - added three new standardized SHOW routines
 
                         all terminal multiplexers:
                         - revised for new common SHOW routines in TMXR library
                         - rewrote set size routines not to use MTAB_VAL
 
-                        hp2100_cpu.c (from Dave Bryan):
+                        hp2100_cpu.c (Dave Bryan):
                         - VIS and IOP are now mutually exclusive on 1000-F
                         - Removed A/B shadow register variables
                         - Moved hp_setdev, hp_showdev to hp2100_sys.c
@@ -106,91 +162,91 @@ patch   date            module(s) and fix(es)
                         - Added SET CPU IDLE/NOIDLE, idle detection for DOS/RTE
                         - Breakpoints on interrupt trap cells now work
 
-                        hp2100_cpu0.c (from Dave Bryan):
+                        hp2100_cpu0.c (Dave Bryan):
                         - .FLUN and self-tests for VIS and SIGNAL are NOP if not present
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
                         - Added "user microcode" dispatcher for unclaimed instructions
 
-                        hp2100_cpu1.c (from Dave Bryan):
+                        hp2100_cpu1.c (Dave Bryan):
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Moved option-present tests to UIG dispatchers
                         - Call "user microcode" dispatcher for unclaimed UIG instructions
 
-                        hp2100_cpu2.c (from Dave Bryan):
+                        hp2100_cpu2.c (Dave Bryan):
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
                         - Updated mp_dms_jmp calling sequence
                         - Fixed DJP, SJP, and UJP jump target validation
                         - RVA/B conditionally updates dms_vr before returning value
                         
-                        hp2100_cpu3.c (from Dave Bryan):
+                        hp2100_cpu3.c (Dave Bryan):
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
                         - Updated mp_dms_jmp calling sequence
 
-                        hp2100_cpu4.c, hp2100_cpu7.c (from Dave Bryan):
+                        hp2100_cpu4.c, hp2100_cpu7.c (Dave Bryan):
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
 
-                        hp2100_cpu5.c (from Dave Bryan):
+                        hp2100_cpu5.c (Dave Bryan):
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
                         - Redefined ABORT to pass address, moved def to hp2100_cpu.h
                         - Rewrote device I/O to model backplane signals
 
-                        hp2100_cpu6.c (from Dave Bryan):
+                        hp2100_cpu6.c (Dave Bryan):
                         - Corrected .SIP debug formatting
                         - Moved microcode function prototypes to hp2100_cpu1.h
                         - Removed option-present tests (now in UIG dispatchers)
                         - Rewrote device I/O to model backplane signals
 
-                        hp2100 all peripherals (from Dave Bryan):
+                        hp2100 all peripherals (Dave Bryan):
                         - Rewrote device I/O to model backplane signals
 
-                        hp2100_baci.c (from Dave Bryan):
+                        hp2100_baci.c (Dave Bryan):
                         - Fixed STC,C losing interrupt request on BREAK
                         - Changed Telnet poll to connect immediately after reset or attach
                         - Added REG_FIT to register variables < 32-bit size
                         - Moved fmt_char() function to hp2100_sys.c
 
-                        hp2100_dp.c, hp2100_dq.c (from Dave Bryan):
+                        hp2100_dp.c, hp2100_dq.c (Dave Bryan):
                         - Added REG_FIT to register variables < 32-bit size
 
-                        hp2100_dr.c (from Dave Bryan):
+                        hp2100_dr.c (Dave Bryan):
                         - Revised drc_boot to use ibl_copy
 
-                        hp2100_fp1.c (from Dave Bryan):
+                        hp2100_fp1.c (Dave Bryan):
                         - Quieted bogus gcc warning in fp_exec
 
-                        hp2100_ipl.c (from Dave Bryan):
+                        hp2100_ipl.c (Dave Bryan):
                         - Changed socket poll to connect immediately after reset or attach
                         - Revised EDT handler to refine completion delay conditions
                         - Revised ipl_boot to use ibl_copy
 
-                        hp2100_lpt.c (from Dave Bryan):
+                        hp2100_lpt.c (Dave Bryan):
                         - Changed CTIME register width to match documentation
 
-                        hp2100_mpx.c (from Dave Bryan):
+                        hp2100_mpx.c (Dave Bryan):
                         - Implemented 12792C eight-channel terminal multiplexer
 
-                        hp2100_ms.c (from Dave Bryan):
+                        hp2100_ms.c (Dave Bryan):
                         - Revised to use AR instead of saved_AR in boot
 
-                        hp2100_mt.c (from Dave Bryan):
+                        hp2100_mt.c (Dave Bryan):
                         - Fixed missing flag after CLR command
                         - Moved write enable and format commands from MTD to MTC
                         
-                        hp2100_mux.c (from Dave Bryan):
+                        hp2100_mux.c (Dave Bryan):
                         - SHOW MUX CONN/STAT with SET MUX DIAG is no longer disallowed
                         - Changed Telnet poll to connect immediately after reset or attach
                         - Added LINEORDER support
                         - Added BREAK deferral to allow RTE break-mode to work
 
-                        hp2100_pif.c (from Dave Bryan):
+                        hp2100_pif.c (Dave Bryan):
                         - Implemented 12620A/12936A Privileged Interrupt Fences
 
-                        hp2100_sys.c (from Dave Bryan):
+                        hp2100_sys.c (Dave Bryan):
                         - Fixed IAK instruction dual-use mnemonic display
                         - Moved hp_setdev, hp_showdev from hp2100_cpu.c
                         - Changed sim_load to use WritePW instead of direct M[] access
@@ -198,14 +254,14 @@ patch   date            module(s) and fix(es)
                         - Moved fmt_char() function from hp2100_baci.c
                         - Added MPX device
 
-                        hp2100_cpu.h (from Dave Bryan):
+                        hp2100_cpu.h (Dave Bryan):
                         - Rearranged declarations with hp2100_cpu.c and hp2100_defs.h
                         - Added mp_control to CPU state externals
 
-                        hp2100_cpu1.h (from Dave Bryan):
+                        hp2100_cpu1.h (Dave Bryan):
                         - Moved microcode function prototypes here
 
-                        hp2100_defs.h (from Dave Bryan):
+                        hp2100_defs.h (Dave Bryan):
                         - Added POLL_FIRST to indicate immediate connection attempt
                         - Rearranged declarations with hp2100_cpu.h
                         - Added PIF device
@@ -213,22 +269,22 @@ patch   date            module(s) and fix(es)
                         - Added MPX device
 
                         i1401_cpu.c:
-                        - fixed bug in ZA and ZS (from Bob Abeles)
-                        - fixed tape indicator implementation (from Bob Abeles)
-                        - added missing magtape modifier A (from Van Snyder)
+                        - fixed bug in ZA and ZS (Bob Abeles)
+                        - fixed tape indicator implementation (Bob Abeles)
+                        - added missing magtape modifier A (Van Snyder)
 
                         i1401_mt.c:
-                        - added -n (no rewind) option to BOOT (from Van Snyder)
-                        - fixed bug to mask input to 6b on read (from Bob Abeles)
+                        - added -n (no rewind) option to BOOT (Van Snyder)
+                        - fixed bug to mask input to 6b on read (Bob Abeles)
 
                         lgp_stddev.c:
                         - changed encode character from # to !, due to overlap
 
                         pdp11_cpu.c:
-                        - fixed failure to clear cpu_bme on RESET (found by Walter Mueller)
+                        - fixed failure to clear cpu_bme on RESET (Walter Mueller)
 
                         pdp11_dz.c:
-                        - added MTAB_NC modifier on SET LOG command (found by Walter Mueller)
+                        - added MTAB_NC modifier on SET LOG command (Walter Mueller)
 
                         pdp11_io.c, vax_io.c, vax780_uba.c:
                         - revised to use PDP-11 I/O library
@@ -247,20 +303,20 @@ patch   date            module(s) and fix(es)
                         - modified to resync TODR on any clock reset
 
   0     15-Jun-08       scp.c:
-                        - fixed bug in local/global register search (found by Mark Pizzolato)
-                        - fixed bug in restore of RO units (from Mark Pizzolato)
-                        - added SET/SHO/NO BR with default argument (from Dave Bryan)
+                        - fixed bug in local/global register search (Mark Pizzolato)
+                        - fixed bug in restore of RO units (Mark Pizzolato)
+                        - added SET/SHO/NO BR with default argument (Dave Bryan)
 
                         sim_tmxr.c
-                        - worked around Telnet negotiation problem with QCTerm (from Dave Bryan)
+                        - worked around Telnet negotiation problem with QCTerm (Dave Bryan)
 
                         gri_defs.h, gri_cpu.c, gri_sys.c:
                         - added GRI-99 support
 
-                        hp2100_baci.c (from Dave Bryan):
+                        hp2100_baci.c (Dave Bryan):
                         - Implemented 12966A Buffered Asynchronous Communications Interface simulator
 
-                        hp2100_cpu.c (from Dave Bryan):
+                        hp2100_cpu.c (Dave Bryan):
                         - Memory ex/dep and bkpt type default to current map mode
                         - Added SET CPU DEBUG and OS/VMA flags, enabled OS/VMA
                         - Corrected MP W5 (JSB) jumper action, SET/SHOW reversal,
@@ -270,49 +326,49 @@ patch   date            module(s) and fix(es)
                         - Enabled SIGNAL instructions, SIG debug flag
                         - Fixed single stepping through interrupts
 
-                        hp2100_cpu0.c (from Dave Bryan and Holger Veit):
+                        hp2100_cpu0.c (Dave Bryan and Holger Veit):
                         - Removed and implemented "cpu_rte_vma" and "cpu_rte_os"
                         - Removed and implemented "cpu_vis" and "cpu_signal"
                         - Removed and implemented "cpu_rte_ema"
 
-                        hp2100_cpu1.c (from Dave Bryan):
+                        hp2100_cpu1.c (Dave Bryan):
                         - Added fprint_ops, fprint_regs for debug printouts
                         - Enabled DIAG as NOP on 1000 F-Series
                         - Fixed VIS and SIGNAL to depend on the FPP and HAVE_INT64
 
-                        hp2100_cpu3.c (from Dave Bryan):
+                        hp2100_cpu3.c (Dave Bryan):
                         - Fixed unsigned divide bug in .DDI
                         - Fixed unsigned multiply bug in .DMP
                         - Added implementation of DBI self-test
 
-                        hp2100_cpu4.c (from Dave Bryan):
+                        hp2100_cpu4.c (Dave Bryan):
                         - Fixed B register return bug in /CMRT
 
-                        hp2100_cpu5.c (from Holger Veit):
+                        hp2100_cpu5.c (Holger Veit):
                         - Implemented RTE-6/VM Virtual Memory Area firmware
                         - Implemented RTE-IV Extended Memory Area firmware
 
-                        hp2100_cpu6.c (from Dave Bryan):
+                        hp2100_cpu6.c (Dave Bryan):
                         - Implemented RTE-6/VM OS accelerator firmware
 
-                        hp2100_cpu7.c (from Holger Veit):
+                        hp2100_cpu7.c (Holger Veit):
                         - Implemented Vector Instruction Set and SIGNAL/1000 firmware
 
-                        hp2100_ds.c (from Dave Bryan):
+                        hp2100_ds.c (Dave Bryan):
                         - Corrected and verified ioCRS action
                         - Corrected DPTR register definition from FLDATA to DRDATA
 
-                        hp2100_fp.c (from Mark Pizzolato)
+                        hp2100_fp.c (Mark Pizzolato)
                         - Corrected fp_unpack mantissa high-word return
 
-                        hp2100_fp1.c (from Dave Bryan):
+                        hp2100_fp1.c (Dave Bryan):
                         - Reworked "complement" to avoid inlining bug in gcc-4.x
                         - Fixed uninitialized return in fp_accum when setting
 
-                        hp2100_mux.c (from Dave Bryan):
+                        hp2100_mux.c (Dave Bryan):
                         - Sync mux poll with console poll for idle compatibility
 
-                        hp2100_stddev.c (from Dave Bryan):
+                        hp2100_stddev.c (Dave Bryan):
                         - Fixed PTR trailing null counter for tape re-read
                         - Added IPTICK register to CLK to display CPU instr/tick
                         - Corrected and verified ioCRS actions
@@ -322,24 +378,24 @@ patch   date            module(s) and fix(es)
                         - Removed redundant control char handling definitions
                         - Changed TTY output wait from 100 to 200 for MSU BASIC
 
-                        hp2100_sys.c (from Dave Bryan):
+                        hp2100_sys.c (Dave Bryan):
                         - Added BACI device
                         - Added RTE OS/VMA/EMA mnemonics
                         - Changed fprint_sym to handle step with irq pending
 
-                        hp2100_cpu.h (from Dave Bryan):
+                        hp2100_cpu.h (Dave Bryan):
                         - Added calc_defer() prototype
                         - Added extern sim_deb, cpu_dev, DEB flags for debug printouts
                         - Added extern intaddr, mp_viol, mp_mevff, calc_int, dev_ctl,
                           ReadIO, WriteIO for RTE-6/VM microcode support
 
-                        hp2100_cpu1.h (from Dave Bryan):
+                        hp2100_cpu1.h (Dave Bryan):
                         - Corrected OP_AFF to OP_AAFF for SIGNAL/1000
                         - Removed unused operand patterns
                         - Added fprint_ops, fprint_regs for debug printouts
                         - Revised OP_KKKAKK operand profile to OP_CCCACC for $LOC
 
-                        hp2100_defs.h (from Dave Bryan):
+                        hp2100_defs.h (Dave Bryan):
                         - Added BACI device
                         - Added 16/32-bit unsigned-to-signed conversions
                         - Changed TMR_MUX to TMR_POLL for idle support
@@ -347,43 +403,43 @@ patch   date            module(s) and fix(es)
                         - Added I_MRG, I_ISZ, I_IOG, I_STF, and I_SFS instruction masks
                         - Added I_MRG_I, I_JSB, I_JSB_I, and I_JMP instruction masks
 
-                        nova_defs.h (from Bruce Ray):
+                        nova_defs.h (Bruce Ray):
                         - added support for third-party 64KW memory
 
-                        nova_clk.c (from Bruce Ray):
+                        nova_clk.c (Bruce Ray):
                         - renamed to RTC, to match DG literature
 
-                        nova_cpu.c (from Bruce Ray):
+                        nova_cpu.c (Bruce Ray):
                         - added support for third-party 64KW memory
                         - added Nova 3 "secret" instructions
                         - added CPU history support
 
-                        nova_dkp.c (from Bruce Ray):
+                        nova_dkp.c (Bruce Ray):
                         - renamed to DKP, to match DG literature
                         - fixed numerous bugs in both documented and undocumented behavior
                         - changed bootstrap code to DG official sequence
 
-                        nova_dsk.c (from Bruce Ray):
+                        nova_dsk.c (Bruce Ray):
                         - renamed to DSK, to match DG literature
                         - added support for undocumented behavior
                         - changed bootstrap code to DG official sequence
 
-                        nova_mta.c (from Bruce Ray):
+                        nova_mta.c (Bruce Ray):
                         - renamed to MTA, to match DG literature
                         - changed bootstrap code to DG official sequence
 
-                        nova_plt.c, nova_pt.c (from Bruce Ray):
+                        nova_plt.c, nova_pt.c (Bruce Ray):
                         - added 7B/8B support
 
-                        nova_sys.c (from Bruce Ray):
+                        nova_sys.c (Bruce Ray):
                         - fixed mistaken instruction mnemonics
 
                         pdp11_cpu.c, pdp11_io.c, pdp11_rh.c:
-                        - fixed DMA memory address limit test (found by John Dundas)
-                        - fixed MMR0 treatment in RESET (found by Walter Mueller)
+                        - fixed DMA memory address limit test (John Dundas)
+                        - fixed MMR0 treatment in RESET (Walter Mueller)
 
                         pdp11_cpumod.h, pdp11_cpumod.c:
-                        - fixed write behavior of 11/70 MBRK, LOSIZE, HISIZE (found by Walter Mueller)
+                        - fixed write behavior of 11/70 MBRK, LOSIZE, HISIZE (Walter Mueller)
                         - added support to set default state of KDJ11B,E clock control register
 
                         pdp11_dc.c:
@@ -403,10 +459,10 @@ patch   date            module(s) and fix(es)
                         pdp11_ke.c:
                         - added support for KE11A
 
-                        pdp11_kg.c (from John Dundas):
+                        pdp11_kg.c (John Dundas):
                         - added support for KG11A
 
-                        pdp11_rc.c (from John Dundas):
+                        pdp11_rc.c (John Dundas):
                         - added support for RC11
 
                         pdp11_sys.c:
@@ -415,7 +471,7 @@ patch   date            module(s) and fix(es)
                         - renamed DL11 devices
 
                         vax_cmode.c, vax_io.c, vax780_uba.c:
-                        - fixed declarations (from Mark Pizzolato)
+                        - fixed declarations (Mark Pizzolato)
 
 
 /* V3.7 revision history 
@@ -436,8 +492,8 @@ patch   date            module(s) and fix(es)
                         vax_cpu.c:
                         - fixed bug in read access g-format indexed specifiers
 
-  2     12-Jul-07       sim_ether.c (from Dave Hittner):
-                        - fixed non-ethernet device removal loop (from Naoki Hamada)
+  2     12-Jul-07       sim_ether.c (Dave Hittner):
+                        - fixed non-ethernet device removal loop (Naoki Hamada)
                         - added dynamic loading of wpcap.dll;
                         - corrected exceed max index bug in ethX lookup
                         - corrected failure to look up ethernet device names in
@@ -447,30 +503,30 @@ patch   date            module(s) and fix(es)
                         - fixed idle timer event selection algorithm
   
                         h316_lp.c:
-                        - fixed loss of last print line (from Theo Engel)
+                        - fixed loss of last print line (Theo Engel)
 
                         h316_mt.c:
-                        - fixed bug in write without stop (from Theo Engel)
+                        - fixed bug in write without stop (Theo Engel)
 
                         h316_stddev.c:
-                        - fixed bug in clock increment (from Theo Engel)
+                        - fixed bug in clock increment (Theo Engel)
 
                         i1401_cpu.c:
                         - added recognition of overlapped operation modifiers
                         - remove restriction on load-mode binary tape operations
 
                         i1401_mt.c:
-                        - fixed read tape mark operation (found by Van Snyder)
+                        - fixed read tape mark operation (Van Snyder)
                         - remove restriction on load-mode binary tape operations
 
                         pdp1_cpu.c:
-                        - fixed typo in SBS clear (from Norm Lastovica)
+                        - fixed typo in SBS clear (Norm Lastovica)
 
                         pdp11_rh.c, pdp11_rp.c, pdp11_tu.c:
                         - CS1 DVA is in the device, not the MBA
 
                         pdp8_ct.c:
-                        - fixed typo (from Norm Lastovica)
+                        - fixed typo (Norm Lastovica)
 
                         vax_cpu.c:
                         - revised idle detector
@@ -481,18 +537,18 @@ patch   date            module(s) and fix(es)
                         - fixed bug in RESTORE with changed memory size
                         - added global 'RESTORE in progress' flag
                         - fixed breakpoint actions in DO command file processing
-                          (from Dave Bryan)
+                          (Dave Bryan)
 
                         all CPU's with clocks:
                         - removed clock initialization (now done in SCP)
 
-                        hp2100_cpu.c (from Dave Bryan):
+                        hp2100_cpu.c (Dave Bryan):
                         - EDT passes input flag and DMA channel in dat parameter
 
-                        hp2100_ipl.c (from Dave Bryan):
+                        hp2100_ipl.c (Dave Bryan):
                         - IPLI EDT delays DMA completion interrupt for TSB
 
-                        hp2100_mux.c (from Dave Bryan):
+                        hp2100_mux.c (Dave Bryan):
                         - corrected "mux_sta" size from 16 to 21 elements
                         - fixed "muxc_reset" to clear lines 16-20
                         - fixed control card OTx to set current channel number
@@ -513,7 +569,7 @@ patch   date            module(s) and fix(es)
                         - MR2 and MR3 only updated on NOP
 
                         pdp10_tu.c, pdp11_tu.c:
-                        - TMK sets FCE only on read (found by Naoki Hamada)
+                        - TMK sets FCE only on read (Naoki Hamada)
 
                         pdp11_xu.c:
                         - added missing FC_RMAL command
@@ -525,7 +581,7 @@ patch   date            module(s) and fix(es)
                         vax780_defs.h
                         - separated PxBR and SBR mbz checks
                         - modified mbz checks to reflect 780 microcode patches
-                          (found by Naoki Hamada)
+                          (Naoki Hamada)
 
                         vax_mmu.c:
                         - added address masking to all SBR-based memory reads
@@ -533,7 +589,7 @@ patch   date            module(s) and fix(es)
   0     30-Jan-07       scp.c:
                         - implemented throttle commands
                         - added -e to control error processing in DO command files
-                          (from Dave Bryan)
+                          (Dave Bryan)
 
                         sim_console.c:
                         - fixed handling of non-printable characters in KSR mode
@@ -550,7 +606,7 @@ patch   date            module(s) and fix(es)
                         - fixed handling of non-printable characters in KSR mode
 
                         hp2100_cpu.c, hp2100_cpu0.c, hp2100_cpu1.c, hp2100_cpu2.c,
-                        hp2100_cpu3.c, hp2100_cpu4.c (from Dave Bryan):
+                        hp2100_cpu3.c, hp2100_cpu4.c (Dave Bryan):
                         - reorganized CPU modules for easier addition of new instructions
                         - added Double Integer instructions, 1000-F CPU, 2114 and
                           2115 CPUs, 12K and 24K memory sizes, 12607B and 12578A DMA
@@ -559,10 +615,10 @@ patch   date            module(s) and fix(es)
                         - fixed indirect interrupt holdoff logic
 
                         hp2100_ds.c:
-                        - fixed REQUEST STATUS to clear status-1 (from Dave Bryan)
+                        - fixed REQUEST STATUS to clear status-1 (Dave Bryan)
 
                         hp2100_fp1.c:
-                        - Added Floating Point Processor (from Dave Bryan)
+                        - Added Floating Point Processor (Dave Bryan)
 
                         hp2100_lps.c:
                         - fixed diag-mode CLC response
@@ -619,7 +675,7 @@ patch   date            module(s) and fix(es)
                         - fixed bug in ASH -32 C value
 
                         pdp11_rf.c:
-                        - fixed unit mask (found by John Dundas)
+                        - fixed unit mask (John Dundas)
 
                         pdp11_stddev.c, vax_stddev.c, vax780_stddev.c:
                         - synced keyboard poll to real-time clock
@@ -636,7 +692,7 @@ patch   date            module(s) and fix(es)
                         - synced service poll to real-time clock
 
                         pdp11_sys.c:
-                        - fixed operand order in EIS instructions (found by W.F.J. Mueller)
+                        - fixed operand order in EIS instructions (W.F.J. Mueller)
                         - added TA11 support
 
                         pdp18b_cpu.c:
@@ -666,7 +722,7 @@ patch   date            module(s) and fix(es)
                         - added XVM RDCLK instruction
 
                         pdp8_cpu.c:
-                        - fixed SC value after DVI overflow (found by Don North)
+                        - fixed SC value after DVI overflow (Don North)
                         - added idle support and infinite loop detection
 
                         pdp8_ct.c:
@@ -687,7 +743,7 @@ patch   date            module(s) and fix(es)
                         - added idle support
 
                         vax_syscm.c:
-                        - fixed operand order in EIS instructions (found by W.F.J. Mueller)
+                        - fixed operand order in EIS instructions (W.F.J. Mueller)
 
 
 /* V3.6 revision history 
@@ -698,11 +754,11 @@ patch   date            module(s) and fix(es)
                         all DECtapes:
                         - fixed conflict in ATTACH switches
 
-                        hp2100_ms.c (from Dave Bryan):
+                        hp2100_ms.c (Dave Bryan):
                         - added CAPACITY as alternate for REEL
                         - fixed EOT test for unlimited reel size
 
-                        i1620_cd.c (from Tom McBride):
+                        i1620_cd.c (Tom McBride):
                         - fixed card reader fgets call
                         - fixed card reader boot sequence
 
@@ -762,29 +818,29 @@ patch   date            module(s) and fix(es)
                         most magtapes:
                         - added support for finite reel size
 
-                        h316_cpu.c: fixed bugs in LLL, LRL (found by Theo Engel)
+                        h316_cpu.c: fixed bugs in LLL, LRL (Theo Engel)
 
-                        h316_lp.c: fixed bug in blanks backscanning (found by Theo Engel)
+                        h316_lp.c: fixed bug in blanks backscanning (Theo Engel)
 
-                        h316_stddev.c: fixed bugs in punch state handling (found by Theo Engel)
+                        h316_stddev.c: fixed bugs in punch state handling (Theo Engel)
 
                         i1401_cpu.c: fixed bug in divide (reported by Van Snyder)
 
-                        i16_cpu.c: fixed bug in DH (found by Mark Hittinger)
+                        i16_cpu.c: fixed bug in DH (Mark Hittinger)
 
                         i32_cpu.c:
-                        - fixed bug in DH (found by Mark Hittinger)
+                        - fixed bug in DH (Mark Hittinger)
                         - added support for 8 register banks in 8/32
 
                         i7094: first release
 
-                        id_io.c: fixed bug, GO preserves EXA and SSTA (found by Davis Johnson)
+                        id_io.c: fixed bug, GO preserves EXA and SSTA (Davis Johnson)
 
                         id_idc.c:
-                        - fixed WD/WH handling (found by Davis Johnson)
-                        - fixed bug, nop command should be ignored (found by Davis Johnson)
+                        - fixed WD/WH handling (Davis Johnson)
+                        - fixed bug, nop command should be ignored (Davis Johnson)
 
-                        nova_cpu.c: fixed bug in DIVS (found by Mark Hittinger)
+                        nova_cpu.c: fixed bug in DIVS (Mark Hittinger)
 
                         pdp11_cis.c: (all reported by John Dundas)
                         - fixed bug in decode table
@@ -797,7 +853,7 @@ patch   date            module(s) and fix(es)
                         pdp11_cr.c: added CR11/CD11 support
 
                         pdp11_tc.c:
-                        - fixed READ to set extended data bits in TCST (found by Alan Frisbie)
+                        - fixed READ to set extended data bits in TCST (Alan Frisbie)
 
                         vax780_fload.c: added FLOAD command
 
@@ -876,7 +932,7 @@ patch   date            module(s) and fix(es)
 
                         sim_tape.c, sim_tape.h:
                         - added write support for P7B format
-                        - fixed bug in write forward (found by Dave Bryan)
+                        - fixed bug in write forward (Dave Bryan)
 
                         h316_stddev.c, hp2100_stddev.c, hp2100_mux.c, id_tt.c,
                         id_ttp.c, id_pas.c, pdp8_tt.c, pdp8_ttx.c, pdp11_stddev.c,
@@ -904,16 +960,16 @@ patch   date            module(s) and fix(es)
                         - changed default adapter to TM03 (for VMS)
 
                         pdp8_df.c, pdp8_dt.c, pdp8_rf.c:
-                        - fixed unaligned access bug (found by Doug Carman)
+                        - fixed unaligned access bug (Doug Carman)
 
-                        pdp8_rl.c: fixed IOT 61 decoding bug (found by David Gesswein)
+                        pdp8_rl.c: fixed IOT 61 decoding bug (David Gesswein)
 
                         vax_cpu.c:
                         - fixed breakpoint detection when USE_ADDR64 option is active
                         - fixed CVTfi to trap on integer overflow if PSW<iv> set
 
   1     15-Oct-05       All CPU's, other sources: fixed declaration inconsistencies
-                        (from Sterling Garwood)
+                        (Sterling Garwood)
 
                         i1401_cpu.c: added control for old/new character encodings
 
@@ -933,7 +989,7 @@ patch   date            module(s) and fix(es)
 
                         vax_io.c: fixed bug in autoconfiguration (missing XU)
 
-                        vax_fpa.c: fixed bug in 32b structure definitions (from Jason Stevens)
+                        vax_fpa.c: fixed bug in 32b structure definitions (Jason Stevens)
 
   0     1-Sep-05        Note: most source modules have been edited to improve
                         readability and to fix declaration and cast problems in C++
@@ -944,7 +1000,7 @@ patch   date            module(s) and fix(es)
 
                         sim_sock.c: fixed SIGPIPE error on Unix
 
-                        sim_ether.c: added Windows user-defined adapter names (from Timothe Litt)
+                        sim_ether.c: added Windows user-defined adapter names (Timothe Litt)
 
                         sim_tape.c: fixed misallocation of TPC map array
 
@@ -977,7 +1033,7 @@ patch   date            module(s) and fix(es)
                         - revised for new autoconfiguration interface
                         - fixed bug in vector display routine
 
-                        pdp11_xu.c: fixed runt packet processing (found by Tim Chapman)
+                        pdp11_xu.c: fixed runt packet processing (Tim Chapman)
 
                         pdp18b_cpu.c, pdp18b_sys.c:
                         - removed spurious AAS instruction
@@ -1004,28 +1060,28 @@ patch   date            module(s) and fix(es)
 
   0     01-May-04       scp.c:
                         - fixed ASSERT code
-                        - revised syntax for SET DEBUG (from Dave Bryan)
+                        - revised syntax for SET DEBUG (Dave Bryan)
                         - revised interpretation of fprint_sym, fparse_sym returns
                         - moved DETACH sanity tests into detach_unit
 
                         sim_sock.h and sim_sock.c:
-                        - added test for WSAEINPROGRESS (from Tim Riker)
+                        - added test for WSAEINPROGRESS (Tim Riker)
 
                         many: revised detach routines to test for attached state
 
-                        hp2100_cpu.c: reorganized CPU options (from Dave Bryan)
+                        hp2100_cpu.c: reorganized CPU options (Dave Bryan)
 
-                        hp2100_cpu1.c: reorganized EIG routines (from Dave Bryan)
+                        hp2100_cpu1.c: reorganized EIG routines (Dave Bryan)
 
-                        hp2100_fp1.c: added FFP support (from Dave Bryan)
+                        hp2100_fp1.c: added FFP support (Dave Bryan)
 
                         id16_cpu.c:
-                        - fixed bug in show history routine (from Mark Hittinger)
+                        - fixed bug in show history routine (Mark Hittinger)
                         - revised examine/deposit to do words rather than bytes
 
                         id32_cpu.c:
                         - fixed bug in initial memory allocation
-                        - fixed bug in show history routine (from Mark Hittinger)
+                        - fixed bug in show history routine (Mark Hittinger)
                         - revised examine/deposit to do words rather than bytes
 
                         id16_sys.c, id32_sys:
@@ -1040,33 +1096,33 @@ patch   date            module(s) and fix(es)
 
 /* V3.3 revision history 
 
-  2     08-Mar-05       scp.c: added ASSERT command (from Dave Bryan)
+  2     08-Mar-05       scp.c: added ASSERT command (Dave Bryan)
 
                         h316_defs.h: fixed IORETURN macro
 
-                        h316_mt.c: fixed error reporting from OCP (found by Philipp Hachtmann)
+                        h316_mt.c: fixed error reporting from OCP (Philipp Hachtmann)
 
-                        h316_stddev.c: fixed bug in OCP '0001 (found by Philipp Hachtmann)
+                        h316_stddev.c: fixed bug in OCP '0001 (Philipp Hachtmann)
 
                         hp2100_cpu.c: split out EAU and MAC instructions
 
-                        hp2100_cpu1.c: (from Dave Bryan)
+                        hp2100_cpu1.c: (Dave Bryan)
                         - fixed missing MPCK on JRS target
                         - removed EXECUTE instruction (is NOP in actual microcode)
 
-                        hp2100_fp: (from Dave Bryan)
+                        hp2100_fp: (Dave Bryan)
                         - fixed missing negative overflow renorm in StoreFP
 
                         i1401_lp.c: fixed bug in write_line (reported by Van Snyder)
 
-                        id32_cpu.c: fixed branches to mask new PC (from Greg Johnson)
+                        id32_cpu.c: fixed branches to mask new PC (Greg Johnson)
 
                         pdp11_cpu.c: fixed bugs in RESET for 11/70 (reported by Tim Chapman)
 
                         pdp11_cpumod.c:
-                        - fixed bug in SHOW MODEL (from Sergey Okhapkin)
-                        - made SYSID variable for 11/70 (from Tim Chapman)
-                        - added MBRK write case for 11/70 (from Tim Chapman)
+                        - fixed bug in SHOW MODEL (Sergey Okhapkin)
+                        - made SYSID variable for 11/70 (Tim Chapman)
+                        - added MBRK write case for 11/70 (Tim Chapman)
 
                         pdp11_rq: added RA60, RA71, RA81 disks
 
@@ -1089,13 +1145,13 @@ patch   date            module(s) and fix(es)
                         h316_lp.c: fixed bug in DMA/DMC support
 
                         hp2100_cpu.c:
-                        - fixed DMA reset to clear alternate CTL flop (from Dave Bryan)
-                        - fixed DMA reset to not clear control words (from Dave Bryan)
+                        - fixed DMA reset to clear alternate CTL flop (Dave Bryan)
+                        - fixed DMA reset to not clear control words (Dave Bryan)
                         - fixed SBS, CBS, TBS to do virtual reads
-                        - separated A/B from M[0/1], for DMA IO (from Dave Bryan)
-                        - added SET CPU 21MX-M, 21MX-E (from Dave Brian)
-                        - disabled TIMER/EXECUTE/DIAG instructions for 21MX-M (from Dave Bryan)
-                        - added post-processor to maintain T/M consistency (from Dave Bryan)
+                        - separated A/B from M[0/1], for DMA IO (Dave Bryan)
+                        - added SET CPU 21MX-M, 21MX-E (Dave Brian)
+                        - disabled TIMER/EXECUTE/DIAG instructions for 21MX-M (Dave Bryan)
+                        - added post-processor to maintain T/M consistency (Dave Bryan)
 
                         hp2100_ds.c: first release
 
@@ -1109,13 +1165,13 @@ patch   date            module(s) and fix(es)
                         hp2100_sys.c (all changes from Dave Bryan):
                         - added STOP_OFFLINE, STOP_PWROFF messages
 
-                        i1401_sys.c: added address argument support (from Van Snyder)
+                        i1401_sys.c: added address argument support (Van Snyder)
 
                         id_mt.c: added read-only file support
 
                         lgp_cpu.c, lgp_sys.c: modified VM pointer setup
 
-                        pdp11_cpu.c: fixed WAIT to work in all modes (from John Dundas)
+                        pdp11_cpu.c: fixed WAIT to work in all modes (John Dundas)
 
                         pdp11_tm.c, pdp11_ts.c: added read-only file support
 
@@ -1123,9 +1179,9 @@ patch   date            module(s) and fix(es)
 
   0     23-Nov-04       scp.c:
                         - added reset_all_p (powerup)
-                        - fixed comma-separated SET options (from Dave Bryan)
-                        - changed ONLINE/OFFLINE to ENABLED/DISABLED (from Dave Bryan)
-                        - modified to flush device buffers on stop (from Dave Bryan)
+                        - fixed comma-separated SET options (Dave Bryan)
+                        - changed ONLINE/OFFLINE to ENABLED/DISABLED (Dave Bryan)
+                        - modified to flush device buffers on stop (Dave Bryan)
                         - changed HELP to suppress duplicate command displays
 
                         sim_console.c:
@@ -1293,26 +1349,26 @@ patch   date            module(s) and fix(es)
 /* V3.2 revision history 
 
   3     03-Sep-04       scp.c:
-                        - added ECHO command (from Dave Bryan)
+                        - added ECHO command (Dave Bryan)
                         - qualified RESTORE detach with SIM_SW_REST
 
-                        sim_console: added OS/2 EMX fixes (from Holger Veit)
+                        sim_console: added OS/2 EMX fixes (Holger Veit)
 
-                        sim_sock.h: added missing definition for OS/2 (from Holger Veit)
+                        sim_sock.h: added missing definition for OS/2 (Holger Veit)
 
                         hp2100_cpu.c: changed error stops to report PC not PC + 1
-                        (from Dave Bryan)
+                        (Dave Bryan)
 
-                        hp2100_dp.c: functional and timing fixes (from Dave Bryan)
+                        hp2100_dp.c: functional and timing fixes (Dave Bryan)
                         - controller sets ATN for all commands except read status
                         - controller resumes polling for ATN interrupts after read status
                         - check status on unattached drive set busy and not ready
                         - check status tests wrong unit for write protect status
                         - drive on line sets ATN, will set FLG if polling
 
-                        hp2100_dr.c: fixed CLC to stop operation (from Dave Bryan)
+                        hp2100_dr.c: fixed CLC to stop operation (Dave Bryan)
 
-                        hp2100_ms.c: functional and timing fixes (from Dave Bryan)
+                        hp2100_ms.c: functional and timing fixes (Dave Bryan)
                         - fixed erroneous execution of rejected command
                         - fixed erroneous execution of select-only command
                         - fixed erroneous execution of clear command
@@ -1323,18 +1379,18 @@ patch   date            module(s) and fix(es)
                         - added reel sizes to simulate end of tape
                         - added debug printouts
 
-                        hp2100_mt.c: modified handling of end of medium (from Dave Bryan)
+                        hp2100_mt.c: modified handling of end of medium (Dave Bryan)
 
-                        hp2100_stddev.c: added tab to control char set (from Dave Bryan)
+                        hp2100_stddev.c: added tab to control char set (Dave Bryan)
 
-                        pdp11_rq.c: VAX controllers luns start at 0 (from Andreas Cejna)
+                        pdp11_rq.c: VAX controllers luns start at 0 (Andreas Cejna)
 
                         vax_cpu.c: fixed bug in EMODD/G, second word of quad dst not probed
 
   2     17-Jul-04       scp.c: fixed problem ATTACHing to read only files
-                        (found by John Dundas)
+                        (John Dundas)
 
-                        sim_console.c: revised Windows console code (from Dave Bryan)
+                        sim_console.c: revised Windows console code (Dave Bryan)
 
                         sim_fio.c: fixed problem in big-endian read
                         (reported by Scott Bailey)
@@ -1342,13 +1398,13 @@ patch   date            module(s) and fix(es)
                         gri_cpu.c: updated MSR, EAO functions
 
                         hp_stddev.c: generalized handling of control char echoing
-                        (from Dave Bryan)
+                        (Dave Bryan)
 
                         vax_sys.c: fixed bad block initialization routine
 
   1     10-Jul-04       scp.c: added SET/SHOW CONSOLE subhierarchy
 
-                        hp2100_cpu.c: fixes and added features (from Dave Bryan)
+                        hp2100_cpu.c: fixes and added features (Dave Bryan)
                         - SBT increments B after store
                         - DMS console map must check dms_enb
                         - SFS x,C and SFC x,C work
@@ -1381,7 +1437,7 @@ patch   date            module(s) and fix(es)
                         hp2100_dr.c: revised boot code to use IBL algorithm
 
                         hp2100_mt.c, hp2100_ms.c: fixed spurious timing error after CLC
-                         (found by Dave Bryan)
+                         (Dave Bryan)
 
                         hp2100_stddev.c:
                         - fixed input behavior during typeout for RTE-IV
@@ -1394,13 +1450,13 @@ patch   date            module(s) and fix(es)
 
                         pdp11_tq.c:
                         - fixed bug in reporting write protect (reported by Lyle Bickley)
-                        - fixed TK70 model number and media ID (found by Robert Schaffrath)
+                        - fixed TK70 model number and media ID (Robert Schaffrath)
 
-                        pdp11_vh.c: added DHQ11 support (from John Dundas)
+                        pdp11_vh.c: added DHQ11 support (John Dundas)
 
-                        pdp11_io.c, vax_io.c: fixed DHQ11 autoconfigure (from John Dundas)
+                        pdp11_io.c, vax_io.c: fixed DHQ11 autoconfigure (John Dundas)
 
-                        pdp11_sys.c, vax_sys.c: added DHQ11 support (from John Dundas)
+                        pdp11_sys.c, vax_sys.c: added DHQ11 support (John Dundas)
 
                         vax_cpu.c: fixed bug in DIVBx, DIVWx (reported by Peter Trimmel)
 
@@ -1434,7 +1490,7 @@ patch   date            module(s) and fix(es)
                         all variable-sized devices: revised for sim_fsize change
 
                         eclipse_cpu.c, nova_cpu.c: fixed device enable/disable support
-                           (found by Bruce Ray)
+                           (Bruce Ray)
 
                         nova_defs.h, nova_sys.c, nova_qty.c:
                         - added QTY and ALM support (Bruce Ray)
@@ -1443,11 +1499,11 @@ patch   date            module(s) and fix(es)
 
                         lgp: added LGP-30 [LGP-21] simulator
 
-                        pdp1_sys.c: fixed bug in LOAD (found by Mark Crispin)
+                        pdp1_sys.c: fixed bug in LOAD (Mark Crispin)
 
                         pdp10_mdfp.c:
                         - fixed bug in floating unpack
-                        - fixed bug in FIXR (found by Philip Stone, fixed by Chris Smith)
+                        - fixed bug in FIXR (Philip Stone, fixed by Chris Smith)
 
                         pdp11_dz.c: added per-line logging
 
@@ -1458,7 +1514,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_hk.c, pdp11_rp.c: revised for device debug support
 
-                        pdp11_rq.c: fixed bug in interrupt control (found by Tom Evans)
+                        pdp11_rq.c: fixed bug in interrupt control (Tom Evans)
 
                         pdp11_ry.c: added VAX support
 
@@ -1536,9 +1592,9 @@ patch   date            module(s) and fix(es)
                         - fixed bug, space operations return record count
                         - fixed bug, reset doesn't cancel rewind
 
-                        nova_sys.c: added floating point, timer support (from Charles Owen)
+                        nova_sys.c: added floating point, timer support (Charles Owen)
 
-                        i1620_cpu.c: fixed bug in branch digit (found by Dave Babcock)
+                        i1620_cpu.c: fixed bug in branch digit (Dave Babcock)
 
                         pdp1_drm.c:
                         - added parallel drum support
@@ -1556,7 +1612,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_io.c:
                         - added autoconfiguration controls
-                        - fixed bug in I/O configuration (found by Dave Hittner)
+                        - fixed bug in I/O configuration (Dave Hittner)
 
                         pdp11_rq.c:
                         - revised MB->LBN conversion for greater accuracy
@@ -1581,7 +1637,7 @@ patch   date            module(s) and fix(es)
                         pdp8_cpu.c: added instruction history
 
                         pdp8_rx.c:
-                        - fixed bug in RX28 read status (found by Charles Dickman)
+                        - fixed bug in RX28 read status (Charles Dickman)
                         - fixed double density write
 
                         pdp8_td.c: added TD8E controller
@@ -1594,7 +1650,7 @@ patch   date            module(s) and fix(es)
 
                         vax_io.c:
                         - added autoconfiguration controls
-                        - fixed bug in I/O configuration (found by Dave Hittner)
+                        - fixed bug in I/O configuration (Dave Hittner)
 
                         id16_cpu.c: revised instruction decoding
 
@@ -1625,7 +1681,7 @@ patch   date            module(s) and fix(es)
                         - added diagnostic read (space forward)
 
                         i1620_cpu.c
-                        - fixed bug in immediate index add (found by Michael Short)
+                        - fixed bug in immediate index add (Michael Short)
 
   1     27-Jul-03       pdp1_cpu.c: updated to detect indefinite I/O wait
 
@@ -1643,7 +1699,7 @@ patch   date            module(s) and fix(es)
 
                         pdp10_rp.c: fixed bug in read header
 
-                        pdp11_rq: fixed bug in user disk size (found by Chaskiel M Grundman)
+                        pdp11_rq: fixed bug in user disk size (Chaskiel M Grundman)
 
                         pdp18b_cpu.c:
                         - added FP15 support
@@ -1717,7 +1773,7 @@ patch   date            module(s) and fix(es)
                         pdp10_rp.c: fixed ordering bug in attach
 
                         pdp11_cpu.c:
-                        - fixed bug in MMR1 update (found by Tim Stark)
+                        - fixed bug in MMR1 update (Tim Stark)
                         - fixed bug in memory size table
 
                         pdp11_lp.c, pdp11_rq.c: added extended file support
@@ -1742,8 +1798,8 @@ patch   date            module(s) and fix(es)
                         vax_io.c: optimized byte and word DMA routines
 
                         vax_sysdev.c:
-                        - added calibrated delay to ROM reads (from Mark Pizzolato)
-                        - fixed calibration problems in interval timer (from Mark Pizzolato)
+                        - added calibrated delay to ROM reads (Mark Pizzolato)
+                        - fixed calibration problems in interval timer (Mark Pizzolato)
 
                         pdp1_dt.c: fixed variable size interaction with restore
 
@@ -1764,7 +1820,7 @@ patch   date            module(s) and fix(es)
                         - fixed bug in read status (13210A controller)
                         - fixed bug in seek completion
 
-                        id_pt.c: fixed type declaration (found by Mark Pizzolato)
+                        id_pt.c: fixed type declaration (Mark Pizzolato)
 
                         gri_cpu.c: fixed bug in SC queue pointer management
 
@@ -1804,7 +1860,7 @@ patch   date            module(s) and fix(es)
 
                         pdp10_tu.c: revised to use magtape library
 
-                        pdp11_cpu.c: fixed bug in MMR1 update (found by Tim Stark)
+                        pdp11_cpu.c: fixed bug in MMR1 update (Tim Stark)
 
                         pdp11_stddev.c
                         - added set line frequency command
@@ -1826,7 +1882,7 @@ patch   date            module(s) and fix(es)
                         - added variable controller, user defined drive support
                         - revised to use magtape library
 
-                        pdp18b_cpu.c: fixed three EAE bugs (found by Hans Pufal)
+                        pdp18b_cpu.c: fixed three EAE bugs (Hans Pufal)
 
                         pdp18b_mt.c:
                         - fixed bugs in BOT error handling, interrupt handling
@@ -1840,7 +1896,7 @@ patch   date            module(s) and fix(es)
                         - added set line frequency command
                         - added set ctrl-c command
 
-                        pdp18b_sys.c: fixed FMTASC printouts (found by Hans Pufal)
+                        pdp18b_sys.c: fixed FMTASC printouts (Hans Pufal)
 
                         pdp8_clk.c: added set line frequency command
 
@@ -1874,7 +1930,7 @@ patch   date            module(s) and fix(es)
                         LP09 printer
 
                         pdp18b_rf.c:
-                        - fixed IOT decoding (found by Hans Pufal)
+                        - fixed IOT decoding (Hans Pufal)
                         - fixed address overrun logic
                         - added variable number of platters and autosizing
 
@@ -1892,18 +1948,18 @@ patch   date            module(s) and fix(es)
 
                         nova_dsk.c: added variable number of platters and autosizing
 
-                        id16_cpu.c: fixed bug in SETM, SETMR (found by Mark Pizzolato)
+                        id16_cpu.c: fixed bug in SETM, SETMR (Mark Pizzolato)
 
   2     15-Jan-03       scp.c:
                         - added dynamic memory size flag and RESTORE support
                         - added EValuate command
                         - added get_ipaddr routine
-                        - added ! (OS command) feature (from Mark Pizzolato)
-                        - added BREAK support to sim_poll_kbd (from Mark Pizzolato)
+                        - added ! (OS command) feature (Mark Pizzolato)
+                        - added BREAK support to sim_poll_kbd (Mark Pizzolato)
 
                         sim_tmxr.c:
-                        - fixed bugs in IAC+IAC handling (from Mark Pizzolato)
-                        - added IAC+BRK handling (from Mark Pizzolato)
+                        - fixed bugs in IAC+IAC handling (Mark Pizzolato)
+                        - added IAC+BRK handling (Mark Pizzolato)
 
                         sim_sock.c:
                         - added use count for Windows start/stop
@@ -1929,12 +1985,12 @@ patch   date            module(s) and fix(es)
                         pdp11_stddev.c: changed default to 7b (for early UNIX)
 
                         vax_cpu.c, vax_io.c, vax_stddev.c, vax_sysdev.c:
-                        added console halt capability (from Mark Pizzolato)
+                        added console halt capability (Mark Pizzolato)
 
                         all terminals and multiplexors: added BREAK support
 
   1     21-Nov-02       pdp1_stddev.c: changed typewriter to half duplex
-                        (found by Derek Peschel)
+                        (Derek Peschel)
 
                         pdp10_tu.c:
                         - fixed bug in bootstrap (reported by Michael Thompson)
@@ -1946,10 +2002,10 @@ patch   date            module(s) and fix(es)
                         - removed VT emulation support
                         - added support for statically buffered devices
                         - added HELP <command>
-                        - fixed bugs in set_logon, ssh_break (found by David Hittner)
-                        - added VMS file optimization (from Robert Alan Byer)
+                        - fixed bugs in set_logon, ssh_break (David Hittner)
+                        - added VMS file optimization (Robert Alan Byer)
                         - added quiet mode, DO with parameters, GUI interface,
-                           extensible commands (from Brian Knittel)
+                           extensible commands (Brian Knittel)
                         - added DEVICE context and flags
                         - added central device enable/disable support
                         - modified SAVE/GET to save and restore flags
@@ -1961,7 +2017,7 @@ patch   date            module(s) and fix(es)
                         - modified for Telnet console support
                         - fixed bug in binary (8b) support
                         sim_sock.c: modified for Telnet console support
-                        sim_ether.c: new library for Ethernet (from David Hittner)
+                        sim_ether.c: new library for Ethernet (David Hittner)
 
                         all magtapes:
                         - added support for end of medium
@@ -1995,7 +2051,7 @@ patch   date            module(s) and fix(es)
                         pdp11_ry.c: added RX211/RX02 support
                         pdp11_hk.c: added RK611/RK06/RK07 support
                         pdp11_tq.c: added TMSCP support
-                        pdp11_xq.c: added DEQNA/DELQA support (from David Hittner)
+                        pdp11_xq.c: added DEQNA/DELQA support (David Hittner)
                         pdp11_pclk.c: added KW11P support
                         pdp11_ts.c:
                         - fixed bug in CTL decoding
@@ -2019,7 +2075,7 @@ patch   date            module(s) and fix(es)
                         vax_stddev.c: removed paper tape, now uses PDP-11 version
                         vax_sysdev.c:
                         - allowed NVR to be attached to file
-                        - removed unused variables (found by David Hittner)
+                        - removed unused variables (David Hittner)
 
                         PDP-10
                         pdp10_defs.h, pdp10_ksio.c, all peripherals:
@@ -2069,12 +2125,12 @@ patch   date            module(s) and fix(es)
 /* V2.9 revision history
 
   11    20-Jul-02       i1401_mt.c: on read, end of record stores group mark
-                           without word mark (found by Van Snyder)
+                           without word mark (Van Snyder)
 
                         i1401_dp.c: reworked address generation and checking
 
                         vax_cpu.c: added infinite loop detection and halt to
-                           boot ROM option (from Mark Pizzolato)
+                           boot ROM option (Mark Pizzolato)
 
                         vax_fpa.c: changed function names to prevent conflict
                            with C math library
@@ -2083,31 +2139,31 @@ patch   date            module(s) and fix(es)
                            John Dundas)
 
                         pdp18b_stddev.c: added "ASCII mode" for reader and
-                           punch (from Hans Pufal)
+                           punch (Hans Pufal)
 
                         gri_*.c: added GRI-909 simulator
 
-                        scp.c: added DO echo, DO exit (from Brian Knittel)
+                        scp.c: added DO echo, DO exit (Brian Knittel)
 
                         scp_tty.c: added Windows priority hacking (from
                            Mark Pizzolato)
 
   10    15-Jun-02       scp.c: fixed error checking on calls to fxread/fxwrite
-                           (found by Norm Lastovic)
+                           (Norm Lastovic)
 
                         scp_tty.c, sim_vt.h, sim_vt.c: added VTxxx emulation
-                           support for Windows (from Fischer Franz)
+                           support for Windows (Fischer Franz)
 
-                        sim_sock.c: added OS/2 support (from Holger Veit)
+                        sim_sock.c: added OS/2 support (Holger Veit)
 
-                        pdp11_cpu.c: fixed bugs (from John Dundas)
+                        pdp11_cpu.c: fixed bugs (John Dundas)
                         - added special case for PS<15:12> = 1111 to MFPI
                         - removed special case from MTPI
                         - added masking of relocation adds 
 
                         i1401_cpu.c:
                         - added multiply/divide
-                        - fixed bugs (found by Van Snyder)
+                        - fixed bugs (Van Snyder)
                            o 5 and 7 character H, 7 character doesn't branch
                            o 8 character NOP
                            o 1401-like memory dump
@@ -2133,9 +2189,9 @@ patch   date            module(s) and fix(es)
                         vax_cpu1.c: fixed exception flows to clear trap request
 
   7     30-Apr-02       scp.c: fixed bug in clock calibration when (real) clock
-                           jumps forward due too far (found by Jonathan Engdahl)
+                           jumps forward due too far (Jonathan Engdahl)
   
-                        pdp11_cpu.c: fixed bugs, added features (from John Dundas
+                        pdp11_cpu.c: fixed bugs, added features (John Dundas
                            and Wolfgang Helbig)
                         - added HTRAP and BPOK to maintenance register
                         - added trap on kernel HALT if MAINT<HTRAP> set
@@ -2167,8 +2223,8 @@ patch   date            module(s) and fix(es)
                         vax_fpu.c: fixed EDIV overflow test for 0 quotient
 
   5     14-Apr-02       vax_cpu1.c:
-                        - fixed interrupt, prv_mode set to 0 (found by Tim Stark)
-                        - fixed PROBEx to mask mode to 2b (found by Kevin Handy)
+                        - fixed interrupt, prv_mode set to 0 (Tim Stark)
+                        - fixed PROBEx to mask mode to 2b (Kevin Handy)
 
   4     1-Apr-02        pdp11_rq.c: fixed bug, reset cleared write protect status
 
@@ -2218,7 +2274,7 @@ patch   date            module(s) and fix(es)
                         - added -e switch to attach
                         - moved device enable/disable to simulators
 
-                        scp_tty.c: VAX specific fix (from Robert Alan Byer)
+                        scp_tty.c: VAX specific fix (Robert Alan Byer)
 
                         sim_tmxr.c, sim_tmxr.h:
                         - added tmxr_fstats, tmxr_dscln
@@ -2235,19 +2291,19 @@ patch   date            module(s) and fix(es)
 
                         pdp8_ttx.c: rewrote as unified multiplexor
 
-                        pdp11_cpu.c: fixed calc_MMR1 macro (found by Robert Alan Byer)
+                        pdp11_cpu.c: fixed calc_MMR1 macro (Robert Alan Byer)
 
-                        pdp11_stddev.c: fixed bugs in KW11L (found by John Dundas)
+                        pdp11_stddev.c: fixed bugs in KW11L (John Dundas)
 
                         pdp11_rp.c: fixed bug in 18b mode boot
 
                         pdp11 bootable I/O devices: fixed register setup at boot
-                           exit (found by Doug Carman)
+                           exit (Doug Carman)
 
                         hp2100_cpu.c:
-                        - fixed DMA register tables (found by Bill McDermith)
-                        - fixed SZx,SLx,RSS bug (found by Bill McDermith)
-                        - fixed flop restore logic (found by Bill McDermith)
+                        - fixed DMA register tables (Bill McDermith)
+                        - fixed SZx,SLx,RSS bug (Bill McDermith)
+                        - fixed flop restore logic (Bill McDermith)
 
                         hp2100_mt.c: fixed bug on write of last character
 
@@ -2255,10 +2311,10 @@ patch   date            module(s) and fix(es)
                            multiplexor controllers
 
                         i1401_cd.c, i1401_mt.c: new zero footprint bootstraps
-                           (from Van Snyder)
+                           (Van Snyder)
 
                         i1401_sys.c: fixed symbolic display of H, NOP with no trailing
-                           word mark (found by Van Snyder)
+                           word mark (Van Snyder)
 
                         most CPUs:
                         - replaced OLDPC with PC queue
@@ -2266,7 +2322,7 @@ patch   date            module(s) and fix(es)
 
    V2.8 revision history
 
-5       25-Dec-01       scp.c: fixed bug in DO command (found by John Dundas)
+5       25-Dec-01       scp.c: fixed bug in DO command (John Dundas)
 
                         pdp10_cpu.c:
                         - moved trap-in-progress to separate variable
@@ -2302,7 +2358,7 @@ patch   date            module(s) and fix(es)
 
                         pdp8: added RL8A
 
-                        pdp10: fixed two ITS-related bugs (found by Dave Conroy)
+                        pdp10: fixed two ITS-related bugs (Dave Conroy)
 
    V2.7 revision history
 
@@ -2316,11 +2372,11 @@ patch   date            module(s) and fix(es)
                            to use symbolic base addresses and lengths
 
 14      20-Oct-01       dec_dz.h, sim_tmxr_h, sim_tmxr.c: fixed bug in Telnet
-                           state handling (found by Thord Nilson), removed
+                           state handling (Thord Nilson), removed
                            tmxr_getchar, added tmxr_rqln and tmxr_tqln
 
 13      18-Oct-01       pdp11_tm.c: added stub diagnostic register clock
-                           for RSTS/E (found by Thord Nilson)
+                           for RSTS/E (Thord Nilson)
 
 12      15-Oct-01       pdp11_defs.h, pdp11_cpu.c, pdp11_tc.c, pdp11_ts.c,
                            pdp11_rp.c: added operations logging

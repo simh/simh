@@ -1,6 +1,6 @@
 /* i1401_mt.c: IBM 1401 magnetic tape simulator
 
-   Copyright (c) 1993-2010, Robert M. Supnik
+   Copyright (c) 1993-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,10 @@
 
    mt           7-track magtape
 
+   19-Mar-11    RMS     Restored lost edit to insert EOF in memory on read EOF
+                        Reverted multiple tape indicator implementation
+   20-Jan-11    RMS     Fixed branch on END indicator per hardware (from Van Snyder)
+   26-Jun-10    RMS     Fixed backspace over tapemark not to set EOR (from Van Snyder)
    11-Jul-08    RMS     Added -n (no rewind) option to BOOT (from Van Snyder)
                         Added tape mark detect to diagnostic read (from Bob Abeles)
                         Added tape mark detect in multi-character records (from Bob Abeles)
@@ -102,10 +106,8 @@
 
 #define MT_NUMDR        7                               /* #drives */
 #define MT_MAXFR        (MAXMEMSIZE * 2)                /* max transfer */
-#define IND             u3                              /* drive indicator */
 
 uint8 dbuf[MT_MAXFR];                                   /* tape buffer */
-int32 mt_sel = 0;                                       /* selected unit */
 
 extern uint8 M[];                                       /* memory */
 extern int32 ind[64];
@@ -115,8 +117,6 @@ extern FILE *sim_deb;
 
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
-t_stat mt_attach (UNIT *uptr, char *cp);
-t_stat mt_detach (UNIT *uptr);
 t_stat mt_map_status (t_stat st);
 UNIT *mt_sel_unit (int32 unit);
 
@@ -145,13 +145,8 @@ UNIT mt_unit[] = {
     };
 
 REG mt_reg[] = {
+    { FLDATA (IND, ind[IN_END], 0) },
     { FLDATA (ERR, ind[IN_TAP], 0) },
-    { FLDATA (IND1, mt_unit[1].IND, 0) },
-    { FLDATA (IND2, mt_unit[2].IND, 0) },
-    { FLDATA (IND3, mt_unit[3].IND, 0) },
-    { FLDATA (IND4, mt_unit[4].IND, 0) },
-    { FLDATA (IND5, mt_unit[5].IND, 0) },
-    { FLDATA (IND6, mt_unit[6].IND, 0) },
     { DRDATA (POS1, mt_unit[1].pos, T_ADDR_W), PV_LEFT + REG_RO },
     { DRDATA (POS2, mt_unit[2].pos, T_ADDR_W), PV_LEFT + REG_RO },
     { DRDATA (POS3, mt_unit[3].pos, T_ADDR_W), PV_LEFT + REG_RO },
@@ -175,7 +170,7 @@ DEVICE mt_dev = {
     "MT", mt_unit, mt_reg, mt_mod,
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
-    &mt_boot,  &mt_attach, &mt_detach,
+    &mt_boot, NULL, NULL,
     NULL, DEV_DEBUG
     };
 
@@ -195,11 +190,12 @@ t_mtrlnt tbc;
 UNIT *uptr;
 t_stat st;
 
-ind[IN_TAP] = 0;                                        /* clear error */
 if ((uptr = mt_sel_unit (unit)) == NULL)                /* sel unit, save */
     return STOP_INVMTU;                                 /* (not valid) */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_UNATT;
+ind[IN_TAP] = 0;                                        /* clear error */
+ind[IN_END] = 0;                                        /* clear indicator */
 switch (mod) {                                          /* case on modifier */
 
     case BCD_A:                                         /* diagnostic read */
@@ -215,8 +211,8 @@ switch (mod) {                                          /* case on modifier */
                 break;
                 }
             if (!(flag & MD_BIN) &&                     /* BCD tape and */
-                ((dbuf[0] & CHAR)  == BCD_TAPMRK))      /* first char TMK? */
-                uptr->IND = 1;                          /* set indicator */
+                ((dbuf[0] & CHAR) == BCD_TAPMRK))       /* first char TMK? */
+                ind[IN_END] = 1;                        /* set indicator */
             }
         break;
 
@@ -224,6 +220,8 @@ switch (mod) {                                          /* case on modifier */
         if (DEBUG_PRS (mt_dev))
             fprintf (sim_deb, ">>MT%d: backspace\n", unit);
         st = sim_tape_sprecr (uptr, &tbc);              /* space rev */
+        if (st == MTSE_TMK)                             /* ignore TMK */
+            st = MTSE_OK;
         break;                                          /* end case */
 
     case BCD_E:                                         /* erase = nop */
@@ -249,8 +247,7 @@ switch (mod) {                                          /* case on modifier */
         if (DEBUG_PRS (mt_dev))
             fprintf (sim_deb, ">>MT%d: rewind and unload\n", unit);
         sim_tape_rewind (uptr);                         /* update position */
-        st = mt_detach (uptr);                          /* detach */
-        break;
+        return sim_tape_detach (uptr);                  /* detach */
 
     default:
         return STOP_INVM;
@@ -283,11 +280,12 @@ t_stat st;
 t_bool passed_eot;
 UNIT *uptr;
 
-ind[IN_TAP] = 0;                                        /* clear error */
 if ((uptr = mt_sel_unit (unit)) == NULL)                /* sel unit, save */
     return STOP_INVMTU;                                 /* (not valid) */
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_UNATT;
+ind[IN_TAP] = 0;                                        /* clear error */
+ind[IN_END] = 0;                                        /* clear indicator */
 
 switch (mod) {
 
@@ -296,7 +294,12 @@ switch (mod) {
             fprintf (sim_deb, ">>MT%d: read from %d", unit, BS);
         wm_seen = 0;                                    /* no word mk seen */
         st = sim_tape_rdrecf (uptr, dbuf, &tbc, MT_MAXFR); /* read rec */
-        if (st != MTSE_TMK) {                           /* not tmk? */
+        if (st == MTSE_TMK) {                           /* tape mark? */
+            ind[IN_END] = 1;                            /* set indicator */
+            tbc = 1;                                    /* one char read */
+            dbuf[0] = BCD_TAPMRK;                       /* BCD tapemark */
+            }
+        else {                                          /* not tmk? */
             if (st == MTSE_RECE)                        /* rec in error? */
                 ind[IN_TAP] = 1;
             else if (st != MTSE_OK) {                   /* stop on error */
@@ -306,7 +309,7 @@ switch (mod) {
                 }
             if (!(flag & MD_BIN) &&                     /* BCD tape and */
                 ((dbuf[0] & CHAR)  == BCD_TAPMRK))      /* first char TMK? */
-                uptr->IND = 1;                          /* set indicator */
+                ind[IN_END] = 1;                        /* set indicator */
             }
         for (i = 0; i < tbc; i++) {                     /* loop thru buf */
             if (!(flag & MD_BOOT) &&                    /* not boot? check */
@@ -390,13 +393,12 @@ switch (mod) {
 return mt_map_status (st);
 }
 
-/* Select unit - save selection if valid, return unit pointer */
+/* Select unit - return unit pointer if valid */
 
 UNIT *mt_sel_unit (int32 unit)
 {
 if ((unit <= 0) || (unit >= MT_NUMDR))
     return NULL;
-mt_sel = unit;                                          /* save selected unit */
 return mt_dev.units + unit;
 }
 
@@ -420,8 +422,7 @@ switch (st) {
         return SCPE_MTRLNT;
 
     case MTSE_TMK:                                      /* end of file */
-        if (mt_sel != 0)
-            mt_unit[mt_sel].IND = 1;                    /* set indicator latch */
+        ind[IN_END] = 1;                                /* set indicator */
         break;
 
     case MTSE_IOERR:                                    /* IO error */
@@ -442,21 +443,6 @@ switch (st) {
 return SCPE_OK;
 }
 
-/* Test and reset selected tape drive's indicator latch */
-
-t_bool mt_testind ()
-{
-t_bool v;
-
-if (mt_sel == 0)                                        /* any mt selected? */
-    return FALSE;
-if (!(mt_unit[mt_sel].flags & UNIT_ATT))                /* attached? */
-    return FALSE;
-v = mt_unit[mt_sel].IND;                                /* save latch */
-mt_unit[mt_sel].IND = 0;                                /* reset latch */
-return v;
-}
-
 /* Reset routine */
 
 t_stat mt_reset (DEVICE *dptr)
@@ -467,11 +453,10 @@ UNIT *uptr;
 for (i = 0; i < MT_NUMDR; i++) {                        /* per drive resets */
     if (uptr = mt_sel_unit (i)) {
         MT_CLR_PNU (uptr);                              /* clear pos flag */
-        uptr->IND = 0;                                  /* clear ind latch */
         }
     }
 ind[IN_TAP] = 0;                                        /* clear mt err ind */
-mt_sel = 0;                                             /* clear unit select */
+ind[IN_END] = 0;                                        /* clear mt end ind */
 return SCPE_OK;
 }
 
@@ -492,20 +477,4 @@ BS = 1;                                                 /* set BS = 001 */
 mt_io (unitno, MD_WM + MD_BOOT, BCD_R);                 /* LDA %U1 001 R */
 saved_IS = 1;
 return SCPE_OK;
-}
-
-/* Attach routine */
-
-t_stat mt_attach (UNIT *uptr, char *cp)
-{
-uptr->IND = 0;                                          /* reset indicator latch */
-return sim_tape_attach (uptr, cp);                      /* tape unit attach */
-}
-
-/* Detach routine */
-
-t_stat mt_detach (UNIT *uptr)
-{
-uptr->IND = 0;                                          /* reset indicator latch */
-return sim_tape_detach (uptr);                          /* tape unit detach */
 }

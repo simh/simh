@@ -1,6 +1,6 @@
 /* i7094_sys.c: IBM 7094 simulator interface
 
-   Copyright (c) 2003-2010, Robert M Supnik
+   Copyright (c) 2003-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,6 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   16-Jul-10    RMS     Added SPUx, SPTx, SPRx
    29-Oct-06    RMS     Added additional expanded core instructions
    08-Jun-06    RMS     Added Dave Pitts' binary loader
 */
@@ -155,7 +154,6 @@ return SCPE_NOFNC;
 #define I_TCH           0130000000000000                /* transfer channel */
 #define I_I9N           0140000000000000                /* 7909 with nostore */
 #define I_I9S           0150000000000000                /* 7909 */
-#define I_SPX           0160000000000000                /* SPU, SPR */
 #define IFAKE_7607      0001000000000000                /* fake op extensions */
 #define IFAKE_7909      0002000000000000
 #define DFAKE           (DMASK|IFAKE_7607|IFAKE_7909)
@@ -173,7 +171,6 @@ return SCPE_NOFNC;
 #define I_N_TCH         013
 #define I_N_I9N         014
 #define I_N_I9S         015
-#define I_N_SPX         016
 
 #define INST_P_XIT      0                               /* exit */
 #define INST_P_SKP      1                               /* do not print */
@@ -181,17 +178,16 @@ return SCPE_NOFNC;
 #define INST_P_PNZ      3                               /* print if nz */
 #define INST_P_PNT      4                               /* print if nz, term */
 
-static const t_uint64 masks[15] = {
+static const t_uint64 masks[14] = {
  03777700000000, 03777700000000,
  03777700000000, 03777700000000,
  03777400000000, 03700000000000,
  03700000000000, 03777700077777,
  03777700000000, 03777700000000,
  03700000200000, 03700000200000,
- 03760000200000, 03740000200000,
- 03777700077760 }; 
+ 03760000200000, 03740000200000 }; 
 
-static const uint32 fld_max[15][3] = {                  /* addr,tag,decr limit */
+static const uint32 fld_max[14][3] = {                  /* addr,tag,decr limit */
  { INST_M_ADDR, INST_M_TAG, 0 },
  { INST_M_ADDR, INST_M_TAG, 0 },
  { INST_M_ADDR, INST_M_TAG, 0 },
@@ -205,11 +201,10 @@ static const uint32 fld_max[15][3] = {                  /* addr,tag,decr limit *
  { INST_M_ADDR, 1,          INST_M_DEC },
  { INST_M_ADDR, 1,          0 },
  { INST_M_ADDR, 1,          0 },
- { INST_M_ADDR, 1,          0 },
- { INST_M_4B,   INST_M_TAG, 0 }
+ { INST_M_ADDR, 1,          0 }
  };
 
-static const uint32 fld_fmt[15][3] = {                  /* addr,tag,decr print */
+static const uint32 fld_fmt[14][3] = {                  /* addr,tag,decr print */
  { INST_P_PNT, INST_P_PNT, INST_P_XIT },                /* nop: all optional */
  { INST_P_PRA, INST_P_PNT, INST_P_XIT },                /* mxr: tag optional */
  { INST_P_PRA, INST_P_PNT, INST_P_XIT },                /* mxn: tag optional */
@@ -223,13 +218,12 @@ static const uint32 fld_fmt[15][3] = {                  /* addr,tag,decr print *
  { INST_P_PRA, INST_P_PNZ, INST_P_PRA },                /* iox: tag optional */
  { INST_P_PRA, INST_P_PNT, INST_P_XIT },                /* tch: tag optional */
  { INST_P_PRA, INST_P_PNT, INST_P_XIT },                /* i9n: tag optional */
- { INST_P_PRA, INST_P_PNT, INST_P_XIT },                /* i9s: tag optional */
- { INST_P_PNZ, INST_P_PNT, INST_P_XIT }                 /* SPx: tag optional */
+ { INST_P_PRA, INST_P_PNT, INST_P_XIT }                 /* i9s: tag optional */
  };
 
-static const t_uint64 ind_test[15] = {
- 0, 0, INST_IND, 0, 0, 0, 0, 0,
- 0, 0, CHI_IND, CHI_IND, CHI_IND, CHI_IND, 0
+static const t_uint64 ind_test[14] = {
+ 0, 0, INST_IND, 0, 0, 0, 0,
+ 0, 0, 0, CHI_IND, CHI_IND, CHI_IND, CHI_IND
  };
 
 static const char *opcode[] = {
@@ -254,15 +248,6 @@ static const char *opcode[] = {
  "RDCA", "RDCB", "RDCC",
  "RDCD", "RDCE", "RDCF",
  "RDCG", "RDCH",
- "SPUA", "SPUB", "SPUC",
- "SPUD", "SPUE", "SPUF",
- "SPUG", "SPUH",
- "SPTA", "SPTB", "SPTC",
- "SPTD", "SPTE", "SPTF",
- "SPTG", "SPTH",
- "SPRA", "SPRB", "SPRC",
- "SPRD", "SPRE", "SPRF",
- "SPRG", "SPRH",
 
  "TRCA", "TRCC",
  "TRCE", "TRCG",
@@ -425,15 +410,6 @@ static const t_uint64 opc_v[] = {
  0076000001352+I_SNS, 0076000002352+I_SNS, 0076000003352+I_SNS,
  0076000004352+I_SNS, 0076000005352+I_SNS, 0076000006352+I_SNS,
  0076000007352+I_SNS, 0076000010352+I_SNS,
- 0076000001340+I_SNS, 0076000002340+I_SNS, 0076000003340+I_SNS,
- 0076000004340+I_SNS, 0076000005340+I_SNS, 0076000006340+I_SNS,
- 0076000007340+I_SNS, 0076000010340+I_SNS,
- 0076000001360+I_SNS, 0076000002360+I_SNS, 0076000003360+I_SNS,
- 0076000004360+I_SNS, 0076000005360+I_SNS, 0076000006360+I_SNS,
- 0076000007360+I_SNS, 0076000010360+I_SNS,
- 0076000001360+I_SNS, 0076000002360+I_SNS, 0076000003360+I_SNS,
- 0076000004360+I_SNS, 0076000005360+I_SNS, 0076000006360+I_SNS,
- 0076000007360+I_SNS, 0076000010360+I_SNS,
 
  0002200000000+I_MXN, 0002400000000+I_MXN,
  0002600000000+I_MXN, 0002700000000+I_MXN,
@@ -642,8 +618,7 @@ for (i = 0; opc_v[i] > 0; i++) {                        /* loop thru ops */
             switch (fmt) {                              /* case on format */
 
             case INST_P_PNT:                            /* print nz, else term */
-                for (l = k, c = 0; l < 3; l++)
-                    c |= fld[k];
+                for (l = k, c = 0; l < 3; l++) c |= fld[k];
                 if (c == 0)
                     return SCPE_OK;
             case INST_P_PNZ:                            /* print non-zero */

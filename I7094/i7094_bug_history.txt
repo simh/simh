@@ -20,8 +20,8 @@ Bugs Found and Fixed During Simulator Debug
 18. CPU: Shift count is 8b wide, not 9b.
 19. SYS: Mnemonic is LDQ not LMQ.
 20. SYS: RQL opcode incorrect in symbolic decode table.
-21. CPU: Multi-tag mode stores OR'd value of tags on any index read except
-    normal effective address.
+21. CPU: Multi-tag mode stores OR'd value of tags on any index read except normal
+    effective address.
 22. CPU: Floating point trap does not write location 0 if trap suppressed.
 23. SYS: TRA instructions should have symbolic class MXN not MXR.
 24. CPU: Floating add instructions test for zero result only if normalization enabled.
@@ -58,12 +58,10 @@ Bugs Found and Fixed During Simulator Debug
 63. IO: 7607 channel modeled incorrectly, could stall.
 64. IO: All 7607 "effective NOP" conditions must be tested when a new command is
     decoded (wc == 0 for IOCx and IOSx, EOR set for IOSx and IORx).
-
-
-
-
-
-
+65. MT: BSR, BSF release the data channel in a few microseconds, like REW.
+66. CPU: Not all PSE and MSE variants are trapped in user mode.
+67. CPU: Storage nullification mask not recalculated at all points needed;
+    replaced with macro.
 
 
 

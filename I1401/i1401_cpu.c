@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2010, Robert M. Supnik
+   Copyright (c) 1993-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Mar-11    RMS     Reverted multiple tape indicator implementation
+   20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (from Van Snyder)
+   07-Nov-10    RMS     Fixed divide not to clear word marks in quotient
    24-Apr-10    RMS     Revised divide algorithm (from Van Snyder)
    11-Jul-08    RMS     Added missing A magtape modifier (from Van Snyder)
                         Fixed tape indicator implementation (from Bob Abeles)
@@ -226,7 +229,6 @@ extern t_stat inq_io (int32 flag, int32 mod);
 extern t_stat mt_io (int32 unit, int32 flag, int32 mod);
 extern t_stat dp_io (int32 fnc, int32 flag, int32 mod);
 extern t_stat mt_func (int32 unit, int32 flag, int32 mod);
-extern t_bool mt_testind (void);
 extern t_stat sim_activate (UNIT *uptr, int32 delay);
 extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
@@ -432,7 +434,7 @@ static const int32 ind_table[64] = {
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 10 - 17 */
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 20 - 27 */
     0, 1, 1, 0, 1, 0, 0, 0,                             /* 30 - 37 */
-    0, 0, 1, 0, 0, 0, 0, 0,                             /* 40 - 47 */
+    0, 0, 0, 0, 0, 0, 0, 0,                             /* 40 - 47 */
     0, 0, 1, 0, 1, 0, 0, 0,                             /* 50 - 57 */
     0, 0, 0, 0, 0, 0, 0, 0,                             /* 60 - 67 */
     0, 0, 1, 0, 0, 0, 0, 0                              /* 70 - 77 */
@@ -841,12 +843,6 @@ CHECK_LENGTH:
             BRANCH;
             }
         else if (ilnt == 5) {                           /* branch on ind? */
-            if (D == IN_END) {                          /* tape indicator */
-                if (mt_testind ()) {                    /* test, reset */
-                    BRANCH;
-                    }
-                else break;
-                }
             if (ind[D]) {                               /* test indicator */
                 BRANCH;
                 }
@@ -1706,7 +1702,7 @@ do {
     r = bcd_to_bin[b & DIGIT] +                         /* sum digits + c */
         bcd_to_bin[a & DIGIT] + c;
     c = (r >= 10);                                      /* set carry out */
-    M[bp] = sum_table[r];                               /* store result */
+    M[bp] = (M[bp] & WM) | sum_table[r];                /* store result */
     ap--;
     bp--;
     } while ((a & WM) == 0);
@@ -1726,14 +1722,14 @@ do {
     r = bcd_to_bin[b & DIGIT] -                         /* a - b - borrow */
         bcd_to_bin[a & DIGIT] - c;
     c = (r < 0);                                        /* set borrow out */
-    M[bp] = sum_table[r + 10];                          /* store result */
+    M[bp] = (M[bp] & WM) | sum_table[r + 10];           /* store result */
     ap--;
     bp--;
     } while ((a & WM) == 0);
 b = M[bp];                                              /* borrow position */
 if (bcd_to_bin[b & DIGIT] != 0) {                       /* non-zero? */
     r = bcd_to_bin[b & DIGIT] - c;                      /* subtract borrow */
-    M[bp] = sum_table[r];                               /* store result */
+    M[bp] = (M[bp] & WM) | sum_table[r];                /* store result */
     return 0;                                           /* subtract worked */
     }
 return c;                                               /* return borrow */

@@ -1,6 +1,6 @@
 /* sim_tmxr.c: Telnet terminal multiplexor library
 
-   Copyright (c) 2001-2011, Robert M Supnik
+   Copyright (c) 2001-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,6 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
-   16-Jan-11    MP      Made option negotiation more reliable
    20-Nov-08    RMS     Added three new standardized SHOW routines
    30-Sep-08    JDB     Reverted tmxr_find_ldsc to original implementation
    27-May-08    JDB     Added line connection order to tmxr_poll_conn,
@@ -87,26 +86,12 @@
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
-/* Commands */
 #define TN_IAC          -1                              /* protocol delim */
 #define TN_DONT         -2                              /* dont */
 #define TN_DO           -3                              /* do */
 #define TN_WONT         -4                              /* wont */
 #define TN_WILL         -5                              /* will */
-#define TN_SB           -6                              /* sub-option negotiation */
-#define TN_GA           -7                              /* go ahead */
-#define TN_EL           -8                              /* erase line */
-#define TN_EC           -9                              /* erase character */
-#define TN_AYT          -10                             /* are you there */
-#define TN_AO           -11                             /* abort output */
-#define TN_IP           -12                             /* interrupt process */
 #define TN_BRK          -13                             /* break */
-#define TN_DATAMK       -14                             /* data mark */
-#define TN_NOP          -15                             /* no operation */
-#define TN_SE           -16                             /* end sub-option negot */
-
-/* Options */
-
 #define TN_BIN          0                               /* bin */
 #define TN_ECHO         1                               /* echo */
 #define TN_SGA          3                               /* sga */
@@ -123,8 +108,6 @@
 #define TNS_WONT        003                             /* WONT seen */
 #define TNS_SKIP        004                             /* skip next cmd */
 #define TNS_CRPAD       005                             /* CR padding */
-#define TNS_DO          006                             /* DO request pending rejection */
-
 
 void tmxr_rmvrc (TMLN *lp, int32 p);
 int32 tmxr_send_buffered_data (TMLN *lp);
@@ -156,7 +139,6 @@ TMLN *lp;
 int32 *op;
 int32 i, j;
 uint32 ipaddr;
-
 static char mantra[] = {
     TN_IAC, TN_WILL, TN_LINE,
     TN_IAC, TN_WILL, TN_SGA,
@@ -196,7 +178,7 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         lp->tsta = 0;                                   /* init telnet state */
         lp->xmte = 1;                                   /* enable transmit */
         lp->dstb = 0;                                   /* default bin mode */
-        sim_write_sock (newsock, mantra, sizeof (mantra));
+        sim_write_sock (newsock, mantra, 15);
         tmxr_linemsg (lp, "\n\r\nConnected to the ");
         tmxr_linemsg (lp, sim_name);
         tmxr_linemsg (lp, " simulator ");
@@ -319,7 +301,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                 break;
 
             case TNS_IAC:                               /* IAC prev */
-                if (tmp == TN_IAC) {                    /* IAC + IAC */
+                if ((tmp == TN_IAC) & !lp->dstb) {      /* IAC + IAC, bin? */
                     lp->tsta = TNS_NORM;                /* treat as normal */
                     j = j + 1;                          /* advance j */
                     break;                              /* keep IAC */
@@ -331,31 +313,11 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     j = j + 1;                          /* advance j */
                     break;
                     }
-                switch (tmp) {
-                case TN_WILL:                           /* IAC + WILL? */
+                if (tmp == TN_WILL)                     /* IAC + WILL? */
                     lp->tsta = TNS_WILL;
-                    break;
-                case TN_WONT:                           /* IAC + WONT? */
+                else if (tmp == TN_WONT)                /* IAC + WONT? */
                     lp->tsta = TNS_WONT;
-                    break;
-                case TN_DO:                             /* IAC + DO? */
-                    lp->tsta = TNS_DO;
-                    break;
-                case TN_DONT:                           /* IAC + DONT? */
-                    lp->tsta = TNS_SKIP;                /* IAC + other */
-                    break;
-                case TN_GA: case TN_EL:                 /* IAC + other 2 byte types */
-                case TN_EC: case TN_AYT:                
-                case TN_AO: case TN_IP:
-                case TN_NOP: 
-                    lp->tsta = TNS_NORM;                /* ignore */
-                    break;
-                case TN_SB:                             /* IAC + SB sub-opt negotiation */
-                case TN_DATAMK:                         /* IAC + data mark */
-                case TN_SE:                             /* IAC + SE sub-opt end */
-                    lp->tsta = TNS_NORM;                /* ignore */
-                    break;
-                    }
+                else lp->tsta = TNS_SKIP;               /* IAC + other */
                 tmxr_rmvrc (lp, j);                     /* remove char */
                 break;
 
@@ -365,9 +327,6 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                         lp->dstb = 0;
                     else lp->dstb = 1;
                     }
-                tmxr_rmvrc (lp, j);                     /* remove it */
-                lp->tsta = TNS_NORM;                    /* next normal */
-                break;
 
             /* Negotiation with the HP terminal emulator "QCTerm" is not working.
                QCTerm says "WONT BIN" but sends bare CRs.  RFC 854 says:
@@ -390,18 +349,9 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     tmxr_rmvrc (lp, j);                 /* remove it */
                 break;
 
-            case TNS_DO:                                /* pending DO request */
-                if (tmp == TN_BIN) {                    /* reject all but binary mode */
-                    char accept[] = {TN_IAC, TN_WILL, TN_BIN};
-                    sim_write_sock (lp->conn, accept, sizeof(accept));
-                    }
-                tmxr_rmvrc (lp, j);                     /* remove it */
-                lp->tsta = TNS_NORM;                    /* next normal */
-                break;
-
             case TNS_SKIP: default:                     /* skip char */
-                tmxr_rmvrc (lp, j);                     /* remove char */
                 lp->tsta = TNS_NORM;                    /* next normal */
+                tmxr_rmvrc (lp, j);                     /* remove char */
                 break;
                 }                                       /* end case state */
             }                                           /* end for char */

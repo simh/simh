@@ -1,6 +1,6 @@
 /* vax780_sbi.c: VAX 11/780 SBI
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,9 +27,10 @@
 
    sbi                  bus controller
 
+   21-Mar-2011  RMS     Added autoreboot capability (from Mark Pizzalato)
    31-May-2008  RMS     Fixed machine_check calling sequence (found by Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
-   28-May-08    RMS     Inlined physical memory routines
+   28-May-2008  RMS     Inlined physical memory routines
 */
 
 #include "vax_defs.h"
@@ -100,6 +101,7 @@ uint32 sbi_sc = 0;                                      /* SBI silo comparator *
 uint32 sbi_mt = 0;                                      /* SBI maintenance */
 uint32 sbi_er = 0;                                      /* SBI error status */
 uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
+char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
 
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -132,6 +134,8 @@ t_stat sbi_reset (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
+t_stat vax780_boot_parse (int32 flag, char *ptr);
+t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
 extern t_stat vax780_fload (int flag, char *cptr);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
@@ -175,6 +179,7 @@ REG sbi_reg[] = {
     { HRDATA (SBIMT, sbi_mt, 32) },
     { HRDATA (SBIER, sbi_er, 32) },
     { HRDATA (SBITMO, sbi_tmo, 32) },
+    { BRDATA (BOOTCMD, cpu_boot_cmd, 16, 8, CBUFSIZE), REG_HRO },
     { NULL }
     };
 
@@ -246,7 +251,7 @@ if ((ipl < IPL_TTINT) && (tti_int || tto_int))          /* console int */
 if (ipl >= IPL_SMAX)                                    /* ipl >= sw max? */
     return 0;
 if ((t = SISR & sw_int_mask[ipl]) == 0)
-    return 0;       /* eligible req */
+    return 0;                                           /* eligible req */
 for (i = IPL_SMAX; i > ipl; i--) {                      /* check swre int */
     if ((t >> i) & 1)                                    /* req != 0? int */
         return i;
@@ -587,11 +592,18 @@ sbi_er = sbi_er & ~SBIER_TMOW1C;                        /* clr SBIER<tmo> etc */
 return cc;
 }
 
-/* Console entry */
+/* Console entry - only reached if CONHALT is set (AUTORESTART is set */
 
 int32 con_halt (int32 code, int32 cc)
 {
-ABORT (STOP_HALT);
+if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
+    (vax780_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+    (reset_all (0) != SCPE_OK) ||                       /* reset the world */
+    (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
+    ABORT (STOP_BOOT);                                  /* any error? */
+printf ("Rebooting...\n");
+if (sim_log)
+    fprintf (sim_log, "Rebooting...\n");
 return cc;
 }
 
@@ -603,6 +615,19 @@ return cc;
 */
 
 t_stat vax780_boot (int32 flag, char *ptr)
+{
+t_stat r;
+
+r = vax780_boot_parse (flag, ptr);                      /* parse the boot cmd */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
+strncpy (cpu_boot_cmd, ptr, CBUFSIZE);                  /* save for reboot */
+return run_cmd (flag, "CPU");
+}
+
+/* Parse boot command, set up registers - also used on reset */
+
+t_stat vax780_boot_parse (int32 flag, char *ptr)
 {
 char gbuf[CBUFSIZE];
 char *slptr, *regptr;
@@ -649,7 +674,7 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
         R[3] = unitno;
         R[4] = 0;
         R[5] = r5v;
-        return run_cmd (flag, "CPU");
+        return SCPE_OK;
         }
     }
 return SCPE_NOFNC;
@@ -662,8 +687,8 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 t_stat r;
 
 printf ("Loading boot code from vmb.exe\n");
-if (sim_log) fprintf (sim_log, 
-    "Loading boot code from vmb.exe\n");
+if (sim_log)
+    fprintf (sim_log, "Loading boot code from vmb.exe\n");
 r = load_cmd (0, "-O vmb.exe 200");
 if (r != SCPE_OK)
     return r;

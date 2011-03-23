@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Added check for 64b definitions
    21-Aug-07    RMS     Added FPP8 support
    13-Dec-06    RMS     Added TA8E support
    30-Oct-06    RMS     Added infinite loop stop
@@ -45,6 +46,10 @@
 #define _PDP8_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "PDP-8 does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 

@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,6 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   20-Jan-11    MP      Added support for BREAK key on Windows
    30-Sep-06    RMS     Fixed non-printable characters in KSR mode
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    31-May-06    JDB     Fixed bug if SET CONSOLE DEBUG with no argument
@@ -663,42 +662,17 @@ return SCPE_OK;
 
 #elif defined (_WIN32)
 
+#include <conio.h>
 #include <fcntl.h>
 #include <io.h>
 #include <windows.h>
 #define RAW_MODE 0
 static HANDLE std_input;
-static HANDLE std_output;
 static DWORD saved_mode;
-
-static BOOL WINAPI
-ControlHandler(DWORD dwCtrlType)
-    {
-    DWORD Mode;
-    extern void int_handler (int sig);
-
-    switch (dwCtrlType)
-        {
-        case CTRL_BREAK_EVENT:      // Use CTRL-Break or CTRL-C to simulate 
-        case CTRL_C_EVENT:          // SERVICE_CONTROL_STOP in debug mode
-            int_handler(0);
-            return TRUE;
-        case CTRL_CLOSE_EVENT:      // Window is Closing
-        case CTRL_LOGOFF_EVENT:     // User is logging off
-            if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &Mode))
-                return TRUE;        // Not our User, so ignore
-        case CTRL_SHUTDOWN_EVENT:   // System is shutting down
-            int_handler(0);
-            return TRUE;
-        }
-    return FALSE;
-    }
-
+ 
 t_stat sim_ttinit (void)
 {
-SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
-std_output = GetStdHandle (STD_OUTPUT_HANDLE);
 if ((std_input == INVALID_HANDLE_VALUE) ||
     !GetConsoleMode (std_input, &saved_mode))
     return SCPE_TTYERR;
@@ -736,49 +710,24 @@ return SCPE_OK;
 
 t_stat sim_os_poll_kbd (void)
 {
-int c = -1;
-DWORD nkbevents, nkbevent;
-INPUT_RECORD rec;
-extern int32 sim_switches;
+int c;
 
-if (!GetNumberOfConsoleInputEvents(std_input, &nkbevents))
-    return SCPE_TTYERR;
-while (c == -1) {
-    if (0 == nkbevents)
-        return SCPE_OK;
-    if (!ReadConsoleInput(std_input, &rec, 1, &nkbevent))
-        return SCPE_TTYERR;
-    if (0 == nkbevent)
-        return SCPE_OK;
-    --nkbevents;
-    if (rec.EventType == KEY_EVENT) {
-        if (rec.Event.KeyEvent.bKeyDown) {
-            if (0 == rec.Event.KeyEvent.uChar.UnicodeChar) {     /* Special Character/Keys? */
-                if (rec.Event.KeyEvent.wVirtualKeyCode == VK_PAUSE) /* Pause/Break Key */
-                    c = sim_brk_char | SCPE_BREAK;
-                else
-                    if (rec.Event.KeyEvent.wVirtualKeyCode == '2')  /* ^@ */
-                        c = 0;                                      /* return NUL */
-            } else
-                c = rec.Event.KeyEvent.uChar.AsciiChar;
-            }
-      }
-    }
+if (!_kbhit ())
+    return SCPE_OK;
+c = _getch ();
 if ((c & 0177) == sim_del_char)
     c = 0177;
 if ((c & 0177) == sim_int_char)
     return SCPE_STOP;
-if ((sim_brk_char && ((c & 0177) == sim_brk_char)) || (c & SCPE_BREAK))
+if (sim_brk_char && ((c & 0177) == sim_brk_char))
     return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
 t_stat sim_os_putchar (int32 c)
 {
-DWORD unused;
-
 if (c != 0177)
-    WriteConsoleA(std_output, &c, 1, &unused, NULL);
+    _putch (c);
 return SCPE_OK;
 }
 

@@ -1,6 +1,6 @@
 /* id_defs.h: Interdata 16b/32b simulator definitions
 
-   Copyright (c) 2000-2006, Robert M. Supnik
+   Copyright (c) 2000-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
 
+   22-May-10    RMS     Added check for 64b definitions
    09-Mar-06    RMS     Increased register sets to architectural limit
    25-Jan-04    RMS     Removed local logging support
    22-Sep-03    RMS     Added additional instruction decode types
@@ -38,6 +39,10 @@
 #define _ID_DEFS_H_     0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "Interdata 16/32 does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 

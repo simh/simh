@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Mar-11    RMS     Revised idle design (from Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Separated base register access checks for 11/780
    10-May-06    RMS     Added access check on system PTE for 11/780
@@ -109,7 +110,6 @@ extern t_bool chk_tb_ent (uint32 va);
 extern int32 ReadIPR (int32 rg);
 extern void WriteIPR (int32 rg, int32 val);
 extern t_bool BadCmPSL (int32 newpsl);
-extern int32 cpu_psl_ipl_idle (int32 newpsl);
 
 extern jmp_buf save_env;
 
@@ -1137,9 +1137,9 @@ else {
         }
     }
 if (ei > 0)                                             /* if int, new IPL */
-    PSL = cpu_psl_ipl_idle (newpsl | (ipl << PSL_V_IPL));
-else PSL = cpu_psl_ipl_idle (newpsl |                   /* exc, old IPL/1F */
-    ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV));
+    PSL = newpsl | (ipl << PSL_V_IPL);
+else PSL = newpsl |                                     /* exc, old IPL/1F */
+    ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
 if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
     fprintf (sim_deb, ">>IEX: PC=%08x, PSL=%08x, SP=%08x, VEC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, oldpsl, oldsp, vec, PSL, SP);
@@ -1249,7 +1249,7 @@ else STK[oldcur] = SP;
 if (DEBUG_PRI (cpu_dev, LOG_CPU_R))
     fprintf (sim_deb, ">>REI: PC=%08x, PSL=%08x, SP=%08x, nPC=%08x, nPSL=%08x, nSP=%08x\n",
              PC, PSL, SP - 8, newpc, newpsl, ((newpsl & IS)? IS: STK[newcur]));
-PSL = cpu_psl_ipl_idle ((PSL & PSL_TP) | (newpsl & ~CC_MASK)); /* set PSL */
+PSL = (PSL & PSL_TP) | (newpsl & ~CC_MASK);             /* set PSL */
 if (PSL & PSL_IS)                                       /* set new stack */
     SP = IS;
 else {

@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
    dt           TC08/TU56 DECtape
 
    23-Jun-06	RMS     Fixed switch conflict in ATTACH
-   07-Jan-06    RMS     Fixed unaligned register access bug (found by Doug Carman)
+   07-Jan-06    RMS     Fixed unaligned register access bug (Doug Carman)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
    09-Jan-04    RMS     Changed sim_fsize calling sequence, added STOP_OFFR

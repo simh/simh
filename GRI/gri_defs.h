@@ -1,6 +1,6 @@
 /* gri_defs.h: GRI-909 simulator definitions 
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Added check for 64b definitions
    12-Jan-08    RMS     Added GRI-99 support
    25-Apr-03    RMS     Revised for extended file support
    19-Sep-02    RMS     Fixed declarations in gdev structure
@@ -46,7 +47,14 @@
    5. How does the EAO handle divide overflow?  Answer: set link.
 */
 
+#ifndef _GRI_DEFS_H_
+#define _GRI_DEFS_H_    0
+
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "GRI does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 
@@ -244,3 +252,5 @@ struct gdev {
 #define VEC_CASR        0047
 #define VEC_DISK        0055                            /* disk */
 #define VEC_RTC         0100                            /* clock */
+
+#endif

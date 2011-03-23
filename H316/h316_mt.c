@@ -274,7 +274,8 @@ switch (inst) {                                         /* case on opcode */
             break;
 
         case 003:                                       /* !BOT */
-            if (!(uptr->UST & STA_BOT)) return IOSKIP (dat);
+            if (!(uptr->UST & STA_BOT))
+                return IOSKIP (dat);
             break;
 
         case 004:                                       /* !interrupting */

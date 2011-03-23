@@ -732,14 +732,16 @@ switch (uptr->FNC) {                                    /* case on function */
     case FNC_FSR:                                       /* space forward */
         if (st = sim_tape_sprecf (uptr, &tbc))          /* space rec fwd, err? */
             r = ms_map_err (uptr, st);                  /* map error */
-        if (tbc & 1) msc_sta = msc_sta | STA_ODD;
+        if (tbc & 1)
+            msc_sta = msc_sta | STA_ODD;
         else msc_sta = msc_sta & ~STA_ODD;
         break;
 
     case FNC_BSR:                                       /* space reverse */
         if (st = sim_tape_sprecr (uptr, &tbc))          /* space rec rev, err? */
             r = ms_map_err (uptr, st);                  /* map error */
-        if (tbc & 1) msc_sta = msc_sta | STA_ODD;
+        if (tbc & 1)
+            msc_sta = msc_sta | STA_ODD;
         else msc_sta = msc_sta & ~STA_ODD;
         break;
 
@@ -786,7 +788,8 @@ switch (uptr->FNC) {                                    /* case on function */
             sim_activate (uptr, msc_xtime);             /* re-activate */
             return SCPE_OK;
             }
-        if (ms_max & 1) msc_sta = msc_sta | STA_ODD;    /* set ODD by rec len */
+        if (ms_max & 1)                                 /* set ODD by rec len */
+            msc_sta = msc_sta | STA_ODD;
         else msc_sta = msc_sta & ~STA_ODD;
         sim_activate (uptr, msc_itime);                 /* sched IRG */
         if (uptr->FNC == FNC_RFF) msc_1st = 1;          /* diagnostic? */

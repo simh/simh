@@ -1,6 +1,6 @@
 /* pdp8_rl.c: RL8A cartridge disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,7 @@
 
    rl           RL8A cartridge disk
 
-   25-Oct-05    RMS     Fixed IOT 61 decode bug (found by David Gesswein)
+   25-Oct-05    RMS     Fixed IOT 61 decode bug (David Gesswein)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    04-Jan-04    RMS     Changed attach routine to use sim_fsize
    25-Apr-03    RMS     Revised for extended file support

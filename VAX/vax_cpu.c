@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2010, Robert M Supnik
+   Copyright (c) 1998-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          VAX central processor
 
+   23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
    24-Apr-10    RMS     Added OLDVMS idle timer option
                         Fixed bug in SET CPU IDLE
    21-May-08    RMS     Removed inline support
@@ -175,8 +176,9 @@
 #define UNIT_CONH       (1u << UNIT_V_CONH)
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
-#define VAX_IDLE_DFLT   1000
-#define OLD_IDLE_DFLT   200
+#define VAX_IDLE_VMS    0x1
+#define VAX_IDLE_ULT    0x2
+#define VAX_IDLE_QUAD   0x3
 
 #define OPND_SIZE       16
 #define INST_SIZE       52
@@ -261,9 +263,8 @@ int32 cpu_astop = 0;
 int32 mchk_va, mchk_ref;                                /* mem ref param */
 int32 ibufl, ibufh;                                     /* prefetch buf */
 int32 ibcnt, ppc;                                       /* prefetch ctl */
-uint32 cpu_idle_ipl_mask = 0x8;                         /* idle if on IPL 3 */
-uint32 cpu_idle_type = 1;                               /* default to VMS */
-int32 cpu_idle_wait = VAX_IDLE_DFLT;                    /* for these cycles */
+uint32 cpu_idle_mask = VAX_IDLE_VMS;                    /* idle mask */
+uint32 cpu_idle_type = 1;                               /* default VMS */
 jmp_buf save_env;
 REG *pcq_r = NULL;                                      /* PC queue reg ptr */
 int32 pcq[PCQ_SIZE] = { 0 };                            /* PC queue */
@@ -387,8 +388,8 @@ int32 cpu_get_vsw (int32 sw);
 SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
 t_bool cpu_show_opnd (FILE *st, InstHistory *h, int32 line);
-int32 cpu_psl_ipl_idle (int32 newpsl);
 t_stat cpu_idle_svc (UNIT *uptr);
+void cpu_idle (void);
 
 /* CPU data structures
 
@@ -445,9 +446,8 @@ REG cpu_reg[] = {
     { FLDATA (CRDERR, crd_err, 0) },
     { FLDATA (MEMERR, mem_err, 0) },
     { FLDATA (HLTPIN, hlt_pin, 0) },
-    { HRDATA (IDLE_IPL, cpu_idle_ipl_mask, 16), REG_HIDDEN },
-    { DRDATA (IDLE_TYPE, cpu_idle_type, 4), REG_HRO },
-    { DRDATA (IDLE_WAIT, cpu_idle_wait, 16), REG_HIDDEN },
+    { HRDATA (IDLE_MASK, cpu_idle_mask, 16), REG_HIDDEN },
+    { DRDATA (IDLE_INDX, cpu_idle_type, 4), REG_HRO },
     { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
     { HRDATA (PCQP, pcq_p, 6), REG_HRO },
     { HRDATA (BADABO, badabo, 32), REG_HRO },
@@ -1571,6 +1571,16 @@ for ( ;; ) {
 
     case TSTL:
         CC_IIZZ_L (op0);                                /* set cc's */
+        if ((cc == CC_Z) &&
+            ((((PSL & PSL_IS) != 0) &&                  /* on IS? */
+              (PSL_GETIPL (PSL) == 0x1) &&              /* at IPL 1? */
+              ((cpu_idle_mask & VAX_IDLE_ULT) != 0))||  /* running Ultrix or friends? */
+             ((PSL_GETIPL (PSL) == 0x0) &&              /* at IPL 0? */
+              ((fault_PC & 0x80000000) != 0) &&         /* in system space? */
+              ((PC - fault_PC) == 6) &&                 /* 6 byte instruction? */
+              ((fault_PC & 0x7fffffff) < 0x4000) &&     /* in low system space? */
+              ((cpu_idle_mask & VAX_IDLE_QUAD) != 0)))) /* running Quad or friends? */
+            cpu_idle();                                 /* idle loop */
         break;
 
 /* Single operand instructions with source, read/write - op src.mx
@@ -2109,14 +2119,20 @@ for ( ;; ) {
 
     case BRB:
         BRANCHB (brdisp);                               /* branch  */
-        if ((PC == fault_PC) && (PSL_GETIPL (PSL) == 0x1F))
-            ABORT (STOP_LOOP);
+        if (PC == fault_PC) {                           /* to self? */
+            if (PSL_GETIPL (PSL) == 0x1F)               /* int locked out? */
+                ABORT (STOP_LOOP);                      /* infinite loop */
+            cpu_idle ();                                /* idle loop */
+            }
         break;
 
     case BRW:
         BRANCHW (brdisp);                               /* branch */
-        if ((PC == fault_PC) && (PSL_GETIPL (PSL) == 0x1F))
-            ABORT (STOP_LOOP);
+        if (PC == fault_PC) {                           /* to self? */
+            if (PSL_GETIPL (PSL) == 0x1F)               /* int locked out? */
+                ABORT (STOP_LOOP);                      /* infinite loop */
+            cpu_idle ();                                /* idle loop */
+            }
         break;
 
     case BSBB:
@@ -2348,8 +2364,13 @@ for ( ;; ) {
 */
 
     case BBS:
-        if (op_bb_n (opnd, acc))                        /* br if bit set */
+        if (op_bb_n (opnd, acc)) {                      /* br if bit set */
             BRANCHB (brdisp);
+            if (((PSL & PSL_IS) != 0) &&                /* on IS? */
+                (PSL_GETIPL (PSL) == 0x3) &&            /* at IPL 3? */
+                ((cpu_idle_mask & VAX_IDLE_VMS) != 0))  /* running VMS? */
+                cpu_idle ();                            /* idle loop */
+            }
         break;
 
     case BBC:
@@ -3071,24 +3092,15 @@ opnd[j++] = Read (va + 12, L_LONG, acc);
 return j;
 }
 
-/* Check new PSL IPL for idle start
-   Checked only on exception or REI, not on MTPR #IPL,
-   to allow for local locking within the idle loop */
+/* Schedule idle before the next instruction */
 
-int32 cpu_psl_ipl_idle (int32 newpsl)
+void cpu_idle (void)
 {
-if (((newpsl ^ PSL) & PSL_IPL) != 0) {
-    sim_cancel (&cpu_unit);
-    if (sim_idle_enab && ((newpsl & PSL_CUR) == 0)) {
-        uint32 newipl = PSL_GETIPL (newpsl);
-        if (cpu_idle_ipl_mask & (1u << newipl))
-            sim_activate (&cpu_unit, cpu_idle_wait);
-        }
-    }
-return newpsl;
+sim_activate_abs (&cpu_unit, 0);
+return;
 }
 
-/* Idle timer has expired with no PSL change */
+/* Idle service */
 
 t_stat cpu_idle_svc (UNIT *uptr)
 {
@@ -3108,15 +3120,17 @@ PSL = PSL_IS | PSL_IPL1F;
 SISR = 0;
 ASTLVL = 4;
 mapen = 0;
-if (M == NULL)
-    M = (uint32 *) calloc (((uint32) MEMSIZE) >> 2, sizeof (uint32));
-if (M == NULL)
-    return SCPE_MEM;
-pcq_r = find_reg ("PCQ", NULL, dptr);
-if (pcq_r)
+FLUSH_ISTR;                                             /* init I-stream */
+if (M == NULL) {                                        /* first time init? */
+    sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    pcq_r = find_reg ("PCQ", NULL, dptr);
+    if (pcq_r == NULL)
+        return SCPE_IERR;
     pcq_r->qptr = 0;
-else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
+    M = (uint32 *) calloc (((uint32) MEMSIZE) >> 2, sizeof (uint32));
+    if (M == NULL)
+        return SCPE_MEM;
+    }
 return build_dib_tab ();
 }
 
@@ -3381,17 +3395,16 @@ return more;
 struct os_idle {
     char        *name;
     uint32      mask;
-    int32       value;
     };
 
 static struct os_idle os_tab[] = {
-    { "VMS", 0x8, VAX_IDLE_DFLT },
-    { "NETBSD", 0x2, VAX_IDLE_DFLT },
-    { "ULTRIX", 0x2, VAX_IDLE_DFLT },
-    { "OPENBSD", 0x1, VAX_IDLE_DFLT },
-    { "32V", 0x1, VAX_IDLE_DFLT },
-    { "OLDVMS", 0xB, OLD_IDLE_DFLT },
-    { NULL, 0, 0 }
+    { "VMS", VAX_IDLE_VMS },
+    { "NETBSD", VAX_IDLE_ULT },
+    { "ULTRIX", VAX_IDLE_ULT },
+    { "OPENBSD", VAX_IDLE_QUAD },
+    { "32V", VAX_IDLE_QUAD },
+    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULT|VAX_IDLE_QUAD },
+    { NULL, 0 }
     };
 
 /* Set and show idle */
@@ -3404,8 +3417,7 @@ if (cptr != NULL) {
     for (i = 0; os_tab[i].name != NULL; i++) {
         if (strcmp (os_tab[i].name, cptr) == 0) {
             cpu_idle_type = i + 1;
-            cpu_idle_ipl_mask = os_tab[i].mask;
-            cpu_idle_wait = os_tab[i].value;
+            cpu_idle_mask = os_tab[i].mask;
             return sim_set_idle (uptr, val, NULL, desc);
             }
         }

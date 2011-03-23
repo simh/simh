@@ -1,6 +1,6 @@
 /* i7094_defs.h: IBM 7094 simulator definitions
 
-   Copyright (c) 2003-2008, Robert M Supnik
+   Copyright (c) 2003-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,12 +26,20 @@
    This simulator incorporates prior work by Paul Pierce, Dave Pitts, and Rob
    Storey.  Tom Van Vleck, Stan Dunten, Jerry Saltzer, and other CTSS veterans
    helped to reconstruct the CTSS hardware RPQ's.  Dave Pitts gets special
-   thanks for patiently coaching me through IBSYS debug. */
+   thanks for patiently coaching me through IBSYS debug.
+   
+   22-May-10    RMS     Added check for 64b addresses
+
+*/
 
 #ifndef _I7094_DEFS_H_
 #define _I7094_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_ADDR64)
+#error "7094 does not support 64b addresses!"
+#endif
 
 /* Simulator stop codes */
 
@@ -168,6 +176,8 @@ typedef struct {
 #define INST_M_TAG      07
 #define INST_V_ADDR     0
 #define INST_M_ADDR     077777
+#define INST_V_4B		0
+#define INST_M_4B		017
 
 #define GET_OPD(x)      ((uint32) (((x) >> INST_V_OPD) & INST_M_OPD))
 #define GET_DEC(x)      ((uint32) (((x) >> INST_V_DEC) & INST_M_DEC))

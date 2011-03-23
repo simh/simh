@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Added check for 64b definitions
    04-Jul-07    BKR     BUSY/DONE/INTR "convenience" macros added,
                         INT_TRAP added for Nova 3, 4 trap instruction handling,
                         support for 3rd-party 64KW Nova extensions added,
@@ -48,6 +49,10 @@
 #define _NOVA_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+#if defined(USE_INT64) || defined(USE_ADDR64)
+#error "Nova does not support 64b values!"
+#endif
 
 /* Simulator stop codes */
 	

@@ -1,7 +1,7 @@
 /* pdp11_xu.c: DEUNA/DELUA ethernet controller simulator
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003-2007, David T. Hittner
+   Copyright (c) 2003-2011, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,7 @@
     Digital DELUA Users Guide, Part# EK-DELUA-UG-002
     Digital DEUNA Users Guide, Part# EK-DEUNA-UG-001
   These manuals can be found online at:
-    http://www.spies.com/~aek/pdf/dec/unibus
+    http://www.bitsavers.org/pdf/dec/unibus
 
   Testing performed:
    1) Receives/Transmits single packet under custom RSX driver
@@ -41,7 +41,13 @@
         DECNET - SET HOST in/out, COPY in/out
         TCP/IP - PING in/out; SET HOST/TELNET in/out, COPY/FTP in/out
         Clustering - Successfully clustered with AlphaVMS 8.2
-   4) Runs VAX EVDWA diagnostic tests 1-10; tests 11-19 (M68000/ROM/RAM) fail
+   4) VMS 4.7 on VAX780 summary:
+       (Jan/2011: Win7 x64 host; MS VC++ 2008; SIMH v3.8-2 rc1 base; WinPcap 4.1)
+        LAT    - SET HOST/LAT in (no outbound exists)
+        DECNET - SET HOST in/out, DIR in/out, COPY in/out
+        TCP/IP - no kit available to test
+        Clustering - not tested
+   5) Runs VAX EVDWA diagnostic tests 1-10; tests 11-19 (M68000/ROM/RAM) fail
 
   Known issues:
    1) Most auxiliary commands are not implemented yet.
@@ -56,6 +62,14 @@
 
   Modification history:
 
+  12-Jan-11  DTH  Added SHOW XU FILTERS modifier
+  11-Jan-11  DTH  Corrected SELFTEST command, enabling use by VMS 3.7, VMS 4.7, and Ultrix 1.1
+  09-Dec-10  MP   Added address conflict check during attach.
+  06-Dec-10  MP   Added loopback processing support
+  30-Nov-10  MP   Fixed the fact that no broadcast packets were received by the DEUNA
+  15-Aug-08  MP   Fixed transmitted packets to have the correct source MAC address.
+                  Fixed incorrect address filter setting calling eth_filter().
+  23-Jan-08  MP   Added debugging support to display packet headers and packet data
   18-Jun-07  RMS  Added UNIT_IDLE flag
   03-May-07  DTH  Added missing FC_RMAL command; cleared multicast on write
   29-Oct-06  RMS  Synced poll and clock
@@ -112,6 +126,7 @@ void xu_clrint (CTLR* xu);
 void xu_process_receive(CTLR* xu);
 void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
+t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
 
 DIB xua_dib = { IOBA_XU, IOLN_XU, &xu_rd, &xu_wr,
 1, IVCL (XU), VEC_XU, {&xu_int} };
@@ -143,6 +158,8 @@ MTAB xu_mod[] = {
     NULL, &eth_show, NULL },
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATS", "STATS",
     &xu_set_stats, &xu_show_stats, NULL },
+  { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "FILTERS", "FILTERS",
+    NULL, &xu_show_filters, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE={DEUNA|DELUA}",
     &xu_set_type, &xu_show_type, NULL },
   { 0 },
@@ -156,6 +173,7 @@ DEBTAB xu_debug[] = {
   {"WARN",   DBG_WRN},
   {"REG",    DBG_REG},
   {"PACKET", DBG_PCK},
+  {"DATA",   DBG_DAT},
   {"ETH",    DBG_ETH},
   {0}
 };
@@ -294,20 +312,39 @@ t_stat xu_set_stats (UNIT* uptr, int32 val, char* cptr, void* desc)
 
 t_stat xu_show_stats (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-  char* fmt = "  %-24s%d\n";
+  char* fmt = "  %-26s%d\n";
   CTLR* xu = xu_unit2ctlr(uptr);
   struct xu_stats* stats = &xu->var->stats;
 
   fprintf(st, "Ethernet statistics:\n");
-  fprintf(st, fmt, "Seconds since cleared:",  stats->secs); 
-  fprintf(st, fmt, "Recv frames:",            stats->frecv);
-  fprintf(st, fmt, "Recv dbytes:",            stats->rbytes);
-  fprintf(st, fmt, "Xmit frames:",            stats->ftrans);
-  fprintf(st, fmt, "Xmit dbytes:",            stats->tbytes);
-  fprintf(st, fmt, "Recv frames(multicast):", stats->mfrecv);
-  fprintf(st, fmt, "Recv dbytes(multicast):", stats->mrbytes);
-  fprintf(st, fmt, "Xmit frames(multicast):", stats->mftrans);
-  fprintf(st, fmt, "Xmit dbytes(multicast):", stats->mtbytes);
+  fprintf(st, fmt, "Seconds since cleared:",   stats->secs); 
+  fprintf(st, fmt, "Recv frames:",             stats->frecv);
+  fprintf(st, fmt, "Recv dbytes:",             stats->rbytes);
+  fprintf(st, fmt, "Xmit frames:",             stats->ftrans);
+  fprintf(st, fmt, "Xmit dbytes:",             stats->tbytes);
+  fprintf(st, fmt, "Recv frames(multicast):",  stats->mfrecv);
+  fprintf(st, fmt, "Recv dbytes(multicast):",  stats->mrbytes);
+  fprintf(st, fmt, "Xmit frames(multicast):",  stats->mftrans);
+  fprintf(st, fmt, "Xmit dbytes(multicast):",  stats->mtbytes);
+  fprintf(st, fmt, "Loopback forward Frames:", stats->loopf);
+  return SCPE_OK;
+}
+
+t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+  CTLR* xu = xu_unit2ctlr(uptr);
+  char  buffer[20];
+  int i;
+
+  fprintf(st, "Filters:\n");
+  for (i=0; i<XU_FILTER_MAX; i++) {
+    eth_mac_fmt((ETH_MAC*)xu->var->setup.macs[i], buffer);
+    fprintf(st, "  [%2d]: %s\n", i, buffer);
+  }
+  if (xu->var->setup.multicast)
+    fprintf(st, "All Multicast Receive Mode\n");
+  if (xu->var->setup.promiscuous)
+    fprintf(st, "Promiscuous Receive Mode\n");
   return SCPE_OK;
 }
 
@@ -359,13 +396,63 @@ void bit_stat16(uint16* stat, uint16 bits)
   *stat |= bits;
 }
 
+t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
+{
+  ETH_PACK  response;
+  ETH_MAC   physical_address;
+  t_stat    status;
+  int offset   = 16 + (pack->msg[14] | (pack->msg[15] << 8));
+  int function = pack->msg[offset] | (pack->msg[offset+1] << 8);
+
+  sim_debug(DBG_TRC, xu->dev, "xu_process_loopback()\n");
+
+  if (function != 2 /*forward*/)
+    return SCPE_NOFNC;
+
+  /* create forward response packet */
+  memcpy (&response, pack, sizeof(ETH_PACK));
+  memcpy (physical_address, xu->var->setup.macs[0], sizeof(ETH_MAC));
+  memcpy (&response.msg[0], &response.msg[offset+2], sizeof(ETH_MAC));
+  memcpy (&response.msg[6], physical_address, sizeof(ETH_MAC));
+  offset += 8;
+  response.msg[14] = offset & 0xFF;
+  response.msg[15] = (offset >> 8) & 0xFF;
+
+  /* send response packet */
+  status = eth_write(xu->var->etherface, &response, NULL);
+  ++xu->var->stats.loopf;
+
+  if (DBG_PCK & xu->dev->dctrl)
+      eth_packet_trace_ex(xu->var->etherface, response.msg, response.len, ((function == 1) ? "xu-loopbackreply" : "xu-loopbackforward"), DBG_DAT & xu->dev->dctrl, DBG_PCK);
+
+  return status;
+}
+
 t_stat xu_process_local (CTLR* xu, ETH_PACK* pack)
 {
-  return SCPE_NOFNC; /* not implemented yet */
+  /* returns SCPE_OK if local processing occurred,
+     otherwise returns SCPE_NOFNC or some other code */
+  int protocol;
+
+  sim_debug(DBG_TRC, xu->dev, "xu_process_local()\n");
+
+  protocol = pack->msg[12] | (pack->msg[13] << 8);
+  switch (protocol) {
+    case 0x0090:  /* ethernet loopback */
+      return xu_process_loopback(xu, pack);
+      break;
+    case 0x0260:  /* MOP remote console */
+      return SCPE_NOFNC; /* not implemented yet */
+      break;
+  }
+  return SCPE_NOFNC;
 }
 
 void xu_read_callback(CTLR* xu, int status)
 {
+  if (DBG_PCK & xu->dev->dctrl)
+	  eth_packet_trace_ex(xu->var->etherface, xu->var->read_buffer.msg, xu->var->read_buffer.len, "xu-recvd", DBG_DAT & xu->dev->dctrl, DBG_PCK);
+
   /* process any packets locally that can be */
   status = xu_process_local (xu, &xu->var->read_buffer);
 
@@ -442,6 +529,8 @@ t_stat xu_system_id (CTLR* xu, const ETH_MAC dest, uint16 receipt_id)
   /* write system id */
   system_id.len = 60;
   status = eth_write(xu->var->etherface, &system_id, NULL);
+  if (DBG_PCK & xu->dev->dctrl)
+    eth_packet_trace_ex(xu->var->etherface, system_id.msg, system_id.len, "xu-systemid", DBG_DAT & xu->dev->dctrl, DBG_PCK);
 
   return status;
 }
@@ -524,6 +613,7 @@ void xu_setclrint(CTLR* xu, int32 bits)
 t_stat xu_sw_reset (CTLR* xu)
 {
   t_stat status;
+  int i;
 
   sim_debug(DBG_TRC, xu->dev, "xu_sw_reset()\n");
 
@@ -559,10 +649,12 @@ t_stat xu_sw_reset (CTLR* xu)
 
   /* reset ethernet interface */
   memcpy (xu->var->setup.macs[0], xu->var->mac, sizeof(ETH_MAC));
-  xu->var->setup.mac_count = 1;
+  for (i=0; i<6; i++)
+    xu->var->setup.macs[1][i] = 0xff; /* Broadcast Address */
+  xu->var->setup.mac_count = 2;
   if (xu->var->etherface)
     status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
-                         &xu->var->mac, xu->var->setup.multicast,
+                         xu->var->setup.macs, xu->var->setup.multicast,
                          xu->var->setup.promiscuous);
 
   /* activate device if not disabled */
@@ -670,24 +762,24 @@ int32 xu_command(CTLR* xu)
     case FC_RMAL:   /* read multicast address list */
       mtlen = (xu->var->pcb[2] & 0xFF00) >> 8;
       udbb = xu->var->pcb[1] | ((xu->var->pcb[2] & 03) << 16);
-      wstatus = Map_WriteB(udbb, mtlen * 3, (uint8*) &xu->var->setup.macs[1]);
-	  break;
+      wstatus = Map_WriteB(udbb, mtlen * 3, (uint8*) &xu->var->setup.macs[2]);
+      break;
 
     case FC_WMAL:   /* write multicast address list */
       mtlen = (xu->var->pcb[2] & 0xFF00) >> 8;
-sim_debug(DBG_TRC, xu->dev, "FC_WAL: mtlen=%d\n", mtlen);
+      sim_debug(DBG_TRC, xu->dev, "FC_WAL: mtlen=%d\n", mtlen);
       if (mtlen > 10)
         return PCSR0_PCEI;
       udbb = xu->var->pcb[1] | ((xu->var->pcb[2] & 03) << 16);
-	  /* clear existing multicast list */
-	  for (i=1; i<XU_FILTER_MAX; i++) {
-		  for (j=0; j<6; j++)
-			xu->var->setup.macs[i][j] = 0;
-	  }
-	  /* get multicast list from host */
-      rstatus = Map_ReadB(udbb, mtlen * 6, (uint8*) &xu->var->setup.macs[1]);
+      /* clear existing multicast list */
+      for (i=2; i<XU_FILTER_MAX; i++) {
+        for (j=0; j<6; j++)
+          xu->var->setup.macs[i][j] = 0;
+      }
+      /* get multicast list from host */
+      rstatus = Map_ReadB(udbb, mtlen * 6, (uint8*) &xu->var->setup.macs[2]);
       if (rstatus == 0) {
-        xu->var->setup.mac_count = mtlen + 1;
+        xu->var->setup.mac_count = mtlen + 2;
         status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
                              xu->var->setup.macs, xu->var->setup.multicast,
                              xu->var->setup.promiscuous);
@@ -807,7 +899,7 @@ sim_debug(DBG_TRC, xu->dev, "FC_WAL: mtlen=%d\n", mtlen);
     case FC_WMODE:			/* write mode register */
       value = xu->var->mode;
       xu->var->mode = xu->var->pcb[1];
-sim_debug(DBG_TRC, xu->dev, "FC_WMODE: mode=%04x\n", xu->var->mode);
+      sim_debug(DBG_TRC, xu->dev, "FC_WMODE: mode=%04x\n", xu->var->mode);
 
       /* set promiscuous and multicast flags */
       xu->var->setup.promiscuous = (xu->var->mode & MODE_PROM) ? 1 : 0;
@@ -816,7 +908,7 @@ sim_debug(DBG_TRC, xu->dev, "FC_WMODE: mode=%04x\n", xu->var->mode);
       /* if promiscuous or multicast flags changed, change filter */
       if ((value ^ xu->var->mode) & (MODE_PROM | MODE_ENAL))
         status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
-                            &xu->var->mac, xu->var->setup.multicast,
+                             xu->var->setup.macs, xu->var->setup.multicast,
                              xu->var->setup.promiscuous);
       break;
 
@@ -1151,6 +1243,11 @@ void xu_process_transmit(CTLR* xu)
          runt = 1;
       }
 
+      /* As described in the DEUNA User Guide (Section 4.7), the DEUNA is responsible 
+         for inserting the appropriate source MAC address in the outgoing packet header, 
+         so we do that now. */
+      memcpy(xu->var->write_buffer.msg+6, (uint8*)&xu->var->setup.macs[0], sizeof(ETH_MAC));
+
       /* are we in internal loopback mode ? */
       if ((xu->var->mode & MODE_LOOP) && (xu->var->mode & MODE_INTL)) {
         /* just put packet in  receive buffer */
@@ -1160,6 +1257,9 @@ void xu_process_transmit(CTLR* xu)
         wstatus = eth_write(xu->var->etherface, &xu->var->write_buffer, xu->var->wcallback);
         if (wstatus)
           xu->var->pcsr0 |= PCSR0_PCEI;
+		else
+          if (DBG_PCK & xu->dev->dctrl)
+            eth_packet_trace_ex(xu->var->etherface, xu->var->write_buffer.msg, xu->var->write_buffer.len, "xu-write", DBG_DAT & xu->dev->dctrl, DBG_PCK);
       }
 
       /* update transmit status in transmit buffer */
@@ -1263,7 +1363,14 @@ void xu_port_command (CTLR* xu)
       break;
 
     case CMD_SELFTEST:		/* SELFTEST */
-      xu_sw_reset(xu);
+      /*
+		SELFTEST is a <=15-second self diagnostic test, setting various
+		error flags and the DONE (DNI) flag when complete. For simulation
+		purposes, signal completion immediately with no errors. This
+		inexact behavior could be incompatible with any guest machine
+		diagnostics that are expecting to be able to monitor the
+		controller's progress through the diagnostic testing.
+	  */
       xu->var->pcsr0 |= PCSR0_DNI;
       break;
 
@@ -1348,7 +1455,7 @@ t_stat xu_rd(int32 *data, int32 PA, int32 access)
       *data = xu->var->pcsr3;
       break;
   }
-  sim_debug(DBG_TRC, xu->dev, "xu_rd(), PCSR%d, data=%04x\n", reg, *data);
+  sim_debug(DBG_REG, xu->dev, "xu_rd(), PCSR%d, data=%04x\n", reg, *data);
   if (PA & 1)
     sim_debug(DBG_WRN, xu->dev, "xu_rd(), Unexpected Odd address access of PCSR%d\n", reg);
   return SCPE_OK;
@@ -1375,7 +1482,7 @@ t_stat xu_wr(int32 data, int32 PA, int32 access)
       strcpy(desc, "Unknown");
       break;
   }
-  sim_debug(DBG_TRC, xu->dev, "xu_wr(), PCSR%d, data=%08x, PA=%08x, access=%d[%s]\n", reg, data, PA, access, desc);
+  sim_debug(DBG_REG, xu->dev, "xu_wr(), PCSR%d, data=%08x, PA=%08x, access=%d[%s]\n", reg, data, PA, access, desc);
   switch (reg) {
     case 00:
 	/* Clear write-one-to-clear interrupt bits */
@@ -1457,6 +1564,15 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
     free(xu->var->etherface);
     xu->var->etherface = 0;
     return status;
+  }
+  if (SCPE_OK != eth_check_address_conflict (xu->var->etherface, &xu->var->mac)) {
+    char buf[32];
+
+    eth_mac_fmt(&xu->var->mac, buf);     /* format ethernet mac address */
+    printf("%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
+    if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
+    eth_close(xu->var->etherface);
+    return SCPE_NOATT;
   }
   uptr->filename = tptr;
   uptr->flags |= UNIT_ATT;

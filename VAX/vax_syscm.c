@@ -1,6 +1,6 @@
 /* vax_syscm.c: PDP-11 compatibility mode symbolic decode and parse
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
+                        (found by Mark Pizzolato)
    12-Nov-06    RMS     Fixed operand order in EIS instructions (found by W.F.J. Mueller)
    27-Sep-05	RMS     Fixed warnings compiling with 64b addresses
    15-Sep-04    RMS     Cloned from pdp11_sys.c
@@ -242,13 +244,13 @@ switch (mode) {
     case 6:
         if (reg != 7)
             fprintf (of, "%-X(%s)", nval, rname[reg]);
-        else fprintf (of, "%-X", (nval + addr + 4) & 0177777);
+        else fprintf (of, "%-X", (int32)((nval + addr + 4) & 0177777));
         break;
 
     case 7:
         if (reg != 7)
             fprintf (of, "@%-X(%s)", nval, rname[reg]);
-        else fprintf (of, "@%-X", (nval + addr + 4) & 0177777);
+        else fprintf (of, "@%-X", (int32)((nval + addr + 4) & 0177777));
         break;
         }                                               /* end case */
 
@@ -326,7 +328,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             case I_V_BR:                                /* cond branch */
                 fprintf (of, "%s ", opcode[i]);
                 brdisp = (l8b + l8b + ((l8b & 0200)? 0177002: 2)) & 0177777;
-                fprintf (of, "%-X", (addr + brdisp) & 0177777);
+                fprintf (of, "%-X", (int32)((addr + brdisp) & 0177777));
                 break;
 
             case I_V_8B:                                /* 8b */
@@ -336,7 +338,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             case I_V_SOB:                               /* sob */
                 fprintf (of, "%s %s,", opcode[i], rname[srcr]);
                 brdisp = (dstm * 2) - 2;
-                fprintf (of, "%-X", (addr - brdisp) & 0177777);
+                fprintf (of, "%-X", (int32)((addr - brdisp) & 0177777));
                 break;
 
             case I_V_RSOP:                              /* rsop */

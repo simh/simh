@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    todr         TODR clock
    tmr          interval timer
 
+   21-Mar-11    RMS     Added reboot capability
    17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    29-Oct-06    RMS     Added clock coscheduler function
@@ -206,6 +207,8 @@ t_stat todr_resync (void);
 t_stat fl_wr_txdb (int32 data);
 t_bool fl_test_xfr (UNIT *uptr, t_bool wr);
 void fl_protocol_error (void);
+
+extern int32 con_halt (int32 code, int32 cc);
 
 /* TTI data structures
 
@@ -778,16 +781,20 @@ else {
         }
     else if (sel == TXDB_MISC) {                        /* misc function? */
         switch (data & MISC_MASK) {                     /* case on function */
+
         case MISC_CLWS:
             comm_region[COMM_WRMS] = 0;
+
         case MISC_CLCS:
             comm_region[COMM_CLDS] = 0;
             break;
+
         case MISC_SWDN:
             ABORT (STOP_SWDN);
             break;
+
         case MISC_BOOT:
-            ABORT (STOP_BOOT);
+            con_halt (0, 0);                            /* set up reboot */
             break;
             }
         }
