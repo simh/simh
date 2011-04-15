@@ -43,9 +43,9 @@ extern int32 sim_switches;
 extern int32 sim_quiet;
 static int trace_dms = 0;
 static void tracesector (int iswrite, int nwords, int addr, int sector);
-static t_stat where_cmd (int flag, char *ptr);
-static t_stat phdebug_cmd (int flag, char *ptr);
-static t_stat fdump_cmd (int flags, char *cptr);
+static t_stat where_cmd (int32 flag, char *ptr);
+static t_stat phdebug_cmd (int32 flag, char *ptr);
+static t_stat fdump_cmd (int32 flags, char *cptr);
 static void enable_dms_tracing (int newsetting);
 #endif
 
@@ -91,7 +91,7 @@ static t_stat dsk_svc    (UNIT *uptr);
 static t_stat dsk_reset  (DEVICE *dptr);
 static t_stat dsk_attach (UNIT *uptr, char *cptr);
 static t_stat dsk_detach (UNIT *uptr);
-static t_stat dsk_boot   (int unitno, DEVICE *dptr);
+static t_stat dsk_boot   (int32 unitno, DEVICE *dptr);
 
 static void diskfail (UNIT *uptr, int dswflag, int unitflag, t_bool do_interrupt);
 
@@ -571,7 +571,7 @@ static t_stat dsk_detach (UNIT *uptr)
 
 /* boot routine - if they type BOOT DSK, load the standard boot card. */
 
-static t_stat dsk_boot (int unitno, DEVICE *dptr)
+static t_stat dsk_boot (int32 unitno, DEVICE *dptr)
 {
 	t_stat rval;
 
@@ -644,7 +644,7 @@ char * saywhere (int addr)
 
 static int phdebug_lo = -1, phdebug_hi = -1;
 
-static t_stat phdebug_cmd (int flag, char *ptr)
+static t_stat phdebug_cmd (int32 flag, char *ptr)
 {
 	int val1, val2;
 
@@ -671,7 +671,7 @@ static t_stat phdebug_cmd (int flag, char *ptr)
 	return SCPE_OK;
 }
 
-static t_stat where_cmd (int flag, char *ptr)
+static t_stat where_cmd (int32 flag, char *ptr)
 {
 	int addr;
 	char *where;
@@ -836,7 +836,7 @@ done:
 		savesector(addr, offset, nwords, phid, name);
 }
 
-static t_stat fdump_cmd (int flags, char *cptr)
+static t_stat fdump_cmd (int32 flags, char *cptr)
 {
 	int addr = 0x7a24;								/* address of next statement */
 	int sofst = 0x7a26, symaddr;

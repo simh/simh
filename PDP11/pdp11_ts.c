@@ -735,7 +735,7 @@ fnc = GET_FNC (cmdhdr);                                 /* get fnc+mode */
 mod = GET_MOD (cmdhdr);
 if (DEBUG_PRS (ts_dev))
     fprintf (sim_deb, ">>TS: cmd=%s, mod=%o, buf=%o, lnt=%d, pos=%d\n",
-        fnc_name[fnc], mod, cmdadl, cmdlnt, ts_unit.pos);
+        fnc_name[fnc], mod, cmdadl, cmdlnt, (int)ts_unit.pos);
 if ((fnc != FNC_WCHR) && (tssr & TSSR_NBA)) {           /* ~wr chr & nba? */
     ts_endcmd (TC3, 0, 0);                              /* error */
     return SCPE_OK;
@@ -1018,7 +1018,7 @@ if (cmdhdr & CMD_IE)
 ts_ownm = 0; ts_ownc = 0;
 if (DEBUG_PRS (ts_dev))
     fprintf (sim_deb, ">>TS: sta=%o, tc=%o, rfc=%d, pos=%d\n",
-        msgxs0, GET_TC (tssr), msgrfc, ts_unit.pos);
+        msgxs0, GET_TC (tssr), msgrfc, (int)ts_unit.pos);
 return;
 }
 

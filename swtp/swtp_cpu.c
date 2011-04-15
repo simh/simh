@@ -161,7 +161,7 @@ address is here, 'nulldev' means no device is available
 */
 
 struct idev {
-	int32 (*routine)();
+	int32 (*routine)(int32, int32);
 };
 
 struct idev dev_table[32] = {
@@ -405,7 +405,7 @@ int32 sim_instr (void)
 		}
 */
 	  	IR = OP = mem_get_byte(PC);		/* fetch instruction */
-	   	PC = ++PC & ADDRMASK;  		/* increment PC */
+	   	PC = (PC + 1) & ADDRMASK;  		/* increment PC */
 	   	sim_interval--;
 
     /* The Big Instruction Decode Switch */
@@ -421,11 +421,11 @@ int32 sim_instr (void)
 				A = get_psw();
 				break;
 			case 0x08:				/* INX */
-				IX = ++IX & ADDRMASK;
+				IX = (IX + 1) & ADDRMASK;
 				condevalZ(IX);
 				break;
 			case 0x09:				/* DEX */
-				IX = --IX & ADDRMASK;
+				IX = (IX + 1) & ADDRMASK;
 				condevalZ(IX);
 				break;
 			case 0x0A:				/* CLV */
@@ -558,60 +558,60 @@ int32 sim_instr (void)
 				IX = (SP + 1) & ADDRMASK;
 				break;
 			case 0x31:				/* INS */
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				break;
 			case 0x32:				/* PUL A */
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 		     	A = mem_get_byte(SP);
 				break;
 			case 0x33:				/* PUL B */
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 		     	B = mem_get_byte(SP);
 				break;
 			case 0x34:				/* DES */
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				break;
 			case 0x35:				/* TXS */
 				SP = (IX - 1) & ADDRMASK;
 				break;
 			case 0x36:				/* PSH A */
 		        mem_put_byte(SP, A);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				break;
 			case 0x37:				/* PSH B */
 		        mem_put_byte(SP, B);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
  				break;
 			case 0x39:				/* RTS */
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				PC = mem_get_word(SP) & ADDRMASK;
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				break;
 			case 0x3B:				/* RTI */
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				set_psw(mem_get_byte(SP));
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				B = mem_get_byte(SP);
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				A = mem_get_byte(SP);
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				IX = mem_get_word(SP);
-				SP = (SP += 2) & ADDRMASK;
+				SP = (SP + 2) & ADDRMASK;
 				PC = mem_get_word(SP) & ADDRMASK;
-				SP = ++SP & ADDRMASK;
+				SP = (SP + 1) & ADDRMASK;
 				break;
 			case 0x3E:				/* WAI */
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				mem_put_word(SP, PC);
-				SP = (SP -= 2) & ADDRMASK;
+				SP = (SP - 2) & ADDRMASK;
 				mem_put_word(SP, IX);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 		        mem_put_byte(SP, A);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 		        mem_put_byte(SP, B);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 		        mem_put_byte(SP, get_psw());
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				if (I) {
 	   				reason = STOP_HALT;
 	       			continue;
@@ -621,17 +621,17 @@ int32 sim_instr (void)
 				}
 				break;
 			case 0x3F:				/* SWI */
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				mem_put_word(SP, PC);
-				SP = (SP -= 2) & ADDRMASK;
+				SP = (SP - 2) & ADDRMASK;
 				mem_put_word(SP, IX);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 		        mem_put_byte(SP, A);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 		        mem_put_byte(SP, B);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 		        mem_put_byte(SP, get_psw());
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				I = 0x10000;
 				PC = mem_get_word(0xFFFB) & ADDRMASK;
 				break;
@@ -720,7 +720,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (A == 0x80)
 					V = 0x10000;
-				A = --A & 0xFF;
+				A = (A - 1) & 0xFF;
 				condevalN(A);
 				condevalZ(A);
 				break;
@@ -728,7 +728,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (A == 0x7F)
 					V = 0x10000;
-				A = ++A & 0xFF;
+				A = (A + 1) & 0xFF;
 				condevalN(A);
 				condevalZ(A);
 				break;
@@ -829,7 +829,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (B == 0x80)
 					V = 0x10000;
-				B = --B & 0xFF;
+				B = (B - 1) & 0xFF;
 				condevalN(B);
 				condevalZ(B);
 				break;
@@ -837,7 +837,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (B == 0x7F)
 					V = 0x10000;
-				B = ++B & 0xFF;
+				B = (B + 1) & 0xFF;
 				condevalN(B);
 				condevalZ(B);
 				break;
@@ -957,7 +957,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (lo == 0x80)
 					V = 0x10000;
-				lo = --lo & 0xFF;
+				lo = (lo - 1) & 0xFF;
 				mem_put_byte(DAR, lo);
 				condevalN(lo);
 				condevalZ(lo);
@@ -968,7 +968,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (lo == 0x7F)
 					V = 0x10000;
-				lo = ++lo & 0xFF;
+				lo = (lo + 1) & 0xFF;
 				mem_put_byte(DAR, lo);
 				condevalN(lo);
 				condevalZ(lo);
@@ -1094,7 +1094,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (lo == 0x80)
 					V = 0x10000;
-				lo = --lo & 0xFF;
+				lo = (lo - 1) & 0xFF;
 				mem_put_byte(DAR, lo);
 				condevalN(lo);
 				condevalZ(lo);
@@ -1105,7 +1105,7 @@ int32 sim_instr (void)
 				V = 0;
 				if (lo == 0x7F)
 					V = 0x10000;
-				lo = ++lo & 0xFF;
+				lo = (lo + 1) & 0xFF;
 				mem_put_byte(DAR, lo);
 				condevalN(lo);
 				condevalZ(lo);
@@ -1215,9 +1215,9 @@ int32 sim_instr (void)
 				break;
 			case 0x8D:				/* BSR rel */
 				lo = get_rel_addr();
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				mem_put_word(SP, PC);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				PC = PC + lo;
 				PC &= ADDRMASK;
 				break;
@@ -1429,9 +1429,9 @@ int32 sim_instr (void)
 				break;
 			case 0xAD:				/* JSR ind */
 				DAR = get_indir_addr();
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				mem_put_word(SP, PC);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				PC = DAR;
 				break;
 			case 0xAE:				/* LDS ind */
@@ -1542,9 +1542,9 @@ int32 sim_instr (void)
 				break;
 			case 0xBD:				/* JSR ext */
 				DAR = get_ext_addr();
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				mem_put_word(SP, PC);
-				SP = --SP & ADDRMASK;
+				SP = (SP - 1) & ADDRMASK;
 				PC = DAR;
 				break;
 			case 0xBE:				/* LDS ext */
@@ -2010,7 +2010,7 @@ int32 get_dir_addr()
 	int32 temp;
 
 	temp = mem_get_byte(PC);
-	PC = ++PC & ADDRMASK;
+	PC = (PC + 1) & ADDRMASK;
 	return temp & 0xFF;
 }
 

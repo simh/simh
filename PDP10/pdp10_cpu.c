@@ -446,24 +446,24 @@ const d10 bytemask[64] = { 0,
  ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES, ONES
  };
 
-static t_bool (*io700d[16])() = {
+static t_bool (*io700d[16])(a10, int32) = {
     &aprid, NULL, NULL, NULL, &wrapr, &rdapr, &czapr, &coapr,
     NULL, NULL, NULL, NULL, &wrpi, &rdpi, &czpi, &copi
     };
-static t_bool (*io701d[16])() = {
+static t_bool (*io701d[16])(a10, int32) = {
     NULL, &rdubr, &clrpt, &wrubr, &wrebr, &rdebr, NULL, NULL,
     NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
     };
-static t_bool (*io702d[16])() = {
+static t_bool (*io702d[16])(a10, int32) = {
     &rdspb, &rdcsb, &rdpur, &rdcstm, &rdtim, &rdint, &rdhsb, NULL,
     &wrspb, &wrcsb, &wrpur, &wrcstm, &wrtim, &wrint, &wrhsb, NULL
     };
 #define io700i io700d
-static t_bool (*io701i[16])() = {
+static t_bool (*io701i[16])(a10, int32) = {
     &clrcsh, &rdubr, &clrpt, &wrubr, &wrebr, &rdebr, NULL, NULL,
     NULL, &rdpcst, NULL, &wrpcst, NULL, NULL, NULL, NULL
     };
-static t_bool (*io702i[16])() = {
+static t_bool (*io702i[16])(a10, int32) = {
     &sdbr1, &sdbr2, &sdbr3, &sdbr4, &rdtim, &rdint, &rdhsb, &spm,
     &ldbr1, &ldbr2, &ldbr3, &ldbr4, &wrtim, &wrint, &wrhsb, &lpmr
     };
@@ -697,7 +697,7 @@ for ( ;; ) {                                            /* loop until ABORT */
 int32 op, ac, i, st, xr, xct_cnt, its_2pr, pflgs;
 a10 ea;
 d10 inst, mb, indrct, rs[2];
-t_bool (*fptr)();
+t_bool (*fptr)(int32, int32);
 
 pager_PC = PC;                                          /* update pager PC */
 pager_tc = FALSE;                                       /* not in trap cycle */

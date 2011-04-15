@@ -138,7 +138,7 @@ void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
 
-extern t_stat vax780_fload (int flag, char *cptr);
+extern t_stat vax780_fload (int32 flag, char *cptr);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);

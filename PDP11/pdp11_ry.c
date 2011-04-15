@@ -161,7 +161,7 @@ t_stat ry_wr (int32 data, int32 PA, int32 access);
 t_stat ry_svc (UNIT *uptr);
 t_stat ry_reset (DEVICE *dptr);
 t_stat ry_boot (int32 unitno, DEVICE *dptr);
-void ry_done (int esr_flags, int new_ecode);
+void ry_done (int32 esr_flags, int32 new_ecode);
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ry_attach (UNIT *uptr, char *cptr);
 

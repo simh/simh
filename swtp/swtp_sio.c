@@ -114,7 +114,7 @@ int32	ptp_flag = 0, ptr_flag = 0;
 
 /* console input service routine */
 
-int32 sio_svc (UNIT *uptr)
+t_stat sio_svc (UNIT *uptr)
 {
 	int32 temp;
 
@@ -132,21 +132,21 @@ int32 sio_svc (UNIT *uptr)
 
 /* paper tape reader input service routine */
 
-int32 ptr_svc (UNIT *uptr)
+t_stat ptr_svc (UNIT *uptr)
 {
     return SCPE_OK;
 }
 
 /* paper tape punch output service routine */
 
-int32 ptp_svc (UNIT *uptr)
+t_stat ptp_svc (UNIT *uptr)
 {
 	return SCPE_OK;
 }
 
 /* Reset console */
 
-int32 sio_reset (DEVICE *dptr)
+t_stat sio_reset (DEVICE *dptr)
 {
 	sio_unit.buf = 0;				// Data buffer
 	sio_unit.u3 = 0x02;				// Status buffer
@@ -156,7 +156,7 @@ int32 sio_reset (DEVICE *dptr)
 
 /* Reset paper tape reader */
 
-int32 ptr_reset (DEVICE *dptr)
+t_stat ptr_reset (DEVICE *dptr)
 {
 	ptr_unit.buf = 0;
 	ptr_unit.u3 = 0x02;
@@ -166,7 +166,7 @@ int32 ptr_reset (DEVICE *dptr)
 
 /* Reset paper tape punch */
 
-int32 ptp_reset (DEVICE *dptr)
+t_stat ptp_reset (DEVICE *dptr)
 {
 	ptp_unit.buf = 0;
 	ptp_unit.u3 = 0x02;

@@ -67,7 +67,7 @@
 struct ndev {
     int32   level;                                      /* interrupt level */
     int32   pri;                                        /* Device priority */
-    int32   (*routine)();                               /* dispatch routine */
+    int32   (*routine)(int32, int32, int32, int32);     /* dispatch routine */
 };
 
 /* Structure to define operation codes */

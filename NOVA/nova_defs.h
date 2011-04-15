@@ -223,14 +223,14 @@
 struct ndev {
     int32       mask;                                   /* done/busy mask */
     int32       pi;                                     /* assigned pi bit */
-    int32       (*routine)();                           /* dispatch routine */
+    int32       (*routine)(int32, int32, int32);        /* dispatch routine */
     };
 
 typedef struct {
     int32       dnum;                                   /* device number */
     int32       mask;                                   /* done/busy mask */
     int32       pi;                                     /* assigned pi bit */
-    int32       (*routine)();                           /* dispatch routine */
+    int32       (*routine)(int32, int32, int32);        /* dispatch routine */
     } DIB;
 
 /* Device flags (simulator representation)

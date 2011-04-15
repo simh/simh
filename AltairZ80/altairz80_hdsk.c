@@ -632,8 +632,8 @@ static int32 doWrite(void) {
             hdskbuf[i] = GetBYTEWrapper(selectedDMA + i);
         rtn = sim_fwrite(hdskbuf, 1, uptr -> HDSK_SECTOR_SIZE, uptr -> fileref);
         if (rtn != (size_t)(uptr -> HDSK_SECTOR_SIZE)) {
-            TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Could not write Sector=%02d Track=%04d Result=%zd." NLP,
-                                      selectedDisk, PCX, selectedSector, selectedTrack, rtn));
+            TRACE_PRINT(VERBOSE_MSG, ("HDSK%d: " ADDRESS_FORMAT " Could not write Sector=%02d Track=%04d Result=%d." NLP,
+                                      selectedDisk, PCX, selectedSector, selectedTrack, (int)rtn));
             return CPM_ERROR;
         }
     }
