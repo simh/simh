@@ -284,6 +284,10 @@ REG clk_reg[] = {
     { DRDATA (TODR, todr_reg, 32), PV_LEFT },
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (TPS, clk_tps, 8), REG_HIDDEN + REG_NZ + PV_LEFT },
+#if defined (SIM_ASYNCH_IO)
+    { DRDATA (LATENCY, sim_asynch_latency, 32), PV_LEFT },
+    { DRDATA (INST_LATENCY, sim_asynch_inst_latency, 32), PV_LEFT },
+#endif
     { NULL }
     };
 
@@ -570,6 +574,7 @@ t_stat clk_svc (UNIT *uptr)
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
 sim_activate (&clk_unit, tmr_poll);                     /* reactivate unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
+AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
 todr_reg = todr_reg + 1;                                /* incr TODR */
 if ((tmr_iccs & TMR_CSR_RUN) && tmr_use_100hz)          /* timer on, std intvl? */
     tmr_incr (TMR_INC);                                 /* do timer service */

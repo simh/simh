@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Jan-11    MP      Added Asynch I/O support
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Added inlining support
    28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
@@ -118,12 +119,16 @@
 
 /* Length specific integer declarations */
 
+#if defined (VMS)
+#include <ints.h>
+#else
 typedef signed char     int8;
 typedef signed short    int16;
 typedef signed int      int32;
 typedef unsigned char   uint8;
 typedef unsigned short  uint16;
-typedef unsigned int    uint32;         
+typedef unsigned int    uint32;
+#endif
 typedef int             t_stat;                         /* status */
 typedef int             t_bool;                         /* boolean */
 
@@ -346,12 +351,23 @@ struct sim_unit {
     uint32              flags;                          /* flags */
     t_addr              capac;                          /* capacity */
     t_addr              pos;                            /* file position */
+    void                (*io_flush)(struct sim_unit *up);/* io flush routine */
+    uint32              iostarttime;                    /* I/O start time */
     int32               buf;                            /* buffer */
     int32               wait;                           /* wait */
     int32               u3;                             /* device specific */
     int32               u4;                             /* device specific */
     int32               u5;                             /* device specific */
     int32               u6;                             /* device specific */
+    void                *up7;                           /* device specific */
+    void                *up8;                           /* device specific */
+#ifdef SIM_ASYNCH_IO
+    void                (*a_check_completion)(struct sim_unit *);
+    struct sim_unit     *a_next;                        /* next asynch active */
+    int32               a_event_time;
+    int32               a_sim_interval;
+    t_stat              (*a_activate_call)(struct sim_unit *, int32);
+#endif
     };
 
 /* Unit flags */
@@ -527,5 +543,158 @@ typedef struct sim_debtab DEBTAB;
 #include "sim_console.h"
 #include "sim_timer.h"
 #include "sim_fio.h"
+
+/* Asynch/Threaded I/O support */
+
+#if defined (SIM_ASYNCH_IO)
+#include <pthread.h>
+
+extern pthread_mutex_t sim_asynch_lock;
+extern pthread_cond_t sim_asynch_wake;
+extern pthread_t sim_asynch_main_threadid;
+extern struct sim_unit *sim_asynch_queue;
+extern t_bool sim_idle_wait;
+extern int32 sim_asynch_check;
+extern int32 sim_asynch_latency;
+extern int32 sim_asynch_inst_latency;
+
+#define AIO_INIT                                                  \
+    if (1) {                                                      \
+      sim_asynch_main_threadid = pthread_self();                  \
+      /* Empty list/list end uses the point value (void *)-1.     \
+         This allows NULL in an entry's a_next pointer to         \
+         indicate that the entry is not currently in any list */  \
+      sim_asynch_queue = (void *)-1;                              \
+    }
+#define AIO_CLEANUP                                               \
+    if (1) {                                                      \
+      pthread_mutex_destroy(&sim_asynch_lock);                    \
+      pthread_cond_destroy(&sim_asynch_wake);                     \
+    }
+#if defined(_WIN32) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
+#define USE_AIO_INTRINSICS 1
+#endif
+#ifdef USE_AIO_INTRINSICS
+/* This approach uses intrinsics to manage access to the link list head     */
+/* sim_asynch_queue.  However, once the list head state has been determined */
+/* a lock is used to manage the list update and entry removal.              */
+/* This approach avoids the ABA issues with a completly lock free approach  */
+/* since the ABA problem is very likely to happen with this use model, and  */
+/* it avoids the lock overhead for the simple list head checking.           */
+#ifdef _WIN32
+#include <winsock2.h>
+#ifdef ERROR
+#undef ERROR
+#endif /* ERROR */
+#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
+#define InterlockedCompareExchangePointer(Destination, Exchange, Comparand) __sync_val_compare_and_swap(Destination, Comparand, Exchange)
+#define InterlockedExchangePointer(Destination, value) __sync_lock_test_and_set(Destination, value)
+#else
+#error "Implementation of functions InterlockedCompareExchangePointer() and InterlockedExchangePointer() are needed to build with USE_AIO_INTRINSICS"
+#endif
+#define AIO_QUEUE_VAL InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL)
+#define AIO_QUEUE_SET(val) InterlockedExchangePointer(&sim_asynch_queue, val)
+#define AIO_UPDATE_QUEUE                                                         \
+    if (1) {                                                                     \
+      UNIT *uptr;                                                                \
+      if (AIO_QUEUE_VAL != (void *)-1) {                                         \
+        pthread_mutex_lock (&sim_asynch_lock);                                   \
+        while ((uptr = AIO_QUEUE_VAL) != (void *)-1) {                           \
+          int32 a_event_time;                                                    \
+          AIO_QUEUE_SET(uptr->a_next);                                           \
+          uptr->a_next = NULL;  /* hygiene */                                    \
+          a_event_time = uptr->a_event_time-(uptr->a_sim_interval-sim_interval); \
+          if (a_event_time < 0) a_event_time = 0;                                \
+          uptr->a_activate_call (uptr, a_event_time);                            \
+          if (uptr->a_check_completion) {                                        \
+            pthread_mutex_unlock (&sim_asynch_lock);                             \
+            uptr->a_check_completion (uptr);                                     \
+            pthread_mutex_lock (&sim_asynch_lock);                               \
+            }                                                                    \
+        }                                                                        \
+        pthread_mutex_unlock (&sim_asynch_lock);                                 \
+      }                                                                          \
+      sim_asynch_check = sim_asynch_inst_latency;                                \
+    }
+#define AIO_ACTIVATE(caller, uptr, event_time)                         \
+    if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
+      pthread_mutex_lock (&sim_asynch_lock);                           \
+      if (uptr->a_next) {                                              \
+        uptr->a_activate_call = sim_activate_abs;                      \
+      } else {                                                         \
+        uptr->a_next = AIO_QUEUE_VAL;                                  \
+        uptr->a_event_time = event_time;                               \
+        uptr->a_sim_interval = sim_interval;                           \
+        uptr->a_activate_call = caller;                                \
+        AIO_QUEUE_SET(uptr);                                           \
+      }                                                                \
+      if (sim_idle_wait)                                               \
+        pthread_cond_signal (&sim_asynch_wake);                        \
+      pthread_mutex_unlock (&sim_asynch_lock);                         \
+      return SCPE_OK;                                                  \
+    }
+#else /* !USE_AIO_INTRINSICS */
+/* This approach uses a pthread mutex to manage access to the link list     */
+/* head sim_asynch_queue.  It will always work, but may be slower than the  */
+/* partially lock free approach when using USE_AIO_INTRINSICS               */
+#define AIO_UPDATE_QUEUE                                                       \
+    if (1) {                                                                   \
+      UNIT *uptr;                                                              \
+      pthread_mutex_lock (&sim_asynch_lock);                                   \
+      while (sim_asynch_queue != (void *)-1) { /* List !Empty */               \
+        int32 a_event_time;                                                    \
+        uptr = sim_asynch_queue;                                               \
+        sim_asynch_queue = uptr->a_next;                                       \
+        uptr->a_next = NULL;                                                   \
+        a_event_time = uptr->a_event_time-(uptr->a_sim_interval-sim_interval); \
+        if (a_event_time < 0) a_event_time = 0;                                \
+        uptr->a_activate_call (uptr, a_event_time);                            \
+        if (uptr->a_check_completion) {                                        \
+          pthread_mutex_unlock (&sim_asynch_lock);                             \
+          uptr->a_check_completion (uptr);                                     \
+          pthread_mutex_lock (&sim_asynch_lock);                               \
+          }                                                                    \
+      }                                                                        \
+      pthread_mutex_unlock (&sim_asynch_lock);                                 \
+      sim_asynch_check = sim_asynch_inst_latency;                              \
+    }
+#define AIO_ACTIVATE(caller, uptr, event_time)                         \
+    if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
+      pthread_mutex_lock (&sim_asynch_lock);                           \
+      if (uptr->a_next) {                                              \
+        uptr->a_activate_call = sim_activate_abs;                      \
+      } else {                                                         \
+        uptr->a_next = sim_asynch_queue;                               \
+        uptr->a_event_time = event_time;                               \
+        uptr->a_sim_interval = sim_interval;                           \
+        uptr->a_activate_call = caller;                                \
+        sim_asynch_queue = uptr;                                       \
+      }                                                                \
+      if (sim_idle_wait)                                               \
+        pthread_cond_signal (&sim_asynch_wake);                        \
+      pthread_mutex_unlock (&sim_asynch_lock);                         \
+      return SCPE_OK;                                                  \
+    }
+#endif /* USE_AIO_INTRINSICS */
+#define AIO_VALIDATE if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) abort()
+#define AIO_CHECK_EVENT                                                \
+    if (0 > --sim_asynch_check) {                                      \
+      AIO_UPDATE_QUEUE;                                                \
+    }
+#define AIO_SET_INTERRUPT_LATENCY(instpersec)                                                   \
+    if (1) {                                                                                    \
+      sim_asynch_inst_latency = (int32)((((double)(instpersec))*sim_asynch_latency)/1000000000);\
+      if (sim_asynch_inst_latency == 0)                                                         \
+        sim_asynch_inst_latency = 1;                                                            \
+    }
+#else /* !SIM_ASYNCH_IO */
+#define AIO_UPDATE_QUEUE
+#define AIO_ACTIVATE(caller, uptr, event_time)
+#define AIO_VALIDATE
+#define AIO_CHECK_EVENT
+#define AIO_INIT
+#define AIO_CLEANUP
+#define AIO_SET_INTERRUPT_LATENCY(instpersec)
+#endif /* SIM_ASYNCH_IO */
 
 #endif

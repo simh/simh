@@ -27,6 +27,8 @@
 
    sbi                  bus controller
 
+   04-Feb-2011  MP      Added RQB, RQC and RQD as bootable controllers
+   07-Jan-2011  MP      Implemented reboot functionality in the console emulator
    31-May-2008  RMS     Fixed machine_check calling sequence (found by Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
    28-May-08    RMS     Inlined physical memory routines
@@ -109,6 +111,9 @@ static struct boot_dev boot_tab[] = {
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },
+    { "RQB", BOOT_UDA, 1 << 24 },
+    { "RQC", BOOT_UDA, 1 << 24 },
+    { "RQD", BOOT_UDA, 1 << 24 },
     { "TQ", BOOT_TK, 1 << 24 },
     { NULL }
     };
@@ -152,6 +157,7 @@ extern void init_mbus_tab (void);
 extern void init_ubus_tab (void);
 extern t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp);
 extern t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
+extern DEVICE cpu_dev;
 
 /* SBI data structures
 
@@ -161,6 +167,8 @@ extern t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
 */
 
 UNIT sbi_unit = { UDATA (NULL, 0, 0) };
+
+char cpu_boot_command[64];
 
 REG sbi_reg[] = {
     { HRDATA (NREQ14, nexus_req[0], 16) },
@@ -175,6 +183,7 @@ REG sbi_reg[] = {
     { HRDATA (SBIMT, sbi_mt, 32) },
     { HRDATA (SBIER, sbi_er, 32) },
     { HRDATA (SBITMO, sbi_tmo, 32) },
+    { BRDATA (BOOTCMD, cpu_boot_command, 16, 8, sizeof(cpu_boot_command)), REG_HRO },
     { NULL }
     };
 
@@ -587,14 +596,6 @@ sbi_er = sbi_er & ~SBIER_TMOW1C;                        /* clr SBIER<tmo> etc */
 return cc;
 }
 
-/* Console entry */
-
-int32 con_halt (int32 code, int32 cc)
-{
-ABORT (STOP_HALT);
-return cc;
-}
-
 /* Special boot command - linked into SCP by initial reset
 
    Syntax: BOOT <device>{/R5:val}
@@ -602,7 +603,7 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax780_boot (int32 flag, char *ptr)
+t_stat vax780_boot_parse (int32 flag, char *ptr)
 {
 char gbuf[CBUFSIZE];
 char *slptr, *regptr;
@@ -649,10 +650,21 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
         R[3] = unitno;
         R[4] = 0;
         R[5] = r5v;
-        return run_cmd (flag, "CPU");
+        strncpy(cpu_boot_command, ptr, sizeof(cpu_boot_command)-1);
+        return SCPE_OK;
         }
     }
 return SCPE_NOFNC;
+}
+
+t_stat vax780_boot (int32 flag, char *ptr)
+{
+t_stat r;
+
+r = vax780_boot_parse (flag, ptr);
+if (r == SCPE_OK)
+    return run_cmd (flag, "CPU");
+return r;
 }
 
 /* Bootstrap - finish up bootstrap process */
@@ -669,6 +681,21 @@ if (r != SCPE_OK)
     return r;
 SP = PC = 512;
 return SCPE_OK;
+}
+
+/* Console entry/Reboot */
+
+int32 con_halt (int32 code, int32 cc)
+{
+t_stat r;
+
+printf ("Reboot Requested ... Rebooting\n");
+if (sim_log) fprintf (sim_log, 
+    "Reboot Requested ... Rebooting\n");
+reset_all (0);
+r = vax780_boot_parse (4, cpu_boot_command);
+if (r == SCPE_OK) r = cpu_boot (0, &cpu_dev);
+return r;
 }
 
 /* SBI reset */

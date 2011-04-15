@@ -84,6 +84,7 @@
 #define MD_ACL          0x0002                          /* t avl: all class NI */
 #define MD_NXU          0x0001                          /* b gus: next unit */
 #define MD_RIP          0x0001                          /* d onl: allow rip NI */
+#define MD_SPD          0x0001                          /* d avl: spin-down */
 
 /* End flags */
 
