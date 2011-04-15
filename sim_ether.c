@@ -49,8 +49,8 @@
   networking is needed - there may be known workarounds.
 
   Define one of the two macros below to enable networking:
-    USE_NETWORK     - Create statically linked network code
-    USE_SHARED      - Create dynamically linked network code (_WIN32 only)
+    USE_NETWORK - Create statically linked network code
+    USE_SHARED  - Create dynamically linked network code (_WIN32 only)
 
   ------------------------------------------------------------------------------
 
@@ -118,13 +118,26 @@
                       Using the threaded approach may require special compile 
                       and/or link time switches (i.e. -lpthread or -pthread, 
                       etc.) Consult the documentation for your platform as 
-                      needed.
-  MUST_DO_SELECT    - Specifies that when USE_READER_THREAD is active, that 
+                      needed.  Although this may be 'less efficient' than the
+                      non-threaded approach, the efficiency is an overall system
+                      efficiency not necessarily a simulator efficiency.  This 
+                      means that work is removed from the thread executing 
+                      simulated instructions so the simulated system will most
+                      likely run faster (given that modern host CPUs are 
+                      multi-core and have someplace to do this work in parallel).
+  MUST_DO_SELECT    - Specifies that, when USE_READER_THREAD is active,  
                       select() should be used to determin when available 
                       packets are ready for reading.  Otherwise, we depend 
                       on the libpcap/kernel packet timeout specified on 
                       pcap_open_live.  If USE_READER_THREAD is not set, then 
                       MUST_DO_SELECT is irrelevant
+  USE_TAP_NETWORK   - Specifies that support for tap networking should be 
+                      included.  This can be leveraged, along with OS bridging
+                      capabilities to share a single LAN interface.  This 
+                      allows device names of the form tap:tap0 to be specified
+                      at open time.  This functionality is only useful/needed 
+                      on *nix platforms since native sharing of Windows NIC 
+                      devices works with no external magic.
 
   NEED_PCAP_SENDPACKET
                     - Specifies that you are using an older version of libpcap
@@ -138,6 +151,89 @@
 
   Modification history:
 
+  09-Jan-11  MP   Fixed missing crc data when USE_READER_THREAD is defined and 
+                  crc's are needed (only the pdp11_xu)
+  16-Dec-10  MP   added priority boost for read and write threads when 
+                  USE_READER_THREAD does I/O in separate threads.  This helps
+                  throughput since it allows these I/O bound threads to preempt 
+                  the main thread (which is executing simulated instructions).                  
+  09-Dec-10  MP   allowed more flexible parsing of MAC address strings
+  09-Dec-10  MP   Added support to determine if network address conflicts exist
+  07-Dec-10  MP   Reworked DECnet self detection to the more general approach
+                  of loopback self when a Physical Address is being set.
+  04-Dec-10  MP   Changed eth_write to do nonblocking writes when 
+                  USE_READER_THREAD is defined.
+  20-Aug-10  TVO  Fix for Mac OSX 10.6
+  17-Jun-10  MP   Fixed bug in the AUTODIN II hash filtering.
+  14-Jun-10  MP   Added support for integrated Tap networking interfaces on BSD 
+                  platforms.
+  13-Jun-10  MP   Added support for integrated Tap networking interfaces on Linux 
+                  platforms.
+  31-May-10  MP   Added support for more TOE (TCP Offload Engine) features for IPv4
+                  network traffic from the host and/or from hosts on the LAN.  These
+                  new TOE features are: LSO (Large Send Offload) and Jumbo packet
+                  fragmentation support.  These features allow a simulated network
+                  device to suuport traffic when a host leverages a NIC's Large 
+                  Send Offload capabilities to fregment and/or segment outgoing 
+                  network traffic.  Additionally a simulated network device can 
+                  reasonably exist on a LAN which is configured to use Jumbo frames.
+  21-May-10  MP   Added functionslity to fixup IP header checksums to accomodate 
+                  packets from a host with a NIC which has TOE (TCP Offload Engine)
+                  enabled which is expected to implement the checksum computations
+                  in hardware.  Since we catch packets before they arrive at the
+                  NIC the expected checksum insertions haven't been performed yet.
+                  This processing is only done for packets sent from the hoat to 
+                  the guest we're supporting.  In general this will be a relatively 
+                  small number of packets so it is done for all IP frame packets
+                  coming from the hoat to the guest.  In order to make the 
+                  determination of packets specifically arriving from the host we
+                  need to know the hardware MAC address of the host NIC.  Currently
+                  determining a NIC's MAC address is relatively easy on Windows.
+                  The non-windows code works on linux and may work on other *nix 
+                  platforms either as is or with slight modifications.  The code, 
+                  as implemented, only messes with this activity if the host 
+                  interface MAC address can be determined.
+  20-May-10  MP   Added general support to deal with receiving packets smaller 
+                  than ETH_MIN_PACKET in length.  These come from packets
+                  looped back by some bridging mechanism and need to be padded
+                  to the minimum frame size.  A real NIC won't pass us any 
+                  packets like that.  This fix belongs here since this layer
+                  is responsible for interfacing to they physical layer 
+                  devices, AND it belongs here to get CRC processing right.
+  05-Mar-08  MP   Added optional multicast filtering support for doing
+                  LANCE style AUTODIN II based hashed filtering.
+  07-Feb-08  MP   Added eth_show_dev to display ethernet state
+                  Changed the return value from eth_read to return whether
+                  or not a packet was read.  No existing callers used or 
+                  checked constant return value that previously was being
+                  supplied.
+  29-Jan-08  MP   Added eth_set_async to provide a mechanism (when 
+                  USE_READER_THREAD is enabled) to allow packet reception 
+                  to dynamically update the simulator event queue and 
+                  potentially avoid polling for I/O.  This provides a minimal 
+                  overhead (no polling) maximal responsiveness for network 
+                  activities.
+  29-Jan-08  MP   Properly sequenced activities in eth_close to avoid a race
+                  condition when USE_READER_THREAD is enabled.
+  25-Jan-08  MP   Changed the following when USE_READER_THREAD is enabled:
+                  - Fixed bug when the simulated device doesn't need crc 
+                    in packet data which is read.
+                  - Added call to pcap_setmintocopy to minimize packet 
+                    delivery latencies.
+                  - Added ethq_destroy and used it to avoid a memory leak in
+                    eth_close.
+                  - Properly cleaned up pthread mutexes in eth_close.
+                  Migrated to using sim_os_ms_sleep for a delay instead of
+                  a call to select().
+                  Fixed the bpf filter used when no traffic is to be matched.
+                  Reworked eth_add_packet_crc32 implementation to avoid an
+                  extra buffer copy while reading packets.
+                  Fixedup #ifdef's relating to USE_SHARED so that setting 
+                  USE_SHARED or USE_NETWORK will build a working network 
+                  environment.
+  23-Jan-08  MP   Reworked eth_packet_trace and eth_packet_trace_ex to allow
+                  only output ethernet header+crc and provide a mechanism for
+                  the simulated device to display full packet data debugging.
   17-May-07  DTH  Fixed non-ethernet device removal loop (from Naoki Hamada)
   15-May-07  DTH  Added dynamic loading of wpcap.dll;
                   Corrected exceed max index bug in ethX lookup
@@ -252,36 +348,23 @@ extern FILE *sim_log;
 
 t_stat eth_mac_scan (ETH_MAC* mac, char* strmac)
 {
-  int i, j;
-  short unsigned int num;
-  char cptr[18];
-  int len = strlen(strmac);
+  int a0, a1, a2, a3, a4, a5;
   const ETH_MAC zeros = {0,0,0,0,0,0};
   const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   ETH_MAC newmac;
 
-  /* format of string must be 6 double-digit hex bytes with valid separators
-     ideally, this mac scanner could allow more flexible formatting later */
-  if (len != 17) return SCPE_ARG;
-
-  /* copy string to local storage for mangling */
-  strcpy(cptr, strmac);
-
-  /* make sure byte separators are OK */
-  for (i=2; i<len; i=i+3) {
-    if ((cptr[i] != '-') && 
-        (cptr[i] != '.') &&
-        (cptr[i] != ':')) return SCPE_ARG;
-    cptr[i] = '\0';
-  }
-
-  /* get and set address bytes */
-  for (i=0, j=0; i<len; i=i+3, j++) {
-    int valid = strspn(&cptr[i], "0123456789abcdefABCDEF");
-    if (valid < 2) return SCPE_ARG;
-    sscanf(&cptr[i], "%hx", &num);
-    newmac[j] = (unsigned char) num;
-  }
+  if ((6 != sscanf(strmac, "%x:%x:%x:%x:%x:%x", &a0, &a1, &a2, &a3, &a4, &a5)) &&
+      (6 != sscanf(strmac, "%x.%x.%x.%x.%x.%x", &a0, &a1, &a2, &a3, &a4, &a5)) &&
+      (6 != sscanf(strmac, "%x-%x-%x-%x-%x-%x", &a0, &a1, &a2, &a3, &a4, &a5)))
+    return SCPE_ARG;
+  if ((a0 > 0xFF) || (a1 > 0xFF) || (a2 > 0xFF) || (a3 > 0xFF) || (a4 > 0xFF) || (a5 > 0xFF))
+    return SCPE_ARG;
+  newmac[0] = a0;
+  newmac[1] = a1;
+  newmac[2] = a2;
+  newmac[3] = a3;
+  newmac[4] = a4;
+  newmac[5] = a5;
 
   /* final check - mac cannot be broadcast or multicast address */
   if (!memcmp(newmac, zeros, sizeof(ETH_MAC)) ||  /* broadcast */
@@ -354,22 +437,48 @@ uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len)
   const unsigned char* buf = (const unsigned char*)vbuf;
 
   crc ^= mask;
+  while (len > 8) {
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
+    len -= 8;
+  }
   while (0 != len--)
     crc = (crc >> 8) ^ crcTable[ (crc ^ (*buf++)) & 0xFF ];
   return(crc ^ mask);
 }
 
-void eth_add_crc32(ETH_PACK* packet)
+int eth_get_packet_crc32_data(const uint8 *msg, int len, uint8 *crcdata)
 {
-  if (packet->len <= ETH_MAX_PACKET) {
-    uint32 crc = eth_crc32(0, packet->msg, packet->len);  /* calculate CRC */
+  int crc_len;
+
+  if (len <= ETH_MAX_PACKET) {
+    uint32 crc = eth_crc32(0, msg, len);                  /* calculate CRC */
     uint32 ncrc = htonl(crc);                             /* CRC in network order */
     int size = sizeof(ncrc);                              /* size of crc field */
-    memcpy(&packet->msg[packet->len], &ncrc, size);       /* append crc to packet */
-    packet->crc_len = packet->len + size;                 /* set packet crc length */
+    memcpy(crcdata, &ncrc, size);                         /* append crc to packet */
+    crc_len = len + size;                                 /* set packet crc length */
   } else {
-    packet->crc_len = 0;                                  /* appending crc would destroy packet */
+    crc_len = 0;                                          /* appending crc would destroy packet */
   }
+  return crc_len;
+}
+
+int eth_add_packet_crc32(uint8 *msg, int len)
+{
+  int crc_len;
+
+  if (len <= ETH_MAX_PACKET) {
+    crc_len = eth_get_packet_crc32_data(msg, len, &msg[len]);/* append crc to packet */
+  } else {
+    crc_len = 0;                                          /* appending crc would destroy packet */
+  }
+  return crc_len;
 }
 
 void eth_setcrc(ETH_DEV* dev, int need_crc)
@@ -377,18 +486,18 @@ void eth_setcrc(ETH_DEV* dev, int need_crc)
   dev->need_crc = need_crc;
 }
 
-void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int dmp)
+void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason)
 {
-  if (dev->dptr->dctrl & dev->dbit) {
+  if (dev->dptr->dctrl & reason) {
     char src[20];
     char dst[20];
     unsigned short* proto = (unsigned short*) &msg[12];
     uint32 crc = eth_crc32(0, msg, len);
     eth_mac_fmt((ETH_MAC*)&msg[0], dst);
     eth_mac_fmt((ETH_MAC*)&msg[6], src);
-    sim_debug(dev->dbit, dev->dptr, "%s  dst: %s  src: %s  proto: 0x%04X  len: %d  crc: %X\n",
+    sim_debug(reason, dev->dptr, "%s  dst: %s  src: %s  proto: 0x%04X  len: %d  crc: %X\n",
           txt, dst, src, ntohs(*proto), len, crc);
-    if (dmp) {
+    if (detail) {
       int i, same, group, sidx, oidx;
       char outbuf[80], strbuf[18];
       static char hex[] = "0123456789ABCDEF";
@@ -398,7 +507,7 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
           continue;
         }
         if (same > 0) {
-          sim_debug(dev->dbit, dev->dptr, "%04X thru %04X same as above\r\n", i-(16*same), i-1);
+          sim_debug(reason, dev->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
           same = 0;
         }
         group = (((len - i) > 16) ? 16 : (len - i));
@@ -413,17 +522,17 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
         }
         outbuf[oidx] = '\0';
         strbuf[sidx] = '\0';
-        sim_debug(dev->dbit, dev->dptr, "%04X%-48s %s\r\n", i, outbuf, strbuf);
+        sim_debug(reason, dev->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
       }
       if (same > 0)
-        sim_debug(dev->dbit, dev->dptr, "%04X thru %04X same as above\r\n", i-(16*same), len-1);
+        sim_debug(reason, dev->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
     }
   }
 }
 
 void eth_packet_trace(ETH_DEV* dev, const uint8 *msg, int len, char* txt)
 {
-  eth_packet_trace_ex(dev, msg, len, txt, 1/*len > ETH_MAX_PACKET*/);
+  eth_packet_trace_ex(dev, msg, len, txt, 0, dev->dbit);
 }
 
 char* eth_getname(int number, char* name)
@@ -441,11 +550,11 @@ char* eth_getname_bydesc(char* desc, char* name)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
   int i;
-  int j=strlen(desc);
+  size_t j=strlen(desc);
 
   for (i=0; i<count; i++) {
     int found = 1;
-    int k = strlen(list[i].desc);
+    size_t k = strlen(list[i].desc);
 
     if (j != k) continue;
     for (k=0; k<j; k++)
@@ -462,9 +571,9 @@ char* eth_getname_bydesc(char* desc, char* name)
 }
 
 /* strncasecmp() is not available on all platforms */
-int eth_strncasecmp(char* string1, char* string2, int len)
+int eth_strncasecmp(char* string1, char* string2, size_t len)
 {
-  int i;
+  size_t i;
   unsigned char s1, s2;
 
   for (i=0; i<len; i++) {
@@ -486,7 +595,8 @@ char* eth_getname_byname(char* name, char* temp)
 {
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
-  int i, n, found;
+  size_t n;
+  int i, found;
 
   found = 0;
   n = strlen(name);
@@ -522,11 +632,12 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
     if (number == 0)
       fprintf(st, "  no network devices are available\n");
     else {
-      int i, min, len;
+      size_t min, len;
+      int i;
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st,"  %d  %-*s (%s)\n", i, min, list[i].name, list[i].desc);
+        fprintf(st,"  %d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
   return SCPE_OK;
 }
@@ -535,19 +646,28 @@ t_stat ethq_init(ETH_QUE* que, int max)
 {
   /* create dynamic queue if it does not exist */
   if (!que->item) {
-    size_t size = sizeof(struct eth_item) * max;
-    que->max = max;
-    que->item = (struct eth_item *) malloc(size);
-    if (que->item) {
-      /* init dynamic memory */
-      memset(que->item, 0, size);
-    } else {
+    que->item = (struct eth_item *) calloc(max, sizeof(struct eth_item));
+    if (!que->item) {
       /* failed to allocate memory */
       char* msg = "EthQ: failed to allocate dynamic queue[%d]\r\n";
       printf(msg, max);
       if (sim_log) fprintf(sim_log, msg, max);
       return SCPE_MEM;
     };
+    que->max = max;
+  };
+  ethq_clear(que);
+  return SCPE_OK;
+}
+
+t_stat ethq_destroy(ETH_QUE* que)
+{
+  /* release dynamic queue if it exists */
+  ethq_clear(que);
+  que->max = 0;
+  if (que->item) {
+    free(que->item);
+    que->item = NULL;
   };
   return SCPE_OK;
 }
@@ -557,7 +677,7 @@ void ethq_clear(ETH_QUE* que)
   /* clear packet array */
   memset(que->item, 0, sizeof(struct eth_item) * que->max);
   /* clear rest of structure */
-  que->count = que->head = que->tail = que->loss = que->high = 0;
+  que->count = que->head = que->tail = 0;
 }
 
 void ethq_remove(ETH_QUE* que)
@@ -572,7 +692,7 @@ void ethq_remove(ETH_QUE* que)
   }
 }
 
-void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
+void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, int len, int crc_len, const uint8 *crc_data, int32 status)
 {
   struct eth_item* item;
 
@@ -598,45 +718,78 @@ void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
   /* set information in (new) tail item */
   item = &que->item[que->tail];
   item->type = type;
-  item->packet.len = pack->len;
-  item->packet.used = 0;
-  item->packet.crc_len = pack->crc_len;
-  memcpy(item->packet.msg, pack->msg, ((pack->len > pack->crc_len) ? pack->len : pack->crc_len));
+  item->packet.len = len;
+  item->packet.used = used;
+  item->packet.crc_len = crc_len;
+  memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
+  if (crc_data && (crc_len > len))
+    memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
   item->packet.status = status;
+}
+
+void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
+{
+  ethq_insert_data(que, type, pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
 }
 
 /*============================================================================*/
 /*                        Non-implemented versions                            */
 /*============================================================================*/
 
-#if !defined (USE_NETWORK) && !defined(USE_SHARED)
+#if !defined (USE_NETWORK) && (!defined (_WIN32) || !defined (USE_SHARED))
 t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
   {return SCPE_NOFNC;}
+t_stat eth_check_address_conflict (ETH_DEV* dev, 
+                                   ETH_MAC* const mac)
+  {return SCPE_NOFNC;}
+t_stat eth_set_async (ETH_DEV *dev, int latency)
+  {return SCPE_NOFNC;}
+t_stat eth_clr_async (ETH_DEV *dev)
+  {return SCPE_NOFNC;}
 t_stat eth_write (ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
   {return SCPE_NOFNC;}
-t_stat eth_read (ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
+int eth_read (ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
   {return SCPE_NOFNC;}
-t_stat eth_filter (ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
+t_stat eth_filter (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                    ETH_BOOL all_multicast, ETH_BOOL promiscuous)
+  {return SCPE_NOFNC;}
+t_stat eth_filter_hash (ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
+                   ETH_BOOL all_multicast, ETH_BOOL promiscuous, ETH_MULTIHASH* const hash)
   {return SCPE_NOFNC;}
 int eth_devices (int max, ETH_LIST* dev)
   {return -1;}
-#else       /* endif unimplemented */
+void eth_show_dev (FILE* st, ETH_DEV* dev)
+  {}
+#else    /* endif unimplemented */
 
 /*============================================================================*/
 /*      WIN32, Linux, and xBSD routines use WinPcap and libpcap packages      */
 /*        OpenVMS Alpha uses a WinPcap port and an associated execlet         */
 /*============================================================================*/
 
-#if defined (xBSD) && !defined(__APPLE__)
+#if defined (xBSD) || defined(__APPLE__)
 #include <sys/ioctl.h>
 #include <net/bpf.h>
 #endif /* xBSD */
 
 #include <pcap.h>
 #include <string.h>
+
+#ifdef USE_TAP_NETWORK
+#if defined(__linux)
+#include <sys/ioctl.h> 
+#include <net/if.h> 
+#include <linux/if_tun.h> 
+#elif defined(USE_BSDTUNTAP)
+#include <sys/types.h>
+#include <net/if_types.h>
+#include <net/if_tun.h>
+#else /* We don't know how to do this on the current platform */
+#undef USE_TAP_NETWORK
+#endif
+#endif /* USE_TAP_NETWORK */
 
 /* Allows windows to look up user-defined adapter names */
 #if defined(_WIN32)
@@ -648,8 +801,8 @@ int eth_devices (int max, ETH_LIST* dev)
    Etherial/WireShark capture_pcap.c */
 
 /* Dynamic DLL load variables */
-static HINSTANCE hDll = 0;          /* handle to DLL */
-static int dll_loaded = 0;          /* 0=not loaded, 1=loaded, 2=DLL load failed, 3=Func load failed */
+static HINSTANCE hDll = 0;                      /* handle to DLL */
+static int dll_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=DLL load failed, 3=Func load failed */
 static char* no_wpcap = "wpcap load failure";
 
 /* define pointers to pcap functions needed */
@@ -663,169 +816,191 @@ static void    (*p_pcap_freecode) (struct bpf_program *);
 static char*   (*p_pcap_geterr) (pcap_t *);
 static int     (*p_pcap_lookupnet) (const char *, bpf_u_int32 *, bpf_u_int32 *, char *);
 static pcap_t* (*p_pcap_open_live) (const char *, int, int, int, char *);
+static int     (*p_pcap_setmintocopy) (pcap_t* handle, int);
+static HANDLE  (*p_pcap_getevent) (pcap_t *);
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
 static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
 static char*   (*p_pcap_lib_version) (void);
 
 /* load function pointer from DLL */
 void load_function(char* function, void** func_ptr) {
-    *func_ptr = GetProcAddress(hDll, function);
-    if (*func_ptr == 0) {
-        char* msg = "Eth: Failed to find function '%s' in wpcap.dll\r\n";
-        printf (msg, function);
-            if (sim_log) fprintf (sim_log, msg, function);
-        dll_loaded = 3;
-    }
+  *func_ptr = GetProcAddress(hDll, function);
+  if (*func_ptr == 0) {
+    char* msg = "Eth: Failed to find function '%s' in wpcap.dll\r\n";
+
+    printf (msg, function);
+    if (sim_log) fprintf (sim_log, msg, function);
+    dll_loaded = 3;
+  }
 }
 
 /* load wpcap.dll as required */
 int load_wpcap(void) {
-    switch(dll_loaded) {
-        case 0:                                 /* not loaded */
+  switch(dll_loaded) {
+    case 0:                  /* not loaded */
             /* attempt to load DLL */
-            hDll = LoadLibrary(TEXT("wpcap.dll"));
-            if (hDll == 0) {
-                /* failed to load DLL */
-                char* msg  = "Eth: Failed to load wpcap.dll\r\n";
-                char* msg2 = "Eth: You must install WinPcap 4.x to use networking\r\n";
-                printf (msg);
-                printf (msg2);
-                if (sim_log) {
-                    fprintf (sim_log, msg);
-                    fprintf (sim_log, msg2);
-                }
-                dll_loaded = 2;
-                break;
-            } else {
-                /* DLL loaded OK */
-                dll_loaded = 1;
-            }
+      hDll = LoadLibrary(TEXT("wpcap.dll"));
+      if (hDll == 0) {
+        /* failed to load DLL */
+        char* msg  = "Eth: Failed to load wpcap.dll\r\n";
+        char* msg2 = "Eth: You must install WinPcap 4.x to use networking\r\n";
 
-            /* load required functions; sets dll_load=3 on error */
-            load_function("pcap_close",            (void**) &p_pcap_close);
-            load_function("pcap_compile",        (void**) &p_pcap_compile);
-            load_function("pcap_datalink",        (void**) &p_pcap_datalink);
-            load_function("pcap_dispatch",        (void**) &p_pcap_dispatch);
-            load_function("pcap_findalldevs",    (void**) &p_pcap_findalldevs);
-            load_function("pcap_freealldevs",    (void**) &p_pcap_freealldevs);
-            load_function("pcap_freecode",        (void**) &p_pcap_freecode);
-            load_function("pcap_geterr",        (void**) &p_pcap_geterr);
-            load_function("pcap_lookupnet",        (void**) &p_pcap_lookupnet);
-            load_function("pcap_open_live",        (void**) &p_pcap_open_live);
-            load_function("pcap_sendpacket",    (void**) &p_pcap_sendpacket);
-            load_function("pcap_setfilter",        (void**) &p_pcap_setfilter);
-            load_function("pcap_lib_version",   (void**) &p_pcap_lib_version);
+        printf (msg);
+        printf (msg2);
+        if (sim_log) {
+          fprintf (sim_log, msg);
+          fprintf (sim_log, msg2);
+        }
+        dll_loaded = 2;
+        break;
+      } else {
+        /* DLL loaded OK */
+        dll_loaded = 1;
+      }
 
-            if (dll_loaded == 1) {
-                /* log successful load */
-                char* version = p_pcap_lib_version();
-                printf("%s\n", version);
-                if (sim_log)
-                    fprintf(sim_log, "%s\n", version);
-            }
-            break;
-        default:                                /* loaded or failed */
-            break;
-    }
-    return (dll_loaded == 1) ? 1 : 0;
+      /* load required functions; sets dll_load=3 on error */
+      load_function("pcap_close",        (void**) &p_pcap_close);
+      load_function("pcap_compile",      (void**) &p_pcap_compile);
+      load_function("pcap_datalink",     (void**) &p_pcap_datalink);
+      load_function("pcap_dispatch",     (void**) &p_pcap_dispatch);
+      load_function("pcap_findalldevs",  (void**) &p_pcap_findalldevs);
+      load_function("pcap_freealldevs",  (void**) &p_pcap_freealldevs);
+      load_function("pcap_freecode",     (void**) &p_pcap_freecode);
+      load_function("pcap_geterr",       (void**) &p_pcap_geterr);
+      load_function("pcap_lookupnet",    (void**) &p_pcap_lookupnet);
+      load_function("pcap_open_live",    (void**) &p_pcap_open_live);
+      load_function("pcap_setmintocopy", (void**) &p_pcap_setmintocopy);
+      load_function("pcap_getevent",     (void**) &p_pcap_getevent);
+      load_function("pcap_sendpacket",   (void**) &p_pcap_sendpacket);
+      load_function("pcap_setfilter",    (void**) &p_pcap_setfilter);
+      load_function("pcap_lib_version",  (void**) &p_pcap_lib_version);
+
+      if (dll_loaded == 1) {
+        /* log successful load */
+        char* version = p_pcap_lib_version();
+        printf("%s\n", version);
+        if (sim_log)
+          fprintf(sim_log, "%s\n", version);
+      }
+      break;
+    default:                /* loaded or failed */
+      break;
+  }
+  return (dll_loaded == 1) ? 1 : 0;
 }
 
 /* define functions with dynamic revectoring */
 void pcap_close(pcap_t* a) {
-    if (load_wpcap() != 0) {
-        p_pcap_close(a);
-    }
+  if (load_wpcap() != 0) {
+    p_pcap_close(a);
+  }
 }
 
 int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e) {
-    if (load_wpcap() != 0) {
-        return p_pcap_compile(a, b, c, d, e);
-    } else {
-        return 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_compile(a, b, c, d, e);
+  } else {
+    return 0;
+  }
 }
 
 int pcap_datalink(pcap_t* a) {
-    if (load_wpcap() != 0) {
-        return p_pcap_datalink(a);
-    } else {
-        return 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_datalink(a);
+  } else {
+    return 0;
+  }
 }
 
 int pcap_dispatch(pcap_t* a, int b, pcap_handler c, u_char* d) {
-    if (load_wpcap() != 0) {
-        return p_pcap_dispatch(a, b, c, d);
-    } else {
-        return 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_dispatch(a, b, c, d);
+  } else {
+    return 0;
+  }
 }
 
 int pcap_findalldevs(pcap_if_t** a, char* b) {
-    if (load_wpcap() != 0) {
-        return p_pcap_findalldevs(a, b);
-    } else {
-        *a = 0;
-        strcpy(b, no_wpcap);
-        return -1;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_findalldevs(a, b);
+  } else {
+    *a = 0;
+    strcpy(b, no_wpcap);
+    return -1;
+  }
 }
 
 void pcap_freealldevs(pcap_if_t* a) {
-    if (load_wpcap() != 0) {
-        p_pcap_freealldevs(a);
-    }
+  if (load_wpcap() != 0) {
+    p_pcap_freealldevs(a);
+  }
 }
 
 void pcap_freecode(struct bpf_program* a) {
-    if (load_wpcap() != 0) {
-        p_pcap_freecode(a);
-    }
+  if (load_wpcap() != 0) {
+    p_pcap_freecode(a);
+  }
 }
 
 char* pcap_geterr(pcap_t* a) {
-    if (load_wpcap() != 0) {
-        return p_pcap_geterr(a);
-    } else {
-        return (char*) 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_geterr(a);
+  } else {
+    return (char*) 0;
+  }
 }
 
 int pcap_lookupnet(const char* a, bpf_u_int32* b, bpf_u_int32* c, char* d) {
-    if (load_wpcap() != 0) {
-        return p_pcap_lookupnet(a, b, c, d);
-    } else {
-        return 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_lookupnet(a, b, c, d);
+  } else {
+    return 0;
+  }
 }
 
 pcap_t* pcap_open_live(const char* a, int b, int c, int d, char* e) {
-    if (load_wpcap() != 0) {
-        return p_pcap_open_live(a, b, c, d, e);
-    } else {
-        return (pcap_t*) 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_open_live(a, b, c, d, e);
+  } else {
+    return (pcap_t*) 0;
+  }
+}
+
+int pcap_setmintocopy(pcap_t* a, int b) {
+  if (load_wpcap() != 0) {
+    return p_pcap_setmintocopy(a, b);
+  } else {
+    return 0;
+  }
+}
+
+HANDLE pcap_getevent(pcap_t* a) {
+  if (load_wpcap() != 0) {
+    return p_pcap_getevent(a);
+  } else {
+    return (HANDLE) 0;
+  }
 }
 
 int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
-    if (load_wpcap() != 0) {
-        return p_pcap_sendpacket(a, b, c);
-    } else {
-        return 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_sendpacket(a, b, c);
+  } else {
+    return 0;
+  }
 }
 
 int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
-    if (load_wpcap() != 0) {
-        return p_pcap_setfilter(a, b);
-    } else {
-        return 0;
-    }
+  if (load_wpcap() != 0) {
+    return p_pcap_setfilter(a, b);
+  } else {
+    return 0;
+  }
 }
 #endif
 
 /* Some platforms have always had pcap_sendpacket */
-#if defined(_WIN32) || defined(VMS)
+#if defined(_WIN32) || defined(__VMS)
 #define HAS_PCAP_SENDPACKET 1
 #else
 /* The latest libpcap and WinPcap all have pcap_sendpacket */
@@ -848,55 +1023,296 @@ int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 }
 #endif /* !HAS_PCAP_SENDPACKET */
 
+#ifdef _WIN32
+#include <Packet32.h>
+#include <ntddndis.h>
+
+static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
+{
+  LPADAPTER         lpAdapter;
+  PPACKET_OID_DATA  OidData;
+  BOOLEAN           Status;
+  int               ReturnValue;
+  HINSTANCE         hDll;         /* handle to DLL */
+  LPADAPTER (*p_PacketOpenAdapter)(PCHAR AdapterName);
+  VOID (*p_PacketCloseAdapter)(LPADAPTER lpAdapter);
+  BOOLEAN (*p_PacketRequest)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData);
+
+  hDll = LoadLibrary(TEXT("packet.dll"));
+  p_PacketOpenAdapter = (void *)GetProcAddress(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void *)GetProcAddress(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (void *)GetProcAddress(hDll, "PacketRequest");
+  
+  /* Open the selected adapter */
+
+  lpAdapter =   p_PacketOpenAdapter(AdapterName);
+
+  if (!lpAdapter || (lpAdapter->hFile == INVALID_HANDLE_VALUE)) {
+    FreeLibrary(hDll);
+    return -1;
+  }
+
+  /* Allocate a buffer to get the MAC adress */
+
+  OidData = malloc(6 + sizeof(PACKET_OID_DATA));
+  if (OidData == NULL) {
+    p_PacketCloseAdapter(lpAdapter);
+    FreeLibrary(hDll);
+    return -1;
+  }
+
+  /* Retrieve the adapter MAC querying the NIC driver */
+
+  OidData->Oid = OID_802_3_CURRENT_ADDRESS;
+
+  OidData->Length = 6;
+  memset(OidData->Data, 0, 6);
+	
+  Status = p_PacketRequest(lpAdapter, FALSE, OidData);
+  if(Status) {
+    memcpy(MACAddress, OidData->Data, 6);
+    ReturnValue = 0;
+  } else
+    ReturnValue = -1;
+
+  free(OidData);
+  p_PacketCloseAdapter(lpAdapter);
+  FreeLibrary(hDll);
+  return ReturnValue;
+}
+#endif
+
+static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
+{
+  memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
+  dev->have_host_nic_phy_addr = 0;
+#ifdef _WIN32
+  if (!pcap_mac_if_win32(devname, (UCHAR *)&dev->host_nic_phy_hw_addr))
+    dev->have_host_nic_phy_addr = 1;
+#elif !defined (__VMS)
+{
+  char command[1024];
+  FILE *f;
+
+  memset(command, 0, sizeof(command));
+  snprintf(command, sizeof(command)-1, "ifconfig %s | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] >NIC.hwaddr", devname);
+  system(command);
+  if (f = fopen("NIC.hwaddr", "r")) {
+    if (fgets(command, sizeof(command)-1, f)) {
+      char *p1, *p2;
+        
+      p1 = strchr(command, ':');
+      while (p1) {
+        p2 = strchr(p1+1, ':');
+        if (p2 == p1+3) {
+          int mac_bytes[6];
+          if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
+            dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
+            dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
+            dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
+            dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
+            dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
+            dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
+            dev->have_host_nic_phy_addr = 1;
+          }
+          break;
+        }
+        p1 = p2;
+      }
+    }
+    fclose(f);
+    remove("NIC.hwaddr");
+  }
+}
+#endif
+}
+
+/* Forward declarations */
+static void
+_eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data);
+
+static t_stat
+_eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine);
+
 #if defined (USE_READER_THREAD)
 #include <pthread.h>
-
-void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data);
 
 static void *
 _eth_reader(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
 int status;
+int sched_policy;
+struct sched_param sched_priority;
+#if defined (_WIN32)
+HANDLE hWait = pcap_getevent ((pcap_t*)dev->handle);
+#endif
+#if defined (MUST_DO_SELECT)
 struct timeval timeout;
+int sel_ret;
+int pcap_fd;
 
-  timeout.tv_sec = 0;
-  timeout.tv_usec = 200*1000;
+if (dev->pcap_mode)
+  pcap_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
+else
+  pcap_fd = dev->fd_handle;
+#endif
 
   sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 
-  while (dev->handle) {
-#if defined (MUST_DO_SELECT)
-    int sel_ret;
+  /* Boost Priority for this I/O thread vs the CPU instruction execution 
+     thread which in general won't be readily yielding the processor when 
+     this thread needs to run */
+  pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
+  ++sched_priority.sched_priority;
+  pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
+  while ((dev->pcap_mode && dev->handle) || dev->fd_handle) {
+#if defined (MUST_DO_SELECT)
     fd_set setl;
     FD_ZERO(&setl);
-    FD_SET(pcap_get_selectable_fd((pcap_t *)dev->handle), &setl);
-    sel_ret = select(1+pcap_get_selectable_fd((pcap_t *)dev->handle), &setl, NULL, NULL, &timeout);
+    FD_SET(pcap_fd, &setl);
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 250*1000;
+    sel_ret = select(1+pcap_fd, &setl, NULL, NULL, &timeout);
     if (sel_ret < 0 && errno != EINTR) break;
     if (sel_ret > 0) {
-      /* dispatch read request queue available packets */
-      status = pcap_dispatch((pcap_t*)dev->handle, -1, &eth_callback, (u_char*)dev);
-    }
+#else /* !MUST_DO_SELECT */
+#if defined (_WIN32)
+    if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250)) {
 #else
-    /* dispatch read request queue available packets */
-    status = pcap_dispatch((pcap_t*)dev->handle, 1, &eth_callback, (u_char*)dev);
+    if (1)  {
 #endif
+#endif /* MUST_DO_SELECT */
+      if ((dev->pcap_mode) && (!dev->handle))
+        break;
+      if ((!dev->pcap_mode) && (!dev->fd_handle))
+        break;
+      /* dispatch read request queue available packets */
+      if (dev->pcap_mode)
+        status = pcap_dispatch ((pcap_t*)dev->handle, -1, &_eth_callback, (u_char*)dev);
+#ifdef USE_TAP_NETWORK
+      else {
+        struct pcap_pkthdr header;
+        int len;
+        u_char buf[ETH_MAX_JUMBO_FRAME];
+
+        memset(&header, 0, sizeof(header));
+        len = read(dev->fd_handle, buf, sizeof(buf));
+        if (len > 0) {
+          status = 1;
+          header.len = len;
+          _eth_callback((u_char *)dev, &header, buf);
+        } else {
+          status = 0;
+        }
+      }
+#endif /* USE_TAP_NETWORK */
+
+      if ((status > 0) && (dev->asynch_io)) {
+        int wakeup_needed;
+        pthread_mutex_lock (&dev->lock);
+        wakeup_needed = (dev->read_queue.count != 0);
+        pthread_mutex_unlock (&dev->lock);
+        if (wakeup_needed) {
+          sim_debug(dev->dbit, dev->dptr, "Queueing automatic poll\n");
+          sim_activate_abs (dev->dptr->units, dev->asynch_io_latency);
+          }
+        }
+      }
   }
 
   sim_debug(dev->dbit, dev->dptr, "Reader Thread Exiting\n");
   return NULL;
 }
+
+static void *
+_eth_writer(void *arg)
+{
+ETH_DEV* volatile dev = (ETH_DEV*)arg;
+struct write_request *request;
+int sched_policy;
+struct sched_param sched_priority;
+
+  /* Boost Priority for this I/O thread vs the CPU instruction execution 
+     thread which in general won't be readily yielding the processor when 
+     this thread needs to run */
+  pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
+  ++sched_priority.sched_priority;
+  pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+
+  sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
+
+  pthread_mutex_lock (&dev->writer_lock);
+  while ((dev->pcap_mode && dev->handle) || dev->fd_handle) {
+    pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
+    while (request = dev->write_requests) {
+      /* Pull buffer off request list */
+      dev->write_requests = request->next;
+      pthread_mutex_unlock (&dev->writer_lock);
+      
+      dev->write_status = _eth_write(dev, &request->packet, NULL);
+      
+      pthread_mutex_lock (&dev->writer_lock);
+      /* Put buffer on free buffer list */
+      request->next = dev->write_buffers;
+      dev->write_buffers = request;
+    }
+  }
+  pthread_mutex_unlock (&dev->writer_lock);
+
+  sim_debug(dev->dbit, dev->dptr, "Writer Thread Exiting\n");
+  return NULL;
+}
 #endif
+
+t_stat eth_set_async (ETH_DEV *dev, int latency)
+{
+#if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
+  char *msg = "Eth: can't operate asynchronously, must poll\r\n";
+  printf ("%s", msg);
+  if (sim_log) fprintf (sim_log, "%s", msg);
+  return SCPE_NOFNC;
+#else
+  int wakeup_needed;
+
+  dev->asynch_io = 1;
+  dev->asynch_io_latency = latency;
+  pthread_mutex_lock (&dev->lock);
+  wakeup_needed = (dev->read_queue.count != 0);
+  pthread_mutex_unlock (&dev->lock);
+  if (wakeup_needed) {
+    sim_debug(dev->dbit, dev->dptr, "Queueing automatic poll\n");
+    sim_activate_abs (dev->dptr->units, dev->asynch_io_latency);
+  }
+#endif
+  return SCPE_OK;
+}
+
+t_stat eth_clr_async (ETH_DEV *dev)
+{
+#if !defined(USE_READER_THREAD) || !defined(SIM_ASYNCH_IO)
+  return SCPE_NOFNC;
+#else
+  /* make sure device exists */
+  if (!dev) return SCPE_UNATT;
+
+  dev->asynch_io = 0;
+  return SCPE_OK;
+#endif
+}
 
 t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
 {
-  const int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
+  int bufsz = (BUFSIZ < ETH_MAX_PACKET) ? ETH_MAX_PACKET : BUFSIZ;
   char errbuf[PCAP_ERRBUF_SIZE];
   char temp[1024];
   char* savname = name;
   int   num;
   char* msg;
+
+  if (bufsz < ETH_MAX_JUMBO_FRAME)
+      bufsz = ETH_MAX_JUMBO_FRAME;  /* Enable handling of jumbo frames */
 
   /* initialize device */
   eth_zero(dev);
@@ -919,23 +1335,87 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
       /* probably is not ethX and has no description */
       savname = eth_getname_byname(name, temp);
       if (savname == 0) /* didn't translate */
-        return SCPE_OPENERR;
+        savname = name;
     }
   }
 
   /* attempt to connect device */
   memset(errbuf, 0, sizeof(errbuf));
-  dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-  if (!dev->handle) { /* can't open device */
-    msg = "Eth: pcap_open_live error - %s\r\n";
+  if (strncmp("tap:", savname, 4)) {
+    dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+    if (!dev->handle) { /* can't open device */
+      msg = "Eth: pcap_open_live error - %s\r\n";
+      printf (msg, errbuf);
+      if (sim_log) fprintf (sim_log, msg, errbuf);
+      return SCPE_OPENERR;
+    }
+    dev->pcap_mode = 1;
+  } else {
+    int  tun = -1;    /* TUN/TAP Socket */
+    int  on = 1;
+    char dev_name[64] = "";
+
+#if defined(USE_TAP_NETWORK)
+    if (!strcmp(savname, "tap:tapN")) {
+      msg = "Eth: Must specify actual tap device name (i.e. tap:tap0)\r\n";
+      printf (msg, errbuf);
+      if (sim_log) fprintf (sim_log, msg, errbuf);
+      return SCPE_OPENERR;
+    }
+#endif
+#if defined(__linux) && defined(USE_TAP_NETWORK)
+    if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
+      struct ifreq ifr; /* Interface Requests */
+
+      memset(&ifr, 0, sizeof(ifr));
+      /* Set up interface flags */
+      strcpy(ifr.ifr_name, savname+4);
+      ifr.ifr_flags = IFF_TAP|IFF_NO_PI;
+
+      // Send interface requests to TUN/TAP driver.
+      if (ioctl(tun, TUNSETIFF, &ifr) >= 0) {
+        if (ioctl(tun, FIONBIO, &on)) {
+          strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+          close(tun);
+        } else {
+          dev->fd_handle = tun;
+          strcpy(savname, ifr.ifr_name);
+        }
+      } else
+        strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+    } else
+      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+#elif defined(USE_BSDTUNTAP) && defined(USE_TAP_NETWORK)
+    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", savname+4);
+    dev_name[sizeof(dev_name)-1] = '\0';
+
+    if ((tun = open(dev_name, O_RDWR)) >= 0) {
+      if (ioctl(tun, FIONBIO, &on)) {
+        strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+        close(tun);
+      } else {
+        dev->fd_handle = tun;
+        strcpy(savname, savname+4);
+      }
+    } else {
+      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+    }
+#else
+    strncpy(errbuf, "No support for tap: devices", sizeof(errbuf)-1);
+#endif /* !defined(__linux) && !defined(USE_BSDTUNTAP) */
+  }
+  if (errbuf[0]) {
+    msg = "Eth: open error - %s\r\n";
     printf (msg, errbuf);
     if (sim_log) fprintf (sim_log, msg, errbuf);
     return SCPE_OPENERR;
-  } else {
-    msg = "Eth: opened %s\r\n";
-    printf (msg, savname);
-    if (sim_log) fprintf (sim_log, msg, savname);
   }
+  msg = "Eth: opened OS device %s\r\n";
+  printf (msg, savname);
+  if (sim_log) fprintf (sim_log, msg, savname);
+
+  /* get the NIC's hardware MAC address */
+  eth_get_nic_hw_addr(dev, savname);
 
   /* save name of device */
   dev->name = malloc(strlen(savname)+1);
@@ -948,7 +1428,7 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
 #if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
   /* Tell the kernel that the header is fully-formed when it gets it.
      This is required in order to fake the src address. */
-  {
+  if (dev->pcap_mode) {
     int one = 1;
     ioctl(pcap_fileno(dev->handle), BIOCSHDRCMPLT, &one);
   }
@@ -958,23 +1438,40 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {
   pthread_attr_t attr;
 
+#if defined(_WIN32)
+  pcap_setmintocopy (dev->handle, 0);
+#endif
   ethq_init (&dev->read_queue, 200);         /* initialize FIFO queue */
   pthread_mutex_init (&dev->lock, NULL);
+  pthread_mutex_init (&dev->writer_lock, NULL);
+  pthread_cond_init (&dev->writer_cond, NULL);
   pthread_attr_init(&attr);
   pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
   pthread_create (&dev->reader_thread, &attr, _eth_reader, (void *)dev);
+  pthread_create (&dev->writer_thread, &attr, _eth_writer, (void *)dev);
   pthread_attr_destroy(&attr);
   }
 #else /* !defined (USE_READER_THREAD */
 #ifdef USE_SETNONBLOCK
   /* set ethernet device non-blocking so pcap_dispatch() doesn't hang */
-  if (pcap_setnonblock (dev->handle, 1, errbuf) == -1) {
+  if (dev->pcap_mode && (pcap_setnonblock (dev->handle, 1, errbuf) == -1)) {
     msg = "Eth: Failed to set non-blocking: %s\r\n";
     printf (msg, errbuf);
     if (sim_log) fprintf (sim_log, msg, errbuf);
   }
 #endif
 #endif /* !defined (USE_READER_THREAD */
+#if defined (__APPLE__)
+  if (1) {
+    /* Deliver packets immediately, needed for OS X 10.6.2 and later
+     * (Snow-Leopard).
+     * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on
+     * the tcpdump mailinglist: http://seclists.org/tcpdump/2010/q1/110
+     */
+    int v = 1;
+    ioctl(pcap_fileno(dev->handle), BIOCIMMEDIATE, &v);
+  }
+#endif
   return SCPE_OK;
 }
 
@@ -982,6 +1479,7 @@ t_stat eth_close(ETH_DEV* dev)
 {
   char* msg = "Eth: closed %s\r\n";
   pcap_t *pcap;
+  int pcap_fd = dev->fd_handle;
 
   /* make sure device exists */
   if (!dev) return SCPE_UNATT;
@@ -989,13 +1487,39 @@ t_stat eth_close(ETH_DEV* dev)
   /* close the device */
   pcap = (pcap_t *)dev->handle;
   dev->handle = NULL;
-  pcap_close(pcap);
-  printf (msg, dev->name);
-  if (sim_log) fprintf (sim_log, msg, dev->name);
+  dev->fd_handle = 0;
+  dev->have_host_nic_phy_addr = 0;
 
 #if defined (USE_READER_THREAD)
   pthread_join (dev->reader_thread, NULL);
+  pthread_mutex_destroy (&dev->lock);
+  pthread_cond_signal (&dev->writer_cond);
+  pthread_join (dev->writer_thread, NULL);
+  pthread_mutex_destroy (&dev->writer_lock);
+  pthread_cond_destroy (&dev->writer_cond);
+  if (1) {
+    struct write_request *buffer;
+
+    while (buffer = dev->write_buffers) {
+      dev->write_buffers = buffer->next;
+      free(buffer);
+    }
+    while (buffer = dev->write_requests) {
+      dev->write_requests = buffer->next;
+      free(buffer);
+    }
+  }
+  ethq_destroy (&dev->read_queue);         /* release FIFO queue */
 #endif
+
+  if (dev->pcap_mode)
+    pcap_close(pcap);
+#ifdef USE_TAP_NETWORK
+  else
+    close(pcap_fd);
+#endif
+  printf (msg, dev->name);
+  if (sim_log) fprintf (sim_log, msg, dev->name);
 
   /* clean up the mess */
   free(dev->name);
@@ -1004,27 +1528,30 @@ t_stat eth_close(ETH_DEV* dev)
   return SCPE_OK;
 }
 
-t_stat eth_reflect(ETH_DEV* dev, ETH_MAC mac)
+t_stat eth_check_address_conflict (ETH_DEV* dev, 
+                                   ETH_MAC* const mac)
 {
   ETH_PACK send, recv;
   t_stat status;
-  int i;
-  struct timeval delay;
+  int responses = 0;
 
-  /* build a packet */
+  sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict...\n");
+
+  /* build a loopback forward request packet */
   memset (&send, 0, sizeof(ETH_PACK));
   send.len = ETH_MIN_PACKET;                              /* minimum packet size */
   memcpy(&send.msg[0], mac, sizeof(ETH_MAC));             /* target address */
   memcpy(&send.msg[6], mac, sizeof(ETH_MAC));             /* source address */
   send.msg[12] = 0x90;                                    /* loopback packet type */
-  for (i=14; i<send.len; i++)
-    send.msg[i] = 32 + i;                                 /* gibberish */
+  send.msg[14] = 0;                                       /* Offset */
+  send.msg[16] = 2;                                       /* Forward */
+  memcpy(&send.msg[18], mac, sizeof(ETH_MAC));            /* Forward Destination */
+  send.msg[24] = 1;                                       /* Reply */
 
-  dev->reflections = 0;
   eth_filter(dev, 1, (ETH_MAC *)mac, 0, 0);
 
   /* send the packet */
-  status = eth_write (dev, &send, NULL);
+  status = _eth_write (dev, &send, NULL);
   if (status != SCPE_OK) {
     char *msg;
     msg = "Eth: Error Transmitting packet: %s\r\n"
@@ -1035,24 +1562,38 @@ t_stat eth_reflect(ETH_DEV* dev, ETH_MAC mac)
     return status;
   }
 
-  /* if/when we have a sim_os_msleep() we'll use it here instead of this select() */
-  delay.tv_sec = 0;
-  delay.tv_usec = 50*1000;
-  select(0, NULL, NULL, NULL, &delay); /* make sure things settle into the read path */
+  sim_os_ms_sleep (300);   /* time for a conflicting host to respond */
 
-  /* empty the read queue and count the reflections */
+  /* empty the read queue and count the responses */
   do {
     memset (&recv, 0, sizeof(ETH_PACK));
     status = eth_read (dev, &recv, NULL);
-    if (memcmp(send.msg, recv.msg, ETH_MIN_PACKET)== 0)
-      dev->reflections++;
+    if (memcmp(send.msg, recv.msg, 14)== 0)
+      responses++;
   } while (recv.len > 0);
+
+  sim_debug(dev->dbit, dev->dptr, "Address Conflict = %d\n", responses);
+  return responses;
+}
+
+t_stat eth_reflect(ETH_DEV* dev)
+{
+  /* Test with an address no NIC should have. */
+  /* We do this to avoid reflections from the wire, */
+  /* in the event that a simulated NIC has a MAC address conflict. */
+  ETH_MAC mac = {0xfe,0xff,0xff,0xff,0xff,0xfe};
+
+  sim_debug(dev->dbit, dev->dptr, "Determining Reflections...\n");
+
+  dev->reflections = 0;
+  dev->reflections = eth_check_address_conflict (dev, &mac);
 
   sim_debug(dev->dbit, dev->dptr, "Reflections = %d\n", dev->reflections);
   return dev->reflections;
 }
 
-t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
+static
+t_stat _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 {
   int status = 1;   /* default to failure */
 
@@ -1067,11 +1608,18 @@ t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
     eth_packet_trace (dev, packet->msg, packet->len, "writing");
 
     /* dispatch write request (synchronous; no need to save write info to dev) */
-    status = pcap_sendpacket((pcap_t*)dev->handle, (u_char*)packet->msg, packet->len);
+    if (dev->pcap_mode)
+      status = pcap_sendpacket((pcap_t*)dev->handle, (u_char*)packet->msg, packet->len);
+#ifdef USE_TAP_NETWORK
+    else
+      status = ((packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
+#endif
 
-    /* detect sending of decnet loopback packet */
-    if ((status == 0) && DECNET_SELF_FRAME(dev->decnet_addr, packet->msg)) 
-      dev->decnet_self_sent += dev->reflections;
+    /* detect sending of loopback packet */
+    if ((status == 0) && (LOOPBACK_SELF_FRAME(dev->physical_addr, packet->msg))) {
+        dev->loopback_self_sent += dev->reflections;
+        dev->loopback_self_sent_total++;
+    }
 
   } /* if packet->len */
 
@@ -1082,19 +1630,480 @@ t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
   return ((status == 0) ? SCPE_OK : SCPE_IOERR);
 }
 
-void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data)
+t_stat eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
+{
+#ifdef USE_READER_THREAD
+  struct write_request *request;
+  int write_queue_size = 1;
+
+  /* make sure device exists */
+  if (!dev) return SCPE_UNATT;
+
+  /* Get a buffer */
+  pthread_mutex_lock (&dev->writer_lock);
+  if (request = dev->write_buffers)
+    dev->write_buffers = request->next;
+  pthread_mutex_unlock (&dev->writer_lock);
+  if (!request)
+    request = malloc(sizeof(*request));
+
+  /* Copy buffer contents */
+  request->packet.len = packet->len;
+  request->packet.used = packet->used;
+  request->packet.status = packet->status;
+  request->packet.crc_len = packet->crc_len;
+  memcpy(request->packet.msg, packet->msg, packet->len);
+
+  /* Insert buffer at the end of the write list (to make sure that */
+  /* packets make it to the wire in the order they were presented here) */
+  pthread_mutex_lock (&dev->writer_lock);
+  request->next = NULL;
+  if (dev->write_requests) {
+    struct write_request *last_request = dev->write_requests;
+
+    ++write_queue_size;
+    while (last_request->next) {
+      last_request = last_request->next;
+      ++write_queue_size;
+    }
+    last_request->next = request;
+  } else
+    dev->write_requests = request;
+  if (write_queue_size > dev->write_queue_peak)
+    dev->write_queue_peak = write_queue_size;
+  pthread_mutex_unlock (&dev->writer_lock);
+
+  /* Awaken writer thread to perform actual write */
+  pthread_cond_signal (&dev->writer_cond);
+
+  /* Return with a status from some prior write */
+  if (routine)
+      (routine)(dev->write_status);
+  return dev->write_status;
+#else
+  return _eth_write(dev, packet, routine);
+#endif
+}
+
+static int
+_eth_hash_lookup(ETH_MULTIHASH hash, const u_char* data)
+{
+  int key = 0x3f & (eth_crc32(0, data, 6) >> 26);
+
+  key ^= 0x3f;
+  return (hash[key>>3] & (1 << (key&0x7)));
+}
+
+static int
+_eth_hash_validate(ETH_MAC *MultiCastList, int count, ETH_MULTIHASH hash)
+{
+  ETH_MULTIHASH lhash;
+  int i;
+
+  memset(lhash, 0, sizeof(lhash));
+  for (i=0; i<count; ++i) {
+    int key = 0x3f & (eth_crc32(0, MultiCastList[i], 6) >> 26);
+
+    key ^= 0x3F;
+    printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X Key: %X, Byte: %X, Val: %X\n", 
+        MultiCastList[i][0], MultiCastList[i][1], MultiCastList[i][2], MultiCastList[i][3], MultiCastList[i][4], MultiCastList[i][5], 
+        key, key>>3, (1 << (key&0x7)));
+    lhash[key>>3] |= (1 << (key&0x7));
+  }
+  if (memcmp(hash, lhash, sizeof(lhash))) {
+    printf("Inconsistent Computed Hash:\n");
+    printf("Should be: %02X %02X %02X %02X %02X %02X %02X %02X\n", 
+            hash[0], hash[1], hash[2], hash[3], 
+            hash[4], hash[5], hash[6], hash[7]);
+    printf("Was:       %02X %02X %02X %02X %02X %02X %02X %02X\n", 
+            lhash[0], lhash[1], lhash[2], lhash[3], 
+            lhash[4], lhash[5], lhash[6], lhash[7]);
+  }
+    printf("Should be: %02X %02X %02X %02X %02X %02X %02X %02X\n", 
+            hash[0], hash[1], hash[2], hash[3], 
+            hash[4], hash[5], hash[6], hash[7]);
+    printf("Was:       %02X %02X %02X %02X %02X %02X %02X %02X\n", 
+            lhash[0], lhash[1], lhash[2], lhash[3], 
+            lhash[4], lhash[5], lhash[6], lhash[7]);
+  return 0;
+}
+
+static void
+_eth_test_multicast_hash()
+{
+  ETH_MAC tMacs[] = {
+                     {0xAB, 0x00, 0x04, 0x01, 0xAC, 0x10},
+                     {0xAB, 0x00, 0x00, 0x04, 0x00, 0x00},
+                     {0x09, 0x00, 0x2B, 0x00, 0x00, 0x0F},
+                     {0x09, 0x00, 0x2B, 0x02, 0x01, 0x04},
+                     {0x09, 0x00, 0x2B, 0x02, 0x01, 0x07},
+                     {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
+                     {0x01, 0x00, 0x5E, 0x00, 0x00, 0x01}};
+  ETH_MULTIHASH thash = {0x01, 0x40, 0x00, 0x00, 0x48, 0x88, 0x40, 0x00};
+
+  _eth_hash_validate(tMacs, sizeof(tMacs)/sizeof(tMacs[0]), thash);
+}
+
+/* The IP header */
+struct IPHeader {
+  uint8 verhlen;          /* Version & Header Length in dwords */
+#define IP_HLEN(IP) (((IP)->verhlen&0xF)<<2) /* Header Length in Bytes */
+#define IP_VERSION(IP) ((((IP)->verhlen)>>4)&0xF) /* IP Version */
+  uint8 tos;              /* Type of service */
+  uint16 total_len;       /* Length of the packet in dwords */
+  uint16 ident;           /* unique identifier */
+  uint16 flags;           /* Fragmentation Flags */
+#define IP_DF_FLAG (0x4000)
+#define IP_MF_FLAG (0x2000)
+#define IP_OFFSET_MASK (0x1FFF)
+#define IP_FRAG_DF(IP) (ntohs(((IP)->flags))&IP_DF_FLAG)
+#define IP_FRAG_MF(IP) (ntohs(((IP)->flags))&IP_MF_FLAG)
+#define IP_FRAG_OFFSET(IP) (ntohs(((IP)->flags))&IP_OFFSET_MASK)
+  uint8 ttl;              /* Time to live */
+  uint8 proto;            /* Protocol number (TCP, UDP etc) */
+  uint16 checksum;        /* IP checksum */
+  uint32 source_ip;       /* Source Address */
+  uint32 dest_ip;         /* Destination Address */
+};
+
+/* ICMP header */
+struct ICMPHeader {
+  uint8 type;          /* ICMP packet type */
+  uint8 code;          /* Type sub code */
+  uint16 checksum;     /* ICMP Checksum */
+  uint32 otherstuff[1];/* optional data */
+};
+
+struct UDPHeader {
+  uint16 source_port;
+  uint16 dest_port;
+  uint16 length;      /* The length of the entire UDP datagram, including both header and Data fields. */
+  uint16 checksum;
+};
+
+struct TCPHeader {
+  uint16 source_port;
+  uint16 dest_port;
+  uint32 sequence_number;
+  uint32 acknowledgement_number;
+  uint16 data_offset_and_flags;
+#define TCP_DATA_OFFSET(TCP) ((ntohs((TCP)->data_offset_and_flags)>>12)<<2)
+#define TCP_CWR_FLAG (0x80)
+#define TCP_ECR_FLAG (0x40)
+#define TCP_URG_FLAG (0x20)
+#define TCP_ACK_FLAG (0x10)
+#define TCP_PSH_FLAG (0x08)
+#define TCP_RST_FLAG (0x04)
+#define TCP_SYN_FLAG (0x02)
+#define TCP_FIN_FLAG (0x01)
+#define TCP_FLAGS_MASK (0xFF)
+  uint16 window;
+  uint16 checksum;
+  uint16 urgent;
+  uint16 otherstuff[1];  /* The rest of the packet */
+};
+
+#ifndef IPPROTO_TCP
+#define IPPROTO_TCP             6               /* tcp */
+#endif
+#ifndef IPPROTO_UDP
+#define IPPROTO_UDP             17              /* user datagram protocol */
+#endif
+#ifndef IPPROTO_ICMP
+#define IPPROTO_ICMP            1               /* control message protocol */
+#endif
+
+static uint16 
+ip_checksum(uint16 *buffer, int size) 
+{
+  unsigned long cksum = 0;
+    
+  /* Sum all the words together, adding the final byte if size is odd  */
+  while (size > 1) {
+    cksum += *buffer++;
+    size -= sizeof(*buffer);
+  }
+  if (size) {
+    uint8 endbytes[2];
+
+    endbytes[0] = *((uint8 *)buffer);
+    endbytes[1] = 0;
+    cksum += *((uint16 *)endbytes);
+  }
+
+  /* Do a little shuffling  */
+  cksum = (cksum >> 16) + (cksum & 0xffff);
+  cksum += (cksum >> 16);
+    
+  /* Return the bitwise complement of the resulting mishmash  */
+  return (uint16)(~cksum);
+}
+
+static uint16 
+pseudo_checksum(uint16 len, uint16 proto, uint16 *src_addr, uint16 *dest_addr, uint8 *buff)
+{
+  uint32 sum;
+
+  /* Sum the data first */
+  sum = 0xffff&(~ip_checksum((uint16 *)buff, len));
+
+  /* add the pseudo header which contains the IP source and destinationn addresses */
+  sum += src_addr[0];
+  sum += src_addr[1];
+  sum += dest_addr[0];
+  sum += dest_addr[1];
+  /* and the protocol number and the length of the UDP packet */
+  sum = sum + htons(proto) + htons(len);
+
+  /* Do a little shuffling  */
+  sum = (sum >> 16) + (sum & 0xffff);
+  sum += (sum >> 16);
+    
+  /* Return the bitwise complement of the resulting mishmash  */
+  return (uint16)(~sum);
+}
+
+static void
+_eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
+{
+  unsigned short* proto = (unsigned short*) &msg[12];
+  struct IPHeader *IP;
+  struct TCPHeader *TCP = NULL;
+  struct UDPHeader *UDP;
+  struct ICMPHeader *ICMP;
+  uint16 orig_checksum;
+  uint16 payload_len;
+  uint16 mtu_payload;
+  uint16 ip_flags;
+  uint16 frag_offset;
+  struct pcap_pkthdr header;
+  uint16 tcp_flags;
+
+  /* Only interested in IP frames */
+  if (ntohs(*proto) != 0x0800) {
+    ++dev->jumbo_dropped; /* Non IP Frames are dropped */
+    return;
+  }
+  IP = (struct IPHeader *)&msg[14];
+  if (IP_VERSION(IP) != 4) {
+    ++dev->jumbo_dropped; /* Non IPv4 jumbo frames are dropped */
+    return;
+  }
+  if ((IP_HLEN(IP) > len) || (ntohs(IP->total_len) > len)) {
+    ++dev->jumbo_dropped; /* Bogus header length frames are dropped */
+    return;
+  }
+  if (IP_FRAG_OFFSET(IP) || IP_FRAG_MF(IP)) {
+    ++dev->jumbo_dropped; /* Previously fragmented, but currently jumbo sized frames are dropped */
+    return;
+  }
+  switch (IP->proto) {
+   case IPPROTO_UDP:
+      UDP = (struct UDPHeader *)(((char *)IP)+IP_HLEN(IP));
+      if (ntohs(UDP->length) > (len-IP_HLEN(IP))) {
+        ++dev->jumbo_dropped; /* Bogus UDP packet length (packet contained length exceeds packet size) frames are dropped */
+        return;
+      }
+      if (UDP->checksum == 0)
+        break; /* UDP Cghecksums are disabled */
+      orig_checksum = UDP->checksum;
+      UDP->checksum = 0;
+      UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)UDP);
+      if (orig_checksum != UDP->checksum)
+        eth_packet_trace (dev, msg, len, "reading jumbo UDP header Checksum Fixed");
+      break;
+   case IPPROTO_ICMP:
+      ICMP = (struct ICMPHeader *)(((char *)IP)+IP_HLEN(IP));
+      orig_checksum = ICMP->checksum;
+      ICMP->checksum = 0;
+      ICMP->checksum = ip_checksum((uint16 *)ICMP, ntohs(IP->total_len)-IP_HLEN(IP));
+      if (orig_checksum != ICMP->checksum)
+        eth_packet_trace (dev, msg, len, "reading jumbo ICMP header Checksum Fixed");
+      break;
+   case IPPROTO_TCP:
+      TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
+      if ((TCP_DATA_OFFSET(TCP) > (len-IP_HLEN(IP))) || (TCP_DATA_OFFSET(TCP) < 20)) {
+        ++dev->jumbo_dropped; /* Bogus TCP packet header length (packet contained length exceeds packet size) frames are dropped */
+        return;
+      }
+      /* We don't do anything with the TCP checksum since we're going to resegment the TCP data below */
+      break;
+   default:
+      ++dev->jumbo_dropped; /* We onlt handle UDP, ICMP and TCP jumbo frames others are dropped */
+      return;
+  }
+  /* Reasonable Checksums are now in the jumbo packet, but we've got to actually */
+  /* deliver ONLY standard sized ethernet frames.  Our job here is to now act as */
+  /* a router might have to and fragment these IPv4 frames as they are delivered */
+  /* into the virtual NIC. We do this by walking down the packet and dispatching */
+  /* a chunk at a time recomputing an appropriate header for each chunk. For */
+  /* datagram oriented protocols (UDP and ICMP) this is done by simple packet */
+  /* fragmentation.  For TCP this is done by breaking large packets into separate */
+  /* TCP packets. */
+  memset(&header, 0, sizeof(header));
+  switch (IP->proto) {
+   case IPPROTO_UDP:
+   case IPPROTO_ICMP:
+      ++dev->jumbo_fragmented;
+      payload_len = ntohs(IP->total_len) - IP_HLEN(IP);
+      mtu_payload = ETH_MIN_JUMBO_FRAME - 14 - IP_HLEN(IP);
+      frag_offset = 0;
+      while (payload_len > 0) {
+        ip_flags = frag_offset;
+        if (payload_len > mtu_payload) {
+          ip_flags |= IP_MF_FLAG;
+          IP->total_len = htons(((mtu_payload>>3)<<3) + IP_HLEN(IP));
+        } else {
+          IP->total_len = htons(payload_len + IP_HLEN(IP));
+        }
+        IP->flags = htons(ip_flags);
+        IP->checksum = 0;
+        IP->checksum = ip_checksum((uint16 *)IP, IP_HLEN(IP));
+        header.len = 14 + ntohs(IP->total_len);
+        eth_packet_trace (dev, ((u_char *)IP)-14, header.len, "reading Datagram fragment");
+#if ETH_MIN_JUMBO_FRAME < ETH_MAX_PACKET
+          { /* Debugging is easier it we read packets directly with pcap */
+          ETH_PACK pkt;
+
+          memset(&pkt, 0, sizeof(pkt));
+          memcpy(pkt.msg, ((u_char *)IP)-14, header.len);
+          pkt.len = header.len;
+          _eth_write(dev, &pkt, NULL);
+          }
+#else
+        _eth_callback((u_char *)dev, &header, ((u_char *)IP)-14);
+#endif
+        payload_len -= (ntohs(IP->total_len) - IP_HLEN(IP));
+        frag_offset += (ntohs(IP->total_len) - IP_HLEN(IP))>>3;
+        if (payload_len > 0) {
+          /* Move the MAC and IP headers down to just prior to the next payload segment */
+          memcpy(((u_char *)IP) + ntohs(IP->total_len) - (14 + IP_HLEN(IP)), ((u_char *)IP) - 14, 14 + IP_HLEN(IP));
+          IP = (struct IPHeader *)(((u_char *)IP) + ntohs(IP->total_len) - IP_HLEN(IP));
+        }
+      }
+      break;
+   case IPPROTO_TCP:
+      ++dev->jumbo_fragmented;
+      TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
+      tcp_flags = ntohs(TCP->data_offset_and_flags)&TCP_FLAGS_MASK;
+      TCP->data_offset_and_flags = htons(((TCP_DATA_OFFSET(TCP)>>2)<<12)|TCP_ACK_FLAG);
+      payload_len = ntohs(IP->total_len) - IP_HLEN(IP) - TCP_DATA_OFFSET(TCP);
+      mtu_payload = ETH_MIN_JUMBO_FRAME - 14 - IP_HLEN(IP) - TCP_DATA_OFFSET(TCP);
+      while (payload_len > 0) {
+        if (payload_len > mtu_payload) {
+          IP->total_len = htons(mtu_payload + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
+        } else {
+          TCP->data_offset_and_flags = htons(ntohs(TCP->data_offset_and_flags)|(tcp_flags&(TCP_PSH_FLAG|TCP_ACK_FLAG|TCP_FIN_FLAG|TCP_RST_FLAG)));
+          IP->total_len = htons(payload_len + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
+        }
+        IP->checksum = 0;
+        IP->checksum = ip_checksum((uint16 *)IP, IP_HLEN(IP));
+        TCP->checksum = 0;
+        TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)TCP);
+        header.len = 14 + ntohs(IP->total_len);
+        eth_packet_trace_ex (dev, ((u_char *)IP)-14, header.len, "reading TCP segment", 1, dev->dbit);
+#if ETH_MIN_JUMBO_FRAME < ETH_MAX_PACKET
+          { /* Debugging is easier it we read packets directly with pcap */
+          ETH_PACK pkt;
+
+          memset(&pkt, 0, sizeof(pkt));
+          memcpy(pkt.msg, ((u_char *)IP)-14, header.len);
+          pkt.len = header.len;
+          _eth_write(dev, &pkt, NULL);
+          }
+#else
+        _eth_callback((u_char *)dev, &header, ((u_char *)IP)-14);
+#endif
+        payload_len -= (ntohs(IP->total_len) - (IP_HLEN(IP) + TCP_DATA_OFFSET(TCP)));
+        if (payload_len > 0) {
+          /* Move the MAC, IP and TCP headers down to just prior to the next payload segment */
+          memcpy(((u_char *)IP) + ntohs(IP->total_len) - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP)), ((u_char *)IP) - 14, 14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
+          IP = (struct IPHeader *)(((u_char *)IP) + ntohs(IP->total_len) - (IP_HLEN(IP) + TCP_DATA_OFFSET(TCP)));
+          TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
+          TCP->sequence_number = htonl(mtu_payload + ntohl(TCP->sequence_number));
+        }
+      }
+      break;
+  }
+}
+
+static void
+_eth_fix_ip_xsum_offload(ETH_DEV* dev, u_char* msg, int len)
+{
+  unsigned short* proto = (unsigned short*) &msg[12];
+  struct IPHeader *IP;
+  struct TCPHeader *TCP;
+  struct UDPHeader *UDP;
+  struct ICMPHeader *ICMP;
+  uint16 orig_checksum;
+
+  /* Only need to process locally originated packets */
+  if ((!dev->have_host_nic_phy_addr) || (memcmp(msg+6, dev->host_nic_phy_hw_addr, 6)))
+    return;
+  /* Only interested in IP frames */
+  if (ntohs(*proto) != 0x0800)
+    return;
+  IP = (struct IPHeader *)&msg[14];
+  if (IP_VERSION(IP) != 4)
+    return; /* Only interested in IPv4 frames */
+  if ((IP_HLEN(IP) > len) || (ntohs(IP->total_len) > len))
+    return; /* Bogus header length */
+  orig_checksum = IP->checksum;
+  IP->checksum = 0;
+  IP->checksum = ip_checksum((uint16 *)IP, IP_HLEN(IP));
+  if (orig_checksum != IP->checksum)
+    eth_packet_trace (dev, msg, len, "reading IP header Checksum Fixed");
+  if (IP_FRAG_OFFSET(IP) || IP_FRAG_MF(IP))
+    return; /* Insufficient data to compute payload checksum */
+  switch (IP->proto) {
+   case IPPROTO_UDP:
+      UDP = (struct UDPHeader *)(((char *)IP)+IP_HLEN(IP));
+      if (ntohs(UDP->length) > (len-IP_HLEN(IP)))
+        return; /* packet contained length exceeds packet size */
+      if (UDP->checksum == 0)
+        return; /* UDP Cghecksums are disabled */
+      orig_checksum = UDP->checksum;
+      UDP->checksum = 0;
+      UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)UDP);
+      if (orig_checksum != UDP->checksum)
+        eth_packet_trace (dev, msg, len, "reading UDP header Checksum Fixed");
+      break;
+   case IPPROTO_TCP:
+      TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
+      orig_checksum = TCP->checksum;
+      TCP->checksum = 0;
+      TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)TCP);
+      if (orig_checksum != TCP->checksum)
+        eth_packet_trace (dev, msg, len, "reading TCP header Checksum Fixed");
+      break;
+   case IPPROTO_ICMP:
+      ICMP = (struct ICMPHeader *)(((char *)IP)+IP_HLEN(IP));
+      orig_checksum = ICMP->checksum;
+      ICMP->checksum = 0;
+      ICMP->checksum = ip_checksum((uint16 *)ICMP, ntohs(IP->total_len)-IP_HLEN(IP));
+      if (orig_checksum != ICMP->checksum)
+        eth_packet_trace (dev, msg, len, "reading ICMP header Checksum Fixed");
+      break;
+  }
+}
+
+static void
+_eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data)
 {
   ETH_DEV*  dev = (ETH_DEV*) info;
 #ifdef USE_BPF
   int to_me = 1;
+
+  /* AUTODIN II hash mode? */
+  if ((dev->hash_filter) && (data[0] & 0x01) && (!dev->promiscuous) && (!dev->all_multicast))
+    to_me = _eth_hash_lookup(dev->hash, data);
 #else /* !USE_BPF */
   int to_me = 0;
   int from_me = 0;
   int i;
 
-#ifdef ETH_DEBUG
-//  eth_packet_trace (dev, data, header->len, "received");
-#endif
+  eth_packet_trace (dev, data, header->len, "received");
+
   for (i = 0; i < dev->addr_count; i++) {
     if (memcmp(data, dev->filter_address[i], 6) == 0) to_me = 1;
     if (memcmp(&data[6], dev->filter_address[i], 6) == 0) from_me = 1;
@@ -1105,13 +2114,19 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
 
   /* promiscuous mode? */
   if (dev->promiscuous) to_me = 1;
+
+  /* AUTODIN II hash mode? */
+  if ((dev->hash_filter) && (!to_me) && (data[0] & 0x01))
+    to_me = _eth_hash_lookup(dev->hash, data);
 #endif /* USE_BPF */
 
-  /* detect sending of decnet loopback packet */
-  if (DECNET_SELF_FRAME(dev->decnet_addr, data)) {
-    /* lower reflection count - if already zero, pass it on */
-    if (dev->decnet_self_sent > 0) {
-      dev->decnet_self_sent--;
+  /* detect reception of loopback packet to our physical address */
+  if (LOOPBACK_SELF_FRAME(dev->physical_addr, data)) {
+    dev->loopback_self_rcvd_total++;
+        /* lower reflection count - if already zero, pass it on */
+    if (dev->loopback_self_sent > 0) {
+      eth_packet_trace (dev, data, header->len, "ignored");
+      dev->loopback_self_sent--;
       to_me = 0;
     } 
 #ifndef USE_BPF
@@ -1125,26 +2140,60 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
 #else /* !USE_BPF */
   if (to_me && !from_me) {
 #endif
+    if (header->len > ETH_MIN_JUMBO_FRAME) {
+      _eth_fix_ip_jumbo_offload(dev, data, header->len);
+      return;
+    }
 #if defined (USE_READER_THREAD)
-    ETH_PACK tmp_packet;
+    if (1) {
+      int crc_len = 0;
+      uint8 crc_data[4];
+      uint32 len = header->len;
+      u_char* moved_data = NULL;
 
-    /* set data in passed read packet */
-    tmp_packet.len = header->len;
-    memcpy(tmp_packet.msg, data, header->len);
-    if (dev->need_crc)
-      eth_add_crc32(&tmp_packet);
+      if (header->len < ETH_MIN_PACKET) {   /* Pad runt packets before CRC append */
+        moved_data = malloc(ETH_MIN_PACKET);
+        memcpy(moved_data, data, len);
+        memset(moved_data + len, 0, ETH_MIN_PACKET-len);
+        len = ETH_MIN_PACKET;
+        data = moved_data;
+      }
 
-    eth_packet_trace (dev, tmp_packet.msg, tmp_packet.len, "rcvqd");
+      /* If necessary, fix IP header checksums for packets originated locally */
+      /* but were presumed to be traversing a NIC which was going to handle that task */
+      /* This must be done before any needed CRC calculation */
+      _eth_fix_ip_xsum_offload(dev, (u_char*)data, len);
+    
+      if (dev->need_crc)
+        crc_len = eth_get_packet_crc32_data(data, len, crc_data);
 
-    pthread_mutex_lock (&dev->lock);
-    ethq_insert(&dev->read_queue, 2, &tmp_packet, 0);
-    pthread_mutex_unlock (&dev->lock);
+      eth_packet_trace (dev, data, len, "rcvqd");
+
+      pthread_mutex_lock (&dev->lock);
+      ethq_insert_data(&dev->read_queue, 2, data, 0, len, crc_len, crc_data, 0);
+      pthread_mutex_unlock (&dev->lock);
+      free(moved_data);
+    }
 #else
     /* set data in passed read packet */
     dev->read_packet->len = header->len;
     memcpy(dev->read_packet->msg, data, header->len);
+    /* Handle runt case and pad with zeros.  */
+    /* The real NIC won't hand us runts from the wire, BUT we may be getting */
+    /* some packets looped back before they actually traverse the wire */
+    /* (by an internal bridge device for instance) */
+    if (header->len < ETH_MIN_PACKET) {
+      memset(&dev->read_packet->msg[header->len], 0, ETH_MIN_PACKET-header->len);
+      dev->read_packet->len = ETH_MIN_PACKET;
+    }
+    /* If necessary, fix IP header checksums for packets originated by the local host */
+    /* but were presumed to be traversing a NIC which was going to handle that task */
+    /* This must be done before any needed CRC calculation */
+    _eth_fix_ip_xsum_offload(dev, dev->read_packet->msg, dev->read_packet->len);
     if (dev->need_crc)
-      eth_add_crc32(dev->read_packet);
+      dev->read_packet->crc_len = eth_add_packet_crc32(dev->read_packet->msg, dev->read_packet->len);
+    else
+      dev->read_packet->crc_len = 0;
 
     eth_packet_trace (dev, dev->read_packet->msg, dev->read_packet->len, "reading");
 
@@ -1155,28 +2204,46 @@ void eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* 
   }
 }
 
-t_stat eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
+int eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 {
   int status;
 
   /* make sure device exists */
 
-  if (!dev) return SCPE_UNATT;
+  if (!dev) return 0;
 
   /* make sure packet exists */
-  if (!packet) return SCPE_ARG;
+  if (!packet) return 0;
 
+  packet->len = 0;
 #if !defined (USE_READER_THREAD)
   /* set read packet */
   dev->read_packet = packet;
-  packet->len = 0;
 
   /* set optional callback routine */
   dev->read_callback = routine;
 
   /* dispatch read request to either receive a filtered packet or timeout */
   do {
-    status = pcap_dispatch((pcap_t*)dev->handle, 1, &eth_callback, (u_char*)dev);
+    if (dev->pcap_mode)
+      status = pcap_dispatch((pcap_t*)dev->handle, 1, &_eth_callback, (u_char*)dev);
+#ifdef USE_TAP_NETWORK
+    else {
+      struct pcap_pkthdr header;
+      int len;
+      u_char buf[ETH_MAX_JUMBO_FRAME];
+
+      memset(&header, 0, sizeof(header));
+      len = read(dev->fd_handle, buf, sizeof(buf));
+      if (len > 0) {
+        status = 1;
+        header.len = len;
+        _eth_callback((u_char *)dev, &header, buf);
+      } else {
+        status = 0;
+      }
+    }
+#endif /* USE_TAP_NETWORK */
   } while ((status) && (0 == packet->len));
 
 #else /* USE_READER_THREAD */
@@ -1186,23 +2253,34 @@ t_stat eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
     if (dev->read_queue.count > 0) {
       ETH_ITEM* item = &dev->read_queue.item[dev->read_queue.head];
       packet->len = item->packet.len;
-      memcpy(packet->msg, item->packet.msg, packet->len);
-      if (routine)
-          routine(status);
+      packet->crc_len = item->packet.crc_len;
+      memcpy(packet->msg, item->packet.msg, ((packet->len > packet->crc_len) ? packet->len : packet->crc_len));
+      status = 1;
       ethq_remove(&dev->read_queue);
     }
     pthread_mutex_unlock (&dev->lock);  
+    if ((status) && (routine))
+      routine(0);
 #endif
 
-  return SCPE_OK;
+  return status;
 }
 
-t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
+t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                   ETH_BOOL all_multicast, ETH_BOOL promiscuous)
+{
+return eth_filter_hash(dev, addr_count, addresses, 
+                       all_multicast, promiscuous, 
+                       NULL);
+}
+
+t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
+                       ETH_BOOL all_multicast, ETH_BOOL promiscuous, 
+                       ETH_MULTIHASH* const hash)
 {
   int i;
   bpf_u_int32  bpf_subnet, bpf_netmask;
-  char buf[110+66*ETH_FILTER_MAX];
+  char buf[114+66*ETH_FILTER_MAX];
   char errbuf[PCAP_ERRBUF_SIZE];
   char mac[20];
   char* buf2;
@@ -1221,6 +2299,11 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
   else
     if (!addresses) return SCPE_ARG;
 
+  /* test reflections.  This is done early in this routine since eth_reflect */
+  /* calls eth_filter recursively and thus changes the state of the device. */
+  if (dev->reflections == -1)
+    status = eth_reflect(dev);
+
   /* set new filter addresses */
   for (i = 0; i < addr_count; i++)
     memcpy(dev->filter_address[i], addresses[i], sizeof(ETH_MAC));
@@ -1229,6 +2312,15 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
   /* store other flags */
   dev->all_multicast = all_multicast;
   dev->promiscuous   = promiscuous;
+
+  /* store multicast hash data */
+  dev->hash_filter = (hash != NULL);
+  if (hash) {
+    memcpy(dev->hash, hash, sizeof(*hash));
+    sim_debug(dev->dbit, dev->dptr, "Multicast Hash: %02X-%02X-%02X-%02X-%02X-%02X-%02X-%02X\n",
+                                    dev->hash[0], dev->hash[1], dev->hash[2], dev->hash[3], 
+                                    dev->hash[4], dev->hash[5], dev->hash[6], dev->hash[7]);
+  }
 
   /* print out filter information if debugging */
   if (dev->dptr->dctrl & dev->dbit) {
@@ -1244,10 +2336,6 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
       sim_debug(dev->dbit, dev->dptr, "Promiscuous\n");
   }
 
-  /* test reflections */
-  if (dev->reflections == -1)
-    status = eth_reflect(dev, dev->filter_address[0]);
-
   /* setup BPF filters and other fields to minimize packet delivery */
   strcpy(buf, "");
 
@@ -1258,10 +2346,12 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
     for (i = 0; i < addr_count; i++) {
       eth_mac_fmt(&dev->filter_address[i], mac);
       if (!strstr(buf, mac))    /* eliminate duplicates */
-        sprintf(&buf[strlen(buf)], "%s(ether dst %s)", (*buf) ? " or " : "", mac);
+        sprintf(&buf[strlen(buf)], "%s(ether dst %s)", (*buf) ? " or " : "((", mac);
     }
-    if (dev->all_multicast)
-      sprintf(&buf[strlen(buf)], "%s(ether multicast)", (*buf) ? " or " : "");
+    if (dev->all_multicast || dev->hash_filter)
+      sprintf(&buf[strlen(buf)], "%s(ether multicast)", (*buf) ? " or " : "((");
+    if (strlen(buf) > 0)
+      sprintf(&buf[strlen(buf)], ")");
   }
 
   /* construct source filters - this prevents packets from being reflected back 
@@ -1281,66 +2371,84 @@ t_stat eth_filter(ETH_DEV* dev, int addr_count, ETH_MAC* addresses,
     }
     sprintf (&buf[strlen(buf)], ")");
   }
-  /* When starting, DECnet sends out a packet with the source and destination
-     addresses set to the same value as the DECnet MAC address. This packet is
-     designed to find and help diagnose DECnet address conflicts. Normally, this
-     packet would not be seen by the sender, only by the other machine that has
-     the same DECnet address. If the ethernet subsystem is reflecting packets,
-     DECnet will fail to start if it sees the reflected packet, since it thinks
-     another system is using this DECnet address. We have to let these packets
-     through, so that if another machine has the same DECnet address that we
-     can detect it. Both eth_write() and eth_callback() help by checking the
-     reflection count - eth_write() adds the reflection count to
-     dev->decnet_self_sent, and eth_callback() check the value - if the
-     dev->decnet_self_sent count is zero, then the packet has come from another
-     machine with the same address, and needs to be passed on to the simulated
-     machine. */
-  memset(dev->decnet_addr, 0, sizeof(ETH_MAC));
-  /* check for decnet address in filters */
+  if (strlen(buf) > 0)
+    sprintf(&buf[strlen(buf)], ")");
+  /* When changing the Physical Address on a LAN interface, VMS sends out a 
+     loopback packet with the source and destination addresses set to the same 
+     value as the Physical Address which is being setup.  This packet is
+     designed to find and help diagnose MAC address conflicts (which also 
+     include DECnet address conflicts). Normally, this packet would not be 
+     seen by the sender, only by the other machine that has the same Physical 
+     Address (or possibly DECnet address). If the ethernet subsystem is 
+     reflecting packets, the network startup will fail to start if it sees the 
+     reflected packet, since it thinks another system is using this Physical 
+     Address (or DECnet address). We have to let these packets through, so 
+     that if another machine has the same Physical Address (or DECnet address)
+     that we can detect it. Both eth_write() and _eth_callback() help by 
+     checking the reflection count - eth_write() adds the reflection count to
+     dev->loopback_self_sent, and _eth_callback() check the value - if the
+     dev->loopback_self_sent count is zero, then the packet has come from 
+     another machine with the same address, and needs to be passed on to the 
+     simulated machine. */
+  memset(dev->physical_addr, 0, sizeof(ETH_MAC));
+  dev->loopback_self_sent = 0;
+  /* check for physical address in filters */
   if ((addr_count) && (dev->reflections > 0)) {
     for (i = 0; i < addr_count; i++) {
+      if (dev->filter_address[i][0]&1)
+        continue;  /* skip all multicast addresses */
       eth_mac_fmt(&dev->filter_address[i], mac);
-      if (memcmp(mac, "AA:00:04", 8) == 0) {
-        memcpy(dev->decnet_addr, &dev->filter_address[i], sizeof(ETH_MAC));
-        /* let packets through where dst and src are the same as our decnet address */
+      if (strcmp(mac, "00:00:00:00:00:00") != 0) {
+        memcpy(dev->physical_addr, &dev->filter_address[i], sizeof(ETH_MAC));
+        /* let packets through where dst and src are the same as our physical address */
         sprintf (&buf[strlen(buf)], " or ((ether dst %s) and (ether src %s))", mac, mac);
         break;
       }
     }
   }
+  if ((0 == strlen(buf)) && (!dev->promiscuous)) /* Empty filter means match nothing */
+      strcpy(buf, "ether host fe:ff:ff:ff:ff:ff"); /* this should be a good match nothing filter */
   sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 
-
   /* get netmask, which is required for compiling */
-  if (pcap_lookupnet(dev->handle, &bpf_subnet, &bpf_netmask, errbuf)<0) {
+  if (dev->pcap_mode && (pcap_lookupnet(dev->handle, &bpf_subnet, &bpf_netmask, errbuf)<0)) {
       bpf_netmask = 0;
   }
 
 #ifdef USE_BPF
-  /* compile filter string */
-  if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
-    sprintf(errbuf, "%s", pcap_geterr(dev->handle));
-    msg = "Eth: pcap_compile error: %s\r\n";
-    printf(msg, errbuf);
-    if (sim_log) fprintf (sim_log, msg, errbuf);
-    /* show erroneous BPF string */
-    msg = "Eth: BPF string is: |%s|\r\n";
-    printf (msg, buf);
-    if (sim_log) fprintf (sim_log, msg, buf);
-  } else {
-    /* apply compiled filter string */
-    if ((status = pcap_setfilter(dev->handle, &bpf)) < 0) {
+  if (dev->pcap_mode) {
+#ifdef USE_READER_THREAD
+    pthread_mutex_lock (&dev->lock);
+    ethq_clear (&dev->read_queue); /* Empty FIFO Queue when filter list changes */
+    pthread_mutex_unlock (&dev->lock);
+#endif
+    /* compile filter string */
+    if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
       sprintf(errbuf, "%s", pcap_geterr(dev->handle));
-      msg = "Eth: pcap_setfilter error: %s\r\n";
+      msg = "Eth: pcap_compile error: %s\r\n";
       printf(msg, errbuf);
       if (sim_log) fprintf (sim_log, msg, errbuf);
+      sim_debug(dev->dbit, dev->dptr, "Eth: pcap_compile error: %s\n", errbuf);
+      /* show erroneous BPF string */
+      msg = "Eth: BPF string is: |%s|\r\n";
+      printf (msg, buf);
+      if (sim_log) fprintf (sim_log, msg, buf);
     } else {
+      /* apply compiled filter string */
+      if ((status = pcap_setfilter(dev->handle, &bpf)) < 0) {
+        sprintf(errbuf, "%s", pcap_geterr(dev->handle));
+        msg = "Eth: pcap_setfilter error: %s\r\n";
+        printf(msg, errbuf);
+        if (sim_log) fprintf (sim_log, msg, errbuf);
+        sim_debug(dev->dbit, dev->dptr, "Eth: pcap_setfilter error: %s\n", errbuf);
+      } else {
 #ifdef USE_SETNONBLOCK
-      /* set file non-blocking */
-      status = pcap_setnonblock (dev->handle, 1, errbuf);
+        /* set file non-blocking */
+        status = pcap_setnonblock (dev->handle, 1, errbuf);
 #endif /* USE_SETNONBLOCK */
+      }
+      pcap_freecode(&bpf);
     }
-    pcap_freecode(&bpf);
   }
 #endif /* USE_BPF */
 
@@ -1387,46 +2495,59 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
 #if defined(_WIN32)
   /* replace device description with user-defined adapter name (if defined) */
   for (i=0; i<used; i++) {
-        char regkey[2048];
+    char regkey[2048];
     char regval[2048];
-        LONG status;
+    LONG status;
     DWORD reglen, regtype;
     HKEY reghnd;
 
-        /* These registry keys don't seem to exist for all devices, so we simply ignore errors. */
-        /* Windows XP x64 registry uses wide characters by default,
-            so we force use of narrow characters by using the 'A'(ANSI) version of RegOpenKeyEx.
-            This could cause some problems later, if this code is internationalized. Ideally,
-            the pcap lookup will return wide characters, and we should use them to build a wide
-            registry key, rather than hardcoding the string as we do here. */
-        if(list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
-              sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
-                            "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
-                            strlen( "\\Device\\NPF_" ) );
-              if((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS) {
-                  continue;
-              }
-        reglen = sizeof(regval);
+    /* These registry keys don't seem to exist for all devices, so we simply ignore errors. */
+    /* Windows XP x64 registry uses wide characters by default,
+       so we force use of narrow characters by using the 'A'(ANSI) version of RegOpenKeyEx.
+       This could cause some problems later, if this code is internationalized. Ideally,
+       the pcap lookup will return wide characters, and we should use them to build a wide
+       registry key, rather than hardcoding the string as we do here. */
+    if(list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
+      sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
+               "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
+               strlen( "\\Device\\NPF_" ) );
+      if((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS) {
+        continue;
+      }
+      reglen = sizeof(regval);
 
-      /* look for user-defined adapter name, bail if not found */    
-        /* same comment about Windows XP x64 (above) using RegQueryValueEx */
+      /* look for user-defined adapter name, bail if not found */  
+      /* same comment about Windows XP x64 (above) using RegQueryValueEx */
       if((status = RegQueryValueExA (reghnd, "Name", NULL, &regtype, regval, &reglen)) != ERROR_SUCCESS) {
-              RegCloseKey (reghnd);
-            continue;
-        }
+        RegCloseKey (reghnd);
+        continue;
+      }
       /* make sure value is the right type, bail if not acceptable */
-        if((regtype != REG_SZ) || (reglen > sizeof(regval))) {
-            RegCloseKey (reghnd);
-            continue;
-        }
+      if((regtype != REG_SZ) || (reglen > sizeof(regval))) {
+        RegCloseKey (reghnd);
+        continue;
+      }
       /* registry value seems OK, finish up and replace description */
-        RegCloseKey (reghnd );
+      RegCloseKey (reghnd );
       sprintf (list[i].desc, "%s", regval);
     }
   } /* for */
 #endif
 
-    return used;
+#ifdef USE_TAP_NETWORK
+  if (used < max) {
+    list[used].num = used;
+#if defined(__OpenBSD__)
+    sprintf(list[used].name, "%s", "tap:tunN");
+#else
+    sprintf(list[used].name, "%s", "tap:tapN");
+#endif
+    sprintf(list[used].desc, "%s", "Integrated Tun/Tap support");
+    ++used;
+  }
+#endif
+
+  return used;
 }
 
 int eth_devices(int max, ETH_LIST* list)
@@ -1467,4 +2588,35 @@ int eth_devices(int max, ETH_LIST* list)
   return i;
 }
 
+void eth_show_dev (FILE *st, ETH_DEV* dev)
+{
+  fprintf(st, "Ethernet Device:\n");
+  if (!dev) {
+    fprintf(st, "-- Not Attached\n");
+    return;
+  }
+  fprintf(st, "  Name:                  %s\n", dev->name);
+  fprintf(st, "  Reflections:           %d\n", dev->reflections);
+  fprintf(st, "  Self Loopbacks Sent:   %d\n", dev->loopback_self_sent_total);
+  fprintf(st, "  Self Loopbacks Rcvd:   %d\n", dev->loopback_self_rcvd_total);
+  if (dev->have_host_nic_phy_addr) {
+    char hw_mac[20];
+
+    eth_mac_fmt(&dev->host_nic_phy_hw_addr, hw_mac);
+    fprintf(st, "  Host NIC Address:      %s\n", hw_mac);
+  }
+  if (dev->jumbo_dropped)
+    fprintf(st, "  Jumbo Dropped:         %d\n", dev->jumbo_dropped);
+  if (dev->jumbo_fragmented)
+    fprintf(st, "  Jumbo Fragmented:      %d\n", dev->jumbo_fragmented);
+#if defined(USE_READER_THREAD)
+  fprintf(st, "  Asynch Interrupts:       %s\n", dev->asynch_io?"Enabled":"Disabled");
+  if (dev->asynch_io)
+    fprintf(st, "  Interrupt Latency:       %d uSec\n", dev->asynch_io_latency);
+  fprintf(st, "  Read Queue: Count:       %d\n", dev->read_queue.count);
+  fprintf(st, "  Read Queue: High:        %d\n", dev->read_queue.high);
+  fprintf(st, "  Read Queue: Loss:        %d\n", dev->read_queue.loss);
+  fprintf(st, "  Peak Write Queue Size:   %d\n", dev->write_queue_peak);
+#endif
+}
 #endif /* USE_NETWORK */

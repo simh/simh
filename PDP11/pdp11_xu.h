@@ -1,7 +1,7 @@
 /* pdp11_xu.h: DEUNA/DELUA ethernet controller information
   ------------------------------------------------------------------------------
 
-   Copyright (c) 2003-2008, David T. Hittner
+   Copyright (c) 2003-2005, David T. Hittner
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
 
   Modification history:
 
+  23-Jan-08  MP   Added debugging support to display packet headers and packet data
   08-Dec-05  DTH  Added load_server, increased UDBSIZE for system ID parameters
   07-Jul-05  RMS  Removed extraneous externs
   05-Jan-04  DTH  Added network statistics
@@ -66,7 +67,7 @@ extern int32 int_req[IPL_HLVL];
 #include "sim_ether.h"
 
 #define XU_QUE_MAX           500                        /* message queue array */
-#define XU_FILTER_MAX         11                        /* mac + 10 multicast addrs */
+#define XU_FILTER_MAX         12                        /* mac + broadcast + 10 multicast addrs */
 #define XU_SERVICE_INTERVAL  100                        /* times per second */
 #define XU_ID_TIMER_VAL      540                        /* 9 min * 60 sec */
 #define UDBSIZE              200                        /* max size of UDB (in words) */
@@ -107,6 +108,7 @@ struct xu_stats {
   uint16 txccf;                                         /* transmit collision test failure */
   uint16 porterr;                                       /* port driver errors */
   uint16 bablcnt;                                       /* babble counter */
+  uint32 loopf;                                         /* loopback frames processed */
 };
 
 struct xu_device {
@@ -300,7 +302,8 @@ typedef struct xu_controller CTLR;
 #define DBG_TRC  0x0001                                 /* trace routine calls */
 #define DBG_REG  0x0002                                 /* trace read/write registers */
 #define DBG_WRN  0x0004                                 /* display warnings */
-#define DBG_PCK  0x0080                                 /* display packets */
+#define DBG_PCK  0x0080                                 /* display packet headers */
+#define DBG_DAT  0x0100                                 /* display packet data */
 #define DBG_ETH  0x8000                                 /* debug ethernet device */
 
 #endif                                                  /* _PDP11_XU_H */

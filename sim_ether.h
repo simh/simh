@@ -28,6 +28,14 @@
 
   Modification history:
 
+  09-Dec-10  MP   Added support to determine if network address conflicts exist
+  07-Dec-10  MP   Reworked DECnet self detection to the more general approach
+                  of loopback self when any Physical Address is being set.
+  04-Dec-10  MP   Changed eth_write to do nonblocking writes when 
+                  USE_READER_THREAD is defined.
+  07-Feb-08  MP   Added eth_show_dev to display ethernet state
+  28-Jan-08  MP   Added eth_set_async
+  23-Jan-08  MP   Added eth_packet_trace_ex and ethq_destroy
   30-Nov-05  DTH  Added CRC length to packet and more field comments
   04-Feb-04  DTH  Added debugging information
   14-Jan-04  MP   Generalized BSD support issues
@@ -64,7 +72,7 @@
 #define USE_SETNONBLOCK 1
 #endif
 
-#if defined(__sun__) && defined(__i386__)
+#if (((defined(__sun__) && defined(__i386__)) || defined(__linux)) && !defined(DONT_USE_READER_THREAD))
 #define USE_READER_THREAD 1
 #endif
 
@@ -108,13 +116,20 @@
 #define ETH_DEV_DESC_MAX     256                        /* maximum device description size */
 #define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
 #define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
+#define ETH_MAX_JUMBO_FRAME 16384                       /* maximum ethernet jumbo frame size */
 #define ETH_MAX_DEVICE        10                        /* maximum ethernet devices */
 #define ETH_CRC_SIZE           4                        /* ethernet CRC size */
-#define ETH_FRAME_SIZE      1518                        /* ethernet maximum frame size */
+#define ETH_FRAME_SIZE (ETH_MAX_PACKET+ETH_CRC_SIZE)    /* ethernet maximum frame size */
+#define ETH_MIN_JUMBO_FRAME ETH_MAX_PACKET              /* Threshold size for Jumbo Frame Processing */
 
-#define DECNET_SELF_FRAME(dnet_mac, msg)    \
-    ((memcmp(dnet_mac, msg  , 6) == 0) &&   \
-     (memcmp(dnet_mac, msg+6, 6) == 0))
+#define LOOPBACK_SELF_FRAME(phy_mac, msg)             \
+    ((memcmp(phy_mac, msg  , 6) == 0) &&              \
+     (memcmp(phy_mac, msg+6, 6) == 0) &&              \
+     ((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&    \
+     ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&    \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&    \
+     (memcmp(phy_mac, msg+18, 6) == 0) &&             \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00))
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
@@ -147,6 +162,7 @@ struct eth_list {
 
 typedef int ETH_BOOL;
 typedef unsigned char ETH_MAC[6];
+typedef unsigned char ETH_MULTIHASH[8];
 typedef struct eth_packet  ETH_PACK;
 typedef void (*ETH_PCALLBACK)(int status);
 typedef struct eth_list ETH_LIST;
@@ -156,24 +172,45 @@ typedef struct eth_item ETH_ITEM;
 struct eth_device {
   char*         name;                                   /* name of ethernet device */
   void*         handle;                                 /* handle of implementation-specific device */
+  int           fd_handle;                              /* fd to kernel device (where needed) */
+  int           pcap_mode;                              /* Flag indicating if pcap API are being used to move packets */
   ETH_PCALLBACK read_callback;                          /* read callback function */
   ETH_PCALLBACK write_callback;                         /* write callback function */
   ETH_PACK*     read_packet;                            /* read packet */
-  ETH_PACK*     write_packet;                           /* write packet */
   ETH_MAC       filter_address[ETH_FILTER_MAX];         /* filtering addresses */
   int           addr_count;                             /* count of filtering addresses */
   ETH_BOOL      promiscuous;                            /* promiscuous mode flag */
   ETH_BOOL      all_multicast;                          /* receive all multicast messages */
-  int32         decnet_self_sent;                       /* loopback packets sent but not seen */
-  ETH_MAC       decnet_addr;                            /* decnet address of interface */
+  ETH_BOOL      hash_filter;                            /* filter using AUTODIN II multicast hash */
+  ETH_MULTIHASH hash;                                   /* AUTODIN II multicast hash */
+  int32         loopback_self_sent;                     /* loopback packets sent but not seen */
+  int32         loopback_self_sent_total;               /* total loopback packets sent */
+  int32         loopback_self_rcvd_total;               /* total loopback packets seen */
+  ETH_MAC       physical_addr;                          /* physical address of interface */
+  int32         have_host_nic_phy_addr;                 /* flag indicating that the host_nic_phy_hw_addr is valid */
+  ETH_MAC       host_nic_phy_hw_addr;                   /* MAC address of the attached NIC */
+  uint32        jumbo_fragmented;                       /* Giant IPv4 Frames Fragmented */
+  uint32        jumbo_dropped;                          /* Giant Frames Dropped */
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */
-  int           need_crc;                               /* device needs CRC (Cyclic Redundancy Check) */
+  int           need_crc;				/* device needs CRC (Cyclic Redundancy Check) */
 #if defined (USE_READER_THREAD)
+  int           asynch_io;                              /* Asynchronous Interrupt scheduling enabled */
+  int           asynch_io_latency;                      /* instructions to delay pending interrupt */
   ETH_QUE       read_queue;
   pthread_mutex_t     lock;
   pthread_t     reader_thread;                          /* Reader Thread Id */
+  pthread_t     writer_thread;                          /* Writer Thread Id */
+  pthread_mutex_t     writer_lock;
+  pthread_cond_t      writer_cond;
+  struct write_request {
+      struct write_request *next;
+      ETH_PACK packet;
+      } *write_requests;
+  int write_queue_peak;
+  struct write_request *write_buffers;
+  t_stat write_status;
 #endif
 };
 
@@ -186,18 +223,30 @@ t_stat eth_open   (ETH_DEV* dev, char* name,            /* open ethernet interfa
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
 t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write sychronous packet; */
                    ETH_PCALLBACK routine);              /*  callback when done */
-t_stat eth_read   (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
+int eth_read      (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
                    ETH_PCALLBACK routine);              /*  callback when done*/
 t_stat eth_filter (ETH_DEV* dev, int addr_count,        /* set filter on incoming packets */
-                   ETH_MAC* addresses,
+                   ETH_MAC* const addresses,
                    ETH_BOOL all_multicast,
                    ETH_BOOL promiscuous);
+t_stat eth_filter_hash (ETH_DEV* dev, int addr_count,   /* set filter on incoming packets with AUTODIN II based hash */
+                        ETH_MAC* const addresses,
+                        ETH_BOOL all_multicast,
+                        ETH_BOOL promiscuous,
+                        ETH_MULTIHASH* const hash);
+t_stat eth_check_address_conflict (ETH_DEV* dev, 
+                                   ETH_MAC* const address);
 int eth_devices   (int max, ETH_LIST* dev);             /* get ethernet devices on host */
 void eth_setcrc   (ETH_DEV* dev, int need_crc);         /* enable/disable CRC mode */
+t_stat eth_set_async (ETH_DEV* dev, int latency);       /* set read behavior to be async */
+t_stat eth_clr_async (ETH_DEV* dev);                    /* set read behavior to be not async */
+uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len); /* Compute Ethernet Autodin II CRC for buffer */
 
-void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet */
+void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet header+crc */
+void eth_packet_trace_ex (ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason); /* trace ethernet packet */
 t_stat eth_show  (FILE* st, UNIT* uptr,                 /* show ethernet devices */
                   int32 val, void* desc);
+void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
 void eth_mac_fmt      (ETH_MAC* add, char* buffer);     /* format ethernet mac address */
 t_stat eth_mac_scan (ETH_MAC* mac, char* strmac);       /* scan string for mac, put in mac */
@@ -207,6 +256,10 @@ void ethq_clear  (ETH_QUE* que);                        /* clear FIFO queue */
 void ethq_remove (ETH_QUE* que);                        /* remove item from FIFO queue */
 void ethq_insert (ETH_QUE* que, int32 type,             /* insert item into FIFO queue */
                   ETH_PACK* packet, int32 status);
+void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO queue */
+                  const uint8 *data, int used, int len, 
+                  int crc_len, const uint8 *crc_data, int32 status);
+t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 
 
 #endif                                                  /* _SIM_ETHER_H */
