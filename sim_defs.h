@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Jan-11    MP      Added log file reference count support
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Added inlining support
    28-Jun-07    RMS     Added IA64 VMS support (from Norm Lastovica)
@@ -486,6 +487,13 @@ struct sim_debtab {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
 
+/* File Reference */
+struct sim_fileref {
+    char                name[CBUFSIZE];                 /* file name */
+    FILE                *file;                          /* file handle */
+    int32               refcount;                       /* reference count */
+    };
+
 /* The following macros define structure contents */
 
 #define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,0
@@ -522,6 +530,7 @@ typedef struct sim_mtab MTAB;
 typedef struct sim_schtab SCHTAB;
 typedef struct sim_brktab BRKTAB;
 typedef struct sim_debtab DEBTAB;
+typedef struct sim_fileref FILEREF;
 
 /* Function prototypes */
 

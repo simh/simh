@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   17-Jan-11    MP      Added Buffered line capabilities
    16-Jan-11    MP      Made option negotiation more reliable
    20-Nov-08    RMS     Added three new standardized SHOW routines
    30-Sep-08    JDB     Reverted tmxr_find_ldsc to original implementation
@@ -154,9 +155,12 @@ int32 tmxr_poll_conn (TMXR *mp)
 SOCKET newsock;
 TMLN *lp;
 int32 *op;
-int32 i, j;
+int32 i, j, psave;
 uint32 ipaddr;
-
+char cmsg[80];
+char dmsg[80] = "";
+char lmsg[80] = "";
+char msgbuf[256];
 static char mantra[] = {
     TN_IAC, TN_WILL, TN_LINE,
     TN_IAC, TN_WILL, TN_SGA,
@@ -189,34 +193,38 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         lp = mp->ldsc + i;                              /* get line desc */
         lp->conn = newsock;                             /* record connection */
         lp->ipad = ipaddr;                              /* ip address */
+        sim_write_sock (newsock, mantra, sizeof(mantra));
+        sprintf (cmsg, "\n\r\nConnected to the %s simulator ", sim_name);
+
+        if (mp->dptr) {                                 /* device defined? */
+            sprintf (dmsg, "%s device",                 /* report device name */
+                           sim_dname (mp->dptr));
+
+            if (mp->lines > 1)                          /* more than one line? */
+                sprintf (lmsg, ", line %d", i);         /* report the line number */
+            }
+
+        sprintf (msgbuf, "%s%s%s\r\n\n", cmsg, dmsg, lmsg);
         lp->cnms = sim_os_msec ();                      /* time of conn */
-        lp->rxbpr = lp->rxbpi = 0;                      /* init buf pointers */
-        lp->txbpr = lp->txbpi = 0;
-        lp->rxcnt = lp->txcnt = 0;                      /* init counters */
+        if (!mp->buffered) {
+            lp->txbpi = 0;                              /* init buf pointers */
+            lp->txbpr = lp->txbsz - strlen (msgbuf);
+            lp->rxcnt = lp->txcnt = lp->txdrp = 0;      /* init counters */
+            }
+        else
+            if (lp->txcnt > lp->txbsz)
+                lp->txbpr = (lp->txbpi + 1) % lp->txbsz;
+            else
+                lp->txbpr = lp->txbsz - strlen (msgbuf);
         lp->tsta = 0;                                   /* init telnet state */
         lp->xmte = 1;                                   /* enable transmit */
         lp->dstb = 0;                                   /* default bin mode */
-        sim_write_sock (newsock, mantra, sizeof (mantra));
-        tmxr_linemsg (lp, "\n\r\nConnected to the ");
-        tmxr_linemsg (lp, sim_name);
-        tmxr_linemsg (lp, " simulator ");
-
-        if (mp->dptr) {                                 /* device defined? */
-            tmxr_linemsg (lp, sim_dname (mp->dptr));    /* report device name */
-            tmxr_linemsg (lp, " device");
-
-            if (mp->lines > 1) {                        /* more than one line? */
-                char line[20];
-
-                tmxr_linemsg (lp, ", line ");           /* report the line number */
-                sprintf (line, "%i", i);
-                tmxr_linemsg (lp, line);
-                }
-            }
-
-        tmxr_linemsg (lp, "\r\n\n");
-
+        psave = lp->txbpi;                              /* save insertion pointer */
+        lp->txbpi = lp->txbpr;                          /* insert connection message */
+        tmxr_linemsg (lp, msgbuf);                      /* beginning of buffer */
+        lp->txbpi = psave;                              /* restore insertion pointer */
         tmxr_poll_tx (mp);                              /* flush output */
+        lp->txcnt -= strlen (msgbuf);                   /* adjust statistics */
         return i;
         }
     }                                                   /* end if newsock */
@@ -233,7 +241,8 @@ tmxr_send_buffered_data (lp);                           /* send buffered data */
 sim_close_sock (lp->conn, 0);                           /* reset conn */
 lp->conn = lp->tsta = 0;                                /* reset state */
 lp->rxbpr = lp->rxbpi = 0;
-lp->txbpr = lp->txbpi = 0;
+if (!lp->txbfd) 
+    lp->txbpr = lp->txbpi = 0;
 lp->xmte = 1;
 lp->dstb = 0;
 return;
@@ -419,7 +428,7 @@ return;
 
 int32 tmxr_rqln (TMLN *lp)
 {
-return (lp->rxbpi - lp->rxbpr);
+return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? TMXR_MAXBUF: 0));
 }
 
 /* Remove character p (and matching status) from line l input buffer */
@@ -447,24 +456,29 @@ t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
 if (lp->txlog)                                          /* log if available */
     fputc (chr, lp->txlog);
-if (lp->conn == 0)                                      /* no conn? lost */
-    return SCPE_LOST;
-if (tmxr_tqln (lp) < (TMXR_MAXBUF - 1)) {               /* room for char (+ IAC)? */
-    lp->txb[lp->txbpi] = (char) chr;                    /* buffer char */
-    lp->txbpi = lp->txbpi + 1;                          /* adv pointer */
-    if (lp->txbpi >= TMXR_MAXBUF)                       /* wrap? */
-        lp->txbpi = 0;
-    if ((char) chr == TN_IAC) {                         /* IAC? */
-        lp->txb[lp->txbpi] = (char) chr;                /* IAC + IAC */
-        lp->txbpi = lp->txbpi + 1;                      /* adv pointer */
-        if (lp->txbpi >= TMXR_MAXBUF)                   /* wrap? */
-            lp->txbpi = 0;
+if ((lp->conn == 0) && (!lp->txbfd))                    /* no conn & not buffered? */
+    if (lp->txlog)                                      /* if it was logged, we got it */           
+        return SCPE_OK;
+    else {
+        ++lp->txdrp;                                    /* lost */
+        return SCPE_LOST;
         }
-    if (tmxr_tqln (lp) > (TMXR_MAXBUF - TMXR_GUARD))    /* near full? */
+#define TXBUF_AVAIL(lp) (lp->txbsz - tmxr_tqln (lp))
+#define TXBUF_CHAR(lp, c) {                               \
+    lp->txb[lp->txbpi++] = (char)(c);                     \
+    lp->txbpi %= lp->txbsz;                               \
+    if (lp->txbpi == lp->txbpr)                           \
+        lp->txbpr = (1+lp->txbpr)%lp->txbsz, ++lp->txdrp; \
+    }
+if ((lp->txbfd) || (TXBUF_AVAIL(lp) > 1)) {             /* room for char (+ IAC)? */
+    if (TN_IAC == (char) chr)                           /* char == IAC ? */
+        TXBUF_CHAR (lp, TN_IAC);                        /* stuff extra IAC char */
+    TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
+    if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */
         lp->xmte = 0;                                   /* disable line */
     return SCPE_OK;                                     /* char sent */
     }
-lp->xmte = 0;                                           /* no room, dsbl line */
+++lp->txdrp; lp->xmte = 0;                              /* no room, dsbl line */
 return SCPE_STALL;                                      /* char not sent */
 }
 
@@ -510,10 +524,10 @@ if (nbytes) {                                           /* >0? write */
         sbytes = sim_write_sock (lp->conn,              /* write all data */
             &(lp->txb[lp->txbpr]), nbytes);
     else sbytes = sim_write_sock (lp->conn,             /* write to end buf */
-            &(lp->txb[lp->txbpr]), TMXR_MAXBUF - lp->txbpr);
+            &(lp->txb[lp->txbpr]), lp->txbsz - lp->txbpr);
     if (sbytes != SOCKET_ERROR) {                       /* ok? */
         lp->txbpr = (lp->txbpr + sbytes);               /* update remove ptr */
-        if (lp->txbpr >= TMXR_MAXBUF)                   /* wrap? */
+        if (lp->txbpr >= lp->txbsz)                     /* wrap? */
             lp->txbpr = 0;
         lp->txcnt = lp->txcnt + sbytes;                 /* update counts */
         nbytes = nbytes - sbytes;
@@ -522,7 +536,7 @@ if (nbytes) {                                           /* >0? write */
         sbytes = sim_write_sock (lp->conn, lp->txb, nbytes);
         if (sbytes != SOCKET_ERROR) {                   /* ok */
             lp->txbpr = (lp->txbpr + sbytes);           /* update remove ptr */
-            if (lp->txbpr >= TMXR_MAXBUF)               /* wrap? */
+            if (lp->txbpr >= lp->txbsz)                 /* wrap? */
                 lp->txbpr = 0;
             lp->txcnt = lp->txcnt + sbytes;             /* update counts */
             nbytes = nbytes - sbytes;
@@ -536,7 +550,7 @@ return nbytes;
 
 int32 tmxr_tqln (TMLN *lp)
 {
-return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? TMXR_MAXBUF: 0));
+return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? lp->txbsz: 0));
 }
 
 /* Open master socket */
@@ -548,6 +562,81 @@ SOCKET sock;
 TMLN *lp;
 t_stat r;
 
+if (!isdigit(*cptr)) {
+    char gbuf[CBUFSIZE];
+    cptr = get_glyph (cptr, gbuf, '=');
+    if (0 == MATCH_CMD (gbuf, "LOG")) {
+        if ((NULL == cptr) || ('\0' == *cptr))
+            return SCPE_2FARG;
+        strncpy(mp->logfiletmpl, cptr, sizeof(mp->logfiletmpl)-1);
+        for (i = 0; i < mp->lines; i++) {
+            lp = mp->ldsc + i;
+            sim_close_logfile (&lp->txlogref);
+            lp->txlog = NULL;
+            lp->txlogname = realloc(lp->txlogname, CBUFSIZE);
+            if (mp->lines > 1)
+                sprintf(lp->txlogname, "%s_%d", mp->logfiletmpl, i);
+            else
+                strcpy(lp->txlogname, mp->logfiletmpl);
+            r = sim_open_logfile (lp->txlogname, TRUE, &lp->txlog, &lp->txlogref);
+            if (r == SCPE_OK)
+                setvbuf(lp->txlog, NULL, _IOFBF, 65536);
+            else {
+                free (lp->txlogname);
+                lp->txlogname = NULL;
+                break;
+                }
+            }
+        return r;
+        }
+    if ((0 == MATCH_CMD (gbuf, "NOBUFFERED")) || 
+        (0 == MATCH_CMD (gbuf, "UNBUFFERED"))) {
+        if (mp->buffered) {
+            mp->buffered = 0;
+            for (i = 0; i < mp->lines; i++) { /* default line buffers */
+                lp = mp->ldsc + i;
+                lp->txbsz = TMXR_MAXBUF;
+                lp->txb = (char *)realloc(lp->txb, lp->txbsz);
+                lp->txbfd = lp->txbpi = lp->txbpr = 0;
+                }
+            }
+        return SCPE_OK;
+        }
+    if (0 == MATCH_CMD (gbuf, "BUFFERED")) {
+        if ((NULL == cptr) || ('\0' == *cptr))
+            mp->buffered = 32768;
+        else {
+            i = (int32) get_uint (cptr, 10, 1024*1024, &r);
+            if ((r != SCPE_OK) || (i == 0))
+                return SCPE_ARG;
+            mp->buffered = i;
+            }
+        for (i = 0; i < mp->lines; i++) { /* initialize line buffers */
+            lp = mp->ldsc + i;
+            lp->txbsz = mp->buffered;
+            lp->txbfd = 1;
+            lp->txb = (char *)realloc(lp->txb, lp->txbsz);
+            lp->txbpi = lp->txbpr = 0;
+            }
+        return SCPE_OK;
+        }
+    if (0 == MATCH_CMD (gbuf, "NOLOG")) {
+        if ((NULL != cptr) && ('\0' != *cptr))
+            return SCPE_2MARG;
+        mp->logfiletmpl[0] = '\0';
+        for (i = 0; i < mp->lines; i++) { /* close line logs */
+            lp = mp->ldsc + i;
+            free(lp->txlogname);
+            lp->txlogname = NULL;
+            if (lp->txlog) {
+                sim_close_logfile (&lp->txlogref);
+                lp->txlog = NULL;
+                }
+            }
+        return SCPE_OK;
+        }
+    return SCPE_ARG;
+    }
 port = (int32) get_uint (cptr, 10, 65535, &r);          /* get port */
 if ((r != SCPE_OK) || (port == 0))
     return SCPE_ARG;
@@ -564,7 +653,12 @@ for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
     lp->conn = lp->tsta = 0;
     lp->rxbpi = lp->rxbpr = 0;
     lp->txbpi = lp->txbpr = 0;
-    lp->rxcnt = lp->txcnt = 0;
+    if (!mp->buffered) {
+        lp->txbfd = lp->txbpi = lp->txbpr = 0;
+        lp->txbsz = TMXR_MAXBUF;
+        lp->txb = (char *)realloc(lp->txb, lp->txbsz);
+        }
+    lp->rxcnt = lp->txcnt = lp->txdrp = 0;
     lp->xmte = 1;
     lp->dstb = 0;
     }
@@ -577,8 +671,11 @@ t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr)
 {
 char* tptr;
 t_stat r;
+char pmsg[20], bmsg[32] = "", lmsg[64+PATH_MAX] = "";
 
-tptr = (char *) malloc (strlen (cptr) + 1);             /* get string buf */
+tptr = (char *) malloc (strlen (cptr) +                 /* get string buf */
+                        sizeof(pmsg) + 
+                        sizeof(bmsg) + sizeof(lmsg));
 if (tptr == NULL)                                       /* no more mem? */
     return SCPE_MEM;
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
@@ -586,7 +683,12 @@ if (r != SCPE_OK) {                                     /* error? */
     free (tptr);                                        /* release buf */
     return SCPE_OPENERR;
     }
-strcpy (tptr, cptr);                                    /* copy port */
+sprintf (pmsg, "%d", mp->port);                         /* copy port */
+if (mp->buffered)
+    sprintf (bmsg, ", buffered=%d", mp->buffered);      /* buffer info */
+if (mp->logfiletmpl[0])
+    sprintf (lmsg, ", log=%s", mp->logfiletmpl);        /* logfile info */
+sprintf (tptr, "%s%s%s", pmsg, bmsg, lmsg);             /* assemble all */
 uptr->filename = tptr;                                  /* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
 
@@ -696,16 +798,24 @@ static const char *enab = "on";
 static const char *dsab = "off";
 
 if (ln >= 0)
-    fprintf (st, "line %d: ", ln);
-if (lp->conn) {
-    fprintf (st, "input (%s) queued/total = %d/%d, ",
+    fprintf (st, "line %d:\b", ln);
+if (!lp->conn)
+    fprintf (st, "line disconnected\n");
+if (lp->rxcnt)
+    fprintf (st, "  input (%s) queued/total = %d/%d\n",
         (lp->rcve? enab: dsab),
-        lp->rxbpi - lp->rxbpr, lp->rxcnt);
-    fprintf (st, "output (%s) queued/total = %d/%d\n",
+        tmxr_rqln (lp), lp->rxcnt);
+if (lp->txcnt || lp->txbpi)
+    fprintf (st, "  output (%s) queued/total = %d/%d\n",
         (lp->xmte? enab: dsab),
-        lp->txbpi - lp->txbpr, lp->txcnt);
-    }
-else fprintf (st, "line disconnected\n");
+        tmxr_tqln (lp), lp->txcnt);
+if (lp->txbfd)
+    fprintf (st, "  output buffer size = %d\n", lp->txbsz);
+if (lp->txcnt || lp->txbpi)
+    fprintf (st, "  bytes in buffer = %d\n", 
+               ((lp->txcnt > 0) && (lp->txcnt > lp->txbsz)) ? lp->txbsz : lp->txbpi);
+if (lp->txdrp)
+    fprintf (st, "  dropped = %d\n", lp->txdrp);
 return;
 }
 
@@ -758,7 +868,7 @@ lp->txlogname = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc namebuf */
 if (lp->txlogname == NULL)                              /* can't? */
     return SCPE_MEM;
 strncpy (lp->txlogname, cptr, CBUFSIZE);                /* save file name */
-lp->txlog = fopen (cptr, "ab");                         /* open log */
+sim_open_logfile (cptr, TRUE, &lp->txlog, &lp->txlogref);/* open log */
 if (lp->txlog == NULL) {                                /* error? */
     free (lp->txlogname);                               /* free buffer */
     return SCPE_OPENERR;
@@ -779,7 +889,7 @@ lp = tmxr_find_ldsc (uptr, val, mp);                    /* find line desc */
 if (lp == NULL)
     return SCPE_IERR;
 if (lp->txlog) {                                        /* logging? */
-    fclose (lp->txlog);                                 /* close log */
+    sim_close_logfile (&lp->txlogref);                  /* close log */
     free (lp->txlogname);                               /* free namebuf */
     lp->txlog = NULL;
     lp->txlogname = NULL;

@@ -26,6 +26,7 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   17-Jan-11    MP      Added buffered line capabilities
    20-Nov-08    RMS     Added three new standardized SHOW routines
    27-May-08    JDB     Added lnorder to TMXR structure,
                         added tmxr_set_lnorder and tmxr_set_lnorder
@@ -62,11 +63,15 @@ struct tmln {
     int32               txbpr;                          /* xmt buf remove */
     int32               txbpi;                          /* xmt buf insert */
     int32               txcnt;                          /* xmt count */
+    int32               txdrp;                          /* xmt drop count */
+    int32               txbsz;                          /* xmt buffer size */
+    int32               txbfd;                          /* xmt buffered flag */
     FILE                *txlog;                         /* xmt log file */
+    FILEREF             *txlogref;                      /* xmt log file reference */
     char                *txlogname;                     /* xmt log file name */
     char                rxb[TMXR_MAXBUF];               /* rcv buffer */
     char                rbr[TMXR_MAXBUF];               /* rcv break */
-    char                txb[TMXR_MAXBUF];               /* xmt buffer */
+    char                *txb;                           /* xmt buffer */
     };
 
 typedef struct tmln TMLN;
@@ -78,6 +83,8 @@ struct tmxr {
     TMLN                *ldsc;                          /* line descriptors */
     int32               *lnorder;                       /* line connection order */
     DEVICE              *dptr;                          /* multiplexer device */
+    char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
+    int32               buffered;                       /* Buffered Line Behavior and Buffer Size Flag */
     };
 
 typedef struct tmxr TMXR;
