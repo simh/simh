@@ -69,6 +69,9 @@ t_stat set_cmd (int32 flag, char *ptr);
 t_stat show_cmd (int32 flag, char *ptr);
 t_stat brk_cmd (int32 flag, char *ptr);
 t_stat do_cmd (int32 flag, char *ptr);
+t_stat goto_cmd (int32 flag, char *ptr);
+t_stat return_cmd (int32 flag, char *ptr);
+t_stat on_cmd (int32 flag, char *ptr);
 t_stat assert_cmd (int32 flag, char *ptr);
 t_stat help_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
@@ -113,6 +116,8 @@ BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc);
 char *match_ext (char *fnam, char *ext);
+char *sim_error_text (t_stat stat);
+t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
 void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
     uint16 before, uint16 after, int terminate);

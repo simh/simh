@@ -149,7 +149,6 @@ extern const t_bool rtc_avail;
 extern uint32 PCX;
 extern int32 sim_switches;
 extern int32 sim_quiet;
-extern const char *scp_error_messages[];
 extern int32 SR;
 extern UNIT cpu_unit;
 extern volatile int32 stop_cpu;
@@ -1189,7 +1188,7 @@ static void attachCPM(UNIT *uptr) {
     sim_quiet = sim_switches & SWMASK ('Q');    /* -q means quiet                       */
     lastCPMStatus = attach_unit(uptr, cpmCommandLine);
     if ((lastCPMStatus != SCPE_OK) && (simh_device.dctrl & VERBOSE_MSG))
-        printf("SIMH: " ADDRESS_FORMAT " Cannot open '%s' (%s)." NLP, PCX, cpmCommandLine, scp_error_messages[lastCPMStatus - SCPE_BASE]);
+        printf("SIMH: " ADDRESS_FORMAT " Cannot open '%s' (%s)." NLP, PCX, cpmCommandLine, sim_error_text(lastCPMStatus));
 }
 
 /* setClockZSDOSAdr points to 6 byte block in M: YY MM DD HH MM SS in BCD notation */
