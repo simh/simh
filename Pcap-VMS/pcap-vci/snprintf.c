@@ -184,6 +184,11 @@
  *		  not used;
  */
 
+#if __CRTL_VER >= 70312000
+#define HAVE_SNPRINTF
+#else
+#pragma message disable NOTINCRTL
+#endif
 
 /* Define HAVE_SNPRINTF if your system already has snprintf and vsnprintf.
  *
@@ -280,6 +285,7 @@
 
 
 
+
 /* ============================================= */
 /* NO USER SERVICABLE PARTS FOLLOWING THIS POINT */
 /* ============================================= */

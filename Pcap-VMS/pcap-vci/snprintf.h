@@ -4,6 +4,12 @@
 #define PORTABLE_SNPRINTF_VERSION_MAJOR 2
 #define PORTABLE_SNPRINTF_VERSION_MINOR 2
 
+#if __CRTL_VER >= 70312000
+#define HAVE_SNPRINTF
+#else
+#pragma message disable NOTINCRTL
+#endif
+
 #ifdef HAVE_SNPRINTF
 #include <stdio.h>
 #else

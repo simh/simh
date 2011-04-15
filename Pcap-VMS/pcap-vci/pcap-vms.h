@@ -49,6 +49,7 @@
 //
 // Do not align
 //
+#pragma member_alignment save
 #pragma nomember_alignment
 typedef unsigned long u_int32;
 typedef struct _promisc_header {
@@ -74,4 +75,5 @@ typedef struct _packet {
     unsigned char data[2048];
 } packet;
 
+#pragma member_alignment restore
 #endif /* __PCAP_VMS__H */
