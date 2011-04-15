@@ -377,9 +377,10 @@ static uint32 sim_rtime;
 static int32 noqueue_time;
 volatile int32 stop_cpu = 0;
 t_value *sim_eval = NULL;
-int32 sim_deb_close = 0;                                /* 1 = close debug */
 FILE *sim_log = NULL;                                   /* log file */
+FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
+FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
 static SCHTAB sim_stab;
 
 static UNIT sim_step_unit = { UDATA (&step_svc, 0, 0)  };

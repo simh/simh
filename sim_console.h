@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Jan-11    MP      Added buffered line capabilities
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    22-Nov-05    RMS     Added central input/output conversion support
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
@@ -57,6 +58,10 @@ t_stat sim_set_notelnet (int32 flag, char *cptr);
 t_stat sim_set_logon (int32 flag, char *cptr);
 t_stat sim_set_logoff (int32 flag, char *cptr);
 t_stat sim_set_debon (int32 flag, char *cptr);
+t_stat sim_set_cons_buff (int32 flg, char *cptr);
+t_stat sim_set_cons_unbuff (int32 flg, char *cptr);
+t_stat sim_set_cons_log (int32 flg, char *cptr);
+t_stat sim_set_cons_nolog (int32 flg, char *cptr);
 t_stat sim_set_deboff (int32 flag, char *cptr);
 t_stat sim_set_pchar (int32 flag, char *cptr);
 t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -65,7 +70,12 @@ t_stat sim_show_telnet (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cp
 t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_pchar (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_cons_buff (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_cons_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_check_console (int32 sec);
+t_stat sim_open_logfile (char *filename, t_bool binary, FILE **pf, FILEREF **pref);
+t_stat sim_close_logfile (FILEREF **pref);
+const char *sim_logfile_name (FILE *st, FILEREF *ref);
 t_stat sim_poll_kbd (void);
 t_stat sim_putchar (int32 c);
 t_stat sim_putchar_s (int32 c);

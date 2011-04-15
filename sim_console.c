@@ -23,6 +23,27 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Jan-11    MP      Fixed support for BREAK key on Windows to account 
+                        for/ignore other keyboard Meta characters.
+   18-Jan-11    MP      Added log file reference count support
+   17-Jan-11    MP      Added support for a "Buffered" behaviors which include:
+                        - If Buffering is enabled and Telnet is enabled, a
+                          telnet connection is not required for simulator 
+                          operation (instruction execution).
+                        - If Buffering is enabled, all console output is 
+                          written to the buffer at all times (deleting the
+                          oldest buffer contents on overflow).
+                        - when a connection is established on the console 
+                          telnet port, the whole contents of the Buffer is
+                          presented on the telnet session and connection 
+                          will then proceed as if the connection had always
+                          been there.
+                        This concept allows a simulator to run in the background
+                        and when needed a console session to be established.  
+                        The "when needed" case usually will be interested in 
+                        what already happened before looking to address what 
+                        to do, hence the buffer contents being presented.
+   28-Dec-10    MP      Added support for BREAK key on Windows
    30-Sep-06    RMS     Fixed non-printable characters in KSR mode
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    31-May-06    JDB     Fixed bug if SET CONSOLE DEBUG with no argument
@@ -62,6 +83,12 @@
    sim_putchar_s -      output character to console, stall if congested
    sim_set_console -    set console parameters
    sim_show_console -   show console parameters
+   sim_set_cons_buff -  set console buffered
+   sim_set_cons_unbuff -set console unbuffered
+   sim_set_cons_log -   set console log
+   sim_set_cons_nolog - set console nolog
+   sim_show_cons_buff - show console buffered
+   sim_show_cons_log -  show console log
    sim_tt_inpcvt -      convert input character per mode
    sim_tt_outcvt -      convert output character per mode
 
@@ -104,8 +131,9 @@ TMLN sim_con_ldsc = { 0 };                              /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };         /* console line mux */
 
 extern volatile int32 stop_cpu;
-extern int32 sim_quiet, sim_deb_close;
+extern int32 sim_quiet;
 extern FILE *sim_log, *sim_deb;
+extern FILEREF *sim_log_ref, *sim_deb_ref;
 extern DEVICE *sim_devices[];
 
 /* Set/show data structures */
@@ -129,9 +157,19 @@ static SHTAB show_con_tab[] = {
     { "BRK", &sim_show_kmap, KMAP_BRK },
     { "DEL", &sim_show_kmap, KMAP_DEL },
     { "PCHAR", &sim_show_pchar, 0 },
-    { "LOG", &sim_show_log, 0 },
+    { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
     { "DEBUG", &sim_show_debug, 0 },
+    { "BUFFERED", &sim_show_cons_buff, 0 },
+    { NULL, NULL, 0 }
+    };
+
+static CTAB set_con_telnet_tab[] = {
+    { "LOG", &sim_set_cons_log, 0 },
+    { "NOLOG", &sim_set_cons_nolog, 0 },
+    { "BUFFERED", &sim_set_cons_buff, 0 },
+    { "NOBUFFERED", &sim_set_cons_unbuff, 0 },
+    { "UNBUFFERED", &sim_set_cons_unbuff, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -261,6 +299,7 @@ return SCPE_OK;
 t_stat sim_set_logon (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
+t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
     return SCPE_2FARG;
@@ -268,12 +307,14 @@ cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
 if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
 sim_set_logoff (0, NULL);                               /* close cur log */
-sim_log = sim_fopen (gbuf, "a");                        /* open log */
-if (sim_log == NULL)                                    /* error? */
-    return SCPE_OPENERR;
+r = sim_open_logfile (gbuf, FALSE, &sim_log, &sim_log_ref); /* open log */
+if (r != SCPE_OK)                                       /* error? */
+    return r;
 if (!sim_quiet)
-    printf ("Logging to file \"%s\"\n", gbuf);
-fprintf (sim_log, "Logging to file \"%s\"\n", gbuf);    /* start of log */
+    printf ("Logging to file \"%s\"\n", 
+             sim_logfile_name (sim_log, sim_log_ref));
+fprintf (sim_log, "Logging to file \"%s\"\n", 
+             sim_logfile_name (sim_log, sim_log_ref));  /* start of log */
 return SCPE_OK;
 }
 
@@ -287,8 +328,8 @@ if (sim_log == NULL)                                    /* no log? */
     return SCPE_OK;
 if (!sim_quiet)
     printf ("Log file closed\n");
-fprintf (sim_log, "Log file closed\n");                 /* close log */
-fclose (sim_log);
+fprintf (sim_log, "Log file closed\n");
+sim_close_logfile (&sim_log_ref);                       /* close log */
 sim_log = NULL;
 return SCPE_OK;
 }
@@ -300,8 +341,8 @@ t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_log)
-    fputs ("Logging enabled\n", st);
-else fputs ("Logging disabled\n", st);
+    fprintf (st, "Logging enabled to %s\n", sim_logfile_name (sim_log, sim_log_ref));
+else fprintf (st, "Logging disabled\n");
 return SCPE_OK;
 }
 
@@ -309,34 +350,24 @@ return SCPE_OK;
 
 t_stat sim_set_debon (int32 flag, char *cptr)
 {
-char *tptr, gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE];
+t_stat r;
 
-if ((cptr == NULL) || (*cptr == 0))                     /* too few arguments? */
+if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
     return SCPE_2FARG;
-tptr = get_glyph (cptr, gbuf, 0);                       /* get file name */
-if (*tptr != 0)                                         /* now eol? */
+cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
+if (*cptr != 0)                                         /* now eol? */
     return SCPE_2MARG;
-sim_set_deboff (0, NULL);                               /* close cur debug */
-if (strcmp (gbuf, "LOG") == 0) {                        /* debug to log? */
-    if (sim_log == NULL)                                /* any log? */
-        return SCPE_ARG;
-    sim_deb = sim_log;
-    }
-else if (strcmp (gbuf, "STDOUT") == 0)                  /* debug to stdout? */
-    sim_deb = stdout;
-else if (strcmp (gbuf, "STDERR") == 0)                  /* debug to stderr? */
-    sim_deb = stderr;
-else {
-    cptr = get_glyph_nc (cptr, gbuf, 0);                /* reparse */
-    sim_deb = sim_fopen (gbuf, "a");                    /* open debug */
-    if (sim_deb == NULL)                                /* error? */
-        return SCPE_OPENERR;
-    sim_deb_close = 1;                                  /* need close */
-    }
+r = sim_open_logfile (gbuf, FALSE, &sim_deb, &sim_deb_ref);
+
+if (r != SCPE_OK)
+    return r;
 if (!sim_quiet)
-    printf ("Debug output to \"%s\"\n", gbuf);
+    printf ("Debug output to \"%s\"\n", 
+            sim_logfile_name (sim_deb, sim_deb_ref));
 if (sim_log)
-    fprintf (sim_log, "Debug output to \"%s\"\n", gbuf);
+    fprintf (sim_log, "Debug output to \"%s\"\n", 
+                      sim_logfile_name (sim_deb, sim_deb_ref));
 return SCPE_OK;
 }
 
@@ -344,18 +375,18 @@ return SCPE_OK;
 
 t_stat sim_set_deboff (int32 flag, char *cptr)
 {
+t_stat r;
+
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 if (sim_deb == NULL)                                    /* no log? */
     return SCPE_OK;
+r = sim_close_logfile (&sim_deb_ref);
+sim_deb = NULL;
 if (!sim_quiet)
     printf ("Debug output disabled\n");
 if (sim_log)
     fprintf (sim_log, "Debug output disabled\n");
-if (sim_deb_close)                                      /* close if needed */
-    fclose (sim_deb);
-sim_deb_close = 0;
-sim_deb = NULL;
 return SCPE_OK;
 }
 
@@ -366,20 +397,41 @@ t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_deb)
-    fputs ("Debug output enabled\n", st);
-else fputs ("Debug output disabled\n", st);
+    fprintf (st, "Debug output enabled\n", sim_logfile_name (sim_deb, sim_deb_ref));
+else fprintf (st, "Debug output disabled\n");
 return SCPE_OK;
 }
 
-/* Set console to Telnet port */
+/* SET CONSOLE command */
 
-t_stat sim_set_telnet (int32 flg, char *cptr)
+/* Set console to Telnet port (and parameters) */
+
+t_stat sim_set_telnet (int32 flag, char *cptr)
 {
-if ((cptr == NULL) || (*cptr == 0))                     /* too few arguments? */
+char *cvptr, gbuf[CBUFSIZE];
+CTAB *ctptr;
+t_stat r;
+
+if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
-if (sim_con_tmxr.master)                                /* already open? */
-    return SCPE_ALATT;
-return tmxr_open_master (&sim_con_tmxr, cptr);          /* open master socket */
+while (*cptr != 0) {                                    /* do all mods */
+    cptr = get_glyph_nc (cptr, gbuf, ',');              /* get modifier */
+    if (cvptr = strchr (gbuf, '='))                     /* = value? */
+        *cvptr++ = 0;
+    get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
+    if (isdigit (*gbuf)) {
+        if (sim_con_tmxr.master) return SCPE_ALATT;     /* already open? */
+        return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
+        }
+    else
+        if (ctptr = find_ctab (set_con_telnet_tab, gbuf)) { /* match? */
+            r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
+            if (r != SCPE_OK)
+                return r;
+            }
+        else return SCPE_NOPARAM;
+    }
+return SCPE_OK;
 }
 
 /* Close console Telnet port */
@@ -401,15 +453,165 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_con_tmxr.master == 0)
     fprintf (st, "Connected to console window\n");
-else if (sim_con_ldsc.conn == 0)
-    fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
 else {
-    fprintf (st, "Listening on port %d, connected to socket %d\n",
-        sim_con_tmxr.port, sim_con_ldsc.conn);
-    tmxr_fconns (st, &sim_con_ldsc, -1);
+    if (sim_con_ldsc.conn == 0)
+        fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
+    else {
+        fprintf (st, "Listening on port %d, connected to socket %d\n",
+            sim_con_tmxr.port, sim_con_ldsc.conn);
+        tmxr_fconns (st, &sim_con_ldsc, -1);
+        }
     tmxr_fstats (st, &sim_con_ldsc, -1);
     }
 return SCPE_OK;
+}
+
+
+/* Set console to Buffering  */
+
+t_stat sim_set_cons_buff (int32 flg, char *cptr)
+{
+char cmdbuf[CBUFSIZE];
+
+sprintf(cmdbuf, "BUFFERED%c%s", cptr ? '=' : '\0', cptr ? cptr : "");
+return tmxr_open_master (&sim_con_tmxr, cmdbuf);      /* open master socket */
+}
+
+/* Set console to NoBuffering */
+
+t_stat sim_set_cons_unbuff (int32 flg, char *cptr)
+{
+char cmdbuf[CBUFSIZE];
+
+sprintf(cmdbuf, "UNBUFFERED%c%s", cptr ? '=' : '\0', cptr ? cptr : "");
+return tmxr_open_master (&sim_con_tmxr, cmdbuf);      /* open master socket */
+}
+
+/* Set console to Logging */
+
+t_stat sim_set_cons_log (int32 flg, char *cptr)
+{
+char cmdbuf[CBUFSIZE];
+
+sprintf(cmdbuf, "LOG%c%s", cptr ? '=' : '\0', cptr ? cptr : "");
+return tmxr_open_master (&sim_con_tmxr, cmdbuf);      /* open master socket */
+}
+
+/* Set console to NoLogging */
+
+t_stat sim_set_cons_nolog (int32 flg, char *cptr)
+{
+char cmdbuf[CBUFSIZE];
+
+sprintf(cmdbuf, "NOLOG%c%s", cptr ? '=' : '\0', cptr ? cptr : "");
+return tmxr_open_master (&sim_con_tmxr, cmdbuf);      /* open master socket */
+}
+
+t_stat sim_show_cons_log (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
+if (sim_con_tmxr.ldsc->txlog)
+    fprintf (st, "Log File being written to %s\n", sim_con_tmxr.ldsc->txlogname);
+else
+    fprintf (st, "No Logging\n");
+return SCPE_OK;
+}
+
+t_stat sim_show_cons_buff (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
+if (!sim_con_tmxr.buffered)
+    fprintf (st, "Unbuffered\n");
+else
+    fprintf (st, "Buffer Size = %d\n", sim_con_tmxr.buffered);
+return SCPE_OK;
+}
+
+
+/* Log File Open/Close/Show Support */
+
+/* Open log file */
+
+t_stat sim_open_logfile (char *filename, t_bool binary, FILE **pf, FILEREF **pref)
+{
+char *tptr, gbuf[CBUFSIZE];
+
+*pref = NULL;
+if ((filename == NULL) || (*filename == 0))             /* too few arguments? */
+    return SCPE_2FARG;
+tptr = get_glyph (filename, gbuf, 0);
+if (*tptr != 0)                                         /* now eol? */
+    return SCPE_2MARG;
+sim_close_logfile (pref);
+*pf = NULL;
+if (strcmp (gbuf, "LOG") == 0) {                        /* output to log? */
+    if (sim_log == NULL)                                /* any log? */
+        return SCPE_ARG;
+    *pf = sim_log;
+    *pref = sim_log_ref;
+    if (*pref)
+        ++(*pref)->refcount;
+    }
+else if (strcmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
+    if (sim_debug == NULL)                              /* any debug? */
+        return SCPE_ARG;
+    *pf = sim_deb;
+    *pref = sim_deb_ref;
+    if (*pref)
+        ++(*pref)->refcount;
+    }
+else if (strcmp (gbuf, "STDOUT") == 0)                  /* output to stdout? */
+    *pf = stdout;
+else if (strcmp (gbuf, "STDERR") == 0)                  /* output to stderr? */
+    *pf = stderr;
+else {
+    *pref = calloc (1, sizeof(**pref));
+    if (!*pref)
+        return SCPE_MEM;
+    get_glyph_nc (filename, gbuf, 0);                   /* reparse */
+    strncpy ((*pref)->name, gbuf, sizeof((*pref)->name)-1);
+    *pf = sim_fopen (gbuf, (binary ? "ab" : "a"));      /* open file */
+    if (*pf == NULL) {                                  /* error? */
+        free (*pref);
+        *pref = NULL;
+        return SCPE_OPENERR;
+        }
+    (*pref)->file = *pf;
+    (*pref)->refcount = 1;                               /* need close */
+    }
+return SCPE_OK;
+}
+
+/* Close log file */
+
+t_stat sim_close_logfile (FILEREF **pref)
+{
+if (NULL == *pref)
+    return SCPE_OK;
+(*pref)->refcount = (*pref)->refcount  - 1;
+if ((*pref)->refcount > 0)
+    return SCPE_OK;
+fclose ((*pref)->file);
+free (*pref);
+*pref = NULL;
+return SCPE_OK;
+}
+
+/* Show logfile support routine */
+
+const char *sim_logfile_name (FILE *st, FILEREF *ref)
+{
+if (!st)
+    return "";
+if (st == stdout)
+    return "STDOUT";
+if (st == stderr)
+    return "STDERR";
+if (!ref)
+    return "";
+return ref->name;
 }
 
 /* Check connection before executing */
@@ -420,10 +622,15 @@ int32 c, i;
 
 if (sim_con_tmxr.master == 0)                           /* not Telnet? done */
     return SCPE_OK;
-if (sim_con_ldsc.conn) {                                /* connected? */
+if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered ? */
     tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
-    if (sim_con_ldsc.conn)                              /* still connected? */
+    if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {      /* still connected? */
+        if (!sim_con_ldsc.conn) {
+            printf ("Running with Buffered Console\n"); /* print transition */
+            fflush (stdout);
+            }
         return SCPE_OK;
+        }
     }
 for (i = 0; i < sec; i++) {                             /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
@@ -455,8 +662,14 @@ int32 c;
 c = sim_os_poll_kbd ();                                 /* get character */
 if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))     /* ^E or not Telnet? */
     return c;                                           /* in-window */
-if (sim_con_ldsc.conn == 0)                              /* no Telnet conn? */
-    return SCPE_LOST;
+if (sim_con_ldsc.conn == 0) {                           /* no Telnet conn? */
+    if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
+        return SCPE_LOST;                               /* connection lost */
+    if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
+        sim_con_ldsc.rcve = 1;                          /* rcv enabled */
+    else                                                /* fall through to poll reception */
+        return SCPE_OK;                                 /* unconnected and buffered - nothing to receive */
+    }
 tmxr_poll_rx (&sim_con_tmxr);                           /* poll for input */
 if (c = tmxr_getc_ln (&sim_con_ldsc))                   /* any char? */ 
     return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
@@ -467,12 +680,19 @@ return SCPE_OK;
 
 t_stat sim_putchar (int32 c)
 {
-if (sim_log)                                            /* log file? */
-    fputc (c, sim_log);
-if (sim_con_tmxr.master == 0)                           /* not Telnet? */
+if (sim_con_tmxr.master == 0) {                         /* not Telnet? */
+    if (sim_log)                                        /* log file? */
+        fputc (c, sim_log);
     return sim_os_putchar (c);                          /* in-window version */
-if (sim_con_ldsc.conn == 0)                             /* no Telnet conn? */
-    return SCPE_LOST;
+    }
+if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
+    fputc (c, sim_log);
+if (sim_con_ldsc.conn == 0) {                           /* no Telnet conn? */
+    if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
+        return SCPE_LOST;                               /* connection lost */
+    if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
+        sim_con_ldsc.rcve = 1;                          /* rcv enabled */
+    }
 tmxr_putc_ln (&sim_con_ldsc, c);                        /* output char */
 tmxr_poll_tx (&sim_con_tmxr);                           /* poll xmt */
 return SCPE_OK;
@@ -485,8 +705,12 @@ t_stat r;
 if (sim_log) fputc (c, sim_log);                        /* log file? */
 if (sim_con_tmxr.master == 0)                           /* not Telnet? */
     return sim_os_putchar (c);                          /* in-window version */
-if (sim_con_ldsc.conn == 0)                             /* no Telnet conn? */
-    return SCPE_LOST;
+if (sim_con_ldsc.conn == 0) {                           /* no Telnet conn? */
+    if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet conn? */
+        return SCPE_LOST;                               /* lost */
+    if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
+        sim_con_ldsc.rcve = 1;                          /* rcv enabled */
+    }
 if (sim_con_ldsc.xmte == 0)                             /* xmt disabled? */
     r = SCPE_STALL;
 else r = tmxr_putc_ln (&sim_con_ldsc, c);               /* no, Telnet output */
@@ -662,17 +886,42 @@ return SCPE_OK;
 
 #elif defined (_WIN32)
 
-#include <conio.h>
 #include <fcntl.h>
 #include <io.h>
 #include <windows.h>
 #define RAW_MODE 0
 static HANDLE std_input;
+static HANDLE std_output;
 static DWORD saved_mode;
  
+static BOOL WINAPI
+ControlHandler(DWORD dwCtrlType)
+    {
+    DWORD Mode;
+    extern void int_handler (int sig);
+
+    switch (dwCtrlType)
+        {
+        case CTRL_BREAK_EVENT:      // Use CTRL-Break or CTRL-C to simulate 
+        case CTRL_C_EVENT:          // SERVICE_CONTROL_STOP in debug mode
+            int_handler(0);
+            return TRUE;
+        case CTRL_CLOSE_EVENT:      // Window is Closing
+        case CTRL_LOGOFF_EVENT:     // User is logging off
+            if (!GetConsoleMode(GetStdHandle(STD_INPUT_HANDLE), &Mode))
+                return TRUE;        // Not our User, so ignore
+        case CTRL_SHUTDOWN_EVENT:   // System is shutting down
+            int_handler(0);
+            return TRUE;
+        }
+    return FALSE;
+    }
+
 t_stat sim_ttinit (void)
 {
+SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
+std_output = GetStdHandle (STD_OUTPUT_HANDLE);
 if ((std_input == INVALID_HANDLE_VALUE) ||
     !GetConsoleMode (std_input, &saved_mode))
     return SCPE_TTYERR;
@@ -710,24 +959,49 @@ return SCPE_OK;
 
 t_stat sim_os_poll_kbd (void)
 {
-int c;
+int c = -1;
+DWORD nkbevents, nkbevent;
+INPUT_RECORD rec;
+extern int32 sim_switches;
 
-if (!_kbhit ())
-    return SCPE_OK;
-c = _getch ();
+if (!GetNumberOfConsoleInputEvents(std_input, &nkbevents))
+    return SCPE_TTYERR;
+while (c == -1) {
+    if (0 == nkbevents)
+        return SCPE_OK;
+    if (!ReadConsoleInput(std_input, &rec, 1, &nkbevent))
+        return SCPE_TTYERR;
+    if (0 == nkbevent)
+        return SCPE_OK;
+    --nkbevents;
+    if (rec.EventType == KEY_EVENT) {
+        if (rec.Event.KeyEvent.bKeyDown) {
+            if (0 == rec.Event.KeyEvent.uChar.UnicodeChar) {     /* Special Character/Keys? */
+                if (rec.Event.KeyEvent.wVirtualKeyCode == VK_PAUSE) /* Pause/Break Key */
+                    c = sim_brk_char | SCPE_BREAK;
+                else
+                    if (rec.Event.KeyEvent.wVirtualKeyCode == '2')  /* ^@ */
+                        c = 0;                                      /* return NUL */
+            } else
+                c = rec.Event.KeyEvent.uChar.AsciiChar;
+            }
+      }
+    }
 if ((c & 0177) == sim_del_char)
     c = 0177;
 if ((c & 0177) == sim_int_char)
     return SCPE_STOP;
-if (sim_brk_char && ((c & 0177) == sim_brk_char))
+if ((sim_brk_char && ((c & 0177) == sim_brk_char)) || (c & SCPE_BREAK))
     return SCPE_BREAK;
 return c | SCPE_KFLAG;
 }
 
 t_stat sim_os_putchar (int32 c)
 {
+DWORD unused;
+
 if (c != 0177)
-    _putch (c);
+    WriteConsoleA(std_output, &c, 1, &unused, NULL);
 return SCPE_OK;
 }
 
