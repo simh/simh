@@ -23,6 +23,11 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Jan-11    MP      Adjusted sim_debug to: 
+                          - include the simulator timestamp (sim_time) 
+                            as part of the prefix for each line of output
+                          - write complete lines at a time (avoid asynch I/O issues).
+   05-Jan-11    MP      Added Asynch I/O support
    22-Jan-11    MP      Added SET ON, SET NOON, ON, GOTO and RETURN command support
    13-Jan-11    MP      Added "SHOW SHOW" and "SHOW <dev> SHOW" commands
    05-Jan-11    RMS     Fixed bug in deposit stride for numeric input (John Dundas)
@@ -252,6 +257,17 @@
     else if (sim_switches & SWMASK ('D')) val = 10; \
     else if (sim_switches & SWMASK ('H')) val = 16; \
     else val = dft;
+
+/* Asynch I/O support */
+#if defined (SIM_ASYNCH_IO)
+pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
+pthread_t sim_asynch_main_threadid;
+struct sim_unit *sim_asynch_queue = NULL;
+int32 sim_asynch_check;
+int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
+int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
+#endif
 
 /* VM interface */
 
@@ -657,6 +673,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
     }                                                   /* end for */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 
+AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
 sim_finit ();                                           /* init fio package */
@@ -742,6 +759,7 @@ sim_set_deboff (0, NULL);                               /* close debug */
 sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
 sim_ttclose ();                                         /* close console */
+AIO_CLEANUP;                                            /* Asynch I/O */
 return 0;
 }
 
@@ -1766,6 +1784,26 @@ for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
     fprintf (st, " at %d\n", accum + uptr->time);
     accum = accum + uptr->time;
     }
+#if defined (SIM_ASYNCH_IO)
+pthread_mutex_lock (&sim_asynch_lock);
+fprintf (st, "asynchronous pending event queue\n");
+if (sim_asynch_queue == (void *)-1)
+    fprintf (st, "Empty\n");
+else {
+    for (uptr = sim_asynch_queue; uptr != (void *)-1; uptr = uptr->a_next) {
+        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+            fprintf (st, "  %s", sim_dname (dptr));
+            if (dptr->numunits > 1) fprintf (st, " unit %d",
+                (int32) (uptr - dptr->units));
+            }
+        else fprintf (st, "  Unknown");
+        fprintf (st, " event delay %d, queue time %d\n", uptr->a_event_time, uptr->a_sim_interval);
+        }
+    }
+fprintf (st, "asynch latency: %d microseconds\n", sim_asynch_latency);
+fprintf (st, "asynch instruction latency: %d instructions\n", sim_asynch_inst_latency);
+pthread_mutex_unlock (&sim_asynch_lock);
+#endif
 return SCPE_OK;
 }
 
@@ -2895,14 +2933,6 @@ r = sim_instr();
 sim_is_running = 0;                                     /* flag idle */
 sim_ttcmd ();                                           /* restore console */
 signal (SIGINT, SIG_DFL);                               /* cancel WRU */
-sim_cancel (&sim_step_unit);                            /* cancel step timer */
-sim_throt_cancel ();                                    /* cancel throttle */
-if (sim_clock_queue != NULL) {                          /* update sim time */
-    UPDATE_SIM_TIME (sim_clock_queue->time);
-    }
-else {
-    UPDATE_SIM_TIME (noqueue_time);
-    }
 if (sim_log)                                            /* flush console log */
     fflush (sim_log);
 if (sim_deb)                                            /* flush debug log */
@@ -2912,11 +2942,23 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
         uptr = dptr->units + j;
         if ((uptr->flags & UNIT_ATT) &&                 /* attached, */
             !(uptr->flags & UNIT_BUF) &&                /* not buffered, */
-            (uptr->fileref) &&                          /* real file, */
-            !(uptr->flags & UNIT_RAW) &&                /* not raw, */
-            !(uptr->flags & UNIT_RO))                   /* not read only? */
-            fflush (uptr->fileref);
+            (uptr->fileref))                            /* real file, */
+            if (uptr->io_flush)                         /* unit specific flush routine */
+                uptr->io_flush (uptr);
+            else
+                if (!(uptr->flags & UNIT_RAW) &&        /* not raw, */
+                    !(uptr->flags & UNIT_RO))           /* not read only? */
+                    fflush (uptr->fileref);
         }
+    }
+sim_cancel (&sim_step_unit);                            /* cancel step timer */
+sim_throt_cancel ();                                    /* cancel throttle */
+AIO_UPDATE_QUEUE;
+if (sim_clock_queue != NULL) {                          /* update sim time */
+    UPDATE_SIM_TIME (sim_clock_queue->time);
+    }
+else {
+    UPDATE_SIM_TIME (noqueue_time);
     }
 #if defined (VMS)
 printf ("\n");
@@ -4457,6 +4499,7 @@ t_stat reason;
 
 if (stop_cpu)                                           /* stop CPU? */
     return SCPE_STOP;
+AIO_UPDATE_QUEUE;
 if (sim_clock_queue == NULL) {                          /* queue empty? */
     UPDATE_SIM_TIME (noqueue_time);                     /* update sim time */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
@@ -4495,8 +4538,7 @@ t_stat sim_activate (UNIT *uptr, int32 event_time)
 UNIT *cptr, *prvptr;
 int32 accum;
 
-if (event_time < 0)
-    return SCPE_IERR;
+AIO_ACTIVATE (sim_activate, uptr, event_time);
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
 if (sim_clock_queue == NULL) {
@@ -4540,6 +4582,7 @@ return SCPE_OK;
 
 t_stat sim_activate_abs (UNIT *uptr, int32 event_time)
 {
+AIO_ACTIVATE (sim_activate_abs, uptr, event_time);
 sim_cancel (uptr);
 return sim_activate (uptr, event_time);
 }
@@ -4557,6 +4600,7 @@ t_stat sim_cancel (UNIT *uptr)
 {
 UNIT *cptr, *nptr;
 
+AIO_VALIDATE;
 if (sim_clock_queue == NULL)
     return SCPE_OK;
 UPDATE_SIM_TIME (sim_clock_queue->time);                /* update sim time */
@@ -4594,6 +4638,7 @@ int32 sim_is_active (UNIT *uptr)
 UNIT *cptr;
 int32 accum;
 
+AIO_VALIDATE;
 accum = 0;
 for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
@@ -5002,7 +5047,7 @@ return SCPE_OK;
 /* Debug printout routines, from Dave Hittner */
 
 const char* debug_bstates = "01_^";
-const char* debug_fmt     = "DBG> %s %s: ";
+const char* debug_fmt     = "DBG(%.0f)> %s %s: ";
 int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
@@ -5032,7 +5077,7 @@ static void sim_debug_prefix (uint32 dbits, DEVICE* dptr)
 {
 if (!debug_unterm) {
     char* debug_type = get_dbg_verb (dbits, dptr);
-    fprintf(sim_deb, debug_fmt, dptr->name, debug_type);
+    fprintf(sim_deb, debug_fmt, sim_time, dptr->name, debug_type);
     }
 }
 
@@ -5060,7 +5105,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
 #if defined (_WIN32)
 #define vsnprintf _vsnprintf
 #endif
-#if defined (__DECC) && defined (__VMS)
+#if defined (__DECC) && defined (__VMS) && defined (__VAX)
 #define NO_vsnprintf
 #endif
 #if defined( NO_vsnprintf)
@@ -5073,9 +5118,12 @@ if (sim_deb && (dptr->dctrl & dbits)) {
    set and the bitmask matches the current device debug options.
    Extra returns are added for un*x systems, since the output
    device is set into 'raw' mode when the cpu is booted,
-   and the extra returns don't hurt any other systems. */
-
-void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...)
+   and the extra returns don't hurt any other systems. 
+   Callers should be calling sim_debug() which is a macro
+   defined in scp.h which evaluates the action condition before 
+   incurring call overhead. */
+ 
+void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...)
 {
 if (sim_deb && (dptr->dctrl & dbits)) {
 
@@ -5084,9 +5132,9 @@ if (sim_deb && (dptr->dctrl & dbits)) {
     char *buf = stackbuf;
     va_list arglist;
     int32 i, j, len;
+    char* debug_type = get_dbg_verb (dbits, dptr);
 
     buf[bufsize-1] = '\0';
-    sim_debug_prefix(dbits, dptr);                      /* print prefix if required */
 
     while (1) {                                         /* format passed string, args */
         va_start (arglist, fmt);
@@ -5132,10 +5180,14 @@ if (sim_deb && (dptr->dctrl & dbits)) {
 
     for (i = j = 0; i < len; ++i) {
         if ('\n' == buf[i]) {
-            if (i > j)
-                fwrite (&buf[j], 1, i-j, sim_deb);
-            j = i;
-            fputc('\r', sim_deb);
+            if (i > j) {
+                if (debug_unterm)
+                    fprintf (sim_deb, "%.*s\r\n", i-j, &buf[j]);
+                else                                    /* print prefix when required */
+                    fprintf (sim_deb, "DBG(%.0f)> %s %s: %.*s\r\n", sim_time, dptr->name, debug_type, i-j, &buf[j]);
+                debug_unterm = 0;
+                }
+            j = i + 1;
             }
         }
     if (i > j)

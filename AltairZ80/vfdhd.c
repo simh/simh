@@ -547,7 +547,7 @@ static void VFDHD_Command(void)
 
     if(vfdhd_info->read == 1) { /* Perform a Read operation */
         unsigned int i, checksum;
-        unsigned int readlen;
+        uint32 readlen;
 
         TRACE_PRINT(RD_DATA_MSG, ("VFDHD: " ADDRESS_FORMAT " RD: Drive=%d, Track=%d, Head=%d, Sector=%d" NLP,
             PCX,
@@ -619,7 +619,7 @@ static void VFDHD_Command(void)
         }
 
     } else {    /* Perform a Write operation */
-        unsigned int writelen;
+        uint32 writelen;
 
         TRACE_PRINT(WR_DATA_MSG, ("VFDHD: " ADDRESS_FORMAT " WR: Drive=%d, Track=%d, Head=%d, Sector=%d" NLP,
             PCX,

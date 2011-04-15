@@ -1,62 +1,117 @@
 #
-# CC Command
+# This GMU make makefile has been tested on:
+#   Linux (x86 & Sparc)
+#   OS X
+#   Solaris (x86 & Sparc)
+#   OpenBSD
+#   NetBSD
+#   FreeBSD
+#   Windows (MinGW & cygwin)
+#   
+#
+# CC Command (and platform available options).  (Poor man's autoconf)
 #
 ifeq ($(WIN32),)
-  #Unix Environments
-  ifneq (,$(findstring solaris,$(OSTYPE)))
-    OS_CCDEFS = -lm -lsocket -lnsl -lrt -lpthread -D_GNU_SOURCE
+  #*nix Environments (&& cygwin)
+  ifeq (SunOS,$(shell uname))
+    TEST = /bin/test
   else
-    ifneq (,$(findstring darwin,$(OSTYPE)))
-      OS_CCDEFS = -D_GNU_SOURCE
-    else
-      ifeq (librt,$(shell if test -e /usr/lib/librt.a; then echo librt; fi))
-        OS_CCDEFS = -lrt -lm -D_GNU_SOURCE
-      else
-        OS_CCDEFS = -lm -D_GNU_SOURCE
-      endif
-    endif
+    TEST = test
   endif
-  ifeq (readline,$(shell if test -e /usr/lib/libreadline.a; then echo readline; fi))
+  ifeq (Darwin,$(shell uname))
+    LIBEXT = dylib
+  else
+    LIBEXT = a
+  endif
+  OS_CCDEFS = -D_GNU_SOURCE
+  ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT); then echo libm; fi))
+    OS_LDFLAGS += -lm
+  endif
+  ifeq (SunOS,$(shell uname))
+    OS_CCDEFS += -I/opt/sfw/include
+    OS_LDFLAGS += -lsocket -lnsl -lrt -lm -lpthread -L/opt/sfw/lib -R/opt/sfw/lib
+    endif
+  ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
+    OS_CCDEFS += -O2 
+  endif
+  ifeq (librt,$(shell if $(TEST) -e /usr/lib/librt.$(LIBEXT); then echo librt; fi))
+    OS_LDFLAGS += -lrt 
+  endif
+  ifeq (libpthread,$(shell if $(TEST) -e /usr/lib/libpthread.$(LIBEXT); then echo libpthread; fi))
+    OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
+    OS_LDFLAGS += -lpthread 
+  endif
+  ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
     # Use Locally installed and available readline support
-    ifeq (ncurses,$(shell if test -e /usr/lib/libncurses.a; then echo ncurses; fi))
-      READLINE_CCDEFS = -DHAVE_READLINE -lreadline -lncurses
+    ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
+      OS_CCDEFS += -DHAVE_READLINE 
+      OS_LDFLAGS += -lreadline -lncurses
     else
-      READLINE_CCDEFS = -DHAVE_READLINE -lreadline
+      OS_CCDEFS += -DHAVE_READLINE 
+      OS_LDFLAGS += -lreadline 
     endif
   endif
-  ifeq (pcap,$(shell if test -e /usr/lib/libpcap.a; then echo pcap; fi))
+  ifeq (pcap,$(shell if $(TEST) -e /usr/include/pcap.h -o -e /opt/sfw/include/pcap.h; then echo pcap; fi))
     # Use Locally installed and available pcap support
-    NETWORK_CCDEFS = -DUSE_NETWORK -lpcap
+    NETWORK_CCDEFS = -DUSE_NETWORK
+    NETWORK_LDFLAGS = -lpcap
   endif
-  ifeq (tuntap,$(shell if test -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
+  ifeq (tuntap,$(shell if $(TEST) -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
     # Provide support for Tap networking on Linux
     NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK
   endif
-  ifeq (bsdtuntap,$(shell if test -e /usr/include/net/if_tun.h; then echo bsdtuntap; fi))
+  ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h; then echo bsdtuntap; fi))
     # Provide support for Tap networking
     NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
   endif
-  CC = gcc -std=c99 -U__STRICT_ANSI__ -g $(OS_CCDEFS) -I . $(READLINE_CCDEFS) $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS)
+  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
+    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
+  endif
   ifneq ($(USE_NETWORK),)
     # Assume built from tcpdump.org sources with default install target
     NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
   endif
 else
-  #Win32 Environments
-  LDFLAGS = -lm -lwsock32 -lwinmm
-  CC = gcc -std=c99 -U__STRICT_ANSI__ -O2 -I.
+  #Win32 Environments (via MinGW32)
+  GCC_Path := $(dir $(shell where gcc.exe))
+  ifeq (pthreads,$(shell if exist ..\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+    PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -I../pthreads/Pre-built.2/include
+    PTHREADS_LDFLAGS = -lpthreadVC2 -L..\pthreads\Pre-built.2\lib
+    NETWORK_OPT = -DUSE_SHARED
+    ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
+      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD
+      PTHREADS_LDFLAGS = -lpthreads
+    endif
+  endif
+  ifeq (pcap,$(shell if exist ..\winpcap\Wpdpack\include\pcap.h echo pcap))
+    PCAP_CCDEFS = -I../winpcap/Wpdpack/include -DUSE_SHARED
+    NETWORK_LDFLAGS = 
+  else
+    ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
+      PCAP_CCDEFS = -DUSE_SHARED
+      NETWORK_LDFLAGS = 
+    endif
+  endif
+  OS_CCDEFS =  -fms-extensions -O2 $(PTHREADS_CCDEFS) $(PCAP_CCDEFS) 
+  OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
+  ifneq (binexists,$(shell if exist BIN echo binexists))
+    MKDIRBIN = if not exist BIN mkdir BIN
+  endif
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT = -DUSE_SHARED
   endif
 endif
+
+CC = gcc -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS) $(OS_CCDEFS)
+LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) 
 
 #
 # Common Libraries
 #
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
-	sim_tmxr.c sim_ether.c sim_tape.c
+	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c
 
 
 #
@@ -81,7 +136,7 @@ ECLIPSE = ${NOVAD}/eclipse_cpu.c ${NOVAD}/eclipse_tt.c ${NOVAD}/nova_sys.c \
 	${NOVAD}/nova_dkp.c ${NOVAD}/nova_dsk.c ${NOVAD}/nova_lp.c \
 	${NOVAD}/nova_mta.c ${NOVAD}/nova_plt.c ${NOVAD}/nova_pt.c \
 	${NOVAD}/nova_clk.c ${NOVAD}/nova_tt1.c ${NOVAD}/nova_qty.c
-ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE 
+ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE
 
 
 PDP18BD = PDP18B
@@ -304,134 +359,161 @@ endif
 pdp1 : ${BIN}pdp1${EXE}
 
 ${BIN}pdp1${EXE} : ${PDP1} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP1} ${SIM} ${PDP1_OPT} -o $@ ${LDFLAGS}
 
 pdp4 : ${BIN}pdp4${EXE}
 
 ${BIN}pdp4${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP4_OPT} -o $@ ${LDFLAGS}
 
 pdp7 : ${BIN}pdp7${EXE}
 
 ${BIN}pdp7${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP7_OPT} -o $@ ${LDFLAGS}
 
 pdp8 : ${BIN}pdp8${EXE}
 
 ${BIN}pdp8${EXE} : ${PDP8} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP8} ${SIM} ${PDP8_OPT} -o $@ ${LDFLAGS}
 
 pdp9 : ${BIN}pdp9${EXE}
 
 ${BIN}pdp9${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP9_OPT} -o $@ ${LDFLAGS}
 
 pdp15 : ${BIN}pdp15${EXE}
 
 ${BIN}pdp15${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP15_OPT} -o $@ ${LDFLAGS}
 
 pdp10 : ${BIN}pdp10${EXE}
 
 ${BIN}pdp10${EXE} : ${PDP10} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP10} ${SIM} ${PDP10_OPT} -o $@ ${LDFLAGS}
 
 pdp11 : ${BIN}pdp11${EXE}
 
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} -o $@ ${LDFLAGS}
 
 vax : ${BIN}vax${EXE}
 
 ${BIN}vax${EXE} : ${VAX} ${SIM}
+	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} -o $@ ${LDFLAGS}
 
 vax780 : ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM}
+	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} -o $@ ${LDFLAGS}
 
 nova : ${BIN}nova${EXE}
 
 ${BIN}nova${EXE} : ${NOVA} ${SIM}
+	${MKDIRBIN}
 	${CC} ${NOVA} ${SIM} ${NOVA_OPT} -o $@ ${LDFLAGS}
 
 eclipse : ${BIN}eclipse${EXE}
 
 ${BIN}eclipse${EXE} : ${ECLIPSE} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ECLIPSE} ${SIM} ${ECLIPSE_OPT} -o $@ ${LDFLAGS}
 
 h316 : ${BIN}h316${EXE}
 
 ${BIN}h316${EXE} : ${H316} ${SIM}
+	${MKDIRBIN}
 	${CC} ${H316} ${SIM} ${H316_OPT} -o $@ ${LDFLAGS}
 
 hp2100 : ${BIN}hp2100${EXE}
 
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
+	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} -o $@ ${LDFLAGS}
 
 i1401 : ${BIN}i1401${EXE}
 
 ${BIN}i1401${EXE} : ${I1401} ${SIM}
+	${MKDIRBIN}
 	${CC} ${I1401} ${SIM} ${I1401_OPT} -o $@ ${LDFLAGS}
 
 i1620 : ${BIN}i1620${EXE}
 
 ${BIN}i1620${EXE} : ${I1620} ${SIM}
+	${MKDIRBIN}
 	${CC} ${I1620} ${SIM} ${I1620_OPT} -o $@ ${LDFLAGS}
 
 i7094 : ${BIN}i7094${EXE}
 
 ${BIN}i7094${EXE} : ${I7094} ${SIM}
+	${MKDIRBIN}
 	${CC} ${I7094} ${SIM} ${I7094_OPT} -o $@ ${LDFLAGS}
 
 ibm1130 : ${BIN}ibm1130${EXE}
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
+	${MKDIRBIN}
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} -o $@ ${LDFLAGS}
 
 s3 : ${BIN}s3${EXE}
 
 ${BIN}s3${EXE} : ${S3} ${SIM}
+	${MKDIRBIN}
 	${CC} ${S3} ${SIM} ${S3_OPT} -o $@ ${LDFLAGS}
 
 altair : ${BIN}altair${EXE}
 
 ${BIN}altair${EXE} : ${ALTAIR} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ALTAIR} ${SIM} ${ALTAIR_OPT} -o $@ ${LDFLAGS}
 
 altairz80 : ${BIN}altairz80${EXE}
 
 ${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM} 
+	${MKDIRBIN}
 	${CC} ${ALTAIRZ80} ${SIM} ${ALTAIRZ80_OPT} -o $@ ${LDFLAGS}
 
 gri : ${BIN}gri${EXE}
 
 ${BIN}gri${EXE} : ${GRI} ${SIM}
+	${MKDIRBIN}
 	${CC} ${GRI} ${SIM} ${GRI_OPT} -o $@ ${LDFLAGS}
 
 lgp : ${BIN}lgp${EXE}
 
 ${BIN}lgp${EXE} : ${LGP} ${SIM}
+	${MKDIRBIN}
 	${CC} ${LGP} ${SIM} ${LGP_OPT} -o $@ ${LDFLAGS}
 
 id16 : ${BIN}id16${EXE}
 
 ${BIN}id16${EXE} : ${ID16} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ID16} ${SIM} ${ID16_OPT} -o $@ ${LDFLAGS}
 
 id32 : ${BIN}id32${EXE}
 
 ${BIN}id32${EXE} : ${ID32} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ID32} ${SIM} ${ID32_OPT} -o $@ ${LDFLAGS}
 
 sds : ${BIN}sds${EXE}
 
 ${BIN}sds${EXE} : ${SDS} ${SIM}
+	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} -o $@ ${LDFLAGS}
 
 swtp : ${BIN}swtp${EXE}
 
 ${BIN}swtp${EXE} : ${SWTP} ${SIM}
+	${MKDIRBIN}
 	${CC} ${SWTP} ${SIM} ${SWTP_OPT} -o $@ ${LDFLAGS}

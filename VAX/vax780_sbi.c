@@ -28,6 +28,7 @@
    sbi                  bus controller
 
    21-Mar-2011  RMS     Added autoreboot capability (from Mark Pizzalato)
+   04-Feb-2011  MP      Added RQB, RQC, and RQD as bootable controllers
    31-May-2008  RMS     Fixed machine_check calling sequence (found by Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
    28-May-2008  RMS     Inlined physical memory routines
@@ -111,6 +112,9 @@ static struct boot_dev boot_tab[] = {
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },
+    { "RQB", BOOT_UDA, 1 << 24 },
+    { "RQC", BOOT_UDA, 1 << 24 },
+    { "RQD", BOOT_UDA, 1 << 24 },
     { "TQ", BOOT_TK, 1 << 24 },
     { NULL }
     };

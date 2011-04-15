@@ -555,7 +555,7 @@ if (strcmp (gbuf, "LOG") == 0) {                        /* output to log? */
         ++(*pref)->refcount;
     }
 else if (strcmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
-    if (sim_debug == NULL)                              /* any debug? */
+    if (sim_deb == NULL)                              /* any debug? */
         return SCPE_ARG;
     *pf = sim_deb;
     *pref = sim_deb_ref;

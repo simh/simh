@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Feb-11    MP      Added sim_fsize_ex and sim_fsize_name_ex returning t_addr
+                        Added export of sim_buf_copy_swapped and sim_buf_swap_data
    28-Jun-07    RMS     Added VMS IA64 support (from Norm Lastovica)
    10-Jul-06    RMS     Fixed linux conditionalization (from Chaskiel Grundman)
    15-May-06    RMS     Added sim_fsize_name
@@ -35,12 +37,17 @@
 
    This library includes:
 
-   sim_finit    -       initialize package
-   sim_fopen    -       open file
-   sim_fread    -       endian independent read (formerly fxread)
-   sim_write    -       endian independent write (formerly fxwrite)
-   sim_fseek    -       extended (>32b) seek (formerly fseek_ext)
-   sim_fsize    -       get file size
+   sim_finit         -       initialize package
+   sim_fopen         -       open file
+   sim_fread         -       endian independent read (formerly fxread)
+   sim_write         -       endian independent write (formerly fxwrite)
+   sim_fseek         -       extended (>32b) seek (formerly fseek_ext)
+   sim_fsize         -       get file size
+   sim_fsize_name    -       get file size of named file
+   sim_fsize_ex      -       get file size as a t_addr
+   sim_fsize_name_ex -       get file size as a t_addr of named file
+   sim_buf_copy_swapped -    copy data swapping elements along the way
+   sim_buf_swap_data -       swap data elements inplace in buffer
 
    sim_fopen and sim_fseek are OS-dependent.  The other routines are not.
    sim_fsize is always a 32b routine (it is used only with small capacity random
@@ -78,18 +85,16 @@ sim_end = end_test.c[0];
 return sim_end;
 }
 
-size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr)
+void sim_buf_swap_data (void *bptr, size_t size, size_t count)
 {
-size_t c, j;
+uint32 j;
 int32 k;
 unsigned char by, *sptr, *dptr;
 
-if ((size == 0) || (count == 0))                        /* check arguments */
-    return 0;
-c = fread (bptr, size, count, fptr);                    /* read buffer */
-if (sim_end || (size == sizeof (char)) || (c == 0))     /* le, byte, or err? */
-    return c;                                           /* done */
-for (j = 0, dptr = sptr = (unsigned char *) bptr; j < c; j++) { /* loop on items */
+if (sim_end || (count == 0) || (size == sizeof (char)))
+    return;
+for (j = 0, dptr = sptr = (unsigned char *) bptr;       /* loop on items */
+     j < count; j++) { 
     for (k = size - 1; k >= (((int32) size + 1) / 2); k--) {
         by = *sptr;                                     /* swap end-for-end */
         *sptr++ = *(dptr + k);
@@ -97,14 +102,44 @@ for (j = 0, dptr = sptr = (unsigned char *) bptr; j < c; j++) { /* loop on items
         }
     sptr = dptr = dptr + size;                          /* next item */
     }
+}
+
+size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr)
+{
+size_t c;
+
+if ((size == 0) || (count == 0))                        /* check arguments */
+    return 0;
+c = fread (bptr, size, count, fptr);                    /* read buffer */
+if (sim_end || (size == sizeof (char)) || (c == 0))     /* le, byte, or err? */
+    return c;                                           /* done */
+sim_buf_swap_data (bptr, size, count);
 return c;
+}
+
+void sim_buf_copy_swapped (void *dbuf, void *sbuf, size_t size, size_t count)
+{
+size_t j;
+int32 k;
+unsigned char *sptr = (unsigned char *)sbuf;
+unsigned char *dptr = (unsigned char *)dbuf;
+
+if (sim_end || (size == sizeof (char))) {
+    memcpy (dptr, sptr, size * count);
+    return;
+    }
+for (j = 0; j < count; j++) {                           /* loop on items */
+    for (k = size - 1; k >= 0; k--)
+        *(dptr + k) = *sptr++;
+    dptr = dptr + size;
+    }
 }
 
 size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr)
 {
-size_t c, j, nelem, nbuf, lcnt, total;
-int32 i, k;
-unsigned char *sptr, *dptr;
+size_t c, nelem, nbuf, lcnt, total;
+int32 i;
+unsigned char *sptr;
 
 if ((size == 0) || (count == 0))                        /* check arguments */
     return 0;
@@ -119,11 +154,8 @@ total = 0;
 sptr = (unsigned char *) bptr;                          /* init input ptr */
 for (i = nbuf; i > 0; i--) {                            /* loop on buffers */
     c = (i == 1)? lcnt: nelem;
-    for (j = 0, dptr = sim_flip; j < c; j++) {          /* loop on items */
-        for (k = size - 1; k >= 0; k--)
-            *(dptr + k) = *sptr++;
-        dptr = dptr + size;
-        }
+    sim_buf_copy_swapped (sim_flip, sptr, size, c);
+    sptr = sptr + size * count;
     c = fwrite (sim_flip, size, c, fptr);
     if (c == 0)
         return total;
@@ -132,31 +164,45 @@ for (i = nbuf; i > 0; i--) {                            /* loop on buffers */
 return total;
 }
 
+/* Forward Declaration */
+
+static t_addr _sim_ftell (FILE *st);
+
 /* Get file size */
 
-uint32 sim_fsize_name (char *fname)
+t_addr sim_fsize_ex (FILE *fp)
+{
+t_addr pos, sz;
+
+if (fp == NULL)
+    return 0;
+pos = _sim_ftell (fp);
+sim_fseek (fp, 0, SEEK_END);
+sz = _sim_ftell (fp);
+sim_fseek (fp, pos, SEEK_SET);
+return sz;
+}
+
+t_addr sim_fsize_name_ex (char *fname)
 {
 FILE *fp;
-uint32 sz;
+t_addr sz;
 
 if ((fp = sim_fopen (fname, "rb")) == NULL)
     return 0;
-sz = sim_fsize (fp);
+sz = sim_fsize_ex (fp);
 fclose (fp);
 return sz;
 }
 
+uint32 sim_fsize_name (char *fname)
+{
+return (uint32)(sim_fsize_name_ex (fname));
+}
+
 uint32 sim_fsize (FILE *fp)
 {
-uint32 pos, sz;
-
-if (fp == NULL)
-    return 0;
-pos = ftell (fp);
-fseek (fp, 0, SEEK_END);
-sz = ftell (fp);
-fseek (fp, pos, SEEK_SET);
-return sz;
+return (uint32)(sim_fsize_ex (fp));
 }
 
 /* OS-dependent routines */
@@ -227,6 +273,9 @@ switch (whence) {
         fileaddr = offset;
         break;
 
+    case SEEK_END:
+        if (_fseeki64 (st, 0, SEEK_END))
+            return (-1);
     case SEEK_CUR:
         if (fgetpos (st, &filepos))
             return (-1);
@@ -243,6 +292,14 @@ int64_to_fpos_t (fileaddr, &filepos, 127);
 return fsetpos (st, &filepos);
 }
 
+static t_addr _sim_ftell (FILE *st)
+{
+fpos_t fileaddr;
+if (fgetpos (st, &fileaddr))
+    return (-1);
+return (t_addr)fpos_t_to_int64 (&fileaddr);
+}
+
 #endif
 
 /* Alpha UNIX - natively 64b */
@@ -255,16 +312,23 @@ int sim_fseek (FILE *st, t_addr offset, int whence)
 return fseek (st, offset, whence);
 }
 
+static t_addr _sim_ftell (FILE *st)
+{
+return (t_addr)(ftell (st));
+}
+
 #endif
 
 /* Windows */
 
 #if defined (_WIN32)
 #define _SIM_IO_FSEEK_EXT_      1
+#include <sys/stat.h>
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
 {
 fpos_t fileaddr;
+struct _stati64 statb;
 
 switch (whence) {
 
@@ -272,6 +336,11 @@ switch (whence) {
         fileaddr = offset;
         break;
 
+    case SEEK_END:
+		if (_fstati64 (_fileno (st), &statb))
+			return (-1);
+		fileaddr = statb.st_size + offset;
+		break;
     case SEEK_CUR:
         if (fgetpos (st, &fileaddr))
             return (-1);
@@ -286,6 +355,14 @@ switch (whence) {
 return fsetpos (st, &fileaddr);
 }
 
+static t_addr _sim_ftell (FILE *st)
+{
+fpos_t fileaddr;
+if (fgetpos (st, &fileaddr))
+    return (-1);
+return (t_addr)fileaddr;
+}
+
 #endif                                                  /* end Windows */
 
 /* Linux */
@@ -296,6 +373,11 @@ return fsetpos (st, &fileaddr);
 int sim_fseek (FILE *st, t_addr xpos, int origin)
 {
 return fseeko64 (st, xpos, origin);
+}
+
+static t_addr _sim_ftell (FILE *st)
+{
+return (t_addr)(ftello64 (st));
 }
 
 #endif                                                  /* end Linux with LFS */
@@ -310,6 +392,11 @@ int sim_fseek (FILE *st, t_addr xpos, int origin)
 return fseeko (st, xpos, origin);
 }
 
+static t_addr _sim_ftell (FILE *st)
+{
+return (t_addr)(ftello (st));
+}
+
 #endif  /* end Apple OS/X */
 
 #endif                                                  /* end 64b seek defs */
@@ -322,6 +409,11 @@ return fseeko (st, xpos, origin);
 int sim_fseek (FILE *st, t_addr xpos, int origin)
 {
 return fseek (st, (int32) xpos, origin);
+}
+
+static t_addr _sim_ftell (FILE *st)
+{
+return (t_addr)(ftell (st));
 }
 
 #endif

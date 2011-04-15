@@ -1989,7 +1989,7 @@ else *ea = (PC & BLKMASK) | (t & IAMASK);               /* within 32K */
 return sta;
 }
 
-t_stat Incr_addr (int32 ma)
+int32 Incr_addr (int32 ma)
 {
 if (memm)
     return ((ma & B_EPCMASK) | ((ma + 1) & B_DAMASK));

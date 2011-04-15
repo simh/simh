@@ -294,7 +294,7 @@ struct xq_device {
   ETH_PACK          read_buffer;
   ETH_PACK          write_buffer;
   ETH_QUE           ReadQ;
-  uint32            idtmr;                              /* countdown for ID Timer */
+  int32             idtmr;                              /* countdown for ID Timer */
   uint32            must_poll;                          /* receiver must poll instead of counting on asynch polls */
 };
 

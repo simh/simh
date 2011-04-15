@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Feb-11    MP      Added sim_fsize_ex and sim_fsize_name_ex returning t_addr
+                        Added export of sim_buf_copy_swapped and sim_buf_swap_data
    15-May-06    RMS     Added sim_fsize_name
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jan-04    RMS     Split out from SCP
@@ -42,5 +44,10 @@ size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 uint32 sim_fsize (FILE *fptr);
 uint32 sim_fsize_name (char *fname);
+t_addr sim_fsize_ex (FILE *fptr);
+t_addr sim_fsize_name_ex (char *fname);
+void sim_buf_swap_data (void *bptr, size_t size, size_t count);
+void sim_buf_copy_swapped (void *dptr, void *bptr, size_t size, size_t count);
+
 
 #endif

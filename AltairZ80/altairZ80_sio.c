@@ -506,10 +506,10 @@ typedef struct {
     int32 sio_can_read;     /* bit mask to indicate that one can read from this port    */
     int32 sio_cannot_read;  /* bit mask to indicate that one cannot read from this port */
     int32 sio_can_write;    /* bit mask to indicate that one can write to this port     */
-    int32 hasReset;         /* TRUE iff SIO has reset command                           */
+    t_bool hasReset;        /* TRUE iff SIO has reset command                           */
     int32 sio_reset;        /* reset command                                            */
-    int32 hasOUT;           /* TRUE iff port supports OUT command                       */
-    int32 isBuiltin;        /* TRUE iff mapping is built in                             */
+    t_bool hasOUT;          /* TRUE iff port supports OUT command                       */
+    t_bool isBuiltin;       /* TRUE iff mapping is built in                             */
 } SIO_PORT_INFO;
 
 static SIO_PORT_INFO port_table[PORT_TABLE_SIZE] = {

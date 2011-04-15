@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Dec-10    MP      Added macro invocation of sim_debug 
    09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
@@ -121,7 +122,14 @@ t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
 void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
     uint16 before, uint16 after, int terminate);
+#ifdef CANT_USE_MACRO_VA_ARGS
+#define _sim_debug sim_debug
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
+#else
+void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
+extern FILE *sim_deb;                                   /* debug file */
+#define sim_debug(dbits, dptr, ...) if (sim_deb && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__)
+#endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 
 #endif

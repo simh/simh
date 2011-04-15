@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Jan-11    MP      Added Asynch I/O support
    29-Dec-10    MP      Fixed clock resolution determination for Unix platforms
    22-Sep-08    RMS     Added "stability threshold" for idle routine
    27-May-08    RMS     Fixed bug in Linux idle routines (from Walter Mueller)
@@ -52,6 +53,7 @@
 #include <ctype.h>
 
 t_bool sim_idle_enab = FALSE;                           /* global flag */
+t_bool sim_idle_wait = FALSE;                           /* global flag */
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
@@ -77,6 +79,11 @@ UNIT sim_throt_unit = { UDATA (&sim_throt_svc, 0, 0) };
 
 #if defined (__VAX)
 #define sys$gettim SYS$GETTIM
+#define sys$setimr SYS$SETIMR
+#define lib$emul LIB$EMUL
+#define sys$waitfr SYS$WAITFR
+#define lib$subx LIB$SUBX
+#define lib$ediv LIB$EDIV
 #endif
 
 #include <starlet.h>
@@ -139,9 +146,29 @@ sys$waitfr (2);
 return sim_os_msec () - stime;
 }
 
-/* Win32 routines */
+#if defined(SIM_ASYNCH_IO)
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 1
+int clock_gettime(int clk_id, struct timespec *tp)
+{
+uint32 secs, ns, tod[2], unixbase[2] = {0xd53e8000, 0x019db1de};
+
+if (clk_id != CLOCK_REALTIME)
+  return -1;
+
+sys$gettim (tod);                                       /* time 0.1usec */
+lib$subx(tod, unixbase, tod);                           /* convert to unix base */
+lib$ediv(&10000000, tod, &secs, &ns);                   /* isolate seconds & 100ns parts */
+tp->tv_sec = secs;
+tp->tv_nsec = ns*100;
+return 0;
+}
+#endif /* CLOCK_REALTIME */
+#endif /* SIM_ASYNCH_IO */
 
 #elif defined (_WIN32)
+
+/* Win32 routines */
 
 #include <windows.h>
 
@@ -193,9 +220,25 @@ Sleep (msec);
 return sim_os_msec () - stime;
 }
 
-/* OS/2 routines, from Bruce Ray */
+#if !defined(CLOCK_REALTIME) && defined (SIM_ASYNCH_IO)
+#define CLOCK_REALTIME 1
+int clock_gettime(int clk_id, struct timespec *tp)
+{
+t_uint64 now, unixbase;
+
+unixbase = 116444736;
+unixbase *= 1000000000;
+GetSystemTimeAsFileTime((FILETIME*)&now);
+now -= unixbase;
+tp->tv_sec = (long)(now/10000000);
+tp->tv_nsec = (now%10000000)*100;
+return 0;
+}
+#endif
 
 #elif defined (__OS2__)
+
+/* OS/2 routines, from Bruce Ray */
 
 const t_bool rtc_avail = FALSE;
 
@@ -267,6 +310,22 @@ treq.tv_nsec = (milliseconds % MILLIS_PER_SEC) * NANOS_PER_MILLI;
 return sim_os_msec () - stime;
 }
 
+#if !defined(CLOCK_REALTIME) && defined (SIM_ASYNCH_IO)
+#define CLOCK_REALTIME 1
+int clock_gettime(int clk_id, struct timespec *tp)
+{
+struct timeval cur;
+struct timezone foo;
+
+if (clk_id != CLOCK_REALTIME)
+  return -1;
+gettimeofday (&cur, &foo);
+tp->tv_sec = cur.tv_sec;
+tp->tv_nsec = cur.tv_usec*1000;
+return 0;
+}
+#endif
+
 #else
 
 /* UNIX routines */
@@ -312,6 +371,24 @@ if (tim > SIM_IDLE_MAX)
     tim = 0;
 return tim;
 }
+#if !defined(_POSIX_SOURCE) && defined(SIM_ASYNCH_IO)
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 1
+typedef int clockid_t;
+int clock_gettime(clockid_t clk_id, struct timespec *tp)
+{
+struct timeval cur;
+struct timezone foo;
+
+if (clk_id != CLOCK_REALTIME)
+  return -1;
+gettimeofday (&cur, &foo);
+tp->tv_sec = cur.tv_sec;
+tp->tv_nsec = cur.tv_usec*1000;
+return 0;
+}
+#endif /* CLOCK_REALTIME */
+#endif /* !defined(_POSIX_SOURCE) && defined(SIM_ASYNCH_IO) */
 
 uint32 sim_os_ms_sleep (unsigned int milliseconds)
 {
@@ -324,6 +401,31 @@ treq.tv_nsec = (milliseconds % MILLIS_PER_SEC) * NANOS_PER_MILLI;
 return sim_os_msec () - stime;
 }
 
+#endif
+
+#if defined(SIM_ASYNCH_IO)
+uint32 sim_idle_ms_sleep (unsigned int msec)
+{
+uint32 start_time = sim_os_msec();
+struct timespec done_time;
+
+clock_gettime(CLOCK_REALTIME, &done_time);
+done_time.tv_sec += (msec/1000);
+done_time.tv_nsec += 1000000*(msec%1000);
+if (done_time.tv_nsec > 1000000000) {
+  done_time.tv_sec += 1;
+  done_time.tv_nsec = done_time.tv_nsec%1000000000;
+  }
+pthread_mutex_lock (&sim_asynch_lock);
+sim_idle_wait = TRUE;
+pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time);
+sim_idle_wait = FALSE;
+pthread_mutex_unlock (&sim_asynch_lock);
+return sim_os_msec() - start_time;
+}
+#define SIM_IDLE_MS_SLEEP sim_idle_ms_sleep
+#else
+#define SIM_IDLE_MS_SLEEP sim_os_ms_sleep
 #endif
 
 /* OS independent clock calibration package */
@@ -407,6 +509,7 @@ if (rtc_based[tmr] <= 0)                                /* never negative or zer
     rtc_based[tmr] = 1;
 if (rtc_currd[tmr] <= 0)                                /* never negative or zero! */
     rtc_currd[tmr] = 1;
+AIO_SET_INTERRUPT_LATENCY(rtc_currd[tmr]*ticksper);     /* set interrrupt latency */
 return rtc_currd[tmr];
 }
 
@@ -446,7 +549,8 @@ return (sim_idle_rate_ms != 0);
 
 t_bool sim_idle (uint32 tmr, t_bool sin_cyc)
 {
-uint32 cyc_ms, w_ms, w_idle, act_ms;
+static uint32 cyc_ms;
+uint32 w_ms, w_idle, act_ms;
 int32 act_cyc;
 
 if ((sim_clock_queue == NULL) ||                        /* clock queue empty? */
@@ -456,7 +560,8 @@ if ((sim_clock_queue == NULL) ||                        /* clock queue empty? */
         sim_interval = sim_interval - 1;
     return FALSE;
     }
-cyc_ms = (rtc_currd[tmr] * rtc_hz[tmr]) / 1000;         /* cycles per msec */
+if (!cyc_ms)
+    cyc_ms = (rtc_currd[tmr] * rtc_hz[tmr]) / 1000;     /* cycles per msec */
 if ((sim_idle_rate_ms == 0) || (cyc_ms == 0)) {         /* not possible? */
     if (sin_cyc)
         sim_interval = sim_interval - 1;
@@ -469,11 +574,11 @@ if (w_idle == 0) {                                      /* none? */
         sim_interval = sim_interval - 1;
     return FALSE;
     }
-act_ms = sim_os_ms_sleep (w_idle);                      /* wait */
+act_ms = SIM_IDLE_MS_SLEEP (w_ms);                      /* wait */
 act_cyc = act_ms * cyc_ms;
 if (sim_interval > act_cyc)
     sim_interval = sim_interval - act_cyc;
-else sim_interval = 1;
+else sim_interval = 0;
 return TRUE;
 }
 

@@ -5957,12 +5957,12 @@ int32 Debug_Entry(int32 PC, int32 inst, int32 inst2, int32 AC0, int32 AC1, int32
     return 0;
 }
 
-int32 Debug_Dump(UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat Debug_Dump(UNIT *uptr, int32 val, char *cptr, void *desc)
 {
     return SCPE_OK;
 }
 
-int32 Dump_History (FILE *st, UNIT *uptr, int32 val, void *desc) 
+t_stat Dump_History (FILE *st, UNIT *uptr, int32 val, void *desc) 
 {
     char debmap[4], debion[4];
     t_value simeval[20];

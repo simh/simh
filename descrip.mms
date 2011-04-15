@@ -2,13 +2,13 @@
 # Written By:	Robert Alan Byer / byer@mail.ourservers.net
 # Modified By:	Mark Pizzolato / mark@infocomm.com
 #		Norman Lastovica / norman.lastovica@oracle.com
-#       Camiel Vanderhoeven / camiel@camicom.com
+#		Camiel Vanderhoeven / camiel@camicom.com
 #
 # This MMS/MMK build script is used to compile the various simulators in
 # the SIMH package for OpenVMS using DEC C v6.0-001(AXP), v6.5-001(AXP),
-# HP C V7.2-001 (IA64) and v6.4-005(VAX).
+# HP C V7.3-009-48GBT (AXP), HP C V7.2-001 (IA64) and v6.4-005(VAX).
 #
-# Notes:  On VAX, the PDP-10 and Eclipse simulators will not be built 
+# Notes:  On VAX, the PDP-10and IBM 7094 simulators will not be built
 #         due to the fact that INT64 is required for that simulator.
 #
 # This build script will accept the following build options.
@@ -23,6 +23,7 @@
 #            HP2100          Just Build The Hewlett-Packard HP-2100. 
 #            I1401           Just Build The IBM 1401.
 #            I1620           Just Build The IBM 1620.
+#            I7094           Just Build The IBM 7094.
 #            IBM1130         Just Build The IBM 1130.
 #            ID16            Just Build The Interdata 16-bit CPU.
 #            ID32            Just Build The Interdata 32-bit CPU.
@@ -37,6 +38,7 @@
 #            PDP15           Just Build The DEC PDP-15.
 #            S3              Just Build The IBM System 3.
 #            SDS             Just Build The SDS 940.
+#            SWTP            Just Build The SWTP.
 #            VAX             Just Build The DEC VAX.
 #            VAX780          Just Build The DEC VAX780.
 #            CLEAN           Will Clean Files Back To Base Kit.
@@ -45,6 +47,11 @@
 # information) use..
 #
 #        MMK/MACRO=(DEBUG=1)
+#
+# To build on older Alpha VMS platforms, SIM_ASYNCH_IO must be disabled. 
+# use..
+#
+#        MMK/MACRO=(NOASYNCH=1)
 #
 # This will produce an executable named {Simulator}-{I64|VAX|AXP}-DBG.EXE
 #
@@ -62,19 +69,23 @@ CC_OPTIMIZE = /NOOPTIMIZE
 .IFDEF MMSALPHA
 ALPHA_OR_IA64 = 1
 CC_FLAGS = /PREF=ALL
-ARCH = AXP-DBG
+.IFDEF NOASYNCH
+ARCH = AXP-NOASYNCH-DBG
 CC_DEFS = "_LARGEFILE"
+.ELSE
+ARCH = AXP-DBG
+CC_DEFS = "_LARGEFILE","SIM_ASYNCH_IO=1"
+.ENDIF
 .ENDIF
 
 .IFDEF MMSIA64
 ALPHA_OR_IA64 = 1
 CC_FLAGS = /PREF=ALL
 ARCH = I64-DBG
-CC_DEFS = "_LARGEFILE"
+CC_DEFS = "_LARGEFILE","SIM_ASYNCH_IO=1"
 .ENDIF
 
 .IFDEF MMSVAX
-ALPHA_OR_IA64 = 0
 CC_FLAGS = $(CC_FLAGS)
 ARCH = VAX-DBG
 CC_DEFS = "__VAX"
@@ -87,8 +98,13 @@ LINK_DEBUG = /NODEBUG/NOTRACEBACK
 ALPHA_OR_IA64 = 1
 CC_OPTIMIZE = /OPT=(LEV=5)/ARCH=HOST
 CC_FLAGS = /PREF=ALL
-ARCH = AXP
+.IFDEF NOASYNCH
+ARCH = AXP-NOASYNCH
 CC_DEFS = "_LARGEFILE"
+.ELSE
+ARCH = AXP
+CC_DEFS = "_LARGEFILE","SIM_ASYNCH_IO=1"
+.ENDIF
 LINK_SECTION_BINDING = /SECTION_BINDING
 .ENDIF
 
@@ -97,11 +113,10 @@ ALPHA_OR_IA64 = 1
 CC_OPTIMIZE = /OPT=(LEV=5)
 CC_FLAGS = /PREF=ALL
 ARCH = I64
-CC_DEFS = "_LARGEFILE"
+CC_DEFS = "_LARGEFILE","SIM_ASYNCH_IO=1"
 .ENDIF
 
 .IFDEF MMSVAX
-ALPHA_OR_IA64 = 0
 CC_OPTIMIZE = /OPTIMIZE
 CC_FLAGS = $(CC_FLAGS)
 ARCH = VAX
@@ -120,15 +135,18 @@ CC = CC/DECC$(OUR_CC_FLAGS)
 # Define The platform specific Build Directory Where The Objects Will Go.
 #
 BIN_DIR = SYS$DISK:[.BIN]
-LIB_DIR = SYS$DISK:[.LIB]
-BLD_DIR = SYS$DISK:[.LIB.BLD-$(ARCH)]
+LIB_DIR = SYS$DISK:[.BIN.VMS.LIB]
+BLD_DIR = SYS$DISK:[.BIN.VMS.LIB.BLD-$(ARCH)]
 
 # Check To Make Sure We Have SYS$DISK:[.BIN] & SYS$DISK:[.LIB] Directory.
 #
 .FIRST
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LES."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LES."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN EXIT %x10000000
   @ IF (F$SEARCH("SYS$DISK:[]BIN.DIR").EQS."") THEN CREATE/DIRECTORY $(BIN_DIR)
-  @ IF (F$SEARCH("SYS$DISK:[]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
-  @ IF (F$SEARCH("SYS$DISK:[.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
+  @ IF (F$SEARCH("SYS$DISK:[.BIN]VMS.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
+  @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
+  @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
   @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
   @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
 
@@ -139,7 +157,11 @@ SIMH_LIB = $(LIB_DIR)SIMH-$(ARCH).OLB
 SIMH_SOURCE = $(SIMH_DIR)SIM_CONSOLE.C,$(SIMH_DIR)SIM_SOCK.C,\
               $(SIMH_DIR)SIM_TMXR.C,$(SIMH_DIR)SIM_ETHER.C,\
               $(SIMH_DIR)SIM_TAPE.C,$(SIMH_DIR)SIM_FIO.C,\
-              $(SIMH_DIR)SIM_TIMER.C
+              $(SIMH_DIR)SIM_TIMER.C,$(SIMH_DIR)SIM_DISK.C
+SIMH_MAIN = SCP.C
+.IFDEF ALPHA_OR_IA64
+SIMH_LIB64 = $(LIB_DIR)SIMH64-$(ARCH).OLB
+.ENDIF
 
 # VMS PCAP File Definitions.
 #
@@ -227,7 +249,7 @@ ECLIPSE_SOURCE = $(NOVA_DIR)ECLIPSE_CPU.C,$(NOVA_DIR)ECLIPSE_TT.C,\
                  $(NOVA_DIR)NOVA_PT.C,$(NOVA_DIR)NOVA_CLK.C,\
                  $(NOVA_DIR)NOVA_TT1.C,$(NOVA_DIR)NOVA_QTY.C
 ECLIPSE_OPTIONS = /INCL=($(SIMH_DIR),$(NOVA_DIR))\
-    		/DEF=($(CC_DEFS),"USE_INT64=1","ECLIPSE=1")
+    		/DEF=($(CC_DEFS),"ECLIPSE=1")
 
 #
 # GRI Corporation GRI-909 Simulator Definitions.
@@ -275,7 +297,7 @@ HP2100_SOURCE1 = $(HP2100_DIR)HP2100_STDDEV.C,$(HP2100_DIR)HP2100_DP.C,\
 HP2100_LIB2 = $(LIB_DIR)HP2100L2-$(ARCH).OLB
 HP2100_SOURCE2 = $(HP2100_DIR)HP2100_FP1.C,$(HP2100_DIR)HP2100_BACI.C,\
                  $(HP2100_DIR)HP2100_MPX.C,$(HP2100_DIR)HP2100_PIF.C
-.IF ALPHA_OR_IA64
+.IFDEF ALPHA_OR_IA64
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))\
     		/DEF=($(CC_DEFS),"HAVE_INT64=1")
 .ELSE
@@ -454,6 +476,15 @@ SDS_SOURCE = $(SDS_DIR)SDS_CPU.C,$(SDS_DIR)SDS_DRM.C,$(SDS_DIR)SDS_DSK.C,\
 SDS_OPTIONS = /INCL=($(SIMH_DIR),$(SDS_DIR))/DEF=($(CC_DEFS))
 
 #
+# SWTP 6800
+#
+SWTP_DIR = SYS$DISK:[.SWTP]
+SWTP_LIB = $(LIB_DIR)SWTP-$(ARCH).OLB
+SWTP_SOURCE = $(SWTP_DIR)SWTP_CPU.C,$(SWTP_DIR)SWTP_DSK.C,$(SWTP_DIR)SWTP_SIO.C,\ 
+             $(SWTP_DIR)SWTP_SYS.C
+SWTP_OPTIONS = /INCL=($(SIMH_DIR),$(SWTP_DIR))/DEF=($(CC_DEFS))
+
+#
 # Digital Equipment VAX Simulator Definitions.
 #
 VAX_DIR = SYS$DISK:[.VAX]
@@ -470,8 +501,15 @@ VAX_SOURCE = $(VAX_DIR)VAX_CIS.C,$(VAX_DIR)VAX_CMODE.C,\
              $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
              $(PDP11_DIR)PDP11_XQ.C,$(PDP11_DIR)PDP11_CR.C,\
              $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_VH.C
+.IFDEF ALPHA_OR_IA64
+VAX_OPTIONS = /INCL=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
+		/DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS))
+VAX_SIMH_LIB = $(SIMH_LIB64)
+.ELSE
 VAX_OPTIONS = /INCL=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
 		/DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS))
+VAX_SIMH_LIB = $(SIMH_LIB)
+.ENDIF
 
 # Digital Equipment VAX780 Simulator Definitions.
 #
@@ -493,8 +531,15 @@ VAX780_SOURCE2 = $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
 	$(PDP11_DIR)PDP11_CR.C,$(PDP11_DIR)PDP11_RP.C,\
 	$(PDP11_DIR)PDP11_TU.C,$(PDP11_DIR)PDP11_HK.C,\
         $(PDP11_DIR)PDP11_IO_LIB.C
+.IFDEF ALPHA_OR_IA64
+VAX780_OPTIONS = /INCL=($(SIMH_DIR),$(VAX780_DIR),$(PDP11_DIR)$(PCAP_INC))\
+	/DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS),"VAX_780=1")
+VAX780_SIMH_LIB = $(SIMH_LIB64)
+.ELSE
 VAX780_OPTIONS = /INCL=($(SIMH_DIR),$(VAX780_DIR),$(PDP11_DIR)$(PCAP_INC))\
 	/DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS),"VAX_780=1")
+VAX780_SIMH_LIB = $(SIMH_LIB)
+.ENDIF
 
 # IBM 7094 Simulator Definitions.
 #
@@ -510,17 +555,17 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 
 # If we're not a VAX, Build Everything
 #
-.IF ALPHA_OR_IA64
+.IFDEF ALPHA_OR_IA64
 ALL :	ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
 	ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX VAX780 SDS \
-	I7094
+	I7094 SWTP
 	$! No further actions necessary
 .ELSE
 #
 # Else We Are On VAX And Build Everything EXCEPT the 64b simulators
 #
-ALL :	ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
-	NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS
+ALL :	ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+	NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS SWTP
 	$! No further actions necessary
 .ENDIF
 
@@ -552,6 +597,19 @@ $(SIMH_LIB) : $(SIMH_SOURCE)
                         LIBRARY/CREATE $(MMS$TARGET)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+.IFDEF ALPHA_OR_IA64
+$(SIMH_LIB64) : $(SIMH_SOURCE)
+                $!
+		$! Building The $(SIMH_LIB64) Library.
+                $!
+                $ $(CC)/DEF=($(CC_DEFS)$(PCAP_DEFS),"USE_ADDR64=1","USE_INT64=1")$(PCAP_SIMH_INC) -
+    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+                        LIBRARY/CREATE $(MMS$TARGET)
+                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ENDIF
 
 $(ALTAIR_LIB) : $(ALTAIR_SOURCE)
 		$!
@@ -586,10 +644,6 @@ $(ALTAIRZ80_LIB2) : $(ALTAIRZ80_SOURCE2)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-#
-# If Not On VAX, Build The Eclipse Library.
-#
-.IF ALPHA_OR_IA64
 $(ECLIPSE_LIB) : $(ECLIPSE_SOURCE)
                 $!
 		$! Building The $(ECLIPSE_LIB) Library.
@@ -600,16 +654,6 @@ $(ECLIPSE_LIB) : $(ECLIPSE_SOURCE)
                         LIBRARY/CREATE $(MMS$TARGET)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-.ELSE
-#
-# We Are On VAX And Due To The Use of INT64 We Can't Build It.
-#
-$(ECLIPSE_LIB) : 
-                $!
-		$! Due To The Use Of INT64 We Can't Build The
-                $! $(LIB_DIR)ECLIPSE-$(ARCH).OLB Library On VAX.
-                $!
-.ENDIF
 
 $(GRI_LIB) : $(GRI_SOURCE)
 		$!
@@ -790,7 +834,7 @@ $(PDP9_LIB) : $(PDP18B_SOURCE)
 #
 # If Not On VAX, Build The PDP-10 Library.
 #
-.IF ALPHA_OR_IA64
+.IFDEF ALPHA_OR_IA64
 $(PDP10_LIB) : $(PDP10_SOURCE)
                 $!
 		$! Building The $(PDP10_LIB) Library.
@@ -807,7 +851,7 @@ $(PDP10_LIB) : $(PDP10_SOURCE)
 #
 $(PDP10_LIB) : 
 		$! Due To The Use Of INT64 We Can't Build The
-                $! $(LIB_DIR)PDP10-$(ARCH).OLB Library On VAX.
+                $! $(MMS$TARGET) Library On VAX.
 .ENDIF
 
 $(PDP11_LIB1) : $(PDP11_SOURCE1)
@@ -865,6 +909,17 @@ $(SDS_LIB) : $(SDS_SOURCE)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+$(SWTP_LIB) : $(SWTP_SOURCE)
+                $!
+		$! Building The $(SWTP_LIB) Library.
+                $!
+                $ $(CC)$(SWTP_OPTIONS) -
+    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+                        LIBRARY/CREATE $(MMS$TARGET)
+                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
 $(VAX_LIB) : $(VAX_SOURCE)
                 $!
 		$! Building The $(VAX_LIB) Library.
@@ -913,7 +968,7 @@ $(PCAP_LIB) : $(PCAP_SOURCE)
 #
 # If Not On VAX, Build The IBM 7094 Library.
 #
-.IF ALPHA_OR_IA64
+.IFDEF ALPHA_OR_IA64
 $(I7094_LIB) : $(I7094_SOURCE)
                 $!
 		$! Building The $(I7094_LIB) Library.
@@ -930,13 +985,16 @@ $(I7094_LIB) : $(I7094_SOURCE)
 #
 $(I7094_LIB) : 
 		$! Due To The Use Of INT64 We Can't Build The
-                $! $(LIB_DIR)I7094-$(ARCH).OLB Library On VAX.
+                $! $(MMS$TARGET) Library On VAX.
 .ENDIF
 
 #
 # Individual Simulator Builds.
 #
-ALTAIR : $(SIMH_LIB) $(ALTAIR_LIB)
+ALTAIR : $(BIN_DIR)ALTAIR-$(ARCH).EXE
+	$! ALTAIR done
+
+$(BIN_DIR)ALTAIR-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIR_LIB)
          $!
          $! Building The $(BIN_DIR)ALTAIR-$(ARCH).EXE Simulator.
          $!
@@ -945,7 +1003,10 @@ ALTAIR : $(SIMH_LIB) $(ALTAIR_LIB)
                 $(BLD_DIR)SCP.OBJ,$(ALTAIR_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
          $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-ALTAIRZ80 : $(SIMH_LIB) $(ALTAIRZ80_LIB1) $(ALTAIRZ80_LIB2)
+ALTAIRZ80 : $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE
+	$! ALTAIRZ80 done
+
+$(BIN_DIR)ALTAIRZ80-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIRZ80_LIB1) $(ALTAIRZ80_LIB2)
             $!
             $! Building The $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE Simulator.
             $!
@@ -955,11 +1016,10 @@ ALTAIRZ80 : $(SIMH_LIB) $(ALTAIRZ80_LIB1) $(ALTAIRZ80_LIB2)
                    $(ALTAIRZ80_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
             $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-#
-# If Not On VAX, Build The PDP-10 Simulator.
-#
-.IF ALPHA_OR_IA64
-ECLIPSE : $(SIMH_LIB) $(ECLIPSE_LIB)
+ECLIPSE : $(BIN_DIR)ECLIPSE-$(ARCH).EXE
+	$! ECLIPSE done
+
+$(BIN_DIR)ECLIPSE-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ECLIPSE_LIB)
           $!
           $! Building The $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator.
           $!
@@ -967,17 +1027,11 @@ ECLIPSE : $(SIMH_LIB) $(ECLIPSE_LIB)
           $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ECLIPSE-$(ARCH).EXE -
                  $(BLD_DIR)SCP.OBJ,$(ECLIPSE_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
           $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-.ELSE
-#
-# Else We Are On VAX And Tell The User We Can't Build On VAX
-# Due To The Use Of INT64.
-#
-ECLIPSE : 
-        $! Sorry, Can't Build $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator
-        $! Because It Requires The Use Of INT64.
-.ENDIF
 
-GRI : $(SIMH_LIB) $(GRI_LIB)
+GRI : $(BIN_DIR)GRI-$(ARCH).EXE
+	$! GRI done
+
+$(BIN_DIR)GRI-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(GRI_LIB)
       $!
       $! Building The $(BIN_DIR)GRI-$(ARCH).EXE Simulator.
       $!
@@ -986,7 +1040,10 @@ GRI : $(SIMH_LIB) $(GRI_LIB)
              $(BLD_DIR)SCP.OBJ,$(GRI_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-LGP : $(SIMH_LIB) $(LGP_LIB)
+LGP : $(BIN_DIR)LGP-$(ARCH).EXE
+	$! LGP done
+
+$(BIN_DIR)LGP-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(LGP_LIB)
       $!
       $! Building The $(BIN_DIR)LGP-$(ARCH).EXE Simulator.
       $!
@@ -995,7 +1052,10 @@ LGP : $(SIMH_LIB) $(LGP_LIB)
              $(BLD_DIR)SCP.OBJ,$(LGP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-H316 : $(SIMH_LIB) $(H316_LIB)
+H316 : $(BIN_DIR)H316-$(ARCH).EXE
+	$! H316 done
+
+$(BIN_DIR)H316-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(H316_LIB)
        $!
        $! Building The $(BIN_DIR)H316-$(ARCH).EXE Simulator.
        $!
@@ -1004,7 +1064,10 @@ H316 : $(SIMH_LIB) $(H316_LIB)
               $(BLD_DIR)SCP.OBJ,$(H316_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-HP2100 : $(SIMH_LIB) $(HP2100_LIB1) $(HP2100_LIB2)
+HP2100 : $(BIN_DIR)HP2100-$(ARCH).EXE
+	$! HP2100 done
+
+$(BIN_DIR)HP2100-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(HP2100_LIB1) $(HP2100_LIB2)
          $!
          $! Building The $(BIN_DIR)HP2100-$(ARCH).EXE Simulator.
          $!
@@ -1014,7 +1077,10 @@ HP2100 : $(SIMH_LIB) $(HP2100_LIB1) $(HP2100_LIB2)
                 $(HP2100_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
          $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-I1401 : $(SIMH_LIB) $(I1401_LIB)
+I1401 : $(BIN_DIR)I1401-$(ARCH).EXE
+	$! I1401 done
+
+$(BIN_DIR)I1401-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1401_LIB)
         $!
         $! Building The $(BIN_DIR)I1401-$(ARCH).EXE Simulator.
         $!
@@ -1023,7 +1089,10 @@ I1401 : $(SIMH_LIB) $(I1401_LIB)
                $(BLD_DIR)SCP.OBJ,$(I1401_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-I1620 : $(SIMH_LIB) $(I1620_LIB)
+I1620 : $(BIN_DIR)I1620-$(ARCH).EXE
+	$! I1620 done
+
+$(BIN_DIR)I1620-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1620_LIB)
         $!
         $! Building The $(BIN_DIR)I1620-$(ARCH).EXE Simulator.
         $!
@@ -1032,7 +1101,10 @@ I1620 : $(SIMH_LIB) $(I1620_LIB)
                $(BLD_DIR)SCP.OBJ,$(I1620_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-IBM1130 : $(SIMH_LIB) $(IBM1130_LIB)
+IBM1130 : $(BIN_DIR)IBM1130-$(ARCH).EXE
+	$! IBM1130 done
+
+$(BIN_DIR)IBM1130-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(IBM1130_LIB)
           $!
           $! Building The $(BIN_DIR)IBM1130-$(ARCH).EXE Simulator.
           $!
@@ -1041,7 +1113,10 @@ IBM1130 : $(SIMH_LIB) $(IBM1130_LIB)
                  $(BLD_DIR)SCP.OBJ,$(IBM1130_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
           $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-ID16 : $(SIMH_LIB) $(ID16_LIB)
+ID16 : $(BIN_DIR)ID16-$(ARCH).EXE
+	$! ID16 done
+
+$(BIN_DIR)ID16-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ID16_LIB)
        $!
        $! Building The $(BIN_DIR)ID16-$(ARCH).EXE Simulator.
        $!
@@ -1050,7 +1125,10 @@ ID16 : $(SIMH_LIB) $(ID16_LIB)
               $(BLD_DIR)SCP.OBJ,$(ID16_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-ID32 : $(SIMH_LIB) $(ID32_LIB)
+ID32 : $(BIN_DIR)ID32-$(ARCH).EXE
+	$! ID32 done
+
+$(BIN_DIR)ID32-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ID32_LIB)
        $!
        $! Building The $(BIN_DIR)ID32-$(ARCH).EXE Simulator.
        $!
@@ -1059,7 +1137,10 @@ ID32 : $(SIMH_LIB) $(ID32_LIB)
               $(BLD_DIR)SCP.OBJ,$(ID32_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-NOVA : $(SIMH_LIB) $(NOVA_LIB)
+NOVA : $(BIN_DIR)NOVA-$(ARCH).EXE
+	$! NOVA done
+
+$(BIN_DIR)NOVA-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(NOVA_LIB)
        $!
        $! Building The $(BIN_DIR)NOVA-$(ARCH).EXE Simulator.
        $!
@@ -1068,7 +1149,10 @@ NOVA : $(SIMH_LIB) $(NOVA_LIB)
               $(BLD_DIR)SCP.OBJ,$(NOVA_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-PDP1 : $(SIMH_LIB) $(PDP1_LIB)
+PDP1 : $(BIN_DIR)PDP1-$(ARCH).EXE
+	$! PDP1 done
+
+$(BIN_DIR)PDP1-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP1_LIB)
        $!
        $! Building The $(BIN_DIR)PDP1-$(ARCH).EXE Simulator.
        $!
@@ -1077,7 +1161,10 @@ PDP1 : $(SIMH_LIB) $(PDP1_LIB)
               $(BLD_DIR)SCP.OBJ,$(PDP1_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-PDP4 : $(SIMH_LIB) $(PDP4_LIB)
+PDP4 : $(BIN_DIR)PDP4-$(ARCH).EXE
+	$! PDP4 done
+
+$(BIN_DIR)PDP4-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP4_LIB)
        $!
        $! Building The $(BIN_DIR)PDP4-$(ARCH).EXE Simulator.
        $!
@@ -1086,7 +1173,10 @@ PDP4 : $(SIMH_LIB) $(PDP4_LIB)
               $(BLD_DIR)SCP.OBJ,$(PDP4_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-PDP7 : $(SIMH_LIB) $(PDP7_LIB)
+PDP7 : $(BIN_DIR)PDP7-$(ARCH).EXE
+	$! PDP7 done
+
+$(BIN_DIR)PDP7-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP7_LIB)
        $!
        $! Building The $(BIN_DIR)PDP7-$(ARCH).EXE Simulator.
        $!
@@ -1095,7 +1185,10 @@ PDP7 : $(SIMH_LIB) $(PDP7_LIB)
               $(BLD_DIR)SCP.OBJ,$(PDP7_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-PDP8 : $(SIMH_LIB) $(PDP8_LIB)
+PDP8 : $(BIN_DIR)PDP8-$(ARCH).EXE
+	$! PDP8 done
+
+$(BIN_DIR)PDP8-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP8_LIB)
        $!
        $! Building The $(BIN_DIR)PDP8-$(ARCH).EXE Simulator.
        $!
@@ -1104,7 +1197,10 @@ PDP8 : $(SIMH_LIB) $(PDP8_LIB)
               $(BLD_DIR)SCP.OBJ,$(PDP8_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-PDP9 : $(SIMH_LIB) $(PDP9_LIB)
+PDP9 : $(BIN_DIR)PDP9-$(ARCH).EXE
+	$! PDP9 done
+
+$(BIN_DIR)PDP9-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP9_LIB)
        $!
        $! Building The $(BIN_DIR)PDP9-$(ARCH).EXE Simulator.
        $!
@@ -1116,8 +1212,11 @@ PDP9 : $(SIMH_LIB) $(PDP9_LIB)
 #
 # If Not On VAX, Build The PDP-10 Simulator.
 #
-.IF ALPHA_OR_IA64
-PDP10 : $(SIMH_LIB) $(PCAP_LIBD) $(PDP10_LIB) $(PCAP_EXECLET)
+.IFDEF ALPHA_OR_IA64
+PDP10 : $(BIN_DIR)PDP10-$(ARCH).EXE
+	$! PDP10 done
+
+$(BIN_DIR)PDP10-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PCAP_LIBD) $(PDP10_LIB) $(PCAP_EXECLET)
         $!
         $! Building The $(BIN_DIR)PDP10-$(ARCH).EXE Simulator.
         $!
@@ -1135,7 +1234,10 @@ PDP10 :
         $! Because It Requires The Use Of INT64.
 .ENDIF
 
-PDP11 : $(SIMH_LIB) $(PCAP_LIBD) $(PDP11_LIB1) $(PDP11_LIB2) $(PCAP_EXECLET)
+PDP11 : $(BIN_DIR)PDP11-$(ARCH).EXE
+	$! PDP11 done
+
+$(BIN_DIR)PDP11-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PCAP_LIBD) $(PDP11_LIB1) $(PDP11_LIB2) $(PCAP_EXECLET)
         $!
         $! Building The $(BIN_DIR)PDP11-$(ARCH).EXE Simulator.
         $!
@@ -1144,7 +1246,10 @@ PDP11 : $(SIMH_LIB) $(PCAP_LIBD) $(PDP11_LIB1) $(PDP11_LIB2) $(PCAP_EXECLET)
                $(BLD_DIR)SCP.OBJ,$(PDP11_LIB1)/LIBRARY,$(PDP11_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY$(PCAP_LIBR)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-PDP15 : $(SIMH_LIB) $(PDP15_LIB)
+PDP15 : $(BIN_DIR)PDP15-$(ARCH).EXE
+	$! PDP15 done
+
+$(BIN_DIR)PDP15-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP15_LIB)
         $!
         $! Building The $(BIN_DIR)PDP15-$(ARCH).EXE Simulator.
         $!
@@ -1153,7 +1258,10 @@ PDP15 : $(SIMH_LIB) $(PDP15_LIB)
                $(BLD_DIR)SCP.OBJ,$(PDP15_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-S3 : $(SIMH_LIB) $(S3_LIB)
+S3 : $(BIN_DIR)S3-$(ARCH).EXE
+	$! S3 done
+
+$(BIN_DIR)S3-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(S3_LIB)
      $!
      $! Building The $(BIN_DIR)S3-$(ARCH).EXE Simulator.
      $!
@@ -1162,7 +1270,10 @@ S3 : $(SIMH_LIB) $(S3_LIB)
             $(BLD_DIR)SCP.OBJ,$(S3_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-SDS : $(SIMH_LIB) $(SDS_LIB)
+SDS : $(BIN_DIR)SDS-$(ARCH).EXE
+	$! SDS done
+
+$(BIN_DIR)SDS-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SDS_LIB)
       $!
       $! Building The $(BIN_DIR)SDS-$(ARCH).EXE Simulator.
       $!
@@ -1171,7 +1282,22 @@ SDS : $(SIMH_LIB) $(SDS_LIB)
              $(BLD_DIR)SCP.OBJ,$(SDS_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-VAX : $(SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB) $(PCAP_EXECLET)
+SWTP : $(BIN_DIR)SWTP-$(ARCH).EXE
+	$! SWTP done
+
+$(BIN_DIR)SWTP-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SWTP_LIB)
+      $!
+      $! Building The $(BIN_DIR)SWTP-$(ARCH).EXE Simulator.
+      $!
+      $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP-$(ARCH).EXE -
+             $(BLD_DIR)SCP.OBJ,$(SWTP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+VAX : $(BIN_DIR)VAX-$(ARCH).EXE
+	$! VAX done
+
+$(BIN_DIR)VAX-$(ARCH).EXE : $(SIMH_MAIN) $(VAX_SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB) $(PCAP_EXECLET)
       $!
       $! Building The $(BIN_DIR)VAX-$(ARCH).EXE Simulator.
       $!
@@ -1179,10 +1305,13 @@ VAX : $(SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB) $(PCAP_EXECLET)
       $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
 	     /EXE=$(BIN_DIR)VAX-$(ARCH).EXE -
              $(BLD_DIR)SCP.OBJ,$(VAX_LIB)/LIBRARY,-
-	     $(SIMH_LIB)/LIBRARY$(PCAP_LIBR)
+	     $(VAX_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-VAX780 : $(SIMH_LIB) $(PCAP_LIBD) $(VAX780_LIB1) $(VAX780_LIB2) $(PCAP_EXECLET)
+VAX780 : $(BIN_DIR)VAX780-$(ARCH).EXE
+	$! VAX780 done
+
+$(BIN_DIR)VAX780-$(ARCH).EXE : $(SIMH_MAIN) $(VAX780_SIMH_LIB) $(PCAP_LIBD) $(VAX780_LIB1) $(VAX780_LIB2) $(PCAP_EXECLET)
       $!
       $! Building The $(BIN_DIR)VAX780-$(ARCH).EXE Simulator.
       $!
@@ -1191,14 +1320,17 @@ VAX780 : $(SIMH_LIB) $(PCAP_LIBD) $(VAX780_LIB1) $(VAX780_LIB2) $(PCAP_EXECLET)
              /EXE=$(BIN_DIR)VAX780-$(ARCH).EXE -
              $(BLD_DIR)SCP.OBJ,-
              $(VAX780_LIB1)/LIBRARY,$(VAX780_LIB2)/LIBRARY,-
- 	     $(SIMH_LIB)/LIBRARY$(PCAP_LIBR)
+ 	     $(VAX780_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
 # If Not On VAX, Build The IBM 7094 Simulator.
 #
-.IF ALPHA_OR_IA64
-I7094 : $(SIMH_LIB) $(I7094_LIB)
+.IFDEF ALPHA_OR_IA64
+I7094 : $(BIN_DIR)I7094-$(ARCH).EXE
+	$! I7094 done
+
+$(BIN_DIR)I7094-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I7094_LIB)
         $!
         $! Building The $(BIN_DIR)I7094-$(ARCH).EXE Simulator.
         $!

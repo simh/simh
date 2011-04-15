@@ -122,7 +122,7 @@ DEVICE ptp_dev = {
 
 /* service routine - actually gets char & places in buffer */
 
-int32 sio_svc (UNIT *uptr)
+t_stat sio_svc (UNIT *uptr)
 {
     int32 temp;
 
@@ -139,12 +139,12 @@ int32 sio_svc (UNIT *uptr)
 }
 
 
-int32 ptr_svc (UNIT *uptr)
+t_stat ptr_svc (UNIT *uptr)
 {
     return SCPE_OK;
 }
 
-int32 ptp_svc (UNIT *uptr)
+t_stat ptp_svc (UNIT *uptr)
 {
     return SCPE_OK;
 }
@@ -152,7 +152,7 @@ int32 ptp_svc (UNIT *uptr)
 
 /* Reset routine */
 
-int32 sio_reset (DEVICE *dptr)
+t_stat sio_reset (DEVICE *dptr)
 {
     sio_unit.buf = 0;                                   /* Data */
     sio_unit.u3 = 0x02;                                 /* Status */
@@ -161,7 +161,7 @@ int32 sio_reset (DEVICE *dptr)
 }
 
 
-int32 ptr_reset (DEVICE *dptr)
+t_stat ptr_reset (DEVICE *dptr)
 {
     ptr_unit.buf = 0;
     ptr_unit.u3 = 0x02;
@@ -169,7 +169,7 @@ int32 ptr_reset (DEVICE *dptr)
     return SCPE_OK;
 }
 
-int32 ptp_reset (DEVICE *dptr)
+t_stat ptp_reset (DEVICE *dptr)
 {
     ptp_unit.buf = 0;
     ptp_unit.u3 = 0x02;

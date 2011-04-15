@@ -47,7 +47,7 @@
 
 extern int cgi;								/* TRUE if we are running as a CGI program */
 extern int cgiwritable;						/* TRUE if we can write the disk images back to the image file in CGI mode */
-extern int sim_gui;
+extern t_bool sim_gui;
 
 extern uint16 M[];							/* core memory, up to 32Kwords (note: don't even think about trying 64K) */
 extern uint16 ILSW[];						/* interrupt level status words */
@@ -269,7 +269,7 @@ void xio_error 			(char *msg);
 
 void   bail (char *msg);
 t_stat load_cr_boot (int drv, int switches);
-t_stat cr_boot (int unitno, DEVICE *dptr);
+t_stat cr_boot (int32 unitno, DEVICE *dptr);
 t_stat cr_rewind (void);
 t_stat cr_detach (UNIT *uptr);
 void   calc_ints (void);							/* recalculate interrupt bitmask */

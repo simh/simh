@@ -637,7 +637,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st,"  %d  %-*s (%s)\n", i, min, list[i].name, list[i].desc);
+        fprintf(st,"  %d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
   return SCPE_OK;
 }
@@ -1000,7 +1000,7 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
 #endif
 
 /* Some platforms have always had pcap_sendpacket */
-#if defined(_WIN32) || defined(VMS)
+#if defined(_WIN32) || defined(__VMS)
 #define HAS_PCAP_SENDPACKET 1
 #else
 /* The latest libpcap and WinPcap all have pcap_sendpacket */
@@ -1089,7 +1089,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 #ifdef _WIN32
   if (!pcap_mac_if_win32(devname, (UCHAR *)&dev->host_nic_phy_hw_addr))
     dev->have_host_nic_phy_addr = 1;
-#else
+#elif !defined (__VMS)
 {
   char command[1024];
   FILE *f;

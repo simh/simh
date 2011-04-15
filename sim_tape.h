@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Feb-11    MP      Add Asynch I/O support
    30-Aug-06    JDB     Added erase gap support
    14-Feb-06    RMS     Added variable tape capacity
    17-Dec-05    RMS     Added write support for Paul Pierce 7b format
@@ -91,6 +92,14 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MT_TST_PNU(u)   ((u)->flags & MTUF_PNU)
 #define MT_GET_FMT(u)   (((u)->flags >> MTUF_V_FMT) & MTUF_M_FMT)
 
+/* sim_tape_position Position Flags */
+#define MTPOS_V_REW     3
+#define MTPOS_M_REW     (1u << MTPOS_V_REW)            /* Rewind First */
+#define MTPOS_V_REV     2
+#define MTPOS_M_REV     (1u << MTPOS_V_REV)            /* Reverse Direction */
+#define MTPOS_V_OBJ     1
+#define MTPOS_M_OBJ     (1u << MTPOS_V_OBJ)            /* Objects vs Records/Files */
+
 /* Return status codes */
 
 #define MTSE_OK         0                               /* no error */
@@ -104,19 +113,47 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTSE_RECE       8                               /* error in record */
 #define MTSE_WRP        9                               /* write protected */
 
+typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
+
 /* Prototypes */
 
+t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit);
 t_stat sim_tape_attach (UNIT *uptr, char *cptr);
 t_stat sim_tape_detach (UNIT *uptr);
 t_stat sim_tape_rdrecf (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max);
+t_stat sim_tape_rdrecf_a (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max, TAPE_PCALLBACK callback);
 t_stat sim_tape_rdrecr (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max);
+t_stat sim_tape_rdrecr_a (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max, TAPE_PCALLBACK callback);
 t_stat sim_tape_wrrecf (UNIT *uptr, uint8 *buf, t_mtrlnt bc);
+t_stat sim_tape_wrrecf_a (UNIT *uptr, uint8 *buf, t_mtrlnt bc, TAPE_PCALLBACK callback);
 t_stat sim_tape_wrtmk (UNIT *uptr);
+t_stat sim_tape_wrtmk_a (UNIT *uptr, TAPE_PCALLBACK callback);
 t_stat sim_tape_wreom (UNIT *uptr);
+t_stat sim_tape_wreom_a (UNIT *uptr, TAPE_PCALLBACK callback);
+t_stat sim_tape_wreomrw (UNIT *uptr);
+t_stat sim_tape_wreomrw_a (UNIT *uptr, TAPE_PCALLBACK callback);
 t_stat sim_tape_wrgap (UNIT *uptr, uint32 gaplen, uint32 bpi);
+t_stat sim_tape_wrgap_a (UNIT *uptr, uint32 gaplen, uint32 bpi, TAPE_PCALLBACK callback);
 t_stat sim_tape_sprecf (UNIT *uptr, t_mtrlnt *bc);
+t_stat sim_tape_sprecf_a (UNIT *uptr, t_mtrlnt *bc, TAPE_PCALLBACK callback);
+t_stat sim_tape_sprecsf (UNIT *uptr, uint32 count, uint32 *skipped);
+t_stat sim_tape_sprecsf_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback);
+t_stat sim_tape_spfilef (UNIT *uptr, uint32 count, uint32 *skipped);
+t_stat sim_tape_spfilef_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback);
+t_stat sim_tape_spfilebyrecf (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped);
+t_stat sim_tape_spfilebyrecf_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, TAPE_PCALLBACK callback);
 t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc);
+t_stat sim_tape_sprecr_a (UNIT *uptr, t_mtrlnt *bc, TAPE_PCALLBACK callback);
+t_stat sim_tape_sprecsr (UNIT *uptr, uint32 count, uint32 *skipped);
+t_stat sim_tape_sprecsr_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback);
+t_stat sim_tape_spfiler (UNIT *uptr, uint32 count, uint32 *skipped);
+t_stat sim_tape_spfiler_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback);
+t_stat sim_tape_spfilebyrecr (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped);
+t_stat sim_tape_spfilebyrecr_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, TAPE_PCALLBACK callback);
 t_stat sim_tape_rewind (UNIT *uptr);
+t_stat sim_tape_rewind_a (UNIT *uptr, TAPE_PCALLBACK callback);
+t_stat sim_tape_position (UNIT *uptr, uint8 flags, uint32 recs, uint32 *recskipped, uint32 files, uint32 *fileskipped, uint32 *objectsskipped);
+t_stat sim_tape_position_a (UNIT *uptr, uint8 flags, uint32 recs, uint32 *recsskipped, uint32 files, uint32 *filesskipped, uint32 *objectsskipped, TAPE_PCALLBACK callback);
 t_stat sim_tape_reset (UNIT *uptr);
 t_bool sim_tape_bot (UNIT *uptr);
 t_bool sim_tape_wrp (UNIT *uptr);
@@ -125,5 +162,8 @@ t_stat sim_tape_set_fmt (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_tape_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat sim_tape_set_asynch (UNIT *uptr, int latency);
+t_stat sim_tape_clr_asynch (UNIT *uptr);
+void sim_tape_data_trace (UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason);
 
 #endif

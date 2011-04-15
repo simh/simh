@@ -159,7 +159,7 @@ t_stat fp15_fmul (int32 ir, UFP *a, UFP *b);
 t_stat fp15_fdiv (int32 ir, UFP *a, UFP *b);
 t_stat fp15_fix (int32 ir, UFP *a);
 t_stat fp15_norm (int32 ir, UFP *a, UFP *b, t_bool rnd);
-t_stat fp15_exc (int32 sta);
+t_stat fp15_exc (t_stat sta);
 void fp15_asign (int32 ir, UFP *a);
 void dp_add (UFP *a, UFP *b);
 void dp_sub (UFP *a, UFP *b);

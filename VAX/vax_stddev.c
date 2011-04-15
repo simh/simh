@@ -27,6 +27,7 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   05-Jan-11    MP      Added Asynch I/O support
    17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    17-Oct-06    RMS     Synced keyboard poll to real-time clock for idling
@@ -178,6 +179,10 @@ REG clk_reg[] = {
     { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (POLL, tmr_poll, 24), REG_NZ + PV_LEFT + REG_HRO },
     { DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
+#if defined (SIM_ASYNCH_IO)
+    { DRDATA (LATENCY, sim_asynch_latency, 32), PV_LEFT },
+    { DRDATA (INST_LATENCY, sim_asynch_inst_latency, 32), PV_LEFT },
+#endif
     { NULL }
     };
 

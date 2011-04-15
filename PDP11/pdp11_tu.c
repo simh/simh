@@ -598,7 +598,7 @@ return MBE_GOE;
 
 /* Abort transfer */
 
-t_stat tu_abort (void)
+int32 tu_abort (void)
 {
 return tu_reset (&tu_dev);
 }

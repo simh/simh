@@ -26,6 +26,7 @@
    cpu          VAX central processor
 
    23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
+   05-Jan-11    MP      Added Asynch I/O support
    24-Apr-10    RMS     Added OLDVMS idle timer option
                         Fixed bug in SET CPU IDLE
    21-May-08    RMS     Removed inline support
@@ -612,6 +613,7 @@ for ( ;; ) {
         }
     fault_PC = PC;
     recqptr = 0;                                        /* clr recovery q */
+    AIO_CHECK_EVENT;
     if (sim_interval <= 0) {                            /* chk clock queue */
         temp = sim_process_event ();
         if (temp)
