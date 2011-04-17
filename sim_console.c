@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Apr-11    MP      Cleaned up to support running in a background/detached
+                        process
    20-Jan-11    MP      Fixed support for BREAK key on Windows to account 
                         for/ignore other keyboard Meta characters.
    18-Jan-11    MP      Added log file reference count support
@@ -702,9 +704,13 @@ t_stat sim_putchar_s (int32 c)
 {
 t_stat r;
 
-if (sim_log) fputc (c, sim_log);                        /* log file? */
-if (sim_con_tmxr.master == 0)                           /* not Telnet? */
+if (sim_con_tmxr.master == 0) {                         /* not Telnet? */
+    if (sim_log)                                        /* log file? */
+        fputc (c, sim_log);
     return sim_os_putchar (c);                          /* in-window version */
+    }
+if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
+    fputc (c, sim_log);
 if (sim_con_ldsc.conn == 0) {                           /* no Telnet conn? */
     if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet conn? */
         return SCPE_LOST;                               /* lost */
@@ -922,16 +928,18 @@ t_stat sim_ttinit (void)
 SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
 std_output = GetStdHandle (STD_OUTPUT_HANDLE);
-if ((std_input == INVALID_HANDLE_VALUE) ||
-    !GetConsoleMode (std_input, &saved_mode))
-    return SCPE_TTYERR;
+if ((std_input) &&                                      /* Not Background process? */
+    (std_input != INVALID_HANDLE_VALUE))
+    GetConsoleMode (std_input, &saved_mode);            /* Save Mode */
 return SCPE_OK;
 }
  
 t_stat sim_ttrun (void)
 {
-if (!GetConsoleMode(std_input, &saved_mode) ||
-    !SetConsoleMode(std_input, RAW_MODE))
+if ((std_input) &&                                      /* If Not Background process? */
+    (std_input != INVALID_HANDLE_VALUE) &&
+    (!GetConsoleMode(std_input, &saved_mode) ||         /* Set mode to RAW */
+     !SetConsoleMode(std_input, RAW_MODE)))
     return SCPE_TTYERR;
 if (sim_log) {
     fflush (sim_log);
@@ -948,7 +956,10 @@ if (sim_log) {
     _setmode (_fileno (sim_log), _O_TEXT);
     }
 SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_NORMAL);
-if (!SetConsoleMode(std_input, saved_mode)) return SCPE_TTYERR;
+if ((std_input) &&                                      /* If Not Background process? */
+    (std_input != INVALID_HANDLE_VALUE) &&
+    (!SetConsoleMode(std_input, saved_mode)))           /* Restore Normal mode */
+    return SCPE_TTYERR;
 return SCPE_OK;
 }
 
@@ -964,6 +975,9 @@ DWORD nkbevents, nkbevent;
 INPUT_RECORD rec;
 extern int32 sim_switches;
 
+if ((std_input == NULL) ||                              /* No keyboard for */
+    (std_input == INVALID_HANDLE_VALUE))                /* background processes */
+    return SCPE_OK;
 if (!GetNumberOfConsoleInputEvents(std_input, &nkbevents))
     return SCPE_TTYERR;
 while (c == -1) {
