@@ -2787,7 +2787,7 @@ errno = Status;
 return hVHD;
 }
 
-static
+static void
 ExpandToFullPath (const char *szFileSpec,
                   char *szFullFileSpecBuffer,
                   size_t BufferSize)
