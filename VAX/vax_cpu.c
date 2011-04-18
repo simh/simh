@@ -449,6 +449,7 @@ REG cpu_reg[] = {
     { FLDATA (HLTPIN, hlt_pin, 0) },
     { HRDATA (IDLE_MASK, cpu_idle_mask, 16), REG_HIDDEN },
     { DRDATA (IDLE_INDX, cpu_idle_type, 4), REG_HRO },
+    { DRDATA (IDLE_ENAB, sim_idle_enab, 4), REG_HRO },
     { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
     { HRDATA (PCQP, pcq_p, 6), REG_HRO },
     { HRDATA (BADABO, badabo, 32), REG_HRO },
