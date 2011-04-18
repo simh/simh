@@ -2567,7 +2567,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   if (status != SCPE_OK) {
     free(tptr);
     free(xq->var->etherface);
-    xq->var->etherface = 0;
+    xq->var->etherface = NULL;
     return status;
   }
   if (xq->var->poll == 0) {
@@ -2575,7 +2575,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     if (status != SCPE_OK) {
       free(tptr);
       free(xq->var->etherface);
-      xq->var->etherface = 0;
+      xq->var->etherface = NULL;
       return status;
     }
     xq->var->must_poll = 0;
@@ -2589,6 +2589,8 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     eth_close(xq->var->etherface);
+    free(xq->var->etherface);
+    xq->var->etherface = NULL;
     return SCPE_NOATT;
   }
   uptr->filename = tptr;
@@ -2613,7 +2615,7 @@ t_stat xq_detach(UNIT* uptr)
   if (uptr->flags & UNIT_ATT) {
     eth_close (xq->var->etherface);
     free(xq->var->etherface);
-    xq->var->etherface = 0;
+    xq->var->etherface = NULL;
     free(uptr->filename);
     uptr->filename = NULL;
     uptr->flags &= ~UNIT_ATT;

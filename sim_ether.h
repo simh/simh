@@ -28,6 +28,8 @@
 
   Modification history:
 
+  18-Apr-11  MP   Fixed race condition with self loopback packets in 
+                  multithreaded environments
   09-Dec-10  MP   Added support to determine if network address conflicts exist
   07-Dec-10  MP   Reworked DECnet self detection to the more general approach
                   of loopback self when any Physical Address is being set.
@@ -203,6 +205,7 @@ struct eth_device {
   pthread_t     reader_thread;                          /* Reader Thread Id */
   pthread_t     writer_thread;                          /* Writer Thread Id */
   pthread_mutex_t     writer_lock;
+  pthread_mutex_t     self_lock;
   pthread_cond_t      writer_cond;
   struct write_request {
       struct write_request *next;

@@ -151,6 +151,8 @@
 
   Modification history:
 
+  18-Apr-11  MP   Fixed race condition with self loopback packets in 
+                  multithreaded environments
   09-Jan-11  MP   Fixed missing crc data when USE_READER_THREAD is defined and 
                   crc's are needed (only the pdp11_xu)
   16-Dec-10  MP   added priority boost for read and write threads when 
@@ -1444,6 +1446,7 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   ethq_init (&dev->read_queue, 200);         /* initialize FIFO queue */
   pthread_mutex_init (&dev->lock, NULL);
   pthread_mutex_init (&dev->writer_lock, NULL);
+  pthread_mutex_init (&dev->self_lock, NULL);
   pthread_cond_init (&dev->writer_cond, NULL);
   pthread_attr_init(&attr);
   pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
@@ -1495,6 +1498,7 @@ t_stat eth_close(ETH_DEV* dev)
   pthread_mutex_destroy (&dev->lock);
   pthread_cond_signal (&dev->writer_cond);
   pthread_join (dev->writer_thread, NULL);
+  pthread_mutex_destroy (&dev->self_lock);
   pthread_mutex_destroy (&dev->writer_lock);
   pthread_cond_destroy (&dev->writer_cond);
   if (1) {
@@ -1534,8 +1538,10 @@ t_stat eth_check_address_conflict (ETH_DEV* dev,
   ETH_PACK send, recv;
   t_stat status;
   int responses = 0;
+  char mac_string[32];
 
-  sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict...\n");
+  eth_mac_fmt(mac, mac_string);
+  sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %s\n", mac_string);
 
   /* build a loopback forward request packet */
   memset (&send, 0, sizeof(ETH_PACK));
@@ -1617,8 +1623,14 @@ t_stat _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 
     /* detect sending of loopback packet */
     if ((status == 0) && (LOOPBACK_SELF_FRAME(dev->physical_addr, packet->msg))) {
+#ifdef USE_READER_THREAD
+        pthread_mutex_lock (&dev->self_lock);
+#endif
         dev->loopback_self_sent += dev->reflections;
         dev->loopback_self_sent_total++;
+#ifdef USE_READER_THREAD
+        pthread_mutex_unlock (&dev->self_lock);
+#endif
     }
 
   } /* if packet->len */
@@ -2122,6 +2134,9 @@ _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data
 
   /* detect reception of loopback packet to our physical address */
   if (LOOPBACK_SELF_FRAME(dev->physical_addr, data)) {
+#ifdef USE_READER_THREAD
+    pthread_mutex_lock (&dev->self_lock);
+#endif
     dev->loopback_self_rcvd_total++;
         /* lower reflection count - if already zero, pass it on */
     if (dev->loopback_self_sent > 0) {
@@ -2132,6 +2147,9 @@ _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data
 #ifndef USE_BPF
     else
       from_me = 0;
+#endif
+#ifdef USE_READER_THREAD
+    pthread_mutex_unlock (&dev->self_lock);
 #endif
   }
 
