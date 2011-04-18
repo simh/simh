@@ -540,7 +540,6 @@ t_stat sim_open_logfile (char *filename, t_bool binary, FILE **pf, FILEREF **pre
 {
 char *tptr, gbuf[CBUFSIZE];
 
-*pref = NULL;
 if ((filename == NULL) || (*filename == 0))             /* too few arguments? */
     return SCPE_2FARG;
 tptr = get_glyph (filename, gbuf, 0);
@@ -564,10 +563,14 @@ else if (strcmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
     if (*pref)
         ++(*pref)->refcount;
     }
-else if (strcmp (gbuf, "STDOUT") == 0)                  /* output to stdout? */
+else if (strcmp (gbuf, "STDOUT") == 0) {                /* output to stdout? */
     *pf = stdout;
-else if (strcmp (gbuf, "STDERR") == 0)                  /* output to stderr? */
+    *pref = NULL;
+    }
+else if (strcmp (gbuf, "STDERR") == 0) {                /* output to stderr? */
     *pf = stderr;
+    *pref = NULL;
+    }
 else {
     *pref = calloc (1, sizeof(**pref));
     if (!*pref)
