@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Apr-11    MP      Changed sim_rest to defer attaching devices until after
+                        device register contents have been restored since some
+                        attach activities may reference register contained info.
    29-Jan-11    MP      Adjusted sim_debug to: 
                           - include the simulator timestamp (sim_time) 
                             as part of the prefix for each line of output
@@ -2635,6 +2638,10 @@ return r;
 t_stat sim_rest (FILE *rfile)
 {
 char buf[CBUFSIZE];
+char **attnames = NULL;
+UNIT **attunits = NULL;
+int32 *attswitches = NULL;
+int32 attcnt = 0;
 void *mbuf;
 int32 j, blkcnt, limit, unitno, time, flg;
 uint32 us, depth;
@@ -2748,9 +2755,15 @@ for ( ;; ) {                                            /* device loop */
             uptr->flags = uptr->flags & ~UNIT_DIS;      /* ensure device is enabled */
             if (flg & UNIT_RO)                          /* [V2.10+] saved flgs & RO? */
                 sim_switches |= SWMASK ('R');           /* RO attach */
-            r = scp_attach_unit (dptr, uptr, buf);      /* reattach unit */
-            if (r != SCPE_OK)
-                return r;
+            /* add unit to list of units to attach after registers are read */
+            attunits = realloc (attunits, sizeof (*attunits)*(attcnt+1));
+            attunits[attcnt] = uptr;
+            attnames = realloc (attnames, sizeof (*attnames)*(attcnt+1));
+            attnames[attcnt] = malloc(1+strlen(buf));
+            strcpy (attnames[attcnt], buf);
+            attswitches = realloc (attswitches, sizeof (*attswitches)*(attcnt+1));
+            attswitches[attcnt] = sim_switches;
+            ++attcnt;
             }
         READ_I (high);                                  /* memory capacity */
         if (high > 0) {                                 /* [V2.5+] any memory? */
@@ -2818,9 +2831,23 @@ for ( ;; ) {                                            /* device loop */
             else if (us < rptr->depth)                  /* in range? */
                 put_rval (rptr, us, val);
             }
-        }
+        }                                               /* end register loop */
     }                                                   /* end device loop */
-return SCPE_OK;
+/* Now that all of the register state has been imported, we can attach 
+   units which were originally attached.  Some of these attach operations 
+   may depend on the state of the device (in registers) to work correctly */
+for (j=0, r = SCPE_OK; j<attcnt; j++) {
+    if (r == SCPE_OK) {
+        dptr = find_dev_from_unit (attunits[j]);
+        sim_switches = attswitches[j];
+        r = scp_attach_unit (dptr, attunits[j], attnames[j]);      /* reattach unit */
+        }
+    free (attnames[j]);
+    }
+free (attnames);
+free (attunits);
+free (attswitches);
+return r;
 }
 
 /* Run, go, cont, step commands
