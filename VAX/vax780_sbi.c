@@ -141,7 +141,7 @@ t_stat vax780_boot (int32 flag, char *ptr);
 t_stat vax780_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
-extern t_stat vax780_fload (int flag, char *cptr);
+extern t_stat vax780_fload (int32 flag, char *cptr);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);

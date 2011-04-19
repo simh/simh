@@ -1200,7 +1200,7 @@ return SCPE_UNK;                                        /* only valid inside of 
 t_stat on_cmd (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
-int32 cond;
+t_stat cond;
 
 cptr = get_glyph (cptr, gbuf, 0);
 if ('\0' == gbuf[0]) return SCPE_ARG;                   /* unspecified condition */

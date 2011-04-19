@@ -343,7 +343,8 @@ t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_log)
-    fprintf (st, "Logging enabled to %s\n", sim_logfile_name (sim_log, sim_log_ref));
+    fprintf (st, "Logging enabled to \"%s\"\n", 
+                 sim_logfile_name (sim_log, sim_log_ref));
 else fprintf (st, "Logging disabled\n");
 return SCPE_OK;
 }
@@ -399,7 +400,8 @@ t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 if (sim_deb)
-    fprintf (st, "Debug output enabled\n", sim_logfile_name (sim_deb, sim_deb_ref));
+    fprintf (st, "Debug output enabled to \"%s\"\n", 
+                 sim_logfile_name (sim_deb, sim_deb_ref));
 else fprintf (st, "Debug output disabled\n");
 return SCPE_OK;
 }
