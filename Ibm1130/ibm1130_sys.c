@@ -455,7 +455,7 @@ t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 
 #ifndef _WIN32
 
-int strnicmp (const char *a, const char *b, int n)
+int strnicmp (const char *a, const char *b, size_t n)
 {
 	int ca, cb;
 
