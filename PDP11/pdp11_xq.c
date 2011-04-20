@@ -68,6 +68,9 @@
 
   Modification history:
 
+  20-Apr-11  MP   Fixed missing information from save/restore which
+                  caused operations to not complete correctly after 
+                  a restore until the OS reset the controller.
   09-Dec-10  MP   Added address conflict check during attach.
   06-Dec-10  MP   Fixed loopback processing to correctly handle forward packets.
   29-Nov-10  MP   Fixed interrupt dispatch issue which caused delivered packets 
@@ -367,7 +370,11 @@ REG xqa_reg[] = {
   { GRDATA ( TBINDX, xqa.tbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( RBINDX, xqa.rbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( IDTMR, xqa.idtmr, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( VECTOR, xqa_dib.vec, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( MUST_POLL, xqa.must_poll, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_ENAB, xqa.sanity.enabled, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_QSECS, xqa.sanity.quarter_secs, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_TIMR, xqa.sanity.timer, XQ_RDX, 32, 0), REG_HRO},
   { NULL },
 };
 
@@ -419,7 +426,11 @@ REG xqb_reg[] = {
   { GRDATA ( TBINDX, xqb.tbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( RBINDX, xqb.rbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( IDTMR, xqb.idtmr, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( VECTOR, xqb_dib.vec, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( MUST_POLL, xqb.must_poll, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_ENAB, xqb.sanity.enabled, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_QSECS, xqb.sanity.quarter_secs, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_TIMR, xqb.sanity.timer, XQ_RDX, 32, 0), REG_HRO},
   { NULL },
 };
 
@@ -2599,8 +2610,27 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   /* turn on transceiver power indicator */
   xq_csr_set_clr(xq, XQ_CSR_OK, 0);
 
-  /* reset the device with the new attach info */
-  xq_reset(xq->dev);
+  /* init read queue (first time only) */
+  status = ethq_init(&xq->var->ReadQ, XQ_QUE_MAX);
+  if (status != SCPE_OK)
+    return status;
+
+  if (xq->var->mode == XQ_T_DELQA_PLUS)
+    eth_filter_hash (xq->var->etherface, 1, &xq->var->init.phys, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
+  else
+    if (xq->var->setup.valid) {
+      int i, count = 0;
+      ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+      ETH_MAC filters[XQ_FILTER_MAX + 1];
+
+      for (i = 0; i < XQ_FILTER_MAX; i++)
+        if (memcmp(zeros, &xq->var->setup.macs[i], sizeof(ETH_MAC)))
+          memcpy (filters[count++], xq->var->setup.macs[i], sizeof(ETH_MAC));
+      eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
+      }
+    else
+      /* reset the device with the new attach info */
+      xq_reset(xq->dev);
 
   return SCPE_OK;
 }
