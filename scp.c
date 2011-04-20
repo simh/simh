@@ -23,6 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Apr-11    MP      Added expansion of %STATUS% and %TSTATUS% in do command
+                        arguments.  STATUS is the numeric value of the last 
+                        command error status and TSTATUS is the text message
+                        relating to the last command error status
    17-Apr-11    MP      Changed sim_rest to defer attaching devices until after
                         device register contents have been restored since some
                         attach activities may reference register contained info.
@@ -423,6 +427,8 @@ static int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
+
+static t_stat sim_last_cmd_stat;                        /* Command Status */
 
 static SCHTAB sim_stab;
 
@@ -976,6 +982,12 @@ do {
         else stat = cmdp->action (cmdp->arg, cptr);     /* exec other cmd */
         }
     else stat = SCPE_UNK;                               /* bad cmd given */
+    if ((stat != SCPE_OK) ||
+        ((cmdp->action != &return_cmd) &&
+         (cmdp->action != &goto_cmd) &&
+         (cmdp->action != &on_cmd) &&
+         (cmdp->action != &echo_cmd)))
+        sim_last_cmd_stat = stat;                       /* save command error status */
     staying = (stat != SCPE_EXIT) &&                    /* decide if staying */
               (stat != SCPE_AFAIL) &&
               (!errabort || (stat < SCPE_BASE) || (stat == SCPE_STEP));
@@ -1088,6 +1100,14 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
                     else if (!strcmp ("CTIME", gbuf)) {
                         strcpy (rbuf, ctime(&now));
                         rbuf[strlen (rbuf)-1] = '\0';    /* remove trailing \n */
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("STATUS", gbuf)) {
+                        sprintf (rbuf, "%08X", sim_last_cmd_stat);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("TSTATUS", gbuf)) {
+                        sprintf (rbuf, "%s", sim_error_text (sim_last_cmd_stat));
                         ap = rbuf;
                         }
                     }
@@ -2993,7 +3013,7 @@ printf ("\n");
 fprint_stopped (stdout, r);                             /* print msg */
 if (sim_log)                                            /* log if enabled */
     fprint_stopped (sim_log, r);
-return SCPE_OK;
+return r;
 }
 
 /* Common setup for RUN or BOOT */
@@ -5036,11 +5056,13 @@ return;
 
 /* Message Text */
 
-char *sim_error_text (t_stat stat)
+const char *sim_error_text (t_stat stat)
 {
 static char msgbuf[64];
 
 stat &= ~(SCPE_KFLAG|SCPE_BREAK);                       /* remove any flags */
+if (stat == SCPE_OK)
+    return "No Error";
 if ((stat >= SCPE_BASE) && (stat <= SCPE_MAX_ERR))
     return scp_errors[stat-SCPE_BASE].message;
 sprintf(msgbuf, "Error %d", stat);
