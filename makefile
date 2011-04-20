@@ -74,22 +74,26 @@ ifeq ($(WIN32),)
 else
   #Win32 Environments (via MinGW32)
   GCC_Path := $(dir $(shell where gcc.exe))
-  ifeq (pthreads,$(shell if exist ..\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-    PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -I../pthreads/Pre-built.2/include
-    PTHREADS_LDFLAGS = -lpthreadVC2 -L..\pthreads\Pre-built.2\lib
-    NETWORK_OPT = -DUSE_SHARED
-    ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD
-      PTHREADS_LDFLAGS = -lpthreads
+  ifeq ($(NOASYNCH),)
+    ifeq (pthreads,$(shell if exist ..\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -I../pthreads/Pre-built.2/include
+      PTHREADS_LDFLAGS = -lpthreadVC2 -L..\pthreads\Pre-built.2\lib
+    else
+      ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
+        PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD
+        PTHREADS_LDFLAGS = -lpthread
+      endif
     endif
   endif
   ifeq (pcap,$(shell if exist ..\winpcap\Wpdpack\include\pcap.h echo pcap))
     PCAP_CCDEFS = -I../winpcap/Wpdpack/include -DUSE_SHARED
     NETWORK_LDFLAGS = 
+    NETWORK_OPT = -DUSE_SHARED
   else
     ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
       PCAP_CCDEFS = -DUSE_SHARED
       NETWORK_LDFLAGS = 
+      NETWORK_OPT = -DUSE_SHARED
     endif
   endif
   OS_CCDEFS =  -fms-extensions -O2 $(PTHREADS_CCDEFS) $(PCAP_CCDEFS) 
@@ -340,7 +344,7 @@ SWTP_OPT = -I ${SWTPD}
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
-	altair altairz80 gri i1620 i7094 ibm1130 id16 \
+	altair altairz80 gri i7094 ibm1130 id16 \
 	id32 sds lgp h316 swtp
 
 all : ${ALL}
