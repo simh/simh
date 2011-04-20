@@ -8,8 +8,8 @@
 # the SIMH package for OpenVMS using DEC C v6.0-001(AXP), v6.5-001(AXP),
 # HP C V7.3-009-48GBT (AXP), HP C V7.2-001 (IA64) and v6.4-005(VAX).
 #
-# Notes:  On VAX, the PDP-10and IBM 7094 simulators will not be built
-#         due to the fact that INT64 is required for that simulator.
+# Notes:  On VAX, the PDP-10, Eclipse and IBM 7094 simulators will not be 
+#         built due to the fact that INT64 is required for these simulators.
 #
 # This build script will accept the following build options.
 #
@@ -48,13 +48,28 @@
 #
 #        MMK/MACRO=(DEBUG=1)
 #
+# This will produce an executable named {Simulator}-{I64|VAX|AXP}-DBG.EXE
+#
 # To build on older Alpha VMS platforms, SIM_ASYNCH_IO must be disabled. 
 # use..
 #
 #        MMK/MACRO=(NOASYNCH=1)
 #
-# This will produce an executable named {Simulator}-{I64|VAX|AXP}-DBG.EXE
+# On AXP the AXP PCAP components are built and used to provide network 
+# support for the VAX and PDP11 simulators.
+# The PCAP-VMS components are presumed (by this procedure) to be located
+# in a directory at the same level as the directory containing the
+# simh source files.  For example, if these exist here:
 #
+#   []descrip.mms
+#   []scp.c
+#   etc.
+#
+# Then the following should exist:
+#   [-.PCAP-VMS]BUILD_ALL.COM
+#   [-.PCAP-VMS.PCAP-VCI]
+#   [-.PCAP-VMS.PCAPVCM]
+#   etc.
 
 # Let's See If We Are Going To Build With DEBUG Enabled.  Always compile
 # /DEBUG so that the traceback and debug information is always available
@@ -165,7 +180,7 @@ SIMH_LIB64 = $(LIB_DIR)SIMH64-$(ARCH).OLB
 
 # VMS PCAP File Definitions.
 #
-PCAP_DIR = SYS$DISK:[.PCAP-VMS.PCAP-VCI]
+PCAP_DIR = SYS$DISK:[-.PCAP-VMS.PCAP-VCI]
 PCAP_LIB = $(LIB_DIR)PCAP-$(ARCH).OLB
 PCAP_SOURCE = \
 	$(PCAP_DIR)PCAPVCI.C,$(PCAP_DIR)VCMUTIL.C,\
@@ -177,7 +192,7 @@ PCAP_SOURCE = \
 	$(PCAP_DIR)PCAP.C,$(PCAP_DIR)SAVEFILE.C,\
 	$(PCAP_DIR)SCANNER.C,$(PCAP_DIR)SNPRINTF.C,\
 	$(PCAP_DIR)PCAP-VMS.C
-PCAP_VCMDIR = SYS$DISK:[.PCAP-VMS.PCAPVCM]
+PCAP_VCMDIR = SYS$DISK:[-.PCAP-VMS.PCAPVCM]
 PCAP_VCM_SOURCES = $(PCAP_VCMDIR)PCAPVCM.C,$(PCAP_VCMDIR)PCAPVCM_INIT.MAR,\
 		   $(PCAP_VCMDIR)VCI_JACKET.MAR,$(PCAP_VCMDIR)VCMUTIL.C
 PCAP_VCI = SYS$COMMON:[SYS$LDR]PCAPVCM.EXE
@@ -564,7 +579,7 @@ ALL :	ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
 #
 # Else We Are On VAX And Build Everything EXCEPT the 64b simulators
 #
-ALL :	ALTAIR ALTAIRZ80 ECLIPSE GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+ALL :	ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
 	NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS SWTP
 	$! No further actions necessary
 .ENDIF
@@ -644,6 +659,10 @@ $(ALTAIRZ80_LIB2) : $(ALTAIRZ80_SOURCE2)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+#
+# If Not On VAX, Build The Eclipse Library.
+#
+.IFDEF ALPHA_OR_IA64
 $(ECLIPSE_LIB) : $(ECLIPSE_SOURCE)
                 $!
 		$! Building The $(ECLIPSE_LIB) Library.
@@ -654,6 +673,14 @@ $(ECLIPSE_LIB) : $(ECLIPSE_SOURCE)
                         LIBRARY/CREATE $(MMS$TARGET)
                 $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
                 $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+.ELSE
+#
+# We Are On VAX And Due To The Use of INT64 We Can't Build It.
+#
+$(ECLIPSE_LIB) : 
+		$! Due To The Use Of INT64 We Can't Build The
+                $! $(MMS$TARGET) Library On VAX.
+.ENDIF
 
 $(GRI_LIB) : $(GRI_SOURCE)
 		$!
@@ -957,9 +984,10 @@ $(PCAP_LIB) : $(PCAP_SOURCE)
                 $!
 		$! Building The $(PCAP_LIB) Library.
                 $!
+		$ Saved_Default = F$Environment("DEFAULT")
 		$ SET DEFAULT $(PCAP_DIR)
                 $ @VMS_PCAP $(DEBUG)
-		$ SET DEFAULT [--]
+		$ SET DEFAULT 'Saved_Default
                 $ IF (F$SEARCH("$(PCAP_LIB)").NES."") THEN -
                         DELETE $(PCAP_LIB);
                 $ COPY $(PCAP_DIR)PCAP.OLB $(PCAP_LIB)
@@ -1015,9 +1043,21 @@ $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIRZ80_LIB1) $(A
                    $(BLD_DIR)SCP.OBJ,$(ALTAIRZ80_LIB1)/LIBRARY, -
                    $(ALTAIRZ80_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
             $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-
+#
+# If Not On VAX, Build The Eclipse Simulator.
+#
+.IFDEF ALPHA_OR_IA64
 ECLIPSE : $(BIN_DIR)ECLIPSE-$(ARCH).EXE
 	$! ECLIPSE done
+.ELSE
+#
+# Else We Are On VAX And Tell The User We Can't Build On VAX
+# Due To The Use Of INT64.
+#
+ECLIPSE : 
+        $! Sorry, Can't Build $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator
+        $! Because It Requires The Use Of INT64.
+.ENDIF
 
 $(BIN_DIR)ECLIPSE-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ECLIPSE_LIB)
           $!
@@ -1361,5 +1401,5 @@ $(PCAP_VCMDIR)PCAPVCM.EXE : $(PCAP_VCM_SOURCES)
                             $!
                             $! Building The PCAP VCI Execlet
                             $!
-                            $ @SYS$DISK:[.PCAP-VMS.PCAPVCM]BUILD_PCAPVCM
+                            $ @SYS$DISK:[-.PCAP-VMS.PCAPVCM]BUILD_PCAPVCM
                             $ DELETE/NOLOG/NOCONFIRM $(PCAP_VCMDIR)*.OBJ;*,$(PCAP_VCMDIR)*.MAP;*
