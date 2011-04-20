@@ -2,7 +2,7 @@ $ if f$search("pcap.olb") .eqs. ""
 $ then
 $	libr/crea pcap.olb
 $ endif
-$ if p1 .eqs. "DEBUG"
+$ if p1 .nes. ""
 $ then
 $    opt = "/debug/noopt"
 $ else
