@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   22-Apr-11    MP      Fixed Asynch I/O support to reasonably account cycles
+                        when an idle wait is terminated by an external event
    05-Jan-11    MP      Added Asynch I/O support
    29-Dec-10    MP      Fixed clock resolution determination for Unix platforms
    22-Sep-08    RMS     Added "stability threshold" for idle routine
@@ -44,6 +46,9 @@
    sim_os_msec  -       return elapsed time in msec
    sim_os_sleep -       sleep specified number of seconds
    sim_os_ms_sleep -    sleep specified number of milliseconds
+   sim_idle_ms_sleep -  sleep specified number of milliseconds
+                        or until awakened by an asynchronous
+                        event
 
    The calibration, idle, and throttle routines are OS-independent; the _os_
    routines are not.
@@ -576,6 +581,8 @@ if (w_idle == 0) {                                      /* none? */
     }
 act_ms = SIM_IDLE_MS_SLEEP (w_ms);                      /* wait */
 act_cyc = act_ms * cyc_ms;
+if (act_ms < w_ms)                                      /* awakened early? */
+    act_cyc += (cyc_ms * sim_idle_rate_ms) / 2;         /* account for half an interval's worth of cycles */
 if (sim_interval > act_cyc)
     sim_interval = sim_interval - act_cyc;
 else sim_interval = 0;

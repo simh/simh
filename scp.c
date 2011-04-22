@@ -1823,7 +1823,7 @@ else {
         fprintf (st, " event delay %d, queue time %d\n", uptr->a_event_time, uptr->a_sim_interval);
         }
     }
-fprintf (st, "asynch latency: %d microseconds\n", sim_asynch_latency);
+fprintf (st, "asynch latency: %d nanoseconds\n", sim_asynch_latency);
 fprintf (st, "asynch instruction latency: %d instructions\n", sim_asynch_inst_latency);
 pthread_mutex_unlock (&sim_asynch_lock);
 #endif
