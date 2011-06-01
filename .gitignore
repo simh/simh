@@ -2,6 +2,8 @@
 Thumbs.db
 #Ignore files built by Visual Studio
 *.obj
+# VAX/vmb.exe is not a generated file and should be in the repository
+!VAX/vmb.exe
 *.exe
 *.pdb
 *.user
