@@ -2166,8 +2166,13 @@ for ( ;; ) {
         break;
 
     case BEQL:
-        if (cc & CC_Z)                                  /* br if Z = 1 */
+        if (cc & CC_Z) {                                /* br if Z = 1 */
             BRANCHB (brdisp);
+            if (((PSL & PSL_IS) != 0) &&                /* on IS? */
+                (PSL_GETIPL (PSL) == 0x1F) &&           /* at IPL 31 */
+                (fault_PC == 0x2004361B))               /* Boot ROM Character Prompt */
+                cpu_idle();
+            }
         break;
 
     case BVC:
