@@ -26,6 +26,8 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   02-Jun-11    MP      Fixed telnet option negotiation loop with some clients
+                        Added Option Negotiation and Debugging Support
    17-Jan-11    MP      Added Buffered line capabilities
    16-Jan-11    MP      Made option negotiation more reliable
    20-Nov-08    RMS     Added three new standardized SHOW routines
@@ -193,7 +195,9 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         lp = mp->ldsc + i;                              /* get line desc */
         lp->conn = newsock;                             /* record connection */
         lp->ipad = ipaddr;                              /* ip address */
+        lp->mp = mp;                                    /* save mux */
         sim_write_sock (newsock, mantra, sizeof(mantra));
+        tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
         sprintf (cmsg, "\n\r\nConnected to the %s simulator ", sim_name);
 
         if (mp->dptr) {                                 /* device defined? */
@@ -305,6 +309,9 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     if (nbytes < 0)                                     /* closed? reset ln */
         tmxr_reset_ln (lp);
     else if (nbytes > 0) {                              /* if data rcvd */
+
+        tmxr_debug (TMXR_DBG_RCV, lp, "Received", &(lp->rxb[lp->rxbpi]), nbytes);
+
         j = lp->rxbpi;                                  /* start of data */
         memset (&lp->rbr[j], 0, nbytes);                /* clear status */
         lp->rxbpi = lp->rxbpi + nbytes;                 /* adv pointers */
@@ -400,20 +407,14 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                 break;
 
             case TNS_DO:                                /* pending DO request */
-                if (tmp == TN_BIN) {                    /* reject all but binary mode */
-                    char accept[] = {TN_IAC, TN_WILL, TN_BIN};
-                    sim_write_sock (lp->conn, accept, sizeof(accept));
-                    }
-                tmxr_rmvrc (lp, j);                     /* remove it */
-                lp->tsta = TNS_NORM;                    /* next normal */
-                break;
-
             case TNS_SKIP: default:                     /* skip char */
                 tmxr_rmvrc (lp, j);                     /* remove char */
                 lp->tsta = TNS_NORM;                    /* next normal */
                 break;
                 }                                       /* end case state */
             }                                           /* end for char */
+            if (nbytes != (lp->rxbpi-lp->rxbpr))
+                tmxr_debug (TMXR_DBG_RCV, lp, "Remaining", &(lp->rxb[lp->rxbpi]), lp->rxbpi-lp->rxbpr);
         }                                               /* end else nbytes */
     }                                                   /* end for lines */
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
@@ -526,6 +527,7 @@ if (nbytes) {                                           /* >0? write */
     else sbytes = sim_write_sock (lp->conn,             /* write to end buf */
             &(lp->txb[lp->txbpr]), lp->txbsz - lp->txbpr);
     if (sbytes != SOCKET_ERROR) {                       /* ok? */
+        tmxr_debug (TMXR_DBG_XMT, lp, "Sent", &(lp->txb[lp->txbpr]), sbytes);
         lp->txbpr = (lp->txbpr + sbytes);               /* update remove ptr */
         if (lp->txbpr >= lp->txbsz)                     /* wrap? */
             lp->txbpr = 0;
@@ -535,6 +537,7 @@ if (nbytes) {                                           /* >0? write */
     if (nbytes && (lp->txbpr == 0))     {               /* more data and wrap? */
         sbytes = sim_write_sock (lp->conn, lp->txb, nbytes);
         if (sbytes != SOCKET_ERROR) {                   /* ok */
+            tmxr_debug (TMXR_DBG_XMT, lp, "Sent", lp->txb, sbytes);
             lp->txbpr = (lp->txbpr + sbytes);           /* update remove ptr */
             if (lp->txbpr >= lp->txbsz)                 /* wrap? */
                 lp->txbpr = 0;
@@ -1154,5 +1157,82 @@ if (mp == NULL)
     return SCPE_IERR;
 fprintf (st, "lines=%d", mp->lines);
 return SCPE_OK;
+}
+
+
+static struct {
+    char value;
+    char *name;
+    } tn_chars[] =
+    {
+        {TN_IAC,    "TN_IAC"},                /* protocol delim */
+        {TN_DONT,   "TN_DONT"},               /* dont */
+        {TN_DO,     "TN_DO"},                 /* do */
+        {TN_WONT,   "TN_WONT"},               /* wont */
+        {TN_WILL,   "TN_WILL"},               /* will */
+        {TN_SB,     "TN_SB"},                 /* sub-option negotiation */
+        {TN_GA,     "TN_SG"},                 /* go ahead */
+        {TN_EL,     "TN_EL"},                 /* erase line */
+        {TN_EC,     "TN_EC"},                 /* erase character */
+        {TN_AYT,    "TN_AYT"},                /* are you there */
+        {TN_AO,     "TN_AO"},                 /* abort output */
+        {TN_IP,     "TN_IP"},                 /* interrupt process */
+        {TN_BRK,    "TN_BRK"},                /* break */
+        {TN_DATAMK, "TN_DATAMK"},             /* data mark */
+        {TN_NOP,    "TN_NOP"},                /* no operation */
+        {TN_SE,     "TN_SE"},                 /* end sub-option negot */
+        /* Options */
+        {TN_BIN,    "TN_BIN"},                /* bin */
+        {TN_ECHO,   "TN_ECHO"},               /* echo */
+        {TN_SGA,    "TN_SGA"},                /* sga */
+        {TN_LINE,   "TN_LINE"},               /* line mode */
+        {TN_CR,     "TN_CR"},                 /* carriage return */
+        {TN_LF,     "TN_LF"},                 /* line feed */
+        {0, NULL}};
+
+static char *tmxr_debug_buf = NULL;
+static size_t tmxr_debug_buf_used = 0;
+static size_t tmxr_debug_buf_size = 0;
+
+static tmxr_buf_debug_char (char value)
+{
+if (tmxr_debug_buf_used+2 > tmxr_debug_buf_size) {
+    tmxr_debug_buf_size += 1024;
+    tmxr_debug_buf = realloc(tmxr_debug_buf, tmxr_debug_buf_size);
+    }
+tmxr_debug_buf[tmxr_debug_buf_used++] = value;
+tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
+}
+
+static tmxr_buf_debug_string (const char *string)
+{
+while (*string)
+    tmxr_buf_debug_char (*string++);
+}
+
+void tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize)
+{
+if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
+    int i, j;
+
+    tmxr_debug_buf_used = 0;
+    if (tmxr_debug_buf)
+        tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
+    for (i=0; i<bufsize; ++i) {
+        for (j=0; 1; ++j) {
+            if (NULL == tn_chars[j].name) {
+                tmxr_buf_debug_char (buf[i]);
+                break;
+                }
+            if (buf[i] == tn_chars[j].value) {
+                tmxr_buf_debug_char ('_');
+                tmxr_buf_debug_string (tn_chars[j].name);
+                tmxr_buf_debug_char ('_');
+                break;
+                }
+            }
+        }
+    sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
+    }
 }
 

@@ -49,6 +49,12 @@
 #define TMXR_MAXBUF     256                             /* buffer size */
 #define TMXR_GUARD      12                              /* buffer guard */
 
+#define TMXR_DBG_XMT    0x10000                         /* Debug Transmit Data */
+#define TMXR_DBG_RCV    0x20000                         /* Debug Received Data */
+
+typedef struct tmln TMLN;
+typedef struct tmxr TMXR;
+
 struct tmln {
     SOCKET              conn;                           /* line conn */
     uint32              ipad;                           /* IP address */
@@ -72,9 +78,8 @@ struct tmln {
     char                rxb[TMXR_MAXBUF];               /* rcv buffer */
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                *txb;                           /* xmt buffer */
+    TMXR                *mp;                            /* back pointer to mux */
     };
-
-typedef struct tmln TMLN;
 
 struct tmxr {
     int32               lines;                          /* # lines */
@@ -86,8 +91,6 @@ struct tmxr {
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
     int32               buffered;                       /* Buffered Line Behavior and Buffer Size Flag */
     };
-
-typedef struct tmxr TMXR;
 
 int32 tmxr_poll_conn (TMXR *mp);
 void tmxr_reset_ln (TMLN *lp);
@@ -116,6 +119,7 @@ t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
+void tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
 
 #endif
 
