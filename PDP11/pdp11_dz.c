@@ -160,6 +160,20 @@ int32 dz_auto = 0;                                      /* autodiscon enabled */
 TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { 0 };              /* line descriptors */
 TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, dz_ldsc };  /* mux descriptor */
 
+/* debugging bitmaps */
+#define DBG_REG  0x0001                                 /* trace read/write registers */
+#define DBG_INT  0x0002                                 /* display transfer requests */
+#define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
+#define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+
+DEBTAB dz_debug[] = {
+  {"REG",    DBG_REG},
+  {"INT",    DBG_INT},
+  {"XMT",    DBG_XMT},
+  {"RCV",    DBG_RCV},
+  {0}
+};
+
 DEVICE dz_dev;
 t_stat dz_rd (int32 *data, int32 PA, int32 access);
 t_stat dz_wr (int32 data, int32 PA, int32 access);
@@ -249,8 +263,15 @@ DEVICE dz_dev = {
     1, DEV_RDX, 8, 1, DEV_RDX, 8,
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
-    &dz_dib, DEV_FLTA | DEV_DISABLE | DEV_NET | DEV_UBUS | DEV_QBUS
+    &dz_dib, DEV_FLTA | DEV_DISABLE | DEV_NET | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    0, dz_debug
     };
+
+/* Register names for Debug tracing */
+static char *dz_rd_regs[] =
+    {"CSR ", "RBUF", "TCR ", "MSR " };
+static char *dz_wr_regs[] = 
+    {"CSR ", "LPR ", "TCR ", "TDR "};
 
 /* IO dispatch routines, I/O addresses 177601x0 - 177601x7 */
 
@@ -289,6 +310,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
         }
 
+sim_debug(DBG_REG, &dz_dev, "dz_rd(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_rd_regs[(PA >> 1) & 03], access, *data);
+
 return SCPE_OK;
 }
 
@@ -297,6 +320,8 @@ t_stat dz_wr (int32 data, int32 PA, int32 access)
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
 int32 i, c, line;
 TMLN *lp;
+
+sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
@@ -517,6 +542,7 @@ int32 dz;
 
 for (dz = 0; dz < DZ_MUXES; dz++) {                     /* find 1st mux */
     if (dz_rxi & (1 << dz)) {
+        sim_debug(DBG_INT, &dz_dev, "dz_rzinta(dz=%d)\n", dz);
         dz_clr_rxint (dz);                              /* clear intr */
         return (dz_dib.vec + (dz * 010));               /* return vector */
         }
@@ -546,6 +572,7 @@ int32 dz;
 
 for (dz = 0; dz < DZ_MUXES; dz++) {                     /* find 1st mux */
     if (dz_txi & (1 << dz)) {
+        sim_debug(DBG_INT, &dz_dev, "dz_txinta(dz=%d)\n", dz);
         dz_clr_txint (dz);                              /* clear intr */
         return (dz_dib.vec + 4 + (dz * 010));           /* return vector */
         }
