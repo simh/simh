@@ -187,7 +187,11 @@
 #if __CRTL_VER >= 70312000
 #define HAVE_SNPRINTF
 #else
+#ifdef __DECC_VER
+#if __DECC_VER > 60590001
 #pragma message disable NOTINCRTL
+#endif
+#endif
 #endif
 
 /* Define HAVE_SNPRINTF if your system already has snprintf and vsnprintf.
