@@ -31,7 +31,7 @@
                         device register contents have been restored since some
                         attach activities may reference register contained info.
    29-Jan-11    MP      Adjusted sim_debug to: 
-                          - include the simulator timestamp (sim_time) 
+                          - include the simulator timestamp (sim_gtime)
                             as part of the prefix for each line of output
                           - write complete lines at a time (avoid asynch I/O issues).
    05-Jan-11    MP      Added Asynch I/O support
@@ -583,6 +583,24 @@ static CTAB cmd_table[] = {
     { "BYE", &exit_cmd, 0, NULL },
     { "SET", &set_cmd, 0,
       "set console arg{,arg...} set console options\n"
+      "set console WRU          specify console drop to simh char\n"
+      "set console BRK          specify console Break character\n"
+      "set console DEL          specify console delete char\n"
+      "set console PCHAR        specify console printable chars\n"
+      "set console TELNET=port  specify console telnet port\n"
+      "set console TELNET=LOG   specify console telnet logging\n"
+      "set console TELNET=NOLOG disables console telnet logging\n"
+      "set console TELNET=BUFFERED[=bufsize]\n"
+      "                         specify console telnet buffering\n"
+      "set console TELNET=NOBUFFERED\n"
+      "                         disables console telnet buffering\n"
+      "set console TELNET=UNBUFFERED\n"
+      "                         disables console telnet buffering\n"
+      "set console NOTELNET     disable console telnet\n"
+      "set console LOG          enable console logging\n"
+      "set console NOLOG        disable console logging\n"
+      "set console DEBUG        enable console debugging\n"
+      "set console NODEBUG      disable console debugging\n"
       "set break <list>         set breakpoints\n"
       "set nobreak <list>       clear breakpoints\n"
       "set throttle x{M|K|%%}    set simulation rate\n"
