@@ -5172,7 +5172,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
 #if defined (_WIN32)
 #define vsnprintf _vsnprintf
 #endif
-#if defined (__DECC) && defined (__VMS) && defined (__VAX)
+#if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__CRTL_VER <= 70311000))
 #define NO_vsnprintf
 #endif
 #if defined( NO_vsnprintf)

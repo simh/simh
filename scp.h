@@ -122,6 +122,9 @@ t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
 void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
     uint16 before, uint16 after, int terminate);
+#if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
+#define CANT_USE_MACRO_VA_ARGS 1
+#endif
 #ifdef CANT_USE_MACRO_VA_ARGS
 #define _sim_debug sim_debug
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);

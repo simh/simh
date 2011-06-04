@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   03-Jun-11    MP      Simplified VMS 64b support and made more portable
    02-Feb-11    MP      Added sim_fsize_ex and sim_fsize_name_ex returning t_addr
                         Added export of sim_buf_copy_swapped and sim_buf_swap_data
    28-Jun-07    RMS     Added VMS IA64 support (from Norm Lastovica)
@@ -227,77 +228,17 @@ return fopen (file, mode);
 
 /* 64b VMS */
 
-#if (defined (__ALPHA) || defined (__ia64)) && defined (VMS) /* 64b VMS */
+#if (defined (__ALPHA) || defined (__ia64)) && defined (VMS) && (__DECC_VER >= 60590001)
 #define _SIM_IO_FSEEK_EXT_      1
-
-static t_int64 fpos_t_to_int64 (fpos_t *pos)
-{
-unsigned short *w = (unsigned short *) pos;             /* endian dep! */
-t_int64 result;
-
-result = w[1];
-result <<= 16;
-result += w[0];
-result <<= 9;
-result += w[2];
-return result;
-}
-
-static void int64_to_fpos_t (t_int64 ipos, fpos_t *pos, size_t mbc)
-{
-unsigned short *w = (unsigned short *) pos;
-int bufsize = mbc << 9;
-
-w[3] = 0;
-w[2] = (unsigned short) (ipos % bufsize);
-ipos -= w[2];
-ipos >>= 9;
-w[0] = (unsigned short) ipos;
-ipos >>= 16;
-w[1] = (unsigned short) ipos;
-if ((w[2] == 0) && (w[0] || w[1])) {
-    w[2] = bufsize;
-    w[0] -= mbc;
-    }
-return;
-}
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
 {
-t_addr fileaddr;
-fpos_t filepos;
-
-switch (whence) {
-
-    case SEEK_SET:
-        fileaddr = offset;
-        break;
-
-    case SEEK_END:
-        if (_fseeki64 (st, 0, SEEK_END))
-            return (-1);
-    case SEEK_CUR:
-        if (fgetpos (st, &filepos))
-            return (-1);
-        fileaddr = fpos_t_to_int64 (&filepos);
-        fileaddr = fileaddr + offset;
-        break;
-
-    default:
-        errno = EINVAL;
-        return (-1);
-        }
-
-int64_to_fpos_t (fileaddr, &filepos, 127);
-return fsetpos (st, &filepos);
+return fseeko (st, (off_t)offset, whence);
 }
 
 static t_addr _sim_ftell (FILE *st)
 {
-fpos_t fileaddr;
-if (fgetpos (st, &fileaddr))
-    return (-1);
-return (t_addr)fpos_t_to_int64 (&fileaddr);
+return (t_addr)(ftello (st));
 }
 
 #endif

@@ -57,6 +57,13 @@
 #
 # On AXP the AXP PCAP components are built and used to provide network 
 # support for the VAX and PDP11 simulators.
+#
+# The AXP PCAP components can only be built using a version of the 
+# DEC/Compaq/HP Compiler version V6.5-001 or later.  To build using an
+# older compiler, networking support must be disabled.  Use...
+#
+#        MMK/MACRO=(NONETWORK=1)
+#
 # The PCAP-VMS components are presumed (by this procedure) to be located
 # in a directory at the same level as the directory containing the
 # simh source files.  For example, if these exist here:
@@ -156,14 +163,25 @@ BLD_DIR = SYS$DISK:[.BIN.VMS.LIB.BLD-$(ARCH)]
 # Check To Make Sure We Have SYS$DISK:[.BIN] & SYS$DISK:[.LIB] Directory.
 #
 .FIRST
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LES."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LES."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN EXIT %x10000000
+  @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN EXIT %x10000000
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN DEFINE/USER SYS$OUTPUT CC_VERSION.DAT
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN CC/VERSION
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN OPEN /READ VERSION CC_VERSION.DAT
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN READ VERSION CC_VERSION
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN CLOSE VERSION
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN DELETE CC_VERSION.DAT;
+  @ IF (F$GETSYI("ARCH_NAME").EQS."Alpha") THEN CC_VERSION = F$ELEMENT(2," ",CC_VERSION)
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** C Compiler is: ''CC_VERSION'"
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."").AND.(F$GETSYI("VERSION").GES."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NONETWORK=1 with this compiler"
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."").AND.(F$GETSYI("VERSION").LTS."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=(NONETWORK=1,NOASYNCH=1) with this compiler"
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."")) THEN EXIT %x10000000
   @ IF (F$SEARCH("SYS$DISK:[]BIN.DIR").EQS."") THEN CREATE/DIRECTORY $(BIN_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN]VMS.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
   @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
-  @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
 
 # Core SIMH File Definitions.
 #
@@ -200,12 +218,16 @@ PCAP_VCI = SYS$COMMON:[SYS$LDR]PCAPVCM.EXE
 # PCAP is not available on OpenVMS VAX or IA64 right now
 #
 .IFDEF MMSALPHA
+.IFDEF NONETWORK
+# Network Capabilities disabled
+.ELSE
 PCAP_EXECLET = $(PCAP_VCI)
 PCAP_INC = ,$(PCAP_DIR)
 PCAP_LIBD = $(PCAP_LIB)
 PCAP_LIBR = ,$(PCAP_LIB)/LIB/SYSEXE
 PCAP_DEFS = ,"USE_NETWORK=1"
 PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
+.ENDIF
 .ENDIF
 
 # MITS Altair Simulator Definitions.
