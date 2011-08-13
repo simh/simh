@@ -1069,7 +1069,7 @@ static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
 
   OidData->Length = 6;
   memset(OidData->Data, 0, 6);
-	
+
   Status = p_PacketRequest(lpAdapter, FALSE, OidData);
   if(Status) {
     memcpy(MACAddress, OidData->Data, 6);
@@ -1203,7 +1203,7 @@ else
         len = read(dev->fd_handle, buf, sizeof(buf));
         if (len > 0) {
           status = 1;
-          header.len = len;
+          header.caplen = header.len = len;
           _eth_callback((u_char *)dev, &header, buf);
         } else {
           status = 0;
@@ -1611,7 +1611,21 @@ t_stat _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
 
   /* make sure packet is acceptable length */
   if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
+    int loopback_self_frame = LOOPBACK_SELF_FRAME(dev->physical_addr, packet->msg);
+
     eth_packet_trace (dev, packet->msg, packet->len, "writing");
+
+    /* record sending of loopback packet (done before actual send to avoid race conditions with receiver) */
+    if (loopback_self_frame) {
+#ifdef USE_READER_THREAD
+        pthread_mutex_lock (&dev->self_lock);
+#endif
+        dev->loopback_self_sent += dev->reflections;
+        dev->loopback_self_sent_total++;
+#ifdef USE_READER_THREAD
+        pthread_mutex_unlock (&dev->self_lock);
+#endif
+    }
 
     /* dispatch write request (synchronous; no need to save write info to dev) */
     if (dev->pcap_mode)
@@ -1621,13 +1635,13 @@ t_stat _eth_write(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
       status = ((packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
 #endif
 
-    /* detect sending of loopback packet */
-    if ((status == 0) && (LOOPBACK_SELF_FRAME(dev->physical_addr, packet->msg))) {
+    /* On error, correct loopback bookkeeping */
+    if ((status != 0) && loopback_self_frame) {
 #ifdef USE_READER_THREAD
         pthread_mutex_lock (&dev->self_lock);
 #endif
-        dev->loopback_self_sent += dev->reflections;
-        dev->loopback_self_sent_total++;
+        dev->loopback_self_sent -= dev->reflections;
+        dev->loopback_self_sent_total--;
 #ifdef USE_READER_THREAD
         pthread_mutex_unlock (&dev->self_lock);
 #endif
@@ -1808,7 +1822,7 @@ struct TCPHeader {
 #define TCP_RST_FLAG (0x04)
 #define TCP_SYN_FLAG (0x02)
 #define TCP_FIN_FLAG (0x01)
-#define TCP_FLAGS_MASK (0xFF)
+#define TCP_FLAGS_MASK (0xFFF)
   uint16 window;
   uint16 checksum;
   uint16 urgent;
@@ -1889,7 +1903,7 @@ _eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
   uint16 ip_flags;
   uint16 frag_offset;
   struct pcap_pkthdr header;
-  uint16 tcp_flags;
+  uint16 orig_tcp_flags;
 
   /* Only interested in IP frames */
   if (ntohs(*proto) != 0x0800) {
@@ -1917,7 +1931,7 @@ _eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
         return;
       }
       if (UDP->checksum == 0)
-        break; /* UDP Cghecksums are disabled */
+        break; /* UDP Checksums are disabled */
       orig_checksum = UDP->checksum;
       UDP->checksum = 0;
       UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)UDP);
@@ -1971,10 +1985,16 @@ _eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
         IP->flags = htons(ip_flags);
         IP->checksum = 0;
         IP->checksum = ip_checksum((uint16 *)IP, IP_HLEN(IP));
-        header.len = 14 + ntohs(IP->total_len);
+        header.caplen = header.len = 14 + ntohs(IP->total_len);
         eth_packet_trace (dev, ((u_char *)IP)-14, header.len, "reading Datagram fragment");
 #if ETH_MIN_JUMBO_FRAME < ETH_MAX_PACKET
-          { /* Debugging is easier it we read packets directly with pcap */
+          { /* Debugging is easier if we read packets directly with pcap
+               (i.e. we can use Wireshark to verify packet contents)
+               we don't want to do this all the time for 2 reasons:
+                 1) sending through pcap involves kernel transitions and
+                 2) if the current system reflects sent packets, the 
+                    recieving side will receive and process 2 copies of 
+                    any packets sent this way. */
           ETH_PACK pkt;
 
           memset(&pkt, 0, sizeof(pkt));
@@ -1996,26 +2016,35 @@ _eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
       break;
    case IPPROTO_TCP:
       ++dev->jumbo_fragmented;
+      eth_packet_trace_ex (dev, ((u_char *)IP)-14, len, "Fragmenting Jumbo TCP segment", 1, dev->dbit);
       TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
-      tcp_flags = ntohs(TCP->data_offset_and_flags)&TCP_FLAGS_MASK;
-      TCP->data_offset_and_flags = htons(((TCP_DATA_OFFSET(TCP)>>2)<<12)|TCP_ACK_FLAG);
-      payload_len = ntohs(IP->total_len) - IP_HLEN(IP) - TCP_DATA_OFFSET(TCP);
+      orig_tcp_flags = ntohs(TCP->data_offset_and_flags);
+      if (0 == ntohs(IP->total_len))     /* Sometimes the IP header indicates a packet size of 0 */
+        IP->total_len = htons(len-14); /* use the captured frame size to compute the IP length */
+      payload_len = ntohs(IP->total_len) - (IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
       mtu_payload = ETH_MIN_JUMBO_FRAME - 14 - IP_HLEN(IP) - TCP_DATA_OFFSET(TCP);
       while (payload_len > 0) {
         if (payload_len > mtu_payload) {
+          TCP->data_offset_and_flags = htons(orig_tcp_flags&~(TCP_PSH_FLAG|TCP_FIN_FLAG|TCP_RST_FLAG));
           IP->total_len = htons(mtu_payload + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
         } else {
-          TCP->data_offset_and_flags = htons(ntohs(TCP->data_offset_and_flags)|(tcp_flags&(TCP_PSH_FLAG|TCP_ACK_FLAG|TCP_FIN_FLAG|TCP_RST_FLAG)));
+          TCP->data_offset_and_flags = htons(orig_tcp_flags);
           IP->total_len = htons(payload_len + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
         }
         IP->checksum = 0;
         IP->checksum = ip_checksum((uint16 *)IP, IP_HLEN(IP));
         TCP->checksum = 0;
         TCP->checksum = pseudo_checksum(ntohs(IP->total_len)-IP_HLEN(IP), IPPROTO_TCP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)TCP);
-        header.len = 14 + ntohs(IP->total_len);
+        header.caplen = header.len = 14 + ntohs(IP->total_len);
         eth_packet_trace_ex (dev, ((u_char *)IP)-14, header.len, "reading TCP segment", 1, dev->dbit);
 #if ETH_MIN_JUMBO_FRAME < ETH_MAX_PACKET
-          { /* Debugging is easier it we read packets directly with pcap */
+          { /* Debugging is easier if we read packets directly with pcap
+               (i.e. we can use Wireshark to verify packet contents)
+               we don't want to do this all the time for 2 reasons:
+                 1) sending through pcap involves kernel transitions and
+                 2) if the current system reflects sent packets, the 
+                    recieving side will receive and process 2 copies of 
+                    any packets sent this way. */
           ETH_PACK pkt;
 
           memset(&pkt, 0, sizeof(pkt));
@@ -2073,7 +2102,7 @@ _eth_fix_ip_xsum_offload(ETH_DEV* dev, u_char* msg, int len)
       if (ntohs(UDP->length) > (len-IP_HLEN(IP)))
         return; /* packet contained length exceeds packet size */
       if (UDP->checksum == 0)
-        return; /* UDP Cghecksums are disabled */
+        return; /* UDP Checksums are disabled */
       orig_checksum = UDP->checksum;
       UDP->checksum = 0;
       UDP->checksum = pseudo_checksum(ntohs(UDP->length), IPPROTO_UDP, (uint16 *)(&IP->source_ip), (uint16 *)(&IP->dest_ip), (uint8 *)UDP);
@@ -2115,7 +2144,7 @@ _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data
   int i;
 
   eth_packet_trace (dev, data, header->len, "received");
-
+f
   for (i = 0; i < dev->addr_count; i++) {
     if (memcmp(data, dev->filter_address[i], 6) == 0) to_me = 1;
     if (memcmp(&data[6], dev->filter_address[i], 6) == 0) from_me = 1;
@@ -2159,7 +2188,10 @@ _eth_callback(u_char* info, const struct pcap_pkthdr* header, const u_char* data
   if (to_me && !from_me) {
 #endif
     if (header->len > ETH_MIN_JUMBO_FRAME) {
-      _eth_fix_ip_jumbo_offload(dev, data, header->len);
+      if (header->len <= header->caplen) /* Whole Frame captured? */
+        _eth_fix_ip_jumbo_offload(dev, data, header->len);
+      else
+        ++dev->jumbo_truncated;
       return;
     }
 #if defined (USE_READER_THREAD)
@@ -2255,7 +2287,7 @@ int eth_read(ETH_DEV* dev, ETH_PACK* packet, ETH_PCALLBACK routine)
       len = read(dev->fd_handle, buf, sizeof(buf));
       if (len > 0) {
         status = 1;
-        header.len = len;
+        header.caplen = header.len = len;
         _eth_callback((u_char *)dev, &header, buf);
       } else {
         status = 0;
@@ -2435,11 +2467,6 @@ t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
 
 #ifdef USE_BPF
   if (dev->pcap_mode) {
-#ifdef USE_READER_THREAD
-    pthread_mutex_lock (&dev->lock);
-    ethq_clear (&dev->read_queue); /* Empty FIFO Queue when filter list changes */
-    pthread_mutex_unlock (&dev->lock);
-#endif
     /* compile filter string */
     if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
       sprintf(errbuf, "%s", pcap_geterr(dev->handle));
@@ -2467,6 +2494,11 @@ t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
       }
       pcap_freecode(&bpf);
     }
+#ifdef USE_READER_THREAD
+    pthread_mutex_lock (&dev->lock);
+    ethq_clear (&dev->read_queue); /* Empty FIFO Queue when filter list changes */
+    pthread_mutex_unlock (&dev->lock);
+#endif
   }
 #endif /* USE_BPF */
 
@@ -2627,6 +2659,8 @@ void eth_show_dev (FILE *st, ETH_DEV* dev)
     fprintf(st, "  Jumbo Dropped:         %d\n", dev->jumbo_dropped);
   if (dev->jumbo_fragmented)
     fprintf(st, "  Jumbo Fragmented:      %d\n", dev->jumbo_fragmented);
+  if (dev->jumbo_truncated)
+    fprintf(st, "  Jumbo Truncated:       %d\n", dev->jumbo_truncated);
 #if defined(USE_READER_THREAD)
   fprintf(st, "  Asynch Interrupts:       %s\n", dev->asynch_io?"Enabled":"Disabled");
   if (dev->asynch_io)

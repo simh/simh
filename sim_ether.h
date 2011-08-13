@@ -118,7 +118,7 @@
 #define ETH_DEV_DESC_MAX     256                        /* maximum device description size */
 #define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
 #define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
-#define ETH_MAX_JUMBO_FRAME 16384                       /* maximum ethernet jumbo frame size */
+#define ETH_MAX_JUMBO_FRAME 65536                       /* maximum ethernet jumbo frame size (or Offload Segment Size) */
 #define ETH_MAX_DEVICE        10                        /* maximum ethernet devices */
 #define ETH_CRC_SIZE           4                        /* ethernet CRC size */
 #define ETH_FRAME_SIZE (ETH_MAX_PACKET+ETH_CRC_SIZE)    /* ethernet maximum frame size */
@@ -193,10 +193,11 @@ struct eth_device {
   ETH_MAC       host_nic_phy_hw_addr;                   /* MAC address of the attached NIC */
   uint32        jumbo_fragmented;                       /* Giant IPv4 Frames Fragmented */
   uint32        jumbo_dropped;                          /* Giant Frames Dropped */
+  uint32        jumbo_truncated;                        /* Giant Frames too big for capture buffer - Dropped */
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */
-  int           need_crc;				/* device needs CRC (Cyclic Redundancy Check) */
+  int           need_crc;                               /* device needs CRC (Cyclic Redundancy Check) */
 #if defined (USE_READER_THREAD)
   int           asynch_io;                              /* Asynchronous Interrupt scheduling enabled */
   int           asynch_io_latency;                      /* instructions to delay pending interrupt */
