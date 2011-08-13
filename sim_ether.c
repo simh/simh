@@ -1971,8 +1971,12 @@ _eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
    case IPPROTO_UDP:
    case IPPROTO_ICMP:
       ++dev->jumbo_fragmented;
-      payload_len = ntohs(IP->total_len) - IP_HLEN(IP);
-      mtu_payload = ETH_MIN_JUMBO_FRAME - 14 - IP_HLEN(IP);
+      /* When we're performing LSO (Large Send Offload), we're given a 
+         'template' header which may not include a value being populated 
+         in the IP header length (which is only 16 bits).
+         We process as payload everything which isn't known header data. */
+      payload_len = len - (14 + IP_HLEN(IP));
+      mtu_payload = ETH_MIN_JUMBO_FRAME - (14 + IP_HLEN(IP));
       frag_offset = 0;
       while (payload_len > 0) {
         ip_flags = frag_offset;
@@ -2019,10 +2023,12 @@ _eth_fix_ip_jumbo_offload(ETH_DEV* dev, const u_char* msg, int len)
       eth_packet_trace_ex (dev, ((u_char *)IP)-14, len, "Fragmenting Jumbo TCP segment", 1, dev->dbit);
       TCP = (struct TCPHeader *)(((char *)IP)+IP_HLEN(IP));
       orig_tcp_flags = ntohs(TCP->data_offset_and_flags);
-      if (0 == ntohs(IP->total_len))     /* Sometimes the IP header indicates a packet size of 0 */
-        IP->total_len = htons(len-14); /* use the captured frame size to compute the IP length */
-      payload_len = ntohs(IP->total_len) - (IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
-      mtu_payload = ETH_MIN_JUMBO_FRAME - 14 - IP_HLEN(IP) - TCP_DATA_OFFSET(TCP);
+      /* When we're performing LSO (Large Send Offload), we're given a 
+         'template' header which may not include a value being populated 
+         in the IP header length (which is only 16 bits).
+         We process as payload everything which isn't known header data. */
+      payload_len = len - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
+      mtu_payload = ETH_MIN_JUMBO_FRAME - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
       while (payload_len > 0) {
         if (payload_len > mtu_payload) {
           TCP->data_offset_and_flags = htons(orig_tcp_flags&~(TCP_PSH_FLAG|TCP_FIN_FLAG|TCP_RST_FLAG));
