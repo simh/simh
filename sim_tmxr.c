@@ -1194,7 +1194,7 @@ static char *tmxr_debug_buf = NULL;
 static size_t tmxr_debug_buf_used = 0;
 static size_t tmxr_debug_buf_size = 0;
 
-static tmxr_buf_debug_char (char value)
+static void tmxr_buf_debug_char (char value)
 {
 if (tmxr_debug_buf_used+2 > tmxr_debug_buf_size) {
     tmxr_debug_buf_size += 1024;
@@ -1204,7 +1204,7 @@ tmxr_debug_buf[tmxr_debug_buf_used++] = value;
 tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
 }
 
-static tmxr_buf_debug_string (const char *string)
+static void tmxr_buf_debug_string (const char *string)
 {
 while (*string)
     tmxr_buf_debug_char (*string++);
