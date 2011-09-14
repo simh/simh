@@ -144,14 +144,18 @@ struct xu_device    xua = {
 
 MTAB xu_mod[] = {
 #if defined (VM_PDP11)
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-		&set_addr, &show_addr, NULL },
+  { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+    &set_addr, &show_addr, NULL },
+  { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
+    &set_addr_flt, NULL, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+    &set_vec, &show_vec, NULL },
 #else
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
-		NULL, &show_addr, NULL },
+  { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
+    NULL, &show_addr, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+    NULL, &show_vec, NULL },
 #endif
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-		NULL, &show_vec, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xu_setmac, &xu_showmac, NULL },
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", "ETH",
@@ -683,7 +687,7 @@ t_stat xu_reset(DEVICE* dptr)
   /* software reset controller */
   xu_sw_reset(xu);
 
-  return SCPE_OK;
+  return auto_config (0, 0);                              /* run autoconfig */
 }
 
 
