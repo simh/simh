@@ -37,7 +37,7 @@ ifeq ($(WIN32),)
   ifeq (librt,$(shell if $(TEST) -e /usr/lib/librt.$(LIBEXT); then echo librt; fi))
     OS_LDFLAGS += -lrt 
   endif
-  ifeq (libpthread,$(shell if $(TEST) -e /usr/lib/libpthread.$(LIBEXT); then echo libpthread; fi))
+  ifeq (libpthread,$(shell if $(TEST) -e /usr/lib/libpthread.$(LIBEXT) -o -e /usr/lib64/libpthread.$(LIBEXT); then echo libpthread; fi))
     OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
     OS_LDFLAGS += -lpthread 
   endif
