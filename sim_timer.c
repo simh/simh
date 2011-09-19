@@ -629,7 +629,7 @@ return SCPE_OK;
 t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 if (sim_idle_enab)
-    fprintf (st, "idle enabled, stability wait = %ds", sim_idle_stable);
+    fprintf (st, "idle enabled, stability wait = %ds, minimum sleep resolution = %dms", sim_idle_stable, sim_idle_rate_ms);
 else fputs ("idle disabled", st);
 return SCPE_OK;
 }

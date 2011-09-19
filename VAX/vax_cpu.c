@@ -3436,8 +3436,10 @@ return sim_set_idle (uptr, val, cptr, desc);
 
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (sim_idle_enab && (cpu_idle_type != 0))
-    fprintf (st, "idle enabled=%s", os_tab[cpu_idle_type - 1].name);
+if (sim_idle_enab && (cpu_idle_type != 0)) {
+    fprintf (st, "idle=%s, ", os_tab[cpu_idle_type - 1].name);
+    sim_show_idle (st, uptr, val, desc);
+    }
 else fprintf (st, "idle disabled");
 return SCPE_OK;
 }
