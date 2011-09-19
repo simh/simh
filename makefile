@@ -34,7 +34,7 @@ ifeq ($(WIN32),)
   ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
     OS_CCDEFS += -O2 
   endif
-  ifeq (librt,$(shell if $(TEST) -e /usr/lib/librt.$(LIBEXT); then echo librt; fi))
+  ifeq (librt,$(shell if $(TEST) -e /usr/lib/librt.$(LIBEXT) -o -e /usr/lib64/librt.$(LIBEXT); then echo librt; fi))
     OS_LDFLAGS += -lrt 
   endif
   ifeq (libpthread,$(shell if $(TEST) -e /usr/lib/libpthread.$(LIBEXT) -o -e /usr/lib64/libpthread.$(LIBEXT); then echo libpthread; fi))
