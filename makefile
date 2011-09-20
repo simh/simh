@@ -50,6 +50,13 @@ ifeq ($(WIN32),)
       OS_CCDEFS += -DHAVE_READLINE 
       OS_LDFLAGS += -lreadline 
     endif
+  else
+    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h; then echo readline_h; fi))
+      ifeq (Linux,$(shell uname))
+        OS_CCDEFS += -DHAVE_READLINE 
+        OS_LDFLAGS += -lreadline 
+      endif
+    endif
   endif
   ifeq (pcap,$(shell if $(TEST) -e /usr/include/pcap.h -o -e /opt/sfw/include/pcap.h; then echo pcap; fi))
     # Use Locally installed and available pcap support
