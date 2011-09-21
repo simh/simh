@@ -25,6 +25,16 @@
 
    cpu          VAX central processor
 
+   20-Sep-11    MP      Fixed idle conditions for various versions of Ultrix, 
+                        Quasijarus-4.3BSD, NetBSD and OpenBSD.
+                        Note: Since NetBSD and OpenBSD are still actively 
+                        developed operating systems, new versions of 
+                        these OSes are moving targets with regard to 
+                        providing idle detection.  At this time, recent versions 
+                        of OpenBSD have veered from the traditional OS idle 
+                        approach taken in the other BSD derived OSes.  
+                        Determining a reasonable idle detection pattern does 
+                        not seem possible for these versions.
    23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
    05-Jan-11    MP      Added Asynch I/O support
    24-Apr-10    RMS     Added OLDVMS idle timer option
@@ -177,9 +187,10 @@
 #define UNIT_CONH       (1u << UNIT_V_CONH)
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
-#define VAX_IDLE_VMS    0x1
-#define VAX_IDLE_ULT    0x2
-#define VAX_IDLE_QUAD   0x3
+#define VAX_IDLE_VMS        0x01
+#define VAX_IDLE_ULT        0x02
+#define VAX_IDLE_ULTOLD     0x04
+#define VAX_IDLE_QUAD       0x08
 
 #define OPND_SIZE       16
 #define INST_SIZE       52
@@ -1575,14 +1586,13 @@ for ( ;; ) {
     case TSTL:
         CC_IIZZ_L (op0);                                /* set cc's */
         if ((cc == CC_Z) &&
-            ((((PSL & PSL_IS) != 0) &&                  /* on IS? */
-              (PSL_GETIPL (PSL) == 0x1) &&              /* at IPL 1? */
-              ((cpu_idle_mask & VAX_IDLE_ULT) != 0))||  /* running Ultrix or friends? */
-             ((PSL_GETIPL (PSL) == 0x0) &&              /* at IPL 0? */
-              ((fault_PC & 0x80000000) != 0) &&         /* in system space? */
-              ((PC - fault_PC) == 6) &&                 /* 6 byte instruction? */
-              ((fault_PC & 0x7fffffff) < 0x4000) &&     /* in low system space? */
-              ((cpu_idle_mask & VAX_IDLE_QUAD) != 0)))) /* running Quad or friends? */
+            ((((cpu_idle_mask & VAX_IDLE_ULTOLD) &&     /* running Old Ultrix or friends? */
+               (PSL_GETIPL (PSL) == 0x1)) ||            /*  at IPL 1? */
+              ((cpu_idle_mask & VAX_IDLE_QUAD) &&       /* running Quasijarus or friends? */
+               (PSL_GETIPL (PSL) == 0x0))) &&           /*  at IPL 0? */
+             (fault_PC & 0x80000000) &&                 /* in system space? */
+             ((PC - fault_PC) == 6) &&                  /* 6 byte instruction? */
+             ((fault_PC & 0x7fffffff) < 0x4000)))       /* in low system space? */
             cpu_idle();                                 /* idle loop */
         break;
 
@@ -1790,6 +1800,14 @@ for ( ;; ) {
     case BITL:
         r = op1 & op0;                                  /* calc result */
         CC_IIZP_L (r);                                  /* set cc's */
+        if ((cc == CC_Z) &&
+            (cpu_idle_mask & VAX_IDLE_ULT) &&           /* running Ultrix or friends? */
+            ((PSL & PSL_IS) != 0) &&                    /* on IS? */
+            (PSL_GETIPL (PSL) == 0x18) &&               /* at IPL 18? */
+            (fault_PC & 0x80000000) &&                  /* in system space? */
+            ((PC - fault_PC) == 8) &&                   /* 8 byte instruction? */
+            ((fault_PC & 0x7fffffff) < 0x6000))         /* in low system space? */
+            cpu_idle();                                 /* idle loop */
         break;
 
 /* Integer operates, 2 operand read/write, and 3 operand, also MOVQ
@@ -3407,11 +3425,13 @@ struct os_idle {
 
 static struct os_idle os_tab[] = {
     { "VMS", VAX_IDLE_VMS },
-    { "NETBSD", VAX_IDLE_ULT },
+    { "NETBSD", VAX_IDLE_ULTOLD },
     { "ULTRIX", VAX_IDLE_ULT },
+    { "ULTRIXOLD", VAX_IDLE_ULTOLD },
     { "OPENBSD", VAX_IDLE_QUAD },
+    { "QUASIJARUS", VAX_IDLE_QUAD },
     { "32V", VAX_IDLE_QUAD },
-    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULT|VAX_IDLE_QUAD },
+    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD },
     { NULL, 0 }
     };
 

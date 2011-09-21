@@ -603,7 +603,7 @@ static CTAB cmd_table[] = {
       "set console NODEBUG      disable console debugging\n"
       "set break <list>         set breakpoints\n"
       "set nobreak <list>       clear breakpoints\n"
-      "set throttle x{M|K|%%}    set simulation rate\n"
+      "set throttle x{M|K|%%}   set simulation rate\n"
       "set nothrottle           set simulation rate to maximum\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
