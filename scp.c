@@ -2976,9 +2976,6 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
         }
     }
 stop_cpu = 0;
-if (signal (SIGINT, int_handler) == SIG_ERR) {          /* set WRU */
-    return SCPE_SIGERR;
-    }
 if (sim_ttrun () != SCPE_OK) {                          /* set console mode */
     sim_ttcmd ();
     return SCPE_TTYERR;
@@ -2986,6 +2983,17 @@ if (sim_ttrun () != SCPE_OK) {                          /* set console mode */
 if ((r = sim_check_console (30)) != SCPE_OK) {          /* check console, error? */
     sim_ttcmd ();
     return r;
+    }
+if (signal (SIGINT, int_handler) == SIG_ERR) {          /* set WRU */
+    return SCPE_SIGERR;
+    }
+#ifdef SIGHUP
+if (signal (SIGHUP, int_handler) == SIG_ERR) {          /* set WRU */
+    return SCPE_SIGERR;
+    }
+#endif
+if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
+    return SCPE_SIGERR;
     }
 if (sim_step)                                           /* set step timer */
     sim_activate (&sim_step_unit, sim_step);
@@ -2998,6 +3006,10 @@ r = sim_instr();
 sim_is_running = 0;                                     /* flag idle */
 sim_ttcmd ();                                           /* restore console */
 signal (SIGINT, SIG_DFL);                               /* cancel WRU */
+#ifdef SIGHUP
+signal (SIGHUP, SIG_DFL);                               /* cancel WRU */
+#endif
+signal (SIGTERM, SIG_DFL);                              /* cancel WRU */
 if (sim_log)                                            /* flush console log */
     fflush (sim_log);
 if (sim_deb)                                            /* flush debug log */
