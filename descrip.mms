@@ -3,6 +3,7 @@
 # Modified By:  Mark Pizzolato / mark@infocomm.com
 #               Norman Lastovica / norman.lastovica@oracle.com
 #               Camiel Vanderhoeven / camiel@camicom.com
+#               Matt Burke / scope.matthew@btinternet.com
 #
 # This MMS/MMK build script is used to compile the various simulators in
 # the SIMH package for OpenVMS using DEC C v6.0-001(AXP), v6.5-001(AXP),
@@ -40,6 +41,7 @@
 #            SDS             Just Build The SDS 940.
 #            SWTP            Just Build The SWTP.
 #            VAX             Just Build The DEC VAX.
+#            VAX730          Just Build The DEC VAX730.
 #            VAX780          Just Build The DEC VAX780.
 #            CLEAN           Will Clean Files Back To Base Kit.
 #
@@ -551,6 +553,35 @@ VAX_OPTIONS = /INCL=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
 VAX_SIMH_LIB = $(SIMH_LIB)
 .ENDIF
 
+# Digital Equipment VAX730 Simulator Definitions.
+#
+VAX730_DIR = SYS$DISK:[.VAX]
+VAX730_LIB1 = $(LIB_DIR)VAX730L1-$(ARCH).OLB
+VAX730_SOURCE1 = $(VAX730_DIR)VAX_CPU.C,$(VAX730_DIR)VAX_CPU1.C,\
+                 $(VAX730_DIR)VAX_FPA.C,$(VAX730_DIR)VAX_CIS.C,\
+                 $(VAX730_DIR)VAX_OCTA.C,$(VAX730_DIR)VAX_CMODE.C,\
+                 $(VAX730_DIR)VAX_MMU.C,$(VAX730_DIR)VAX_SYS.C,\
+                 $(VAX730_DIR)VAX_SYSCM.C,$(VAX730_DIR)VAX730_STDDEV.C,\
+                 $(VAX730_DIR)VAX730_SYS.C,$(VAX730_DIR)VAX730_MEM.C,\
+                 $(VAX730_DIR)VAX730_UBA.C,$(VAX730_DIR)VAX730_RB.C,\
+                 $(VAX730_DIR)VAX730_SYSLIST.C
+VAX730_LIB2 = $(LIB_DIR)VAX730L2-$(ARCH).OLB
+VAX730_SOURCE2 = $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
+                 $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
+                 $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
+                 $(PDP11_DIR)PDP11_XU.C,$(PDP11_DIR)PDP11_RY.C,\
+                 $(PDP11_DIR)PDP11_CR.C,$(PDP11_DIR)PDP11_HK.C,\
+                 $(PDP11_DIR)PDP11_IO_LIB.C
+.IFDEF ALPHA_OR_IA64
+VAX730_OPTIONS = /INCL=($(SIMH_DIR),$(VAX730_DIR),$(PDP11_DIR)$(PCAP_INC))\
+                 /DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS),"VAX_730=1")
+VAX730_SIMH_LIB = $(SIMH_LIB64)
+.ELSE
+VAX730_OPTIONS = /INCL=($(SIMH_DIR),$(VAX730_DIR),$(PDP11_DIR)$(PCAP_INC))\
+                 /DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS),"VAX_730=1")
+VAX730_SIMH_LIB = $(SIMH_LIB)
+.ENDIF
+
 # Digital Equipment VAX780 Simulator Definitions.
 #
 VAX780_DIR = SYS$DISK:[.VAX]
@@ -597,8 +628,8 @@ I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 #
 .IFDEF ALPHA_OR_IA64
 ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
-      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX VAX780 SDS \
-      I7094 SWTP
+      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX VAX730 VAX780 \
+      SDS I7094 SWTP
         $! No further actions necessary
 .ELSE
 #
@@ -1011,6 +1042,28 @@ $(VAX_LIB2) : $(VAX_SOURCE2)
         $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
+$(VAX730_LIB1) : $(VAX730_SOURCE1)
+        $!
+        $! Building The $(VAX730_LIB1) Library.
+        $!
+        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX730_DIR) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(VAX730_LIB2) : $(VAX730_SOURCE2)
+        $!
+        $! Building The $(VAX730_LIB2) Library.
+        $!
+        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX730_DIR) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
 $(VAX780_LIB1) : $(VAX780_SOURCE1)
         $!
         $! Building The $(VAX780_LIB1) Library.
@@ -1399,6 +1452,21 @@ $(BIN_DIR)VAX-$(ARCH).EXE : $(SIMH_MAIN) $(VAX_SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB1
                /EXE=$(BIN_DIR)VAX-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(VAX_LIB1)/LIBRARY,$(VAX_LIB2)/LIBRARY,-
                $(VAX_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+VAX730 : $(BIN_DIR)VAX730-$(ARCH).EXE
+        $! VAX730 done
+
+$(BIN_DIR)VAX730-$(ARCH).EXE : $(SIMH_MAIN) $(VAX730_SIMH_LIB) $(PCAP_LIBD) $(VAX730_LIB1) $(VAX730_LIB2) $(PCAP_EXECLET)
+        $!
+        $! Building The $(BIN_DIR)VAX730-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(VAX730_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
+               /EXE=$(BIN_DIR)VAX730-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,-
+               $(VAX730_LIB1)/LIBRARY,$(VAX730_LIB2)/LIBRARY,-
+               $(VAX730_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 VAX780 : $(BIN_DIR)VAX780-$(ARCH).EXE

@@ -45,8 +45,8 @@ ifeq ($(WIN32),)
     OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
     OS_LDFLAGS += -lpthread 
   endif
-  ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
-    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h; then echo readline_h; fi))
+  ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /usr/lib64/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
+    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h; then echo readline_h; fi))
       # Use Locally installed and available readline support
       ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
         OS_CCDEFS += -DHAVE_READLINE 
@@ -192,6 +192,19 @@ VAX = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c ${VAXD}/vax_io.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_vh.c \
 	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_io_lib.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+
+
+VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
+	${VAXD}/vax730_stddev.c ${VAXD}/vax730_sys.c \
+	${VAXD}/vax730_mem.c ${VAXD}/vax730_uba.c ${VAXD}/vax730_rb.c \
+	${VAXD}/vax730_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
+	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_io_lib.c
+VAX730_OPT = -DVM_VAX -DVAX_730 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
@@ -355,7 +368,7 @@ SWTP_OPT = -I ${SWTPD}
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
+	vax vax730 vax780 nova eclipse hp2100 i1401 i1620 s3 \
 	altair altairz80 gri i7094 ibm1130 id16 \
 	id32 sds lgp h316 swtp
 
@@ -436,6 +449,12 @@ vax : ${BIN}vax${EXE}
 ${BIN}vax${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} -o $@ ${LDFLAGS}
+
+vax730 : ${BIN}vax730${EXE}
+
+${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX730} ${SIM} ${VAX730_OPT} -o $@ ${LDFLAGS}
 
 vax780 : ${BIN}vax780${EXE}
 

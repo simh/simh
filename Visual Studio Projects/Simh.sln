@@ -65,6 +65,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SWTP", "SWTP.vcproj", "{0AB
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BuildROMs", "BuildROMs.vcproj", "{D40F3AF1-EEE7-4432-9807-2AD287B490F8}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VAX730", "VAX730.vcproj", "{C526F7F2-9476-44BC-B1E9-9522B693BEA7}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -187,6 +192,10 @@ Global
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8}.Debug|Win32.Build.0 = Debug|Win32
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8}.Release|Win32.ActiveCfg = Release|Win32
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8}.Release|Win32.Build.0 = Release|Win32
+		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Debug|Win32.Build.0 = Debug|Win32
+		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Release|Win32.ActiveCfg = Release|Win32
+		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

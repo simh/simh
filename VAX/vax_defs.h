@@ -720,6 +720,8 @@ enum opcodes {
 
 #if defined (VAX_780)
 #include "vax780_defs.h"
+#elif defined (VAX_730)
+#include "vax730_defs.h"
 #else
 #include "vaxmod_defs.h"
 #endif

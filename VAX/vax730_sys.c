@@ -1,6 +1,7 @@
-/* vax780_sbi.c: VAX 11/780 SBI
+/* vax730_sys.c: VAX 11/730 system-specific logic
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2010-2011, Matt Burke
+   This module incorporates code from SimH, Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -15,23 +16,20 @@
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   THE AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the name(s) of the author(s) shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the author(s).
 
-   This module contains the VAX 11/780 system-specific registers and devices.
+   This module contains the VAX 11/730 system-specific registers and devices.
 
-   sbi                  bus controller
+   sysb                 system bus controller
 
-   21-Mar-2011  RMS     Added autoreboot capability (from Mark Pizzalato)
-   04-Feb-2011  MP      Added RQB, RQC, and RQD as bootable controllers
-   31-May-2008  RMS     Fixed machine_check calling sequence (found by Peter Schorn)
-   03-May-2006  RMS     Fixed writes to ACCS
-   28-May-2008  RMS     Inlined physical memory routines
+   29-Mar-2011  MB      First Version
+
 */
 
 #include "vax_defs.h"
@@ -40,56 +38,9 @@
 #include "vax780_vmb_exe.h"
 #endif
 
-/* 11/780 specific IPRs */
+static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
 
-/* Writeable control store */
-
-#define WCSA_RW         0xFFFF                          /* writeable */
-#define WCSA_ADDR       0x1FFF                          /* addr */
-#define WCSA_CTR        0x6000                          /* counter */
-#define WCSA_CTR_INC    0x2000                          /* increment */
-#define WCSA_CTR_MAX    0x6000                          /* max value */
-#define WCSD_RD_VAL     0xFF                            /* fixed read val */
-#define WCSD_WR         0xFFFFFFFF                      /* write */
-#define MBRK_RW         0x1FFF                          /* microbreak */
-
-/* System registers */
-
-#define SBIFS_RD        (0x031F0000|SBI_FAULTS)         /* SBI faults */
-#define SBIFS_WR        0x03140000
-#define SBIFS_W1C       0x00080000
-
-#define SBISC_RD        0xFFFF0000                      /* SBI silo comp */
-#define SBISC_WR        0x7FFF0000
-#define SBISC_LOCK      0x80000000                      /* lock */
-
-#define SBIMT_RD        0xFFFFFF00                      /* SBI maint */
-#define SBIMT_WR        0xFFFFF900
-
-#define SBIER_CRDIE     0x00008000                      /* SBI error, CRD IE */
-#define SBIER_CRD       0x00004000                      /* CRD */
-#define SBIER_RDS       0x00002000                      /* RDS */
-#define SBIER_TMO       0x00001000                      /* timeout */
-#define SBIER_STA       0x00000C00                      /* timeout status (0) */
-#define SBIER_CNF       0x00000100                      /* error confirm */
-#define SBIER_IBRDS     0x00000080
-#define SBIER_IBTMO     0x00000040
-#define SBIER_IBSTA     0x00000030
-#define SBIER_IBCNF     0x00000008
-#define SBIER_MULT      0x00000004                      /* multiple errors */
-#define SBIER_FREE      0x00000002                      /* SBI free */
-#define SBIER_RD        0x0000FDFE
-#define SBIER_WR        0x00008000
-#define SBIER_W1C       0x000070C0
-#define SBIER_TMOW1C    (SBIER_TMO|SBIER_STA|SBIER_CNF|SBIER_MULT)
-#define SBIER_IBTW1C    (SBIER_IBTMO|SBIER_STA|SBIER_IBCNF)
-
-#define SBITMO_V_MODE   30                              /* mode */
-#define SBITMO_VIRT     0x20000000                      /* physical */
-
-#define SBIQC_MBZ       0xC0000007                      /* MBZ */
-
-/* VAX-11/780 boot device definitions */
+/* VAX-11/730 boot device definitions */
 
 struct boot_dev {
     char                *name;
@@ -97,22 +48,10 @@ struct boot_dev {
     int32               let;
     };
 
-uint32 wcs_addr = 0;
-uint32 wcs_data = 0;
-uint32 wcs_mbrk = 0;
-uint32 nexus_req[NEXUS_HLVL];                           /* nexus int req */
-uint32 sbi_fs = 0;                                      /* SBI fault status */
-uint32 sbi_sc = 0;                                      /* SBI silo comparator */
-uint32 sbi_mt = 0;                                      /* SBI maintenance */
-uint32 sbi_er = 0;                                      /* SBI error status */
-uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
-static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
-
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
 
 static struct boot_dev boot_tab[] = {
-    { "RP", BOOT_MB, 0 },
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },
@@ -120,6 +59,8 @@ static struct boot_dev boot_tab[] = {
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
     { "TQ", BOOT_TK, 1 << 24 },
+    { "TD", BOOT_TD, 0 },
+    { "RB", BOOT_RB, 0 },
     { NULL }
     };
 
@@ -130,7 +71,7 @@ extern int32 mapen, pme, trpirq;
 extern int32 in_ie;
 extern int32 mchk_va, mchk_ref;
 extern int32 crd_err, mem_err, hlt_pin;
-extern int32 tmr_int, tti_int, tto_int;
+extern int32 tmr_int, tti_int, tto_int, csi_int, cso_int;
 extern jmp_buf save_env;
 extern int32 p1;
 extern int32 sim_switches;
@@ -138,14 +79,11 @@ extern DEVICE *sim_devices[];
 extern FILE *sim_log;
 extern CTAB *sim_vm_cmd;
 
-t_stat sbi_reset (DEVICE *dptr);
-void sbi_set_tmo (int32 pa);
-void uba_eval_int (void);
-t_stat vax780_boot (int32 flag, char *ptr);
-t_stat vax780_boot_parse (int32 flag, char *ptr);
+t_stat sysb_reset (DEVICE *dptr);
+t_stat vax730_boot (int32 flag, char *ptr);
+t_stat vax730_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
-extern t_stat vax780_fload (int32 flag, char *cptr);
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
 extern int32 iccs_rd (void);
 extern int32 nicr_rd (void);
@@ -154,76 +92,59 @@ extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
 extern int32 rxdb_rd (void);
 extern int32 txcs_rd (void);
+extern int32 csrs_rd (void);
+extern int32 csrd_rd (void);
+extern int32 csts_rd (void);
 extern void iccs_wr (int32 dat);
 extern void nicr_wr (int32 dat);
 extern void todr_wr (int32 dat);
 extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
-extern void init_mbus_tab (void);
+extern void csrs_wr (int32 dat);
+extern void csts_wr (int32 dat);
+extern void cstd_wr (int32 dat);
 extern void init_ubus_tab (void);
-extern t_stat build_mbus_tab (DEVICE *dptr, DIB *dibp);
 extern t_stat build_ubus_tab (DEVICE *dptr, DIB *dibp);
+extern int32 ubamap_rd (int32 pa);
+extern void ubamap_wr (int32 pa, int32 val, int32 lnt);
+extern t_bool uba_eval_int (int32 lvl);
+extern int32 uba_get_ubvector (int32 lvl);
 
-/* SBI data structures
+/* SYSB data structures
 
-   sbi_dev      SBI device descriptor
-   sbi_unit     SBI unit
-   sbi_reg      SBI register list
+   sysb_dev      SYSB device descriptor
+   sysb_unit     SYSB unit
+   sysb_reg      SYSB register list
 */
 
-UNIT sbi_unit = { UDATA (NULL, 0, 0) };
+UNIT sysb_unit = { UDATA (NULL, 0, 0) };
 
-REG sbi_reg[] = {
-    { HRDATA (NREQ14, nexus_req[0], 16) },
-    { HRDATA (NREQ15, nexus_req[1], 16) },
-    { HRDATA (NREQ16, nexus_req[2], 16) },
-    { HRDATA (NREQ17, nexus_req[3], 16) },
-    { HRDATA (WCSA, wcs_addr, 16) },
-    { HRDATA (WCSD, wcs_data, 32) },
-    { HRDATA (MBRK, wcs_mbrk, 13) },
-    { HRDATA (SBIFS, sbi_fs, 32) },
-    { HRDATA (SBISC, sbi_sc, 32) },
-    { HRDATA (SBIMT, sbi_mt, 32) },
-    { HRDATA (SBIER, sbi_er, 32) },
-    { HRDATA (SBITMO, sbi_tmo, 32) },
+REG sysb_reg[] = {
     { BRDATA (BOOTCMD, cpu_boot_cmd, 16, 8, CBUFSIZE), REG_HRO },
     { NULL }
     };
 
-DEVICE sbi_dev = {
-    "SBI", &sbi_unit, sbi_reg, NULL,
+DEVICE sysb_dev = {
+    "SYSB", &sysb_unit, sysb_reg, NULL,
     1, 16, 16, 1, 16, 8,
-    NULL, NULL, &sbi_reset,
+    NULL, NULL, &sysb_reset,
     NULL, NULL, NULL,
     NULL, 0
     };
 
 /* Special boot command, overrides regular boot */
 
-CTAB vax780_cmd[] = {
-    { "BOOT", &vax780_boot, RU_BOOT,
+CTAB vax730_cmd[] = {
+    { "BOOT", &vax730_boot, RU_BOOT,
       "bo{ot} <device>{/R5:flg} boot device\n" },
-    { "FLOAD", &vax780_fload, 0,
-      "fl{oad} <file> {<start>} load file from console floppy\n" },
     { NULL }
     };
 
-/* The VAX 11/780 has three sources of interrupts
+/* The VAX 11/730 has two sources of interrupts
 
-   - internal device interrupts (CPU, console, clock)
-   - nexus interupts (e.g., memory controller, MBA, UBA)
+   - internal device interrupts (CPU, console, clock, console storage)
    - external device interrupts (Unibus)
-
-   Internal devices vector to fixed SCB locations.
-
-   Nexus interrupts vector to an SCB location based on this
-   formula: SCB_NEXUS + ((IPL - 0x14) * 0x40) + (TR# * 0x4)
-
-   External device interrupts do not vector directly.
-   Instead, the interrupt handler for a given UBA IPL
-   reads a vector register that contains the Unibus vector
-   for that IPL.
 
 /* Find highest priority vectorable interrupt */
 
@@ -241,27 +162,24 @@ static const int32 sw_int_mask[IPL_SMAX] = {
 
 if (hlt_pin)                                            /* hlt pin int */
     return IPL_HLTPIN;
-if ((ipl < IPL_MEMERR) && mem_err)                      /* mem err int */
-    return IPL_MEMERR;
-if ((ipl < IPL_CRDERR) && crd_err)                      /* crd err int */
-    return IPL_CRDERR;
 if ((ipl < IPL_CLKINT) && tmr_int)                      /* clock int */
     return IPL_CLKINT;
-uba_eval_int ();                                        /* update UBA */
 for (i = IPL_HMAX; i >= IPL_HMIN; i--) {                /* chk hwre int */
     if (i <= ipl)                                       /* at ipl? no int */
         return 0;
-    if (nexus_req[i - IPL_HMIN])                        /* req != 0? int */
+    if (uba_eval_int(i - IPL_HMIN))
         return i;
     }
 if ((ipl < IPL_TTINT) && (tti_int || tto_int))          /* console int */
     return IPL_TTINT;
+if ((ipl < IPL_CSINT) && (csi_int || cso_int))          /* console storage int */
+    return IPL_CSINT;
 if (ipl >= IPL_SMAX)                                    /* ipl >= sw max? */
     return 0;
-if ((t = SISR & sw_int_mask[ipl]) == 0)
-    return 0;                                           /* eligible req */
+if ((t = SISR & sw_int_mask[ipl]) == 0)                 /* eligible req */
+    return 0;
 for (i = IPL_SMAX; i > ipl; i--) {                      /* check swre int */
-    if ((t >> i) & 1)                                    /* req != 0? int */
+    if ((t >> i) & 1)                                   /* req != 0? int */
         return i;
     }
 return 0;
@@ -271,16 +189,8 @@ return 0;
 
 int32 get_vector (int32 lvl)
 {
-int32 i, l;
+int32 l;
 
-if (lvl == IPL_MEMERR) {                                /* mem error? */
-    mem_err = 0;
-    return SCB_MEMERR;
-    }
-if (lvl == IPL_CRDERR) {                                /* CRD error? */
-    crd_err = 0;
-    return SCB_CRDERR;
-    }
 if (lvl == IPL_CLKINT) {                                /* clock? */
     tmr_int = 0;                                        /* clear req */
     return SCB_INTTIM;                                  /* return vector */
@@ -290,12 +200,8 @@ if (lvl > IPL_HMAX) {                                   /* error req lvl? */
     }
 if ((lvl <= IPL_HMAX) && (lvl >= IPL_HMIN)) {           /* nexus? */
     l = lvl - IPL_HMIN;
-    for (i = 0; nexus_req[l] && (i < NEXUS_NUM); i++) {
-        if ((nexus_req[l] >> i) & 1) {
-            nexus_req[l] = nexus_req[l] & ~(1u << i);
-            return SCB_NEXUS + (l << 6) + (i << 2);     /* return vector */
-            }
-        }
+    if (uba_eval_int(l))
+        return uba_get_ubvector(l);
     }
 if (lvl == IPL_TTINT) {                                 /* console? */
     if (tti_int) {                                      /* input? */
@@ -307,10 +213,20 @@ if (lvl == IPL_TTINT) {                                 /* console? */
         return SCB_TTO;                                 /* return vector */
         }
     }
+if (lvl == IPL_CSINT) {                                 /* console storage? */
+    if (csi_int) {                                      /* input? */
+        csi_int = 0;                                    /* clear req */
+        return SCB_CSI;                                 /* return vector */
+        }
+    if (cso_int) {                                      /* output? */
+        cso_int = 0;                                    /* clear req */
+        return SCB_CSO;                                 /* return vector */
+        }
+    }
 return 0;
 }
 
-/* Read 780-specific IPR's */
+/* Read 730-specific IPR's */
 
 int32 ReadIPR (int32 rg)
 {
@@ -338,14 +254,6 @@ switch (rg) {
         val = 0;
         break;
 
-    case MT_WCSA:                                       /* WCSA */
-        val = wcs_addr & WCSA_RW;
-        break;
-
-    case MT_WCSD:                                       /* WCSD */
-        val = WCSD_RD_VAL;
-        break;
-
     case MT_RXCS:                                       /* RXCS */
         val = rxcs_rd ();
         break;
@@ -358,36 +266,34 @@ switch (rg) {
         val = txcs_rd ();
         break;
 
-    case MT_SBIFS:                                      /* SBIFS */
-        val = sbi_fs & SBIFS_RD;
+    case MT_SID:                                        /* SID */
+        val = VAX730_SID | VAX730_MICRO;
         break;
 
-    case MT_SBIS:                                       /* SBIS */
+    case MT_MCESR:                                      /* MCESR (not impl) */
         val = 0;
         break;
 
+    case MT_CSRS:                                       /* CSRS */
+        val = csrs_rd ();
+        break;
+        
+    case MT_CSRD:                                       /* CSRD */
+        val = csrd_rd ();
+        break;
+        
+    case MT_CSTS:                                       /* CSTS */
+        val = csts_rd ();
+        break;
+
+    case MT_CDR:                                        /* CDR */
+    case MT_SBIFS:                                      /* SBIFS */
+    case MT_SBIS:                                       /* SBIS */
     case MT_SBISC:                                      /* SBISC */
-        val = sbi_sc & SBISC_RD;
-        break;
-
     case MT_SBIMT:                                      /* SBIMT */
-        val = sbi_mt & SBIMT_RD;
-        break;
-
     case MT_SBIER:                                      /* SBIER */
-        val = sbi_er & SBIER_RD;
-        break;
-
     case MT_SBITA:                                      /* SBITA */
-        val = sbi_tmo;
-        break;
-
-    case MT_MBRK:                                       /* MBRK */
-        val = wcs_mbrk & MBRK_RW;
-        break;
-
-    case MT_SID:                                        /* SID */
-        val = VAX780_SID | VAX780_ECO | VAX780_PLANT | VAX780_SN;
+        val = 0;
         break;
 
     default:
@@ -397,7 +303,7 @@ switch (rg) {
 return val;
 }
 
-/* Write 780-specific IPR's */
+/* Write 730-specific IPR's */
 
 void WriteIPR (int32 rg, int32 val)
 {
@@ -418,19 +324,6 @@ switch (rg) {
     case MT_ACCS:                                       /* ACCS (not impl) */
         break;
 
-    case MT_WCSA:                                       /* WCSA */
-        wcs_addr = val & WCSA_RW;
-        break;
-
-    case MT_WCSD:                                       /* WCSD */
-        wcs_data = val & WCSD_WR;
-        wcs_addr = (wcs_addr & ~WCSA_CTR) |
-            ((wcs_addr + WCSA_CTR_INC) & WCSA_CTR);
-        if ((wcs_addr & WCSA_CTR) == WCSA_CTR_MAX)
-            wcs_addr = (wcs_addr & ~WCSA_ADDR) |
-                       ((wcs_addr + 1) & WCSA_ADDR);
-        break;
-
     case MT_RXCS:                                       /* RXCS */
         rxcs_wr (val);
         break;
@@ -443,41 +336,30 @@ switch (rg) {
         txdb_wr (val);
         break;
 
+    case MT_MCESR:                                      /* MCESR (not impl) */
+        break;
+
+    case MT_UBINIT:                                     /* UBINIT (not impl) */
+        break;
+
+    case MT_CSRS:                                       /* CSRS */
+        csrs_wr (val);
+        break;
+        
+    case MT_CSTS:                                       /* CSTS */
+        csts_wr (val);
+        break;
+        
+    case MT_CSTD:                                       /* CSTD */
+        cstd_wr (val);
+        break;
+
+    case MT_CDR:                                        /* CDR */
     case MT_SBIFS:                                      /* SBIFS */
-        sbi_fs = (sbi_fs & ~SBIFS_WR) | (val & SBIFS_WR);
-        sbi_fs = sbi_fs & ~(val & SBIFS_W1C);
-        break;
-
     case MT_SBISC:                                      /* SBISC */
-        sbi_sc = (sbi_sc & ~(SBISC_LOCK|SBISC_WR)) | (val & SBISC_WR);
-        break;
-
     case MT_SBIMT:                                      /* SBIMT */
-        sbi_mt = (sbi_mt & ~SBIMT_WR) | (val & SBIMT_WR);
-        break;
-
     case MT_SBIER:                                      /* SBIER */
-        sbi_er = (sbi_er & ~SBIER_WR) | (val & SBIER_WR);
-        sbi_er = sbi_er & ~(val & SBIER_W1C);
-        if (val & SBIER_TMO)
-            sbi_er = sbi_er & ~SBIER_TMOW1C;
-        if (val & SBIER_IBTMO)
-            sbi_er = sbi_er & ~SBIER_IBTW1C;
-        if ((sbi_er & SBIER_CRDIE) && (sbi_er & SBIER_CRD))
-            crd_err = 1;
-        else crd_err = 0;
-        break;
-
     case MT_SBIQC:                                      /* SBIQC */
-        if (val & SBIQC_MBZ) {
-            RSVD_OPND_FAULT;
-            }
-        WriteLP (val, 0);
-        WriteLP (val + 4, 0);
-        break;
-
-    case MT_MBRK:                                       /* MBRK */
-        wcs_mbrk = val & MBRK_RW;
         break;
 
     default:
@@ -508,8 +390,7 @@ if (ADDR_IS_REG (pa)) {                                 /* reg space? */
         return val;
         }
     }
-sbi_set_tmo (pa);                                       /* timeout */
-MACH_CHECK (MCHK_RD_F);                                 /* machine check */
+MACH_CHECK (MCHK_NXM);
 return 0;
 } 
 
@@ -535,34 +416,7 @@ if (ADDR_IS_REG (pa)) {                                 /* reg space? */
         return;
         }
     }
-sbi_set_tmo (pa);                                       /* timeout */
-mem_err = 1;                                            /* interrupt */
-eval_int ();
-return;
-}
-
-/* Set SBI timeout - machine checks only on reads */
-
-void sbi_set_tmo (int32 pa)
-{
-if ((sbi_er & SBIER_TMO) == 0) {                        /* not yet set? */
-    sbi_tmo = pa >> 2;                                  /* save addr */
-    if (mchk_ref == REF_V)                              /* virt? add mode */
-        sbi_tmo |= SBITMO_VIRT | (PSL_GETCUR (PSL) << SBITMO_V_MODE);
-    sbi_er |= SBIER_TMO;                                /* set tmo flag */
-    }
-else sbi_er |= SBIER_MULT;                              /* yes, multiple */
-return;
-}
-
-/* Set SBI error confirmation - always machine checks */
-
-void sbi_set_errcnf (void)
-{
-if (sbi_er & SBIER_CNF)
-    sbi_er |= SBIER_MULT;
-else sbi_er |= SBIER_CNF;
-MACH_CHECK (MCHK_RD_F);
+MACH_CHECK (MCHK_NXM);
 return;
 }
 
@@ -577,26 +431,24 @@ return;
 
 int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
 {
-int32 acc, err;
+int32 acc, nxm;
 
-err = (GET_TRAP (trpirq) << 4) | (pme << 3) | ASTLVL;   /* error word */
-cc = intexc (SCB_MCHK, cc, 0, IE_SVE);                  /* take exception */
+nxm = ((p1 == MCHK_NXM) || (p1 == MCHK_IIA) || (p1 == MCHK_IUA));
+if (nxm)
+    cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
+else
+    cc = intexc (SCB_MCHK, cc, 0, IE_SVE);              /* take severe exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
 in_ie = 1;
-SP = SP - 44;                                           /* push 11 words */
-Write (SP, 40, L_LONG, WA);                             /* # bytes */
+SP = SP - 16;                                           /* push 4 words */
+Write (SP, 12, L_LONG, WA);                             /* # bytes */
 Write (SP + 4, p1, L_LONG, WA);                         /* mcheck type */
-Write (SP + 8, err, L_LONG, WA);                        /* CPU error status */
-Write (SP + 12, 0, L_LONG, WA);                         /* uPC */
-Write (SP + 16, mchk_va, L_LONG, WA);                   /* VA */
-Write (SP + 20, 0, L_LONG, WA);                         /* D register */
-Write (SP + 24, mapen, L_LONG, WA);                     /* TB status 1 */
-Write (SP + 28, 0, L_LONG, WA);                         /* TB status 2 */
-Write (SP + 32, sbi_tmo, L_LONG, WA);                   /* SBI timeout addr */
-Write (SP + 36, 0, L_LONG, WA);                         /* cache status */
-Write (SP + 40, sbi_er, L_LONG, WA);                    /* SBI error */
+if (nxm)
+    Write (SP + 8, mchk_va, L_LONG, WA);                /* NXM addr */
+else
+    Write (SP + 8, 0, L_LONG, WA);                      /* first parameter */
+Write (SP + 12, 0, L_LONG, WA);                         /* second parameter */
 in_ie = 0;
-sbi_er = sbi_er & ~SBIER_TMOW1C;                        /* clr SBIER<tmo> etc */
 return cc;
 }
 
@@ -605,7 +457,7 @@ return cc;
 int32 con_halt (int32 code, int32 cc)
 {
 if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
-    (vax780_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+    (vax730_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
     (reset_all (0) != SCPE_OK) ||                       /* reset the world */
     (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
     ABORT (STOP_BOOT);                                  /* any error? */
@@ -622,11 +474,11 @@ return cc;
    Sets up R0-R5, calls SCP boot processor with effective BOOT CPU
 */
 
-t_stat vax780_boot (int32 flag, char *ptr)
+t_stat vax730_boot (int32 flag, char *ptr)
 {
 t_stat r;
 
-r = vax780_boot_parse (flag, ptr);                      /* parse the boot cmd */
+r = vax730_boot_parse (flag, ptr);                      /* parse the boot cmd */
 if (r != SCPE_OK)                                       /* error? */
     return r;
 strncpy (cpu_boot_cmd, ptr, CBUFSIZE);                  /* save for reboot */
@@ -635,7 +487,7 @@ return run_cmd (flag, "CPU");
 
 /* Parse boot command, set up registers - also used on reset */
 
-t_stat vax780_boot_parse (int32 flag, char *ptr)
+t_stat vax730_boot_parse (int32 flag, char *ptr)
 {
 char gbuf[CBUFSIZE];
 char *slptr, *regptr;
@@ -643,6 +495,7 @@ int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
 DIB *dibp;
+uint32 ba;
 t_stat r;
 
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
@@ -655,7 +508,9 @@ if ((dptr == NULL) || (uptr == NULL))
     return SCPE_ARG;
 dibp = (DIB *) dptr->ctxt;                              /* get DIB */
 if (dibp == NULL)
-    return SCPE_ARG;
+    ba = 0;
+else
+    ba = dibp->ba;
 unitno = (int32) (uptr - dptr->units);
 r5v = 0;
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
@@ -671,14 +526,10 @@ else if (*regptr != 0)
 for (i = 0; boot_tab[i].name != NULL; i++) {
     if (strcmp (dptr->name, boot_tab[i].name) == 0) {
         R[0] = boot_tab[i].code;
-        if (dptr->flags & DEV_MBUS) {
-            R[1] = dibp->ba + TR_MBA0;
-            R[2] = unitno;
-            }
-        else {
-            R[1] = TR_UBA;
-            R[2] = boot_tab[i].let | (dibp->ba & UBADDRMASK);
-            }
+        if (boot_tab[i].code == BOOT_RB)                /* vector set by console for RB730 */
+            R[0] = R[0] | ((VEC_RB - VEC_Q) << 16);
+        R[1] = TR_UBA;
+        R[2] = boot_tab[i].let | (ba & UBADDRMASK);
         R[3] = unitno;
         R[4] = 0;
         R[5] = r5v;
@@ -695,8 +546,8 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 t_stat r;
 
 printf ("Loading boot code from vmb.exe\n");
-if (sim_log)
-    fprintf (sim_log, "Loading boot code from vmb.exe\n");
+if (sim_log) fprintf (sim_log, 
+    "Loading boot code from vmb.exe\n");
 r = load_cmd (0, "-O vmb.exe 200");
 if (r != SCPE_OK) {
 #ifndef DONT_USE_INTERNAL_ROM
@@ -722,19 +573,11 @@ SP = PC = 512;
 return SCPE_OK;
 }
 
-/* SBI reset */
+/* SYSB reset */
 
-t_stat sbi_reset (DEVICE *dptr)
+t_stat sysb_reset (DEVICE *dptr)
 {
-wcs_addr = 0;
-wcs_data = 0;
-wcs_mbrk = 0;
-sbi_fs = 0;
-sbi_sc = 0;
-sbi_mt = 0;
-sbi_er = 0;
-sbi_tmo = 0;
-sim_vm_cmd = vax780_cmd;
+sim_vm_cmd = vax730_cmd;
 return SCPE_OK;
 }
 
@@ -805,16 +648,11 @@ t_stat r;
 
 init_nexus_tab ();
 init_ubus_tab ();
-init_mbus_tab ();
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_NEXUS) {                  /* Nexus? */
             if (r = build_nexus_tab (dptr, dibp))       /* add to dispatch table */
-                return r;
-            }
-        else if (dptr->flags & DEV_MBUS) {              /* Massbus? */
-            if (r = build_mbus_tab (dptr, dibp))
                 return r;
             }
         else {                                          /* no, Unibus device */

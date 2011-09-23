@@ -473,6 +473,11 @@ MTAB cpu_mod[] = {
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &cpu_set_idle, &cpu_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
+#if defined (VAX_730)
+    { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size },
+    { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size },
+    { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size },
+#endif
     { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
     { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
