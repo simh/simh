@@ -54,6 +54,10 @@
 
 #include "vax_defs.h"
 
+#ifndef DONT_USE_INTERNAL_ROM
+#include "vax_ka655x_bin.h"
+#endif
+
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
@@ -1555,8 +1559,24 @@ if (*rom == 0) {                                        /* no boot? */
     if (sim_log)
         fprintf (sim_log, "Loading boot code from ka655x.bin\n");
     r = load_cmd (0, "-R ka655x.bin");
-    if (r != SCPE_OK)
+    if (r != SCPE_OK) {
+#ifndef DONT_USE_INTERNAL_ROM
+        FILE *f;
+
+        if (f = sim_fopen ("ka655x.bin", "wb")) {
+            printf ("Saving boot code to ka655x.bin\n");
+            if (sim_log)
+                fprintf (sim_log, "Saving boot code to ka655x.bin\n");
+            sim_fwrite (vax_ka655x_bin, sizeof(vax_ka655x_bin[0]), sizeof(vax_ka655x_bin)/sizeof(vax_ka655x_bin[0]), f);
+            fclose (f);
+            printf ("Loading boot code from ka655x.bin\n");
+            if (sim_log)
+                fprintf (sim_log, "Loading boot code from ka655x.bin\n");
+            r = load_cmd (0, "-R ka655x.bin");
+            }
+#endif
         return r;
+        }
     }
 sysd_powerup ();
 return SCPE_OK;

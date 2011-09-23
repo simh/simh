@@ -36,6 +36,10 @@
 
 #include "vax_defs.h"
 
+#ifndef DONT_USE_INTERNAL_ROM
+#include "vax780_vmb_exe.h"
+#endif
+
 /* 11/780 specific IPRs */
 
 /* Writeable control store */
@@ -694,8 +698,26 @@ printf ("Loading boot code from vmb.exe\n");
 if (sim_log)
     fprintf (sim_log, "Loading boot code from vmb.exe\n");
 r = load_cmd (0, "-O vmb.exe 200");
-if (r != SCPE_OK)
+if (r != SCPE_OK) {
+#ifndef DONT_USE_INTERNAL_ROM
+    FILE *f;
+
+    if (f = sim_fopen ("vmb.exe", "wb")) {
+        printf ("Saving boot code to vmb.exe\n");
+        if (sim_log)
+            fprintf (sim_log, "Saving boot code to vmb.exe\n");
+        sim_fwrite (vax780_vmb_exe, sizeof(vax780_vmb_exe[0]), sizeof(vax780_vmb_exe)/sizeof(vax780_vmb_exe[0]), f);
+        fclose (f);
+        printf ("Loading boot code from vmb.exe\n");
+        if (sim_log)
+            fprintf (sim_log, "Loading boot code from vmb.exe\n");
+        r = load_cmd (0, "-O vmb.exe 200");
+        if (r == SCPE_OK)
+            SP = PC = 512;
+        }
+#endif
     return r;
+    }
 SP = PC = 512;
 return SCPE_OK;
 }

@@ -21,7 +21,11 @@ ifeq ($(WIN32),)
   ifeq (Darwin,$(shell uname))
     LIBEXT = dylib
   else
-    LIBEXT = a
+    ifeq (Linux,$(shell uname))
+      LIBEXT = so
+    else
+      LIBEXT = a
+    endif
   endif
   OS_CCDEFS = -D_GNU_SOURCE
   ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT); then echo libm; fi))
@@ -42,17 +46,12 @@ ifeq ($(WIN32),)
     OS_LDFLAGS += -lpthread 
   endif
   ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
-    # Use Locally installed and available readline support
-    ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
-      OS_CCDEFS += -DHAVE_READLINE 
-      OS_LDFLAGS += -lreadline -lncurses
-    else
-      OS_CCDEFS += -DHAVE_READLINE 
-      OS_LDFLAGS += -lreadline 
-    endif
-  else
     ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h; then echo readline_h; fi))
-      ifeq (Linux,$(shell uname))
+      # Use Locally installed and available readline support
+      ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
+        OS_CCDEFS += -DHAVE_READLINE 
+        OS_LDFLAGS += -lreadline -lncurses
+      else
         OS_CCDEFS += -DHAVE_READLINE 
         OS_LDFLAGS += -lreadline 
       endif
@@ -113,8 +112,14 @@ else
     NETWORK_OPT = -DUSE_SHARED
   endif
 endif
+ifneq ($(DONT_USE_ROMS),)
+  ROMS_OPT = -DDONT_USE_INTERNAL_ROM
+else
+  BUILD_ROMS = ${BIN}BuildROMs${EXE}
+endif
 
-CC = gcc -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS) $(OS_CCDEFS)
+
+CC = gcc -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS) $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) 
 
 #
@@ -364,6 +369,17 @@ else
 	if exist BIN rmdir BIN
 endif
 
+${BIN}BuildROMs${EXE} : 
+	${MKDIRBIN}
+	${CC} sim_BuildROMs.c -o $@
+ifeq ($(WIN32),)
+	$@
+	${RM} $@
+else
+	$(@D)\$(@F)
+	del $(@D)\$(@F)
+endif
+
 #
 # Individual builds
 #
@@ -417,13 +433,13 @@ ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 
 vax : ${BIN}vax${EXE}
 
-${BIN}vax${EXE} : ${VAX} ${SIM}
+${BIN}vax${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} -o $@ ${LDFLAGS}
 
 vax780 : ${BIN}vax780${EXE}
 
-${BIN}vax780${EXE} : ${VAX780} ${SIM}
+${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} -o $@ ${LDFLAGS}
 

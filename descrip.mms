@@ -1,8 +1,8 @@
 # DESCRIP.MMS
-# Written By:	Robert Alan Byer / byer@mail.ourservers.net
-# Modified By:	Mark Pizzolato / mark@infocomm.com
-#		Norman Lastovica / norman.lastovica@oracle.com
-#		Camiel Vanderhoeven / camiel@camicom.com
+# Written By:   Robert Alan Byer / byer@mail.ourservers.net
+# Modified By:  Mark Pizzolato / mark@infocomm.com
+#               Norman Lastovica / norman.lastovica@oracle.com
+#               Camiel Vanderhoeven / camiel@camicom.com
 #
 # This MMS/MMK build script is used to compile the various simulators in
 # the SIMH package for OpenVMS using DEC C v6.0-001(AXP), v6.5-001(AXP),
@@ -149,7 +149,7 @@ CC_DEFS = "__VAX"
 
 # Define Our Compiler Flags & Define The Compile Command
 OUR_CC_FLAGS = $(CC_FLAGS)$(CC_DEBUG)$(CC_OPTIMIZE) \
-	/NEST=PRIMARY/NAME=(AS_IS,SHORT)
+               /NEST=PRIMARY/NAME=(AS_IS,SHORT)
 CC = CC/DECC$(OUR_CC_FLAGS)
 
 # Define The BIN Directory Where The Executables Will Go.
@@ -182,6 +182,8 @@ BLD_DIR = SYS$DISK:[.BIN.VMS.LIB.BLD-$(ARCH)]
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
   @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
+  @ MMS /NoAction BuildROMs
+
 
 # Core SIMH File Definitions.
 #
@@ -200,19 +202,18 @@ SIMH_LIB64 = $(LIB_DIR)SIMH64-$(ARCH).OLB
 #
 PCAP_DIR = SYS$DISK:[-.PCAP-VMS.PCAP-VCI]
 PCAP_LIB = $(LIB_DIR)PCAP-$(ARCH).OLB
-PCAP_SOURCE = \
-	$(PCAP_DIR)PCAPVCI.C,$(PCAP_DIR)VCMUTIL.C,\
-	$(PCAP_DIR)BPF_DUMP.C,$(PCAP_DIR)BPF_FILTER.C,\
-	$(PCAP_DIR)BPF_IMAGE.C,$(PCAP_DIR)ETHERENT.C,\
-	$(PCAP_DIR)FAD-GIFC.C,$(PCAP_DIR)GENCODE.C,\
-	$(PCAP_DIR)GRAMMAR.C,$(PCAP_DIR)INET.C,\
-	$(PCAP_DIR)NAMETOADDR.C,$(PCAP_DIR)OPTIMIZE.C,\
-	$(PCAP_DIR)PCAP.C,$(PCAP_DIR)SAVEFILE.C,\
-	$(PCAP_DIR)SCANNER.C,$(PCAP_DIR)SNPRINTF.C,\
-	$(PCAP_DIR)PCAP-VMS.C
+PCAP_SOURCE = $(PCAP_DIR)PCAPVCI.C,$(PCAP_DIR)VCMUTIL.C,\
+              $(PCAP_DIR)BPF_DUMP.C,$(PCAP_DIR)BPF_FILTER.C,\
+              $(PCAP_DIR)BPF_IMAGE.C,$(PCAP_DIR)ETHERENT.C,\
+              $(PCAP_DIR)FAD-GIFC.C,$(PCAP_DIR)GENCODE.C,\
+              $(PCAP_DIR)GRAMMAR.C,$(PCAP_DIR)INET.C,\
+              $(PCAP_DIR)NAMETOADDR.C,$(PCAP_DIR)OPTIMIZE.C,\
+              $(PCAP_DIR)PCAP.C,$(PCAP_DIR)SAVEFILE.C,\
+              $(PCAP_DIR)SCANNER.C,$(PCAP_DIR)SNPRINTF.C,\
+              $(PCAP_DIR)PCAP-VMS.C
 PCAP_VCMDIR = SYS$DISK:[-.PCAP-VMS.PCAPVCM]
 PCAP_VCM_SOURCES = $(PCAP_VCMDIR)PCAPVCM.C,$(PCAP_VCMDIR)PCAPVCM_INIT.MAR,\
-		   $(PCAP_VCMDIR)VCI_JACKET.MAR,$(PCAP_VCMDIR)VCMUTIL.C
+                   $(PCAP_VCMDIR)VCI_JACKET.MAR,$(PCAP_VCMDIR)VCMUTIL.C
 PCAP_VCI = SYS$COMMON:[SYS$LDR]PCAPVCM.EXE
 
 # PCAP is not available on OpenVMS VAX
@@ -286,7 +287,7 @@ ECLIPSE_SOURCE = $(NOVA_DIR)ECLIPSE_CPU.C,$(NOVA_DIR)ECLIPSE_TT.C,\
                  $(NOVA_DIR)NOVA_PT.C,$(NOVA_DIR)NOVA_CLK.C,\
                  $(NOVA_DIR)NOVA_TT1.C,$(NOVA_DIR)NOVA_QTY.C
 ECLIPSE_OPTIONS = /INCL=($(SIMH_DIR),$(NOVA_DIR))\
-    		/DEF=($(CC_DEFS),"ECLIPSE=1")
+                    /DEF=($(CC_DEFS),"ECLIPSE=1")
 
 #
 # GRI Corporation GRI-909 Simulator Definitions.
@@ -336,7 +337,7 @@ HP2100_SOURCE2 = $(HP2100_DIR)HP2100_FP1.C,$(HP2100_DIR)HP2100_BACI.C,\
                  $(HP2100_DIR)HP2100_MPX.C,$(HP2100_DIR)HP2100_PIF.C
 .IFDEF ALPHA_OR_IA64
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))\
-    		/DEF=($(CC_DEFS),"HAVE_INT64=1")
+                    /DEF=($(CC_DEFS),"HAVE_INT64=1")
 .ELSE
 HP2100_OPTIONS = /INCL=($(SIMH_DIR),$(HP2100_DIR))/DEF=($(CC_DEFS))
 .ENDIF
@@ -421,12 +422,12 @@ PDP8_LIB = $(LIB_DIR)PDP8-$(ARCH).OLB
 PDP8_SOURCE = $(PDP8_DIR)PDP8_CPU.C,$(PDP8_DIR)PDP8_CLK.C,\
               $(PDP8_DIR)PDP8_DF.C,$(PDP8_DIR)PDP8_DT.C,\
               $(PDP8_DIR)PDP8_LP.C,$(PDP8_DIR)PDP8_MT.C,\
-	      $(PDP8_DIR)PDP8_PT.C,$(PDP8_DIR)PDP8_RF.C,\
+              $(PDP8_DIR)PDP8_PT.C,$(PDP8_DIR)PDP8_RF.C,\
               $(PDP8_DIR)PDP8_RK.C,$(PDP8_DIR)PDP8_RX.C,\
               $(PDP8_DIR)PDP8_SYS.C,$(PDP8_DIR)PDP8_TT.C,\
-	      $(PDP8_DIR)PDP8_TTX.C,$(PDP8_DIR)PDP8_RL.C,\
-	      $(PDP8_DIR)PDP8_TSC.C,$(PDP8_DIR)PDP8_TD.C,\
-	      $(PDP8_DIR)PDP8_CT.C,$(PDP8_DIR)PDP8_FPP.C
+              $(PDP8_DIR)PDP8_TTX.C,$(PDP8_DIR)PDP8_RL.C,\
+              $(PDP8_DIR)PDP8_TSC.C,$(PDP8_DIR)PDP8_TD.C,\
+              $(PDP8_DIR)PDP8_CT.C,$(PDP8_DIR)PDP8_FPP.C
 PDP8_OPTIONS = /INCL=($(SIMH_DIR),$(PDP8_DIR))/DEF=($(CC_DEFS))
 
 #
@@ -473,7 +474,7 @@ PDP11_SOURCE2 = $(PDP11_DIR)PDP11_TM.C,$(PDP11_DIR)PDP11_TS.C,\
                $(PDP11_DIR)PDP11_RC.C,$(PDP11_DIR)PDP11_KG.C,\
                $(PDP11_DIR)PDP11_KE.C,$(PDP11_DIR)PDP11_DC.C
 PDP11_OPTIONS = /INCL=($(SIMH_DIR),$(PDP11_DIR)$(PCAP_INC))\
-		/DEF=($(CC_DEFS),"VM_PDP11=1"$(PCAP_DEFS))
+                /DEF=($(CC_DEFS),"VM_PDP11=1"$(PCAP_DEFS))
 
 #
 # Digital Equipment PDP-10 Simulator Definitions.
@@ -483,14 +484,14 @@ PDP10_LIB = $(LIB_DIR)PDP10-$(ARCH).OLB
 PDP10_SOURCE = $(PDP10_DIR)PDP10_FE.C,\
                $(PDP10_DIR)PDP10_CPU.C,$(PDP10_DIR)PDP10_KSIO.C,\
                $(PDP10_DIR)PDP10_LP20.C,$(PDP10_DIR)PDP10_MDFP.C,\
-	       $(PDP10_DIR)PDP10_PAG.C,$(PDP10_DIR)PDP10_XTND.C,\
+               $(PDP10_DIR)PDP10_PAG.C,$(PDP10_DIR)PDP10_XTND.C,\
                $(PDP10_DIR)PDP10_RP.C,$(PDP10_DIR)PDP10_SYS.C,\
                $(PDP10_DIR)PDP10_TIM.C,$(PDP10_DIR)PDP10_TU.C,\
-	       $(PDP11_DIR)PDP11_PT.C,$(PDP11_DIR)PDP11_DZ.C,\
+               $(PDP11_DIR)PDP11_PT.C,$(PDP11_DIR)PDP11_DZ.C,\
                $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_XU.C,\
                $(PDP11_DIR)PDP11_CR.C
 PDP10_OPTIONS = /INCL=($(SIMH_DIR),$(PDP10_DIR),$(PDP11_DIR))\
-		/DEF=($(CC_DEFS),"USE_INT64=1","VM_PDP10=1"$(PCAP_DEFS))
+                /DEF=($(CC_DEFS),"USE_INT64=1","VM_PDP10=1"$(PCAP_DEFS))
 
 #
 # IBM System 3 Simulator Definitions.
@@ -525,26 +526,28 @@ SWTP_OPTIONS = /INCL=($(SIMH_DIR),$(SWTP_DIR))/DEF=($(CC_DEFS))
 # Digital Equipment VAX Simulator Definitions.
 #
 VAX_DIR = SYS$DISK:[.VAX]
-VAX_LIB = $(LIB_DIR)VAX-$(ARCH).OLB
-VAX_SOURCE = $(VAX_DIR)VAX_CIS.C,$(VAX_DIR)VAX_CMODE.C,\
-             $(VAX_DIR)VAX_CPU.C,$(VAX_DIR)VAX_CPU1.C,\
-             $(VAX_DIR)VAX_FPA.C,$(VAX_DIR)VAX_MMU.C,\
-             $(VAX_DIR)VAX_OCTA.C,$(VAX_DIR)VAX_SYS.C,\
-             $(VAX_DIR)VAX_SYSCM.C,$(VAX_DIR)VAX_SYSDEV.C,\
-	     $(VAX_DIR)VAX_SYSLIST.C,$(VAX_DIR)VAX_IO.C,\
-             $(VAX_DIR)VAX_STDDEV.C,$(PDP11_DIR)PDP11_IO_LIB.C,\
-             $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
-             $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
-             $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
-             $(PDP11_DIR)PDP11_XQ.C,$(PDP11_DIR)PDP11_CR.C,\
-             $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_VH.C
+VAX_LIB1 = $(LIB_DIR)VAXL1-$(ARCH).OLB
+VAX_LIB2 = $(LIB_DIR)VAXL2-$(ARCH).OLB
+VAX_SOURCE1 = $(VAX_DIR)VAX_CIS.C,$(VAX_DIR)VAX_CMODE.C,\
+              $(VAX_DIR)VAX_CPU.C,$(VAX_DIR)VAX_CPU1.C,\
+              $(VAX_DIR)VAX_FPA.C,$(VAX_DIR)VAX_MMU.C,\
+              $(VAX_DIR)VAX_OCTA.C,$(VAX_DIR)VAX_SYS.C,\
+              $(VAX_DIR)VAX_SYSCM.C,$(VAX_DIR)VAX_SYSDEV.C,\
+              $(VAX_DIR)VAX_SYSLIST.C,$(VAX_DIR)VAX_IO.C,\
+              $(VAX_DIR)VAX_STDDEV.C
+VAX_SOURCE2 = $(PDP11_DIR)PDP11_IO_LIB.C,\
+              $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
+              $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
+              $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
+              $(PDP11_DIR)PDP11_XQ.C,$(PDP11_DIR)PDP11_CR.C,\
+              $(PDP11_DIR)PDP11_RY.C,$(PDP11_DIR)PDP11_VH.C
 .IFDEF ALPHA_OR_IA64
 VAX_OPTIONS = /INCL=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
-		/DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS))
+                /DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS))
 VAX_SIMH_LIB = $(SIMH_LIB64)
 .ELSE
 VAX_OPTIONS = /INCL=($(SIMH_DIR),$(VAX_DIR),$(PDP11_DIR)$(PCAP_INC))\
-		/DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS))
+                /DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS))
 VAX_SIMH_LIB = $(SIMH_LIB)
 .ENDIF
 
@@ -553,28 +556,28 @@ VAX_SIMH_LIB = $(SIMH_LIB)
 VAX780_DIR = SYS$DISK:[.VAX]
 VAX780_LIB1 = $(LIB_DIR)VAX780L1-$(ARCH).OLB
 VAX780_SOURCE1 = $(VAX780_DIR)VAX_CPU.C,$(VAX780_DIR)VAX_CPU1.C,\
-	$(VAX780_DIR)VAX_FPA.C,$(VAX780_DIR)VAX_CIS.C,\
-	$(VAX780_DIR)VAX_OCTA.C,$(VAX780_DIR)VAX_CMODE.C,\
-	$(VAX780_DIR)VAX_MMU.C,$(VAX780_DIR)VAX_SYS.C,\
-	$(VAX780_DIR)VAX_SYSCM.C,$(VAX780_DIR)VAX780_STDDEV.C,\
-	$(VAX780_DIR)VAX780_SBI.C,$(VAX780_DIR)VAX780_MEM.C,\
-	$(VAX780_DIR)VAX780_UBA.C,$(VAX780_DIR)VAX780_MBA.C,\
-	$(VAX780_DIR)VAX780_FLOAD.C,$(VAX780_DIR)VAX780_SYSLIST.C
+                 $(VAX780_DIR)VAX_FPA.C,$(VAX780_DIR)VAX_CIS.C,\
+                 $(VAX780_DIR)VAX_OCTA.C,$(VAX780_DIR)VAX_CMODE.C,\
+                 $(VAX780_DIR)VAX_MMU.C,$(VAX780_DIR)VAX_SYS.C,\
+                 $(VAX780_DIR)VAX_SYSCM.C,$(VAX780_DIR)VAX780_STDDEV.C,\
+                 $(VAX780_DIR)VAX780_SBI.C,$(VAX780_DIR)VAX780_MEM.C,\
+                 $(VAX780_DIR)VAX780_UBA.C,$(VAX780_DIR)VAX780_MBA.C,\
+                 $(VAX780_DIR)VAX780_FLOAD.C,$(VAX780_DIR)VAX780_SYSLIST.C
 VAX780_LIB2 = $(LIB_DIR)VAX780L2-$(ARCH).OLB
 VAX780_SOURCE2 = $(PDP11_DIR)PDP11_RL.C,$(PDP11_DIR)PDP11_RQ.C,\
-	$(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
-	$(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
-	$(PDP11_DIR)PDP11_XU.C,$(PDP11_DIR)PDP11_RY.C,\
-	$(PDP11_DIR)PDP11_CR.C,$(PDP11_DIR)PDP11_RP.C,\
-	$(PDP11_DIR)PDP11_TU.C,$(PDP11_DIR)PDP11_HK.C,\
-        $(PDP11_DIR)PDP11_IO_LIB.C
+                 $(PDP11_DIR)PDP11_TS.C,$(PDP11_DIR)PDP11_DZ.C,\
+                 $(PDP11_DIR)PDP11_LP.C,$(PDP11_DIR)PDP11_TQ.C,\
+                 $(PDP11_DIR)PDP11_XU.C,$(PDP11_DIR)PDP11_RY.C,\
+                 $(PDP11_DIR)PDP11_CR.C,$(PDP11_DIR)PDP11_RP.C,\
+                 $(PDP11_DIR)PDP11_TU.C,$(PDP11_DIR)PDP11_HK.C,\
+                 $(PDP11_DIR)PDP11_IO_LIB.C
 .IFDEF ALPHA_OR_IA64
 VAX780_OPTIONS = /INCL=($(SIMH_DIR),$(VAX780_DIR),$(PDP11_DIR)$(PCAP_INC))\
-	/DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS),"VAX_780=1")
+                 /DEF=($(CC_DEFS),"VM_VAX=1","USE_ADDR64=1","USE_INT64=1"$(PCAP_DEFS),"VAX_780=1")
 VAX780_SIMH_LIB = $(SIMH_LIB64)
 .ELSE
 VAX780_OPTIONS = /INCL=($(SIMH_DIR),$(VAX780_DIR),$(PDP11_DIR)$(PCAP_INC))\
-	/DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS),"VAX_780=1")
+                 /DEF=($(CC_DEFS),"VM_VAX=1"$(PCAP_DEFS),"VAX_780=1")
 VAX780_SIMH_LIB = $(SIMH_LIB)
 .ENDIF
 
@@ -583,494 +586,522 @@ VAX780_SIMH_LIB = $(SIMH_LIB)
 I7094_DIR = SYS$DISK:[.I7094]
 I7094_LIB = $(LIB_DIR)I7094-$(ARCH).OLB
 I7094_SOURCE = $(I7094_DIR)I7094_CPU.C,$(I7094_DIR)I7094_CPU1.C,\
-	$(I7094_DIR)I7094_IO.C,$(I7094_DIR)I7094_CD.C,\
-	$(I7094_DIR)I7094_CLK.C,$(I7094_DIR)I7094_COM.C,\
-	$(I7094_DIR)I7094_DRM.C,$(I7094_DIR)I7094_DSK.C,\
-	$(I7094_DIR)I7094_SYS.C,$(I7094_DIR)I7094_LP.C,\
-	$(I7094_DIR)I7094_MT.C,$(I7094_DIR)I7094_BINLOADER.C
+               $(I7094_DIR)I7094_IO.C,$(I7094_DIR)I7094_CD.C,\
+               $(I7094_DIR)I7094_CLK.C,$(I7094_DIR)I7094_COM.C,\
+               $(I7094_DIR)I7094_DRM.C,$(I7094_DIR)I7094_DSK.C,\
+               $(I7094_DIR)I7094_SYS.C,$(I7094_DIR)I7094_LP.C,\
+               $(I7094_DIR)I7094_MT.C,$(I7094_DIR)I7094_BINLOADER.C
 I7094_OPTIONS = /INCL=($(SIMH_DIR),$(I7094_DIR))/DEF=($(CC_DEFS))
 
 # If we're not a VAX, Build Everything
 #
 .IFDEF ALPHA_OR_IA64
-ALL :	ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
-	ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX VAX780 SDS \
-	I7094 SWTP
-	$! No further actions necessary
+ALL : ALTAIR ALTAIRZ80 ECLIPSE GRI LGP H316 HP2100 I1401 I1620 IBM1130 ID16 \
+      ID32 NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP10 PDP11 PDP15 S3 VAX VAX780 SDS \
+      I7094 SWTP
+        $! No further actions necessary
 .ELSE
 #
 # Else We Are On VAX And Build Everything EXCEPT the 64b simulators
 #
-ALL :	ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
-	NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS SWTP
-	$! No further actions necessary
+ALL : ALTAIR ALTAIRZ80 GRI H316 HP2100 I1401 I1620 IBM1130 ID16 ID32 \
+      NOVA PDP1 PDP4 PDP7 PDP8 PDP9 PDP11 PDP15 S3 VAX VAX780 SDS SWTP
+        $! No further actions necessary
 .ENDIF
 
 CLEAN : 
-	$!
-	$! Clean out all targets and building Remnants
-	$!
-	$ IF (F$SEARCH("$(BIN_DIR)*.EXE;*").NES."") THEN -
-	     DELETE/NOLOG/NOCONFIRM $(BIN_DIR)*.EXE;*
-	$ IF (F$SEARCH("$(LIB_DIR)*.OLB;*").NES."") THEN -
-	     DELETE/NOLOG/NOCONFIRM $(LIB_DIR)*.OLB;*
-	$ IF (F$SEARCH("SYS$DISK:[...]*.OBJ;*").NES."") THEN -
-	     DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.OBJ;*
-	$ IF (F$SEARCH("SYS$DISK:[...]*.LIS;*").NES."") THEN -
-	     DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.LIS;*
-	$ IF (F$SEARCH("SYS$DISK:[...]*.MAP;*").NES."") THEN -
-	     DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.MAP;*
+        $!
+        $! Clean out all targets and building Remnants
+        $!
+        $ IF (F$SEARCH("$(BIN_DIR)*.EXE;*").NES."") THEN -
+             DELETE/NOLOG/NOCONFIRM $(BIN_DIR)*.EXE;*
+        $ IF (F$SEARCH("$(LIB_DIR)*.OLB;*").NES."") THEN -
+             DELETE/NOLOG/NOCONFIRM $(LIB_DIR)*.OLB;*
+        $ IF (F$SEARCH("SYS$DISK:[...]*.OBJ;*").NES."") THEN -
+             DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.OBJ;*
+        $ IF (F$SEARCH("SYS$DISK:[...]*.LIS;*").NES."") THEN -
+             DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.LIS;*
+        $ IF (F$SEARCH("SYS$DISK:[...]*.MAP;*").NES."") THEN -
+             DELETE/NOLOG/NOCONFIRM SYS$DISK:[...]*.MAP;*
+
+#
+# ROM support
+#
+BUILDROMS : $(BIN_DIR)BuildROMs-$(ARCH).EXE
+        $! BuildROMs done
+
+$(BIN_DIR)BuildROMs-$(ARCH).EXE : sim_BuildROMs.c
+        $!
+        $! Building The $(BIN_DIR)BuildROMs-$(ARCH).EXE Tool.
+        $!
+        $ $(CC)/OBJ=$(BLD_DIR) SIM_BUILDROMS.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)BUILDROMS-$(ARCH).EXE -
+               $(BLD_DIR)SIM_BUILDROMS.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
+
 
 #
 # Build The Libraries.
 #
 $(SIMH_LIB) : $(SIMH_SOURCE)
-                $!
-		$! Building The $(SIMH_LIB) Library.
-                $!
-                $ $(CC)/DEF=($(CC_DEFS)$(PCAP_DEFS))$(PCAP_SIMH_INC) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(SIMH_LIB) Library.
+        $!
+        $ $(CC)/DEF=($(CC_DEFS)$(PCAP_DEFS))$(PCAP_SIMH_INC) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 .IFDEF ALPHA_OR_IA64
 $(SIMH_LIB64) : $(SIMH_SOURCE)
-                $!
-		$! Building The $(SIMH_LIB64) Library.
-                $!
-                $ $(CC)/DEF=($(CC_DEFS)$(PCAP_DEFS),"USE_ADDR64=1","USE_INT64=1")$(PCAP_SIMH_INC) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(SIMH_LIB64) Library.
+        $!
+        $ $(CC)/DEF=($(CC_DEFS)$(PCAP_DEFS),"USE_ADDR64=1","USE_INT64=1")$(PCAP_SIMH_INC) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ENDIF
 
 $(ALTAIR_LIB) : $(ALTAIR_SOURCE)
-		$!
-		$! Building The $(ALTAIR_LIB) Library.
-                $!
-                $ $(CC)$(ALTAIR_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(ALTAIR_LIB) Library.
+        $!
+        $ $(CC)$(ALTAIR_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(ALTAIRZ80_LIB1) : $(ALTAIRZ80_SOURCE1)
-                $!
-		$! Building The $(ALTAIRZ80_LIB1) Library.
-                $!
-                $ $(CC)$(ALTAIRZ80_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(ALTAIRZ80_LIB1) Library.
+        $!
+        $ $(CC)$(ALTAIRZ80_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(ALTAIRZ80_LIB2) : $(ALTAIRZ80_SOURCE2)
-                $!
-		$! Building The $(ALTAIRZ80_LIB2) Library.
-                $!
-                $ $(CC)$(ALTAIRZ80_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(ALTAIRZ80_LIB2) Library.
+        $!
+        $ $(CC)$(ALTAIRZ80_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
 # If Not On VAX, Build The Eclipse Library.
 #
 .IFDEF ALPHA_OR_IA64
 $(ECLIPSE_LIB) : $(ECLIPSE_SOURCE)
-                $!
-		$! Building The $(ECLIPSE_LIB) Library.
-                $!
-                $ $(CC)$(ECLIPSE_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(ECLIPSE_LIB) Library.
+        $!
+        $ $(CC)$(ECLIPSE_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ELSE
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
 $(ECLIPSE_LIB) : 
-		$! Due To The Use Of INT64 We Can't Build The
-                $! $(MMS$TARGET) Library On VAX.
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
 .ENDIF
 
 $(GRI_LIB) : $(GRI_SOURCE)
-		$!
-		$! Building The $(GRI_LIB) Library.
-		$!
-		$ $(CC)$(GRI_OPTIONS) -
-			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-		$ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-			LIBRARY/CREATE $(MMS$TARGET)
-		$ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-		$ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(GRI_LIB) Library.
+        $!
+        $ $(CC)$(GRI_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(LGP_LIB) : $(LGP_SOURCE)
-		$!
-		$! Building The $(LGP_LIB) Library.
-		$!
-		$ $(CC)$(LGP_OPTIONS) -
-			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-		$ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-			LIBRARY/CREATE $(MMS$TARGET)
-		$ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-		$ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(LGP_LIB) Library.
+        $!
+        $ $(CC)$(LGP_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(H316_LIB) : $(H316_SOURCE)
-                $!
-		$! Building The $(H316_LIB) Library.
-                $!
-                $ $(CC)$(H316_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(H316_LIB) Library.
+        $!
+        $ $(CC)$(H316_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(HP2100_LIB1) : $(HP2100_SOURCE1)
-                $!
-		$! Building The $(HP2100_LIB1) Library.
-                $!
-                $ $(CC)$(HP2100_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(HP2100_LIB1) Library.
+        $!
+        $ $(CC)$(HP2100_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(HP2100_LIB2) : $(HP2100_SOURCE2)
-                $!
-		$! Building The $(HP2100_LIB2) Library.
-                $!
-                $ $(CC)$(HP2100_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(HP2100_LIB2) Library.
+        $!
+        $ $(CC)$(HP2100_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(I1401_LIB) : $(I1401_SOURCE)
-                $!
-		$! Building The $(I1401_LIB) Library.
-                $!
-	        $ $(CC)$(I1401_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(I1401_LIB) Library.
+        $!
+        $ $(CC)$(I1401_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(I1620_LIB) : $(I1620_SOURCE)
-                $!
-		$! Building The $(I1620_LIB) Library.
-                $!
-	        $ $(CC)$(I1620_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(I1620_LIB) Library.
+        $!
+        $ $(CC)$(I1620_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(IBM1130_LIB) : $(IBM1130_SOURCE)
-                $!
-		$! Building The $(IBM1130_LIB) Library.
-                $!
-	        $ $(CC)$(IBM1130_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(IBM1130_LIB) Library.
+        $!
+        $ $(CC)$(IBM1130_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(ID16_LIB) : $(ID16_SOURCE)
-                $!
-		$! Building The $(ID16_LIB) Library.
-                $!
-	        $ $(CC)$(ID16_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(ID16_LIB) Library.
+        $!
+        $ $(CC)$(ID16_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(ID32_LIB) : $(ID32_SOURCE)
-                $!
-		$! Building The $(ID32_LIB) Library.
-                $!
-	        $ $(CC)$(ID32_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(ID32_LIB) Library.
+        $!
+        $ $(CC)$(ID32_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(NOVA_LIB) : $(NOVA_SOURCE)
-                $!
-		$! Building The $(NOVA_LIB) Library.
-                $!
-                $ $(CC)$(NOVA_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(NOVA_LIB) Library.
+        $!
+        $ $(CC)$(NOVA_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP1_LIB) : $(PDP1_SOURCE)
-                $!
-		$! Building The $(PDP1_LIB) Library.
-                $!
-                $ $(CC)$(PDP1_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP1_LIB) Library.
+        $!
+        $ $(CC)$(PDP1_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP4_LIB) : $(PDP18B_SOURCE)
-                $!
-		$! Building The $(PDP4_LIB) Library.
-                $!
-                $ $(CC)$(PDP4_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP4_LIB) Library.
+        $!
+        $ $(CC)$(PDP4_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP7_LIB) : $(PDP18B_SOURCE)
-                $!
-		$! Building The $(PDP7_LIB) Library.
-                $!
-                $ $(CC)$(PDP7_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP7_LIB) Library.
+        $!
+        $ $(CC)$(PDP7_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP8_LIB) : $(PDP8_SOURCE)
-                $!
-		$! Building The $(PDP8_LIB) Library.
-                $!
-                $ $(CC)$(PDP8_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP8_LIB) Library.
+        $!
+        $ $(CC)$(PDP8_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP9_LIB) : $(PDP18B_SOURCE)
-                $!
-		$! Building The $(PDP9_LIB) Library.
-                $!
-                $ $(CC)$(PDP9_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP9_LIB) Library.
+        $!
+        $ $(CC)$(PDP9_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
 # If Not On VAX, Build The PDP-10 Library.
 #
 .IFDEF ALPHA_OR_IA64
 $(PDP10_LIB) : $(PDP10_SOURCE)
-                $!
-		$! Building The $(PDP10_LIB) Library.
-                $!
-                $ $(CC)$(PDP10_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP10_LIB) Library.
+        $!
+        $ $(CC)$(PDP10_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ELSE
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
 $(PDP10_LIB) : 
-		$! Due To The Use Of INT64 We Can't Build The
-                $! $(MMS$TARGET) Library On VAX.
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
 .ENDIF
 
 $(PDP11_LIB1) : $(PDP11_SOURCE1)
-                $!
-		$! Building The $(PDP11_LIB1) Library.
-                $!
-                $(CC)$(PDP11_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP11_LIB1) Library.
+        $!
+        $ $(CC)$(PDP11_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP11_LIB2) : $(PDP11_SOURCE2)
-                $!
-		$! Building The $(PDP11_LIB2) Library.
-                $!
-                $(CC)$(PDP11_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP11_LIB2) Library.
+        $!
+        $ $(CC)$(PDP11_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PDP15_LIB) : $(PDP18B_SOURCE)
-                $!
-		$! Building The $(PDP15_LIB) Library.
-                $!
-                $ $(CC)$(PDP15_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(PDP15_LIB) Library.
+        $!
+        $ $(CC)$(PDP15_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(S3_LIB) : $(S3_SOURCE)
-                $!
-		$! Building The $(S3_LIB) Library.
-                $!
-                $ $(CC)$(S3_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(S3_LIB) Library.
+        $!
+        $ $(CC)$(S3_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(SDS_LIB) : $(SDS_SOURCE)
-                $!
-		$! Building The $(SDS_LIB) Library.
-                $!
-                $ $(CC)$(SDS_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(SDS_LIB) Library.
+        $!
+        $ $(CC)$(SDS_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(SWTP_LIB) : $(SWTP_SOURCE)
-                $!
-		$! Building The $(SWTP_LIB) Library.
-                $!
-                $ $(CC)$(SWTP_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(SWTP_LIB) Library.
+        $!
+        $ $(CC)$(SWTP_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
-$(VAX_LIB) : $(VAX_SOURCE)
-                $!
-		$! Building The $(VAX_LIB) Library.
-                $!
-                $ $(CC)$(VAX_OPTIONS)/OBJ=$(VAX_DIR) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+$(VAX_LIB1) : $(VAX_SOURCE1)
+        $!
+        $! Building The $(VAX_LIB1) Library.
+        $!
+        $ $(CC)$(VAX_OPTIONS)/OBJ=$(VAX_DIR) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+
+$(VAX_LIB2) : $(VAX_SOURCE2)
+        $!
+        $! Building The $(VAX_LIB2) Library.
+        $!
+        $ $(CC)$(VAX_OPTIONS)/OBJ=$(VAX_DIR) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(VAX780_LIB1) : $(VAX780_SOURCE1)
-                $!
-		$! Building The $(VAX780_LIB1) Library.
-                $!
-                $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(VAX780_LIB1) Library.
+        $!
+        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(VAX780_LIB2) : $(VAX780_SOURCE2)
-                $!
-		$! Building The $(VAX780_LIB2) Library.
-                $!
-                $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(VAX780_LIB2) Library.
+        $!
+        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 $(PCAP_LIB) : $(PCAP_SOURCE)
-                $!
-		$! Building The $(PCAP_LIB) Library.
-                $!
-		$ Saved_Default = F$Environment("DEFAULT")
-		$ SET DEFAULT $(PCAP_DIR)
-                $ @VMS_PCAP $(DEBUG)
-		$ SET DEFAULT 'Saved_Default
-                $ IF (F$SEARCH("$(PCAP_LIB)").NES."") THEN -
-                        DELETE $(PCAP_LIB);
-                $ COPY $(PCAP_DIR)PCAP.OLB $(PCAP_LIB)
-                $ DELETE/NOLOG/NOCONFIRM $(PCAP_DIR)*.OBJ;*,$(PCAP_DIR)*.OLB;*
-			     
+        $!
+        $! Building The $(PCAP_LIB) Library.
+        $!
+        $ Saved_Default = F$Environment("DEFAULT")
+        $ SET DEFAULT $(PCAP_DIR)
+        $ @VMS_PCAP $(DEBUG)
+        $ SET DEFAULT 'Saved_Default
+        $ IF (F$SEARCH("$(PCAP_LIB)").NES."") THEN -
+             DELETE $(PCAP_LIB);
+        $ COPY $(PCAP_DIR)PCAP.OLB $(PCAP_LIB)
+        $ DELETE/NOLOG/NOCONFIRM $(PCAP_DIR)*.OBJ;*,$(PCAP_DIR)*.OLB;*
+
 #
 # If Not On VAX, Build The IBM 7094 Library.
 #
 .IFDEF ALPHA_OR_IA64
 $(I7094_LIB) : $(I7094_SOURCE)
-                $!
-		$! Building The $(I7094_LIB) Library.
-                $!
-                $ $(CC)$(I7094_OPTIONS) -
-    			/OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
-                $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
-                        LIBRARY/CREATE $(MMS$TARGET)
-                $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
-                $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(I7094_LIB) Library.
+        $!
+        $ $(CC)$(I7094_OPTIONS) -
+               /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
+        $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
+             LIBRARY/CREATE $(MMS$TARGET)
+        $ LIBRARY/REPLACE $(MMS$TARGET) $(BLD_DIR)*.OBJ
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 .ELSE
 #
 # We Are On VAX And Due To The Use of INT64 We Can't Build It.
 #
 $(I7094_LIB) : 
-		$! Due To The Use Of INT64 We Can't Build The
-                $! $(MMS$TARGET) Library On VAX.
+        $! Due To The Use Of INT64 We Can't Build The
+        $! $(MMS$TARGET) Library On VAX.
 .ENDIF
 
 #
 # Individual Simulator Builds.
 #
 ALTAIR : $(BIN_DIR)ALTAIR-$(ARCH).EXE
-	$! ALTAIR done
+        $! ALTAIR done
 
 $(BIN_DIR)ALTAIR-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIR_LIB)
-         $!
-         $! Building The $(BIN_DIR)ALTAIR-$(ARCH).EXE Simulator.
-         $!
-         $ $(CC)$(ALTAIR_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ALTAIR-$(ARCH).EXE -
-                $(BLD_DIR)SCP.OBJ,$(ALTAIR_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)ALTAIR-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(ALTAIR_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ALTAIR-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(ALTAIR_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 ALTAIRZ80 : $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE
-	$! ALTAIRZ80 done
+        $! ALTAIRZ80 done
 
 $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ALTAIRZ80_LIB1) $(ALTAIRZ80_LIB2)
-            $!
-            $! Building The $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE Simulator.
-            $!
-            $ $(CC)$(ALTAIRZ80_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-            $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ALTAIRZ80-$(ARCH).EXE -
-                   $(BLD_DIR)SCP.OBJ,$(ALTAIRZ80_LIB1)/LIBRARY, -
-                   $(ALTAIRZ80_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
-            $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)ALTAIRZ80-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(ALTAIRZ80_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ALTAIRZ80-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(ALTAIRZ80_LIB1)/LIBRARY, -
+               $(ALTAIRZ80_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 #
 # If Not On VAX, Build The Eclipse Simulator.
 #
 .IFDEF ALPHA_OR_IA64
 ECLIPSE : $(BIN_DIR)ECLIPSE-$(ARCH).EXE
-	$! ECLIPSE done
+        $! ECLIPSE done
 .ELSE
 #
 # Else We Are On VAX And Tell The User We Can't Build On VAX
@@ -1082,65 +1113,65 @@ ECLIPSE :
 .ENDIF
 
 $(BIN_DIR)ECLIPSE-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ECLIPSE_LIB)
-          $!
-          $! Building The $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator.
-          $!
-          $ $(CC)$(ECLIPSE_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-          $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ECLIPSE-$(ARCH).EXE -
-                 $(BLD_DIR)SCP.OBJ,$(ECLIPSE_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-          $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)ECLIPSE-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(ECLIPSE_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ECLIPSE-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(ECLIPSE_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 GRI : $(BIN_DIR)GRI-$(ARCH).EXE
-	$! GRI done
+        $! GRI done
 
 $(BIN_DIR)GRI-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(GRI_LIB)
-      $!
-      $! Building The $(BIN_DIR)GRI-$(ARCH).EXE Simulator.
-      $!
-      $ $(CC)$(GRI_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)GRI-$(ARCH).EXE -
-             $(BLD_DIR)SCP.OBJ,$(GRI_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)GRI-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(GRI_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)GRI-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(GRI_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 LGP : $(BIN_DIR)LGP-$(ARCH).EXE
-	$! LGP done
+        $! LGP done
 
 $(BIN_DIR)LGP-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(LGP_LIB)
-      $!
-      $! Building The $(BIN_DIR)LGP-$(ARCH).EXE Simulator.
-      $!
-      $ $(CC)$(LGP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)LGP-$(ARCH).EXE -
-             $(BLD_DIR)SCP.OBJ,$(LGP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)LGP-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(LGP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)LGP-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(LGP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 H316 : $(BIN_DIR)H316-$(ARCH).EXE
-	$! H316 done
+        $! H316 done
 
 $(BIN_DIR)H316-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(H316_LIB)
-       $!
-       $! Building The $(BIN_DIR)H316-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(H316_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)H316-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(H316_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)H316-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(H316_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)H316-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(H316_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 HP2100 : $(BIN_DIR)HP2100-$(ARCH).EXE
-	$! HP2100 done
+        $! HP2100 done
 
 $(BIN_DIR)HP2100-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(HP2100_LIB1) $(HP2100_LIB2)
-         $!
-         $! Building The $(BIN_DIR)HP2100-$(ARCH).EXE Simulator.
-         $!
-         $ $(CC)$(HP2100_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)HP2100-$(ARCH).EXE -
-                $(BLD_DIR)SCP.OBJ,$(HP2100_LIB1)/LIBRARY, -
-                $(HP2100_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
-         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)HP2100-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(HP2100_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)HP2100-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(HP2100_LIB1)/LIBRARY, -
+               $(HP2100_LIB2)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 I1401 : $(BIN_DIR)I1401-$(ARCH).EXE
-	$! I1401 done
+        $! I1401 done
 
 $(BIN_DIR)I1401-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1401_LIB)
         $!
@@ -1152,7 +1183,7 @@ $(BIN_DIR)I1401-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1401_LIB)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 I1620 : $(BIN_DIR)I1620-$(ARCH).EXE
-	$! I1620 done
+        $! I1620 done
 
 $(BIN_DIR)I1620-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1620_LIB)
         $!
@@ -1164,119 +1195,119 @@ $(BIN_DIR)I1620-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I1620_LIB)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 IBM1130 : $(BIN_DIR)IBM1130-$(ARCH).EXE
-	$! IBM1130 done
+        $! IBM1130 done
 
 $(BIN_DIR)IBM1130-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(IBM1130_LIB)
-          $!
-          $! Building The $(BIN_DIR)IBM1130-$(ARCH).EXE Simulator.
-          $!
-          $ $(CC)$(IBM1130_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-          $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)IBM1130-$(ARCH).EXE -
-                 $(BLD_DIR)SCP.OBJ,$(IBM1130_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-          $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)IBM1130-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(IBM1130_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)IBM1130-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(IBM1130_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 ID16 : $(BIN_DIR)ID16-$(ARCH).EXE
-	$! ID16 done
+        $! ID16 done
 
 $(BIN_DIR)ID16-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ID16_LIB)
-       $!
-       $! Building The $(BIN_DIR)ID16-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(ID16_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ID16-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(ID16_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)ID16-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(ID16_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ID16-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(ID16_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 ID32 : $(BIN_DIR)ID32-$(ARCH).EXE
-	$! ID32 done
+        $! ID32 done
 
 $(BIN_DIR)ID32-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(ID32_LIB)
-       $!
-       $! Building The $(BIN_DIR)ID32-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(ID32_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ID32-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(ID32_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)ID32-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(ID32_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)ID32-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(ID32_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 NOVA : $(BIN_DIR)NOVA-$(ARCH).EXE
-	$! NOVA done
+        $! NOVA done
 
 $(BIN_DIR)NOVA-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(NOVA_LIB)
-       $!
-       $! Building The $(BIN_DIR)NOVA-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(NOVA_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)NOVA-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(NOVA_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)NOVA-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(NOVA_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)NOVA-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(NOVA_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 PDP1 : $(BIN_DIR)PDP1-$(ARCH).EXE
-	$! PDP1 done
+        $! PDP1 done
 
 $(BIN_DIR)PDP1-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP1_LIB)
-       $!
-       $! Building The $(BIN_DIR)PDP1-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(PDP1_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP1-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(PDP1_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)PDP1-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(PDP1_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP1-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(PDP1_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 PDP4 : $(BIN_DIR)PDP4-$(ARCH).EXE
-	$! PDP4 done
+        $! PDP4 done
 
 $(BIN_DIR)PDP4-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP4_LIB)
-       $!
-       $! Building The $(BIN_DIR)PDP4-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(PDP4_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP4-$(ARCH).EXE -
+        $!
+        $! Building The $(BIN_DIR)PDP4-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(PDP4_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP4-$(ARCH).EXE -
               $(BLD_DIR)SCP.OBJ,$(PDP4_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 PDP7 : $(BIN_DIR)PDP7-$(ARCH).EXE
-	$! PDP7 done
+        $! PDP7 done
 
 $(BIN_DIR)PDP7-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP7_LIB)
-       $!
-       $! Building The $(BIN_DIR)PDP7-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(PDP7_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP7-$(ARCH).EXE -
+        $!
+        $! Building The $(BIN_DIR)PDP7-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(PDP7_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP7-$(ARCH).EXE -
               $(BLD_DIR)SCP.OBJ,$(PDP7_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 PDP8 : $(BIN_DIR)PDP8-$(ARCH).EXE
-	$! PDP8 done
+        $! PDP8 done
 
 $(BIN_DIR)PDP8-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP8_LIB)
-       $!
-       $! Building The $(BIN_DIR)PDP8-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(PDP8_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP8-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(PDP8_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)PDP8-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(PDP8_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP8-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(PDP8_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 PDP9 : $(BIN_DIR)PDP9-$(ARCH).EXE
-	$! PDP9 done
+        $! PDP9 done
 
 $(BIN_DIR)PDP9-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP9_LIB)
-       $!
-       $! Building The $(BIN_DIR)PDP9-$(ARCH).EXE Simulator.
-       $!
-       $ $(CC)$(PDP9_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-       $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP9-$(ARCH).EXE -
-              $(BLD_DIR)SCP.OBJ,$(PDP9_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)PDP9-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(PDP9_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)PDP9-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(PDP9_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
 # If Not On VAX, Build The PDP-10 Simulator.
 #
 .IFDEF ALPHA_OR_IA64
 PDP10 : $(BIN_DIR)PDP10-$(ARCH).EXE
-	$! PDP10 done
+        $! PDP10 done
 
 $(BIN_DIR)PDP10-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PCAP_LIBD) $(PDP10_LIB) $(PCAP_EXECLET)
         $!
@@ -1297,7 +1328,7 @@ PDP10 :
 .ENDIF
 
 PDP11 : $(BIN_DIR)PDP11-$(ARCH).EXE
-	$! PDP11 done
+        $! PDP11 done
 
 $(BIN_DIR)PDP11-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PCAP_LIBD) $(PDP11_LIB1) $(PDP11_LIB2) $(PCAP_EXECLET)
         $!
@@ -1309,7 +1340,7 @@ $(BIN_DIR)PDP11-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PCAP_LIBD) $(PDP11_LIB1
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 PDP15 : $(BIN_DIR)PDP15-$(ARCH).EXE
-	$! PDP15 done
+        $! PDP15 done
 
 $(BIN_DIR)PDP15-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP15_LIB)
         $!
@@ -1321,76 +1352,76 @@ $(BIN_DIR)PDP15-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(PDP15_LIB)
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 S3 : $(BIN_DIR)S3-$(ARCH).EXE
-	$! S3 done
+        $! S3 done
 
 $(BIN_DIR)S3-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(S3_LIB)
-     $!
-     $! Building The $(BIN_DIR)S3-$(ARCH).EXE Simulator.
-     $!
-     $ $(CC)$(S3_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-     $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)S3-$(ARCH).EXE -
-            $(BLD_DIR)SCP.OBJ,$(S3_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-     $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)S3-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(S3_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)S3-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(S3_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 SDS : $(BIN_DIR)SDS-$(ARCH).EXE
-	$! SDS done
+        $! SDS done
 
 $(BIN_DIR)SDS-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SDS_LIB)
-      $!
-      $! Building The $(BIN_DIR)SDS-$(ARCH).EXE Simulator.
-      $!
-      $ $(CC)$(SDS_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SDS-$(ARCH).EXE -
-             $(BLD_DIR)SCP.OBJ,$(SDS_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)SDS-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(SDS_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SDS-$(ARCH).EXE -
+                 $(BLD_DIR)SCP.OBJ,$(SDS_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 SWTP : $(BIN_DIR)SWTP-$(ARCH).EXE
-	$! SWTP done
+        $! SWTP done
 
 $(BIN_DIR)SWTP-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(SWTP_LIB)
-      $!
-      $! Building The $(BIN_DIR)SWTP-$(ARCH).EXE Simulator.
-      $!
-      $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-      $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP-$(ARCH).EXE -
-             $(BLD_DIR)SCP.OBJ,$(SWTP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
-      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)SWTP-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(SWTP_LIB)/LIBRARY,$(SIMH_LIB)/LIBRARY
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 VAX : $(BIN_DIR)VAX-$(ARCH).EXE
-	$! VAX done
+        $! VAX done
 
-$(BIN_DIR)VAX-$(ARCH).EXE : $(SIMH_MAIN) $(VAX_SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB) $(PCAP_EXECLET)
-      $!
-      $! Building The $(BIN_DIR)VAX-$(ARCH).EXE Simulator.
-      $!
-      $ $(CC)$(VAX_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-      $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
-	     /EXE=$(BIN_DIR)VAX-$(ARCH).EXE -
-             $(BLD_DIR)SCP.OBJ,$(VAX_LIB)/LIBRARY,-
-	     $(VAX_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
-      $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+$(BIN_DIR)VAX-$(ARCH).EXE : $(SIMH_MAIN) $(VAX_SIMH_LIB) $(PCAP_LIBD) $(VAX_LIB1) $(VAX_LIB2) $(PCAP_EXECLET)
+        $!
+        $! Building The $(BIN_DIR)VAX-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(VAX_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
+               /EXE=$(BIN_DIR)VAX-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,$(VAX_LIB1)/LIBRARY,$(VAX_LIB2)/LIBRARY,-
+               $(VAX_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 VAX780 : $(BIN_DIR)VAX780-$(ARCH).EXE
-	$! VAX780 done
+        $! VAX780 done
 
 $(BIN_DIR)VAX780-$(ARCH).EXE : $(SIMH_MAIN) $(VAX780_SIMH_LIB) $(PCAP_LIBD) $(VAX780_LIB1) $(VAX780_LIB2) $(PCAP_EXECLET)
-      $!
-      $! Building The $(BIN_DIR)VAX780-$(ARCH).EXE Simulator.
-      $!
-      $ $(CC)$(VAX780_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
-      $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
-             /EXE=$(BIN_DIR)VAX780-$(ARCH).EXE -
-             $(BLD_DIR)SCP.OBJ,-
-             $(VAX780_LIB1)/LIBRARY,$(VAX780_LIB2)/LIBRARY,-
- 	     $(VAX780_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
-       $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
+        $!
+        $! Building The $(BIN_DIR)VAX780-$(ARCH).EXE Simulator.
+        $!
+        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
+               /EXE=$(BIN_DIR)VAX780-$(ARCH).EXE -
+               $(BLD_DIR)SCP.OBJ,-
+               $(VAX780_LIB1)/LIBRARY,$(VAX780_LIB2)/LIBRARY,-
+               $(VAX780_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
+        $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
 
 #
 # If Not On VAX, Build The IBM 7094 Simulator.
 #
 .IFDEF ALPHA_OR_IA64
 I7094 : $(BIN_DIR)I7094-$(ARCH).EXE
-	$! I7094 done
+        $! I7094 done
 
 $(BIN_DIR)I7094-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_LIB) $(I7094_LIB)
         $!
@@ -1414,14 +1445,14 @@ I7094 :
 # PCAP VCI Components
 #
 $(PCAP_VCI) : $(PCAP_VCMDIR)PCAPVCM.EXE
-              $!
-              $! Installing the PCAP VCI Execlet in SYS$LOADABLE_IMAGES
-              $!
-              $ COPY $(PCAP_VCMDIR)PCAPVCM.EXE SYS$COMMON:[SYS$LDR]PCAPVCM.EXE 
+        $!
+        $! Installing the PCAP VCI Execlet in SYS$LOADABLE_IMAGES
+        $!
+        $ COPY $(PCAP_VCMDIR)PCAPVCM.EXE SYS$COMMON:[SYS$LDR]PCAPVCM.EXE 
 
 $(PCAP_VCMDIR)PCAPVCM.EXE : $(PCAP_VCM_SOURCES) 
-                            $!
-                            $! Building The PCAP VCI Execlet
-                            $!
-                            $ @SYS$DISK:[-.PCAP-VMS.PCAPVCM]BUILD_PCAPVCM
-                            $ DELETE/NOLOG/NOCONFIRM $(PCAP_VCMDIR)*.OBJ;*,$(PCAP_VCMDIR)*.MAP;*
+        $!
+        $! Building The PCAP VCI Execlet
+        $!
+        $ @SYS$DISK:[-.PCAP-VMS.PCAPVCM]BUILD_PCAPVCM
+        $ DELETE/NOLOG/NOCONFIRM $(PCAP_VCMDIR)*.OBJ;*,$(PCAP_VCMDIR)*.MAP;*

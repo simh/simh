@@ -26,6 +26,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Build Dependent ROM include File(s)"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -110,6 +112,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Build Dependent ROM include File(s)"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
