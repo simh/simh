@@ -45,8 +45,8 @@ ifeq ($(WIN32),)
     OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
     OS_LDFLAGS += -lpthread 
   endif
-  ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
-    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h; then echo readline_h; fi))
+  ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /usr/lib64/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
+    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h; then echo readline_h; fi))
       # Use Locally installed and available readline support
       ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
         OS_CCDEFS += -DHAVE_READLINE 
