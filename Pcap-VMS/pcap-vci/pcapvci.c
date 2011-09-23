@@ -1,4 +1,4 @@
-#pragma module PCAPVCI "X-1"
+#pragma module PCAPVCI "X-2"
 /*
 **++
 **  FACILITY:  PCAP
@@ -24,6 +24,9 @@
 **
 **
 **  MODIFICATION HISTORY:
+**
+**      X-2	MB			Matt Burke	    10-Jun-2011
+**		Changes to allow compilation on IA64.
 **
 **      X-1	Ankan					    25-Oct-2003
 **		Lock/unlock data prior to passing it to execlet.
@@ -447,7 +450,11 @@ int load_execlet ()
 
 	// Get the shared context. We built the execlet so that the address
 	// of the routine that does this is at home base...
+#ifdef __ia64
+	rtnptr = *(void **)reference_handle.ldrimg_ptr->ldrimg$l_segments[5].ldrisd$p_base;
+#else
 	rtnptr = *(void **)reference_handle.ldrimg_ptr->ldrimg$l_nonpag_w_base;
+#endif
 	if (rtnptr) {
 	    getContext = (int (*)())rtnptr;
 	    status = (*getContext)(&pcapvcm);

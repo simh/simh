@@ -1,4 +1,4 @@
-#pragma module	PCAPVCM "X-1"
+#pragma module	PCAPVCM "X-3"
 #pragma code_psect "EXEC$NONPAGED_CODE"
 #pragma linkage_psect "EXEC$NONPAGED_LINKAGE"
 
@@ -61,6 +61,17 @@
 //
 //
 // REVISION HISTORY:
+//
+//      X-3     MB			Matt Burke		07-Jul-2011
+//              Missing fork_unlock for return path in
+//              pcap$vcm_read_packet when queue is empty.
+//
+//      X-2     MB			Matt Burke		10-Jun-2011
+//           03 IOLOCK8 must be held whilst calling any LAN
+//              functions to ensure proper synchronization
+//              on SMP systems.
+//           02 Changes to allow compilation on IA64.
+//           01 Fix register corruption in pcap_event on ALPHA.
 //
 //      X-1     Ankan			Anders Ahgren		21-Mar-2003
 //              Initial version.
@@ -137,22 +148,38 @@ int pcap$vcm_get_statistics(VCMCTX_64P vcmctx, CHAR_64P stats);
 // are called via JSBs from the LAN driver (LAN.MAR).
 //
 /* Transmit Complete */
+#ifdef __ia64
+#pragma linkage_ia64 pcap_txLnkg = (parameters(r4,r3), preserved(r28,r4,r5), nopreserve(r8,r9))
+#else
 #pragma linkage pcap_txLnkg = (parameters(r4,r3), preserved(r2,r4,r5), nopreserve(r0,r1))
+#endif
 #pragma use_linkage pcap_txLnkg (pcap_txCompl)
 void pcap_txCompl( VCIBDLLDEF *vcib, VCRPDEF *request );
 
 /* PortMgmt Complete */
+#ifdef __ia64
+#pragma linkage_ia64 pcap_mgmLnkg = (parameters(r4,r3), preserved(r28,r4,r5), nopreserve(r8,r9))
+#else
 #pragma linkage pcap_mgmLnkg = (parameters(r4,r3), preserved(r2,r4,r5), nopreserve(r0,r1))
+#endif
 #pragma use_linkage pcap_mgmLnkg (pcap_mgmCompl)
 void pcap_mgmCompl( VCIBDLLDEF *vcib, VCRPDEF *request );
 
 /* Receive */
+#ifdef __ia64
+#pragma linkage_ia64 pcap_rxLnkg = (parameters(r4,r3), preserved(r28,r4,r5), nopreserve(r8,r9))
+#else
 #pragma linkage pcap_rxLnkg = (parameters(r4,r3), preserved(r2,r4,r5), nopreserve(r0,r1))
+#endif
 #pragma use_linkage pcap_rxLnkg (pcap_rxCompl)
 void pcap_rxCompl( VCIBDEF *vcib, VCRPDEF *request );
 
 /* Events */
-#pragma linkage pcap_evtLnkg = (parameters(r4,r1, r2), preserved(r5), nopreserve(r0,r1))
+#ifdef __ia64
+#pragma linkage_ia64 pcap_evtLnkg = (parameters(r4,r9,r28), preserved(r4,r5), nopreserve(r8,r9))
+#else
+#pragma linkage pcap_evtLnkg = (parameters(r4,r1,r2), preserved(r4,r5), nopreserve(r0,r1))
+#endif
 #pragma use_linkage pcap_evtLnkg (pcap_event)
 void pcap_event( VCIBDLLDEF *vcib, int event, int reason );
 
@@ -259,15 +286,26 @@ int pcap$vcm_init (LDRIMG *ini_image_block,
     ini_image_block->ldrimg$l_unlvec = unlvec;
 
     //
-    // Allocate a 2 pages for our shared data structure
+    // Allocate 2 pages for our shared data structure
     // with our companion, the PCAP library.
     //
+#if __VMS_VER >= 80200000
+    status = mmg$allocate_sva_and_pfns (
+		    2,					// number of pages
+		    0,
+		    0,
+		    1,					// S1 space
+		    PTE$C_UW | PTE$M_ASM,		// User mode RW
+		    1,					// nonpaged
+		    (VOID_PPQ) &pcapvcm );
+#else
     status = mmg_std$alloc_system_va_map (
 		    PTE$C_UW | PTE$M_ASM,		// User mode RW
 		    2,					// number of pages
 		    1,					// nonpaged
 		    1,					// S1 space
 		    (VOID_PPQ) &pcapvcm );
+#endif
     if (!$VMS_STATUS_SUCCESS(status))
       bug_check (CUSTOMER, FATAL, COLD);
 
@@ -352,7 +390,7 @@ void pcap_txCompl( VCIBDLLDEF *vcib, VCRPDEF *request )
 
 
 //
-// Do nothing. We own the management VCRP an have a method for getting
+// Do nothing. We own the management VCRP and have a method for getting
 // the status below.
 //
 void pcap_mgmCompl( VCIBDLLDEF *vcib, VCRPDEF *request )
@@ -375,7 +413,8 @@ void pcap_rxCompl( VCIBDEF *vcib, VCRPDEF *request )
     PCAPVCIB *pcapvcib;
     VCRPDEF *vcrpout;
     VCMCTX *vcmctx;
-    
+    int saved_ipl;
+
 
     //
     // Get our port context
@@ -397,7 +436,9 @@ void pcap_rxCompl( VCIBDEF *vcib, VCRPDEF *request )
     // If we failed to insert this item, drop it
     //
     if (status < 0) {
+	fork_lock(SPL$C_IOLOCK8, &saved_ipl);
 	status = vci_delete_vcrp(request);
+	fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
 	vcmctx->stat.recv_packets_dropped++;
 	return;
     }
@@ -415,7 +456,9 @@ void pcap_rxCompl( VCIBDEF *vcib, VCRPDEF *request )
 	status = __PAL_REMQTIL(vcib, (void *)&vcrpout);
 	vcib->vcib$w_size--;
 	if (status != 0) {
+	    fork_lock(SPL$C_IOLOCK8, &saved_ipl);
 	    status = vci_delete_vcrp(vcrpout);
+	    fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
 	    vcmctx->stat.recv_packets_dropped++;
 	}
     }
@@ -525,9 +568,12 @@ int pcap$vcm_getdevice(VCMCTX_64P vcmctx, CHAR_64P devnam)
     LDCDEF *ldc;
     unsigned char *tmpname;
     int len = 0;
+    int saved_ipl;
 
     id = vcmctx->ldcid;
+    fork_lock(SPL$C_IOLOCK8, &saved_ipl);
     status = vci_get_device(&id, &ldc);
+    fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
     if ($VMS_STATUS_SUCCESS(status)) {
 	vcmctx->ldcid = id;
 	tmpname = (unsigned char *) ldc->ldc$a_name;
@@ -554,6 +600,7 @@ int pcap$vcm_create_port(VCMCTX_64P vcmctx, CHAR_64P device)
     char tmpdev[128];
     int len;
     PCAPVCIB *pcapvcib;
+    int saved_ipl;
 
     len = (int) device[0];
     memcpy(tmpdev, device, len+1);
@@ -578,7 +625,9 @@ int pcap$vcm_create_port(VCMCTX_64P vcmctx, CHAR_64P device)
     pcapvcib->vcmctx = (VCMCTX *) vcmctx;
 
     if $VMS_STATUS_SUCCESS(status) {
+	fork_lock(SPL$C_IOLOCK8, &saved_ipl);
 	status = vci_create_port((VCIBDLLDEF *)&vcmctx->vcib);
+	fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
     }
 
     return status;
@@ -590,8 +639,11 @@ int pcap$vcm_create_port(VCMCTX_64P vcmctx, CHAR_64P device)
 int pcap$vcm_delete_port(VCMCTX_64P vcmctx)
 {
     int status;
+    int saved_ipl;
 
+    fork_lock(SPL$C_IOLOCK8, &saved_ipl);
     status = vci_delete_port((VCIBDLLDEF *)&vcmctx->vcib);
+    fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
 
     return status;
 }
@@ -602,6 +654,7 @@ int pcap$vcm_delete_port(VCMCTX_64P vcmctx)
 int pcap$vcm_enable_port(VCMCTX_64P vcmctx, int p2len, CHAR_64P p2buf)
 {
     int status;
+    int saved_ipl;
 
     if (p2len > 0 && p2buf != NULL) {
 	memcpy(&vcmctx->p2_buf[0], p2buf, p2len);
@@ -615,8 +668,10 @@ int pcap$vcm_enable_port(VCMCTX_64P vcmctx, int p2len, CHAR_64P p2buf)
     }
 
     if $VMS_STATUS_SUCCESS(status) {
+	fork_lock(SPL$C_IOLOCK8, &saved_ipl);
 	status = vci_mgmt_port((VCRPLANDEF *)&vcmctx->vcrp,
 	    (VCIBDLLDEF *)&vcmctx->vcib);
+	fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
     }
 
     return status;
@@ -628,13 +683,16 @@ int pcap$vcm_enable_port(VCMCTX_64P vcmctx, int p2len, CHAR_64P p2buf)
 int pcap$vcm_disable_port(VCMCTX_64P vcmctx)
 {
     int status = SS$_NORMAL;
+    int saved_ipl;
 
     status = init_mgmt_vcrp((VCRPLANDEF *)&vcmctx->vcrp, 
 		VCRP$K_FC_DISABLE_PORT, 0, 0);
 
     if $VMS_STATUS_SUCCESS(status) {
+	fork_lock(SPL$C_IOLOCK8, &saved_ipl);
 	status = vci_mgmt_port((VCRPLANDEF *)&vcmctx->vcrp, 
 		    (VCIBDLLDEF *)&vcmctx->vcib);
+	fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
     }
 
     return status;
@@ -707,6 +765,7 @@ int pcap$vcm_read_packet(VCMCTX_64P vcmctx, int len, CHAR_64P packet)
     // If queue is empty, give up
     //
     if (status <= 0) {
+	fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
 	return SS$_NOSUCHOBJECT;
     }
 
@@ -777,7 +836,9 @@ int pcap$vcm_send_packet(VCMCTX_64P vcmctx, int hdrlen, int len,
     // Point to where we're going to put the packet
     //
     packptr = (char *) vcrp + VCRP$T_LAN_DATA + LAN$C_MAX_HDR_SIZE + 8;
+    fork_lock(SPL$C_IOLOCK8, &saved_ipl);
     built_hdrlen = vci_build_header(packptr, &reshdr, 0, 0, (VCRPLANDEF *)&vcmctx->vcib);
+    fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
 
     //
     // Save the port context address
@@ -832,6 +893,7 @@ int pcap$vcm_build_header(VCMCTX_64P vcmctx, int len, CHAR_64P header)
     char *reshdr;
     char *hdrptr;
     int hdrlen;
+    int saved_ipl;
 
     //
     // Set up pointer to (the middle of) header
@@ -841,7 +903,9 @@ int pcap$vcm_build_header(VCMCTX_64P vcmctx, int len, CHAR_64P header)
     //
     // Build the header
     //
+    fork_lock(SPL$C_IOLOCK8, &saved_ipl);
     hdrlen = vci_build_header(hdrptr, &reshdr, 0, 0, (VCRPLANDEF *)&vcmctx->vcib);
+    fork_unlock(SPL$C_IOLOCK8, saved_ipl, SMP_RESTORE);
 
     //
     // Copy header just built

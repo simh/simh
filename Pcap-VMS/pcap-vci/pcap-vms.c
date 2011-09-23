@@ -17,6 +17,9 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
+ * X-5      MB			Matt Burke			10-Jun-2011
+ *	    Changed protocol type from 'IP' to 'DEC Customer Protocol'
+ *
  * X-4      Mark Pizzolato	mark@infocomm.com		30-Oct-2003
  *	    Changed the interface names returned by pcap_platform_finddevs
  *	    to be upper case to conform to the form provided by UCX. This
@@ -302,7 +305,7 @@ pcap_t *pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *
     pcap_t *pcap_handle;
     char *ctlptr;
     char proto[5] = {8,0,0x2b,0x80,0x00};
-    char pty[2] = {0x08,0x00};
+    char pty[2] = {0x60,0x06};
     unsigned long ctldesc[2];
     INTERFACE interface;
 
@@ -368,13 +371,9 @@ pcap_t *pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *
     // Use standard ethernet package type
     //
     ctlptr = pcap_handle->lan_ctl;
-//    ADD_INT_VAL(ctlptr, NMA$C_PCLI_FMT, NMA$C_LINFM_802E);
     ADD_INT_VAL(ctlptr, NMA$C_PCLI_FMT, NMA$C_LINFM_ETH);
-//    ADD_INT_VAL(ctlptr, NMA$C_PCLI_SAP, 0xfffe);
     ADD_INT_VAL(ctlptr, NMA$C_PCLI_PAD, NMA$C_STATE_OFF);
-//    ADD_INT_VAL(ctlptr, NMA$C_PCLI_CRC, NMA$C_STATE_OFF);
     ADD_INT_VAL(ctlptr, NMA$C_PCLI_MLT, NMA$C_STATE_ON);
-//    ADD_INT_VAL(ctlptr, NMA$C_PCLI_ACC, NMA$C_ACC_SHR);
      
     
     //
@@ -382,7 +381,6 @@ pcap_t *pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *
     //
     ADD_INT_VAL(ctlptr, NMA$C_PCLI_BFN, 255);
     ADD_INT_VAL(ctlptr, NMA$C_PCLI_BUS, 2048);
-//    ADD_INT_VAL(ctlptr, NMA$C_PCLI_DCH, NMA$C_STATE_ON);
 
     //
     // If promiscious mode, enable it
@@ -395,7 +393,6 @@ pcap_t *pcap_open_live(char *device, int snaplen, int promisc, int to_ms, char *
     // All ethernet packets
     //
     ADD_INT_VAL(ctlptr, NMA$C_PCLI_PTY, *(int *)pty);
-//    ADD_CNT_VAL(ctlptr, NMA$C_PCLI_PID, sizeof(proto), proto);
 
     //
     // Calculate length

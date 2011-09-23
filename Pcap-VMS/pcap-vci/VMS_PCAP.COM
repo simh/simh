@@ -2,7 +2,7 @@ $ if f$search("pcap.olb") .eqs. ""
 $ then
 $	libr/crea pcap.olb
 $ endif
-$ if p1 .nes. ""
+$ if p1 .eqs. "DEBUG"
 $ then
 $    opt = "/debug/noopt"
 $ else
@@ -39,7 +39,7 @@ $ libr/replace pcap grammar
 $ cc/name=( as_is,shortened)/opt/nomember_align'opt/include=sys$disk:[] -
  inet+sys$share:sys$lib_c.tlb/lib
 $ libr/replace pcap inet
-$ cc/name=( as_is,shortened)/opt'opt/include=sys$disk:[] -
+$ cc/name=( as_is,shortened)/opt/nomember_align'opt/include=sys$disk:[] -
   nametoaddr+sys$share:sys$lib_c.tlb/lib
 $ libr/replace pcap nametoaddr
 $ cc/name=( as_is,shortened)/opt/nomember_align'opt/include=sys$disk:[] - 
@@ -61,4 +61,3 @@ $ cc/name=( as_is,shortened)/opt/nomember_alig'opt/include=sys$disk:[] -
  pcap-vms+sys$share:sys$lib_c.tlb/lib
 $ libr/replace pcap pcap-vms
 $ exit
-

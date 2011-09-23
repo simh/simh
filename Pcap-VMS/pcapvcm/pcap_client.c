@@ -1,4 +1,4 @@
-#pragma module pcap_client "X-1"
+#pragma module pcap_client "X-2"
 /*
  *****************************************************************************
  *
@@ -34,15 +34,15 @@
 
 /* Define data structures and constants */
 
-#include 	<descrip.h>		/* Descriptors			*/
-#include 	<ldrimgdef.h>		/* Loaded image data block	*/
-#include 	<lnmdef.h>		/* Logical names		*/
-#include 	<pdscdef.h>		/* Linkage pairs		*/
-#include	<starlet.h>		/* System service proto-types	*/
-#include 	<ssdef.h>		/* System service status codes	*/
-#include  <stsdef.h>
-#include 	<stdio.h>		/* CRTL I/O			*/
-#include 	<string.h>		/* CTRL strings			*/
+#include <descrip.h>		/* Descriptors			*/
+#include <ldrimgdef.h>		/* Loaded image data block	*/
+#include <lnmdef.h>		/* Logical names		*/
+#include <pdscdef.h>		/* Linkage pairs		*/
+#include <starlet.h>		/* System service proto-types	*/
+#include <ssdef.h>		/* System service status codes	*/
+#include <stsdef.h>
+#include <stdio.h>		/* CRTL I/O			*/
+#include <string.h>		/* CTRL strings			*/
 #include <ldrdef.h>
 #include <nmadef.h>
 
@@ -399,7 +399,11 @@ int load_execlet ()
 
 	// Get the shared context. We built the execlet so that the address
 	// of the routine that does this is at home base...
-	rtnptr = *(void **)reference_handle.ldrimg_ptr->ldrimg$l_nonpag_w_base;
+#ifdef __ia64
+        rtnptr = *(void **)reference_handle.ldrimg_ptr->ldrimg$l_segments[5].ldrisd$p_base;
+#else
+        rtnptr = *(void **)reference_handle.ldrimg_ptr->ldrimg$l_nonpag_w_base;
+#endif
 	if (rtnptr) {
 	    getContext = (int (*)())rtnptr;
 	    status = (*getContext)(&pcapvcm);
