@@ -1046,7 +1046,7 @@ $(VAX730_LIB1) : $(VAX730_SOURCE1)
         $!
         $! Building The $(VAX730_LIB1) Library.
         $!
-        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX730_DIR) -
+        $ $(CC)$(VAX730_OPTIONS)/OBJ=$(VAX730_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1057,7 +1057,7 @@ $(VAX730_LIB2) : $(VAX730_SOURCE2)
         $!
         $! Building The $(VAX730_LIB2) Library.
         $!
-        $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX730_DIR) -
+        $ $(CC)$(VAX730_OPTIONS)/OBJ=$(VAX730_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
