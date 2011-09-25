@@ -565,6 +565,7 @@ extern pthread_cond_t sim_asynch_wake;
 extern pthread_t sim_asynch_main_threadid;
 extern struct sim_unit *sim_asynch_queue;
 extern t_bool sim_idle_wait;
+extern t_bool sim_asynch_enabled;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;

@@ -408,15 +408,17 @@ return SCPE_NOFNC;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 pthread_attr_t attr;
 
-ctx->asynch_io = 1;
+ctx->asynch_io = sim_asynch_enabled;
 ctx->asynch_io_latency = latency;
-pthread_mutex_init (&ctx->io_lock, NULL);
-pthread_cond_init (&ctx->io_cond, NULL);
-pthread_attr_init(&attr);
-pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-pthread_create (&ctx->io_thread, &attr, _disk_io, (void *)uptr);
-pthread_attr_destroy(&attr);
-uptr->a_check_completion = _disk_completion_dispatch;
+if (ctx->asynch_io) {
+    pthread_mutex_init (&ctx->io_lock, NULL);
+    pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_create (&ctx->io_thread, &attr, _disk_io, (void *)uptr);
+    pthread_attr_destroy(&attr);
+    uptr->a_check_completion = _disk_completion_dispatch;
+    }
 #endif
 return SCPE_OK;
 }
@@ -723,7 +725,8 @@ uint32 f = DK_GET_FMT (uptr);
 
 #if defined (SIM_ASYNCH_IO)
 sim_disk_clr_async (uptr);
-sim_disk_set_async (uptr, 0);
+if (sim_asynch_enabled)
+    sim_disk_set_async (uptr, 0);
 #endif
 switch (f) {                                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */

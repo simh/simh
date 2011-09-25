@@ -180,6 +180,7 @@ REG clk_reg[] = {
     { DRDATA (POLL, tmr_poll, 24), REG_NZ + PV_LEFT + REG_HRO },
     { DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 #if defined (SIM_ASYNCH_IO)
+    { DRDATA (ASYNCH, sim_asynch_enabled, 1), PV_LEFT },
     { DRDATA (LATENCY, sim_asynch_latency, 32), PV_LEFT },
     { DRDATA (INST_LATENCY, sim_asynch_inst_latency, 32), PV_LEFT },
 #endif

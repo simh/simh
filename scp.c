@@ -23,6 +23,17 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Sep-11    MP      Added the ability for a simulator built with 
+                        SIM_ASYNCH_IO to change whether I/O is actually done
+                        asynchronously by the new scp command SET ASYNCH and 
+                        SET NOASYNCH
+   22-Sep-11    MP      Added signal catching of SIGHUP and SIGTERM to cause 
+                        simulator STOP.  This allows an externally signalled
+                        event (i.e. system shutdown, or logoff) to signal a
+                        running simulator of these events and to allow 
+                        reasonable actions to be taken.  This will facilitate 
+                        running a simulator as a 'service' on *nix platforms, 
+                        given a sufficiently flexible simulator .ini file.  
    20-Apr-11    MP      Added expansion of %STATUS% and %TSTATUS% in do command
                         arguments.  STATUS is the numeric value of the last 
                         command error status and TSTATUS is the text message
@@ -271,6 +282,7 @@ pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
 pthread_t sim_asynch_main_threadid;
 struct sim_unit *sim_asynch_queue = NULL;
+t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
@@ -387,6 +399,7 @@ t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
 t_stat step_svc (UNIT *ptr);
 void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[]);
 t_stat set_on (int32 flag, char *cptr);
+t_stat set_asynch (int32 flag, char *cptr);
 
 
 /* Global data */
@@ -605,6 +618,8 @@ static CTAB cmd_table[] = {
       "set nobreak <list>       clear breakpoints\n"
       "set throttle x{M|K|%%}   set simulation rate\n"
       "set nothrottle           set simulation rate to maximum\n"
+      "set asynch               enable asynchronous I/O\n"
+      "set noasynch             disable asynchronous I/O\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -628,6 +643,7 @@ static CTAB cmd_table[] = {
       "sh{ow} q{ueue}           show event queue\n"  
       "sh{ow} ti{me}            show simulated time\n"
       "sh{ow} th{rottle}        show simulation rate\n" 
+      "sh{ow} a{synch}          show asynchronouse I/O state\n" 
       "sh{ow} ve{rsion}         show simulator version\n" 
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
@@ -1281,6 +1297,61 @@ if ((sim_do_depth != 0) &&
 return SCPE_OK;
 }
 
+/* Set asynch/noasynch routine */
+
+t_stat sim_set_asynch (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+#ifdef SIM_ASYNCH_IO
+if (flag == sim_asynch_enabled)                         /* already set correctly? */
+    return SCPE_OK;
+sim_asynch_enabled = flag;
+if (1) {
+    uint32 i, j;
+    DEVICE *dptr;
+    UNIT *uptr;
+
+    /* Call unit flush routines to report asynch status change to device layer */
+    for (i = 1; (dptr = sim_devices[i]) != NULL; i++) { /* flush attached files */
+        for (j = 0; j < dptr->numunits; j++) {          /* if not buffered in mem */
+            uptr = dptr->units + j;
+            if ((uptr->flags & UNIT_ATT) &&             /* attached, */
+                !(uptr->flags & UNIT_BUF) &&            /* not buffered, */
+                (uptr->fileref))                        /* real file, */
+                if (uptr->io_flush)                     /* unit specific flush routine */
+                    uptr->io_flush (uptr);
+            }
+        }
+    }
+if (!sim_quiet)
+    printf ("Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
+if (sim_log)
+    fprintf (sim_log, "Asynchronous I/O %sabled\n", sim_asynch_enabled ? "en" : "dis");
+return SCPE_OK;
+#else
+if (!sim_quiet)
+    printf ("Asynchronous I/O is not available in this simulator\n");
+if (sim_log)
+    fprintf (sim_log, "Asynchronous I/O is not available in this simulator\n");
+return SCPE_NOFNC;
+#endif
+}
+
+/* Show asynch routine */
+
+t_stat sim_show_asynch (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
+#ifdef SIM_ASYNCH_IO
+fprintf (st, "Asynchronous I/O is %sabled\n", (sim_asynch_enabled) ? "en" : "dis");
+#else
+fprintf (st, "Asynchronous I/O is not available in this simulator\n");
+#endif
+return SCPE_OK;
+}
+
 /* Set command */
 
 t_stat set_cmd (int32 flag, char *cptr)
@@ -1305,6 +1376,8 @@ static CTAB set_glob_tab[] = {
     { "NODEBUG", &sim_set_deboff, 0 },                  /* deprecated */
     { "THROTTLE", &sim_set_throt, 1 },
     { "NOTHROTTLE", &sim_set_throt, 0 },
+    { "ASYNCH", &sim_set_asynch, 1 },
+    { "NOASYNCH", &sim_set_asynch, 0 },
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
     { NULL, NULL, 0 }
@@ -1570,6 +1643,7 @@ static SHTAB show_glob_tab[] = {
     { "TELNET", &sim_show_telnet, 0 },                  /* deprecated */
     { "DEBUG", &sim_show_debug, 0 },                    /* deprecated */
     { "THROTTLE", &sim_show_throt, 0 },
+    { "ASYNCH", &sim_show_asynch, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };

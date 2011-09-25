@@ -5,6 +5,9 @@ Theory of operation.
 Features.
    - Optional Use.  Build with or without SIM_ASYNCH_IO defined and 
      simulators will still build and perform correctly when run.
+     Additionmally, a simulator built with SIM_ASYNCH_IO defined can
+     dynamically disable and reenable asynchronous operation with 
+     the scp commands SET NOASYNCH and SET ASYNCH respectively.
    - Consistent Save/Restore state.  The state of a simulator saved 
      on a simulator with (or without) Asynch support can be restored
      on any simulator of the same version with or without Asynch 
