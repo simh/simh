@@ -134,6 +134,11 @@ Windows notes:
 
 
 Building on Windows:
+ Building with MinGW can use the provided makefile following the instructions 
+ below.  Alternatively, you can use the free Visual C++ Express 2008 or 2010
+ interactive development environments.  Read the file 
+ ".\Visual Studio Projects\0ReadMe_Projects.txt" for details.
+ 
  1. Install WinPCAP 4.x runtime and the WinPCAP Developer's kit.
 
  2. Put the required .h files (bittypes,devioctl,ip6_misc,pcap,pcap-stdinc
@@ -159,8 +164,11 @@ Linux, {Free|Net|Open}BSD, OS/X, and Un*x notes:
 ----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
 
 Sim_Ether has been reworked to be more universal; because of this, you will
-need to get a version of libpcap that is 0.9 or greater. This can be
-downloaded from www.tcpdump.org - see the comments at the top of Sim_ether.c
+need to get a version of libpcap that is 0.9 or greater. All current Linux
+distributions provide a libpcap-dev package which has the needed version
+of libpcap and the required components to build applications using it.  
+If you are running an older Linux OS, you can download and build the required 
+library from www.tcpdump.org - see the comments at the top of Sim_ether.c 
 for details.  
 
 ----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
@@ -187,11 +195,13 @@ for details.
     will be welcomed.
 
  2. If you want to use TAP devices, and any surrounding system network/bridge
-    setup must be done before running SIMH.
+    setup must be done before running SIMH.  However, once that is done 
+    (possibly at system boot time), using the TAP devices can be done without
+    root privileges.
 
 Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
 
- 1. Get/make/install the libpcap package for your operating system. Sources:
+ 1. Get/make/install the libpcap-dev package for your operating system. Sources:
       All    : http://www.tcpdump.org/
       Older versions of libpcap can be found, for various systems, at:
       Linux  : search for your variant on http://rpmfind.net
@@ -214,7 +224,7 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
 
 -------------------------------------------------------------------------------
 
-OpenVMS Alpha notes:
+OpenVMS Alpha and OpenVMS Integrety (IA64) notes:
   1. Ethernet support will only work on Alpha VMS 7.3-1 or later, which is
      when required VCI promiscuous mode support was added. Hobbyists can
      get the required version of VMS from the OpenVMS Alpha Hobbyist Kit 3.0.
@@ -247,10 +257,10 @@ OpenVMS Alpha notes:
      adapter prior trying to connect with SIMH, or the host may crash.
      The execlet is not written to create an I/O structure for the device.
 
-Building on OpenVMS Alpha:
+Building on OpenVMS Alpha and OpenVMS Integrety (IA64):
   The current descrip.mms file will build simulators capable of using
   Ethernet support with them automatically.  These currently are: VAX, 
-  PDP11, and PDP10.  The descrip.mms driven builds will also build the
+  VAX780, and PDP11.  The descrip.mms driven builds will also build the
   pcap library and build and install the VCI execlet.
   
   1. Fetch the VMS-PCAP zip file from:  
@@ -320,7 +330,16 @@ Dave
 ===============================================================================
                                Change Log
 ===============================================================================
-
+  
+  07-Jul-11  MB   VMS Pcap (from Mike Burke)
+                     - Fixed Alpha issues
+                     - Added OpenVMS Integrety support
+  17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 
+                  vector assignments
+  12-Aug-11  MP   Cleaned up payload length determination
+                  Fixed race condition detecting reflections when threaded 
+                  reading and writing is enabled
+  20-Apr-11  MP   Fixed save/restore behavior
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected DEUNA/DELUA SELFTEST command, enabling use by
                   VMS 3.7, VMS 4.7, and Ultrix 1.1
