@@ -424,7 +424,8 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if (isdigit (*gbuf)) {
-        if (sim_con_tmxr.master) return SCPE_ALATT;     /* already open? */
+        if (sim_con_tmxr.master)                        /* already open? */
+            sim_set_notelnet (0, NULL);                 /* close first */
         return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
         }
     else
