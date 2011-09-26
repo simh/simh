@@ -1022,13 +1022,6 @@ do {
          (cmdp->action != &on_cmd) &&
          (cmdp->action != &echo_cmd)))
         sim_last_cmd_stat = stat;                       /* save command error status */
-    staying = (stat != SCPE_EXIT) &&                    /* decide if staying */
-              (stat != SCPE_AFAIL) &&
-              (!errabort || (stat < SCPE_BASE) || (stat == SCPE_STEP));
-    if ((stat == SCPE_AFAIL) &&                         /* handle special case AFAIL */
-        sim_on_check[sim_do_depth] &&                   /* and use trap action if defined */
-        sim_on_actions[sim_do_depth][stat])             /* otherwise exit */
-        staying = TRUE;
     if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
@@ -1039,8 +1032,23 @@ do {
             }
         stat = stat & ~SCPE_DOFAILED;                   /* remove possible flag */
         }
+    switch (stat) {
+        case SCPE_OK:
+        case SCPE_STEP:
+            break;
+        case SCPE_AFAIL:
+            staying = (sim_on_check[sim_do_depth] &&        /* if trap action defined */
+                       sim_on_actions[sim_do_depth][stat]); /* use it, otherwise exit */
+            break;
+        case SCPE_EXIT:
+            staying = FALSE;
+            break;
+        default:
+            staying = sim_on_check[sim_do_depth];
+            break;
+        }
     if ((staying || !interactive) &&                    /* report error if staying */
-        (stat >= SCPE_BASE)) {                          /* or in cmdline file */
+        (stat >= SCPE_BASE) && !isdo) {                 /* or in cmdline file */
         printf ("%s\n", sim_error_text (stat));
         if (sim_log)
             fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -1049,7 +1057,7 @@ do {
         (sim_on_check[sim_do_depth]) && 
         (stat != SCPE_OK) &&
         (stat != SCPE_STEP))
-        if (sim_on_actions[sim_do_depth][stat])
+        if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][stat];
         else
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][0];
