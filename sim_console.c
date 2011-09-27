@@ -636,6 +636,10 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
         if (!sim_con_ldsc.conn) {
             printf ("Running with Buffered Console\n"); /* print transition */
             fflush (stdout);
+            if (sim_log) {                              /* log file? */
+                fprintf (sim_log, "Running with Buffered Console\n");
+                fflush (sim_log);
+                }
             }
         return SCPE_OK;
         }
@@ -646,6 +650,10 @@ for (i = 0; i < sec; i++) {                             /* loop */
         if (i) {                                        /* if delayed */
             printf ("Running\n");                       /* print transition */
             fflush (stdout);
+            if (sim_log) {                              /* log file? */
+                fprintf (sim_log, "Running\n");
+                fflush (sim_log);
+                }
             }
         return SCPE_OK;                                 /* ready to proceed */
         }
@@ -655,6 +663,10 @@ for (i = 0; i < sec; i++) {                             /* loop */
     if ((i % 10) == 0) {                                /* Status every 10 sec */
         printf ("Waiting for console Telnet connection\n");
         fflush (stdout);
+        if (sim_log) {                              /* log file? */
+            fprintf (sim_log, "Waiting for console Telnet connection\n");
+            fflush (sim_log);
+            }
         }
     sim_os_sleep (1);                                   /* wait 1 second */
     }
