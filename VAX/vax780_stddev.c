@@ -29,6 +29,30 @@
    todr         TODR clock
    tmr          interval timer
 
+   28-Sep-11    MP      Generalized setting TODR for all OSes.  
+                        Unbound the TODR value from the 100hz clock tick 
+                        interrupt.  TODR now behaves like the original 
+                        battery backed-up clock and runs with the wall 
+                        clock, not the simulated instruction clock.  
+                        Two operational modes are available:
+                        - Default VMS mode, which is similar to the previous 
+                          behavior in that without initializing the TODR it 
+                          would default to the value VMS would set it to if
+                          VMS knew the correct time.  This would be correct
+                          almost all the time unless a VMS disk hadn't been
+                          booted from for more than a year.  This mode 
+                          produces strange time results for non VMS OSes on 
+                          each system boot.
+                        - OS Agnostic mode.  This mode behaves precisely like
+                          the VAX780 TODR and works correctly for all OSes.  
+                          This mode is enabled by attaching the TODR to a 
+                          battery backup state file for the TOY clock 
+                          (i.e. sim> attach TODR TOY_CLOCK).  When operating 
+                          in OS Agnostic mode, the TODR will initially start
+                          counting from 0 and be adjusted differently when an
+                          OS specifically writes to the TODR.  VMS will prompt
+                          to set the time on each boot unless the SYSGEN 
+                          parameter TIMEPROMPTWAIT is set to 0.
    21-Mar-11    RMS     Added reboot capability
    17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
@@ -56,7 +80,7 @@
 */
 
 #include "vax_defs.h"
-#include <time.h>
+
 
 /* Terminal definitions */
 
@@ -171,6 +195,11 @@ int32 clk_tps = 100;                                    /* ticks/second */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
 int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
 int32 todr_reg = 0;                                     /* TODR register */
+struct todr_battery_info {
+    uint32 toy_gmtbase;                                 /* GMT base of set value */
+    uint32 toy_gmtbasemsec;                             /* The milliseconds of the set value */
+    };
+typedef struct todr_battery_info TOY;
 
 int32 fl_fnc = 0;                                       /* function */
 int32 fl_esr = 0;                                       /* error status */
@@ -197,6 +226,8 @@ t_stat tmr_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat clk_attach (UNIT *uptr, char *cptr);
+t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
 t_stat fl_svc (UNIT *uptr);
 t_stat fl_reset (DEVICE *dptr);
@@ -281,7 +312,7 @@ DEVICE tto_dev = {
 
 /* TODR and TMR data structures */
 
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };          /* 100Hz */
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE+UNIT_FIX, sizeof(TOY)), CLK_DELAY };/* 100Hz */
 
 REG clk_reg[] = {
     { DRDATA (TODR, todr_reg, 32), PV_LEFT },
@@ -296,9 +327,9 @@ REG clk_reg[] = {
 
 DEVICE clk_dev = {
     "TODR", &clk_unit, clk_reg, NULL,
-    1, 0, 0, 0, 0, 0,
+    1, 0, 8, 1, 0, 0,
     NULL, NULL, &clk_reset,
-    NULL, NULL, NULL,
+    NULL, &clk_attach, &clk_detach,
     NULL, 0
     };
 
@@ -578,7 +609,6 @@ tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
 sim_activate (&clk_unit, tmr_poll);                     /* reactivate unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
-todr_reg = todr_reg + 1;                                /* incr TODR */
 if ((tmr_iccs & TMR_CSR_RUN) && tmr_use_100hz)          /* timer on, std intvl? */
     tmr_incr (TMR_INC);                                 /* do timer service */
 return SCPE_OK;
@@ -651,8 +681,43 @@ t_stat clk_reset (DEVICE *dptr)
 tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
 sim_activate_abs (&clk_unit, tmr_poll);                 /* activate 100Hz unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
+if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
+    clk_unit.filebuf = calloc(sizeof(TOY), 1);
+    if (clk_unit.filebuf == NULL)
+        return SCPE_MEM;
+    todr_resync ();
+    }
 return SCPE_OK;
 }
+
+/* CLK attach */
+
+t_stat clk_attach (UNIT *uptr, char *cptr)
+{
+t_stat r;
+
+uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
+memset (uptr->filebuf, 0, (size_t)uptr->capac);
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK)
+    uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
+else
+    uptr->hwmark = (uint32) uptr->capac;
+return r;
+}
+
+/* CLK detach */
+
+t_stat clk_detach (UNIT *uptr)
+{
+t_stat r;
+
+r = detach_unit (uptr);
+if ((uptr->flags & UNIT_ATT) == 0)
+    uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
+return r;
+}
+
 
 /* Interval timer reset */
 
@@ -668,36 +733,89 @@ todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
 }
 
+
+int
+timeval_subtract (result, x, y)
+  struct timeval *result, *x, *y;
+{
+/* Perform the carry for the later subtraction by updating y. */
+if (x->tv_usec < y->tv_usec) {
+ int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+ y->tv_usec -= 1000000 * nsec;
+ y->tv_sec += nsec;
+}
+if (x->tv_usec - y->tv_usec > 1000000) {
+ int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+ y->tv_usec += 1000000 * nsec;
+ y->tv_sec -= nsec;
+}
+
+/* Compute the time remaining to wait.
+  tv_usec is certainly positive. */
+result->tv_sec = x->tv_sec - y->tv_sec;
+result->tv_usec = x->tv_usec - y->tv_usec;
+
+/* Return 1 if result is negative. */
+return x->tv_sec < y->tv_sec;
+}
+
 /* TODR routines */
 
 int32 todr_rd (void)
 {
-return todr_reg;
+TOY *toy = (TOY *)clk_unit.filebuf;
+struct timespec base, now, val;
+
+clock_gettime(CLOCK_REALTIME, &now);                    /* get curr time */
+base.tv_sec = toy->toy_gmtbase;
+base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
+sim_timespec_diff (&val, &now, &base);
+return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
 }
+
 
 void todr_wr (int32 data)
 {
-todr_reg = data;
-return;
+TOY *toy = (TOY *)clk_unit.filebuf;
+struct timespec now, val, base;
+
+/* Save the GMT time when set value was 0 to record the base for future 
+   read operations in "battery backed-up" state */
+
+if (-1 == clock_gettime(CLOCK_REALTIME, &now))          /* get curr time */
+    return;                                             /* error? */
+val.tv_sec = ((uint32)data) / 100;
+val.tv_nsec = (((uint32)data) % 100) * 10000000;
+sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
+toy->toy_gmtbase = base.tv_sec;
+toy->toy_gmtbasemsec = base.tv_nsec/1000000;
 }
 
 t_stat todr_resync (void)
 {
-uint32 base;
-time_t curr;
-struct tm *ctm;
+TOY *toy = (TOY *)clk_unit.filebuf;
 
-curr = time (NULL);                                     /* get curr time */
-if (curr == (time_t) -1)                                /* error? */
-    return SCPE_NOFNC;
-ctm = localtime (&curr);                                /* decompose */
-if (ctm == NULL)                                        /* error? */
-    return SCPE_NOFNC;
-base = (((((ctm->tm_yday * 24) +                        /* sec since 1-Jan */
-        ctm->tm_hour) * 60) +
-        ctm->tm_min) * 60) +
-        ctm->tm_sec;
-todr_reg = (base * 100) + 0x10000000;                   /* cvt to VAX form */
+if (clk_unit.flags & UNIT_ATT) {                        /* Attached means behave like real VAX780 */
+    if (!toy->toy_gmtbase)                              /* Never set? */
+        todr_wr (0);                                    /* Start ticking from 0 */
+    }
+else {                                                  /* Not-Attached means */
+    uint32 base;                                        /* behave like simh VMS default */
+    time_t curr;
+    struct tm *ctm;
+
+    curr = time (NULL);                                 /* get curr time */
+    if (curr == (time_t) -1)                            /* error? */
+        return SCPE_NOFNC;
+    ctm = localtime (&curr);                            /* decompose */
+    if (ctm == NULL)                                    /* error? */
+        return SCPE_NOFNC;
+    base = (((((ctm->tm_yday * 24) +                    /* sec since 1-Jan */
+            ctm->tm_hour) * 60) +
+            ctm->tm_min) * 60) +
+            ctm->tm_sec;
+    todr_wr ((base * 100) + 0x10000000);                /* use VMS form */
+    }
 return SCPE_OK;
 }
 

@@ -152,8 +152,7 @@ return sim_os_msec () - stime;
 }
 
 #if defined(SIM_ASYNCH_IO)
-#ifndef CLOCK_REALTIME
-#define CLOCK_REALTIME 1
+#ifdef NEED_CLOCK_REALTIME
 int clock_gettime(int clk_id, struct timespec *tp)
 {
 uint32 secs, ns, tod[2], unixbase[2] = {0xd53e8000, 0x019db1de};
@@ -225,12 +224,13 @@ Sleep (msec);
 return sim_os_msec () - stime;
 }
 
-#if !defined(CLOCK_REALTIME) && defined (SIM_ASYNCH_IO)
-#define CLOCK_REALTIME 1
+#if defined(NEED_CLOCK_REALTIME)
 int clock_gettime(int clk_id, struct timespec *tp)
 {
 t_uint64 now, unixbase;
 
+if (clk_id != CLOCK_REALTIME)
+    return -1;
 unixbase = 116444736;
 unixbase *= 1000000000;
 GetSystemTimeAsFileTime((FILETIME*)&now);
@@ -315,8 +315,7 @@ treq.tv_nsec = (milliseconds % MILLIS_PER_SEC) * NANOS_PER_MILLI;
 return sim_os_msec () - stime;
 }
 
-#if !defined(CLOCK_REALTIME) && defined (SIM_ASYNCH_IO)
-#define CLOCK_REALTIME 1
+#if defined(NEED_CLOCK_REALTIME)
 int clock_gettime(int clk_id, struct timespec *tp)
 {
 struct timeval cur;
@@ -377,8 +376,7 @@ if (tim > SIM_IDLE_MAX)
 return tim;
 }
 #if !defined(_POSIX_SOURCE) && defined(SIM_ASYNCH_IO)
-#ifndef CLOCK_REALTIME
-#define CLOCK_REALTIME 1
+#ifdef NEED_CLOCK_REALTIME
 typedef int clockid_t;
 int clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
@@ -407,6 +405,21 @@ return sim_os_msec () - stime;
 }
 
 #endif
+
+/* diff = min - sub */
+void
+sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub)
+{
+/* move the minuend value to the difference and operate there. */
+*diff = *min;
+/* Borrow as needed for the nsec value */
+if (sub->tv_nsec > min->tv_nsec) {
+    --diff->tv_sec;
+    diff->tv_nsec += 1000000000;
+    }
+diff->tv_nsec -= sub->tv_nsec;
+diff->tv_sec -= sub->tv_sec;
+}
 
 #if defined(SIM_ASYNCH_IO)
 uint32 sim_idle_ms_sleep (unsigned int msec)
