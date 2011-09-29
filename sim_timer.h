@@ -31,6 +31,15 @@
 #ifndef _SIM_TIMER_H_
 #define _SIM_TIMER_H_   0
 
+#include <time.h>
+
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 1
+#define NEED_CLOCK_REALTIME 1
+int clock_gettime(int clock_id, struct timespec *tp);
+#endif
+
+
 #define SIM_NTIMERS     8                               /* # timers */
 #define SIM_TMAX        500                             /* max timer makeup */
 
@@ -51,6 +60,7 @@
 #define SIM_THROT_PCT   3
 
 t_bool sim_timer_init (void);
+void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);
 int32 sim_rtcn_init (int32 time, int32 tmr);
 void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
