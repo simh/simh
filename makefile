@@ -28,7 +28,7 @@ ifeq ($(WIN32),)
     endif
   endif
   OS_CCDEFS = -D_GNU_SOURCE
-  ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT); then echo libm; fi))
+  ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT) -o -e /usr/lib64/libm.$(LIBEXT); then echo libm; fi))
     OS_LDFLAGS += -lm
   endif
   ifeq (SunOS,$(shell uname))
