@@ -55,9 +55,10 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #define SIM_THROT_WMIN  100                             /* min wait */
 #define SIM_THROT_MSMIN 10                              /* min for measurement */
 #define SIM_THROT_NONE  0                               /* throttle parameters */
-#define SIM_THROT_MCYC  1
-#define SIM_THROT_KCYC  2
-#define SIM_THROT_PCT   3
+#define SIM_THROT_MCYC  1                               /* MegaCycles Per Sec */
+#define SIM_THROT_KCYC  2                               /* KiloCycles Per Sec */
+#define SIM_THROT_PCT   3                               /* Max Percent of host CPU */
+#define SIM_THROT_SPC   4                               /* Specific periodic Delay */
 
 t_bool sim_timer_init (void);
 void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);

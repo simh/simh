@@ -23,6 +23,28 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-Oct-11    MP      Fixed throttling in several ways:
+                         - Sleep for the observed clock tick size while throttling
+                         - Recompute the throttling wait once every 10 seconds
+                           to account for varying instruction mixes during
+                           different phases of a simulator execution or to 
+                           accommodate the presence of other load on the host 
+                           system.
+                         - Each of the pre-existing throttling modes (Kcps, 
+                           Mcps, and %) all compute the appropriate throttling 
+                           interval dynamically.  These dynamic computations
+                           assume that 100% of the host CPU is dedicated to 
+                           the current simulator during this computation.
+                           This assumption may not always be true and under 
+                           certain conditions may never provide a way to 
+                           correctly determine the appropriate throttling 
+                           wait.  An additional throttling mode has been added
+                           which allows the simulator operator to explicitly
+                           state the desired throttling wait parameters.
+                           These are specified by: 
+                                  SET THROT insts/delay
+                           where 'insts' is the number of instructions to 
+                           execute before sleeping for 'delay' milliseconds.
    22-Apr-11    MP      Fixed Asynch I/O support to reasonably account cycles
                         when an idle wait is terminated by an external event
    05-Jan-11    MP      Added Asynch I/O support
@@ -67,6 +89,7 @@ static uint32 sim_throt_ms_stop = 0;
 static uint32 sim_throt_type = 0;
 static uint32 sim_throt_val = 0;
 static uint32 sim_throt_state = 0;
+static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
 extern int32 sim_interval, sim_switches;
 extern FILE *sim_log;
@@ -641,8 +664,11 @@ return SCPE_OK;
 
 t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (sim_idle_enab)
-    fprintf (st, "idle enabled, stability wait = %ds, minimum sleep resolution = %dms", sim_idle_stable, sim_idle_rate_ms);
+if (sim_idle_enab) {
+    fprintf (st, "idle enabled");
+    if (sim_switches & SWMASK ('D'))
+        fprintf (st, ", stability wait = %ds, minimum sleep resolution = %dms", sim_idle_stable, sim_idle_rate_ms);
+    }
 else fputs ("idle disabled", st);
 return SCPE_OK;
 }
@@ -652,7 +678,7 @@ return SCPE_OK;
 t_stat sim_set_throt (int32 arg, char *cptr)
 {
 char *tptr, c;
-t_value val;
+t_value val, val2;
 
 if (arg == 0) {
     if ((cptr != 0) && (*cptr != 0))
@@ -666,8 +692,11 @@ else {
     val = strtotv (cptr, &tptr, 10);
     if (cptr == tptr)
         return SCPE_ARG;
+    sim_throt_sleep_time = sim_idle_rate_ms;
     c = toupper (*tptr++);
-    if (*tptr != 0)
+    if (c == '/')
+        val2 = strtotv (tptr, &tptr, 10);
+    if ((*tptr != 0) || (val == 0))
         return SCPE_ARG;
     if (c == 'M') 
         sim_throt_type = SIM_THROT_MCYC;
@@ -675,6 +704,9 @@ else {
         sim_throt_type = SIM_THROT_KCYC;
     else if ((c == '%') && (val > 0) && (val < 100))
         sim_throt_type = SIM_THROT_PCT;
+    else if ((c == '/') && (val2 != 0)) {
+        sim_throt_type = SIM_THROT_SPC;
+        }
     else return SCPE_ARG;
     if (sim_idle_enab) {
         printf ("Idling disabled\n");
@@ -683,6 +715,14 @@ else {
         sim_clr_idle (NULL, 0, NULL, NULL);
         }
     sim_throt_val = (uint32) val;
+    if (sim_throt_type == SIM_THROT_SPC) {
+        if (val2 >= sim_idle_rate_ms)
+            sim_throt_sleep_time = (uint32) val2;
+        else {
+            sim_throt_sleep_time = (uint32) (val2 * sim_idle_rate_ms);
+            sim_throt_val = (uint32) (val * sim_idle_rate_ms);
+            }
+        }
     }
 return SCPE_OK;
 }
@@ -706,13 +746,17 @@ else {
         fprintf (st, "Throttle = %d%%\n", sim_throt_val);
         break;
 
+    case SIM_THROT_SPC:
+        fprintf (st, "Throttle = %d ms every %d cycles\n", sim_throt_sleep_time, sim_throt_val);
+        break;
+
     default:
         fprintf (st, "Throttling disabled\n");
         break;
         }
 
     if (sim_switches & SWMASK ('D')) {
-        fprintf (st, "Wait rate = %d ms\n", sim_idle_rate_ms);
+        fprintf (st, "minimum sleep resolution = %d ms\n", sim_idle_rate_ms);
         if (sim_throt_type != 0)
             fprintf (st, "Throttle interval = %d cycles\n", sim_throt_wait);
         }
@@ -725,7 +769,6 @@ void sim_throt_sched (void)
 sim_throt_state = 0;
 if (sim_throt_type)
     sim_activate (&sim_throt_unit, SIM_THROT_WINIT);
-return;
 }
 
 void sim_throt_cancel (void)
@@ -735,11 +778,12 @@ sim_cancel (&sim_throt_unit);
 
 /* Throttle service
 
-   Throttle service has three distinct states
+   Throttle service has three distinct states used while dynamically
+   determining a throttling interval:
 
-   0        take initial measurement
-   1        take final measurement, calculate wait values
-   2        periodic waits to slow down the CPU
+       0    take initial measurement
+       1    take final measurement, calculate wait values
+       2    periodic waits to slow down the CPU
 */
 
 t_stat sim_throt_svc (UNIT *uptr)
@@ -747,12 +791,16 @@ t_stat sim_throt_svc (UNIT *uptr)
 uint32 delta_ms;
 double a_cps, d_cps;
 
+if (sim_throt_type == SIM_THROT_SPC) {                  /* Non dynamic? */
+    sim_throt_state = 2;                                /* force state */
+    sim_throt_wait = sim_throt_val;
+    }
 switch (sim_throt_state) {
 
     case 0:                                             /* take initial reading */
         sim_throt_ms_start = sim_os_msec ();
         sim_throt_wait = SIM_THROT_WST;
-        sim_throt_state++;                              /* next state */
+        sim_throt_state = 1;                            /* next state */
         break;                                          /* reschedule */
 
     case 1:                                             /* take final reading */
@@ -774,24 +822,32 @@ switch (sim_throt_state) {
                 d_cps = (double) sim_throt_val * 1000.0;
             else d_cps = (a_cps * ((double) sim_throt_val)) / 100.0;
             if (d_cps >= a_cps) {
-                sim_throt_state = 0;
+                sim_throt_sched ();                     /* start over */
                 return SCPE_OK;
                 }
             sim_throt_wait = (int32)                    /* time between waits */
                 ((a_cps * d_cps * ((double) sim_idle_rate_ms)) /
                  (1000.0 * (a_cps - d_cps)));
             if (sim_throt_wait < SIM_THROT_WMIN) {      /* not long enough? */
-                sim_throt_state = 0;
+                sim_throt_sched ();                     /* start over */
                 return SCPE_OK;
                 }
-            sim_throt_state++;
+            sim_throt_ms_start = sim_throt_ms_stop;
+            sim_throt_state = 2;
 //            fprintf (stderr, "Throttle values a_cps = %f, d_cps = %f, wait = %d\n",
 //                a_cps, d_cps, sim_throt_wait);
             }
         break;
 
     case 2:                                             /* throttling */
-        sim_os_ms_sleep (1);
+        sim_os_ms_sleep (sim_throt_sleep_time);
+        delta_ms = sim_os_msec () - sim_throt_ms_start;
+        if ((sim_throt_type != SIM_THROT_SPC) &&        /* when dynamic throttling */
+            (delta_ms >= 10000)) {                      /* recompute every 10 sec */
+            sim_throt_ms_start = sim_os_msec ();
+            sim_throt_wait = SIM_THROT_WST;
+            sim_throt_state = 1;                        /* next state */
+            }
         break;
         }
 
