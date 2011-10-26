@@ -1,6 +1,6 @@
 /* pdp8_fpp.c: PDP-8 floating point processor (FPP8A)
 
-   Copyright (c) 2007-2011, Robert M Supnik
+   Copyright (c) 2007-2010, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
