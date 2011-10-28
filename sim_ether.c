@@ -2608,12 +2608,12 @@ int eth_host_devices(int used, int max, ETH_LIST* list)
 
 int eth_devices(int max, ETH_LIST* list)
 {
+  int i = 0;
+#ifndef DONT_USE_PCAP_FINDALLDEVS
   pcap_if_t* alldevs;
   pcap_if_t* dev;
-  int i = 0;
   char errbuf[PCAP_ERRBUF_SIZE];
 
-#ifndef DONT_USE_PCAP_FINDALLDEVS
   /* retrieve the device list */
   if (pcap_findalldevs(&alldevs, errbuf) == -1) {
     char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
