@@ -634,7 +634,7 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
     tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
     if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {      /* still connected? */
         if (!sim_con_ldsc.conn) {
-            printf ("Running with Buffered Console\n"); /* print transition */
+            printf ("Running with Buffered Console\r\n"); /* print transition */
             fflush (stdout);
             if (sim_log) {                              /* log file? */
                 fprintf (sim_log, "Running with Buffered Console\n");
@@ -648,7 +648,7 @@ for (i = 0; i < sec; i++) {                             /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
         if (i) {                                        /* if delayed */
-            printf ("Running\n");                       /* print transition */
+            printf ("Running\r\n");                       /* print transition */
             fflush (stdout);
             if (sim_log) {                              /* log file? */
                 fprintf (sim_log, "Running\n");
@@ -661,7 +661,7 @@ for (i = 0; i < sec; i++) {                             /* loop */
     if ((c == SCPE_STOP) || stop_cpu)
         return SCPE_STOP;
     if ((i % 10) == 0) {                                /* Status every 10 sec */
-        printf ("Waiting for console Telnet connection\n");
+        printf ("Waiting for console Telnet connection\r\n");
         fflush (stdout);
         if (sim_log) {                              /* log file? */
             fprintf (sim_log, "Waiting for console Telnet connection\n");
