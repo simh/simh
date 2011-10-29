@@ -787,7 +787,7 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 #elif defined(USE_BSDTUNTAP)
 #include <sys/types.h>
 #include <net/if_types.h>
-#include <net/if_tun.h>
+#include <net/if.h>
 #else /* We don't know how to do this on the current platform */
 #undef USE_TAP_NETWORK
 #endif
@@ -1399,6 +1399,23 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
         dev->fd_handle = tun;
         strcpy(savname, savname+4);
       }
+#if defined (__APPLE__)
+      if (1) {
+        struct ifreq ifr;
+        int s;
+
+        memset (&ifr, 0, sizeof(ifr));
+        ifr.ifr_addr.sa_family = AF_INET;
+        strncpy(ifr.ifr_name, savname+4, sizeof(ifr.ifr_name));
+        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
+          if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
+            ifr.ifr_flags |= IFF_UP;
+            ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr);
+          }
+          close(s);
+        }
+      }
+#endif
     } else {
       strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
     }
@@ -1465,7 +1482,7 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
 #endif
 #endif /* !defined (USE_READER_THREAD */
 #if defined (__APPLE__)
-  if (1) {
+  if (dev->pcap_mode) {
     /* Deliver packets immediately, needed for OS X 10.6.2 and later
      * (Snow-Leopard).
      * See this thread on libpcap and Mac Os X 10.6 Snow Leopard on

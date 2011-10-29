@@ -66,7 +66,7 @@ ifeq ($(WIN32),)
     # Provide support for Tap networking on Linux
     NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK
   endif
-  ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h; then echo bsdtuntap; fi))
+  ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
     # Provide support for Tap networking
     NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
   endif

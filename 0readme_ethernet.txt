@@ -43,9 +43,9 @@ bridge, or route TAP devices for you.
 Integrated Universal TUN/TAP support can be used for host<->simulator network
 traffic (on the platforms where it is available) by using the SIMH command:
 "attach xq tap:tapN" (i.e. attach xq tap:tap0).  Platforms that this has been
-tested on include: Linux, FreeBSD, OpenBSD, NetBSD.  Each of these platforms
-has some way to create a tap pseudo device and then bridge it with a physical
-network interface.
+tested on include: Linux, FreeBSD, OpenBSD, NetBSD and OSX.  Each of these 
+platforms has some way to create a tap pseudo device (and possibly then to 
+bridge it with a physical network interface).
 
 The following steps were performed to get a working SIMH vax simulator 
 sharing a physical NIC and allowing Host<->SIMH vax communications:
@@ -117,6 +117,29 @@ NetBSD (NetBSD 5.0.2)
 
     # Run simulator and "attach xq tap:tap0"
 
+OSX (Snow Leopard)
+    OSX Does NOT have native support for tun/tap interfaces.  It also does not have native
+    support for bridging.
+    
+    Mattias Nissler has created tun/tap functionality available at http://tuntaposx,sourceforge.net/
+    
+    We'll punt on bridging for the sake of this example and move on to use a basic tap
+    based internal network so a host and guest can communicate directly.
+    
+    Download the install package from: 
+    http://sourceforge.net/projects/tuntaposx/files/tuntap/20090913/tuntap_20090913.tar.gz
+    
+    Expand the tarball to a directory.
+    Invoke the package installer tuntap_20090913.pkg
+    Click through the various prompts accepting things and eventually installing the package.
+    
+    # Run simulator and:
+       sim> attach xq tap:tap0
+       sim> ! ifconfig tap0 192.168.6.1 netmask 255.255.255.0
+
+    Simulated system uses IP address 192.168.6.2 and host uses 192.167.6.1 and things work.
+    As far as I can tell you must run as root for this to work.
+    
 -------------------------------------------------------------------------------
 
 Windows notes:
@@ -331,14 +354,15 @@ Dave
                                Change Log
 ===============================================================================
   
-  07-Jul-11  MB   VMS Pcap (from Mike Burke)
-                     - Fixed Alpha issues
-                     - Added OpenVMS Integrety support
+  29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
   17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 
                   vector assignments
   12-Aug-11  MP   Cleaned up payload length determination
                   Fixed race condition detecting reflections when threaded 
                   reading and writing is enabled
+  07-Jul-11  MB   VMS Pcap (from Mike Burke)
+                     - Fixed Alpha issues
+                     - Added OpenVMS Integrety support
   20-Apr-11  MP   Fixed save/restore behavior
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected DEUNA/DELUA SELFTEST command, enabling use by
