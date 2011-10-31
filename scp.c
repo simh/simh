@@ -2961,7 +2961,9 @@ for (j=0, r = SCPE_OK; j<attcnt; j++) {
     if (r == SCPE_OK) {
         dptr = find_dev_from_unit (attunits[j]);
         sim_switches = attswitches[j];
-        r = scp_attach_unit (dptr, attunits[j], attnames[j]);      /* reattach unit */
+        r = scp_attach_unit (dptr, attunits[j], attnames[j]);/* reattach unit */
+        if (r != SCPE_OK)
+            printf ("Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
         }
     free (attnames[j]);
     }
