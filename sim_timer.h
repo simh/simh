@@ -35,7 +35,14 @@
 
 #ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME 1
-#define NEED_CLOCK_REALTIME 1
+#define NEED_CLOCK_GETTIME 1
+#ifndef HAVE_STRUCT_TIMESPEC
+#define HAVE_STRUCT_TIMESPEC 1
+struct timespec {
+        long tv_sec;
+        long tv_nsec;
+};
+#endif /* HAVE_STRUCT_TIMESPEC */
 int clock_gettime(int clock_id, struct timespec *tp);
 #endif
 

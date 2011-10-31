@@ -175,7 +175,7 @@ return sim_os_msec () - stime;
 }
 
 #if defined(SIM_ASYNCH_IO)
-#ifdef NEED_CLOCK_REALTIME
+#ifdef NEED_CLOCK_GETTIME
 int clock_gettime(int clk_id, struct timespec *tp)
 {
 uint32 secs, ns, tod[2], unixbase[2] = {0xd53e8000, 0x019db1de};
@@ -247,7 +247,7 @@ Sleep (msec);
 return sim_os_msec () - stime;
 }
 
-#if defined(NEED_CLOCK_REALTIME)
+#if defined(NEED_CLOCK_GETTIME)
 int clock_gettime(int clk_id, struct timespec *tp)
 {
 t_uint64 now, unixbase;
@@ -338,7 +338,7 @@ treq.tv_nsec = (milliseconds % MILLIS_PER_SEC) * NANOS_PER_MILLI;
 return sim_os_msec () - stime;
 }
 
-#if defined(NEED_CLOCK_REALTIME)
+#if defined(NEED_CLOCK_GETTIME)
 int clock_gettime(int clk_id, struct timespec *tp)
 {
 struct timeval cur;
@@ -399,7 +399,7 @@ if (tim > SIM_IDLE_MAX)
 return tim;
 }
 #if !defined(_POSIX_SOURCE) && defined(SIM_ASYNCH_IO)
-#ifdef NEED_CLOCK_REALTIME
+#ifdef NEED_CLOCK_GETTIME
 typedef int clockid_t;
 int clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
