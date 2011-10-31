@@ -2657,6 +2657,7 @@ if (SizeInBytes > ((uint64)(1024*1024*1024))*2040) {
     }
 if (File = sim_fopen (szVHDPath, "rb")) {
     fclose (File);
+    File = NULL;
     Status = EEXIST;
     goto Cleanup_Return;
     }
@@ -2784,7 +2785,8 @@ if (WriteFilePosition(File,
 
 Cleanup_Return:
 free (BAT);
-fclose (File);
+if (File)
+    fclose (File);
 if (Status) {
     if (Status != EEXIST)
         remove (szVHDPath);
