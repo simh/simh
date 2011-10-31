@@ -13,6 +13,7 @@
 #
 ifeq ($(WIN32),)
   #*nix Environments (&& cygwin)
+  GCC = gcc
   ifeq (SunOS,$(shell uname))
     TEST = /bin/test
   else
@@ -62,13 +63,18 @@ ifeq ($(WIN32),)
     NETWORK_CCDEFS = -DUSE_NETWORK
     NETWORK_LDFLAGS = -lpcap
   endif
+  ifeq (vde,$(shell if $(TEST) -e /usr/include/libvdeplug.h -a \( -e /usr/lib/libvdeplug.$(LIBEXT) -o -e /usr/lib64/libvdeplug.$(LIBEXT) \); then echo vde; fi))
+    # Provide support for vde networking
+    NETWORK_CCDEFS += -DUSE_VDE_NETWORK
+    NETWORK_LDFLAGS += -lvdeplug
+  endif
   ifeq (tuntap,$(shell if $(TEST) -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
     # Provide support for Tap networking on Linux
-    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK
+    NETWORK_CCDEFS += -DUSE_TAP_NETWORK
   endif
   ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
     # Provide support for Tap networking
-    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
+    NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
@@ -79,6 +85,7 @@ ifeq ($(WIN32),)
   endif
 else
   #Win32 Environments (via MinGW32)
+  GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
   ifeq ($(NOASYNCH),)
     ifeq (pthreads,$(shell if exist ..\pthreads\Pre-built.2\include\pthread.h echo pthreads))
@@ -119,7 +126,7 @@ else
 endif
 
 
-CC = gcc -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS) $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) 
 
 #

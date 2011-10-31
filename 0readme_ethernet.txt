@@ -133,13 +133,37 @@ OSX (Snow Leopard)
     Invoke the package installer tuntap_20090913.pkg
     Click through the various prompts accepting things and eventually installing the package.
     
-    # Run simulator and:
+    # Build and Run simulator and:
        sim> attach xq tap:tap0
        sim> ! ifconfig tap0 192.168.6.1 netmask 255.255.255.0
 
-    Simulated system uses IP address 192.168.6.2 and host uses 192.167.6.1 and things work.
-    As far as I can tell you must run as root for this to work.
+    Simulated system uses IP address 192.168.6.2 and host uses 192.167.6.1 
+    and things work.
+    You must run as root for this to work.
     
+-------------------------------------------------------------------------------
+An alternative to direct pcap and tun/tap networking on *nix environments is 
+VDE (Virtual Distributed Ethernet).
+
+Note 1: Using vde based networking is likely more flexible, but it isn't 
+        nearly as efficient.  Host OS overhead will always be higher when 
+        vde networking is used as compared to native pcap and/or tun/tap 
+        networking.
+Note 2: Root access will likely be needed to configure or start the vde 
+        environment prior to starting a simulator which may use it.
+Note 3: Simulators running using VDE networking can run without root 
+        privilege.
+
+Linux (Ubuntu 10.04):
+    apt-get install libvdeplug-dev
+    apt-get install vde2
+
+    vde_switch -s /tmp/switch1 -tap tap0 -m 666
+    ifconfig tap0 192.168.6.1 netmask 255.255.255.0 up
+    
+    # Build and Run simulator and:
+       sim> attach xq vde:/tmp/switch1  #simulator uses IP address 192.168.6.2
+
 -------------------------------------------------------------------------------
 
 Windows notes:
@@ -354,6 +378,7 @@ Dave
                                Change Log
 ===============================================================================
   
+  30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
   17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 
                   vector assignments
