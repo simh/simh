@@ -39,7 +39,7 @@ $ libr/replace pcap grammar
 $ cc/name=( as_is,shortened)/opt/nomember_align'opt/include=sys$disk:[] -
  inet+sys$share:sys$lib_c.tlb/lib
 $ libr/replace pcap inet
-$ cc/name=( as_is,shortened)/opt/nomember_align'opt/include=sys$disk:[] -
+$ cc/name=( as_is,shortened)/opt/member_align'opt/include=sys$disk:[] -
   nametoaddr+sys$share:sys$lib_c.tlb/lib
 $ libr/replace pcap nametoaddr
 $ cc/name=( as_is,shortened)/opt/nomember_align'opt/include=sys$disk:[] - 
