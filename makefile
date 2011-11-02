@@ -25,7 +25,11 @@ ifeq ($(WIN32),)
     ifeq (Linux,$(shell uname))
       LIBEXT = so
     else
-      LIBEXT = a
+      ifeq (SunOS,$(shell uname))
+        LIBEXT = so
+      else
+        LIBEXT = a
+      endif
     endif
   endif
   OS_CCDEFS = -D_GNU_SOURCE
@@ -33,7 +37,7 @@ ifeq ($(WIN32),)
     OS_LDFLAGS += -lm
   endif
   ifeq (SunOS,$(shell uname))
-    OS_CCDEFS += -I/opt/sfw/include
+    OS_CCDEFS += -I/opt/sfw/include -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
     OS_LDFLAGS += -lsocket -lnsl -lrt -lm -lpthread -L/opt/sfw/lib -R/opt/sfw/lib
     endif
   ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
@@ -47,14 +51,21 @@ ifeq ($(WIN32),)
     OS_LDFLAGS += -lpthread 
   endif
   ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /usr/lib64/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
-    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h; then echo readline_h; fi))
+    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h -o -e /opt/sfw/include/readline/readline.h; then echo readline_h; fi))
       # Use Locally installed and available readline support
       ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
         OS_CCDEFS += -DHAVE_READLINE 
         OS_LDFLAGS += -lreadline -lncurses
       else
-        OS_CCDEFS += -DHAVE_READLINE 
-        OS_LDFLAGS += -lreadline 
+        ifeq (curses,$(shell if $(TEST) -e /usr/lib/libcurses.$(LIBEXT); then echo curses; fi))
+          OS_CCDEFS += -DHAVE_READLINE 
+          OS_LDFLAGS += -lreadline -lcurses
+        else
+          ifeq (solaris_readline,$(shell if $(TEST) ! -e /opt/sfw/lib/libreadline.a; then echo solaris_readline; fi))
+            OS_CCDEFS += -DHAVE_READLINE 
+            OS_LDFLAGS += -lreadline 
+          endif
+        endif
       endif
     endif
   endif
