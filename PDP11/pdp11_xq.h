@@ -87,7 +87,7 @@ extern int32 int_req[IPL_HLVL];
 
 #define XQ_QUE_MAX           500                        /* read queue size in packets */
 #define XQ_FILTER_MAX         14                        /* number of filters allowed */
-#if defined SIM_ASYNCH_IO
+#if defined(SIM_ASYNCH_IO) && defined(USE_READER_THREAD)
 #define XQ_SERVICE_INTERVAL  0                          /* polling interval - No Polling with Asynch I/O */
 #else
 #define XQ_SERVICE_INTERVAL  100                        /* polling interval - X per second */
