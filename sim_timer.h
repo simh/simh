@@ -33,6 +33,10 @@
 
 #include <time.h>
 
+#if defined (__APPLE__)
+#define HAVE_STRUCT_TIMESPEC 1   /* OSX defined the structure but doesn't tell us */
+#endif
+
 #ifndef CLOCK_REALTIME
 #define CLOCK_REALTIME 1
 #define NEED_CLOCK_GETTIME 1
