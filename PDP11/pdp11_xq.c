@@ -323,7 +323,7 @@ struct xq_device    xqb = {
 
 /* SIMH device structures */
 DIB xqa_dib = { IOBA_XQ, IOLN_XQ, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_int } };
+		1, IVCL (XQDELQA), 0, { &xq_int } };
 
 UNIT xqa_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
@@ -347,6 +347,7 @@ REG xqa_reg[] = {
   { GRDATA ( CSR,  xqa.csr,  XQ_RDX, 16, 0), REG_FIT },
   { FLDATA ( INT,  xqa.irq, 0) },
   { GRDATA ( TYPE,  xqa.type,  XQ_RDX, 32, 0), REG_FIT },
+  { GRDATA ( VLOC,  xqa_dib.vloc,  XQ_RDX, 32, 0), REG_FIT },
   { GRDATA ( MODE,  xqa.mode,  XQ_RDX, 32, 0), REG_FIT },
   { GRDATA ( POLL, xqa.poll, XQ_RDX, 16, 0), REG_HRO},
   { GRDATA ( CLAT, xqa.coalesce_latency, XQ_RDX, 16, 0), REG_HRO},
@@ -379,7 +380,7 @@ REG xqa_reg[] = {
 };
 
 DIB xqb_dib = { IOBA_XQB, IOLN_XQB, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_int } };
+		1, IVCL (XQDELQA), 0, { &xq_int } };
 
 UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
@@ -403,6 +404,7 @@ REG xqb_reg[] = {
   { GRDATA ( CSR,  xqb.csr,  XQ_RDX, 16, 0), REG_FIT },
   { FLDATA ( INT,  xqb.irq, 0) },
   { GRDATA ( TYPE,  xqb.type,  XQ_RDX, 32, 0), REG_FIT },
+  { GRDATA ( VLOC,  xqb_dib.vloc,  XQ_RDX, 32, 0), REG_FIT },
   { GRDATA ( MODE,  xqb.mode,  XQ_RDX, 32, 0), REG_FIT },
   { GRDATA ( POLL, xqb.poll, XQ_RDX, 16, 0), REG_HRO},
   { GRDATA ( CLAT, xqb.coalesce_latency, XQ_RDX, 16, 0), REG_HRO},
@@ -744,8 +746,11 @@ t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc)
   else if (!strcmp(cptr, "DELQA-T"))    xq->var->type = XQ_T_DELQA_PLUS;
   else return SCPE_ARG;
   xq->var->mode = XQ_T_DELQA;
-  if (xq->var->type == XQ_T_DEQNA)
+  xq->dib->vloc = IVCL (XQDELQA);
+  if (xq->var->type == XQ_T_DEQNA) {
     xq->var->mode = XQ_T_DEQNA;
+    xq->dib->vloc = IVCL (XQDEQNA);
+  }
 
   return SCPE_OK;
 }
@@ -2674,7 +2679,10 @@ void xq_setint(CTLR* xq)
   sim_debug(DBG_TRC, xq->dev, "xq_setint() - Generate Interrupt\n");
 
   xq->var->irq = 1;
-  SET_INT(XQ);
+  if (xq->var->type == XQ_T_DEQNA)
+    SET_INT(XQDEQNA);
+  else
+    SET_INT(XQDELQA);
   return;
 }
 
@@ -2683,12 +2691,17 @@ void xq_clrint(CTLR* xq)
   int i;
   xq->var->irq = 0;                               /* set controller irq off */
   /* clear master interrupt? */
+  if (xq->var->type == XQ_T_DEQNA)
+    CLR_INT(XQDEQNA);                             /* clear DEQNA master interrupt */
+  else
+    CLR_INT(XQDELQA);                             /* clear DELQA master interrupt */
   for (i=0; i<XQ_MAX_CONTROLLERS; i++)            /* check all controllers.. */
     if (xq_ctrl[i].var->irq) {                    /* if any irqs enabled */
-      SET_INT(XQ);                                /* set master interrupt on */
-      return;
+      if (xq->var->type == XQ_T_DEQNA)
+        SET_INT(XQDEQNA);                         /* set DEQNA master interrupt on */
+      else
+        SET_INT(XQDELQA);                         /* set DELQA master interrupt on */
     }
-  CLR_INT(XQ);                                    /* clear master interrupt */
   return;
 }
 

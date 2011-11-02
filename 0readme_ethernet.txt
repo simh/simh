@@ -378,6 +378,8 @@ Dave
                                Change Log
 ===============================================================================
   
+  02-Nov-11  MP   Fixed Interrupt Priority Level of DELQA and DELQA-T devices to 
+                  be BR4 devices.  Reported by Sergey Oboguev
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
   17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 
