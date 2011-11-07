@@ -23,7 +23,6 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   02-Nov-11    MP      Added separate IPL for DELQA/DELQA-T vs DEQNA
    29-Apr-07    RMS     Separated checks for PxBR and SBR
    17-May-06    RMS     Added CR11/CD11 support
    10-May-06    RMS     Added NOP'd reserved operand checking macros
@@ -337,7 +336,7 @@ typedef struct {
 #define INT_V_RP        4                               /* RP,RM drives */
 #define INT_V_TS        5                               /* TS11/TSV05 */
 #define INT_V_TQ        6                               /* TMSCP */
-#define INT_V_XQDEQNA   7                               /* DEQNA */
+#define INT_V_XQ        7                               /* DEQNA/DELQA */
 #define INT_V_RY        8                               /* RXV21 */
 
 /* IPL 14 */
@@ -355,7 +354,6 @@ typedef struct {
 #define INT_V_VHTX      10 
 #define INT_V_QDSS      11                              /* QDSS */
 #define INT_V_CR        12
-#define INT_V_XQDELQA   13                              /* DELQA */
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -365,8 +363,7 @@ typedef struct {
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TS          (1u << INT_V_TS)
 #define INT_TQ          (1u << INT_V_TQ)
-#define INT_XQDEQNA     (1u << INT_V_XQDEQNA)
-#define INT_XQDELQA     (1u << INT_V_XQDELQA)
+#define INT_XQ          (1u << INT_V_XQ)
 #define INT_RY          (1u << INT_V_RY)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_TTO         (1u << INT_V_TTO)
@@ -390,8 +387,7 @@ typedef struct {
 #define IPL_RP          (0x15 - IPL_HMIN)
 #define IPL_TS          (0x15 - IPL_HMIN)
 #define IPL_TQ          (0x15 - IPL_HMIN)
-#define IPL_XQDEQNA     (0x15 - IPL_HMIN)
-#define IPL_XQDELQA     (0x14 - IPL_HMIN)
+#define IPL_XQ          (0x15 - IPL_HMIN)
 #define IPL_RY          (0x15 - IPL_HMIN)
 #define IPL_TTI         (0x14 - IPL_HMIN)
 #define IPL_TTO         (0x14 - IPL_HMIN)
