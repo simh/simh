@@ -37,8 +37,8 @@ ifeq ($(WIN32),)
     OS_LDFLAGS += -lm
   endif
   ifeq (SunOS,$(shell uname))
-    OS_CCDEFS += -I/opt/sfw/include -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
-    OS_LDFLAGS += -lsocket -lnsl -lrt -lm -lpthread -L/opt/sfw/lib -R/opt/sfw/lib
+    OS_CCDEFS += -I/opt/sfw/include
+    OS_LDFLAGS += -lsocket -lnsl -L/opt/sfw/lib -R/opt/sfw/lib
     endif
   ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
     OS_CCDEFS += -O2 
@@ -90,6 +90,7 @@ ifeq ($(WIN32),)
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
   endif
+  NETWORK_OPT = $(NETWORK_CCDEFS)
   ifneq ($(USE_NETWORK),)
     # Assume built from tcpdump.org sources with default install target
     NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
@@ -137,7 +138,7 @@ else
 endif
 
 
-CC = $(GCC) -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) -std=c99 -U__STRICT_ANSI__ -g -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) 
 
 #
