@@ -130,7 +130,7 @@ fprintf (iFile, "#define ROM_%s_H 0\n", rom_array_name);
 fprintf (iFile, "/*\n");
 fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
 fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
-fprintf (iFile, "   file size: %d (0x%X)\n", statb.st_size, statb.st_size);
+fprintf (iFile, "   file size: %d (0x%X)\n", (int)statb.st_size, (int)statb.st_size);
 fprintf (iFile, "*/\n");
 fprintf (iFile, "unsigned char %s[] = {", rom_array_name);
 for (bytes_written=0;bytes_written<statb.st_size; ++bytes_written) {

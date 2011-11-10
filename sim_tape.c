@@ -320,14 +320,16 @@ return SCPE_NOFNC;
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 pthread_attr_t attr;
 
-ctx->asynch_io = 1;
+ctx->asynch_io = sim_asynch_enabled;
 ctx->asynch_io_latency = latency;
-pthread_mutex_init (&ctx->io_lock, NULL);
-pthread_cond_init (&ctx->io_cond, NULL);
-pthread_attr_init(&attr);
-pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-pthread_create (&ctx->io_thread, &attr, _tape_io, (void *)uptr);
-pthread_attr_destroy(&attr);
+if (ctx->asynch_io) {
+    pthread_mutex_init (&ctx->io_lock, NULL);
+    pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_create (&ctx->io_thread, &attr, _tape_io, (void *)uptr);
+    pthread_attr_destroy(&attr);
+    }
 uptr->a_check_completion = _tape_completion_dispatch;
 #endif
 return SCPE_OK;
@@ -362,7 +364,8 @@ static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
 sim_tape_clr_async (uptr);
-sim_tape_set_async (uptr, 0);
+if (sim_asynch_enabled)
+    sim_tape_set_async (uptr, 0);
 #endif
 fflush (uptr->fileref);
 }

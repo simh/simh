@@ -408,15 +408,17 @@ return SCPE_NOFNC;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 pthread_attr_t attr;
 
-ctx->asynch_io = 1;
+ctx->asynch_io = sim_asynch_enabled;
 ctx->asynch_io_latency = latency;
-pthread_mutex_init (&ctx->io_lock, NULL);
-pthread_cond_init (&ctx->io_cond, NULL);
-pthread_attr_init(&attr);
-pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
-pthread_create (&ctx->io_thread, &attr, _disk_io, (void *)uptr);
-pthread_attr_destroy(&attr);
-uptr->a_check_completion = _disk_completion_dispatch;
+if (ctx->asynch_io) {
+    pthread_mutex_init (&ctx->io_lock, NULL);
+    pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_attr_init(&attr);
+    pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_create (&ctx->io_thread, &attr, _disk_io, (void *)uptr);
+    pthread_attr_destroy(&attr);
+    uptr->a_check_completion = _disk_completion_dispatch;
+    }
 #endif
 return SCPE_OK;
 }
@@ -723,7 +725,8 @@ uint32 f = DK_GET_FMT (uptr);
 
 #if defined (SIM_ASYNCH_IO)
 sim_disk_clr_async (uptr);
-sim_disk_set_async (uptr, 0);
+if (sim_asynch_enabled)
+    sim_disk_set_async (uptr, 0);
 #endif
 switch (f) {                                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
@@ -1332,7 +1335,7 @@ if (strchr (openmode, 'r'))
     DesiredAccess |= GENERIC_READ;
 if (strchr (openmode, 'w') || strchr (openmode, '+'))
     DesiredAccess |= GENERIC_WRITE;
-Handle = CreateFileA (rawdevicename, DesiredAccess, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS, NULL);
+Handle = CreateFileA (rawdevicename, DesiredAccess, FILE_SHARE_READ|FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_FLAG_RANDOM_ACCESS|FILE_FLAG_WRITE_THROUGH, NULL);
 if (Handle == INVALID_HANDLE_VALUE) {
     _set_errno_from_status (GetLastError ());
     return NULL;
@@ -1418,17 +1421,21 @@ static t_stat sim_os_disk_unload_raw (FILE *Disk)
 {
 #ifdef IOCTL_STORAGE_EJECT_MEDIA
 DWORD BytesReturned;
+uint32 Removable = FALSE;
 
-if (!DeviceIoControl((HANDLE)Disk,                      /* handle to disk */
-                     IOCTL_STORAGE_EJECT_MEDIA,         /* dwIoControlCode */
-                     NULL,                              /* lpInBuffer */
-                     0,                                 /* nInBufferSize */
-                     NULL,                              /* lpOutBuffer */
-                     0,                                 /* nOutBufferSize */
-                     (LPDWORD) &BytesReturned,          /* number of bytes returned */
-                     (LPOVERLAPPED) NULL)) {            /* OVERLAPPED structure */
-    _set_errno_from_status (GetLastError ());
-    return SCPE_IOERR;
+sim_os_disk_info_raw (Disk, NULL, &Removable);
+if (Removable) {
+    if (!DeviceIoControl((HANDLE)Disk,                  /* handle to disk */
+                         IOCTL_STORAGE_EJECT_MEDIA,     /* dwIoControlCode */
+                         NULL,                          /* lpInBuffer */
+                         0,                             /* nInBufferSize */
+                         NULL,                          /* lpOutBuffer */
+                         0,                             /* nOutBufferSize */
+                         (LPDWORD) &BytesReturned,      /* number of bytes returned */
+                         (LPOVERLAPPED) NULL)) {        /* OVERLAPPED structure */
+        _set_errno_from_status (GetLastError ());
+        return SCPE_IOERR;
+        }
     }
 return SCPE_OK;
 #else
@@ -1440,17 +1447,21 @@ static t_bool sim_os_disk_isavailable_raw (FILE *Disk)
 {
 #ifdef IOCTL_STORAGE_EJECT_MEDIA
 DWORD BytesReturned;
+uint32 Removable = FALSE;
 
-if (!DeviceIoControl((HANDLE)Disk,                      /* handle to disk */
-                     IOCTL_STORAGE_CHECK_VERIFY,        /* dwIoControlCode */
-                     NULL,                              /* lpInBuffer */
-                     0,                                 /* nInBufferSize */
-                     NULL,                              /* lpOutBuffer */
-                     0,                                 /* nOutBufferSize */
-                     (LPDWORD) &BytesReturned,          /* number of bytes returned */
-                     (LPOVERLAPPED) NULL)) {            /* OVERLAPPED structure */
-    _set_errno_from_status (GetLastError ());
-    return FALSE;
+sim_os_disk_info_raw (Disk, NULL, &Removable);
+if (Removable) {
+    if (!DeviceIoControl((HANDLE)Disk,                  /* handle to disk */
+                         IOCTL_STORAGE_CHECK_VERIFY,    /* dwIoControlCode */
+                         NULL,                          /* lpInBuffer */
+                         0,                             /* nInBufferSize */
+                         NULL,                          /* lpOutBuffer */
+                         0,                             /* nOutBufferSize */
+                         (LPDWORD) &BytesReturned,      /* number of bytes returned */
+                         (LPOVERLAPPED) NULL)) {        /* OVERLAPPED structure */
+        _set_errno_from_status (GetLastError ());
+        return FALSE;
+        }
     }
 #endif
 return TRUE;
@@ -2646,6 +2657,7 @@ if (SizeInBytes > ((uint64)(1024*1024*1024))*2040) {
     }
 if (File = sim_fopen (szVHDPath, "rb")) {
     fclose (File);
+    File = NULL;
     Status = EEXIST;
     goto Cleanup_Return;
     }
@@ -2773,7 +2785,8 @@ if (WriteFilePosition(File,
 
 Cleanup_Return:
 free (BAT);
-fclose (File);
+if (File)
+    fclose (File);
 if (Status) {
     if (Status != EEXIST)
         remove (szVHDPath);

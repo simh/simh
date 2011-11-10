@@ -27,6 +27,31 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   28-Sep-11    MP      Generalized setting TODR for all OSes.  
+                        Unbound the TODR value from the 100hz clock tick 
+                        interrupt.  TODR now behaves like the original 
+                        battery backed-up clock and runs with the wall 
+                        clock, not the simulated instruction clock
+                        (except when running ROM diagnostics).
+                        Two operational modes are available:
+                        - Default VMS mode, which is similar to the previous 
+                          behavior in that without initializing the TODR it 
+                          would default to the value VMS would set it to if
+                          VMS knew the correct time.  This would be correct
+                          almost all the time unless a VMS disk hadn't been
+                          booted from for more than a year.  This mode 
+                          produces strange time results for non VMS OSes on 
+                          each system boot.
+                        - OS Agnostic mode.  This mode behaves precisely like
+                          the VAX780 TODR and works correctly for all OSes.  
+                          This mode is enabled by attaching the TODR to a 
+                          battery backup state file for the TOY clock 
+                          (i.e. sim> attach TODR TOY_CLOCK).  When operating 
+                          in OS Agnostic mode, the TODR will initially start
+                          counting from 0 and be adjusted differently when an
+                          OS specifically writes to the TODR.  VMS will prompt
+                          to set the time on each boot unless the SYSGEN 
+                          parameter TIMEPROMPTWAIT is set to 0.
    05-Jan-11    MP      Added Asynch I/O support
    17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
@@ -70,6 +95,11 @@ int32 clk_csr = 0;                                      /* control/status */
 int32 clk_tps = 100;                                    /* ticks/second */
 int32 todr_reg = 0;                                     /* TODR register */
 int32 todr_blow = 1;                                    /* TODR battery low */
+struct todr_battery_info {
+    uint32 toy_gmtbase;                                 /* GMT base of set value */
+    uint32 toy_gmtbasemsec;                             /* The milliseconds of the set value */
+    };
+typedef struct todr_battery_info TOY;
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
 int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
 
@@ -79,9 +109,12 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+t_stat clk_attach (UNIT *uptr, char *cptr);
+t_stat clk_detach (UNIT *uptr);
 t_stat todr_resync (void);
 
 extern int32 sysd_hlt_enb (void);
+extern int32 fault_PC;
 
 /* TTI data structures
 
@@ -168,7 +201,7 @@ DEVICE tto_dev = {
 
 DIB clk_dib = { 0, 0, NULL, NULL, 1, IVCL (CLK), SCB_INTTIM, { NULL } };
 
-UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };
+UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE+UNIT_FIX, sizeof(TOY)), CLK_DELAY };/* 100Hz */
 
 REG clk_reg[] = {
     { HRDATA (CSR, clk_csr, 16) },
@@ -180,6 +213,7 @@ REG clk_reg[] = {
     { DRDATA (POLL, tmr_poll, 24), REG_NZ + PV_LEFT + REG_HRO },
     { DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
 #if defined (SIM_ASYNCH_IO)
+    { DRDATA (ASYNCH, sim_asynch_enabled, 1), PV_LEFT },
     { DRDATA (LATENCY, sim_asynch_latency, 32), PV_LEFT },
     { DRDATA (INST_LATENCY, sim_asynch_inst_latency, 32), PV_LEFT },
 #endif
@@ -193,16 +227,15 @@ MTAB clk_mod[] = {
 
 DEVICE clk_dev = {
     "CLK", &clk_unit, clk_reg, clk_mod,
-    1, 0, 0, 0, 0, 0,
+    1, 0, 8, 1, 0, 0,
     NULL, NULL, &clk_reset,
-    NULL, NULL, NULL,
+    NULL, &clk_attach, &clk_detach,
     &clk_dib, 0
     };
 
 /* Clock and terminal MxPR routines
 
    iccs_rd/wr   interval timer
-   todr_rd/wr   time of year clock
    rxcs_rd/wr   input control/status
    rxdb_rd      input buffer
    txcs_rd/wr   output control/status
@@ -212,11 +245,6 @@ DEVICE clk_dev = {
 int32 iccs_rd (void)
 {
 return (clk_csr & CLKCSR_IMP);
-}
-
-int32 todr_rd (void)
-{
-return todr_reg;
 }
 
 int32 rxcs_rd (void)
@@ -244,14 +272,6 @@ void iccs_wr (int32 data)
 if ((data & CSR_IE) == 0)
     CLR_INT (CLK);
 clk_csr = (clk_csr & ~CLKCSR_RW) | (data & CLKCSR_RW);
-return;
-}
-
-void todr_wr (int32 data)
-{
-todr_reg = data;
-if (data)
-    todr_blow = 0;
 return;
 }
 
@@ -357,7 +377,8 @@ return SCPE_OK;
 
    clk_svc      process event (clock tick)
    clk_reset    process reset
-   todr_powerup powerup for TODR (get date from system)
+   todr_rd/wr   time of year clock
+   todr_resync  powerup for TODR (get date from system)
 */
 
 t_stat clk_svc (UNIT *uptr)
@@ -370,8 +391,8 @@ t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
 sim_activate (&clk_unit, t);                            /* reactivate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
-if (!todr_blow)                                         /* incr TODR */
-    todr_reg = todr_reg + 1;
+if (!todr_blow && todr_reg)                             /* if running? */
+    todr_reg = todr_reg + 1;                            /* incr TODR */
 return SCPE_OK;
 }
 
@@ -385,26 +406,80 @@ t = sim_is_active (&clk_unit);
 return (t? t - 1: wait);
 }
 
+int32 todr_rd (void)
+{
+TOY *toy = (TOY *)clk_unit.filebuf;
+struct timespec base, now, val;
+
+if ((fault_PC&0xFFFE0000) == 0x20040000)                /* running from ROM? */
+    return todr_reg;                                    /* return counted value for ROM diags */
+
+if (0 == todr_reg)                                      /* clock running? */
+    return todr_reg;
+
+/* Maximum number of seconds which can be represented as 10ms ticks 
+   in the 32bit TODR.  This is the 33bit value 0x100000000/100 to get seconds */
+#define TOY_MAX_SECS (0x40000000/25)
+
+clock_gettime(CLOCK_REALTIME, &now);                    /* get curr time */
+base.tv_sec = toy->toy_gmtbase;
+base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
+sim_timespec_diff (&val, &now, &base);
+
+if (val.tv_sec >= TOY_MAX_SECS)                         /* todr overflowed? */
+    return todr_reg = 0;                                /* stop counting */
+
+return (int32)(val.tv_sec*100 + val.tv_nsec/10000000);  /* 100hz Clock Ticks */
+}
+
+
+void todr_wr (int32 data)
+{
+TOY *toy = (TOY *)clk_unit.filebuf;
+struct timespec now, val, base;
+
+/* Save the GMT time when set value was 0 to record the base for future 
+   read operations in "battery backed-up" state */
+
+if (-1 == clock_gettime(CLOCK_REALTIME, &now))          /* get curr time */
+    return;                                             /* error? */
+val.tv_sec = ((uint32)data) / 100;
+val.tv_nsec = (((uint32)data) % 100) * 10000000;
+sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
+toy->toy_gmtbase = base.tv_sec;
+toy->toy_gmtbasemsec = base.tv_nsec/1000000;
+todr_reg = data;
+if (data)
+    todr_blow = 0;
+}
+
 /* TODR resync routine */
 
 t_stat todr_resync (void)
 {
-uint32 base;
-time_t curr;
-struct tm *ctm;
+TOY *toy = (TOY *)clk_unit.filebuf;
 
-curr = time (NULL);                                     /* get curr time */
-if (curr == (time_t) -1)                                /* error? */
-    return SCPE_NOFNC;
-ctm = localtime (&curr);                                /* decompose */
-if (ctm == NULL)                                        /* error? */
-    return SCPE_NOFNC;
-base = (((((ctm->tm_yday * 24) +                        /* sec since 1-Jan */
-        ctm->tm_hour) * 60) +
-        ctm->tm_min) * 60) +
-        ctm->tm_sec;
-todr_reg = (base * 100) + 0x10000000;                   /* cvt to VAX form */
-todr_blow = 0;
+if (clk_unit.flags & UNIT_ATT) {                        /* Attached means behave like real VAX780 */
+    if (!toy->toy_gmtbase)                              /* Never set? */
+        todr_wr (0);                                    /* Start ticking from 0 */
+    }
+else {                                                  /* Not-Attached means */
+    uint32 base;                                        /* behave like simh VMS default */
+    time_t curr;
+    struct tm *ctm;
+
+    curr = time (NULL);                                 /* get curr time */
+    if (curr == (time_t) -1)                            /* error? */
+        return SCPE_NOFNC;
+    ctm = localtime (&curr);                            /* decompose */
+    if (ctm == NULL)                                    /* error? */
+        return SCPE_NOFNC;
+    base = (((((ctm->tm_yday * 24) +                    /* sec since 1-Jan */
+            ctm->tm_hour) * 60) +
+            ctm->tm_min) * 60) +
+            ctm->tm_sec;
+    todr_wr ((base * 100) + 0x10000000);                /* use VMS form */
+    }
 return SCPE_OK;
 }
 
@@ -414,13 +489,46 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
-todr_resync ();                                         /* resync clock */
 clk_csr = 0;
 CLR_INT (CLK);
 t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init timer */
 sim_activate_abs (&clk_unit, t);                        /* activate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
+    clk_unit.filebuf = calloc(sizeof(TOY), 1);
+    if (clk_unit.filebuf == NULL)
+        return SCPE_MEM;
+    todr_resync ();
+    }
 return SCPE_OK;
+}
+
+/* CLK attach */
+
+t_stat clk_attach (UNIT *uptr, char *cptr)
+{
+t_stat r;
+
+uptr->flags = uptr->flags | (UNIT_ATTABLE | UNIT_BUFABLE);
+memset (uptr->filebuf, 0, (size_t)uptr->capac);
+r = attach_unit (uptr, cptr);
+if (r != SCPE_OK)
+    uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
+else
+    uptr->hwmark = (uint32) uptr->capac;
+return r;
+}
+
+/* CLK detach */
+
+t_stat clk_detach (UNIT *uptr)
+{
+t_stat r;
+
+r = detach_unit (uptr);
+if ((uptr->flags & UNIT_ATT) == 0)
+    uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
+return r;
 }
 

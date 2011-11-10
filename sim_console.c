@@ -424,7 +424,8 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if (isdigit (*gbuf)) {
-        if (sim_con_tmxr.master) return SCPE_ALATT;     /* already open? */
+        if (sim_con_tmxr.master)                        /* already open? */
+            sim_set_notelnet (0, NULL);                 /* close first */
         return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
         }
     else
@@ -633,8 +634,12 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
     tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
     if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {      /* still connected? */
         if (!sim_con_ldsc.conn) {
-            printf ("Running with Buffered Console\n"); /* print transition */
+            printf ("Running with Buffered Console\r\n"); /* print transition */
             fflush (stdout);
+            if (sim_log) {                              /* log file? */
+                fprintf (sim_log, "Running with Buffered Console\n");
+                fflush (sim_log);
+                }
             }
         return SCPE_OK;
         }
@@ -643,8 +648,12 @@ for (i = 0; i < sec; i++) {                             /* loop */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0) {          /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */
         if (i) {                                        /* if delayed */
-            printf ("Running\n");                       /* print transition */
+            printf ("Running\r\n");                       /* print transition */
             fflush (stdout);
+            if (sim_log) {                              /* log file? */
+                fprintf (sim_log, "Running\n");
+                fflush (sim_log);
+                }
             }
         return SCPE_OK;                                 /* ready to proceed */
         }
@@ -652,8 +661,12 @@ for (i = 0; i < sec; i++) {                             /* loop */
     if ((c == SCPE_STOP) || stop_cpu)
         return SCPE_STOP;
     if ((i % 10) == 0) {                                /* Status every 10 sec */
-        printf ("Waiting for console Telnet connection\n");
+        printf ("Waiting for console Telnet connection\r\n");
         fflush (stdout);
+        if (sim_log) {                              /* log file? */
+            fprintf (sim_log, "Waiting for console Telnet connection\n");
+            fflush (sim_log);
+            }
         }
     sim_os_sleep (1);                                   /* wait 1 second */
     }

@@ -13,6 +13,7 @@
 #
 ifeq ($(WIN32),)
   #*nix Environments (&& cygwin)
+  GCC = gcc
   ifeq (SunOS,$(shell uname))
     TEST = /bin/test
   else
@@ -24,15 +25,19 @@ ifeq ($(WIN32),)
     ifeq (Linux,$(shell uname))
       LIBEXT = so
     else
-      LIBEXT = a
+      ifeq (SunOS,$(shell uname))
+        LIBEXT = so
+      else
+        LIBEXT = a
+      endif
     endif
   endif
   OS_CCDEFS = -D_GNU_SOURCE
-  ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT); then echo libm; fi))
+  ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT) -o -e /usr/lib64/libm.$(LIBEXT); then echo libm; fi))
     OS_LDFLAGS += -lm
   endif
   ifeq (SunOS,$(shell uname))
-    OS_CCDEFS += -I/opt/sfw/include
+    OS_CCDEFS += -I/opt/sfw/include -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
     OS_LDFLAGS += -lsocket -lnsl -lrt -lm -lpthread -L/opt/sfw/lib -R/opt/sfw/lib
     endif
   ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
@@ -46,14 +51,21 @@ ifeq ($(WIN32),)
     OS_LDFLAGS += -lpthread 
   endif
   ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /usr/lib64/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
-    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h; then echo readline_h; fi))
+    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h -o -e /opt/sfw/include/readline/readline.h; then echo readline_h; fi))
       # Use Locally installed and available readline support
       ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
         OS_CCDEFS += -DHAVE_READLINE 
         OS_LDFLAGS += -lreadline -lncurses
       else
-        OS_CCDEFS += -DHAVE_READLINE 
-        OS_LDFLAGS += -lreadline 
+        ifeq (curses,$(shell if $(TEST) -e /usr/lib/libcurses.$(LIBEXT); then echo curses; fi))
+          OS_CCDEFS += -DHAVE_READLINE 
+          OS_LDFLAGS += -lreadline -lcurses
+        else
+          ifeq (solaris_readline,$(shell if $(TEST) ! -e /opt/sfw/lib/libreadline.a; then echo solaris_readline; fi))
+            OS_CCDEFS += -DHAVE_READLINE 
+            OS_LDFLAGS += -lreadline 
+          endif
+        endif
       endif
     endif
   endif
@@ -62,13 +74,18 @@ ifeq ($(WIN32),)
     NETWORK_CCDEFS = -DUSE_NETWORK
     NETWORK_LDFLAGS = -lpcap
   endif
+  ifeq (vde,$(shell if $(TEST) -e /usr/include/libvdeplug.h -a \( -e /usr/lib/libvdeplug.$(LIBEXT) -o -e /usr/lib64/libvdeplug.$(LIBEXT) \); then echo vde; fi))
+    # Provide support for vde networking
+    NETWORK_CCDEFS += -DUSE_VDE_NETWORK
+    NETWORK_LDFLAGS += -lvdeplug
+  endif
   ifeq (tuntap,$(shell if $(TEST) -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
     # Provide support for Tap networking on Linux
-    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK
+    NETWORK_CCDEFS += -DUSE_TAP_NETWORK
   endif
-  ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h; then echo bsdtuntap; fi))
+  ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
     # Provide support for Tap networking
-    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
+    NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
@@ -79,6 +96,7 @@ ifeq ($(WIN32),)
   endif
 else
   #Win32 Environments (via MinGW32)
+  GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
   ifeq ($(NOASYNCH),)
     ifeq (pthreads,$(shell if exist ..\pthreads\Pre-built.2\include\pthread.h echo pthreads))
@@ -119,7 +137,7 @@ else
 endif
 
 
-CC = gcc -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS) $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) -std=c99 -U__STRICT_ANSI__ -g -I . $(NETWORK_CCDEFS) $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) 
 
 #

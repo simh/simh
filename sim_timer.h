@@ -31,6 +31,26 @@
 #ifndef _SIM_TIMER_H_
 #define _SIM_TIMER_H_   0
 
+#include <time.h>
+
+#if defined (__APPLE__)
+#define HAVE_STRUCT_TIMESPEC 1   /* OSX defined the structure but doesn't tell us */
+#endif
+
+#ifndef CLOCK_REALTIME
+#define CLOCK_REALTIME 1
+#define NEED_CLOCK_GETTIME 1
+#ifndef HAVE_STRUCT_TIMESPEC
+#define HAVE_STRUCT_TIMESPEC 1
+struct timespec {
+        long tv_sec;
+        long tv_nsec;
+};
+#endif /* HAVE_STRUCT_TIMESPEC */
+int clock_gettime(int clock_id, struct timespec *tp);
+#endif
+
+
 #define SIM_NTIMERS     8                               /* # timers */
 #define SIM_TMAX        500                             /* max timer makeup */
 
@@ -46,11 +66,13 @@
 #define SIM_THROT_WMIN  100                             /* min wait */
 #define SIM_THROT_MSMIN 10                              /* min for measurement */
 #define SIM_THROT_NONE  0                               /* throttle parameters */
-#define SIM_THROT_MCYC  1
-#define SIM_THROT_KCYC  2
-#define SIM_THROT_PCT   3
+#define SIM_THROT_MCYC  1                               /* MegaCycles Per Sec */
+#define SIM_THROT_KCYC  2                               /* KiloCycles Per Sec */
+#define SIM_THROT_PCT   3                               /* Max Percent of host CPU */
+#define SIM_THROT_SPC   4                               /* Specific periodic Delay */
 
 t_bool sim_timer_init (void);
+void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);
 int32 sim_rtcn_init (int32 time, int32 tmr);
 void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);

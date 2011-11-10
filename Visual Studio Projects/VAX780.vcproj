@@ -27,7 +27,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s)"
-				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -112,7 +112,7 @@
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s)"
-				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -134,7 +134,7 @@
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;../../winpcap/Wpdpack/Include;&quot;../../pthreads/Pre-built.2/include&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_780;USE_SHARED;_CRT_SECURE_NO_WARNINGS;USE_READER_THREAD"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_780;USE_SHARED;_CRT_SECURE_NO_WARNINGS;USE_READER_THREAD;SIM_ASYNCH_IO"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"

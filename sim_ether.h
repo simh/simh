@@ -28,6 +28,7 @@
 
   Modification history:
 
+  30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   18-Apr-11  MP   Fixed race condition with self loopback packets in 
                   multithreaded environments
   09-Dec-10  MP   Added support to determine if network address conflicts exist
@@ -89,13 +90,13 @@
 #if defined (USE_READER_THREAD)
 #if defined (USE_SETNONBLOCK)
 #undef USE_SETNONBLOCK
-#endif
+#endif /* USE_SETNONBLOCK */
 #undef PCAP_READ_TIMEOUT
 #define PCAP_READ_TIMEOUT 15
-#if !defined (xBSD) && !defined(_WIN32) && !defined(VMS)
-#define MUST_DO_SELECT
+#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
+#define MUST_DO_SELECT 1
 #endif
-#endif
+#endif /* USE_READER_THREAD */
 
 /*
   USE_BPF is defined to let this code leverage the libpcap/OS kernel provided 
@@ -175,7 +176,10 @@ struct eth_device {
   char*         name;                                   /* name of ethernet device */
   void*         handle;                                 /* handle of implementation-specific device */
   int           fd_handle;                              /* fd to kernel device (where needed) */
-  int           pcap_mode;                              /* Flag indicating if pcap API are being used to move packets */
+  int           eth_api;                                /* Designator for which API is being used to move packets */
+#define ETH_API_PCAP 0                                  /* Pcap API in use */
+#define ETH_API_TAP  1                                  /* tun/tap API in use */
+#define ETH_API_VDE  2                                  /* VDE API in use */
   ETH_PCALLBACK read_callback;                          /* read callback function */
   ETH_PCALLBACK write_callback;                         /* write callback function */
   ETH_PACK*     read_packet;                            /* read packet */

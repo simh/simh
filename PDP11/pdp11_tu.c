@@ -469,7 +469,7 @@ den = GET_DEN (tutc);                                   /* get density */
 uptr = tu_dev.units + drv;                              /* get unit */
 if (DEBUG_PRS (tu_dev)) {
     fprintf (sim_deb, ">>TU%d STRT: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=",
-             drv, tu_fname[fnc], tufc, tufs, tuer, uptr->pos);
+             drv, tu_fname[fnc], tufc, tufs, tuer);
     fprint_val (sim_deb, uptr->pos, 10, T_ADDR_W, PV_LEFT);
     fprintf (sim_deb, "\n");
     }

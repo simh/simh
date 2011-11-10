@@ -57,8 +57,8 @@
 #
 #        MMK/MACRO=(NOASYNCH=1)
 #
-# On AXP the AXP PCAP components are built and used to provide network 
-# support for the VAX and PDP11 simulators.
+# On AXP and IA64 the VMS PCAP components are built and used to provide 
+# network support for the VAX and PDP11 simulators.
 #
 # The AXP PCAP components can only be built using a version of the 
 # DEC/Compaq/HP Compiler version V6.5-001 or later.  To build using an

@@ -450,10 +450,10 @@ MTAB xq_mod[] = {
   { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE={DEQNA|DELQA|DELQA-T}",
     &xq_set_type, &xq_show_type, NULL },
 #ifdef USE_READER_THREAD
-        { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500|DELAY=nnn}",
+  { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500|DELAY=nnn}",
     &xq_set_poll, &xq_show_poll, NULL },
 #else
-        { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
+  { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
     &xq_set_poll, &xq_show_poll, NULL },
 #endif
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "SANITY", "SANITY={ON|OFF}",
@@ -2584,6 +2584,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   if (xq->var->poll == 0) {
     status = eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     if (status != SCPE_OK) {
+      eth_close(xq->var->etherface);
       free(tptr);
       free(xq->var->etherface);
       xq->var->etherface = NULL;
