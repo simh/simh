@@ -11,6 +11,15 @@
 #
 # CC Command (and platform available options).  (Poor man's autoconf)
 #
+# In general, the logic below will detect and build with the available 
+# features which the host build environment provides. 
+#
+# Readline support can be disabled if GNU make is invoked with 
+# DONT_USE_READLINE=1 on the command line.
+#
+# Internal ROM support can be disabled if GNU make is invoked with
+# DONT_USE_ROMS=1 on the command line.
+#
 ifeq ($(WIN32),)
   #*nix Environments (&& cygwin)
   GCC = gcc
@@ -19,81 +28,123 @@ ifeq ($(WIN32),)
   else
     TEST = test
   endif
+  INCPATH=/usr/include
+  LIBPATH=/usr/lib
+  OS_CCDEFS = -D_GNU_SOURCE
   ifeq (Darwin,$(shell uname))
     LIBEXT = dylib
   else
     ifeq (Linux,$(shell uname))
       LIBEXT = so
+      ifeq (usrlib64,$(shell if $(TEST) -d /usr/lib64; then echo usrlib64; fi))
+        LIBPATH += /usr/lib64
+      endif
+      ifeq (lib32,$(shell if $(TEST) -d /usr/lib32; then echo lib32; fi))
+        LIBPATH += /usr/lib32
+      endif
     else
       ifeq (SunOS,$(shell uname))
         LIBEXT = so
+        OS_LDFLAGS += -lsocket -lnsl
+        ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
+          INCPATH += /opt/sfw/include
+          OS_CCDEFS += -I/opt/sfw/include
+        endif
+        ifeq (libsfw,$(shell if $(TEST) -d /opt/sfw/lib; then echo libsfw; fi))
+          LIBPATH += /opt/sfw/lib
+          OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
+        endif
       else
+        ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
+          LIBPATH += /usr/pkg/lib
+          OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+        endif
         LIBEXT = a
       endif
     endif
   endif
-  OS_CCDEFS = -D_GNU_SOURCE
-  ifeq (libm,$(shell if $(TEST) -e /usr/lib/libm.$(LIBEXT) -o -e /usr/lib64/libm.$(LIBEXT); then echo libm; fi))
-    OS_LDFLAGS += -lm
-  endif
-  ifeq (SunOS,$(shell uname))
-    OS_CCDEFS += -I/opt/sfw/include
-    OS_LDFLAGS += -lsocket -lnsl -L/opt/sfw/lib -R/opt/sfw/lib
-    endif
   ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
     OS_CCDEFS += -O2 
   endif
-  ifeq (librt,$(shell if $(TEST) -e /usr/lib/librt.$(LIBEXT) -o -e /usr/lib64/librt.$(LIBEXT); then echo librt; fi))
+  find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
+  find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
+  ifneq (,$(call find_lib,m))
+    OS_LDFLAGS += -lm
+    $(info using libm: $(call find_lib,m))
+  endif
+  ifneq (,$(call find_lib,rt))
     OS_LDFLAGS += -lrt 
+    $(info using librt: $(call find_lib,rt))
   endif
-  ifeq (libpthread,$(shell if $(TEST) -e /usr/lib/libpthread.$(LIBEXT) -o -e /usr/lib64/libpthread.$(LIBEXT); then echo libpthread; fi))
-    OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
-    OS_LDFLAGS += -lpthread 
+  ifneq (,$(call find_lib,pthread))
+    ifneq (,$(call find_include,pthread))
+      OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
+      OS_LDFLAGS += -lpthread 
+      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+    endif
   endif
-  ifeq (readline,$(shell if $(TEST) -e /usr/lib/libreadline.$(LIBEXT) -o -e /usr/lib64/libreadline.$(LIBEXT) -o -e /opt/sfw/lib/libreadline.a; then echo readline; fi))
-    ifeq (readline_h,$(shell if $(TEST) -e /usr/include/readline/readline.h -o -e /usr/include/readline.h -o -e /opt/sfw/include/readline/readline.h; then echo readline_h; fi))
-      # Use Locally installed and available readline support
-      ifeq (ncurses,$(shell if $(TEST) -e /usr/lib/libncurses.$(LIBEXT) -o -e /opt/sfw/lib/libncurses.a; then echo ncurses; fi))
-        OS_CCDEFS += -DHAVE_READLINE 
-        OS_LDFLAGS += -lreadline -lncurses
-      else
-        ifeq (curses,$(shell if $(TEST) -e /usr/lib/libcurses.$(LIBEXT); then echo curses; fi))
+  ifeq ($(DONT_USE_READLINE),)
+    ifneq (,$(call find_include,readline/readline))
+      ifneq (,$(call find_lib,readline))
+        # Use Locally installed and available readline support
+        ifneq (,$(call find_lib,ncurses))
           OS_CCDEFS += -DHAVE_READLINE 
-          OS_LDFLAGS += -lreadline -lcurses
+          OS_LDFLAGS += -lreadline -lncurses
+          $(info using libreadline and libncurses: $(call find_lib,readline) $(call find_lib,ncurses) $(call find_include,readline/readline))
         else
-          ifeq (solaris_readline,$(shell if $(TEST) ! -e /opt/sfw/lib/libreadline.a; then echo solaris_readline; fi))
+          ifneq (,$(call find_lib,curses))
             OS_CCDEFS += -DHAVE_READLINE 
-            OS_LDFLAGS += -lreadline 
+            OS_LDFLAGS += -lreadline -lcurses
+            $(info using libreadline and libcurses: $(call find_lib,readline) $(call find_lib,curses) $(call find_include,readline/readline))
           endif
         endif
       endif
     endif
   endif
-  ifeq (pcap,$(shell if $(TEST) -e /usr/include/pcap.h -o -e /opt/sfw/include/pcap.h; then echo pcap; fi))
-    # Use Locally installed and available pcap support
-    NETWORK_CCDEFS = -DUSE_NETWORK
-    NETWORK_LDFLAGS = -lpcap
+  ifneq (,$(call find_lib,pcap))
+    ifneq (,$(call find_include,pcap))
+      NETWORK_CCDEFS = -DUSE_NETWORK
+      NETWORK_LDFLAGS = -lpcap
+      $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+    endif
   endif
-  ifeq (vde,$(shell if $(TEST) -e /usr/include/libvdeplug.h -a \( -e /usr/lib/libvdeplug.$(LIBEXT) -o -e /usr/lib64/libvdeplug.$(LIBEXT) \); then echo vde; fi))
-    # Provide support for vde networking
-    NETWORK_CCDEFS += -DUSE_VDE_NETWORK
-    NETWORK_LDFLAGS += -lvdeplug
+  ifneq (,$(call find_lib,vdeplug))
+    ifneq (,$(call find_include,libvdeplug))
+      # Provide support for vde networking
+      NETWORK_CCDEFS += -DUSE_VDE_NETWORK
+      NETWORK_LDFLAGS += -lvdeplug
+      $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
+    endif
   endif
-  ifeq (tuntap,$(shell if $(TEST) -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
+  ifneq (,$(call find_include,linux/if_tun))
     # Provide support for Tap networking on Linux
     NETWORK_CCDEFS += -DUSE_TAP_NETWORK
   endif
   ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
-    # Provide support for Tap networking
+    # Provide support for Tap networking on BSD platforms (including OS X)
     NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
   endif
   NETWORK_OPT = $(NETWORK_CCDEFS)
-  ifneq ($(USE_NETWORK),)
-    # Assume built from tcpdump.org sources with default install target
-    NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
+  ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
+    ifneq (USE_NETWORK,$(findstring USE_NETWORK,$(NETWORK_CCDEFS)))
+      # Look for package built from tcpdump.org sources with default install target
+      LIBPATH += /usr/local/lib
+      INCPATH += /usr/local/include
+      LIBEXT = a
+      ifneq (,$(call find_lib,pcap))
+        ifneq (,$(call find_include,pcap))
+          NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
+          $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+        else
+          $(error using libpcap: $(call find_lib,pcap) missing pcap.h)
+        endif
+      else
+        $(error missing libpcap)
+      endif
+    endif
   endif
 else
   #Win32 Environments (via MinGW32)
