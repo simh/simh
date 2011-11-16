@@ -7,9 +7,10 @@
 #   NetBSD
 #   FreeBSD
 #   Windows (MinGW & cygwin)
-#   
+#   Linux x86 targeting Android (using agcc script)
 #
-# CC Command (and platform available options).  (Poor man's autoconf)
+# Android targeted builds should invoke GNU make with GCC=agcc on
+# the command line.
 #
 # In general, the logic below will detect and build with the available 
 # features which the host build environment provides. 
@@ -20,46 +21,54 @@
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
-ifeq ($(WIN32),)
-  #*nix Environments (&& cygwin)
-  GCC = gcc
+# CC Command (and platform available options).  (Poor man's autoconf)
+#
+ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
+  ifeq ($(GCC),)
+    GCC = gcc
+  endif
   ifeq (SunOS,$(shell uname))
     TEST = /bin/test
   else
     TEST = test
   endif
-  INCPATH=/usr/include
-  LIBPATH=/usr/lib
-  OS_CCDEFS = -D_GNU_SOURCE
-  ifeq (Darwin,$(shell uname))
-    LIBEXT = dylib
-  else
-    ifeq (Linux,$(shell uname))
-      LIBEXT = so
-      ifeq (usrlib64,$(shell if $(TEST) -d /usr/lib64; then echo usrlib64; fi))
-        LIBPATH += /usr/lib64
-      endif
-      ifeq (lib32,$(shell if $(TEST) -d /usr/lib32; then echo lib32; fi))
-        LIBPATH += /usr/lib32
-      endif
+  ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
+    OS_CCDEFS = -D_GNU_SOURCE -DSIM_ASYNCH_IO
+    OS_LDFLAGS = -lm 
+  else # Non-Android Builds
+    INCPATH=/usr/include
+    LIBPATH=/usr/lib
+    OS_CCDEFS = -D_GNU_SOURCE
+    ifeq (Darwin,$(shell uname))
+      LIBEXT = dylib
     else
-      ifeq (SunOS,$(shell uname))
+      ifeq (Linux,$(shell uname))
         LIBEXT = so
-        OS_LDFLAGS += -lsocket -lnsl
-        ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
-          INCPATH += /opt/sfw/include
-          OS_CCDEFS += -I/opt/sfw/include
+        ifeq (usrlib64,$(shell if $(TEST) -d /usr/lib64; then echo usrlib64; fi))
+    	  LIBPATH += /usr/lib64
         endif
-        ifeq (libsfw,$(shell if $(TEST) -d /opt/sfw/lib; then echo libsfw; fi))
-          LIBPATH += /opt/sfw/lib
-          OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
+        ifeq (lib32,$(shell if $(TEST) -d /usr/lib32; then echo lib32; fi))
+    	  LIBPATH += /usr/lib32
         endif
       else
-        ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
-          LIBPATH += /usr/pkg/lib
-          OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+        ifeq (SunOS,$(shell uname))
+          LIBEXT = so
+          OS_LDFLAGS += -lsocket -lnsl
+          ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
+            INCPATH += /opt/sfw/include
+            OS_CCDEFS += -I/opt/sfw/include
+          endif
+          ifeq (libsfw,$(shell if $(TEST) -d /opt/sfw/lib; then echo libsfw; fi))
+            LIBPATH += /opt/sfw/lib
+            OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
+          endif
+        else
+          ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
+            LIBPATH += /usr/pkg/lib
+            OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+          endif
+          LIBEXT = a
         endif
-        LIBEXT = a
       endif
     endif
   endif
@@ -441,7 +450,11 @@ endif
 
 ${BIN}BuildROMs${EXE} : 
 	${MKDIRBIN}
+ifeq (agcc,$(findstring agcc,$(firstword $(CC))))
+	gcc $(wordlist 2,1000,${CC}) sim_BuildROMs.c -o $@
+else
 	${CC} sim_BuildROMs.c -o $@
+endif
 ifeq ($(WIN32),)
 	$@
 	${RM} $@
