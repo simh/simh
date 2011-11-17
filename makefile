@@ -14,6 +14,10 @@
 #
 # In general, the logic below will detect and build with the available 
 # features which the host build environment provides. 
+# 
+# Dynamic loading of libpcap is the default behavior if pcap.h is
+# available at build time.  Direct calls to libpcap can be enabled
+# if GNU make is invoked with USE_NETWORK on the command line.
 #
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
@@ -105,11 +109,19 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
-  ifneq (,$(call find_lib,pcap))
-    ifneq (,$(call find_include,pcap))
-      NETWORK_CCDEFS = -DUSE_NETWORK
-      NETWORK_LDFLAGS = -lpcap
-      $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+  ifneq (,$(call find_include,pcap))
+    ifneq (,$(call find_lib,pcap))
+      ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
+        NETWORK_CCDEFS = -DUSE_NETWORK
+        NETWORK_LDFLAGS = -lpcap
+        $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+      else # default build uses dynamic libpcap
+        NETWORK_CCDEFS = -DUSE_SHARED
+        $(info using libpcap: $$(call find_include,pcap))
+      endif
+    else
+      NETWORK_CCDEFS = -DUSE_SHARED
+      $(info using libpcap: $$(call find_include,pcap))
     endif
   endif
   ifneq (,$(call find_lib,vdeplug))

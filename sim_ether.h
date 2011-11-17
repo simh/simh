@@ -28,6 +28,7 @@
 
   Modification history:
 
+  17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   18-Apr-11  MP   Fixed race condition with self loopback packets in 
                   multithreaded environments
@@ -97,6 +98,15 @@
 #define MUST_DO_SELECT 1
 #endif
 #endif /* USE_READER_THREAD */
+
+/* give priority to USE_NETWORK over USE_SHARED */
+#if defined(USE_NETWORK) && defined(USE_SHARED)
+#undef USE_SHARED
+#endif
+/* USE_SHARED only works on Windows or if HAVE_DLOPEN */
+#if defined(USE_SHARED) && !defined(_WIN32) && !defined(HAVE_DLOPEN)
+#undef USE_SHARED
+#endif
 
 /*
   USE_BPF is defined to let this code leverage the libpcap/OS kernel provided 
