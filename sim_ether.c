@@ -863,6 +863,7 @@ static int     (*p_pcap_setmintocopy) (pcap_t* handle, int);
 static HANDLE  (*p_pcap_getevent) (pcap_t *);
 #else
 static int     (*p_pcap_get_selectable_fd) (pcap_t *);
+static int     (*p_pcap_fileno) (pcap_t *);
 #endif
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
 static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
@@ -933,6 +934,7 @@ int load_pcap(void) {
       load_function("pcap_getevent",     (void**) &p_pcap_getevent);
 #else
       load_function("pcap_get_selectable_fd",     (void**) &p_pcap_get_selectable_fd);
+      load_function("pcap_fileno",       (void**) &p_pcap_fileno);
 #endif
       load_function("pcap_sendpacket",   (void**) &p_pcap_sendpacket);
       load_function("pcap_setfilter",    (void**) &p_pcap_setfilter);
@@ -1050,6 +1052,14 @@ HANDLE pcap_getevent(pcap_t* a) {
 int pcap_get_selectable_fd(pcap_t* a) {
   if (load_pcap() != 0) {
     return p_pcap_get_selectable_fd(a);
+  } else {
+    return 0;
+  }
+}
+
+int pcap_fileno(pcap_t * a) {
+  if (load_pcap() != 0) {
+    return p_pcap_fileno(a);
   } else {
     return 0;
   }

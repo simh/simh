@@ -117,7 +117,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
       else # default build uses dynamic libpcap
         NETWORK_CCDEFS = -DUSE_SHARED
-        $(info using libpcap: $$(call find_include,pcap))
+        $(info using libpcap: $(call find_include,pcap))
       endif
     else
       NETWORK_CCDEFS = -DUSE_SHARED
