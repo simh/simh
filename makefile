@@ -15,9 +15,6 @@
 # In general, the logic below will detect and build with the available 
 # features which the host build environment provides. 
 #
-# Readline support can be disabled if GNU make is invoked with 
-# DONT_USE_READLINE=1 on the command line.
-#
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
@@ -67,7 +64,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             LIBPATH += /usr/pkg/lib
             OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
           endif
-          LIBEXT = a
+          ifneq (,$(findstring NetBSD,$(shell uname))$(findstring FreeBSD,$(shell uname)))
+            LIBEXT = so
+          else
+            LIBEXT = a
+          endif
         endif
       endif
     endif
@@ -92,21 +93,15 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     endif
   endif
-  ifeq ($(DONT_USE_READLINE),)
-    ifneq (,$(call find_include,readline/readline))
-      ifneq (,$(call find_lib,readline))
-        # Use Locally installed and available readline support
-        ifneq (,$(call find_lib,ncurses))
-          OS_CCDEFS += -DHAVE_READLINE 
-          OS_LDFLAGS += -lreadline -lncurses
-          $(info using libreadline and libncurses: $(call find_lib,readline) $(call find_lib,ncurses) $(call find_include,readline/readline))
-        else
-          ifneq (,$(call find_lib,curses))
-            OS_CCDEFS += -DHAVE_READLINE 
-            OS_LDFLAGS += -lreadline -lcurses
-            $(info using libreadline and libcurses: $(call find_lib,readline) $(call find_lib,curses) $(call find_include,readline/readline))
-          endif
-        endif
+  ifneq (,$(call find_include,dlfcn))
+    ifneq (,$(call find_lib,dl))
+      OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
+      OS_LDFLAGS += -ldl
+      $(info using libdl: $(call find_lib,dl) $(call find_include,dlfcn))
+    else
+      ifeq (BSD,$(findstring BSD,$(shell uname)))
+        OS_CCDEFS += -DHAVE_DLOPEN=so
+        $(info using libdl: $(call find_include,dlfcn))
       endif
     endif
   endif
