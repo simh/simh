@@ -121,7 +121,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       NETWORK_CCDEFS = -DUSE_SHARED
-      $(info using libpcap: $$(call find_include,pcap))
+      $(info using libpcap: $(call find_include,pcap))
     endif
   endif
   ifneq (,$(call find_lib,vdeplug))
@@ -149,14 +149,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       # Look for package built from tcpdump.org sources with default install target
       LIBPATH += /usr/local/lib
       INCPATH += /usr/local/include
+      LIBEXTSAVE = $(LIBEXT)
       LIBEXT = a
       ifneq (,$(call find_lib,pcap))
         ifneq (,$(call find_include,pcap))
-          NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
+          NETWORK_OPT := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,pcap)
           $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
         else
           $(error using libpcap: $(call find_lib,pcap) missing pcap.h)
         endif
+        LIBEXT = $(LIBEXTSAVE)
       else
         $(error missing libpcap)
       endif
