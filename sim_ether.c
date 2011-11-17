@@ -849,7 +849,7 @@ static char* no_pcap =
 
 /* define pointers to pcap functions needed */
 static void    (*p_pcap_close) (pcap_t *);
-static int     (*p_pcap_compile) (pcap_t *, struct bpf_program *, char *, int, bpf_u_int32);
+static int     (*p_pcap_compile) (pcap_t *, struct bpf_program *, const char *, int, bpf_u_int32);
 static int     (*p_pcap_datalink) (pcap_t *);
 static int     (*p_pcap_dispatch) (pcap_t *, int, pcap_handler, u_char *);
 static int     (*p_pcap_findalldevs) (pcap_if_t **, char *);
@@ -905,10 +905,10 @@ int load_pcap(void) {
 #endif
 
         printf (msg, lib_name);
-        printf (msg2);
+        printf ("%s", msg2);
         if (sim_log) {
           fprintf (sim_log, msg, lib_name);
-          fprintf (sim_log, msg2);
+          fprintf (sim_log, "%s", msg2);
         }
         lib_loaded = 2;
         break;
@@ -959,7 +959,7 @@ void pcap_close(pcap_t* a) {
   }
 }
 
-int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e) {
+int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_int32 e) {
   if (load_pcap() != 0) {
     return p_pcap_compile(a, b, c, d, e);
   } else {
