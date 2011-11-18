@@ -378,6 +378,7 @@ Dave
                                Change Log
 ===============================================================================
   
+  17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
   17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 

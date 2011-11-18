@@ -213,9 +213,8 @@
 #include <ctype.h>
 #include <time.h>
 
-#if defined(HAVE_READLINE)
-#include <readline/readline.h>
-#include <readline/history.h>
+#if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
+#include <dlfcn.h>
 #endif
 
 #define EX_D            0                               /* deposit */
@@ -3841,15 +3840,40 @@ return read_line_p (NULL, cptr, size, stream);
 char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 {
 char *tptr;
+#if defined(HAVE_DLOPEN)
+static int initialized = 0;
+static char *(*p_readline)(const char *) = NULL;
+static void (*p_add_history)(const char *) = NULL;
 
-#if defined(HAVE_READLINE)
+if (!initialized) {
+    initialized = 1;
+    void *handle;
+
+#define __STR_QUOTE(tok) #tok
+#define __STR(tok) __STR_QUOTE(tok)
+    handle = dlopen("libncurses." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libcurses." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libreadline." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    if (handle) {
+        p_readline = dlsym(handle, "readline");
+        p_add_history = dlsym(handle, "add_history");
+        }
+    }
 if (prompt) {                                           /* interactive? */
-    char *tmpc = readline (prompt);                     /* get cmd line */
-    if (tmpc == NULL)                                   /* bad result? */
-        cptr = NULL;
+    char *tmpc;
+
+    if (p_readline) {
+        char *tmpc = p_readline (prompt);               /* get cmd line */
+        if (tmpc == NULL)                               /* bad result? */
+            cptr = NULL;
+        else {
+            strncpy (cptr, tmpc, size);                 /* copy result */
+            free (tmpc) ;                               /* free temp */
+            }
+        }
     else {
-        strncpy (cptr, tmpc, size);                     /* copy result */
-        free (tmpc) ;                                   /* free temp */
+        printf ("%s", prompt);                          /* display prompt */
+        cptr = fgets (cptr, size, stream);              /* get cmd line */
         }
     }
 else cptr = fgets (cptr, size, stream);                 /* get cmd line */
@@ -3875,9 +3899,9 @@ while (isspace (*cptr))                                 /* trim leading spc */
 if (*cptr == ';')                                       /* ignore comment */
     *cptr = 0;
 
-#if defined (HAVE_READLINE)
-if (prompt)
-    add_history (cptr);
+#if defined (HAVE_DLOPEN)
+if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
+    p_add_history (cptr);
 #endif
 
 return cptr;
