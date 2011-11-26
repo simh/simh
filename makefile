@@ -61,7 +61,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           endif
         else
           LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
-          ifneq (,$(LDSEARCH)
+          ifneq (,$(LDSEARCH))
             LIBPATH := $(LDSEARCH)
           endif
           ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
