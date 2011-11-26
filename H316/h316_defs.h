@@ -1,6 +1,6 @@
 /* h316_defs.h: Honeywell 316/516 simulator definitions
 
-   Copyright (c) 1999-2010, Robert M. Supnik
+   Copyright (c) 1999-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   19-Nov-11    RMS     Removed XR macro, added XR_LOC macro (from Adrian Wise)
    22-May-10    RMS     Added check for 64b definitions
    15-Feb-05    RMS     Added start button interrupt
    01-Dec-04    RMS     Added double precision constants
@@ -65,10 +66,10 @@
 #define DP_SIGN         010000000000
 #define DMASK           0177777                         /* data mask */
 #define MMASK           (DMASK & ~SIGN)                 /* magnitude mask */
-#define XR              M[0]
 #define M_CLK           061                             /* clock location */
 #define M_RSTINT        062                             /* restrict int */
 #define M_INT           063                             /* int location */
+#define M_XR            (ext? 0: (PC & 040000))         /* XR location */
 
 /* CPU options */
 
