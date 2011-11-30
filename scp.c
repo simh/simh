@@ -1376,6 +1376,7 @@ C1TAB *ctbr, *glbr;
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
     { "BREAK", &brk_cmd, SSH_ST },
+    { "NOBREAK", &brk_cmd, SSH_CL },
     { "TELNET", &sim_set_telnet, 0 },                   /* deprecated */
     { "NOTELNET", &sim_set_notelnet, 0 },               /* deprecated */
     { "LOG", &sim_set_logon, 0 },                       /* deprecated */
