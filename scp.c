@@ -620,6 +620,7 @@ static CTAB cmd_table[] = {
       "set nothrottle           set simulation rate to maximum\n"
       "set asynch               enable asynchronous I/O\n"
       "set noasynch             disable asynchronous I/O\n"
+      "set environment name=val set environment variable\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -781,6 +782,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         continue;
     if (*cptr == 0)                                     /* ignore blank */
         continue;
+    sub_args (cbuf, gbuf, CBUFSIZE, argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "sim> %s\n", cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -1360,6 +1362,33 @@ fprintf (st, "Asynchronous I/O is not available in this simulator\n");
 return SCPE_OK;
 }
 
+#if defined(_WIN32)
+static
+int setenv(const char *envname, const char *envval, int overwrite)
+    {
+    char *envstr = malloc(strlen(envname)+strlen(envval)+2);
+    int r;
+
+    sprintf(envstr, "%s=%s", envname, envval);
+    r = _putenv(envstr);
+    free(envstr);
+    return r;
+    }
+#endif
+
+/* Set environment routine */
+
+t_stat sim_set_environment (int32 flag, char *cptr)
+{
+char varname[CBUFSIZE];
+
+if ((!cptr) || (*cptr == 0))                            /* now eol? */
+    return SCPE_2FARG;
+cptr = get_glyph_gen (cptr, varname, '=', FALSE);       /* get environment variable name */
+setenv(varname, cptr, 1);
+return SCPE_OK;
+}
+
 /* Set command */
 
 t_stat set_cmd (int32 flag, char *cptr)
@@ -1387,6 +1416,7 @@ static CTAB set_glob_tab[] = {
     { "NOTHROTTLE", &sim_set_throt, 0 },
     { "ASYNCH", &sim_set_asynch, 1 },
     { "NOASYNCH", &sim_set_asynch, 0 },
+    { "ENV", &sim_set_environment, 1 },
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
     { NULL, NULL, 0 }
