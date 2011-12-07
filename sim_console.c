@@ -23,6 +23,12 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   07-Dec-11    MP      Added sim_ttisatty to support reasonable behaviour (i.e. 
+                        avoid in infinite loop) in the main command input
+                        loop when EOF is detected and input is coming from 
+                        a file (or a null device: /dev/null or NUL:) This may
+                        happen when a simulator is running in a background 
+                        process.
    17-Apr-11    MP      Cleaned up to support running in a background/detached
                         process
    20-Jan-11    MP      Fixed support for BREAK key on Windows to account 
@@ -98,6 +104,7 @@
    sim_ttrun    -       called to put terminal into run state
    sim_ttcmd    -       called to return terminal to command state
    sim_ttclose  -       called once before the simulator exits
+   sim_ttisatty -       called to determine if running interactively
    sim_os_poll_kbd -    poll for keyboard input
    sim_os_putchar -     output character to console
 
@@ -867,6 +874,11 @@ t_stat sim_ttclose (void)
 return sim_ttcmd ();
 }
 
+t_bool sim_ttisatty (void)
+{
+return isatty (fileno (stdin));
+}
+
 t_stat sim_os_poll_kbd (void)
 {
 unsigned int status, term[2];
@@ -986,6 +998,13 @@ t_stat sim_ttclose (void)
 return SCPE_OK;
 }
 
+t_bool sim_ttisatty (void)
+{
+DWORD Mode;
+
+return (std_input) && (std_input != INVALID_HANDLE_VALUE) && GetConsoleMode (std_input, &Mode);
+}
+
 t_stat sim_os_poll_kbd (void)
 {
 int c = -1;
@@ -1061,6 +1080,11 @@ return SCPE_OK;
 t_stat sim_ttclose (void)
 {
 return SCPE_OK;
+}
+
+t_bool sim_ttisatty (void)
+{
+return 1;
 }
 
 t_stat sim_os_poll_kbd (void)
@@ -1259,6 +1283,11 @@ t_stat sim_ttclose (void)
 return SCPE_OK;
 }
 
+t_bool sim_ttisatty (void)
+{
+return 1;
+}
+
 t_stat sim_os_poll_kbd (void)
 {
 int c;
@@ -1353,6 +1382,11 @@ return SCPE_OK;
 t_stat sim_ttclose (void)
 {
 return sim_ttcmd ();
+}
+
+t_bool sim_ttisatty (void)
+{
+return isatty (0);
 }
 
 t_stat sim_os_poll_kbd (void)
@@ -1460,6 +1494,11 @@ return SCPE_OK;
 t_stat sim_ttclose (void)
 {
 return sim_ttcmd ();
+}
+
+t_bool sim_ttisatty(void)
+{
+return isatty (fileno (stdin));
 }
 
 t_stat sim_os_poll_kbd (void)

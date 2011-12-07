@@ -778,8 +778,9 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
         }
     else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
-    if (cptr == NULL)                                   /* ignore EOF */
-        continue;
+    if (cptr == NULL)                                   /* EOF? */
+        if (sim_ttisatty()) continue;                   /* ignore tty EOF */
+        else break;                                     /* otherwise exit */
     if (*cptr == 0)                                     /* ignore blank */
         continue;
     sub_args (cbuf, gbuf, CBUFSIZE, argv);

@@ -83,6 +83,7 @@ t_stat sim_ttinit (void);
 t_stat sim_ttrun (void);
 t_stat sim_ttcmd (void);
 t_stat sim_ttclose (void);
+t_bool sim_ttisatty(void);
 t_stat sim_os_poll_kbd (void);
 t_stat sim_os_putchar (int32 out);
 int32 sim_tt_inpcvt (int32 c, uint32 mode);
