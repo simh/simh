@@ -434,7 +434,8 @@ FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
-static FILE *sim_gotofile;
+static FILE *sim_gotofile;                              /* the currently open do file */
+static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
 static int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
@@ -954,7 +955,7 @@ t_stat do_cmd (int32 flag, char *fcptr)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp;
-int32 echo, nargs, errabort, i;
+int32 echo = sim_do_echo, nargs, errabort, i;
 t_bool interactive, isdo, staying;
 t_stat stat;
 char *ocptr;
@@ -965,7 +966,8 @@ interactive = (flag > 0);                               /* issued interactively?
 if (interactive) {                                      /* get switches */
     GET_SWITCHES (fcptr);
     }
-echo = sim_switches & SWMASK ('V');                     /* -v means echo */
+if (sim_switches & SWMASK ('V'))                        /* -v means echo */
+    echo = 1;
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
 c = fcptr;
@@ -1023,6 +1025,7 @@ do {
     sim_switches = 0;                                   /* init switches */
     isdo = FALSE;
     sim_gotofile = fpin;
+    sim_do_echo = echo;
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
         if ((cmdp->action == &return_cmd))              /* RETURN command? */
             break;                                      /*    done! */
@@ -1086,6 +1089,7 @@ do {
 
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
+sim_do_echo = 0;
 for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
     free (sim_on_actions[sim_do_depth][i]);
     sim_on_actions[sim_do_depth][i] = NULL;
@@ -1245,12 +1249,14 @@ t_stat goto_cmd (int32 flag, char *fcptr)
 {
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], gbuf1[CBUFSIZE];
 long fpos;
+int32 saved_do_echo = sim_do_echo;
 
 if (NULL == sim_gotofile) return SCPE_UNK;		/* only valid inside of do_cmd */
 get_glyph (fcptr, gbuf1, 0);
 if ('\0' == gbuf1[0]) return SCPE_ARG;                  /* unspecified goto target */
 fpos = ftell(sim_gotofile);                             /* Save start position */
 rewind(sim_gotofile);                                   /* start search for label */
+sim_do_echo = 0;                                        /* Don't echo while searching for label */
 while (1) {
     cptr = read_line (cbuf, CBUFSIZE, sim_gotofile);    /* get cmd line */
     if (cptr == NULL) break;                            /* exit on eof */
@@ -1261,9 +1267,15 @@ while (1) {
     cptr = get_glyph (cptr, gbuf, 0);                   /* get label glyph */
     if (0 == strcmp(gbuf, gbuf1)) {
         sim_brk_clract ();                              /* goto defangs current actions */
+        sim_do_echo = saved_do_echo;                    /* restore echo mode */
+        if (sim_do_echo)                                /* echo if -v */
+            printf("do> %s\n", cbuf);
+        if (sim_do_echo && sim_log)
+            fprintf (sim_log, "do> %s\n", cbuf);
         return SCPE_OK;
         }
     }
+sim_do_echo = saved_do_echo;                            /* restore echo mode */
 fseek(sim_gotofile, fpos, SEEK_SET);                    /* resture start position */
 return SCPE_ARG;
 }
@@ -3115,6 +3127,9 @@ if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
     }
 if (sim_step)                                           /* set step timer */
     sim_activate (&sim_step_unit, sim_step);
+fflush(stdout);                                         /* flush stdout */
+if (sim_log)                                            /* flush log if enabled */
+    fflush (sim_log);
 sim_throt_sched ();                                     /* set throttle */
 sim_is_running = 1;                                     /* flag running */
 sim_brk_clract ();                                      /* defang actions */
@@ -3930,8 +3945,13 @@ for (tptr = cptr; tptr < (cptr + size); tptr++) {       /* remove cr or nl */
     }
 while (isspace (*cptr))                                 /* trim leading spc */
     cptr++;
-if (*cptr == ';')                                       /* ignore comment */
+if (*cptr == ';') {                                     /* ignore comment */
+    if (sim_do_echo)                                    /* echo comments if -v */
+        printf("do> %s\n", cptr);
+    if (sim_do_echo && sim_log)
+        fprintf (sim_log, "do> %s\n", cptr);
     *cptr = 0;
+    }
 
 #if defined (HAVE_DLOPEN)
 if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
