@@ -188,6 +188,7 @@
 #define PSL_M_IPL       0x1F
 #define PSL_IPL         (PSL_M_IPL << PSL_V_IPL)
 #define PSL_IPL1        (0x01 << PSL_V_IPL)
+#define PSL_IPL17       (0x17 << PSL_V_IPL)
 #define PSL_IPL1F       (0x1F << PSL_V_IPL)
 #define PSL_MBZ         (0x30200000 | PSW_MBZ)          /* must be zero */
 #define PSW_MBZ         0xFF00                          /* must be zero */

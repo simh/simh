@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2010, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   11-Dec-11    RMS     Fixed priority of PIRQ vs IO; added INT_INTERNALn
    22-May-10    RMS     Added check for 64b definitions
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added KE11A, DC11 support
@@ -628,61 +629,65 @@ typedef struct pdp_dib DIB;
 #define IOBA_PSW        (IOPAGEBASE + 017776)           /* PSW */
 #define IOLN_PSW        002
 
-/* Interrupt assignments; within each level, priority is right to left */
+/* Interrupt assignments; within each level, priority is right to left
+   PIRQn has the highest priority with a level and is always bit <0>
+   On level 6, the clock is second highest priority */
 
 #define IPL_HLVL        8                               /* # int levels */
+#define IPL_HMIN        4                               /* lowest IO int level */
 
 #define INT_V_PIR7      0                               /* BR7 */
 
-#define INT_V_CLK       0                               /* BR6 */
-#define INT_V_PCLK      1
-#define INT_V_DTA       2
-#define INT_V_TA        3
-#define INT_V_PIR6      4
+#define INT_V_PIR6      0                               /* BR6 */
+#define INT_V_CLK       1
+#define INT_V_PCLK      2
+#define INT_V_DTA       3
+#define INT_V_TA        4
 
-#define INT_V_RK        0                               /* BR5 */
-#define INT_V_RL        1
-#define INT_V_RX        2
-#define INT_V_TM        3
-#define INT_V_RP        4
-#define INT_V_TS        5
-#define INT_V_HK        6
-#define INT_V_RQ        7
-#define INT_V_DZRX      8
-#define INT_V_DZTX      9
-#define INT_V_TQ        10
-#define INT_V_RY        11
-#define INT_V_XQ        12
-#define INT_V_XU        13
-#define INT_V_TU        14
-#define INT_V_RF        15
-#define INT_V_RC        16
-#define INT_V_PIR5      17
+#define INT_V_PIR5      0                               /* BR5 */
+#define INT_V_RK        1
+#define INT_V_RL        2
+#define INT_V_RX        3
+#define INT_V_TM        4
+#define INT_V_RP        5
+#define INT_V_TS        6
+#define INT_V_HK        7
+#define INT_V_RQ        8
+#define INT_V_DZRX      9
+#define INT_V_DZTX      10
+#define INT_V_TQ        11
+#define INT_V_RY        12
+#define INT_V_XQ        13
+#define INT_V_XU        14
+#define INT_V_TU        15
+#define INT_V_RF        16
+#define INT_V_RC        17
 
-#define INT_V_TTI       0                               /* BR4 */
-#define INT_V_TTO       1
-#define INT_V_PTR       2
-#define INT_V_PTP       3
-#define INT_V_LPT       4
-#define INT_V_VHRX      5
-#define INT_V_VHTX      6  
-#define INT_V_CR        7
-#define INT_V_DLI       8
-#define INT_V_DLO       9
-#define INT_V_DCI       10
-#define INT_V_DCO       11
-#define INT_V_PIR4      12
+#define INT_V_PIR4      0                               /* BR4 */
+#define INT_V_TTI       1
+#define INT_V_TTO       2
+#define INT_V_PTR       3
+#define INT_V_PTP       4
+#define INT_V_LPT       5
+#define INT_V_VHRX      6
+#define INT_V_VHTX      7  
+#define INT_V_CR        8
+#define INT_V_DLI       9
+#define INT_V_DLO       10
+#define INT_V_DCI       11
+#define INT_V_DCO       12
 
 #define INT_V_PIR3      0                               /* BR3 */
 #define INT_V_PIR2      0                               /* BR2 */
 #define INT_V_PIR1      0                               /* BR1 */
 
 #define INT_PIR7        (1u << INT_V_PIR7)
+#define INT_PIR6        (1u << INT_V_PIR6)
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_PCLK        (1u << INT_V_PCLK)
 #define INT_DTA         (1u << INT_V_DTA)
 #define INT_TA          (1u << INT_V_TA)
-#define INT_PIR6        (1u << INT_V_PIR6)
+#define INT_PIR5        (1u << INT_V_PIR5)
 #define INT_RK          (1u << INT_V_RK)
 #define INT_RL          (1u << INT_V_RL)
 #define INT_RX          (1u << INT_V_RX)
@@ -700,11 +705,11 @@ typedef struct pdp_dib DIB;
 #define INT_TU          (1u << INT_V_TU)
 #define INT_RF          (1u << INT_V_RF)
 #define INT_RC          (1u << INT_V_RC)
-#define INT_PIR5        (1u << INT_V_PIR5)
-#define INT_PTR         (1u << INT_V_PTR)
-#define INT_PTP         (1u << INT_V_PTP)
+#define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_TTO         (1u << INT_V_TTO)
+#define INT_PTR         (1u << INT_V_PTR)
+#define INT_PTP         (1u << INT_V_PTP)
 #define INT_LPT         (1u << INT_V_LPT)
 #define INT_VHRX        (1u << INT_V_VHRX)
 #define INT_VHTX        (1u << INT_V_VHTX)
@@ -713,10 +718,17 @@ typedef struct pdp_dib DIB;
 #define INT_DLO         (1u << INT_V_DLO)
 #define INT_DCI         (1u << INT_V_DCI)
 #define INT_DCO         (1u << INT_V_DCO)
-#define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_PIR3        (1u << INT_V_PIR3)
 #define INT_PIR2        (1u << INT_V_PIR2)
 #define INT_PIR1        (1u << INT_V_PIR1)
+
+#define INT_INTERNAL7   (INT_PIR7)
+#define INT_INTERNAL6   (INT_PIR6 | INT_CLK)
+#define INT_INTERNAL5   (INT_PIR5)
+#define INT_INTERNAL4   (INT_PIR4)
+#define INT_INTERNAL3   (INT_PIR3)
+#define INT_INTERNAL2   (INT_PIR2)
+#define INT_INTERNAL1   (INT_PIR1)
 
 #define IPL_CLK         6                               /* int pri levels */
 #define IPL_PCLK        6
