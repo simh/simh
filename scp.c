@@ -677,6 +677,21 @@ static CTAB cmd_table[] = {
     { NULL, NULL, 0 }
     };
 
+#if defined(_WIN32)
+static
+int setenv(const char *envname, const char *envval, int overwrite)
+    {
+    char *envstr = malloc(strlen(envname)+strlen(envval)+2);
+    int r;
+
+    sprintf(envstr, "%s=%s", envname, envval);
+    r = _putenv(envstr);
+    free(envstr);
+    return r;
+    }
+#endif
+
+
 /* Main command loop */
 
 int main (int argc, char *argv[])
@@ -721,6 +736,7 @@ AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
 sim_finit ();                                           /* init fio package */
+setenv ("SIM_NAME", sim_name, 1);                       /* Publish simulator name */
 stop_cpu = 0;
 sim_interval = 0;
 sim_time = sim_rtime = 0;
@@ -1362,20 +1378,6 @@ fprintf (st, "Asynchronous I/O is not available in this simulator\n");
 #endif
 return SCPE_OK;
 }
-
-#if defined(_WIN32)
-static
-int setenv(const char *envname, const char *envval, int overwrite)
-    {
-    char *envstr = malloc(strlen(envname)+strlen(envval)+2);
-    int r;
-
-    sprintf(envstr, "%s=%s", envname, envval);
-    r = _putenv(envstr);
-    free(envstr);
-    return r;
-    }
-#endif
 
 /* Set environment routine */
 
