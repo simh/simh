@@ -1,6 +1,6 @@
 /* h316_cpu.c: Honeywell 316/516 CPU simulator
 
-   Copyright (c) 1999-2010, Robert M. Supnik
+   Copyright (c) 1999-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    cpu          H316/H516 CPU
 
+   19-Nov-11    RMS     Fixed XR behavior (from Adrian Wise)
+   19-Nov-11    RMS     Fixed bugs in double precision, normalization, SC (from Adrian Wise)
    10-Jan-10    RMS     Fixed bugs in LDX, STX introduced in 3.8-1 (from Theo Engel)
    28-Apr-07    RMS     Removed clock initialization
    03-Apr-06    RMS     Fixed bugs in LLL, LRL (from Theo Engel)
@@ -51,7 +53,7 @@
    C                    overflow flag
    EXT                  extend mode flag
    DP                   double precision mode flag
-   SC<1:5>              shift count
+   SC<1:6>              shift count
    SR[1:4]<0>           sense switches 1-4
 
    The Honeywell 316/516 has six instruction formats: memory reference,
@@ -195,6 +197,18 @@
         h316_defs.h     add interrupt request definition
         h316_cpu.c      add device dispatch table entry
         h316_sys.c      add sim_devices table entry
+
+   Notes on the behavior of XR:
+
+   - XR is "shadowed" by memory location 0 as seen by the program currently
+     executing.  Thus, in extend mode, this is always absolute location 0.
+     However, if extend mode is off, this is location 0, if the program is
+     executing in the lower bank, or location 040000, if the program is
+     executing in the upper bank.  Writing XR writes the shadowed memory
+     location, and vice versa.
+   - However, the front panel console always equates XR to absolute location
+     0, regardless of extend mode.  There is no direct examine or deposit
+     to XR; the user must examine or deposit location 0.
 */
 
 #include "h316_defs.h"
@@ -234,6 +248,7 @@ uint16 M[MAXMEMSIZE] = { 0 };                           /* memory */
 int32 saved_AR = 0;                                     /* A register */
 int32 saved_BR = 0;                                     /* B register */
 int32 saved_XR = 0;                                     /* X register */
+int32 XR = 0;                                           /* live copy - must be global */
 int32 PC = 0;                                           /* P register */
 int32 C = 0;                                            /* C register */
 int32 ext = 0;                                          /* extend mode */
@@ -302,7 +317,7 @@ REG cpu_reg[] = {
     { ORDATA (P, PC, 15) },
     { ORDATA (A, saved_AR, 16) },
     { ORDATA (B, saved_BR, 16) },
-    { ORDATA (X, XR, 16) },
+    { ORDATA (X, saved_XR, 16) },
     { ORDATA (SC, sc, 16) },
     { FLDATA (C, C, 0) },
     { FLDATA (EXT, ext, 0) },
@@ -388,6 +403,8 @@ int32 Operate (int32 MB, int32 AR);
                         BR = (BR & SIGN) | ((x) & MMASK)
 #define PUTDBL_U(x)     AR = ((x) >> 16) & DMASK; \
                         BR = (x) & DMASK
+#define PUTDBL_Z(x)     AR = ((x) >> 15) & DMASK; \
+                        BR = (x) & MMASK
 #define SEXT(x)         (((x) & SIGN)? ((x) | ~DMASK): ((x) & DMASK))
 #define NEWA(c,n)       (ext? (((c) & ~X_AMASK) | ((n) & X_AMASK)): \
                         (((c) & ~NX_AMASK) | ((n) & NX_AMASK)))
@@ -559,7 +576,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             t1 = GETDBL_S (AR, BR);                     /* get A'B */
             t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
             t1 = Add31 (t1, t2);                        /* 31b add */
-            PUTDBL_S (t1);
+            PUTDBL_Z (t1);
             sc = 0;
             }
         else AR = Add16 (AR, Read (Y));                 /* no, 16b add */
@@ -572,7 +589,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             t1 = GETDBL_S (AR, BR);                     /* get A'B */
             t2 = GETDBL_S (Read (Y & ~1), Read (Y | 1));
             t1 = Add31 (t1, -t2);                       /* 31b sub */
-            PUTDBL_S (t1);
+            PUTDBL_Z (t1);
             sc = 0;
             }
         else AR = Add16 (AR, (-Read (Y)) & DMASK);      /* no, 16b sub */
@@ -624,6 +641,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
         if (reason = Ea (MB & ~IDX, &Y))                /* eff addr */
             break;
         XR = Read (Y);                                  /* load XR */
+        M[M_XR] = XR;                                   /* update mem too */
         break;
 
     case 016: case 036: case 056: case 076:             /* MPY */
@@ -631,7 +649,7 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             if (reason = Ea (MB, &Y))                   /* eff addr */
                 break;
             t1 = SEXT (AR) * SEXT (Read (Y));
-            PUTDBL_S (t1);
+            PUTDBL_Z (t1);
             sc = 0;
             }
         else reason = stop_inst;
@@ -719,15 +737,15 @@ switch (I_GETOP (MB)) {                                 /* case on <1:6> */
             CLR_INT (INT_MPE);
         if (MB & m11) {                                 /* SCA, INK */
             if (MB & m15)                               /* INK */
-                AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 037);
+                AR = (C << 15) | (dp << 14) | (pme << 13) | (sc & 077);
             else if (cpu_unit.flags & UNIT_HSA)         /* SCA */
-                AR = sc & 037;
+                AR = sc & 077;
             else reason = stop_inst; 
             }
         else if (MB & m10) {                            /* NRM */
             if (cpu_unit.flags & UNIT_HSA) {
                 for (sc = 0;
-                    (sc <= 32) && ((AR & SIGN) != ((AR << 1) & SIGN));
+                    (sc < 32) && ((AR & SIGN) == ((AR << 1) & SIGN));
                      sc++) {
                     AR = (AR & SIGN) | ((AR << 1) & MMASK) |
                         ((BR >> 14) & 1);
@@ -1050,6 +1068,8 @@ void Write (int32 addr, int32 val)
 {
 if (((addr == 0) || (addr >= 020)) && MEM_ADDR_OK (addr))
     M[addr] = val;
+if (addr == M_XR)                                       /* write XR loc? */
+    XR = val;                                           /* update XR */
 return;
 }
 
@@ -1292,15 +1312,10 @@ return SCPE_OK;
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw)
 {
-int32 d;
-
 if (addr >= MEMSIZE)
     return SCPE_NXM;
-if (addr == 0)
-    d = saved_XR;
-else d = M[addr];
 if (vptr != NULL)
-    *vptr = d & DMASK;
+    *vptr = M[addr] & DMASK;
 return SCPE_OK;
 }
 
@@ -1312,7 +1327,7 @@ if (addr >= MEMSIZE)
     return SCPE_NXM;
 if (addr == 0)
     saved_XR = val & DMASK;
-else M[addr] = val & DMASK;
+M[addr] = val & DMASK;
 return SCPE_OK;
 }
 

@@ -434,7 +434,8 @@ FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
-static FILE *sim_gotofile;
+static FILE *sim_gotofile;                              /* the currently open do file */
+static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
 static int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
@@ -620,6 +621,7 @@ static CTAB cmd_table[] = {
       "set nothrottle           set simulation rate to maximum\n"
       "set asynch               enable asynchronous I/O\n"
       "set noasynch             disable asynchronous I/O\n"
+      "set environment name=val set environment variable\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -676,6 +678,21 @@ static CTAB cmd_table[] = {
     { NULL, NULL, 0 }
     };
 
+#if defined(_WIN32)
+static
+int setenv(const char *envname, const char *envval, int overwrite)
+    {
+    char *envstr = malloc(strlen(envname)+strlen(envval)+2);
+    int r;
+
+    sprintf(envstr, "%s=%s", envname, envval);
+    r = _putenv(envstr);
+    free(envstr);
+    return r;
+    }
+#endif
+
+
 /* Main command loop */
 
 int main (int argc, char *argv[])
@@ -720,6 +737,7 @@ AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
 sim_finit ();                                           /* init fio package */
+setenv ("SIM_NAME", sim_name, 1);                       /* Publish simulator name */
 stop_cpu = 0;
 sim_interval = 0;
 sim_time = sim_rtime = 0;
@@ -777,10 +795,12 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
         }
     else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
-    if (cptr == NULL)                                   /* ignore EOF */
-        continue;
+    if (cptr == NULL)                                   /* EOF? */
+        if (sim_ttisatty()) continue;                   /* ignore tty EOF */
+        else break;                                     /* otherwise exit */
     if (*cptr == 0)                                     /* ignore blank */
         continue;
+    sub_args (cbuf, gbuf, CBUFSIZE, argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "sim> %s\n", cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -935,7 +955,7 @@ t_stat do_cmd (int32 flag, char *fcptr)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp;
-int32 echo, nargs, errabort, i;
+int32 echo = sim_do_echo, nargs, errabort, i;
 t_bool interactive, isdo, staying;
 t_stat stat;
 char *ocptr;
@@ -946,7 +966,8 @@ interactive = (flag > 0);                               /* issued interactively?
 if (interactive) {                                      /* get switches */
     GET_SWITCHES (fcptr);
     }
-echo = sim_switches & SWMASK ('V');                     /* -v means echo */
+if (sim_switches & SWMASK ('V'))                        /* -v means echo */
+    echo = 1;
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
 c = fcptr;
@@ -1004,6 +1025,7 @@ do {
     sim_switches = 0;                                   /* init switches */
     isdo = FALSE;
     sim_gotofile = fpin;
+    sim_do_echo = echo;
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
         if ((cmdp->action == &return_cmd))              /* RETURN command? */
             break;                                      /*    done! */
@@ -1067,6 +1089,7 @@ do {
 
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
+sim_do_echo = 0;
 for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
     free (sim_on_actions[sim_do_depth][i]);
     sim_on_actions[sim_do_depth][i] = NULL;
@@ -1226,12 +1249,14 @@ t_stat goto_cmd (int32 flag, char *fcptr)
 {
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], gbuf1[CBUFSIZE];
 long fpos;
+int32 saved_do_echo = sim_do_echo;
 
 if (NULL == sim_gotofile) return SCPE_UNK;		/* only valid inside of do_cmd */
 get_glyph (fcptr, gbuf1, 0);
 if ('\0' == gbuf1[0]) return SCPE_ARG;                  /* unspecified goto target */
 fpos = ftell(sim_gotofile);                             /* Save start position */
 rewind(sim_gotofile);                                   /* start search for label */
+sim_do_echo = 0;                                        /* Don't echo while searching for label */
 while (1) {
     cptr = read_line (cbuf, CBUFSIZE, sim_gotofile);    /* get cmd line */
     if (cptr == NULL) break;                            /* exit on eof */
@@ -1242,9 +1267,15 @@ while (1) {
     cptr = get_glyph (cptr, gbuf, 0);                   /* get label glyph */
     if (0 == strcmp(gbuf, gbuf1)) {
         sim_brk_clract ();                              /* goto defangs current actions */
+        sim_do_echo = saved_do_echo;                    /* restore echo mode */
+        if (sim_do_echo)                                /* echo if -v */
+            printf("do> %s\n", cbuf);
+        if (sim_do_echo && sim_log)
+            fprintf (sim_log, "do> %s\n", cbuf);
         return SCPE_OK;
         }
     }
+sim_do_echo = saved_do_echo;                            /* restore echo mode */
 fseek(sim_gotofile, fpos, SEEK_SET);                    /* resture start position */
 return SCPE_ARG;
 }
@@ -1360,6 +1391,19 @@ fprintf (st, "Asynchronous I/O is not available in this simulator\n");
 return SCPE_OK;
 }
 
+/* Set environment routine */
+
+t_stat sim_set_environment (int32 flag, char *cptr)
+{
+char varname[CBUFSIZE];
+
+if ((!cptr) || (*cptr == 0))                            /* now eol? */
+    return SCPE_2FARG;
+cptr = get_glyph_gen (cptr, varname, '=', FALSE);       /* get environment variable name */
+setenv(varname, cptr, 1);
+return SCPE_OK;
+}
+
 /* Set command */
 
 t_stat set_cmd (int32 flag, char *cptr)
@@ -1376,6 +1420,7 @@ C1TAB *ctbr, *glbr;
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
     { "BREAK", &brk_cmd, SSH_ST },
+    { "NOBREAK", &brk_cmd, SSH_CL },
     { "TELNET", &sim_set_telnet, 0 },                   /* deprecated */
     { "NOTELNET", &sim_set_notelnet, 0 },               /* deprecated */
     { "LOG", &sim_set_logon, 0 },                       /* deprecated */
@@ -1386,6 +1431,7 @@ static CTAB set_glob_tab[] = {
     { "NOTHROTTLE", &sim_set_throt, 0 },
     { "ASYNCH", &sim_set_asynch, 1 },
     { "NOASYNCH", &sim_set_asynch, 0 },
+    { "ENV", &sim_set_environment, 1 },
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
     { NULL, NULL, 0 }
@@ -3081,6 +3127,9 @@ if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
     }
 if (sim_step)                                           /* set step timer */
     sim_activate (&sim_step_unit, sim_step);
+fflush(stdout);                                         /* flush stdout */
+if (sim_log)                                            /* flush log if enabled */
+    fflush (sim_log);
 sim_throt_sched ();                                     /* set throttle */
 sim_is_running = 1;                                     /* flag running */
 sim_brk_clract ();                                      /* defang actions */
@@ -3896,8 +3945,13 @@ for (tptr = cptr; tptr < (cptr + size); tptr++) {       /* remove cr or nl */
     }
 while (isspace (*cptr))                                 /* trim leading spc */
     cptr++;
-if (*cptr == ';')                                       /* ignore comment */
+if (*cptr == ';') {                                     /* ignore comment */
+    if (sim_do_echo)                                    /* echo comments if -v */
+        printf("do> %s\n", cptr);
+    if (sim_do_echo && sim_log)
+        fprintf (sim_log, "do> %s\n", cptr);
     *cptr = 0;
+    }
 
 #if defined (HAVE_DLOPEN)
 if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */

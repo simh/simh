@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
    23-Mar-11    RMS     Revised idle design (from Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Separated base register access checks for 11/780
@@ -860,7 +861,7 @@ else {
     else R[5] = MVC_FILL;                               /* fill, set state */
     R[5] = R[5] | (cc << MVC_V_CC);                     /* pack with state */
     PSL = PSL | PSL_FPD;                                /* set FPD */
-	}
+    }
 
 /* At this point,
 
@@ -1099,7 +1100,7 @@ return (R[0]? 0: CC_Z);
 
 /* Interrupt or exception
 
-        vec     =       SCB vector
+        vec     =       SCB vector (bit<0> = interrupt in Qbus mode)
         cc      =       condition codes
         ipl     =       new IPL if interrupt
         ei      =       -1: severe exception
@@ -1118,8 +1119,8 @@ int32 acc;
 
 in_ie = 1;                                              /* flag int/exc */
 CLR_TRAPS;                                              /* clear traps */
-newpc = ReadLP ((SCBB + vec) & PAMASK);                 /* read new PC */
-if (ei < 0)                                             /* severe? on istk */
+newpc = ReadLP ((SCBB + vec) & (PAMASK & ~3));          /* read new PC */
+if (ei == IE_SVE)                                       /* severe? on istk */
     newpc = newpc | 1;
 if (newpc & 2)                                          /* bad flags? */
     ABORT (STOP_ILLVEC);
@@ -1136,8 +1137,13 @@ else {
         SP = KSP;                                       /* new stack */
         }
     }
-if (ei > 0)                                             /* if int, new IPL */
-    PSL = newpsl | (ipl << PSL_V_IPL);
+if (ei == IE_INT) {                                     /* if int, new IPL */
+    int32 newipl;
+    if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
+        newipl = PSL_IPL17;                             /* force IPL 17 */
+    else newipl = ipl << PSL_V_IPL;                     /* otherwise, int IPL */
+    PSL = newpsl | newipl;
+    }
 else PSL = newpsl |                                     /* exc, old IPL/1F */
     ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
 if (DEBUG_PRI (cpu_dev, LOG_CPU_I))

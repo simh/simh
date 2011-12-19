@@ -17,7 +17,7 @@
 # 
 # Dynamic loading of libpcap is the default behavior if pcap.h is
 # available at build time.  Direct calls to libpcap can be enabled
-# if GNU make is invoked with USE_NETWORK on the command line.
+# if GNU make is invoked with USE_NETWORK=1 on the command line.
 #
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
@@ -37,22 +37,18 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_CCDEFS = -D_GNU_SOURCE -DSIM_ASYNCH_IO
     OS_LDFLAGS = -lm 
   else # Non-Android Builds
-    INCPATH=/usr/include
-    LIBPATH=/usr/lib
+    INCPATH:=/usr/include
+    LIBPATH:=/usr/lib
     OS_CCDEFS = -D_GNU_SOURCE
     ifeq (Darwin,$(shell uname))
       LIBEXT = dylib
     else
       ifeq (Linux,$(shell uname))
+        LIBPATH := $(sort $(foreach lib,$(shell ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
         LIBEXT = so
-        ifeq (usrlib64,$(shell if $(TEST) -d /usr/lib64; then echo usrlib64; fi))
-    	  LIBPATH += /usr/lib64
-        endif
-        ifeq (lib32,$(shell if $(TEST) -d /usr/lib32; then echo lib32; fi))
-    	  LIBPATH += /usr/lib32
-        endif
       else
         ifeq (SunOS,$(shell uname))
+          LIBPATH := $(shell crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
           ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
@@ -64,6 +60,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
           endif
         else
+          LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+          ifneq (,$(LDSEARCH))
+            LIBPATH := $(LDSEARCH)
+          endif
           ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
             LIBPATH += /usr/pkg/lib
             OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
@@ -77,6 +77,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
+  $(info lib paths are: $(LIBPATH))
   ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
     OS_CCDEFS += -O2 
   endif

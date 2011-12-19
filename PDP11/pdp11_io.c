@@ -1,6 +1,6 @@
 /* pdp11_io.c: PDP-11 I/O simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Dec-11    RMS     Fixed interrupts to treat all Qbus devices as BR4
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added multiple DC11 support
                         Renamed DL11 in autoconfigure
@@ -79,6 +80,11 @@ static const int32 pirq_bit[7] = {
     INT_V_PIR5, INT_V_PIR6, INT_V_PIR7
     };
 
+static const int32 int_internal[IPL_HLVL] = {
+    INT_INTERNAL7, INT_INTERNAL6, INT_INTERNAL5, INT_INTERNAL4,
+    INT_INTERNAL3, INT_INTERNAL2, INT_INTERNAL1, 0
+    };
+
 /* I/O page lookup and linkage routines
 
    Inputs:
@@ -118,27 +124,32 @@ if (iodispW[idx]) {
 return SCPE_NXM;
 }
 
-/* Calculate interrupt outstanding */
+/* Calculate interrupt outstanding
+   In a Qbus system, all device interrupts are treated as BR4 */
 
 int32 calc_ints (int32 nipl, int32 trq)
 {
-int32 i;
+int32 i, t;
+t_bool all_int = (UNIBUS || (nipl < IPL_HMIN));
 
 for (i = IPL_HLVL - 1; i > nipl; i--) {
-    if (int_req[i])
+    t = all_int? int_req[i]: (int_req[i] & int_internal[i]);
+    if (t)
         return (trq | TRAP_INT);
     }
 return (trq & ~TRAP_INT);
 }
 
-/* Find vector for highest priority interrupt */
+/* Find vector for highest priority interrupt
+   In a Qbus system, all device interrupts are treated as BR4 */
 
 int32 get_vector (int32 nipl)
 {
 int32 i, j, t, vec;
+t_bool all_int = (UNIBUS || (nipl < IPL_HMIN));
 
 for (i = IPL_HLVL - 1; i > nipl; i--) {                 /* loop thru lvls */
-    t = int_req[i];                                     /* get level */
+    t = all_int? int_req[i]: (int_req[i] & int_internal[i]);
     for (j = 0; t && (j < 32); j++) {                   /* srch level */
         if ((t >> j) & 1) {                             /* irq found? */
             int_req[i] = int_req[i] & ~(1u << j);       /* clr irq */

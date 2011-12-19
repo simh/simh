@@ -2609,7 +2609,7 @@ RPC_STATUS
 
 if (!UuidCreate_c) {
     HINSTANCE hDll;
-    hDll = LoadLibrary("rpcrt4.dll");
+    hDll = LoadLibraryA("rpcrt4.dll");
     UuidCreate_c = (void *)GetProcAddress(hDll, "UuidCreate");
     }
 if (UuidCreate_c)
@@ -2617,13 +2617,26 @@ if (UuidCreate_c)
 else
     _rand_uuid_gen (uuidaddr);
 }
-#elif defined (USE_LIBUUID)
-#include <uuid/uuid.h> 
+#elif defined (HAVE_DLOPEN)
+#include <dlfcn.h>
 
 static void
 uuid_gen (void *uuidaddr)
 {
-uuid_generate((uuid_t)uuidaddr);
+void (*uuid_generate_c) (void *) = NULL;
+void *handle;
+
+#define __STR_QUOTE(tok) #tok
+#define __STR(tok) __STR_QUOTE(tok)
+    handle = dlopen("libuuid." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    if (handle)
+        uuid_generate_c = dlsym(handle, "uuid_generate");
+if (uuid_generate_c)
+    uuid_generate_c(uuidaddr);
+else
+    _rand_uuid_gen (uuidaddr);
+    if (handle)
+        dlclose(handle);
 }
 #else
 static void
