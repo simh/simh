@@ -23,8 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   26-Nov-11    MP      Changed RQ amd TQ BR levels to BR4 to reflect real hardware
-   25-Nov-11    RMS     Added VEC_QBUS definition
+   05-Nov-11    RMS     Added VEC_QBUS definition
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    29-Apr-07    RMS     Modified model-specific reserved operand check macros
                         to reflect 780 microcode patches (found by Naoki Hamada)
@@ -319,16 +318,16 @@ typedef struct {
 #define INT_V_DZTX      1
 #define INT_V_HK        2
 #define INT_V_RL        3
-#define INT_V_TS        4
-#define INT_V_RY        5
-#define INT_V_XU        6
+#define INT_V_RQ        4
+#define INT_V_TQ        5
+#define INT_V_TS        6
+#define INT_V_RY        7
+#define INT_V_XU        8
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
 #define INT_V_PTP       2
 #define INT_V_CR        3
-#define INT_V_RQ        4
-#define INT_V_TQ        5
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -348,8 +347,8 @@ typedef struct {
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)
 #define IPL_RL          (0x15 - IPL_HMIN)
-#define IPL_RQ          (0x14 - IPL_HMIN)
-#define IPL_TQ          (0x14 - IPL_HMIN)
+#define IPL_RQ          (0x15 - IPL_HMIN)
+#define IPL_TQ          (0x15 - IPL_HMIN)
 #define IPL_TS          (0x15 - IPL_HMIN)
 #define IPL_RY          (0x15 - IPL_HMIN)
 #define IPL_XU          (0x15 - IPL_HMIN)
