@@ -324,6 +324,7 @@ typedef struct {
 
 /* Device vectors */
 
+#define VEC_QBUS        0
 #define VEC_Q           0x200
 #define VEC_PTR         (VEC_Q + 0070)
 #define VEC_PTP         (VEC_Q + 0074)
