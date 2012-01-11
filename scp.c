@@ -212,6 +212,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
+#include <sys/stat.h>
 
 #if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
 #include <dlfcn.h>
@@ -2819,12 +2820,15 @@ t_bool v35, v32;
 DEVICE *dptr;
 UNIT *uptr;
 REG *rptr;
+struct stat rstat;
+t_bool force_restore = sim_switches & SWMASK ('F');
 
 #define READ_S(xx) if (read_line ((xx), CBUFSIZE, rfile) == NULL) \
     return SCPE_IOERR;
 #define READ_I(xx) if (sim_fread (&xx, sizeof (xx), 1, rfile) == 0) \
     return SCPE_IOERR;
 
+fstat (fileno (rfile), &rstat);
 READ_S (buf);                                           /* [V2.5+] read version */
 v35 = v32 = FALSE;
 if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
@@ -2833,22 +2837,30 @@ else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
 else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
     printf ("Invalid file version: %s\n", buf);
+    if (sim_log)
+        fprintf (sim_log, "Invalid file version: %s\n", buf);
     return SCPE_INCOMP;
     }
 READ_S (buf);                                           /* read sim name */
 if (strcmp (buf, sim_name)) {                           /* name match? */
     printf ("Wrong system type: %s\n", buf);
+    if (sim_log)
+        fprintf (sim_log, "Wrong system type: %s\n", buf);
     return SCPE_INCOMP;
     }
 if (v35) {                                              /* [V3.5+] options */
     READ_S (buf);                                       /* integer size */
     if (strcmp (buf, sim_si64) != 0) {
         printf ("Incompatible integer size, save file = %s\n", buf);
+        if (sim_log)
+            fprintf (sim_log, "Incompatible integer size, save file = %s\n", buf);
         return SCPE_INCOMP;
         }
     READ_S (buf);                                       /* address size */
     if (strcmp (buf, sim_sa64) != 0) {
         printf ("Incompatible address size, save file = %s\n", buf);
+        if (sim_log)
+            fprintf (sim_log, "Incompatible address size, save file = %s\n", buf);
         return SCPE_INCOMP;
         }
     READ_S (buf);                                       /* Ethernet */
@@ -2866,6 +2878,8 @@ for ( ;; ) {                                            /* device loop */
         break;
     if ((dptr = find_dev (buf)) == NULL) {              /* locate device */
         printf ("Invalid device name: %s\n", buf);
+        if (sim_log)
+            fprintf (sim_log, "Invalid device name: %s\n", buf);
         return SCPE_INCOMP;
         }
     READ_S (buf);                                       /* [V3.0+] logical name */
@@ -2886,6 +2900,8 @@ for ( ;; ) {                                            /* device loop */
             break;
         if ((uint32) unitno >= dptr->numunits) {        /* too big? */
             printf ("Invalid unit number: %s%d\n", sim_dname (dptr), unitno);
+            if (sim_log)
+                fprintf (sim_log, "Invalid unit number: %s%d\n", sim_dname (dptr), unitno);
             return SCPE_INCOMP;
             }
         READ_I (time);                                  /* event time */
@@ -2936,6 +2952,8 @@ for ( ;; ) {                                            /* device loop */
             if (((uptr->flags & (UNIT_FIX + UNIT_ATTABLE)) != UNIT_FIX) ||
                  (dptr->deposit == NULL)) {
                 printf ("Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
+                if (sim_log)
+                    fprintf (sim_log, "Can't restore memory: %s%d\n", sim_dname (dptr), unitno);
                 return SCPE_INCOMP;
                 }
             if (high != old_capac) {                    /* size change? */
@@ -2945,12 +2963,20 @@ for ( ;; ) {                                            /* device loop */
                      (dptr->msize (uptr, (int32) high, NULL, NULL) != SCPE_OK))) {
                     printf ("Can't change memory size: %s%d\n",
                         sim_dname (dptr), unitno);
+                    if (sim_log)
+                        fprintf (sim_log, "Can't change memory size: %s%d\n",
+                            sim_dname (dptr), unitno);
                     return SCPE_INCOMP;
                     }
                 uptr->capac = high;                     /* new memory size */
                 printf ("Memory size changed: %s%d = ", sim_dname (dptr), unitno);
                 fprint_capac (stdout, dptr, uptr);
                 printf ("\n");
+                if (sim_log) {
+                    fprintf (sim_log, "Memory size changed: %s%d = ", sim_dname (dptr), unitno);
+                    fprint_capac (sim_log, dptr, uptr);
+                    fprintf (sim_log, "\n");
+                    }
                 }
             sz = SZ_D (dptr);                           /* allocate buffer */
             if ((mbuf = calloc (SRBSIZ, sz)) == NULL)
@@ -2981,19 +3007,28 @@ for ( ;; ) {                                            /* device loop */
         READ_I (depth);                                 /* [V2.10+] depth */
         if ((rptr = find_reg (buf, NULL, dptr)) == NULL) {
             printf ("Invalid register name: %s %s\n", sim_dname (dptr), buf);
+            if (sim_log)
+                fprintf (sim_log, "Invalid register name: %s %s\n", sim_dname (dptr), buf);
             for (us = 0; us < depth; us++) {            /* skip values */
                 READ_I (val);
                 }
             continue;
             }
-        if (depth != rptr->depth)                       /* [V2.10+] mismatch? */
+        if (depth != rptr->depth) {                      /* [V2.10+] mismatch? */
             printf ("Register depth mismatch: %s %s, file = %d, sim = %d\n",
                 sim_dname (dptr), buf, depth, rptr->depth);
+            if (sim_log)
+                fprintf (sim_log, "Register depth mismatch: %s %s, file = %d, sim = %d\n",
+                    sim_dname (dptr), buf, depth, rptr->depth);
+            }
         mask = width_mask[rptr->width];                 /* get mask */
         for (us = 0; us < depth; us++) {                /* loop thru values */
             READ_I (val);                               /* read value */
-            if (val > mask)                             /* value ok? */
+            if (val > mask) {                           /* value ok? */
                 printf ("Invalid register value: %s %s\n", sim_dname (dptr), buf);
+                if (sim_log)
+                    fprintf (sim_log, "Invalid register value: %s %s\n", sim_dname (dptr), buf);
+                }
             else if (us < rptr->depth)                  /* in range? */
                 put_rval (rptr, us, val);
             }
@@ -3004,11 +3039,28 @@ for ( ;; ) {                                            /* device loop */
    may depend on the state of the device (in registers) to work correctly */
 for (j=0, r = SCPE_OK; j<attcnt; j++) {
     if (r == SCPE_OK) {
+        struct stat fstat;
+
         dptr = find_dev_from_unit (attunits[j]);
+        if ((!force_restore) && 
+            (!stat(attnames[j], &fstat)))
+            if (fstat.st_mtime > rstat.st_mtime + 30) {
+                r = SCPE_INCOMP;
+                printf ("Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
+                printf ("restore with the -F switch to override this sanity check\n");
+                if (sim_log) {
+                    fprintf (sim_log, "Error Attaching %s to %s - the restore state is %d seconds older than the attach file\n", sim_dname (dptr), attnames[j], (int)(fstat.st_mtime - rstat.st_mtime));
+                    fprintf (sim_log, "restore with the -F switch to override this sanity check\n");
+                    }
+                continue;
+                }
         sim_switches = attswitches[j];
         r = scp_attach_unit (dptr, attunits[j], attnames[j]);/* reattach unit */
-        if (r != SCPE_OK)
+        if (r != SCPE_OK) {
             printf ("Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
+            if (sim_log)
+                fprintf (sim_log, "Error Attaching %s to %s\n", sim_dname (dptr), attnames[j]);
+            }
         }
     free (attnames[j]);
     }
