@@ -2168,7 +2168,7 @@ if (dptr->modifiers) {
             continue;
         if (any++)
             fprintf (st, ", %s", mptr->pstring);
-        else fprintf (st, "SHOW %s\t%s", sim_dname (dptr), mptr->pstring);
+        else fprintf (st, "sh{ow} %s\t%s", sim_dname (dptr), mptr->pstring);
         }
     }
 if (any)
