@@ -150,7 +150,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       # Look for package built from tcpdump.org sources with default install target
       LIBPATH += /usr/local/lib
       INCPATH += /usr/local/include
-      LIBEXTSAVE = $(LIBEXT)
+      LIBEXTSAVE := $(LIBEXT)
       LIBEXT = a
       ifneq (,$(call find_lib,pcap))
         ifneq (,$(call find_include,pcap))
