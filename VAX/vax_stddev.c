@@ -27,6 +27,10 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   13-Jan-12    MP      Normalized the saved format of the TODR persistent 
+                        file so that it may be moved around from one platform
+                        to another along with other simulator state files 
+                        (disk & tape images, save/restore files, etc.)
    28-Sep-11    MP      Generalized setting TODR for all OSes.  
                         Unbound the TODR value from the 100hz clock tick 
                         interrupt.  TODR now behaves like the original 
@@ -49,9 +53,10 @@
                           (i.e. sim> attach TODR TOY_CLOCK).  When operating 
                           in OS Agnostic mode, the TODR will initially start
                           counting from 0 and be adjusted differently when an
-                          OS specifically writes to the TODR.  VMS will prompt
-                          to set the time on each boot unless the SYSGEN 
-                          parameter TIMEPROMPTWAIT is set to 0.
+                          OS specifically writes to the TODR.  On the first OS 
+                          boot with an attached TODR VMS will prompt to set 
+                          the time unless the SYSGEN parameter TIMEPROMPTWAIT 
+                          is set to 0.
    05-Jan-11    MP      Added Asynch I/O support
    17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
@@ -96,6 +101,8 @@ int32 clk_tps = 100;                                    /* ticks/second */
 int32 todr_reg = 0;                                     /* TODR register */
 int32 todr_blow = 1;                                    /* TODR battery low */
 struct todr_battery_info {
+    char   toy_gmtbase_a[16];                           /* Platform independent Text format of toy_gmtbase */
+    char   toy_gmtbasemsec_a[16];                       /* Platform independent Text format of toy_gmtbasemsec */
     uint32 toy_gmtbase;                                 /* GMT base of set value */
     uint32 toy_gmtbasemsec;                             /* The milliseconds of the set value */
     };
@@ -422,6 +429,8 @@ if (0 == todr_reg)                                      /* clock running? */
 #define TOY_MAX_SECS (0x40000000/25)
 
 clock_gettime(CLOCK_REALTIME, &now);                    /* get curr time */
+toy->toy_gmtbase = strtoul(toy->toy_gmtbase_a, NULL, 0);
+toy->toy_gmtbasemsec = strtoul(toy->toy_gmtbasemsec_a, NULL, 0);
 base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
@@ -446,8 +455,10 @@ if (-1 == clock_gettime(CLOCK_REALTIME, &now))          /* get curr time */
 val.tv_sec = ((uint32)data) / 100;
 val.tv_nsec = (((uint32)data) % 100) * 10000000;
 sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
-toy->toy_gmtbase = base.tv_sec;
+toy->toy_gmtbase = (uint32)base.tv_sec;
 toy->toy_gmtbasemsec = base.tv_nsec/1000000;
+sprintf(toy->toy_gmtbase_a, "0x%08X", toy->toy_gmtbase);
+sprintf(toy->toy_gmtbasemsec_a, "0x%08X", toy->toy_gmtbasemsec);
 todr_reg = data;
 if (data)
     todr_blow = 0;
