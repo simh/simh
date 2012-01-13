@@ -31,21 +31,28 @@
 #ifndef _SIM_TIMER_H_
 #define _SIM_TIMER_H_   0
 
+/* Pick up a struct timespec definition if it is available */
 #include <time.h>
+#if defined(SIM_ASYNCH_IO) || defined(USE_READER_THREAD)
+#include <pthread.h>
+#endif
 
 #if defined (__APPLE__)
 #define HAVE_STRUCT_TIMESPEC 1   /* OSX defined the structure but doesn't tell us */
 #endif
 
-#ifndef CLOCK_REALTIME
+#if !defined(CLOCK_REALTIME)
 #define CLOCK_REALTIME 1
 #define NEED_CLOCK_GETTIME 1
-#ifndef HAVE_STRUCT_TIMESPEC
+#if !defined(HAVE_STRUCT_TIMESPEC)
 #define HAVE_STRUCT_TIMESPEC 1
+#if !defined(_TIMESPEC_DEFINED)
+#define _TIMESPEC_DEFINED
 struct timespec {
-        long tv_sec;
-        long tv_nsec;
+    long   tv_sec;
+    long   tv_nsec;
 };
+#endif /* _TIMESPEC_DEFINED */
 #endif /* HAVE_STRUCT_TIMESPEC */
 int clock_gettime(int clock_id, struct timespec *tp);
 #endif
