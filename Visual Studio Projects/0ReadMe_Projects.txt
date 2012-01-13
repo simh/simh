@@ -44,7 +44,15 @@ simulator.  The default working directory for included project files is the
 "Visual Studio Projects" directory.
 
 
-Only network devices are capable of using pthreads to enhance their 
-performance.  Build the desire simulator with USE_READER_THREAD defined.  The 
-relevant simulators which have network support are VAX, VAX780 and PDP11.
+Network devices are capable of using pthreads to enhance their performance.  
+To realize these benefits, you must build the desire simulator with 
+USE_READER_THREAD defined.  The relevant simulators which have network 
+support are VAX, VAX780 and PDP11.
+
+Additionally, simulators which contain devices which use the asynchronous
+APIs in sim_disk.c and sim_tape.c can also achieve greater performance by
+leveraging pthreads to perform blocking I/O in separate threads.  Currently
+the simulators which have such devices are VAX, VAX780 and PDP11.  To 
+achieve these benefits the simulators must be built with SIM_ASYNCH_IO 
+defined.
 
