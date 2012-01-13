@@ -126,7 +126,7 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;   \
 if ((!callback) || !ctx->asynch_io)
 
 #define AIO_CALL(op, _lba, _buf, _rsects, _sects,  _callback)   \
-    if (1) {                                                    \
+    if (ctx->asynch_io) {                                       \
         struct disk_context *ctx =                              \
                       (struct disk_context *)uptr->disk_ctx;    \
                                                                 \
@@ -146,7 +146,10 @@ if ((!callback) || !ctx->asynch_io)
         ctx->callback = _callback;                              \
         pthread_cond_signal (&ctx->io_cond);                    \
         pthread_mutex_unlock (&ctx->io_lock);                   \
-        }
+        }                                                       \
+    else                                                        \
+        if (_callback)                                          \
+            (_callback) (uptr, r);
 
 
 #define DOP_DONE  0             /* close */
