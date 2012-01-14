@@ -146,7 +146,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;       \
 if ((!callback) || !ctx->asynch_io)
 
 #define AIO_CALL(op, _buf, _bc, _fc, _max, _vbc, _gaplen, _bpi, _obj, _callback)\
-    if (1) {                                                            \
+    if (ctx->asynch_io) {                                               \
         struct tape_context *ctx =                                      \
                       (struct tape_context *)uptr->tape_ctx;            \
                                                                         \
@@ -167,7 +167,10 @@ if ((!callback) || !ctx->asynch_io)
         ctx->objupdate = _obj;                                          \
         ctx->callback = _callback;                                      \
         pthread_cond_signal (&ctx->io_cond);                            \
-        }
+        }                                                               \
+    else                                                                \
+        if (_callback)                                                  \
+            (_callback) (uptr, r);
 #define TOP_DONE  0             /* close */
 #define TOP_RDRF  1             /* sim_tape_rdrecf_a */
 #define TOP_RDRR  2             /* sim_tape_rdrecr_a */
