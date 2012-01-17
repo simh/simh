@@ -764,7 +764,7 @@ if (rbc > max) {                                        /* rec out of range? */
     uptr->pos = opos;
     return MTSE_INVRL;
     }
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
+i = (t_mtrlnt)sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
 if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     uptr->pos = opos;
@@ -823,7 +823,7 @@ if (st = sim_tape_rdlntr (uptr, &tbc))                  /* read rec lnt */
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
     return MTSE_INVRL;
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
+i = (t_mtrlnt)sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
 if (ferror (uptr->fileref))                             /* error? */
     return sim_tape_ioerr (uptr);
 for ( ; i < rbc; i++)                                   /* fill with 0's */
@@ -1765,7 +1765,8 @@ uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
 {
 t_addr tpos;
 t_tpclnt bc;
-uint32 i, objc;
+size_t i;
+uint32 objc;
 
 if ((uptr == NULL) || (uptr->fileref == NULL))
     return 0;

@@ -96,7 +96,7 @@ if (sim_end || (count == 0) || (size == sizeof (char)))
     return;
 for (j = 0, dptr = sptr = (unsigned char *) bptr;       /* loop on items */
      j < count; j++) { 
-    for (k = size - 1; k >= (((int32) size + 1) / 2); k--) {
+    for (k = (int32)(size - 1); k >= (((int32) size + 1) / 2); k--) {
         by = *sptr;                                     /* swap end-for-end */
         *sptr++ = *(dptr + k);
         *(dptr + k) = by;
@@ -130,7 +130,7 @@ if (sim_end || (size == sizeof (char))) {
     return;
     }
 for (j = 0; j < count; j++) {                           /* loop on items */
-    for (k = size - 1; k >= 0; k--)
+    for (k = (int32)(size - 1); k >= 0; k--)
         *(dptr + k) = *sptr++;
     dptr = dptr + size;
     }
@@ -153,7 +153,7 @@ if (lcnt) nbuf = nbuf + 1;
 else lcnt = nelem;
 total = 0;
 sptr = (unsigned char *) bptr;                          /* init input ptr */
-for (i = nbuf; i > 0; i--) {                            /* loop on buffers */
+for (i = (int32)nbuf; i > 0; i--) {                     /* loop on buffers */
     c = (i == 1)? lcnt: nelem;
     sim_buf_copy_swapped (sim_flip, sptr, size, c);
     sptr = sptr + size * count;

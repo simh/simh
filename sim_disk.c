@@ -473,7 +473,7 @@ if (!err) {
         memset (&buf[i*ctx->xfer_element_size], 0, tbc-(i*ctx->xfer_element_size));
     err = ferror (uptr->fileref);
     if ((!err) && (sectsread))
-        *sectsread = (i*ctx->xfer_element_size+ctx->sector_size-1)/ctx->sector_size;
+        *sectsread = (t_seccnt)((i*ctx->xfer_element_size+ctx->sector_size-1)/ctx->sector_size);
     }
 return err;
 }
@@ -587,7 +587,7 @@ if (!err) {
     i = sim_fwrite (buf, ctx->xfer_element_size, tbc/ctx->xfer_element_size, uptr->fileref);
     err = ferror (uptr->fileref);
     if ((!err) && (sectswritten))
-        *sectswritten = (i*ctx->xfer_element_size+ctx->sector_size-1)/ctx->sector_size;
+        *sectswritten = (t_seccnt)((i*ctx->xfer_element_size+ctx->sector_size-1)/ctx->sector_size);
     }
 return err;
 }
@@ -826,7 +826,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     else {
         uint8 *copy_buf = malloc (1024*1024);
         t_lba lba;
-        t_seccnt sectors_per_buffer = (1024*1024)/sector_size;
+        t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
         t_lba total_sectors = (t_lba)(uptr->capac/sector_size);
         t_seccnt sects = sectors_per_buffer;
 
@@ -894,12 +894,12 @@ uptr->disk_ctx = ctx = (struct disk_context *)calloc(1, sizeof(struct disk_conte
 if ((uptr->filename == NULL) || (uptr->disk_ctx == NULL))
     return _err_return (uptr, SCPE_MEM);
 strncpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
-ctx->sector_size = sector_size;                         /* save sector_size */
-ctx->xfer_element_size = xfer_element_size;             /* save xfer_element_size */
+ctx->sector_size = (uint32)sector_size;                 /* save sector_size */
+ctx->xfer_element_size = (uint32)xfer_element_size;     /* save xfer_element_size */
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
 ctx->auto_format = auto_format;                         /* save that we auto selected format */
-ctx->storage_sector_size = sector_size;                 /* Default */
+ctx->storage_sector_size = (uint32)sector_size;         /* Default */
 if (sim_switches & SWMASK ('R')) {                      /* read only? */
     if ((uptr->flags & UNIT_ROABLE) == 0)               /* allowed? */
         return _err_return (uptr, SCPE_NORO);           /* no, error */
@@ -1470,7 +1470,7 @@ if (Removable) {
 return TRUE;
 }
 
-static t_stat sim_os_disk_info_raw (FILE *Disk, size_t *sector_size, uint32 *removable)
+static t_stat sim_os_disk_info_raw (FILE *Disk, uint32 *sector_size, uint32 *removable)
 {
 DWORD IoctlReturnSize;
 #ifndef __GNUC__
@@ -2822,7 +2822,7 @@ ExpandToFullPath (const char *szFileSpec,
                   size_t BufferSize)
 {
 #ifdef _WIN32
-GetFullPathNameA (szFileSpec, BufferSize, szFullFileSpecBuffer, NULL);
+GetFullPathNameA (szFileSpec, (DWORD)BufferSize, szFullFileSpecBuffer, NULL);
 #else
 strncpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
 #endif
@@ -2905,14 +2905,14 @@ hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataOffset = NtoHll (LocatorPositi
 if (RelativeMatch) {
     memcpy (hVHD->Dynamic.ParentLocatorEntries[5].PlatformCode, "W2ru", 4);
     hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataSpace = NtoHl (BytesPerSector);
-    hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataLength = NtoHl (2*strlen(RelativeParentVHDPath));
+    hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataLength = NtoHl ((uint32)(2*strlen(RelativeParentVHDPath)));
     hVHD->Dynamic.ParentLocatorEntries[5].Reserved = 0;
     hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
     ++LocatorsWritten;
     }
 memcpy (hVHD->Dynamic.ParentLocatorEntries[4].PlatformCode, "W2ku", 4);
 hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataSpace = NtoHl (BytesPerSector);
-hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataLength = NtoHl (2*strlen(FullParentVHDPath));
+hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataLength = NtoHl ((uint32)(2*strlen(FullParentVHDPath)));
 hVHD->Dynamic.ParentLocatorEntries[4].Reserved = 0;
 hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
 ++LocatorsWritten;

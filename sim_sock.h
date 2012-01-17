@@ -83,6 +83,6 @@ int32 sim_check_conn (SOCKET sock, t_bool rd);
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);
 int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes);
 void sim_close_sock (SOCKET sock, t_bool master);
-SOCKET sim_setnonblock (SOCKET sock);
+int32 sim_setnonblock (SOCKET sock);
 
 #endif

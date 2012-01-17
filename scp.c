@@ -1826,7 +1826,7 @@ return SCPE_OK;
 
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
 {
-int32 u = uptr - dptr->units;
+int32 u = (int32)(uptr - dptr->units);
 
 if (flag > 1)
     fprintf (st, "  %s%d", sim_dname (dptr), u);
@@ -2460,7 +2460,7 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     if (uptr->filebuf == NULL)                          /* no buffer? */
         return attach_err (uptr, SCPE_MEM);             /* error */
     if (!sim_quiet) printf ("%s: buffering file in memory\n", sim_dname (dptr));
-    uptr->hwmark = sim_fread (uptr->filebuf,            /* read file */
+    uptr->hwmark = (uint32)sim_fread (uptr->filebuf,    /* read file */
         SZ_D (dptr), cap, uptr->fileref);
     uptr->flags = uptr->flags | UNIT_BUF;               /* set buffered */
     }
@@ -2985,7 +2985,7 @@ for ( ;; ) {                                            /* device loop */
                 READ_I (blkcnt);                        /* block count */
                 if (blkcnt < 0)                         /* compressed? */
                     limit = -blkcnt;
-                else limit = sim_fread (mbuf, sz, blkcnt, rfile);
+                else limit = (int32)sim_fread (mbuf, sz, blkcnt, rfile);
                 if (limit <= 0)                         /* invalid or err? */
                     return SCPE_IOERR;
                 for (j = 0; j < limit; j++, k = k + (dptr->aincr)) {
@@ -3766,7 +3766,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
             SZ_LOAD (sz, sim_eval[i], uptr->filebuf, loc);
             }
         else {
-            sim_fseek (uptr->fileref, sz * loc, SEEK_SET);
+            sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET);
             sim_fread (&sim_eval[i], sz, 1, uptr->fileref);
             if ((feof (uptr->fileref)) &&
                !(uptr->flags & UNIT_FIX)) {
@@ -3857,7 +3857,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
                 uptr->hwmark = (uint32) loc + 1;
             }
         else {
-            sim_fseek (uptr->fileref, sz * loc, SEEK_SET);
+            sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET);
             sim_fwrite (&sim_eval[i], sz, 1, uptr->fileref);
             if (ferror (uptr->fileref)) {
                 clearerr (uptr->fileref);
@@ -4384,7 +4384,7 @@ REG *find_reg (char *cptr, char **optr, DEVICE *dptr)
 {
 char *tptr;
 REG *rptr;
-uint32 slnt;
+size_t slnt;
 
 if ((cptr == NULL) || (dptr == NULL) || (dptr->registers == NULL))
     return NULL;
@@ -4569,7 +4569,8 @@ return pptr;
 
 SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr)
 {
-int32 c, logop, cmpop;
+int32 c;
+size_t logop, cmpop;
 t_value logval, cmpval;
 char *sptr, *tptr;
 const char logstr[] = "|&^", cmpstr[] = "=!><";
@@ -4599,11 +4600,11 @@ for (logop = cmpop = -1; c = *cptr++; ) {               /* loop thru clauses */
     else return NULL;
     }                                                   /* end for */
 if (logop >= 0) {
-    schptr->logic = logop;
+    schptr->logic = (int32)logop;
     schptr->mask = logval;
     }
 if (cmpop >= 0) {
-    schptr->boolop = cmpop;
+    schptr->boolop = (int32)cmpop;
     schptr->comp = cmpval;
     }
 return schptr;
