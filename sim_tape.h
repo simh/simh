@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Jan-12    MP      Added support for Logical EOT detection while positioning
    05-Feb-11    MP      Add Asynch I/O support
    30-Aug-06    JDB     Added erase gap support
    14-Feb-06    RMS     Added variable tape capacity
@@ -99,6 +100,8 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTPOS_M_REV     (1u << MTPOS_V_REV)            /* Reverse Direction */
 #define MTPOS_V_OBJ     1
 #define MTPOS_M_OBJ     (1u << MTPOS_V_OBJ)            /* Objects vs Records/Files */
+#define MTPOS_V_DLE     4
+#define MTPOS_M_DLE     (1u << MTPOS_V_DLE)            /* Detect LEOT */
 
 /* Return status codes */
 
@@ -112,6 +115,7 @@ typedef uint16          t_tpclnt;                       /* magtape rec lnt */
 #define MTSE_EOM        7                               /* end of medium */
 #define MTSE_RECE       8                               /* error in record */
 #define MTSE_WRP        9                               /* write protected */
+#define MTSE_LEOT       10                              /* Logical End Of Tape */
 
 typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
@@ -140,8 +144,8 @@ t_stat sim_tape_sprecsf (UNIT *uptr, uint32 count, uint32 *skipped);
 t_stat sim_tape_sprecsf_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback);
 t_stat sim_tape_spfilef (UNIT *uptr, uint32 count, uint32 *skipped);
 t_stat sim_tape_spfilef_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback);
-t_stat sim_tape_spfilebyrecf (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped);
-t_stat sim_tape_spfilebyrecf_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, TAPE_PCALLBACK callback);
+t_stat sim_tape_spfilebyrecf (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, t_bool check_leot);
+t_stat sim_tape_spfilebyrecf_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, t_bool check_leot, TAPE_PCALLBACK callback);
 t_stat sim_tape_sprecr (UNIT *uptr, t_mtrlnt *bc);
 t_stat sim_tape_sprecr_a (UNIT *uptr, t_mtrlnt *bc, TAPE_PCALLBACK callback);
 t_stat sim_tape_sprecsr (UNIT *uptr, uint32 count, uint32 *skipped);
