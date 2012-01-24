@@ -51,6 +51,8 @@ The following steps were performed to get a working SIMH vax simulator
 sharing a physical NIC and allowing Host<->SIMH vax communications:
 
 Linux (Ubuntu 10.04):
+    apt-get install make
+    apt-get install libpcap-dev
     apt-get install bridge-utils
     apt-get install uml-utilities
 
