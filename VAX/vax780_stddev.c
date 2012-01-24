@@ -761,7 +761,7 @@ if (-1 == clock_gettime(CLOCK_REALTIME, &now))          /* get curr time */
 val.tv_sec = ((uint32)data) / 100;
 val.tv_nsec = (((uint32)data) % 100) * 10000000;
 sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
-toy->toy_gmtbase = base.tv_sec;
+toy->toy_gmtbase = (uint32)base.tv_sec;
 toy->toy_gmtbasemsec = base.tv_nsec/1000000;
 }
 
