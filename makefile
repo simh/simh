@@ -44,7 +44,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXT = dylib
     else
       ifeq (Linux,$(shell uname))
-        LIBPATH := $(sort $(foreach lib,$(shell ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
         LIBEXT = so
       else
         ifeq (SunOS,$(shell uname))
