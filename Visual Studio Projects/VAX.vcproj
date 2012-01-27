@@ -22,12 +22,12 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\VAX\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s)"
-				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -44,8 +44,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;../../winpcap/Wpdpack/Include;&quot;../../pthreads/Pre-built.2/include&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_SECURE_NO_WARNINGS;USE_READER_THREAD;SIM_ASYNCH_IO"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO"
 				KeepComments="false"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
@@ -69,10 +69,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="pthreadVC2.lib wsock32.lib packet.lib winmm.lib"
+				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"
+				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)\VAX.pdb"
 				SubSystem="1"
@@ -108,12 +108,12 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\VAX\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
 				Description="Build Dependent ROM include File(s)"
-				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -134,8 +134,8 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
-				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;../../winpcap/Wpdpack/Include;&quot;../../pthreads/Pre-built.2/include&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_SECURE_NO_WARNINGS;USE_READER_THREAD;SIM_ASYNCH_IO"
+				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO"
 				KeepComments="false"
 				StringPooling="true"
 				RuntimeLibrary="0"
@@ -158,10 +158,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="pthreadVC2.lib wsock32.lib packet.lib winmm.lib"
+				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"
+				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
@@ -243,6 +243,26 @@
 			<File
 				RelativePath="..\PDP11\pdp11_xq.c"
 				>
+			</File>
+			<File
+				RelativePath="..\..\windows-build\pthreads\pthread.c"
+				>
+				<FileConfiguration
+					Name="Debug|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Release|Win32"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
+					/>
+				</FileConfiguration>
 			</File>
 			<File
 				RelativePath="..\scp.c"

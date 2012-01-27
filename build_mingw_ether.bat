@@ -1,5 +1,6 @@
 @echo off
-rem 12-Nov-02	rms	Ethernet support
+rem Built in Ethernet support (requires WinPcap installed)
+rem
 rem Compile all of SIMH using MINGW make and gcc environment
 rem Individual simulator sources are in .\simulator_name
 rem Individual simulator executables are to .\bin

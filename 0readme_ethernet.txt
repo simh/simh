@@ -51,6 +51,8 @@ The following steps were performed to get a working SIMH vax simulator
 sharing a physical NIC and allowing Host<->SIMH vax communications:
 
 Linux (Ubuntu 10.04):
+    apt-get install make
+    apt-get install libpcap-dev
     apt-get install bridge-utils
     apt-get install uml-utilities
 
@@ -155,6 +157,7 @@ Note 3: Simulators running using VDE networking can run without root
         privilege.
 
 Linux (Ubuntu 10.04):
+    apt-get install make
     apt-get install libvdeplug-dev
     apt-get install vde2
 
@@ -181,28 +184,43 @@ Windows notes:
 
 
 Building on Windows:
- Building with MinGW can use the provided makefile following the instructions 
- below.  Alternatively, you can use the free Visual C++ Express 2008 or 2010
- interactive development environments.  Read the file 
- ".\Visual Studio Projects\0ReadMe_Projects.txt" for details.
+ You should be able to build with any of the free compiler environments 
+ available on the Windows platform.  If you want to use the Visual C++ 
+ Express 2008 or 2010 interactive development environments, read the file 
+ ".\Visual Studio Projects\0ReadMe_Projects.txt" for details about the
+ required dependencies.  Alternatively, you can build simh with networking
+ support using the MinGW GCC compiler environment.  Both the Visual C++
+ and MinGW build environments require WinPcap and Posix packages being
+ available.  These should be located in a directory structure parallel to
+ the current simulator source directory.
  
- 1. Install WinPCAP 4.x runtime and the WinPCAP Developer's kit.
+ For Example, the directory structure should look like:
 
- 2. Put the required .h files (bittypes,devioctl,ip6_misc,pcap,pcap-stdinc
-    packet32,ntddndis).h from the WinPCAP 4.x developer's kit in the 
-    compiler's include file path
+    .../simh/simhv38-2-rc1/VAX/vax_cpu.c
+    .../simh/simhv38-2-rc1/scp.c
+    .../simh/simhv38-2-rc1/Visual Studio Projects/simh.sln
+    .../simh/simhv38-2-rc1/Visual Studio Projects/VAX.vcproj
+    .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
+    .../simh/windows-build/pthreads/pthread.h
+    .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
 
- 3. Put the required .lib files (packet,wpcap).lib from the WinPCAP 4.x
-    developer's kit in the linker's library path
+ The contents of the windows-build directory can be downloaded from:
 
- 4. If you're using Borland C++, use COFF2OMF to convert the .lib files into
-    a format that can be used by the compiler.
+    https://github.com/downloads/markpizz/simh/windows-build.zip
 
- 5. Define USE_NETWORK.  The current windows network built binaries will 
-    run on any system. regardless of whether or not WinPcap is installed, 
-    and will provide Network functionality when WinPcap is available.
 
- 6. Build it!
+ There are Windows batch files provided to initiate compiles using the MinGW
+ compiler tool chain.  These batch files are located in the same directory 
+ as this file and are called: build_mingw.bat, build_mingw_ether.bat, and 
+ build_mingw_noasync.bat.  These batch files each presume that the MinGW 
+ toolchain is either in the current path or, if not that it is located at
+ C:\MinGW\bin.  These batch files merely invoke the MinGW make (GNU make)
+ passing some specific arguments along with the optional arguments the batch 
+ file is invoked with.
+ 
+ The current windows network built binaries will run on any system without 
+ regard to whether or not WinPcap is installed, and will provide 
+ Network functionality when WinPcap is available.
 
 -------------------------------------------------------------------------------
 
@@ -254,18 +272,26 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
       Linux  : search for your variant on http://rpmfind.net
       OS/X   : Apple Developer's site?
 
-	    NOTE: These repositories for older versions of these platforms
+	    NOTE: The repositories for older versions of these platforms
 	          don't contain a version of libpcap greater than 0.8.1.
-	          However, most(all) recent releases of *nix environments ship 
-	          with sufficiently recent versions of libpcap either automatically 
-              installed or available for installation as part of the 
-              distribution.  
+	          However, most(all) recent releases of *nix environments 
+	          ship with sufficiently recent versions of libpcap either 
+	          automatically installed or available for installation as 
+	          part of the distribution.  
+	          The OS provided libpcap-dev components will be prefereable 
+	          to a package built from www.tcpdump.org sources.  This is
+	          due to the fact that various OS supplied packages will 
+	          depend on the OS supplied libpcap.  The improper build or 
+	          install of the www.tcpdump.org source package can conflict 
+	          with the OS provided one and break the OS provided 
+	          applications (i.e. tcpdump and/or wireshark) as well as
+	          not working correctly for use by simh.
 
- 2. If you install the vendor supplied libpcap-dev package and it provides
-    a /usr/lib/libpcap.a file, then the existing makefile will automatically
-    use the vendor supplied library without any additional arguments.
-    If you have downloaded and built the libpcap from tcpdump.org, then 
-    you can use it during a build by typing 'make USE_NETWORK=1'
+ 2. If you install the vendor supplied libpcap-dev package then the simh
+    makefile will automatically use the vendor supplied library without any 
+    additional arguments.  If you have downloaded and built libpcap from 
+    www.tcpdump.org, then you can force its use during a build by typing 
+    'make USE_NETWORK=1'
 
  3. Build it!
 

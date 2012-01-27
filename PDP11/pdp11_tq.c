@@ -25,6 +25,8 @@
 
    tq           TQK50 tape controller
 
+   23-Jan-12    MP      Added missing support for Logical EOT detection while
+                        positioning.
    05-Mar-11    MP      Added missing state for proper save/restore
    01-Mar-11    MP      - Migrated complex physical tape activities to sim_tape
                         - adopted use of asynch I/O interfaces from sim_tape
@@ -1451,11 +1453,13 @@ switch (cmd) {                                          /* case on command */
             sim_tape_position_a (uptr,
                                  ((mdf & MD_RWD) ? MTPOS_M_REW : 0) | 
                                  ((mdf & MD_REV) ? MTPOS_M_REV : 0) |
-                                 ((mdf & MD_OBC) ? MTPOS_M_OBJ : 0) ,
+                                 ((mdf & MD_OBC) ? MTPOS_M_OBJ : 0) |
+                                 (((mdf & MD_DLE) && !(mdf & MD_REV)) ? MTPOS_M_DLE : 0),
                                  nrec, &res->skrec, ntmk, &res->sktmk, (uint32 *)&res->objupd, tq_io_complete);
             return SCPE_OK;
             }
-        if (res->io_status)
+        res->sts = tq_map_status (uptr, res->io_status);
+        if ((res->io_status != MTSE_OK) && (res->io_status != MTSE_BOT) && (res->io_status != MTSE_LEOT))
             return tq_mot_err (uptr, 0);                /* log, end */
         sim_debug (DBG_REQ, &tq_dev, "Position Done: mdf=0x%04X, nrec=%d, ntmk=%d, skrec=%d, sktmk=%d, skobj=%d\n", 
                             mdf, nrec, ntmk, res->skrec, res->sktmk, res->objupd);
@@ -1558,6 +1562,9 @@ switch (st) {
     case MTSE_WRP:
         uptr->flags = uptr->flags | UNIT_SXC;
         return ST_WPR;
+
+    case MTSE_LEOT:
+        return ST_LED;
         }
 
 return ST_SUC;

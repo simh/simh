@@ -212,14 +212,14 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         lp->cnms = sim_os_msec ();                      /* time of conn */
         if (!mp->buffered) {
             lp->txbpi = 0;                              /* init buf pointers */
-            lp->txbpr = lp->txbsz - strlen (msgbuf);
+            lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
             lp->rxcnt = lp->txcnt = lp->txdrp = 0;      /* init counters */
             }
         else
             if (lp->txcnt > lp->txbsz)
                 lp->txbpr = (lp->txbpi + 1) % lp->txbsz;
             else
-                lp->txbpr = lp->txbsz - strlen (msgbuf);
+                lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
         lp->tsta = 0;                                   /* init telnet state */
         lp->xmte = 1;                                   /* enable transmit */
         lp->dstb = 0;                                   /* default bin mode */
@@ -228,7 +228,7 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         tmxr_linemsg (lp, msgbuf);                      /* beginning of buffer */
         lp->txbpi = psave;                              /* restore insertion pointer */
         tmxr_poll_tx (mp);                              /* flush output */
-        lp->txcnt -= strlen (msgbuf);                   /* adjust statistics */
+        lp->txcnt -= (int32)strlen (msgbuf);            /* adjust statistics */
         return i;
         }
     }                                                   /* end if newsock */
@@ -752,7 +752,7 @@ return SCPE_NOFNC;
 void tmxr_msg (SOCKET sock, char *msg)
 {
 if (sock)
-    sim_write_sock (sock, msg, strlen (msg));
+    sim_write_sock (sock, msg, (int32)strlen (msg));
 return;
 }
 
@@ -760,7 +760,7 @@ void tmxr_linemsg (TMLN *lp, char *msg)
 {
 int32 len;
 
-for (len = strlen (msg); len > 0; --len)
+for (len = (int32)strlen (msg); len > 0; --len)
     tmxr_putc_ln (lp, *msg++);
 return;
 }

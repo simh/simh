@@ -90,7 +90,7 @@ void sim_close_sock (SOCKET sock, t_bool master)
 return;
 }
 
-SOCKET sim_setnonblock (SOCKET sock)
+int32 sim_setnonblock (SOCKET sock)
 {
 return SOCKET_ERROR;
 }
@@ -289,7 +289,7 @@ return;
 }
 
 #if defined (_WIN32)                                    /* Windows */
-SOCKET sim_setnonblock (SOCKET sock)
+int32 sim_setnonblock (SOCKET sock)
 {
 unsigned long non_block = 1;
 
@@ -297,7 +297,7 @@ return ioctlsocket (sock, FIONBIO, &non_block);         /* set nonblocking */
 }
 
 #elif defined (VMS)                                     /* VMS */
-SOCKET sim_setnonblock (SOCKET sock)
+int32 sim_setnonblock (SOCKET sock)
 {
 int non_block = 1;
 

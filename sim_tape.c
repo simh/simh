@@ -26,6 +26,7 @@
    Ultimately, this will be a place to hide processing of various tape formats,
    as well as OS-specific direct hardware access.
 
+   23-Jan-12    MP      Added support for Logical EOT detection while positioning
    05-Feb-11    MP      Refactored to prepare for SIM_ASYNC_IO support
                         Added higher level routines:
                             sim_tape_wreomrw    - erase remainder of tape & rewind
@@ -146,7 +147,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;       \
 if ((!callback) || !ctx->asynch_io)
 
 #define AIO_CALL(op, _buf, _bc, _fc, _max, _vbc, _gaplen, _bpi, _obj, _callback)\
-    if (1) {                                                            \
+    if (ctx->asynch_io) {                                               \
         struct tape_context *ctx =                                      \
                       (struct tape_context *)uptr->tape_ctx;            \
                                                                         \
@@ -167,7 +168,10 @@ if ((!callback) || !ctx->asynch_io)
         ctx->objupdate = _obj;                                          \
         ctx->callback = _callback;                                      \
         pthread_cond_signal (&ctx->io_cond);                            \
-        }
+        }                                                               \
+    else                                                                \
+        if (_callback)                                                  \
+            (_callback) (uptr, r);
 #define TOP_DONE  0             /* close */
 #define TOP_RDRF  1             /* sim_tape_rdrecf_a */
 #define TOP_RDRR  2             /* sim_tape_rdrecr_a */
@@ -248,7 +252,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
                 ctx->io_status = sim_tape_spfilef (uptr, ctx->vbc, ctx->bc);
                 break;
             case TOP_SFRF:
-                ctx->io_status = sim_tape_spfilebyrecf (uptr, ctx->vbc, ctx->bc, ctx->fc);
+                ctx->io_status = sim_tape_spfilebyrecf (uptr, ctx->vbc, ctx->bc, ctx->fc, ctx->max);
                 break;
             case TOP_SPFR:
                 ctx->io_status = sim_tape_spfiler (uptr, ctx->vbc, ctx->bc);
@@ -761,7 +765,7 @@ if (rbc > max) {                                        /* rec out of range? */
     uptr->pos = opos;
     return MTSE_INVRL;
     }
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
+i = (t_mtrlnt)sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
 if (ferror (uptr->fileref)) {                           /* error? */
     MT_SET_PNU (uptr);
     uptr->pos = opos;
@@ -820,7 +824,7 @@ if (st = sim_tape_rdlntr (uptr, &tbc))                  /* read rec lnt */
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
     return MTSE_INVRL;
-i = sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
+i = (t_mtrlnt)sim_fread (buf, sizeof (uint8), rbc, uptr->fileref);/* read record */
 if (ferror (uptr->fileref))                             /* error? */
     return sim_tape_ioerr (uptr);
 for ( ; i < rbc; i++)                                   /* fill with 0's */
@@ -1422,6 +1426,7 @@ return r;
         count   =       count of files to skip
         skipped =       pointer to number of files actually skipped
         recsskipped =   pointer to number of records skipped
+        check_leot =    flag to detect and stop skip between two successive tape marks
    Outputs:
         status  =       operation status
 
@@ -1435,14 +1440,23 @@ return r;
    data record error    updated
 */
 
-t_stat sim_tape_spfilebyrecf (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped)
+t_stat sim_tape_spfilebyrecf (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, t_bool check_leot)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 t_stat st;
+t_bool last_tapemark = FALSE;
 uint32 filerecsskipped;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilebyrecf(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilebyrecf(unit=%d, count=%d, check_leot=%d)\n", uptr-ctx->dptr->units, count, check_leot);
 
+if (check_leot) {
+    t_mtrlnt rbc;
+
+    st = sim_tape_rdlntr (uptr, &rbc);
+    last_tapemark = (MTSE_TMK == st);
+    if ((st == MTSE_OK) || (st == MTSE_TMK))
+        sim_tape_rdlntf (uptr, &rbc);
+    }
 *skipped = 0;
 *recsskipped = 0;
 while (*skipped < count) {                              /* loopo */
@@ -1452,20 +1466,28 @@ while (*skipped < count) {                              /* loopo */
         if (st != MTSE_OK)
             break;
         }
-    if (st == MTSE_TMK)
+    if (st == MTSE_TMK) {
         *skipped = *skipped + 1;                        /* # files skipped */
+        if (check_leot && (filerecsskipped == 0) && last_tapemark) {
+            uint32 filefileskipped;
+            sim_tape_spfilebyrecr (uptr, 1, &filefileskipped, &filerecsskipped);
+            *skipped = *skipped - 1;                    /* adjust # files skipped */
+            return MTSE_LEOT;
+            }
+        last_tapemark = TRUE;
+        }
     else
         return st;
     }
 return MTSE_OK;
 }
 
-t_stat sim_tape_spfilebyrecf_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, TAPE_PCALLBACK callback)
+t_stat sim_tape_spfilebyrecf_a (UNIT *uptr, uint32 count, uint32 *skipped, uint32 *recsskipped, t_bool check_leot, TAPE_PCALLBACK callback)
 {
 t_stat r = MTSE_OK;
 AIO_CALLSETUP
-    r = sim_tape_spfilebyrecf (uptr, count, skipped, recsskipped);
-AIO_CALL(TOP_SPFF, NULL, skipped, recsskipped, 0, count, 0, 0, NULL, callback);
+    r = sim_tape_spfilebyrecf (uptr, count, skipped, recsskipped, check_leot);
+AIO_CALL(TOP_SFRF, NULL, skipped, recsskipped, check_leot, count, 0, 0, NULL, callback);
 return r;
 }
 
@@ -1495,7 +1517,7 @@ uint32 totalrecsskipped;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_tape_spfilef(unit=%d, count=%d)\n", uptr-ctx->dptr->units, count);
 
-return sim_tape_spfilebyrecf (uptr, count, skipped, &totalrecsskipped);
+return sim_tape_spfilebyrecf (uptr, count, skipped, &totalrecsskipped, FALSE);
 }
 
 t_stat sim_tape_spfilef_a (UNIT *uptr, uint32 count, uint32 *skipped, TAPE_PCALLBACK callback)
@@ -1661,7 +1683,7 @@ else {
     if (flags & MTPOS_M_REV)                            /* reverse? */
         r = sim_tape_spfilebyrecr (uptr, files, filesskipped, &fileskiprecs);
     else
-        r = sim_tape_spfilebyrecf (uptr, files, filesskipped, &fileskiprecs);
+        r = sim_tape_spfilebyrecf (uptr, files, filesskipped, &fileskiprecs, (flags & MTPOS_M_DLE));
     if (r != MTSE_OK)
         return r;
     if (flags & MTPOS_M_REV)                            /* reverse? */
@@ -1762,7 +1784,8 @@ uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map)
 {
 t_addr tpos;
 t_tpclnt bc;
-uint32 i, objc;
+size_t i;
+uint32 objc;
 
 if ((uptr == NULL) || (uptr->fileref == NULL))
     return 0;
