@@ -22,7 +22,7 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\ALTAIR\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -101,7 +101,7 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\ALTAIR\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"

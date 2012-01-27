@@ -170,9 +170,9 @@ else
   GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
   ifeq ($(NOASYNCH),)
-    ifeq (pthreads,$(shell if exist ..\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -I../pthreads/Pre-built.2/include
-      PTHREADS_LDFLAGS = -lpthreadVC2 -L..\pthreads\Pre-built.2\lib
+    ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
+      PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
     else
       ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
         PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD
@@ -180,13 +180,13 @@ else
       endif
     endif
   endif
-  ifeq (pcap,$(shell if exist ..\winpcap\Wpdpack\include\pcap.h echo pcap))
-    PCAP_CCDEFS = -I../winpcap/Wpdpack/include -DUSE_SHARED
+  ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
+    PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
     NETWORK_LDFLAGS = 
     NETWORK_OPT = -DUSE_SHARED
   else
     ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
-      PCAP_CCDEFS = -DUSE_SHARED
+      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk 
       NETWORK_LDFLAGS = 
       NETWORK_OPT = -DUSE_SHARED
     endif

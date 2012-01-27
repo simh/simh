@@ -56,7 +56,7 @@
 
   Supported/Tested Platforms:
 
-  Windows(NT,2K,XP,2K3)     WinPcap         V3.0+
+  Windows(NT,2K,XP,2K3,Vista,Win7)     WinPcap         V3.0+
   Linux                     libpcap at least 0.9
   OpenBSD,FreeBSD,NetBSD    libpcap at least 0.9
   MAC OS/X                  libpcap at least 0.9
@@ -72,13 +72,18 @@
   libpcap for VMS is available from: 
                         http://simh.trailing-edge.com/sources/vms-pcap.zip
   libpcap for other Unix platforms is available at: 
+        NOTE: As of the release of this version of sim_ether.c ALL current 
+              *nix platforms ship with a sufficiently new version of 
+              libpcap, and ALL provide a libpcap-dev package for developing
+              libpcap based applications.  The OS vendor supplied version
+              of libpcap AND the libpcap-dev components are preferred for
+              proper operation of both simh AND other applications on the 
+              host system which use libpcap.
         Current Version:  http://www.tcpdump.org/daily/libpcap-current.tar.gz
         Released Version: http://www.tcpdump.org/release/
-        Note: You can only use the released version if it is at least 
-              version 0.9
 
-        
-        We've gotten the tarball, unpacked, built and installed it with:
+        When necessary (see NOTE above about vendor supplied libpcap), 
+        we've gotten the tarball, unpacked, built and installed it with:
             gzip -dc libpcap-current.tar.gz | tar xvf -
             cd libpcap-directory-name
             ./configure
@@ -86,10 +91,8 @@
             make install
         Note:  The "make install" step generally will have to be done as root.
         This will install libpcap in /usr/local/lib and /usr/local/include
-        It is then important to make sure that you get the just installed 
-        libpcap components referenced during your build.  This is generally 
-        achieved by invoking gcc with: 
-             -isystem /usr/local/include -L /usr/local/lib
+        The current simh makefile will do the right thing to locate and 
+        reference the OS provided libpcap or the one just installed.
 
 
   Note: Building for the platforms indicated above, with the indicated libpcap, 

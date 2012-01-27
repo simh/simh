@@ -1,5 +1,11 @@
 @echo off
 rem Compile all of SIMH using MINGW make and gcc environment
+rem
+rem The makefile will determine if the needed WinPcap build 
+rem components are available and the resulting simulators will
+rem run with networking support when the WinPcap environment 
+rem is installed on the running system.
+rem
 rem Individual simulator sources are in .\simulator_name
 rem Individual simulator executables are to .\bin
 rem

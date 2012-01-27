@@ -22,7 +22,7 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\PDP10\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -42,8 +42,8 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="./;../;../PDP10/;../PDP11/;../VAX/;../../winpcap/Wpdpack/Include;&quot;../../pthreads/Pre-built.2/include&quot;"
-				PreprocessorDefinitions="USE_INT64;VM_PDP10;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_READER_THREAD"
+				AdditionalIncludeDirectories="./;../;../PDP10/;../PDP11/;../VAX/"
+				PreprocessorDefinitions="USE_INT64;VM_PDP10;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -63,10 +63,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="pthreadVC2.lib wsock32.lib packet.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\PDP10.exe"
 				LinkIncremental="2"
-				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"
+				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)\PDP10.pdb"
 				SubSystem="1"
@@ -102,7 +102,7 @@
 			IntermediateDirectory="..\BIN\NT\Project\simh\PDP10\$(PlatformName)-$(ConfigurationName)"
 			ConfigurationType="1"
 			InheritedPropertySheets="$(VCInstallDir)VCProjectDefaults\UpgradeFromVC71.vsprops"
-			CharacterSet="2"
+			CharacterSet="0"
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
@@ -124,8 +124,8 @@
 				Optimization="2"
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
-				AdditionalIncludeDirectories="./;../;../PDP10/;../PDP11/;../VAX/;../../winpcap/Wpdpack/Include;&quot;../../pthreads/Pre-built.2/include&quot;"
-				PreprocessorDefinitions="USE_INT64;VM_PDP10;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;USE_READER_THREAD"
+				AdditionalIncludeDirectories="./;../;../PDP10/;../PDP11/;../VAX/"
+				PreprocessorDefinitions="USE_INT64;VM_PDP10;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -145,10 +145,10 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="pthreadVC2.lib wsock32.lib packet.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\PDP10.exe"
 				LinkIncremental="1"
-				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"
+				AdditionalLibraryDirectories=""
 				GenerateDebugInformation="true"
 				SubSystem="1"
 				OptimizeReferences="2"
