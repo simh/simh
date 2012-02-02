@@ -1924,7 +1924,7 @@ if (err != 0) {                                         /* error? */
     if (rq_dte (cp, uptr, ST_DRV))                      /* post err log */
         rq_rw_end (cp, uptr, EF_LOG, ST_DRV);           /* if ok, report err */
     perror ("RQ I/O error");
-    if (!(uptr->flags | UNIT_RAW))
+    if (!(uptr->flags & UNIT_RAW))
         clearerr (uptr->fileref);
     return SCPE_IOERR;
     }
