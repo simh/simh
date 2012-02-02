@@ -2725,8 +2725,18 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
         WRITE_I (uptr->u6);
         WRITE_I (uptr->flags);                          /* [V2.10] flags */
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
-        if (uptr->flags & UNIT_ATT)
+        if (uptr->flags & UNIT_ATT) {
             fputs (uptr->filename, sfile);
+            if ((uptr->flags & UNIT_BUF) &&             /* writable buffered */
+                uptr->hwmark &&                         /* files need to be */
+                ((uptr->flags & UNIT_RO) == 0)) {       /* written on save */
+                uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
+                rewind (uptr->fileref);
+                sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
+                fclose (uptr->fileref);                 /* flush data and state */
+                uptr->fileref = sim_fopen (uptr->filename, "rb+");/* reopen r/w */
+                }
+            }
         fputc ('\n', sfile);
         if (((uptr->flags & (UNIT_FIX + UNIT_ATTABLE)) == UNIT_FIX) &&
              (dptr->examine != NULL) &&
