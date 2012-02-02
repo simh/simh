@@ -2660,7 +2660,7 @@ VHD_DynamicDiskHeader Dynamic;
 uint32 *BAT = NULL;
 time_t now;
 uint32 i;
-FILE *File;
+FILE *File = NULL;
 uint32 Status = 0;
 uint32 BytesPerSector = 512;
 uint64 SizeInBytes = ((uint64)SizeInSectors)*BytesPerSector;
@@ -2833,7 +2833,7 @@ CreateDifferencingVirtualDisk(const char *szVHDPath,
                               const char *szParentVHDPath)
 {
 uint32 BytesPerSector = 512;
-VHDHANDLE hVHD;
+VHDHANDLE hVHD = NULL;
 VHD_Footer ParentFooter;
 VHD_DynamicDiskHeader ParentDynamic;
 uint32 ParentTimeStamp;
