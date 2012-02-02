@@ -101,8 +101,6 @@ int32 clk_tps = 100;                                    /* ticks/second */
 int32 todr_reg = 0;                                     /* TODR register */
 int32 todr_blow = 1;                                    /* TODR battery low */
 struct todr_battery_info {
-    char   toy_gmtbase_a[16];                           /* Platform independent Text format of toy_gmtbase */
-    char   toy_gmtbasemsec_a[16];                       /* Platform independent Text format of toy_gmtbasemsec */
     uint32 toy_gmtbase;                                 /* GMT base of set value */
     uint32 toy_gmtbasemsec;                             /* The milliseconds of the set value */
     };
@@ -234,7 +232,7 @@ MTAB clk_mod[] = {
 
 DEVICE clk_dev = {
     "CLK", &clk_unit, clk_reg, clk_mod,
-    1, 0, 8, 1, 0, 0,
+    1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
     &clk_dib, 0
@@ -429,8 +427,6 @@ if (0 == todr_reg)                                      /* clock running? */
 #define TOY_MAX_SECS (0x40000000/25)
 
 clock_gettime(CLOCK_REALTIME, &now);                    /* get curr time */
-toy->toy_gmtbase = strtoul(toy->toy_gmtbase_a, NULL, 0);
-toy->toy_gmtbasemsec = strtoul(toy->toy_gmtbasemsec_a, NULL, 0);
 base.tv_sec = toy->toy_gmtbase;
 base.tv_nsec = toy->toy_gmtbasemsec * 1000000;
 sim_timespec_diff (&val, &now, &base);
@@ -457,8 +453,6 @@ val.tv_nsec = (((uint32)data) % 100) * 10000000;
 sim_timespec_diff (&base, &now, &val);                  /* base = now - data */
 toy->toy_gmtbase = (uint32)base.tv_sec;
 toy->toy_gmtbasemsec = base.tv_nsec/1000000;
-sprintf(toy->toy_gmtbase_a, "0x%08X", toy->toy_gmtbase);
-sprintf(toy->toy_gmtbasemsec_a, "0x%08X", toy->toy_gmtbasemsec);
 todr_reg = data;
 if (data)
     todr_blow = 0;
