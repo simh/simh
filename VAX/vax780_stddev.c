@@ -327,7 +327,7 @@ REG clk_reg[] = {
 
 DEVICE clk_dev = {
     "TODR", &clk_unit, clk_reg, NULL,
-    1, 0, 8, 1, 0, 0,
+    1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
     NULL, 0

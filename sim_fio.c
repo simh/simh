@@ -57,7 +57,6 @@
 
 #include "sim_defs.h"
 
-static unsigned char sim_flip[FLIP_SIZE];
 int32 sim_end = 1;                                      /* 1 = little */
 
 /* OS-independent, endian independent binary I/O package
@@ -141,11 +140,13 @@ size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr)
 size_t c, nelem, nbuf, lcnt, total;
 int32 i;
 unsigned char *sptr;
+unsigned char *sim_flip;
 
 if ((size == 0) || (count == 0))                        /* check arguments */
     return 0;
 if (sim_end || (size == sizeof (char)))                 /* le or byte? */
     return fwrite (bptr, size, count, fptr);            /* done */
+sim_flip = (unsigned char *)malloc(FLIP_SIZE);
 nelem = FLIP_SIZE / size;                               /* elements in buffer */
 nbuf = count / nelem;                                   /* number buffers */
 lcnt = count % nelem;                                   /* count in last buf */
@@ -158,10 +159,13 @@ for (i = (int32)nbuf; i > 0; i--) {                     /* loop on buffers */
     sim_buf_copy_swapped (sim_flip, sptr, size, c);
     sptr = sptr + size * count;
     c = fwrite (sim_flip, size, c, fptr);
-    if (c == 0)
+    if (c == 0) {
+        free(sim_flip);
         return total;
+        }
     total = total + c;
     }
+free(sim_flip);
 return total;
 }
 

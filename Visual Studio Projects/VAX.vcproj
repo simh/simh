@@ -26,8 +26,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Build Dependent ROM include File(s)"
-				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;"
+				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;&#x0D;&#x0A;if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -112,8 +112,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Build Dependent ROM include File(s)"
-				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;"
+				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies"
+				CommandLine="pushd ..&#x0D;&#x0A;$(TargetDir)BuildROMs&#x0D;&#x0A;popd&#x0D;&#x0A;&#x0D;&#x0A;if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
