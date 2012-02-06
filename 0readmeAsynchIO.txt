@@ -142,8 +142,7 @@ Most *nix platforms have these APIs available and on these platforms
 simh is typically built with these available since on these platforms, 
 pthreads is required for simh networking support.  Windows can also 
 utilize the pthreads APIs if the compile and run time support for the
-win32Pthreads package has been installed on the build system and the
-run time dll is available in the execution environment.
+win32Pthreads package has been installed on the build system.
 
 Sample Asynch I/O device implementations.
 The pdp11_rq.c module has been refactored to leverage the asynch I/O
