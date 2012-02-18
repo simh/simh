@@ -2697,8 +2697,10 @@ if ((0 == strlen(buf)) && (!dev->promiscuous)) /* Empty filter means match nothi
   strcpy(buf, "ether host fe:ff:ff:ff:ff:ff"); /* this should be a good match nothing filter */
 sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 
-/* get netmask, which is required for compiling */
-if ((dev->eth_api == ETH_API_PCAP) && (pcap_lookupnet(dev->handle, &bpf_subnet, &bpf_netmask, errbuf)<0))
+/* get netmask, which is a required argument for compiling, the value, in our 
+   case isn't actually interesting since the filters we generate aren't 
+   referencing IP fields, networks or values */
+if ((dev->eth_api == ETH_API_PCAP) && (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0))
   bpf_netmask = 0;
 
 #ifdef USE_BPF
