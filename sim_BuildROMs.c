@@ -53,7 +53,8 @@
 #include <utime.h>
 #endif
 
-int sim_make_ROM_include(const char *rom_filename, 
+int sim_make_ROM_include(const char *rom_filename,
+                         int expected_size,
                          const char *include_filename, 
                          const char *rom_array_name)
 {
@@ -70,13 +71,21 @@ if (NULL == (rFile = fopen (rom_filename, "rb"))) {
     return -1;
     }
 if (stat (rom_filename, &statb)) {
-    printf ("Error Stating '%s': %s\n", rom_filename, strerror(errno));
+    printf ("Error stating '%s': %s\n", rom_filename, strerror(errno));
+    fclose (rFile);
+    return -1;
+    }
+if (statb.st_size != expected_size) {
+    printf ("Error: ROM file '%s' has an unexpected size: %d vs %d\n", (int)statb.st_size, expected_size);
+    printf ("This can happen if the file was transferred or unpacked incorrectly\n");
+    printf ("and in the process tried to convert line endings rather than passing\n");
+    printf ("the file's contents unmodified\n");
     fclose (rFile);
     return -1;
     }
 ROMData = malloc (statb.st_size);
 if (statb.st_size != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
-    printf ("Error Stating '%s': %s\n", rom_filename, strerror(errno));
+    printf ("Error reading '%s': %s\n", rom_filename, strerror(errno));
     fclose (rFile);
     free (ROMData);
     return -1;
@@ -156,7 +165,7 @@ return 0;
 int
 main(int argc, char **argv)
 {
-sim_make_ROM_include ("VAX/ka655x.bin", "VAX/vax_ka655x_bin.h", "vax_ka655x_bin");
-sim_make_ROM_include ("VAX/vmb.exe",    "VAX/vax780_vmb_exe.h", "vax780_vmb_exe");
+sim_make_ROM_include ("VAX/ka655x.bin",  131072,  "VAX/vax_ka655x_bin.h", "vax_ka655x_bin");
+sim_make_ROM_include ("VAX/vmb.exe",      44544,  "VAX/vax780_vmb_exe.h", "vax780_vmb_exe");
 exit(0);
 }
