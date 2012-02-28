@@ -136,13 +136,30 @@
 #define ETH_MIN_JUMBO_FRAME ETH_MAX_PACKET              /* Threshold size for Jumbo Frame Processing */
 
 #define LOOPBACK_SELF_FRAME(phy_mac, msg)             \
-    ((memcmp(phy_mac, msg  , 6) == 0) &&              \
-     (memcmp(phy_mac, msg+6, 6) == 0) &&              \
-     ((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&    \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&    \
      ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&    \
      ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&    \
-     (memcmp(phy_mac, msg+18, 6) == 0) &&             \
-     ((msg)[24] == 0x01) && ((msg)[25] == 0x00))
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&    \
+     (memcmp(phy_mac, (msg),    6) == 0) &&           \
+     (memcmp(phy_mac, (msg)+6,  6) == 0) &&           \
+     (memcmp(phy_mac, (msg)+18, 6) == 0))
+
+#define LOOPBACK_PHYSICAL_RESPONSE(host_phy, phy_mac, msg) \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&         \
+     ((msg)[14] == 0x08) && ((msg)[15] == 0x00) &&         \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&         \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&         \
+     (memcmp(host_phy, (msg)+18, 6) == 0) &&               \
+     (memcmp(host_phy, (msg),    6) == 0) &&               \
+     (memcmp(phy_mac,  (msg)+6,  6) == 0))
+
+#define LOOPBACK_PHYSICAL_REFLECTION(host_phy, msg)  \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&   \
+     ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&   \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&   \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&   \
+     (memcmp(host_phy, (msg)+6,  6) == 0) &&         \
+     (memcmp(host_phy, (msg)+18, 6) == 0))
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
