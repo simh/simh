@@ -560,7 +560,7 @@ char* eth_getname(int number, char* name)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
 
-  if (count <= number) return 0;
+  if (count <= number) return NULL;
   strcpy(name, list[number].name);
   return name;
 }
@@ -587,7 +587,7 @@ char* eth_getname_bydesc(char* desc, char* name)
     return name;
   }
   /* not found */
-  return 0;
+  return NULL;
 }
 
 /* strncasecmp() is not available on all platforms */
@@ -621,16 +621,13 @@ char* eth_getname_byname(char* name, char* temp)
   found = 0;
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
-    if (eth_strncasecmp(name, list[i].name, n) == 0) {
+    if ((n == strlen(list[i].name)) &&
+        (eth_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
     }
   }
-  if (found) {
-    return temp;
-  } else {
-    return 0;
-  }
+  return (found ? temp : NULL);
 }
 
 void eth_zero(ETH_DEV* dev)
@@ -657,7 +654,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st,"  %d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
   return SCPE_OK;
 }
@@ -1452,16 +1449,16 @@ if ((strlen(name) == 4)
    ) {
   num = atoi(&name[3]);
   savname = eth_getname(num, temp);
-  if (savname == 0) /* didn't translate */
+  if (savname == NULL) /* didn't translate */
     return SCPE_OPENERR;
   }
 else {
   /* are they trying to use device description? */
   savname = eth_getname_bydesc(name, temp);
-  if (savname == 0) { /* didn't translate */
+  if (savname == NULL) { /* didn't translate */
     /* probably is not ethX and has no description */
     savname = eth_getname_byname(name, temp);
-    if (savname == 0) /* didn't translate */
+    if (savname == NULL) /* didn't translate */
       savname = name;
     }
   }
@@ -2825,7 +2822,6 @@ for (i=0; i<used; i++) {
 
 #ifdef USE_TAP_NETWORK
 if (used < max) {
-  list[used].num = used;
 #if defined(__OpenBSD__)
   sprintf(list[used].name, "%s", "tap:tunN");
 #else
@@ -2837,7 +2833,6 @@ if (used < max) {
 #endif
 #ifdef USE_VDE_NETWORK
 if (used < max) {
-  list[used].num = used;
   sprintf(list[used].name, "%s", "vde:device");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
   ++used;
@@ -2855,6 +2850,7 @@ pcap_if_t* alldevs;
 pcap_if_t* dev;
 char errbuf[PCAP_ERRBUF_SIZE];
 
+memset(list, 0, max*sizeof(*list));
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
@@ -2863,15 +2859,13 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   }
 else {
   /* copy device list into the passed structure */
-  for (i=0, dev=alldevs; dev; dev=dev->next) {
+  for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
-    list[i].num = i;
-    sprintf(list[i].name, "%s", dev->name);
+    strncpy(list[i].name, dev->name, sizeof(list[i].name)-1);
     if (dev->description)
-      sprintf(list[i].desc, "%s", dev->description);
+      strncpy(list[i].desc, dev->description, sizeof(list[i].desc)-1);
     else
-      sprintf(list[i].desc, "%s", "No description available");
-    if (i++ >= max) break;
+      strncpy(list[i].desc, "No description available", sizeof(list[i].desc)-1);
     }
 
   /* free device list */

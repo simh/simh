@@ -130,7 +130,7 @@
 #define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
 #define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
 #define ETH_MAX_JUMBO_FRAME 65536                       /* maximum ethernet jumbo frame size (or Offload Segment Size) */
-#define ETH_MAX_DEVICE        10                        /* maximum ethernet devices */
+#define ETH_MAX_DEVICE        20                        /* maximum ethernet devices */
 #define ETH_CRC_SIZE           4                        /* ethernet CRC size */
 #define ETH_FRAME_SIZE (ETH_MAX_PACKET+ETH_CRC_SIZE)    /* ethernet maximum frame size */
 #define ETH_MIN_JUMBO_FRAME ETH_MAX_PACKET              /* Threshold size for Jumbo Frame Processing */
@@ -168,7 +168,6 @@ struct eth_queue {
 };
 
 struct eth_list {
-  int     num;
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
 };
