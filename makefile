@@ -117,10 +117,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   # building the pdp11, or any vax simulator could use networking support
   ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
     NETWORK_USEFUL = true
+    ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
+      BUILD_MULTIPLE = (s)
+    else
+      BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
+    endif
   else
     ifeq ($(MAKECMDGOALS),)
       # default target is all
       NETWORK_USEFUL = true
+      BUILD_MULTIPLE = (s)
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
@@ -134,12 +140,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           NETWORK_CCDEFS = -DUSE_SHARED
           $(info using libpcap: $(call find_include,pcap))
         endif
-        $(info *** Simulator(s) being built with networking support using)
+        $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
         $(info *** $(OSTYPE) provided libpcap components)
       else
         NETWORK_CCDEFS = -DUSE_SHARED
         $(info using libpcap: $(call find_include,pcap))
-        $(info *** Simulator(s) being built with networking support using)
+        $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
         $(info *** $(OSTYPE) provided libpcap components)
       endif
     else
@@ -153,7 +159,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,pcap)
           $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
           $(info *** Warning ***)
-          $(info *** Warning *** Simulator(s) being built with networking support using)
+          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
           $(info *** Warning *** libpcap components from www.tcpdump.org.)
           $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
           $(info *** Warning *** components for simh networking.  For best results, with)
@@ -189,7 +195,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       $(info *** Warning ***)
-      $(info *** Warning *** Simulator(s) are being built WITHOUT networking support)
+      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT networking support)
       $(info *** Warning ***)
       $(info *** Warning *** To build simulator(s) with networking support you should install)
       $(info *** Warning *** the libpcap-dev package from your $(OSTYPE) distribution)
