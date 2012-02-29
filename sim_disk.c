@@ -2132,6 +2132,7 @@ typedef struct _VHD_DynamicDiskHeader {
     } VHD_DynamicDiskHeader;
 
 #define VHD_BAT_FREE_ENTRY (0xFFFFFFFF)
+#define VHD_DATA_BLOCK_ALIGNMENT ((uint64)4096)    /* Optimum when underlying storage has 4k sectors */
 
 static char *VHD_DiskTypes[] =
     {
@@ -3214,6 +3215,14 @@ while (sects) {
         BitMap = malloc(BitMapSectors*SectorSize);
         memset(BitMap, 0xFF, BitMapBytes);
         BlockOffset -= sizeof(hVHD->Footer);
+        /* align the data portion of the block to the desired alignment */
+        /* compute the address of the data portion of the block */
+        BlockOffset += BitMapSectors*SectorSize;
+        /* round up this address to the desired alignment */
+        BlockOffset += VHD_DATA_BLOCK_ALIGNMENT-1;
+        BlockOffset &= ~(VHD_DATA_BLOCK_ALIGNMENT-1);
+        /* the actual block address is the beginning of the block bitmap */
+        BlockOffset -= BitMapSectors*SectorSize;
         hVHD->BAT[BlockNumber] = NtoHl((uint32)(BlockOffset/SectorSize));
         if (WriteFilePosition(hVHD->File,
                               BitMap,

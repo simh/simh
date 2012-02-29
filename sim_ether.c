@@ -560,7 +560,7 @@ char* eth_getname(int number, char* name)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
 
-  if (count <= number) return 0;
+  if (count <= number) return NULL;
   strcpy(name, list[number].name);
   return name;
 }
@@ -587,7 +587,7 @@ char* eth_getname_bydesc(char* desc, char* name)
     return name;
   }
   /* not found */
-  return 0;
+  return NULL;
 }
 
 /* strncasecmp() is not available on all platforms */
@@ -621,16 +621,13 @@ char* eth_getname_byname(char* name, char* temp)
   found = 0;
   n = strlen(name);
   for (i=0; i<count && !found; i++) {
-    if (eth_strncasecmp(name, list[i].name, n) == 0) {
+    if ((n == strlen(list[i].name)) &&
+        (eth_strncasecmp(name, list[i].name, n) == 0)) {
       found = 1;
       strcpy(temp, list[i].name); /* only case might be different */
     }
   }
-  if (found) {
-    return temp;
-  } else {
-    return 0;
-  }
+  return (found ? temp : NULL);
 }
 
 void eth_zero(ETH_DEV* dev)
@@ -657,7 +654,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st,"  %d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
   return SCPE_OK;
 }
@@ -1452,16 +1449,16 @@ if ((strlen(name) == 4)
    ) {
   num = atoi(&name[3]);
   savname = eth_getname(num, temp);
-  if (savname == 0) /* didn't translate */
+  if (savname == NULL) /* didn't translate */
     return SCPE_OPENERR;
   }
 else {
   /* are they trying to use device description? */
   savname = eth_getname_bydesc(name, temp);
-  if (savname == 0) { /* didn't translate */
+  if (savname == NULL) { /* didn't translate */
     /* probably is not ethX and has no description */
     savname = eth_getname_byname(name, temp);
-    if (savname == 0) /* didn't translate */
+    if (savname == NULL) /* didn't translate */
       savname = name;
     }
   }
@@ -1724,6 +1721,66 @@ char mac_string[32];
 eth_mac_fmt(mac, mac_string);
 sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %s\n", mac_string);
 
+/* The process of checking address conflicts is used in two ways:
+   1) to determine the behavior of the currently running packet 
+      delivery facility regarding whether it may receive copies 
+      of every packet sent (and how many). 
+   2) to verify if a MAC address which this facility is planning 
+      to use as the source address of packets is already in use 
+      by some other node on the local network 
+   Case #1, doesn't require (and explicitly doesn't want) any 
+   interaction or response from other systems on the LAN so 
+   therefore no considerations regarding switch packet forwarding 
+   are important.  Meanwhile, Case #2 does require responses from 
+   other components on the LAN to provide useful functionality. 
+   The original designers of this mechanism did this when essentially 
+   all LANs were single collision domains (i.e. ALL nodes which might 
+   be affected by an address conflict were physically present on a single
+   Ethernet cable which might have been extended by a couple of repeaters).
+   Since that time, essentially no networks are single collision domains.  
+   Thick and thinwire Ethernet cables don’t exist and very few networks 
+   even have hubs.  Today, essentially all LANs are deployed using one 
+   or more layers of network switches.  In a switched LAN environment, the 
+   switches on the LAN ‘learn’ which ports on the LAN source traffic from 
+   which MAC addresses and then forward traffic destined for particular 
+   MAC address to the appropriate ports.  If a particular MAC address is
+   already in use somewhere on the LAN, then the switches ‘know’ where 
+   it is.  The host based test using the loopback protocol is poorly 
+   designed to detect this condition.  This test is performed by the host
+   first changing the device’s Physical MAC address to the address which
+   is to be tested, and then sending a loopback packet FROM AND TO this
+   MAC address with a loopback reply to be sent by a system which may be
+   currently using the MAC address.  If no reply is received, then the 
+   MAC address is presumed to be unused.  The sending of this packet will
+   result in its delivery to the right system since the switch port/MAC
+   address tables know where to deliver packets destined to this MAC 
+   address, however the response it generates won’t be delivered to the 
+   system performing the test since the switches on the LAN won’t know 
+   about the local port being the right target for packets with this MAC 
+   address.  A better test design to detect these conflicts would be for 
+   the testing system to send a loopback packet FROM the current physical
+   MAC address (BEFORE changing it) TO the MAC address being tested with 
+   the loopback response coming to the current physical MAC address of 
+   the device.  If a response is received, then the address is in use and
+   the attempt to change the device’s MAC address should fail.  Since we 
+   can’t change the software running in these simulators to implement this
+   better conflict detection approach, we can still ‘do the right thing’ 
+   in the sim_ether layer.  We’re already handling the loopback test 
+   packets specially since we always had to avoid receiving the packets 
+   which were being sent, but needed to allow for the incoming loopback 
+   packets to be properly dealt with.  We can extend this current special
+   handling to change outgoing ‘loopback to self’ packets to have source 
+   AND loopback destination addresses in the packets to be the host NIC’s
+   physical address.  The switch network will already know the correct 
+   MAC/port relationship for the host NIC’s physical address, so loopback 
+   response packets will be delivered as needed.
+
+   Code in _eth_write and _eth_callback provide the special handling to 
+   perform the described loopback packet adjustments, and code in 
+   eth_filter_hash makes sure that the loopback response packets are received.
+
+   */
+
 /* build a loopback forward request packet */
 memset (&send, 0, sizeof(ETH_PACK));
 send.len = ETH_MIN_PACKET;                              /* minimum packet size */
@@ -1743,7 +1800,7 @@ if (status != SCPE_OK) {
   char *msg;
   msg = "Eth: Error Transmitting packet: %s\r\n"
         "You may need to run as root, or install a libpcap version\r\n"
-        "which is at least 0.9 from www.tcpdump.org\r\n";
+        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n";
   printf(msg, strerror(errno));
   if (sim_log) fprintf (sim_log, msg, strerror(errno));
   return status;
@@ -1755,7 +1812,10 @@ sim_os_ms_sleep (300);   /* time for a conflicting host to respond */
 do {
   memset (&recv, 0, sizeof(ETH_PACK));
   status = eth_read (dev, &recv, NULL);
-  if (memcmp(send.msg, recv.msg, 14)== 0)
+  if (((0 == memcmp(send.msg+12, recv.msg+12, 2)) &&   /* Protocol Match */
+       (0 == memcmp(send.msg,    recv.msg+6,  6)) &&   /* Source Match */
+       (0 == memcmp(send.msg+6,  recv.msg,    6))) ||  /* Destination Match */
+      (0 == memcmp(send.msg, recv.msg, 14)))           /* Packet Match (Reflection) */
     responses++;
   } while (recv.len > 0);
 
@@ -1792,12 +1852,16 @@ if (!packet) return SCPE_ARG;
 
 /* make sure packet is acceptable length */
 if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
-  int loopback_self_frame = LOOPBACK_SELF_FRAME(dev->physical_addr, packet->msg);
+  int loopback_self_frame = LOOPBACK_SELF_FRAME(packet->msg, packet->msg);
 
   eth_packet_trace (dev, packet->msg, packet->len, "writing");
 
   /* record sending of loopback packet (done before actual send to avoid race conditions with receiver) */
   if (loopback_self_frame) {
+    if (dev->have_host_nic_phy_addr) {
+      memcpy(&packet->msg[6],  dev->host_nic_phy_hw_addr, sizeof(ETH_MAC));
+      memcpy(&packet->msg[18], dev->host_nic_phy_hw_addr, sizeof(ETH_MAC));
+    }
 #ifdef USE_READER_THREAD
     pthread_mutex_lock (&dev->self_lock);
 #endif
@@ -1806,7 +1870,7 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
 #ifdef USE_READER_THREAD
     pthread_mutex_unlock (&dev->self_lock);
 #endif
-    }
+  }
 
     /* dispatch write request (synchronous; no need to save write info to dev) */
   switch (dev->eth_api) {
@@ -2346,6 +2410,17 @@ int from_me = 0;
 int i;
 int bpf_used;
 
+if ((dev->have_host_nic_phy_addr) &&
+    (LOOPBACK_PHYSICAL_RESPONSE(dev->host_nic_phy_hw_addr, dev->physical_addr, data))) {
+  u_char *datacopy = malloc(header->len);
+
+  memcpy(datacopy, data, header->len);
+  memcpy(datacopy, dev->physical_addr, sizeof(ETH_MAC));
+  memcpy(datacopy+18, dev->physical_addr, sizeof(ETH_MAC));
+  _eth_callback(info, header, datacopy);
+  free(datacopy);
+  return;
+}
 switch (dev->eth_api) {
   case ETH_API_PCAP:
 #ifdef USE_BPF
@@ -2380,7 +2455,9 @@ switch (dev->eth_api) {
   }
 
 /* detect reception of loopback packet to our physical address */
-if (LOOPBACK_SELF_FRAME(dev->physical_addr, data)) {
+if ((LOOPBACK_SELF_FRAME(dev->physical_addr, data)) ||
+    (dev->have_host_nic_phy_addr && 
+     LOOPBACK_PHYSICAL_REFLECTION(dev->host_nic_phy_hw_addr, data))) {
 #ifdef USE_READER_THREAD
   pthread_mutex_lock (&dev->self_lock);
 #endif
@@ -2397,7 +2474,7 @@ if (LOOPBACK_SELF_FRAME(dev->physical_addr, data)) {
 #ifdef USE_READER_THREAD
   pthread_mutex_unlock (&dev->self_lock);
 #endif
-  }
+}
 
 if (bpf_used ? to_me : (to_me && !from_me)) {
   if (header->len > ETH_MIN_JUMBO_FRAME) {
@@ -2689,6 +2766,10 @@ if ((addr_count) && (dev->reflections > 0)) {
       memcpy(dev->physical_addr, &dev->filter_address[i], sizeof(ETH_MAC));
       /* let packets through where dst and src are the same as our physical address */
       sprintf (&buf[strlen(buf)], " or ((ether dst %s) and (ether src %s))", mac, mac);
+      if (dev->have_host_nic_phy_addr) {
+        eth_mac_fmt(&dev->host_nic_phy_hw_addr, mac);
+        sprintf(&buf[strlen(buf)], "or ((ether dst %s) and (ether proto 0x9000))", mac);
+      }
       break;
       }
     }
@@ -2697,8 +2778,10 @@ if ((0 == strlen(buf)) && (!dev->promiscuous)) /* Empty filter means match nothi
   strcpy(buf, "ether host fe:ff:ff:ff:ff:ff"); /* this should be a good match nothing filter */
 sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 
-/* get netmask, which is required for compiling */
-if ((dev->eth_api == ETH_API_PCAP) && (pcap_lookupnet(dev->handle, &bpf_subnet, &bpf_netmask, errbuf)<0))
+/* get netmask, which is a required argument for compiling.  The value, 
+   in our case isn't actually interesting since the filters we generate 
+   aren't referencing IP fields, networks or values */
+if ((dev->eth_api == ETH_API_PCAP) && (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0))
   bpf_netmask = 0;
 
 #ifdef USE_BPF
@@ -2823,7 +2906,6 @@ for (i=0; i<used; i++) {
 
 #ifdef USE_TAP_NETWORK
 if (used < max) {
-  list[used].num = used;
 #if defined(__OpenBSD__)
   sprintf(list[used].name, "%s", "tap:tunN");
 #else
@@ -2835,7 +2917,6 @@ if (used < max) {
 #endif
 #ifdef USE_VDE_NETWORK
 if (used < max) {
-  list[used].num = used;
   sprintf(list[used].name, "%s", "vde:device");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
   ++used;
@@ -2853,6 +2934,7 @@ pcap_if_t* alldevs;
 pcap_if_t* dev;
 char errbuf[PCAP_ERRBUF_SIZE];
 
+memset(list, 0, max*sizeof(*list));
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
@@ -2861,15 +2943,13 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   }
 else {
   /* copy device list into the passed structure */
-  for (i=0, dev=alldevs; dev; dev=dev->next) {
+  for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
-    list[i].num = i;
-    sprintf(list[i].name, "%s", dev->name);
+    strncpy(list[i].name, dev->name, sizeof(list[i].name)-1);
     if (dev->description)
-      sprintf(list[i].desc, "%s", dev->description);
+      strncpy(list[i].desc, dev->description, sizeof(list[i].desc)-1);
     else
-      sprintf(list[i].desc, "%s", "No description available");
-    if (i++ >= max) break;
+      strncpy(list[i].desc, "No description available", sizeof(list[i].desc)-1);
     }
 
   /* free device list */

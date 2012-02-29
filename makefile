@@ -28,7 +28,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
     GCC = gcc
   endif
-  ifeq (SunOS,$(shell uname))
+  OSTYPE = $(shell uname)
+  OSNAME = $(OSTYPE)
+  ifeq (SunOS,$(OSTYPE))
     TEST = /bin/test
   else
     TEST = test
@@ -40,14 +42,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     INCPATH:=/usr/include
     LIBPATH:=/usr/lib
     OS_CCDEFS = -D_GNU_SOURCE
-    ifeq (Darwin,$(shell uname))
+    ifeq (Darwin,$(OSTYPE))
+      OSNAME = OSX
       LIBEXT = dylib
     else
-      ifeq (Linux,$(shell uname))
+      ifeq (Linux,$(OSTYPE))
         LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
         LIBEXT = so
       else
-        ifeq (SunOS,$(shell uname))
+        ifeq (SunOS,$(OSTYPE))
+          OSNAME = Solaris
           LIBPATH := $(shell crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
           LIBEXT = so
           OS_LDFLAGS += -lsocket -lnsl
@@ -68,7 +72,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             LIBPATH += /usr/pkg/lib
             OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
           endif
-          ifneq (,$(findstring NetBSD,$(shell uname))$(findstring FreeBSD,$(shell uname)))
+          ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
             LIBEXT = so
           else
             LIBEXT = a
@@ -104,49 +108,41 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_LDFLAGS += -ldl
       $(info using libdl: $(call find_lib,dl) $(call find_include,dlfcn))
     else
-      ifeq (BSD,$(findstring BSD,$(shell uname)))
+      ifeq (BSD,$(findstring BSD,$(OSTYPE)))
         OS_CCDEFS += -DHAVE_DLOPEN=so
         $(info using libdl: $(call find_include,dlfcn))
       endif
     endif
   endif
-  ifneq (,$(call find_include,pcap))
-    ifneq (,$(call find_lib,pcap))
-      ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
-        NETWORK_CCDEFS = -DUSE_NETWORK
-        NETWORK_LDFLAGS = -lpcap
-        $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
-      else # default build uses dynamic libpcap
+  # building the pdp11, or any vax simulator could use networking support
+  ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
+    NETWORK_USEFUL = true
+  else
+    ifeq ($(MAKECMDGOALS),)
+      # default target is all
+      NETWORK_USEFUL = true
+    endif
+  endif
+  ifneq (,$(NETWORK_USEFUL))
+    ifneq (,$(call find_include,pcap))
+      ifneq (,$(call find_lib,pcap))
+        ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
+          NETWORK_CCDEFS = -DUSE_NETWORK
+          NETWORK_LDFLAGS = -lpcap
+          $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+        else # default build uses dynamic libpcap
+          NETWORK_CCDEFS = -DUSE_SHARED
+          $(info using libpcap: $(call find_include,pcap))
+        endif
+        $(info *** Simulator(s) being built with networking support using)
+        $(info *** $(OSTYPE) provided libpcap components)
+      else
         NETWORK_CCDEFS = -DUSE_SHARED
         $(info using libpcap: $(call find_include,pcap))
+        $(info *** Simulator(s) being built with networking support using)
+        $(info *** $(OSTYPE) provided libpcap components)
       endif
     else
-      NETWORK_CCDEFS = -DUSE_SHARED
-      $(info using libpcap: $(call find_include,pcap))
-    endif
-  endif
-  ifneq (,$(call find_lib,vdeplug))
-    ifneq (,$(call find_include,libvdeplug))
-      # Provide support for vde networking
-      NETWORK_CCDEFS += -DUSE_VDE_NETWORK
-      NETWORK_LDFLAGS += -lvdeplug
-      $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
-    endif
-  endif
-  ifneq (,$(call find_include,linux/if_tun))
-    # Provide support for Tap networking on Linux
-    NETWORK_CCDEFS += -DUSE_TAP_NETWORK
-  endif
-  ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
-    # Provide support for Tap networking on BSD platforms (including OS X)
-    NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
-  endif
-  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
-    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
-  endif
-  NETWORK_OPT = $(NETWORK_CCDEFS)
-  ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
-    ifneq (USE_NETWORK,$(findstring USE_NETWORK,$(NETWORK_CCDEFS)))
       # Look for package built from tcpdump.org sources with default install target
       LIBPATH += /usr/local/lib
       INCPATH += /usr/local/include
@@ -154,16 +150,55 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXT = a
       ifneq (,$(call find_lib,pcap))
         ifneq (,$(call find_include,pcap))
-          NETWORK_OPT := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,pcap)
+          NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,pcap)
           $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+          $(info *** Warning ***)
+          $(info *** Warning *** Simulator(s) being built with networking support using)
+          $(info *** Warning *** libpcap components from www.tcpdump.org.)
+          $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
+          $(info *** Warning *** components for simh networking.  For best results, with)
+          $(info *** Warning *** simh networking, it is recommended that you install the)
+          $(info *** Warning *** libpcap-dev package from your $(OSTYPE) distribution)
+          $(info *** Warning ***)
         else
           $(error using libpcap: $(call find_lib,pcap) missing pcap.h)
         endif
         LIBEXT = $(LIBEXTSAVE)
-      else
-        $(error missing libpcap)
       endif
     endif
+    ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+	  # Given we have libpcap components, consider other network connections as well
+      ifneq (,$(call find_lib,vdeplug))
+        # libvdeplug requires the use of the OS provided libpcap
+		ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+          ifneq (,$(call find_include,libvdeplug))
+            # Provide support for vde networking
+            NETWORK_CCDEFS += -DUSE_VDE_NETWORK
+            NETWORK_LDFLAGS += -lvdeplug
+            $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
+          endif
+        endif
+      endif
+      ifneq (,$(call find_include,linux/if_tun))
+        # Provide support for Tap networking on Linux
+        NETWORK_CCDEFS += -DUSE_TAP_NETWORK
+      endif
+      ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
+        # Provide support for Tap networking on BSD platforms (including OS X)
+        NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
+      endif
+    else
+      $(info *** Warning ***)
+      $(info *** Warning *** Simulator(s) are being built WITHOUT networking support)
+      $(info *** Warning ***)
+      $(info *** Warning *** To build simulator(s) with networking support you should install)
+      $(info *** Warning *** the libpcap-dev package from your $(OSTYPE) distribution)
+      $(info *** Warning ***)
+    endif
+    NETWORK_OPT = $(NETWORK_CCDEFS)
+  endif
+  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
+    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
   endif
 else
   #Win32 Environments (via MinGW32)

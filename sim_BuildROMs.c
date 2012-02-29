@@ -53,7 +53,9 @@
 #include <utime.h>
 #endif
 
-int sim_make_ROM_include(const char *rom_filename, 
+int sim_make_ROM_include(const char *rom_filename,
+                         int expected_size,
+                         int expected_checksum,
                          const char *include_filename, 
                          const char *rom_array_name)
 {
@@ -64,24 +66,44 @@ int bytes_written = 0;
 int c;
 struct stat statb;
 unsigned char *ROMData = NULL;
+unsigned int checksum = 0;
 
 if (NULL == (rFile = fopen (rom_filename, "rb"))) {
     printf ("Error Opening '%s' for input: %s\n", rom_filename, strerror(errno));
     return -1;
     }
 if (stat (rom_filename, &statb)) {
-    printf ("Error Stating '%s': %s\n", rom_filename, strerror(errno));
+    printf ("Error stating '%s': %s\n", rom_filename, strerror(errno));
+    fclose (rFile);
+    return -1;
+    }
+if (statb.st_size != expected_size) {
+    printf ("Error: ROM file '%s' has an unexpected size: %d vs %d\n", rom_filename, (int)statb.st_size, expected_size);
+    printf ("This can happen if the file was transferred or unpacked incorrectly\n");
+    printf ("and in the process tried to convert line endings rather than passing\n");
+    printf ("the file's contents unmodified\n");
     fclose (rFile);
     return -1;
     }
 ROMData = malloc (statb.st_size);
 if (statb.st_size != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
-    printf ("Error Stating '%s': %s\n", rom_filename, strerror(errno));
+    printf ("Error reading '%s': %s\n", rom_filename, strerror(errno));
     fclose (rFile);
     free (ROMData);
     return -1;
     }
 fclose (rFile);
+for (c=0; c<statb.st_size; ++c)
+    checksum += ROMData[c];
+checksum = ~checksum;
+if ((expected_checksum != 0) && (checksum != expected_checksum)) {
+    printf ("Error: ROM file '%s' has an unexpected checksum: 0x%08X vs 0x%08X\n", rom_filename, checksum, expected_checksum);
+    printf ("This can happen if the file was transferred or unpacked incorrectly\n");
+    printf ("and in the process tried to convert line endings rather than passing\n");
+    printf ("the file's contents unmodified\n");
+    fclose (rFile);
+    return -1;
+    }
 /*
  * If the target include file already exists, determine if it contains the exact
  * data in the base ROM image.  If so, then we are already done
@@ -130,7 +152,7 @@ fprintf (iFile, "#define ROM_%s_H 0\n", rom_array_name);
 fprintf (iFile, "/*\n");
 fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
 fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
-fprintf (iFile, "   file size: %d (0x%X)\n", (int)statb.st_size, (int)statb.st_size);
+fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\n", (int)statb.st_size, (int)statb.st_size, checksum);
 fprintf (iFile, "*/\n");
 fprintf (iFile, "unsigned char %s[] = {", rom_array_name);
 for (bytes_written=0;bytes_written<statb.st_size; ++bytes_written) {
@@ -156,7 +178,8 @@ return 0;
 int
 main(int argc, char **argv)
 {
-sim_make_ROM_include ("VAX/ka655x.bin", "VAX/vax_ka655x_bin.h", "vax_ka655x_bin");
-sim_make_ROM_include ("VAX/vmb.exe",    "VAX/vax780_vmb_exe.h", "vax780_vmb_exe");
-exit(0);
+int status = 0;
+status += sim_make_ROM_include ("VAX/ka655x.bin",  131072, 0xFF7673B6, "VAX/vax_ka655x_bin.h", "vax_ka655x_bin");
+status += sim_make_ROM_include ("VAX/vmb.exe",      44544, 0xFFC014CC, "VAX/vax780_vmb_exe.h", "vax780_vmb_exe");
+exit((status == 0) ? 0 : 1);
 }

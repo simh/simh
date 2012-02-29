@@ -416,6 +416,17 @@ t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
   /* create forward response packet */
   memcpy (&response, pack, sizeof(ETH_PACK));
   memcpy (physical_address, xu->var->setup.macs[0], sizeof(ETH_MAC));
+
+  /* The only packets we should be responding to are ones which 
+     we received due to them being directed to our physical MAC address, 
+     OR the Broadcast address OR to a Multicast address we're listening to 
+     (we may receive others if we're in promiscuous mode, but shouldn't 
+     respond to them) */
+  if ((0 == (pack->msg[0]&1)) &&           /* Multicast or Broadcast */
+      (0 != memcmp(physical_address, pack->msg, sizeof(ETH_MAC))))
+      return SCPE_NOFNC;
+
+
   memcpy (&response.msg[0], &response.msg[offset+2], sizeof(ETH_MAC));
   memcpy (&response.msg[6], physical_address, sizeof(ETH_MAC));
   offset += 8;
