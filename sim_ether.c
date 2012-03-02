@@ -129,7 +129,7 @@
                       likely run faster (given that modern host CPUs are 
                       multi-core and have someplace to do this work in parallel).
   MUST_DO_SELECT    - Specifies that, when USE_READER_THREAD is active,  
-                      select() should be used to determin when available 
+                      select() should be used to determine when available 
                       packets are ready for reading.  Otherwise, we depend 
                       on the libpcap/kernel packet timeout specified on 
                       pcap_open_live.  If USE_READER_THREAD is not set, then 
@@ -163,6 +163,12 @@
 
   Modification history:
 
+  01-Mar-12  MP   Made host NIC address determination on *nix platforms more 
+                  robust.
+  01-Mar-12  MP   Added host NIC address determination work when building 
+                  under Cygwin
+  01-Mar-12  AGN  Add conditionals for Cygwin dynamic loading of wpcap.dll
+  01-Mar-12  AGN  Specify the full /usr/lib for dlopen under Apple Mac OS X.
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
@@ -193,11 +199,11 @@
                   network traffic from the host and/or from hosts on the LAN.  These
                   new TOE features are: LSO (Large Send Offload) and Jumbo packet
                   fragmentation support.  These features allow a simulated network
-                  device to suuport traffic when a host leverages a NIC's Large 
+                  device to support traffic when a host leverages a NIC's Large 
                   Send Offload capabilities to fregment and/or segment outgoing 
                   network traffic.  Additionally a simulated network device can 
                   reasonably exist on a LAN which is configured to use Jumbo frames.
-  21-May-10  MP   Added functionslity to fixup IP header checksums to accomodate 
+  21-May-10  MP   Added functionality to fixup IP header checksums to accomodate 
                   packets from a host with a NIC which has TOE (TCP Offload Engine)
                   enabled which is expected to implement the checksum computations
                   in hardware.  Since we catch packets before they arrive at the
@@ -817,13 +823,13 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 #include <winreg.h>
 #endif
 
-#if defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN))
-/* Dynamic DLL loading technique and modified source comes from
-   Etherial/WireShark capture_pcap.c */
-
 #ifdef HAVE_DLOPEN
 #include <dlfcn.h>
 #endif
+
+#if defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN))
+/* Dynamic DLL loading technique and modified source comes from
+   Etherial/WireShark capture_pcap.c */
 
 /* Dynamic DLL load variables */
 #ifdef _WIN32
@@ -833,15 +839,17 @@ static void *hLib = 0;                      /* handle to Library */
 #endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
 static char* lib_name =
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
+#elif defined(__APPLE__)
+                          "/usr/lib/libpcap.A.dylib";
 #else
 #define __STR_QUOTE(tok) #tok
 #define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
 static char* no_pcap = 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap load failure";
 #else
                           "libpcap load failure";
@@ -862,7 +870,9 @@ static pcap_t* (*p_pcap_open_live) (const char *, int, int, int, char *);
 static int     (*p_pcap_setmintocopy) (pcap_t* handle, int);
 static HANDLE  (*p_pcap_getevent) (pcap_t *);
 #else
+#ifdef MUST_DO_SELECT
 static int     (*p_pcap_get_selectable_fd) (pcap_t *);
+#endif
 static int     (*p_pcap_fileno) (pcap_t *);
 #endif
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
@@ -933,7 +943,9 @@ int load_pcap(void) {
       load_function("pcap_setmintocopy", (void**) &p_pcap_setmintocopy);
       load_function("pcap_getevent",     (void**) &p_pcap_getevent);
 #else
+#ifdef MUST_DO_SELECT
       load_function("pcap_get_selectable_fd",     (void**) &p_pcap_get_selectable_fd);
+#endif
       load_function("pcap_fileno",       (void**) &p_pcap_fileno);
 #endif
       load_function("pcap_sendpacket",   (void**) &p_pcap_sendpacket);
@@ -1054,6 +1066,7 @@ HANDLE pcap_getevent(pcap_t* a) {
 }
 
 #else
+#ifdef MUST_DO_SELECT
 int pcap_get_selectable_fd(pcap_t* a) {
   if (load_pcap() != 0) {
     return p_pcap_get_selectable_fd(a);
@@ -1061,6 +1074,7 @@ int pcap_get_selectable_fd(pcap_t* a) {
     return 0;
   }
 }
+#endif
 
 int pcap_fileno(pcap_t * a) {
   if (load_pcap() != 0) {
@@ -1112,32 +1126,57 @@ int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 }
 #endif /* !HAS_PCAP_SENDPACKET */
 
-#ifdef _WIN32
-#include <Packet32.h>
-#include <ntddndis.h>
+#if defined(_WIN32) || defined(__CYGWIN__)
+/* extracted from WinPcap's Packet32.h */
+struct _PACKET_OID_DATA {
+    uint32 Oid;					///< OID code. See the Microsoft DDK documentation or the file ntddndis.h
+								///< for a complete list of valid codes.
+    uint32 Length;				///< Length of the data field
+    uint8 Data[1];				///< variable-lenght field that contains the information passed to or received 
+								///< from the adapter.
+}; 
+typedef struct _PACKET_OID_DATA PACKET_OID_DATA, *PPACKET_OID_DATA;
+typedef void **LPADAPTER;
+#define OID_802_3_CURRENT_ADDRESS               0x01010102 /* Extracted from ntddmdis.h */
 
-static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
+static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 {
   LPADAPTER         lpAdapter;
   PPACKET_OID_DATA  OidData;
-  BOOLEAN           Status;
+  int               Status;
   int               ReturnValue;
+#ifdef _WIN32
   HINSTANCE         hDll;         /* handle to DLL */
-  LPADAPTER (*p_PacketOpenAdapter)(PCHAR AdapterName);
-  VOID (*p_PacketCloseAdapter)(LPADAPTER lpAdapter);
-  BOOLEAN (*p_PacketRequest)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData);
+#else
+  static void       *hDll = NULL; /* handle to Library */
+  typedef int BOOLEAN;
+#endif
+  LPADAPTER (*p_PacketOpenAdapter)(char *AdapterName);
+  void (*p_PacketCloseAdapter)(LPADAPTER lpAdapter);
+  int (*p_PacketRequest)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData);
 
-  hDll = LoadLibrary(TEXT("packet.dll"));
+#ifdef _WIN32
+  hDll = LoadLibraryA("packet.dll");
   p_PacketOpenAdapter = (void *)GetProcAddress(hDll, "PacketOpenAdapter");
   p_PacketCloseAdapter = (void *)GetProcAddress(hDll, "PacketCloseAdapter");
   p_PacketRequest = (void *)GetProcAddress(hDll, "PacketRequest");
+#else
+  hDll = dlopen("packet.dll", RTLD_NOW);
+  p_PacketOpenAdapter = (void *)dlsym(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void *)dlsym(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (void *)dlsym(hDll, "PacketRequest");
+#endif
   
   /* Open the selected adapter */
 
   lpAdapter =   p_PacketOpenAdapter(AdapterName);
 
-  if (!lpAdapter || (lpAdapter->hFile == INVALID_HANDLE_VALUE)) {
-    FreeLibrary(hDll);
+  if (!lpAdapter || (*lpAdapter == (void *)-1)) {
+#ifdef _WIN32
+      FreeLibrary(hDll);
+#else
+      dlclose(hDll);
+#endif
     return -1;
   }
 
@@ -1146,7 +1185,11 @@ static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
   OidData = malloc(6 + sizeof(PACKET_OID_DATA));
   if (OidData == NULL) {
     p_PacketCloseAdapter(lpAdapter);
+#ifdef _WIN32
     FreeLibrary(hDll);
+#else
+    dlclose(hDll);
+#endif
     return -1;
   }
 
@@ -1166,7 +1209,11 @@ static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
 
   free(OidData);
   p_PacketCloseAdapter(lpAdapter);
+#ifdef _WIN32
   FreeLibrary(hDll);
+#else
+  dlclose(hDll);
+#endif
   return ReturnValue;
 }
 #endif
@@ -1175,44 +1222,55 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
-#ifdef _WIN32
-  if (!pcap_mac_if_win32(devname, (UCHAR *)&dev->host_nic_phy_hw_addr))
+#if defined(_WIN32) || defined(__CYGWIN__)
+  if (!pcap_mac_if_win32(devname, dev->host_nic_phy_hw_addr))
     dev->have_host_nic_phy_addr = 1;
-#elif !defined (__VMS)
+#elif !defined (__VMS) && !defined(__CYGWIN__)
   if (1) {
     char command[1024];
     FILE *f;
+    int i;
+    char *patterns[] = {
+        "grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
+        "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
+        NULL};
 
     if (0 == strncmp("vde:", devname, 4))
       return;
     memset(command, 0, sizeof(command));
-    snprintf(command, sizeof(command)-1, "ifconfig %s | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] >NIC.hwaddr", devname);
-    system(command);
-    if (f = fopen("NIC.hwaddr", "r")) {
-      if (fgets(command, sizeof(command)-1, f)) {
-        char *p1, *p2;
-        
-        p1 = strchr(command, ':');
-        while (p1) {
-          p2 = strchr(p1+1, ':');
-          if (p2 == p1+3) {
-            int mac_bytes[6];
-            if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
-              dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
-              dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
-              dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
-              dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
-              dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
-              dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
-              dev->have_host_nic_phy_addr = 1;
+    for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
+      snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
+      system(command);
+      if (f = fopen("NIC.hwaddr", "r")) {
+        while (0 == dev->have_host_nic_phy_addr) {
+          if (fgets(command, sizeof(command)-1, f)) {
+            char *p1, *p2;
+
+            p1 = strchr(command, ':');
+            while (p1) {
+              p2 = strchr(p1+1, ':');
+              if (p2 <= p1+3) {
+                int mac_bytes[6];
+                if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
+                  dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
+                  dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
+                  dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
+                  dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
+                  dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
+                  dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
+                  dev->have_host_nic_phy_addr = 1;
+                  }
+                break;
+                }
+              p1 = p2;
               }
-            break;
             }
-          p1 = p2;
+          else
+            break;
           }
+        fclose(f);
+        remove("NIC.hwaddr");
         }
-      fclose(f);
-      remove("NIC.hwaddr");
       }
     }
 #endif
@@ -1523,11 +1581,14 @@ if (0 == strncmp("tap:", savname, 4)) {
 
       memset (&ifr, 0, sizeof(ifr));
       ifr.ifr_addr.sa_family = AF_INET;
-      strncpy(ifr.ifr_name, savname+4, sizeof(ifr.ifr_name));
+      strncpy(ifr.ifr_name, savname, sizeof(ifr.ifr_name));
       if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
         if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
           ifr.ifr_flags |= IFF_UP;
-          ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr);
+          if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
+            strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+            close(tun);
+            }
           }
         close(s);
         }
@@ -1798,9 +1859,12 @@ eth_filter(dev, 1, (ETH_MAC *)mac, 0, 0);
 status = _eth_write (dev, &send, NULL);
 if (status != SCPE_OK) {
   char *msg;
-  msg = "Eth: Error Transmitting packet: %s\r\n"
+  msg = (dev->eth_api == ETH_API_PCAP) ?
+      "Eth: Error Transmitting packet: %s\r\n"
         "You may need to run as root, or install a libpcap version\r\n"
-        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n";
+        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n" :
+      "Eth: Error Transmitting packet: %s\r\n"
+        "You may need to run as root.\r\n";
   printf(msg, strerror(errno));
   if (sim_log) fprintf (sim_log, msg, strerror(errno));
   return status;

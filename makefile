@@ -1,5 +1,5 @@
 #
-# This GMU make makefile has been tested on:
+# This GNU make makefile has been tested on:
 #   Linux (x86 & Sparc)
 #   OS X
 #   Solaris (x86 & Sparc)
@@ -12,9 +12,9 @@
 # Android targeted builds should invoke GNU make with GCC=agcc on
 # the command line.
 #
-# In general, the logic below will detect and build with the available 
-# features which the host build environment provides. 
-# 
+# In general, the logic below will detect and build with the available
+# features which the host build environment provides.
+#
 # Dynamic loading of libpcap is the default behavior if pcap.h is
 # available at build time.  Direct calls to libpcap can be enabled
 # if GNU make is invoked with USE_NETWORK=1 on the command line.
@@ -29,15 +29,21 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     GCC = gcc
   endif
   OSTYPE = $(shell uname)
+  # OSNAME is used in messages to indicate the source of libpcap components
   OSNAME = $(OSTYPE)
   ifeq (SunOS,$(OSTYPE))
     TEST = /bin/test
   else
     TEST = test
   endif
+  ifeq (CYGWIN,$(findstring CYGWIN,$(OSTYPE))) # uname returns CYGWIN_NT-n.n-ver
+    OSTYPE = cygwin
+    OSNAME = windows-build
+  endif
+  PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
     OS_CCDEFS = -D_GNU_SOURCE -DSIM_ASYNCH_IO
-    OS_LDFLAGS = -lm 
+    OS_LDFLAGS = -lm
   else # Non-Android Builds
     INCPATH:=/usr/include
     LIBPATH:=/usr/lib
@@ -64,26 +70,36 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
           endif
         else
-          LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
-          ifneq (,$(LDSEARCH))
-            LIBPATH := $(LDSEARCH)
-          endif
-          ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
-            LIBPATH += /usr/pkg/lib
-            OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
-          endif
-          ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
-            LIBEXT = so
-          else
+          ifeq (cygwin,$(OSTYPE))
+            # use 0readme_ethernet.txt documented Windows pcap build components
+            INCPATH += ../windows-build/winpcap/WpdPack/include
+            LIBPATH += ../windows-build/winpcap/WpdPack/lib
+            PCAPLIB = wpcap
             LIBEXT = a
+          else
+            LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+            ifneq (,$(LDSEARCH))
+              LIBPATH := $(LDSEARCH)
+            endif
+            ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
+              LIBPATH += /usr/pkg/lib
+              OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+            endif
+            ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
+              LIBEXT = so
+            else
+              LIBEXT = a
+            endif
           endif
         endif
       endif
     endif
   endif
   $(info lib paths are: $(LIBPATH))
-  ifeq (cygwin,$(findstring cygwin,$(OSTYPE)))
-    OS_CCDEFS += -O2 
+  ifeq (cygwin,$(OSTYPE))
+    # gcc optimization seems to be broken in Cygwin's gcc 4.5.3
+    # (vax780 won't boot VMS 4.7 unless -O2 removed)
+    #OS_CCDEFS += -O2
   endif
   find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
   find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
@@ -92,13 +108,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     $(info using libm: $(call find_lib,m))
   endif
   ifneq (,$(call find_lib,rt))
-    OS_LDFLAGS += -lrt 
+    OS_LDFLAGS += -lrt
     $(info using librt: $(call find_lib,rt))
   endif
   ifneq (,$(call find_lib,pthread))
     ifneq (,$(call find_include,pthread))
-      OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD 
-      OS_LDFLAGS += -lpthread 
+      OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD
+      OS_LDFLAGS += -lpthread
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     endif
   endif
@@ -131,43 +147,61 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(NETWORK_USEFUL))
     ifneq (,$(call find_include,pcap))
-      ifneq (,$(call find_lib,pcap))
+      ifneq (,$(call find_lib,$(PCAPLIB)))
         ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
-          NETWORK_CCDEFS = -DUSE_NETWORK
-          NETWORK_LDFLAGS = -lpcap
-          $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
+          NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+          ifeq (cygwin,$(OSTYPE))
+            # cygwin has no ldconfig so explicitly specify pcap object library
+            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+          else
+            NETWORK_LDFLAGS = -l$(PCAPLIB)
+          endif
+          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
         else # default build uses dynamic libpcap
-          NETWORK_CCDEFS = -DUSE_SHARED
+          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
           $(info using libpcap: $(call find_include,pcap))
         endif
+        $(info ***)
         $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-        $(info *** $(OSTYPE) provided libpcap components)
+        $(info *** $(OSNAME) provided libpcap components)
+        $(info ***)
       else
-        NETWORK_CCDEFS = -DUSE_SHARED
+        NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
         $(info using libpcap: $(call find_include,pcap))
+        $(info ***)
         $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-        $(info *** $(OSTYPE) provided libpcap components)
+        $(info *** $(OSNAME) provided libpcap components)
+        $(info ***)
       endif
     else
-      # Look for package built from tcpdump.org sources with default install target
+      # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
       LIBPATH += /usr/local/lib
       INCPATH += /usr/local/include
       LIBEXTSAVE := $(LIBEXT)
       LIBEXT = a
-      ifneq (,$(call find_lib,pcap))
+      ifneq (,$(call find_lib,$(PCAPLIB)))
         ifneq (,$(call find_include,pcap))
-          NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,pcap)
-          $(info using libpcap: $(call find_lib,pcap) $(call find_include,pcap))
-          $(info *** Warning ***)
-          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-          $(info *** Warning *** libpcap components from www.tcpdump.org.)
-          $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
-          $(info *** Warning *** components for simh networking.  For best results, with)
-          $(info *** Warning *** simh networking, it is recommended that you install the)
-          $(info *** Warning *** libpcap-dev package from your $(OSTYPE) distribution)
-          $(info *** Warning ***)
+          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+          ifeq (cygwin,$(OSTYPE))
+            NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+            $(info ***)
+            $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
+            $(info *** libpcap components located in the cygwin directories.)
+            $(info ***)
+          else
+            NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
+            $(info *** Warning ***)
+            $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
+            $(info *** Warning *** libpcap components from www.tcpdump.org.)
+            $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
+            $(info *** Warning *** components for simh networking.  For best results, with)
+            $(info *** Warning *** simh networking, it is recommended that you install the)
+            $(info *** Warning *** libpcap-dev package from your $(OSTYPE) distribution)
+            $(info *** Warning ***)
+          endif
         else
-          $(error using libpcap: $(call find_lib,pcap) missing pcap.h)
+          $(error using libpcap: $(call find_lib,$(PCAPLIB)) missing pcap.h)
         endif
         LIBEXT = $(LIBEXTSAVE)
       endif
@@ -197,8 +231,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Warning ***)
       $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT networking support)
       $(info *** Warning ***)
-      $(info *** Warning *** To build simulator(s) with networking support you should install)
-      $(info *** Warning *** the libpcap-dev package from your $(OSTYPE) distribution)
+      $(info *** Warning *** To build simulator(s) with networking support you should read)
+      $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the )
+      $(info *** Warning *** needed libpcap components for your $(OSTYPE) platform)
       $(info *** Warning ***)
     endif
     NETWORK_OPT = $(NETWORK_CCDEFS)
@@ -223,16 +258,16 @@ else
   endif
   ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
     PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
-    NETWORK_LDFLAGS = 
+    NETWORK_LDFLAGS =
     NETWORK_OPT = -DUSE_SHARED
   else
     ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
-      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk 
-      NETWORK_LDFLAGS = 
+      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
+      NETWORK_LDFLAGS =
       NETWORK_OPT = -DUSE_SHARED
     endif
   endif
-  OS_CCDEFS =  -fms-extensions -O2 $(PTHREADS_CCDEFS) $(PCAP_CCDEFS) 
+  OS_CCDEFS =  -fms-extensions -O2 $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
   OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
   ifneq (binexists,$(shell if exist BIN echo binexists))
@@ -247,10 +282,12 @@ ifneq ($(DONT_USE_ROMS),)
 else
   BUILD_ROMS = ${BIN}BuildROMs${EXE}
 endif
-
+ifneq ($(DONT_USE_READER_THREAD),)
+  NETWORK_OPT += -DDONT_USE_READER_THREAD
+endif
 
 CC = $(GCC) -std=c99 -U__STRICT_ANSI__ -g -I . $(OS_CCDEFS) $(ROMS_OPT)
-LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) 
+LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS)
 
 #
 # Common Libraries
@@ -499,7 +536,7 @@ else
 	if exist BIN rmdir BIN
 endif
 
-${BIN}BuildROMs${EXE} : 
+${BIN}BuildROMs${EXE} :
 	${MKDIRBIN}
 ifeq (agcc,$(findstring agcc,$(firstword $(CC))))
 	gcc $(wordlist 2,1000,${CC}) sim_BuildROMs.c -o $@
@@ -509,6 +546,9 @@ endif
 ifeq ($(WIN32),)
 	$@
 	${RM} $@
+  ifeq (Darwin,$(OSTYPE)) # remove Xcode's debugging symbols folder too
+	${RM} -rf $@.dSYM
+  endif
 else
 	$(@D)\$(@F)
 	del $(@D)\$(@F)
@@ -639,7 +679,7 @@ ${BIN}altair${EXE} : ${ALTAIR} ${SIM}
 
 altairz80 : ${BIN}altairz80${EXE}
 
-${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM} 
+${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM}
 	${MKDIRBIN}
 	${CC} ${ALTAIRZ80} ${SIM} ${ALTAIRZ80_OPT} -o $@ ${LDFLAGS}
 

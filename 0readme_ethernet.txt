@@ -129,17 +129,17 @@ OSX (Snow Leopard)
     based internal network so a host and guest can communicate directly.
     
     Download the install package from: 
-    http://sourceforge.net/projects/tuntaposx/files/tuntap/20090913/tuntap_20090913.tar.gz
+    http://sourceforge.net/projects/tuntaposx/files/tuntap/20111101/tuntap_20111101.tar.gz
     
     Expand the tarball to a directory.
-    Invoke the package installer tuntap_20090913.pkg
+    Invoke the package installer tuntap_20111101.pkg
     Click through the various prompts accepting things and eventually installing the package.
     
     # Build and Run simulator and:
        sim> attach xq tap:tap0
        sim> ! ifconfig tap0 192.168.6.1 netmask 255.255.255.0
 
-    Simulated system uses IP address 192.168.6.2 and host uses 192.167.6.1 
+    Simulated system uses IP address 192.168.6.2 and host uses 192.168.6.1 
     and things work.
     You must run as root for this to work.
     
@@ -180,7 +180,8 @@ Windows notes:
     and the user must be an Administrator on the machine to do so. If you need
     to run as an unprivileged user, you must set the "npf" driver to autostart. 
     Current WinPcap installers provide an option to configure this at 
-    installation time.
+    installation time, so if that choice is made, then there is no need for
+    administrator privileged to run simulators with network support.
 
 
 Building on Windows:
@@ -189,10 +190,10 @@ Building on Windows:
  Express 2008 or 2010 interactive development environments, read the file 
  ".\Visual Studio Projects\0ReadMe_Projects.txt" for details about the
  required dependencies.  Alternatively, you can build simh with networking
- support using the MinGW GCC compiler environment.  Both the Visual C++
- and MinGW build environments require WinPcap and Posix packages being
- available.  These should be located in a directory structure parallel to
- the current simulator source directory.
+ support using the MinGW GCC compiler environment or the cygwin environment.
+ Each of these Visual C++, MinGW and cygwin build environments require 
+ WinPcap and Posix packages being available.  These should be located in a 
+ directory structure parallel to the current simulator source directory.
  
  For Example, the directory structure should look like:
 
@@ -243,7 +244,9 @@ for details.
     packets through the driver. 
       a) For Windows systems this means having administrator privileges to 
          start the "npf" driver.  The current WinPcap installer offers an 
-         option to autostart the "npf" driver when the system boots.
+         option to autostart the "npf" driver when the system boots. 
+         Starting the "npf" driver at boot time means that simulators do
+         not need to run with administrator privileges.
       b) For more recent Linux systems, The concepts leveraging "Filesystem
          Capabilities" can be used to specifically grant the simh binary
          the needed privileges to access the network.  The article at:
@@ -264,7 +267,7 @@ for details.
     (possibly at system boot time), using the TAP devices can be done without
     root privileges.
 
-Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
+Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
 
  1. Get/make/install the libpcap-dev package for your operating system. Sources:
       All    : http://www.tcpdump.org/
@@ -290,10 +293,16 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
  2. If you install the vendor supplied libpcap-dev package then the simh
     makefile will automatically use the vendor supplied library without any 
     additional arguments.  If you have downloaded and built libpcap from 
-    www.tcpdump.org, then you can force its use during a build by typing 
-    'make USE_NETWORK=1'
+    www.tcpdump.org, then the existing makefile will detect that this is
+    the case and try to use that.
 
- 3. Build it!
+ 3. The makefile defaults to building simulators with network support which
+    dynamically load the libpcap library.  This means that the same simulator
+    binaries will run on any system whether or not libpcap is installed.  If 
+    you want to force direct libpcap linking during a build you do so by 
+    typing 'make USE_NETWORK=1'
+
+ 4. Build it!
 
 -------------------------------------------------------------------------------
 
@@ -404,6 +413,14 @@ Dave
                                Change Log
 ===============================================================================
   
+  01-Mar-12  AGN  Added support for building using Cygwin on Windows
+  01-Mar-12  MP   Made host NIC address detection more robust on *nix platforms 
+                  and mad it work when compiling under Cygwin
+  29-Feb-12  MP   Fixed MAC Address Conflict detection support
+  28-Feb-12  MP   Fixed overrun bug in eth_devices which caused SEGFAULTs
+  28-Feb-12  MP   Fixed internal loopback processing to only respond to loopback
+                  packets addressed to the physical MAC or appropriate Multicast
+                  or Broadcast addresses.
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
