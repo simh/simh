@@ -93,6 +93,7 @@ struct disk_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
     uint32              dbit;               /* debugging bit */
     uint32              sector_size;        /* Disk Sector Size (of the pseudo disk) */
+    uint32              capac_factor;       /* Units of Capacity (2 = word, 1 = byte) */
     uint32              xfer_element_size;  /* Disk Bus Transfer size (1 - byte, 2 - word, 4 - longword) */
     uint32              storage_sector_size;/* Sector size of the containing storage */
     uint32              removable;          /* Removable device flag */
@@ -333,12 +334,17 @@ return SCPE_OK;
 
 t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+char *cap_units = "B";
+
+if (ctx->capac_factor == 2)
+    cap_units = "W";
 if (uptr->capac) {
     if (uptr->capac >= (t_addr) 1000000)
-        fprintf (st, "capacity=%dMB", (uint32) (uptr->capac / ((t_addr) 1000000)));
+        fprintf (st, "capacity=%dM%s", (uint32) (uptr->capac / ((t_addr) 1000000)), cap_units);
     else if (uptr->capac >= (t_addr) 1000)
-        fprintf (st, "capacity=%dKB", (uint32) (uptr->capac / ((t_addr) 1000)));
-    else fprintf (st, "capacity=%dB", (uint32) uptr->capac);
+        fprintf (st, "capacity=%dK%s", (uint32) (uptr->capac / ((t_addr) 1000)), cap_units);
+    else fprintf (st, "capacity=%d%S", (uint32) uptr->capac, cap_units);
     }
 else fprintf (st, "undefined capacity");
 return SCPE_OK;
@@ -487,7 +493,7 @@ t_seccnt sread;
 sim_debug (ctx->dbit, ctx->dptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
 
 if ((sects == 1) &&                                     /* Single sector reads */
-    (lba >= uptr->capac/ctx->sector_size)) {            /* beyond the end of the disk */
+    (lba >= (uptr->capac*ctx->capac_factor)/ctx->sector_size)) {/* beyond the end of the disk */
     memset (buf, '\0', ctx->sector_size);               /* are bad block management efforts - zero buffer */
     if (sectsread)
         *sectsread = 1;
@@ -817,7 +823,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         }
     if (!sim_quiet) 
         printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-    vhd = sim_vhd_disk_create (gbuf, uptr->capac);
+    vhd = sim_vhd_disk_create (gbuf, uptr->capac*ctx->capac_factor);
     if (!vhd) {
         if (!sim_quiet)
             printf ("%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
@@ -827,7 +833,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         uint8 *copy_buf = malloc (1024*1024);
         t_lba lba;
         t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
-        t_lba total_sectors = (t_lba)(uptr->capac/sector_size);
+        t_lba total_sectors = (t_lba)((uptr->capac*ctx->capac_factor)/sector_size);
         t_seccnt sects = sectors_per_buffer;
 
         if (!copy_buf) {
@@ -895,6 +901,7 @@ if ((uptr->filename == NULL) || (uptr->disk_ctx == NULL))
     return _err_return (uptr, SCPE_MEM);
 strncpy (uptr->filename, cptr, CBUFSIZE);               /* save name */
 ctx->sector_size = (uint32)sector_size;                 /* save sector_size */
+ctx->capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capacity units (word: 2, byte: 1) */
 ctx->xfer_element_size = (uint32)xfer_element_size;     /* save xfer_element_size */
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
@@ -927,7 +934,7 @@ else {                                                  /* normal */
             if (sim_switches & SWMASK ('E'))            /* must exist? */
                 return _err_return (uptr, SCPE_OPENERR); /* yes, error */
             if (create_function)
-                uptr->fileref = create_function (cptr, uptr->capac);/* create new file */
+                uptr->fileref = create_function (cptr, uptr->capac*ctx->capac_factor);/* create new file */
             else
                 uptr->fileref = open_function (cptr, "wb+");/* open new file */
             if (uptr->fileref == NULL)                  /* open fail? */
@@ -973,7 +980,7 @@ if (created) {
     if (secbuf == NULL)
         r = SCPE_MEM;
     if (r == SCPE_OK)
-        r = sim_disk_wrsect (uptr, (t_lba)((uptr->capac - ctx->sector_size)/ctx->sector_size), secbuf, NULL, 1); /* Write Last Sector */
+        r = sim_disk_wrsect (uptr, (t_lba)(((uptr->capac*ctx->capac_factor) - ctx->sector_size)/ctx->sector_size), secbuf, NULL, 1); /* Write Last Sector */
     if (r == SCPE_OK)
         r = sim_disk_wrsect (uptr, (t_lba)(0), secbuf, NULL, 1); /* Write First Sector */
     free (secbuf);
@@ -989,19 +996,19 @@ if (created) {
 capac = size_function (uptr->fileref);
 if (capac && (capac != (t_addr)-1))
     if (dontautosize) {
-        if ((capac < uptr->capac) && (DKUF_F_STD != DK_GET_FMT (uptr))) {
+        if ((capac < (uptr->capac*ctx->capac_factor)) && (DKUF_F_STD != DK_GET_FMT (uptr))) {
             if (!sim_quiet) {
                 printf ("%s%d: non expandable disk %s is smaller than simulated device (", sim_dname (dptr), (int)(uptr-dptr->units), cptr);
-                fprint_val (stdout, capac, 10, T_ADDR_W, PV_LEFT);
-                printf (" < ");
+                fprint_val (stdout, capac/ctx->capac_factor, 10, T_ADDR_W, PV_LEFT);
+                printf ("%s < ", (ctx->capac_factor == 2) ? "W" : "");
                 fprint_val (stdout, uptr->capac, 10, T_ADDR_W, PV_LEFT);
-                printf (")\n");
+                printf ("%s)\n", (ctx->capac_factor == 2) ? "W" : "");
                 }
             }
         }
     else
-        if ((capac > uptr->capac) || (DKUF_F_STD != DK_GET_FMT (uptr)))
-            uptr->capac = capac;
+        if ((capac > (uptr->capac*ctx->capac_factor)) || (DKUF_F_STD != DK_GET_FMT (uptr)))
+            uptr->capac = capac/ctx->capac_factor;
 
 #if defined (SIM_ASYNCH_IO)
 sim_disk_set_async (uptr, 0);
@@ -1082,7 +1089,6 @@ return SCPE_OK;
 t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-DEVICE *dptr;
 int32 i;
 t_addr da;
 int32 wds = ctx->sector_size/sizeof (uint16);
@@ -1094,9 +1100,7 @@ if ((uptr->flags & UNIT_ATT) == 0)
     return SCPE_UNATT;
 if (uptr->flags & UNIT_RO)
     return SCPE_RO;
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
-    return SCPE_NOATT;
-if ((dptr->dwidth / dptr->aincr) <= 8)                  /* Must be Word oriented Capacity */
+if (ctx->capac_factor != 2)                  /* Must be Word oriented Capacity */
     return SCPE_IERR;
 if (!get_yn ("Overwrite last track? [N]", FALSE))
     return SCPE_OK;
