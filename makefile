@@ -19,11 +19,30 @@
 # available at build time.  Direct calls to libpcap can be enabled
 # if GNU make is invoked with USE_NETWORK=1 on the command line.
 #
+# The default build will build compiler optimized binaries.
+# If debugging is desired, then GNU make can be invoked with
+# DEBUG=1 on the command line.
+#
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
 # CC Command (and platform available options).  (Poor man's autoconf)
 #
+# building the pdp11, or any vax simulator could use networking support
+ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
+  NETWORK_USEFUL = true
+  ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
+    BUILD_MULTIPLE = (s)
+  else
+    BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
+  endif
+else
+  ifeq ($(MAKECMDGOALS),)
+    # default target is all
+    NETWORK_USEFUL = true
+    BUILD_MULTIPLE = (s)
+  endif
+endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq ($(GCC),)
     GCC = gcc
@@ -96,11 +115,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
   endif
   $(info lib paths are: $(LIBPATH))
-  ifeq (cygwin,$(OSTYPE))
-    # gcc optimization seems to be broken in Cygwin's gcc 4.5.3
-    # (vax780 won't boot VMS 4.7 unless -O2 removed)
-    #OS_CCDEFS += -O2
-  endif
   find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
   find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
   ifneq (,$(call find_lib,m))
@@ -128,21 +142,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         OS_CCDEFS += -DHAVE_DLOPEN=so
         $(info using libdl: $(call find_include,dlfcn))
       endif
-    endif
-  endif
-  # building the pdp11, or any vax simulator could use networking support
-  ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
-    NETWORK_USEFUL = true
-    ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
-      BUILD_MULTIPLE = (s)
-    else
-      BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
-    endif
-  else
-    ifeq ($(MAKECMDGOALS),)
-      # default target is all
-      NETWORK_USEFUL = true
-      BUILD_MULTIPLE = (s)
     endif
   endif
   ifneq (,$(NETWORK_USEFUL))
@@ -267,7 +266,7 @@ else
       NETWORK_OPT = -DUSE_SHARED
     endif
   endif
-  OS_CCDEFS =  -fms-extensions -O2 $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
+  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
   OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
   ifneq (binexists,$(shell if exist BIN echo binexists))
@@ -277,6 +276,18 @@ else
     NETWORK_OPT = -DUSE_SHARED
   endif
 endif
+ifneq ($(DEBUG),)
+  CFLAGS_G = -g -ggdb -g3
+  CFLAGS_O = -O0
+  BUILD_FEATURES = debugging support
+else
+  CFLAGS_O = -O2 -flto -finline-functions -fgcse-after-reload -fpredictive-commoning -fipa-cp-clone -fno-unsafe-loop-optimizations -fno-strict-overflow
+  LDFLAGS_O = -flto -fwhole-program
+  BUILD_FEATURES = compiler optimizations and no debugging support
+endif
+$(info ***)
+$(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with $(BUILD_FEATURES).)
+$(info ***)
 ifneq ($(DONT_USE_ROMS),)
   ROMS_OPT = -DDONT_USE_INTERNAL_ROM
 else
@@ -286,8 +297,8 @@ ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
 endif
 
-CC = $(GCC) -std=c99 -U__STRICT_ANSI__ -g -I . $(OS_CCDEFS) $(ROMS_OPT)
-LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS)
+CC = $(GCC) -std=c99 -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) -I . $(OS_CCDEFS) $(ROMS_OPT)
+LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 
 #
 # Common Libraries
