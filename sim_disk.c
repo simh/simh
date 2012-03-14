@@ -806,6 +806,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     FILE *vhd;
     int saved_sim_switches = sim_switches;
     int32 saved_sim_quiet = sim_quiet;
+    uint32 capac_factor;
     t_stat r;
 
     sim_switches = sim_switches & ~(SWMASK ('C'));
@@ -823,7 +824,8 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         }
     if (!sim_quiet) 
         printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
-    vhd = sim_vhd_disk_create (gbuf, uptr->capac*ctx->capac_factor);
+    capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
+    vhd = sim_vhd_disk_create (gbuf, uptr->capac*capac_factor);
     if (!vhd) {
         if (!sim_quiet)
             printf ("%s%d: can't create virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
@@ -833,7 +835,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         uint8 *copy_buf = malloc (1024*1024);
         t_lba lba;
         t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
-        t_lba total_sectors = (t_lba)((uptr->capac*ctx->capac_factor)/sector_size);
+        t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/sector_size);
         t_seccnt sects = sectors_per_buffer;
 
         if (!copy_buf) {
