@@ -156,21 +156,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             NETWORK_LDFLAGS = -l$(PCAPLIB)
           endif
           $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+          NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
         else # default build uses dynamic libpcap
           NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
           $(info using libpcap: $(call find_include,pcap))
+          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
         endif
-        $(info ***)
-        $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-        $(info *** $(OSNAME) provided libpcap components)
-        $(info ***)
       else
         NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+        NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
         $(info using libpcap: $(call find_include,pcap))
-        $(info ***)
-        $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-        $(info *** $(OSNAME) provided libpcap components)
-        $(info ***)
       endif
     else
       # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
@@ -184,12 +179,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifeq (cygwin,$(OSTYPE))
             NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
             NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
-            $(info ***)
-            $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-            $(info *** libpcap components located in the cygwin directories.)
-            $(info ***)
+            NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
           else
             NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
+            NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
             $(info *** Warning ***)
             $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
             $(info *** Warning *** libpcap components from www.tcpdump.org.)
@@ -227,11 +220,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
       endif
     else
+      NETWORK_FEATURES = - WITHOUT networking support
       $(info *** Warning ***)
       $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT networking support)
       $(info *** Warning ***)
       $(info *** Warning *** To build simulator(s) with networking support you should read)
-      $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the )
+      $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the)
       $(info *** Warning *** needed libpcap components for your $(OSTYPE) platform)
       $(info *** Warning ***)
     endif
@@ -259,11 +253,13 @@ else
     PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
     NETWORK_LDFLAGS =
     NETWORK_OPT = -DUSE_SHARED
+    NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
   else
     ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
       PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
       NETWORK_LDFLAGS =
       NETWORK_OPT = -DUSE_SHARED
+      NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
     endif
   endif
   OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
@@ -279,14 +275,16 @@ endif
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0
-  BUILD_FEATURES = debugging support
+  BUILD_FEATURES = - debugging support
 else
   CFLAGS_O = -O2 -flto -finline-functions -fgcse-after-reload -fpredictive-commoning -fipa-cp-clone -fno-unsafe-loop-optimizations -fno-strict-overflow
   LDFLAGS_O = -flto -fwhole-program
-  BUILD_FEATURES = compiler optimizations and no debugging support
+  BUILD_FEATURES = - compiler optimizations and no debugging support
 endif
 $(info ***)
-$(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with $(BUILD_FEATURES).)
+$(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
+$(info *** $(BUILD_FEATURES).)
+$(info *** $(NETWORK_FEATURES).)
 $(info ***)
 ifneq ($(DONT_USE_ROMS),)
   ROMS_OPT = -DDONT_USE_INTERNAL_ROM
