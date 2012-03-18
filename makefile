@@ -26,6 +26,9 @@
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
+# Asynchronous I/O support can be disabled if GNU make is invoked with
+# NOASYNCH=1 on the command line.
+#
 # CC Command (and platform available options).  (Poor man's autoconf)
 #
 # building the pdp11, or any vax simulator could use networking support
@@ -61,7 +64,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
-    OS_CCDEFS = -D_GNU_SOURCE -DSIM_ASYNCH_IO
+    OS_CCDEFS = -D_GNU_SOURCE
+    ifeq (,$(NOASYNCH))
+      OS_CCDEFS += -DSIM_ASYNCH_IO 
+     endif
     OS_LDFLAGS = -lm
   else # Non-Android Builds
     INCPATH:=/usr/include
@@ -127,7 +133,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(call find_lib,pthread))
     ifneq (,$(call find_include,pthread))
-      OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD
+      OS_CCDEFS += -DUSE_READER_THREAD
+      ifeq (,$(NOASYNCH))
+        OS_CCDEFS += -DSIM_ASYNCH_IO 
+      endif
       OS_LDFLAGS += -lpthread
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     endif
@@ -238,15 +247,19 @@ else
   #Win32 Environments (via MinGW32)
   GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
-  ifeq ($(NOASYNCH),)
-    ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
-      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
-      PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
-    else
-      ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
-        PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD
-        PTHREADS_LDFLAGS = -lpthread
+  ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+    PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
+    ifeq (,$(NOASYNCH))
+      PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
+    endif
+    PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
+  else
+    ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
+      PTHREADS_CCDEFS = -DUSE_READER_THREAD
+      ifeq (,$(NOASYNCH))
+        PTHREADS_CCDEFS += -DSIM_ASYNCH_IO 
       endif
+      PTHREADS_LDFLAGS = -lpthread
     endif
   endif
   ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
