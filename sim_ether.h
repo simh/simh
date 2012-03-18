@@ -28,6 +28,7 @@
 
   Modification history:
 
+  01-Mar-12  AGN  Cygwin doesn't have non-blocking pcap I/O pcap (it uses WinPcap)
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   18-Apr-11  MP   Fixed race condition with self loopback packets in 
@@ -72,16 +73,25 @@
 #if defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__)
 #define xBSD 1
 #endif
-#if !defined(__FreeBSD__) && !defined(_WIN32) && !defined(VMS)
+#if !defined(__FreeBSD__) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__) && !defined(__APPLE__)
 #define USE_SETNONBLOCK 1
+#endif
+
+/* cygwin dowsn't have the right features to use the threaded network I/O */
+#if defined(__CYGWIN__)
+#define DONT_USE_READER_THREAD
 #endif
 
 #if (((defined(__sun__) && defined(__i386__)) || defined(__linux)) && !defined(DONT_USE_READER_THREAD))
 #define USE_READER_THREAD 1
 #endif
 
+#if defined(DONT_USE_READER_THREAD)
+#undef USE_READER_THREAD
+#endif
+
 /* make common winpcap code a bit easier to read in this file */
-#if defined(_WIN32) || defined(VMS)
+#if defined(_WIN32) || defined(VMS) || defined(__CYGWIN__)
 #define PCAP_READ_TIMEOUT -1
 #else
 #define PCAP_READ_TIMEOUT  1
@@ -94,7 +104,7 @@
 #endif /* USE_SETNONBLOCK */
 #undef PCAP_READ_TIMEOUT
 #define PCAP_READ_TIMEOUT 15
-#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
+#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
 #define MUST_DO_SELECT 1
 #endif
 #endif /* USE_READER_THREAD */

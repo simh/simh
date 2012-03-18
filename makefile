@@ -1,55 +1,294 @@
 #
-# CC Command
+# This GNU make makefile has been tested on:
+#   Linux (x86 & Sparc)
+#   OS X
+#   Solaris (x86 & Sparc)
+#   OpenBSD
+#   NetBSD
+#   FreeBSD
+#   Windows (MinGW & cygwin)
+#   Linux x86 targeting Android (using agcc script)
 #
-ifeq ($(WIN32),)
-  #Unix Environments
-  ifneq (,$(findstring solaris,$(OSTYPE)))
-    OS_CCDEFS = -lm -lsocket -lnsl -lrt -lpthread -D_GNU_SOURCE
+# Android targeted builds should invoke GNU make with GCC=agcc on
+# the command line.
+#
+# In general, the logic below will detect and build with the available
+# features which the host build environment provides.
+#
+# Dynamic loading of libpcap is the default behavior if pcap.h is
+# available at build time.  Direct calls to libpcap can be enabled
+# if GNU make is invoked with USE_NETWORK=1 on the command line.
+#
+# The default build will build compiler optimized binaries.
+# If debugging is desired, then GNU make can be invoked with
+# DEBUG=1 on the command line.
+#
+# CC Command (and platform available options).  (Poor man's autoconf)
+#
+# building the pdp11, or any vax simulator could use networking support
+ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
+  NETWORK_USEFUL = true
+  ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
+    BUILD_MULTIPLE = (s)
   else
-    ifneq (,$(findstring darwin,$(OSTYPE)))
-      OS_CCDEFS = -D_GNU_SOURCE
+    BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
+  endif
+else
+  ifeq ($(MAKECMDGOALS),)
+    # default target is all
+    NETWORK_USEFUL = true
+    BUILD_MULTIPLE = (s)
+  endif
+endif
+ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
+  ifeq ($(GCC),)
+    GCC = gcc
+  endif
+  OSTYPE = $(shell uname)
+  # OSNAME is used in messages to indicate the source of libpcap components
+  OSNAME = $(OSTYPE)
+  ifeq (SunOS,$(OSTYPE))
+    TEST = /bin/test
+  else
+    TEST = test
+  endif
+  ifeq (CYGWIN,$(findstring CYGWIN,$(OSTYPE))) # uname returns CYGWIN_NT-n.n-ver
+    OSTYPE = cygwin
+    OSNAME = windows-build
+  endif
+  PCAPLIB = pcap
+  ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
+    OS_CCDEFS = -D_GNU_SOURCE -DSIM_ASYNCH_IO
+    OS_LDFLAGS = -lm
+  else # Non-Android Builds
+    INCPATH:=/usr/include
+    LIBPATH:=/usr/lib
+    OS_CCDEFS = -D_GNU_SOURCE
+    ifeq (Darwin,$(OSTYPE))
+      OSNAME = OSX
+      LIBEXT = dylib
     else
-      ifeq (librt,$(shell if test -e /usr/lib/librt.a; then echo librt; fi))
-        OS_CCDEFS = -lrt -lm -D_GNU_SOURCE
+      ifeq (Linux,$(OSTYPE))
+        LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
+        LIBEXT = so
       else
-        OS_CCDEFS = -lm -D_GNU_SOURCE
+        ifeq (SunOS,$(OSTYPE))
+          OSNAME = Solaris
+          LIBPATH := $(shell crle | grep 'Default Library Path' | awk '{ print $$5 }' | sed 's/:/ /g')
+          LIBEXT = so
+          OS_LDFLAGS += -lsocket -lnsl
+          ifeq (incsfw,$(shell if $(TEST) -d /opt/sfw/include; then echo incsfw; fi))
+            INCPATH += /opt/sfw/include
+            OS_CCDEFS += -I/opt/sfw/include
+          endif
+          ifeq (libsfw,$(shell if $(TEST) -d /opt/sfw/lib; then echo libsfw; fi))
+            LIBPATH += /opt/sfw/lib
+            OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
+          endif
+        else
+          ifeq (cygwin,$(OSTYPE))
+            # use 0readme_ethernet.txt documented Windows pcap build components
+            INCPATH += ../windows-build/winpcap/WpdPack/include
+            LIBPATH += ../windows-build/winpcap/WpdPack/lib
+            PCAPLIB = wpcap
+            LIBEXT = a
+          else
+            LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+            ifneq (,$(LDSEARCH))
+              LIBPATH := $(LDSEARCH)
+            endif
+            ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
+              LIBPATH += /usr/pkg/lib
+              OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
+            endif
+            ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
+              LIBEXT = so
+            else
+              LIBEXT = a
+            endif
+          endif
+        endif
       endif
     endif
   endif
-  ifeq (readline,$(shell if test -e /usr/lib/libreadline.a; then echo readline; fi))
-    # Use Locally installed and available readline support
-    ifeq (ncurses,$(shell if test -e /usr/lib/libncurses.a; then echo ncurses; fi))
-      READLINE_CCDEFS = -DHAVE_READLINE -lreadline -lncurses
-    else
-      READLINE_CCDEFS = -DHAVE_READLINE -lreadline
+  $(info lib paths are: $(LIBPATH))
+  find_lib = $(strip $(firstword $(foreach dir,$(strip $(LIBPATH)),$(wildcard $(dir)/lib$(1).$(LIBEXT)))))
+  find_include = $(strip $(firstword $(foreach dir,$(strip $(INCPATH)),$(wildcard $(dir)/$(1).h))))
+  ifneq (,$(call find_lib,m))
+    OS_LDFLAGS += -lm
+    $(info using libm: $(call find_lib,m))
+  endif
+  ifneq (,$(call find_lib,rt))
+    OS_LDFLAGS += -lrt
+    $(info using librt: $(call find_lib,rt))
+  endif
+  ifneq (,$(call find_lib,pthread))
+    ifneq (,$(call find_include,pthread))
+      OS_CCDEFS += -DSIM_ASYNCH_IO -DUSE_READER_THREAD
+      OS_LDFLAGS += -lpthread
+      $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
     endif
   endif
-  ifeq (pcap,$(shell if test -e /usr/lib/libpcap.a; then echo pcap; fi))
-    # Use Locally installed and available pcap support
-    NETWORK_CCDEFS = -DUSE_NETWORK -lpcap
+  ifneq (,$(call find_include,dlfcn))
+    ifneq (,$(call find_lib,dl))
+      OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
+      OS_LDFLAGS += -ldl
+      $(info using libdl: $(call find_lib,dl) $(call find_include,dlfcn))
+    else
+      ifeq (BSD,$(findstring BSD,$(OSTYPE)))
+        OS_CCDEFS += -DHAVE_DLOPEN=so
+        $(info using libdl: $(call find_include,dlfcn))
+      endif
+    endif
   endif
-  ifeq (tuntap,$(shell if test -e /usr/include/linux/if_tun.h; then echo tuntap; fi))
-    # Provide support for Tap networking on Linux
-    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK
+  ifneq (,$(NETWORK_USEFUL))
+    ifneq (,$(call find_include,pcap))
+      ifneq (,$(call find_lib,$(PCAPLIB)))
+        ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
+          NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+          ifeq (cygwin,$(OSTYPE))
+            # cygwin has no ldconfig so explicitly specify pcap object library
+            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+          else
+            NETWORK_LDFLAGS = -l$(PCAPLIB)
+          endif
+          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+          NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
+        else # default build uses dynamic libpcap
+          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+          $(info using libpcap: $(call find_include,pcap))
+          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
+        endif
+      else
+        NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+        NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
+        $(info using libpcap: $(call find_include,pcap))
+      endif
+    else
+      # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
+      LIBPATH += /usr/local/lib
+      INCPATH += /usr/local/include
+      LIBEXTSAVE := $(LIBEXT)
+      LIBEXT = a
+      ifneq (,$(call find_lib,$(PCAPLIB)))
+        ifneq (,$(call find_include,pcap))
+          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+          ifeq (cygwin,$(OSTYPE))
+            NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+            NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
+          else
+            NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
+            NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
+            $(info *** Warning ***)
+            $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
+            $(info *** Warning *** libpcap components from www.tcpdump.org.)
+            $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
+            $(info *** Warning *** components for simh networking.  For best results, with)
+            $(info *** Warning *** simh networking, it is recommended that you install the)
+            $(info *** Warning *** libpcap-dev package from your $(OSTYPE) distribution)
+            $(info *** Warning ***)
+          endif
+        else
+          $(error using libpcap: $(call find_lib,$(PCAPLIB)) missing pcap.h)
+        endif
+        LIBEXT = $(LIBEXTSAVE)
+      endif
+    endif
+    ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+	  # Given we have libpcap components, consider other network connections as well
+      ifneq (,$(call find_lib,vdeplug))
+        # libvdeplug requires the use of the OS provided libpcap
+		ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+          ifneq (,$(call find_include,libvdeplug))
+            # Provide support for vde networking
+            NETWORK_CCDEFS += -DUSE_VDE_NETWORK
+            NETWORK_LDFLAGS += -lvdeplug
+            $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
+          endif
+        endif
+      endif
+      ifneq (,$(call find_include,linux/if_tun))
+        # Provide support for Tap networking on Linux
+        NETWORK_CCDEFS += -DUSE_TAP_NETWORK
+      endif
+      ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
+        # Provide support for Tap networking on BSD platforms (including OS X)
+        NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
+      endif
+    else
+      NETWORK_FEATURES = - WITHOUT networking support
+      $(info *** Warning ***)
+      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT networking support)
+      $(info *** Warning ***)
+      $(info *** Warning *** To build simulator(s) with networking support you should read)
+      $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the)
+      $(info *** Warning *** needed libpcap components for your $(OSTYPE) platform)
+      $(info *** Warning ***)
+    endif
+    NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
-  ifeq (bsdtuntap,$(shell if test -e /usr/include/net/if_tun.h; then echo bsdtuntap; fi))
-    # Provide support for Tap networking
-    NETWORK_TAP_CCDEFS = -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
-  endif
-  CC = gcc -std=c99 -U__STRICT_ANSI__ -g $(OS_CCDEFS) -I . $(READLINE_CCDEFS) $(NETWORK_CCDEFS) $(NETWORK_TAP_CCDEFS)
-  ifneq ($(USE_NETWORK),)
-    # Assume built from tcpdump.org sources with default install target
-    NETWORK_OPT = -DUSE_NETWORK -isystem /usr/local/include /usr/local/lib/libpcap.a
+  ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
+    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
   endif
 else
-  #Win32 Environments
-  LDFLAGS = -lm -lwsock32 -lwinmm
-  CC = gcc -std=c99 -U__STRICT_ANSI__ -O2 -fno-strict-overflow -I.
+  #Win32 Environments (via MinGW32)
+  GCC = gcc
+  GCC_Path := $(dir $(shell where gcc.exe))
+  ifeq ($(NOASYNCH),)
+    ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
+      PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
+      PTHREADS_LDFLAGS = -lpthreadGC2 -L..\windows-build\pthreads\Pre-built.2\lib
+    else
+      ifeq (pthreads,$(shell if exist $(dir $(GCC_Path))..\include\pthread.h echo pthreads))
+        PTHREADS_CCDEFS = -DSIM_ASYNCH_IO -DUSE_READER_THREAD
+        PTHREADS_LDFLAGS = -lpthread
+      endif
+    endif
+  endif
+  ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
+    PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
+    NETWORK_LDFLAGS =
+    NETWORK_OPT = -DUSE_SHARED
+    NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
+  else
+    ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
+      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
+      NETWORK_LDFLAGS =
+      NETWORK_OPT = -DUSE_SHARED
+      NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
+    endif
+  endif
+  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
+  OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
+  ifneq (binexists,$(shell if exist BIN echo binexists))
+    MKDIRBIN = if not exist BIN mkdir BIN
+  endif
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT = -DUSE_SHARED
   endif
 endif
+ifneq ($(DEBUG),)
+  CFLAGS_G = -g -ggdb -g3
+  CFLAGS_O = -O0
+  BUILD_FEATURES = - debugging support
+else
+  CFLAGS_O = -O2 -flto -finline-functions -fgcse-after-reload -fpredictive-commoning -fipa-cp-clone -fno-unsafe-loop-optimizations -fno-strict-overflow
+  LDFLAGS_O = -flto -fwhole-program
+  BUILD_FEATURES = - compiler optimizations and no debugging support
+endif
+$(info ***)
+$(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
+$(info *** $(BUILD_FEATURES).)
+$(info *** $(NETWORK_FEATURES).)
+$(info ***)
+ifneq ($(DONT_USE_READER_THREAD),)
+  NETWORK_OPT += -DDONT_USE_READER_THREAD
+endif
+
+CC = $(GCC) -std=c99 -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) -I . $(OS_CCDEFS) $(ROMS_OPT)
+LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 
 #
 # Common Libraries
@@ -81,7 +320,7 @@ ECLIPSE = ${NOVAD}/eclipse_cpu.c ${NOVAD}/eclipse_tt.c ${NOVAD}/nova_sys.c \
 	${NOVAD}/nova_dkp.c ${NOVAD}/nova_dsk.c ${NOVAD}/nova_lp.c \
 	${NOVAD}/nova_mta.c ${NOVAD}/nova_plt.c ${NOVAD}/nova_pt.c \
 	${NOVAD}/nova_clk.c ${NOVAD}/nova_tt1.c ${NOVAD}/nova_qty.c
-ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE 
+ECLIPSE_OPT = -I ${NOVAD} -DECLIPSE
 
 
 PDP18BD = PDP18B
@@ -144,7 +383,7 @@ PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP10D}/pdp10_tim.c ${PDP10D}/pdp10_tu.c ${PDP10D}/pdp10_xtnd.c \
 	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c \
 	${PDP11D}/pdp11_cr.c
-PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
+PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} ${NETWORK_OPT}
 
 
 
@@ -158,7 +397,7 @@ PDP8 = ${PDP8D}/pdp8_cpu.c ${PDP8D}/pdp8_clk.c ${PDP8D}/pdp8_df.c \
 PDP8_OPT = -I ${PDP8D}
 
 
-H316D = h316
+H316D = H316
 H316 = ${H316D}/h316_stddev.c ${H316D}/h316_lp.c ${H316D}/h316_cpu.c \
 	${H316D}/h316_sys.c ${H316D}/h316_mt.c ${H316D}/h316_fhd.c \
 	${H316D}/h316_dp.c
@@ -246,7 +485,7 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/altairz80_hdsk.c ${ALTAIRZ80D}/altairz80_net.c \
 	${ALTAIRZ80D}/flashwriter2.c ${ALTAIRZ80D}/i86_decode.c \
 	${ALTAIRZ80D}/i86_ops.c ${ALTAIRZ80D}/i86_prim_ops.c \
-	${ALTAIRZ80D}/i8272.c ${ALTAIRZ80D}/insnsd.c \
+	${ALTAIRZ80D}/i8272.c ${ALTAIRZ80D}/insnsa.c ${ALTAIRZ80D}/insnsd.c \
 	${ALTAIRZ80D}/mfdc.c ${ALTAIRZ80D}/n8vem.c ${ALTAIRZ80D}/vfdhd.c \
 	${ALTAIRZ80D}/s100_disk1a.c ${ALTAIRZ80D}/s100_disk2.c ${ALTAIRZ80D}/s100_disk3.c\
 	${ALTAIRZ80D}/s100_fif.c ${ALTAIRZ80D}/s100_mdriveh.c \
@@ -285,7 +524,7 @@ SWTP_OPT = -I ${SWTPD}
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
-	altair altairz80 gri i1620 i7094 ibm1130 id16 \
+	altair altairz80 gri i7094 ibm1130 id16 \
 	id32 sds lgp h316 swtp
 
 all : ${ALL}
@@ -304,134 +543,161 @@ endif
 pdp1 : ${BIN}pdp1${EXE}
 
 ${BIN}pdp1${EXE} : ${PDP1} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP1} ${SIM} ${PDP1_OPT} -o $@ ${LDFLAGS}
 
 pdp4 : ${BIN}pdp4${EXE}
 
 ${BIN}pdp4${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP4_OPT} -o $@ ${LDFLAGS}
 
 pdp7 : ${BIN}pdp7${EXE}
 
 ${BIN}pdp7${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP7_OPT} -o $@ ${LDFLAGS}
 
 pdp8 : ${BIN}pdp8${EXE}
 
 ${BIN}pdp8${EXE} : ${PDP8} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP8} ${SIM} ${PDP8_OPT} -o $@ ${LDFLAGS}
 
 pdp9 : ${BIN}pdp9${EXE}
 
 ${BIN}pdp9${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP9_OPT} -o $@ ${LDFLAGS}
 
 pdp15 : ${BIN}pdp15${EXE}
 
 ${BIN}pdp15${EXE} : ${PDP18B} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP18B} ${SIM} ${PDP15_OPT} -o $@ ${LDFLAGS}
 
 pdp10 : ${BIN}pdp10${EXE}
 
 ${BIN}pdp10${EXE} : ${PDP10} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP10} ${SIM} ${PDP10_OPT} -o $@ ${LDFLAGS}
 
 pdp11 : ${BIN}pdp11${EXE}
 
 ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
+	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} -o $@ ${LDFLAGS}
 
 vax : ${BIN}vax${EXE}
 
 ${BIN}vax${EXE} : ${VAX} ${SIM}
+	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} -o $@ ${LDFLAGS}
 
 vax780 : ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM}
+	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} -o $@ ${LDFLAGS}
 
 nova : ${BIN}nova${EXE}
 
 ${BIN}nova${EXE} : ${NOVA} ${SIM}
+	${MKDIRBIN}
 	${CC} ${NOVA} ${SIM} ${NOVA_OPT} -o $@ ${LDFLAGS}
 
 eclipse : ${BIN}eclipse${EXE}
 
 ${BIN}eclipse${EXE} : ${ECLIPSE} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ECLIPSE} ${SIM} ${ECLIPSE_OPT} -o $@ ${LDFLAGS}
 
 h316 : ${BIN}h316${EXE}
 
 ${BIN}h316${EXE} : ${H316} ${SIM}
+	${MKDIRBIN}
 	${CC} ${H316} ${SIM} ${H316_OPT} -o $@ ${LDFLAGS}
 
 hp2100 : ${BIN}hp2100${EXE}
 
 ${BIN}hp2100${EXE} : ${HP2100} ${SIM}
+	${MKDIRBIN}
 	${CC} ${HP2100} ${SIM} ${HP2100_OPT} -o $@ ${LDFLAGS}
 
 i1401 : ${BIN}i1401${EXE}
 
 ${BIN}i1401${EXE} : ${I1401} ${SIM}
+	${MKDIRBIN}
 	${CC} ${I1401} ${SIM} ${I1401_OPT} -o $@ ${LDFLAGS}
 
 i1620 : ${BIN}i1620${EXE}
 
 ${BIN}i1620${EXE} : ${I1620} ${SIM}
+	${MKDIRBIN}
 	${CC} ${I1620} ${SIM} ${I1620_OPT} -o $@ ${LDFLAGS}
 
 i7094 : ${BIN}i7094${EXE}
 
 ${BIN}i7094${EXE} : ${I7094} ${SIM}
+	${MKDIRBIN}
 	${CC} ${I7094} ${SIM} ${I7094_OPT} -o $@ ${LDFLAGS}
 
 ibm1130 : ${BIN}ibm1130${EXE}
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
+	${MKDIRBIN}
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} -o $@ ${LDFLAGS}
 
 s3 : ${BIN}s3${EXE}
 
 ${BIN}s3${EXE} : ${S3} ${SIM}
+	${MKDIRBIN}
 	${CC} ${S3} ${SIM} ${S3_OPT} -o $@ ${LDFLAGS}
 
 altair : ${BIN}altair${EXE}
 
 ${BIN}altair${EXE} : ${ALTAIR} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ALTAIR} ${SIM} ${ALTAIR_OPT} -o $@ ${LDFLAGS}
 
 altairz80 : ${BIN}altairz80${EXE}
 
-${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM} 
+${BIN}altairz80${EXE} : ${ALTAIRZ80} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ALTAIRZ80} ${SIM} ${ALTAIRZ80_OPT} -o $@ ${LDFLAGS}
 
 gri : ${BIN}gri${EXE}
 
 ${BIN}gri${EXE} : ${GRI} ${SIM}
+	${MKDIRBIN}
 	${CC} ${GRI} ${SIM} ${GRI_OPT} -o $@ ${LDFLAGS}
 
 lgp : ${BIN}lgp${EXE}
 
 ${BIN}lgp${EXE} : ${LGP} ${SIM}
+	${MKDIRBIN}
 	${CC} ${LGP} ${SIM} ${LGP_OPT} -o $@ ${LDFLAGS}
 
 id16 : ${BIN}id16${EXE}
 
 ${BIN}id16${EXE} : ${ID16} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ID16} ${SIM} ${ID16_OPT} -o $@ ${LDFLAGS}
 
 id32 : ${BIN}id32${EXE}
 
 ${BIN}id32${EXE} : ${ID32} ${SIM}
+	${MKDIRBIN}
 	${CC} ${ID32} ${SIM} ${ID32_OPT} -o $@ ${LDFLAGS}
 
 sds : ${BIN}sds${EXE}
 
 ${BIN}sds${EXE} : ${SDS} ${SIM}
+	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} -o $@ ${LDFLAGS}
 
 swtp : ${BIN}swtp${EXE}
 
 ${BIN}swtp${EXE} : ${SWTP} ${SIM}
+	${MKDIRBIN}
 	${CC} ${SWTP} ${SIM} ${SWTP_OPT} -o $@ ${LDFLAGS}
