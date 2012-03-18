@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   05-Nov-11    RMS     Added VEC_QMODE definition
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    29-Apr-07    RMS     Modified model-specific reserved operand check macros
                         to reflect 780 microcode patches (found by Naoki Hamada)
@@ -358,6 +359,7 @@ typedef struct {
 
 /* Device vectors */
 
+#define VEC_QBUS        0
 #define VEC_Q           0000
 #define VEC_PTR         0070
 #define VEC_PTP         0074

@@ -25,6 +25,8 @@
 
    cpu          VAX central processor
 
+   13-Sep-11    RMS     Fixed XFC, BPT to clear PSL<tp> before exception
+                        (found by Camiel Vanderhoeven)
    23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
    24-Apr-10    RMS     Added OLDVMS idle timer option
                         Fixed bug in SET CPU IDLE
@@ -178,7 +180,7 @@
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
 #define VAX_IDLE_VMS    0x1
 #define VAX_IDLE_ULT    0x2
-#define VAX_IDLE_QUAD   0x3
+#define VAX_IDLE_QUAD   0x4
 
 #define OPND_SIZE       16
 #define INST_SIZE       52
@@ -1571,15 +1573,17 @@ for ( ;; ) {
 
     case TSTL:
         CC_IIZZ_L (op0);                                /* set cc's */
-        if ((cc == CC_Z) &&
-            ((((PSL & PSL_IS) != 0) &&                  /* on IS? */
-              (PSL_GETIPL (PSL) == 0x1) &&              /* at IPL 1? */
-              ((cpu_idle_mask & VAX_IDLE_ULT) != 0))||  /* running Ultrix or friends? */
-             ((PSL_GETIPL (PSL) == 0x0) &&              /* at IPL 0? */
-              ((fault_PC & 0x80000000) != 0) &&         /* in system space? */
-              ((PC - fault_PC) == 6) &&                 /* 6 byte instruction? */
-              ((fault_PC & 0x7fffffff) < 0x4000) &&     /* in low system space? */
-              ((cpu_idle_mask & VAX_IDLE_QUAD) != 0)))) /* running Quad or friends? */
+        if ((cc == CC_Z) &&                             /* zero result and */
+            ((mapen == 0)?                              /* physical mode? */
+             (fault_PC == 0x20043619):                  /* cons prompt loop? */
+             ((((PSL & PSL_IS) != 0) &&                 /* on IS? */
+               (PSL_GETIPL (PSL) == 0x1) &&             /* at IPL 1? */
+               ((cpu_idle_mask & VAX_IDLE_ULT) != 0))|| /* running Ultrix or friends? */
+              ((PSL_GETIPL (PSL) == 0x0) &&             /* at IPL 0? */
+               ((fault_PC & 0x80000000) != 0) &&        /* in system space? */
+               ((PC - fault_PC) == 6) &&                /* 6 byte instruction? */
+               ((fault_PC & 0x7fffffff) < 0x4000) &&    /* in low system space? */
+               ((cpu_idle_mask & VAX_IDLE_QUAD) != 0))))) /* running Quad or friends? */
             cpu_idle();                                 /* idle loop */
         break;
 
@@ -2527,12 +2531,14 @@ for ( ;; ) {
 
     case BPT:
         SETPC (fault_PC);
+        PSL = PSL & ~PSL_TP;                                /* clear <tp> */
         cc = intexc (SCB_BPT, cc, 0, IE_EXC);
         GET_CUR;
         break;
 
     case XFC:
         SETPC (fault_PC);
+        PSL = PSL & ~PSL_TP;                                /* clear <tp> */
         cc = intexc (SCB_XFC, cc, 0, IE_EXC);
         GET_CUR;
         break;

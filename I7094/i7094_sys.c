@@ -1,6 +1,6 @@
 /* i7094_sys.c: IBM 7094 simulator interface
 
-   Copyright (c) 2003-2010, Robert M Supnik
+   Copyright (c) 2003-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   31-Dec-11    RMS     Added SPI, SPI
    16-Jul-10    RMS     Added SPUx, SPTx, SPRx
    29-Oct-06    RMS     Added additional expanded core instructions
    08-Jun-06    RMS     Added Dave Pitts' binary loader
@@ -362,7 +363,8 @@ static const char *opcode[] = {
  "RSCF", "RSCH",
  "STCB", "STCD",
  "STCF", "STCH",
- "STQ", "ORS", "DST",
+ "STQ", "SRI", "ORS", "DST",
+ "SPI",
  "SLQ", "STL",
  "SXD", "SCD",
  "SCHB", "SCHD",
@@ -533,7 +535,8 @@ static const t_uint64 opc_v[] = {
  0454200000000+I_MXN, 0454300000000+I_MXN,
  0454400000000+I_MXN, 0454500000000+I_MXN,
  0454600000000+I_MXN, 0454700000000+I_MXN,
- 0460000000000+I_MXN, 0460200000000+I_MXN, 0460300000000+I_MXN,
+ 0460000000000+I_MXN, 0460100000000+I_MXN, 0460200000000+I_MXN, 0460300000000+I_MXN,
+ 0460400000000+I_MXN, 
  0462000000000+I_MXN, 0462500000000+I_MXN,
  0463400000000+I_MXR, 0463600000000+I_MXR,
  0464000000000+I_MXN, 0464000000000+I_MXN,

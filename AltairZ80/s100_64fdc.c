@@ -248,10 +248,6 @@ static MTAB cromfdc_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(cromfdc_dev.dctrl & level) { \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB cromfdc_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -1463,13 +1459,13 @@ static t_stat cromfdc_svc (UNIT *uptr)
         motor_timeout ++;
         if(motor_timeout == MOTOR_TO_LIMIT) {
             cromfdc_info->motor_on = 0;
-            TRACE_PRINT(DRIVE_MSG, ("CROMFDC: Motor OFF" NLP))
+            sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: Motor OFF\n");
         }
     }
 
     cromfdc_info->rtc ++;
 
-    TRACE_PRINT(VERBOSE_MSG, ("CROMFDC: " ADDRESS_FORMAT " Timer IRQ" NLP, PCX));
+    sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " Timer IRQ\n", PCX);
     cromfdc_info->ipend |= CROMFDC_IRQ_TIMER3;
 
 /*  sim_activate (cromfdc_unit, cromfdc_unit->wait); */ /* requeue! */
@@ -1498,14 +1494,13 @@ static t_stat cromfdc_reset(DEVICE *dptr)
     } else {
         /* Connect CROMFDC ROM at base address */
         if (cromfdc_hasProperty(UNIT_CROMFDC_ROM)) {
-            TRACE_PRINT(VERBOSE_MSG, ("CROMFDC: ROM Enabled." NLP));
+            sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: ROM Enabled.\n");
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &cromfdcrom, FALSE) != 0) {
                 printf("%s: error mapping MEM resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
                 return SCPE_ARG;
             }
-        } else {
-            TRACE_PRINT(VERBOSE_MSG, ("CROMFDC: ROM Disabled." NLP))
-        }
+        } else
+            sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: ROM Disabled.\n");
         /* Connect CROMFDC Interrupt, and Aux Disk Registers */
         if(sim_map_resource(0x03, 0x02, RESOURCE_TYPE_IO, &cromfdc_ext, FALSE) != 0) {
             printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
@@ -1535,7 +1530,7 @@ static t_stat cromfdc_reset(DEVICE *dptr)
             printf("%s: error mapping I/O resource at 0x%04x" NLP, __FUNCTION__, pnp->io_base);
             return SCPE_ARG;
         } else {
-            TRACE_PRINT(VERBOSE_MSG, ("Mapped CCS2810 UART Status at 0x26" NLP));
+            sim_debug(VERBOSE_MSG, &cromfdc_dev, "Mapped CCS2810 UART Status at 0x26\n");
         }
 
     }
@@ -1600,8 +1595,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
             wd179x_info->sel_drive = 3;
             break;
         default:
-            TRACE_PRINT(STATUS_MSG,
-                ("CROMFDC: " ADDRESS_FORMAT " WR CTRL  = 0x%02x: Invalid drive selected." NLP, PCX, data & 0xFF));
+            sim_debug(STATUS_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL  = 0x%02x: Invalid drive selected.\n", PCX, data & 0xFF);
             break;
         }
         if(data & CROMFDC_CTRL_MAXI) {
@@ -1617,8 +1611,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
 
         if(data & CROMFDC_CTRL_DDENS) {
             if(crofdc_type == 4) { /* 4FDC */
-                TRACE_PRINT(DRIVE_MSG,
-                    ("CROMFDC: " ADDRESS_FORMAT " WR CTRL: Cannot set double density on 4FDC" NLP, PCX));
+                sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: Cannot set double density on 4FDC\n", PCX);
             } else {
                 wd179x_info->ddens = 1;
             }
@@ -1631,9 +1624,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
             cromfdc_info->autowait = 0;
         }
 
-        TRACE_PRINT(DRIVE_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " WR CTRL: sel_drive=%d, drivetype=%d, motor=%d, dens=%d, aw=%d" NLP, PCX,
-            wd179x_info->sel_drive, wd179x_info->drivetype, cromfdc_info->motor_on, wd179x_info->ddens, cromfdc_info->autowait));
+        sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: sel_drive=%d, drivetype=%d, motor=%d, dens=%d, aw=%d\n", PCX, wd179x_info->sel_drive, wd179x_info->drivetype, cromfdc_info->motor_on, wd179x_info->ddens, cromfdc_info->autowait);
     } else { /* I/O Read */
         result = (crofdc_boot) ? 0 : CROMFDC_FLAG_BOOT;
         result |= (wd179x_info->intrq) ? CROMFDC_FLAG_EOJ : 0;
@@ -1665,8 +1656,8 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
 
 /*          printf("CCS2422FDC: " ADDRESS_FORMAT " Read STATUS1=0x%02x" NLP, PCX, result); */
         }
-        TRACE_PRINT(STATUS_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " Read DISK FLAGS, Port 0x%02x Result 0x%02x" NLP, PCX, port, result))
+        sim_debug(STATUS_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " Read DISK FLAGS, Port 0x%02x Result 0x%02x\n", PCX, port, result);
     }
 
     return result;
@@ -1684,8 +1675,7 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
             if(crofdc_type != 50) { /* Cromemco Controller */
                 if((data & CROMFDC_AUX_CMD_SIDE) == 0) {
                     if(crofdc_type == 4) { /* 4FDC */
-                        TRACE_PRINT(DRIVE_MSG,
-                            ("CROMFDC: " ADDRESS_FORMAT " WR CTRL: Cannot set side 1 on 4FDC" NLP, PCX));
+                        sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: Cannot set side 1 on 4FDC\n", PCX);
                     } else {
                         wd179x_info->fdc_head = 1;
                     }
@@ -1717,14 +1707,13 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
 
             }
         } else if (port == 0x3) { /* Interrupt Address */
-            TRACE_PRINT(IRQ_MSG,
-                ("CROMFDC: " ADDRESS_FORMAT " IRQ Mask=0x%02x" NLP, PCX, data));
+            sim_debug(IRQ_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " IRQ Mask=0x%02x\n", PCX, data);
             cromfdc_info->imask = data;
         } else {
         }
 
-        TRACE_PRINT(DRIVE_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " AUX OUT, Port 0x%02x Data 0x%02x" NLP, PCX, port, data))
+        sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " AUX OUT, Port 0x%02x Data 0x%02x\n", PCX, port, data);
         result = 0;
     } else { /* I/O Read */
         if(port == 0x4) {
@@ -1732,20 +1721,18 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
             result |= 0x00;     /* Bit 6 is Seek in Progress for Persci drives. */
             result |= (cromfdc_info->rtc & 1) ? 0x80 : 0;
             if(crofdc_type == 50) {
-                TRACE_PRINT(STATUS_MSG,
-                    ("CCS2422FDC: " ADDRESS_FORMAT " Read STATUS2=0x%02x" NLP, PCX, result));
+                sim_debug(STATUS_MSG, &cromfdc_dev, "CCS2422FDC: " ADDRESS_FORMAT " Read STATUS2=0x%02x\n", PCX, result);
             }
         } else if (port == 0x3) { /* Interrupt Address */
             result = ipend_to_rst_opcode(cromfdc_info->ipend);
             if(result != 0) {
-                TRACE_PRINT(IRQ_MSG,
-                    ("CROMFDC: " ADDRESS_FORMAT " RST Opcode=%x, Vector=%04x" NLP, PCX, result, RST_OPCODE_TO_VECTOR(result)));
+                sim_debug(IRQ_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " RST Opcode=%x, Vector=%04x\n", PCX, result, RST_OPCODE_TO_VECTOR(result));
             }
         } else {
             result = 0xFF;
         }
-        TRACE_PRINT(STATUS_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " AUX IN, Port 0x%02x Result 0x%02x" NLP, PCX, port, result))
+        sim_debug(STATUS_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " AUX IN, Port 0x%02x Result 0x%02x\n", PCX, port, result);
     }
     return result;
 }
@@ -1755,14 +1742,14 @@ static int32 cromfdc_timer(const int32 port, const int32 io, const int32 data)
 {
     static int32 result = 0;
     if(io) {
-        TRACE_PRINT(VERBOSE_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " TIMER%d OUT, Port 0x%02x Data 0x%02x" NLP, PCX, (port-4), port, data))
+        sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " TIMER%d OUT, Port 0x%02x Data 0x%02x\n", PCX, (port-4), port, data);
         result = 0;
         sim_activate(cromfdc_unit, (CROMFDC_SIM_64US * data));
     } else {
         result++;
-        TRACE_PRINT(VERBOSE_MSG,
-           ("CROMFDC: " ADDRESS_FORMAT " TIMER%d IN, Port 0x%02x Result 0x%02x" NLP, PCX, (port-4), port, result))
+        sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " TIMER%d IN, Port 0x%02x Result 0x%02x\n", PCX, (port-4), port, result);
     }
     return result;
 }
@@ -1772,15 +1759,15 @@ static int32 cromfdc_banksel(const int32 port, const int32 io, const int32 data)
 {
     int32 result;
     if(io) {
-        TRACE_PRINT(VERBOSE_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " BANKSEL OUT, Port 0x%02x Data 0x%02x" NLP, PCX, port, data))
+        sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " BANKSEL OUT, Port 0x%02x Data 0x%02x\n", PCX, port, data);
             /* Unmap Boot ROM */
             cromfdc_info->rom_disabled = TRUE;
         result = 0;
     } else {
         result = 0xFF;
-        TRACE_PRINT(VERBOSE_MSG,
-            ("CROMFDC: " ADDRESS_FORMAT " BANKSEL IN, Port 0x%02x Result 0x%02x" NLP, PCX, port, result))
+        sim_debug(VERBOSE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT
+                  " BANKSEL IN, Port 0x%02x Result 0x%02x\n", PCX, port, result);
     }
     return result;
 }

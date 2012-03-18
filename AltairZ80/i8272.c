@@ -202,11 +202,6 @@ static MTAB i8272_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(i8272_dev.dctrl & level) {   \
-                                       printf args;                 \
-                                    }
-
-
 /* Debug Flags */
 static DEBTAB i8272_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -427,26 +422,32 @@ uint8 I8272_Read(const uint32 Addr)
                 cData |= ~I8272_MSR_FDC_BUSY;
             }
 #endif /* 0 hharte */
-            TRACE_PRINT(STATUS_MSG, ("I8272: " ADDRESS_FORMAT " RD FDC MSR = 0x%02x" NLP, PCX, cData));
+            sim_debug(STATUS_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                      " RD FDC MSR = 0x%02x\n", PCX, cData);
             break;
         case I8272_FDC_DATA:
             if(i8272_info->fdc_phase == DATA_PHASE) {
                 cData = i8272_info->result[i8272_info->result_index];
-                TRACE_PRINT(VERBOSE_MSG, ("I8272: " ADDRESS_FORMAT " RD Data, phase=%d, [%d]=0x%02x" NLP, PCX, i8272_info->fdc_phase, i8272_info->result_index, cData));
+                sim_debug(VERBOSE_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                          " RD Data, phase=%d, [%d]=0x%02x\n",
+                          PCX, i8272_info->fdc_phase, i8272_info->result_index, cData);
                 i8272_irq = 0;
                 i8272_info->result_index ++;
                 if(i8272_info->result_index == i8272_info->result_len) {
-                    TRACE_PRINT(VERBOSE_MSG, ("I8272: " ADDRESS_FORMAT " result phase complete." NLP, PCX));
+                    sim_debug(VERBOSE_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                              " result phase complete.\n", PCX);
                     i8272_info->fdc_phase = CMD_PHASE;
                 }
             } else {
                 cData = i8272_info->result[0]; /* hack, in theory any value should be ok but this makes "format" work */
-                TRACE_PRINT(VERBOSE_MSG, ("I8272: " ADDRESS_FORMAT " error, reading data register when not in data phase. "
-                                          "Returning 0x%02x" NLP, PCX, cData));
+                sim_debug(VERBOSE_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                          " error, reading data register when not in data phase. "
+                          "Returning 0x%02x\n", PCX, cData);
             }
             break;
         default:
-            TRACE_PRINT(VERBOSE_MSG, ("I8272: " ADDRESS_FORMAT " Cannot read register %x" NLP, PCX, Addr));
+            sim_debug(VERBOSE_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                      " Cannot read register %x\n", PCX, Addr);
             cData = 0xFF;
     }
 
@@ -488,19 +489,20 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
 
     switch(Addr & 0x3) {
         case I8272_FDC_MSR:
-            TRACE_PRINT(WR_DATA_MSG, ("I8272: " ADDRESS_FORMAT " WR Drive Select Reg=%02x" NLP,
-                PCX, cData));
+            sim_debug(WR_DATA_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                      " WR Drive Select Reg=%02x\n", PCX, cData);
             break;
         case I8272_FDC_DATA:
             i8272_info->fdc_msr &= 0xF0;
-            TRACE_PRINT(VERBOSE_MSG, ("I8272: " ADDRESS_FORMAT " WR Data, phase=%d, index=%d" NLP,
-                PCX, i8272_info->fdc_phase, i8272_info->cmd_index));
+            sim_debug(VERBOSE_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                      " WR Data, phase=%d, index=%d\n",
+                      PCX, i8272_info->fdc_phase, i8272_info->cmd_index);
             if(i8272_info->fdc_phase == CMD_PHASE) {
                 i8272_info->cmd[i8272_info->cmd_index] = cData;
 
                 if(i8272_info->cmd_index == 0) {
-                    TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT " CMD=0x%02x[%s]" NLP,
-                        PCX, cData & 0x1F, messages[cData & 0x1F]));
+                    sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                              " CMD=0x%02x[%s]\n", PCX, cData & 0x1F, messages[cData & 0x1F]);
                     I8272_Setup_Cmd(cData & 0x1F);
                 }
                 i8272_info->cmd_index ++;
@@ -537,14 +539,12 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                             i8272_info->fdc_seek_end = 0;
                         }
                         if(pDrive->track != i8272_info->cmd[2]) {
-                            TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT
-                                " ERROR: CMD=0x%02x[%s]: Drive: %d, Command wants track %d, but positioner is on track %d." NLP,
-                                PCX,
-                                i8272_info->cmd[0] & 0x1F,
-                                messages[i8272_info->cmd[0] & 0x1F],
-                                i8272_info->sel_drive,
-                                i8272_info->cmd[2],
-                                pDrive->track));
+                            sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " ERROR: CMD=0x%02x[%s]: Drive: %d, Command wants track %d, "
+                                      "but positioner is on track %d.\n",
+                                      PCX, i8272_info->cmd[0] & 0x1F,
+                                      messages[i8272_info->cmd[0] & 0x1F],
+                                      i8272_info->sel_drive, i8272_info->cmd[2], pDrive->track);
                         }
 
                         pDrive->track = i8272_info->cmd[2];
@@ -552,30 +552,31 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         i8272_info->fdc_sector = i8272_info->cmd[4];
                         i8272_info->fdc_sec_len = i8272_info->cmd[5];
                         if(i8272_info->fdc_sec_len > I8272_MAX_N) {
-                            TRACE_PRINT(ERROR_MSG, ("I8272: " ADDRESS_FORMAT " Illegal sector size %d [N=%d]. Reset to %d [N=%d]." NLP,
-                                                    PCX, 128 << i8272_info->fdc_sec_len, i8272_info->fdc_sec_len,
-                                                    128 << I8272_MAX_N, I8272_MAX_N));
+                            sim_debug(ERROR_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " Illegal sector size %d [N=%d]. Reset to %d [N=%d].\n",
+                                      PCX, 128 << i8272_info->fdc_sec_len,
+                                      i8272_info->fdc_sec_len, 128 << I8272_MAX_N, I8272_MAX_N);
                             i8272_info->fdc_sec_len = I8272_MAX_N;
                         }
                         i8272_info->fdc_eot = i8272_info->cmd[6];
                         i8272_info->fdc_gpl = i8272_info->cmd[7];
                         i8272_info->fdc_dtl = i8272_info->cmd[8];
 
-                        TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT
-                            " CMD=0x%02x[%s]: Drive: %d, %s %s, C=%d. H=%d. S=%d, N=%d, EOT=%02x, GPL=%02x, DTL=%02x" NLP,
-                            PCX,
-                            i8272_info->cmd[0] & 0x1F,
-                            messages[i8272_info->cmd[0] & 0x1F],
-                            i8272_info->sel_drive,
-                            i8272_info->fdc_mt ? "Multi" : "Single",
-                            i8272_info->fdc_mfm ? "MFM" : "FM",
-                            pDrive->track,
-                            i8272_info->fdc_head,
-                            i8272_info->fdc_sector,
-                            i8272_info->fdc_sec_len,
-                            i8272_info->fdc_eot,
-                            i8272_info->fdc_gpl,
-                            i8272_info->fdc_dtl));
+                        sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " CMD=0x%02x[%s]: Drive: %d, %s %s, C=%d. H=%d. S=%d, N=%d, "
+                                  "EOT=%02x, GPL=%02x, DTL=%02x\n", PCX,
+                                  i8272_info->cmd[0] & 0x1F,
+                                  messages[i8272_info->cmd[0] & 0x1F],
+                                  i8272_info->sel_drive,
+                                  i8272_info->fdc_mt ? "Multi" : "Single",
+                                  i8272_info->fdc_mfm ? "MFM" : "FM",
+                                  pDrive->track,
+                                  i8272_info->fdc_head,
+                                  i8272_info->fdc_sector,
+                                  i8272_info->fdc_sec_len,
+                                  i8272_info->fdc_eot,
+                                  i8272_info->fdc_gpl,
+                                  i8272_info->fdc_dtl);
 
                         i8272_info->fdc_status[0]  = (i8272_info->fdc_hds & 1) << 2;
                         i8272_info->fdc_status[0] |= (i8272_info->sel_drive & 0x03);
@@ -613,8 +614,9 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         /* READID to detect non-standard disk formats.        */
                         i8272_info->fdc_sector = pDrive->imd->track[pDrive->track][i8272_info->fdc_hds].start_sector;
                         if((i8272_info->fdc_sec_len == 0xF8) || (i8272_info->fdc_sec_len > I8272_MAX_N)) { /* Error calculating N or N too large */
-                            TRACE_PRINT(ERROR_MSG, ("I8272: " ADDRESS_FORMAT " Illegal sector size N=%d. Reset to 0." NLP,
-                                                    PCX, i8272_info->fdc_sec_len));
+                            sim_debug(ERROR_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " Illegal sector size N=%d. Reset to 0.\n",
+                                      PCX, i8272_info->fdc_sec_len);
                             i8272_info->fdc_sec_len = 0;
                             return 0xFF;
                         }
@@ -642,8 +644,9 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         pDrive->track = 0;
                         i8272_info->fdc_phase = CMD_PHASE;  /* No result phase */
                         i8272_info->fdc_seek_end = 1;
-                        TRACE_PRINT(SEEK_MSG, ("I8272: " ADDRESS_FORMAT " Recalibrate: Drive 0x%02x" NLP,
-                            PCX, i8272_info->sel_drive));
+                        sim_debug(SEEK_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " Recalibrate: Drive 0x%02x\n",
+                                  PCX, i8272_info->sel_drive);
                         break;
                     case I8272_FORMAT_TRACK:    /* FORMAT A TRACK */
                         i8272_info->fdc_mfm = (i8272_info->cmd[0] & 0x40) >> 6;
@@ -662,25 +665,27 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         }
                         i8272_info->fdc_sec_len = i8272_info->cmd[2];
                         if(i8272_info->fdc_sec_len > I8272_MAX_N) {
-                            TRACE_PRINT(ERROR_MSG, ("I8272: " ADDRESS_FORMAT " Illegal sector size %d [N=%d]. Reset to %d [N=%d]." NLP,
-                                                    PCX, 128 << i8272_info->fdc_sec_len, i8272_info->fdc_sec_len,
-                                                    128 << I8272_MAX_N, I8272_MAX_N));
+                            sim_debug(ERROR_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " Illegal sector size %d [N=%d]. Reset to %d [N=%d].\n",
+                                      PCX, 128 << i8272_info->fdc_sec_len,
+                                      i8272_info->fdc_sec_len, 128 << I8272_MAX_N, I8272_MAX_N);
                             i8272_info->fdc_sec_len = I8272_MAX_N;
                         }
                         i8272_info->fdc_sc = i8272_info->cmd[3];
                         i8272_info->fdc_gpl = i8272_info->cmd[4];
                         i8272_info->fdc_fillbyte = i8272_info->cmd[5];
 
-                        TRACE_PRINT(FMT_MSG, ("I8272: " ADDRESS_FORMAT " Format Drive: %d, %s, C=%d. H=%d. N=%d, SC=%d, GPL=%02x, FILL=%02x" NLP,
-                            PCX,
-                            i8272_info->sel_drive,
-                            i8272_info->fdc_mfm ? "MFM" : "FM",
-                            pDrive->track,
-                            i8272_info->fdc_head,
-                            i8272_info->fdc_sec_len,
-                            i8272_info->fdc_sc,
-                            i8272_info->fdc_gpl,
-                            i8272_info->fdc_fillbyte));
+                        sim_debug(FMT_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " Format Drive: %d, %s, C=%d. H=%d. N=%d, SC=%d, GPL=%02x, FILL=%02x\n",
+                                  PCX,
+                                  i8272_info->sel_drive,
+                                  i8272_info->fdc_mfm ? "MFM" : "FM",
+                                  pDrive->track,
+                                  i8272_info->fdc_head,
+                                  i8272_info->fdc_sec_len,
+                                  i8272_info->fdc_sc,
+                                  i8272_info->fdc_gpl,
+                                  i8272_info->fdc_fillbyte);
 
                         i8272_info->fdc_status[0]  = (i8272_info->fdc_hds & 1) << 2;
                         i8272_info->fdc_status[0] |= (i8272_info->sel_drive & 0x03);
@@ -698,7 +703,8 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         i8272_info->result[6] = i8272_info->fdc_sec_len;
                         break;
                     case I8272_SENSE_INTR_STATUS:   /* SENSE INTERRUPT STATUS */
-                        TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT " Sense Interrupt Status" NLP, PCX));
+                        sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " Sense Interrupt Status\n", PCX);
                         i8272_info->result[0]  = i8272_info->fdc_seek_end ? 0x20 : 0x00;  /* SEEK_END */
                         i8272_info->result[0] |= i8272_info->sel_drive;
                         i8272_info->result[1]  = pDrive->track;
@@ -710,12 +716,12 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         i8272_info->fdc_hlt = ((i8272_info->cmd[2] & 0xFE) >> 1) * 2;
                         i8272_info->fdc_nd  = (i8272_info->cmd[2] & 0x01);
                         i8272_info->fdc_phase = CMD_PHASE;  /* No result phase */
-                        TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT " Specify: SRT=%d, HUT=%d, HLT=%d, ND=%s" NLP,
-                            PCX,
-                            i8272_info->fdc_srt,
-                            i8272_info->fdc_hut,
-                            i8272_info->fdc_hlt,
-                            i8272_info->fdc_nd ? "NON-DMA" : "DMA"));
+                        sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " Specify: SRT=%d, HUT=%d, HLT=%d, ND=%s\n",
+                                  PCX, i8272_info->fdc_srt,
+                                  i8272_info->fdc_hut,
+                                  i8272_info->fdc_hlt,
+                                  i8272_info->fdc_nd ? "NON-DMA" : "DMA");
                         break;
                     case I8272_SENSE_DRIVE_STATUS:  /* Setup Status3 Byte */
                         i8272_info->fdc_hds = (i8272_info->cmd[1] & 0x04) >> 2;
@@ -735,8 +741,8 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         i8272_info->result[0] |= (i8272_info->fdc_hds & 1) << 2;
                         i8272_info->result[0] |= (i8272_info->sel_drive & 0x03);
                         i8272_info->result[0] |= (pDrive->track == 0) ? DRIVE_STATUS_TRACK0 : 0x00; /* Track 0 */
-                        TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT " Sense Drive Status = 0x%02x" NLP,
-                            PCX, i8272_info->result[0]));
+                        sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " Sense Drive Status = 0x%02x\n", PCX, i8272_info->result[0]);
                         break;
                     case I8272_SEEK:    /* SEEK */
                         i8272_info->fdc_mt = (i8272_info->cmd[0] & 0x80) >> 7;
@@ -752,15 +758,15 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         pDrive->track = i8272_info->cmd[2];
                         i8272_info->fdc_head = i8272_info->fdc_hds; /*AGN seek should save the head */
                         i8272_info->fdc_seek_end = 1;
-                        TRACE_PRINT(SEEK_MSG, ("I8272: " ADDRESS_FORMAT
-                                    " Seek Drive: %d, %s %s, C=%d. Skip Deleted Data=%s Head Select=%s" NLP,
-                                    PCX,
-                                    i8272_info->sel_drive,
-                                    i8272_info->fdc_mt ? "Multi" : "Single",
-                                    i8272_info->fdc_mfm ? "MFM" : "FM",
-                                    i8272_info->cmd[2],
-                                    i8272_info->fdc_sk ? "True" : "False",
-                                    i8272_info->fdc_hds ? "True" : "False"));
+                        sim_debug(SEEK_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                  " Seek Drive: %d, %s %s, C=%d. Skip Deleted Data=%s Head Select=%s\n",
+                                  PCX,
+                                  i8272_info->sel_drive,
+                                  i8272_info->fdc_mt ? "Multi" : "Single",
+                                  i8272_info->fdc_mfm ? "MFM" : "FM",
+                                  i8272_info->cmd[2],
+                                  i8272_info->fdc_sk ? "True" : "False",
+                                  i8272_info->fdc_hds ? "True" : "False");
                         break;
                     default:    /* INVALID */
                         break;
@@ -777,10 +783,11 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         case I8272_WRITE_DATA:
                         case I8272_WRITE_DELETED_DATA:
                             for(;i8272_info->fdc_sector<=i8272_info->fdc_eot;i8272_info->fdc_sector++) {
-                                TRACE_PRINT(RD_DATA_MSG, ("I8272: " ADDRESS_FORMAT " %s Data, sector: %d sector len=%d" NLP,
-                                    PCX, disk_read ? "RD" : "WR",
-                                    i8272_info->fdc_sector,
-                                    128 << i8272_info->fdc_sec_len));
+                                sim_debug(RD_DATA_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                          " %s Data, sector: %d sector len=%d\n",
+                                          PCX, disk_read ? "RD" : "WR",
+                                          i8272_info->fdc_sector,
+                                          128 << i8272_info->fdc_sec_len);
 
                                 if(pDrive->imd == NULL) {
                                     printf(".imd is NULL!" NLP);
@@ -799,20 +806,21 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                                         PutByteDMA(i8272_info->fdc_dma_addr, sdata.raw[i]);
                                         i8272_info->fdc_dma_addr++;
                                     }
-                                    TRACE_PRINT(RD_DATA_MSG, ("I8272: " ADDRESS_FORMAT " T:%d/H:%d/S:%d/L:%4d: Data transferred to RAM at 0x%06x" NLP,
-                                        PCX,
-                                        pDrive->track,
-                                        i8272_info->fdc_head,
-                                        i8272_info->fdc_sector,
-                                        128 << i8272_info->fdc_sec_len,
-                                        i8272_info->fdc_dma_addr - i));
+                                    sim_debug(RD_DATA_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                              " T:%d/H:%d/S:%d/L:%4d: Data transferred to RAM at 0x%06x\n",
+                                              PCX, pDrive->track,
+                                              i8272_info->fdc_head,
+                                              i8272_info->fdc_sector,
+                                              128 << i8272_info->fdc_sec_len,
+                                              i8272_info->fdc_dma_addr - i);
                                 } else { /* Write */
                                     for(i=0;i<(128 << i8272_info->fdc_sec_len);i++) {
                                         sdata.raw[i] = GetByteDMA(i8272_info->fdc_dma_addr);
                                         i8272_info->fdc_dma_addr++;
                                     }
-                                    TRACE_PRINT(WR_DATA_MSG, ("I8272: " ADDRESS_FORMAT " Data transferred from RAM at 0x%06x" NLP,
-                                        PCX, i8272_info->fdc_dma_addr));
+                                    sim_debug(WR_DATA_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                              " Data transferred from RAM at 0x%06x\n",
+                                              PCX, i8272_info->fdc_dma_addr);
                                     sectWrite(pDrive->imd,
                                         pDrive->track,
                                         i8272_info->fdc_head,
@@ -829,14 +837,12 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                             break;
                         case I8272_FORMAT_TRACK:    /* FORMAT A TRACK */
                             for(i8272_info->fdc_sector = 1;i8272_info->fdc_sector<=i8272_info->fdc_sc;i8272_info->fdc_sector++) {
-                                TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT " Format Track %d, Sector=%d, len=%d" NLP,
-                                    PCX,
-                                    pDrive->track,
-                                    i8272_info->fdc_sector,
-                                    128 << i8272_info->fdc_sec_len));
+                                sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                          " Format Track %d, Sector=%d, len=%d\n", PCX, pDrive->track, i8272_info->fdc_sector, 128 << i8272_info->fdc_sec_len);
 
                                 if(i8272_info->fdc_sectorcount >= I8272_MAX_SECTOR) {
-                                    TRACE_PRINT(ERROR_MSG, ("I8272: " ADDRESS_FORMAT " Illegal sector count" NLP, PCX));
+                                    sim_debug(ERROR_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                              " Illegal sector count\n", PCX);
                                     i8272_info->fdc_sectorcount = 0;
                                 }
                                 i8272_info->fdc_sectormap[i8272_info->fdc_sectorcount] = i8272_info->fdc_sector;
@@ -862,16 +868,20 @@ uint8 I8272_Write(const uint32 Addr, uint8 cData)
                         case I8272_SCAN_LOW_EQUAL:  /* SCAN LOW OR EQUAL */
                         case I8272_SCAN_HIGH_EQUAL: /* SCAN HIGH OR EQUAL */
                         case I8272_SCAN_EQUAL:  /* SCAN EQUAL */
-                            TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT " Scan Data" NLP,
-                                PCX));
-                            TRACE_PRINT(ERROR_MSG, ("I8272: " ADDRESS_FORMAT " ERROR: Scan not implemented." NLP, PCX));
+                            sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " Scan Data\n", PCX);
+                            sim_debug(ERROR_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " ERROR: Scan not implemented.\n", PCX);
                             break;
                         case I8272_READ_ID:  /* READ ID */
-                            TRACE_PRINT(CMD_MSG, ("I8272: " ADDRESS_FORMAT
-                                " READ ID Drive %d result ST0=%02x ST1=%02x ST2=%02x C=%d H=%d R=%02x N=%d"
-                                NLP, PCX, i8272_info->sel_drive, i8272_info->result[0],
-                                i8272_info->result[1],i8272_info->result[2],i8272_info->result[3],
-                                i8272_info->result[4],i8272_info->result[5],i8272_info->result[6]));
+                            sim_debug(CMD_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT
+                                      " READ ID Drive %d result ST0=%02x ST1=%02x ST2=%02x "
+                                      "C=%d H=%d R=%02x N=%d\n", PCX,
+                                      i8272_info->sel_drive,
+                                      i8272_info->result[0], i8272_info->result[1],
+                                      i8272_info->result[2], i8272_info->result[3],
+                                      i8272_info->result[4], i8272_info->result[5],
+                                      i8272_info->result[6]);
                             break;
 
                         default:
@@ -956,7 +966,7 @@ extern void raise_disk1a_interrupt(void);
 
 static void raise_i8272_interrupt(void)
 {
-    TRACE_PRINT(IRQ_MSG, ("I8272: " ADDRESS_FORMAT " FDC Interrupt" NLP, PCX));
+    sim_debug(IRQ_MSG, &i8272_dev, "I8272: " ADDRESS_FORMAT " FDC Interrupt\n", PCX);
     i8272_irq = 1;
     raise_disk1a_interrupt();
 }

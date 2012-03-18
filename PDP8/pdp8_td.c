@@ -28,6 +28,7 @@
 
    td           TD8E/TU56 DECtape
 
+   23-Mar-11    RMS     Fixed SDLC to clear AC (from Dave Gesswein)
    23-Jun-06	RMS     Fixed switch conflict in ATTACH
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Jan-04    RMS     Changed sim_fsize calling sequence, added STOP_OFFR
@@ -302,6 +303,7 @@ switch (pulse) {
             if (td_newsa (td_cmd))                      /* new command */
                 return AC | (IORETURN (td_stopoffr, STOP_DTOFF) << IOT_V_REASON);
             }
+        AC = 0;
         break;
 
     case 05:                                            /* SDLD */

@@ -145,10 +145,6 @@ static MTAB disk1a_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(disk1a_dev.dctrl & level) {  \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB disk1a_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -805,14 +801,13 @@ static int32 disk1adev(const int32 port, const int32 io, const int32 data)
 {
     int32 result;
     if(io) {
-        TRACE_PRINT(VERBOSE_MSG,
-            ("DISK1A: " ADDRESS_FORMAT " OUT, Port 0x%02x Data 0x%02x" NLP, PCX, port, data))
+        sim_debug(VERBOSE_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT
+                  " OUT, Port 0x%02x Data 0x%02x\n", PCX, port, data);
         DISK1A_Write(port, data);
         result = 0;
     } else {
         result = DISK1A_Read(port);
-        TRACE_PRINT(VERBOSE_MSG,
-            ("DISK1A: " ADDRESS_FORMAT " IN, Port 0x%02x Result 0x%02x" NLP, PCX, port, result))
+        sim_debug(VERBOSE_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT " IN, Port 0x%02x Result 0x%02x\n", PCX, port, result);
     }
     return result;
 }
@@ -835,12 +830,10 @@ static uint8 DISK1A_Read(const uint32 Addr)
             break;
         case DISK1A_DRIVE_STATUS:
             cData = i8272_irq ? 0x81 : 0x01;   /* Ready */
-            TRACE_PRINT(STATUS_MSG,
-                ("DISK1A: " ADDRESS_FORMAT " RD STATUS = 0x%02x" NLP, PCX, cData))
+            sim_debug(STATUS_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT " RD STATUS = 0x%02x\n", PCX, cData);
             break;
         case DISK1A_MOTOR:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("DISK1A: " ADDRESS_FORMAT " Error, can't read from MOTOR register." NLP, PCX))
+            sim_debug(VERBOSE_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT " Error, can't read from MOTOR register.\n", PCX);
             cData = 0xFF;   /* Return High-Z data */
             break;
     }
@@ -862,24 +855,24 @@ static uint8 DISK1A_Write(const uint32 Addr, uint8 cData)
             disk1a_info->dma_addr <<= 8;
             disk1a_info->dma_addr &= 0x00FFFF00;
             disk1a_info->dma_addr |= cData;
-            TRACE_PRINT(RD_DATA_MSG, ("DISK1A: " ADDRESS_FORMAT " DMA Address=%06x" NLP,
-                PCX, disk1a_info->dma_addr))
+            sim_debug(RD_DATA_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT
+                      " DMA Address=%06x\n", PCX, disk1a_info->dma_addr);
             I8272_Set_DMA(disk1a_info->dma_addr);
             break;
         case DISK1A_MOTOR:
-            TRACE_PRINT(CMD_MSG,
-                ("DISK1A: " ADDRESS_FORMAT " write Motor Reg=0x%02x" NLP, PCX, cData))
+            sim_debug(CMD_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT
+                      " write Motor Reg=0x%02x\n", PCX, cData);
 
             if((cData & BOOT_PROM_DISABLE) == 0) {
-                TRACE_PRINT(CMD_MSG,
-                    ("DISK1A: " ADDRESS_FORMAT " Boot ROM disabled" NLP, PCX))
+                sim_debug(CMD_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT
+                          " Boot ROM disabled\n", PCX);
 
                 /* Unmap Boot ROM */
                 disk1a_info->rom_disabled = TRUE;
             }
 
-            TRACE_PRINT(CMD_MSG, ("DISK1A: " ADDRESS_FORMAT " Motors = %x" NLP,
-                PCX, (cData & FLOPPY_MOTORS) >> 4))
+            sim_debug(CMD_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT
+                      " Motors = %x\n", PCX, (cData & FLOPPY_MOTORS) >> 4);
             break;
     }
 
@@ -890,7 +883,7 @@ static uint8 DISK1A_Write(const uint32 Addr, uint8 cData)
 
 void raise_disk1a_interrupt(void)
 {
-    TRACE_PRINT(IRQ_MSG, ("DISK1A: " ADDRESS_FORMAT " Interrupt" NLP, PCX));
+    sim_debug(IRQ_MSG, &disk1a_dev, "DISK1A: " ADDRESS_FORMAT " Interrupt\n", PCX);
 
     raise_ss1_interrupt(SS1_VI4_INT);
 

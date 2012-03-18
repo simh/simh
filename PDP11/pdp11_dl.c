@@ -1,6 +1,6 @@
 /* pdp11_dl.c: PDP-11 multiple terminal interface simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dli,dlo      DL11 terminal input/output
 
+   17-Aug-2011  RMS     Added AUTOCONFIGURE modifier
    19-Nov-2008  RMS     Revised for common TMXR show routines
                         Revised to autoconfigure vectors
    20-May-2008  RMS     Added modem control support
@@ -142,6 +143,8 @@ MTAB dli_mod[] = {
       NULL, &tmxr_show_cstat, (void *) &dlx_desc },
     { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
       &set_addr, &show_addr, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
+      &set_addr_flt, NULL, NULL },
     { MTAB_XTD|MTAB_VDV, 1, "VECTOR", NULL,
       &set_vec, &show_vec_mux, (void *) &dlx_desc },
     { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",

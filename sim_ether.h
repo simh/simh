@@ -28,6 +28,10 @@
 
   Modification history:
 
+  17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
+  30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
+  18-Apr-11  MP   Fixed race condition with self loopback packets in 
+                  multithreaded environments
   09-Dec-10  MP   Added support to determine if network address conflicts exist
   07-Dec-10  MP   Reworked DECnet self detection to the more general approach
                   of loopback self when any Physical Address is being set.
@@ -87,12 +91,21 @@
 #if defined (USE_READER_THREAD)
 #if defined (USE_SETNONBLOCK)
 #undef USE_SETNONBLOCK
-#endif
+#endif /* USE_SETNONBLOCK */
 #undef PCAP_READ_TIMEOUT
 #define PCAP_READ_TIMEOUT 15
-#if !defined (xBSD) && !defined(_WIN32) && !defined(VMS)
-#define MUST_DO_SELECT
+#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
+#define MUST_DO_SELECT 1
 #endif
+#endif /* USE_READER_THREAD */
+
+/* give priority to USE_NETWORK over USE_SHARED */
+#if defined(USE_NETWORK) && defined(USE_SHARED)
+#undef USE_SHARED
+#endif
+/* USE_SHARED only works on Windows or if HAVE_DLOPEN */
+#if defined(USE_SHARED) && !defined(_WIN32) && !defined(HAVE_DLOPEN)
+#undef USE_SHARED
 #endif
 
 /*
@@ -116,20 +129,37 @@
 #define ETH_DEV_DESC_MAX     256                        /* maximum device description size */
 #define ETH_MIN_PACKET        60                        /* minimum ethernet packet size */
 #define ETH_MAX_PACKET      1514                        /* maximum ethernet packet size */
-#define ETH_MAX_JUMBO_FRAME 16384                       /* maximum ethernet jumbo frame size */
-#define ETH_MAX_DEVICE        10                        /* maximum ethernet devices */
+#define ETH_MAX_JUMBO_FRAME 65536                       /* maximum ethernet jumbo frame size (or Offload Segment Size) */
+#define ETH_MAX_DEVICE        20                        /* maximum ethernet devices */
 #define ETH_CRC_SIZE           4                        /* ethernet CRC size */
 #define ETH_FRAME_SIZE (ETH_MAX_PACKET+ETH_CRC_SIZE)    /* ethernet maximum frame size */
 #define ETH_MIN_JUMBO_FRAME ETH_MAX_PACKET              /* Threshold size for Jumbo Frame Processing */
 
 #define LOOPBACK_SELF_FRAME(phy_mac, msg)             \
-    ((memcmp(phy_mac, msg  , 6) == 0) &&              \
-     (memcmp(phy_mac, msg+6, 6) == 0) &&              \
-     ((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&    \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&    \
      ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&    \
      ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&    \
-     (memcmp(phy_mac, msg+18, 6) == 0) &&             \
-     ((msg)[24] == 0x01) && ((msg)[25] == 0x00))
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&    \
+     (memcmp(phy_mac, (msg),    6) == 0) &&           \
+     (memcmp(phy_mac, (msg)+6,  6) == 0) &&           \
+     (memcmp(phy_mac, (msg)+18, 6) == 0))
+
+#define LOOPBACK_PHYSICAL_RESPONSE(host_phy, phy_mac, msg) \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&         \
+     ((msg)[14] == 0x08) && ((msg)[15] == 0x00) &&         \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&         \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&         \
+     (memcmp(host_phy, (msg)+18, 6) == 0) &&               \
+     (memcmp(host_phy, (msg),    6) == 0) &&               \
+     (memcmp(phy_mac,  (msg)+6,  6) == 0))
+
+#define LOOPBACK_PHYSICAL_REFLECTION(host_phy, msg)  \
+    (((msg)[12] == 0x90) && ((msg)[13] == 0x00) &&   \
+     ((msg)[14] == 0x00) && ((msg)[15] == 0x00) &&   \
+     ((msg)[16] == 0x02) && ((msg)[17] == 0x00) &&   \
+     ((msg)[24] == 0x01) && ((msg)[25] == 0x00) &&   \
+     (memcmp(host_phy, (msg)+6,  6) == 0) &&         \
+     (memcmp(host_phy, (msg)+18, 6) == 0))
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
@@ -155,7 +185,6 @@ struct eth_queue {
 };
 
 struct eth_list {
-  int     num;
   char    name[ETH_DEV_NAME_MAX];
   char    desc[ETH_DEV_DESC_MAX];
 };
@@ -173,7 +202,10 @@ struct eth_device {
   char*         name;                                   /* name of ethernet device */
   void*         handle;                                 /* handle of implementation-specific device */
   int           fd_handle;                              /* fd to kernel device (where needed) */
-  int           pcap_mode;                              /* Flag indicating if pcap API are being used to move packets */
+  int           eth_api;                                /* Designator for which API is being used to move packets */
+#define ETH_API_PCAP 0                                  /* Pcap API in use */
+#define ETH_API_TAP  1                                  /* tun/tap API in use */
+#define ETH_API_VDE  2                                  /* VDE API in use */
   ETH_PCALLBACK read_callback;                          /* read callback function */
   ETH_PCALLBACK write_callback;                         /* write callback function */
   ETH_PACK*     read_packet;                            /* read packet */
@@ -191,10 +223,11 @@ struct eth_device {
   ETH_MAC       host_nic_phy_hw_addr;                   /* MAC address of the attached NIC */
   uint32        jumbo_fragmented;                       /* Giant IPv4 Frames Fragmented */
   uint32        jumbo_dropped;                          /* Giant Frames Dropped */
+  uint32        jumbo_truncated;                        /* Giant Frames too big for capture buffer - Dropped */
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */
-  int           need_crc;				/* device needs CRC (Cyclic Redundancy Check) */
+  int           need_crc;                               /* device needs CRC (Cyclic Redundancy Check) */
 #if defined (USE_READER_THREAD)
   int           asynch_io;                              /* Asynchronous Interrupt scheduling enabled */
   int           asynch_io_latency;                      /* instructions to delay pending interrupt */
@@ -203,6 +236,7 @@ struct eth_device {
   pthread_t     reader_thread;                          /* Reader Thread Id */
   pthread_t     writer_thread;                          /* Writer Thread Id */
   pthread_mutex_t     writer_lock;
+  pthread_mutex_t     self_lock;
   pthread_cond_t      writer_cond;
   struct write_request {
       struct write_request *next;

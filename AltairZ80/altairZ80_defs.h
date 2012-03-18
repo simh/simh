@@ -1,6 +1,6 @@
 /*  altairz80_defs.h: MITS Altair simulator definitions
 
-    Copyright (c) 2002-2010, Peter Schorn
+    Copyright (c) 2002-2011, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -43,7 +43,7 @@
 #define RESOURCE_TYPE_MEMORY    1
 #define RESOURCE_TYPE_IO        2
 
-#define NUM_OF_DSK              8                           /* NUM_OF_DSK must be power of two              */
+#define NUM_OF_DSK              16                          /* NUM_OF_DSK must be power of two              */
 #define LDA_INSTRUCTION         0x3e                        /* op-code for LD A,<8-bit value> instruction   */
 #define UNIT_NO_OFFSET_1        0x37                        /* LD A,<unitno>                                */
 #define UNIT_NO_OFFSET_2        0xb4                        /* LD a,80h | <unitno>                          */

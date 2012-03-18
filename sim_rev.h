@@ -28,15 +28,15 @@
 #define _SIM_REV_H_     0
 
 #define SIM_MAJOR       3
-#define SIM_MINOR       8
-#define SIM_PATCH       2
+#define SIM_MINOR       9
+#define SIM_PATCH       0
 #define SIM_DELTA       0
 
-/* V3.8 revision history
+/* V3.9 revision history
 
 patch   date            module(s) and fix(es)
 
-  2     tbd             scp.c:
+  0     xx-yyy-1       scp.c:
                         - added *nix READLINE support (Mark Pizzolato)
                         - fixed handling of DO with no arguments (Dave Bryan)
                         - clarified some help messages (Mark Pizzolato)
@@ -53,7 +53,64 @@ patch   date            module(s) and fix(es)
                         - made option negotiation more reliable (Mark Pizzolato)
 
                         h316_cpu.c:
-                        - fixed bugs in MPY, DIV introduced in 3.8-1
+                        - fixed bugs in MPY, DIV introduced in 3.8-1 (from Theo Engel)
+                        - fixed bugs in double precision, normalization, SC (from Adrian Wise)
+                        - fixed XR behavior (from Adrian Wise)
+
+                        hp2100 all peripherals (Dave Bryan):
+                        - Changed I/O signal handlers for newly revised signal model
+
+                        hp2100_cpu.c (Dave Bryan):
+                        - Revised DMA for new multi-card paradigm
+                        - Consolidated DMA reset routines
+                        - DMA channels renamed from 0,1 to 1,2 to match documentation
+                        - Changed I/O instructions, handlers, and DMA for revised signal model
+                        - Changed I/O dispatch table to use DIB pointers
+                        - Removed DMA latency counter
+                        - Fixed DMA requests to enable stealing every cycle
+                        - Fixed DMA priority for channel 1 over channel 2
+                        - Corrected comments for "cpu_set_idle"
+                        - Fixed I/O return status bug for DMA cycles 
+                        - Failed I/O cycles now stop on failing instruction
+
+                        hp2100_cpu.h:
+                        - Changed declarations for VMS compiler
+
+                        hp2100_cpu0.c (Dave Bryan):
+                        - Removed DS note regarding PIF card (is now implemented)
+
+                        hp2100_cpu6.c (Dave Bryan):
+                        - DMA channels renamed from 0,1 to 1,2 to match documentation
+
+                        hp2100_defs.h (Dave Bryan):
+                        - DMA channels renamed from 0,1 to 1,2 to match documentation
+                        - Revised I/O signal enum values for concurrent signals
+                        - Revised I/O macros for new signal handling
+
+                        hp2100_ds.c (Dave Bryan):
+                        - Corrected status returns for disabled drive, auto-seek
+                          beyond drive limits, Request Sector Address and Wakeup
+                          with invalid or offline unit
+                        - Address verification reenabled if auto-seek during
+                          Read Without Verify
+
+                        hp2100_fp1.c (Dave Bryan):
+                        - Completed the comments for divide; no code changes
+
+                        hp2100_ipl.c (Dave Bryan):
+                        - Revised for new multi-card paradigm
+                        - A failed STC may now be retried
+
+                        hp2100_lps.c (Dave Bryan):
+                        - Corrected 12566B (DIAG mode) jumper settings
+                        - Revised detection of CLC at last DMA cycle
+
+                        hp2100_mt.c (Dave Bryan):
+                        - Fixed error in command scan in mtcio ioIOO handler
+
+                        hp2100_sys.c (Dave Bryan):
+                        - DMA channels renamed from 0,1 to 1,2 to match documentation
+                        - Changed DIB access for revised signal model
 
                         i1401_cd.c:
                         - fixed read stacker operation in column binary mode
@@ -70,6 +127,12 @@ patch   date            module(s) and fix(es)
                         - fixed END indicator test not to clear indicator (Van Snyder)
                         - fixed backspace over tapemark not to set EOR (Van Snyder)
                         - added no rewind option (Van Snyder)
+
+                        pdp11_defs.h:
+                        - fixed priority of PIRQ vs IO; added INT_INTERNALn
+
+                        pdp11_io.c:
+                        - fixed Qbus interrupts to treat all IO devices as BR4
 
                         pdp11_rk.c:
                         - fixed bug in read header (Walter F Mueller)
@@ -90,7 +153,7 @@ patch   date            module(s) and fix(es)
                         - fixed debug output of tape file positions when they are 64b
                         - added more debug output after positioning operations
                         - added textual display of the command being performed
-                        (All of the above from Mark Pizzolato)
+                          (all of the above from Mark Pizzolato)
                         - fixed comments about register addresses
                         
                         pdp11_ts.c:
@@ -103,12 +166,25 @@ patch   date            module(s) and fix(es)
                         pdp8_sys.c:
                         - added link to FPP
 
+                        pdp8_td.c:
+                        - fixed SDLC to clear AC (from Dave Gesswein)
+
                         vax_cpu.c:
                         - revised idle design (from Mark Pizzolato)
                         - fixed bug in SET CPU IDLE
+                        - fixed failure to clear PSL<tp> in BPT, XFC
 
                         vax_cpu1.c:
                         - revised idle design (from Mark Pizzolato)
+                        - added VEC_QMODE test in interrupt handler
+
+                        vax_fpa.c
+                        - fixed integer overflow bug in EMODx (from Camiel Vanderhoeven)
+                        - fixed POLYx normalizing before add mask bug (from Camiel Vanderhoeven)
+
+                        vax_octa.c
+                        - fixed integer overflow bug in EMODH (from Camiel Vanderhoeven)
+                        - fixed POLYH normalizing before add mask bug (from Camiel Vanderhoeven)
 
                         vax_syscm.c:
                         - fixed t_addr printouts for 64b big-endian systems
@@ -123,6 +199,11 @@ patch   date            module(s) and fix(es)
                         vax780_stddev.c
                         - added REBOOT support (from Mark Pizzolato)
 
+                        vaxmod_def.h
+                        - moved all Qbus devices to BR4; deleted RP definitions
+
+
+/* V3.8 revision history
 
   1     08-Feb-09       scp.c:
                         - revised RESTORE unit logic for consistency
@@ -132,6 +213,7 @@ patch   date            module(s) and fix(es)
                         - decommitted MTAB_VAL
                         - fixed implementation of MTAB_NC
                         - fixed warnings in help printouts
+                        - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
 
                         sim_tape.c:
                         - fixed signed/unsigned warning in sim_tape_set_fmt (Dave Bryan)

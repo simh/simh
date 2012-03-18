@@ -1,6 +1,6 @@
 /* hp2100_ds.c: HP 2100 13037 disk controller simulator
 
-   Copyright (c) 2004-2008, Robert M. Supnik
+   Copyright (c) 2004-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,13 @@
 
    DS           13037 disk controller
 
+   21-Jun-11    JDB     Corrected status returns for disabled drive, auto-seek
+                        beyond drive limits, Request Sector Address and Wakeup
+                        with invalid or offline unit
+                        Address verification reenabled if auto-seek during
+                        Read Without Verify
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    31-Dec-07    JDB     Corrected and verified ioCRS action
    20-Dec-07    JDB     Corrected DPTR register definition from FLDATA to DRDATA
@@ -346,10 +353,12 @@ static struct drvtyp drv_tab[] = {
     { 0 }
     };
 
-FLIP_FLOP ds_control = CLEAR;
-FLIP_FLOP ds_flag = CLEAR;
-FLIP_FLOP ds_flagbuf = CLEAR;
-FLIP_FLOP ds_srq = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    FLIP_FLOP srq;                                      /* service request flip-flop */
+    } ds = { CLEAR, CLEAR, CLEAR, CLEAR };
 
 uint32 ds_fifo[DS_FIFO_SIZE] = { 0 };                   /* fifo */
 uint32 ds_fifo_ip = 0;                                  /* insertion ptr */
@@ -412,7 +421,9 @@ static const uint32 ds_opflags[32] = {                  /* flags for ops */
     };
 
 DEVICE ds_dev;
-uint32 dsio (uint32 select_code, IOSIG signal, uint32 data);
+
+IOHANDLER dsio;
+
 t_stat ds_svc_c (UNIT *uptr);
 t_stat ds_svc_u (UNIT *uptr);
 t_stat ds_svc_t (UNIT *uptr);
@@ -455,7 +466,7 @@ void ds_fifo_reset (void);
    ds_mod       DS modifier list
 */
 
-DIB ds_dib = { DS, &dsio };
+DIB ds_dib = { &dsio, DS };
 
 UNIT ds_unit[] = {
     { UDATA (&ds_svc_u, UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE |
@@ -491,10 +502,10 @@ REG ds_reg[] = {
     { DRDATA (FIP, ds_fifo_ip, 4) },
     { DRDATA (FRP, ds_fifo_rp, 4) },
     { DRDATA (FCNT, ds_fifo_cnt, 5) },
-    { FLDATA (CTL, ds_control, 0) },
-    { FLDATA (FLG, ds_flag,    0) },
-    { FLDATA (FBF, ds_flagbuf, 0) },
-    { FLDATA (SRQ, ds_srq,     0) },
+    { FLDATA (CTL, ds.control, 0) },
+    { FLDATA (FLG, ds.flag,    0) },
+    { FLDATA (FBF, ds.flagbuf, 0) },
+    { FLDATA (SRQ, ds.srq,     0) },
     { FLDATA (BUSY, ds_busy, 0) },
     { FLDATA (CMDF, ds_cmdf, 0) },
     { FLDATA (CMDP, ds_cmdp, 0) },
@@ -515,7 +526,7 @@ REG ds_reg[] = {
               DS_NUMDR + 1, REG_HRO) },
     { URDATA (CAPAC, ds_unit[0].capac, 10, T_ADDR_W, 0,
               DS_NUMDR, PV_LEFT | REG_HRO) },
-    { ORDATA (DEVNO, ds_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, ds_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -576,7 +587,7 @@ DEVICE ds_dev = {
    of a command.
 
    Also unusual is that SFC and SFS test different things, rather than
-   complementaty states of the same thing.  SFC tests the busy flip-flop, and
+   complementary states of the same thing.  SFC tests the busy flip-flop, and
    SFS tests the flag flip-flop.
 
    Implementation notes:
@@ -586,108 +597,110 @@ DEVICE ds_dev = {
        access to fail.
 */
 
-uint32 dsio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 dsio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        ds_flag = ds_flagbuf = CLEAR;                   /* clear flag */
-        ds_srq = CLEAR;                                 /* CLF clears SRQ */
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        ds_flag = ds_flagbuf = SET;                     /* set flag and flag buffer */
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            ds.flag = ds.flagbuf = CLEAR;               /* clear flag */
+            ds.srq = CLEAR;                             /* CLF clears SRQ */
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setSKF (ds_busy == 0);                          /* skip if not busy */
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            ds.flag = ds.flagbuf = SET;                 /* set flag and flag buffer */
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (ds);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setSKF (ds_busy == 0);                      /* skip if not busy */
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = ds_fifo_read ();
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (ds);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        if (ds_cmdf) {                                  /* expecting command? */
-            ds_cmd = data;                              /* save command */
-            ds_cmdf = 0;
-            ds_cmdp = 1;                                /* command present */
-            }
-
-        else
-            ds_fifo_write (data);                       /* put in fifo */
-        break;
+        case ioIOI:                                             /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, ds_fifo_read ());    /* merge in return status */
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        ds_flag = ds_flagbuf = SET;                     /* set flag and flag buffer */
-        ds_cmdp = 0;                                    /* clear command ready */
-                                                        /* fall into CRS handler */
+        case ioIOO:                                     /* I/O data output */
+            if (ds_cmdf) {                              /* expecting command? */
+                ds_cmd = IODATA (stat_data);            /* save command */
+                ds_cmdf = 0;
+                ds_cmdp = 1;                            /* command present */
+                }
 
-    case ioCRS:                                         /* control reset */
-        ds_control = CLEAR;                             /* clear control */
-        ds_cmdf = 0;                                    /* not expecting command */
-        ds_clear ();                                    /* do controller CLEAR */
-        break;
-
-
-    case ioCLC:                                         /* clear control flip-flop */
-        ds_control = CLEAR;                             /* clear control */
-        ds_cmdf = 1;                                    /* expecting command */
-        ds_cmdp = 0;                                    /* none pending */
-        ds_eod = 1;                                     /* set EOD flag */
-        ds_fifo_reset ();                               /* clear fifo */
-        break;
+            else
+                ds_fifo_write (IODATA (stat_data));     /* put in fifo */
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        ds_control = SET;                               /* set control */
-        break;
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            ds.flag = ds.flagbuf = SET;                 /* set flag and flag buffer */
+            ds_cmdp = 0;                                /* clear command ready */
+            break;
 
 
-    case ioEDT:                                         /* end data transfer */
-        ds_eod = 1;                                     /* flag end transfer */
-        break;
+        case ioCRS:                                     /* control reset */
+            ds.control = CLEAR;                         /* clear control */
+            ds_cmdf = 0;                                /* not expecting command */
+            ds_clear ();                                /* do controller CLEAR */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, ds);                    /* set standard PRL signal */
-        setstdIRQ (select_code, ds);                    /* set standard IRQ signal */
-        setSRQ (select_code, ds_srq);                   /* set SRQ signal */
-        break;
+        case ioCLC:                                     /* clear control flip-flop */
+            ds.control = CLEAR;                         /* clear control */
+            ds_cmdf = 1;                                /* expecting command */
+            ds_cmdp = 0;                                /* none pending */
+            ds_eod = 1;                                 /* set EOD flag */
+            ds_fifo_reset ();                           /* clear fifo */
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        ds_flagbuf = CLEAR;
-        break;
+        case ioSTC:                                     /* set control flip-flop */
+            ds.control = SET;                           /* set control */
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioEDT:                                     /* end data transfer */
+            ds_eod = 1;                                 /* flag end transfer */
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (ds);                             /* set standard PRL signal */
+            setstdIRQ (ds);                             /* set standard IRQ signal */
+            setSRQ (dibptr->select_code, ds.srq);       /* set SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            ds.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-if (signal > ioCLF)                                     /* multiple signals? */
-    dsio (select_code, ioCLF, 0);                       /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    dsio (select_code, ioSIR, 0);                       /* set interrupt request */
-
-
-if ((signal != ioSIR) && (signal != ioENF))             /* if not IRQ update */
+if (!(signal_set & ioSIR) && !(signal_set & ioENF))     /* if not IRQ update */
     ds_poll ();                                         /*   run the controller */
 
-return data;
+return stat_data;
 }
 
 
@@ -702,7 +715,7 @@ void ds_poll (void)
 {
 if ((ds_state != DS_BUSY) && ds_cmdp)                   /* cmd pending? */
     ds_docmd (ds_cmd);                                  /* do it */
-if ((ds_state == DS_IDLE) && ds_control)                /* idle? */
+if ((ds_state == DS_IDLE) && ds.control)                /* idle? */
     ds_doatn ();                                        /* check ATN */
 return;
 }
@@ -719,7 +732,7 @@ return;
 
 void ds_docmd (uint32 cmd)
 {
-uint32 op, f, dtyp, unum;
+uint32 op, f, unum;
 
 op = DSC_GETOP (cmd);                                   /* operation */
 f = ds_opflags[op];                                     /* flags */
@@ -749,6 +762,7 @@ switch (op) {
             (DSC_GETCSC (ds_cmd) << DSHS_V_SC);
     case DSC_RECAL:                                     /* recalibrate */
     case DSC_SEEK:                                      /* seek */
+    case DSC_RSA:                                       /* read sector address */
     case DSC_READ:                                      /* read */
     case DSC_RFULL:                                     /* read full */
     case DSC_ROFF:                                      /* read offset */
@@ -786,12 +800,6 @@ switch (op) {
         ds_sched_ctrl_op (DSC_RSTA, 2, SET_BUSY);       /* sched 2 wds, busy */
         break;
 
-    case DSC_RSA:                                       /* read sector address */
-        dtyp = GET_DTYPE (ds_unit[unum].flags);         /* get unit type */
-        dsxb[0] = GET_CURSEC (ds_dtime * DS_NUMWD, dtyp);       /* rot position */
-        ds_sched_ctrl_op (DSC_RSTA, 1, SET_BUSY);       /* sched 1 wd, busy */
-        break;
-
     case DSC_RDA:                                       /* read disk address */
         ds_reqad (&dsxb[1], &dsxb[0]);                  /* return disk address */
         ds_sched_ctrl_op (DSC_RSTA, 2, SET_BUSY);       /* sched 2 wds, busy */
@@ -806,10 +814,15 @@ switch (op) {
 
 /* Other controller commands */
 
+    case DSC_WAKE:                                      /* wakeup */
+        ds_sr1 = unum;                                  /* init status */
+        if (unum >= DS_NUMDR) {                         /* invalid unit? */
+            ds_sched_ctrl_op (DSC_BADU, unum, CLR_BUSY);/* sched, not busy */
+            return;
+            }
     case DSC_SFM:                                       /* set file mask */
     case DSC_CLEAR:                                     /* clear */
     case DSC_AREC:                                      /* address record */
-    case DSC_WAKE:                                      /* wakeup */
     case DSC_WTIO:                                      /* write TIO */
         ds_sched_ctrl_op (op, 0, SET_BUSY);             /* schedule, busy */
         break;
@@ -833,7 +846,7 @@ for (i = 0; i < DS_NUMDR; i++) {                        /* intr disabled? */
     ds_lastatn = (ds_lastatn + 1) & DS_DRMASK;          /* loop through units */
     if (ds_unit[ds_lastatn].STA & DS2_ATN) {            /* ATN set? */
         ds_unit[ds_lastatn].STA &= ~DS2_ATN;            /* clear ATN */
-        dsio (ds_dib.devno, ioENF, 0);                  /* request interrupt */
+        dsio (&ds_dib, ioENF, 0);                       /* request interrupt */
         ds_sr1 = DS1_ATN | ds_lastatn;                  /* set up status 1 */
         ds_state = DS_WAIT;                             /* block atn intrs */
         return;
@@ -889,9 +902,9 @@ switch (op) {
     case DSC_CLEAR:                                     /* clear */
         ds_clear ();                                    /* reset ctrl */
 
-        ds_control = CLEAR;                             /* clear CTL, SRQ */
-        ds_srq = CLEAR;
-        dsio (ds_dib.devno, ioSIR, 0);                  /* set interrupt request */
+        ds.control = CLEAR;                             /* clear CTL, SRQ */
+        ds.srq = CLEAR;
+        dsio (&ds_dib, ioSIR, 0);                       /* set interrupt request */
 
         ds_cmd_done (1, DS1_OK);                        /* op done, set flag */
         break;
@@ -994,6 +1007,15 @@ switch (op) {                                           /* case on function */
 
 /* Read variants */
 
+    case DSC_RSA:                                               /* read sector address */
+        if ((uptr->flags & UNIT_UNLOAD) == 0) {                 /* drive up? */
+            dsxb[0] = GET_CURSEC (ds_dtime * DS_NUMWD, dtyp);   /* rot position */
+            ds_sched_ctrl_op (DSC_RSTA, 1, SET_BUSY);           /* sched 1 wd, busy */
+            }
+        else                                                    /* no drive or heads unloaded */
+            ds_cmd_done (1, DS1_S2ERR);                         /* not ready error */
+        break;
+
     case DSC_ROFF:                                      /* read with offset */
         ds_wait_for_cpu (uptr, DSC_ROFF|DSC_2ND);       /* set flag, new state */
         break;
@@ -1001,7 +1023,7 @@ switch (op) {                                           /* case on function */
         if (!DS_FIFO_EMPTY) {                           /* OTA ds? new state */
             ds_fifo_read ();                            /* drain fifo */
             uptr->FNC = DSC_READ;
-            dsio (ds_dib.devno, ioENF, 0);              /* handshake */
+            dsio (&ds_dib, ioENF, 0);                   /* handshake */
             }
         sim_activate (uptr, ds_ctime);                  /* schedule unit */
         break;
@@ -1022,14 +1044,15 @@ switch (op) {                                           /* case on function */
         ds_end_rw (uptr, DSC_READ);                     /* see if more to do */
         break;
 
-    case DSC_RNOVFY:                                    /* read, no verify */
+    case DSC_RNOVFY:                                    /* read, no verify before xfer */
         if (r = ds_start_rd (uptr, 0, 0)) return r;     /* new sector; error? */
         break;
     case DSC_RNOVFY | DSC_2ND:                          /* word transfer */
         ds_cont_rd (uptr, DS_NUMWD);                    /* xfr wd, check end */
         break;
     case DSC_RNOVFY | DSC_3RD:                          /* end of sector */
-        ds_end_rw (uptr, DSC_RNOVFY);                   /* see if more to do */
+        ds_end_rw (uptr,                                /* see if more to do */
+          DSHS_GETSC (ds_hs) ? DSC_RNOVFY : DSC_READ);  /* start verifying if end of track */
         break;
 
     case DSC_RFULL:                                     /* read full */
@@ -1049,7 +1072,7 @@ switch (op) {                                           /* case on function */
     case DSC_VFY:                                       /* verify */
         ds_wait_for_cpu (uptr, DSC_VFY|DSC_2ND);        /* set flag, new state */
         break;
-    case DSC_VFY | DSC_2ND:                                     /* poll done */
+    case DSC_VFY | DSC_2ND:                             /* poll done */
         if (!DS_FIFO_EMPTY) {                           /* OTA ds? */
             ds_vctr = ds_fifo_read ();                  /* save count */
             uptr->FNC = DSC_VFY | DSC_3RD;              /* next state */
@@ -1058,11 +1081,11 @@ switch (op) {                                           /* case on function */
         else sim_activate (uptr, ds_ctime);             /* no, continue poll */
         break;
     case DSC_VFY | DSC_3RD:                             /* start sector */
-        if (ds_start_rw (uptr, ds_dtime * DS_NUMWD, 1)) break;
-                                                        /* new sector; error? */
+        if (ds_start_rw (uptr, ds_dtime * DS_NUMWD, 1)) /* new sector; error? */
+            break;
         ds_next_sec (uptr);                             /* increment hd, sc */
         break;
-    case DSC_VFY | DSC_4TH:                                     /* end sector */
+    case DSC_VFY | DSC_4TH:                             /* end sector */
         ds_vctr = (ds_vctr - 1) & DMASK;                /* decrement count */
         if (ds_vctr) ds_end_rw (uptr, DSC_VFY|DSC_3RD); /* more to do? */
         else ds_cmd_done (1, DS1_OK);                   /* no, set done */
@@ -1120,7 +1143,7 @@ return SCPE_OK;
 
 void ds_wait_for_cpu (UNIT *uptr, uint32 newst)
 {
-dsio (ds_dib.devno, ioENF, 0);                          /* set flag */
+dsio (&ds_dib, ioENF, 0);                               /* set flag */
 uptr->FNC = newst;                                      /* new state */
 sim_activate (uptr, ds_ctime);                          /* activate unit */
 sim_cancel (&ds_timer);                                 /* activate timeout */
@@ -1154,7 +1177,7 @@ return;
 void ds_cmd_done (t_bool sf, uint32 sr1)
 {
 if (sf)                                                 /* set host flag? */
-    dsio (ds_dib.devno, ioENF, 0);                      /* set flag */
+    dsio (&ds_dib, ioENF, 0);                           /* set flag */
 
 ds_busy = 0;                                            /* clear visible busy */
 ds_sr1 = ds_sr1 | sr1;                                  /* final status */
@@ -1165,7 +1188,20 @@ return;
 }
 
 
-/* Return drive status (status word 2) */
+/* Return drive status (status word 2).
+
+   In hardware, the controller outputs the Address Unit command on the drive tag
+   bus and the unit number on the drive control bus.  The addressed drive
+   responds by setting its internal "selected" flag.  The controller then
+   outputs Request Status on the tag bug.  If a drive is selected but the heads
+   are unloaded, the drive returns Not Ready and Busy status on the control bus.
+   If no drive is selected, the control bus floats inactive.  This is
+   interpreted by the controller as Not Ready status (because the drive returns
+   inactive Ready status).
+
+   Under simulation, an enabled but detached unit corresponds to "selected but
+   heads unloaded," and a disabled unit corresponds to a non-existent unit.
+*/
 
 uint32 ds_updds2 (UNIT *uptr)
 {
@@ -1174,10 +1210,11 @@ uint32 dtyp = GET_DTYPE (uptr->flags);
 
 sta = drv_tab[dtyp].id |                                /* form status */
     uptr->STA |                                         /* static bits */
-    ((uptr->flags & UNIT_WPR)? DS2_RO: 0) |             /* dynamic bits */
-    ((uptr->flags & UNIT_FMT)? DS2_FRM: 0) |
-    ((uptr->flags & UNIT_UNLOAD)? DS2_NR | DS2_BS: 0) |
-    (sim_is_active (uptr)? DS2_BS: 0);
+    ((uptr->flags & UNIT_WPR) ? DS2_RO : 0) |           /* dynamic bits */
+    ((uptr->flags & UNIT_FMT) ? DS2_FRM : 0) |
+    ((uptr->flags & UNIT_DIS) ? DS2_NR :
+       (uptr->flags & UNIT_UNLOAD) ? DS2_NR | DS2_BS : 0) |
+    (sim_is_active (uptr) ? DS2_BS : 0);
 if (sta & DS2_ALLERR) sta = sta | DS2_ERR;              /* set error */
 return sta;
 }
@@ -1240,7 +1277,12 @@ return;
    - If error, set command done, return TRUE, nothing is scheduled
    - If implicit seek, return TRUE, implicit seek is scheduled, but
      state is not changed - we will return here when seek is done
-   - Otherwise, advance state, set position in file, schedule next state */
+   - Otherwise, advance state, set position in file, schedule next state
+
+   If a an auto-seek was done, it may have incremented or decremented beyond the
+   cylinder bounds.  If so, then Seek Check status will have been set.  If we
+   see that, terminate the current command with a Status-2 error.
+*/
 
 t_bool ds_start_rw (UNIT *uptr, int32 tm, t_bool vfy)
 {
@@ -1249,8 +1291,8 @@ uint32 dtyp = GET_DTYPE (uptr->flags);
 
 ds_eod = 0;                                             /* init eod */
 ds_ptr = 0;                                             /* init buffer ptr */
-if (uptr->flags & UNIT_UNLOAD) {                        /* drive down? */
-    ds_cmd_done (1, DS1_S2ERR);
+if (uptr->flags & UNIT_UNLOAD | uptr->STA & DS2_SC) {   /* drive down or seek check? */
+    ds_cmd_done (1, DS1_S2ERR);                         /* report Status-2 error */
     return TRUE;
     }
 if (ds_eoc) {                                           /* at end of cylinder? */
@@ -1258,21 +1300,16 @@ if (ds_eoc) {                                           /* at end of cylinder? *
     return TRUE;                                        /* or error */
     }
 if (vfy && ((uint32) uptr->CYL != ds_cyl)) {            /* on wrong cylinder? */
-    if (ds_cyl >= drv_tab[dtyp].cyl)                    /* seeking to bad? */
-        ds_cmd_done (1, DS1_CYLCE);                     /* lose */
-    else ds_start_seek (uptr, ds_cyl, uptr->FNC);       /* seek right cyl */
+    ds_start_seek (uptr, ds_cyl, uptr->FNC);            /* seek right cyl */
     return TRUE;
     }
 hd = DSHS_GETHD (ds_hs);
 sc = DSHS_GETSC (ds_hs);
-if ((uint32) uptr->CYL >= drv_tab[dtyp].cyl) {          /* valid cylinder? */
-    uptr->STA = uptr->STA | DS2_SC;                     /* set seek check */
-    ds_cmd_done (1, DS1_S2ERR);                         /* error */
-    return TRUE;
-    }
-if ((hd >= drv_tab[dtyp].hd) ||                         /* valid head, sector? */
+if (((uint32) uptr->CYL >= drv_tab[dtyp].cyl) ||        /* valid cylinder? (sanity check) */
+    (hd >= drv_tab[dtyp].hd) ||                         /* valid head, sector? */
     (sc >= drv_tab[dtyp].sc)) {
-    ds_cmd_done (1, DS1_HSCE);                          /* no, error */
+    uptr->STA = uptr->STA | DS2_SC;                     /* set seek check */
+    ds_cmd_done (1, DS1_S2ERR);                         /* report Status-2 error */
     return TRUE;
     }
 da = GET_DA (uptr->CYL, hd, sc, dtyp);                  /* position in file */
@@ -1327,8 +1364,8 @@ if ((uptr->flags & UNIT_WPR) ||                         /* write protected? */
     }
 if (ds_start_rw (uptr, ds_rtime, vfy)) return;          /* new sec; err or seek? */
 for (i = 0; i < DS_NUMWDF; i++) dsxb[i] = 0;            /* clear buffer */
-ds_srq = SET;                                           /* request word */
-dsio (ds_dib.devno, ioSIR, 0);                          /* set interrupt request */
+ds.srq = SET;                                           /* request word */
+dsio (&ds_dib, ioSIR, 0);                               /* set interrupt request */
 return;
 }
 
@@ -1355,7 +1392,10 @@ return;
 /* Advance to next cylinder
 
    - If autoseek enabled, seek to cylinder +/- 1
-   - Otherwise, done with end of cylinder error */
+   - Otherwise, done with end of cylinder error.
+
+   If we exceed the cylinder range, the seek will set Seek Check status.
+*/
 
 void ds_next_cyl (UNIT *uptr)
 {
@@ -1378,14 +1418,14 @@ return;
 void ds_cont_rd (UNIT *uptr, uint32 bsize)
 {
 if (ds_eod) ds_cmd_done (1, DS1_OK);                    /* DMA end? done */
-else if (ds_srq) {                                      /* overrun? */
+else if (ds.srq) {                                      /* overrun? */
     ds_cmd_done (1, DS1_OVRUN);                         /* set done */
     return;
     }
 else {
     ds_fifo_write (dsxb[ds_ptr++]);                     /* next word */
-    ds_srq = SET;                                       /* request service */
-    dsio (ds_dib.devno, ioSIR, 0);                      /* set interrupt request */
+    ds.srq = SET;                                       /* request service */
+    dsio (&ds_dib, ioSIR, 0);                           /* set interrupt request */
     if (ds_ptr >= bsize) uptr->FNC += DSC_NEXT;         /* sec done? next state */
     sim_activate (uptr, ds_dtime);                      /* schedule */
     }
@@ -1398,13 +1438,13 @@ return;
    - Copy word from fifo to buffer
    - If end of data, write buffer, terminate command, nothing scheduled
    - If end of sector, write buffer, next state, schedule
-   - Otherwises, set service request, schedule  */
+   - Otherwise, set service request, schedule  */
 
 t_stat ds_cont_wr (UNIT *uptr, uint32 off, uint32 bsize)
 {
 uint32 i, dat;
 
-if (ds_srq) {                                           /* overrun? */
+if (ds.srq) {                                           /* overrun? */
     ds_cmd_done (1, DS1_OVRUN);                         /* set done */
     return SCPE_OK;
     }
@@ -1422,8 +1462,8 @@ if (ds_eod || (ds_ptr >= bsize)) {                      /* xfr or sector done? *
     else uptr->FNC += DSC_NEXT;                         /* no, next state */
     }
 else {
-    ds_srq = SET;                                       /* request next word */
-    dsio (ds_dib.devno, ioSIR, 0);                      /* set interrupt request */
+    ds.srq = SET;                                       /* request next word */
+    dsio (&ds_dib, ioSIR, 0);                           /* set interrupt request */
     }
 sim_activate (uptr, ds_dtime);                          /* schedule */
 return SCPE_OK;
@@ -1529,8 +1569,8 @@ return SCPE_OK;
 
 t_stat ds_reset (DEVICE *dptr)
 {
-dsio (ds_dib.devno, ioPOPIO, 0);                        /* send POPIO signal */
-ds_srq = CLEAR;                                         /* clear SRQ */
+IOPRESET (&ds_dib);                                     /* PRESET device */
+ds.srq = CLEAR;                                         /* clear SRQ */
 return SCPE_OK;
 }
 
@@ -1593,7 +1633,7 @@ void ds_sched_atn (UNIT *uptr)
 {
 int32 i;
 
-if (!ds_control || (sim_switches & SIM_SW_REST)) return;
+if (!ds.control || (sim_switches & SIM_SW_REST)) return;
 for (i = 0; i < (DS_NUMDR + 1); i++) {                  /* check units, ctrl */
     if (sim_is_active (ds_dev.units + i)) return;
     }
@@ -1687,7 +1727,7 @@ t_stat ds_boot (int32 unitno, DEVICE *dptr)
 int32 dev;
 
 if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = ds_dib.devno;                                     /* get data chan dev */
+dev = ds_dib.select_code;                               /* get data chan dev */
 if (ibl_copy (ds_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
 SR = (SR & (IBL_OPT | IBL_DS_HEAD)) | IBL_DS | IBL_MAN | (dev << IBL_V_DEV);
 return SCPE_OK;

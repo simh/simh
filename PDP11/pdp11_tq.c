@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   17-Aug-11    RMS     Added CAPACITY modifier
    14-Jan-11    MP      Various fixes discovered while exploring Ultrix issue:
                         - Set UNIT_SXC flag when a tape mark is encountered 
                           during forward motion read operations
@@ -414,10 +415,10 @@ DIB tq_dib = {
     };
 
 UNIT tq_unit[] = {
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
     { UDATA (&tq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&tq_quesvc, UNIT_IDLE|UNIT_DIS, 0) }
     };
@@ -492,9 +493,13 @@ MTAB tq_mod[] = {
       NULL, &tq_show_unitq, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
+      &set_addr_flt, NULL, NULL },
 #else
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
       NULL, &show_addr, NULL },

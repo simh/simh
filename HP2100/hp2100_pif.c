@@ -1,6 +1,6 @@
 /* hp2100_pif.c: HP 12620A/12936A privileged interrupt fence simulator
 
-   Copyright (c) 2008, J. David Bryan
+   Copyright (c) 2008-2011, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    PIF          12620A/12936A privileged interrupt fence
 
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    18-Jun-08    JDB     Created PIF device
 
@@ -103,14 +105,16 @@
 
 /* PIF state variables */
 
-FLIP_FLOP pif_control = CLEAR;                          /* control flip-flop */
-FLIP_FLOP pif_flag    = CLEAR;                          /* flag flip-flop */
-FLIP_FLOP pif_flagbuf = CLEAR;                          /* flag buffer flip-flop */
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } pif = { CLEAR, CLEAR, CLEAR };
 
 
 /* PIF global routines */
 
-uint32 pif_io (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER pif_io;
 
 t_stat pif_reset     (DEVICE *dptr);
 t_stat pif_set_card  (UNIT   *uptr, int32  val,  char  *cptr, void *desc);
@@ -136,17 +140,17 @@ t_stat pif_show_card (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
 
 DEVICE pif_dev;
 
-DIB pif_dib = { PIF, &pif_io };
+DIB pif_dib = { &pif_io, PIF };
 
 UNIT pif_unit = {
     UDATA (NULL, 0, 0)                                  /* dummy unit */
     };
 
 REG pif_reg [] = {
-    { FLDATA (CTL,   pif_control,   0) },
-    { FLDATA (FLG,   pif_flag,      0) },
-    { FLDATA (FBF,   pif_flagbuf,   0) },
-    { ORDATA (DEVNO, pif_dib.devno, 6), REG_HRO },
+    { FLDATA (CTL,   pif.control,         0) },
+    { FLDATA (FLG,   pif.flag,            0) },
+    { FLDATA (FBF,   pif.flagbuf,         0) },
+    { ORDATA (DEVNO, pif_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -155,7 +159,6 @@ MTAB pif_mod [] = {
     { MTAB_XTD | MTAB_VDV, 1, NULL,    "12936A", &pif_set_card, NULL,           NULL     },
     { MTAB_XTD | MTAB_VDV, 0, "TYPE",  NULL,     NULL,          &pif_show_card, NULL     },
     { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",  &hp_setdev,    &hp_showdev,    &pif_dev },
-
     { 0 }
     };
 
@@ -184,7 +187,6 @@ DEVICE pif_dev = {
     NULL };                                 /* logical device name */
 
 
-
 /* I/O signal handler.
 
    Operation of the 12620A and the 12936A is different.  The I/O responses of
@@ -210,118 +212,120 @@ DEVICE pif_dev = {
    Note that PRL and IRQ are non-standard for the 12936A.
 */
 
-uint32 pif_io (uint32 select_code, IOSIG signal, uint32 data)
+uint32 pif_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
+const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 const t_bool is_rte_pif = (pif_dev.flags & DEV_12936) == 0;
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        pif_flag = pif_flagbuf = CLEAR;                 /* clear flag buffer and flag */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-        if (DEBUG_PRS (pif_dev))
-            fputs (">>PIF: [CLF] Flag cleared\n", sim_deb);
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-        if (is_rte_pif) {                               /* RTE PIF? */
-            pif_flag = pif_flagbuf = SET;               /* set flag buffer and flag */
+        case ioCLF:                                     /* clear flag flip-flop */
+            pif.flag = pif.flagbuf = CLEAR;             /* clear flag buffer and flag */
 
             if (DEBUG_PRS (pif_dev))
-                fputs (">>PIF: [STF] Flag set\n", sim_deb);
-            }
-        break;
+                fputs (">>PIF: [CLF] Flag cleared\n", sim_deb);
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        if (is_rte_pif)                                 /* RTE PIF? */
-            setstdSKF (pif);                            /* card responds to SFC */
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+            if (is_rte_pif) {                           /* RTE PIF? */
+                pif.flag = pif.flagbuf = SET;           /* set flag buffer and flag */
+
+                if (DEBUG_PRS (pif_dev))
+                    fputs (">>PIF: [STF] Flag set\n", sim_deb);
+                }
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        if (is_rte_pif)                                 /* RTE PIF? */
-            setstdSKF (pif);                            /* card responds to SFS */
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            if (is_rte_pif)                             /* RTE PIF? */
+                setstdSKF (pif);                        /* card responds to SFC */
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        if (!is_rte_pif) {                              /* DOS PIF? */
-            pif_flag = pif_flagbuf = SET;               /* set flag buffer and flag */
-            pif_io (select_code, ioSIR, 0);             /* set IRQ (not normally done for IOO) */
+        case ioSFS:                                     /* skip if flag is set */
+            if (is_rte_pif)                             /* RTE PIF? */
+                setstdSKF (pif);                        /* card responds to SFS */
+            break;
+
+
+        case ioIOO:                                     /* I/O data output */
+            if (!is_rte_pif) {                          /* DOS PIF? */
+                pif.flag = pif.flagbuf = SET;           /* set flag buffer and flag */
+                working_set = working_set | ioSIR;      /* set SIR (not normally done for IOO) */
+
+                if (DEBUG_PRS (pif_dev))
+                    fprintf (sim_deb, ">>PIF: [OTx%s] Flag set\n", hold_or_clear);
+                }
+            break;
+
+
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            pif.flag = pif.flagbuf =                    /* set or clear flag and flag buffer */
+                (is_rte_pif ? SET : CLEAR);
 
             if (DEBUG_PRS (pif_dev))
-                fprintf (sim_deb, ">>PIF: [OTx%s] Flag set\n", hold_or_clear);
-            }
-        break;
+                fprintf (sim_deb, ">>PIF: [POPIO] Flag %s\n",
+                                  (is_rte_pif ? "set" : "cleared"));
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        pif_flag = pif_flagbuf =                        /* set or clear flag and flag buffer */
-            (is_rte_pif ? SET : CLEAR);
+        case ioCRS:                                     /* control reset */
+        case ioCLC:                                     /* clear control flip-flop */
+            pif.control = CLEAR;                        /* clear control */
 
-        if (DEBUG_PRS (pif_dev))
-            fprintf (sim_deb, ">>PIF: [POPIO] Flag %s\n",
-                              (is_rte_pif ? "set" : "cleared"));
-                                                        /* fall into CRS handler */
-
-    case ioCRS:                                         /* control reset */
-                                                        /* fall into CLC handler */
-
-    case ioCLC:                                         /* clear control flip-flop */
-        pif_control = CLEAR;                            /* clear control */
-
-        if (DEBUG_PRS (pif_dev))
-            fprintf (sim_deb, ">>PIF: [%s%s] Control cleared\n",
-                              (signal == ioCRS ? "CRS" : "CLC"), hold_or_clear);
-        break;
+            if (DEBUG_PRS (pif_dev))
+                fprintf (sim_deb, ">>PIF: [%s%s] Control cleared\n",
+                                  (signal == ioCRS ? "CRS" : "CLC"), hold_or_clear);
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        pif_control = SET;                              /* set control */
+        case ioSTC:                                     /* set control flip-flop */
+            pif.control = SET;                          /* set control */
 
-        if (DEBUG_PRS (pif_dev))
-            fprintf (sim_deb, ">>PIF: [STC%s] Control set\n", hold_or_clear);
-        break;
-
-
-    case ioSIR:                                         /* set interrupt request */
-        if (is_rte_pif) {                               /* RTE PIF? */
-            setstdPRL (select_code, pif);               /* set standard PRL signal */
-            setstdIRQ (select_code, pif);               /* set standard IRQ signal */
-            setstdSRQ (select_code, pif);               /* set standard SRQ signal */
-            }
-
-        else {                                          /* DOS PIF */
-            setPRL (select_code, !(pif_control | pif_flag));
-            setIRQ (select_code, !pif_control & pif_flag & pif_flagbuf);
-            }
-
-        if (DEBUG_PRS (pif_dev))
-            fprintf (sim_deb, ">>PIF: [SIR] PRL = %d, IRQ = %d\n",
-                              PRL (select_code), IRQ (select_code));
-        break;
+            if (DEBUG_PRS (pif_dev))
+                fprintf (sim_deb, ">>PIF: [STC%s] Control set\n", hold_or_clear);
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        pif_flagbuf = CLEAR;
-        break;
+        case ioSIR:                                         /* set interrupt request */
+            if (is_rte_pif) {                               /* RTE PIF? */
+                setstdPRL (pif);                            /* set standard PRL signal */
+                setstdIRQ (pif);                            /* set standard IRQ signal */
+                setstdSRQ (pif);                            /* set standard SRQ signal */
+                }
+
+            else {                                          /* DOS PIF */
+                setPRL (dibptr->select_code, !(pif.control | pif.flag));
+                setIRQ (dibptr->select_code, !pif.control & pif.flag & pif.flagbuf);
+                }
+
+            if (DEBUG_PRS (pif_dev))
+                fprintf (sim_deb, ">>PIF: [SIR] PRL = %d, IRQ = %d\n",
+                                  PRL (dibptr->select_code),
+                                  IRQ (dibptr->select_code));
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioIAK:                                     /* interrupt acknowledge */
+            pif.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    pif_io (select_code, ioCLF, 0);                     /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    pif_io (select_code, ioSIR, 0);                     /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -329,7 +333,7 @@ return data;
 
 t_stat pif_reset (DEVICE *dptr)
 {
-pif_io (pif_dib.devno, ioPOPIO, 0);                     /* send POPIO signal */
+IOPRESET (&pif_dib);                                    /* PRESET device (does not use PON) */
 return SCPE_OK;
 }
 

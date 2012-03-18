@@ -340,10 +340,10 @@ static const MTAB vh_mod[] = {
 	{ UNIT_HANGUP, UNIT_HANGUP, "hangup", "HANGUP", NULL },
 	{ MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
 		&set_addr, &show_addr, NULL },
-	{ MTAB_XTD|MTAB_VDV, VH_LINES, "VECTOR", "VECTOR",
-		&set_vec, &show_vec_mux, (void *) &vh_desc },
 	{ MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
 		&set_addr_flt, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, VH_LINES, "VECTOR", "VECTOR",
+		&set_vec, &show_vec_mux, (void *) &vh_desc },
 	/* this one is dangerous, don't use yet */
 	{ MTAB_XTD|MTAB_VDV, 0, "LINES", "LINES",
 		NULL, &tmxr_show_lines, (void *) &vh_desc },

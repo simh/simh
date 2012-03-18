@@ -43,14 +43,16 @@ bridge, or route TAP devices for you.
 Integrated Universal TUN/TAP support can be used for host<->simulator network
 traffic (on the platforms where it is available) by using the SIMH command:
 "attach xq tap:tapN" (i.e. attach xq tap:tap0).  Platforms that this has been
-tested on include: Linux, FreeBSD, OpenBSD, NetBSD.  Each of these platforms
-has some way to create a tap pseudo device and then bridge it with a physical
-network interface.
+tested on include: Linux, FreeBSD, OpenBSD, NetBSD and OSX.  Each of these 
+platforms has some way to create a tap pseudo device (and possibly then to 
+bridge it with a physical network interface).
 
 The following steps were performed to get a working SIMH vax simulator 
 sharing a physical NIC and allowing Host<->SIMH vax communications:
 
 Linux (Ubuntu 10.04):
+    apt-get install make
+    apt-get install libpcap-dev
     apt-get install bridge-utils
     apt-get install uml-utilities
 
@@ -117,6 +119,54 @@ NetBSD (NetBSD 5.0.2)
 
     # Run simulator and "attach xq tap:tap0"
 
+OSX (Snow Leopard)
+    OSX Does NOT have native support for tun/tap interfaces.  It also does not have native
+    support for bridging.
+    
+    Mattias Nissler has created tun/tap functionality available at http://tuntaposx,sourceforge.net/
+    
+    We'll punt on bridging for the sake of this example and move on to use a basic tap
+    based internal network so a host and guest can communicate directly.
+    
+    Download the install package from: 
+    http://sourceforge.net/projects/tuntaposx/files/tuntap/20090913/tuntap_20090913.tar.gz
+    
+    Expand the tarball to a directory.
+    Invoke the package installer tuntap_20090913.pkg
+    Click through the various prompts accepting things and eventually installing the package.
+    
+    # Build and Run simulator and:
+       sim> attach xq tap:tap0
+       sim> ! ifconfig tap0 192.168.6.1 netmask 255.255.255.0
+
+    Simulated system uses IP address 192.168.6.2 and host uses 192.167.6.1 
+    and things work.
+    You must run as root for this to work.
+    
+-------------------------------------------------------------------------------
+An alternative to direct pcap and tun/tap networking on *nix environments is 
+VDE (Virtual Distributed Ethernet).
+
+Note 1: Using vde based networking is likely more flexible, but it isn't 
+        nearly as efficient.  Host OS overhead will always be higher when 
+        vde networking is used as compared to native pcap and/or tun/tap 
+        networking.
+Note 2: Root access will likely be needed to configure or start the vde 
+        environment prior to starting a simulator which may use it.
+Note 3: Simulators running using VDE networking can run without root 
+        privilege.
+
+Linux (Ubuntu 10.04):
+    apt-get install make
+    apt-get install libvdeplug-dev
+    apt-get install vde2
+
+    vde_switch -s /tmp/switch1 -tap tap0 -m 666
+    ifconfig tap0 192.168.6.1 netmask 255.255.255.0 up
+    
+    # Build and Run simulator and:
+       sim> attach xq vde:/tmp/switch1  #simulator uses IP address 192.168.6.2
+
 -------------------------------------------------------------------------------
 
 Windows notes:
@@ -134,23 +184,43 @@ Windows notes:
 
 
 Building on Windows:
- 1. Install WinPCAP 4.x runtime and the WinPCAP Developer's kit.
+ You should be able to build with any of the free compiler environments 
+ available on the Windows platform.  If you want to use the Visual C++ 
+ Express 2008 or 2010 interactive development environments, read the file 
+ ".\Visual Studio Projects\0ReadMe_Projects.txt" for details about the
+ required dependencies.  Alternatively, you can build simh with networking
+ support using the MinGW GCC compiler environment.  Both the Visual C++
+ and MinGW build environments require WinPcap and Posix packages being
+ available.  These should be located in a directory structure parallel to
+ the current simulator source directory.
+ 
+ For Example, the directory structure should look like:
 
- 2. Put the required .h files (bittypes,devioctl,ip6_misc,pcap,pcap-stdinc
-    packet32,ntddndis).h from the WinPCAP 4.x developer's kit in the 
-    compiler's include file path
+    .../simh/simhv38-2-rc1/VAX/vax_cpu.c
+    .../simh/simhv38-2-rc1/scp.c
+    .../simh/simhv38-2-rc1/Visual Studio Projects/simh.sln
+    .../simh/simhv38-2-rc1/Visual Studio Projects/VAX.vcproj
+    .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
+    .../simh/windows-build/pthreads/pthread.h
+    .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
 
- 3. Put the required .lib files (packet,wpcap).lib from the WinPCAP 4.x
-    developer's kit in the linker's library path
+ The contents of the windows-build directory can be downloaded from:
 
- 4. If you're using Borland C++, use COFF2OMF to convert the .lib files into
-    a format that can be used by the compiler.
+    https://github.com/downloads/markpizz/simh/windows-build.zip
 
- 5. Define USE_NETWORK.  The current windows network built binaries will 
-    run on any system. regardless of whether or not WinPcap is installed, 
-    and will provide Network functionality when WinPcap is available.
 
- 6. Build it!
+ There are Windows batch files provided to initiate compiles using the MinGW
+ compiler tool chain.  These batch files are located in the same directory 
+ as this file and are called: build_mingw.bat, build_mingw_ether.bat, and 
+ build_mingw_noasync.bat.  These batch files each presume that the MinGW 
+ toolchain is either in the current path or, if not that it is located at
+ C:\MinGW\bin.  These batch files merely invoke the MinGW make (GNU make)
+ passing some specific arguments along with the optional arguments the batch 
+ file is invoked with.
+ 
+ The current windows network built binaries will run on any system without 
+ regard to whether or not WinPcap is installed, and will provide 
+ Network functionality when WinPcap is available.
 
 -------------------------------------------------------------------------------
 
@@ -159,8 +229,11 @@ Linux, {Free|Net|Open}BSD, OS/X, and Un*x notes:
 ----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
 
 Sim_Ether has been reworked to be more universal; because of this, you will
-need to get a version of libpcap that is 0.9 or greater. This can be
-downloaded from www.tcpdump.org - see the comments at the top of Sim_ether.c
+need to get a version of libpcap that is 0.9 or greater. All current Linux
+distributions provide a libpcap-dev package which has the needed version
+of libpcap and the required components to build applications using it.  
+If you are running an older Linux OS, you can download and build the required 
+library from www.tcpdump.org - see the comments at the top of Sim_ether.c 
 for details.  
 
 ----- WARNING ----- WARNING ----- WARNING ----- WARNING ----- WARNING -----
@@ -187,34 +260,44 @@ for details.
     will be welcomed.
 
  2. If you want to use TAP devices, and any surrounding system network/bridge
-    setup must be done before running SIMH.
+    setup must be done before running SIMH.  However, once that is done 
+    (possibly at system boot time), using the TAP devices can be done without
+    root privileges.
 
 Building on Linux, {Free|Net|Open}BSD, OS/X, Un*x:
 
- 1. Get/make/install the libpcap package for your operating system. Sources:
+ 1. Get/make/install the libpcap-dev package for your operating system. Sources:
       All    : http://www.tcpdump.org/
       Older versions of libpcap can be found, for various systems, at:
       Linux  : search for your variant on http://rpmfind.net
       OS/X   : Apple Developer's site?
 
-	    NOTE: These repositories for older versions of these platforms
+	    NOTE: The repositories for older versions of these platforms
 	          don't contain a version of libpcap greater than 0.8.1.
-	          However, most(all) recent releases of *nix environments ship 
-	          with sufficiently recent versions of libpcap either automatically 
-              installed or available for installation as part of the 
-              distribution.  
+	          However, most(all) recent releases of *nix environments 
+	          ship with sufficiently recent versions of libpcap either 
+	          automatically installed or available for installation as 
+	          part of the distribution.  
+	          The OS provided libpcap-dev components will be prefereable 
+	          to a package built from www.tcpdump.org sources.  This is
+	          due to the fact that various OS supplied packages will 
+	          depend on the OS supplied libpcap.  The improper build or 
+	          install of the www.tcpdump.org source package can conflict 
+	          with the OS provided one and break the OS provided 
+	          applications (i.e. tcpdump and/or wireshark) as well as
+	          not working correctly for use by simh.
 
- 2. If you install the vendor supplied libpcap-dev package and it provides
-    a /usr/lib/libpcap.a file, then the existing makefile will automatically
-    use the vendor supplied library without any additional arguments.
-    If you have downloaded and built the libpcap from tcpdump.org, then 
-    you can use it during a build by typing 'make USE_NETWORK=1'
+ 2. If you install the vendor supplied libpcap-dev package then the simh
+    makefile will automatically use the vendor supplied library without any 
+    additional arguments.  If you have downloaded and built libpcap from 
+    www.tcpdump.org, then you can force its use during a build by typing 
+    'make USE_NETWORK=1'
 
  3. Build it!
 
 -------------------------------------------------------------------------------
 
-OpenVMS Alpha notes:
+OpenVMS Alpha and OpenVMS Integrety (IA64) notes:
   1. Ethernet support will only work on Alpha VMS 7.3-1 or later, which is
      when required VCI promiscuous mode support was added. Hobbyists can
      get the required version of VMS from the OpenVMS Alpha Hobbyist Kit 3.0.
@@ -247,10 +330,10 @@ OpenVMS Alpha notes:
      adapter prior trying to connect with SIMH, or the host may crash.
      The execlet is not written to create an I/O structure for the device.
 
-Building on OpenVMS Alpha:
+Building on OpenVMS Alpha and OpenVMS Integrety (IA64):
   The current descrip.mms file will build simulators capable of using
   Ethernet support with them automatically.  These currently are: VAX, 
-  PDP11, and PDP10.  The descrip.mms driven builds will also build the
+  VAX780, and PDP11.  The descrip.mms driven builds will also build the
   pcap library and build and install the VCI execlet.
   
   1. Fetch the VMS-PCAP zip file from:  
@@ -320,7 +403,19 @@ Dave
 ===============================================================================
                                Change Log
 ===============================================================================
-
+  
+  17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
+  30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
+  29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
+  17-Aug-11  RMS  Fix from Sergey Oboguev relating to XU and XQ Auto Config and 
+                  vector assignments
+  12-Aug-11  MP   Cleaned up payload length determination
+                  Fixed race condition detecting reflections when threaded 
+                  reading and writing is enabled
+  07-Jul-11  MB   VMS Pcap (from Mike Burke)
+                     - Fixed Alpha issues
+                     - Added OpenVMS Integrety support
+  20-Apr-11  MP   Fixed save/restore behavior
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected DEUNA/DELUA SELFTEST command, enabling use by
                   VMS 3.7, VMS 4.7, and Ultrix 1.1

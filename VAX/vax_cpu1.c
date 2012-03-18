@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (from Mark Pizzolato)
+   25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
    23-Mar-11    RMS     Revised idle design (from Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Separated base register access checks for 11/780
@@ -860,7 +862,7 @@ else {
     else R[5] = MVC_FILL;                               /* fill, set state */
     R[5] = R[5] | (cc << MVC_V_CC);                     /* pack with state */
     PSL = PSL | PSL_FPD;                                /* set FPD */
-	}
+    }
 
 /* At this point,
 
@@ -1099,7 +1101,7 @@ return (R[0]? 0: CC_Z);
 
 /* Interrupt or exception
 
-        vec     =       SCB vector
+        vec     =       SCB vector (bit<0> = interrupt in Qbus mode)
         cc      =       condition codes
         ipl     =       new IPL if interrupt
         ei      =       -1: severe exception
@@ -1118,7 +1120,7 @@ int32 acc;
 
 in_ie = 1;                                              /* flag int/exc */
 CLR_TRAPS;                                              /* clear traps */
-newpc = ReadLP ((SCBB + vec) & PAMASK);                 /* read new PC */
+newpc = ReadLP ((SCBB + vec) & (PAMASK & ~3));          /* read new PC */
 if (ei < 0)                                             /* severe? on istk */
     newpc = newpc | 1;
 if (newpc & 2)                                          /* bad flags? */
@@ -1136,8 +1138,13 @@ else {
         SP = KSP;                                       /* new stack */
         }
     }
-if (ei > 0)                                             /* if int, new IPL */
-    PSL = newpsl | (ipl << PSL_V_IPL);
+if (ei > 0) {                                           /* if int, new IPL */
+    int32 newipl;
+    if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
+        newipl = PSL_IPL17;                             /* force IPL 17 */
+    else newipl = ipl << PSL_V_IPL;                     /* otherwise, int IPL */
+    PSL = newpsl | newipl;
+    }
 else PSL = newpsl |                                     /* exc, old IPL/1F */
     ((newpc & 1)? PSL_IPL1F: (oldpsl & PSL_IPL)) | (oldcur << PSL_V_PRV);
 if (DEBUG_PRI (cpu_dev, LOG_CPU_I))
@@ -1268,7 +1275,7 @@ return newpsl & CC_MASK;                                /* set new cc */
 
 void op_ldpctx (int32 acc)
 {
-int32 newpc, newpsl, pcbpa, t;
+uint32 newpc, newpsl, pcbpa, t;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;

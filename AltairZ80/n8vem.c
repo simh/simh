@@ -136,10 +136,6 @@ static MTAB n8vem_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(n8vem_dev.dctrl & level) {   \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB n8vem_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -165,7 +161,7 @@ static t_stat n8vem_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reset.\n"));
+    sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Reset.\n");
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &n8vemdev, TRUE);
@@ -196,7 +192,7 @@ static t_stat n8vem_reset(DEVICE *dptr)
 
 static t_stat n8vem_boot(int32 unitno, DEVICE *dptr)
 {
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Boot.\n"));
+    sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Boot.\n");
 
     /* Clear the RAM and ROM mapping registers */
     n8vem_info->mpcl_ram = 0;
@@ -226,7 +222,7 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
     /* Determine length of this disk */
     uptr->capac = sim_fsize(uptr->fileref);
 
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Attach %s.\n", i == 0 ? "ROM" : "RAM"));
+    sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Attach %s.\n", i == 0 ? "ROM" : "RAM");
 
     if(i == 0) { /* Attaching ROM */
         n8vem_info->rom_attached = TRUE;
@@ -240,9 +236,7 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
                 uptr->capac = N8VEM_ROM_SIZE;
 
             rtn = fread((void *)(n8vem_info->rom), uptr->capac, 1, uptr->fileref);
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into ROM."
-                                      " Result = %ssuccessful.\n",
-                                      uptr->capac, rtn == 1 ? "" : "not "));
+            sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Reading %d bytes into ROM." " Result = %ssuccessful.\n", uptr->capac, rtn == 1 ? "" : "not ");
         }
     } else { /* attaching RAM */
         /* Erase RAM */
@@ -254,9 +248,7 @@ static t_stat n8vem_attach(UNIT *uptr, char *cptr)
                 uptr->capac = N8VEM_RAM_SIZE;
 
             rtn = fread((void *)(n8vem_info->ram), uptr->capac, 1, uptr->fileref);
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Reading %d bytes into RAM."
-                                      " Result = %ssuccessful.\n",
-                                      uptr->capac, rtn == 1 ? "" : "not "));
+            sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Reading %d bytes into RAM." " Result = %ssuccessful.\n", uptr->capac, rtn == 1 ? "" : "not ");
         }
     }
     return r;
@@ -274,7 +266,7 @@ static t_stat n8vem_detach(UNIT *uptr)
         return (SCPE_IERR);
     }
 
-    TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Detach %s.\n", i == 0 ? "ROM" : "RAM"));
+    sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Detach %s.\n", i == 0 ? "ROM" : "RAM");
 
     /* rewind to the beginning of the file. */
     sim_fseek(uptr->fileref, 0, SEEK_SET);
@@ -282,13 +274,13 @@ static t_stat n8vem_detach(UNIT *uptr)
     if(i == 0) { /* ROM */
         /* Save the ROM back to disk if SAVEROM is set. */
         if(save_rom == 1) {
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Writing %d bytes into ROM image.\n", N8VEM_ROM_SIZE));
+            sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Writing %d bytes into ROM image.\n", N8VEM_ROM_SIZE);
             fwrite((void *)(n8vem_info->rom), N8VEM_ROM_SIZE, 1, uptr->fileref);
         }
     } else { /* RAM */
         /* Save the RAM back to disk if SAVERAM is set. */
         if(save_ram == 1) {
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: Writing %d bytes into RAM image.\n", N8VEM_RAM_SIZE));
+            sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: Writing %d bytes into RAM image.\n", N8VEM_RAM_SIZE);
             fwrite((void *)(n8vem_info->ram), N8VEM_RAM_SIZE, 1, uptr->fileref);
         }
     }
@@ -334,7 +326,7 @@ static t_stat n8vem_detach(UNIT *uptr)
             if(save_rom == 1) {
                 n8vem_info->rom[((n8vem_info->mpcl_rom & N8VEM_ROM_MASK) << 15) | (Addr & N8VEM_ADDR_MASK)] = data;
             } else {
-                TRACE_PRINT(ROM_MSG, ("N8VEM: " ADDRESS_FORMAT " WR ROM[0x%05x]: Cannot write to ROM." NLP, PCX, ((n8vem_info->mpcl_rom & N8VEM_ROM_MASK) << 15) | (Addr & N8VEM_ADDR_MASK)));
+                sim_debug(ROM_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR ROM[0x%05x]: Cannot write to ROM.\n", PCX, ((n8vem_info->mpcl_rom & N8VEM_ROM_MASK) << 15) | (Addr & N8VEM_ADDR_MASK));
             }
         }
         return 0;
@@ -391,19 +383,19 @@ static uint8 N8VEM_Read(const uint32 Addr)
 
     switch(Addr & 0x1F) {
         case N8VEM_PIO1A:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: PIO1A" NLP, PCX));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD: PIO1A\n", PCX);
             cData = n8vem_pio1a;
             break;
         case N8VEM_PIO1B:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: PIO1B" NLP, PCX));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD: PIO1B\n", PCX);
             cData = n8vem_pio1b;
             break;
         case N8VEM_PIO1C:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: PIO1C" NLP, PCX));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD: PIO1C\n", PCX);
             cData = n8vem_pio1c;
             break;
         case N8VEM_PIO1CONT:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: PIO1CTRL" NLP, PCX));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD: PIO1CTRL\n", PCX);
             cData = n8vem_pio1ctrl;
             break;
         case N8VEM_UART_LCR:
@@ -415,7 +407,7 @@ static uint8 N8VEM_Read(const uint32 Addr)
         case N8VEM_UART_INTR:
         case N8VEM_UART_MCR:
         case N8VEM_UART_MSR:
-            TRACE_PRINT(UART_MSG, ("N8VEM: " ADDRESS_FORMAT " RD[%02x]: UART not Implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD[%02x]: UART not Implemented.\n", PCX, Addr);
             break;
         case N8VEM_UART_SCR:        /* 16550 Scratchpad, implemented so software can detect UART is present */
             cData = n8vem_info->uart_scr;
@@ -424,16 +416,16 @@ static uint8 N8VEM_Read(const uint32 Addr)
         case N8VEM_MPCL_RAM1:
         case N8VEM_MPCL_RAM2:
         case N8VEM_MPCL_RAM3:
-            TRACE_PRINT(MPCL_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: MPCL_RAM not Implemented." NLP, PCX));
+            sim_debug(MPCL_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD: MPCL_RAM not Implemented.\n", PCX);
             break;
         case N8VEM_MPCL_ROM:
         case N8VEM_MPCL_ROM1:
         case N8VEM_MPCL_ROM2:
         case N8VEM_MPCL_ROM3:
-            TRACE_PRINT(MPCL_MSG, ("N8VEM: " ADDRESS_FORMAT " RD: MPCL_ROM not Implemented." NLP, PCX));
+            sim_debug(MPCL_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD: MPCL_ROM not Implemented.\n", PCX);
             break;
         default:
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: " ADDRESS_FORMAT " RD[%02x]: not Implemented." NLP, PCX, Addr));
+            sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " RD[%02x]: not Implemented.\n", PCX, Addr);
             break;
     }
 
@@ -446,23 +438,23 @@ static uint8 N8VEM_Write(const uint32 Addr, uint8 cData)
 
     switch(Addr & 0x1F) {
         case N8VEM_PIO1A:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: PIO1A=0x%02x" NLP, PCX, cData));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: PIO1A=0x%02x\n", PCX, cData);
             n8vem_pio1a = cData;
             break;
         case N8VEM_PIO1B:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: PIO1B=0x%02x" NLP, PCX, cData));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: PIO1B=0x%02x\n", PCX, cData);
             n8vem_pio1b = cData;
             break;
         case N8VEM_PIO1C:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: PIO1C=0x%02x" NLP, PCX, cData));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: PIO1C=0x%02x\n", PCX, cData);
             n8vem_pio1c = cData;
             break;
         case N8VEM_PIO1CONT:
-            TRACE_PRINT(PIO_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: PIO1_CTRL=0x%02x" NLP, PCX, cData));
+            sim_debug(PIO_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: PIO1_CTRL=0x%02x\n", PCX, cData);
             n8vem_pio1ctrl = cData;
             break;
         case N8VEM_UART_LCR:
-            TRACE_PRINT(UART_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: UART LCR=%02x." NLP, PCX, cData));
+            sim_debug(UART_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: UART LCR=%02x.\n", PCX, cData);
             n8vem_info->uart_lcr = cData;
             break;
         case N8VEM_UART_DATA:
@@ -471,7 +463,7 @@ static uint8 N8VEM_Write(const uint32 Addr, uint8 cData)
         case N8VEM_UART_MCR:
         case N8VEM_UART_LSR:
         case N8VEM_UART_MSR:
-            TRACE_PRINT(UART_MSG, ("N8VEM: " ADDRESS_FORMAT " WR[%02x]: UART not Implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR[%02x]: UART not Implemented.\n", PCX, Addr);
             break;
         case N8VEM_UART_SCR:        /* 16550 Scratchpad, implemented so software can detect UART is present */
             n8vem_info->uart_scr = cData;
@@ -480,18 +472,18 @@ static uint8 N8VEM_Write(const uint32 Addr, uint8 cData)
         case N8VEM_MPCL_RAM1:
         case N8VEM_MPCL_RAM2:
         case N8VEM_MPCL_RAM3:
-            TRACE_PRINT(MPCL_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: MPCL_RAM=0x%02x" NLP, PCX, cData));
+            sim_debug(MPCL_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: MPCL_RAM=0x%02x\n", PCX, cData);
             n8vem_info->mpcl_ram = cData;
             break;
         case N8VEM_MPCL_ROM:
         case N8VEM_MPCL_ROM1:
         case N8VEM_MPCL_ROM2:
         case N8VEM_MPCL_ROM3:
-            TRACE_PRINT(MPCL_MSG, ("N8VEM: " ADDRESS_FORMAT " WR: MPCL_ROM=0x%02x" NLP, PCX, cData));
+            sim_debug(MPCL_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR: MPCL_ROM=0x%02x\n", PCX, cData);
             n8vem_info->mpcl_rom = cData;
             break;
         default:
-            TRACE_PRINT(VERBOSE_MSG, ("N8VEM: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented." NLP, PCX, Addr, cData));
+            sim_debug(VERBOSE_MSG, &n8vem_dev, "N8VEM: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented.\n", PCX, Addr, cData);
             break;
     }
 

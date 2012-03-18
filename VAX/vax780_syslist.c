@@ -1,4 +1,4 @@
-/* vax_syslist.c: VAX device list
+/* vax780_syslist.c: VAX 780 device list
 
    Copyright (c) 1998-2008, Robert M Supnik
 

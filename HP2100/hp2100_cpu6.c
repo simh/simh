@@ -1,6 +1,6 @@
 /* hp2100_cpu6.c: HP 1000 RTE-6/VM OS instructions
 
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2010, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU6         RTE-6/VM OS instructions
 
+   29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
    18-Sep-08    JDB     Corrected .SIP debug formatting
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -258,8 +259,8 @@ if (iotrap) {                                           /* do priv setup only if
 
     if (priv_fence) {                                   /* privileged system? */
         reason = iogrp (STC_0 + priv_fence, iotrap);    /* STC SC on priv fence */
-        reason = iogrp (CLC_0 + DMA0, iotrap);          /* CLC 6 to inh IRQ on DCPC 0 */
-        reason = iogrp (CLC_0 + DMA1, iotrap);          /* CLC 7 to inh IRQ on DCPC 1 */
+        reason = iogrp (CLC_0 + DMA1, iotrap);          /* CLC 6 to inh IRQ on DCPC 1 */
+        reason = iogrp (CLC_0 + DMA2, iotrap);          /* CLC 7 to inh IRQ on DCPC 2 */
         reason = iogrp (STF_0, iotrap);                 /* turn interrupt system back on */
         }
     }
@@ -600,11 +601,11 @@ switch (entry) {                                        /* decode IR<3:0> */
             reason = iogrp (CLC_0 + priv_fence, iotrap);    /* CLC SC on priv fence */
             reason = iogrp (STF_0 + priv_fence, iotrap);    /* STF SC on priv fence */
 
-            if (cpu_get_intbl (DMA0) & SIGN)            /* DCPC 0 active? */
-                reason = iogrp (STC_0 + DMA0, iotrap);  /* STC 6 to enable IRQ on DCPC 0 */
-
             if (cpu_get_intbl (DMA1) & SIGN)            /* DCPC 1 active? */
-                reason = iogrp (STC_0 + DMA1, iotrap);  /* STC 7 to enable IRQ on DCPC 1 */
+                reason = iogrp (STC_0 + DMA1, iotrap);  /* STC 6 to enable IRQ on DCPC 1 */
+
+            if (cpu_get_intbl (DMA2) & SIGN)            /* DCPC 2 active? */
+                reason = iogrp (STC_0 + DMA2, iotrap);  /* STC 7 to enable IRQ on DCPC 2 */
             }
 
         tbg_tick = 0;                                   /* .IRT terminates TBG servicing */

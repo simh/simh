@@ -68,6 +68,9 @@
 
   Modification history:
 
+  20-Apr-11  MP   Fixed missing information from save/restore which
+                  caused operations to not complete correctly after 
+                  a restore until the OS reset the controller.
   09-Dec-10  MP   Added address conflict check during attach.
   06-Dec-10  MP   Fixed loopback processing to correctly handle forward packets.
   29-Nov-10  MP   Fixed interrupt dispatch issue which caused delivered packets 
@@ -367,7 +370,11 @@ REG xqa_reg[] = {
   { GRDATA ( TBINDX, xqa.tbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( RBINDX, xqa.rbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( IDTMR, xqa.idtmr, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( VECTOR, xqa_dib.vec, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( MUST_POLL, xqa.must_poll, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_ENAB, xqa.sanity.enabled, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_QSECS, xqa.sanity.quarter_secs, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_TIMR, xqa.sanity.timer, XQ_RDX, 32, 0), REG_HRO},
   { NULL },
 };
 
@@ -419,7 +426,11 @@ REG xqb_reg[] = {
   { GRDATA ( TBINDX, xqb.tbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( RBINDX, xqb.rbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( IDTMR, xqb.idtmr, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( VECTOR, xqb_dib.vec, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( MUST_POLL, xqb.must_poll, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_ENAB, xqb.sanity.enabled, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_QSECS, xqb.sanity.quarter_secs, XQ_RDX, 32, 0), REG_HRO},
+  { GRDATA ( SANT_TIMR, xqb.sanity.timer, XQ_RDX, 32, 0), REG_HRO},
   { NULL },
 };
 
@@ -439,10 +450,10 @@ MTAB xq_mod[] = {
   { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE={DEQNA|DELQA|DELQA-T}",
     &xq_set_type, &xq_show_type, NULL },
 #ifdef USE_READER_THREAD
-        { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500|DELAY=nnn}",
+  { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500|DELAY=nnn}",
     &xq_set_poll, &xq_show_poll, NULL },
 #else
-        { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
+  { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
     &xq_set_poll, &xq_show_poll, NULL },
 #endif
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "SANITY", "SANITY={ON|OFF}",
@@ -469,7 +480,7 @@ DEVICE xq_dev = {
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
-  &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG,
+  &xqa_dib, DEV_FLTA | DEV_DISABLE | DEV_QBUS | DEV_DEBUG,
   0, xq_debug
 };
 
@@ -478,7 +489,7 @@ DEVICE xqb_dev = {
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
-  &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG,
+  &xqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG,
   0, xq_debug
 };
 
@@ -1678,6 +1689,16 @@ t_stat xq_process_loopback(CTLR* xq, ETH_PACK* pack)
         physical_address = &xq->var->setup.macs[0];
       else
         physical_address = &xq->var->mac;
+
+  /* The only packets we should be responding to are ones which 
+     we received due to them being directed to our physical MAC address, 
+     OR the Broadcast address OR to a Multicast address we're listening to 
+     (we may receive others if we're in promiscuous mode, but shouldn't 
+     respond to them) */
+  if ((0 == (pack->msg[0]&1)) &&           /* Multicast or Broadcast */
+      (0 != memcmp(physical_address, pack->msg, sizeof(ETH_MAC))))
+      return SCPE_NOFNC;
+
   memcpy (&response.msg[0], &response.msg[offset+2], sizeof(ETH_MAC));
   memcpy (&response.msg[6], physical_address, sizeof(ETH_MAC));
   offset += 8 - 16; /* Account for the Ethernet Header and Offset value in this number  */
@@ -2366,7 +2387,7 @@ t_stat xq_reset(DEVICE* dptr)
     xq->var->sanity.quarter_secs = XQ_HW_SANITY_SECS * 4/*qsec*/;
   }
 
-  return SCPE_OK;
+  return auto_config (0, 0);                              /* run autoconfig */
 }
 
 void xq_reset_santmr(CTLR* xq)
@@ -2567,15 +2588,16 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   if (status != SCPE_OK) {
     free(tptr);
     free(xq->var->etherface);
-    xq->var->etherface = 0;
+    xq->var->etherface = NULL;
     return status;
   }
   if (xq->var->poll == 0) {
     status = eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     if (status != SCPE_OK) {
+      eth_close(xq->var->etherface);
       free(tptr);
       free(xq->var->etherface);
-      xq->var->etherface = 0;
+      xq->var->etherface = NULL;
       return status;
     }
     xq->var->must_poll = 0;
@@ -2589,6 +2611,8 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     eth_close(xq->var->etherface);
+    free(xq->var->etherface);
+    xq->var->etherface = NULL;
     return SCPE_NOATT;
   }
   uptr->filename = tptr;
@@ -2597,8 +2621,27 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   /* turn on transceiver power indicator */
   xq_csr_set_clr(xq, XQ_CSR_OK, 0);
 
-  /* reset the device with the new attach info */
-  xq_reset(xq->dev);
+  /* init read queue (first time only) */
+  status = ethq_init(&xq->var->ReadQ, XQ_QUE_MAX);
+  if (status != SCPE_OK)
+    return status;
+
+  if (xq->var->mode == XQ_T_DELQA_PLUS)
+    eth_filter_hash (xq->var->etherface, 1, &xq->var->init.phys, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
+  else
+    if (xq->var->setup.valid) {
+      int i, count = 0;
+      ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+      ETH_MAC filters[XQ_FILTER_MAX + 1];
+
+      for (i = 0; i < XQ_FILTER_MAX; i++)
+        if (memcmp(zeros, &xq->var->setup.macs[i], sizeof(ETH_MAC)))
+          memcpy (filters[count++], xq->var->setup.macs[i], sizeof(ETH_MAC));
+      eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
+      }
+    else
+      /* reset the device with the new attach info */
+      xq_reset(xq->dev);
 
   return SCPE_OK;
 }
@@ -2613,7 +2656,7 @@ t_stat xq_detach(UNIT* uptr)
   if (uptr->flags & UNIT_ATT) {
     eth_close (xq->var->etherface);
     free(xq->var->etherface);
-    xq->var->etherface = 0;
+    xq->var->etherface = NULL;
     free(uptr->filename);
     uptr->filename = NULL;
     uptr->flags &= ~UNIT_ATT;

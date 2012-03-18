@@ -207,10 +207,6 @@ static MTAB adcs6_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(adcs6_dev.dctrl & level) {   \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB adcs6_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -398,7 +394,7 @@ static t_stat adcs6_svc (UNIT *uptr)
         motor_timeout ++;
         if(motor_timeout == MOTOR_TO_LIMIT) {
             adcs6_info->head_sel = 0;
-            TRACE_PRINT(DRIVE_MSG, ("ADCS6: Motor OFF" NLP))
+            sim_debug(DRIVE_MSG, &adcs6_dev, "ADCS6: Motor OFF\n");
         }
     }
 
@@ -430,14 +426,14 @@ static t_stat adcs6_reset(DEVICE *dptr)
     } else {
         /* Connect ADCS6 ROM at base address */
         if (adcs6_hasProperty(UNIT_ADCS6_ROM)) {
-            TRACE_PRINT(VERBOSE_MSG, ("ADCS6: ROM Enabled." NLP))
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: ROM Enabled.\n");
             if(sim_map_resource(pnp->mem_base, pnp->mem_size, RESOURCE_TYPE_MEMORY, &adcs6rom, FALSE) != 0) {
                 printf("%s: error mapping MEM resource at 0x%04x\n", __FUNCTION__, pnp->io_base);
                 return SCPE_ARG;
             }
             adcs6_info->rom_disabled = FALSE;
         } else {
-            TRACE_PRINT(VERBOSE_MSG, ("ADCS6: ROM Disabled." NLP))
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: ROM Disabled.\n");
             adcs6_info->rom_disabled = TRUE;
         }
 
@@ -508,8 +504,8 @@ static int32 adcs6rom(const int32 Addr, const int32 write, const int32 data)
 /*  DBG_PRINT(("ADCS6: ROM %s, Addr %04x" NLP, write ? "WR" : "RD", Addr)); */
     if(write) {
         if(adcs6_info->rom_disabled == FALSE) {
-            TRACE_PRINT(ERROR_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " Cannot write to ROM." NLP, PCX));
+            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " Cannot write to ROM.\n", PCX);
         } else {
             adcs6ram[Addr & ADCS6_ADDR_MASK] = data;
         }
@@ -555,16 +551,15 @@ static int32 adcs6_control(const int32 port, const int32 io, const int32 data)
             adcs6_info->autowait = 0;
         }
 
-        TRACE_PRINT(DRIVE_MSG,
-            ("ADCS6: " ADDRESS_FORMAT " WR CTRL: sel_drive=%d, drivetype=%d, head_sel=%d, dens=%d, aw=%d" NLP, PCX,
-            wd179x_info->sel_drive, wd179x_info->drivetype, adcs6_info->head_sel, wd179x_info->ddens, adcs6_info->autowait));
+        sim_debug(DRIVE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                  " WR CTRL: sel_drive=%d, drivetype=%d, head_sel=%d, dens=%d, aw=%d\n",
+                  PCX, wd179x_info->sel_drive,
+                  wd179x_info->drivetype, adcs6_info->head_sel,
+                  wd179x_info->ddens, adcs6_info->autowait);
     } else { /* I/O Read */
         result = wd179x_info->drq ? 0xFF : 0;
         if (wd179x_info->intrq)
             result &= 0x7F;
-
-/*      TRACE_PRINT(VERBOSE_MSG, */
-/*            ("ADCS6: " ADDRESS_FORMAT " Read DISK FLAGS, Port 0x%02x Result 0x%02x" NLP, PCX, port, result)) */
     }
 
     return result;
@@ -575,12 +570,12 @@ static int32 adcs6_dma(const int32 port, const int32 io, const int32 data)
 {
     int32 result = 0xff;
     if(io) { /* I/O Write */
-        TRACE_PRINT(DMA_MSG,
-            ("ADCS6: " ADDRESS_FORMAT " WR DMA: 0x%02x" NLP, PCX, data & 0xFF));
+        sim_debug(DMA_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                  " WR DMA: 0x%02x\n", PCX, data & 0xFF);
     } else { /* I/O Read */
         result = 0xFF;
-        TRACE_PRINT(DMA_MSG,
-            ("ADCS6: " ADDRESS_FORMAT " RD DMA: 0x%02x" NLP, PCX, result));
+        sim_debug(DMA_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                  " RD DMA: 0x%02x\n", PCX, result);
     }
     return result;
 }
@@ -592,62 +587,62 @@ static int32 adcs6_timer(const int32 port, const int32 io, const int32 data)
     if(io) { /* Write */
         switch(port) {
         case 0x04:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR PIOA DATA=0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR PIOA DATA=0x%02x\n", PCX, data);
             break;
         case 0x05:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR PIOB DATA=0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR PIOB DATA=0x%02x\n", PCX, data);
             break;
         case 0x06:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR PIOA CTRL=0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR PIOA CTRL=0x%02x\n", PCX, data);
             break;
         case 0x07:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR PIOB CTRL=0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR PIOB CTRL=0x%02x\n", PCX, data);
             break;
         case 0x08:
         case 0x09:
         case 0x0A:
         case 0x0B:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR CTC%d: 0x%02x" NLP, PCX, port - 8, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR CTC%d: 0x%02x\n", PCX, port - 8, data);
             break;
         default:
-            TRACE_PRINT(ERROR_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR Unhandled Port: 0x%02x=0x%02x" NLP, PCX, port, data));
+            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
             break;
         }
     } else { /* Read */
         result = 0xFF;
         switch(port) {
         case 0x04:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD PIOA DATA=0x%02x" NLP, PCX, result));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD PIOA DATA=0x%02x\n", PCX, result);
             break;
         case 0x05:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD PIOB DATA=0x%02x" NLP, PCX, result));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD PIOB DATA=0x%02x\n", PCX, result);
             break;
         case 0x06:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD PIOA CTRL=0x%02x" NLP, PCX, result));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD PIOA CTRL=0x%02x\n", PCX, result);
             break;
         case 0x07:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD PIOB CTRL=0x%02x" NLP, PCX, result));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD PIOB CTRL=0x%02x\n", PCX, result);
             break;
         case 0x08:
         case 0x09:
         case 0x0A:
         case 0x0B:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD CTC%d: 0x%02x" NLP, PCX, port - 8, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD CTC%d: 0x%02x\n", PCX, port - 8, data);
             break;
         default:
-            TRACE_PRINT(ERROR_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD Unhandled Port: 0x%02x=0x%02x" NLP, PCX, port, data));
+            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
             break;
         }
     }
@@ -662,28 +657,28 @@ static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data)
         switch(port) {
         case 0x15:
             adcs6_info->s100_addr_u = data & 0xFF;
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR S100 A[23:16]=0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR S100 A[23:16]=0x%02x\n", PCX, data);
             break;
         case 0x16:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR MCTRL0: 0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR MCTRL0: 0x%02x\n", PCX, data);
             adcs6_info->rom_disabled = (data & 0x20) ? TRUE : FALSE; /* Unmap Boot ROM */
             break;
         case 0x17:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR MCTRL1: 0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR MCTRL1: 0x%02x\n", PCX, data);
             break;
         case 0x18:
         case 0x19:
         case 0x1A:
         case 0x1B:
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR BAUD RATE=0x%02x" NLP, PCX, data));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR BAUD RATE=0x%02x\n", PCX, data);
             break;
         default:
-            TRACE_PRINT(ERROR_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " WR Unhandled Port: 0x%02x=0x%02x" NLP, PCX, port, data));
+            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " WR Unhandled Port: 0x%02x=0x%02x\n", PCX, port, data);
             break;
         }
         result = 0;
@@ -697,8 +692,8 @@ static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data)
              * Bit 5:0 = "Baud Rate"
              */
             result = dipswitch;
-            TRACE_PRINT(VERBOSE_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD BAUD RATE=0x%02x" NLP, PCX, result));
+            sim_debug(VERBOSE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD BAUD RATE=0x%02x\n", PCX, result);
             break;
         case 0x16:
         case 0x17:
@@ -707,8 +702,8 @@ static int32 adcs6_banksel(const int32 port, const int32 io, const int32 data)
         case 0x1A:
         case 0x1B:
         default:
-            TRACE_PRINT(ERROR_MSG,
-                ("ADCS6: " ADDRESS_FORMAT " RD attempt from write-only 0x%02x=0x%02x" NLP, PCX, port, result));
+            sim_debug(ERROR_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
+                      " RD attempt from write-only 0x%02x=0x%02x\n", PCX, port, result);
             break;
         }
     }
