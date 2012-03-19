@@ -381,7 +381,7 @@ int32 debug_reg = 0;                                    /* set for debug/trace *
 int32 debug_flag = 0;                                   /* 1 when trace.log open */
 FILE *trace;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);

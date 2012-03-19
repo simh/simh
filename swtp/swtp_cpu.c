@@ -109,7 +109,7 @@ int32 int_req = 0;					/* Interrupt request */
 int32 mem_fault = 0;				/* memory fault flag */
 
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ;	/* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 /* function prototypes */
 

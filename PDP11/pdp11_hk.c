@@ -60,7 +60,7 @@
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 extern uint16 *M;

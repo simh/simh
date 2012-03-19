@@ -215,7 +215,8 @@ static struct drvtyp dp_tab[] = {
     { DP_DRV (4720) }
     };
 
-extern int32 dev_int, dev_enb, chan_req;
+extern int32 dev_int, dev_enb;
+extern uint32 chan_req;
 extern int32 stop_inst;
 extern uint32 dma_ad[DMA_MAX];
 extern int32 sim_switches;

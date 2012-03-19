@@ -79,7 +79,7 @@ extern int32    int_req[IPL_HLVL];
 #if defined (VM_PDP11)
 #include "pdp11_defs.h"
 extern int32    int_req[IPL_HLVL];
-extern int32    cpu_opt;
+extern uint32    cpu_opt;
 #endif
 
 #include "sim_sock.h"

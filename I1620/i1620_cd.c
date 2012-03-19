@@ -43,7 +43,7 @@
 extern uint8 M[MAXMEMSIZE];
 extern uint8 ind[NUM_IND];
 extern UNIT cpu_unit;
-extern int32 io_stop;
+extern uint32 io_stop;
 
 char cdr_buf[CD_LEN + 2];
 char cdp_buf[CD_LEN + 2];
@@ -332,8 +332,8 @@ return SCPE_OK;
 t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
-int32 old_io_stop;
-extern int32 saved_PC;
+uint32 old_io_stop;
+extern uint32 saved_PC;
 
 old_io_stop = io_stop;
 io_stop = 1;

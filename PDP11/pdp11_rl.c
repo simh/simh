@@ -530,7 +530,7 @@ max 17ms for 1 track seek w/head switch
             rlmp2 = rlmp1 = rlmp;
             if (DEBUG_PRS (rl_dev))
                 fprintf (sim_deb, ">>RL GSTA: rlds=%06o drv=%ld\n",
-                    rlmp, uptr - rl_dev.units);
+                    rlmp, (long)(uptr - rl_dev.units));
             rl_set_done (0);                        /* done */
             break;
         default:                                    /* data transfer */

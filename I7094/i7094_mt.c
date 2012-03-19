@@ -72,7 +72,7 @@ extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
 extern FILE *sim_deb;
-extern char *sel_name[];
+extern const char *sel_name[];
 
 t_stat mt_chsel (uint32 ch, uint32 sel, uint32 unit);
 t_stat mt_chwr (uint32 ch, t_uint64 val, uint32 flags);

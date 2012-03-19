@@ -1,13 +1,8 @@
 Notes For V3.9
 
 
-The makefile now works for Linux and most Unix's. However, for Solaris
-and MacOS, you must first export the OSTYPE environment variable:
-
-> export OSTYPE
-> make
-
-Otherwise, you will get build errors.
+The makefile now works for all *nix platforms and with cygwin and MinGW32 
+on Windows.
 
 
 1. New Features

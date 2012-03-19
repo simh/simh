@@ -304,7 +304,7 @@ t_addr cpu_memsize = INIMEMSIZE;                        /* last mem addr */
 extern int32 CPUERR, MAINT;
 extern int32 sim_interval;
 extern int32 sim_int_char;
-extern uint32 sim_switches;
+extern int32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern t_bool sim_idle_enab;
 extern DEVICE *sim_devices[];

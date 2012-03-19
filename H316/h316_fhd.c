@@ -72,7 +72,8 @@
 #define OTA_CW1         1                               /* expecting CW1 */
 #define OTA_CW2         2                               /* expecting CW2 */
 
-extern int32 dev_int, dev_enb, chan_req;
+extern int32 dev_int, dev_enb;
+extern uint32 chan_req;
 extern int32 stop_inst;
 extern uint32 dma_ad[DMA_MAX];
 

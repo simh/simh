@@ -82,7 +82,8 @@
 #define STA_BOT         0000002                         /* beg of tape */
 #define STA_EOT         0000001                         /* end of tape */
 
-extern int32 dev_int, dev_enb, chan_req;
+extern int32 dev_int, dev_enb;
+extern uint32 chan_req;
 extern int32 stop_inst;
 
 uint32 mt_buf = 0;                                      /* data buffer */

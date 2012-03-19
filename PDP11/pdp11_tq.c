@@ -83,7 +83,7 @@
 #include "pdp11_defs.h"
 #define INIT_TYPE       TQ5_TYPE
 #define INIT_CAP        TQ5_CAP
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #include "pdp11_uqssp.h"

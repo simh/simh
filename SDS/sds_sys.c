@@ -154,7 +154,8 @@ t_stat sim_load_cct (FILE *fileref)
 {
 int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
-extern int32 lpt_ccl, lpt_ccp, lpt_cct[CCT_LNT];
+extern int32 lpt_ccl, lpt_ccp;
+extern uint8 lpt_cct[CCT_LNT];
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;

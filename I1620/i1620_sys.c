@@ -124,7 +124,8 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
-extern int32 cct_lnt, cct_ptr, cct[CCT_LNT];
+extern int32 cct_lnt, cct_ptr;
+extern uint32 cct[CCT_LNT];
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 if ((*cptr != 0) || (flag != 0))

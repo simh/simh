@@ -86,7 +86,7 @@ extern DEVICE mt_dev[NUM_CHAN];
 extern DEVICE drm_dev;
 extern DEVICE dsk_dev;
 extern DEVICE com_dev;
-extern int32 sim_brk_summ;
+extern uint32 sim_brk_summ;
 
 t_stat ch_reset (DEVICE *dptr);
 t_stat ch6_svc (UNIT *uptr);

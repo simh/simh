@@ -344,7 +344,7 @@ if (uptr->capac) {
         fprintf (st, "capacity=%dM%s", (uint32) (uptr->capac / ((t_addr) 1000000)), cap_units);
     else if (uptr->capac >= (t_addr) 1000)
         fprintf (st, "capacity=%dK%s", (uint32) (uptr->capac / ((t_addr) 1000)), cap_units);
-    else fprintf (st, "capacity=%d%S", (uint32) uptr->capac, cap_units);
+    else fprintf (st, "capacity=%d%s", (uint32) uptr->capac, cap_units);
     }
 else fprintf (st, "undefined capacity");
 return SCPE_OK;

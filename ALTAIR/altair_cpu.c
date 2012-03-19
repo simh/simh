@@ -107,7 +107,7 @@ int32 chip = 0;                                         /* 0 = 8080 chip, 1 = z8
 int32 PCX;                                              /* External view of PC */
 
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 /* function prototypes */
 

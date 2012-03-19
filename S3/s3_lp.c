@@ -41,7 +41,7 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat write_line (int32 ilnt, int32 mod);
 t_stat space (int32 lines, int32 lflag);
 t_stat carriage_control (int32 action, int32 mod);
-extern unsigned char ebcdic_to_ascii[256];
+extern unsigned char ebcdic_to_ascii[];
 
 #define UNIT_V_PCHAIN   (UNIT_V_UF + 0)
 #define UNIT_M_PCHAIN   03

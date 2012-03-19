@@ -52,7 +52,8 @@
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern int32 ub_map[UBM_LNT_LW];
-extern int32 cpu_opt, cpu_bme;
+extern uint32 cpu_opt;
+extern int32 cpu_bme;
 extern int32 trap_req, ipl;
 extern int32 cpu_log;
 extern int32 autcon_enb;

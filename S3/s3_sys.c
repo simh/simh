@@ -41,7 +41,7 @@ extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern unsigned char M[];
 extern int32 saved_PC, IAR[];
-extern char ebcdic_to_ascii[256];
+extern unsigned char ebcdic_to_ascii[];
 char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype);
 
 int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,

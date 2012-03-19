@@ -143,7 +143,11 @@ static UFP fmb;                                         /* FMB */
 static UFP fmq;                                         /* FMQ - hi,lo only */
 
 extern int32 M[MAXMEMSIZE];
-extern int32 pcq[PCQ_SIZE];
+#if defined (PDP15)
+extern int32 pcq[PCQ_SIZE];                             /* PC queue */
+#else
+extern int16 pcq[PCQ_SIZE];                             /* PC queue */
+#endif
 extern int32 pcq_p;
 extern int32 PC;
 extern int32 trap_pending, usmd;

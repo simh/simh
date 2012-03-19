@@ -75,6 +75,9 @@
 
 #define STA_WRP         0x80                            /* *write prot */
 #define STA_DEF         0x40                            /* def track NI */
+#ifdef STA_DEL /* Some platforms define a conflicting symbol here */
+#undef STA_DEL
+#endif
 #define STA_DEL         0x20                            /* del record */
 #define STA_ERR         0x10                            /* error */
 #define STA_IDL         0x02                            /* idle */

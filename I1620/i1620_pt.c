@@ -363,7 +363,7 @@ const static uint8 boot_rom[] = {
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
+extern uint32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];

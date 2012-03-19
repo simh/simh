@@ -96,7 +96,7 @@
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define TS_DIS          DEV_DIS                         /* off by default */
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #include "sim_tape.h"

@@ -99,7 +99,7 @@ extern int32 fault_PC;
 #define RQ_XTIME        500
 #define OLDPC           MMR2
 extern int32 MMR2;
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #if !defined (RQ_NUMCT)

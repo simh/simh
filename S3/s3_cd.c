@@ -40,8 +40,8 @@
 #include <ctype.h>
 
 extern uint8 M[];
-extern char ebcdic_to_ascii[256];
-extern char ascii_to_ebcdic[256];
+extern unsigned char ebcdic_to_ascii[];
+extern unsigned char ascii_to_ebcdic[];
 int32 s1sel, s2sel;
 char rbuf[CBUFSIZE];                                    /* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);
