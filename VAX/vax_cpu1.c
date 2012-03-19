@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (from Mark Pizzolato)
    25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
    23-Mar-11    RMS     Revised idle design (from Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
@@ -1137,7 +1138,7 @@ else {
         SP = KSP;                                       /* new stack */
         }
     }
-if (ei == IE_INT) {                                     /* if int, new IPL */
+if (ei > 0) {                                           /* if int, new IPL */
     int32 newipl;
     if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
         newipl = PSL_IPL17;                             /* force IPL 17 */
@@ -1274,7 +1275,7 @@ return newpsl & CC_MASK;                                /* set new cc */
 
 void op_ldpctx (int32 acc)
 {
-int32 newpc, newpsl, pcbpa, t;
+uint32 newpc, newpsl, pcbpa, t;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;

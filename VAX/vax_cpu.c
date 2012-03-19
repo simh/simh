@@ -35,6 +35,8 @@
                         approach taken in the other BSD derived OSes.  
                         Determining a reasonable idle detection pattern does 
                         not seem possible for these versions.
+   13-Sep-11    RMS     Fixed XFC, BPT to clear PSL<tp> before exception
+                        (found by Camiel Vanderhoeven)
    23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
    05-Jan-11    MP      Added Asynch I/O support
    24-Apr-10    RMS     Added OLDVMS idle timer option
@@ -1585,7 +1587,7 @@ for ( ;; ) {
 
     case TSTL:
         CC_IIZZ_L (op0);                                /* set cc's */
-        if ((cc == CC_Z) &&
+        if ((cc == CC_Z) &&                             /* zero result and */
             ((((cpu_idle_mask & VAX_IDLE_ULTOLD) &&     /* running Old Ultrix or friends? */
                (PSL_GETIPL (PSL) == 0x1)) ||            /*  at IPL 1? */
               ((cpu_idle_mask & VAX_IDLE_QUAD) &&       /* running Quasijarus or friends? */
@@ -2553,12 +2555,14 @@ for ( ;; ) {
 
     case BPT:
         SETPC (fault_PC);
+        PSL = PSL & ~PSL_TP;                                /* clear <tp> */
         cc = intexc (SCB_BPT, cc, 0, IE_EXC);
         GET_CUR;
         break;
 
     case XFC:
         SETPC (fault_PC);
+        PSL = PSL & ~PSL_TP;                                /* clear <tp> */
         cc = intexc (SCB_XFC, cc, 0, IE_EXC);
         GET_CUR;
         break;

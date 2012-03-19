@@ -1,4 +1,4 @@
-/* vax_sys.c: VAX simulator interface
+/* vax_syslist.c: VAX device list
 
    Copyright (c) 1998-2008, Robert M Supnik
 

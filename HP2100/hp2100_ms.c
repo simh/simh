@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    11-Aug-08    JDB     Revised to use AR instead of saved_AR in boot
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    28-Dec-06    JDB     Added ioCRS state to I/O decoders
@@ -152,9 +154,11 @@
 enum { A13181, A13183 } ms_ctype = A13181;              /* ctrl type */
 int32 ms_timing = 1;                                    /* timing type */
 
-FLIP_FLOP msc_control = CLEAR;
-FLIP_FLOP msc_flag = CLEAR;
-FLIP_FLOP msc_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } msc = { CLEAR, CLEAR, CLEAR };
 
 int32 msc_sta = 0;                                      /* status */
 int32 msc_buf = 0;                                      /* buffer */
@@ -162,9 +166,11 @@ int32 msc_usl = 0;                                      /* unit select */
 int32 msc_1st = 0;                                      /* first service */
 int32 msc_stopioe = 1;                                  /* stop on error */
 
-FLIP_FLOP msd_control = CLEAR;
-FLIP_FLOP msd_flag = CLEAR;
-FLIP_FLOP msd_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } msd = { CLEAR, CLEAR, CLEAR };
 
 int32 msd_buf = 0;                                      /* data buffer */
 uint8 msxb[DBSIZE] = { 0 };                             /* data buffer */
@@ -206,8 +212,10 @@ const TIMESET msc_times[3] = {
     };
 
 DEVICE msd_dev, msc_dev;
-uint32 msdio (uint32 select_code, IOSIG signal, uint32 data);
-uint32 mscio (uint32 select_code, IOSIG signal, uint32 data);
+
+IOHANDLER msdio;
+IOHANDLER mscio;
+
 t_stat msc_svc (UNIT *uptr);
 t_stat msc_reset (DEVICE *dptr);
 t_stat msc_attach (UNIT *uptr, char *cptr);
@@ -235,8 +243,8 @@ t_stat ms_clear (void);
 */
 
 DIB ms_dib[] = {
-    { MSD, &msdio },
-    { MSC, &mscio }
+    { &msdio, MSD },
+    { &mscio, MSC }
     };
 
 #define msd_dib ms_dib[0]
@@ -246,13 +254,13 @@ UNIT msd_unit = { UDATA (NULL, 0, 0) };
 
 REG msd_reg[] = {
     { ORDATA (BUF, msd_buf, 16) },
-    { FLDATA (CTL, msd_control, 0) },
-    { FLDATA (FLG, msd_flag, 0) },
-    { FLDATA (FBF, msd_flagbuf, 0) },
+    { FLDATA (CTL, msd.control, 0) },
+    { FLDATA (FLG, msd.flag, 0) },
+    { FLDATA (FBF, msd.flagbuf, 0) },
     { BRDATA (DBUF, msxb, 8, 8, DBSIZE) },
     { DRDATA (BPTR, ms_ptr, DB_N_SIZE + 1) },
     { DRDATA (BMAX, ms_max, DB_N_SIZE + 1) },
-    { ORDATA (DEVNO, msd_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, msd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -295,9 +303,9 @@ REG msc_reg[] = {
     { ORDATA (BUF, msc_buf, 16) },
     { ORDATA (USEL, msc_usl, 2) },
     { FLDATA (FSVC, msc_1st, 0) },
-    { FLDATA (CTL, msc_control, 0) },
-    { FLDATA (FLG, msc_flag, 0) },
-    { FLDATA (FBF, msc_flagbuf, 0) },
+    { FLDATA (CTL, msc.control, 0) },
+    { FLDATA (FLG, msc.flag, 0) },
+    { FLDATA (FBF, msc.flagbuf, 0) },
     { URDATA (POS, msc_unit[0].pos, 10, T_ADDR_W, 0, MS_NUMDR, PV_LEFT) },
     { URDATA (FNC, msc_unit[0].FNC, 8, 8, 0, MS_NUMDR, REG_HRO) },
     { URDATA (UST, msc_unit[0].UST, 8, 12, 0, MS_NUMDR, REG_HRO) },
@@ -311,7 +319,7 @@ REG msc_reg[] = {
     { FLDATA (TIMING, ms_timing, 0), REG_HRO },
     { FLDATA (STOP_IOE, msc_stopioe, 0) },
     { FLDATA (CTYPE, ms_ctype, 0), REG_HRO },
-    { ORDATA (DEVNO, msc_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, msc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -362,75 +370,77 @@ DEVICE msc_dev = {
 
 /* Data channel I/O signal handler */
 
-uint32 msdio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 msdio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        msd_flag = msd_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
+        case ioCLF:                                     /* clear flag flip-flop */
+            msd.flag = msd.flagbuf = CLEAR;
+            break;
 
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        msd_flag = msd_flagbuf = SET;
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            msd.flag = msd.flagbuf = SET;
+            break;
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (msd);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (msd);
+            break;
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (msd);
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (msd);
+            break;
 
-    case ioIOI:                                         /* I/O data input */
-        data = msd_buf;
-        break;
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, msd_buf);    /* merge in return status */
+            break;
 
-    case ioIOO:                                         /* I/O data output */
-        msd_buf = data;                                 /* store data */
-        break;
+        case ioIOO:                                     /* I/O data output */
+            msd_buf = IODATA (stat_data);               /* store data */
+            break;
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        ms_clear ();                                    /* issue CLR to controller */
-                                                        /* fall into CRS handler */
-    case ioCRS:                                         /* control reset */
-        msd_flag = msd_flagbuf = SET;                   /* set flag and flag buffer */
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            ms_clear ();                                /* issue CLR to controller */
+            break;
+
+        case ioCRS:                                     /* control reset */
+            msd.flag = msd.flagbuf = SET;               /* set flag and flag buffer */
                                                         /* fall into CLC handler */
-    case ioCLC:                                         /* clear control flip-flop */
-        msd_control = CLEAR;
-        break;
+        case ioCLC:                                     /* clear control flip-flop */
+            msd.control = CLEAR;
+            break;
 
-    case ioSTC:                                         /* set control flip-flop */
-        msd_control = SET;
-        break;
+        case ioSTC:                                     /* set control flip-flop */
+            msd.control = SET;
+            break;
 
-    case ioEDT:                                         /* end data transfer */
-        msd_flag = msd_flagbuf = CLEAR;                 /* same as CLF */
-        break;
+        case ioEDT:                                     /* end data transfer */
+            msd.flag = msd.flagbuf = CLEAR;             /* same as CLF */
+            break;
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, msd);                   /* set standard PRL signal */
-        setstdIRQ (select_code, msd);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, msd);                   /* set standard SRQ signal */
-        break;
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (msd);                            /* set standard PRL signal */
+            setstdIRQ (msd);                            /* set standard IRQ signal */
+            setstdSRQ (msd);                            /* set standard SRQ signal */
+            break;
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        msd_flagbuf = CLEAR;
-        break;
+        case ioIAK:                                     /* interrupt acknowledge */
+            msd.flagbuf = CLEAR;
+            break;
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-if (signal > ioCLF)                                     /* multiple signals? */
-    msdio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    msdio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -453,195 +463,197 @@ return data;
        the command card under simulation to allow the command card to interrupt.
 */
 
-uint32 mscio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 mscio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
 static const uint8 map_sel[16] = {
     0, 0, 1, 1, 2, 2, 2, 2,
     3, 3, 3, 3, 3, 3, 3, 3
     };
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+uint16 data;
 int32 sched_time;
 UNIT *uptr = msc_dev.units + msc_usl;
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        msc_flag = msc_flagbuf = CLEAR;
-        break;
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
+    switch (signal) {                                   /* dispatch I/O signal */
 
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        msc_flag = msc_flagbuf = SET;
-        break;
-
-
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (msc);
-        break;
-
-
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (msc);
-        break;
-
-
-    case ioIOI:                                         /* I/O data input */
-        data = msc_sta & ~STA_DYN;                      /* get card status */
-
-        if ((uptr->flags & UNIT_OFFLINE) == 0) {        /* online? */
-            data = data | uptr->UST;                    /* add unit status */
-
-            if (sim_tape_bot (uptr))                    /* BOT? */
-                data = data | STA_BOT;
-
-            if (sim_is_active (uptr) &&                 /* TBSY unless RWD at BOT */
-                !((uptr->FNC & FNF_RWD) && sim_tape_bot (uptr)))
-                data = data | STA_TBSY;
-
-            if (sim_tape_wrp (uptr))                    /* write prot? */
-                data = data | STA_WLK;
-
-            if (sim_tape_eot (uptr))                    /* EOT? */
-                data = data | STA_EOT;
-            }
-
-        else
-            data = data | STA_TBSY | STA_LOCAL;
-
-        if (ms_ctype == A13183)                         /* 13183A? */
-            data = data | STA_PE | (msc_usl << STA_V_SEL);
-
-        if (DEBUG_PRI (msc_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", data);
-
-        break;
-
-
-    case ioIOO:                                         /* I/O data output */
-        if (DEBUG_PRI (msc_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", data);
-
-        msc_buf = data;
-        msc_sta = msc_sta & ~STA_REJ;                   /* clear reject */
-
-        if ((data & 0377) == FNC_CLR)                   /* clear always ok */
+        case ioCLF:                                     /* clear flag flip-flop */
+            msc.flag = msc.flagbuf = CLEAR;
             break;
 
-        if (msc_sta & STA_BUSY) {                       /* busy? reject */
-            msc_sta = msc_sta | STA_REJ;                /* dont chg select */
+
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            msc.flag = msc.flagbuf = SET;
             break;
-            }
-
-        if (data & FNF_CHS) {                           /* select change */
-            msc_usl = map_sel[FNC_GETSEL (data)];       /* is immediate */
-            uptr = msc_dev.units + msc_usl;
-            if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>MSC OTx: Unit %d selected\n", msc_usl);
-            }
-
-        if (((data & FNF_MOT) && sim_is_active (uptr)) ||
-            ((data & FNF_REV) && sim_tape_bot (uptr)) ||
-            ((data & FNF_WRT) && sim_tape_wrp (uptr)))
-            msc_sta = msc_sta | STA_REJ;                /* reject? */
-
-        break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-                                                        /* fall into CRS handler */
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (msc);
+            break;
 
-    case ioCRS:                                         /* control reset */
-        msc_flag = msc_flagbuf = SET;                   /* set flag and flag buffer */
+
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (msc);
+            break;
+
+
+        case ioIOI:                                     /* I/O data input */
+            data = msc_sta & ~STA_DYN;                  /* get card status */
+
+            if ((uptr->flags & UNIT_OFFLINE) == 0) {    /* online? */
+                data = data | uptr->UST;                /* add unit status */
+
+                if (sim_tape_bot (uptr))                /* BOT? */
+                    data = data | STA_BOT;
+
+                if (sim_is_active (uptr) &&             /* TBSY unless RWD at BOT */
+                    !((uptr->FNC & FNF_RWD) && sim_tape_bot (uptr)))
+                    data = data | STA_TBSY;
+
+                if (sim_tape_wrp (uptr))                /* write prot? */
+                    data = data | STA_WLK;
+
+                if (sim_tape_eot (uptr))                /* EOT? */
+                    data = data | STA_EOT;
+                }
+
+            else
+                data = data | STA_TBSY | STA_LOCAL;
+
+            if (ms_ctype == A13183)                     /* 13183A? */
+                data = data | STA_PE | (msc_usl << STA_V_SEL);
+
+            if (DEBUG_PRI (msc_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MSC LIx: Status = %06o\n", data);
+
+            stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
+            break;
+
+
+        case ioIOO:                                         /* I/O data output */
+            msc_buf = IODATA (stat_data);                   /* clear supplied status */
+
+            if (DEBUG_PRI (msc_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MSC OTx: Command = %06o\n", msc_buf);
+
+            msc_sta = msc_sta & ~STA_REJ;                   /* clear reject */
+
+            if ((msc_buf & 0377) == FNC_CLR)                /* clear always ok */
+                break;
+
+            if (msc_sta & STA_BUSY) {                       /* busy? reject */
+                msc_sta = msc_sta | STA_REJ;                /* dont chg select */
+                break;
+                }
+
+            if (msc_buf & FNF_CHS) {                        /* select change */
+                msc_usl = map_sel[FNC_GETSEL (msc_buf)];    /* is immediate */
+                uptr = msc_dev.units + msc_usl;
+                if (DEBUG_PRI (msc_dev, DEB_CMDS))
+                    fprintf (sim_deb, ">>MSC OTx: Unit %d selected\n", msc_usl);
+                }
+
+            if (((msc_buf & FNF_MOT) && sim_is_active (uptr)) ||
+                ((msc_buf & FNF_REV) && sim_tape_bot (uptr)) ||
+                ((msc_buf & FNF_WRT) && sim_tape_wrp (uptr)))
+                msc_sta = msc_sta | STA_REJ;                /* reject? */
+
+            break;
+
+
+        case ioCRS:                                     /* control reset */
+            msc.flag = msc.flagbuf = SET;               /* set flag and flag buffer */
                                                         /* fall into CLC handler */
 
-    case ioCLC:                                         /* clear control flip-flop */
-        msc_control = CLEAR;
-        break;
+        case ioCLC:                                     /* clear control flip-flop */
+            msc.control = CLEAR;
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        if (!(msc_sta & STA_REJ)) {                     /* last cmd rejected? */
-            if ((msc_buf & 0377) == FNC_CLR) {          /* clear? */
-                ms_clear ();                            /* issue CLR to controller */
+        case ioSTC:                                     /* set control flip-flop */
+            if (!(msc_sta & STA_REJ)) {                 /* last cmd rejected? */
+                if ((msc_buf & 0377) == FNC_CLR) {      /* clear? */
+                    ms_clear ();                        /* issue CLR to controller */
 
-                msc_control = SET;                      /* set CTL for STC */
-                msc_flag = msc_flagbuf = SET;           /* set FLG for completion */
+                    msc.control = SET;                  /* set CTL for STC */
+                    msc.flag = msc.flagbuf = SET;       /* set FLG for completion */
 
-                signal = ioSTC;                         /* eliminate possible CLF */
+                    working_set = working_set & ~ioCLF; /* eliminate possible CLF */
 
-                if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                    fputs (">>MSC STC: Controller cleared\n", sim_deb);
+                    if (DEBUG_PRI (msc_dev, DEB_CMDS))
+                        fputs (">>MSC STC: Controller cleared\n", sim_deb);
 
-                break;                                  /* command completes immediately */
+                    break;                              /* command completes immediately */
+                    }
+
+                uptr->FNC = msc_buf & 0377;             /* save function */
+
+                if (uptr->FNC & FNF_RWD) {              /* rewind? */
+                    if (!sim_tape_bot (uptr))           /* not at BOT? */
+                        uptr->UST = STA_REW;            /* set rewinding */
+
+                    sched_time = msc_rtime;             /* set response time */
+                    }
+
+                else {
+                    if (sim_tape_bot (uptr))            /* at BOT? */
+                        sched_time = msc_btime;         /* use BOT start time */
+
+                    else if ((uptr->FNC == FNC_GAP) || (uptr->FNC == FNC_GFM))
+                        sched_time = msc_gtime;         /* use gap traversal time */
+
+                    else sched_time = 0;
+
+                    if (uptr->FNC != FNC_GAP)
+                        sched_time += msc_ctime;        /* add base command time */
+                    }
+
+                if (msc_buf & ~FNC_SEL) {               /* NOP for unit sel alone */
+                    sim_activate (uptr, sched_time);    /* else schedule op */
+
+                    if (DEBUG_PRI (msc_dev, DEB_CMDS))
+                        fprintf (sim_deb,
+                            ">>MSC STC: Unit %d command %03o (%s) scheduled, "
+                            "pos = %d, time = %d\n",
+                            msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
+                            uptr->pos, sched_time);
+                    }
+
+                else if (DEBUG_PRI (msc_dev, DEB_CMDS))
+                    fputs (">>MSC STC: Unit select (NOP)\n", sim_deb);
+
+                msc_sta = STA_BUSY;                     /* ctrl is busy */
+                msc_1st = 1;
+                msc.control = SET;                      /* go */
                 }
-
-            uptr->FNC = msc_buf & 0377;                 /* save function */
-
-            if (uptr->FNC & FNF_RWD) {                  /* rewind? */
-                if (!sim_tape_bot (uptr))               /* not at BOT? */
-                    uptr->UST = STA_REW;                /* set rewinding */
-
-                sched_time = msc_rtime;                 /* set response time */
-                }
-
-            else {
-                if (sim_tape_bot (uptr))                /* at BOT? */
-                    sched_time = msc_btime;             /* use BOT start time */
-
-                else if ((uptr->FNC == FNC_GAP) || (uptr->FNC == FNC_GFM))
-                    sched_time = msc_gtime;             /* use gap traversal time */
-
-                else sched_time = 0;
-
-                if (uptr->FNC != FNC_GAP)
-                    sched_time += msc_ctime;            /* add base command time */
-                }
-
-            if (msc_buf & ~FNC_SEL) {                   /* NOP for unit sel alone */
-                sim_activate (uptr, sched_time);        /* else schedule op */
-
-                if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                    fprintf (sim_deb,
-                        ">>MSC STC: Unit %d command %03o (%s) scheduled, "
-                        "pos = %d, time = %d\n",
-                        msc_usl, uptr->FNC, ms_cmd_name (uptr->FNC),
-                        uptr->pos, sched_time);
-                }
-
-            else if (DEBUG_PRI (msc_dev, DEB_CMDS))
-                fputs (">>MSC STC: Unit select (NOP)\n", sim_deb);
-
-            msc_sta = STA_BUSY;                         /* ctrl is busy */
-            msc_1st = 1;
-            msc_control = SET;                          /* go */
-            }
-        break;
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, msc);                   /* set standard PRL signal */
-        setstdIRQ (select_code, msc);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, msc);                   /* set standard SRQ signal */
-        break;
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (msc);                            /* set standard PRL signal */
+            setstdIRQ (msc);                            /* set standard IRQ signal */
+            setstdSRQ (msc);                            /* set standard SRQ signal */
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        msc_flagbuf = CLEAR;
-        break;
+        case ioIAK:                                     /* interrupt acknowledge */
+            msc.flagbuf = CLEAR;
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    mscio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    mscio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -671,8 +683,8 @@ unum = uptr - msc_dev.units;                            /* get unit number */
 
 if ((uptr->FNC != FNC_RWS) && (uptr->flags & UNIT_OFFLINE)) {  /* offline? */
     msc_sta = (msc_sta | STA_REJ) & ~STA_BUSY;          /* reject */
-    mscio (msc_dib.devno, ioENF, 0);                    /* set flag */
-    return IORETURN (msc_stopioe, SCPE_UNATT);
+    mscio (&msc_dib, ioENF, 0);                         /* set flag */
+    return IOERROR (msc_stopioe, SCPE_UNATT);
     }
 
 switch (uptr->FNC) {                                    /* case on function */
@@ -779,12 +791,12 @@ switch (uptr->FNC) {                                    /* case on function */
             if (ms_ctype == A13183)
                 msc_sta = msc_sta | STA_ODD;            /* set ODD for 13183A */
             }
-        if (msd_control && (ms_ptr < ms_max)) {         /* DCH on, more data? */
-            if (msd_flag) msc_sta = msc_sta | STA_TIM | STA_PAR;
+        if (msd.control && (ms_ptr < ms_max)) {         /* DCH on, more data? */
+            if (msd.flag) msc_sta = msc_sta | STA_TIM | STA_PAR;
             msd_buf = ((uint16) msxb[ms_ptr] << 8) |
                       ((ms_ptr + 1 == ms_max) ? 0 : msxb[ms_ptr + 1]);
             ms_ptr = ms_ptr + 2;
-            msdio (msd_dib.devno, ioENF, 0);            /* set flag */
+            msdio (&msd_dib, ioENF, 0);                 /* set flag */
             sim_activate (uptr, msc_xtime);             /* re-activate */
             return SCPE_OK;
             }
@@ -822,8 +834,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 }
             else msc_sta = msc_sta | STA_PAR;
            }
-        if (msd_control) {                              /* xfer flop set? */
-            msdio (msd_dib.devno, ioENF, 0);            /* set flag */
+        if (msd.control) {                              /* xfer flop set? */
+            msdio (&msd_dib, ioENF, 0);                 /* set flag */
             sim_activate (uptr, msc_xtime);             /* re-activate */
             return SCPE_OK;
             }
@@ -853,7 +865,7 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
         }
 
-mscio (msc_dib.devno, ioENF, 0);                        /* set flag */
+mscio (&msc_dib, ioENF, 0);                             /* set flag */
 msc_sta = msc_sta & ~STA_BUSY;                          /* update status */
 if (DEBUG_PRI (msc_dev, DEB_CMDS))
      fprintf (sim_deb,
@@ -973,17 +985,15 @@ t_stat msc_reset (DEVICE *dptr)
 {
 int32 i;
 UNIT *uptr;
+DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
 
 hp_enbdis_pair (dptr,                                   /* make pair cons */
     (dptr == &msd_dev) ? &msc_dev : &msd_dev);
 
-if (sim_switches & SWMASK ('P'))                        /* PON reset? */
+if (sim_switches & SWMASK ('P'))                        /* initialization reset? */
     ms_config_timing ();
 
-if (dptr == &msc_dev)                                   /* command channel reset? */
-    mscio (msc_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to command channel */
-else                                                    /* data channel reset */
-    msdio (msd_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to data channel */
+IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
 
 msc_buf = msd_buf = 0;
 msc_sta = msc_usl = 0;
@@ -1247,7 +1257,7 @@ t_stat msc_boot (int32 unitno, DEVICE *dptr)
 int32 dev;
 
 if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = msd_dib.devno;                                    /* get data chan dev */
+dev = msd_dib.select_code;                              /* get data chan dev */
 if (ibl_copy (ms_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
 SR = (SR & IBL_OPT) | IBL_MS | (dev << IBL_V_DEV);      /* set SR */
 if ((sim_switches & SWMASK ('S')) && AR) SR = SR | 1;   /* skip? */

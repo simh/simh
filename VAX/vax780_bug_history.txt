@@ -56,6 +56,11 @@ Bugs Found And Fixed During Simulator Debug
 53. MTPR SBR/PCBB/SCBB: 11/780 only checks that bits<1:0> == 0.
 54. MTPR xLR: 11/780 excludes bits<31:24> from mbz test.
 55. MTPR PxBR: 11/780 only checks bits<31,1:0> == 1,00.
+56. EMODx: integer overflow case requiring left shift returns wrong result.
+57. BPT, XFC: not clearing PSL<tp> before taking exception.
+58. POLYx: add step <does> require truncation (proved by AXE tests).
+
+
 
 
 

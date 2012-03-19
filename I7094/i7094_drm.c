@@ -1,6 +1,6 @@
 /* i7094_drm.c: 7289/7320A drum simulator
 
-   Copyright (c) 2005-2008, Robert M Supnik
+   Copyright (c) 2005-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,31 +25,29 @@
 
    drm          7289/7320A "fast" drum
 
-   Very little is known about this device; the behavior simulated here is
-   what is used by CTSS.
+   25-Mar-11    RMS     Updated based on RPQ
+
+   This simulator implements a subset of the functionality of the 7289, as
+   required by CTSS.
 
    - The drum channel/controller behaves like a hybrid of the 7607 and the 7909.
      It responds to SCD (like the 7909), gets its address from the channel
      program (like the 7909), but responds to IOCD/IOCP (like the 7607) and
      sets channel flags (like the 7607).
-   - The drum channel supports at least 2 drums.  The maximum is 8 or less.
+   - The drum channel supports at least 2 drums.  The maximum is 4 or less.
      Physical drums are numbered from 0.
    - Each drum has a capacity of 192K 36b words.  This is divided into 6
      "logical" drum of 32KW each.  Each "logical" drum has 16 2048W "sectors".
      Logical drums are numbered from 1.
-   - The drum's behavior if a sector boundary is crossed in mid-transfer is
-     unknown.  CTSS never does this.
-   - The drum's behavior with record operations is unknown.  CTSS only uses
-     IOCD and IOCP.
-   - The drum's error indicators are unknown.  CTSS regards bits <0:2,13> of
-     the returned SCD data as errors, as well as the normal 7607 trap flags.
-   - The drum's rotational speed is unknown.
+   - The drum allows transfers across sector boundaries, but not logical
+     drum boundaries.
+   - The drum's only supports IOCD, IOCP, and IOCT.  IOCT (and chaining mode)
+     are not used by CTSS.
 
-   Assumptions in this simulator:
+   Limitations in this simulator:
 
-   - Transfers may not cross a sector boundary.  An attempt to do so sets
-     the EOF flag and causes an immediate disconnect.
-   - The hardware never sets end of record.
+   - Chain mode is not implemented.
+   - Write protect switches are not implemented.
 
    For speed, the entire drum is buffered in memory.
 */
@@ -65,6 +63,7 @@
 #define DRM_SCMASK      (DRM_NUMWDS - 1)                /* sector mask */
 #define DRM_NUMSC       16                              /* sectors/log drum */
 #define DRM_NUMWDL      (DRM_NUMWDS * DRM_NUMSC)        /* words/log drum */
+#define DRM_LDMASK      (DRM_NUMWDL - 1)                /* logical disk mask */
 #define DRM_NUMLD       6                               /* log drums/phys drum */
 #define DRM_SIZE        (DRM_NUMLD * DRM_NUMWDL)        /* words/phys drum */
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
@@ -73,7 +72,7 @@
 /* Drum address from channel */
 
 #define DRM_V_PHY       30                              /* physical drum sel */
-#define DRM_M_PHY       07
+#define DRM_M_PHY       03
 #define DRM_V_LOG       18                              /* logical drum sel */
 #define DRM_M_LOG       07
 #define DRM_V_WDA       0                               /* word address */
@@ -83,15 +82,30 @@
 #define DRM_GETWDA(x)   ((((uint32) (x)) >> DRM_V_WDA) & DRM_M_WDA)
 #define DRM_GETDA(x)    (((DRM_GETLOG(x) - 1) * DRM_NUMWDL) + DRM_GETWDA(x))
 
+/* SCD word */
+
+#define DRMS_V_IOC      35                              /* IO check */
+#define DRMS_V_INV      33                              /* invalid command */
+#define DRMS_V_PHY      31                              /* physical drum */
+#define DRMS_V_LOG      28                              /* logical drum */
+#define DRMS_V_HWDA     24                              /* high word addr */
+#define DRMS_M_HWDA     017
+#define DRMS_V_GRP      23                              /* group */
+#define DRMS_V_WRP      22                              /* write protect */
+#define DRMS_V_LPCR     18                              /* LPRCR */
+#define DRMS_M_LPCR     017
+
 /* Drum controller states */
 
 #define DRM_IDLE        0
 #define DRM_1ST         1
-#define DRM_DATA        2
-#define DRM_EOS         3
+#define DRM_FILL        2
+#define DRM_DATA        3
+#define DRM_EOD         4
 
 uint32 drm_ch = CH_G;                                   /* drum channel */
 uint32 drm_da = 0;                                      /* drum address */
+uint32 drm_phy = 0;                                     /* physical drum */
 uint32 drm_sta = 0;                                     /* state */
 uint32 drm_op = 0;                                      /* operation */
 t_uint64 drm_chob = 0;                                  /* output buf */
@@ -131,13 +145,14 @@ UNIT drm_unit[] = {
     { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
              UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
     { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
-             UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) }
+             UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
     };
 
 REG drm_reg[] = {
-    { ORDATA (STATE, drm_sta, 2) },
+    { ORDATA (STATE, drm_sta, 3) },
     { ORDATA (DA, drm_da, 18) },
     { FLDATA (OP, drm_op, 0) },
+    { ORDATA (UNIT,drm_phy, 3) },
     { ORDATA (CHOB, drm_chob, 36) },
     { FLDATA (CHOBV, drm_chob_v, 0) },
     { DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
@@ -188,14 +203,14 @@ return SCPE_OK;
 
 t_stat drm_chwr (uint32 ch, t_uint64 val, uint32 flags)
 {
-uint32 u, l;
+uint32 l;
 int32 cp, dp;
 
 if (drm_sta == DRM_1ST) {
-    u = DRM_GETPHY (val);                               /* get unit */
+    drm_phy = DRM_GETPHY (val);                         /* get unit */
     l = DRM_GETLOG (val);                               /* get logical address */
-    if ((u >= DRM_NUMDR) ||                             /* invalid unit? */
-        (drm_unit[u].flags & UNIT_DIS) ||               /* disabled unit? */
+    if ((drm_phy >= DRM_NUMDR) ||                       /* invalid unit? */
+        (drm_unit[drm_phy].flags & UNIT_DIS) ||         /* disabled unit? */
         (l == 0) || (l > DRM_NUMLD)) {                  /* invalid log drum? */
         ch6_err_disc (ch, U_DRM, CHF_TRC);              /* disconnect */
         drm_sta = DRM_IDLE;
@@ -206,10 +221,12 @@ if (drm_sta == DRM_1ST) {
     dp = (drm_da & DRM_SCMASK) - cp;                    /* delta to desired pos */
     if (dp <= 0)                                        /* if neg, add rev */
         dp = dp + DRM_NUMWDS;
-    sim_activate (&drm_unit[u], dp * drm_time);         /* schedule */
-    if (drm_op)                                         /* if write, get word */
+    sim_activate (&drm_unit[drm_phy], dp * drm_time);   /* schedule */
+    if (drm_op) {                                       /* if write, get word */
         ch6_req_wr (ch, U_DRM);
-    drm_sta = DRM_DATA;
+        drm_sta = DRM_FILL;                             /* sector fill */
+        }
+    else drm_sta = DRM_DATA;                            /* data transfer */
     drm_chob = 0;                                       /* clr, inval buffer */
     drm_chob_v = 0;
     }
@@ -224,6 +241,7 @@ return SCPE_OK;
 
 t_stat drm_svc (UNIT *uptr)
 {
+uint32 i;
 t_uint64 *fbuf = (t_uint64 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? */
@@ -239,6 +257,13 @@ if (drm_da >= DRM_SIZE) {                               /* nx logical drum? */
 
 switch (drm_sta) {                                      /* case on state */
 
+    case DRM_FILL:                                      /* write, clr sector */
+        for (i = drm_da & ~DRM_SCMASK; i <= (drm_da | DRM_SCMASK); i++)
+            fbuf[i] = 0;                                /* clear sector */
+        if (i >= uptr-> hwmark)
+            uptr->hwmark = i + 1;
+        drm_sta = DRM_DATA;                             /* now data */
+                                                        /* fall through */
     case DRM_DATA:                                      /* data */
         if (drm_op) {                                   /* write? */
             if (drm_chob_v)                             /* valid? clear */
@@ -258,7 +283,7 @@ switch (drm_sta) {                                      /* case on state */
         sim_activate (uptr, drm_time);                  /* next word */
         break;
 
-    case DRM_EOS:                                       /* end sector */
+    case DRM_EOD:                                       /* end logical disk */
         if (ch6_qconn (drm_ch, U_DRM))                  /* drum still conn? */
             ch6_err_disc (drm_ch, U_DRM, CHF_EOF);      /* set EOF, disc */
         drm_sta = DRM_IDLE;                             /* drum is idle */
@@ -272,10 +297,10 @@ return SCPE_OK;
 
 t_bool drm_da_incr (void)
 {
-drm_da = drm_da + 1;
-if (drm_da & DRM_SCMASK)
+drm_da = (drm_da & ~DRM_LDMASK) | ((drm_da + 1) & DRM_LDMASK);
+if ((drm_da & DRM_LDMASK) != 0)
     return FALSE;
-drm_sta = DRM_EOS;
+drm_sta = DRM_EOD;
 return TRUE;
 }
 
@@ -285,6 +310,7 @@ t_stat drm_reset (DEVICE *dptr)
 {
 uint32 i;
 
+drm_phy = 0;
 drm_da = 0;
 drm_op = 0;
 drm_sta = DRM_IDLE;

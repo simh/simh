@@ -126,10 +126,6 @@ static MTAB if3_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(if3_dev.dctrl & level) { \
-                                       printf args;             \
-                                    }
-
 /* Debug Flags */
 static DEBTAB if3_dt[] = {
     { "ERROR",  ERROR_MSG   },
@@ -153,15 +149,15 @@ DEVICE if3_dev = {
 static t_stat set_if3_connect(UNIT *uptr, int32 val, char *cptr, void *desc)
 {
     if(uptr->flags & UNIT_DISABLE) {
-        TRACE_PRINT(ERROR_MSG, ("IF3[%d]: not enabled." NLP, uptr->u3));
+        sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: not enabled.\n", uptr->u3);
         return SCPE_OK;
     }
 
     if(val & UNIT_IF3_CONNECT) {
-        TRACE_PRINT((RXIRQ_MSG|TXIRQ_MSG), ("IF3[%d]: IRQ polling started..." NLP, uptr->u3));
+        sim_debug((RXIRQ_MSG|TXIRQ_MSG), &if3_dev, "IF3[%d]: IRQ polling started...\n", uptr->u3);
         sim_activate(uptr, 100000);
     } else {
-        TRACE_PRINT((RXIRQ_MSG|TXIRQ_MSG), ("IF3[%d]: IRQ polling stopped." NLP, uptr->u3));
+        sim_debug((RXIRQ_MSG|TXIRQ_MSG), &if3_dev, "IF3[%d]: IRQ polling stopped.\n", uptr->u3);
         sim_cancel(uptr);
     }
     return (SCPE_OK);
@@ -189,7 +185,7 @@ static t_stat if3_reset(DEVICE *dptr)
         for(i=0;i<IF3_MAX_BOARDS;i++) {
             if3_unit[i].u3 = i; /* Store unit board ID in u3. Also guarantees that u3 < IF3_MAX_BOARDS */
             if(if3_unit[i].flags & UNIT_IF3_CONNECT) {
-                TRACE_PRINT((RXIRQ_MSG|TXIRQ_MSG), ("IF3[%d]: IRQ polling started..." NLP, i));
+                sim_debug((RXIRQ_MSG|TXIRQ_MSG), &if3_dev, "IF3[%d]: IRQ polling started...\n", i);
                 sim_activate(&if3_unit[i], 200000); /* start Rx/Tx interrupt polling routine */
 
             }
@@ -224,43 +220,40 @@ static uint8 IF3_Read(const uint32 Addr)
 
     /* Check if board is connected */
     if(!(if3_unit[if3_board].flags & UNIT_IF3_CONNECT)) {
-        TRACE_PRINT(ERROR_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART[%d] Board not connected DATA=0x%02x" NLP,
-                                if3_board, PCX, if3_user, cData));
+        sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART[%d] Board not connected DATA=0x%02x\n", if3_board, PCX, if3_user, cData);
         return cData;
     }
 
     switch(Addr & 0x07) {
         case IF3_UART_DATA:
             cData = sio0d(IF3_PORT_BASE+(if3_board*0x10)+(if3_user*2), 0, 0);
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART[%d] DATA=0x%02x Port=0x%03x" NLP,
-                                   if3_board, PCX, if3_user, cData, IF3_PORT_BASE+(if3_board*0x10)+(if3_user*2)));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART[%d] DATA=0x%02x Port=0x%03x\n", if3_board, PCX, if3_user, cData, IF3_PORT_BASE+(if3_board*0x10)+(if3_user*2));
             break;
         case IF3_UART_STAT:
             cData = sio0s(IF3_PORT_BASE+(if3_board*0x10)+1+(if3_user*2), 0, 0);
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART[%d] STAT=0x%02x Port=0x%03x" NLP,
-                                   if3_board, PCX, if3_user, cData, IF3_PORT_BASE+(if3_board*0x10)+1+(if3_user*2)));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART[%d] STAT=0x%02x Port=0x%03x\n", if3_board, PCX, if3_user, cData, IF3_PORT_BASE+(if3_board*0x10)+1+(if3_user*2));
             break;
         case IF3_UART_MODE:
-            TRACE_PRINT(ERROR_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART MODE cannot read 0x%02x" NLP, if3_board, PCX, Addr));
+            sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART MODE cannot read 0x%02x\n", if3_board, PCX, Addr);
             break;
         case IF3_UART_CMD:
-            TRACE_PRINT(ERROR_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART CMD cannot read 0x%02x" NLP, if3_board, PCX, Addr));
+            sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART CMD cannot read 0x%02x\n", if3_board, PCX, Addr);
             break;
         case IF3_TISR:
             update_rx_tx_isr (&if3_unit[if3_board]);
             cData = if3_tisr[if3_board];
-            TRACE_PRINT(TXIRQ_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART TISR=0x%02x" NLP, if3_board, PCX, cData));
+            sim_debug(TXIRQ_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART TISR=0x%02x\n", if3_board, PCX, cData);
             break;
         case IF3_RISR:
             update_rx_tx_isr (&if3_unit[if3_board]);
             cData = if3_risr[if3_board];
-            TRACE_PRINT(RXIRQ_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART RISR=0x%02x" NLP, if3_board,  PCX, cData));
+            sim_debug(RXIRQ_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART RISR=0x%02x\n", if3_board,  PCX, cData);
             break;
         case IF3_RESERVED:
-            TRACE_PRINT(ERROR_MSG, ("IF3[%d]: " ADDRESS_FORMAT " RD UART RESERVED cannot read 0x%02x" NLP, if3_board, PCX, Addr));
+            sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " RD UART RESERVED cannot read 0x%02x\n", if3_board, PCX, Addr);
             break;
         case IF3_USER_SEL:
-            TRACE_PRINT(USER_MSG, ("IF3[%d]: " ADDRESS_FORMAT " Cannot read UART_SEL" NLP, if3_board, PCX));
+            sim_debug(USER_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " Cannot read UART_SEL\n", if3_board, PCX);
             break;
     }
 
@@ -273,8 +266,7 @@ static uint8 IF3_Write(const uint32 Addr, uint8 cData)
     /* Check if board is connected for all ports except "user select" */
     if((Addr & 0x7) != IF3_USER_SEL) {
         if(!(if3_unit[if3_board].flags & UNIT_IF3_CONNECT)) {
-            TRACE_PRINT(ERROR_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] Board not connected DATA=0x%02x" NLP,
-                                    if3_board, PCX, if3_user, cData));
+            sim_debug(ERROR_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] Board not connected DATA=0x%02x\n", if3_board, PCX, if3_user, cData);
             return cData;
         }
     }
@@ -282,34 +274,32 @@ static uint8 IF3_Write(const uint32 Addr, uint8 cData)
     switch(Addr & 0x07) {
         case IF3_UART_DATA:
             sio0d(IF3_PORT_BASE+(if3_board*0x10)+(if3_user*2), 1, cData);
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] DATA=0x%02x Port=0x%03x" NLP,
-                                   if3_board, PCX, if3_user, cData, IF3_PORT_BASE+(if3_board*0x10)+(if3_user*2)));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] DATA=0x%02x Port=0x%03x\n", if3_board, PCX, if3_user, cData, IF3_PORT_BASE+(if3_board*0x10)+(if3_user*2));
             break;
         case IF3_UART_STAT:
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] STAT=0x%02x" NLP, if3_board, PCX, if3_user, cData));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] STAT=0x%02x\n", if3_board, PCX, if3_user, cData);
             break;
         case IF3_UART_MODE:
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] MODE=0x%02x" NLP, if3_board, PCX, if3_user, cData));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] MODE=0x%02x\n", if3_board, PCX, if3_user, cData);
             break;
         case IF3_UART_CMD:
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] CMD=0x%02x" NLP, if3_board, PCX, if3_user, cData));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] CMD=0x%02x\n", if3_board, PCX, if3_user, cData);
             break;
         case IF3_TISR:
-            TRACE_PRINT(TXIRQ_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART TIMR=0x%02x" NLP, if3_board, PCX, cData));
+            sim_debug(TXIRQ_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART TIMR=0x%02x\n", if3_board, PCX, cData);
             if3_timr[if3_board] = cData;
             break;
         case IF3_RISR:
-            TRACE_PRINT(RXIRQ_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART RIMR=0x%02x" NLP, if3_board, PCX, cData));
+            sim_debug(RXIRQ_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART RIMR=0x%02x\n", if3_board, PCX, cData);
             if3_rimr[if3_board] = cData;
             break;
         case IF3_RESERVED:
-            TRACE_PRINT(UART_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] RESERVED=0x%02x" NLP, if3_board, PCX, if3_user, cData));
+            sim_debug(UART_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART[%d] RESERVED=0x%02x\n", if3_board, PCX, if3_user, cData);
             break;
         case IF3_USER_SEL:
             if3_board = (cData & 0x18) >> 3; /* guarantees that if3_board < IF3_MAX_BOARDS */
             if3_user = cData & 0x7;
-            TRACE_PRINT(USER_MSG, ("IF3[%d]: " ADDRESS_FORMAT " WR UART_SEL=0x%02x (Board=%d, Rel_User=%d, User=%d)" NLP,
-                if3_board, PCX, cData, if3_board, if3_user, cData));
+            sim_debug(USER_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " WR UART_SEL=0x%02x (Board=%d, Rel_User=%d, User=%d)\n", if3_board, PCX, cData, if3_board, if3_user, cData);
             break;
     }
 
@@ -334,13 +324,13 @@ static t_stat if3_svc (UNIT *uptr)
 
     pending_rx_irqs = if3_risr[board] & if3_rimr[board];
     if(pending_rx_irqs) {
-        TRACE_PRINT(RXIRQ_MSG, ("IF3[%d]: " ADDRESS_FORMAT " Rx IRQ Pending: 0x%02x" NLP, board, PCX, pending_rx_irqs));
+        sim_debug(RXIRQ_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " Rx IRQ Pending: 0x%02x\n", board, PCX, pending_rx_irqs);
         raise_ss1_interrupt(SS1_VI2_INT);
     }
 
     pending_tx_irqs = if3_tisr[board] & if3_timr[board];
     if(pending_tx_irqs) {
-        TRACE_PRINT(TXIRQ_MSG, ("IF3[%d]: " ADDRESS_FORMAT " Tx IRQ Pending: 0x%02x" NLP, board, PCX, pending_tx_irqs));
+        sim_debug(TXIRQ_MSG, &if3_dev, "IF3[%d]: " ADDRESS_FORMAT " Tx IRQ Pending: 0x%02x\n", board, PCX, pending_tx_irqs);
         raise_ss1_interrupt(SS1_VI3_INT);
     }
 

@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2010, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
+   26-Oct-10    JDB     Changed DIB access for revised signal model
    03-Sep-08    JDB     Fixed IAK instruction dual-use mnemonic display
    07-Aug-08    JDB     Moved hp_setdev, hp_showdev from hp2100_cpu.c
                         Changed sim_load to use WritePW instead of direct M[] access
@@ -60,7 +62,7 @@ extern UNIT   cpu_unit;
 extern REG    cpu_reg[];
 
 extern DEVICE mp_dev;
-extern DEVICE dma0_dev, dma1_dev;
+extern DEVICE dma1_dev, dma2_dev;
 extern DEVICE ptr_dev, ptp_dev;
 extern DEVICE tty_dev, clk_dev;
 extern DEVICE lps_dev;
@@ -98,8 +100,7 @@ int32 sim_emax = 3;
 DEVICE *sim_devices[] = {
     &cpu_dev,
     &mp_dev,
-    &dma0_dev,
-    &dma1_dev,
+    &dma1_dev, &dma2_dev,
     &ptr_dev,
     &ptp_dev,
     &tty_dev,
@@ -772,18 +773,18 @@ else {                                                  /* printable character *
 t_stat hp_setdev (UNIT *uptr, int32 num, char *cptr, void *desc)
 {
 DEVICE *dptr = (DEVICE *) desc;
-DIB *dibp;
+DIB *dibptr;
 int32 i, newdev;
 t_stat r;
 
 if (cptr == NULL) return SCPE_ARG;
 if ((desc == NULL) || (num > 1)) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
+dibptr = (DIB *) dptr->ctxt;
+if (dibptr == NULL) return SCPE_IERR;
 newdev = get_uint (cptr, 8, I_DEVMASK - num, &r);
 if (r != SCPE_OK) return r;
 if (newdev < VARDEV) return SCPE_ARG;
-for (i = 0; i <= num; i++, dibp++) dibp->devno = newdev + i;
+for (i = 0; i <= num; i++, dibptr++) dibptr->select_code = newdev + i;
 return SCPE_OK;
 }
 
@@ -793,13 +794,13 @@ return SCPE_OK;
 t_stat hp_showdev (FILE *st, UNIT *uptr, int32 num, void *desc)
 {
 DEVICE *dptr = (DEVICE *) desc;
-DIB *dibp;
+DIB *dibptr;
 int32 i;
 
 if ((desc == NULL) || (num > 1)) return SCPE_IERR;
-dibp = (DIB *) dptr->ctxt;
-if (dibp == NULL) return SCPE_IERR;
-fprintf (st, "devno=%o", dibp->devno);
-for (i = 1; i <= num; i++) fprintf (st, "/%o", dibp->devno + i);
+dibptr = (DIB *) dptr->ctxt;
+if (dibptr == NULL) return SCPE_IERR;
+fprintf (st, "devno=%o", dibptr->select_code);
+for (i = 1; i <= num; i++) fprintf (st, "/%o", dibptr->select_code + i);
 return SCPE_OK;
 }

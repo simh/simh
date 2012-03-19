@@ -361,6 +361,7 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
     DISK_INFO *myDisk = NULL;
     char *comment;
     char *curptr;
+    char *result;
     uint8 answer;
     int32 len, remaining;
 
@@ -387,8 +388,8 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
     remaining = MAX_COMMENT_LEN;
     do {
         printf("IMD> ");
-        fgets(curptr, remaining - 3, stdin);
-        if (strcmp(curptr, ".\n") == 0) {
+        result = fgets(curptr, remaining - 3, stdin);
+        if ((result == NULL) || (strcmp(curptr, ".\n") == 0)) {
             remaining = 0;
         } else {
             len = strlen(curptr) - 1;
@@ -409,7 +410,10 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
 #ifdef _WIN32 /* This might work under UNIX and/or VMS since this POSIX, but I haven't tried it. */
     _chsize(_fileno(fileref), ftell (fileref));
 #else
-    ftruncate(fileno(fileref), ftell (fileref));
+    if (ftruncate(fileno(fileref), ftell (fileref)) == -1) {
+        printf("SIM_IMD: Error overwriting disk image.\n");
+        return(SCPE_OPENERR);
+    }
 #endif
 
     fprintf(fileref, "IMD SIMH %s %s\n", __DATE__, __TIME__);
@@ -722,7 +726,11 @@ t_stat trackWrite(DISK_INFO *myDisk,
 #ifdef _WIN32 /* This might work under UNIX and/or VMS since this POSIX, but I haven't tried it. */
         _chsize(_fileno(fileref), ftell (fileref));
 #else
-        ftruncate(fileno(fileref), ftell (fileref));
+        if (ftruncate(fileno(fileref), ftell (fileref)) == -1) {
+            printf("Disk truncation failed." NLP);
+            *flags |= IMD_DISK_IO_ERROR_GENERAL;
+            return(SCPE_IOERR);
+        }
 #endif
         /* Flush and re-parse the IMD file. */
         fflush(fileref);

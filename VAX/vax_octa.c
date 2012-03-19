@@ -1,6 +1,6 @@
 /* vax_octa.c - VAX octaword and h_floating instructions
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    This module simulates the VAX h_floating instruction set.
 
+   15-Sep-11    RMS     Fixed integer overflow bug in EMODH
+                        Fixed POLYH normalizing before add mask bug
+                        (both from Camiel Vanderhoeven)
    28-May-08    RMS     Inlined physical memory routines
    10-May-06    RMS     Fixed bug in reported VA on faulting cross-page write
    03-May-06    RMS     Fixed MNEGH to test negated sign, clear C
@@ -93,7 +96,7 @@ void h_write_w (int32 spec, int32 va, int32 val, int32 acc);
 void h_write_l (int32 spec, int32 va, int32 val, int32 acc);
 void h_write_q (int32 spec, int32 va, int32 vl, int32 vh, int32 acc);
 void h_write_o (int32 spec, int32 va, int32 *val, int32 acc);
-void vax_hadd (UFPH *a, UFPH *b);
+void vax_hadd (UFPH *a, UFPH *b, uint32 mlo);
 void vax_hmul (UFPH *a, UFPH *b, uint32 mlo);
 void vax_hmod (UFPH *a, int32 *intgr, int32 *flg);
 void vax_hdiv (UFPH *a, UFPH *b);
@@ -581,7 +584,7 @@ h_unpackh (&opnd[0], &a);                               /* unpack s1, s2 */
 h_unpackh (&opnd[4], &b);
 if (sub)                                                /* sub? -s1 */
     a.sign = a.sign ^ FPSIGN;
-vax_hadd (&a, &b);                                      /* do add */
+vax_hadd (&a, &b, 0);                                   /* do add */
 return h_rpackh (&a, hflt);                             /* round and pack */
 }
 
@@ -643,7 +646,7 @@ for (i = 0; i < deg; i++) {                             /* loop */
     wd[3] = Read (ptr + 12, L_LONG, RD);
     ptr = ptr + 16;
     h_unpackh (wd, &c);                                 /* unpack Cnext */
-    vax_hadd (&r, &c);                                  /* r = r + Cnext */
+    vax_hadd (&r, &c, 1);                               /* r = r + Cnext */
     h_rpackh (&r, res);                                 /* round and pack */
     }
 R[0] = res[0];                                          /* result */
@@ -678,7 +681,7 @@ return h_rpackh (&a, hflt);                             /* round and pack frac *
 
 /* Floating add */
 
-void vax_hadd (UFPH *a, UFPH *b)
+void vax_hadd (UFPH *a, UFPH *b, uint32 mlo)
 {
 int32 ediff;
 UFPH t;
@@ -703,6 +706,7 @@ if (a->sign ^ b->sign) {                                /* eff sub? */
     if (ediff)                                          /* denormalize */
         qp_rsh_s (&b->frac, ediff, 1);
     qp_add (&a->frac, &b->frac);                        /* "add" frac */
+    a->frac.f0 = a->frac.f0 & ~mlo;                     /* mask before norm */
     h_normh (a);                                        /* normalize */
     }
 else {
@@ -713,6 +717,7 @@ else {
         a->frac.f3 = a->frac.f3 | UH_NM_H;              /* add norm bit */
         a->exp = a->exp + 1;                            /* incr exp */
         }
+    a->frac.f0 = a->frac.f0 & ~mlo;                      /* mask */
     }
 return;
 }
@@ -778,7 +783,14 @@ else if (a->exp <= (H_BIAS + 128)) {                    /* in range? */
     a->exp = H_BIAS;
     }
 else {
-    *intgr = 0;                                         /* out of range */
+    if (a->exp < (H_BIAS + 160)) {                      /* left shift needed? */
+        ifr = a->frac;
+        qp_lsh (&ifr, a->exp - H_BIAS - 128);
+        *intgr = ifr.f0;
+        }
+    else *intgr = 0;                                    /* out of range */
+    if (a->sign)
+        *intgr = -*intgr;
     a->frac.f0 = a->frac.f1 = 0;                        /* result 0 */
     a->frac.f2 = a->frac.f3 = 0;
     a->sign = a->exp = 0;

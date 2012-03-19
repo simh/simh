@@ -1,6 +1,6 @@
 /*  altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2010, Peter Schorn
+    Copyright (c) 2002-2011, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -191,6 +191,8 @@ uint8 GetByteDMA(const uint32 Addr);
 void PutByteDMA(const uint32 Addr, const uint32 Value);
 int32 getBankSelect(void);
 void setBankSelect(const int32 b);
+uint32 getClockFrequency(void);
+void setClockFrequency(const uint32 Value);
 uint32 getCommon(void);
 t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
@@ -1867,6 +1869,17 @@ t_stat sim_instr (void) {
     return result;
 }
 
+static int32 clockHasChanged = FALSE;
+
+uint32 getClockFrequency(void) {
+    return clockFrequency;
+}
+
+void setClockFrequency(const uint32 Value) {
+    clockFrequency = Value;
+    clockHasChanged = TRUE;
+}
+
 static t_stat sim_instr_mmu (void) {
     extern int32 sim_interval;
     extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
@@ -1916,22 +1929,29 @@ static t_stat sim_instr_mmu (void) {
         startTime = sim_os_msec();
         tStatesInSlice = sliceLength*clockFrequency;
     }
-    else { /* make sure that sim_os_msec() is not called later */
+    else /* make sure that sim_os_msec() is not called later */
         clockFrequency = startTime = tStatesInSlice = 0;
-    }
 
     /* main instruction fetch/decode loop */
     while (switch_cpu_now == TRUE) {        /* loop until halted    */
         if (sim_interval <= 0) {            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_os_poll_kbd()) == SCPE_STOP) {   /* poll on platforms without reliable signalling */
+            if ((reason = sim_os_poll_kbd()) == SCPE_STOP)   /* poll on platforms without reliable signalling */
                 break;
-            }
 #endif
-            if ( (reason = sim_process_event()) )
+            if ((reason = sim_process_event()))
                 break;
-            else
-                specialProcessing = clockFrequency | timerInterrupt | keyboardInterrupt | sim_brk_summ;
+            if (clockHasChanged) {
+                clockHasChanged = FALSE;
+                tStates = 0;
+                if (rtc_avail) {
+                    startTime = sim_os_msec();
+                    tStatesInSlice = sliceLength*clockFrequency;
+                }
+                else /* make sure that sim_os_msec() is not called later */
+                    clockFrequency = startTime = tStatesInSlice = 0;
+            }
+            specialProcessing = clockFrequency | timerInterrupt | keyboardInterrupt | sim_brk_summ;
         }
 
         if (specialProcessing) { /* quick check for special processing */
@@ -6442,6 +6462,7 @@ static void cpu_clear(void) {
         mmu_table[i] = EMPTY_PAGE;
     if (cpu_unit.flags & UNIT_CPU_ALTAIRROM)
         install_ALTAIRbootROM();
+    clockHasChanged = FALSE;
 }
 
 static t_stat cpu_clear_command(UNIT *uptr, int32 value, char *cptr, void *desc) {

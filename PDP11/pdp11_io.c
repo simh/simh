@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   12-Dec-11    RMS     Fixed interrupts to treat all Qbus devices as BR4
+   12-Dec-11    RMS     Fixed Qbus interrupts to treat all IO devices as BR4
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added multiple DC11 support
                         Renamed DL11 in autoconfigure

@@ -1,6 +1,6 @@
 /* hp2100_cpu0.c: HP 1000 user microcode and unimplemented instruction set stubs
 
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2010, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU0         User microcode and unimplemented firmware options
 
+   04-Nov-10    JDB     Removed DS note regarding PIF card (is now implemented)
    18-Sep-08    JDB     .FLUN and self-tests for VIS and SIGNAL are NOP if not present
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -81,8 +82,7 @@
    the cards.
 
    Implementation of the DS instructions will also require simulation of the
-   12665A Hardwired Serial Data Interface Card and the 12620A RTE Privileged
-   Interrupt Fence.  These are required for DS/1000.
+   12665A Hardwired Serial Data Interface Card.
 
    Option implementation by CPU was as follows:
 
@@ -180,11 +180,11 @@ t_stat reason = SCPE_OK;
 if (UNIT_CPU_TYPE == UNIT_TYPE_211X)                    /* 2116/15/14 CPU? */
     return stop_inst;                                   /* user microprograms not supported */
 
-switch (IR) {                                           /* opcodes for firmware detection */
-    case 0105226:                                       /* FFP .FLUN */
-    case 0105355:                                       /* RTE-6/VM OS self-test */
-    case 0105477:                                       /* VIS self-test */
-    case 0105617:                                       /* SIGNAL/1000 self-test */
+switch (IR) {
+    case 0105226:                                       /* firmware detection: FFP .FLUN */
+    case 0105355:                                       /* firmware detection: RTE-6/VM OS self-test */
+    case 0105477:                                       /* firmware detection: VIS self-test */
+    case 0105617:                                       /* firmware detection: SIGNAL/1000 self-test */
         return SCPE_OK;                                 /* execute as NOP */
     }
 

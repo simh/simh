@@ -281,24 +281,25 @@ extern uint32 O;                                        /* O register */
 
 /* CPU state */
 
-extern uint32  err_PC;
-extern uint32  dms_enb;
-extern uint32  dms_ump;
-extern uint32  dms_sr;
-extern uint32  dms_vr;
-extern FLIP_FLOP  mp_control;
-extern uint32  mp_fence;
-extern uint32  mp_viol;
-extern FLIP_FLOP  mp_mevff;
-extern uint32  iop_sp;
-extern t_bool  ion_defer;
-extern uint32  intaddr;
-extern uint16  pcq [PCQ_SIZE];
-extern uint32  pcq_p;
-extern uint32  stop_inst;
-extern UNIT    cpu_unit;
-extern DEVICE  cpu_dev;
-extern jmp_buf save_env;
+extern uint32    err_PC;
+extern uint32    dms_enb;
+extern uint32    dms_ump;
+extern uint32    dms_sr;
+extern uint32    dms_vr;
+extern FLIP_FLOP mp_control;
+extern uint32    mp_fence;
+extern uint32    mp_viol;
+extern FLIP_FLOP mp_mevff;
+extern uint32    iop_sp;
+extern t_bool    ion_defer;
+extern uint32    intaddr;
+extern uint16    pcq [PCQ_SIZE];
+extern uint32    pcq_p;
+extern uint32    stop_inst;
+extern UNIT      cpu_unit;
+extern DEVICE    cpu_dev;
+extern jmp_buf   save_env;
+
 
 /* CPU functions */
 

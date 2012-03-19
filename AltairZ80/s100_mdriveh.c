@@ -118,10 +118,6 @@ static MTAB mdriveh_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(mdriveh_dev.dctrl & level) { \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB mdriveh_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -207,8 +203,7 @@ static uint8 MDRIVEH_Read(const uint32 Addr)
 
     switch(Addr & 0x1) {
         case MDRIVEH_ADDR:
-            TRACE_PRINT(VERBOSE_MSG, ("MDRIVEH: " ADDRESS_FORMAT " RD Addr = 0x%02x" NLP,
-                PCX, cData));
+            sim_debug(VERBOSE_MSG, &mdriveh_dev, "MDRIVEH: " ADDRESS_FORMAT " RD Addr = 0x%02x\n", PCX, cData);
             break;
         case MDRIVEH_DATA:
             unit = (mdriveh_info->dma_addr & 0x380000) >> 19;
@@ -218,8 +213,7 @@ static uint8 MDRIVEH_Read(const uint32 Addr)
                 cData = mdriveh_info->storage[unit][offset];
             }
 
-            TRACE_PRINT(RD_DATA_MSG, ("MDRIVEH: " ADDRESS_FORMAT " RD Data [%x:%05x] = 0x%02x" NLP,
-                PCX, unit, offset, cData));
+            sim_debug(RD_DATA_MSG, &mdriveh_dev, "MDRIVEH: " ADDRESS_FORMAT " RD Data [%x:%05x] = 0x%02x\n", PCX, unit, offset, cData);
 
             /* Increment M-DRIVE/H Data Address */
             mdriveh_info->dma_addr++;
@@ -241,8 +235,7 @@ static uint8 MDRIVEH_Write(const uint32 Addr, uint8 cData)
             mdriveh_info->dma_addr <<= 8;
             mdriveh_info->dma_addr &= 0x003FFF00;
             mdriveh_info->dma_addr |= cData;
-            TRACE_PRINT(SEEK_MSG, ("MDRIVEH: " ADDRESS_FORMAT " DMA Address=%06x" NLP,
-                PCX, mdriveh_info->dma_addr));
+            sim_debug(SEEK_MSG, &mdriveh_dev, "MDRIVEH: " ADDRESS_FORMAT " DMA Address=%06x\n", PCX, mdriveh_info->dma_addr);
             break;
         case MDRIVEH_DATA:
             unit = (mdriveh_info->dma_addr & 0x380000) >> 19;
@@ -250,16 +243,13 @@ static uint8 MDRIVEH_Write(const uint32 Addr, uint8 cData)
 
             if(mdriveh_info->storage[unit] != NULL) {
                 if(mdriveh_info->uptr[unit].flags & UNIT_MDRIVEH_WLK) {
-                    TRACE_PRINT(WR_DATA_MSG, ("MDRIVEH: " ADDRESS_FORMAT " WR Data [%x:%05x] = Unit Write Locked" NLP,
-                        PCX, unit, offset));
+                    sim_debug(WR_DATA_MSG, &mdriveh_dev, "MDRIVEH: " ADDRESS_FORMAT " WR Data [%x:%05x] = Unit Write Locked\n", PCX, unit, offset);
                 } else {
-                    TRACE_PRINT(WR_DATA_MSG, ("MDRIVEH: " ADDRESS_FORMAT " WR Data [%x:%05x] = 0x%02x" NLP,
-                        PCX, unit, offset, cData));
+                    sim_debug(WR_DATA_MSG, &mdriveh_dev, "MDRIVEH: " ADDRESS_FORMAT " WR Data [%x:%05x] = 0x%02x\n", PCX, unit, offset, cData);
                     mdriveh_info->storage[unit][offset] = cData;
                 }
             } else {
-                TRACE_PRINT(WR_DATA_MSG, ("MDRIVEH: " ADDRESS_FORMAT " WR Data [%x:%05x] = Unit OFFLINE" NLP,
-                    PCX, unit, offset));
+                sim_debug(WR_DATA_MSG, &mdriveh_dev, "MDRIVEH: " ADDRESS_FORMAT " WR Data [%x:%05x] = Unit OFFLINE\n", PCX, unit, offset);
             }
 
             /* Increment M-DRIVE/H Data Address */

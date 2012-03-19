@@ -144,10 +144,6 @@ static MTAB hdc1001_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(hdc1001_dev.dctrl & level) { \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB hdc1001_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -289,7 +285,7 @@ t_stat hdc1001_detach(UNIT *uptr)
 
 static int32 hdc1001dev(const int32 port, const int32 io, const int32 data)
 {
-/*    TRACE_PRINT(VERBOSE_MSG, ("HDC1001: " ADDRESS_FORMAT " IO %s, Port %02x" NLP, PCX, io ? "WR" : "RD", port)); */
+/*    sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001: " ADDRESS_FORMAT " IO %s, Port %02x\n", PCX, io ? "WR" : "RD", port); */
     if(io) {
         HDC1001_Write(port, data);
         return 0;
@@ -369,19 +365,18 @@ static uint8 HDC1001_Write(const uint32 Addr, uint8 cData)
         case TF_CYLLO:
         case TF_CYLHI:
             hdc1001_info->taskfile[Addr & 0x07] = cData;
-            TRACE_PRINT(VERBOSE_MSG, ("HDC1001: " ADDRESS_FORMAT " WR TF[%d]=0x%02x" NLP, PCX, Addr & 7, cData));
+            sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001: " ADDRESS_FORMAT
+                      " WR TF[%d]=0x%02x\n", PCX, Addr & 7, cData);
             break;
         case TF_CMD:
             pDrive->track = hdc1001_info->taskfile[TF_CYLLO] | (hdc1001_info->taskfile[TF_CYLHI] << 8);
             pDrive->xfr_nsects = hdc1001_info->taskfile[TF_SECNT];
 
-            TRACE_PRINT(CMD_MSG, ("HDC1001[%d]: Command=%d, T:%d/H:%d/S:%d N=%d" NLP,
-                hdc1001_info->sel_drive,
-                hdc1001_info->taskfile[TF_CMD],
-                pDrive->track,
-                hdc1001_info->taskfile[TF_SDH] & 0x07,
-                hdc1001_info->taskfile[TF_SECNO],
-                pDrive->xfr_nsects));
+            sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: Command=%d, T:%d/H:%d/S:%d N=%d\n",
+                      hdc1001_info->sel_drive,
+                      hdc1001_info->taskfile[TF_CMD],
+                      pDrive->track, hdc1001_info->taskfile[TF_SDH] & 0x07,
+                      hdc1001_info->taskfile[TF_SECNO], pDrive->xfr_nsects);
             break;
         default:
             break;
@@ -394,7 +389,8 @@ static uint8 HDC1001_Read(const uint32 Addr)
     uint8 cData;
 
     cData = hdc1001_info->taskfile[Addr & 0x07];
-    TRACE_PRINT(VERBOSE_MSG, ("HDC1001: " ADDRESS_FORMAT " RD TF[%d]=0x%02x" NLP, PCX, Addr & 7, cData));
+    sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001: " ADDRESS_FORMAT
+              " RD TF[%d]=0x%02x\n", PCX, Addr & 7, cData);
 
     return (cData);
 }
@@ -415,12 +411,7 @@ static uint8 HDC1001_Read(const uint32 Addr)
     next_link |= hdc1001_info->iopb[0x0E] << 8;
     next_link |= hdc1001_info->iopb[0x0F] << 16;
 
-    TRACE_PRINT(VERBOSE_MSG, ("HDC1001[%d]: LINK=0x%05x, NEXT=0x%05x, CMD=%x, DMA@0x%05x\n",
-        hdc1001_info->sel_drive,
-        hdc1001_info->link_addr,
-        next_link,
-        hdc1001_info->iopb[0],
-        hdc1001_info->dma_addr));
+    sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001[%d]: LINK=0x%05x, NEXT=0x%05x, CMD=%x, DMA@0x%05x\n", hdc1001_info->sel_drive, hdc1001_info->link_addr, next_link, hdc1001_info->iopb[0], hdc1001_info->dma_addr);
 
 
 
@@ -429,26 +420,26 @@ static uint8 HDC1001_Read(const uint32 Addr)
         /* Perform command */
         switch(cmd) {
             case HDC1001_CODE_NOOP:
-                TRACE_PRINT(VERBOSE_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " NOOP" NLP, hdc1001_info->sel_drive, PCX));
+                sim_debug(VERBOSE_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " NOOP\n", hdc1001_info->sel_drive, PCX);
                 break;
             case HDC1001_CODE_VERSION:
                 break;
             case HDC1001_CODE_GLOBAL:
-                TRACE_PRINT(CMD_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " GLOBAL" NLP, hdc1001_info->sel_drive, PCX));
+                sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " GLOBAL\n", hdc1001_info->sel_drive, PCX);
 
                 hdc1001_info->mode = hdc1001_info->iopb[3];
                 hdc1001_info->retries = hdc1001_info->iopb[4];
                 hdc1001_info->ndrives = hdc1001_info->iopb[5];
 
-                TRACE_PRINT(VERBOSE_MSG, ("        Mode: 0x%02x" NLP, hdc1001_info->mode));
-                TRACE_PRINT(VERBOSE_MSG, ("   # Retries: 0x%02x" NLP, hdc1001_info->retries));
-                TRACE_PRINT(VERBOSE_MSG, ("    # Drives: 0x%02x" NLP, hdc1001_info->ndrives));
+                sim_debug(VERBOSE_MSG, &hdc1001_dev, "        Mode: 0x%02x\n", hdc1001_info->mode);
+                sim_debug(VERBOSE_MSG, &hdc1001_dev, "   # Retries: 0x%02x\n", hdc1001_info->retries);
+                sim_debug(VERBOSE_MSG, &hdc1001_dev, "    # Drives: 0x%02x\n", hdc1001_info->ndrives);
 
                 break;
             case HDC1001_CODE_SPECIFY:
                 {
                     uint8 specify_data[22];
-                    TRACE_PRINT(CMD_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " SPECIFY" NLP, hdc1001_info->sel_drive, PCX));
+                    sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " SPECIFY\n", hdc1001_info->sel_drive, PCX);
 
                     for(i = 0; i < 22; i++) {
                         specify_data[i] = GetBYTEWrapper(hdc1001_info->dma_addr + i);
@@ -460,32 +451,32 @@ static uint8 HDC1001_Read(const uint32 Addr)
                     pDrive->ntracks = specify_data[10] | (specify_data[11] << 8);
                     pDrive->res_tracks = specify_data[18] | (specify_data[19] << 8);
 
-                    TRACE_PRINT(VERBOSE_MSG, ("    Sectsize: %d" NLP, pDrive->sectsize));
-                    TRACE_PRINT(VERBOSE_MSG, ("     Sectors: %d" NLP, pDrive->nsectors));
-                    TRACE_PRINT(VERBOSE_MSG, ("       Heads: %d" NLP, pDrive->nheads));
-                    TRACE_PRINT(VERBOSE_MSG, ("      Tracks: %d" NLP, pDrive->ntracks));
-                    TRACE_PRINT(VERBOSE_MSG, ("    Reserved: %d" NLP, pDrive->res_tracks));
+                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "    Sectsize: %d\n", pDrive->sectsize);
+                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "     Sectors: %d\n", pDrive->nsectors);
+                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "       Heads: %d\n", pDrive->nheads);
+                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "      Tracks: %d\n", pDrive->ntracks);
+                    sim_debug(VERBOSE_MSG, &hdc1001_dev, "    Reserved: %d\n", pDrive->res_tracks);
                     break;
                 }
             case HDC1001_CODE_HOME:
                 pDrive->track = 0;
-                TRACE_PRINT(SEEK_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " HOME" NLP, hdc1001_info->sel_drive, PCX));
+                sim_debug(SEEK_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " HOME\n", hdc1001_info->sel_drive, PCX);
                 break;
             case HDC1001_CODE_SEEK:
                 pDrive->track = hdc1001_info->iopb[3];
                 pDrive->track |= (hdc1001_info->iopb[4] << 8);
 
                 if(pDrive->track > pDrive->ntracks) {
-                    TRACE_PRINT(ERROR_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " SEEK ERROR %d not found" NLP, hdc1001_info->sel_drive, PCX, pDrive->track));
+                    sim_debug(ERROR_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " SEEK ERROR %d not found\n", hdc1001_info->sel_drive, PCX, pDrive->track);
                     pDrive->track = pDrive->ntracks - 1;
                     result = HDC1001_STATUS_TIMEOUT;
                 } else {
-                    TRACE_PRINT(SEEK_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " SEEK %d" NLP, hdc1001_info->sel_drive, PCX, pDrive->track));
+                    sim_debug(SEEK_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " SEEK %d\n", hdc1001_info->sel_drive, PCX, pDrive->track);
                 }
                 break;
             case HDC1001_CODE_READ_HDR:
             {
-                TRACE_PRINT(CMD_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " READ HEADER: %d" NLP, pDrive->track, PCX));
+                sim_debug(CMD_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " READ HEADER: %d\n", pDrive->track, PCX);
                 PutBYTEWrapper(hdc1001_info->dma_addr + 0, pDrive->track & 0xFF);
                 PutBYTEWrapper(hdc1001_info->dma_addr + 1, (pDrive->track >> 8) & 0xFF);
                 PutBYTEWrapper(hdc1001_info->dma_addr + 2, 0);
@@ -517,14 +508,7 @@ static uint8 HDC1001_Read(const uint32 Addr)
                 sim_fseek((pDrive->uptr)->fileref, file_offset, SEEK_SET);
 
                 if(hdc1001_info->iopb[3] == 1) { /* Read */
-                    TRACE_PRINT(RD_DATA_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT "  READ @0x%05x T:%04d/S:%04d/#:%d" NLP,
-                        hdc1001_info->sel_drive,
-                        PCX,
-                        hdc1001_info->dma_addr,
-                        pDrive->cur_track,
-                        pDrive->cur_sect,
-                        pDrive->xfr_nsects
-                        ));
+                    sim_debug(RD_DATA_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT "  READ @0x%05x T:%04d/S:%04d/#:%d\n", hdc1001_info->sel_drive, PCX, hdc1001_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
 
                     sim_fread(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
 
@@ -533,14 +517,7 @@ static uint8 HDC1001_Read(const uint32 Addr)
                         PutBYTEWrapper(hdc1001_info->dma_addr + xfr_count, dataBuffer[xfr_count]);
                     }
                 } else { /* Write */
-                    TRACE_PRINT(WR_DATA_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " WRITE @0x%05x T:%04d/S:%04d/#:%d" NLP,
-                        hdc1001_info->sel_drive,
-                        PCX,
-                        hdc1001_info->dma_addr,
-                        pDrive->cur_track,
-                        pDrive->cur_sect,
-                        pDrive->xfr_nsects
-                        ));
+                    sim_debug(WR_DATA_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " WRITE @0x%05x T:%04d/S:%04d/#:%d\n", hdc1001_info->sel_drive, PCX, hdc1001_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
 
                     /* Perform DMA Transfer */
                     for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
@@ -562,14 +539,7 @@ static uint8 HDC1001_Read(const uint32 Addr)
 
                 data_len = pDrive->nsectors * pDrive->sectsize;
 
-                TRACE_PRINT(WR_DATA_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " FORMAT T:%d/H:%d/Fill=0x%02x/Len=%d" NLP,
-                    hdc1001_info->sel_drive,
-                    PCX,
-                    pDrive->track,
-                    hdc1001_info->iopb[5],
-                    hdc1001_info->iopb[4],
-                    data_len
-                    ));
+                sim_debug(WR_DATA_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " FORMAT T:%d/H:%d/Fill=0x%02x/Len=%d\n", hdc1001_info->sel_drive, PCX, pDrive->track, hdc1001_info->iopb[5], hdc1001_info->iopb[4], data_len );
 
                 file_offset = (pDrive->track * (pDrive->nheads) * data_len); /* Calculate offset based on current track */
                 file_offset += (hdc1001_info->iopb[5] * data_len);
@@ -592,7 +562,7 @@ static uint8 HDC1001_Read(const uint32 Addr)
             case HDC1001_CODE_EXAMINE:
             case HDC1001_CODE_MODIFY:
             default:
-                TRACE_PRINT(ERROR_MSG, ("HDC1001[%d]: " ADDRESS_FORMAT " CMD=%x Unsupported" NLP, hdc1001_info->sel_drive, PCX, cmd));
+                sim_debug(ERROR_MSG, &hdc1001_dev, "HDC1001[%d]: " ADDRESS_FORMAT " CMD=%x Unsupported\n", hdc1001_info->sel_drive, PCX, cmd);
                 break;
         }
     } else { /* Drive not ready */

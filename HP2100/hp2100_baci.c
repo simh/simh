@@ -1,6 +1,6 @@
 /* hp2100_baci.c: HP 12966A buffered asynchronous communications interface simulator
 
-   Copyright (c) 2007-2008, J. David Bryan
+   Copyright (c) 2007-2011, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    BACI         12966A BACI card
 
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
    11-Sep-08    JDB     Fixed STC,C losing interrupt request on BREAK
    07-Sep-08    JDB     Fixed IN_LOOPBACK conflict with netinet/in.h
@@ -320,11 +322,13 @@
 
 /* BACI state variables */
 
-FLIP_FLOP baci_control = CLEAR;                         /* control flip-flop */
-FLIP_FLOP baci_flag = CLEAR;                            /* flag flip-flop */
-FLIP_FLOP baci_flagbuf = CLEAR;                         /* flag buffer flip-flop */
-FLIP_FLOP baci_srq = CLEAR;                             /* SRQ flip-flop */
-FLIP_FLOP baci_lockout = CLEAR;                         /* interrupt lockout flip-flop */
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    FLIP_FLOP srq;                                      /* SRQ flip-flop */
+    FLIP_FLOP lockout;                                  /* interrupt lockout flip-flop */
+    } baci = { CLEAR, CLEAR, CLEAR, CLEAR, CLEAR };
 
 uint16 baci_ibuf = 0;                                   /* status/data in */
 uint16 baci_obuf = 0;                                   /* command/data out */
@@ -372,7 +376,8 @@ static void   clock_uart (void);
 
 /* BACI global routines */
 
-uint32 baci_io (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER baci_io;
+
 t_stat baci_term_svc (UNIT *uptr);
 t_stat baci_poll_svc (UNIT *uptr);
 t_stat baci_reset (DEVICE *dptr);
@@ -400,13 +405,14 @@ t_stat baci_detach (UNIT *uptr);
    ten millisecond period.
 */
 
-DIB baci_dib = { BACI, &baci_io };
+DIB baci_dib = { &baci_io, BACI, 0 };
 
 DEVICE baci_dev;
 
-UNIT baci_unit[] =
-    { { UDATA (&baci_term_svc, UNIT_ATTABLE | UNIT_FASTTIME, 0) },  /* terminal I/O unit */
-      { UDATA (&baci_poll_svc, UNIT_DIS, POLL_FIRST) } };           /* Telnet poll unit */
+UNIT baci_unit[] = {
+    { UDATA (&baci_term_svc, UNIT_ATTABLE | UNIT_FASTTIME, 0) },    /* terminal I/O unit */
+    { UDATA (&baci_poll_svc, UNIT_DIS, POLL_FIRST) }                /* Telnet poll unit */
+    };
 
 REG baci_reg[] = {
     { ORDATA (IBUF,   baci_ibuf,   16), REG_FIT },
@@ -438,12 +444,12 @@ REG baci_reg[] = {
     { FLDATA (ENQFLAG, baci_enq_seen,  0), REG_HRO },
     { DRDATA (ENQCNTR, baci_enq_cntr, 16), REG_HRO },
 
-    { FLDATA (LKO,   baci_lockout,   0) },
-    { FLDATA (CTL,   baci_control,   0) },
-    { FLDATA (FLG,   baci_flag,      0) },
-    { FLDATA (FBF,   baci_flagbuf,   0) },
-    { FLDATA (SRQ,   baci_srq,       0) },
-    { ORDATA (DEVNO, baci_dib.devno, 6), REG_HRO },
+    { FLDATA (LKO,   baci.lockout,         0) },
+    { FLDATA (CTL,   baci.control,         0) },
+    { FLDATA (FLG,   baci.flag,            0) },
+    { FLDATA (FBF,   baci.flagbuf,         0) },
+    { FLDATA (SRQ,   baci.srq,             0) },
+    { ORDATA (DEVNO, baci_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -526,232 +532,233 @@ DEVICE baci_dev = {
        would be cleared, and the interrupt would be lost.
 */
 
-uint32 baci_io (uint32 select_code, IOSIG signal, uint32 data)
+uint32 baci_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 uint8 ch;
+uint16 data;
 uint32 mask;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        baci_flag = baci_flagbuf = CLEAR;               /* clear flag and flag buffer */
-        baci_srq = CLEAR;                               /* clear SRQ */
+    switch (signal) {                                   /* dispatch I/O signal */
 
-        if (DEBUG_PRI (baci_dev, DEB_CMDS))
-            fputs (">>BACI cmds: [CLF] Flag and SRQ cleared\n", sim_deb);
-
-        update_status ();                               /* FLG might set when SRQ clears */
-        break;
-
-
-    case ioSTF:                                         /* set flag flip-flop */
-        baci_flag = baci_flagbuf = SET;                 /* set flag and flag buffer */
-        baci_lockout = SET;                             /* set lockout */
-        baci_srq = SET;                                 /* set SRQ */
-
-        if (DEBUG_PRI (baci_dev, DEB_CMDS))
-            fputs (">>BACI cmds: [STF] Flag, SRQ, and lockout set\n", sim_deb);
-        break;
-
-
-    case ioENF:                                         /* enable flag */
-        baci_flag = baci_flagbuf = SET;                 /* set device flag and flag buffer */
-        baci_lockout = SET;                             /* set lockout */
-        break;
-
-
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (baci);
-        break;
-
-
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (baci);
-        break;
-
-
-    case ioIOI:                                         /* I/O data input */
-        if (baci_control) {                             /* control set? */
-            baci_ibuf = TO_CHARCNT (baci_fcount);       /* get FIFO count */
-
-            if (IO_MODE == RECV)                        /* receiving? */
-                baci_ibuf = baci_ibuf | fifo_get ();    /* add char and validity flag */
-
-            data = baci_ibuf;                           /* return received data */
-
-            if (DEBUG_PRI (baci_dev, DEB_CPU))
-                fprintf (sim_deb, ">>BACI cpu:  [LIx%s] Received data = %06o\n", hold_or_clear, data);
-            }
-
-        else {                                          /* control clear? */
-            data = baci_status;                         /* return status */
-
-            if (DEBUG_PRI (baci_dev, DEB_CPU))
-                fprintf (sim_deb, ">>BACI cpu:  [LIx%s] Status = %06o\n", hold_or_clear, data);
-            }
-        break;
-
-
-    case ioIOO:                                         /* I/O data output */
-        if (DEBUG_PRI (baci_dev, DEB_CPU))
-            fprintf (sim_deb, ">>BACI cpu:  [OTx%s] Command = %06o\n", hold_or_clear, data);
-
-        baci_obuf = data;
-
-        if (baci_obuf & OUT_MR) {                       /* master reset? */
-            master_reset ();                            /* do before processing */
-            baci_io (select_code, ioSIR, 0);            /* set interrupt request */
+        case ioCLF:                                     /* clear flag flip-flop */
+            baci.flag = baci.flagbuf = CLEAR;           /* clear flag and flag buffer */
+            baci.srq = CLEAR;                           /* clear SRQ */
 
             if (DEBUG_PRI (baci_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>BACI cmds: [OTx%s] Master reset\n", hold_or_clear);
-            }
+                fputs (">>BACI cmds: [CLF] Flag and SRQ cleared\n", sim_deb);
 
-        switch (GET_ID (baci_obuf)) {                   /* isolate ID code */
+            update_status ();                           /* FLG might set when SRQ clears */
+            break;
 
-            case 0:                                     /* transmit data */
-                if (IO_MODE == XMIT) {                  /* transmitting? */
-                    ch = baci_obuf & OUT_DATA;          /* mask to character */
-                    fifo_put (ch);                      /* queue character */
 
-                    if (baci_term.flags & UNIT_ATT) {           /* attached to network? */
-                        if (DEBUG_PRI (baci_dev, DEB_CMDS) &&   /* debugging? */
-                            (sim_is_active (&baci_term) == 0))  /* service stopped? */
-                            fprintf (sim_deb, ">>BACI cmds: [OTx%s] Terminal service scheduled, "
-                                              "time = %d\n", hold_or_clear, baci_term.wait);
+        case ioSTF:                                     /* set flag flip-flop */
+            baci.flag = baci.flagbuf = SET;             /* set flag and flag buffer */
+            baci.lockout = SET;                         /* set lockout */
+            baci.srq = SET;                             /* set SRQ */
 
-                        if (baci_fcount == 1)                   /* first char to xmit? */
-                            sim_activate_abs (&baci_term,       /* start service with full char time */
-                                              baci_term.wait);
-                        else
-                            sim_activate (&baci_term,           /* start service if not running */
-                                          baci_term.wait);
-                        }
-                    }
-                break;
+            if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                fputs (">>BACI cmds: [STF] Flag, SRQ, and lockout set\n", sim_deb);
+            break;
 
-            case 1:                                     /* enable device status interrupt */
-                baci_edsiw = baci_obuf;                 /* load new enable word */
-                update_status ();                       /* may have enabled an interrupt */
-                break;
 
-            case 2:                                     /* device status reference */
-                if ((baci_term.flags & UNIT_DIAG) &&    /* diagnostic mode? */
-                    (baci_dsrw & OUT_DIAG) &&           /*   and last DIAG was high? */
-                    !(baci_obuf & OUT_DIAG) &&          /*   and new DIAG is low? */
-                    !(baci_icw & OUT_BAUDRATE))         /*   and clock is external? */
-                    clock_uart ();                      /* pulse UART clock */
+        case ioENF:                                     /* enable flag */
+            baci.flag = baci.flagbuf = SET;             /* set device flag and flag buffer */
+            baci.lockout = SET;                         /* set lockout */
+            break;
 
-                baci_dsrw = baci_obuf;                  /* load new reference word */
-                update_status ();                       /* clocking UART may interrupt */
-                break;
 
-            case 3:                                     /* character frame control */
-                baci_cfcw = baci_obuf;                  /* load new frame word */
-                break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (baci);
+            break;
 
-            case 4:                                         /* interface control */
-                if ((baci_icw ^ baci_obuf) & OUT_BAUDRATE) {    /* baud rate change? */
-                    baci_term.wait = service_time (baci_obuf);  /* set service time to match rate */
 
-                    if (baci_term.flags & UNIT_DIAG)        /* diagnostic mode? */
-                        if (baci_obuf & OUT_BAUDRATE) {     /* internal baud rate requested? */
-                            sim_activate (&baci_term,       /* activate I/O service */
-                                          baci_term.wait);
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (baci);
+            break;
 
-                            if (DEBUG_PRI (baci_dev, DEB_CMDS))
+
+        case ioIOI:                                         /* I/O data input */
+            if (baci.control) {                             /* control set? */
+                baci_ibuf = TO_CHARCNT (baci_fcount);       /* get FIFO count */
+
+                if (IO_MODE == RECV)                        /* receiving? */
+                    baci_ibuf = baci_ibuf | fifo_get ();    /* add char and validity flag */
+
+                data = baci_ibuf;                           /* return received data */
+
+                if (DEBUG_PRI (baci_dev, DEB_CPU))
+                    fprintf (sim_deb, ">>BACI cpu:  [LIx%s] Received data = %06o\n", hold_or_clear, baci_ibuf);
+                }
+
+            else {                                          /* control clear? */
+                data = baci_status;                         /* return status */
+
+                if (DEBUG_PRI (baci_dev, DEB_CPU))
+                    fprintf (sim_deb, ">>BACI cpu:  [LIx%s] Status = %06o\n", hold_or_clear, baci_status);
+                }
+
+            stat_data = IORETURN (SCPE_OK, data);           /* merge in return status */
+            break;
+
+
+        case ioIOO:                                         /* I/O data output */
+            baci_obuf = IODATA (stat_data);                 /* get data value */
+
+            if (DEBUG_PRI (baci_dev, DEB_CPU))
+                fprintf (sim_deb, ">>BACI cpu:  [OTx%s] Command = %06o\n", hold_or_clear, baci_obuf);
+
+            if (baci_obuf & OUT_MR) {                       /* master reset? */
+                master_reset ();                            /* do before processing */
+                baci_io (&baci_dib, ioSIR, 0);              /* set interrupt request */
+
+                if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                    fprintf (sim_deb, ">>BACI cmds: [OTx%s] Master reset\n", hold_or_clear);
+                }
+
+            switch (GET_ID (baci_obuf)) {                   /* isolate ID code */
+
+                case 0:                                     /* transmit data */
+                    if (IO_MODE == XMIT) {                  /* transmitting? */
+                        ch = baci_obuf & OUT_DATA;          /* mask to character */
+                        fifo_put (ch);                      /* queue character */
+
+                        if (baci_term.flags & UNIT_ATT) {           /* attached to network? */
+                            if (DEBUG_PRI (baci_dev, DEB_CMDS) &&   /* debugging? */
+                                (sim_is_active (&baci_term) == 0))  /* service stopped? */
                                 fprintf (sim_deb, ">>BACI cmds: [OTx%s] Terminal service scheduled, "
                                                   "time = %d\n", hold_or_clear, baci_term.wait);
+
+                            if (baci_fcount == 1)                   /* first char to xmit? */
+                                sim_activate_abs (&baci_term,       /* start service with full char time */
+                                                  baci_term.wait);
+                            else
+                                sim_activate (&baci_term,           /* start service if not running */
+                                              baci_term.wait);
                             }
+                        }
+                    break;
 
-                        else {                              /* external rate */
-                            sim_cancel (&baci_term);        /* stop I/O service */
+                case 1:                                     /* enable device status interrupt */
+                    baci_edsiw = baci_obuf;                 /* load new enable word */
+                    update_status ();                       /* may have enabled an interrupt */
+                    break;
 
-                            if (DEBUG_PRI (baci_dev, DEB_CMDS))
-                                fprintf (sim_deb, ">>BACI cmds: [OTx%s] Terminal service stopped\n",
-                                                  hold_or_clear);
-                            }
-                    }
+                case 2:                                     /* device status reference */
+                    if ((baci_term.flags & UNIT_DIAG) &&    /* diagnostic mode? */
+                        (baci_dsrw & OUT_DIAG) &&           /*   and last DIAG was high? */
+                        !(baci_obuf & OUT_DIAG) &&          /*   and new DIAG is low? */
+                        !(baci_icw & OUT_BAUDRATE))         /*   and clock is external? */
+                        clock_uart ();                      /* pulse UART clock */
 
-                baci_icw = baci_obuf;                   /* load new reference word */
-                update_status ();                       /* loopback may change status */
-                break;
+                    baci_dsrw = baci_obuf;                  /* load new reference word */
+                    update_status ();                       /* clocking UART may interrupt */
+                    break;
 
-            case 5:                                     /* interrupt status reset */
-                baci_isrw = baci_obuf;                  /* load new reset word */
+                case 3:                                     /* character frame control */
+                    baci_cfcw = baci_obuf;                  /* load new frame word */
+                    break;
 
-                mask = (baci_isrw & OUT_IRQCLR) <<      /* form reset mask */
-                       IN_V_IRQCLR;                     /*   for common irqs */
+                case 4:                                         /* interface control */
+                    if ((baci_icw ^ baci_obuf) & OUT_BAUDRATE) {    /* baud rate change? */
+                        baci_term.wait = service_time (baci_obuf);  /* set service time to match rate */
 
-                if (baci_isrw & OUT_CSC)                /* add special char mask bit */
-                    mask = mask | IN_SPCHAR;            /*   if requested */
+                        if (baci_term.flags & UNIT_DIAG)        /* diagnostic mode? */
+                            if (baci_obuf & OUT_BAUDRATE) {     /* internal baud rate requested? */
+                                sim_activate (&baci_term,       /* activate I/O service */
+                                              baci_term.wait);
 
-                baci_status = baci_status & ~mask;      /* clear specified status bits */
-                break;
+                                if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                                    fprintf (sim_deb, ">>BACI cmds: [OTx%s] Terminal service scheduled, "
+                                                      "time = %d\n", hold_or_clear, baci_term.wait);
+                                }
 
-            case 6:                                     /* special character */
-                baci_spchar [baci_obuf & OUT_SPCHAR] =  /* set special character entry */
-                    ((baci_obuf & OUT_SPFLAG) != 0);
-                break;
-            }
-        break;
+                            else {                              /* external rate */
+                                sim_cancel (&baci_term);        /* stop I/O service */
 
+                                if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                                    fprintf (sim_deb, ">>BACI cmds: [OTx%s] Terminal service stopped\n",
+                                                      hold_or_clear);
+                                }
+                        }
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-                                                        /* fall into CRS handler */
+                    baci_icw = baci_obuf;                   /* load new reference word */
+                    update_status ();                       /* loopback may change status */
+                    break;
 
-    case ioCRS:                                         /* control reset */
-        master_reset ();                                /* issue master reset */
+                case 5:                                     /* interrupt status reset */
+                    baci_isrw = baci_obuf;                  /* load new reset word */
 
-        if (DEBUG_PRI (baci_dev, DEB_CMDS))
-            fputs (">>BACI cmds: [CRS] Master reset\n", sim_deb);
-        break;
+                    mask = (baci_isrw & OUT_IRQCLR) <<      /* form reset mask */
+                           IN_V_IRQCLR;                     /*   for common irqs */
 
+                    if (baci_isrw & OUT_CSC)                /* add special char mask bit */
+                        mask = mask | IN_SPCHAR;            /*   if requested */
 
-    case ioCLC:                                         /* clear control flip-flop */
-        baci_control = CLEAR;                           /* clear control */
+                    baci_status = baci_status & ~mask;      /* clear specified status bits */
+                    break;
 
-        if (DEBUG_PRI (baci_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>BACI cmds: [CLC%s] Control cleared\n", hold_or_clear);
-        break;
-
-
-    case ioSTC:                                         /* set control flip-flop */
-        baci_control = SET;                             /* set control */
-        baci_lockout = CLEAR;                           /* clear lockout */
-
-        if (DEBUG_PRI (baci_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>BACI cmds: [STC%s] Control set and lockout cleared\n", hold_or_clear);
-
-        if (signal == ioSTC)                            /* STC without ,C ? */
-            update_status ();                           /* clearing lockout might interrupt */
-        break;
-
-
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, baci);                  /* set standard PRL signal */
-        setstdIRQ (select_code, baci);                  /* set standard IRQ signal */
-        setSRQ (select_code, baci_srq);                 /* set SRQ signal */
-        break;
+                case 6:                                     /* special character */
+                    baci_spchar [baci_obuf & OUT_SPCHAR] =  /* set special character entry */
+                        ((baci_obuf & OUT_SPFLAG) != 0);
+                    break;
+                }
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        baci_flagbuf = CLEAR;
-        break;
+        case ioCRS:                                     /* control reset */
+            master_reset ();                            /* issue master reset */
+
+            if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                fputs (">>BACI cmds: [CRS] Master reset\n", sim_deb);
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioCLC:                                     /* clear control flip-flop */
+            baci.control = CLEAR;                       /* clear control */
+
+            if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                fprintf (sim_deb, ">>BACI cmds: [CLC%s] Control cleared\n", hold_or_clear);
+            break;
+
+
+        case ioSTC:                                     /* set control flip-flop */
+            baci.control = SET;                         /* set control */
+            baci.lockout = CLEAR;                       /* clear lockout */
+
+            if (DEBUG_PRI (baci_dev, DEB_CMDS))
+                fprintf (sim_deb, ">>BACI cmds: [STC%s] Control set and lockout cleared\n", hold_or_clear);
+
+            if (!(signal_set & ioCLF))                  /* STC without ,C ? */
+                update_status ();                       /* clearing lockout might interrupt */
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (baci);                           /* set standard PRL signal */
+            setstdIRQ (baci);                           /* set standard IRQ signal */
+            setSRQ (dibptr->select_code, baci.srq);     /* set SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            baci.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    baci_io (select_code, ioCLF, 0);                    /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    baci_io (select_code, ioSIR, 0);                    /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -931,7 +938,7 @@ while (recv_loop &&                                     /* OK to process? */
         baci_uart_rhr = CLEAR_HR;                       /* clear RHR */
         update_status ();                               /* update FIFO status (may set flag) */
 
-        recv_loop = fast_timing && !IRQ (baci_dib.devno);   /* loop if fast mode and no IRQ */
+        recv_loop = fast_timing && !IRQ (baci_dib.select_code);   /* loop if fast mode and no IRQ */
         }
 
     else {                                              /* xmit or ENQ/ACK, leave char in RHR */
@@ -1002,7 +1009,7 @@ return SCPE_OK;
 
 t_stat baci_reset (DEVICE *dptr)
 {
-baci_io (baci_dib.devno, ioPOPIO, 0);                   /* send POPIO signal */
+IOPRESET (&baci_dib);                                   /* PRESET device (does not use PON) */
 
 baci_ibuf = 0;                                          /* clear input buffer */
 baci_obuf = 0;                                          /* clear output buffer */
@@ -1083,10 +1090,10 @@ baci_uart_rr = CLEAR_R;                                 /* clear receiver regist
 baci_uart_clk = 0;                                      /* clear UART clock */
 baci_bcount   = 0;                                      /* clear break counter */
 
-baci_control = CLEAR;                                   /* clear control */
-baci_flag = baci_flagbuf = SET;                         /* set flag and flag buffer */
-baci_srq = SET;                                         /* set SRQ */
-baci_lockout = SET;                                     /* set lockout flip-flop */
+baci.control = CLEAR;                                   /* clear control */
+baci.flag = baci.flagbuf = SET;                         /* set flag and flag buffer */
+baci.srq = SET;                                         /* set SRQ */
+baci.lockout = SET;                                     /* set lockout flip-flop */
 
 baci_edsiw = 0;                                         /* clear interrupt enables */
 baci_dsrw = 0;                                          /* clear status reference */
@@ -1150,18 +1157,18 @@ if ((baci_status & IN_STDIRQ) ||                        /* standard interrupt? *
      (baci_edsiw & OUT_ENCM) &&                         /*   and char mode */
      (baci_fget != baci_fput)) {                        /*   and FIFO not empty? */
 
-    if (baci_lockout) {                                 /* interrupt lockout? */
+    if (baci.lockout) {                                 /* interrupt lockout? */
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
             fputs (">>BACI cmds: Lockout prevents flag set", sim_deb);
         }
 
-    else if (baci_srq) {                                /* SRQ set? */
+    else if (baci.srq) {                                /* SRQ set? */
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
             fputs (">>BACI cmds: SRQ prevents flag set", sim_deb);
         }
 
     else {
-        baci_io (baci_dib.devno, ioENF, 0);             /* set flag */
+        baci_io (&baci_dib, ioENF, 0);                  /* set flag */
 
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
             fputs (">>BACI cmds: Flag and lockout set", sim_deb);
@@ -1175,14 +1182,14 @@ if ((baci_icw & OUT_DCPC) &&                            /* DCPC enabled? */
     ((IO_MODE == XMIT) && (baci_fcount < 128) ||        /*   and xmit and room in FIFO */
      (IO_MODE == RECV) && (baci_fcount > 0))) {         /*   or recv and data in FIFO? */
 
-    if (baci_lockout) {                                 /* interrupt lockout? */
+    if (baci.lockout) {                                 /* interrupt lockout? */
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
             fputs (">>BACI cmds: Lockout prevents SRQ set", sim_deb);
         }
 
     else {
-        baci_srq = SET;                                 /* set SRQ */
-        baci_io (baci_dib.devno, ioSIR, 0);             /* set interrupt request */
+        baci.srq = SET;                                 /* set SRQ */
+        baci_io (&baci_dib, ioSIR, 0);                  /* set interrupt request */
 
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
             fputs (">>BACI cmds: SRQ set", sim_deb);

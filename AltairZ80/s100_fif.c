@@ -2,7 +2,7 @@
 
     IMSAI FIF Disk Controller by Ernie Price
 
-    Based on altairz80_dsk.c, Copyright (c) 2002-2010, Peter Schorn
+    Based on altairz80_dsk.c, Copyright (c) 2002-2011, Peter Schorn
 
     Plug-n-Play added by Howard M. Harte
 

@@ -1,0 +1,149 @@
+1. CPU: register pointer was being loaded from PSW1 instead of PSW2.
+2. CPU: register pointer was not preserved on an XPSD 0.
+3. CPU: some decode points were taking unimplemented rather than non-existent
+   instruction traps.
+4. CPU: BDR branches on result >=0, instead of > 0.
+5. CPU: PSD change instructions were not saving old PC in PC queue.
+6. CPU: illegal register pointer does not stop the system on the Sigma 5-7;
+   instead, registers read as 0's, and writes are ignored.
+7. CPU: traps were setting the Sigma 9 vector field unconditionally.
+8. CPU: CH does not SEXT Rn<16:31>.
+9. CPU: MTW and MTH overflow traps not implemented.
+10. CPU: MTH condition code calculations not implemented correctly.
+11. CPU: illegal shift opcodes on the Sigma 5-7 are treated as arithmetic
+    single (according to the AUTO diagnostic).
+12. FP: SF did not calculate condition codes correctly.
+13. FP: SF left did not detect normalized if the count reached zero.
+14. FP: SF right was retaining a guard digit incorrectly.
+15. FP: SF right test was not taking into account single/double precision.
+16. FP: fp_unpack killed the operand sign before testing it.
+17. FP: fp_pack did not recomplement a negative operand.
+18. CPU: DW overflow test was incorrect.
+19. IO: device status bit field was incorrectly defined.
+20. IO: AIO was testing for == 0 instead of != 0.
+21. TT: input keyboard character mappings were incorrect.
+22. SYS: shifts were not displaying or accepting an index register.
+23. CPU: mapping from pulse interrupt number to counter interrupt number
+    was incorrect.
+24. CPU, CIS: handling of instructions aborts was incorrect.
+25. CPU: CC2,4 set incorrectly on aborted stack instruction.
+26. CPU: CC2,4 set incorrectly on MSP,0 instruction.
+27. CPU: PLW not converting operand address to byte address.
+28. CPU: PSM, PLM not converting limit operand address to byte address correctly.
+29. CPU: PLM wrote registers in inverse order.
+30. Definitions: number of virtual, physical pages derived incorrectly.
+31. MAP: MMC control set wrap incorrect.
+32. MAP: MMC register update of Rn|1 incorrect.
+33. CPU: CBS set CC's incorrectly on unequal.
+34. CPU: TTBS set CC's incorrectly on early exit.
+35. IO: chan_proc_epilog and four other routines extracted device address incorrectly.
+36. CPU: DW was fetching halfwords instead of words.
+37. CPU: multiples were not setting condition codes on 0 operands.
+38. FP: floating add zero test on second operand was inverted.
+39. FP: floating add zero cases failed to set the result variable.
+40. FP: floating add zero cases failed to go through postnormalization logic.
+41. FP: double precision add macro lost high carry out.
+42. FP: double precision add macro had an undocumented restriction about operands.
+43. FP: all double precision instructions unpacked the wrong low order memory operand.
+44. FP: normalization failed to decrement the exponent.
+45. FP: in single precision, removing the guard digit created a spurious low-order digit.
+46. FP: denormalization failed to clear the low word (single precision).
+47. FP: denormalization failed to clear the guard digit (double precision).
+48. FP: add/subtract failed to treat abnormal 0's as normal numbers.
+49. CIS: WriteDecA set local rather than global condition codes.
+50. CIS: Illegal digit check missed byte 0.
+51. CIS: Overflow check set wrong condition codes.
+52. CIS: NibbleLShift routine overflow check was (also broken in VAX, PDP11).
+53. CIS: WordLShift routine overflow check was wrong (also broken in VAX, PDP11).
+54. CIS: WordLShift had signed/unsigned variable conflict in compare.
+55. CIS: WriteDecA not setting correct condition codes for -0.
+55. CIS: WriteDECA not clearing CC3/4 before setting.
+56. CIS: DM shift-and-test loop did 14 iterations instead of 15.
+57. CIS: DM final shift of 16 done outside non-zero case instead of inside.
+58. CIS: DD put quotient and remainder in wrong registers.
+59. CIS: DD did not shift remainder to proper place, based on dividend/divisor widths.
+60. CIS: DD overflow test missed exact 16 digit quotient case.
+61. CIS: algorithm to compute length of operand failed for certain lengths (also broken
+    in VAX, PDP11).
+62. CIS: DM and DD answer was wrong on restart cases. [NOT FIXED YET]
+63. CIS: EBS fetched pattern from wrong address pointer.
+64. CIS: EBS field separator wrote wrong byte.
+65. MAP: Access codes defined incorrectly for access protection check.
+66. CPU: LPSD fetching operands with write check rather than read check.
+67. CPU: Illegal instruction stop (and other trap stops) weren't rolling back the PC.
+68. CPU: History routine merged CC's into history array incorrectly.
+69. CPU: History routine stored incremented rather than actualy PC.
+70. CPU: History reporting routine printed wrong operand value, due to colliding declarations.
+71. IO: Power up/down interrupts should not be implemented.
+72. IO: WD was not recalculating int_hiact.
+73. IO: Interrupt chain was not linked at powerup.
+74. IO: Interrupt chain link algorithm was wrong.
+75. IO: WD processing was spanning [beg,end) rather than [beg,end].
+76. RTC: RTC interrupts were happening at the wrong level.
+77. PTR: leader skip was testing for channel end.
+78. PTR: leader skip was testing per command instead of per reel/file.
+79. PTR: end of file was treated as fatal error instead of channel end + length error.
+80. PTR, PTP: units were not marked UNIT_SEQ.
+81. LPT: unit was not marked UNIT_SEQ.
+82. IO: device address set/show updated/displayed wrong field in single unit devices.
+83. CPU: address calculation for MTx in interrupt location used incorrect length.
+84. LPT: print, format opcode definitions inverted.
+85. LPT: wrong index used to count buffer fill loop.
+86. IO: CPU/IOP communications through 20/21 were not modelled.
+87. CIS: Multiply algorithm incorrect, multiply restart not modelled.
+88. CIS: Divide algorithm incorrect, divide restart not modelled.
+89. IO: WD .44 not recognized as effective NOP.
+90. CPU: Sigma 5 (uniquely) does not implement CVA or CVS.
+91. IO: AIO merging status incorrectly.
+92. IO: system for returning status byte from IO was muddled; rewrite required.
+93. RAD: 7232 track shift offset was incorrectly defined.
+94. CPU: MTX for interrupts returned wrong value.
+95. CPU: Counter overflow trigger equation was incorrect.
+96. CPU: MTX interrupts not recalculating interrupt summary values.
+97. RTC: SET/SHOW C1-C4 routines were broken.
+98. DP: comparison for sector field overflow was incorrect.
+99. DP: cross-cylinder incorrectly set on read to end of cylinder.
+100. DP: seek never executed.
+101. DP: seek followon state codes set incorrectly.
+102. DP: cylinder offset defined incorrectly.
+103. DP: SIO not initing unit thread properly for non-zero units.
+104. MUX: Line enable must be remembered for lines that are not currently connected.
+105. RAD: write check was reading words off disk instead of bytes.
+106. RAD: end of transfer routine checking for address error incorrectly.
+107. DK: end of transfer routine checking for address error incorrectly.
+
+
+Diagnostic Notes
+----------------
+
+1. PATTERN paper tape (SA = 60, end pass = 1AC), SET CPU RBLKS=32.
+   Break at 60 is triggered once during loading process.
+2. VERIFY paper tape (SA = 140, end pass = 8E6).
+3. AUTO paper tape (SA = 105), SET CPU LASLMS to suppress spurious error message.
+   AUTO magtape runs correctly with no messages.
+4. SUFFIX magtape (SA = 100, end pass = 115), no printouts.
+5. FLOAT magtape.
+6. DECIMAL paper tape (SA = EE).
+7. PROTECT paper tape (SA = F9), long runtime until printout.
+8. MAP paper tape (SA = 7C).
+9. MEDIC paper tape (SA = 68), set SSW2 after breakpoint, long runtime.
+10. INT magtape, stops after M6, set SSW2 and continue,
+   enters pattern generator and loops forever, as expected.
+11. RTC paper tape, clocks must be 500Mhz, reports clocks as "too slow" due
+   to faster simulation speed.
+   Runs correctly with SET THROTTLE 500K.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

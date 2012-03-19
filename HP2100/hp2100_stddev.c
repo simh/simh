@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
    TTY          12531C buffered teleprinter interface
    CLK          12539C time base generator
 
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    25-Apr-08    JDB     Changed TTY output wait from 100 to 200 for MSU BASIC
    18-Apr-08    JDB     Removed redundant control char handling definitions
@@ -125,23 +127,29 @@
 #define CLK_V_ERROR     4                               /* clock overrun */
 #define CLK_ERROR       (1 << CLK_V_ERROR)
 
-FLIP_FLOP ptr_control = CLEAR;
-FLIP_FLOP ptr_flag = CLEAR;
-FLIP_FLOP ptr_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } ptr = { CLEAR, CLEAR, CLEAR };
 
 int32 ptr_stopioe = 0;                                  /* stop on error */
 int32 ptr_trlcnt = 0;                                   /* trailer counter */
 int32 ptr_trllim = 40;                                  /* trailer to add */
 
-FLIP_FLOP ptp_control = CLEAR;
-FLIP_FLOP ptp_flag = CLEAR;
-FLIP_FLOP ptp_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } ptp = { CLEAR, CLEAR, CLEAR };
 
 int32 ptp_stopioe = 0;
 
-FLIP_FLOP tty_control = CLEAR;
-FLIP_FLOP tty_flag = CLEAR;
-FLIP_FLOP tty_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } tty = { CLEAR, CLEAR, CLEAR };
 
 int32 ttp_stopioe = 0;
 int32 tty_buf = 0;                                      /* tty buffer */
@@ -149,9 +157,11 @@ int32 tty_mode = 0;                                     /* tty mode */
 int32 tty_shin = 0377;                                  /* tty shift in */
 int32 tty_lf = 0;                                       /* lf flag */
 
-FLIP_FLOP clk_control = CLEAR;
-FLIP_FLOP clk_flag = CLEAR;
-FLIP_FLOP clk_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } clk = { CLEAR, CLEAR, CLEAR };
 
 int32 clk_select = 0;                                   /* clock time select */
 int32 clk_error = 0;                                    /* clock error */
@@ -169,17 +179,17 @@ uint32 clk_tick = 0;                                    /* instructions per tick
 
 DEVICE ptr_dev, ptp_dev, tty_dev, clk_dev;
 
-uint32 ptrio (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER ptrio;
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_attach (UNIT *uptr, char *cptr);
 t_stat ptr_reset (DEVICE *dptr);
 t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 
-uint32 ptpio (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER ptpio;
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptp_reset (DEVICE *dptr);
 
-uint32 ttyio (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER ttyio;
 t_stat tti_svc (UNIT *uptr);
 t_stat tto_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
@@ -188,7 +198,7 @@ t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tto_out (int32 c);
 t_stat ttp_out (int32 c);
 
-uint32 clkio (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER clkio;
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
 int32 clk_delay (int32 flg);
@@ -201,7 +211,7 @@ int32 clk_delay (int32 flg);
    ptr_reg      PTR register list
 */
 
-DIB ptr_dib = { PTR, &ptrio };
+DIB ptr_dib = { &ptrio, PTR };
 
 UNIT ptr_unit = {
     UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
@@ -210,15 +220,15 @@ UNIT ptr_unit = {
 
 REG ptr_reg[] = {
     { ORDATA (BUF, ptr_unit.buf, 8) },
-    { FLDATA (CTL, ptr_control, 0) },
-    { FLDATA (FLG, ptr_flag, 0) },
-    { FLDATA (FBF, ptr_flagbuf, 0) },
+    { FLDATA (CTL, ptr.control, 0) },
+    { FLDATA (FLG, ptr.flag, 0) },
+    { FLDATA (FBF, ptr.flagbuf, 0) },
     { DRDATA (TRLCTR, ptr_trlcnt, 8), REG_HRO },
     { DRDATA (TRLLIM, ptr_trllim, 8), PV_LEFT },
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
-    { ORDATA (DEVNO, ptr_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, ptr_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -246,7 +256,7 @@ DEVICE ptr_dev = {
    ptp_reg      PTP register list
 */
 
-DIB ptp_dib = { PTP, &ptpio };
+DIB ptp_dib = { &ptpio, PTP };
 
 UNIT ptp_unit = {
     UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
@@ -254,13 +264,13 @@ UNIT ptp_unit = {
 
 REG ptp_reg[] = {
     { ORDATA (BUF, ptp_unit.buf, 8) },
-    { FLDATA (CTL, ptp_control, 0) },
-    { FLDATA (FLG, ptp_flag, 0) },
-    { FLDATA (FBF, ptp_flagbuf, 0) },
+    { FLDATA (CTL, ptp.control, 0) },
+    { FLDATA (FLG, ptp.flag, 0) },
+    { FLDATA (FBF, ptp.flagbuf, 0) },
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptp_stopioe, 0) },
-    { ORDATA (DEVNO, ptp_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, ptp_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -290,7 +300,7 @@ DEVICE ptp_dev = {
 #define TTO     1
 #define TTP     2
 
-DIB tty_dib = { TTY, &ttyio };
+DIB tty_dib = { &ttyio, TTY };
 
 UNIT tty_unit[] = {
     { UDATA (&tti_svc, UNIT_IDLE | TT_MODE_UC, 0), POLL_WAIT },
@@ -302,9 +312,9 @@ REG tty_reg[] = {
     { ORDATA (BUF, tty_buf, 8) },
     { ORDATA (MODE, tty_mode, 16) },
     { ORDATA (SHIN, tty_shin, 8), REG_HRO },
-    { FLDATA (CTL, tty_control, 0) },
-    { FLDATA (FLG, tty_flag, 0) },
-    { FLDATA (FBF, tty_flagbuf, 0) },
+    { FLDATA (CTL, tty.control, 0) },
+    { FLDATA (FLG, tty.flag, 0) },
+    { FLDATA (FBF, tty.flagbuf, 0) },
     { FLDATA (KLFP, tty_lf, 0), REG_HRO },
     { DRDATA (KPOS, tty_unit[TTI].pos, T_ADDR_W), PV_LEFT },
     { DRDATA (KTIME, tty_unit[TTI].wait, 24), REG_NZ + PV_LEFT },
@@ -312,7 +322,7 @@ REG tty_reg[] = {
     { DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
     { FLDATA (STOP_IOE, ttp_stopioe, 0) },
-    { ORDATA (DEVNO, tty_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, tty_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -344,20 +354,20 @@ DEVICE tty_dev = {
    clk_reg      CLK register list
 */
 
-DIB clk_dib = { CLK, &clkio };
+DIB clk_dib = { &clkio, CLK };
 
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0) };
 
 REG clk_reg[] = {
     { ORDATA (SEL, clk_select, 3) },
     { DRDATA (CTR, clk_ctr, 14) },
-    { FLDATA (CTL, clk_control, 0) },
-    { FLDATA (FLG, clk_flag, 0) },
-    { FLDATA (FBF, clk_flagbuf, 0) },
+    { FLDATA (CTL, clk.control, 0) },
+    { FLDATA (FLG, clk.flag, 0) },
+    { FLDATA (FBF, clk.flagbuf, 0) },
     { FLDATA (ERR, clk_error, CLK_V_ERROR) },
     { BRDATA (TIME, clk_time, 10, 24, 8) },
     { DRDATA (IPTICK, clk_tick, 24), PV_RSPC | REG_RO },
-    { ORDATA (DEVNO, clk_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, clk_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -392,78 +402,79 @@ DEVICE clk_dev = {
        simulation, we omit the buffer clear.
 */
 
-uint32 ptrio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 ptrio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        ptr_flag = ptr_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        ptr_flag = ptr_flagbuf = SET;
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            ptr.flag = ptr.flagbuf = CLEAR;
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (ptr);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            ptr.flag = ptr.flagbuf = SET;
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (ptr);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (ptr);
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = ptr_unit.buf;
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (ptr);
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        ptr_flag = ptr_flagbuf = SET;                   /* set flag and flag buffer */
-                                                        /* fall into CRS handler */
-
-    case ioCRS:                                         /* control reset */
-                                                        /* fall into CLC handler */
-
-    case ioCLC:                                         /* clear control flip-flop */
-        ptr_control = CLEAR;
-        break;
+        case ioIOI:                                         /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, ptr_unit.buf);   /* merge in return status */
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        ptr_control = SET;
-        sim_activate (&ptr_unit, ptr_unit.wait);
-        break;
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            ptr.flag = ptr.flagbuf = SET;               /* set flag and flag buffer */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, ptr);                   /* set standard PRL signal */
-        setstdIRQ (select_code, ptr);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, ptr);                   /* set standard SRQ signal */
-        break;
+        case ioCRS:                                     /* control reset */
+        case ioCLC:                                     /* clear control flip-flop */
+            ptr.control = CLEAR;
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        ptr_flagbuf = CLEAR;
-        break;
+        case ioSTC:                                     /* set control flip-flop */
+            ptr.control = SET;
+            sim_activate (&ptr_unit, ptr_unit.wait);
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (ptr);                            /* set standard PRL signal */
+            setstdIRQ (ptr);                            /* set standard IRQ signal */
+            setstdSRQ (ptr);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            ptr.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-if (signal > ioCLF)                                     /* multiple signals? */
-    ptrio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    ptrio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -474,7 +485,7 @@ t_stat ptr_svc (UNIT *uptr)
 int32 temp;
 
 if ((ptr_unit.flags & UNIT_ATT) == 0)                   /* attached? */
-    return IORETURN (ptr_stopioe, SCPE_UNATT);
+    return IOERROR (ptr_stopioe, SCPE_UNATT);
 while ((temp = getc (ptr_unit.fileref)) == EOF) {       /* read byte, error? */
     if (feof (ptr_unit.fileref)) {                      /* end of file? */
         if ((ptr_unit.flags & UNIT_DIAG) && (ptr_unit.pos > 0)) {
@@ -501,7 +512,7 @@ while ((temp = getc (ptr_unit.fileref)) == EOF) {       /* read byte, error? */
         }
     }
 
-ptrio (ptr_dib.devno, ioENF, 0);                        /* set flag */
+ptrio (&ptr_dib, ioENF, 0);                             /* set flag */
 
 ptr_unit.buf = temp & 0377;                             /* put byte in buf */
 ptr_unit.pos = ftell (ptr_unit.fileref);
@@ -526,7 +537,7 @@ return attach_unit (uptr, cptr);
 
 t_stat ptr_reset (DEVICE *dptr)
 {
-ptrio (ptr_dib.devno, ioPOPIO, 0);                      /* send POPIO signal */
+IOPRESET (&ptr_dib);                                    /* PRESET device (does not use PON) */
 sim_cancel (&ptr_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
@@ -591,7 +602,7 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 dev;
 
-dev = ptr_dib.devno;                                    /* get device no */
+dev = ptr_dib.select_code;                              /* get device no */
 if (ibl_copy (ptr_rom, dev)) return SCPE_IERR;          /* copy boot to memory */
 SR = (SR & IBL_OPT) | IBL_PTR | (dev << IBL_V_DEV);     /* set SR */
 return SCPE_OK;
@@ -608,87 +619,88 @@ return SCPE_OK;
        state is implied by the activation of the PTP unit.
 */
 
-uint32 ptpio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 ptpio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        ptp_flag = ptp_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        ptp_flag = ptp_flagbuf = SET;
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            ptp.flag = ptp.flagbuf = CLEAR;
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (ptp);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            ptp.flag = ptp.flagbuf = SET;
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (ptp);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (ptp);
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        if ((ptp_unit.flags & UNIT_ATT) == 0)           /* not attached? */
-            data = PTP_LOW;                             /* report as out of tape */
-        else
-            data = 0;
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (ptp);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        ptp_unit.buf = data;
-        break;
+        case ioIOI:                                         /* I/O data input */
+            if ((ptp_unit.flags & UNIT_ATT) == 0)           /* not attached? */
+                stat_data = IORETURN (SCPE_OK, PTP_LOW);    /* report as out of tape */
+            else
+                stat_data = IORETURN (SCPE_OK, 0);
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        ptp_flag = ptp_flagbuf = SET;                   /* set flag and flag buffer */
-        ptp_unit.buf = 0;                               /* clear output buffer */
-                                                        /* fall into CRS handler */
-
-    case ioCRS:                                         /* control reset */
-                                                        /* fall into CLC handler */
-
-    case ioCLC:                                         /* clear control flip-flop */
-        ptp_control = CLEAR;
-        break;
+        case ioIOO:                                     /* I/O data output */
+            ptp_unit.buf = IODATA (stat_data);          /* clear supplied status */
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        ptp_control = SET;
-        sim_activate (&ptp_unit, ptp_unit.wait);
-        break;
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            ptp.flag = ptp.flagbuf = SET;               /* set flag and flag buffer */
+            ptp_unit.buf = 0;                           /* clear output buffer */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, ptp);                   /* set standard PRL signal */
-        setstdIRQ (select_code, ptp);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, ptp);                   /* set standard SRQ signal */
-        break;
+        case ioCRS:                                     /* control reset */
+        case ioCLC:                                     /* clear control flip-flop */
+            ptp.control = CLEAR;
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        ptp_flagbuf = CLEAR;
-        break;
+        case ioSTC:                                     /* set control flip-flop */
+            ptp.control = SET;
+            sim_activate (&ptp_unit, ptp_unit.wait);
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (ptp);                            /* set standard PRL signal */
+            setstdIRQ (ptp);                            /* set standard IRQ signal */
+            setstdSRQ (ptp);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            ptp.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-if (signal > ioCLF)                                     /* multiple signals? */
-    ptpio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    ptpio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -696,10 +708,10 @@ return data;
 
 t_stat ptp_svc (UNIT *uptr)
 {
-ptpio (ptp_dib.devno, ioENF, 0);                        /* set flag */
+ptpio (&ptp_dib, ioENF, 0);                             /* set flag */
 
 if ((ptp_unit.flags & UNIT_ATT) == 0)                   /* attached? */
-    return IORETURN (ptp_stopioe, SCPE_UNATT);
+    return IOERROR (ptp_stopioe, SCPE_UNATT);
 if (putc (ptp_unit.buf, ptp_unit.fileref) == EOF) {     /* output byte */
     perror ("PTP I/O error");
     clearerr (ptp_unit.fileref);
@@ -714,7 +726,7 @@ return SCPE_OK;
 
 t_stat ptp_reset (DEVICE *dptr)
 {
-ptpio (ptp_dib.devno, ioPOPIO, 0);                      /* send POPIO signal */
+IOPRESET (&ptp_dib);                                    /* PRESET device (does not use PON) */
 sim_cancel (&ptp_unit);                                 /* deactivate unit */
 return SCPE_OK;
 }
@@ -722,97 +734,100 @@ return SCPE_OK;
 
 /* Terminal I/O signal handler */
 
-uint32 ttyio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 ttyio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+uint16 data;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        tty_flag = tty_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        tty_flag = tty_flagbuf = SET;
-        break;
-
-
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (tty);
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            tty.flag = tty.flagbuf = CLEAR;
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (tty);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            tty.flag = tty.flagbuf = SET;
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = tty_buf;
-
-        if (!(tty_mode & TM_KBD) && sim_is_active (&tty_unit[TTO]))
-            data = data | TP_BUSY;
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (tty);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        if (data & TM_MODE)
-            tty_mode = data & (TM_KBD|TM_PRI|TM_PUN);
-
-        tty_buf = data & 0377;
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (tty);
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-                                                        /* fall into CRS handler */
+        case ioIOI:                                     /* I/O data input */
+            data = tty_buf;
 
-    case ioCRS:                                         /* control reset */
-        tty_control = CLEAR;                            /* clear control */
-        tty_flag = tty_flagbuf = SET;                   /* set flag and flag buffer */
-        tty_mode = TM_KBD;                              /* set tty, clear print/punch */
-        tty_shin = 0377;                                /* input inactive */
-        tty_lf = 0;                                     /* no lf pending */
-        break;
+            if (!(tty_mode & TM_KBD) && sim_is_active (&tty_unit[TTO]))
+                data = data | TP_BUSY;
+
+            stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
+            break;
 
 
-    case ioCLC:                                         /* clear control flip-flop */
-        tty_control = CLEAR;
-        break;
+        case ioIOO:                                     /* I/O data output */
+            data = IODATA (stat_data);                  /* clear supplied status */
+
+            if (data & TM_MODE)
+                tty_mode = data & (TM_KBD|TM_PRI|TM_PUN);
+
+            tty_buf = data & 0377;
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        tty_control = SET;
-
-        if (!(tty_mode & TM_KBD))                       /* output? */
-            sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);
-        break;
-
-
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, tty);                   /* set standard PRL signal */
-        setstdIRQ (select_code, tty);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, tty);                   /* set standard SRQ signal */
-        break;
+        case ioCRS:                                     /* control reset */
+            tty.control = CLEAR;                        /* clear control */
+            tty.flag = tty.flagbuf = SET;               /* set flag and flag buffer */
+            tty_mode = TM_KBD;                          /* set tty, clear print/punch */
+            tty_shin = 0377;                            /* input inactive */
+            tty_lf = 0;                                 /* no lf pending */
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        tty_flagbuf = CLEAR;
-        break;
+        case ioCLC:                                     /* clear control flip-flop */
+            tty.control = CLEAR;
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSTC:                                     /* set control flip-flop */
+            tty.control = SET;
+
+            if (!(tty_mode & TM_KBD))                   /* output? */
+                sim_activate (&tty_unit[TTO], tty_unit[TTO].wait);
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (tty);                            /* set standard PRL signal */
+            setstdIRQ (tty);                            /* set standard IRQ signal */
+            setstdSRQ (tty);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            tty.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    ttyio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    ttyio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -880,7 +895,7 @@ if (tty_mode & TM_KBD) {                                /* keyboard enabled? */
     tty_buf = c;                                        /* put char in buf */
     uptr->pos = uptr->pos + 1;
 
-    ttyio (tty_dib.devno, ioENF, 0);                    /* set flag */
+    ttyio (&tty_dib, ioENF, 0);                         /* set flag */
 
     if (c) {
         tto_out (c);                                    /* echo? */
@@ -907,7 +922,7 @@ if ((r = tto_out (c)) != SCPE_OK) {                     /* output; error? */
     return ((r == SCPE_STALL)? SCPE_OK: r);             /* !stall? report */
     }
 
-ttyio (tty_dib.devno, ioENF, 0);                        /* set flag */
+ttyio (&tty_dib, ioENF, 0);                             /* set flag */
 
 return ttp_out (c);                                     /* punch if enabled */
 }
@@ -932,7 +947,7 @@ t_stat ttp_out (int32 c)
 {
 if (tty_mode & TM_PUN) {                                /* punching? */
     if ((tty_unit[TTP].flags & UNIT_ATT) == 0)          /* attached? */
-        return IORETURN (ttp_stopioe, SCPE_UNATT);
+        return IOERROR (ttp_stopioe, SCPE_UNATT);
     if (putc (c, tty_unit[TTP].fileref) == EOF) {       /* output char */
         perror ("TTP I/O error");
         clearerr (tty_unit[TTP].fileref);
@@ -948,10 +963,10 @@ return SCPE_OK;
 
 t_stat tty_reset (DEVICE *dptr)
 {
-if (sim_switches & SWMASK ('P'))                        /* PON reset? */
+if (sim_switches & SWMASK ('P'))                        /* initialization reset? */
     tty_buf = 0;                                        /* clear buffer */
 
-ttyio (tty_dib.devno, ioPOPIO, 0);                      /* send POPIO signal */
+IOPRESET (&tty_dib);                                    /* PRESET device (does not use PON) */
 
 tty_unit[TTI].wait = POLL_WAIT;                         /* reset initial poll */
 sim_rtcn_init (tty_unit[TTI].wait, TMR_POLL);           /* init poll timer */
@@ -1024,105 +1039,105 @@ int32 poll_time;
    expected.
 */
 
-uint32 clkio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 clkio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        clk_flag = clk_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        clk_flag = clk_flagbuf = SET;
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            clk.flag = clk.flagbuf = CLEAR;
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (clk);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            clk.flag = clk.flagbuf = SET;
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (clk);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (clk);
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = clk_error;
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (clk);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        clk_select = data & 07;                         /* save select */
-        sim_cancel (&clk_unit);                         /* stop the clock */
-        clk_control = CLEAR;                            /* clear control */
-        clkio (select_code, ioSIR, 0);                  /* set interrupt request (IOO normally doesn't) */
-        break;
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, clk_error);  /* merge in return status */
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        clk_flag = clk_flagbuf = SET;                   /* set flag and flag buffer */
-                                                        /* fall into CRS handler */
-
-    case ioCRS:                                         /* control reset */
-                                                        /* fall into CLC handler */
-
-    case ioCLC:                                         /* clear control flip-flop */
-        clk_control = CLEAR;
-        sim_cancel (&clk_unit);                         /* deactivate unit */
-        break;
+        case ioIOO:                                     /* I/O data output */
+            clk_select = IODATA (stat_data) & 07;       /* save select */
+            sim_cancel (&clk_unit);                     /* stop the clock */
+            clk.control = CLEAR;                        /* clear control */
+            working_set = working_set | ioSIR;          /* set interrupt request (IOO normally doesn't) */
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        clk_control = SET;
-        if (clk_unit.flags & UNIT_DIAG)                     /* diag mode? */
-            clk_unit.flags = clk_unit.flags & ~UNIT_IDLE;   /* not calibrated */
-        else
-            clk_unit.flags = clk_unit.flags | UNIT_IDLE;    /* is calibrated */
-
-        if (!sim_is_active (&clk_unit)) {               /* clock running? */
-            clk_tick = clk_delay (0);                   /* get tick count */
-
-            if ((clk_unit.flags & UNIT_DIAG) == 0)      /* calibrated? */
-                if (clk_select == 2)                    /* 10 msec. interval? */
-                    clk_tick = sync_poll (INITIAL);     /* sync  poll */
-                else
-                    sim_rtcn_init (clk_tick, TMR_CLK);  /* initialize timer */
-
-            sim_activate (&clk_unit, clk_tick);         /* start clock */
-            clk_ctr = clk_delay (1);                    /* set repeat ctr */
-            }
-        clk_error = 0;                                  /* clear error */
-        break;
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            clk.flag = clk.flagbuf = SET;               /* set flag and flag buffer */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, clk);                   /* set standard PRL signal */
-        setstdIRQ (select_code, clk);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, clk);                   /* set standard SRQ signal */
-        break;
+        case ioCRS:                                     /* control reset */
+        case ioCLC:                                     /* clear control flip-flop */
+            clk.control = CLEAR;
+            sim_cancel (&clk_unit);                     /* deactivate unit */
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        clk_flagbuf = CLEAR;
-        break;
+        case ioSTC:                                             /* set control flip-flop */
+            clk.control = SET;
+            if (clk_unit.flags & UNIT_DIAG)                     /* diag mode? */
+                clk_unit.flags = clk_unit.flags & ~UNIT_IDLE;   /* not calibrated */
+            else
+                clk_unit.flags = clk_unit.flags | UNIT_IDLE;    /* is calibrated */
+
+            if (!sim_is_active (&clk_unit)) {                   /* clock running? */
+                clk_tick = clk_delay (0);                       /* get tick count */
+
+                if ((clk_unit.flags & UNIT_DIAG) == 0)          /* calibrated? */
+                    if (clk_select == 2)                        /* 10 msec. interval? */
+                        clk_tick = sync_poll (INITIAL);         /* sync  poll */
+                    else
+                        sim_rtcn_init (clk_tick, TMR_CLK);      /* initialize timer */
+
+                sim_activate (&clk_unit, clk_tick);             /* start clock */
+                clk_ctr = clk_delay (1);                        /* set repeat ctr */
+                }
+            clk_error = 0;                                      /* clear error */
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (clk);                            /* set standard PRL signal */
+            setstdIRQ (clk);                            /* set standard IRQ signal */
+            setstdSRQ (clk);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            clk.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    clkio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    clkio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -1134,7 +1149,7 @@ return data;
 
 t_stat clk_svc (UNIT *uptr)
 {
-if (!clk_control)                                       /* control clear? */
+if (!clk.control)                                       /* control clear? */
     return SCPE_OK;                                     /* done */
 
 if (clk_unit.flags & UNIT_DIAG)                         /* diag mode? */
@@ -1147,10 +1162,10 @@ else
 sim_activate (uptr, clk_tick);                          /* reactivate */
 clk_ctr = clk_ctr - 1;                                  /* decrement counter */
 if (clk_ctr <= 0) {                                     /* end of interval? */
-    if (clk_flag)
+    if (clk.flag)
         clk_error = CLK_ERROR;                          /* overrun? error */
     else
-        clkio (clk_dib.devno, ioENF, 0);                /* set flag */
+        clkio (&clk_dib, ioENF, 0);                     /* set flag */
     clk_ctr = clk_delay (1);                            /* reset counter */
     }
 return SCPE_OK;
@@ -1161,13 +1176,13 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
-if (sim_switches & SWMASK ('P')) {                      /* PON reset? */
+if (sim_switches & SWMASK ('P')) {                      /* initialization reset? */
     clk_error = 0;                                      /* clear error */
     clk_select = 0;                                     /* clear select */
     clk_ctr = 0;                                        /* clear counter */
     }
 
-clkio (clk_dib.devno, ioPOPIO, 0);                      /* send POPIO signal */
+IOPRESET (&clk_dib);                                    /* PRESET device (does not use PON) */
 
 return SCPE_OK;
 }

@@ -590,7 +590,7 @@ return (sim_idle_rate_ms != 0);
 
 t_bool sim_idle (uint32 tmr, t_bool sin_cyc)
 {
-static uint32 cyc_ms;
+static uint32 cyc_ms = 0;
 uint32 w_ms, w_idle, act_ms;
 int32 act_cyc;
 
@@ -601,7 +601,7 @@ if ((sim_clock_queue == NULL) ||                        /* clock queue empty? */
         sim_interval = sim_interval - 1;
     return FALSE;
     }
-if (!cyc_ms)
+if (cyc_ms == 0)                                        /* not computed yet? */
     cyc_ms = (rtc_currd[tmr] * rtc_hz[tmr]) / 1000;     /* cycles per msec */
 if ((sim_idle_rate_ms == 0) || (cyc_ms == 0)) {         /* not possible? */
     if (sin_cyc)
@@ -620,8 +620,8 @@ act_cyc = act_ms * cyc_ms;
 if (act_ms < w_ms)                                      /* awakened early? */
     act_cyc += (cyc_ms * sim_idle_rate_ms) / 2;         /* account for half an interval's worth of cycles */
 if (sim_interval > act_cyc)
-    sim_interval = sim_interval - act_cyc;
-else sim_interval = 0;
+    sim_interval = sim_interval - act_cyc;              /* count down sim_interval */
+else sim_interval = 0;                                  /* or fire immediately */
 return TRUE;
 }
 

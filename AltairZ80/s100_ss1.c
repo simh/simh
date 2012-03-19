@@ -207,10 +207,6 @@ static MTAB ss1_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(ss1_dev.dctrl & level) { \
-                                       printf args;             \
-                                    }
-
 /* Debug Flags */
 static DEBTAB ss1_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -306,10 +302,12 @@ static uint8 SS1_Read(const uint32 Addr)
         case SS1_M8259_L:
             if((ss1_pic[sel_pic].OCW3 & 0x03) == 0x03) {
                 cData = ss1_pic[sel_pic].ISR;
-                TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " RD: %s PIC ISR=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+                sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                          " RD: %s PIC ISR=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
             } else if((ss1_pic[sel_pic].OCW3 & 0x03) == 0x02) {
                 cData = ss1_pic[sel_pic].IRR;
-                TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " RD: %s PIC IRR=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+                sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                          " RD: %s PIC IRR=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
             } else {
                 cData = 0xFF;
             }
@@ -318,27 +316,32 @@ static uint8 SS1_Read(const uint32 Addr)
             sel_pic = SLAVE_PIC;
         case SS1_M8259_H:
             cData = ss1_pic[sel_pic].IMR;
-            TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " RD: %s PIC IMR=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+            sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: %s PIC IMR=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
             ss1_pic[sel_pic].IMR = cData;
             break;
         case SS1_8253_CTL:
             cData = ss1_tc[0].CTL;
-            TRACE_PRINT(TC_MSG, ("SS1: " ADDRESS_FORMAT " RD: TC CTL=0x%02x." NLP, PCX, cData));
+            sim_debug(TC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: TC CTL=0x%02x.\n", PCX, cData);
             break;
         case SS1_8253_TC2:
             sel_tc++;
         case SS1_8253_TC1:
             sel_tc++;
         case SS1_8253_TC0:
-            TRACE_PRINT(TC_MSG, ("SS1: " ADDRESS_FORMAT " RD: TC [%d]=0x%02x." NLP, PCX, sel_tc, cData));
+            sim_debug(TC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: TC [%d]=0x%02x.\n", PCX, sel_tc, cData);
             break;
         case SS1_9511A_DATA:
         case SS1_9511A_CMD:
-            TRACE_PRINT(MATH_MSG, ("SS1: " ADDRESS_FORMAT " RD: Math Coprocessor not Implemented." NLP, PCX));
+            sim_debug(MATH_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: Math Coprocessor not Implemented.\n", PCX);
             break;
         case SS1_RTC_CMD:
             cData = 0xFF;
-            TRACE_PRINT(RTC_MSG, ("SS1: " ADDRESS_FORMAT " RD: RTC  Cmd=0x%02x." NLP, PCX, cData));
+            sim_debug(RTC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: RTC  Cmd=0x%02x.\n", PCX, cData);
             break;
         case SS1_RTC_DATA:
                 time(&now);
@@ -389,20 +392,24 @@ static uint8 SS1_Read(const uint32 Addr)
                 cData = 0;
                 break;
             }
-            TRACE_PRINT(RTC_MSG, ("SS1: " ADDRESS_FORMAT " RD: RTC Data[%x]=0x%02x." NLP, PCX, ss1_rtc[0].digit_sel, cData));
+            sim_debug(RTC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: RTC Data[%x]=0x%02x.\n", PCX, ss1_rtc[0].digit_sel, cData);
 
             break;
         case SS1_UART_DATA:
             cData = sio0d(Addr, 0, 0);
-            TRACE_PRINT(UART_MSG, ("SS1: " ADDRESS_FORMAT " RD: UART Data=0x%02x." NLP, PCX, cData));
+            sim_debug(UART_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: UART Data=0x%02x.\n", PCX, cData);
             break;
         case SS1_UART_STAT:
             cData = sio0s(Addr, 0, 0);
-            TRACE_PRINT(UART_MSG, ("SS1: " ADDRESS_FORMAT " RD: UART Stat=0x%02x." NLP, PCX, cData));
+            sim_debug(UART_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: UART Stat=0x%02x.\n", PCX, cData);
             break;
         case SS1_UART_MODE:
         case SS1_UART_CMD:
-            TRACE_PRINT(UART_MSG, ("SS1: " ADDRESS_FORMAT " RD: UART not Implemented." NLP, PCX));
+            sim_debug(UART_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " RD: UART not Implemented.\n", PCX);
             break;
     }
 
@@ -427,15 +434,18 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData)
             sel_pic = SLAVE_PIC;
         case SS1_M8259_L:
             if(cData & 0x10) {
-                TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " WR: %s PIC ICW1=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+                sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                          " WR: %s PIC ICW1=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
                 ss1_pic[sel_pic].ICW[1] = cData;
                 ss1_pic[sel_pic].config_cnt=1;
             } else {
                 if(cData & 0x08) { /* OCW3 */
-                    TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " WR: %s PIC OCW3=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+                    sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                              " WR: %s PIC OCW3=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
                     ss1_pic[sel_pic].OCW3 = cData;
                 } else { /* OCW2 */
-                    TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " WR: %s PIC OCW2=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+                    sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                              " WR: %s PIC OCW2=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
                     ss1_pic[sel_pic].OCW2 = cData;
                 }
             }
@@ -444,12 +454,12 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData)
             sel_pic = SLAVE_PIC;
         case SS1_M8259_H:
             if(ss1_pic[sel_pic].config_cnt == 0) {
-                TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " WR: %s PIC IMR=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), cData));
+                sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT " WR: %s PIC IMR=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), cData);
                 ss1_pic[sel_pic].IMR = cData;
                 generate_ss1_interrupt();
             } else {
                 ss1_pic[sel_pic].config_cnt++;
-                TRACE_PRINT(PIC_MSG, ("SS1: " ADDRESS_FORMAT " WR: %s PIC ICW%d=0x%02x." NLP, PCX, (sel_pic ? "Slave " : "Master"), ss1_pic[sel_pic].config_cnt, cData));
+                sim_debug(PIC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT " WR: %s PIC ICW%d=0x%02x.\n", PCX, (sel_pic ? "Slave " : "Master"), ss1_pic[sel_pic].config_cnt, cData);
                 ss1_pic[sel_pic].ICW[ss1_pic[sel_pic].config_cnt] = cData;
 
                 ss1_unit[0].u3 = ss1_pic[SLAVE_PIC].ICW[2]+TC0_IRQ_OFFSET;
@@ -464,15 +474,22 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData)
         case SS1_8253_CTL:
             ss1_tc[0].CTL = cData;
             sel_timer = (ss1_tc[0].CTL & I8253_CTL_SC_MASK) >> 6;
-            TRACE_PRINT(TC_MSG, ("SS1: " ADDRESS_FORMAT " WR: TC CTL=0x%02x." NLP, PCX, ss1_tc[0].CTL));
+            sim_debug(TC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: TC CTL=0x%02x.\n",
+                      PCX, ss1_tc[0].CTL);
             if(ss1_tc[0].CTL & I8253_CTL_BCD) {
-                TRACE_PRINT(ERROR_MSG, ("SS1: " ADDRESS_FORMAT " Timer %d: BCD Mode not supported: TC CTL=0x%02x." NLP, PCX, sel_timer, ss1_tc[0].CTL));
+                sim_debug(ERROR_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                          " Timer %d: BCD Mode not supported: TC CTL=0x%02x.\n",
+                          PCX, sel_timer, ss1_tc[0].CTL);
             }
             ss1_tc[0].bcd[sel_timer] = (ss1_tc[0].CTL & I8253_CTL_BCD);
             ss1_tc[0].mode[sel_timer] = (ss1_tc[0].CTL & I8253_CTL_MODE_MASK) >> 1;
             ss1_tc[0].rl[sel_timer] = (ss1_tc[0].CTL & I8253_CTL_RL_MASK) >> 4;
-            TRACE_PRINT(TRACE_MSG, ("SS1: " ADDRESS_FORMAT " Timer %d: Mode: %d, RL=%d, %s." NLP, PCX,
-                sel_timer, ss1_tc[0].mode[sel_timer], ss1_tc[0].rl[sel_timer], ss1_tc[0].bcd[sel_timer] ? "BCD" : "Binary"));
+            sim_debug(TRACE_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " Timer %d: Mode: %d, RL=%d, %s.\n",
+                      PCX, sel_timer, ss1_tc[0].mode[sel_timer],
+                      ss1_tc[0].rl[sel_timer],
+                      ss1_tc[0].bcd[sel_timer] ? "BCD" : "Binary");
             newcount = 0;
             bc=0;
             break;
@@ -497,38 +514,45 @@ static uint8 SS1_Write(const uint32 Addr, uint8 cData)
                 sim_activate(&ss1_unit[sel_tc], newcount);
             }
 
-            TRACE_PRINT(TC_MSG, ("SS1: " ADDRESS_FORMAT " WR: TC [%d]=0x%02x." NLP, PCX, sel_tc, cData));
+            sim_debug(TC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: TC [%d]=0x%02x.\n", PCX, sel_tc, cData);
             if(sel_tc == 0) {
             }
             break;
         case SS1_9511A_DATA:
         case SS1_9511A_CMD:
-            TRACE_PRINT(TRACE_MSG, ("SS1: " ADDRESS_FORMAT " WR: Math Coprocessor not Implemented." NLP, PCX));
+            sim_debug(TRACE_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: Math Coprocessor not Implemented.\n", PCX);
             break;
         case SS1_RTC_CMD:
             ss1_rtc[0].digit_sel = cData & 0x0F;
             ss1_rtc[0].flags = (cData >> 4) & 0x0F;
-            TRACE_PRINT(RTC_MSG, ("SS1: " ADDRESS_FORMAT " WR: RTC  Cmd=0x%02x (%s%s%s SEL=%x)" NLP,
-                PCX, cData,
-                ss1_rtc[0].flags & 0x4 ? "HOLD " :"",
-                ss1_rtc[0].flags & 0x2 ? "WR" :"",
-                ss1_rtc[0].flags & 0x1 ? "RD" :"",
-                ss1_rtc[0].digit_sel))
+            sim_debug(RTC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: RTC  Cmd=0x%02x (%s%s%s SEL=%x)\n",
+                      PCX, cData,
+                      ss1_rtc[0].flags & 0x4 ? "HOLD " :"",
+                      ss1_rtc[0].flags & 0x2 ? "WR" :"",
+                      ss1_rtc[0].flags & 0x1 ? "RD" :"",
+                      ss1_rtc[0].digit_sel);
             break;
         case SS1_RTC_DATA:
-            TRACE_PRINT(RTC_MSG, ("SS1: " ADDRESS_FORMAT " WR: RTC Data=0x%02x" NLP, PCX, cData));
+            sim_debug(RTC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: RTC Data=0x%02x\n", PCX, cData);
             break;
         case SS1_UART_DATA:
-            TRACE_PRINT(UART_MSG, ("SS1: " ADDRESS_FORMAT " WR: UART Data=0x%02x." NLP, PCX, cData));
+            sim_debug(UART_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: UART Data=0x%02x.\n", PCX, cData);
             sio0d(Addr, 1, cData);
             break;
         case SS1_UART_STAT:
-            TRACE_PRINT(UART_MSG, ("SS1: " ADDRESS_FORMAT " WR: UART Stat=0x%02x." NLP, PCX, cData));
+            sim_debug(UART_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: UART Stat=0x%02x.\n", PCX, cData);
             sio0s(Addr, 1, cData);
             break;
         case SS1_UART_MODE:
         case SS1_UART_CMD:
-            TRACE_PRINT(TRACE_MSG, ("SS1: " ADDRESS_FORMAT " WR: UART not Implemented." NLP, PCX));
+            sim_debug(TRACE_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT
+                      " WR: UART not Implemented.\n", PCX);
             break;
     }
 
@@ -564,22 +588,12 @@ static void generate_ss1_interrupt(void)
             if(irq_bit) {
                 ss1_pic[pic].IRR |= (irq_bit << irq_index);
                 irq = ss1_pic[pic].ICW[2]+irq_index;
-                TRACE_PRINT(IRQ_MSG, ("Handling interrupt on %s PIC: IMR=0x%02x, ISR=0x%02x, IRR=0x%02x, index=%d" NLP,
-                    pic ? "SLAVE" : "MASTER",
-                    ss1_pic[pic].IMR,
-                    ss1_pic[pic].ISR,
-                    ss1_pic[pic].IRR,
-                    irq_index));
+                sim_debug(IRQ_MSG, &ss1_dev, "Handling interrupt on %s PIC: IMR=0x%02x, ISR=0x%02x, IRR=0x%02x, index=%d\n", pic ? "SLAVE" : "MASTER", ss1_pic[pic].IMR, ss1_pic[pic].ISR, ss1_pic[pic].IRR, irq_index);
                 cpu_raise_interrupt(irq);
                 ss1_pic[pic].IRR &= ~(irq_bit << irq_index);
                 ss1_pic[pic].ISR &= ~(irq_bit << irq_index);
                 if(irq_pend & 0x7E) {
-/*              TRACE_PRINT(IRQ_MSG, ("Requeue interrupt on %s PIC: IMR=0x%02x, ISR=0x%02x, IRR=0x%02x, index=%d" NLP,
-                    pic ? "SLAVE" : "MASTER",
-                    ss1_pic[pic].IMR,
-                    ss1_pic[pic].ISR,
-                    ss1_pic[pic].IRR,
-                    irq_index));
+/*              sim_debug(IRQ_MSG, &ss1_dev, "Requeue interrupt on %s PIC: IMR=0x%02x, ISR=0x%02x, IRR=0x%02x, index=%d\n", pic ? "SLAVE" : "MASTER", ss1_pic[pic].IMR, ss1_pic[pic].ISR, ss1_pic[pic].IRR, irq_index);
 */
                     sim_activate(&ss1_unit[3], 1000);  /* requeue, because more interrupts are pending. */
                 }
@@ -607,7 +621,7 @@ static t_stat ss1_svc (UNIT *uptr)
         generate_ss1_interrupt();
         sim_activate(uptr, 1000);  /* requeue, because we still need to handle the timer interrupt. */
     } else if((cData & 1) && ((ss1_pic[SLAVE_PIC].IMR & 0x40) == 0)) {
-        TRACE_PRINT(IRQ_MSG, ("SS1: " ADDRESS_FORMAT " Calling UART Tx ISR." NLP, PCX));
+        sim_debug(IRQ_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT " Calling UART Tx ISR.\n", PCX);
         ss1_pic[SLAVE_PIC].ISR |= 0x40;
         generate_ss1_interrupt();
         sim_activate(uptr, 1000);   /* requeue, because we still need to handle the timer interrupt. */
@@ -626,15 +640,15 @@ static t_stat ss1_svc (UNIT *uptr)
                 break;
         }
         if(ss1_tc[0].mode[uptr->u4] == 0x0) {
-            TRACE_PRINT(TC_MSG, ("SS1: " ADDRESS_FORMAT " Calling Timer%d ISR." NLP, PCX, uptr->u4));
+            sim_debug(TC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT " Calling Timer%d ISR.\n", PCX, uptr->u4);
             ss1_pic[SLAVE_PIC].ISR |= irq_bit;
             generate_ss1_interrupt();
         }
         if(ss1_tc[0].mode[uptr->u4] == 0x3) {
-            TRACE_PRINT(TC_MSG, ("SS1: " ADDRESS_FORMAT " Calling Timer%d ISR." NLP, PCX, uptr->u4));
+            sim_debug(TC_MSG, &ss1_dev, "SS1: " ADDRESS_FORMAT " Calling Timer%d ISR.\n", PCX, uptr->u4);
             ss1_pic[SLAVE_PIC].ISR |= irq_bit;
             generate_ss1_interrupt();
-            TRACE_PRINT(TC_MSG, ("Timer %d, mode %d, reloading\n", uptr->u4, ss1_tc[0].mode[uptr->u4]));
+            sim_debug(TC_MSG, &ss1_dev, "Timer %d, mode %d, reloading\n", uptr->u4, ss1_tc[0].mode[uptr->u4]);
                 sim_activate(uptr, 33280);
         }
     }

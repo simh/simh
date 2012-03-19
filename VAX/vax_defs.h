@@ -1,6 +1,6 @@
 /* vax_defs.h: VAX architecture definitions file
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   05-Nov-11    RMS     Added PSL_IPL17 definition
    09-May-06    RMS     Added system PTE ACV error code
    03-May-06    RMS     Added EDITPC get/put cc's macros
    03-Nov-05    RMS     Added 780 stop codes

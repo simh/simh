@@ -1,6 +1,6 @@
 /* i7094_cpu1.c: IBM 7094 CPU complex instructions
 
-   Copyright (c) 2003-2010, Robert M. Supnik
+   Copyright (c) 2003-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   31-Dec-11    RMS     Refined PSE and MSE user-mode protection based on
+                        CTSS RPQ specification
+                        Select traps have priority over protection traps
    16-Jul-10    RMS     Fixed PSE and MSE user-mode protection (from Dave Pitts)
                         Added SPUx, SPTx, SPRx
 */
@@ -296,10 +299,11 @@ switch (addr) {
         break;
 
     case 00007:                                         /* ETM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_ttrap = 1;
+            }
         break;
 
     case 00010:                                         /* RND */
@@ -322,6 +326,8 @@ switch (addr) {
         break;
 
     case 00014:                                         /* RCT */
+        if (prot_trap (0))                              /* user mode? */
+            break;
         chtr_inhi = 1;                                  /* 1 cycle delay */
         chtr_inht = 0;                                  /* clr inhibit trap */
         chtr_pend = 0;                                  /* no trap now */
@@ -350,10 +356,8 @@ switch (addr) {
 
     case 001000: case 002000: case 003000: case 004000: /* BTT */
     case 005000: case 060000: case 070000: case 010000:
-       if (prot_trap (0))                               /* user mode? */
-           break;
-       if (cpu_model & I_9X) {                          /* 709X only */
-             if (sel_trap (PC))                         /* sel trap? */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (addr);                       /* get channel */
             if (ch_flags[ch] & CHF_BOT)                 /* BOT? */
@@ -437,32 +441,43 @@ switch (addr) {
         break;
 
     case 00004:                                         /* LFTM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_ftrap = 0;
+            }
         break;
 
     case 00005:                                         /* ESTM */
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_strap = 1;
+            }
         break;
 
     case 00006:                                         /* ECTM */
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_ctrap = 1;
+            }
         break;
 
     case 00007:                                         /* LTM */
-        if (prot_trap (0))                              /* user mode? */
-            break;
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_ttrap = 0;
+            }
         break;
 
     case 00010:                                         /* LSNM */
-        if (cpu_model & I_9X)                           /* 709X only */
+        if (cpu_model & I_9X) {                         /* 709X only */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_storn = 0;
+            }
         break;
 
     case 00012:                                         /* RTT (704) */
@@ -497,7 +512,7 @@ switch (addr) {
 
     case 001000: case 002000: case 003000: case 004000: /* ETT */
     case 005000: case 006000: case 007000: case 010000:
-        if (sel_trap (PC))                              /* sel trap? */
+        if (sel_trap (0) || prot_trap (PC))             /* select takes priority */
             break;
         ch = GET_U_CH (addr);                           /* get channel */
         if (ch_flags[ch] & CHF_EOT)                     /* EOT? */

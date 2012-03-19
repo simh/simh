@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
    25-Sep-11    MP      Added the ability for a simulator built with 
                         SIM_ASYNCH_IO to change whether I/O is actually done
                         asynchronously by the new scp command SET ASYNCH and 
@@ -1201,13 +1202,12 @@ return;
 
 t_stat assert_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr, *aptr, *tptr;
+char gbuf[CBUFSIZE], *gptr, *tptr;
 REG *rptr;
 uint32 idx;
 t_value val;
 t_stat r;
 
-aptr = cptr;                                            /* save assertion */
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
@@ -1798,19 +1798,19 @@ if (qdisable (dptr)) {                                  /* disabled? */
     }
 for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
     uptr = dptr->units + j;
-    if (uptr->flags & UNIT_DISABLE)
-        udbl++;
-    if (!(uptr->flags & UNIT_DIS))
+    if (!(uptr->flags & UNIT_DIS))                      /* count enabled units */
         ucnt++;
+    else if (uptr->flags & UNIT_DISABLE)
+        udbl++;                                         /* count user-disabled */
     }
 show_all_mods (st, dptr, dptr->units, MTAB_VDV);        /* show dev mods */
 if (dptr->numunits == 0)
     fprintf (st, "\n");
 else {
-    if (udbl && (ucnt == 0))
+    if (ucnt == 0)
         fprintf (st, ", all units disabled\n");
-    else if (ucnt > 1)
-        fprintf (st, ", %d units\n", ucnt);
+    else if ((ucnt > 1) || (udbl > 0))
+        fprintf (st, ", %d units\n", ucnt + udbl);
     else if (flag)
         fprintf (st, "\n");
     }
@@ -1819,7 +1819,7 @@ if (flag)                                               /* dev only? */
 for (j = 0; j < dptr->numunits; j++) {                  /* loop thru units */
     uptr = dptr->units + j;
     if ((uptr->flags & UNIT_DIS) == 0)
-        show_unit (st, dptr, uptr, ucnt);
+        show_unit (st, dptr, uptr, ucnt + udbl);
     }
 return SCPE_OK;
 }

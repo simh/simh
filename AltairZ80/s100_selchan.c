@@ -109,10 +109,6 @@ static MTAB selchan_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(selchan_dev.dctrl & level) { \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB selchan_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -167,18 +163,12 @@ static int32 selchandev(const int32 port, const int32 io, const int32 data)
         selchan_info->reg_cnt ++;
 
         if(selchan_info->reg_cnt == 4) {
-            TRACE_PRINT(VERBOSE_MSG, ("SELCHAN: " ADDRESS_FORMAT " DMA=0x%06x, Mode=0x%02x (%s, %s, %s)" NLP,
-                PCX,
-                selchan_info->dma_addr,
-                selchan_info->dma_mode,
-                selchan_info->dma_mode & SELCHAN_MODE_WRITE ? "WR" : "RD",
-                selchan_info->dma_mode & SELCHAN_MODE_IO ? "I/O" : "MEM",
-                selchan_info->dma_mode & SELCHAN_MODE_IO ? "FIX" : selchan_info->dma_mode & SELCHAN_MODE_CNT_UP ? "INC" : "DEC"));
+            sim_debug(VERBOSE_MSG, &selchan_dev, "SELCHAN: " ADDRESS_FORMAT " DMA=0x%06x, Mode=0x%02x (%s, %s, %s)\n", PCX, selchan_info->dma_addr, selchan_info->dma_mode, selchan_info->dma_mode & SELCHAN_MODE_WRITE ? "WR" : "RD", selchan_info->dma_mode & SELCHAN_MODE_IO ? "I/O" : "MEM", selchan_info->dma_mode & SELCHAN_MODE_IO ? "FIX" : selchan_info->dma_mode & SELCHAN_MODE_CNT_UP ? "INC" : "DEC");
         }
 
         return 0;
     } else {
-        TRACE_PRINT(VERBOSE_MSG, ("SELCHAN: " ADDRESS_FORMAT " Reset" NLP, PCX));
+        sim_debug(VERBOSE_MSG, &selchan_dev, "SELCHAN: " ADDRESS_FORMAT " Reset\n", PCX);
         selchan_info->reg_cnt = 0;
         return(0xFF);
     }
@@ -199,9 +189,7 @@ int32 selchan_dma(uint8 *buf, uint32 len)
         printf("SELCHAN: " ADDRESS_FORMAT " I/O Not supported" NLP, PCX);
         return (-1);
     } else {
-        TRACE_PRINT(DMA_MSG, ("SELCHAN: " ADDRESS_FORMAT " DMA %s Transfer, len=%d" NLP,
-            PCX,
-            (selchan_info->dma_mode & SELCHAN_MODE_WRITE) ? "WR" : "RD", len));
+        sim_debug(DMA_MSG, &selchan_dev, "SELCHAN: " ADDRESS_FORMAT " DMA %s Transfer, len=%d\n", PCX, (selchan_info->dma_mode & SELCHAN_MODE_WRITE) ? "WR" : "RD", len);
         for(i=0;i<len;i++) {
             if(selchan_info->dma_mode & SELCHAN_MODE_WRITE) {
                 PutByteDMA(selchan_info->dma_addr + i, buf[i]);

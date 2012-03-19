@@ -266,6 +266,7 @@ REG cpu_reg[] = {
     { FLDATA (IOCHK, iochk, 0) },
     { FLDATA (PRCHK, prchk, 0) },
     { FLDATA (HBPEND, hb_pend, 0) },
+    { BRDATA (IND, ind, 8, 32, 64), REG_HIDDEN + PV_LEFT },
     { BRDATA (ISQ, pcq, 10, 14, PCQ_SIZE), REG_RO+REG_CIRC },
     { DRDATA (ISQP, pcq_p, 6), REG_HRO },
     { ORDATA (WRU, sim_int_char, 8) },

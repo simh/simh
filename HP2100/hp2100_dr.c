@@ -1,6 +1,6 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    09-Jul-08    JDB     Revised drc_boot to use ibl_copy
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    28-Dec-06    JDB     Added ioCRS state to I/O decoders
@@ -178,8 +180,10 @@ int32 drc_cw = 0;                                       /* fnc, addr */
 int32 drc_sta = 0;                                      /* status */
 int32 drc_run = 0;                                      /* run flip-flop */
 
-FLIP_FLOP drd_control = CLEAR;
-FLIP_FLOP drd_flag = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    } drd = { CLEAR, CLEAR };
 
 int32 drd_ibuf = 0;                                     /* input buffer */
 int32 drd_obuf = 0;                                     /* output buffer */
@@ -192,9 +196,9 @@ static int32 sz_tab[16] = {
  184320, 1048576, 368640, 1572864, 737280, 393216, 0, 524288,
  0, 655360, 0, 786432,  0, 917504, 0, 0 };
 
-DEVICE drd_dev, drc_dev;
-uint32 drdio (uint32 select_code, IOSIG signal, uint32 data);
-uint32 drcio (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER drdio;
+IOHANDLER drcio;
+
 t_stat drc_svc (UNIT *uptr);
 t_stat drc_reset (DEVICE *dptr);
 t_stat drc_attach (UNIT *uptr, char *cptr);
@@ -205,6 +209,8 @@ t_stat dr_set_prot (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dr_show_prot (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
+DEVICE drd_dev, drc_dev;
+
 /* DRD data structures
 
    drd_dev      device descriptor
@@ -213,8 +219,8 @@ t_stat dr_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 */
 
 DIB dr_dib[] = {
-    { DRD, &drdio },
-    { DRC, &drcio }
+    { &drdio, DRD },
+    { &drcio, DRC }
     };
 
 #define drd_dib dr_dib[0]
@@ -231,10 +237,10 @@ UNIT drd_unit[] = {
 REG drd_reg[] = {
     { ORDATA (IBUF, drd_ibuf, 16) },
     { ORDATA (OBUF, drd_obuf, 16) },
-    { FLDATA (CTL, drd_control, 0) },
-    { FLDATA (FLG, drd_flag,    0) },
+    { FLDATA (CTL, drd.control, 0) },
+    { FLDATA (FLG, drd.flag,    0) },
     { ORDATA (BPTR, drd_ptr, 6) },
-    { ORDATA (DEVNO, drd_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, drd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -272,7 +278,7 @@ REG drc_reg[] = {
     { FLDATA (RUN, drc_run, 0) },
     { DRDATA (TIME, dr_time, 24), REG_NZ + PV_LEFT },
     { FLDATA (STOP_IOE, dr_stopioe, 0) },
-    { ORDATA (DEVNO, drc_dib.devno, 6), REG_HRO },
+    { ORDATA (DEVNO, drc_dib.select_code, 6), REG_HRO },
     { DRDATA (CAPAC, drc_unit.capac, 24), REG_HRO },
     { NULL }
     };
@@ -326,82 +332,80 @@ DEVICE drc_dev = {
        and as CRS is sent to all devices, we simply clear the control word here.
 */
 
-uint32 drdio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 drdio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
 int32 t;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        drd_flag = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioENF:                                         /* enable flag */
-        drd_flag = SET;
-        break;
-
-
-    case ioIOI:                                         /* I/O data input */
-        data = drd_ibuf;
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            drd.flag = CLEAR;
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        drd_obuf = data;
-        break;
+        case ioENF:                                     /* enable flag */
+            drd.flag = SET;
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-                                                        /* fall into CRS handler */
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, drd_ibuf);   /* merge in return status */
+            break;
 
-    case ioCRS:                                         /* control reset */
-        if (!(drc_unit.flags & UNIT_DRUM))              /* 12606B? */
-            drc_cw = 0;                                 /* clear control word */
+
+        case ioIOO:                                     /* I/O data output */
+            drd_obuf = IODATA (stat_data);              /* clear supplied status */
+            break;
+
+
+        case ioCRS:                                     /* control reset */
+            if (!(drc_unit.flags & UNIT_DRUM))          /* 12606B? */
+                drc_cw = 0;                             /* clear control word */
                                                         /* fall into CLC handler */
 
-    case ioCLC:                                         /* clear control flip-flop */
-        drd_flag = drd_control = CLEAR;                 /* clear control and flag */
+        case ioCLC:                                     /* clear control flip-flop */
+            drd.flag = drd.control = CLEAR;             /* clear control and flag */
 
-        if (!drc_run)                                   /* cancel curr op */
-            sim_cancel (&drc_unit);
+            if (!drc_run)                               /* cancel curr op */
+                sim_cancel (&drc_unit);
 
-        drc_sta = drc_sta & ~DRS_SAC;                   /* clear SAC flag */
-        break;
-
-
-    case ioSTC:                                         /* set control flip-flop */
-        drd_control = SET;                              /* set ctl */
-
-        if (drc_cw & CW_WR)                             /* writing? */
-            drd_flag = SET;                             /* prime DMA */
-
-        drc_sta = 0;                                    /* clr status */
-        drd_ptr = 0;                                    /* clear sec ptr */
-        sim_cancel (&drc_unit);                         /* cancel curr op */
-        t = CW_GETSEC (drc_cw) - dr_seccntr (sim_gtime());
-        if (t <= 0) t = t + DR_NUMSC;
-        sim_activate (&drc_unit, t * DR_NUMWD * dr_time);
-        break;
+            drc_sta = drc_sta & ~DRS_SAC;               /* clear SAC flag */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdSRQ (select_code, drd);                   /* set SRQ signal */
-        break;
+        case ioSTC:                                     /* set control flip-flop */
+            drd.control = SET;                          /* set ctl */
+
+            if (drc_cw & CW_WR)                         /* writing? */
+                drd.flag = SET;                         /* prime DMA */
+
+            drc_sta = 0;                                /* clr status */
+            drd_ptr = 0;                                /* clear sec ptr */
+            sim_cancel (&drc_unit);                     /* cancel curr op */
+            t = CW_GETSEC (drc_cw) - dr_seccntr (sim_gtime());
+            if (t <= 0) t = t + DR_NUMSC;
+            sim_activate (&drc_unit, t * DR_NUMWD * dr_time);
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSIR:                                     /* set interrupt request */
+            setstdSRQ (drd);                            /* set SRQ signal */
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    drdio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    drdio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -423,81 +427,80 @@ return data;
     2. The command channel cannot interrupt, so there is no SIR handler.
 */
 
-uint32 drcio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 drcio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+
+uint16 data;
 int32 sec;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        if (!(drc_unit.flags & UNIT_DRUM)) {            /* disk? */
-            sec = dr_seccntr (sim_gtime ());            /* current sector */
-            sim_cancel (&drd_unit[TMR_ORG]);            /* sched origin tmr */
-            sim_activate (&drd_unit[TMR_ORG],
-                (DR_FNUMSC - sec) * DR_NUMWD * dr_time);
-            }
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSFC:                                         /* skip if flag is clear */
-        if (!(drc_unit.flags & UNIT_DRUM))              /* 12606? */
-            setSKF (!(CALC_SCP (sim_gtime())));         /* skip if nearing end of sector */
-        break;
-
-
-    case ioSFS:                                             /* skip if flag is set */
-        if (!(drc_unit.flags & UNIT_DRUM))                  /* 12606? */
-            setSKF (!sim_is_active (&drd_unit[TMR_ORG]));   /* skip if origin seen */
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            if (!(drc_unit.flags & UNIT_DRUM)) {        /* disk? */
+                sec = dr_seccntr (sim_gtime ());        /* current sector */
+                sim_cancel (&drd_unit[TMR_ORG]);        /* sched origin tmr */
+                sim_activate (&drd_unit[TMR_ORG],
+                    (DR_FNUMSC - sec) * DR_NUMWD * dr_time);
+                }
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = drc_sta;                                 /* static bits */
-
-        if (!(drc_unit.flags & UNIT_PROT) ||            /* not protected? */
-             (CW_GETTRK(drc_cw) >= drc_pcount))         /* or not in range? */
-            data = data | DRS_WEN;                      /* set wrt enb status */
-
-        if (drc_unit.flags & UNIT_ATT) {                /* attached? */
-            data = data | (dr_seccntr (sim_gtime()) << DRS_V_NS) | DRS_RDY;
-            if (sim_is_active (&drc_unit))              /* op in progress? */
-                data = data | DRS_BSY;
-            if (CALC_SCP (sim_gtime()))                 /* SCP ff set? */
-                data = data | DRS_SEC;                  /* set sector flag */
-            if (sim_is_active (&drd_unit[TMR_INH]) &&   /* inhibit timer on? */
-                !(drc_cw & CW_WR))
-                data = data | DRS_RIF;                  /* set read inh flag */
-            }
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            if (!(drc_unit.flags & UNIT_DRUM))          /* 12606? */
+                setSKF (!(CALC_SCP (sim_gtime())));     /* skip if nearing end of sector */
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        if (!(drc_unit.flags & UNIT_DRUM)) {            /* disk? */
-            sim_cancel (&drd_unit[TMR_INH]);            /* schedule inhibit timer */
-            sim_activate (&drd_unit[TMR_INH], DR_FTIME * DR_NUMWD);
-            }
-        drc_cw = data;                                  /* get control word */
-        break;
+        case ioSFS:                                             /* skip if flag is set */
+            if (!(drc_unit.flags & UNIT_DRUM))                  /* 12606? */
+                setSKF (!sim_is_active (&drd_unit[TMR_ORG]));   /* skip if origin seen */
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-                                                        /* fall into CRS handler */
+        case ioIOI:                                         /* I/O data input */
+            data = drc_sta;                                 /* static bits */
 
-    case ioCRS:                                         /* control reset */
-        break;                                          /* allow data channel to handle this */
+            if (!(drc_unit.flags & UNIT_PROT) ||            /* not protected? */
+                 (CW_GETTRK(drc_cw) >= drc_pcount))         /* or not in range? */
+                data = data | DRS_WEN;                      /* set wrt enb status */
+
+            if (drc_unit.flags & UNIT_ATT) {                /* attached? */
+                data = data | (dr_seccntr (sim_gtime()) << DRS_V_NS) | DRS_RDY;
+                if (sim_is_active (&drc_unit))              /* op in progress? */
+                    data = data | DRS_BSY;
+                if (CALC_SCP (sim_gtime()))                 /* SCP ff set? */
+                    data = data | DRS_SEC;                  /* set sector flag */
+                if (sim_is_active (&drd_unit[TMR_INH]) &&   /* inhibit timer on? */
+                    !(drc_cw & CW_WR))
+                    data = data | DRS_RIF;                  /* set read inh flag */
+                }
+
+            stat_data = IORETURN (SCPE_OK, data);           /* merge in return status */
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioIOO:                                     /* I/O data output */
+            if (!(drc_unit.flags & UNIT_DRUM)) {        /* disk? */
+                sim_cancel (&drd_unit[TMR_INH]);        /* schedule inhibit timer */
+                sim_activate (&drd_unit[TMR_INH], DR_FTIME * DR_NUMWD);
+                }
+            drc_cw = IODATA (stat_data);                /* get control word */
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    drcio (select_code, ioCLF, 0);                      /* issue CLF */
-
-return data;
-
+return stat_data;
 }
 
 
@@ -511,7 +514,7 @@ uint16 *bptr = (uint16 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_ATT) == 0) {
     drc_sta = DRS_ABO;
-    return IORETURN (dr_stopioe, SCPE_UNATT);
+    return IOERROR (dr_stopioe, SCPE_UNATT);
     }
 
 trk = CW_GETTRK (drc_cw);
@@ -527,8 +530,8 @@ if (drc_cw & CW_WR) {                                   /* write? */
             uptr->hwmark = da + drd_ptr + 1;
         }
     drd_ptr = dr_incda (trk, sec, drd_ptr);             /* inc disk addr */
-    if (drd_control) {                                  /* dch active? */
-        drdio (drd_dib.devno, ioENF, 0);                /* set SRQ */
+    if (drd.control) {                                  /* dch active? */
+        drdio (&drd_dib, ioENF, 0);                     /* set SRQ */
         sim_activate (uptr, dr_time);                   /* sched next word */
         }
     else {                                              /* done */
@@ -541,11 +544,11 @@ if (drc_cw & CW_WR) {                                   /* write? */
         }
     }                                                   /* end write */
 else {                                                  /* read */
-    if (drd_control) {                                  /* dch active? */
+    if (drd.control) {                                  /* dch active? */
         if ((da >= uptr->capac) || (sec >= DR_NUMSC)) drd_ibuf = 0;
         else drd_ibuf = bptr[da + drd_ptr];
         drd_ptr = dr_incda (trk, sec, drd_ptr);
-        drdio (drd_dib.devno, ioENF, 0);                /* set SRQ */
+        drdio (&drd_dib, ioENF, 0);                     /* set SRQ */
         sim_activate (uptr, dr_time);                   /* sched next word */
         }
     else drc_run = 0;                                   /* clear run ff */
@@ -601,16 +604,17 @@ else return ((curword - DR_OVRHEAD) / DR_NUMWD +
 
 t_stat drc_reset (DEVICE *dptr)
 {
+DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
+
 hp_enbdis_pair (dptr,                                   /* make pair cons */
     (dptr == &drd_dev)? &drc_dev: &drd_dev);
 
-if (sim_switches & SWMASK ('P'))                        /* PON reset? */
-    drc_sta = drc_cw = drd_ptr = 0;                     /* clear controller state variables */
+if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
+    drd_ptr = 0;                                        /* clear sector pointer */
+    drc_sta = drc_cw = 0;                               /* clear controller state variables */
+    }
 
-if (dptr == &drc_dev)                                   /* command channel reset? */
-    drcio (drc_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to command channel */
-else                                                    /* data channel reset */
-    drdio (drd_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to data channel */
+IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
 
 sim_cancel (&drc_unit);
 sim_cancel (&drd_unit[TMR_ORG]);
@@ -726,7 +730,7 @@ static const BOOT_ROM dr_rom = {                        /* padded to start at x7
 
 t_stat drc_boot (int32 unitno, DEVICE *dptr)
 {
-const int32 dev = drd_dib.devno;                        /* data chan select code */
+const int32 dev = drd_dib.select_code;                  /* data chan select code */
 
 if (unitno != 0)                                        /* only unit 0 */
     return SCPE_NOFNC;
