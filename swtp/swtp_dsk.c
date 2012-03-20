@@ -408,7 +408,7 @@ int32 fdccmd(int32 io, int32 data)
 #endif
 				break;
 			default:
-				printf("Unknown FDC command %02X\n\r", data);
+				printf("Unknown FDC command %02XH\n\r", data);
 		}
 	} else {							/* read status from fdc */
 		val = cur_flg[cur_dsk];			/* set return value */
