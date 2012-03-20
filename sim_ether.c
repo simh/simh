@@ -1713,12 +1713,13 @@ t_stat eth_close(ETH_DEV* dev)
 {
 char* msg = "Eth: closed %s\r\n";
 pcap_t *pcap;
-int pcap_fd = dev->fd_handle;
+int pcap_fd;
 
 /* make sure device exists */
 if (!dev) return SCPE_UNATT;
 
 /* close the device */
+pcap_fd = dev->fd_handle;                   /* save handle to possibly close later */
 pcap = (pcap_t *)dev->handle;
 dev->handle = NULL;
 dev->fd_handle = 0;
