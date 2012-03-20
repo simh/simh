@@ -248,6 +248,7 @@ else
   #Win32 Environments (via MinGW32)
   GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
+  GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
     PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
     ifeq (,$(NOASYNCH))
@@ -326,6 +327,7 @@ ifneq (3,$(GCC_MAJOR_VERSION))
     CFLAGS_O += -Wno-unused-result
   endif
 endif
+BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
 $(info ***)
 $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
 $(info *** $(BUILD_FEATURES).)
