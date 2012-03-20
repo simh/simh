@@ -2159,21 +2159,39 @@ return SCPE_OK;
 
 t_stat show_dev_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-int32 any, enb;
+int32 any = 0;
 MTAB *mptr;
 
-any = enb = 0;
 if (dptr->modifiers) {
+    any = 0;
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!mptr->disp) || (!mptr->pstring))
+            continue;
+        if (('\0' == *mptr->pstring) ||
+            (0 == (mptr->mask & MTAB_XTD)) ||
+            (0 == (mptr->mask & MTAB_VDV)))     /* Device Option */
             continue;
         if (any++)
             fprintf (st, ", %s", mptr->pstring);
         else fprintf (st, "sh{ow} %s\t%s", sim_dname (dptr), mptr->pstring);
         }
+    if (any)
+        fprintf (st, "\n");
+    any = 0;
+    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
+        if ((!mptr->disp) || (!mptr->pstring))
+            continue;
+        if (('\0' == *mptr->pstring) ||
+            (0 == (mptr->mask & MTAB_XTD)) ||
+            (0 == (mptr->mask & MTAB_VUN)))     /* Unit Option */
+            continue;
+        if (any++)
+            fprintf (st, ", %s", mptr->pstring);
+        else fprintf (st, "sh{ow} %sn\t%s", sim_dname (dptr), mptr->pstring);
+        }
+    if (any)
+        fprintf (st, "\n");
     }
-if (any)
-    fprintf (st, "\n");
 return SCPE_OK;
 }
 
