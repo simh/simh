@@ -160,30 +160,6 @@ BIN_DIR = SYS$DISK:[.BIN]
 LIB_DIR = SYS$DISK:[.BIN.VMS.LIB]
 BLD_DIR = SYS$DISK:[.BIN.VMS.LIB.BLD-$(ARCH)]
 
-# Check To Make Sure We Have SYS$DISK:[.BIN] & SYS$DISK:[.LIB] Directory.
-#
-.FIRST
-  @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN EXIT %x10000000
-  @ DEFINE/USER SYS$OUTPUT CC_VERSION.DAT
-  @ CC/VERSION
-  @ OPEN /READ VERSION CC_VERSION.DAT
-  @ READ VERSION CC_VERSION
-  @ CLOSE VERSION
-  @ DELETE CC_VERSION.DAT;
-  @ CC_VERSION = F$ELEMENT(2," ",CC_VERSION)
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** C Compiler is: ''CC_VERSION'"
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."").AND.(F$GETSYI("VERSION").GES."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NONETWORK=1 with this compiler"
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."").AND.(F$GETSYI("VERSION").LTS."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=(NONETWORK=1,NOASYNCH=1) with this compiler"
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS."")) THEN EXIT %x10000000
-  @ IF (F$SEARCH("SYS$DISK:[]BIN.DIR").EQS."") THEN CREATE/DIRECTORY $(BIN_DIR)
-  @ IF (F$SEARCH("SYS$DISK:[.BIN]VMS.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
-  @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
-  @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
-  @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
-  @ MMS /NoAction BuildROMs
-
 
 # Core SIMH File Definitions.
 #
@@ -230,6 +206,51 @@ PCAP_DEFS = ,"USE_NETWORK=1"
 PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
 .ENDIF
 .ENDIF
+
+# Check To Make Sure We Have SYS$DISK:[.BIN] & SYS$DISK:[.LIB] Directory.
+#
+.FIRST
+  @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
+  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN EXIT %x10000000
+  @ DEFINE/USER SYS$OUTPUT CC_VERSION.DAT
+  @ CC/VERSION
+  @ OPEN /READ VERSION CC_VERSION.DAT
+  @ READ VERSION CC_VERSION
+  @ CLOSE VERSION
+  @ DELETE CC_VERSION.DAT;
+  @ CC_VERSION = F$ELEMENT(2," ",CC_VERSION)
+  @ BAD_CC_VERSION = ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS.""))
+  @ IF (BAD_CC_VERSION) THEN WRITE SYS$OUTPUT "*** WARNING *** C Compiler is: ''CC_VERSION'"
+  @ IF (BAD_CC_VERSION.AND.(F$GETSYI("VERSION").GES."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING *** Build should be invoked with /MACRO=NONETWORK=1 with this compiler"
+  @ IF (BAD_CC_VERSION.AND.(F$GETSYI("VERSION").LTS."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING *** Build should be invoked with /MACRO=(NONETWORK=1,NOASYNCH=1) with this compiler"
+  @ IF (BAD_CC_VERSION) THEN EXIT %x10000000
+  @ MISSING_PCAP = (("$(PCAP_EXECLET)".NES."").AND.("$(NONETWORK)".EQS."").AND.(F$SEARCH("$(PCAP_DIR)PCAP-VMS.C").EQS.""))
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** Attempting a Network Build but the VMS-PCAP components are not"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** available"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** "
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** The PCAP-VMS components are presumed (by this procedure) to be"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** located in a directory at the same level as the directory"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** containing the simh source files."
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** For example, if these exist here:"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** "
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   []descrip.mms"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   []scp.c"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   etc."
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** "
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** Then the following should exist:"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   [-.PCAP-VMS]BUILD_ALL.COM"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   [-.PCAP-VMS.PCAP-VCI]"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   [-.PCAP-VMS.PCAPVCM]"
+  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   etc."
+  @ IF (MISSING_PCAP) THEN EXIT %x10000000
+  @ IF (F$SEARCH("SYS$DISK:[]BIN.DIR").EQS."") THEN CREATE/DIRECTORY $(BIN_DIR)
+  @ IF (F$SEARCH("SYS$DISK:[.BIN]VMS.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
+  @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
+  @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
+  @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
+  @ IF (("$(BUILDING_ROMS)".EQS."").AND.(F$SEARCH("$(BIN_DIR)BuildROMs-$(ARCH).EXE").EQS."")) THEN $(MMS) BUILDROMS/MACRO=(BUILDING_ROMS=1)
+
 
 # MITS Altair Simulator Definitions.
 #
@@ -641,7 +662,6 @@ $(BIN_DIR)BuildROMs-$(ARCH).EXE : sim_BuildROMs.c
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
         $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
 
-
 #
 # Build The Libraries.
 #
@@ -994,6 +1014,7 @@ $(VAX_LIB1) : $(VAX_SOURCE1)
         $!
         $! Building The $(VAX_LIB1) Library.
         $!
+        $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX_OPTIONS)/OBJ=$(VAX_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1016,6 +1037,7 @@ $(VAX780_LIB1) : $(VAX780_SOURCE1)
         $!
         $! Building The $(VAX780_LIB1) Library.
         $!
+        $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
