@@ -2582,7 +2582,10 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   strcpy(tptr, cptr);
 
   xq->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
-  if (!xq->var->etherface) return SCPE_MEM;
+  if (!xq->var->etherface) {
+    free(tptr);
+    return SCPE_MEM;
+    }
 
   status = eth_open(xq->var->etherface, cptr, xq->dev, DBG_ETH);
   if (status != SCPE_OK) {

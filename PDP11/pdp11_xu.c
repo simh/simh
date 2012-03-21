@@ -1571,7 +1571,10 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
   strcpy(tptr, cptr);
 
   xu->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
-  if (!xu->var->etherface) return SCPE_MEM;
+  if (!xu->var->etherface) {
+    free(tptr);
+    return SCPE_MEM;
+    }
 
   status = eth_open(xu->var->etherface, cptr, xu->dev, DBG_ETH);
   if (status != SCPE_OK) {
