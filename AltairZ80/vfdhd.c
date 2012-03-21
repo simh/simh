@@ -534,7 +534,7 @@ static void VFDHD_Command(void)
 
     if(vfdhd_info->read == 1) { /* Perform a Read operation */
         unsigned int i, checksum;
-        unsigned int readlen;
+        uint32 readlen;
 
         sim_debug(RD_DATA_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " RD: Drive=%d, Track=%d, Head=%d, Sector=%d\n", PCX, vfdhd_info->sel_drive, pDrive->track, vfdhd_info->head, vfdhd_info->sector);
 
@@ -601,7 +601,7 @@ static void VFDHD_Command(void)
         }
 
     } else {    /* Perform a Write operation */
-        unsigned int writelen;
+        uint32 writelen;
 
         sim_debug(WR_DATA_MSG, &vfdhd_dev, "VFDHD: " ADDRESS_FORMAT " WR: Drive=%d, Track=%d, Head=%d, Sector=%d\n", PCX, vfdhd_info->sel_drive, pDrive->track, vfdhd_info->head, vfdhd_info->sector);
 

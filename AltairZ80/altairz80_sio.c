@@ -132,7 +132,7 @@ static t_stat sio_attach(UNIT *uptr, char *cptr);
 static t_stat sio_detach(UNIT *uptr);
 static t_stat ptr_reset(DEVICE *dptr);
 static t_stat ptp_reset(DEVICE *dptr);
-static t_stat toBool(char tf, int *result);
+static t_stat toBool(char tf, int32 *result);
 static t_stat sio_dev_set_port(UNIT *uptr, int32 value, char *cptr, void *desc);
 static t_stat sio_dev_show_port(FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat sio_dev_set_interrupton(UNIT *uptr, int32 value, char *cptr, void *desc);
@@ -859,7 +859,7 @@ int32 sio1d(const int32 port, const int32 io, const int32 data) {
     return result;
 }
 
-static t_stat toBool(char tf, int *result) {
+static t_stat toBool(char tf, int32 *result) {
     if (tf == 'T') {
         *result = TRUE;
         return SCPE_OK;

@@ -476,8 +476,8 @@ static char *messages[0x20] = {
 uint8 I8272_Write(const uint32 Addr, uint8 cData)
 {
     I8272_DRIVE_INFO    *pDrive;
-    unsigned int flags = 0;
-    unsigned int readlen;
+    uint32 flags = 0;
+    uint32 readlen;
     uint8   disk_read = 0;
     int32 i;
 

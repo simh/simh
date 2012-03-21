@@ -444,8 +444,8 @@ uint8 WD179X_Read(const uint32 Addr)
 {
     uint8 cData;
     WD179X_DRIVE_INFO    *pDrive;
-    unsigned int flags = 0;
-    unsigned int readlen;
+    uint32 flags = 0;
+    uint32 readlen;
     int status;
 
     if(wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
@@ -571,8 +571,8 @@ static uint8 Do1793Command(uint8 cCommand)
 {
     uint8 result = 0;
     WD179X_DRIVE_INFO    *pDrive;
-    unsigned int flags = 0;
-    unsigned int readlen;
+    uint32 flags = 0;
+    uint32 readlen;
     int status;
 
     if(wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
@@ -952,8 +952,8 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
 {
     WD179X_DRIVE_INFO    *pDrive;
 /*    uint8   disk_read = 0; */
-    unsigned int flags = 0;
-    unsigned int writelen;
+    uint32 flags = 0;
+    uint32 writelen;
 
     if(wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
         return 0xFF;

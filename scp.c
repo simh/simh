@@ -438,7 +438,7 @@ FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
-static int32 sim_do_depth = 0;
+int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
@@ -4599,8 +4599,7 @@ return pptr;
 
 SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr)
 {
-int32 c;
-size_t logop, cmpop;
+int32 c, logop, cmpop;
 t_value logval, cmpval;
 char *sptr, *tptr;
 const char logstr[] = "|&^", cmpstr[] = "=!><";
@@ -4610,14 +4609,14 @@ if (*cptr == 0)                                         /* check for clause */
     return NULL;
 for (logop = cmpop = -1; c = *cptr++; ) {               /* loop thru clauses */
     if (sptr = strchr (logstr, c)) {                    /* check for mask */
-        logop = sptr - logstr;
+        logop = (int32)(sptr - logstr);
         logval = strtotv (cptr, &tptr, radix);
         if (cptr == tptr)
             return NULL;
         cptr = tptr;
         }
     else if (sptr = strchr (cmpstr, c)) {               /* check for boolop */
-        cmpop = sptr - cmpstr;
+        cmpop = (int32)(sptr - cmpstr);
         if (*cptr == '=') {
             cmpop = cmpop + strlen (cmpstr);
             cptr++;
@@ -4630,11 +4629,11 @@ for (logop = cmpop = -1; c = *cptr++; ) {               /* loop thru clauses */
     else return NULL;
     }                                                   /* end for */
 if (logop >= 0) {
-    schptr->logic = (int32)logop;
+    schptr->logic = logop;
     schptr->mask = logval;
     }
 if (cmpop >= 0) {
-    schptr->boolop = (int32)cmpop;
+    schptr->boolop = cmpop;
     schptr->comp = cmpval;
     }
 return schptr;

@@ -130,7 +130,7 @@ t_stat rx_wr (int32 data, int32 PA, int32 access);
 t_stat rx_svc (UNIT *uptr);
 t_stat rx_reset (DEVICE *dptr);
 t_stat rx_boot (int32 unitno, DEVICE *dptr);
-void rx_done (int esr_flags, int new_ecode);
+void rx_done (int32 esr_flags, int32 new_ecode);
 
 /* RX11 data structures
 

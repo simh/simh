@@ -1774,7 +1774,8 @@ void PutByteDMA(const uint32 Addr, const uint32 Value) {
 static int32 sim_brk_lookup (const t_addr loc, const int32 btyp) {
     extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
     extern t_addr sim_brk_ploc[SIM_BKPT_N_SPC];
-    extern char *sim_brk_act;
+    extern int32 sim_do_depth;
+    extern char *sim_brk_act[];
     BRKTAB *bp;
     if ((bp = sim_brk_fnd (loc)) &&                         /* entry in table?  */
         (btyp & bp -> typ) &&                               /* type match?      */
@@ -1782,7 +1783,7 @@ static int32 sim_brk_lookup (const t_addr loc, const int32 btyp) {
         (--(bp -> cnt) <= 0)) {                             /* count reach 0?   */
         bp -> cnt = 0;                                      /* reset count      */
         sim_brk_ploc[0] = loc;                              /* save location    */
-        sim_brk_act = bp -> act;                            /* set up actions   */
+        sim_brk_act[sim_do_depth] = bp -> act;              /* set up actions   */
         sim_brk_pend[0] = TRUE;                             /* don't do twice   */
         return TRUE;
     }
