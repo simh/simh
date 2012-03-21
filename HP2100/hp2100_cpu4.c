@@ -1,6 +1,6 @@
 /* hp2100_cpu4.c: HP 1000 FPP/SIS
 
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU4         Floating Point Processor and Scientific Instruction Set
 
+   06-Feb-12    JDB     Added OPSIZE casts to fp_accum calls in .FPWR/.TPWR
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    18-Mar-08    JDB     Fixed B register return bug in /CMRT
@@ -1074,7 +1075,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 exponent = exponent - 1;
 
             O = 0;                                      /* clear overflow */
-            fp_accum (&op[2], (fp_f + p));              /* acc = arg */
+            fp_accum (&op[2], (OPSIZE) (fp_f + p));     /* acc = arg */
 
             while (exponent-- > 0) {
                 O = O | fp_exec ((uint16) (0054 | p),   /* square acc */
@@ -1086,7 +1087,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 i = i << 1;
                 }
 
-            op[2] = fp_accum (NULL, (fp_f + p));        /* get accum */
+            op[2] = fp_accum (NULL, (OPSIZE) (fp_f + p));   /* get accum */
 
             if (op[2].fpk[0] == 0)                      /* result zero? */
                 O = 1;                                  /* underflow */

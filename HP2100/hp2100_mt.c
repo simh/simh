@@ -1,6 +1,6 @@
 /* hp2100_mt.c: HP 2100 12559A magnetic tape simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,9 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
-   29-Oct-10    JDB     Fixed error in command scan in mtcio ioIOO handler
+   29-Oct-10    JDB     Fixed command scanning error in mtcio ioIOO handler
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    04-Sep-08    JDB     Fixed missing flag after CLR command
    02-Sep-08    JDB     Moved write enable and format commands from MTD to MTC
@@ -168,13 +169,14 @@ REG mtd_reg[] = {
     { BRDATA (DBUF, mtxb, 8, 8, DBSIZE) },
     { DRDATA (BPTR, mt_ptr, DB_V_SIZE + 1) },
     { DRDATA (BMAX, mt_max, DB_V_SIZE + 1) },
+    { ORDATA (SC, mtd_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, mtd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB mtd_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &mtd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &mtd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &mtd_dev },
     { 0 }
     };
 
@@ -210,6 +212,7 @@ REG mtc_reg[] = {
     { DRDATA (GTIME, mtc_gtime, 24), REG_NZ + PV_LEFT },
     { DRDATA (XTIME, mtc_xtime, 24), REG_NZ + PV_LEFT },
     { FLDATA (STOP_IOE, mtc_stopioe, 0) },
+    { ORDATA (SC, mtc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, mtc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -219,8 +222,8 @@ MTAB mtc_mod[] = {
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
     { MTAB_XTD | MTAB_VDV | MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &mtd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &mtd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &mtd_dev },
     { 0 }
     };
 

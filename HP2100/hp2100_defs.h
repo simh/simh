@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,10 +23,12 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
    28-Mar-11    JDB     Tidied up signal handling
    29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
    27-Oct-10    JDB     Revised I/O signal enum values for concurrent signals
                         Revised I/O macros for new signal handling
+   09-Oct-10    JDB     Added DA and DC device select code assignments
    07-Sep-08    JDB     Added POLL_FIRST to indicate immediate connection attempt
    15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.h
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
@@ -170,6 +172,8 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define MUXL            040                             /* 12920A lower data */
 #define MUXU            041                             /* 12920A upper data */
 #define MUXC            042                             /* 12920A control */
+#define DI_DA           043                             /* 12821A Disc Interface with Amigo disc devices */
+#define DI_DC           044                             /* 12821A Disc Interface with CS/80 disc and tape devices */
 
 #define OPTDEV          002                             /* start of optional devices */
 #define CRSDEV          006                             /* start of devices that receive CRS */
@@ -178,19 +182,19 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 
 /* IBL assignments */
 
-#define IBL_V_SEL       14                              /* ROM select */
+#define IBL_V_SEL       14                              /* ROM select <15:14> */
 #define IBL_M_SEL       03
-#define IBL_PTR         0000000                         /* PTR */
-#define IBL_DP          0040000                         /* disk: DP */
-#define IBL_DQ          0060000                         /* disk: DQ */
-#define IBL_MS          0100000                         /* option 0: MS */
-#define IBL_DS          0140000                         /* option 1: DS */
-#define IBL_MAN         0010000                         /* RPL/man boot */
-#define IBL_V_DEV       6                               /* dev in <11:6> */
+#define IBL_PTR         0000000                         /* ROM 0: 12992K paper tape reader (PTR) */
+#define IBL_DP          0040000                         /* ROM 1: 12992A 7900 disc (DP) */
+#define IBL_DQ          0060000                         /* ROM 1: 12992A 2883 disc (DQ) */
+#define IBL_MS          0100000                         /* ROM 2: 12992D 7970 tape (MS) */
+#define IBL_DS          0140000                         /* ROM 3: 12992B 7905/06/20/25 disc (DS) */
+#define IBL_MAN         0010000                         /* RPL/manual boot <13:12> */
+#define IBL_V_DEV       6                               /* select code <11:6> */
 #define IBL_OPT         0000070                         /* options in <5:3> */
-#define IBL_DP_REM      0000001                         /* DP removable */
-#define IBL_DS_HEAD     0000003                         /* DS head number */
-#define IBL_LNT         64                              /* boot ROM length */
+#define IBL_DP_REM      0000001                         /* DP removable <0:0> */
+#define IBL_DS_HEAD     0000003                         /* DS head number <1:0> */
+#define IBL_LNT         64                              /* boot ROM length in words */
 #define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
 #define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
 #define IBL_END         (IBL_LNT - 1)                   /* last location */
@@ -453,10 +457,12 @@ extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 
 extern t_stat      fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 extern const char *fmt_char   (uint8 ch);
+extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat      hp_setdev  (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
 
-/* Standard device functions */
+/* Device-specific functions */
 
 extern int32 sync_poll (POLLMODE poll_mode);
 

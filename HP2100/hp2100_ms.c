@@ -1,6 +1,6 @@
 /* hp2100_ms.c: HP 2100 13181A/13183A magnetic tape simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Added CNTLR_TYPE cast to ms_settype
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    11-Aug-08    JDB     Revised to use AR instead of saved_AR in boot
@@ -151,7 +153,14 @@
 #define STA_DYN         (STA_PE  | STA_SEL | STA_TBSY | STA_BOT | \
                          STA_EOT | STA_WLK | STA_LOCAL)
 
-enum { A13181, A13183 } ms_ctype = A13181;              /* ctrl type */
+/* Controller types */
+
+typedef enum {
+    A13181,
+    A13183
+    } CNTLR_TYPE;
+
+CNTLR_TYPE ms_ctype = A13181;                           /* ctrl type */
 int32 ms_timing = 1;                                    /* timing type */
 
 struct {
@@ -260,13 +269,14 @@ REG msd_reg[] = {
     { BRDATA (DBUF, msxb, 8, 8, DBSIZE) },
     { DRDATA (BPTR, ms_ptr, DB_N_SIZE + 1) },
     { DRDATA (BMAX, ms_max, DB_N_SIZE + 1) },
+    { ORDATA (SC, msd_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, msd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB msd_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &msd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &msd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &msd_dev },
     { 0 }
     };
 
@@ -319,6 +329,7 @@ REG msc_reg[] = {
     { FLDATA (TIMING, ms_timing, 0), REG_HRO },
     { FLDATA (STOP_IOE, msc_stopioe, 0) },
     { FLDATA (CTYPE, ms_ctype, 0), REG_HRO },
+    { ORDATA (SC, msc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, msc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -346,8 +357,8 @@ MTAB msc_mod[] = {
       &ms_set_timing, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TIMING", NULL,
       NULL, &ms_show_timing, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &msd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &msd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &msd_dev },
     { 0 }
     };
 
@@ -1079,7 +1090,7 @@ if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
 for (i = 0; i < MS_NUMDR; i++) {
     if (msc_unit[i].flags & UNIT_ATT) return SCPE_ALATT;
     }
-ms_ctype = val;
+ms_ctype = (CNTLR_TYPE) val;
 ms_config_timing ();                                    /* update for new type */
 return SCPE_OK;
 }

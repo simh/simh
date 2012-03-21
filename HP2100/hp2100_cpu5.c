@@ -1,7 +1,7 @@
 /* hp2100_cpu5.c: HP 1000 RTE-6/VM VMA and RTE-IV EMA instructions
 
    Copyright (c) 2007-2008, Holger Veit
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2011, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   28-Dec-11    JDB     Eliminated unused variable in "cpu_ema_vset"
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    30-Jul-08    JDB     Redefined ABORT to pass address, moved def to hp2100_cpu.h
@@ -970,7 +971,7 @@ uint32 scalars = op[3].word;                            /* S4 */
 uint32 vectors = op[4].word;                            /* S5 */
 uint32 k       = op[5].word;                            /* S6 */
 uint32 imax    = 0;                                     /* imax S11*/
-uint32 xidex,idext1,mseg,phys, addr, i, MA;
+uint32 xidex, idext1, mseg, addr, i, MA;
 t_bool negflag = FALSE;
 
 for (i=0; i<scalars; i++) {                             /* copy scalars */
@@ -981,7 +982,6 @@ xidex = ReadIO(idx,UMAP);                               /* get ID extension */
 if (xidex==0) goto vi22;                                /* NO EMA? error */
 idext1 = ReadWA(xidex+1);
 mseg = (idext1 >> 1) & MSEGMASK;                        /* S9 get logical start MSEG */
-phys = idext1 & 01777;                                  /* phys start of EMA */
 
 for (i=0; i<vectors; i++) {                             /* copy vector addresses */
     MA = ReadW(vin++);

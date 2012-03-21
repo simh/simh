@@ -1,6 +1,6 @@
 /* hp2100_baci.c: HP 12966A buffered asynchronous communications interface simulator
 
-   Copyright (c) 2007-2011, J. David Bryan
+   Copyright (c) 2007-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    BACI         12966A BACI card
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
@@ -358,12 +359,6 @@ t_bool baci_enq_seen = FALSE;                           /* ENQ seen flag */
 uint32 baci_enq_cntr = 0;                               /* ENQ seen counter */
 
 
-/* Terminal multiplexer library interface */
-
-TMLN baci_ldsc = { 0 };                                 /* line descriptor */
-TMXR baci_desc = { 1, 0, 0, &baci_ldsc };               /* device descriptor */
-
-
 /* BACI local routines */
 
 static int32 service_time  (uint32 control_word);
@@ -387,12 +382,14 @@ t_stat baci_detach (UNIT *uptr);
 
 /* BACI data structures
 
+   baci_ldsc    BACI terminal multiplexer line descriptor
+   baci_desc    BACI terminal multiplexer device descriptor
    baci_dib     BACI device information block
-   baci_dev     BACI device descriptor
    baci_unit    BACI unit list
    baci_reg     BACI register list
    baci_mod     BACI modifier list
    baci_deb     BACI debug list
+   baci_dev     BACI device descriptor
 
    Two units are used: one to handle character I/O via the Telnet library, and
    another to poll for connections and input.  The character I/O service routine
@@ -405,9 +402,12 @@ t_stat baci_detach (UNIT *uptr);
    ten millisecond period.
 */
 
-DIB baci_dib = { &baci_io, BACI, 0 };
-
 DEVICE baci_dev;
+
+TMLN baci_ldsc = { 0 };                                 /* line descriptor */
+TMXR baci_desc = { 1, 0, 0, &baci_ldsc };               /* device descriptor */
+
+DIB baci_dib = { &baci_io, BACI, 0 };
 
 UNIT baci_unit[] = {
     { UDATA (&baci_term_svc, UNIT_ATTABLE | UNIT_FASTTIME, 0) },    /* terminal I/O unit */
@@ -444,11 +444,12 @@ REG baci_reg[] = {
     { FLDATA (ENQFLAG, baci_enq_seen,  0), REG_HRO },
     { DRDATA (ENQCNTR, baci_enq_cntr, 16), REG_HRO },
 
-    { FLDATA (LKO,   baci.lockout,         0) },
-    { FLDATA (CTL,   baci.control,         0) },
-    { FLDATA (FLG,   baci.flag,            0) },
-    { FLDATA (FBF,   baci.flagbuf,         0) },
-    { FLDATA (SRQ,   baci.srq,             0) },
+    { FLDATA (LKO,   baci.lockout,         0)  },
+    { FLDATA (CTL,   baci.control,         0)  },
+    { FLDATA (FLG,   baci.flag,            0)  },
+    { FLDATA (FBF,   baci.flagbuf,         0)  },
+    { FLDATA (SRQ,   baci.srq,             0)  },
+    { ORDATA (SC,    baci_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, baci_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -470,7 +471,8 @@ MTAB baci_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,         NULL,        &tmxr_show_cstat, &baci_desc },
     { MTAB_XTD | MTAB_VDV,            0, NULL,         "DISCONNECT", &tmxr_dscln, NULL,             &baci_desc },
 
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &baci_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &baci_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &baci_dev },
     { 0 }
     };
 
@@ -500,7 +502,7 @@ DEVICE baci_dev = {
     &baci_attach,                           /* attach routine */
     &baci_detach,                           /* detach routine */
     &baci_dib,                              /* device information block */
-    DEV_NET | DEV_DEBUG | DEV_DISABLE,      /* device flags */
+    DEV_DEBUG | DEV_DISABLE,                /* device flags */
     0,                                      /* debug control flags */
     baci_deb,                               /* debug flag name table */
     NULL,                                   /* memory size change routine */
@@ -786,8 +788,8 @@ return stat_data;
    transmit mode enables the output of the FIFO to be unloaded into the
    transmitter holding register (THR).  Characters received or transmitted pass
    through the receiver register (RR) or transmitter register (TR),
-   respectively.  They are not strictly necessary in terminal (Telnet)
-   transactions but are critical to diagnostic operations.
+   respectively.  They are not strictly necessary in terminal transactions but
+   are critical to diagnostic operations.
 
    The UART signals an overrun if a complete character is received while the RHR
    still contains the previous character.  The BACI does not use this signal,
@@ -854,7 +856,7 @@ while (xmit_loop && (baci_uart_thr & IN_VALID)) {       /* valid character in UA
                               "ENQ count = %d\n", baci_enq_cntr);
         }
 
-    else {                                              /* character is not an ENQ */
+    else {                                              /* character is not ENQ or not fast timing */
         baci_enq_cntr = 0;                              /* reset ENQ counter */
 
         if (is_attached) {                              /* attached to network? */
@@ -980,12 +982,16 @@ return status;
    characters.  If characters are available, the terminal I/O service routine is
    scheduled.  It starts when the socket is attached and stops when the socket
    is detached.
+
+   As there is only one line, we only poll for a new connection when the line is
+   disconnected.
 */
 
 t_stat baci_poll_svc (UNIT *uptr)
 {
-if (baci_term.flags & UNIT_ATT) {                       /* attached to network? */
-    if (tmxr_poll_conn (&baci_desc) >= 0)               /* new connection established? */
+if (baci_term.flags & UNIT_ATT) {                       /* attached to line? */
+    if ((baci_ldsc.conn == 0) &&                        /* line not connected? */
+        (tmxr_poll_conn (&baci_desc) >= 0))             /*   and new connection established? */
         baci_ldsc.rcve = 1;                             /* enable line to receive */
 
     tmxr_poll_rx (&baci_desc);                          /* poll for input */
@@ -1205,9 +1211,9 @@ return;
 
 /* Calculate service time from baud rate.
 
-   Service times are based on 1580 instructions per second, which is the 1000
-   E-Series execution speed.  The "external clock" rate uses the 9600 baud rate,
-   as most real terminals were set to their maximum rate.
+   Service times are based on 1580 instructions per millisecond, which is the
+   1000 E-Series execution speed.  The "external clock" rate uses the 9600 baud
+   rate, as most real terminals were set to their maximum rate.
 
    Note that the RTE driver has a race condition that will trip if the service
    time is less than 1500 instructions.  Therefore, these times cannot be
@@ -1216,6 +1222,8 @@ return;
 
 static int32 service_time (uint32 control_word)
 {
+/*           Baud Rates 0- 7 :   ext.,     50,     75,    110,  134.5,    150,   300,   600, */
+/*           Baud Rates 8-15 :    900,   1200,   1800,   2400,   3600,   4800,  7200,  9600  */
 static const int32 ticks [] = {  1646, 316000, 210667, 143636, 117472, 105333, 52667, 26333,
                                 17556,  13667,   8778,   6583,   4389,   3292,  2194, 1646 };
 

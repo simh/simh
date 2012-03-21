@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Added CNTLR_TYPE cast to dp_settype
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    10-Aug-08    JDB     Added REG_FIT to register variables < 32-bit size
@@ -131,7 +133,7 @@
 #define DP_NUMWD        (1 << DP_N_NUMWD)               /* words/sector */
 #define DP_NUMSC2       12                              /* sectors/srf 12557 */
 #define DP_NUMSC3       24                              /* sectors/srf 13210 */
-#define DP_NUMSC        (dp_ctype? DP_NUMSC3: DP_NUMSC2)
+#define DP_NUMSC        (dp_ctype ? DP_NUMSC3 : DP_NUMSC2)
 #define DP_NUMSF        4                               /* surfaces/cylinder */
 #define DP_NUMCY        203                             /* cylinders/disk */
 #define DP_SIZE2        (DP_NUMSF * DP_NUMCY * DP_NUMSC2 * DP_NUMWD)
@@ -171,11 +173,11 @@
 #define DA_V_SC         0                               /* sector */
 #define DA_M_SC2        017
 #define DA_M_SC3        037
-#define DA_M_SC         (dp_ctype? DA_M_SC3: DA_M_SC2)
+#define DA_M_SC         (dp_ctype ? DA_M_SC3 : DA_M_SC2)
 #define DA_GETSC(x)     (((x) >> DA_V_SC) & DA_M_SC)
 #define DA_CKMASK2      037                             /* check mask */
 #define DA_CKMASK3      077
-#define DA_CKMASK       (dp_ctype? DA_CKMASK3: DA_CKMASK2)
+#define DA_CKMASK       (dp_ctype ? DA_CKMASK3 : DA_CKMASK2)
 
 /* Status in dpc_sta[drv], (u) = unused in 13210, (d) = dynamic */
 
@@ -215,7 +217,14 @@ struct {
     FLIP_FLOP flagbuf;                                  /* cch flag buffer flip-flop */
     } dpc = { CLEAR, CLEAR, CLEAR, CLEAR };
 
-enum { A12557, A13210 } dp_ctype = A13210;              /* ctrl type */
+/* Controller types */
+
+typedef enum {
+    A12557,
+    A13210
+    } CNTLR_TYPE;
+
+CNTLR_TYPE dp_ctype = A13210;                           /* ctrl type */
 int32 dpc_busy = 0;                                     /* cch unit */
 int32 dpc_poll = 0;                                     /* cch poll enable */
 int32 dpc_cnt = 0;                                      /* check count */
@@ -289,13 +298,14 @@ REG dpd_reg[] = {
     { FLDATA (FBF, dpd.flagbuf, 0) },
     { FLDATA (XFER, dpd_xfer, 0) },
     { FLDATA (WVAL, dpd_wval, 0) },
+    { ORDATA (SC, dpd_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, dpd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB dpd_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &dpd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dpd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dpd_dev },
     { 0 }
     };
 
@@ -350,6 +360,7 @@ REG dpc_reg[] = {
               DP_NUMDRV, REG_HRO) },
     { URDATA (CAPAC, dpc_unit[0].capac, 10, T_ADDR_W, 0,
               DP_NUMDRV, PV_LEFT | REG_HRO) },
+    { ORDATA (SC, dpc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, dpc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -365,8 +376,8 @@ MTAB dpc_mod[] = {
       &dp_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
       NULL, &dp_showtype, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &dpd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dpd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dpd_dev },
     { 0 }
     };
 
@@ -1064,13 +1075,18 @@ t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 i;
 
-if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
+if ((val < 0) || (val > 1) || (cptr != NULL))
+    return SCPE_ARG;
+
 for (i = 0; i < DP_NUMDRV; i++) {
-    if (dpc_unit[i].flags & UNIT_ATT) return SCPE_ALATT;
+    if (dpc_unit[i].flags & UNIT_ATT)
+        return SCPE_ALATT;
     }
+
 for (i = 0; i < DP_NUMDRV; i++)
     dpc_unit[i].capac = (val? DP_SIZE3: DP_SIZE2);
-dp_ctype = val;
+
+dp_ctype = (CNTLR_TYPE) val;
 return SCPE_OK;
 }
 
@@ -1079,8 +1095,11 @@ return SCPE_OK;
 
 t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (dp_ctype == A13210) fprintf (st, "13210A");
-else fprintf (st, "12557A");
+if (dp_ctype == A13210)
+    fprintf (st, "13210A");
+else
+    fprintf (st, "12557A");
+
 return SCPE_OK;
 }
 

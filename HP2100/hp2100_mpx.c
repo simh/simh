@@ -1,6 +1,6 @@
 /* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
 
-   Copyright (c) 2008-2011, J. David Bryan
+   Copyright (c) 2008-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
@@ -105,9 +106,9 @@
    The simulation provides both the "realistic timing" described above, as well
    as an optimized "fast timing" option.  Optimization makes three improvements:
 
-     1. Buffered characters are transferred via Telnet in blocks.
+     1. Buffered characters are transferred in blocks.
 
-     2. ENQ/ACK handshaking is done locally without involving the Telnet client.
+     2. ENQ/ACK handshaking is done locally without involving the client.
 
      3. BS and DEL respond visually more like prior RTE terminal drivers.
 
@@ -599,15 +600,15 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
 
 /* MPX data structures.
 
-   mpx_order   MPX line connection order table
-   mpx_ldsc    MPX line descriptors
-   mpx_desc    MPX multiplexer descriptor
-   mpx_dib     MPX device information block
-   mpx_unit    MPX unit list
-   mpx_reg     MPX register list
-   mpx_mod     MPX modifier list
-   mpx_deb     MPX debug list
-   mpx_dev     MPX device descriptor
+   mpx_order    MPX line connection order table
+   mpx_ldsc     MPX terminal multiplexer line descriptors
+   mpx_desc     MPX terminal multiplexer device descriptor
+   mpx_dib      MPX device information block
+   mpx_unit     MPX unit list
+   mpx_reg      MPX register list
+   mpx_mod      MPX modifier list
+   mpx_deb      MPX debug list
+   mpx_dev      MPX device descriptor
 
    The first eight units correspond to the eight multiplexer line ports.  These
    handle character I/O via the Telnet library.  A ninth unit acts as the card
@@ -626,18 +627,16 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
    ten millisecond period.
 
    The controller and poll units are hidden by disabling them, so as to present
-   a logical picture of the multiplexer to the user.  However, we cannot attach
-   to a disabled unit, so the poll unit is enabled prior to attaching and
-   disabled thereafter.
+   a logical picture of the multiplexer to the user.
 */
+
+DEVICE mpx_dev;
 
 int32 mpx_order [MPX_PORTS] = { -1 };                       /* connection order */
 TMLN  mpx_ldsc [MPX_PORTS] = { { 0 } };                     /* line descriptors */
 TMXR  mpx_desc = { MPX_PORTS, 0, 0, mpx_ldsc, mpx_order };  /* device descriptor */
 
 DIB mpx_dib = { &mpx_io, MPX };
-
-DEVICE mpx_dev;
 
 UNIT mpx_unit [] = {
     { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 0 */
@@ -685,9 +684,10 @@ REG mpx_reg [] = {
     { BRDATA (SEP, mpx_sep,   10, 10, MPX_PORTS * 2) },
     { BRDATA (PUT, mpx_put,   10, 10, MPX_PORTS * 2) },
 
-    { FLDATA (CTL,   mpx.control,   0) },
-    { FLDATA (FLG,   mpx.flag,      0) },
-    { FLDATA (FBF,   mpx.flagbuf,   0) },
+    { FLDATA (CTL,   mpx.control,         0)  },
+    { FLDATA (FLG,   mpx.flag,            0)  },
+    { FLDATA (FBF,   mpx.flagbuf,         0)  },
+    { ORDATA (SC,    mpx_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, mpx_dib.select_code, 6), REG_HRO },
 
     { BRDATA (CONNORD, mpx_order, 10, 32, MPX_PORTS), REG_HRO },
@@ -711,7 +711,8 @@ MTAB mpx_mod [] = {
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mpx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mpx_desc },
     { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mpx_desc },
-    { MTAB_XTD | MTAB_VDV,            0, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &mpx_dev  },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",          "SC",         &hp_setsc,   &hp_showsc,       &mpx_dev  },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &mpx_dev  },
 
     { 0 }
     };
@@ -742,7 +743,7 @@ DEVICE mpx_dev = {
     &mpx_attach,                            /* attach routine */
     &mpx_detach,                            /* detach routine */
     &mpx_dib,                               /* device information block */
-    DEV_NET | DEV_DEBUG | DEV_DISABLE,      /* device flags */
+    DEV_DEBUG | DEV_DISABLE,                /* device flags */
     0,                                      /* debug control flags */
     mpx_deb,                                /* debug flag name table */
     NULL,                                   /* memory size change routine */
@@ -2052,7 +2053,7 @@ return SCPE_OK;
    the first serial line and be reported there in a SHOW MPX command.
 
    To preserve the logical picture, we attach the port to the Telnet poll unit,
-   which is normally disabled, inhibiting its display.  Attaching to a disabled
+   which is normally disabled to inhibit its display.  Attaching to a disabled
    unit is not allowed, so we first enable the unit, then attach it, then
    disable it again.  Attachment is reported by the "mpx_status" routine below.
 
@@ -2073,7 +2074,7 @@ mpx_poll.flags = mpx_poll.flags | UNIT_DIS;             /* disable unit */
 
 if (status == SCPE_OK) {
     mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start Telnet poll immediately */
+    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
     }
 return status;
 }
@@ -2229,9 +2230,9 @@ return;
 
 /* Calculate service time from baud rate.
 
-   Service times are based on 1580 instructions per second, which is the 1000
-   E-Series execution speed.  Baud rate 0 means "don't change" and is handled by
-   the "Set port key" command executor.
+   Service times are based on 1580 instructions per millisecond, which is the
+   1000 E-Series execution speed.  Baud rate 0 means "don't change" and is
+   handled by the "Set port key" command executor.
 
    Baud rate settings of 13-15 are marked as "reserved" in the user manual, but
    the firmware defines these as 38400, 9600, and 9600 baud, respectively.
@@ -2239,9 +2240,8 @@ return;
 
 static uint32 service_time (uint16 control_word)
 {
-/*           Baud Rates 0- 7 :    --,     50,     75,    110,  134.5,    150,   300,  1200,
-             Baud Rates 8-15 :  1800,   2400,   4800,   9600,  19200,  38400,  9600,  9600
-*/
+/*           Baud Rates 0- 7 :    --,     50,     75,    110,  134.5,    150,   300,  1200, */
+/*           Baud Rates 8-15 :  1800,   2400,   4800,   9600,  19200,  38400,  9600,  9600  */
 static const int32 ticks [] = {    0, 316000, 210667, 143636, 117472, 105333, 52667, 13167,
                                 8778,   6583,   3292,   1646,    823,    411,  1646,  1646 };
 
