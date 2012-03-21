@@ -1,6 +1,6 @@
 /* hp2100_pif.c: HP 12620A/12936A privileged interrupt fence simulator
 
-   Copyright (c) 2008-2011, J. David Bryan
+   Copyright (c) 2008-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    PIF          12620A/12936A privileged interrupt fence
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
@@ -147,18 +148,20 @@ UNIT pif_unit = {
     };
 
 REG pif_reg [] = {
-    { FLDATA (CTL,   pif.control,         0) },
-    { FLDATA (FLG,   pif.flag,            0) },
-    { FLDATA (FBF,   pif.flagbuf,         0) },
+    { FLDATA (CTL,   pif.control,         0)  },
+    { FLDATA (FLG,   pif.flag,            0)  },
+    { FLDATA (FBF,   pif.flagbuf,         0)  },
+    { ORDATA (SC,    pif_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, pif_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB pif_mod [] = {
-    { MTAB_XTD | MTAB_VDV, 0, NULL,    "12620A", &pif_set_card, NULL,           NULL     },
-    { MTAB_XTD | MTAB_VDV, 1, NULL,    "12936A", &pif_set_card, NULL,           NULL     },
-    { MTAB_XTD | MTAB_VDV, 0, "TYPE",  NULL,     NULL,          &pif_show_card, NULL     },
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",  &hp_setdev,    &hp_showdev,    &pif_dev },
+    { MTAB_XTD | MTAB_VDV,            0, NULL,    "12620A", &pif_set_card, NULL,           NULL     },
+    { MTAB_XTD | MTAB_VDV,            1, NULL,    "12936A", &pif_set_card, NULL,           NULL     },
+    { MTAB_XTD | MTAB_VDV,            0, "TYPE",  NULL,     NULL,          &pif_show_card, NULL     },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",     &hp_setsc,     &hp_showsc,     &pif_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO",  &hp_setdev,    &hp_showdev,    &pif_dev },
     { 0 }
     };
 

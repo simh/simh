@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2011, J. David Bryan
+   Copyright (c) 2005-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   06-Feb-12    JDB     Added missing precision on constant "one" in fp_trun
    21-Jun-11    JDB     Completed the comments for divide; no code changes
    08-Jun-08    JDB     Quieted bogus gcc warning in fp_exec
    10-May-08    JDB     Fixed uninitialized return in fp_accum when setting
@@ -1421,7 +1422,7 @@ uint32 fp_trun (OP *result, OP source, OPSIZE precision)
 {
 t_bool bits_lost;
 FPU unpacked;
-FPU one = { FP_ONEHALF, 1, 0 };                         /* 0.5 * 2 ** 1 = 1.0 */
+FPU one = { FP_ONEHALF, 1, fp_t };                      /* 0.5 * 2 ** 1 = 1.0 */
 OP zero = { { 0, 0, 0, 0, 0 } };                        /* 0.0 */
 t_uint64 mask = mant_mask[precision] & ~FP_MSIGN;
 

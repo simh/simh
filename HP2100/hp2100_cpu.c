@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 21xx/1000 CPU simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,8 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   13-Jan-12    JDB     Minor speedup in "is_mapped"
+                        Added casts to cpu_mod, dmasio, dmapio, cpu_reset, dma_reset
    07-Apr-11    JDB     Fixed I/O return status bug for DMA cycles
                         Failed I/O cycles now stop on failing instruction
    28-Mar-11    JDB     Tidied up signal handling
@@ -729,17 +731,17 @@ REG cpu_reg[] = {
    Reference Handbook. */
 
 MTAB cpu_mod[] = {
-    { UNIT_MODEL_MASK, UNIT_2116,   "",   "2116",   &cpu_set_model, &cpu_show_model, "2116"   },
-    { UNIT_MODEL_MASK, UNIT_2115,   "",   "2115",   &cpu_set_model, &cpu_show_model, "2115"   },
-    { UNIT_MODEL_MASK, UNIT_2114,   "",   "2114",   &cpu_set_model, &cpu_show_model, "2114"   },
-    { UNIT_MODEL_MASK, UNIT_2100,   "",   "2100",   &cpu_set_model, &cpu_show_model, "2100"   },
-    { UNIT_MODEL_MASK, UNIT_1000_E, "",   "1000-E", &cpu_set_model, &cpu_show_model, "1000-E" },
-    { UNIT_MODEL_MASK, UNIT_1000_E, NULL, "21MX-E", &cpu_set_model, &cpu_show_model, "1000-E" },
-    { UNIT_MODEL_MASK, UNIT_1000_M, "",   "1000-M", &cpu_set_model, &cpu_show_model, "1000-M" },
-    { UNIT_MODEL_MASK, UNIT_1000_M, NULL, "21MX-M", &cpu_set_model, &cpu_show_model, "1000-M" },
+    { UNIT_MODEL_MASK, UNIT_2116,   "",   "2116",   &cpu_set_model, &cpu_show_model, (void *) "2116"   },
+    { UNIT_MODEL_MASK, UNIT_2115,   "",   "2115",   &cpu_set_model, &cpu_show_model, (void *) "2115"   },
+    { UNIT_MODEL_MASK, UNIT_2114,   "",   "2114",   &cpu_set_model, &cpu_show_model, (void *) "2114"   },
+    { UNIT_MODEL_MASK, UNIT_2100,   "",   "2100",   &cpu_set_model, &cpu_show_model, (void *) "2100"   },
+    { UNIT_MODEL_MASK, UNIT_1000_E, "",   "1000-E", &cpu_set_model, &cpu_show_model, (void *) "1000-E" },
+    { UNIT_MODEL_MASK, UNIT_1000_E, NULL, "21MX-E", &cpu_set_model, &cpu_show_model, (void *) "1000-E" },
+    { UNIT_MODEL_MASK, UNIT_1000_M, "",   "1000-M", &cpu_set_model, &cpu_show_model, (void *) "1000-M" },
+    { UNIT_MODEL_MASK, UNIT_1000_M, NULL, "21MX-M", &cpu_set_model, &cpu_show_model, (void *) "1000-M" },
 
 #if defined (HAVE_INT64)
-    { UNIT_MODEL_MASK, UNIT_1000_F, "",   "1000-F", &cpu_set_model, &cpu_show_model, "1000-F" },
+    { UNIT_MODEL_MASK, UNIT_1000_F, "",   "1000-F", &cpu_set_model, &cpu_show_model, (void *) "1000-F" },
 #endif
 
     { MTAB_XTD | MTAB_VDV, 1, "IDLE", "IDLE",   &cpu_set_idle, &cpu_show_idle, NULL },
@@ -2442,13 +2444,15 @@ return;
 
 static t_bool is_mapped (uint32 va)
 {
-uint32 dms_fence = dms_sr & MST_FENCE;                  /* get BP fence value */
+uint32 dms_fence;
 
 if (va >= 02000)                                        /* above the base bage? */
     return TRUE;                                        /* always mapped */
-else
+else {
+    dms_fence = dms_sr & MST_FENCE;                     /* get BP fence value */
     return (dms_sr & MST_FLT) ? (va < dms_fence) :      /* below BP fence and lower portion mapped? */
                                 (va >= dms_fence);      /*   or above BP fence and upper portion mapped? */
+    }
 }
 
 
@@ -3073,7 +3077,7 @@ return stat_data;
 
 uint32 dmasio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const CHANNEL ch = dibptr->card_index;                  /* DMA channel number */
+const CHANNEL ch = (CHANNEL) dibptr->card_index;        /* DMA channel number */
 uint16 data;
 IOSIGNAL signal;
 IOCYCLE  working_set = signal_set;                      /* no SIR handler needed */
@@ -3155,7 +3159,7 @@ return stat_data;
 
 uint32 dmapio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const CHANNEL ch = dibptr->card_index;                  /* DMA channel number */
+const CHANNEL ch = (CHANNEL) dibptr->card_index;        /* DMA channel number */
 uint16 data;
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
@@ -3459,7 +3463,7 @@ if (M == NULL) {                                        /* initial call after st
     else                                                /* not defined */
         return SCPE_IERR;                               /* internal error */
 
-    M = calloc (PASIZE, sizeof (uint16));               /* alloc mem */
+    M = (uint16 *) calloc (PASIZE, sizeof (uint16));    /* alloc mem */
 
     if (M == NULL)                                      /* alloc fail? */
         return SCPE_MEM;
@@ -3504,7 +3508,7 @@ return SCPE_OK;
 t_stat dma_reset (DEVICE *dptr)
 {
 DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
-const CHANNEL ch = dibptr->card_index;                  /* DMA channel number */
+const CHANNEL ch = (CHANNEL) dibptr->card_index;        /* DMA channel number */
 
 if (UNIT_CPU_MODEL != UNIT_2114)                        /* 2114 has only one channel */
     hp_enbdis_pair (dma_dptrs [ch],                     /* make specified channel */
@@ -3980,7 +3984,7 @@ switch (sel) {
         break;
 
     case 3:                                             /* DS boot */
-        ibl_copy (ds_rom,dev);
+        ibl_copy (ds_rom, dev);
         break;
         }
 

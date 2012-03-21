@@ -98,6 +98,7 @@
              105521   105301   "Closed loop" (trap cell handler)
              105522   105302   [unknown]
      [test]  105524   105304   [self test]
+               --     105310   7974 boot loader ROM extension
 
    Notes:
 

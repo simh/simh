@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
    Copyright (c) 2008, Holger Veit
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   06-Feb-12    JDB     Corrected "opsize" parameter type in vis_abs
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    30-Apr-08    JDB     Updated SIGNAL code from Holger
@@ -192,7 +193,7 @@ for (i=0; i<n; i++) {
 
 #define GET_MSIGN(op) ((op)->fpk[0] & 0100000)
 
-static void vis_abs(OP* in, uint32 opsize)
+static void vis_abs(OP* in, OPSIZE opsize)
 {
 uint32 sign = GET_MSIGN(in);                             /* get sign */
 if (sign) (void)fp_pcom(in, opsize);                     /* if negative, make positive */

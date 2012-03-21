@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2011, Robert M Supnik
+   Copyright (c) 2002-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    MUX,MUXL,MUXM        12920A terminal multiplexor
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
@@ -329,16 +330,11 @@ t_stat mux_detach (UNIT *uptr);
 t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 
-/* MUX data structures.
+/* MUXL/MUXU device information block.
 
-   mux_order   MUX line connection order table
-   mux_ldsc    MUX line descriptors
-   mux_desc    MUX multiplexer descriptor
+   The DIBs of adjacent cards must be contained in an array, so they are defined
+   here and referenced in the lower and upper card device structures.
 */
-
-int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
-TMLN  mux_ldsc [MUX_LINES] = { { 0 } };                     /* line descriptors */
-TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
 
 DIB mux_dib[] = {
     { &muxlio, MUXL },
@@ -357,6 +353,8 @@ DIB mux_dib[] = {
    muxl_mod     MUXL modifier list
    muxl_dev     MUXL device descriptor
 */
+
+TMXR mux_desc;
 
 DEVICE muxl_dev;
 
@@ -393,6 +391,7 @@ REG muxl_reg[] = {
     { BRDATA (BDFR, mux_defer, 8, 1, MUX_LINES) },
     { URDATA (TIME, muxl_unit[0].wait, 10, 24, 0,
               MUX_LINES, REG_NZ + PV_LEFT) },
+    { ORDATA (SC, muxl_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, muxl_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -409,8 +408,9 @@ MTAB muxl_mod[] = {
     { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &mux_desc },
     { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, NULL,  "NOLOG", &tmxr_set_nolog, NULL,           &mux_desc },
 
-    { MTAB_XTD | MTAB_VUN, 0, NULL,    "DISCONNECT", &tmxr_dscln, NULL,        &mux_desc },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",      &hp_setdev,  &hp_showdev, &muxl_dev },
+    { MTAB_XTD | MTAB_VUN,            0, NULL,    "DISCONNECT", &tmxr_dscln, NULL,        &mux_desc },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",         &hp_setsc,   &hp_showsc,  &muxl_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO",      &hp_setdev,  &hp_showdev, &muxl_dev },
 
     { 0 }
     };
@@ -442,6 +442,10 @@ DEVICE muxl_dev = {
 
 /* MUXU data structures
 
+   mux_order    MUX line connection order table
+   mux_ldsc     MUX terminal multiplexer line descriptors
+   mux_desc     MUX terminal multiplexer device descriptor
+
    muxu_dib     MUXU device information block
    muxu_unit    MUXU unit list
    muxu_reg     MUXU register list
@@ -452,11 +456,16 @@ DEVICE muxl_dev = {
 
 DEVICE muxu_dev;
 
+int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
+TMLN  mux_ldsc  [MUX_LINES] = { { 0 } };                    /* line descriptors */
+TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
+
 UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_FIRST };
 
 REG muxu_reg[] = {
     { ORDATA (IBUF, muxu_ibuf, 16) },
     { ORDATA (OBUF, muxu_obuf, 16) },
+    { ORDATA (SC, muxu_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, muxu_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -471,7 +480,8 @@ MTAB muxu_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
     { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mux_desc },
-    { MTAB_XTD | MTAB_VDV,            1, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &muxl_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",          "SC",         &hp_setsc,   &hp_showsc,       &muxl_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &muxl_dev },
 
     { 0 }
     };
@@ -501,7 +511,7 @@ DEVICE muxu_dev = {
     &mux_attach,                            /* attach routine */
     &mux_detach,                            /* detach routine */
     &muxu_dib,                              /* device information block */
-    DEV_NET | DEV_DISABLE | DEV_DEBUG,      /* device flags */
+    DEV_DISABLE | DEV_DEBUG,                /* device flags */
     0,                                      /* debug control flags */
     muxu_deb,                               /* debug flag name table */
     NULL,                                   /* memory size change routine */
@@ -531,12 +541,14 @@ REG muxc_reg[] = {
     { ORDATA (CHAN, muxc_chan, 4) },
     { BRDATA (DSO, muxc_ota, 8, 6, MUX_LINES) },
     { BRDATA (DSI, muxc_lia, 8, 2, MUX_LINES) },
+    { ORDATA (SC, muxc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, muxc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB muxc_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &muxc_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &muxc_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &muxc_dev },
     { 0 }
     };
 
@@ -975,8 +987,6 @@ t_bool loopback;
 loopback = ((muxu_unit.flags & UNIT_DIAG) != 0);        /* diagnostic mode? */
 
 if (!loopback) {                                        /* terminal mode? */
-    if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;  /* attached? */
-
     if (uptr->wait == POLL_FIRST)                       /* first poll? */
         uptr->wait = sync_poll (INITIAL);               /* initial synchronization */
     else                                                /* not first */
@@ -1328,7 +1338,7 @@ if (status == SCPE_OK) {
     sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
     }
 
-return SCPE_OK;
+return status;
 }
 
 

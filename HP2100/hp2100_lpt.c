@@ -1,6 +1,6 @@
 /* hp2100_lpt.c: HP 2100 12845B line printer simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    LPT          12845B 2607 line printer
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
@@ -137,6 +138,7 @@ REG lpt_reg[] = {
     { DRDATA (CTIME, lpt_ctime, 24), PV_LEFT },
     { DRDATA (PTIME, lpt_ptime, 24), PV_LEFT },
     { FLDATA (STOP_IOE, lpt_stopioe, 0) },
+    { ORDATA (SC, lpt_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, lpt_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -146,8 +148,8 @@ MTAB lpt_mod[] = {
     { UNIT_POWEROFF, 0, "power on", "POWERON", lpt_restart },
     { UNIT_OFFLINE, UNIT_OFFLINE, "offline", "OFFLINE", NULL },
     { UNIT_OFFLINE, 0, "online", "ONLINE", lpt_restart },
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &lpt_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &lpt_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &lpt_dev },
     { 0 }
     };
 

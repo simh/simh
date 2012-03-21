@@ -1,7 +1,7 @@
 /* hp2100_dq.c: HP 2100 12565A disk simulator
 
    Copyright (c) 1993-2006, Bill McDermith
-   Copyright (c) 2004-2011 J. David Bryan
+   Copyright (c) 2004-2012 J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    DQ           12565A 2883 disk system
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    10-Aug-08    JDB     Added REG_FIT to register variables < 32-bit size
@@ -223,13 +224,14 @@ REG dqd_reg[] = {
     { FLDATA (FBF, dqd.flagbuf, 0) },
     { FLDATA (XFER, dqd_xfer, 0) },
     { FLDATA (WVAL, dqd_wval, 0) },
+    { ORDATA (SC, dqd_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, dqd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB dqd_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &dqd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dqd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dqd_dev },
     { 0 }
     };
 
@@ -276,6 +278,7 @@ REG dqc_reg[] = {
     { DRDATA (XTIME, dqc_xtime, 24), REG_NZ + PV_LEFT },
     { URDATA (UFNC, dqc_unit[0].FNC, 8, 8, 0,
               DQ_NUMDRV, REG_HRO) },
+    { ORDATA (SC, dqc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, dqc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -285,8 +288,8 @@ MTAB dqc_mod[] = {
     { UNIT_UNLOAD, 0, "heads loaded", "LOADED", dqc_load_unload },
     { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
     { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &dqd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dqd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dqd_dev },
     { 0 }
     };
 

@@ -1,6 +1,6 @@
 /* hp2100_ipl.c: HP 2000 interprocessor link simulator
 
-   Copyright (c) 2002-2011, Robert M Supnik
+   Copyright (c) 2002-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Added CARD_INDEX casts to dib.card_index
    07-Apr-11    JDB     A failed STC may now be retried
    28-Mar-11    JDB     Tidied up signal handling
    27-Mar-11    JDB     Consolidated reporting of consecutive CRS signals
@@ -165,6 +167,7 @@ REG ipli_reg [] = {
     { ORDATA (HOLD, ipl [ipli].hold, 8) },
     { DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ipl_stopioe, 0) },
+    { ORDATA (SC, ipli_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ipli_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -174,8 +177,8 @@ MTAB ipl_mod [] = {
     { UNIT_DIAG, 0, "link mode", "LINK", &ipl_setdiag },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "DISCONNECT",
       &ipl_dscln, NULL, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &ipli_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ipli_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ipli_dev },
     { 0 }
     };
 
@@ -203,6 +206,7 @@ REG iplo_reg [] = {
     { FLDATA (FBF, ipl [iplo].flagbuf, 0) },
     { ORDATA (HOLD, ipl [iplo].hold, 8) },
     { DRDATA (TIME, ipl_ptime, 24), PV_LEFT },
+    { ORDATA (SC, iplo_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, iplo_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -291,7 +295,7 @@ DEVICE iplo_dev = {
 
 uint32 iplio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const CARD_INDEX card = dibptr->card_index;             /* set card selector */
+CARD_INDEX card = (CARD_INDEX) dibptr->card_index;      /* set card selector */
 UNIT *const uptr = &(ipl_unit [card]);                  /* associated unit pointer */
 const char *iotype [] = { "Status", "Command" };
 int32 sta;
@@ -474,7 +478,7 @@ if (nb < 0) {                                           /* connection closed? */
 else if (nb == 0)                                       /* no data? */
     return SCPE_OK;
 
-card = (uptr == &iplo_unit);                            /* set card selector */
+card = (CARD_INDEX) (uptr == &iplo_unit);               /* set card selector */
 
 if (uptr->flags & UNIT_HOLD) {                          /* holdover byte? */
     uptr->IBUF = (ipl [card].hold << 8) | (((int32) msg [0]) & 0377);
@@ -537,7 +541,7 @@ t_stat ipl_reset (DEVICE *dptr)
 {
 UNIT *uptr = dptr->units;
 DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
-CARD_INDEX card = dibptr->card_index;                   /* card number */
+CARD_INDEX card = (CARD_INDEX) dibptr->card_index;      /* card number */
 
 hp_enbdis_pair (dptr, dptrs [card ^ 1]);                /* make pair cons */
 

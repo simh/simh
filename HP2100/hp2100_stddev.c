@@ -1,6 +1,6 @@
 /* hp2100_stddev.c: HP2100 standard devices simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,8 @@
    TTY          12531C buffered teleprinter interface
    CLK          12539C time base generator
 
+   12-Feb-12    JDB     Add TBG as a logical name for the CLK device
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
@@ -228,6 +230,7 @@ REG ptr_reg[] = {
     { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptr_stopioe, 0) },
+    { ORDATA (SC, ptr_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ptr_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -235,8 +238,8 @@ REG ptr_reg[] = {
 MTAB ptr_mod[] = {
     { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
     { UNIT_DIAG, 0, "reader mode", "READER", NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &ptr_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ptr_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ptr_dev },
     { 0 }
     };
 
@@ -270,13 +273,14 @@ REG ptp_reg[] = {
     { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
     { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
     { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { ORDATA (SC, ptp_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, ptp_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB ptp_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &ptp_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &ptp_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &ptp_dev },
     { 0 }
     };
 
@@ -322,6 +326,7 @@ REG tty_reg[] = {
     { DRDATA (TTIME, tty_unit[TTO].wait, 24), REG_NZ + PV_LEFT },
     { DRDATA (PPOS, tty_unit[TTP].pos, T_ADDR_W), PV_LEFT },
     { FLDATA (STOP_IOE, ttp_stopioe, 0) },
+    { ORDATA (SC, tty_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, tty_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -333,8 +338,8 @@ MTAB tty_mod[] = {
     { TT_MODE, TT_MODE_7P, "7p", "7P", &tty_set_opt },
     { UNIT_AUTOLF, UNIT_AUTOLF, "autolf", "AUTOLF", &tty_set_alf },
     { UNIT_AUTOLF, 0          , NULL, "NOAUTOLF", &tty_set_alf },
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &tty_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &tty_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &tty_dev },
     { 0 }
     };
 
@@ -367,6 +372,7 @@ REG clk_reg[] = {
     { FLDATA (ERR, clk_error, CLK_V_ERROR) },
     { BRDATA (TIME, clk_time, 10, 24, 8) },
     { DRDATA (IPTICK, clk_tick, 24), PV_RSPC | REG_RO },
+    { ORDATA (SC, clk_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, clk_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -374,8 +380,8 @@ REG clk_reg[] = {
 MTAB clk_mod[] = {
     { UNIT_DIAG, UNIT_DIAG, "diagnostic mode", "DIAG", NULL },
     { UNIT_DIAG, 0, "calibrated", "CALIBRATED", NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &clk_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &clk_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &clk_dev },
     { 0 }
     };
 
@@ -384,7 +390,8 @@ DEVICE clk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, DEV_DISABLE
+    &clk_dib, DEV_DISABLE,
+    0, NULL, NULL, "TBG"
     };
 
 

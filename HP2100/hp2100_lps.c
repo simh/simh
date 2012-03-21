@@ -1,6 +1,6 @@
 /* hp2100_lps.c: HP 2100 12653A/2767 line printer simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    LPS          12653A 2767 line printer
                 12566B microcircuit interface with loopback diagnostic connector
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
                         Revised detection of CLC at last DMA cycle
@@ -245,6 +246,7 @@ REG lps_reg[] = {
     { DRDATA (RTIME, lps_rtime, 24), PV_LEFT },
     { FLDATA (TIMING, lps_timing, 0), REG_HRO },
     { FLDATA (STOP_IOE, lps_stopioe, 0) },
+    { ORDATA (SC, lps_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, lps_dib.select_code, 6), REG_HRO },
     { NULL }
     };
@@ -262,8 +264,8 @@ MTAB lps_mod[] = {
       &lps_set_timing, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TIMING", NULL,
       NULL, &lps_show_timing, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &lps_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &lps_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &lps_dev },
     { 0 }
     };
 

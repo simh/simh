@@ -1,6 +1,6 @@
 /* hp2100_dr.c: HP 2100 12606B/12610B fixed head disk/drum simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    DR           12606B 2770/2771 fixed head disk
                 12610B 2773/2774/2775 drum
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    09-Jul-08    JDB     Revised drc_boot to use ibl_copy
@@ -240,13 +241,14 @@ REG drd_reg[] = {
     { FLDATA (CTL, drd.control, 0) },
     { FLDATA (FLG, drd.flag,    0) },
     { ORDATA (BPTR, drd_ptr, 6) },
+    { ORDATA (SC, drd_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, drd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB drd_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &drd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &drd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &drd_dev },
     { 0 }
     };
 
@@ -278,6 +280,7 @@ REG drc_reg[] = {
     { FLDATA (RUN, drc_run, 0) },
     { DRDATA (TIME, dr_time, 24), REG_NZ + PV_LEFT },
     { FLDATA (STOP_IOE, dr_stopioe, 0) },
+    { ORDATA (SC, drc_dib.select_code, 6), REG_HRO },
     { ORDATA (DEVNO, drc_dib.select_code, 6), REG_HRO },
     { DRDATA (CAPAC, drc_unit.capac, 24), REG_HRO },
     { NULL }
@@ -300,8 +303,8 @@ MTAB drc_mod[] = {
     { UNIT_PROT, 0, "unprotected", "UNPROTECTED", NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TRACKPROT", "TRACKPROT",
       &dr_set_prot, &dr_show_prot, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &drd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &drd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &drd_dev },
     { 0 }
     };
 
