@@ -459,10 +459,9 @@ int strnicmp (const char *a, const char *b, size_t n)
 {
 	int ca, cb;
 
-	for (;;) {
-		if (--n < 0)					/* still equal after n characters? quit now */
-			return 0;
+	if (n == 0) return 0;					/* zero length compare is equal */
 
+	for (;;) {
 		if ((ca = *a) == 0)				/* get character, stop on null terminator */
 			return *b ? -1 : 0;
 
@@ -477,6 +476,9 @@ int strnicmp (const char *a, const char *b, size_t n)
 			return ca;
 
 		a++, b++;
+
+		if (--n == 0)					/* still equal after n characters? quit now */
+			return 0;
 	}
 }
 
