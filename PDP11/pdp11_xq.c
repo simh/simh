@@ -2611,6 +2611,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     eth_close(xq->var->etherface);
+    free(tptr);
     free(xq->var->etherface);
     xq->var->etherface = NULL;
     return SCPE_NOATT;
@@ -2623,8 +2624,13 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
 
   /* init read queue (first time only) */
   status = ethq_init(&xq->var->ReadQ, XQ_QUE_MAX);
-  if (status != SCPE_OK)
+  if (status != SCPE_OK) {
+    eth_close(xq->var->etherface);
+    free(tptr);
+    free(xq->var->etherface);
+    xq->var->etherface = NULL;
     return status;
+    }
 
   if (xq->var->mode == XQ_T_DELQA_PLUS)
     eth_filter_hash (xq->var->etherface, 1, &xq->var->init.phys, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);

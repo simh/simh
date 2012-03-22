@@ -1587,6 +1587,8 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
     printf("%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     eth_close(xu->var->etherface);
+    free(tptr);
+    xu->var->etherface = 0;
     return SCPE_NOATT;
   }
   uptr->filename = tptr;
