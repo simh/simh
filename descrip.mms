@@ -211,8 +211,10 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
 #
 .FIRST
   @ IF "".NES."''CC'" THEN DELETE/SYMBOL/GLOBAL CC
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
-  @ IF ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS."")) THEN EXIT %x10000000
+  @ EXIT_ON_ERROR := IF (ERROR_CONDITION) THEN EXIT %X10000004
+  @ ERROR_CONDITION = ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(F$GETSYI("VERSION").LTS."V8.0").AND.("$(NOASYNCH)".EQS.""))
+  @ IF (ERROR_CONDITION) THEN WRITE SYS$OUTPUT "*** WARNING **** Build should be invoked with /MACRO=NOASYNCH=1 on this platform"
+  @ 'EXIT_ON_ERROR
   @ DEFINE/USER SYS$OUTPUT CC_VERSION.DAT
   @ CC/VERSION
   @ OPEN /READ VERSION CC_VERSION.DAT
@@ -222,28 +224,41 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
   @ CC_VERSION = F$ELEMENT(2," ",CC_VERSION)
   @ BAD_CC_VERSION = ((F$GETSYI("ARCH_NAME").EQS."Alpha").AND.(CC_VERSION.LTS."V6.5-001").AND.("$(NONETWORK)".EQS.""))
   @ IF (BAD_CC_VERSION) THEN WRITE SYS$OUTPUT "*** WARNING *** C Compiler is: ''CC_VERSION'"
-  @ IF (BAD_CC_VERSION.AND.(F$GETSYI("VERSION").GES."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING *** Build should be invoked with /MACRO=NONETWORK=1 with this compiler"
-  @ IF (BAD_CC_VERSION.AND.(F$GETSYI("VERSION").LTS."V8.0")) THEN WRITE SYS$OUTPUT "*** WARNING *** Build should be invoked with /MACRO=(NONETWORK=1,NOASYNCH=1) with this compiler"
-  @ IF (BAD_CC_VERSION) THEN EXIT %x10000000
+  @ IF (BAD_CC_VERSION.AND.(F$GETSYI("VERSION").GES."V8.0")) THEN -
+     WRITE SYS$OUTPUT "*** WARNING *** Build should be invoked with /MACRO=NONETWORK=1 with this compiler"
+  @ IF (BAD_CC_VERSION.AND.(F$GETSYI("VERSION").LTS."V8.0")) THEN -
+     WRITE SYS$OUTPUT "*** WARNING *** Build should be invoked with /MACRO=(NONETWORK=1,NOASYNCH=1) with this compiler"
+  @ ERROR_CONDITION = BAD_CC_VERSION
+  @ 'EXIT_ON_ERROR
   @ MISSING_PCAP = (("$(PCAP_EXECLET)".NES."").AND.("$(NONETWORK)".EQS."").AND.(F$SEARCH("$(PCAP_DIR)PCAP-VMS.C").EQS.""))
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** Attempting a Network Build but the VMS-PCAP components are not"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** available"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** "
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** The PCAP-VMS components are presumed (by this procedure) to be"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** located in a directory at the same level as the directory"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** containing the simh source files."
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** For example, if these exist here:"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** "
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   []descrip.mms"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   []scp.c"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   etc."
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** "
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error *** Then the following should exist:"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   [-.PCAP-VMS]BUILD_ALL.COM"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   [-.PCAP-VMS.PCAP-VCI]"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   [-.PCAP-VMS.PCAPVCM]"
-  @ IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT "*** Error ***   etc."
-  @ IF (MISSING_PCAP) THEN EXIT %x10000000
+  @ MISS_SAY := IF (MISSING_PCAP) THEN WRITE SYS$OUTPUT
+  @ 'MISS_SAY' "*** Error *** Attempting a Network Build but the VMS-PCAP components are not"
+  @ 'MISS_SAY' "*** Error *** available"
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error *** The vms-pcap.zip file can be downloaded from:"
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error ***     https://github.com/markpizz/simh/downloads"
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error *** Be sure to ""unzip -a vms-pcap"" to properly set the file attributes"
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error *** The PCAP-VMS components are presumed (by this procedure) to be"
+  @ 'MISS_SAY' "*** Error *** located in a directory at the same level as the directory"
+  @ 'MISS_SAY' "*** Error *** containing the simh source files."
+  @ 'MISS_SAY' "*** Error *** For example, if these exist here:"
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error ***   []descrip.mms"
+  @ 'MISS_SAY' "*** Error ***   []scp.c"
+  @ 'MISS_SAY' "*** Error ***   etc."
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error *** Then the following should exist:"
+  @ 'MISS_SAY' "*** Error ***   [-.PCAP-VMS]BUILD_ALL.COM"
+  @ 'MISS_SAY' "*** Error ***   [-.PCAP-VMS.PCAP-VCI]"
+  @ 'MISS_SAY' "*** Error ***   [-.PCAP-VMS.PCAPVCM]"
+  @ 'MISS_SAY' "*** Error ***   etc."
+  @ 'MISS_SAY' "*** Error *** "
+  @ 'MISS_SAY' "*** Error *** Aborting Build"
+  @ ERROR_CONDITION = MISSING_PCAP
+  @ 'EXIT_ON_ERROR
   @ IF (F$SEARCH("SYS$DISK:[]BIN.DIR").EQS."") THEN CREATE/DIRECTORY $(BIN_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN]VMS.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
