@@ -1132,7 +1132,6 @@ t_stat xq_process_setup(CTLR* xq)
   int i,j;
   int count = 0;
   float secs;
-  t_stat status;
   uint32 saved_debug = xq->dev->dctrl;
   ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
   ETH_MAC filters[XQ_FILTER_MAX + 1];
@@ -1225,11 +1224,11 @@ t_stat xq_process_setup(CTLR* xq)
   for (i = 0; i < XQ_FILTER_MAX; i++)
     if (memcmp(zeros, &xq->var->setup.macs[i], sizeof(ETH_MAC)))
       memcpy (filters[count++], xq->var->setup.macs[i], sizeof(ETH_MAC));
-  status = eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
+  eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
 
   /* process MOP information */
   if (xq->var->write_buffer.msg[0])
-    status = xq_process_mop(xq);
+    xq_process_mop(xq);
 
   /* mark setup block valid */
   xq->var->setup.valid = 1;
@@ -1366,7 +1365,6 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
 {
   int i;
   int32 rstatus, wstatus;
-  t_stat status;
 
   sim_debug(DBG_TRC, xq->dev, "xq_dispatch_rbdl()\n");
 
@@ -1394,7 +1392,7 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
 
   /* process any waiting packets in receive queue */
   if (xq->var->ReadQ.count)
-    status = xq_process_rbdl(xq);
+    xq_process_rbdl(xq);
 
   return SCPE_OK;
 }
@@ -2250,7 +2248,6 @@ t_stat xq_wr_icr(CTLR* xq, int32 data)
 
 t_stat xq_wr(int32 data, int32 PA, int32 access)
 {
-  t_stat status;
   CTLR* xq = xq_pa2ctlr(PA);
   int index = (PA >> 1) & 07;   /* word index */
 
@@ -2266,19 +2263,19 @@ t_stat xq_wr(int32 data, int32 PA, int32 access)
           xq->var->iba = (xq->var->iba & 0xFFFF) | ((data & 0xFFFF) << 16);
           break;
         case 2:   /* ICR */
-          status = xq_wr_icr(xq, data);
+          xq_wr_icr(xq, data);
           break;
         case 3:
           break;
         case 4:   /* SRQR */
-          status = xq_wr_srqr(xq, data);
+          xq_wr_srqr(xq, data);
           break;
         case 5:
           break;
         case 6:
           break;
         case 7:   /* ARQR */
-          status = xq_wr_arqr(xq, data);
+          xq_wr_arqr(xq, data);
           break;
       }
       break;
@@ -2304,20 +2301,20 @@ t_stat xq_wr(int32 data, int32 PA, int32 access)
           break;
         case 3:   /* receive bdl high bits */
           xq->var->rbdl[1] = data;
-          status = xq_dispatch_rbdl(xq); /* start receive operation */
+          xq_dispatch_rbdl(xq); /* start receive operation */
           break;
         case 4:   /* transmit bdl low bits */
           xq->var->xbdl[0] = data;
           break;
         case 5:   /* transmit bdl high bits */
           xq->var->xbdl[1] = data;
-          status = xq_dispatch_xbdl(xq); /* start transmit operation */
+          xq_dispatch_xbdl(xq); /* start transmit operation */
           break;
         case 6:   /* vector address register */
-          status = xq_wr_var(xq, data);
+          xq_wr_var(xq, data);
           break;
         case 7:   /* control and status register */
-          status = xq_wr_csr(xq, data);
+          xq_wr_csr(xq, data);
           break;
       }
       break;

@@ -1151,9 +1151,9 @@ if (uptr == NULL)
 if ((uptr->flags & UNIT_ATT) == 0)
     return SCPE_UNATT;
 dptr = find_dev_from_unit (uptr);
-u = uptr - dptr->units;
 if (dptr == NULL)
     return SCPE_IERR;
+u = uptr - dptr->units;
 
 dtyp = GET_DTYPE (uptr->flags);
 if ((dtyp == TYPE_7320) || (dtyp == TYPE_1301))

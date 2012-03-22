@@ -2132,7 +2132,7 @@ if (usmd && (sw & SWMASK ('V'))) {
         addr = RelocXVM (addr, REL_C);
     else if (RELOC)
         addr = Reloc15 (addr, REL_C);
-    if ((int32) addr < 0)
+    if (((int32)addr) < 0)
         return STOP_MME;
     }
 #endif
@@ -2153,7 +2153,7 @@ if (usmd && (sw & SWMASK ('V'))) {
         addr = RelocXVM (addr, REL_C);
     else if (RELOC)
         addr = Reloc15 (addr, REL_C);
-    if ((int32) addr < 0)
+    if (((int32)addr) < 0)
         return STOP_MME;
     }
 #endif

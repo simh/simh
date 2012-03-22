@@ -1024,12 +1024,12 @@ t_stat sim_disk_detach (UNIT *uptr)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 int (*close_function)(FILE *f);
-FILE *fileref = uptr->fileref;
-DEVICE *dptr;
+FILE *fileref;
 t_bool auto_format;
 
 if (uptr == NULL)
     return SCPE_IERR;
+fileref = uptr->fileref;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
         close_function = fclose;
@@ -1045,7 +1045,7 @@ if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
-if ((dptr = find_dev_from_unit (uptr)) == NULL)
+if (NULL == find_dev_from_unit (uptr))
     return SCPE_OK;
 auto_format = ctx->auto_format;
 

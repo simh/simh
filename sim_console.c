@@ -385,13 +385,11 @@ return SCPE_OK;
 
 t_stat sim_set_deboff (int32 flag, char *cptr)
 {
-t_stat r;
-
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 if (sim_deb == NULL)                                    /* no log? */
     return SCPE_OK;
-r = sim_close_logfile (&sim_deb_ref);
+sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 if (!sim_quiet)
     printf ("Debug output disabled\n");

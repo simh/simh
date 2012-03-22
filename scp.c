@@ -3991,8 +3991,6 @@ if (!initialized) {
         }
     }
 if (prompt) {                                           /* interactive? */
-    char *tmpc;
-
     if (p_readline) {
         char *tmpc = p_readline (prompt);               /* get cmd line */
         if (tmpc == NULL)                               /* bad result? */
