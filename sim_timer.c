@@ -174,7 +174,6 @@ sys$waitfr (2);
 return sim_os_msec () - stime;
 }
 
-#if defined(SIM_ASYNCH_IO)
 #ifdef NEED_CLOCK_GETTIME
 int clock_gettime(int clk_id, struct timespec *tp)
 {
@@ -191,7 +190,6 @@ tp->tv_nsec = ns*100;
 return 0;
 }
 #endif /* CLOCK_REALTIME */
-#endif /* SIM_ASYNCH_IO */
 
 #elif defined (_WIN32)
 
