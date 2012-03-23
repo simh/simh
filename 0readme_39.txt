@@ -19,6 +19,10 @@ on Windows.
 1.1.2 PDP-8
 
 	- floating point processor is now enabled
+	
+1.1.3 IA64 VMS Ethernet Support
+
+        - Identified compiler version issues and added IA64 support (Matt Burke)
 
 2. Bugs Fixed
 
