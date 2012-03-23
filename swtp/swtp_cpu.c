@@ -425,7 +425,7 @@ int32 sim_instr (void)
 				condevalZ(IX);
 				break;
 			case 0x09:				/* DEX */
-				IX = (IX + 1) & ADDRMASK;
+				IX = (IX - 1) & ADDRMASK;
 				condevalZ(IX);
 				break;
 			case 0x0A:				/* CLV */
