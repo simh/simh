@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2012-02-13
+                             Last update: 2012-02-20
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -127,12 +127,12 @@ offline diagnostics:
                                               Date    Host    Date  SIMH
 Part Number  Diagnostic Name                  Code  Op. Sys.  Code  Vers.  Result
 -----------  -------------------------------  ----  --------  ----  -----  ----------
-92067-16013  Extended Memory Area Firmware    1805  RTE-IVB   5010  3.8-0  Passed
-92084-16423  Virtual Memory Area Firmware     2121  RTE-6/VM  6200  3.8-0  Passed
 12824-16002  Vector Instruction Set Firmware  2026  RTE-IVB   5010  3.8-0  Passed
-12829-16006  Vector Instruction Set Firmware  2226  RTE-6/VM  6200  3.8-0  Passed
-92835-16006  SIGNAL/1000 Firmware Diagnostic  2040  RTE-6/VM  6200  3.8-0  Passed
 91711-12032  ICD/MAC Disc Diagnostic          2201  RTE-IVB   5010  3.8-2  Partial
+92067-16013  Extended Memory Area Firmware    1805  RTE-IVB   5010  3.8-0  Passed
+12829-16006  Vector Instruction Set Firmware  2226  RTE-6/VM  6200  3.8-0  Passed
+92084-16423  Virtual Memory Area Firmware     2121  RTE-6/VM  6200  3.8-0  Passed
+92835-16006  SIGNAL/1000 Firmware Diagnostic  2040  RTE-6/VM  6200  3.8-0  Passed
 
 
 The "SIMH Version" is the version number of the earliest SIMH system that was
@@ -3497,54 +3497,6 @@ system.
 
 
 
-------------------------------------------------
-#EMA - Extended Memory Array Firmware Diagnostic
-------------------------------------------------
-
-TESTED DEVICE:  CPU (hp2100_cpu5.c)
-
-BINARY FILE:    92067-16013 Rev. 1805
-
-HOST SYSTEM:    RTE-IVB Rev. 5010
-
-CONFIGURATION:  sim> set CPU EMA
-                sim> go
-
-TEST REPORT:    EMA ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
-
-TEST RESULT:    Passed.
-
-
-
-------------------------------------------------
-VMACK - Virtual Memory Array Firmware Diagnostic
-------------------------------------------------
-
-TESTED DEVICE:  CPU (hp2100_cpu5.c)
-
-BINARY FILE:    92084-16423 Rev. 2121
-
-HOST SYSTEM:    RTE-6/VM Rev. 6200
-
-CONFIGURATION:  sim> set CPU 1000-F
-                sim> set CPU VMA
-                sim> go
-
-TEST REPORT:    VMACK  - VMA FIRMWARE DIAGNOSTIC, FIRMWARE REV#   003
-                VMACK  - .IMAR     NO ERRORS DETECTED    PASS#     1
-                VMACK  - .JMAR     NO ERRORS DETECTED    PASS#     1
-                VMACK  - .LBP      NO ERRORS DETECTED    PASS#     1
-                VMACK  - .LBPR     NO ERRORS DETECTED    PASS#     1
-                VMACK  - .LPX      NO ERRORS DETECTED    PASS#     1
-                VMACK  - .LPXR     NO ERRORS DETECTED    PASS#     1
-                VMACK  - .PMAP     NO ERRORS DETECTED    PASS#     1
-                VMACK  - .IMAP     NO ERRORS DETECTED    PASS#     1
-                VMACK  - .JMAP     NO ERRORS DETECTED    PASS#     1
-
-TEST RESULT:    Passed.
-
-
-
 --------------------------------------------------
 VISOD - Vector Instruction Set Firmware Diagnostic
 --------------------------------------------------
@@ -3565,49 +3517,6 @@ TEST RESULT:    Passed.
 
 
 
---------------------------------------------------
-VISOD - Vector Instruction Set Firmware Diagnostic
---------------------------------------------------
-
-TESTED DEVICE:  CPU (hp2100_cpu7.c)
-
-BINARY FILE:    12829-16006 Rev. 2226
-
-HOST SYSTEM:    RTE-6/VM Rev. 6200
-
-CONFIGURATION:  sim> set CPU 1000-F
-                sim> set CPU VIS
-                sim> go
-
-TEST REPORT:    VIS ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
-
-TEST RESULT:    Passed.
-
-
-
----------------------------------------
-SDIAG - SIGNAL/1000 Firmware Diagnostic
----------------------------------------
-
-TESTED DEVICE:  CPU (hp2100_cpu7.c)
-
-BINARY FILE:    92835-16006 Rev. 2040
-
-HOST SYSTEM:    RTE-6/VM Rev. 6200
-
-CONFIGURATION:  sim> set CPU 1000-F
-                sim> set CPU VIS
-                sim> set CPU SIGNAL
-                sim> go
-
-TEST REPORT:    SIGNAL/1000 FIRMWARE DIAGNOSTIC
-
-                SIGNAL/1000 FIRMWARE DIAGNOSTIC SUCCESSFUL COMPLETION
-
-TEST RESULT:    Passed.
-
-
-
 ------------------------------
 DIAG - ICD/MAC Disc Diagnostic
 ------------------------------
@@ -3618,7 +3527,8 @@ BINARY FILE:    91711-12032 Rev. 2201
 
 HOST SYSTEM:    RTE-IVB Rev. 5010
 
-CONFIGURATION:  sim> go
+CONFIGURATION:  sim> set DS0 FORMAT
+                sim> go
 
 TEST REPORT:    DIAG :  HP-IB DISC DIAGNOSTIC
 
@@ -4122,3 +4032,94 @@ TEST NOTES:     Steps 11-14 test CRC generation and checking.  Steps 21 and 28
                 bit.  Step 30 tests track sparing.  Steps 52, 54, and 55 test
                 cylinder, head, and sector miscompares by writing incorrect
                 preambles.  These features are not simulated.
+
+
+
+------------------------------------------------
+#EMA - Extended Memory Array Firmware Diagnostic
+------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu5.c)
+
+BINARY FILE:    92067-16013 Rev. 1805
+
+HOST SYSTEM:    RTE-IVB Rev. 5010
+
+CONFIGURATION:  sim> set CPU EMA
+                sim> go
+
+TEST REPORT:    EMA ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------------------
+VISOD - Vector Instruction Set Firmware Diagnostic
+--------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu7.c)
+
+BINARY FILE:    12829-16006 Rev. 2226
+
+HOST SYSTEM:    RTE-6/VM Rev. 6200
+
+CONFIGURATION:  sim> set CPU 1000-F
+                sim> set CPU VIS
+                sim> go
+
+TEST REPORT:    VIS ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------------------------
+VMACK - Virtual Memory Array Firmware Diagnostic
+------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu5.c)
+
+BINARY FILE:    92084-16423 Rev. 2121
+
+HOST SYSTEM:    RTE-6/VM Rev. 6200
+
+CONFIGURATION:  sim> set CPU 1000-F
+                sim> set CPU VMA
+                sim> go
+
+TEST REPORT:    VMACK  - VMA FIRMWARE DIAGNOSTIC, FIRMWARE REV#   003
+                VMACK  - .IMAR     NO ERRORS DETECTED    PASS#     1
+                VMACK  - .JMAR     NO ERRORS DETECTED    PASS#     1
+                VMACK  - .LBP      NO ERRORS DETECTED    PASS#     1
+                VMACK  - .LBPR     NO ERRORS DETECTED    PASS#     1
+                VMACK  - .LPX      NO ERRORS DETECTED    PASS#     1
+                VMACK  - .LPXR     NO ERRORS DETECTED    PASS#     1
+                VMACK  - .PMAP     NO ERRORS DETECTED    PASS#     1
+                VMACK  - .IMAP     NO ERRORS DETECTED    PASS#     1
+                VMACK  - .JMAP     NO ERRORS DETECTED    PASS#     1
+
+TEST RESULT:    Passed.
+
+
+
+---------------------------------------
+SDIAG - SIGNAL/1000 Firmware Diagnostic
+---------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu7.c)
+
+BINARY FILE:    92835-16006 Rev. 2040
+
+HOST SYSTEM:    RTE-6/VM Rev. 6200
+
+CONFIGURATION:  sim> set CPU 1000-F
+                sim> set CPU VIS
+                sim> set CPU SIGNAL
+                sim> go
+
+TEST REPORT:    SIGNAL/1000 FIRMWARE DIAGNOSTIC
+
+                SIGNAL/1000 FIRMWARE DIAGNOSTIC SUCCESSFUL COMPLETION
+
+TEST RESULT:    Passed.

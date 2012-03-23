@@ -1,7 +1,7 @@
 /* hp2100_cpu5.c: HP 1000 RTE-6/VM VMA and RTE-IV EMA instructions
 
    Copyright (c) 2007-2008, Holger Veit
-   Copyright (c) 2006-2011, J. David Bryan
+   Copyright (c) 2006-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   20-Mar-12    JDB     Added sign extension for dim count in "cpu_ema_resolve"
    28-Dec-11    JDB     Eliminated unused variable in "cpu_ema_vset"
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -815,7 +816,7 @@ static t_bool cpu_ema_resolve(uint32 dtbl,uint32 atbl,uint32* sum)
 int32 sub, act, low, sz;
 uint32 MA, base;
 
-int32 ndim = ReadW(dtbl++);                             /* # dimensions */
+int32 ndim = SEXT(ReadW(dtbl++));                       /* # dimensions */
 if (ndim < 0) return FALSE;                             /* invalid? */
 
 *sum = 0;                                               /* accu for index calc */

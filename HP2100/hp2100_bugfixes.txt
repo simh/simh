@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2012-03-17
+                             Last update: 2012-03-20
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -4386,10 +4386,11 @@
 
      CAUSE:  The "exdep_cmd" routine is calling "find_reg_glob" if the
      "find_reg" routine returns a not-found error for the selected device.
-     "find_reg_glob" searches for a unique name among all devices and returns
-     it if found.
+     "find_reg_glob" searches for a unique name among all devices and returns it
+     if found.
 
-     RESOLUTION:  None.
+     RESOLUTION:  Modify "exdep_cmd" (scp.c) to search for a global register
+     name only if the device was not explicitly specified.
 
      STATUS:  Fixed in version 3.8-0.
 
@@ -5701,7 +5702,8 @@
 
 
 
-227. PROBLEM: The 79xx disc returns incorrect status for a disabled drive.
+227. PROBLEM: The 13037 disc controller returns incorrect status for a disabled
+     drive.
 
      VERSION:  3.8-1
 
@@ -5711,9 +5713,9 @@
 
      CAUSE:  SIMH initially defines the DS device as having eight 7905 drives
      connected to the controller.  Each drive reports "heads unloaded" status
-     (status-2 bits 1-0 = 11) until it has a disc image attached.  If a unit is
+     (Status-2 bits 1-0 = 11) until it has a disc image attached.  If a unit is
      disabled, it continues to report "heads unloaded" status.  It should be
-     reporting "unit not present" (status-2 bits 1-0 = 10) status.
+     reporting "unit not present" (Status-2 bits 1-0 = 10) status.
 
      RESOLUTION:  Modify "ds_updds2" (hp2100_ds.c) to report an "enabled and
      unloaded" condition as Not Ready and Busy, and a "disabled" condition as
@@ -5723,8 +5725,8 @@
 
 
 
-228. PROBLEM:  The 79xx disc returns incorrect status for an auto-seek beyond
-     the drive limits.
+228. PROBLEM:  The 13037 disc controller returns incorrect status for an
+     auto-seek beyond the drive limits.
 
      VERSION:  3.8-1
 
@@ -5771,8 +5773,8 @@
 
 
 
-229. PROBLEM: The Read Without Verify command does not verify the address when a
-     track boundary is crossed.
+229. PROBLEM: The 13037 Read Without Verify command does not verify the address
+     when a track boundary is crossed.
 
      VERSION:  3.8-1
 
@@ -5832,7 +5834,7 @@
 
 
 
-230. PROBLEM:  The Request Sector Address command does not check the unit
+230. PROBLEM:  The 13037 Request Sector Address command does not check the unit
      number.
 
      VERSION:  3.8-1
@@ -5888,7 +5890,7 @@
 
 
 
-231. PROBLEM:  The Wakeup command does not check the unit number.
+231. PROBLEM:  The 13037 Wakeup command does not check the unit number.
 
      VERSION:  3.8-1
 
@@ -6001,7 +6003,7 @@
      or SHOW lists but can still be displayed or modified if requested
      explicitly.  Add hp_setsc and hp_showsc functions (hp2100_sys.c) to set and
      show the select code, and modify hp_setdev and hp_showdev to call hp_setsc
-     and hp_showsc, respectively, and to work aroung newline suppression for
+     and hp_showsc, respectively, and to work around newline suppression for
      MTAB_NMO entries.  Modify the documentation to change device number
      references to select code references.
 
@@ -6171,44 +6173,7 @@
 
 
 
-242. PROBLEM:  The DO -E command continues to execute commands after a VM error.
-
-     VERSION:  3.8-1
-
-     OBSERVATION:  According to the manual, when invoking a DO command file and
-     specifying the -E switch, "command processing (including nested command
-     invocations) will be aborted if any error is encountered."  Errors that
-     occur as a result of commands, e.g., an invalid unit name supplied to the
-     ATTACH command, correctly terminate the DO command.  However, errors that
-     occur when running the simulated CPU (e.g., a host I/O error) do not; the
-     error is printed on the console, but the command file continues to execute.
-
-     CAUSE:  When the -E switch is specified, the DO command processor checks
-     the return status from each command invoked and aborts execution of the
-     command file if the return is not SCPE_OK.  When a RUN, GO, STEP, CONT, or
-     BOOT command is invoked, the run command processor calls the VM-provided
-     instruction execution function to start the simulation.
-
-     When simulation is stopped, the instruction executor returns a status code
-     to indicate why execution has stopped.  The reason might be a VM-defined
-     condition (e.g., execution of a "halt" instruction) or a system condition
-     (e.g., a host file system I/O error).  The run command processor uses this
-     code to print an error message, but then returns SCPE_OK to the caller.  As
-     the DO command processor never sees the error message, it continues to
-     execute commands.
-
-     RESOLUTION:  Modify "run_cmd" (scp.c) to return the correct status instead
-     of SCPE_OK.  Consolidate the error printing code from "run_cmd", "main",
-     and "do_cmd" into a new "fprint_error" function that combines both VM stop
-     and command error messages.  Modify the error checkers in "main" and
-     "do_cmd" to call "fprint_error" to avoid printing messages from "run_cmd"
-     twice.
-
-     STATUS:  Fixed in version 3.9-0.
-
-
-
-243. ENHANCEMENT:  Modify the 13037 disc simulator to use the common disc
+242. ENHANCEMENT:  Modify the 13037 disc simulator to use the common disc
      controller library.
 
      VERSION:  3.8-1
@@ -6225,7 +6190,7 @@
 
 
 
-244. ENHANCEMENT:  Add debug printout support to the 13037 disc simulator.
+243. ENHANCEMENT:  Add debug printout support to the 13037 disc simulator.
 
      VERSION:  3.8-1
 
@@ -6238,7 +6203,7 @@
 
 
 
-245. ENHANCEMENT:  Eliminate the poll for parameters to 13037 disc commands.
+244. ENHANCEMENT:  Eliminate the poll for parameters to 13037 disc commands.
 
      VERSION:  3.8-1
 

@@ -24,7 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   15-Mar-12    JDB     First release
+   20-Mar-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
    References:
@@ -436,110 +436,49 @@ static const DRIVE_PROPERTIES drive_props [] = {
    command, and flags to indicate certain common actions that should be taken.
 */
 
-#define CP_V_CLRS       15                              /* bits 15-15: command clears the controller status */
-#define CP_V_WAIT       14                              /* bits 14-15: command waits for seek completion */
-#define CP_V_UACC       13                              /* bits 13-13: command accesses the unit */
-#define CP_V_UCHK       12                              /* bits 12-12: command checks for unit legality */
-#define CP_V_UNIT       11                              /* bits 11-11: command has a unit field */
-#define CP_V_CTYPE       9                              /* bits 10- 9: valid controller types */
-#define CP_V_CLASS       6                              /* bits  8- 6: command classification code */
-#define CP_V_INCNT       3                              /* bits  5- 3: inbound parameter word count */
-#define CP_V_OUTCNT      0                              /* bits  2- 0: outbound parameter word count */
-
-#define CP_M_CTYPE       3                              /* 2-bit valid controller types mask */
-#define CP_M_CLASS       7                              /* 3-bit classification code mask */
-#define CP_M_INCNT       7                              /* 3-bit inbound parameter word count mask */
-#define CP_M_OUTCNT      7                              /* 3-bit outbound parameter word count mask */
-
-#define CP_CLRS         (1 << CP_V_CLRS)
-#define CP_WAIT         (1 << CP_V_WAIT)
-#define CP_UACC         (1 << CP_V_UACC)
-#define CP_UCHK         (1 << CP_V_UCHK)
-#define CP_UNIT         (1 << CP_V_UNIT)
-
-#define CP_MAC          (MAC << CP_V_CTYPE)             /* command is valid for MAC controllers */
-#define CP_ICD          (ICD << CP_V_CTYPE)             /* command is valid for ICD controllers */
-
-#define CP_INVAL        (class_invalid << CP_V_CLASS)   /* invalid classification */
-#define CP_READ         (class_read    << CP_V_CLASS)   /* read classification */
-#define CP_WRITE        (class_write   << CP_V_CLASS)   /* write classification */
-#define CP_CNTL         (class_control << CP_V_CLASS)   /* control classification */
-#define CP_STAT         (class_status  << CP_V_CLASS)   /* status classification */
-
-#define TO_CTYPE(t)     (uint32) ((t) << CP_V_CTYPE)
-
-#define GET_CLASS(c)    (CNTLR_CLASS) (((c) >> CP_V_CLASS) & CP_M_CLASS)
-#define GET_INCNT(c)    (((c) >> CP_V_INCNT) & CP_M_INCNT)
-#define GET_OUTCNT(c)   (((c) >> CP_V_OUTCNT) & CP_M_OUTCNT)
-
-// >>> better?
-#if 0
 typedef struct {
-    CNTLR_OPCODE code;
-    uint32       inbound;
-    uint32       outbound;
-    CNTLR_CLASS  class;
-    t_bool       mac;
-    t_bool       icd;
-    t_bool       clear_status;
-    t_bool       unit_field;
-    t_bool       unit_check;
-    t_bool       unit_access;
-    t_bool       seek_wait;
+    uint32       params_in;                             /* count of input parameters */
+    uint32       params_out;                            /* count of output parameters */
+    CNTLR_CLASS  classification;                        /* command classification */
+    t_bool       valid [TYPE_COUNT];                    /* per-type command validity */
+    t_bool       clear_status;                          /* command clears status */
+    t_bool       unit_field;                            /* command has a unit field */
+    t_bool       unit_check;                            /* command checks unit number validity */
+    t_bool       unit_access;                           /* command accesses the drive unit */
+    t_bool       seek_wait;                             /* command waits for seek completion */
     } DS_PROPS;
 
-static const DS_PROPS cmd_props [] = {
-/*   in  out  class          mac  icd  clst  unit  uchk  uacc  wait */
-    { 0,  0,  class_read,     1,   1,   1,    0,    1,    1,    0 },   /* cold load read */
-    { 0,  0,  class_control,  1,   1,   1,    1,    1,    1,    1 },   /* recalibrate */
-    { 2,  0,  class_control,  1,   1,   1,    1,    1,    1,    0 },   /* seek */
-    { 0,  2,  class_status,   1,   1,   0,    1,    0,    0,    0 },   /* request status */
-    { 0,  1,  class_status,   1,   1,   1,    1,    1,    0,    0 },   /* request sector address */
-    { 0,  0,  class_read,     1,   1,   1,    1,    1,    1,    1 },   /* read */
-    { 0,  0,  class_read,     1,   1,   1,    1,    1,    1,    1 },   /* read full sector */
-    { 1,  0,  class_read,     1,   1,   1,    1,    1,    1,    1 },   /* verify */
-    { 0,  0,  class_write,    1,   1,   1,    1,    1,    1,    1 },   /* write */
-    { 0,  0,  class_write,    1,   1,   1,    1,    1,    1,    1 },   /* write full sector */
-    { 0,  0,  class_control,  1,   1,   1,    0,    0,    0,    0 },   /* clear */
-    { 0,  0,  class_write,    1,   1,   1,    1,    1,    1,    1 },   /* initialize */
-    { 2,  0,  class_control,  1,   1,   1,    0,    0,    0,    0 },   /* address record */
-    { 0,  7,  class_status,   1,   0,   0,    0,    0,    0,    0 },   /* request syndrome */
-    { 1,  0,  class_read,     1,   1,   1,    1,    1,    1,    1 },   /* read with offset */
-    { 0,  0,  class_control,  1,   1,   1,    0,    0,    0,    0 },   /* set file mask */
-    { 0,  0,  class_invalid,  0,   0,   1,    0,    0,    0,    0 },   /* invalid */
-    { 0,  0,  class_invalid,  0,   0,   1,    0,    0,    0,    0 },   /* invalid */
-    { 0,  0,  class_read,     1,   1,   1,    1,    1,    1,    1 },   /* read without verify */
-    { 1,  0,  class_status,   1,   0,   1,    0,    0,    0,    0 },   /* load TIO register */
-    { 0,  2,  class_status,   1,   1,   0,    0,    0,    0,    0 },   /* request disc address */
-    { 0,  0,  class_control,  1,   1,   1,    0,    0,    0,    0 },   /* end */
-    { 0,  0,  class_control,  1,   0,   1,    1,    1,    0,    0 }    /* wakeup */
-    };
-#endif
+typedef const DS_PROPS *PRPTR;
 
-static const uint32 cmd_props [] = {
-    000  | CP_READ  | CP_MAC | CP_ICD | CP_CLRS           | CP_UCHK | CP_UACC,              /* cold load read */
-    000  | CP_CNTL  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* recalibrate */
-    020  | CP_CNTL  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC,              /* seek */
-    002  | CP_STAT  | CP_MAC | CP_ICD           | CP_UNIT,                                  /* request status */
-    001  | CP_STAT  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK,                        /* request sector address */
-    000  | CP_READ  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* read */
-    000  | CP_READ  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* read full sector */
-    010  | CP_READ  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* verify */
-    000  | CP_WRITE | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* write */
-    000  | CP_WRITE | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* write full sector */
-    000  | CP_CNTL  | CP_MAC | CP_ICD | CP_CLRS,                                            /* clear */
-    000  | CP_WRITE | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* initialize */
-    020  | CP_CNTL  | CP_MAC | CP_ICD | CP_CLRS,                                            /* address record */
-    007  | CP_STAT  | CP_MAC,                                                               /* request syndrome */
-    010  | CP_READ  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* read with offset */
-    000  | CP_CNTL  | CP_MAC | CP_ICD | CP_CLRS,                                            /* set file mask */
-    000  | CP_INVAL |                   CP_CLRS,                                            /* invalid */
-    000  | CP_INVAL |                   CP_CLRS,                                            /* invalid */
-    000  | CP_READ  | CP_MAC | CP_ICD | CP_CLRS | CP_UNIT | CP_UCHK | CP_UACC | CP_WAIT,    /* read without verify */
-    010  | CP_STAT  | CP_MAC |          CP_CLRS,                                            /* load TIO register */
-    002  | CP_STAT  | CP_MAC | CP_ICD,                                                      /* request disc address */
-    000  | CP_CNTL  | CP_MAC | CP_ICD | CP_CLRS,                                            /* end */
-    000  | CP_CNTL  | CP_MAC |          CP_CLRS | CP_UNIT | CP_UCHK                         /* wakeup */
+#define T   TRUE
+#define F   FALSE
+
+static const DS_PROPS cmd_props [] = {
+/*   par par  opcode           valid for  clear unit  unit  unit  seek */
+/*   in  out  classification   MAC  ICD   stat  field check acces wait */
+    { 0,  0,  class_read,     { T,   T },   T,    F,    T,    T,    F },   /* 00 = cold load read */
+    { 0,  0,  class_control,  { T,   T },   T,    T,    T,    T,    T },   /* 01 = recalibrate */
+    { 2,  0,  class_control,  { T,   T },   T,    T,    T,    T,    F },   /* 02 = seek */
+    { 0,  2,  class_status,   { T,   T },   F,    T,    F,    F,    F },   /* 03 = request status */
+    { 0,  1,  class_status,   { T,   T },   T,    T,    T,    F,    F },   /* 04 = request sector address */
+    { 0,  0,  class_read,     { T,   T },   T,    T,    T,    T,    T },   /* 05 = read */
+    { 0,  0,  class_read,     { T,   T },   T,    T,    T,    T,    T },   /* 06 = read full sector */
+    { 1,  0,  class_read,     { T,   T },   T,    T,    T,    T,    T },   /* 07 = verify */
+    { 0,  0,  class_write,    { T,   T },   T,    T,    T,    T,    T },   /* 10 = write */
+    { 0,  0,  class_write,    { T,   T },   T,    T,    T,    T,    T },   /* 11 = write full sector */
+    { 0,  0,  class_control,  { T,   T },   T,    F,    F,    F,    F },   /* 12 = clear */
+    { 0,  0,  class_write,    { T,   T },   T,    T,    T,    T,    T },   /* 13 = initialize */
+    { 2,  0,  class_control,  { T,   T },   T,    F,    F,    F,    F },   /* 14 = address record */
+    { 0,  7,  class_status,   { T,   F },   F,    F,    F,    F,    F },   /* 15 = request syndrome */
+    { 1,  0,  class_read,     { T,   T },   T,    T,    T,    T,    T },   /* 16 = read with offset */
+    { 0,  0,  class_control,  { T,   T },   T,    F,    F,    F,    F },   /* 17 = set file mask */
+    { 0,  0,  class_invalid,  { F,   F },   T,    F,    F,    F,    F },   /* 20 = invalid */
+    { 0,  0,  class_invalid,  { F,   F },   T,    F,    F,    F,    F },   /* 21 = invalid */
+    { 0,  0,  class_read,     { T,   T },   T,    T,    T,    T,    T },   /* 22 = read without verify */
+    { 1,  0,  class_status,   { T,   F },   T,    F,    F,    F,    F },   /* 23 = load TIO register */
+    { 0,  2,  class_status,   { T,   T },   F,    F,    F,    F,    F },   /* 24 = request disc address */
+    { 0,  0,  class_control,  { T,   T },   T,    F,    F,    F,    F },   /* 25 = end */
+    { 0,  0,  class_control,  { T,   F },   T,    T,    T,    F,    F }    /* 26 = wakeup */
     };
 
 
@@ -547,7 +486,7 @@ static const uint32 cmd_props [] = {
 
 typedef enum {
     controller = 0,                                     /* controller unit index */
-    timer = 1                                           /* command wait timer index */
+    timer                                               /* command wait timer index */
     } AUX_INDEX;
 
 
@@ -640,7 +579,8 @@ static uint16 drive_status (UNIT  *uptr);
 
 t_bool dl_prepare_command (CVPTR cvptr, UNIT *units, uint32 unit_limit)
 {
-uint32 props, unit;
+uint32 unit;
+PRPTR props;
 CNTLR_OPCODE opcode;
 
 set_timer (cvptr, CLEAR);                               /* stop the command wait timer */
@@ -648,12 +588,12 @@ set_timer (cvptr, CLEAR);                               /* stop the command wait
 opcode = GET_OPCODE (cvptr->buffer [0]);                /* get the opcode from the command */
 
 if (opcode > last_opcode)                               /* is the opcode invalid? */
-    props = CP_CLRS;                                    /* undefined commands clear prior status */
+    props = &cmd_props [invalid_opcode];                /* undefined commands clear prior status */
 else                                                    /* the opcode is potentially valid */
-    props = cmd_props [opcode];                         /* get the command properties */
+    props = &cmd_props [opcode];                        /* get the command properties */
 
 if (cvptr->type == MAC)                                 /* is this a MAC controller? */
-    if (props & CP_UNIT)                                /* is the unit field defined for this command? */
+    if (props->unit_field)                              /* is the unit field defined for this command? */
         unit = GET_UNIT (cvptr->buffer [0]);            /* get the unit from the command */
     else                                                /* no unit specified in the command */
         unit = 0;                                       /*   so the unit is always unit 0 */
@@ -661,19 +601,20 @@ if (cvptr->type == MAC)                                 /* is this a MAC control
 else                                                    /* an ICD controller */
     unit = unit_limit;                                  /*   uses the supplied unit number */
 
-if (props & CP_CLRS) {                                  /* clear the prior controller status */
+if (props->clear_status) {                              /* clear the prior controller status */
     cvptr->status = normal_completion;                  /*   if indicated for this command */
     cvptr->spd_unit = SET_S1UNIT (unit);                /* save the unit number for status requests */
     }
 
-if (props & TO_CTYPE (cvptr->type))                     /* is the opcode defined for this controller? */
-    if ((props & CP_UCHK) && unit > DL_MAXUNIT)         /* if the unit number is checked and is illegal, */
+if (cvptr->type <= last_type                            /* is the controller type legal? */
+  && props->valid [cvptr->type])                        /*   and the opcode defined for this controller? */
+    if (props->unit_check && unit > DL_MAXUNIT)         /* if the unit number is checked and is illegal, */
         dl_end_command (cvptr, unit_unavailable);       /*   end with a unit unavailable error */
 
     else {
         cvptr->state = cntlr_busy;                      /* legal unit, so controller is now busy */
         cvptr->opcode = opcode;                         /* save the controller opcode */
-        cvptr->length = GET_INCNT (props);              /* set the inbound parameter count */
+        cvptr->length = props->params_in;               /* set the inbound parameter count */
         cvptr->index = 1;                               /* point at the first parameter element (if any) */
 
         if (cvptr->type == MAC && cvptr->length) {      /* MAC controller and inbound parameters? */
@@ -780,28 +721,30 @@ return FALSE;                                           /* the preparation has f
        drive units but are scheduled on the controller unit because they may be
        issued while a drive is processing a seek.
 
-    8. The activation time is set to one-half of the intersector time (latency)
-       for read and write commands, and to the controller processing time for
-       all others.
+    8. The activation time is set to the intersector time (latency) for read and
+       write commands, and to the controller processing time for all others.
+       This time cannot be shorter than 20 instructions, or DVR32 will be unable
+       to start DCPC in time to avoid an over/underrun.
 */
 
 UNIT *dl_start_command (CVPTR cvptr, UNIT *units, uint32 unit_limit)
 {
 UNIT *uptr, *rptr;
-uint32 props, unit;
+uint32 unit;
+PRPTR props;
 t_bool is_seeking = FALSE;
 
-props = cmd_props [cvptr->opcode];                      /* get the command properties */
+props = &cmd_props [cvptr->opcode];                     /* get the command properties */
 
 if (cvptr->type == MAC) {                               /* is this a MAC controller? */
-    if (props & CP_UNIT)                                /* is the unit field defined for this command? */
+    if (props->unit_field)                              /* is the unit field defined for this command? */
         unit = GET_UNIT (cvptr->buffer [0]);            /* get the unit number from the command */
     else                                                /* no unit is specified in the command */
         unit = 0;                                       /*   so the unit number defaults to 0 */
 
     if (unit > unit_limit)                              /* if the unit number is invalid, */
         uptr = NULL;                                    /*   it does not correspond to a unit */
-    else if (props & CP_UACC)                           /* if the command accesses a drive, */
+    else if (props->unit_access)                        /* if the command accesses a drive, */
         uptr = units + unit;                            /*   get the address of the unit */
     else                                                /* the command accesses the controller only */
         uptr = cvptr->aux + controller;                 /*   so use the controller unit */
@@ -812,17 +755,16 @@ else {                                                  /* for an ICD controller
     uptr = units + unit_limit;                          /*   and we use the indicated unit */
     }
 
-if ((props & CP_UCHK) && !uptr                          /* if the unit number is checked and is invalid */
-  || (props & CP_WAIT)                                  /* or the command waits for the drive */
-  && (drive_status (uptr) & DL_S2STOPS)) {              /*   and the drive is offline or faulted */
-    dl_end_command (cvptr, status_2_error);             /*     then the command ends with a Status-2 error */
-    uptr = NULL;                                        /* prevent command from starting */
+if (props->unit_check && !uptr                                  /* if the unit number is checked and is invalid */
+  || props->seek_wait && (drive_status (uptr) & DL_S2STOPS)) {  /*   or if waiting for an offline drive */
+    dl_end_command (cvptr, status_2_error);                     /*     then the command ends with a Status-2 error */
+    uptr = NULL;                                                /* prevent the command from starting */
     }
 
 else if (uptr) {                                        /* otherwise, we have a valid unit */
     uptr->wait = cvptr->cmd_time;                       /* most commands use the command delay */
 
-    if (props & CP_UACC) {                              /* does the command access the unit? */
+    if (props->unit_access) {                           /* does the command access the unit? */
         is_seeking = sim_is_active (uptr) != 0;         /* see if the unit is busy */
 
         if (is_seeking)                                 /* if a seek is in progress, */
@@ -831,15 +773,15 @@ else if (uptr) {                                        /* otherwise, we have a 
         else {                                          /* otherwise, the unit is idle */
             uptr->STAT &= ~DL_S2ATN;                    /* clear the drive Attention status */
 
-             if (GET_CLASS (props) == class_read        /* if a read command */
-              || GET_CLASS (props) == class_write)      /*   or a write command */
-                uptr->wait = cvptr->sector_time / 2;    /*     schedule the sector start latency */
+             if (props->classification == class_read    /* if a read command */
+              || props->classification == class_write)  /*   or a write command */
+                uptr->wait = cvptr->sector_time;        /*     schedule the sector start latency */
             }
         }
     }
 
 cvptr->index = 0;                                       /* reset the buffer index */
-cvptr->length = GET_OUTCNT (props);                     /* set the count of outbound parameters */
+cvptr->length = props->params_out;                      /* set the count of outbound parameters */
 cvptr->eod = CLEAR;                                     /* clear the end of data flag */
 
 
@@ -1643,17 +1585,11 @@ return SCPE_OK;
 
 CNTLR_CLASS dl_classify (CNTLR_VARS cntlr)
 {
-uint32 flags;
-
-if (cntlr.opcode > last_opcode)                         /* is the opcode illegal? */
-    return class_invalid;                               /* return an invalid classification */
-
-flags = cmd_props [cntlr.opcode];                       /* get the opcode properties */
-
-if (cntlr.type == MAC && (flags & CP_MAC)               /* is the opcode */
-  || cntlr.type == ICD && (flags & CP_ICD))             /*   defined for this controller? */
-    return GET_CLASS (cmd_props [cntlr.opcode]);        /* yes, so return the command classification */
-else                                                    /* opcode is undefined */
+if (cntlr.type <= last_type                             /* if the controller type is legal, */
+  && cntlr.opcode <= last_opcode                        /*   and the opcode is legal */
+  && cmd_props [cntlr.opcode].valid [cntlr.type])       /*   and is defined for this controller, */
+    return cmd_props [cntlr.opcode].classification;     /*     then return the command classification */
+else                                                    /* type or opcode is illegal */
     return class_invalid;                               /*   so return an invalid classification */
 }
 
@@ -1667,17 +1603,11 @@ else                                                    /* opcode is undefined *
 
 const char *dl_opcode_name (CNTLR_TYPE controller, CNTLR_OPCODE opcode)
 {
-uint32 flags;
-
-if (opcode > last_opcode)                               /* is the opcode illegal? */
-    return invalid_name;                                /* return an error indication */
-
-flags = cmd_props [opcode];                             /* get the opcode properties */
-
-if (controller == MAC && (flags & CP_MAC) ||            /* is the opcode */
-    controller == ICD && (flags & CP_ICD))              /*   defined for this controller? */
-    return opcode_name [opcode];                        /* yes, so return the opcode name */
-else                                                    /* opcode is undefined, */
+if (controller <= last_type                             /* if the controller type is legal, */
+  && opcode <= last_opcode                              /*   and the opcode is legal */
+  && cmd_props [opcode].valid [controller])             /*   and is defined for this controller, */
+    return opcode_name [opcode];                        /*     then return the opcode name */
+else                                                    /* type or opcode is illegal, */
     return invalid_name;                                /*   so return an error indication */
 }
 
@@ -1690,10 +1620,10 @@ else                                                    /* opcode is undefined, 
 
 const char *dl_phase_name (CNTLR_PHASE phase)
 {
-if (phase > last_phase)                                 /* is the phase illegal? */
-    return invalid_name;                                /* return an error indication */
-else                                                    /* phase is defined, */
-    return phase_name [phase];                          /*   so return the phase name */
+if (phase <= last_phase)                                /* if the phase is legal, */
+    return phase_name [phase];                          /*   return the phase name */
+else                                                    /* phase is illegal, */
+    return invalid_name;                                /*   so return an error indication */
 }
 
 

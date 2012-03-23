@@ -24,7 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   15-Mar-12    JDB     First release
+   19-Mar-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
 
@@ -191,11 +191,12 @@
 #define MODEL_7925      SET_MODEL (D7925_MODEL)
 
 
-/* Controller types (values must be powers of 2) */
+/* Controller types */
 
 typedef enum {
-    MAC = 1,
-    ICD = 2
+    MAC = 0,
+    ICD,                last_type = ICD,                /* last valid type */
+    TYPE_COUNT                                          /* count of controller types */
     } CNTLR_TYPE;
 
 
@@ -218,11 +219,12 @@ typedef enum {
     request_syndrome       = 015,
     read_with_offset       = 016,
     set_file_mask          = 017,
+    invalid_opcode         = 020,
     read_without_verify    = 022,
     load_tio_register      = 023,
     request_disc_address   = 024,
     end                    = 025,
-    wakeup                 = 026, last_opcode = wakeup  /* last opcode */
+    wakeup                 = 026, last_opcode = wakeup  /* last valid opcode */
     } CNTLR_OPCODE;
 
 #define DL_OPCODE_MASK  037
@@ -231,9 +233,9 @@ typedef enum {
 /* Controller command phases */
 
 typedef enum {
-    start_phase,
+    start_phase = 0,
     data_phase,
-    end_phase, last_phase = end_phase                   /* last phase */
+    end_phase,          last_phase = end_phase          /* last valid phase */
     } CNTLR_PHASE;
 
 

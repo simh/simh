@@ -1,6 +1,6 @@
 /* sim_rev.h: simulator revisions and current rev level
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -38,6 +38,7 @@ patch   date            module(s) and fix(es)
 
   0     xx-yyy-1       scp.c:
                         - added *nix READLINE support (Mark Pizzolato)
+                        - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
                         - fixed handling of DO with no arguments (Dave Bryan)
                         - clarified some help messages (Mark Pizzolato)
                         - added "SHOW SHOW" and "SHOW <dev> SHOW" commands (Mark Pizzolato)
@@ -50,7 +51,8 @@ patch   date            module(s) and fix(es)
                         - major revision (Dave Hittner and Mark Pizzolato)
 
                         sim_tmxr.c:
-                        - made option negotiation more reliable (Mark Pizzolato)
+                        - made telnet option negotiation more reliable.  
+                          VAX works with PuTTY. (Mark Pizzolato)
 
                         h316_cpu.c:
                         - fixed bugs in MPY, DIV introduced in 3.8-1 (from Theo Engel)
@@ -59,8 +61,13 @@ patch   date            module(s) and fix(es)
 
                         hp2100 all peripherals (Dave Bryan):
                         - Changed I/O signal handlers for newly revised signal model
+                        - Deprecated DEVNO modifier in favor of SC
 
                         hp2100_cpu.c (Dave Bryan):
+                        - Minor speedup in "is_mapped"
+                        - Added casts to cpu_mod, dmasio, dmapio, cpu_reset, dma_reset
+                        - Fixed I/O return status bug for DMA cycles
+                        - Failed I/O cycles now stop on failing instruction
                         - Revised DMA for new multi-card paradigm
                         - Consolidated DMA reset routines
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
@@ -70,8 +77,6 @@ patch   date            module(s) and fix(es)
                         - Fixed DMA requests to enable stealing every cycle
                         - Fixed DMA priority for channel 1 over channel 2
                         - Corrected comments for "cpu_set_idle"
-                        - Fixed I/O return status bug for DMA cycles 
-                        - Failed I/O cycles now stop on failing instruction
 
                         hp2100_cpu.h:
                         - Changed declarations for VMS compiler
@@ -79,15 +84,42 @@ patch   date            module(s) and fix(es)
                         hp2100_cpu0.c (Dave Bryan):
                         - Removed DS note regarding PIF card (is now implemented)
 
+                        hp2100_cpu4.c (Dave Bryan):
+                        - Added OPSIZE casts to fp_accum calls in .FPWR/.TPWR
+
+                        hp2100_cpu5.c (Dave Bryan):
+                        - Added OPSIZE casts to fp_accum calls in .FPWR/.TPWR
+
                         hp2100_cpu6.c (Dave Bryan):
-                        - DMA channels renamed from 0,1 to 1,2 to match documentation
+                        - Eliminated unused variable in "cpu_ema_vset"
+
+                        hp2100_cpu7.c (Dave Bryan):
+                        - Corrected "opsize" parameter type in vis_abs
 
                         hp2100_defs.h (Dave Bryan):
+                        - Added hp_setsc, hp_showsc functions to support SC modifier
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Revised I/O signal enum values for concurrent signals
                         - Revised I/O macros for new signal handling
+                        - Added DA and DC device select code assignments
+
+                        hp2100_di.c (Dave Bryan):
+                        - Implemented 12821A HP-IB Disc Interface
+
+                        hp2100_di_da.c (Dave Bryan):
+                        - Implemented 7906H/20H/25H ICD disc drives
+
+                        hp2100_dp.c (Dave Bryan):
+                        - Added CNTLR_TYPE cast to dp_settype
 
                         hp2100_ds.c (Dave Bryan):
+                        - Rewritten to use the MAC/ICD disc controller library
+                        - ioIOO now notifies controller service of parameter output
+                        - Corrected SRQ generation and FIFO under/overrun detection
+                        - Corrected Clear command to conform to the hardware
+                        - Fixed Request Status to return Unit Unavailable if illegal
+                        - Seek and Cold Load Read now Seek Check if seek in progress
+                        - Remodeled command wait for seek completion
                         - Corrected status returns for disabled drive, auto-seek
                           beyond drive limits, Request Sector Address and Wakeup
                           with invalid or offline unit
@@ -95,22 +127,37 @@ patch   date            module(s) and fix(es)
                           Read Without Verify
 
                         hp2100_fp1.c (Dave Bryan):
+                        - Added missing precision on constant "one" in fp_trun
                         - Completed the comments for divide; no code changes
 
                         hp2100_ipl.c (Dave Bryan):
-                        - Revised for new multi-card paradigm
+                        - Added CARD_INDEX casts to dib.card_index
                         - A failed STC may now be retried
+                        - Consolidated reporting of consecutive CRS signals
+                        - Revised for new multi-card paradigm
 
                         hp2100_lps.c (Dave Bryan):
-                        - Corrected 12566B (DIAG mode) jumper settings
                         - Revised detection of CLC at last DMA cycle
+                        - Corrected 12566B (DIAG mode) jumper settings
+
+                        hp2100_ms.c (Dave Bryan):
+                        - Added CNTLR_TYPE cast to ms_settype
 
                         hp2100_mt.c (Dave Bryan):
-                        - Fixed error in command scan in mtcio ioIOO handler
+                        - Fixed command scanning error in mtcio ioIOO handler
+
+                        hp2100_stddev.c (Dave Bryan):
+                        - Add TBG as a logical name for the CLK device
 
                         hp2100_sys.c (Dave Bryan):
+                        - Add TBG as a logical name for the CLK device
+                        - Added hp_setsc, hp_showsc functions to support SC modifier
+                        - Added DA and dummy DC devices
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Changed DIB access for revised signal model
+
+                        hp_disclib.c, hp_disclib.h (Dave Bryan)
+                        - Created MAC/ICD disc controller library
 
                         i1401_cd.c:
                         - fixed read stacker operation in column binary mode

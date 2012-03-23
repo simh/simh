@@ -1015,7 +1015,8 @@ t_stat sim_os_poll_kbd (void)
 int c = -1;
 DWORD nkbevents, nkbevent;
 INPUT_RECORD rec;
-extern int32 sim_switches;
+
+\
 
 if ((std_input == NULL) ||                              /* No keyboard for */
     (std_input == INVALID_HANDLE_VALUE))                /* background processes */
