@@ -906,7 +906,7 @@ return rpackg (&a, flo);                                /* return frac */
 
 /* Floating add */
 
-void vax_fadd (UFP *a, UFP *b)
+void vax_fadd (UFP *a, UFP *b, uint32 mhi, uint32 mlo)
 {
 int32 ediff;
 UFP t;
