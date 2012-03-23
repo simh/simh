@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   18-Apr-11    MP      Fixed t_addr printouts for 64b big-endian systems
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
@@ -466,10 +467,12 @@ UNIT *uptr;
 fnc = GET_FNC (tucs1);                                  /* get function */
 den = GET_DEN (tutc);                                   /* get density */
 uptr = tu_dev.units + drv;                              /* get unit */
-if (DEBUG_PRS (tu_dev))
-    fprintf (sim_deb, ">>TU%d STRT: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=%d\n",
-             drv, tu_fname[fnc], tufc, tufs, tuer, uptr->pos);
-
+if (DEBUG_PRS (tu_dev)) {
+    fprintf (sim_deb, ">>TU%d STRT: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=",
+             drv, tu_fname[fnc], tufc, tufs, tuer);
+    fprint_val (sim_deb, uptr->pos, 10, T_ADDR_W, PV_LEFT);
+    fprintf (sim_deb, "\n");
+    }
 if ((fnc != FNC_FCLR) &&                                /* not clear & err */
     ((tufs & FS_ERR) || sim_is_active (uptr))) {        /* or in motion? */
     tu_set_er (ER_ILF);                                 /* set err */
@@ -598,7 +601,7 @@ return MBE_GOE;
 
 /* Abort transfer */
 
-t_stat tu_abort (void)
+int32 tu_abort (void)
 {
 return tu_reset (&tu_dev);
 }
@@ -786,9 +789,12 @@ if (fnc >= FNC_XFER) {                                  /* data xfer? */
     tu_update_fs (0, drv);                              /* update fs */
     }
 else tu_update_fs (FS_ATA, drv);                        /* no, set attn */
-if (DEBUG_PRS (tu_dev))
-    fprintf (sim_deb, ">>TU%d DONE: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=%d\n",
-             drv, tu_fname[fnc], tufc, tufs, tuer, uptr->pos);
+if (DEBUG_PRS (tu_dev)) {
+    fprintf (sim_deb, ">>TU%d DONE: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=",
+             drv, tu_fname[fnc], tufc, tufs, tuer);
+    fprint_val (sim_deb, uptr->pos, 10, T_ADDR_W, PV_LEFT);
+    fprintf (sim_deb, "\n");
+    }
 return SCPE_OK;
 }
 
