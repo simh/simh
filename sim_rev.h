@@ -88,10 +88,11 @@ patch   date            module(s) and fix(es)
                         - Added OPSIZE casts to fp_accum calls in .FPWR/.TPWR
 
                         hp2100_cpu5.c (Dave Bryan):
-                        - Added OPSIZE casts to fp_accum calls in .FPWR/.TPWR
+                        - Added sign extension for dim count in "cpu_ema_resolve"
+                        - Eliminated unused variable in "cpu_ema_vset"
 
                         hp2100_cpu6.c (Dave Bryan):
-                        - Eliminated unused variable in "cpu_ema_vset"
+                        - DMA channels renamed from 0,1 to 1,2 to match documentation
 
                         hp2100_cpu7.c (Dave Bryan):
                         - Corrected "opsize" parameter type in vis_abs
