@@ -26,7 +26,7 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
-   20-Mar-12    JDB     Added sign extension for dim count in "cpu_ema_resolve"
+   23-Mar-12    JDB     Added sign extension for dim count in "cpu_ema_resolve"
    28-Dec-11    JDB     Eliminated unused variable in "cpu_ema_vset"
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -798,6 +798,12 @@ return reason;
      1. RTE-IV EMA and RTE-6 VMA instructions share the same address space, so a
         given machine can run one or the other, but not both.
 
+     2. The EMA diagnostic (92067-16013) reports bogus MMAP failures if it is
+        not loaded at the start of its partition (e.g., because of a LOADR "LO"
+        command).  The "ICMPS" map comparison check in the diagnostic assumes
+        that the starting page of the program's partition contains the first
+        instruction of the program and prints "MMAP ERROR" if it does not.
+
    Additional references:
     - RTE-IVB Programmer's Reference Manual (92068-90004, Dec-1983).
     - RTE-IVB Technical Specifications (92068-90013, Jan-1980).
@@ -813,10 +819,11 @@ static const OP_PAT op_ema[16] = {
 /* calculate the 32 bit EMA subscript for an array */
 static t_bool cpu_ema_resolve(uint32 dtbl,uint32 atbl,uint32* sum)
 {
-int32 sub, act, low, sz;
+int32 sub, act, low, sz, ndim;
 uint32 MA, base;
 
-int32 ndim = SEXT(ReadW(dtbl++));                       /* # dimensions */
+ndim = ReadW(dtbl++);                                   /* # dimensions */
+ndim = SEXT(ndim);                                      /* sign extend */
 if (ndim < 0) return FALSE;                             /* invalid? */
 
 *sum = 0;                                               /* accu for index calc */
