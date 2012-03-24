@@ -25,9 +25,9 @@
 
    lpt          line printer
 
-   09-Jun-07    RMS     Fixed lost last print line (from Theo Engel)
+   09-Jun-07    RMS     Fixed lost last print line (Theo Engel)
    19-Jan-06    RMS     Added UNIT_TEXT flag
-   03-Apr-06    RMS     Fixed bug in blanks backscanning (from Theo Engel)
+   03-Apr-06    RMS     Fixed bug in blanks backscanning (Theo Engel)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
    24-Oct-03    RMS     Added DMA/DMC support
    25-Apr-03    RMS     Revised for extended file support

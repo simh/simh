@@ -27,7 +27,7 @@
 
    15-Sep-11    RMS     Fixed integer overflow bug in EMODH
                         Fixed POLYH normalizing before add mask bug
-                        (both from Camiel Vanderhoeven)
+                        (Camiel Vanderhoeven)
    28-May-08    RMS     Inlined physical memory routines
    10-May-06    RMS     Fixed bug in reported VA on faulting cross-page write
    03-May-06    RMS     Fixed MNEGH to test negated sign, clear C
@@ -40,7 +40,7 @@
                         Fixed fp add routine to test for zero via fraction
                          to support "denormal" argument from POLYH
                         Fixed EMODH to concatenate 15b of 16b extension
-                        (all reported by Tim Stark)
+                        (Tim Stark)
    15-Jul-04    RMS     Cloned from 32b VAX floating point implementation
 */
 

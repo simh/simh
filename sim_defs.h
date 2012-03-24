@@ -244,6 +244,7 @@ typedef uint32          t_addr;
 #define SCPE_AFAIL      (SCPE_BASE + 42)                /* assert failed */
 #define SCPE_KFLAG      0010000                         /* tti data flag */
 #define SCPE_BREAK      0020000                         /* tti break flag */
+#define SCPE_DOFAILED   0040000                         /* fail in DO, not subproc */
 
 /* Print value format codes */
 

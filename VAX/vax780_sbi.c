@@ -27,8 +27,8 @@
 
    sbi                  bus controller
 
-   21-Mar-2011  RMS     Added autoreboot capability (from Mark Pizzalato)
-   31-May-2008  RMS     Fixed machine_check calling sequence (found by Peter Schorn)
+   21-Mar-2011  RMS     Added autoreboot capability (Mark Pizzalato)
+   31-May-2008  RMS     Fixed machine_check calling sequence (Peter Schorn)
    03-May-2006  RMS     Fixed writes to ACCS
    28-May-2008  RMS     Inlined physical memory routines
 */

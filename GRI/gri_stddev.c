@@ -29,7 +29,7 @@
    hsp          S42-006 high speed punch
    rtc          real time clock
 
-   31-May-08    RMS     Fixed declarations (found by Peter Schorn)
+   31-May-08    RMS     Fixed declarations (Peter Schorn)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    22-Nov-05    RMS     Revised for new terminal processing routines
    29-Dec-03    RMS     Added support for console backpressure

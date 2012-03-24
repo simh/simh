@@ -944,7 +944,7 @@ t_stat load_cr_boot (int drvno, int switches)
 #ifdef GUI_SUPPORT
 		remark_cmd(msg);
 #else
-		printf(msg);
+		printf("%s", msg);
 #endif
 	}
 

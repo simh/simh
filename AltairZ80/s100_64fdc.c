@@ -86,7 +86,7 @@ typedef struct {
     uint8 ipend;        /* Interrupt Pending Register */
 } CROMFDC_INFO;
 
-extern WD179X_INFO_PUB *wd179x_info;
+extern WD179X_INFO_PUB *wd179x_infop;
 
 static CROMFDC_INFO cromfdc_info_data = { { 0xC000, CROMFDC_ROM_SIZE, 0x3, 2 } };
 static CROMFDC_INFO *cromfdc_info = &cromfdc_info_data;
@@ -1580,28 +1580,28 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
     if(io) { /* I/O Write */
         switch(data & 0x0F) {
         case 0:
-            wd179x_info->sel_drive = 0xFF;
+            wd179x_infop->sel_drive = 0xFF;
             break;
         case CROMFDC_CTRL_DS1:
-            wd179x_info->sel_drive = 0;
+            wd179x_infop->sel_drive = 0;
             break;
         case CROMFDC_CTRL_DS2:
-            wd179x_info->sel_drive = 1;
+            wd179x_infop->sel_drive = 1;
             break;
         case CROMFDC_CTRL_DS3:
-            wd179x_info->sel_drive = 2;
+            wd179x_infop->sel_drive = 2;
             break;
         case CROMFDC_CTRL_DS4:
-            wd179x_info->sel_drive = 3;
+            wd179x_infop->sel_drive = 3;
             break;
         default:
             sim_debug(STATUS_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL  = 0x%02x: Invalid drive selected.\n", PCX, data & 0xFF);
             break;
         }
         if(data & CROMFDC_CTRL_MAXI) {
-            wd179x_info->drivetype = 8;
+            wd179x_infop->drivetype = 8;
         } else {
-            wd179x_info->drivetype = 5;
+            wd179x_infop->drivetype = 5;
         }
 
         if(data & CROMFDC_CTRL_MTRON) {
@@ -1613,10 +1613,10 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
             if(crofdc_type == 4) { /* 4FDC */
                 sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: Cannot set double density on 4FDC\n", PCX);
             } else {
-                wd179x_info->ddens = 1;
+                wd179x_infop->ddens = 1;
             }
         } else {
-            wd179x_info->ddens = 0;
+            wd179x_infop->ddens = 0;
         }
         if(data & CROMFDC_CTRL_AUTOWAIT) {
             cromfdc_info->autowait = 1;
@@ -1624,11 +1624,11 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
             cromfdc_info->autowait = 0;
         }
 
-        sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: sel_drive=%d, drivetype=%d, motor=%d, dens=%d, aw=%d\n", PCX, wd179x_info->sel_drive, wd179x_info->drivetype, cromfdc_info->motor_on, wd179x_info->ddens, cromfdc_info->autowait);
+        sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: sel_drive=%d, drivetype=%d, motor=%d, dens=%d, aw=%d\n", PCX, wd179x_infop->sel_drive, wd179x_infop->drivetype, cromfdc_info->motor_on, wd179x_infop->ddens, cromfdc_info->autowait);
     } else { /* I/O Read */
         result = (crofdc_boot) ? 0 : CROMFDC_FLAG_BOOT;
-        result |= (wd179x_info->intrq) ? CROMFDC_FLAG_EOJ : 0;
-        result |= (wd179x_info->drq) ? CROMFDC_FLAG_DRQ : 0;
+        result |= (wd179x_infop->intrq) ? CROMFDC_FLAG_EOJ : 0;
+        result |= (wd179x_infop->drq) ? CROMFDC_FLAG_DRQ : 0;
         if(crofdc_type != 50) { /* Cromemco Controller */
             result |= (motor_timeout < MOTOR_TO_LIMIT) ? CROMFDC_FLAG_SEL_REQ : 0;
             if(crofdc_type > 4) { /* 16, 64FDC */
@@ -1639,7 +1639,7 @@ static int32 cromfdc_control(const int32 port, const int32 io, const int32 data)
                 result |= 0x1E; /* Make unused bits '1' on 4FDC */
             }
         } else { /* CCS 2422 Controller */
-            switch(wd179x_info->sel_drive) {
+            switch(wd179x_infop->sel_drive) {
                 case 1:
                     result |= 0x02;
                     break;
@@ -1677,10 +1677,10 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
                     if(crofdc_type == 4) { /* 4FDC */
                         sim_debug(DRIVE_MSG, &cromfdc_dev, "CROMFDC: " ADDRESS_FORMAT " WR CTRL: Cannot set side 1 on 4FDC\n", PCX);
                     } else {
-                        wd179x_info->fdc_head = 1;
+                        wd179x_infop->fdc_head = 1;
                     }
                 } else {
-                    wd179x_info->fdc_head = 0;
+                    wd179x_infop->fdc_head = 0;
                 }
 #if 0   /* hharte - nothing implemented for these */
                 if((data & CROMFDC_AUX_EJECT) == 0) {
@@ -1700,9 +1700,9 @@ static int32 cromfdc_ext(const int32 port, const int32 io, const int32 data)
                 }
             } else { /* CCS 2422 Controller */
                 if((data & CCSFDC_CMD_SIDE) == 0) {
-                    wd179x_info->fdc_head = 1;
+                    wd179x_infop->fdc_head = 1;
                 } else {
-                    wd179x_info->fdc_head = 0;
+                    wd179x_infop->fdc_head = 0;
                 }
 
             }

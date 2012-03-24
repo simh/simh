@@ -253,14 +253,14 @@ t_stat rl_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
 static void rlv_maint (void);
 t_stat rl_detach (UNIT *uptr);
 t_stat rl_set_cover (UNIT *, int32, char *, void *);
-t_stat rl_show_cover (FILE *, UNIT *, int, void *);
+t_stat rl_show_cover (FILE *, UNIT *, int32, void *);
 t_stat rl_set_load (UNIT *, int32, char *, void *);
-t_stat rl_show_load (FILE *, UNIT *, int, void *);
-t_stat rl_show_dstate (FILE *, UNIT *, int, void *);
+t_stat rl_show_load (FILE *, UNIT *, int32, void *);
+t_stat rl_show_dstate (FILE *, UNIT *, int32, void *);
 #if defined (VM_PDP11)
 t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc);
 #endif
-t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int val, void *desc);
+t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* RL11 data structures
 
@@ -530,7 +530,7 @@ max 17ms for 1 track seek w/head switch
             rlmp2 = rlmp1 = rlmp;
             if (DEBUG_PRS (rl_dev))
                 fprintf (sim_deb, ">>RL GSTA: rlds=%06o drv=%ld\n",
-                    rlmp, uptr - rl_dev.units);
+                    rlmp, (long)(uptr - rl_dev.units));
             rl_set_done (0);                        /* done */
             break;
         default:                                    /* data transfer */
@@ -1043,7 +1043,7 @@ t_stat rl_set_cover (UNIT *uptr, int32 val, char *cptr, void *desc)
     return (SCPE_OK);
 }
 
-t_stat rl_show_cover (FILE *st, UNIT *uptr, int val, void *desc)
+t_stat rl_show_cover (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
     fprintf (st, "cover %s", (uptr->STAT & RLDS_CVO) ? "open" : "closed");
     return (SCPE_OK);
@@ -1072,14 +1072,14 @@ t_stat rl_set_load (UNIT *uptr, int32 val, char *cptr, void *desc)
     return (SCPE_OK);
 }
 
-t_stat rl_show_load (FILE *st, UNIT *uptr, int val, void *desc)
+t_stat rl_show_load (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
     fprintf (st, "load %s",
         ((uptr->STAT & RLDS_M_STATE) != RLDS_LOAD) ? "set" : "reset");
     return (SCPE_OK);
 }
 
-t_stat rl_show_dstate (FILE *st, UNIT *uptr, int val, void *desc)
+t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
     int32   cnt;
 
@@ -1121,7 +1121,7 @@ t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc)
 #endif
 
 /* SHOW RL will display the controller type */
-t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int val, void *desc)
+t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
     char    *s = "RLV12";
 	

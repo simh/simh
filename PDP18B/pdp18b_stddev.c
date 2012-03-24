@@ -53,7 +53,7 @@
    22-Dec-02    RMS     Added break support
    01-Nov-02    RMS     Added 7B/8B support to terminal
    05-Oct-02    RMS     Added DIBs, device number support, IORS call
-   14-Jul-02    RMS     Added ASCII reader/punch support (from Hans Pufal)
+   14-Jul-02    RMS     Added ASCII reader/punch support (Hans Pufal)
    30-May-02    RMS     Widened POS to 32b
    29-Nov-01    RMS     Added read only unit support
    25-Nov-01    RMS     Revised interrupt structure

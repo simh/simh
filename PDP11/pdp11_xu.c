@@ -553,7 +553,6 @@ t_stat xu_system_id (CTLR* xu, const ETH_MAC dest, uint16 receipt_id)
 t_stat xu_svc(UNIT* uptr)
 {
   int queue_size;
-  t_stat status;
   CTLR* xu = xu_unit2ctlr(uptr);
   const ETH_MAC mop_multicast = {0xAB, 0x00, 0x00, 0x02, 0x00, 0x00};
   const int one_second = clk_tps * tmr_poll;
@@ -568,7 +567,7 @@ t_stat xu_svc(UNIT* uptr)
     {
     queue_size = xu->var->ReadQ.count;
     /* read a packet from the ethernet - processing is via the callback */
-    status = eth_read (xu->var->etherface, &xu->var->read_buffer, xu->var->rcallback);
+    eth_read (xu->var->etherface, &xu->var->read_buffer, xu->var->rcallback);
   } while (queue_size != xu->var->ReadQ.count);
 
   /* Now pump any still queued packets into the system */
@@ -578,7 +577,7 @@ t_stat xu_svc(UNIT* uptr)
   /* send identity packet when timer expires */
   if (--xu->var->idtmr <= 0) {
     if ((xu->var->mode & MODE_DMNT) == 0)           /* if maint msg is not disabled */
-      status = xu_system_id(xu, mop_multicast, 0);  /*   then send ID packet */
+      xu_system_id(xu, mop_multicast, 0);           /*   then send ID packet */
     xu->var->idtmr = XU_ID_TIMER_VAL * one_second;  /* reset timer */
   }
 
@@ -627,7 +626,6 @@ void xu_setclrint(CTLR* xu, int32 bits)
 
 t_stat xu_sw_reset (CTLR* xu)
 {
-  t_stat status;
   int i;
 
   sim_debug(DBG_TRC, xu->dev, "xu_sw_reset()\n");
@@ -668,9 +666,9 @@ t_stat xu_sw_reset (CTLR* xu)
     xu->var->setup.macs[1][i] = 0xff; /* Broadcast Address */
   xu->var->setup.mac_count = 2;
   if (xu->var->etherface)
-    status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
-                         xu->var->setup.macs, xu->var->setup.multicast,
-                         xu->var->setup.promiscuous);
+    eth_filter (xu->var->etherface, xu->var->setup.mac_count,
+                xu->var->setup.macs, xu->var->setup.multicast,
+                xu->var->setup.promiscuous);
 
   /* activate device if not disabled */
   if ((xu->dev->flags & DEV_DIS) == 0) {
@@ -708,7 +706,7 @@ int32 xu_command(CTLR* xu)
   uint32 udbb;
   int fnc, mtlen, i, j;
   uint16 value, pltlen;
-  t_stat status, rstatus, wstatus, wstatus2, wstatus3;
+  t_stat rstatus, wstatus, wstatus2, wstatus3;
   struct xu_stats* stats = &xu->var->stats;
   uint16* udb = xu->var->udb;
   uint16* mac_w = (uint16*) xu->var->mac;
@@ -795,9 +793,9 @@ int32 xu_command(CTLR* xu)
       rstatus = Map_ReadB(udbb, mtlen * 6, (uint8*) &xu->var->setup.macs[2]);
       if (rstatus == 0) {
         xu->var->setup.mac_count = mtlen + 2;
-        status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
-                             xu->var->setup.macs, xu->var->setup.multicast,
-                             xu->var->setup.promiscuous);
+        eth_filter (xu->var->etherface, xu->var->setup.mac_count,
+                    xu->var->setup.macs, xu->var->setup.multicast,
+                    xu->var->setup.promiscuous);
       } else {
         xu->var->pcsr0 |= PCSR0_PCEI;
       }
@@ -922,9 +920,9 @@ int32 xu_command(CTLR* xu)
 
       /* if promiscuous or multicast flags changed, change filter */
       if ((value ^ xu->var->mode) & (MODE_PROM | MODE_ENAL))
-        status = eth_filter (xu->var->etherface, xu->var->setup.mac_count,
-                             xu->var->setup.macs, xu->var->setup.multicast,
-                             xu->var->setup.promiscuous);
+        eth_filter (xu->var->etherface, xu->var->setup.mac_count,
+                    xu->var->setup.macs, xu->var->setup.multicast,
+                    xu->var->setup.promiscuous);
       break;
 
     case FC_RSTAT:			/* read extended status */
@@ -1339,7 +1337,6 @@ void xu_port_command (CTLR* xu)
   char* msg;
   int command = xu->var->pcsr0 & PCSR0_PCMD;
   int state = xu->var->pcsr1 & PCSR1_STATE;
-  int bits;
   static char* commands[] = {
       "NO-OP",
       "GET PCBB",
@@ -1368,7 +1365,7 @@ void xu_port_command (CTLR* xu)
       break;
 
     case CMD_GETCMD:		/* GET COMMAND */
-      bits = xu_command(xu);
+      xu_command(xu);
       xu->var->pcsr0 |= PCSR0_DNI;
       break;
 
@@ -1571,7 +1568,10 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
   strcpy(tptr, cptr);
 
   xu->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
-  if (!xu->var->etherface) return SCPE_MEM;
+  if (!xu->var->etherface) {
+    free(tptr);
+    return SCPE_MEM;
+    }
 
   status = eth_open(xu->var->etherface, cptr, xu->dev, DBG_ETH);
   if (status != SCPE_OK) {
@@ -1587,6 +1587,8 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
     printf("%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     eth_close(xu->var->etherface);
+    free(tptr);
+    xu->var->etherface = 0;
     return SCPE_NOATT;
   }
   uptr->filename = tptr;
@@ -1603,12 +1605,11 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
 
 t_stat xu_detach(UNIT* uptr)
 {
-  t_stat status;
   CTLR* xu = xu_unit2ctlr(uptr);
   sim_debug(DBG_TRC, xu->dev, "xu_detach()\n");
 
   if (uptr->flags & UNIT_ATT) {
-    status = eth_close (xu->var->etherface);
+    eth_close (xu->var->etherface);
     free(xu->var->etherface);
     xu->var->etherface = 0;
     free(uptr->filename);

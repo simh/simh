@@ -1,6 +1,6 @@
 /* h316_dp.c: Honeywell 4623, 4651, 4720 disk simulator
 
-   Copyright (c) 2003-2008, Robert M. Supnik
+   Copyright (c) 2003-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,8 @@
                 4651 disk subsystem
                 4720 disk subsystem
 
-   04-Sep-05    RMS     Fixed missing return (found by Peter Schorn)
+   19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
+   04-Sep-05    RMS     Fixed missing return (Peter Schorn)
    15-Jul-05    RMS     Fixed bug in attach routine
    01-Dec-04    RMS     Fixed bug in skip on !seeking
 
@@ -215,7 +216,8 @@ static struct drvtyp dp_tab[] = {
     { DP_DRV (4720) }
     };
 
-extern int32 dev_int, dev_enb, chan_req;
+extern int32 dev_int, dev_enb;
+extern uint32 chan_req;
 extern int32 stop_inst;
 extern uint32 dma_ad[DMA_MAX];
 extern int32 sim_switches;

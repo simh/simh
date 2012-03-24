@@ -26,7 +26,7 @@
    qba          Qbus adapter
 
    28-May-08    RMS     Inlined physical memory routines
-   25-Jan-08    RMS     Fixed declarations (from Mark Pizzolato)
+   25-Jan-08    RMS     Fixed declarations (Mark Pizzolato)
    03-Dec-05    RMS     Added SHOW QBA VIRT and ex/dep via map
    05-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
@@ -34,11 +34,11 @@
                         Moved mem_err, crd_err interrupts here from vax_cpu.c
    09-Sep-04    RMS     Integrated powerup into RESET (with -p)
    05-Sep-04    RMS     Added CRD interrupt handling
-   28-May-04    RMS     Revised I/O dispatching (from John Dundas)
+   28-May-04    RMS     Revised I/O dispatching (John Dundas)
    21-Mar-04    RMS     Added RXV21 support
    21-Dec-03    RMS     Fixed bug in autoconfigure vector assignment; added controls
-   21-Nov-03    RMS     Added check for interrupt slot conflict (found by Dave Hittner)
-   29-Oct-03    RMS     Fixed WriteX declaration (found by Mark Pizzolato)
+   21-Nov-03    RMS     Added check for interrupt slot conflict (Dave Hittner)
+   29-Oct-03    RMS     Fixed WriteX declaration (Mark Pizzolato)
    19-Apr-03    RMS     Added optimized byte and word DMA routines
    12-Mar-03    RMS     Added logical name support
    22-Dec-02    RMS     Added console halt support

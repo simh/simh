@@ -1,6 +1,6 @@
 /* i7094_io.c: IBM 7094 I/O subsystem (channels)
 
-   Copyright (c) 2003-2006, Robert M. Supnik
+   Copyright (c) 2003-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    chana..chanh         I/O channels
+
+   19-Mar-12    RMS     Fixed declaration of breakpoint variables (Mark Pizzolato)
 
    Notes on channels and CTSS.
 
@@ -86,7 +88,7 @@ extern DEVICE mt_dev[NUM_CHAN];
 extern DEVICE drm_dev;
 extern DEVICE dsk_dev;
 extern DEVICE com_dev;
-extern int32 sim_brk_summ;
+extern uint32 sim_brk_summ;
 
 t_stat ch_reset (DEVICE *dptr);
 t_stat ch6_svc (UNIT *uptr);
@@ -834,10 +836,12 @@ return SCPE_OK;
 
 t_stat ch_op_store_diag (uint32 ch, t_uint64 *dat)
 {
+extern t_uint64 drm_sdc (uint32 ch);
+
 if ((ch >= NUM_CHAN) || (ch_dev[ch].flags & DEV_DIS))
     return STOP_NXCHN;
 if (ch_flags[ch] & DEV_7289)
-    *dat = ind_ioc? SIGN: 0;
+    *dat = drm_sdc (ch);
 else if (ch_flags[ch] & DEV_7909)
     *dat = (((t_uint64) (ch_lcc[ch] & CHF_M_LCC)) << CHF_V_LCC) | 
         (ch_flags[ch] & CHF_SDC_7909);

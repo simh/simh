@@ -26,7 +26,7 @@
    lpt          1403 line printer
 
    19-Jan-07    RMS     Added UNIT_TEXT flag
-   07-Mar-05    RMS     Fixed bug in write_line (reported by Van Snyder)
+   07-Mar-05    RMS     Fixed bug in write_line (Van Snyder)
    25-Apr-03    RMS     Revised for extended file support
    30-May-02    RMS     Widened POS to 32b
    13-Apr-01    RMS     Revised for register arrays

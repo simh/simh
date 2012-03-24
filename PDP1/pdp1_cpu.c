@@ -1,6 +1,6 @@
 /* pdp1_cpu.c: PDP-1 CPU simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,10 +25,11 @@
 
    cpu          PDP-1 central processor
 
-   30-May-07    RMS     Fixed typo in SBS clear (from Norm Lastovica)
+   210Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
+   30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
    28-Jun-06    RMS     Fixed bugs in MUS and DIV
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Nov-04    RMS     Added instruction history
    07-Sep-03    RMS     Added additional explanation on I/O simulation
@@ -1406,7 +1407,7 @@ else {                                                  /* multi-level */
         return STOP_IND;
     }                                                   /* end else !extm */
 if (IR & IA) {                                          /* automatic mode? */
-    if (rm & !sbs_act & ((MB & 0607777) == 0607777))    /* page cross? */
+    if (rm && !sbs_act && ((MB & 0607777) == 0607777))  /* page cross? */
         return set_rmv (RTB_CHR);
     MB = inc_bp (MB);                                   /* incr byte ptr */
     Write ();                                           /* rewrite */

@@ -1,6 +1,6 @@
 /* i7094_mt.c: IBM 7094 magnetic tape simulator
 
-   Copyright (c) 2003-2008, Robert M Supnik
+   Copyright (c) 2003-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    mt           magtape simulator
 
-   16-Jul-10    RMS     Fixed handling of BSR, BSF (from Dave Pitts)
+   19-Mar-12    RMS     Fixed declaration of sel_name (Mark Pizzolato)
+   16-Jul-10    RMS     Fixed handling of BSR, BSF (Dave Pitts)
 */
 
 #include "i7094_defs.h"
@@ -72,7 +73,7 @@ extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
 extern FILE *sim_deb;
-extern char *sel_name[];
+extern const char *sel_name[];
 
 t_stat mt_chsel (uint32 ch, uint32 sel, uint32 unit);
 t_stat mt_chwr (uint32 ch, t_uint64 val, uint32 flags);

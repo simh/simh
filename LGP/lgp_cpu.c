@@ -25,8 +25,8 @@
 
    cpu          LGP-30 [LGP-21] CPU
 
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
-   04-Sep-05    RMS     Fixed missing returns (found by Peter Schorn)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
+   04-Sep-05    RMS     Fixed missing returns (Peter Schorn)
    04-Jan-05    RMS     Modified VM pointer setup
 
    The system state for the LGP-30 [LGP-21] is:

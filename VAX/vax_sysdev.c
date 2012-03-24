@@ -32,10 +32,10 @@
    cso          console storage output
    sysd         system devices (SSC miscellany)
 
-   23-Dec-10    RMS     Added power clear call to boot routine (from Mark Pizzolato)
+   23-Dec-10    RMS     Added power clear call to boot routine (Mark Pizzolato)
    25-Oct-05    RMS     Automated CMCTL extended memory
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   10-Mar-05    RMS     Fixed bug in timer schedule routine (from Mark Hittinger)
+   10-Mar-05    RMS     Fixed bug in timer schedule routine (Mark Hittinger)
    30-Sep-04    RMS     Moved CADR, MSER, CONPC, CONPSL, machine_check, cpu_boot,
                          con_halt here from vax_cpu.c
                         Moved model-specific IPR's here from vax_cpu1.c
@@ -46,10 +46,10 @@
                         Fixed calibration problems interval timer (Mark Pizzolato)
    12-May-03    RMS     Fixed compilation warnings from VC.Net
    23-Apr-03    RMS     Revised for 32b/64b t_addr
-   19-Aug-02    RMS     Removed unused variables (found by David Hittner)
+   19-Aug-02    RMS     Removed unused variables (David Hittner)
                         Allowed NVR to be attached to file
    30-May-02    RMS     Widened POS to 32b
-   28-Feb-02    RMS     Fixed bug, missing end of table (found by Lars Brinkhoff)
+   28-Feb-02    RMS     Fixed bug, missing end of table (Lars Brinkhoff)
 */
 
 #include "vax_defs.h"

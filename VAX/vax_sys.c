@@ -26,7 +26,7 @@
    21-Mar-11    RMS     Modified string for STOP_BOOT message
    19-Nov-08    RMS     Moved bad block routine to I/O library
    03-Nov-05    RMS     Added 780 stop codes
-   04-Sep-05    RMS     Fixed missing assignment (found by Peter Schorn)
+   04-Sep-05    RMS     Fixed missing assignment (Peter Schorn)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    15-Sep-04    RMS     Fixed bugs in character display and parse
    30-Sep-04    RMS     Fixed bugs in parsing indirect displacement modes

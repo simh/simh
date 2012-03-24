@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   21-Mar-12    RMS     Fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Oct-06    RMS     Synced PASLA to clock
@@ -345,7 +346,7 @@ for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
             else {                                      /* normal */
                 out = c & 0x7F;                         /* echo is 7b */
                 c = sim_tt_inpcvt (c, TT_GET_MODE (pasl_unit[ln].flags));
-                if (TT_GET_MODE (pasl_unit[ln].flags) != TT_MODE_8B)
+                if (TT_GET_MODE (pasl_unit[ln].flags) != TTUF_MODE_8B)
                     c = pas_par (pas_cmd[ln], c);       /* apply parity */
                 pas_rbuf[ln] = c;                       /* save char */
                 pas_rchp[ln] = 1;                       /* char pending */
@@ -378,7 +379,7 @@ uint32 ln = uptr - pasl_unit;                           /* line # */
 if (pas_ldsc[ln].conn) {                                /* connected? */
     if (pas_ldsc[ln].xmte) {                            /* xmt enabled? */
         TMLN *lp = &pas_ldsc[ln];                       /* get line */
-        if (TT_GET_MODE (pasl_unit[ln].flags) == TT_MODE_8B)
+        if (TT_GET_MODE (pasl_unit[ln].flags) == TTUF_MODE_8B)
             c = pas_par (pas_cmd[ln], pas_xbuf[ln]);    /* apply parity */
         else c = sim_tt_outcvt (pas_xbuf[ln], TT_GET_MODE (pasl_unit[ln].flags));
         if (c >= 0) {

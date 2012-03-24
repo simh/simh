@@ -36,16 +36,16 @@
    This allows cards to be created and edited as normal files.
 
    24-Mar-09    RMS     Fixed read stacker operation in column binary mode
-                        Fixed punch stacker operation (from Van Snyder)
+                        Fixed punch stacker operation (Van Snyder)
    28-Jun-07    RMS     Added support for SS overlap modifiers
    19-Jan-07    RMS     Added UNIT_TEXT flag
    20-Sep-05    RMS     Revised for new code tables, compatible colbinary treatment
    30-Aug-05    RMS     Fixed read, punch to ignore modifier on 1,4 char inst
-                        (reported by Van Snyder)
+                        (Van Snyder)
    14-Nov-04    WVS     Added column binary support
    25-Apr-03    RMS     Revised for extended file support
    30-May-02    RMS     Widened POS to 32b
-   30-Jan-02    RMS     New zero footprint card bootstrap from Van Snyder
+   30-Jan-02    RMS     New zero footprint card bootstrap (Van Snyder)
    29-Nov-01    RMS     Added read only unit support
    13-Apr-01    RMS     Revised for register arrays
 */

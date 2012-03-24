@@ -26,7 +26,7 @@
    31-Dec-11    RMS     Refined PSE and MSE user-mode protection based on
                         CTSS RPQ specification
                         Select traps have priority over protection traps
-   16-Jul-10    RMS     Fixed PSE and MSE user-mode protection (from Dave Pitts)
+   16-Jul-10    RMS     Fixed PSE and MSE user-mode protection (Dave Pitts)
                         Added SPUx, SPTx, SPRx
 */
 

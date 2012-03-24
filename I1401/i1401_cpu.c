@@ -24,21 +24,21 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    19-Mar-11    RMS     Reverted multiple tape indicator implementation
-   20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (from Van Snyder)
+   20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (Van Snyder)
    07-Nov-10    RMS     Fixed divide not to clear word marks in quotient
-   24-Apr-10    RMS     Revised divide algorithm (from Van Snyder)
-   11-Jul-08    RMS     Added missing A magtape modifier (from Van Snyder)
-                        Fixed tape indicator implementation (from Bob Abeles)
-                        Fixed bug in ZA and ZS (from Bob Abeles)
+   24-Apr-10    RMS     Revised divide algorithm (Van Snyder)
+   11-Jul-08    RMS     Added missing A magtape modifier (Van Snyder)
+                        Fixed tape indicator implementation (Bob Abeles)
+                        Fixed bug in ZA and ZS (Bob Abeles)
    07-Jul-07    RMS     Removed restriction on load-mode binary tape
    28-Jun-07    RMS     Added support for SS overlap modifiers
-   22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
-   06-Mar-06    RMS     Fixed bug in divide (found by Van Snyder)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
+   06-Mar-06    RMS     Fixed bug in divide (Van Snyder)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    01-Sep-05	RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
-                        (reported by Ralph Reinke)
+                        (Ralph Reinke)
    14-Nov-04    WVS     Added column binary support, debug support
    06-Nov-04    RMS     Added instruction history
    12-Jul-03    RMS     Moved ASCII/BCD tables to included file

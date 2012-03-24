@@ -1,6 +1,6 @@
 /* vax_fpa.c - VAX f_, d_, g_floating instructions
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   23-Mar-12    RMS     Fixed missing arguments in 32b floating add (Mark Pizzolato)
    15-Sep-11    RMS     Fixed integer overflow bug in EMODx
                         Fixed POLYx normalizing before add mask bug
-                        (both from Camiel Vanderhoeven)
+                        (Camiel Vanderhoeven)
    28-May-08    RMS     Inlined physical memory routines
    16-May-06    RMS     Fixed bug in 32b floating multiply routine
                         Fixed bug in 64b extended modulus routine
@@ -37,8 +38,8 @@
                         Fixed POLYF, POLYD, POLYG to mask mul reslt to 31b/63b/63b
                         Fixed fp add routine to test for zero via fraction
                          to support "denormal" argument from POLYF, POLYD, POLYG
-                        (all reported by Tim Stark)
-   27-Sep-05    RMS     Fixed bug in 32b structure definitions (from Jason Stevens)
+                        (Tim Stark)
+   27-Sep-05    RMS     Fixed bug in 32b structure definitions (Jason Stevens)
    30-Sep-04    RMS     Comment and formating changes based on vax_octa.c
    18-Apr-04    RMS     Moved format definitions to vax_defs.h
    19-Jun-03    RMS     Simplified add algorithm
@@ -906,7 +907,7 @@ return rpackg (&a, flo);                                /* return frac */
 
 /* Floating add */
 
-void vax_fadd (UFP *a, UFP *b)
+void vax_fadd (UFP *a, UFP *b, uint32 mhi, uint32 mlo)
 {
 int32 ediff;
 UFP t;

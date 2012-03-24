@@ -417,8 +417,8 @@ static uint8 MFDC_Read(const uint32 Addr)
             if(mfdc_info->datacount == 0) {
                 unsigned int i, checksum;
                 unsigned long sec_offset;
-                unsigned int flags;
-                unsigned int readlen;
+                uint32 flags;
+                uint32 readlen;
 
                 /* Clear out unused portion of sector. */
                 memset(&sdata.u.unused[0], 0x00, 10);
@@ -516,8 +516,8 @@ static uint8 MFDC_Read(const uint32 Addr)
 static uint8 MFDC_Write(const uint32 Addr, uint8 cData)
 {
     unsigned int sec_offset;
-    unsigned int flags = 0;
-    unsigned int writelen;
+    uint32 flags = 0;
+    uint32 writelen;
     MFDC_DRIVE_INFO *pDrive;
 
     pDrive = &mfdc_info->drive[mfdc_info->sel_drive];

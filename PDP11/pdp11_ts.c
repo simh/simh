@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2010, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,9 @@
 
    ts           TS11/TSV05 magtape
 
+   19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
-                        (found by Mark Pizzolato)
+                        (Mark Pizzolato)
    16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -59,7 +60,7 @@
    19-Sep-01    RMS     Fixed bug in bootstrap
    15-Sep-01    RMS     Fixed bug in NXM test
    07-Sep-01    RMS     Revised device disable and interrupt mechanism
-   13-Jul-01    RMS     Fixed bug in space reverse (found by Peter Schorn)
+   13-Jul-01    RMS     Fixed bug in space reverse (Peter Schorn)
 
    Magnetic tapes are represented as a series of variable 8b records
    of the form:
@@ -96,7 +97,7 @@
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 #define TS_DIS          DEV_DIS                         /* off by default */
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #include "sim_tape.h"

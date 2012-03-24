@@ -25,7 +25,7 @@
 
    dz           DZ11 terminal multiplexor
 
-   29-Dec-08    RMS     Added MTAB_NC to SET LOG command (found by Walter Mueller)
+   29-Dec-08    RMS     Added MTAB_NC to SET LOG command (Walter Mueller)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock

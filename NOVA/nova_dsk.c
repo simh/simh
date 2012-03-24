@@ -29,7 +29,7 @@
                         DEV_xxx macros now used for consistency,
                         added secret DG DIC function,
                         fixed boot info table size calculation
-   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
+   15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    26-Jul-03    RMS     Fixed bug in set size routine
    14-Mar-03    RMS     Fixed variable capacity interaction with save/restore

@@ -34,10 +34,10 @@
                         'ind_max' changed from 16 to 65536 for better unmapped system compatibility,
                         INT_TRAP added for Nova 3, 4 trap instruction handling,
    28-Apr-07    RMS     Removed clock initialization
-   06-Feb-06    RMS     Fixed bug in DIVS (found by Mark Hittinger)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   06-Feb-06    RMS     Fixed bug in DIVS (Mark Hittinger)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS case 2^31 / - 1
-   14-Jan-04    RMS     Fixed device enable/disable support (found by Bruce Ray)
+   14-Jan-04    RMS     Fixed device enable/disable support (Bruce Ray)
    19-Jan-03    RMS     Changed CMASK to CDMASK for Apple Dev Kit conflict
    03-Oct-02    RMS     Added DIB infrastructure
    30-Dec-01    RMS     Added old PC queue

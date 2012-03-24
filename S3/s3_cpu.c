@@ -1,6 +1,6 @@
 /* s3_cpu.c: IBM System/3 CPU simulator
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
    HPL & SLC instruction code Copyright (c) 2001 by Henk Stegeman
    Decimal Arithmetic Copyright (c) 2000 by Roger Bowler
 
@@ -28,6 +28,8 @@
    ------------------------------------------------------------------------------
 
    cpu          System/3 (models 10 and 15)  central processor
+
+   19-Mar-12    RMS     Changed int to int32 in declarations (Mark Pizzolato)
 
    The IBM System/3 was a popular small-business computing system introduced
    in 1969 as an entry-level system for businesses that could not afford
@@ -381,7 +383,7 @@ int32 debug_reg = 0;                                    /* set for debug/trace *
 int32 debug_flag = 0;                                   /* 1 when trace.log open */
 FILE *trace;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -398,13 +400,13 @@ extern t_stat sim_activate (UNIT *uptr, int32 delay);
 extern int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
     UNIT *uptr, int32 sw);
 int32 nulldev (int32 opcode, int32 m, int32 n, int32 data);
-int add_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
+int32 add_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
 int32 subtract_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
 static int32 compare(int32 byte1, int32 byte2, int32 cond);
 static int32 condition(int32 qbyte);
 static void store_decimal (int32 addr, int32 len, uint8 *dec, int sign);
-static void load_decimal (int32 addr, int32 len, uint8 *result, int32 *count, int32 *sign);
-static void add_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int32 *count);
+static void load_decimal (int32 addr, int32 len, uint8 *result, int *count, int *sign);
+static void add_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int *count);
 static void subtract_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int *count, int *sign);
 int32 GetMem(int32 addr);
 int32 PutMem(int32 addr, int32 data);
@@ -1541,7 +1543,7 @@ int     sign1, sign2, sign3;            /* Sign of operands & result */
 /*              This field is set to zero if the result is all zero, */
 /*              or to MAX_DECIMAL_DIGITS+1 if overflow occurred.     */
 /*-------------------------------------------------------------------*/
-static void add_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int32 *count)
+static void add_decimal (uint8 *dec1, uint8 *dec2, uint8 *result, int *count)
 {
 int     d;                              /* Decimal digit             */
 int     i;                              /* Array subscript           */
@@ -1684,7 +1686,7 @@ uint8   *lower;                         /* -> Lower value operand    */
 /*      exception, or if the operand causes a data exception         */
 /*      because of invalid decimal digits or sign.                   */
 /*-------------------------------------------------------------------*/
-static void load_decimal (int32 addr, int32 len, uint8 *result, int32 *count, int32 *sign)
+static void load_decimal (int32 addr, int32 len, uint8 *result, int *count, int *sign)
 {
 int     h;                              /* Hexadecimal digit         */
 int     i, j;                           /* Array subscripts          */

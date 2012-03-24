@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
    13-Jan-11    MP      Added "SHOW SHOW" and "SHOW <dev> SHOW" commands
    05-Jan-11    RMS     Fixed bug in deposit stride for numeric input (John Dundas)
@@ -189,9 +190,8 @@
 #include <signal.h>
 #include <ctype.h>
 
-#if defined(HAVE_READLINE)
-#include <readline/readline.h>
-#include <readline/history.h>
+#if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
+#include <dlfcn.h>
 #endif
 
 #define EX_D            0                               /* deposit */
@@ -1057,6 +1057,7 @@ C1TAB *ctbr, *glbr;
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
     { "BREAK", &brk_cmd, SSH_ST },
+    { "NOBREAK", &brk_cmd, SSH_CL },
     { "TELNET", &sim_set_telnet, 0 },                   /* deprecated */
     { "NOTELNET", &sim_set_notelnet, 0 },               /* deprecated */
     { "LOG", &sim_set_logon, 0 },                       /* deprecated */
@@ -1454,7 +1455,7 @@ return SCPE_OK;
 
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
 {
-int32 u = uptr - dptr->units;
+int32 u = (int32)(uptr - dptr->units);
 
 if (flag > 1)
     fprintf (st, "  %s%d", sim_dname (dptr), u);
@@ -1575,8 +1576,8 @@ for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
         fprintf (st, "  Step timer");
     else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
         fprintf (st, "  %s", sim_dname (dptr));
-        if (dptr->numunits > 1) fprintf (st, " unit %d",
-            (int32) (uptr - dptr->units));
+        if (dptr->numunits > 1)
+            fprintf (st, " unit %d", (int32) (uptr - dptr->units));
         }
     else fprintf (st, "  Unknown");
     fprintf (st, " at %d\n", accum + uptr->time);
@@ -1742,21 +1743,39 @@ return SCPE_OK;
 
 t_stat show_dev_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-int32 any, enb;
+int32 any = 0;
 MTAB *mptr;
 
-any = enb = 0;
 if (dptr->modifiers) {
+    any = 0;
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
+        if (('\0' == *mptr->pstring) ||
+            (0 == (mptr->mask & MTAB_XTD)) ||
+            (0 == (mptr->mask & MTAB_VDV)))     /* Device Option */
+            continue;
         if (any++)
             fprintf (st, ", %s", mptr->pstring);
-        else fprintf (st, "SHOW %s\t%s", sim_dname (dptr), mptr->pstring);
+        else fprintf (st, "sh{ow} %s\t%s", sim_dname (dptr), mptr->pstring);
         }
+    if (any)
+        fprintf (st, "\n");
+    any = 0;
+    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
+        if ((!mptr->disp) || (!mptr->pstring))
+            continue;
+        if (('\0' == *mptr->pstring) ||
+            (0 == (mptr->mask & MTAB_XTD)) ||
+            (0 == (mptr->mask & MTAB_VUN)))     /* Unit Option */
+            continue;
+        if (any++)
+            fprintf (st, ", %s", mptr->pstring);
+        else fprintf (st, "sh{ow} %sn\t%s", sim_dname (dptr), mptr->pstring);
+        }
+    if (any)
+        fprintf (st, "\n");
     }
-if (any)
-    fprintf (st, "\n");
 return SCPE_OK;
 }
 
@@ -2043,7 +2062,7 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     if (uptr->filebuf == NULL)                          /* no buffer? */
         return attach_err (uptr, SCPE_MEM);             /* error */
     if (!sim_quiet) printf ("%s: buffering file in memory\n", sim_dname (dptr));
-    uptr->hwmark = sim_fread (uptr->filebuf,            /* read file */
+    uptr->hwmark = (uint32)sim_fread (uptr->filebuf,    /* read file */
         SZ_D (dptr), cap, uptr->fileref);
     uptr->flags = uptr->flags | UNIT_BUF;               /* set buffered */
     }
@@ -2738,8 +2757,8 @@ t_stat r = 0;
 t_addr k;
 t_value pcval;
 
-if (v >= SCPE_BASE) fprintf (st, "\n%s, %s: ",
-    scp_error_messages[v - SCPE_BASE], pc->name);
+if (v >= SCPE_BASE)
+    fprintf (st, "\n%s, %s: ", scp_error_messages[v - SCPE_BASE], pc->name);
 else fprintf (st, "\n%s, %s: ", sim_stop_messages[v], pc->name);
 pcval = get_rval (pc, 0);
 if (sim_vm_fprint_addr)
@@ -3253,7 +3272,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
             SZ_LOAD (sz, sim_eval[i], uptr->filebuf, loc);
             }
         else {
-            sim_fseek (uptr->fileref, sz * loc, SEEK_SET);
+            sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET);
             sim_fread (&sim_eval[i], sz, 1, uptr->fileref);
             if ((feof (uptr->fileref)) &&
                !(uptr->flags & UNIT_FIX)) {
@@ -3344,7 +3363,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
                 uptr->hwmark = (uint32) loc + 1;
             }
         else {
-            sim_fseek (uptr->fileref, sz * loc, SEEK_SET);
+            sim_fseek (uptr->fileref, (t_addr)(sz * loc), SEEK_SET);
             sim_fwrite (&sim_eval[i], sz, 1, uptr->fileref);
             if (ferror (uptr->fileref)) {
                 clearerr (uptr->fileref);
@@ -3428,15 +3447,40 @@ return read_line_p (NULL, cptr, size, stream);
 char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 {
 char *tptr;
+#if defined(HAVE_DLOPEN)
+static int initialized = 0;
+static char *(*p_readline)(const char *) = NULL;
+static void (*p_add_history)(const char *) = NULL;
 
-#if defined(HAVE_READLINE)
+if (!initialized) {
+    initialized = 1;
+    void *handle;
+
+#define __STR_QUOTE(tok) #tok
+#define __STR(tok) __STR_QUOTE(tok)
+    handle = dlopen("libncurses." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libcurses." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libreadline." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    if (!handle)
+        handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
+    if (handle) {
+        p_readline = dlsym(handle, "readline");
+        p_add_history = dlsym(handle, "add_history");
+        }
+    }
 if (prompt) {                                           /* interactive? */
-    char *tmpc = readline (prompt);                     /* get cmd line */
-    if (tmpc == NULL)                                   /* bad result? */
-        cptr = NULL;
+    if (p_readline) {
+        char *tmpc = p_readline (prompt);               /* get cmd line */
+        if (tmpc == NULL)                               /* bad result? */
+            cptr = NULL;
+        else {
+            strncpy (cptr, tmpc, size);                 /* copy result */
+            free (tmpc) ;                               /* free temp */
+            }
+        }
     else {
-        strncpy (cptr, tmpc, size);                     /* copy result */
-        free (tmpc) ;                                   /* free temp */
+        printf ("%s", prompt);                          /* display prompt */
+        cptr = fgets (cptr, size, stream);              /* get cmd line */
         }
     }
 else cptr = fgets (cptr, size, stream);                 /* get cmd line */
@@ -3462,9 +3506,9 @@ while (isspace (*cptr))                                 /* trim leading spc */
 if (*cptr == ';')                                       /* ignore comment */
     *cptr = 0;
 
-#if defined (HAVE_READLINE)
-if (prompt)
-    add_history (cptr);
+#if defined (HAVE_DLOPEN)
+if (prompt && p_add_history && *cptr)                   /* Save non blank lines in history */
+    p_add_history (cptr);
 #endif
 
 return cptr;
@@ -3841,7 +3885,7 @@ REG *find_reg (char *cptr, char **optr, DEVICE *dptr)
 {
 char *tptr;
 REG *rptr;
-uint32 slnt;
+size_t slnt;
 
 if ((cptr == NULL) || (dptr == NULL) || (dptr->registers == NULL))
     return NULL;
@@ -4036,14 +4080,14 @@ if (*cptr == 0)                                         /* check for clause */
     return NULL;
 for (logop = cmpop = -1; c = *cptr++; ) {               /* loop thru clauses */
     if (sptr = strchr (logstr, c)) {                    /* check for mask */
-        logop = sptr - logstr;
+        logop = (int32)(sptr - logstr);
         logval = strtotv (cptr, &tptr, radix);
         if (cptr == tptr)
             return NULL;
         cptr = tptr;
         }
     else if (sptr = strchr (cmpstr, c)) {               /* check for boolop */
-        cmpop = sptr - cmpstr;
+        cmpop = (int32)(sptr - cmpstr);
         if (*cptr == '=') {
             cmpop = cmpop + strlen (cmpstr);
             cptr++;
@@ -4814,7 +4858,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
 #if defined (_WIN32)
 #define vsnprintf _vsnprintf
 #endif
-#if defined (__DECC) && defined (__VMS)
+#if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__CRTL_VER <= 70311000))
 #define NO_vsnprintf
 #endif
 #if defined( NO_vsnprintf)

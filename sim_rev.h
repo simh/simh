@@ -38,8 +38,8 @@ patch   date            module(s) and fix(es)
 
   0     xx-yyy-1       scp.c:
                         - added *nix READLINE support (Mark Pizzolato)
-                        - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
                         - fixed handling of DO with no arguments (Dave Bryan)
+                        - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
                         - clarified some help messages (Mark Pizzolato)
                         - added "SHOW SHOW" and "SHOW <dev> SHOW" commands (Mark Pizzolato)
                         - fixed bug in deposit stride for numeric input (John Dundas)
@@ -51,8 +51,7 @@ patch   date            module(s) and fix(es)
                         - major revision (Dave Hittner and Mark Pizzolato)
 
                         sim_tmxr.c:
-                        - made telnet option negotiation more reliable.  
-                          VAX works with PuTTY. (Mark Pizzolato)
+                        - made option negotiation more reliable (Mark Pizzolato)
 
                         h316_cpu.c:
                         - fixed bugs in MPY, DIV introduced in 3.8-1 (from Theo Engel)
@@ -97,14 +96,14 @@ patch   date            module(s) and fix(es)
                         hp2100_cpu7.c (Dave Bryan):
                         - Corrected "opsize" parameter type in vis_abs
 
-                        hp2100_defs.h (Dave Bryan):
+                         hp2100_defs.h (Dave Bryan):
                         - Added hp_setsc, hp_showsc functions to support SC modifier
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Revised I/O signal enum values for concurrent signals
                         - Revised I/O macros for new signal handling
                         - Added DA and DC device select code assignments
 
-                        hp2100_di.c (Dave Bryan):
+                        hp2100_di.c, hp2100_di.h (Dave Bryan):
                         - Implemented 12821A HP-IB Disc Interface
 
                         hp2100_di_da.c (Dave Bryan):
@@ -112,8 +111,8 @@ patch   date            module(s) and fix(es)
 
                         hp2100_dp.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to dp_settype
-
-                        hp2100_ds.c (Dave Bryan):
+ 
+                         hp2100_ds.c (Dave Bryan):
                         - Rewritten to use the MAC/ICD disc controller library
                         - ioIOO now notifies controller service of parameter output
                         - Corrected SRQ generation and FIFO under/overrun detection
@@ -138,31 +137,34 @@ patch   date            module(s) and fix(es)
                         - Revised for new multi-card paradigm
 
                         hp2100_lps.c (Dave Bryan):
-                        - Revised detection of CLC at last DMA cycle
+                         - Revised detection of CLC at last DMA cycle
                         - Corrected 12566B (DIAG mode) jumper settings
 
                         hp2100_ms.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to ms_settype
-
+ 
                         hp2100_mt.c (Dave Bryan):
                         - Fixed command scanning error in mtcio ioIOO handler
 
                         hp2100_stddev.c (Dave Bryan):
                         - Add TBG as a logical name for the CLK device
-
+ 
                         hp2100_sys.c (Dave Bryan):
-                        - Add TBG as a logical name for the CLK device
+                        - Deprecated DEVNO in favor of SC
                         - Added hp_setsc, hp_showsc functions to support SC modifier
                         - Added DA and dummy DC devices
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Changed DIB access for revised signal model
-
+ 
                         hp_disclib.c, hp_disclib.h (Dave Bryan)
                         - Created MAC/ICD disc controller library
 
                         i1401_cd.c:
                         - fixed read stacker operation in column binary mode
                         - fixed punch stacker operation (Van Snyder)
+
+                        id_pas.c:
+                        - fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
 
                         1401_cpu.c:
                         - reverted multiple tape indicator implementation
@@ -176,11 +178,20 @@ patch   date            module(s) and fix(es)
                         - fixed backspace over tapemark not to set EOR (Van Snyder)
                         - added no rewind option (Van Snyder)
 
+                        pdp1_cpu.c:
+                        - fixed misuse of & instead of && in Ea_ch (Michael Bloom)
+
+                        pdp1_stddev.c:
+                        - fixed unitialized variable in tty output service (Michael Bloom)
+
                         pdp11_defs.h:
                         - fixed priority of PIRQ vs IO; added INT_INTERNALn
 
                         pdp11_io.c:
                         - fixed Qbus interrupts to treat all IO devices as BR4
+
+                        ppd11_rf.c
+                        - fixed bug in updating mem addr extension (Peter Schorn)
 
                         pdp11_rk.c:
                         - fixed bug in read header (Walter F Mueller)
@@ -191,7 +202,7 @@ patch   date            module(s) and fix(es)
                         pdp11_rq.c:
                         - added RD32 support
 
-                        pdp11_tq.c:
+                        pdp11_tq.c: (Mark Pizzolato)
                         - set UNIT_SXC flag when a tape mark is encountered 
                           during forward motion read operations
                         - fixed logic which clears UNIT_SXC to check command modifier
@@ -201,51 +212,52 @@ patch   date            module(s) and fix(es)
                         - fixed debug output of tape file positions when they are 64b
                         - added more debug output after positioning operations
                         - added textual display of the command being performed
-                          (all of the above from Mark Pizzolato)
                         - fixed comments about register addresses
                         
                         pdp11_ts.c:
-                        - fixed t_addr printouts for 64b big-endian systems
-                          (from Mark Pizzolato)
+                        - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
 
-                        pdp8_fpp.c:
-                        - many bug fixes (all from Rick Murphy); now functional
+                        pdp8_fpp.c: (Rick Murphy)
+                        - many bug fixes; now functional
 
                         pdp8_sys.c:
                         - added link to FPP
 
                         pdp8_td.c:
-                        - fixed SDLC to clear AC (from Dave Gesswein)
+                        - fixed SDLC to clear AC (Dave Gesswein)
+
+                        sds_mt.c:
+                        - fixed bug in scan function decode (Peter Schorn)
 
                         vax_cpu.c:
-                        - revised idle design (from Mark Pizzolato)
+                        - revised idle design Mark Pizzolato)
                         - fixed bug in SET CPU IDLE
                         - fixed failure to clear PSL<tp> in BPT, XFC
 
                         vax_cpu1.c:
-                        - revised idle design (from Mark Pizzolato)
+                        - revised idle design Mark Pizzolato)
                         - added VEC_QMODE test in interrupt handler
 
-                        vax_fpa.c
-                        - fixed integer overflow bug in EMODx (from Camiel Vanderhoeven)
-                        - fixed POLYx normalizing before add mask bug (from Camiel Vanderhoeven)
+                        vax_fpa.c:
+                        - fixed integer overflow bug in EMODx (Camiel Vanderhoeven)
+                        - fixed POLYx normalizing before add mask bug (Camiel Vanderhoeven)
+                        - fixed missing arguments in 32b floating add (Mark Pizzolato)
 
-                        vax_octa.c
-                        - fixed integer overflow bug in EMODH (from Camiel Vanderhoeven)
-                        - fixed POLYH normalizing before add mask bug (from Camiel Vanderhoeven)
+                        vax_octa.c (Camiel Vanderhoeven)
+                        - fixed integer overflow bug in EMODH
+                        - fixed POLYH normalizing before add mask bug
 
                         vax_syscm.c:
-                        - fixed t_addr printouts for 64b big-endian systems
-                          (from Mark Pizzolato)
+                        - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
 
                         vax_sysdev.c:
-                        - added power clear call to boot routine (from Mark Pizzolato)
+                        - added power clear call to boot routine (Mark Pizzolato)
 
                         vax780_sbi.c:
-                        - added AUTORESTART switch support (from Mark Pizzolato)
+                        - added AUTORESTART switch support (Mark Pizzolato)
 
                         vax780_stddev.c
-                        - added REBOOT support (from Mark Pizzolato)
+                        - added REBOOT support (Mark Pizzolato)
 
                         vaxmod_def.h
                         - moved all Qbus devices to BR4; deleted RP definitions

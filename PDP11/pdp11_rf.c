@@ -1,6 +1,6 @@
 /* pdp11_rf.c: RF11 fixed head disk simulator
 
-   Copyright (c) 2006-2008, Robert M Supnik
+   Copyright (c) 2006-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    rf           RF11 fixed head disk
 
-   25-Dec-06    RMS     Fixed bug in unit mask (found by John Dundas)
+   19-Mar-12    RMS     Fixed bug in updating mem addr extension (Peter Schorn)
+   25-Dec-06    RMS     Fixed bug in unit mask (John Dundas)
    26-Jun-06    RMS     Cloned from RF08 simulator
 
    The RF11 is a head-per-track disk.  To minimize overhead, the entire RF11
@@ -377,7 +378,7 @@ do {
     } while ((rf_wc != 0) && (rf_burst != 0));          /* brk if wc, no brst */
 
 rf_da = da & DMASK;                                     /* split da */
-rf_dae = (rf_dae & ~RFDAE_DAE) | ((rf_da >> 16) && RFDAE_DAE);
+rf_dae = (rf_dae & ~RFDAE_DAE) | ((rf_da >> 16) & RFDAE_DAE);
 rf_cma = ma & DMASK;                                    /* split ma */
 rf_cs = (rf_cs & ~RFCS_MEX) | ((ma >> (16 - RFCS_V_MEX)) & RFCS_MEX); 
 if ((rf_wc != 0) && ((rf_cs & RFCS_ERR) == 0))          /* more to do? */

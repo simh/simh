@@ -25,9 +25,9 @@
 
    ry           RX211/RXV21/RX02 floppy disk
 
-   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
+   15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    07-Jul-05    RMS     Removed extraneous externs
-   18-Feb-05    RMS     Fixed bug in boot code (reported by Graham Toal)
+   18-Feb-05    RMS     Fixed bug in boot code (Graham Toal)
    30-Sep-04    RMS     Revised Unibus interface
    21-Mar-04    RMS     Added VAX support
    29-Dec-03    RMS     Added RXV21 support
@@ -161,7 +161,7 @@ t_stat ry_wr (int32 data, int32 PA, int32 access);
 t_stat ry_svc (UNIT *uptr);
 t_stat ry_reset (DEVICE *dptr);
 t_stat ry_boot (int32 unitno, DEVICE *dptr);
-void ry_done (int esr_flags, int new_ecode);
+void ry_done (int32 esr_flags, int32 new_ecode);
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ry_attach (UNIT *uptr, char *cptr);
 

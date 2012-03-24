@@ -27,7 +27,7 @@
 
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    28-May-08    RMS     Inlined physical memory routines
-   25-Jan-08    RMS     Fixed declarations (from Mark Pizzolato)
+   25-Jan-08    RMS     Fixed declarations (Mark Pizzolato)
 */
 
 #include "vax_defs.h"

@@ -29,7 +29,7 @@
    16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLShift)
                         Fixed bug in DIVx (LntDstr calculation)
    28-May-08    RMS     Inlined physical memory routines
-   16-May-06    RMS     Fixed bug in length calculation (found by Tim Stark)
+   16-May-06    RMS     Fixed bug in length calculation (Tim Stark)
    03-May-06    RMS     Fixed MOVTC, MOVTUC to preserve cc's through page faults
                         Fixed MOVTUC to stop on translated == escape
                         Fixed CVTPL to set registers before destination reg write
@@ -38,7 +38,7 @@
                         Fixed EDITPC EO$BLANK_ZERO count, cc test
                         Fixed EDITPC EO$INSERT to insert fill instead of blank
                         Fixed EDITPC EO$LOAD_PLUS/MINUS to skip character
-                        (all reported by Tim Stark)
+                        (Tim Stark)
    12-Apr-04    RMS     Cloned from pdp11_cis.c and vax_cpu1.c
 
    Zero length decimal strings require either zero bytes (trailing) or one byte

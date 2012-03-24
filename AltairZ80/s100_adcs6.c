@@ -88,7 +88,7 @@ typedef struct {
     uint8 s100_addr_u;  /* A23:16 of S-100 bus */
 } ADCS6_INFO;
 
-extern WD179X_INFO_PUB *wd179x_info;
+extern WD179X_INFO_PUB *wd179x_infop;
 
 static ADCS6_INFO adcs6_info_data = { { 0xF000, ADCS6_ROM_SIZE, 0x3, 2 } };
 static ADCS6_INFO *adcs6_info = &adcs6_info_data;
@@ -524,26 +524,26 @@ static int32 adcs6_control(const int32 port, const int32 io, const int32 data)
 {
     int32 result = 0;
     if(io) { /* I/O Write */
-        wd179x_info->sel_drive = data & 0x03;
+        wd179x_infop->sel_drive = data & 0x03;
 
         if(data & ADCS6_CTRL_MINI) {
-            wd179x_info->drivetype = 5;
+            wd179x_infop->drivetype = 5;
         } else {
-            wd179x_info->drivetype = 8;
+            wd179x_infop->drivetype = 8;
         }
 
         if(data & ADCS6_CTRL_HDS) {
             adcs6_info->head_sel = 1;
-            wd179x_info->fdc_head = 1;
+            wd179x_infop->fdc_head = 1;
         } else {
             adcs6_info->head_sel = 0;
-            wd179x_info->fdc_head = 0;
+            wd179x_infop->fdc_head = 0;
         }
 
         if(data & ADCS6_CTRL_DDENS) {
-            wd179x_info->ddens = 1;
+            wd179x_infop->ddens = 1;
         } else {
-            wd179x_info->ddens = 0;
+            wd179x_infop->ddens = 0;
         }
         if(data & ADCS6_CTRL_AUTOWAIT) {
             adcs6_info->autowait = 1;
@@ -553,12 +553,12 @@ static int32 adcs6_control(const int32 port, const int32 io, const int32 data)
 
         sim_debug(DRIVE_MSG, &adcs6_dev, "ADCS6: " ADDRESS_FORMAT
                   " WR CTRL: sel_drive=%d, drivetype=%d, head_sel=%d, dens=%d, aw=%d\n",
-                  PCX, wd179x_info->sel_drive,
-                  wd179x_info->drivetype, adcs6_info->head_sel,
-                  wd179x_info->ddens, adcs6_info->autowait);
+                  PCX, wd179x_infop->sel_drive,
+                  wd179x_infop->drivetype, adcs6_info->head_sel,
+                  wd179x_infop->ddens, adcs6_info->autowait);
     } else { /* I/O Read */
-        result = wd179x_info->drq ? 0xFF : 0;
-        if (wd179x_info->intrq)
+        result = wd179x_infop->drq ? 0xFF : 0;
+        if (wd179x_infop->intrq)
             result &= 0x7F;
     }
 

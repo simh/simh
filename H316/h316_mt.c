@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2008, Robert M. Supnik
+   Copyright (c) 2003-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,10 +25,11 @@
 
    mt           516-4100 seven track magnetic tape
 
-   09-Jun-07    RMS     Fixed bug in write without stop (from Theo Engel)
+   19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
+   09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking
    26-Aug-05    RMS     Revised to use API for write lock check
-   08-Feb-05    RMS     Fixed error reporting from OCP (found by Philipp Hachtmann)
+   08-Feb-05    RMS     Fixed error reporting from OCP (Philipp Hachtmann)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
 
    Magnetic tapes are represented as a series of variable records
@@ -82,7 +83,8 @@
 #define STA_BOT         0000002                         /* beg of tape */
 #define STA_EOT         0000001                         /* end of tape */
 
-extern int32 dev_int, dev_enb, chan_req;
+extern int32 dev_int, dev_enb;
+extern uint32 chan_req;
 extern int32 stop_inst;
 
 uint32 mt_buf = 0;                                      /* data buffer */

@@ -58,6 +58,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSTYPE = cygwin
     OSNAME = windows-build
   endif
+  GCC_VERSION = $(shell $(GCC) --version /dev/null | grep GCC | awk '{ print $$3 }')
+  LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
     OS_CCDEFS = -D_GNU_SOURCE
@@ -243,6 +245,8 @@ else
   #Win32 Environments (via MinGW32)
   GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
+  GCC_VERSION = $(word 3,$(shell $(GCC) --version))
+  LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
     PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
     ifeq (,$(NOASYNCH))
@@ -286,14 +290,53 @@ ifneq ($(DEBUG),)
   CFLAGS_O = -O0
   BUILD_FEATURES = - debugging support
 else
-  CFLAGS_O = -O2 -flto -finline-functions -fgcse-after-reload -fpredictive-commoning -fipa-cp-clone -fno-unsafe-loop-optimizations -fno-strict-overflow
-  LDFLAGS_O = -flto -fwhole-program
+  CFLAGS_O = -O2
+  LDFLAGS_O = 
+  GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
+  ifneq (3,$(GCC_MAJOR_VERSION))
+    GCC_OPTIMIZERS = $(shell $(GCC) --help=optimizers)
+  endif
+  ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
+    NO_LTO = 1
+  endif
+  ifneq (,$(findstring inline-functions,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -finline-functions
+  endif
+  ifneq (,$(findstring gcse-after-reload,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -fgcse-after-reload
+  endif
+  ifneq (,$(findstring predictive-commoning,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -fpredictive-commoning
+  endif
+  ifneq (,$(findstring ipa-cp-clone,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -fipa-cp-clone
+  endif
+  ifneq (,$(findstring unsafe-loop-optimizations,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -fno-unsafe-loop-optimizations
+  endif
+  ifneq (,$(findstring strict-overflow,$(GCC_OPTIMIZERS)))
+    CFLAGS_O += -fno-strict-overflow
+  endif
+  ifeq (,$(NO_LTO))
+    ifneq (,$(findstring lto,$(GCC_OPTIMIZERS)))
+      CFLAGS_O += -flto -fwhole-program
+      LDFLAGS_O += -flto -fwhole-program
+    endif
+  endif
   BUILD_FEATURES = - compiler optimizations and no debugging support
 endif
+ifneq (3,$(GCC_MAJOR_VERSION))
+  ifneq (,$(findstring unused-result,$(shell $(GCC) --help=warnings)))
+    CFLAGS_O += -Wno-unused-result
+  endif
+endif
+BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
 $(info ***)
 $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
 $(info *** $(BUILD_FEATURES).)
-$(info *** $(NETWORK_FEATURES).)
+ifneq (,$(NETWORK_FEATURES))
+  $(info *** $(NETWORK_FEATURES).)
+endif
 $(info ***)
 ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
@@ -395,7 +438,7 @@ PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP10D}/pdp10_tim.c ${PDP10D}/pdp10_tu.c ${PDP10D}/pdp10_xtnd.c \
 	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c \
 	${PDP11D}/pdp11_cr.c
-PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D} ${NETWORK_OPT}
+PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
 
 
 
@@ -498,7 +541,7 @@ ALTAIRZ80 = ${ALTAIRZ80D}/altairz80_cpu.c ${ALTAIRZ80D}/altairz80_cpu_nommu.c \
 	${ALTAIRZ80D}/altairz80_hdsk.c ${ALTAIRZ80D}/altairz80_net.c \
 	${ALTAIRZ80D}/flashwriter2.c ${ALTAIRZ80D}/i86_decode.c \
 	${ALTAIRZ80D}/i86_ops.c ${ALTAIRZ80D}/i86_prim_ops.c \
-	${ALTAIRZ80D}/i8272.c ${ALTAIRZ80D}/insnsa.c ${ALTAIRZ80D}/insnsd.c \
+	${ALTAIRZ80D}/i8272.c ${ALTAIRZ80D}/insnsd.c \
 	${ALTAIRZ80D}/mfdc.c ${ALTAIRZ80D}/n8vem.c ${ALTAIRZ80D}/vfdhd.c \
 	${ALTAIRZ80D}/s100_disk1a.c ${ALTAIRZ80D}/s100_disk2.c ${ALTAIRZ80D}/s100_disk3.c\
 	${ALTAIRZ80D}/s100_fif.c ${ALTAIRZ80D}/s100_mdriveh.c \

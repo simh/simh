@@ -44,10 +44,10 @@
    16-Feb-06    RMS     Revised for new magtape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
+   22-Jul-05    RMS     Fixed warning from Solaris C (Doug Gwyn)
    30-Sep-04    RMS     Revised Unibus interface
-   12-Jun-04    RMS     Fixed bug in reporting write protect (reported by Lyle Bickley)
-   18-Apr-04    RMS     Fixed TQK70 media ID and model byte (found by Robert Schaffrath)
+   12-Jun-04    RMS     Fixed bug in reporting write protect (Lyle Bickley)
+   18-Apr-04    RMS     Fixed TQK70 media ID and model byte (Robert Schaffrath)
    26-Mar-04    RMS     Fixed warnings with -std=c99
    25-Jan-04    RMS     Revised for device debug support
    19-May-03    RMS     Revised for new conditional compilation scheme
@@ -58,7 +58,7 @@
    22-Feb-03    RMS     Fixed ordering bug in queue process
                         Fixed flags table to allow MD_CSE everywhere
    09-Jan-03    RMS     Fixed bug in transfer end packet status
-   17-Oct-02    RMS     Fixed bug in read reverse (found by Hans Pufal)
+   17-Oct-02    RMS     Fixed bug in read reverse (Hans Pufal)
 */
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
@@ -78,7 +78,7 @@
 #include "pdp11_defs.h"
 #define INIT_TYPE       TQ5_TYPE
 #define INIT_CAP        TQ5_CAP
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #include "pdp11_uqssp.h"

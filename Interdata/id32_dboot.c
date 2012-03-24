@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   17-Jul-06    RMS     Fixed transcription errors (found by Davis Johnson)
+   17-Jul-06    RMS     Fixed transcription errors (Davis Johnson)
    17-Feb-03    RMS     Fixed for UNIX bootstrap, upper platter bootstrap
 */
 

@@ -1,6 +1,6 @@
 /* sds_io.c: SDS 940 I/O simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   19-Mar-2012  RMS     Fixed various declarations (Mark Pizzolato)
 */
 
 #include "sds_defs.h"
@@ -79,9 +81,10 @@ extern uint32 int_req;                                  /* int req */
 extern uint32 xfr_req;                                  /* xfer req */
 extern uint32 alert;                                    /* pin/pot alert */
 extern uint32 X, EM2, EM3, OV, ion, bpt;
-extern uint32 nml_mode, usr_mode, rtc_pie;
+extern uint32 nml_mode, usr_mode;
+extern int32 rtc_pie;
 extern int32 stop_invins, stop_invdev, stop_inviop;
-extern int32 mon_usr_trap;
+extern uint32 mon_usr_trap;
 extern UNIT cpu_unit;
 extern FILE *sim_log;
 extern DEVICE *sim_devices[];

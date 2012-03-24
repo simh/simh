@@ -20,10 +20,18 @@ Otherwise, you will get build errors.
 	- added "SHOW SHOW" and "SHOW <dev> SHOW" commands (Mark Pizzolato)
 	- added support for BREAK key on Windows (Mark Pizzolato)
 
-
 1.1.2 PDP-8
 
 	- floating point processor is now enabled
+
+1.1.3 HP2100 (Dave Bryan)
+
+	- added support for 12821A HP-IP disk controller,
+	  7906H/20H/25H disks
+
+1.1.4 IA64 VMS Ethernet Support
+
+        - Identified compiler version issues and added IA64 support (Matt Burke)
 
 2. Bugs Fixed
 

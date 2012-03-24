@@ -30,20 +30,20 @@
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
+   22-Jul-05    RMS     Fixed warning from Solaris C (Doug Gwyn)
    17-Jan-05    RMS     Added more RA and RD disks
    31-Oct-04    RMS     Added -L switch (LBNs) to RAUSER size specification
    01-Oct-04    RMS     Revised Unibus interface
                         Changed to identify as UDA50 in Unibus configurations
                         Changed width to be 16b in all configurations
                         Changed default timing for VAX
-   24-Jul-04    RMS     VAX controllers luns start with 0 (from Andreas Cejna)
+   24-Jul-04    RMS     VAX controllers luns start with 0 (Andreas Cejna)
    05-Feb-04    RMS     Revised for file I/O library
    25-Jan-04    RMS     Revised for device debug support
-   12-Jan-04    RMS     Fixed bug in interrupt control (found by Tom Evans)
+   12-Jan-04    RMS     Fixed bug in interrupt control (Tom Evans)
    07-Oct-03    RMS     Fixed problem with multiple RAUSER drives
    17-Sep-03    RMS     Fixed MB to LBN conversion to be more accurate
-   11-Jul-03    RMS     Fixed bug in user disk size (found by Chaskiel M Grundman)
+   11-Jul-03    RMS     Fixed bug in user disk size (Chaskiel M Grundman)
    19-May-03    RMS     Revised for new conditional compilation scheme
    25-Apr-03    RMS     Revised for extended file support
    14-Mar-03    RMS     Fixed variable size interaction with save/restore
@@ -57,7 +57,7 @@
                         Fixed status code in HBE error log
                         Consolidated MSCP/TMSCP header file
                         New data structures
-   16-Aug-02    RMS     Removed unused variables (found by David Hittner)
+   16-Aug-02    RMS     Removed unused variables (David Hittner)
    04-May-02    RMS     Fixed bug in polling loop for queued operations
    26-Mar-02    RMS     Fixed bug, reset routine cleared UF_WPH
    09-Mar-02    RMS     Adjusted delays for M+ timing bugs
@@ -86,7 +86,7 @@ extern int32 fault_PC;
 #define RQ_XTIME        500
 #define OLDPC           MMR2
 extern int32 MMR2;
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #if !defined (RQ_NUMCT)

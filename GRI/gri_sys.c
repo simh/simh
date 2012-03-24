@@ -24,7 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    14-Jan-08    RMS     Added GRI-99 support
-   18-Oct-02    RMS     Fixed bug in symbolic decode (found by Hans Pufal)
+   18-Oct-02    RMS     Fixed bug in symbolic decode (Hans Pufal)
 */
 
 #include "gri_defs.h"

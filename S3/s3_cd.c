@@ -1,6 +1,6 @@
 /* s3_cd.c: IBM 1442 card reader/punch
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    cdp          card punch
    cdp2         card punch stacker 2
 
+   19-Mar-12    RMS     Fixed declaration of conversion tables (Mark Pizzolato)
    25-Apr-03    RMS     Revised for extended file support
    08-Oct-02    RMS     Added impossible function catcher
 
@@ -40,8 +41,8 @@
 #include <ctype.h>
 
 extern uint8 M[];
-extern char ebcdic_to_ascii[256];
-extern char ascii_to_ebcdic[256];
+extern unsigned char ebcdic_to_ascii[];
+extern unsigned char ascii_to_ebcdic[];
 int32 s1sel, s2sel;
 char rbuf[CBUFSIZE];                                    /* > CDR_WIDTH */
 t_stat cdr_svc (UNIT *uptr);

@@ -26,7 +26,7 @@
    pt           paper tape reader and punch
 
    25-Apr-03    RMS     Revised for extended file support
-   10-Apr-03    RMS     Fixed type problem in ptr service (from Mark Pizzolato)
+   10-Apr-03    RMS     Fixed type problem in ptr service (Mark Pizzolato)
 */
 
 #include "id_defs.h"

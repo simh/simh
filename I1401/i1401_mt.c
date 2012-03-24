@@ -27,21 +27,21 @@
 
    19-Mar-11    RMS     Restored lost edit to insert EOF in memory on read EOF
                         Reverted multiple tape indicator implementation
-   20-Jan-11    RMS     Fixed branch on END indicator per hardware (from Van Snyder)
-   26-Jun-10    RMS     Fixed backspace over tapemark not to set EOR (from Van Snyder)
-   11-Jul-08    RMS     Added -n (no rewind) option to BOOT (from Van Snyder)
-                        Added tape mark detect to diagnostic read (from Bob Abeles)
-                        Added tape mark detect in multi-character records (from Bob Abeles)
-                        Fixed memory leak in tape rewind-unload op (from Bob Abeles)
-                        Fixed bug, BOOT ignores GM+WM in memory (from Bob Abeles)
-                        Fixed handling of indicators (from Bob Abeles)
-                        Fixed bug to mask input to 6b on read (from Bob Abeles)
+   20-Jan-11    RMS     Fixed branch on END indicator per hardware (Van Snyder)
+   26-Jun-10    RMS     Fixed backspace over tapemark not to set EOR (Van Snyder)
+   11-Jul-08    RMS     Added -n (no rewind) option to BOOT (Van Snyder)
+                        Added tape mark detect to diagnostic read (Bob Abeles)
+                        Added tape mark detect in multi-character records (Bob Abeles)
+                        Fixed memory leak in tape rewind-unload op (Bob Abeles)
+                        Fixed bug, BOOT ignores GM+WM in memory (Bob Abeles)
+                        Fixed handling of indicators (Bob Abeles)
+                        Fixed bug to mask input to 6b on read (Bob Abeles)
    07-Jul-07    RMS     Removed restriction on load-mode binary tape
    28-Jun-07    RMS     Revised read tape mark behavior based on real hardware
-                        (found by Van Snyder)
+                        (Van Snyder)
    16-Feb-06    RMS     Added tape capacity checking
    15-Sep-05    RMS     Yet another fix to load read group mark plus word mark
-                        Added debug printouts (from Van Snyder)
+                        Added debug printouts (Van Snyder)
    26-Aug-05    RMS     Revised to use API for write lock check
    16-Aug-03    RMS     End-of-record on load read works like move read
                         (verified on real 1401)
@@ -55,11 +55,11 @@
    30-Sep-02    RMS     Revamped error handling
    28-Aug-02    RMS     Added end of medium support
    12-Jun-02    RMS     End-of-record on move read preserves old WM under GM
-                        (found by Van Snyder)
+                        (Van Snyder)
    03-Jun-02    RMS     Modified for 1311 support
    30-May-02    RMS     Widened POS to 32b
    22-Apr-02    RMS     Added protection against bad record lengths
-   30-Jan-02    RMS     New zero footprint tape bootstrap from Van Snyder
+   30-Jan-02    RMS     New zero footprint tape bootstrap (Van Snyder)
    20-Jan-02    RMS     Changed write enabled modifier
    29-Nov-01    RMS     Added read only unit support
    18-Apr-01    RMS     Changed to rewind tape before boot

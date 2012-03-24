@@ -199,6 +199,7 @@ uint8 floorlog2(unsigned int n);
 
 WD179X_INFO wd179x_info_data = { { 0x0, 0, 0x30, 4 } };
 WD179X_INFO *wd179x_info = &wd179x_info_data;
+WD179X_INFO_PUB *wd179x_infop = (WD179X_INFO_PUB *)&wd179x_info_data;
 
 static UNIT wd179x_unit[] = {
     { UDATA (&wd179x_svc, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, WD179X_CAPACITY), 58200 },
@@ -443,8 +444,8 @@ uint8 WD179X_Read(const uint32 Addr)
 {
     uint8 cData;
     WD179X_DRIVE_INFO    *pDrive;
-    unsigned int flags = 0;
-    unsigned int readlen;
+    uint32 flags = 0;
+    uint32 readlen;
     int status;
 
     if(wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
@@ -570,8 +571,8 @@ static uint8 Do1793Command(uint8 cCommand)
 {
     uint8 result = 0;
     WD179X_DRIVE_INFO    *pDrive;
-    unsigned int flags = 0;
-    unsigned int readlen;
+    uint32 flags = 0;
+    uint32 readlen;
     int status;
 
     if(wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
@@ -951,8 +952,8 @@ uint8 WD179X_Write(const uint32 Addr, uint8 cData)
 {
     WD179X_DRIVE_INFO    *pDrive;
 /*    uint8   disk_read = 0; */
-    unsigned int flags = 0;
-    unsigned int writelen;
+    uint32 flags = 0;
+    uint32 writelen;
 
     if(wd179x_info->sel_drive >= WD179X_MAX_DRIVES) {
         return 0xFF;
