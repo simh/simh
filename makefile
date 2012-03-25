@@ -32,13 +32,11 @@
 # CC Command (and platform available options).  (Poor man's autoconf)
 #
 # building the pdp11, or any vax simulator could use networking support
+BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_SUFFIX)
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
-    BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
-  else
-    BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
   endif
 else
   ifeq ($(MAKECMDGOALS),)
@@ -210,8 +208,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         else
           $(error using libpcap: $(call find_lib,$(PCAPLIB)) missing pcap.h)
         endif
-        LIBEXT = $(LIBEXTSAVE)
       endif
+      LIBEXT = $(LIBEXTSAVE)
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
 	  # Given we have libpcap components, consider other network connections as well
@@ -344,14 +342,16 @@ ifneq (3,$(GCC_MAJOR_VERSION))
     CFLAGS_O += -Wno-unused-result
   endif
 endif
-BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
-$(info ***)
-$(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
-$(info *** $(BUILD_FEATURES).)
-ifneq (,$(NETWORK_FEATURES))
-  $(info *** $(NETWORK_FEATURES).)
+ifeq (clean,$(MAKECMDGOALS))
+  BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
+  $(info ***)
+  $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
+  $(info *** $(BUILD_FEATURES).)
+  ifneq (,$(NETWORK_FEATURES))
+    $(info *** $(NETWORK_FEATURES).)
+  endif
+  $(info ***)
 endif
-$(info ***)
 ifneq ($(DONT_USE_ROMS),)
   ROMS_OPT = -DDONT_USE_INTERNAL_ROM
 else
