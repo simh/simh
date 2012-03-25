@@ -1,6 +1,6 @@
 /* s3_sys.c: IBM System/3 system interface
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Charles E. Owen shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Charles E. Owen.
+
+   19-Mar-12    RMS     Fixed declaration of conversion tables (Mark Pizzolato)
 */
 
 #include <ctype.h>

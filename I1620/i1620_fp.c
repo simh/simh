@@ -31,7 +31,7 @@
 
    where S represents flag bits if the mantissa or exponent are negative.
 
-   31-May-2008  RMS     Fixed add_field call (found by Peter Schorn)
+   31-May-2008  RMS     Fixed add_field call (Peter Schorn)
 */
 
 #include "i1620_defs.h"

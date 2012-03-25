@@ -25,12 +25,12 @@
 
    cpu          H316/H516 CPU
 
-   19-Nov-11    RMS     Fixed XR behavior (from Adrian Wise)
-   19-Nov-11    RMS     Fixed bugs in double precision, normalization, SC (from Adrian Wise)
-   10-Jan-10    RMS     Fixed bugs in LDX, STX introduced in 3.8-1 (from Theo Engel)
+   19-Nov-11    RMS     Fixed XR behavior (Adrian Wise)
+   19-Nov-11    RMS     Fixed bugs in double precision, normalization, SC (Adrian Wise)
+   10-Jan-10    RMS     Fixed bugs in LDX, STX introduced in 3.8-1 (Theo Engel)
    28-Apr-07    RMS     Removed clock initialization
-   03-Apr-06    RMS     Fixed bugs in LLL, LRL (from Theo Engel)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   03-Apr-06    RMS     Fixed bugs in LLL, LRL (Theo Engel)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    15-Feb-05    RMS     Added start button interrupt
    01-Dec-04    RMS     Fixed bug in DIV

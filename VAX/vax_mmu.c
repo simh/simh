@@ -26,7 +26,7 @@
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Added address masking for system page table reads
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    30-Sep-04    RMS     Comment and formating changes
    19-Sep-03    RMS     Fixed upper/lower case linkage problems on VMS
    01-Jun-03    RMS     Fixed compilation problem with USE_ADDR64

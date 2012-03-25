@@ -24,8 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
-                        (found by Mark Pizzolato)
-   12-Nov-06    RMS     Fixed operand order in EIS instructions (found by W.F.J. Mueller)
+                        (Mark Pizzolato)
+   12-Nov-06    RMS     Fixed operand order in EIS instructions (W.F.J. Mueller)
    27-Sep-05	RMS     Fixed warnings compiling with 64b addresses
    15-Sep-04    RMS     Cloned from pdp11_sys.c
 */

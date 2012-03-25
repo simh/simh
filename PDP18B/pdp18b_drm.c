@@ -30,7 +30,7 @@
    05-Dec-02    RMS     Updated from Type 24 documentation
    22-Nov-02    RMS     Added PDP-4 support
    05-Feb-02    RMS     Added DIB, device number support
-   03-Feb-02    RMS     Fixed bug in reset routine (found by Robert Alan Byer)
+   03-Feb-02    RMS     Fixed bug in reset routine (Robert Alan Byer)
    06-Jan-02    RMS     Revised enable/disable support
    25-Nov-01    RMS     Revised interrupt structure
    10-Jun-01    RMS     Cleaned up IOT decoding to reflect hardware

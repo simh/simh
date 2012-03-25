@@ -29,12 +29,12 @@
                         Fixed bug in DIVx (LntDstr calculation)
    30-May-06    RMS     Added interrupt tests to character instructions
                         Added 11/44 stack probe test to MOVCx (only)
-   22-May-06    RMS     Fixed bug in decode table (found by John Dundas)
-                        Fixed bug in ASHP (reported by John Dundas)
+   22-May-06    RMS     Fixed bug in decode table (John Dundas)
+                        Fixed bug in ASHP (John Dundas)
                         Fixed bug in write decimal string with mmgt enabled
                         Fixed bug in 0-length strings in multiply/divide
    16-Sep-04    RMS     Fixed bug in CMPP/N of negative strings
-   17-Oct-02    RMS     Fixed compiler warning (found by Hans Pufal)
+   17-Oct-02    RMS     Fixed compiler warning (Hans Pufal)
    08-Oct-02    RMS     Fixed macro definitions
 
    The commercial instruction set consists of three instruction formats:

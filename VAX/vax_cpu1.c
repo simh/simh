@@ -23,14 +23,14 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (from Mark Pizzolato)
+   15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (Mark Pizzolato)
    25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
-   23-Mar-11    RMS     Revised idle design (from Mark Pizzolato)
+   23-Mar-11    RMS     Revised idle design (Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Separated base register access checks for 11/780
    10-May-06    RMS     Added access check on system PTE for 11/780
                         Added mbz check in LDPCTX for 11/780
-   22-Sep-06    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-06    RMS     Fixed declarations (Sterling Garwood)
    30-Sep-04    RMS     Added conditionals for full VAX
                         Moved emulation to vax_cis.c
                         Moved model-specific IPRs to system module
@@ -38,8 +38,8 @@
                         Fixed EXTxV, INSV double register PC reference fault
    30-Apr-02    RMS     Fixed interrupt/exception handler to clear traps
    17-Apr-02    RMS     Fixed pos > 31 test in bit fields (should be unsigned)
-   14-Apr-02    RMS     Fixed prv_mode handling for interrupts (found by Tim Stark)
-                        Fixed PROBEx to mask mode to 2b (found by Kevin Handy)
+   14-Apr-02    RMS     Fixed prv_mode handling for interrupts (Tim Stark)
+                        Fixed PROBEx to mask mode to 2b (Kevin Handy)
 
    This module contains the instruction simulators for
 

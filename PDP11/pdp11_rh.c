@@ -1,6 +1,6 @@
 /* pdp11_rh.c: PDP-11 Massbus adapter simulator
 
-   Copyright (c) 2005-2008, Robert M Supnik
+   Copyright (c) 2005-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    rha, rhb             RH11/RH70 Massbus adapter
 
-   02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
+   19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
+   02-Feb-08    RMS     Fixed DMA memory address limit test (John Dundas)
    17-May-07    RMS     Moved CS1 drive enable to devices
    21-Nov-05    RMS     Added enable/disable routine
    07-Jul-05    RMS     Removed extraneous externs

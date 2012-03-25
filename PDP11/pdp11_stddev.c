@@ -32,7 +32,7 @@
                         Added clock coscheduling support
    05-Jul-06    RMS     Added UC only support for early DOS/RSTS
    22-Nov-05    RMS     Revised for new terminal processing routines
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    07-Jul-05    RMS     Removed extraneous externs
    11-Oct-04    RMS     Added clock model dependencies
    28-May-04    RMS     Removed SET TTI CTRL-C
@@ -46,7 +46,7 @@
                         Split DL11 dibs
    30-May-02    RMS     Widened POS to 32b
    26-Jan-02    RMS     Revised for multiple timers
-   09-Jan-02    RMS     Fixed bugs in KW11L (found by John Dundas)
+   09-Jan-02    RMS     Fixed bugs in KW11L (John Dundas)
    06-Jan-02    RMS     Split I/O address routines, revised enable/disable support
    29-Nov-01    RMS     Added read only unit support
    09-Nov-01    RMS     Added RQDX3 support

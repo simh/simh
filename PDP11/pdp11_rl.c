@@ -39,7 +39,7 @@
                         SET RLn ONLINE/OFFLINE
                         SET RL RLV11/RLV12 (PDP-11 only)
                         SET RL DEBUG/NODEBUG
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface

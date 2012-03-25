@@ -25,7 +25,7 @@
 
    rk           RK11/RKV11/RK05 cartridge disk
 
-   20-Mar-09    RMS     Fixed bug in read header (from Walter F Mueller)
+   20-Mar-09    RMS     Fixed bug in read header (Walter F Mueller)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface

@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2009, Robert M Supnik
+   Copyright (c) 1993-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,7 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    24-Mar-09    RMS     Added link to FPP
-   24-Jun-08    RMS     Fixed bug in new rim loader (found by Don North)
+   24-Jun-08    RMS     Fixed bug in new rim loader (Don North)
    24-May-08    RMS     Fixed signed/unsigned declaration inconsistency
    03-Sep-07    RMS     Added FPP8 support
                         Rewrote rim and binary loaders

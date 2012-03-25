@@ -1,6 +1,6 @@
 /* sds_io.c: SDS 940 I/O simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   19-Mar-2012  RMS     Fixed various declarations (Mark Pizzolato)
 */
 
 #include "sds_defs.h"

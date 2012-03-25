@@ -26,7 +26,7 @@
    tc           TC11/TU56 DECtape
 
    23-Jun-06	RMS     Fixed switch conflict in ATTACH
-   10-Feb-06    RMS     READ sets extended data bits in TCST (found by Alan Frisbie)
+   10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
    30-Sep-04    RMS     Revised Unibus interface

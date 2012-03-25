@@ -60,7 +60,7 @@
                         Synced keyboard to clock for idling
    11-May-06    RMS     Revised timer logic for EVKAE
    22-Nov-05    RMS     Revised for new terminal processing routines
-   10-Mar-05    RMS     Fixed bug in timer schedule routine (from Mark Hittinger)
+   10-Mar-05    RMS     Fixed bug in timer schedule routine (Mark Hittinger)
    08-Sep-04    RMS     Cloned from vax_stddev.c, vax_sysdev.c, and pdp11_rx.c
 
    The console floppy protocol is based on the description in the 1982 VAX

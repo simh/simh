@@ -1,6 +1,6 @@
 /* s3_cpu.c: IBM System/3 CPU simulator
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
    HPL & SLC instruction code Copyright (c) 2001 by Henk Stegeman
    Decimal Arithmetic Copyright (c) 2000 by Roger Bowler
 
@@ -28,6 +28,8 @@
    ------------------------------------------------------------------------------
 
    cpu          System/3 (models 10 and 15)  central processor
+
+   19-Mar-12    RMS     Changed int to int32 in declarations (Mark Pizzolato)
 
    The IBM System/3 was a popular small-business computing system introduced
    in 1969 as an entry-level system for businesses that could not afford

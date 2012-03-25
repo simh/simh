@@ -35,7 +35,7 @@
    to mean the implied sector number that would be in place if the disk pack
    had been formatted with sequential sector numbers.
 
-   18-Oct-02    RMS     Fixed bug in error testing (found by Hans Pufal)
+   18-Oct-02    RMS     Fixed bug in error testing (Hans Pufal)
 */
 
 #include "i1620_defs.h"

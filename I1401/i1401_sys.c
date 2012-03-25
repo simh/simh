@@ -28,10 +28,10 @@
    14-Nov-04    WVS     Added data printout support
    16-Mar-03    RMS     Fixed mnemonic for MCS
    03-Jun-02    RMS     Added 1311 support
-   18-May-02    RMS     Added -D feature from Van Snyder
-   26-Jan-02    RMS     Fixed H, NOP with no trailing wm (found by Van Snyder)
+   18-May-02    RMS     Added -D feature (Van Snyder)
+   26-Jan-02    RMS     Fixed H, NOP with no trailing wm (Van Snyder)
    17-Sep-01    RMS     Removed multiconsole support
-   13-Jul-01    RMS     Fixed bug in symbolic output (found by Peter Schorn)
+   13-Jul-01    RMS     Fixed bug in symbolic output (Peter Schorn)
    27-May-01    RMS     Added multiconsole support
    14-Mar-01    RMS     Revised load/dump interface (again)
    30-Oct-00    RMS     Added support for examine to file

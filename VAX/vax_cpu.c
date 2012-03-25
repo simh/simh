@@ -36,8 +36,8 @@
                         Determining a reasonable idle detection pattern does 
                         not seem possible for these versions.
    13-Sep-11    RMS     Fixed XFC, BPT to clear PSL<tp> before exception
-                        (found by Camiel Vanderhoeven)
-   23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
+                        (Camiel Vanderhoeven)
+   23-Mar-11    RMS     Revised for new idle design (Mark Pizzolato)
    05-Jan-11    MP      Added Asynch I/O support
    24-Apr-10    RMS     Added OLDVMS idle timer option
                         Fixed bug in SET CPU IDLE
@@ -46,7 +46,7 @@
    13-Aug-07    RMS     Fixed bug in read access g-format indexed specifiers
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added idle support
-   22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
+   22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
    10-May-06    RMS     Added -kesu switches for virtual addressing modes
                         Fixed bugs in examine virtual
                         Rewrote history function for greater usability
@@ -56,32 +56,31 @@
                         Fixed ACBD/G to test correct operand
                         Fixed access checking on modify-class specifiers
                         Fixed branch displacements in history buffer
-                        (all reported by Tim Stark)
+                        (Tim Stark)
    17-Nov-05    RMS     Fixed CVTfi with integer overflow to trap if PSW<iv> set
    13-Nov-05    RMS     Fixed breakpoint test with 64b addresses
    25-Oct-05    RMS     Removed cpu_extmem
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    13-Jan-05    RMS     Fixed initial state of cpu_extmem
    06-Nov-04    RMS     Added =n to SHOW HISTORY
    30-Sep-04    RMS     Added octaword specifier decodes and instructions
                         Moved model-specific routines to system module
    02-Sep-04    RMS     Fixed bug in EMODD/G, second word of quad dst not probed
-   28-Jun-04    RMS     Fixed bug in DIVBx, DIVWx (reported by Peter Trimmel)
+   28-Jun-04    RMS     Fixed bug in DIVBx, DIVWx (Peter Trimmel)
    18-Apr-04    RMS     Added octaword macros
    25-Jan-04    RMS     Removed local debug logging support
                 RMS,MP  Added extended physical memory support
    31-Dec-03    RMS     Fixed bug in set_cpu_hist
    21-Dec-03    RMS     Added autoconfiguration controls
-   29-Oct-03    RMS     Fixed WriteB declaration (found by Mark Pizzolato)
+   29-Oct-03    RMS     Fixed WriteB declaration (Mark Pizzolato)
    23-Sep-03    RMS     Revised instruction history for dynamic sizing
    17-May-03    RMS     Fixed operand order in EMODx
    23-Apr-03    RMS     Revised for 32b/64b t_addr
    05-Jan-02    RMS     Added memory size restore support
-   25-Dec-02    RMS     Added instruction history (from Mark Pizzolato)
+   25-Dec-02    RMS     Added instruction history (Mark Pizzolato)
    29-Sep-02    RMS     Revised to build dib_tab dynamically
-   14-Jul-02    RMS     Added halt to console, infinite loop detection
-                        (from Mark Pizzolato)
+   14-Jul-02    RMS     Added halt to console, infinite loop detection (Mark Pizzolato)
    02-May-02    RMS     Fixed bug in indexed autoincrement register logging
    30-Apr-02    RMS     Added TODR powerup routine
    18-Apr-02    RMS     Cleanup ambiguous signed left shifts

@@ -1,6 +1,6 @@
 /* sds_mt.c: SDS 940 magnetic tape simulator
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mt           7 track magnetic tape
 
+   19-Mar-12    RMS     Fixed bug in scan function decode (Peter Schorn)
    16-Feb-06    RMS     Added tape capacity checking
    07-Dec-04    RMS     Added read-only file support
    25-Apr-03    RMS     Revised for extended file support
@@ -209,7 +210,7 @@ switch (fnc) {                                          /* case function */
             (inst & CHC_REV))                           /* rw & rev? */
             return STOP_INVIOP;
         mt_inst = inst;                                 /* save inst */
-        if ((inst & DEV_MTS) && !(inst && DEV_OUT))     /* scanning? */
+        if ((inst & DEV_MTS) && !(inst & DEV_OUT))      /* scanning? */
             chan_set_flag (mt_dib.chan, CHF_SCAN);      /* set chan flg */
         xfr_req = xfr_req & ~XFR_MT0;                   /* clr xfr flag */
         sim_activate (uptr, mt_gtime);                  /* start timer */

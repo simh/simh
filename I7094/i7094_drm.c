@@ -25,6 +25,7 @@
 
    drm          7289/7320A "fast" drum
 
+   23-Mar-12    RMS     Corrected disk addressing and logical disk crossing
    25-Mar-11    RMS     Updated based on RPQ
 
    This simulator implements a subset of the functionality of the 7289, as
@@ -47,7 +48,7 @@
    Limitations in this simulator:
 
    - Chain mode is not implemented.
-   - Write protect switches are not implemented.
+   - LPCR is not implemented.
 
    For speed, the entire drum is buffered in memory.
 */
@@ -55,10 +56,12 @@
 #include "i7094_defs.h"
 #include <math.h>
 
-#define DRM_NUMDR       8                               /* drums/controller */
+#define DRM_NUMDR       4                               /* drums/controller */
 
 /* Drum geometry */
 
+#define DRM_NUMWDG      1024                            /* words/group */
+#define DRM_GPMASK      (DRM_NUMWDG - 1)                /* group mask */
 #define DRM_NUMWDS      2048                            /* words/sector */
 #define DRM_SCMASK      (DRM_NUMWDS - 1)                /* sector mask */
 #define DRM_NUMSC       16                              /* sectors/log drum */
@@ -68,6 +71,7 @@
 #define DRM_SIZE        (DRM_NUMLD * DRM_NUMWDL)        /* words/phys drum */
 #define GET_POS(x)      ((int) fmod (sim_gtime() / ((double) (x)), \
                         ((double) DRM_NUMWDS)))
+#define GET_PROT(x)     ((x[drm_phy] >> (drm_log - 1)) & 1)
 
 /* Drum address from channel */
 
@@ -80,7 +84,7 @@
 #define DRM_GETPHY(x)   (((uint32) ((x) >> DRM_V_PHY)) & DRM_M_PHY)
 #define DRM_GETLOG(x)   ((((uint32) (x)) >> DRM_V_LOG) & DRM_M_LOG)
 #define DRM_GETWDA(x)   ((((uint32) (x)) >> DRM_V_WDA) & DRM_M_WDA)
-#define DRM_GETDA(x)    (((DRM_GETLOG(x) - 1) * DRM_NUMWDL) + DRM_GETWDA(x))
+#define DRM_GETDA(l,x)  ((((l) - 1) * DRM_NUMWDL) + (x))
 
 /* SCD word */
 
@@ -88,9 +92,7 @@
 #define DRMS_V_INV      33                              /* invalid command */
 #define DRMS_V_PHY      31                              /* physical drum */
 #define DRMS_V_LOG      28                              /* logical drum */
-#define DRMS_V_HWDA     24                              /* high word addr */
-#define DRMS_M_HWDA     017
-#define DRMS_V_GRP      23                              /* group */
+#define DRMS_V_WDA      13                              /* disk address */
 #define DRMS_V_WRP      22                              /* write protect */
 #define DRMS_V_LPCR     18                              /* LPRCR */
 #define DRMS_M_LPCR     017
@@ -106,10 +108,12 @@
 uint32 drm_ch = CH_G;                                   /* drum channel */
 uint32 drm_da = 0;                                      /* drum address */
 uint32 drm_phy = 0;                                     /* physical drum */
+uint32 drm_log = 0;                                     /* logical drum */
 uint32 drm_sta = 0;                                     /* state */
 uint32 drm_op = 0;                                      /* operation */
 t_uint64 drm_chob = 0;                                  /* output buf */
 uint32 drm_chob_v = 0;                                  /* valid */
+uint32 drm_prot[DRM_NUMDR] = { 0 };                     /* drum protect sw */
 int32 drm_time = 10;                                    /* inter-word time */
 
 extern uint32 ind_ioc;
@@ -138,23 +142,20 @@ UNIT drm_unit[] = {
              UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
     { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
              UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
-    { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
-             UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
-    { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
-             UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
-    { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
-             UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
-    { UDATA (&drm_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+
-             UNIT_MUSTBUF+UNIT_DISABLE+UNIT_DIS, DRM_SIZE) },
     };
 
 REG drm_reg[] = {
     { ORDATA (STATE, drm_sta, 3) },
-    { ORDATA (DA, drm_da, 18) },
+    { ORDATA (UNIT,drm_phy, 2), REG_RO },
+    { ORDATA (LOG, drm_log, 3), REG_RO },
+    { ORDATA (DA, drm_da, 15) },
     { FLDATA (OP, drm_op, 0) },
-    { ORDATA (UNIT,drm_phy, 3) },
     { ORDATA (CHOB, drm_chob, 36) },
     { FLDATA (CHOBV, drm_chob_v, 0) },
+    { ORDATA (PROT0, drm_prot[0], 6) },
+    { ORDATA (PROT1, drm_prot[1], 6) },
+    { ORDATA (PROT2, drm_prot[2], 6) },
+    { ORDATA (PROT3, drm_prot[3], 6) },
     { DRDATA (TIME, drm_time, 24), REG_NZ + PV_LEFT },
     { DRDATA (CHAN, drm_ch, 3), REG_HRO },
     { NULL }
@@ -199,24 +200,38 @@ switch (sel) {                                          /* case on cmd */
 return SCPE_OK;
 }
 
+/* Channel diagnostic store routine */
+
+t_uint64 drm_sdc (uint32 ch)
+{
+t_uint64 val;
+
+
+val = (((t_uint64) ind_ioc) << DRMS_V_IOC) |
+    (((t_uint64) drm_phy) << DRMS_V_PHY) |
+    (((t_uint64) drm_log) << DRMS_V_LOG) |
+    (((t_uint64) (drm_da & ~ DRM_GPMASK)) << DRMS_V_WDA) |
+    (((t_uint64) GET_PROT(drm_prot)) << DRMS_V_WRP);
+return val;
+}
+
 /* Channel write routine */
 
 t_stat drm_chwr (uint32 ch, t_uint64 val, uint32 flags)
 {
-uint32 l;
 int32 cp, dp;
 
 if (drm_sta == DRM_1ST) {
     drm_phy = DRM_GETPHY (val);                         /* get unit */
-    l = DRM_GETLOG (val);                               /* get logical address */
-    if ((drm_phy >= DRM_NUMDR) ||                       /* invalid unit? */
-        (drm_unit[drm_phy].flags & UNIT_DIS) ||         /* disabled unit? */
-        (l == 0) || (l > DRM_NUMLD)) {                  /* invalid log drum? */
+    drm_log = DRM_GETLOG (val);                         /* get logical disk */
+    drm_da = DRM_GETWDA (val);                          /* get drum word addr */
+    if ((drm_unit[drm_phy].flags & UNIT_DIS) ||         /* disabled unit? */
+        (drm_log == 0) || (drm_log > DRM_NUMLD) ||      /* invalid log drum? */
+        ((drm_op != 0) && (GET_PROT (drm_prot) != 0))) { /* write to prot drum? */
         ch6_err_disc (ch, U_DRM, CHF_TRC);              /* disconnect */
         drm_sta = DRM_IDLE;
         return SCPE_OK;
         }
-    drm_da = DRM_GETDA (val);                           /* get drum addr */
     cp = GET_POS (drm_time);                            /* current pos in sec */
     dp = (drm_da & DRM_SCMASK) - cp;                    /* delta to desired pos */
     if (dp <= 0)                                        /* if neg, add rev */
@@ -243,23 +258,19 @@ t_stat drm_svc (UNIT *uptr)
 {
 uint32 i;
 t_uint64 *fbuf = (t_uint64 *) uptr->filebuf;
+uint32 da = DRM_GETDA (drm_log, drm_da);
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? */
     ch6_err_disc (drm_ch, U_DRM, CHF_TRC);              /* set TRC, disc */
     drm_sta = DRM_IDLE;                                 /* drum is idle */
     return SCPE_UNATT;
     }
-if (drm_da >= DRM_SIZE) {                               /* nx logical drum? */
-    ch6_err_disc (drm_ch, U_DRM, CHF_EOF);              /* set EOF, disc */
-    drm_sta = DRM_IDLE;                                 /* drum is idle */
-    return SCPE_OK;
-    }
 
 switch (drm_sta) {                                      /* case on state */
 
-    case DRM_FILL:                                      /* write, clr sector */
-        for (i = drm_da & ~DRM_SCMASK; i <= (drm_da | DRM_SCMASK); i++)
-            fbuf[i] = 0;                                /* clear sector */
+    case DRM_FILL:                                      /* write, clr group */
+        for (i = da & ~DRM_GPMASK; i <= (da | DRM_GPMASK); i++)
+            fbuf[i] = 0;                                /* clear group */
         if (i >= uptr-> hwmark)
             uptr->hwmark = i + 1;
         drm_sta = DRM_DATA;                             /* now data */
@@ -270,14 +281,14 @@ switch (drm_sta) {                                      /* case on state */
                 drm_chob_v = 0;
             else if (ch6_qconn (drm_ch, U_DRM))         /* no, chan conn? */
                 ind_ioc = 1;                            /* io check */
-            fbuf[drm_da] = drm_chob;                    /* get data */
-            if (drm_da >= uptr->hwmark)
-                uptr->hwmark = drm_da + 1;
-            if (!drm_da_incr ())
+            fbuf[da] = drm_chob;                        /* get data */
+            if (da >= uptr->hwmark)
+                uptr->hwmark = da + 1;
+            if (!drm_da_incr ())                        /* room for more? */
                 ch6_req_wr (drm_ch, U_DRM);
             }
         else{                                           /* read */
-            ch6_req_rd (drm_ch, U_DRM, fbuf[drm_da], 0); /* send word to channel */
+            ch6_req_rd (drm_ch, U_DRM, fbuf[da], 0);    /* send word to channel */
             drm_da_incr ();
             }
         sim_activate (uptr, drm_time);                  /* next word */
@@ -293,12 +304,12 @@ switch (drm_sta) {                                      /* case on state */
 return SCPE_OK;
 }
 
-/* Increment drum address - return true, set new state if end of sector */
+/* Increment drum address - return true, set new state if end of logical disk */
 
 t_bool drm_da_incr (void)
 {
-drm_da = (drm_da & ~DRM_LDMASK) | ((drm_da + 1) & DRM_LDMASK);
-if ((drm_da & DRM_LDMASK) != 0)
+drm_da = (drm_da + 1) & DRM_LDMASK;
+if (drm_da != 0)
     return FALSE;
 drm_sta = DRM_EOD;
 return TRUE;
@@ -311,6 +322,7 @@ t_stat drm_reset (DEVICE *dptr)
 uint32 i;
 
 drm_phy = 0;
+drm_log = 0;
 drm_da = 0;
 drm_op = 0;
 drm_sta = DRM_IDLE;

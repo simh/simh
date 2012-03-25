@@ -28,13 +28,13 @@
    tty          316/516-33 teleprinter
    clk/options  316/516-12 real time clocks/internal options
 
-   09-Jun-07    RMS     Fixed bug in clock increment (found by Theo Engel)
+   09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
-   03-Apr-06    RMS     Fixed bugs in punch state handling (from Theo Engel)
+   03-Apr-06    RMS     Fixed bugs in punch state handling (Theo Engel)
    22-Nov-05    RMS     Revised for new terminal processing routines
-   05-Feb-05    RMS     Fixed bug in OCP '0001 (found by Philipp Hachtmann)
-   31-Jan-05    RMS     Fixed bug in TTY print (found by Philipp Hachtmann)
-   01-Dec-04    RMS     Fixed problem in SKS '104 (reported by Philipp Hachtmann)
+   05-Feb-05    RMS     Fixed bug in OCP '0001 (Philipp Hachtmann)
+   31-Jan-05    RMS     Fixed bug in TTY print (Philipp Hachtmann)
+   01-Dec-04    RMS     Fixed problem in SKS '104 (Philipp Hachtmann)
                         Fixed bug in SKS '504
                         Added PTR detach routine, stops motion
                         Added PTR/PTP ASCII file support

@@ -41,7 +41,7 @@
    15-Oct-00    RMS     Added stack, byte, trap instructions
    14-Apr-99    RMS     Changed t_addr to unsigned
    27-Oct-98    RMS     V2.4 load interface
-   24-Sep-97    RMS     Fixed bug in device name table (found by Charles Owen)
+   24-Sep-97    RMS     Fixed bug in device name table (Charles Owen)
 */
 
 #include "nova_defs.h"

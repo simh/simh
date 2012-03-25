@@ -1,6 +1,6 @@
 /* scp.c: simulator control program
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
    25-Sep-11    MP      Added the ability for a simulator built with 
                         SIM_ASYNCH_IO to change whether I/O is actually done
@@ -1947,8 +1948,8 @@ for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
         fprintf (st, "  Step timer");
     else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
         fprintf (st, "  %s", sim_dname (dptr));
-        if (dptr->numunits > 1) fprintf (st, " unit %d",
-            (int32) (uptr - dptr->units));
+        if (dptr->numunits > 1)
+            fprintf (st, " unit %d", (int32) (uptr - dptr->units));
         }
     else fprintf (st, "  Unknown");
     fprintf (st, " at %d\n", accum + uptr->time);
@@ -3279,9 +3280,10 @@ t_stat r = 0;
 t_addr k;
 t_value pcval;
 
-if (v >= SCPE_BASE) fprintf (st, "\n%s, %s: ",
-    sim_error_text (v), pc->name);
-else fprintf (st, "\n%s, %s: ", sim_stop_messages[v], pc->name);
+if (v >= SCPE_BASE)
+    fprintf (st, "\n%s, %s: ", sim_error_text (v), pc->name);
+else
+    fprintf (st, "\n%s, %s: ", sim_stop_messages[v], pc->name);
 pcval = get_rval (pc, 0);
 if (sim_vm_fprint_addr)
     sim_vm_fprint_addr (st, dptr, (t_addr) pcval);

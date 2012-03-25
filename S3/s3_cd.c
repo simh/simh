@@ -1,6 +1,6 @@
 /* s3_cd.c: IBM 1442 card reader/punch
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
    cdp          card punch
    cdp2         card punch stacker 2
 
+   19-Mar-12    RMS     Fixed declaration of conversion tables (Mark Pizzolato)
    25-Apr-03    RMS     Revised for extended file support
    08-Oct-02    RMS     Added impossible function catcher
 

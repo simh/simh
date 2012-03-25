@@ -1,6 +1,6 @@
 /* h316_fhd.c: H316/516 fixed head simulator
 
-   Copyright (c) 2003-2008, Robert M. Supnik
+   Copyright (c) 2003-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    fhd          516-4400 fixed head disk
 
-   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
+   19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
+   15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
 
    These head-per-track devices are buffered in memory, to minimize overhead.

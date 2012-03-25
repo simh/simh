@@ -33,7 +33,7 @@
    17-Sep-01    RMS     Added terminal multiplexor support
    17-Mar-01    RMS     Moved function prototype
    05-Mar-01    RMS     Added clock calibration
-   24-Sep-97    RMS     Fixed bug in unit service (found by Charles Owen)
+   24-Sep-97    RMS     Fixed bug in unit service (Charles Owen)
 */
 
 #include "nova_defs.h"

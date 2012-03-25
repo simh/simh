@@ -28,7 +28,7 @@
    31-Dec-11    RMS     Select traps have priority over protect traps
                         Added SRI, SPI
                         Fixed user mode and relocation from CTSS RPQ documentation
-   16-Jul-10    RMS     Fixed user mode protection (found by Dave Pitts)
+   16-Jul-10    RMS     Fixed user mode protection (Dave Pitts)
                         Fixed issues in storage nullification mode
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added additional expanded core instructions

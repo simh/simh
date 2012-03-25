@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   19-Mar-12    RMS     Fixed declaration of CCT (Mark Pizzolato)
 */
 
 #include "i1620_defs.h"
@@ -122,7 +124,8 @@ const char *sim_stop_messages[] = {
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
+uint32 col, mask, cctbuf[CCT_LNT];
+int32 ptr, rpt;
 t_stat r;
 extern int32 cct_lnt, cct_ptr;
 extern uint32 cct[CCT_LNT];

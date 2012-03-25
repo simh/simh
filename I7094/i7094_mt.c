@@ -1,6 +1,6 @@
 /* i7094_mt.c: IBM 7094 magnetic tape simulator
 
-   Copyright (c) 2003-2008, Robert M Supnik
+   Copyright (c) 2003-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    mt           magtape simulator
 
-   16-Jul-10    RMS     Fixed handling of BSR, BSF (from Dave Pitts)
+   19-Mar-12    RMS     Fixed declaration of sel_name (Mark Pizzolato)
+   16-Jul-10    RMS     Fixed handling of BSR, BSF (Dave Pitts)
 */
 
 #include "i7094_defs.h"

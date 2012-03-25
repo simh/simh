@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,9 +26,10 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   19-Mar-12    RMS     Fixed declarations of saved_pc, io_stop (Mark Pizzolato)
    19-Jan-07    RMS     Set UNIT_TEXT flag
-   13-Jul-06    RMS     Fixed card reader fgets call (from Tom McBride)
-                        Fixed card reader boot sequence (from Tom McBride)
+   13-Jul-06    RMS     Fixed card reader fgets call (Tom McBride)
+                        Fixed card reader boot sequence (Tom McBride)
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    25-Apr-03    RMS     Revised for extended file support
 

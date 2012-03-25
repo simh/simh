@@ -35,7 +35,8 @@
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
-    BUILD_MULTIPLE = (s)
+    BUILD_MULTIPLE = s
+    BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
   else
     BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
   endif
@@ -43,7 +44,8 @@ else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
     NETWORK_USEFUL = true
-    BUILD_MULTIPLE = (s)
+    BUILD_MULTIPLE = s
+    BUILD_SINGLE := all $(BUILD_SINGLE)
   endif
 endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
@@ -63,6 +65,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSNAME = windows-build
   endif
   GCC_VERSION = $(shell $(GCC) --version /dev/null | grep GCC | awk '{ print $$3 }')
+  LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
     OS_CCDEFS = -D_GNU_SOURCE
@@ -249,6 +252,7 @@ else
   GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
+  LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
     PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
     ifeq (,$(NOASYNCH))
@@ -298,6 +302,9 @@ else
   ifneq (3,$(GCC_MAJOR_VERSION))
     GCC_OPTIMIZERS = $(shell $(GCC) --help=optimizers)
   endif
+  ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
+    NO_LTO = 1
+  endif
   ifneq (,$(findstring inline-functions,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -finline-functions
   endif
@@ -316,9 +323,11 @@ else
   ifneq (,$(findstring strict-overflow,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fno-strict-overflow
   endif
-  ifneq (,$(findstring lto,$(GCC_OPTIMIZERS)))
-    CFLAGS_O += -flto -fwhole-program
-    LDFLAGS_O += -flto -fwhole-program
+  ifeq (,$(NO_LTO))
+    ifneq (,$(findstring lto,$(GCC_OPTIMIZERS)))
+      CFLAGS_O += -flto -fwhole-program
+      LDFLAGS_O += -flto -fwhole-program
+    endif
   endif
   BUILD_FEATURES = - compiler optimizations and no debugging support
 endif

@@ -46,23 +46,22 @@
    28-Aug-02    RMS     Added end of medium support
    30-May-02    RMS     Widened POS to 32b
    22-Apr-02    RMS     Fixed max record length, first block bootstrap
-                        (found by Jonathan Engdahl)
+                        (Jonathan Engdahl)
    26-Jan-02    RMS     Revised bootstrap to conform to M9312
    06-Jan-02    RMS     Revised enable/disable support
    30-Nov-01    RMS     Added read only unit, extended SET/SHOW support
    24-Nov-01    RMS     Converted UST, POS, FLG to arrays
    09-Nov-01    RMS     Added bus map support
-   18-Oct-01    RMS     Added stub diagnostic register (found by Thord Nilson)
+   18-Oct-01    RMS     Added stub diagnostic register (Thord Nilson)
    07-Sep-01    RMS     Revised device disable and interrupt mechanisms
    26-Apr-01    RMS     Added device enable/disable support
    18-Apr-01    RMS     Changed to rewind tape before boot
    14-Apr-99    RMS     Changed t_addr to unsigned
    04-Oct-98    RMS     V2.4 magtape format
-   10-May-98    RMS     Fixed bug with non-zero unit operation (from Steven Schultz)
-   09-May-98    RMS     Fixed problems in bootstrap (from Steven Schultz)
-   10-Apr-98    RMS     Added 2nd block bootstrap (from John Holden,
-                        University of Sydney)
-   31-Jul-97    RMS     Added bootstrap (from Ethan Dicks, Ohio State)
+   10-May-98    RMS     Fixed bug with non-zero unit operation (Steven Schultz)
+   09-May-98    RMS     Fixed problems in bootstrap (Steven Schultz)
+   10-Apr-98    RMS     Added 2nd block bootstrap (John Holden)
+   31-Jul-97    RMS     Added bootstrap (Ethan Dicks)
    22-Jan-97    RMS     V2.3 magtape format
    18-Jan-97    RMS     Fixed double interrupt, error flag bugs
    29-Jun-96    RMS     Added unit disable support

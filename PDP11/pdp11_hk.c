@@ -1,6 +1,6 @@
 /* pdp11_hk.c - RK611/RK06/RK07 disk controller
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    hk           RK611/RK06/RK07 disk
 
+   19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    29-Apr-07    RMS     NOP and DCLR (at least) do not check drive type
                         MR2 and MR3 only updated on NOP
    17-Nov-05    RMS     Removed unused variable

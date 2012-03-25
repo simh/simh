@@ -25,8 +25,8 @@
 
    idc          MSM/IDC disk controller
 
-   03-Apr-06    RMS     Fixed WD/WH handling (found by Davis Johnson)
-   30-Mar-06    RMS     Fixed bug, nop command should be ignored (found by Davis Johnson)
+   03-Apr-06    RMS     Fixed WD/WH handling (Davis Johnson)
+   30-Mar-06    RMS     Fixed bug, nop command should be ignored (Davis Johnson)
    25-Apr-03    RMS     Revised for extended file support
    16-Feb-03    RMS     Fixed read to test transfer ok before selch operation
 

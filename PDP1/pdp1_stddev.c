@@ -1,6 +1,6 @@
 /* pdp1_stddev.c: PDP-1 standard devices
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,16 +28,17 @@
    tti          keyboard
    tto          teleprinter
 
+   21-Mar-12    RMS     Fixed unitialized variable in tto_svc (Michael Bloom)
    21-Dec-06    RMS     Added 16-channel sequence break support
-   29-Oct-03    RMS     Added PTR FIODEC-to-ASCII translation (from Phil Budne)
+   29-Oct-03    RMS     Added PTR FIODEC-to-ASCII translation (Phil Budne)
    07-Sep-03    RMS     Changed ioc to ios
    30-Aug-03    RMS     Revised PTR to conform to Maintenance Manual;
                         added deadlock prevention on errors
    23-Jul-03    RMS     Revised to detect I/O wait hang
    25-Apr-03    RMS     Revised for extended file support
    22-Dec-02    RMS     Added break support
-   29-Nov-02    RMS     Fixed output flag initialization (found by Derek Peschel)
-   21-Nov-02    RMS     Changed typewriter to half duplex (found by Derek Peschel)
+   29-Nov-02    RMS     Fixed output flag initialization (Derek Peschel)
+   21-Nov-02    RMS     Changed typewriter to half duplex (Derek Peschel)
    06-Oct-02    RMS     Revised for V2.10
    30-May-02    RMS     Widened POS to 32b
    29-Nov-01    RMS     Added read only unit support
@@ -591,7 +592,6 @@ return SCPE_OK;
 
 t_stat tto_svc (UNIT *uptr)
 {
-int32 c;
 t_stat r;
 
 if (tty_buf == FIODEC_UC)                               /* upper case? */
@@ -599,10 +599,15 @@ if (tty_buf == FIODEC_UC)                               /* upper case? */
 else if (tty_buf == FIODEC_LC)                          /* lower case? */
     tty_uc = 0;
 else {
+    int32 c;
     c = fiodec_to_ascii[tty_buf | tty_uc];              /* translate */
     if (c && ((r = sim_putchar_s (c)) != SCPE_OK)) {    /* output; error? */
         sim_activate (uptr, uptr->wait);                /* retry */
         return ((r == SCPE_STALL)? SCPE_OK: r);
+        }
+    if (c == '\r') {                                    /* cr? add lf */
+        sim_putchar ('\n');
+        uptr->pos = uptr->pos + 1;
         }
     }
 if (cpls & CPLS_TTO) {                                  /* completion pulse? */
@@ -612,10 +617,6 @@ if (cpls & CPLS_TTO) {                                  /* completion pulse? */
 iosta = iosta | IOS_TTO;                                /* set flag */
 dev_req_int (tto_sbs);                                  /* req interrupt */
 uptr->pos = uptr->pos + 1;
-if (c == '\r') {                                        /* cr? add lf */
-    sim_putchar ('\n');
-    uptr->pos = uptr->pos + 1;
-    }
 return SCPE_OK;
 }
 
