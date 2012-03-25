@@ -37,7 +37,7 @@ static t_stat ptr_svc    (UNIT *uptr);
 static t_stat ptr_reset  (DEVICE *dptr);
 static t_stat ptr_attach (UNIT *uptr, char *cptr);
 static t_stat ptr_detach (UNIT *uptr);
-static t_stat ptr_boot	 (int unitno, DEVICE *dptr);
+static t_stat ptr_boot	 (int32 unitno, DEVICE *dptr);
 static t_stat ptp_svc    (UNIT *uptr);
 static t_stat ptp_reset  (DEVICE *dptr);
 static t_stat ptp_attach (UNIT *uptr, char *cptr);
@@ -228,7 +228,7 @@ static t_stat ptr_detach (UNIT *uptr)
 
 /* ptr_attach - perform paper tape initial program load */
 
-static t_stat ptr_boot (int unitno, DEVICE *dptr)
+static t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 	int ch, nch, val, addr;
 	t_bool leader = TRUE, start = FALSE;

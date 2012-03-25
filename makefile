@@ -28,18 +28,18 @@
 # building the pdp11, or any vax simulator could use networking support
 # No Asynch I/O support for now.
 NOASYNCH = 1
+BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_PREFIX)
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
-    BUILD_MULTIPLE = (s)
-  else
-    BUILD_SINGLE := $(MAKECMDGOALS) $(BUILD_SINGLE)
+    BUILD_MULTIPLE = s
   endif
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
     NETWORK_USEFUL = true
-    BUILD_MULTIPLE = (s)
+    BUILD_MULTIPLE = s
+    BUILD_SINGLE := all $(BLANK_PREFIX)
   endif
 endif
 ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
@@ -58,7 +58,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSTYPE = cygwin
     OSNAME = windows-build
   endif
-  GCC_VERSION = $(shell $(GCC) --version /dev/null | grep GCC | awk '{ print $$3 }')
+  GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
@@ -74,6 +74,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
+      GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
+      GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     else
       ifeq (Linux,$(OSTYPE))
         LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
@@ -202,8 +204,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         else
           $(error using libpcap: $(call find_lib,$(PCAPLIB)) missing pcap.h)
         endif
-        LIBEXT = $(LIBEXTSAVE)
       endif
+      LIBEXT = $(LIBEXTSAVE)
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
 	  # Given we have libpcap components, consider other network connections as well
@@ -294,31 +296,34 @@ else
   LDFLAGS_O = 
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
   ifneq (3,$(GCC_MAJOR_VERSION))
-    GCC_OPTIMIZERS = $(shell $(GCC) --help=optimizers)
+    ifeq (,$(GCC_OPTIMIZERS_CMD))
+      GCC_OPTIMIZERS_CMD = $(GCC) --help=optimizers
+    endif
+    GCC_OPTIMIZERS = $(shell $(GCC_OPTIMIZERS_CMD))
   endif
   ifneq (,$(findstring $(GCC_VERSION),$(LTO_EXCLUDE_VERSIONS)))
     NO_LTO = 1
   endif
-  ifneq (,$(findstring inline-functions,$(GCC_OPTIMIZERS)))
+  ifneq (,$(findstring -finline-functions,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -finline-functions
   endif
-  ifneq (,$(findstring gcse-after-reload,$(GCC_OPTIMIZERS)))
+  ifneq (,$(findstring -fgcse-after-reload,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fgcse-after-reload
   endif
-  ifneq (,$(findstring predictive-commoning,$(GCC_OPTIMIZERS)))
+  ifneq (,$(findstring -fpredictive-commoning,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fpredictive-commoning
   endif
-  ifneq (,$(findstring ipa-cp-clone,$(GCC_OPTIMIZERS)))
+  ifneq (,$(findstring -fipa-cp-clone,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fipa-cp-clone
   endif
-  ifneq (,$(findstring unsafe-loop-optimizations,$(GCC_OPTIMIZERS)))
+  ifneq (,$(findstring -funsafe-loop-optimizations,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fno-unsafe-loop-optimizations
   endif
-  ifneq (,$(findstring strict-overflow,$(GCC_OPTIMIZERS)))
+  ifneq (,$(findstring -fstrict-overflow,$(GCC_OPTIMIZERS)))
     CFLAGS_O += -fno-strict-overflow
   endif
   ifeq (,$(NO_LTO))
-    ifneq (,$(findstring lto,$(GCC_OPTIMIZERS)))
+    ifneq (,$(findstring -flto,$(GCC_OPTIMIZERS)))
       CFLAGS_O += -flto -fwhole-program
       LDFLAGS_O += -flto -fwhole-program
     endif
@@ -326,18 +331,23 @@ else
   BUILD_FEATURES = - compiler optimizations and no debugging support
 endif
 ifneq (3,$(GCC_MAJOR_VERSION))
-  ifneq (,$(findstring unused-result,$(shell $(GCC) --help=warnings)))
+  ifeq (,$(GCC_WARNINGS_CMD))
+    GCC_WARNINGS_CMD = $(GCC) --help=warnings
+  endif
+  ifneq (,$(findstring -Wunused-result,$(shell $(GCC_WARNINGS_CMD))))
     CFLAGS_O += -Wno-unused-result
   endif
 endif
-BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
-$(info ***)
-$(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
-$(info *** $(BUILD_FEATURES).)
-ifneq (,$(NETWORK_FEATURES))
-  $(info *** $(NETWORK_FEATURES).)
+ifneq (clean,$(MAKECMDGOALS))
+  BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
+  $(info ***)
+  $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
+  $(info *** $(BUILD_FEATURES).)
+  ifneq (,$(NETWORK_FEATURES))
+    $(info *** $(NETWORK_FEATURES).)
+  endif
+  $(info ***)
 endif
-$(info ***)
 ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
 endif

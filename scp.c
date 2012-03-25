@@ -3463,6 +3463,8 @@ if (!initialized) {
     handle = dlopen("libreadline." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
         handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
+    if (!handle)
+        handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
     if (handle) {
         p_readline = dlsym(handle, "readline");
         p_add_history = dlsym(handle, "add_history");

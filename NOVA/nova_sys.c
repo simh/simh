@@ -861,7 +861,8 @@ return SCPE_ARG;
 
 char *get_addr (char *cptr, t_addr addr, t_bool ext, int32 cflag, int32 *val)
 {
-int32 d, r, x, pflag;
+int32 d, x, pflag;
+t_stat r;
 char gbuf[CBUFSIZE];
 int32 dmax, dsign;
 

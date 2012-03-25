@@ -197,7 +197,7 @@ int32 int_mask;						/* current active interrupt mask (ipl sensitive) */
 int32 mem_mask;						/* mask for memory address bits based on current memory size */
 int32 cpu_dsw = 0;					/* CPU device status word */
 int32 ibkpt_addr = -1;				/* breakpoint addr */
-int32 sim_gui = TRUE;				/* enable gui */
+t_bool sim_gui = TRUE;				/* enable gui */
 t_bool running = FALSE;				/* TRUE if CPU is running */
 t_bool power   = TRUE;				/* TRUE if CPU power is on */
 t_bool cgi     = FALSE;				/* TRUE if we are running as a CGI program */
@@ -222,7 +222,7 @@ t_stat cpu_set_type (UNIT *uptr, int32 value, char *cptr, void *desc);
 void calc_ints (void);
 
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
-extern t_stat detach_cmd (int flags, char *cptr);
+extern t_stat detach_cmd (int32 flags, char *cptr);
 extern UNIT cr_unit;
 extern int32 sim_switches;
 
@@ -230,7 +230,7 @@ extern int32 sim_switches;
 	static void   archive_backtrace(char *inst);
 	static void   reset_backtrace (void);
 	static void   show_backtrace (int nshow);
-	static t_stat backtrace_cmd (int flag, char *cptr);
+	static t_stat backtrace_cmd (int32 flag, char *cptr);
 #else
 	#define archive_backtrace(inst)
 	#define reset_backtrace()
@@ -245,7 +245,7 @@ extern int32 sim_switches;
 
 static void   init_console_window (void);
 static void   destroy_console_window (void);
-static t_stat view_cmd (int flag, char *cptr);
+static t_stat view_cmd (int32 flag, char *cptr);
 static t_stat cpu_attach (UNIT *uptr, char *cptr);
 static t_bool bsctest (int32 DSPLC, t_bool reset_V);
 static void   exit_irq (void);
@@ -1556,7 +1556,7 @@ static void show_backtrace (int nshow)
 		putchar('\n');
 }
 
-static t_stat backtrace_cmd (int flag, char *cptr)
+static t_stat backtrace_cmd (int32 flag, char *cptr)
 {
 	int n;
 
@@ -1854,7 +1854,7 @@ void debug_print (char *fmt, ...)
 
 /* view_cmd - let user view and/or edit a file (e.g. a printer output file, script, or source deck) */
 
-static t_stat view_cmd (int flag, char *cptr)
+static t_stat view_cmd (int32 flag, char *cptr)
 {
 #ifdef _WIN32
 	char cmdline[256];

@@ -951,7 +951,7 @@ t_stat load_cr_boot (int drvno, int switches)
 	return SCPE_OK;
 }
 
-t_stat cr_boot (int unitno, DEVICE *dptr)
+t_stat cr_boot (int32 unitno, DEVICE *dptr)
 {
 	t_stat rval;
 	int i;
