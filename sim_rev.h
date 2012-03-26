@@ -49,9 +49,14 @@ patch   date            module(s) and fix(es)
 
                         sim_ether.c
                         - major revision (Dave Hittner and Mark Pizzolato)
+                        - fixed array overrun which caused SEGFAULT on hosts with many
+                          devices which libpcap can access.
+                        - fixed duplicate MAC address detection to work reliably on switch
+                          connected LANs
 
                         sim_tmxr.c:
-                        - made option negotiation more reliable (Mark Pizzolato)
+                        - made telnet option negotiation more reliable, VAX simulator now 
+                          works with PuTTY as console (Mark Pizzolato)
 
                         h316_cpu.c:
                         - fixed bugs in MPY, DIV introduced in 3.8-1 (from Theo Engel)
@@ -216,6 +221,63 @@ patch   date            module(s) and fix(es)
                         
                         pdp11_ts.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
+
+                        pdp11_tu.c:
+                        - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
+
+                        pdp11_vh.c: (Mark Pizzolato)
+                        - fixed SET VH LINES=n to correctly adjust the number
+                          of lines available to be 8, 16, 24, or 32.
+                        - fixed performance issue avoiding redundant polling
+
+                        pdp11_xq.c: (Mark Pizzolato)
+                        - Fixed missing information from save/restore which
+                          caused operations to not complete correctly after 
+                          a restore until the OS reset the controller.
+                        - Added address conflict check during attach.
+                        - Fixed loopback processing to correctly handle forward packets.
+                        - Fixed interrupt dispatch issue which caused delivered packets 
+                          (in and out) to sometimes not interrupt the CPU after processing.
+                        - Fixed the SCP visibile SA registers to always display the 
+                          ROM mac address, even after it is changed by SET XQ MAC=.
+                        - Added changes so that the Console DELQA diagnostic (>>>TEST 82) 
+                          will succeed.
+                        - Added DELQA-T (aka DELQA Plus) device emulation support.
+                        - Added dropped frame statistics to record when the receiver discards
+                          received packets due to the receiver being disabled, or due to the
+                          XQ device's packet receive queue being full.
+                        - Fixed bug in receive processing when we're not polling.  This could
+                          cause receive processing to never be activated again if we don't 
+                          read all available packets via eth_read each time we get the 
+                          opportunity.
+                        - Added the ability to Coalesce received packet interrupts.  This
+                          is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of 
+                          microseconds to delay the triggering of an interrupt when a packet
+                          is received.
+                        - Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without 
+                          polling for packet read completion.
+                        - Changed the sanity and id timer mechanisms to use a separate timer
+                          unit so that transmit and recieve activities can be dealt with
+                          by the normal xq_svc routine.
+                          Dynamically determine the timer polling rate based on the 
+                          calibrated tmr_poll and clk_tps values of the simulator.
+                        - Enabled the SET XQ POLL to be meaningful if the simulator currently
+                          doesn't support idling.
+                        - Changed xq_debug_setup to use sim_debug instead of printf so that
+                          all debug output goes to the same place.
+                        - Restored the call to xq_svc after all successful calls to eth_write
+                          to allow receive processing to happen before the next event
+                          service time.  This must have been inadvertently commented out 
+                          while other things were being tested.
+
+                        pdp11_xu.c: (Mark Pizzolato)
+                        - Added SHOW XU FILTERS modifier (Dave Hittner)
+                        - Corrected SELFTEST command, enabling use by VMS 3.7, VMS 4.7, and Ultrix 1.1 (Dave Hittner)
+                        - Added address conflict check during attach.
+                        - Added loopback processing support
+                        - Fixed the fact that no broadcast packets were received by the DEUNA
+                        - Fixed transmitted packets to have the correct source MAC address.
+                        - Fixed incorrect address filter setting calling eth_filter().
 
                         pdp8_fpp.c: (Rick Murphy)
                         - many bug fixes; now functional
