@@ -1018,10 +1018,11 @@ do {
         }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
-    if (echo)                                           /* echo if -v */
+    if (echo) {                                         /* echo if -v */
         printf("do> %s\n", cptr);
-    if (echo && sim_log)
-        fprintf (sim_log, "do> %s\n", cptr);
+        if (sim_log)
+            fprintf (sim_log, "do> %s\n", cptr);
+        }
     if (*cptr == ':')                                   /* ignore label */
         continue;
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -1058,9 +1059,6 @@ do {
         stat = stat & ~SCPE_DOFAILED;                   /* remove possible flag */
         }
     switch (stat) {
-        case SCPE_OK:
-        case SCPE_STEP:
-            break;
         case SCPE_AFAIL:
             staying = (sim_on_check[sim_do_depth] &&        /* if trap action defined */
                        sim_on_actions[sim_do_depth][stat]); /* use it, otherwise exit */
@@ -1068,8 +1066,10 @@ do {
         case SCPE_EXIT:
             staying = FALSE;
             break;
+        case SCPE_OK:
+        case SCPE_STEP:
+            break;
         default:
-            staying = sim_on_check[sim_do_depth];
             break;
         }
     if ((staying || !interactive) &&                    /* report error if staying */
