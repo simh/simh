@@ -994,12 +994,15 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
 if ((nargs <= 0) || (do_arg [0] == NULL))               /* need at least 1 */
     return SCPE_2FARG;
 if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
-    if (flag == 0)                                      /* cmd line file? */
-         fprintf (stderr, "Can't open file %s\n", do_arg[0]);
-    if (flag > 1)
-        return SCPE_OPENERR | SCPE_DOFAILED;            /* return failure with flag */
-    else
-        return SCPE_OPENERR;                            /* return failure */
+    strcat (strcpy (cbuf, do_arg[0]), ".sim");          /* try again with .sim extension */
+    if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
+        if (flag == 0)                                      /* cmd line file? */
+             fprintf (stderr, "Can't open file %s\n", do_arg[0]);
+        if (flag > 1)
+            return SCPE_OPENERR | SCPE_DOFAILED;        /* return failure with flag */
+        else
+            return SCPE_OPENERR;                        /* return failure */
+        }
     }
 if (flag < 1)                                           /* start at level 1 */
     flag = 1;
