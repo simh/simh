@@ -26,6 +26,7 @@
    17-Jan-11    MP      Added buffered line capabilities
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    22-Nov-05    RMS     Added central input/output conversion support
+   05-Nov-04    JDB     [local fix 3] Added SET/SHOW CONSOLE HALT/RESPONSE/DELAY, svc routine
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
    28-May-04    RMS     Added SET/SHOW CONSOLE
    02-Jan-04    RMS     Removed timer routines, added Telnet console routines
@@ -64,12 +65,23 @@ t_stat sim_set_cons_log (int32 flg, char *cptr);
 t_stat sim_set_cons_nolog (int32 flg, char *cptr);
 t_stat sim_set_deboff (int32 flag, char *cptr);
 t_stat sim_set_pchar (int32 flag, char *cptr);
+/* [JDB local fix 3] begin */
+t_stat sim_set_halt (int32 flag, char *cptr);
+t_stat sim_set_response (int32 flag, char *cptr);
+t_stat sim_set_delay (int32 flag, char *cptr);
+/* [JDB local fix 3] end */
 t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_telnet (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_pchar (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+/* [JDB local fix 3] begin */
+t_stat sim_show_halt (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_response (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_delay (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat halt_svc (UNIT *ptr);
+/* [JDB local fix 3] end */
 t_stat sim_show_cons_buff (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_cons_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_check_console (int32 sec);

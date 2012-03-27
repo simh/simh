@@ -30,7 +30,7 @@
 #define SIM_MAJOR       3
 #define SIM_MINOR       9
 #define SIM_PATCH       0
-#define SIM_DELTA       0
+#define SIM_DELTA       1
 
 /* V3.9 revision history
 

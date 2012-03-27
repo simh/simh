@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    18-Mar-12    RMS     Removed unused reference to sim_switches (Dave Bryan)
+   22-Dec-11    JDB     [local fix 3] Fixed bug with anchored halt string matching
    07-Dec-11    MP      Added sim_ttisatty to support reasonable behaviour (i.e. 
                         avoid in infinite loop) in the main command input
                         loop when EOF is detected and input is coming from 
@@ -57,6 +58,9 @@
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    31-May-06    JDB     Fixed bug if SET CONSOLE DEBUG with no argument
    22-Nov-05    RMS     Added central input/output conversion support
+   05-Nov-04    JDB     [local fix 3] Added SET/SHOW CONSOLE HALT=<string> command
+                        [local fix 3] Added SET/SHOW CONSOLE RESPONSE=<string> command
+                        [local fix 3] Added SET/SHOW CONSOLE DELAY=<n> command, halt svc
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
    28-Oct-04    JDB     Fixed SET CONSOLE to allow comma-separated parameters
    20-Aug-04    RMS     Added OS/2 EMX fixes (Holger Veit)
@@ -128,6 +132,12 @@
 #define KMAP_MASK       0377
 #define KMAP_NZ         0400
 
+/* [JDB local fix 3] begin */
+#define CMD_WANTSTR     0100000
+
+#define ESC_CHAR '~'
+/* [JDB local fix 3] end */
+
 int32 sim_int_char = 005;                               /* interrupt character */
 int32 sim_brk_char = 000;                               /* break character */
 int32 sim_tt_pchar = 0x00002780;
@@ -139,11 +149,28 @@ int32 sim_del_char = 0177;
 TMLN sim_con_ldsc = { 0 };                              /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };         /* console line mux */
 
+/* [JDB local fix 3] begin */
+UNIT sim_halt_unit = { UDATA (&halt_svc, 0, 0), 0 };
+/* [JDB local fix 3] end */
+
 extern volatile int32 stop_cpu;
 extern int32 sim_quiet;
 extern FILE *sim_log, *sim_deb;
 extern FILEREF *sim_log_ref, *sim_deb_ref;
 extern DEVICE *sim_devices[];
+/* [JDB local fix 3] begin */
+extern int32 sim_switches;
+
+static char mbuf [CBUFSIZE];                            /* match buffer */
+static char rbuf [CBUFSIZE];                            /* response buffer */
+static char *rptr = NULL;
+static t_bool halt_enabled = FALSE;                     /* console halt is enabled */
+static t_bool halt_anchored = FALSE;                    /* halt string is anchored */
+static t_bool halt_immediate = FALSE;                   /* halt match mode is immediate */
+static char *mptr = mbuf;                               /* current match string pointer */
+static t_bool match = FALSE;                            /* halt string has matched */
+static t_bool check = FALSE;                            /* halt string is to be checked */
+/* [JDB local fix 3] end */
 
 /* Set/show data structures */
 
@@ -158,6 +185,13 @@ static CTAB set_con_tab[] = {
     { "NOLOG", &sim_set_logoff, 0 },
     { "DEBUG", &sim_set_debon, 0 },
     { "NODEBUG", &sim_set_deboff, 0 },
+/* [JDB local fix 3] begin */
+    { "HALT", &sim_set_halt, 1 | CMD_WANTSTR },
+    { "NOHALT", &sim_set_halt, 0 },
+    { "DELAY", &sim_set_delay, 0 },
+    { "RESPONSE", &sim_set_response, 1 | CMD_WANTSTR },
+    { "NORESPONSE", &sim_set_response, 0 },
+/* [JDB local fix 3] end */
     { NULL, NULL, 0 }
     };
 
@@ -169,6 +203,11 @@ static SHTAB show_con_tab[] = {
     { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
     { "DEBUG", &sim_show_debug, 0 },
+/* [JDB local fix 3] begin */
+    { "HALT", &sim_show_halt, 0 },
+    { "DELAY", &sim_show_delay, 0 },
+    { "RESPONSE", &sim_show_response, 0 },
+/* [JDB local fix 3] end */
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { NULL, NULL, 0 }
     };
@@ -188,6 +227,12 @@ static int32 *cons_kmap[] = {
     &sim_del_char
     };
 
+/* [JDB local fix 3] begin */
+static void test_console_halt (int32 test_char);
+static void decode (char *decoded, const char *encoded);
+static void encode (char *encoded, const char *decoded);
+/* [JDB local fix 3] end */
+
 /* Console I/O package.
 
    The console terminal can be attached to the controlling window
@@ -203,16 +248,34 @@ t_stat sim_set_console (int32 flag, char *cptr)
 char *cvptr, gbuf[CBUFSIZE];
 CTAB *ctptr;
 t_stat r;
+/* [JDB local fix 3] begin */
+char *sptr;
+/* [JDB local fix 3] end */
 
 if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
 while (*cptr != 0) {                                    /* do all mods */
+/* [JDB local fix 3] begin */
+    sptr = cptr;
+/* [JDB local fix 3] end */
     cptr = get_glyph_nc (cptr, gbuf, ',');              /* get modifier */
     if (cvptr = strchr (gbuf, '='))                     /* = value? */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
     if (ctptr = find_ctab (set_con_tab, gbuf)) {        /* match? */
-        r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
+/* [JDB local fix 3] begin */
+        if (ctptr->arg & CMD_WANTSTR) {                 /* need full string? */
+            sptr = get_glyph_nc (sptr, gbuf, '=');      /* everything after '=' */
+
+            while (isspace (*(sptr - 1)))               /* restore any leading spaces */
+                sptr--;                                 /* (get_glyph_nc strips spaces after '=') */
+
+            r = ctptr->action (ctptr->arg, sptr);
+            *cptr = 0;                                  /* no more modifiers */
+            }
+        else
+            r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
+/* [JDB local fix 3] end */
         if (r != SCPE_OK)
             return r;
         }
@@ -627,6 +690,329 @@ if (!ref)
 return ref->name;
 }
 
+/* [JDB local fix 3] begin */
+
+/* Set console halt */
+
+t_stat sim_set_halt (int32 flag, char *cptr)
+{
+if (flag == 0)                                              /* no halt? */
+    halt_enabled = FALSE;                                   /* disable halt checks */
+
+else {
+    if (cptr == NULL || *cptr == 0)                         /* no match string? */
+        return SCPE_2FARG;                                  /* need an argument */
+
+    halt_enabled = TRUE;                                    /* enable halt checks */
+
+    decode (mbuf, cptr);                                    /* save decoded match string */
+
+    halt_anchored = ((sim_switches & SWMASK ('A')) != 0);   /* set match type */
+    halt_immediate = ((sim_switches & SWMASK ('I')) != 0);  /* set match trigger */
+
+    mptr = mbuf;                                            /* init match string pointer */
+    check = TRUE;                                           /* init check for match */
+    match = FALSE;                                          /* init match has occurred */
+    }
+
+return SCPE_OK;
+}
+
+
+/* Show console halt */
+
+t_stat sim_show_halt (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char pbuf [CBUFSIZE];
+
+if (cptr && *cptr != 0)                                 /* extra chars? */
+    return SCPE_2MARG;                                  /* too many arguments */
+
+if (halt_enabled) {                                     /* halt enabled? */
+    encode (pbuf, mbuf);                                /* encode the string for printing */
+
+    fprintf (st, "Halt string is \"%s\", mode is %s %s\n",
+             pbuf,
+             halt_anchored  ? "anchored"  : "unanchored",
+             halt_immediate ? "immediate" : "deferred");
+    }
+
+else
+    fputs ("Halt disabled\n", st);
+
+return SCPE_OK;
+}
+
+
+/* Set console response */
+
+t_stat sim_set_response (int32 flag, char *cptr)
+{
+if (flag == 0)                                          /* no response? */
+    rptr = NULL;                                        /* clear response ptr */
+
+else {
+    if (cptr == NULL || *cptr == 0)
+        return SCPE_2FARG;                              /* need arg */
+
+    decode (rbuf, cptr);                                /* save decoded string */
+    rptr = rbuf;                                        /* set response ptr */
+    }
+
+return SCPE_OK;
+}
+
+
+/* Show console response */
+
+t_stat sim_show_response (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char pbuf [CBUFSIZE];
+
+if (cptr && *cptr != 0)                                 /* extra chars? */
+    return SCPE_2MARG;                                  /* too many arguments */
+
+if (rptr) {
+    encode (pbuf, rptr);                                /* encode match str */
+    fprintf (st, "Response string is \"%s\"\n", pbuf);
+    }
+
+else
+    fputs ("Response disabled\n", st);
+
+return SCPE_OK;
+}
+
+
+/* Set console delay */
+
+t_stat sim_set_delay (int32 flag, char *cptr)
+{
+int32 val;
+t_stat r;
+
+if (cptr == NULL || *cptr == 0)                         /* no argument string? */
+    return SCPE_2FARG;                                  /* need an argument */
+
+val = (int32) get_uint (cptr, 10, INT_MAX, &r);         /* parse the argument */
+
+if (r == SCPE_OK)                                       /* parse OK? */
+    sim_halt_unit.wait = val;                           /* save the delay value */
+
+return r;
+}
+
+
+/* Show console delay */
+
+t_stat sim_show_delay (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+if (cptr && *cptr != 0)                                 /* extra chars? */
+    return SCPE_2MARG;                                  /* too many arguments */
+
+fprintf (st, "Halt delay=%i\n", sim_halt_unit.wait);    /* report delay value */
+
+return SCPE_OK;
+}
+
+
+/* Unit service for console halt timeout.
+
+   Scheduled by test_console_halt when the halt string is seen.  Returns the
+   halt timeout SCP code after the specified delay, which will cause the
+   simulator to stop.
+*/
+
+t_stat halt_svc (UNIT *uptr)
+{
+return SCPE_CHALT;
+}
+
+
+/* Check for a console halt.
+
+   The console halt string match mode may be specified as anchored (-a) or
+   unanchored, and immediate (-i) or deferred.  An anchored string must match at
+   the start of the output buffer; an unanchored string may match anywhere. An
+   immediate match halts as soon as the last character of the match string is
+   seen in the output stream and may occur multiple times per line; a deferred
+   match halts only after the trailing line feed character is output and occurs
+   only once, regardless of the number of times the match string appears in the
+   output stream.
+
+   Once a deferred match has occured, or an anchored match has failed, no
+   further match checks are made on the current line.
+
+   An immediate, anchored match halts only once when the halt string first
+   matches, even if the match string also occurs later in the line.  For
+   example, if the match string is "ABC" and the output characters are
+   "ABC-ABC", the halt occurs after the first "C" is output but NOT after the
+   second "C" is output, even though the halt string still matches the start of
+   the output buffer.  The second halt would occur if the immediate match was
+   unanchored.
+
+   To summarize the match modes:
+
+     - unanchored, deferred:  halt once if match occurs anywhere in the line
+     - unanchored, immediate: halt each time the match occurs anywhere in the line
+     - anchored,   deferred:  halt once if match occurs at the start of the line
+     - anchored,   immediate: halt once if match occurs at the start of the line
+
+   Implementation Notes:
+
+    1. This routine should be called only when console halts are enabled.
+
+    2. The passed character is checked against the current match character.  If
+       it matches, the match string pointer is advanced.  If the end of the
+       match string is reached, match success is indicated and further match
+       checks are suppressed until the console halt occurs, which may be
+       immediately or at the end of the line, depending on whether the "-i"
+       switch was used.
+
+    3. If the character does not match, and the match is anchored, further match
+       checks are suppressed until the start of the next line.
+
+    4. If the character does not match, and the match is unanchored, a check is
+       made to see if any characters have matched.  If not, then substrings need
+       not be checked.  Otherwise, the output stream is searched for substrings
+       of the match string.  For example, if the match string is "GAGAX" and the
+       output characters are "GAGAG", then the match fails on the fifth
+       character.  However, the last three characters output match the leading
+       substring "GAG" of the match string, so the match pointer is reset to
+       point at the fourth character, rather than the second.  Then, if an "AX"
+       is subsequently output, the match will succeed.
+
+    5. Searching for the longest substring that matches the output stream would
+       appear to require a history buffer.  However, the fact that all of the
+       prior output characters until the current one have matched means that the
+       match string itself IS a history of the output stream.  We need only
+       search for substrings that equal the substring of the match string that
+       ends with the last-matched character.
+
+    6. The search starts with the longest possible substring and then attempts
+       shorter and shorter substrings until either a match occurs or no
+       substring matches.  In the first case, the match pointer is reset
+       appropriately, and partial matching continues.  In the second, the match
+       pointer is reset to the beginning of the match string, and a new match is
+       sought.
+*/
+
+static void test_console_halt (int32 test_char)
+{
+char *history, *hptr, *sptr;
+
+if (check)                                              /* are we checking for a match? */
+    if (*mptr == test_char) {                           /* does the search character match? */
+        mptr++;                                         /* point at the next character to match */
+
+        if (*mptr == '\0') {                            /* is the search string exhausted? */
+            match = TRUE;                               /* the match has succeeded */
+            check = FALSE;                              /* stop checking until console halt */
+            mptr = mbuf;                                /* reset the search pointer */
+            }
+        }
+
+    else if (halt_anchored)                             /* match failed; is search anchored? */
+        check = FALSE;                                  /* yes, so done until end of line */
+
+    else if (mptr != mbuf) {                            /* unanchored failure; partial match? */
+        history = --mptr;                               /* save pointer to output history */
+
+        do {                                            /* search for a substring match */
+            while (mptr >= mbuf && *mptr != test_char)  /* back up in search string */
+                mptr--;                                 /*   until a matching character found */
+
+            if (mptr < mbuf) {                          /* if no matching character found */
+                mptr = mbuf;                            /*   reset the search pointer */
+                sptr = NULL;                            /*   and exit the substring search */
+                }
+
+            else {                                      /* potential substring match */
+                hptr = history;                         /* set up history */
+                sptr = mptr - 1;                        /*   and substring pointers */
+
+                while (sptr >= mbuf && *sptr == *hptr) {    /* test substring in reverse */
+                    sptr--;                                 /*   until a match fails */
+                    hptr--;                                 /*   or the entire substring matches */
+                    }
+
+                if (sptr < mbuf) {                      /* if a substring was found */
+                    mptr++;                             /*   point at the next character to match */
+                    sptr = NULL;                        /*   and exit the substring search */
+                    }
+
+                else                                    /* the substring did not match */
+                    mptr = sptr;                        /*   so try the next shorter substring */
+                }
+
+            } while (sptr);
+        }
+
+
+if (test_char == '\n' && halt_anchored) {               /* end of line for an anchored match? */
+    mptr = mbuf;                                        /* reset the search pointer */
+    check = TRUE;                                       /*   and resume checking for matches */
+    }
+
+if (match && (halt_immediate || test_char == '\n')) {   /* immediate or end-of-line match? */
+    sim_activate (&sim_halt_unit, sim_halt_unit.wait);  /* schedule the console halt */
+    match = FALSE;                                      /* reset the match flag */
+
+    if (! halt_anchored)                                /* if not anchored */
+        check = TRUE;                                   /*   resume checking for matches */
+    }
+
+return;
+}
+
+
+/* Decode a string.
+
+   A string containing encoded control characters is decoded into the equivalent
+   character string.  Escape targets @, A-Z, and [\]^_ form control characters
+   000-037.
+*/
+
+static void decode (char *decoded, const char *encoded)
+{
+char c;
+
+while (c = *decoded++ = *encoded++)                     /* copy the character */
+    if (c == ESC_CHAR)                                  /* does it start an escape? */
+        if (isalpha (*encoded) ||                       /* is next character "A-Z" or "a-z"? */
+            *encoded == '@' ||                          /*   or "@"? */
+            *encoded >= '[' && *encoded <= '_')         /*   or "[\]^_"? */
+
+            *(decoded - 1) = *encoded++ & 037;          /* convert back to control character */
+
+        else if (*encoded == '\0' ||                    /* single escape character at EOL? */
+                 *encoded++ != ESC_CHAR)                /*   or not followed by another escape? */
+            decoded--;                                  /* drop the encoding */
+return;
+}
+
+
+/* Encode a string.
+
+   A string containing control characters is encoded into the equivalent escaped
+   form.  Control characters 000-037 are encoded into the form "~<c>", where <c>
+   is a character in the range 0100-0137.
+ */
+
+static void encode (char *encoded, const char *decoded)
+{
+char c;
+
+while (c = *encoded++ = *decoded++)                     /* copy the character */
+    if (iscntrl (c) && c != 0177) {                     /* if a control character (but not DEL) */
+        *(encoded - 1) = ESC_CHAR;                      /* change to the escape character */
+        *encoded++ = c | 0100;                          /*   followed by the encoded character */
+        }
+return;
+}
+/* [JDB local fix 3] end */
+
+
 /* Check connection before executing */
 
 t_stat sim_check_console (int32 sec)
@@ -684,6 +1070,13 @@ t_stat sim_poll_kbd (void)
 {
 int32 c;
 
+/* [JDB local fix 3] begin */
+if (rptr)                                               /* response set? */
+    if (c = *rptr++)                                    /* more characters to send? */
+        return (c | SCPE_KFLAG);                        /* return response char */
+    else                                                /* at end of string */
+        rptr = NULL;                                    /* terminate the response */
+/* [JDB local fix 3] end */
 c = sim_os_poll_kbd ();                                 /* get character */
 if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))     /* ^E or not Telnet? */
     return c;                                           /* in-window */
@@ -705,6 +1098,10 @@ return SCPE_OK;
 
 t_stat sim_putchar (int32 c)
 {
+/* [JDB local fix 3] begin */
+if (halt_enabled)
+    test_console_halt (c);                              /* check for a console halt */
+/* [JDB local fix 3] end */
 if (sim_con_tmxr.master == 0) {                         /* not Telnet? */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
@@ -727,6 +1124,10 @@ t_stat sim_putchar_s (int32 c)
 {
 t_stat r;
 
+/* [JDB local fix 3] begin */
+if (halt_enabled)
+    test_console_halt (c);                              /* check for a console halt */
+/* [JDB local fix 3] end */
 if (sim_con_tmxr.master == 0) {                         /* not Telnet? */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);

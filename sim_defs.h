@@ -37,6 +37,7 @@
                         Added REG_FIT flag
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    11-Mar-05    RMS     Moved 64b data type definitions outside USE_INT64
+   25-Feb-05    JDB     [local fix 3] Added SCPE_CHALT error value
    07-Feb-05    RMS     Added assertion fail stop
    05-Nov-04    RMS     Added support for SHOW opt=val
    20-Oct-04    RMS     Converted all base types to typedefs
@@ -248,8 +249,11 @@ typedef uint32          t_addr;
 #define SCPE_TTMO       (SCPE_BASE + 40)                /* Telnet conn timeout */
 #define SCPE_STALL      (SCPE_BASE + 41)                /* Telnet conn stall */
 #define SCPE_AFAIL      (SCPE_BASE + 42)                /* assert failed */
+/* [JDB local fix 3] begin */
+#define SCPE_CHALT      (SCPE_BASE + 43)                /* Console halt */
+/* [JDB local fix 3] end */
 
-#define SCPE_MAX_ERR    (SCPE_BASE + 43)                /* Maximum SCPE Error Value */
+#define SCPE_MAX_ERR    (SCPE_BASE + 44)                /* Maximum SCPE Error Value */
 #define SCPE_KFLAG      0010000                         /* tti data flag */
 #define SCPE_BREAK      0020000                         /* tti break flag */
 

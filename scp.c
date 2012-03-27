@@ -57,10 +57,12 @@
    08-Feb-09    RMS     Fixed warnings in help printouts
    29-Dec-08    RMS     Fixed implementation of MTAB_NC
    24-Nov-08    RMS     Revised RESTORE unit logic for consistency
+   12-Sep-08    JDB     [local fix 3] no SCPE_CHALT message if RUN from DO file without -V
    05-Sep-08    JDB     "detach_all" ignores error status returns if shutting down
    17-Aug-08    RMS     Revert RUN/BOOT to standard, rather than powerup, reset
    25-Jul-08    JDB     DO cmd missing params now default to null string
    29-Jun-08    JDB     DO cmd sub_args now allows "\\" to specify literal backslash
+   04-Jun-08    JDB     [local fix 8] Label the patch delta more clearly
    31-Mar-08    RMS     Fixed bug in local/global register search (Mark Pizzolato)
                         Fixed bug in restore of RO units (Mark Pizzolato)
    06-Feb-08    RMS     Added SET/SHO/NO BR with default argument
@@ -72,6 +74,7 @@
    30-Jan-07    RMS     Fixed bugs in get_ipaddr
    17-Oct-06    RMS     Added idle support
    04-Oct-06    JDB     DO cmd failure now echoes cmd unless -q
+   30-Aug-06    JDB     [local fix 7] detach_unit returns SCPE_UNATT if not attached
    14-Jul-06    RMS     Added sim_activate_abs
    02-Jun-06    JDB     Fixed do_cmd to exit nested files on assertion failure
                         Added -E switch to do_cmd to exit on any error
@@ -88,6 +91,9 @@
    22-Mar-05    JDB     Modified DO command to allow ten-level nesting
    18-Mar-05    RMS     Moved DETACH tests into detach_unit (Dave Bryan)
                         Revised interface to fprint_sym, fparse_sym
+   13-Mar-05    JDB     [local fix 4] ASSERT now requires a conditional operator
+   25-Feb-05    JDB     [local fix 3] Added SCPE_CHALT message string
+                        [local fix 3] Added halt unit support in show_queue
    07-Feb-05    RMS     Added ASSERT command (Dave Bryan)
    02-Feb-05    RMS     Fixed bug in global register search
    26-Dec-04    RMS     Qualified SAVE examine, RESTORE deposit with SIM_SW_REST
@@ -99,6 +105,7 @@
    27-Sep-04    RMS     Fixed comma-separation options in set (David Bryan)
    09-Sep-04    RMS     Added -p option for RESET
    13-Aug-04    RMS     Qualified RESTORE detach with SIM_SW_REST
+   17-Jul-04    JDB     [local fix 2] DO cmd file open failure retries with ".sim" appended
    17-Jul-04    RMS     Added ECHO command (Dave Bryan)
    12-Jul-04    RMS     Fixed problem ATTACHing to read only files
                         (John Dundas)
@@ -290,6 +297,10 @@ int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
 #endif
 
+/* [JDB local fix 3] begin */
+extern UNIT sim_halt_unit;
+
+/* [JDB local fix 3] end */
 /* VM interface */
 
 extern char sim_name[];
@@ -517,6 +528,9 @@ const struct scp_error {
          {"TTMO",    "Console Telnet connection timed out"},
          {"STALL",   "Console Telnet output stall"},
          {"AFAIL",   "Assertion failed"},
+/* [JDB local fix 3] begin */
+         {"CHALT",   "Console halt"}
+/* [JDB local fix 3] end */
 };
 
 const size_t size_map[] = { sizeof (int8),
@@ -617,6 +631,17 @@ static CTAB cmd_table[] = {
       "set console NOLOG        disable console logging\n"
       "set console DEBUG        enable console debugging\n"
       "set console NODEBUG      disable console debugging\n"
+      "set console {-A}{-I} HALT=<string>\n"
+      "                         set a console output string which\n"
+      "                         will cause a simulator halt\n"
+      "set console NOHALT       disable console halt condition\n"
+      "set console RESPONSE=<string>\n"
+      "                         specify characters which will be\n"
+      "                         presented as console input\n"
+      "set console NORESPONSE   cancels pending console input\n"
+      "set console DELAY=<n>    specifies a number of instructions to delay\n"
+      "                         between when a console halt condition\n"
+      "                         is satisfied and the halt occurs\n"
       "set break <list>         set breakpoints\n"
       "set nobreak <list>       clear breakpoints\n"
       "set throttle {x{M|K|%}}|{x/t}\n"
@@ -936,7 +961,7 @@ return SCPE_OK;
 
    Note that SCPE_STEP ("Step expired") is considered a note and not an error
    and so does not abort command execution when using -E.
-   
+
    Inputs:
         flag    =   caller and nesting level indicator
         fcptr   =   filename and optional arguments, space-separated
@@ -971,6 +996,7 @@ if (interactive) {                                      /* get switches */
     }
 if (sim_switches & SWMASK ('V'))                        /* -v means echo */
     echo = 1;
+
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
 c = fcptr;
@@ -1036,6 +1062,10 @@ do {
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
         if ((cmdp->action == &return_cmd))              /* RETURN command? */
             break;                                      /*    done! */
+/* [JDB local fix 3] begin */
+        if ((cmdp->action == &run_cmd) && !echo)        /* run command and not echoing? */
+            sim_switches = SIM_SW_HIDE;                 /* suppress potential console halt message */
+/* [JDB local fix 3] end */
         isdo = (cmdp->action == &do_cmd);
         if (isdo) {                                     /* DO command? */
             if (flag >= MAX_DO_NEST_LVL)                /* nest too deep? */
@@ -1213,6 +1243,9 @@ t_value val;
 t_stat r;
 
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
+/* [JDB local fix 4] begin */
+sim_stab.boolop = -1;                                   /* no relational op dflt */
+/* [JDB local fix 4] end */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get register */
@@ -1239,7 +1272,10 @@ else {
     }
 if (*cptr != 0)                                         /* must be done */
     return SCPE_2MARG;
-if (!get_search (gbuf, rptr->radix, &sim_stab))         /* parse condition */
+/* [JDB local fix 4] begin */
+if (!get_search (gbuf, rptr->radix, &sim_stab) ||       /* parse condition */
+    (sim_stab.boolop == -1))                            /* relational op reqd */
+/* [JDB local fix 4] end */
     return SCPE_MISVAL;
 val = get_rval (rptr, idx);                             /* get register value */
 if (test_search (val, &sim_stab))                       /* test condition */
@@ -1889,7 +1925,9 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
 if (vdelt)
-    fprintf (st, "(%d)", vdelt);
+/* [JDB local fix 8] begin */
+    fprintf (st, " delta %d", vdelt);
+/* [JDB local fix 8] end */
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
 fprintf (st, "\n");
@@ -1949,6 +1987,10 @@ accum = 0;
 for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
     if (uptr == &sim_step_unit)
         fprintf (st, "  Step timer");
+/* [JDB local fix 3] begin */
+    else if (uptr == &sim_halt_unit)
+        fprintf (st, "  Console halt timer");
+/* [JDB local fix 3] end */
     else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
         fprintf (st, "  %s", sim_dname (dptr));
         if (dptr->numunits > 1)
@@ -2583,8 +2625,13 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
-if (!(uptr->flags & UNIT_ATT))                          /* attached? */
-    return SCPE_OK;
+/* [JDB local fix 7] begin */
+if (!(uptr->flags & UNIT_ATT))                          /* not attached? */
+    if (sim_switches & SIM_SW_REST)                     /* restoring? */
+        return SCPE_OK;                                 /* allow detach */
+    else
+        return SCPE_UNATT;                              /* complain */
+/* [JDB local fix 7] end */
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
 if (uptr->flags & UNIT_BUF) {
@@ -3257,6 +3304,10 @@ else {
 #if defined (VMS)
 printf ("\n");
 #endif
+/* [JDB local fix 3] begin */
+if ((r == SCPE_CHALT) && (sim_switches & SIM_SW_HIDE))  /* hide console halt message? */
+    return SCPE_OK;                                     /* return quietly */
+/* [JDB local fix 3] end */
 fprint_stopped (stdout, r);                             /* print msg */
 if (sim_log)                                            /* log if enabled */
     fprint_stopped (sim_log, r);
