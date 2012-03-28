@@ -825,6 +825,10 @@ return SCPE_OK;
 
 t_stat halt_svc (UNIT *uptr)
 {
+/* [JDB local fix 3] begin */
+if (sim_switches & SIM_SW_HIDE)                         /* hide console halt message? */
+    return SCPE_CHALT | SCPE_NOMESSAGE;                 /* return quietly */
+/* [JDB local fix 3] end */
 return SCPE_CHALT;
 }
 

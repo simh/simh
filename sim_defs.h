@@ -254,8 +254,9 @@ typedef uint32          t_addr;
 /* [JDB local fix 3] end */
 
 #define SCPE_MAX_ERR    (SCPE_BASE + 44)                /* Maximum SCPE Error Value */
-#define SCPE_KFLAG      0010000                         /* tti data flag */
-#define SCPE_BREAK      0020000                         /* tti break flag */
+#define SCPE_KFLAG      0x1000                          /* tti data flag */
+#define SCPE_BREAK      0x2000                          /* tti break flag */
+#define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
 
 /* Print value format codes */
 

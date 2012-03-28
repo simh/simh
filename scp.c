@@ -454,6 +454,7 @@ int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
+static char sim_do_filename[MAX_DO_NEST_LVL+1][CBUFSIZE];
 
 static t_stat sim_last_cmd_stat;                        /* Command Status */
 
@@ -976,8 +977,6 @@ return SCPE_OK;
         >1      =   nested "DO" command
 */
 
-#define SCPE_DOFAILED   0040000                         /* fail in DO, not subproc */
-
 t_stat do_cmd (int32 flag, char *fcptr)
 {
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
@@ -985,7 +984,7 @@ FILE *fpin;
 CTAB *cmdp;
 int32 echo = sim_do_echo, nargs, errabort, i;
 t_bool interactive, isdo, staying;
-t_stat stat;
+t_stat stat, stat_nomessage;
 char *ocptr;
 
 stat = SCPE_OK;
@@ -1017,15 +1016,16 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
         }
     }                                                   /* end for */
 
-if ((nargs <= 0) || (do_arg [0] == NULL))               /* need at least 1 */
+if (do_arg [0] == NULL)                                 /* need at least 1 */
     return SCPE_2FARG;
-if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
+strcpy (cbuf, do_arg[0]);
+if ((fpin = fopen (cbuf, "r")) == NULL) {               /* file failed to open? */
     strcat (strcpy (cbuf, do_arg[0]), ".sim");          /* try again with .sim extension */
     if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
         if (flag == 0)                                      /* cmd line file? */
              fprintf (stderr, "Can't open file %s\n", do_arg[0]);
         if (flag > 1)
-            return SCPE_OPENERR | SCPE_DOFAILED;        /* return failure with flag */
+            return SCPE_OPENERR | SCPE_NOMESSAGE;       /* return failure with flag */
         else
             return SCPE_OPENERR;                        /* return failure */
         }
@@ -1033,6 +1033,8 @@ if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? 
 if (flag < 1)                                           /* start at level 1 */
     flag = 1;
 ++sim_do_depth;
+sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1];
+strcpy( sim_do_filename[sim_do_depth], cbuf);           /* stash away do file name */
 if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
@@ -1075,6 +1077,8 @@ do {
         else stat = cmdp->action (cmdp->arg, cptr);     /* exec other cmd */
         }
     else stat = SCPE_UNK;                               /* bad cmd given */
+    stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+    stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
     if ((stat != SCPE_OK) ||
         ((cmdp->action != &return_cmd) &&
          (cmdp->action != &goto_cmd) &&
@@ -1084,12 +1088,11 @@ do {
     if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
-            (!isdo || (stat & SCPE_DOFAILED))) {        /* and not from DO return */
+            (!isdo || stat_nomessage)) {                /* and not suppressing messages */
             printf("%s> %s\n", do_arg[0], ocptr);
             if (sim_log)
                 fprintf (sim_log, "%s> %s\n", do_arg[0], ocptr);
             }
-        stat = stat & ~SCPE_DOFAILED;                   /* remove possible flag */
         }
     switch (stat) {
         case SCPE_AFAIL:
@@ -1105,8 +1108,8 @@ do {
         default:
             break;
         }
-    if ((staying || !interactive) &&                    /* report error if staying */
-        (stat >= SCPE_BASE) && !isdo) {                 /* or in cmdline file */
+    if ((staying || !interactive) &&                   /* report error if staying */
+        (stat >= SCPE_BASE) && !stat_nomessage) {      /* or in cmdline file */
         printf ("%s\n", sim_error_text (stat));
         if (sim_log)
             fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -1137,6 +1140,7 @@ if (cmdp && (cmdp->action == &return_cmd)) {            /* return command? */
     if (0 == *cptr)
         return stat;                                    /* return with last command status */
     sim_string_to_stat (cptr, &stat);
+    sim_last_cmd_stat = stat;                           /* save explicit status as command error status */
     return stat;                                        /* return with explicit return status */
     }
 return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
@@ -3304,13 +3308,11 @@ else {
 #if defined (VMS)
 printf ("\n");
 #endif
-/* [JDB local fix 3] begin */
-if ((r == SCPE_CHALT) && (sim_switches & SIM_SW_HIDE))  /* hide console halt message? */
-    return SCPE_OK;                                     /* return quietly */
-/* [JDB local fix 3] end */
-fprint_stopped (stdout, r);                             /* print msg */
-if (sim_log)                                            /* log if enabled */
-    fprint_stopped (sim_log, r);
+if (!(r & SCPE_NOMESSAGE)) {
+    fprint_stopped (stdout, r);                         /* print msg */
+    if (sim_log)                                        /* log if enabled */
+        fprint_stopped (sim_log, r);
+    }
 return r;
 }
 
@@ -5391,7 +5393,7 @@ const char *sim_error_text (t_stat stat)
 {
 static char msgbuf[64];
 
-stat &= ~(SCPE_KFLAG|SCPE_BREAK);                       /* remove any flags */
+stat &= ~(SCPE_KFLAG|SCPE_BREAK|SCPE_NOMESSAGE);        /* remove any flags */
 if (stat == SCPE_OK)
     return "No Error";
 if ((stat >= SCPE_BASE) && (stat <= SCPE_MAX_ERR))
@@ -5414,6 +5416,8 @@ for (cond=0; cond < (SCPE_MAX_ERR-SCPE_BASE); cond++)
         cond += SCPE_BASE;
         break;
         }
+if (0 == strcmp(gbuf, "OK"))
+    cond = SCPE_OK;
 if (cond == (SCPE_MAX_ERR-SCPE_BASE)) {       /* not found? */
     if (0 == (cond = strtol(gbuf, NULL, 0)))  /* try explicit number */
         return SCPE_ARG;
