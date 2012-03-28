@@ -729,7 +729,7 @@ int main (int argc, char *argv[])
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr;
 int32 i, sw;
 t_bool lookswitch;
-t_stat stat;
+t_stat stat, stat_nomessage;
 CTAB *cmdp;
 
 #if defined (__MWERKS__) && defined (macintosh)
@@ -837,7 +837,9 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     if (cmdp = find_cmd (gbuf))                         /* lookup command */
         stat = cmdp->action (cmdp->arg, cptr);          /* if found, exec */
     else stat = SCPE_UNK;
-    if (stat >= SCPE_BASE) {                            /* error? */
+    stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+    stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
+    if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
         printf ("%s\n", sim_error_text (stat));
         if (sim_log)
             fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -1161,6 +1163,15 @@ return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
    literal "\".  All other character combinations are rendered literally.
 
    Omitted parameters result in null-string substitutions.
+
+   A Tokens preceeded and followed by % characters are expanded as environment
+   variables, and if one isn't found then can be one of several special 
+   variables: 
+          %DATE%              yyyy/mm/dd
+          %TIME%              hh:mm:ss
+          %CTIME%             Www Mmm dd hh:mm:ss yyyy
+          %STATUS%            Status value from the last command executed
+          %TSTATUS%           The text form of the last status value
 */
 
 void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
@@ -3313,7 +3324,7 @@ if (!(r & SCPE_NOMESSAGE)) {
     if (sim_log)                                        /* log if enabled */
         fprint_stopped (sim_log, r);
     }
-return r;
+return r | SCPE_NOMESSAGE;
 }
 
 /* Common setup for RUN or BOOT */
