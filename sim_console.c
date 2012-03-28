@@ -279,7 +279,8 @@ while (*cptr != 0) {                                    /* do all mods */
         if (r != SCPE_OK)
             return r;
         }
-    else return SCPE_NOPARAM;
+    else
+        return SCPE_NOPARAM;
     }
 return SCPE_OK;
 }
@@ -498,7 +499,7 @@ while (*cptr != 0) {                                    /* do all mods */
         }
     else
         if (ctptr = find_ctab (set_con_telnet_tab, gbuf)) { /* match? */
-            r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
+            r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
             if (r != SCPE_OK)
                 return r;
             }
@@ -1420,8 +1421,6 @@ t_stat sim_os_poll_kbd (void)
 int c = -1;
 DWORD nkbevents, nkbevent;
 INPUT_RECORD rec;
-
-\
 
 if ((std_input == NULL) ||                              /* No keyboard for */
     (std_input == INVALID_HANDLE_VALUE))                /* background processes */
