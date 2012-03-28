@@ -1177,7 +1177,9 @@ return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
    maxstr       =       min (len (instr), len (tmpbuf))
    do_arg[10]   =       arguments
 
-   Token "%0" represents the command file name.
+   Token "%0" expands to the command file name. 
+   Token %n (n being a single digit) expands to the n'th argument
+   Tonen %* expands to the whole set of arguments (%1 ... %9)
 
    The input sequence "\%" represents a literal "%", and "\\" represents a
    literal "\".  All other character combinations are rendered literally.
@@ -1198,6 +1200,7 @@ return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
 void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
 {
 char *ip, *op, *ap, *oend = tmpbuf + maxstr - 2;
+char rbuf[CBUFSIZE];
 
 for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
     if ((ip [0] == '\\') &&                             /* literal escape? */
@@ -1205,11 +1208,25 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
         ip++;                                           /* skip '\' */
         *op++ = *ip++;                                  /* copy escaped char */
         }
-    else
+    else 
         if (*ip == '%') {                               /* sub? */
             if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
                 ap = do_arg[ip[1] - '0'];
                 ip = ip + 2;
+                }
+            else if (ip[1] == '*') {                    /* %1 ... %9 = sub */
+                int i;
+                
+                memset (rbuf, '\0', sizeof(rbuf));
+                ap = rbuf;
+                for (i=1; i<=9; ++i)
+                    if (do_arg[i] == NULL)
+                        break;
+                    else
+                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i])))
+                            sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
+                        else
+                            break;
                 }
             else {                                      /* environment variable */
                 char gbuf[CBUFSIZE];
@@ -1220,7 +1237,6 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
                 if (*ip == '%') ++ip;
                 ap = getenv(gbuf);
                 if (!ap) {
-                    static char rbuf[CBUFSIZE];
                     time_t now;
                     struct tm *tmnow;
 
