@@ -985,7 +985,7 @@ t_stat do_cmd (int32 flag, char *fcptr)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp;
-int32 echo = sim_do_echo, nargs, errabort, i;
+int32 echo, saved_sim_do_echo = sim_do_echo, nargs, errabort, i;
 t_bool interactive, isdo, staying;
 t_stat stat, stat_nomessage;
 char *ocptr;
@@ -996,8 +996,7 @@ interactive = (flag > 0);                               /* issued interactively?
 if (interactive) {                                      /* get switches */
     GET_SWITCHES (fcptr);
     }
-if (sim_switches & SWMASK ('V'))                        /* -v means echo */
-    echo = 1;
+echo = sim_switches & SWMASK ('V');                     /* -v means echo */
 
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
@@ -1150,7 +1149,7 @@ do {
 
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
-sim_do_echo = 0;
+sim_do_echo = saved_sim_do_echo;                        /* restore echo state we entered with */
 for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
     free (sim_on_actions[sim_do_depth][i]);
     sim_on_actions[sim_do_depth][i] = NULL;
