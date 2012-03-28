@@ -839,6 +839,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     else stat = SCPE_UNK;
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
+    sim_last_cmd_stat = stat;                           /* save command error status */
     if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
         printf ("%s\n", sim_error_text (stat));
         if (sim_log)
@@ -1035,7 +1036,26 @@ if ((fpin = fopen (cbuf, "r")) == NULL) {               /* file failed to open? 
 if (flag < 1)                                           /* start at level 1 */
     flag = 1;
 ++sim_do_depth;
-sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1];
+sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1]; /* inherit On mode */
+if (sim_switches & SWMASK ('O')) {                      /* -o means inherit ON condition actions */
+    for (i=0; i<SCPE_MAX_ERR; i++) {                    /* replicate any on commands */
+        if (sim_on_actions[sim_do_depth-1][i]) {
+            sim_on_actions[sim_do_depth][i] = malloc(1+strlen(sim_on_actions[sim_do_depth-1][i]));
+            if (NULL == sim_on_actions[sim_do_depth][i]) {
+                while (--i >= 0) {
+                    free(sim_on_actions[sim_do_depth][i]);
+                    sim_on_actions[sim_do_depth][i] = NULL;
+                    }
+                sim_on_check[sim_do_depth] = 0;
+                sim_brk_clract ();                      /* defang breakpoint actions */
+                --sim_do_depth;                         /* unwind nesting */
+                return SCPE_MEM;
+                }
+            strcpy(sim_on_actions[sim_do_depth][i], sim_on_actions[sim_do_depth-1][i]);
+            }
+        }
+    }
+
 strcpy( sim_do_filename[sim_do_depth], cbuf);           /* stash away do file name */
 if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
@@ -1172,6 +1192,7 @@ return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
           %CTIME%             Www Mmm dd hh:mm:ss yyyy
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
+          %SIM_VERIFY%        The Verify mode of the current Do command file
 */
 
 void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
@@ -1224,6 +1245,10 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
                         }
                     else if (!strcmp ("TSTATUS", gbuf)) {
                         sprintf (rbuf, "%s", sim_error_text (sim_last_cmd_stat));
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("SIM_VERIFY", gbuf)) {
+                        sprintf (rbuf, "%s", sim_do_echo ? "-V" : "");
                         ap = rbuf;
                         }
                     }
