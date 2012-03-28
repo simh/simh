@@ -77,6 +77,11 @@ UNIT sim_throt_unit = { UDATA (&sim_throt_svc, 0, 0) };
 
 #if defined (__VAX)
 #define sys$gettim SYS$GETTIM
+#define sys$setimr SYS$SETIMR
+#define lib$emul LIB$EMUL
+#define sys$waitfr SYS$WAITFR
+#define lib$subx LIB$SUBX
+#define lib$ediv LIB$EDIV
 #endif
 
 #include <starlet.h>
