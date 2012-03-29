@@ -342,7 +342,7 @@ ifneq (3,$(GCC_MAJOR_VERSION))
     CFLAGS_O += -Wno-unused-result
   endif
 endif
-ifeq (clean,$(MAKECMDGOALS))
+ifneq (clean,$(MAKECMDGOALS))
   BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
   $(info ***)
   $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
