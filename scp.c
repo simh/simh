@@ -698,7 +698,7 @@ static CTAB cmd_table[] = {
       "goto <label>             goto label in command file\n" },
     { "RETURN", &return_cmd, 0,
       "return                   return from command file with last command status\n"
-      "return <status>          return from command file with specific status\n" },
+      "return {-Q} <status>     return from command file with specific status\n" },
     { "ON", &on_cmd, 0,
       "on <condition> <action>  perform action after condition\n"
       "on <condition>           clear action for specific condition\n" },
@@ -1166,10 +1166,12 @@ sim_on_check[sim_do_depth] = 0;                         /* clear on mode */
 sim_brk_clract ();                                      /* defang breakpoint actions */
 --sim_do_depth;                                         /* unwind nesting */
 if (cmdp && (cmdp->action == &return_cmd)) {            /* return command? */
-    if (0 == *cptr)
-        return stat;                                    /* return with last command status */
+    if (0 == *cptr)                                     /* No Argument? */
+        return stat | SCPE_NOMESSAGE;                   /* return last command status (suppressing message)*/
     sim_string_to_stat (cptr, &stat);
     sim_last_cmd_stat = stat;                           /* save explicit status as command error status */
+    if (sim_switches & SWMASK ('Q'))
+        stat |= SCPE_NOMESSAGE;                         /* suppress error message display (in caller) if requested */
     return stat;                                        /* return with explicit return status */
     }
 return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
