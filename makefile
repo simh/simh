@@ -71,11 +71,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     INCPATH:=/usr/include
     LIBPATH:=/usr/lib
     OS_CCDEFS = -D_GNU_SOURCE
+    GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
+    GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
-      GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     else
       ifeq (Linux,$(OSTYPE))
         LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
