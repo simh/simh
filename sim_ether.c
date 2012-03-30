@@ -163,6 +163,7 @@
 
   Modification history:
 
+  30-Mar-12  MP   Added host NIC address determination on supported VMS platforms
   01-Mar-12  MP   Made host NIC address determination on *nix platforms more 
                   robust.
   01-Mar-12  MP   Added host NIC address determination work when building 
@@ -1216,6 +1217,94 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 #endif
   return ReturnValue;
 }
+#endif  /* defined(_WIN32) || defined(__CYGWIN__) */
+
+#if defined (__VMS) && !defined(__VAX)
+#include <descrip.h>
+#include <iodef.h>
+#include <ssdef.h>
+#include <starlet.h>
+#include <stdio.h>
+#include <stsdef.h>
+#include <nmadef.h>
+
+static int pcap_mac_if_vms(char *AdapterName, unsigned char MACAddress[6])
+{
+  char VMS_Device[16];
+  $DESCRIPTOR(Device, VMS_Device);
+  unsigned short iosb[4];
+  unsigned short *w;
+  unsigned char *pha = NULL;
+  unsigned char *hwa = NULL;
+  int tmpval;
+  int status;
+  unsigned short characteristics[512];
+  long chardesc[] = {sizeof(characteristics), (long)&characteristics};
+  unsigned short chan;
+#pragma member_alignment save
+#pragma nomember_alignment
+  static struct {
+    short fmt;
+    long val_fmt;
+    short pty;
+    long val_pty;
+    short pad;
+    long val_pad;
+    } setup  = {
+        NMA$C_PCLI_FMT, NMA$C_LINFM_ETH,
+        NMA$C_PCLI_PTY, 0x0090,
+        NMA$C_PCLI_PAD, NMA$C_STATE_OFF,
+    };
+#pragma member_alignment restore
+    long setupdesc[] = {sizeof(setup), (long)&setup};
+
+  /* Convert Interface Name to VMS Device Name */
+  /* This is a name shuffle */
+  /*   WE0 becomes EWA0:    */
+  /*   SE1 becomes ESB0:    */
+  /*   XE0 becomes EXA0:    */
+  tmpval = (int)(AdapterName[2]-'0');
+  if ((tmpval < 0) || (tmpval > 25))
+    return -1;
+  VMS_Device[0] = toupper(AdapterName[1]);
+  VMS_Device[1] = toupper(AdapterName[0]);
+  VMS_Device[2] = 'A' + tmpval;
+  VMS_Device[3] = '0';
+  VMS_Device[4] = '\0';
+  VMS_Device[5] = '\0';
+  Device.dsc$w_length = strlen(VMS_Device);
+  if (!$VMS_STATUS_SUCCESS( sys$assign (&Device, &chan, 0, 0, 0) ))
+    return -1;
+  status = sys$qiow (0, chan, IO$_SETMODE|IO$M_CTRL|IO$M_STARTUP, &iosb, 0, 0, 
+                     0, &setupdesc, 0, 0, 0, 0);
+  if ((!$VMS_STATUS_SUCCESS(status)) || (!$VMS_STATUS_SUCCESS(iosb[0]))) {
+    sys$dassgn(chan);
+    return -1;
+    }
+  status = sys$qiow (0, chan, IO$_SENSEMODE|IO$M_CTRL, &iosb, 0, 0, 
+                     0, &chardesc, 0, 0, 0, 0);
+  sys$dassgn(chan);
+  if ((!$VMS_STATUS_SUCCESS(status)) || (!$VMS_STATUS_SUCCESS(iosb[0])))
+    return -1;
+  for (w=characteristics; w < &characteristics[iosb[1]]; ) {
+    if ((((*w)&0xFFF) == NMA$C_PCLI_HWA) && (6 == *(w+1)))
+      hwa = (unsigned char *)(w + 2);
+    if ((((*w)&0xFFF) == NMA$C_PCLI_PHA) && (6 == *(w+1)))
+      pha = (unsigned char *)(w + 2);
+    if (((*w)&0x1000) == 0)
+      w += 3;                       /* Skip over Longword Parameter */
+    else
+      w += (2 + ((1 + *(w+1))/2));  /* Skip over String Parameter */
+    }
+  if (pha != NULL)                  /* Prefer Physical Address */
+    memcpy(MACAddress, pha, 6);
+  else
+    if (hwa != NULL)                /* Fallback to Hardware Address */
+      memcpy(MACAddress, hwa, 6);
+    else
+      return -1;
+  return 0;
+}
 #endif
 
 static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
@@ -1225,7 +1314,10 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 #if defined(_WIN32) || defined(__CYGWIN__)
   if (!pcap_mac_if_win32(devname, dev->host_nic_phy_hw_addr))
     dev->have_host_nic_phy_addr = 1;
-#elif !defined (__VMS) && !defined(__CYGWIN__)
+#elif defined (__VMS) && !defined(__VAX)
+  if (!pcap_mac_if_vms(devname, dev->host_nic_phy_hw_addr))
+    dev->have_host_nic_phy_addr = 1;
+#elif !defined(__CYGWIN__) && !defined(__VMS)
   if (1) {
     char command[1024];
     FILE *f;
