@@ -1204,14 +1204,27 @@ return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
           %SIM_VERIFY%        The Verify mode of the current Do command file
+   Environment variable lookups are done first with the precise name between 
+   the % characters and if that fails, then the name between the % characters
+   is upcased and a lookup of that valus is attempted.
+
+   The first Space delimited token on the line is extracted in uppercase and 
+   then looked up as an environment variable.  If found it the value is 
+   supstituted for the original string before expanding everything else.  If 
+   it is not found, then the original beginning token on the line is left 
+   untouched.
 */
 
 void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
 {
-char *ip, *op, *ap, *oend = tmpbuf + maxstr - 2;
+char gbuf[CBUFSIZE];
+char *ip = instr, *op = tmpbuf, *ap, *oend = tmpbuf + maxstr - 2, *istart;
 char rbuf[CBUFSIZE];
 
-for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
+while (isspace (*ip))                                   /* skip leading spaces */
+    *op++ = *ip++;
+istart = ip;
+for (; *ip && (op < oend); ) {
     if ((ip [0] == '\\') &&                             /* literal escape? */
         ((ip [1] == '%') || (ip [1] == '\\'))) {        /*   and followed by '%' or '\'? */
         ip++;                                           /* skip '\' */
@@ -1238,13 +1251,15 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
                             break;
                 }
             else {                                      /* environment variable */
-                char gbuf[CBUFSIZE];
-
                 ap = NULL;
-                get_glyph_gen (ip+1, gbuf, '%', FALSE);
+                get_glyph_gen (ip+1, gbuf, '%', FALSE); /* first try using the literal name */
+                ap = getenv(gbuf);
+                if (!ap) {
+                    get_glyph_gen (ip+1, gbuf, '%', TRUE); /* now try using the upcased name */
+                    ap = getenv(gbuf);
+                    }
                 ip += 1 + strlen (gbuf);
                 if (*ip == '%') ++ip;
-                ap = getenv(gbuf);
                 if (!ap) {
                     time_t now;
                     struct tm *tmnow;
@@ -1284,7 +1299,19 @@ for (ip = instr, op = tmpbuf; *ip && (op < oend); ) {
                 }
             }
         else
-            *op++ = *ip++;                              /* literal character */
+            if (ip == istart) {                         /* at beginning of input? */
+                get_glyph_gen (instr, gbuf, 0, TRUE);   /* substitute initial token */
+                ap = getenv(gbuf);                      /* if it is an environment variable name */
+                if (!ap) {                              /* nope? */
+                    *op++ = *ip++;                      /* press on with literal character */
+                    continue;
+                    }
+                while (*ap && (op < oend))              /* copy the translation */
+                    *op++ = *ap++;
+                ip += strlen(gbuf);
+                }
+            else
+                *op++ = *ip++;                          /* literal character */
     }
 *op = 0;                                                /* term buffer */
 strcpy (instr, tmpbuf);
@@ -1505,7 +1532,7 @@ char varname[CBUFSIZE];
 
 if ((!cptr) || (*cptr == 0))                            /* now eol? */
     return SCPE_2FARG;
-cptr = get_glyph_gen (cptr, varname, '=', FALSE);       /* get environment variable name */
+cptr = get_glyph_gen (cptr, varname, '=', TRUE);       /* get environment variable name */
 setenv(varname, cptr, 1);
 return SCPE_OK;
 }
