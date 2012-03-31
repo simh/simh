@@ -87,6 +87,7 @@ CC_DEBUG = /DEBUG
 .IFDEF DEBUG
 LINK_DEBUG = /DEBUG/TRACEBACK
 CC_OPTIMIZE = /NOOPTIMIZE
+NEST_DEBUG = ,DEBUG=1
 
 .IFDEF MMSALPHA
 ALPHA_OR_IA64 = 1
@@ -265,7 +266,7 @@ PCAP_SIMH_INC = /INCL=($(PCAP_DIR))
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS]LIB.DIR").EQS."") THEN CREATE/DIRECTORY $(LIB_DIR)
   @ IF (F$SEARCH("SYS$DISK:[.BIN.VMS.LIB]BLD-$(ARCH).DIR").EQS."") THEN CREATE/DIRECTORY $(BLD_DIR)
   @ IF (F$SEARCH("$(BLD_DIR)*.*").NES."") THEN DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.*;*
-  @ IF (("$(BUILDING_ROMS)".EQS."").AND.(F$SEARCH("$(BIN_DIR)BuildROMs-$(ARCH).EXE").EQS."")) THEN $(MMS) BUILDROMS/MACRO=(BUILDING_ROMS=1)
+  @ IF (("$(BUILDING_ROMS)".EQS."").AND.(F$SEARCH("$(BIN_DIR)BuildROMs-$(ARCH).EXE").EQS."")) THEN $(MMS) BUILDROMS/MACRO=(BUILDING_ROMS=1$(NEST_DEBUG))
 
 
 # MITS Altair Simulator Definitions.
@@ -676,7 +677,7 @@ $(BIN_DIR)BuildROMs-$(ARCH).EXE : sim_BuildROMs.c
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)BUILDROMS-$(ARCH).EXE -
                $(BLD_DIR)SIM_BUILDROMS.OBJ
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
-        $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
+        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
 
 #
 # Build The Libraries.
@@ -1030,7 +1031,7 @@ $(VAX_LIB1) : $(VAX_SOURCE1)
         $!
         $! Building The $(VAX_LIB1) Library.
         $!
-        $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
+        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX_OPTIONS)/OBJ=$(VAX_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
@@ -1053,7 +1054,7 @@ $(VAX780_LIB1) : $(VAX780_SOURCE1)
         $!
         $! Building The $(VAX780_LIB1) Library.
         $!
-        $ RUN $(BIN_DIR)BuildROMs-$(ARCH).EXE
+        $ RUN/NODEBUG $(BIN_DIR)BuildROMs-$(ARCH).EXE
         $ $(CC)$(VAX780_OPTIONS)/OBJ=$(VAX780_DIR) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
