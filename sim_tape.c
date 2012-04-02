@@ -367,9 +367,11 @@ return SCPE_OK;
 static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
 sim_tape_clr_async (uptr);
 if (sim_asynch_enabled)
-    sim_tape_set_async (uptr, 0);
+    sim_tape_set_async (uptr, ctx->asynch_io_latency);
 #endif
 fflush (uptr->fileref);
 }
@@ -378,10 +380,10 @@ fflush (uptr->fileref);
 
 t_stat sim_tape_attach (UNIT *uptr, char *cptr)
 {
-return sim_tape_attach_ex (uptr, cptr, 0);
+return sim_tape_attach_ex (uptr, cptr, 0, 0);
 }
 
-t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit)
+t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay)
 {
 struct tape_context *ctx;
 uint32 objc;
@@ -429,7 +431,7 @@ ctx->dbit = dbit;                                       /* save debug bit */
 sim_tape_rewind (uptr);
 
 #if defined (SIM_ASYNCH_IO)
-sim_tape_set_async (uptr, 0);
+sim_tape_set_async (uptr, completion_delay);
 #endif
 uptr->io_flush = _sim_tape_io_flush;
 

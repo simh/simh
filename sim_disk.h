@@ -64,7 +64,8 @@ typedef void (*DISK_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
-t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, uint32 debugbit, const char *drivetype, uint32 pdp11_tracksize);
+t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
+                        uint32 debugbit, const char *drivetype, uint32 pdp11_tracksize, int completion_delay);
 t_stat sim_disk_detach (UNIT *uptr);
 t_stat sim_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 t_stat sim_disk_rdsect_a (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects, DISK_PCALLBACK callback);
