@@ -859,7 +859,7 @@ t_stat dpc_svc (UNIT *uptr)
 int32 da, drv, err;
 
 err = 0;                                                /* assume no err */
-drv = uptr - dpc_dev.units;                             /* get drive no */
+drv = uptr - dpc_unit;                                  /* get drive no */
 if (uptr->flags & UNIT_UNLOAD) {                        /* drive down? */
 
     dpc.command = CLEAR;                                /* clr cch cmd */
@@ -1052,7 +1052,7 @@ return detach_unit (uptr);                              /* detach unit */
 
 t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-uint32 drv;
+int32 drv;
 
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* must be attached to load */
 
@@ -1060,7 +1060,7 @@ if (value == UNIT_UNLOAD)                               /* unload heads? */
     uptr->flags = uptr->flags | UNIT_UNLOAD;            /* indicate unload */
 else {                                                  /* load heads */
     uptr->flags = uptr->flags & ~UNIT_UNLOAD;           /* indicate load */
-    drv = uptr - dpc_dev.units;                         /* get drive no */
+    drv = uptr - dpc_unit;                              /* get drive no */
     dpc_sta[drv] = dpc_sta[drv] | STA_ATN | STA_1ST;    /* update status */
     if (dpc_poll)                                       /* polling enabled? */
         dpcio (&dpc_dib, ioENF, 0);                     /* set flag */

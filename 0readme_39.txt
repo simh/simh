@@ -2,7 +2,8 @@ Notes For V3.9
 
 
 The makefile now works for all *nix platforms and with cygwin and MinGW32 
-on Windows.
+on Windows.  It will automatically detect the availability of libpcap 
+components and build network capable simulators if they are available.
 
 
 1. New Features
@@ -14,15 +15,32 @@ on Windows.
 	- added *nix READLINE support (Mark Pizzolato)
 	- added "SHOW SHOW" and "SHOW <dev> SHOW" commands (Mark Pizzolato)
 	- added support for BREAK key on Windows (Mark Pizzolato)
-
+	- added ethernet support (Mark Pizzolato)
+	     windows host <-> simulator NIC sharing
+	     native tap interfaces on BSD, Linux and OSX
+	     vde (Virtual Distributed Ethernet) networking
+	     Large Send Offload support
+	     UDP and TCP Checksum offload support
+	     dynamic libpcap loading on *nix platforms
 
 1.1.2 PDP-8
 
 	- floating point processor is now enabled
-	
-1.1.3 IA64 VMS Ethernet Support
+
+1.1.3 HP2100 (Dave Bryan)
+
+	- added support for 12821A HP-IB disk controller,
+	  7906H/20H/25H disks
+
+1.1.4 PDP11 and VAX (Mark Pizzolato)
+
+        - Added DELQA-Plus device.
+
+1.1.5 IA64 VMS Ethernet Support
 
         - Identified compiler version issues and added IA64 support (Matt Burke)
+        
+1.1.6 Visual Studio Projects (Mark Pizzolato)
 
 2. Bugs Fixed
 

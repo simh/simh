@@ -26,7 +26,7 @@
 
    DS           13037D/13175D disc controller/interface
 
-   02-Mar-12    JDB     Rewritten to use the MAC/ICD disc controller library
+   29-Mar-12    JDB     Rewritten to use the MAC/ICD disc controller library
                         ioIOO now notifies controller service of parameter output
    14-Feb-12    JDB     Corrected SRQ generation and FIFO under/overrun detection
                         Corrected Clear command to conform to the hardware
@@ -60,15 +60,14 @@
    The 13037D multiple-access (MAC) disc controller supports from one to eight
    HP 7905 (15 MB), 7906 (20MB), 7920 (50 MB), and 7925 (120 MB) disc drives
    accessed by one to eight CPUs.  The controller hardware consists of a 16-bit
-   microprogrammed processor constructed from 74S181 bit slices and operating at
-   5 MHz, a device controller providing the interconnections to the drives and
-   CPU interfaces, and error correction circuitry that enables the controller to
-   correct up to a 32-bit error burst.  1024 words of 24-bit firmware are stored
-   in ROM.
+   microprogrammed processor constructed from 74S181 bit slices operating at 5
+   MHz, a device controller providing the interconnections to the drives and CPU
+   interfaces, and an error correction controller that enables the correction of
+   up to 32-bit error bursts.  1024 words of 24-bit firmware are stored in ROM.
 
-   The 13175D disc interface is used to connect the CPU to the 13037 device
-   controller.  In a multiple-CPU system, one interface is strapped to reset the
-   controller when the CPU's front panel PRESET button is pressed.
+   The 13175D disc interface is used to connect the HP 1000 CPU to the 13037
+   device controller.  In a multiple-CPU system, one interface is strapped to
+   reset the controller when the CPU's front panel PRESET button is pressed.
 
    This module simulates a 13037D connected to a single 13175D interface.  From
    one to eight drives may be connected, and drive types may be freely
@@ -134,7 +133,7 @@
 #define FIFO_STOP       (ds.fifo_count >= 5)            /* FIFO stop filling test */
 #define FIFO_FULL       (ds.fifo_count == FIFO_SIZE)    /* FIFO full test */
 
-#define PRESET_ENABLE   TRUE                            /* Preset Jumper (W4) enabled */
+#define PRESET_ENABLE   TRUE                            /* Preset Jumper (W4) is enabled */
 
 
 /* Debug flags */
@@ -223,7 +222,7 @@ static t_stat activate_unit     (UNIT *uptr);
 
     1. The validation routine does not allow the model number or autosizing
        option to be changed when the unit is attached.  Therefore, specifying
-       UNIT_ATT in the mask field has no deleterious effect.
+       UNIT_ATT in the mask field has no adverse effect.
 
     2. The modifier DEVNO is deprecated in favor of SC but is retained for
        compatibility.
@@ -237,14 +236,14 @@ static DIB ds_dib = { &ds_io, DS };
 #define UNIT_FLAGS  (UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE | UNIT_DISABLE | UNIT_UNLOAD)
 
 static UNIT ds_unit [] = {
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 0 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 1 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 2 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 3 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 4 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 5 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 6 */
-    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* unit 7 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 0 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 1 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 2 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 3 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 4 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 5 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 6 */
+    { UDATA (&ds_service_drive,      UNIT_FLAGS | MODEL_7905, D7905_WORDS) },   /* drive unit 7 */
     { UDATA (&ds_service_controller, UNIT_DIS,                0)           },   /* controller unit */
     { UDATA (&ds_service_timer,      UNIT_DIS,                0)           }    /* timer unit */
     };
@@ -252,8 +251,8 @@ static UNIT ds_unit [] = {
 static REG ds_reg [] = {
     { FLDATA (CMFOL,  ds.cmfol,                0)                           },
     { FLDATA (CMRDY,  ds.cmrdy,                0)                           },
-    { BRDATA (FIFO,   ds.fifo,                 8, 16, FIFO_SIZE), REG_CIRC  },
     { DRDATA (FCNT,   ds.fifo_count,           5)                           },
+    { BRDATA (FIFO,   ds.fifo,                 8, 16, FIFO_SIZE), REG_CIRC  },
     { ORDATA (FREG,   ds.fifo_reg,            32), REG_HRO                  },
 
     { ORDATA (CNTYPE, mac_cntlr.type,          2), REG_HRO                  },
@@ -375,13 +374,13 @@ DEVICE ds_dev = {
    The control path consists of the usual control, flag buffer, flag, and SRQ
    flip-flops, although flag and SRQ are decoupled to allow the full DCPC
    transfer rate through the FIFO (driving SRQ from the flag limits transfers to
-   only every other cycle).  SRQ is based on the FIFO level: if data or room in
-   the FIFO is available, SRQ is set to transfer it.  The flag is only used to
-   signal an interrupt at the end of a command.
+   every other cycle).  SRQ is based on the FIFO level: if data or room in the
+   FIFO is available, SRQ is set to initiate a transfer.  The flag is only used
+   to signal an interrupt at the end of a command.
 
    One unusual aspect is that SFC and SFS test different things, rather than
-   complementary states of the same thing.  SFC tests the busy flip-flop, and
-   SFS tests the flag flip-flop.
+   complementary states of the same thing.  SFC tests the controller busy state,
+   and SFS tests the flag flip-flop.
 
    In addition, the card contains end-of-data-transfer, command-follows, and
    command-ready flip-flops.  EDT is set when the DCPC EDT signal is asserted
@@ -397,16 +396,16 @@ DEVICE ds_dev = {
     1. In hardware, SRQ is enabled only when the controller is reading or
        writing the disc (IFIN or IFOUT functions are asserted) and set when the
        FIFO is not empty (read) or not full (write).  In simulation, SRQ is set
-       by the unit service read/write data phase transfers and cleared below
-       when the FIFO is empty (read) or full (write).
+       by the unit service read/write data phase transfers and cleared in the
+       IOI and IOO signal handlers when the FIFO is empty (read) or full
+       (write).
 
     2. The DCPC EDT signal cannot set the controller's end-of-data flag directly
        because a write EOD must occur only after the FIFO has been drained.
 
-    3. Polling the interface or drives must be deferred to the end of the I/O
-       signal service.  If they are performed in the IOO/STC handlers
-       themselves, an associated CLF might clear the flag that was set by the
-       poll.
+    3. Polling the interface or drives must be deferred to the end of I/O signal
+       handling.  If they are performed in the IOO/STC handlers themselves, an
+       associated CLF might clear the flag that was set by the poll.
 
     4. Executing a CLC sets the controller's end-of-data flag, which will abort
        a read or write data transfer in progress.  Parameter transfers are not
@@ -417,7 +416,7 @@ DEVICE ds_dev = {
 
     5. The hardware Interface Function and Flag Buses are not implemented
        explicitly.  Instead, interface functions and signals are inferred by the
-       interface by the current command operation and phase.
+       interface from the current command operation and phase.
 */
 
 uint32 ds_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
@@ -512,7 +511,7 @@ while (working_set) {
                     if (ds.srq == SET && DEBUG_PRI (ds_dev, DEB_CMDS))
                         fprintf (sim_deb, ">>DS cmds: [OTx%s] SRQ cleared\n", hold_or_clear);
 
-                    ds.srq = CLEAR;                         /* clear SRQ */
+                    ds.srq = CLEAR;                         /* clear SRQ to stop filling */
                     }
                 }
             break;
@@ -622,7 +621,7 @@ return stat_data;
    overrun error.
 
    Write transfers set the initial SRQ to request words from the CPU.  As each
-   arrives, it is unloaded from the FIFO into the sector buffer, and SRQ is
+   word arrives, it is unloaded from the FIFO into the sector buffer, and SRQ is
    enabled.  If the current sector transfer is complete, the controller is moved
    to the end phase.  If the FIFO underflows, the write terminates with a data
    overrun error.
@@ -639,12 +638,12 @@ return stat_data;
 
    Implementation notes:
 
-    1. Every command except Seek, Recalibrate, and End set the flag when the
+    1. Every command except Seek, Recalibrate, and End sets the flag when the
        command completes.  A command completes when the controller is no longer
-       busy (it becomes idle for Seek, Recalibrate, and End, and becomes waiting
-       for all others).  Seek and Recalibrate may generate errors (e.g., heads
-       unloaded), in which case the flag must be set.  But in these cases, the
-       controller state is waiting, not idle.
+       busy (it becomes idle for Seek, Recalibrate, and End, or it becomes
+       waiting for all others).  Seek and Recalibrate may generate errors (e.g.,
+       heads unloaded), in which case the flag must be set.  But in these cases,
+       the controller state is waiting, not idle.
 
        However, it is insufficient simply to check that the controller has moved
        to the wait state, because a seek may complete while the controller is
@@ -653,8 +652,9 @@ return stat_data;
        completes, another command is issued that attempts to access unit 1,
        which is not ready.  The command fails with a Status-2 error, and the
        controller moves to the wait state.  When the seek completes, the
-       controller is waiting with error status.  We must determine if the seek
-       completed successfully or not, as we must interrupt in the latter case.
+       controller is waiting with error status.  We must determine whether the
+       seek completed successfully or not, as we must interrupt in the latter
+       case.
 
        Therefore, we determine seek completion by checking if the Attention
        status was set.  Attention sets only if the seek completes successfully.
@@ -663,31 +663,31 @@ return stat_data;
        command terminated before the seek ever started.  Also, a seek may
        complete while the controller is busy, waiting, or idle.)
 
-     2. For debug printouts, we want to print the name of the command that has
-        completed when the controller returns to the idle or wait state.
-        Normally, we would use the controller's "opcode" field to identify the
-        command that completed.  However, while waiting for Seek or Recalibrate
-        completion, "opcode" may be set to another command if that command does
-        not access this drive.  For example, it might be set to a Read of
-        another unit, or a Request Status for this unit.  So we can't rely on
-        "opcode" to report the correct positioning command completion.
+    2. For debug printouts, we want to print the name of the command that has
+       completed when the controller returns to the idle or wait state.
+       Normally, we would use the controller's "opcode" field to identify the
+       command that completed.  However, while waiting for Seek or Recalibrate
+       completion, "opcode" may be set to another command if that command does
+       not access this drive.  For example, it might be set to a Read of another
+       unit, or a Request Status for this unit.  So we can't rely on "opcode" to
+       report the correct name of the completed positioning command.
 
-        However, we cannot rely on "uptr->OP" either, as it can be changed
-        during the course of a command.  For example, Read Without Verify is
-        changed to Read after a track crossing.
+       However, we cannot rely on "uptr->OP" either, as that can be changed
+       during the course of a command.  For example, Read Without Verify is
+       changed to Read after a track crossing.
 
-        Instead, we have to determine whether a seek is completing.  If it is,
-        then we report "uptr->OP"; otherwise, we report "opcode".
+       Instead, we have to determine whether a seek is completing.  If it is,
+       then we report "uptr->OP"; otherwise, we report "opcode".
 
-     3. The initial write SRQ must set only at the transition from the start
-        phase to the data phase.  If a write command begins with an auto-seek,
-        the drive service will be entered twice in the start phase (the first
-        entry performs the seek, and the second begins the write).  In hardware,
-        SRQ does not assert until the write begins.
+    3. The initial write SRQ must set only at the transition from the start
+       phase to the data phase.  If a write command begins with an auto-seek,
+       the drive service will be entered twice in the start phase (the first
+       entry performs the seek, and the second begins the write).  In hardware,
+       SRQ does not assert until the write begins.
 
-     4. The DCPC EDT signal cannot set the controller's end-of-data flag
-        directly because a write EOD must only occur after the FIFO has been
-        drained.
+    4. The DCPC EDT signal cannot set the controller's end-of-data flag
+       directly because a write EOD must only occur after the FIFO has been
+       drained.
 */
 
 t_stat ds_service_drive (UNIT *uptr)
@@ -695,9 +695,10 @@ t_stat ds_service_drive (UNIT *uptr)
 static const char completion_message [] = ">>DS rwsc: Unit %d %s command completed\n";
 t_stat result;
 t_bool seek_completion;
-FLIP_FLOP entry_srq = ds.srq;                           /* SRQ state on entry */
-CNTLR_PHASE entry_phase = (CNTLR_PHASE) uptr->PHASE;    /* operation phase on entry */
-uint32 entry_status = uptr->STAT;                       /* drive status on entry */
+int32 unit;
+FLIP_FLOP entry_srq = ds.srq;                           /* get the SRQ state on entry */
+CNTLR_PHASE entry_phase = (CNTLR_PHASE) uptr->PHASE;    /* get the operation phase on entry */
+uint32 entry_status = uptr->STAT;                       /* get the drive status on entry */
 
 result = dl_service_drive (&mac_cntlr, uptr);           /* service the drive */
 
@@ -764,7 +765,7 @@ if ((CNTLR_PHASE) uptr->PHASE == data_phase)            /* is the drive in the d
             break;
 
 
-        default:                                        /* entered with an invalid state */
+        default:                                        /* we were entered with an invalid state */
             result = SCPE_IERR;                         /* return an internal (programming) error */
             break;
         }                                               /* end of data phase operation dispatch */
@@ -774,13 +775,13 @@ if (DEBUG_PRI (ds_dev, DEB_CMDS) && entry_srq != ds.srq)
     fprintf (sim_deb, ">>DS cmds: SRQ %s\n", ds.srq == SET ? "set" : "cleared");
 
 
-if (uptr->wait)                                             /* is service requested? */
+if (uptr->wait)                                             /* was service requested? */
     activate_unit (uptr);                                   /* schedule the next event */
 
 seek_completion = ~entry_status & uptr->STAT & DL_S2ATN;    /* seek is complete when Attention sets */
 
 if (mac_cntlr.state != cntlr_busy) {                        /* is the command complete? */
-    if (mac_cntlr.state == cntlr_wait && !seek_completion)  /* is it command and not seek completion? */
+    if (mac_cntlr.state == cntlr_wait && !seek_completion)  /* is it command but not seek completion? */
         ds_io (&ds_dib, ioENF, 0);                          /* set the data flag to interrupt the CPU */
 
     poll_interface ();                                      /* poll the interface for the next command */
@@ -788,22 +789,22 @@ if (mac_cntlr.state != cntlr_busy) {                        /* is the command co
     }
 
 
-if (DEBUG_PRI (ds_dev, DEB_RWSC))
+if (DEBUG_PRI (ds_dev, DEB_RWSC)) {
+    unit = uptr - ds_unit;                                  /* get the unit number */
+
     if (result == SCPE_IERR)                                /* did an internal error occur? */
         fprintf (sim_deb, ">>DS rwsc: Unit %d %s command %s phase service not handled\n",
-                 uptr - ds_dev.units,
-                 dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP),
+                 unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP),
                  dl_phase_name ((CNTLR_PHASE) uptr->PHASE));
 
     else if (seek_completion)                               /* if a seek has completed */
         fprintf (sim_deb, completion_message,               /*   report the unit command */
-                 uptr - ds_dev.units,
-                 dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP));
+                 unit, dl_opcode_name (MAC, (CNTLR_OPCODE) uptr->OP));
 
     else if (mac_cntlr.state == cntlr_wait)                 /* if the controller has stopped */
         fprintf (sim_deb, completion_message,               /*   report the controller command */
-                 uptr - ds_dev.units,
-                 dl_opcode_name (MAC, mac_cntlr.opcode));
+                 unit, dl_opcode_name (MAC, mac_cntlr.opcode));
+    }
 
 return result;                                              /* return the result of the service */
 }
@@ -862,11 +863,11 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
             case clear:
             case set_file_mask:
             case wakeup:
-                ds_io (&ds_dib, ioENF, 0);              /* complete the operation with the flag set */
+                ds_io (&ds_dib, ioENF, 0);              /* complete the operation and set the flag */
                 break;
 
 
-            default:                                    /* entered with an invalid state */
+            default:                                    /* we were entered with an invalid state */
                 result = SCPE_IERR;                     /* return an internal (programming) error */
                 break;
             }                                           /* end of operation dispatch */
@@ -917,7 +918,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the current 
                 break;
 
 
-            default:                                    /* entered with an invalid state */
+            default:                                    /* we were entered with an invalid state */
                 result = SCPE_IERR;                     /* return an internal (programming) error */
                 break;
             }                                           /* end of operation dispatch */
@@ -976,7 +977,7 @@ return result;                                          /* return the result of 
 
     1. During a power-on reset, a pointer to the FIFO simulation register is
        saved to allow access to the "qptr" field during FIFO loading and
-       unloading.  This enables the SCP to view the FIFO as a circular queue, so
+       unloading.  This enables SCP to view the FIFO as a circular queue, so
        that the bottom word of the FIFO is always displayed as FIFO[0],
        regardless of where it is in the actual FIFO array.
 
@@ -992,7 +993,7 @@ if (sim_switches & SWMASK ('P')) {                      /* is this a power-on re
     ds.fifo_reg = find_reg ("FIFO", NULL, dptr);        /* find the FIFO register entry */
 
     if (ds.fifo_reg == NULL)                            /* if it cannot be found, */
-        return SCPE_IERR;                               /*   report a programming error! */
+        return SCPE_IERR;                               /*   report a programming error */
 
     else {                                              /* found it */
         ds.fifo_reg->qptr = 0;                          /*   so reset the FIFO bottom index */
@@ -1064,7 +1065,7 @@ return result;
 /* Boot a MAC disc drive.
 
    The MAC disc bootstrap program is loaded from the HP 12992B Boot Loader ROM
-   into memory, the I/O instructions are configured from the interface card
+   into memory, the I/O instructions are configured for the interface card's
    select code, and the program is run to boot from the specified unit.  The
    loader supports booting from cylinder 0 of drive unit 0 only.  Before
    execution, the S register is automatically set as follows:
@@ -1166,7 +1167,7 @@ if (unitno != 0)                                            /* boot supported on
     return SCPE_NOFNC;                                      /* report "Command not allowed" if attempted */
 
 if (ibl_copy (ds_rom, ds_dib.select_code))                  /* copy the boot ROM to memory and configure */
-    return SCPE_IERR;                                       /* return an internal error if failed */
+    return SCPE_IERR;                                       /* return an internal error if the copy failed */
 
 SR = SR & (IBL_OPT | IBL_DS_HEAD)                           /* set S to a reasonable value */
   | IBL_DS | IBL_MAN | (ds_dib.select_code << IBL_V_DEV);   /*   before boot execution */
@@ -1193,7 +1194,7 @@ return SCPE_OK;
 
 t_stat ds_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-const t_bool load = (value != UNIT_UNLOAD);             /* true if heads are loading */
+const t_bool load = (value != UNIT_UNLOAD);             /* true if the heads are loading */
 
 return dl_load_unload (&mac_cntlr, uptr, load);         /* load or unload the heads */
 }
@@ -1265,7 +1266,7 @@ if (uptr) {                                             /* did the command start
     time = uptr->wait;                                  /* save the activation time */
 
     if (time)                                           /* was the unit scheduled? */
-        activate_unit (uptr);                           /* activate it (clears "wait") */
+        activate_unit (uptr);                           /* activate it (and clear the "wait" field) */
 
     if (DEBUG_PRI (ds_dev, DEB_RWSC)) {
         unit = uptr - ds_unit;                          /* get the unit number */
@@ -1337,8 +1338,8 @@ return;
 
 void poll_drives (void)
 {
-if (mac_cntlr.state == cntlr_idle && ds.control == SET)     /* controller is idle and OK to interrupt? */
-    if (dl_poll_drives (&mac_cntlr, ds_unit, DL_MAXDRIVE))  /* poll drives; was Attention seen? */
+if (mac_cntlr.state == cntlr_idle && ds.control == SET)     /* is the controller idle and interrupts are allowed? */
+    if (dl_poll_drives (&mac_cntlr, ds_unit, DL_MAXDRIVE))  /* poll the drives; was Attention seen? */
         ds_io (&ds_dib, ioENF, 0);                          /* request an interrupt */
 return;
 }
@@ -1455,7 +1456,7 @@ return;
 
 static t_stat activate_unit (UNIT *uptr)
 {
-uint32 unit;
+int32 unit;
 t_stat result;
 
 if (DEBUG_PRI (ds_dev, DEB_SERV)) {
