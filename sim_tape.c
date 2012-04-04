@@ -151,6 +151,7 @@ if ((!callback) || !ctx->asynch_io)
         struct tape_context *ctx =                                      \
                       (struct tape_context *)uptr->tape_ctx;            \
                                                                         \
+        pthread_mutex_lock (&ctx->io_lock);                             \
                                                                         \
         sim_debug (ctx->dbit, ctx->dptr,                                \
       "sim_tape AIO_CALL(op=%d, unit=%d)\n", op, uptr-ctx->dptr->units);\
@@ -168,6 +169,7 @@ if ((!callback) || !ctx->asynch_io)
         ctx->objupdate = _obj;                                          \
         ctx->callback = _callback;                                      \
         pthread_cond_signal (&ctx->io_cond);                            \
+        pthread_mutex_unlock (&ctx->io_lock);                           \
         }                                                               \
     else                                                                \
         if (_callback)                                                  \
