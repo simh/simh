@@ -1961,17 +1961,17 @@ for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_lock (&sim_asynch_lock);
 fprintf (st, "asynchronous pending event queue\n");
-if (sim_asynch_queue == (void *)-1)
+if (sim_asynch_queue == AIO_LIST_END)
     fprintf (st, "Empty\n");
 else {
-    for (uptr = sim_asynch_queue; uptr != (void *)-1; uptr = uptr->a_next) {
+    for (uptr = sim_asynch_queue; uptr != AIO_LIST_END; uptr = uptr->a_next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
             fprintf (st, "  %s", sim_dname (dptr));
             if (dptr->numunits > 1) fprintf (st, " unit %d",
                 (int32) (uptr - dptr->units));
             }
         else fprintf (st, "  Unknown");
-        fprintf (st, " event delay %d, queue time %d\n", uptr->a_event_time, uptr->a_sim_interval);
+        fprintf (st, " event delay %d\n", uptr->a_event_time);
         }
     }
 fprintf (st, "asynch latency: %d nanoseconds\n", sim_asynch_latency);
@@ -4912,6 +4912,30 @@ t_stat sim_activate_abs (UNIT *uptr, int32 event_time)
 AIO_ACTIVATE (sim_activate_abs, uptr, event_time);
 sim_cancel (uptr);
 return sim_activate (uptr, event_time);
+}
+
+/* sim_activate_notbefore - activate (queue) event even if event already scheduled
+                            but not before the specified time
+
+   Inputs:
+        uptr    =       pointer to unit
+        rtime   =       relative timeout
+   Outputs:
+        reason  =       result (SCPE_OK if ok)
+*/
+
+t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime)
+{
+uint32 rtimenow, urtime = (uint32)rtime;
+
+AIO_ACTIVATE (sim_activate_notbefore, uptr, rtime);
+sim_cancel (uptr);
+rtimenow = sim_grtime();
+sim_cancel (uptr);
+if (0x80000000 <= urtime-rtimenow)
+    return sim_activate (uptr, 0);
+else
+    return sim_activate (uptr, urtime-rtimenow);
 }
 
 /* sim_cancel - cancel (dequeue) event

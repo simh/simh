@@ -1280,15 +1280,13 @@ return ST_SUC;                                          /* success! */
 void tq_io_complete (UNIT *uptr, t_stat status)
 {
 struct tq_req_results *res = (struct tq_req_results *)uptr->results;
-int32 elapsed = sim_grtime()-uptr->iostarttime;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_io_complete(status=%d)\n", status);
 
 res->io_status = status;
 res->io_complete = 1;
 /* Reschedule for the appropriate delay */
-if (elapsed <= tq_xtime)
-    sim_activate_abs (uptr, tq_xtime-elapsed);
+sim_activate_notbefore (uptr, uptr->iostarttime+tq_xtime);
 }
 
 

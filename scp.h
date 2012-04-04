@@ -83,6 +83,7 @@ t_stat echo_cmd (int32 flag, char *ptr);
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
+t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
 t_stat sim_cancel (UNIT *uptr);
 int32 sim_is_active (UNIT *uptr);
 double sim_gtime (void);

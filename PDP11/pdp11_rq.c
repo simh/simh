@@ -1794,15 +1794,13 @@ return 0;                                               /* success! */
 void rq_io_complete (UNIT *uptr, t_stat status)
 {
 MSC *cp = rq_ctxmap[uptr->cnum];
-int32 elapsed = sim_grtime()-uptr->iostarttime;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_io_complete(status=%d)\n", status);
 
 uptr->io_status = status;
 uptr->io_complete = 1;
 /* Reschedule for the appropriate delay */
-if (elapsed <= rq_xtime)
-    sim_activate_abs (uptr, rq_xtime-elapsed);
+sim_activate_notbefore (uptr, uptr->iostarttime+rq_xtime);
 }
 
 /* Unit service for data transfer commands */
