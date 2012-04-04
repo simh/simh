@@ -1658,7 +1658,7 @@ return SCPE_OK;
 
 t_stat mpx_line_svc (UNIT *uptr)
 {
-const uint32 port = uptr - mpx_unit;                            /* port number */
+const  int32 port = uptr - mpx_unit;                            /* port number */
 const uint16 rt = mpx_rcvtype [port];                           /* receive type for port */
 const uint32 data_bits = 5 + GET_BPC (mpx_config [port]);       /* number of data bits */
 const uint32 data_mask = (1 << data_bits) - 1;                  /* mask for data bits */

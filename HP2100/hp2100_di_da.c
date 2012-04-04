@@ -25,7 +25,7 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
-   21-Feb-12    JDB     First release
+   29-Mar-12    JDB     First release
    04-Nov-11    JDB     Created DA device
 
    References:
@@ -45,13 +45,14 @@
    connected via an 12821A disc interface and provided 20MB, 50MB, and 120MB
    capacities.  The drives were identical to the 7906M, 7920M, and 7925M
    Multi-Access Controller (MAC) units but incorporated internal two-card
-   controllers in each drive and connected to the CPU interface via HP-IB.  Each
+   controllers in each drive and connected to the CPU interface via the
+   Hewlett-Packard Interface Bus (HP-IB), HP's implementation of IEEE-488.  Each
    controller was dedicated to a single drive and operated similarly to the
    12745 Disc Controller to HP-IB Adapter option for the 13037 Disc Controller
-   box.  The 7906H was introduced in 1980 (there was no 7905H version, as the
-   7905 was obsolete by that time).  Up to four ICD drives could be connected to
-   a single 12821A card.  The limitation was imposed by the bus loading and the
-   data transfer rate.
+   chassis.  The 7906H was introduced in 1980 (there was no 7905H version, as
+   the 7905 was obsolete by that time).  Up to four ICD drives could be
+   connected to a single 12821A card.  The limitation was imposed by the bus
+   loading and the target data transfer rate.
 
    The ICD command set essentially was the MAC command set modified for
    single-unit operation.  The unit number and CPU hold bit fields in the opcode
@@ -61,12 +62,12 @@
    controller did not support ECC.  Controller status values 02B (Unit
    Available) and 27B (Unit Unavailable) were dropped as the controller
    supported only single units, 12B (I/O Program Error) was reused to indicate
-   HP-IB sequence errors, 13B (Sync Not Received) was added, and 17B (Possibly
+   HP-IB protocol errors, 13B (Sync Not Received) was added, and 17B (Possibly
    Correctable Data Error) was removed as error correction was not supported.
 
    Some minor redefinitions also occurred.  For example, status 14B (End of
    Cylinder) was expanded to include an auto-seek beyond the drive limits, and
-   37B (Drive Attention) was restricted from head loads and unloads to just head
+   37B (Drive Attention) was restricted just head unloads from head loads and
    unloads.
 
    The command set was expanded to include several commands related to HP-IB
@@ -76,12 +77,6 @@
    sequences, Read and Write Loopback channel tests, and controller Self Test
    commands.
 
-   Unfortunately, the primary reference for the ICD controller (the HP 13365
-   Integrated Controller Programming Guide) does not indicate parallel poll
-   responses for these HP-IB commands.  Therefore, the responses have been
-   derived from the sequences in the 7910 and 12745 manuals, although they
-   sometimes conflict.
-
    This simulator implements the Amigo disc protocol.  It calls the 12821A Disc
    Interface (DI) simulator to send and receive bytes across the HP-IB to and
    from the CPU, and it calls the HP Disc Library to implement the controller
@@ -89,8 +84,15 @@
    Four units are provided, and any combination of 7906H/20H/25H drives may be
    defined.
 
-   The drives respond to the following commands; numeric values are in hex, and
-   bus addressing is indicated by U [untalk], L [listen], and T [talk]:
+   Unfortunately, the primary reference for the ICD controller (the HP 13365
+   Integrated Controller Programming Guide) does not indicate parallel poll
+   responses for these HP-IB commands.  Therefore, the responses have been
+   derived from the sequences in the 7910 and 12745 manuals, although they
+   sometimes conflict.
+
+   The drives respond to the following commands; the secondary and opcode
+   numeric values are in hex, and the bus addressing state is indicated by U
+   [untalk], L [listen], and T [talk]:
 
      Bus  Sec  Op  Operation
      ---  ---  --  --------------------------------
@@ -410,18 +412,15 @@ static const IF_STATE next_state [] = {
 
 typedef enum {
     invalid = 0,                                        /* invalid = default for reset */
-
     disc_command,                                       /* MLA 08 */
     crc_listen,                                         /* MLA 09 */
     amigo_clear,                                        /* MLA 10 */
     write_loopback,                                     /* MLA 1E */
     initiate_self_test,                                 /* MLA 1F */
-
     crc_talk,                                           /* MTA 09 */
     device_specified_jump,                              /* MTA 10 */
     read_loopback,                                      /* MTA 1E */
     return_self_test_result,                            /* MTA 1F */
-
     amigo_identify                                      /* UNT MSA */
     } IF_COMMAND;
 
@@ -429,18 +428,15 @@ typedef enum {
 
 static const char *if_command_name [] = {
     "invalid",
-
     "disc command",
     "CRC listen",
     "Amigo clear",
     "write loopback",
     "initiate self-test",
-
     "CRC talk",
     "device specified jump",
     "read loopback",
     "return self-test result",
-
     "Amigo identify"
     };
 
@@ -488,7 +484,7 @@ static void   complete_write    (uint32 unit);
 static void   complete_abort    (uint32 unit);
 static uint8  get_buffer_byte   (CVPTR  cvptr);
 static void   put_buffer_byte   (CVPTR  cvptr, uint8 data);
-static t_stat activate_unit     (UNIT *uptr);
+static t_stat activate_unit     (UNIT   *uptr);
 
 
 
@@ -514,6 +510,14 @@ static t_stat activate_unit     (UNIT *uptr);
     2. The CNVARS register is included to ensure that the controller state
        variables array is saved by a SAVE command.  It is declared as a hidden,
        read-only byte array of a depth compatible with the size of the array.
+
+       There does not appear to be a way to expose the fields of the four
+       controller state variables as arrayed registers.  Access to an array
+       always assumes that elements appear at memory offsets equal to the
+       element size, i.e., a 32-bit arrayed register has elements at four-byte
+       offsets.  There's no way to specify an array of structure elements where
+       a given 32-bit field appears at, say, 92-byte offsets (i.e., the size of
+       the structure).
 */
 
 DEVICE da_dev;
@@ -523,10 +527,10 @@ DIB da_dib = { &di_io, DI_DA, da };
 #define UNIT_FLAGS  (UNIT_FIX | UNIT_ATTABLE | UNIT_ROABLE | UNIT_DISABLE | UNIT_UNLOAD)
 
 UNIT da_unit [] = {
-    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (0), D7906_WORDS) }, /* bus address 0 */
-    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (1), D7906_WORDS) }, /* bus address 1 */
-    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (2), D7906_WORDS) }, /* bus address 2 */
-    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (3), D7906_WORDS) }  /* bus address 3 */
+    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (0), D7906_WORDS) }, /* drive unit 0 */
+    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (1), D7906_WORDS) }, /* drive unit 1 */
+    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (2), D7906_WORDS) }, /* drive unit 2 */
+    { UDATA (&da_service, UNIT_FLAGS | MODEL_7906 | SET_BUSADR (3), D7906_WORDS) }  /* drive unit 3 */
     };
 
 REG da_reg [] = {
@@ -535,8 +539,8 @@ REG da_reg [] = {
     { BRDATA (BUFFER, buffer,      8, 16,       DL_BUFSIZE)                              },
 
     { BRDATA (DSJ,    if_dsj,     10,  2,                             DA_UNITS)          },
-    { BRDATA (IFSTAT, if_state,   10, sizeof (IF_STATE) * CHAR_BIT,   DA_UNITS), PV_LEFT },
-    { BRDATA (IFCMD,  if_command, 10, sizeof (IF_COMMAND) * CHAR_BIT, DA_UNITS), PV_LEFT },
+    { BRDATA (ISTATE, if_state,   10, sizeof (IF_STATE) * CHAR_BIT,   DA_UNITS), PV_LEFT },
+    { BRDATA (ICMD,   if_command, 10, sizeof (IF_COMMAND) * CHAR_BIT, DA_UNITS), PV_LEFT },
 
     { BRDATA (CNVARS, icd_cntlr,  10, CHAR_BIT, sizeof (CNTLR_VARS) * DA_UNITS), REG_HRO },
 
@@ -594,14 +598,14 @@ DEVICE da_dev = {
 
 /* Service an Amigo disc drive I/O event.
 
-   The service routine is called to start commands and control the transfer of
+   The service routine is called to execute commands and control the transfer of
    data to and from the HP-IB card.  The actions to be taken depend on the
    current state of the ICD interface.  The possibilities are:
 
     1. A command is pending on the interface.  This occurs only when a command
        is received while a Seek or Recalibrate command is in progress.
 
-    2. A command is ready for execution.
+    2. A command is executing.
 
     3. Data is being sent or received over the HP-IB during command execution.
 
@@ -640,7 +644,7 @@ DEVICE da_dev = {
      into the sector buffer, a data phase that transfers bytes from the buffer
      to the card, and an end phase that schedules the intersector gap time and
      resets to the start phase.  Data phase transfers are performed in the
-     read_exec or write_exec interface states.
+     read_xfer or write_xfer interface states.
 
      The results of the disc library service are inferred by the controller
      state.  If the controller is busy, then the command continues in a new
@@ -675,8 +679,8 @@ DEVICE da_dev = {
      has already stored the received byte in the sector buffer and has asserted
      NRFD to hold off the card.  If the buffer is now full, or the byte was
      tagged with EOI, then we terminate the transfer and move to the end phase
-     of the command.  Otherwise, we deny NRFD and exit, as we will be
-     rescheduled when the next byte arrives.
+     of the command.  Otherwise, we deny NRFD and exit; we will be rescheduled
+     when the next byte arrives.
 
    error_source
    ============
@@ -692,13 +696,14 @@ DEVICE da_dev = {
      If an error occurred during the data transfer phase of a write command,
      dummy bytes are sunk from the bus until EOI is seen or the card is
      unaddressed.  This allows the OS driver to complete the command as expected
-     and to determine the failure by requesting the controller's status.
+     and then determine the cause of the failure by requesting the controller's
+     status.
 
 
    Implementation notes:
 
     1. The disc library sets the controller state to idle for a normal End,
-       Seek, or Recalibrate command and to Wait for all other commands that end
+       Seek, or Recalibrate command and to wait for all other commands that end
        normally.  So we determine command completion by checking if the
        controller is not busy, rather than checking if the controller is idle.
 
@@ -720,7 +725,7 @@ DEVICE da_dev = {
        that was started by the ICD boot loader ROM.
 
        In hardware, if the LSTN control bit is cleared, e.g., by CRS,
-       transmission stops because the card denies NDAC and NRFD (the GPIB
+       transmission stops because the card denies NDAC and NRFD (the HP-IB
        handshake requires NDAC and NRFD to be asserted to start the handshake
        sequence; TACS * SDYS * ~NDAC * ~NRFD is an error condition).  In
        simulation, we handle this by terminating a read transfer if the card
@@ -733,15 +738,15 @@ t_stat da_service (UNIT *uptr)
 {
 uint8 data;
 CNTLR_CLASS command_class;
-const uint32 unit = uptr - da_dev.units;                    /* disc unit number */
-const CVPTR cvptr = &icd_cntlr [unit];                      /* pointer to controller */
+const int32 unit = uptr - da_unit;                          /* get the disc unit number */
+const CVPTR cvptr = &icd_cntlr [unit];                      /* get a pointer to the controller */
 t_stat result = SCPE_OK;
 t_bool release_interface = FALSE;
 
-switch (if_state [unit]) {                                  /* dispatch interface state */
+switch (if_state [unit]) {                                  /* dispatch the interface state */
 
     case command_wait:                                      /* command is waiting */
-        release_interface = TRUE;                           /* release interface at end if idle */
+        release_interface = TRUE;                           /* release the interface at then end if it's idle */
 
         /* fall into the command_exec handler to process the current command */
 
@@ -751,50 +756,50 @@ switch (if_state [unit]) {                                  /* dispatch interfac
             case disc_command:                              /* execute a disc command */
                 result = dl_service_drive (cvptr, uptr);    /* service the disc unit */
 
-                if (cvptr->opcode == clear)                 /* Clear command? */
-                    if_dsj [unit] = 2;                      /* indicate self test complete */
+                if (cvptr->opcode == clear)                 /* is this a Clear command? */
+                    if_dsj [unit] = 2;                      /* indicate that the self test is complete */
 
                 if (cvptr->state != cntlr_busy) {           /* has the controller stopped? */
                     if_state [unit] = idle;                 /* idle the interface */
 
-                    if (cvptr->status == normal_completion ||   /* normal completion? */
+                    if (cvptr->status == normal_completion ||   /* do we have normal completion */
                         cvptr->status == drive_attention)       /*   or drive attention? */
                         break;                                  /* we're done */
 
-                    else {                                      /* if status is abnormal */
+                    else {                                      /* if the status is abnormal */
                         if_dsj [unit] = 1;                      /*   an error has occurred */
 
-                        command_class = dl_classify (*cvptr);   /* classify command */
+                        command_class = dl_classify (*cvptr);   /* classify the command */
 
-                        if (command_class == class_write) {     /* write command failed? */
-                            if_state [unit] = error_sink;       /* sink remaining bytes */
+                        if (command_class == class_write) {     /* did a write command fail? */
+                            if_state [unit] = error_sink;       /* sink the remaining bytes */
                             uptr->wait = cvptr->cmd_time;       /* activate to complete processing */
                             }
 
-                        else if (command_class != class_control) {  /* read or status command failed? */
+                        else if (command_class != class_control) {  /* did a read or status command fail? */
                             if_state [unit] = error_source;         /* source an error byte */
                             uptr->wait = cvptr->cmd_time;           /* activate to complete processing */
                             }
                         }
                     }
 
-                else if (uptr->PHASE == data_phase) {           /* starting the data phase? */
-                    cvptr->length = cvptr->length * 2;          /* convert buffer length to bytes */
+                else if (uptr->PHASE == data_phase) {           /* are we starting the data phase? */
+                    cvptr->length = cvptr->length * 2;          /* convert the buffer length to bytes */
 
-                    if (dl_classify (*cvptr) == class_write)    /* write command? */
-                        if_state [unit] = write_xfer;           /* set for write data transfer */
-                    else                                        /* read or status command */
-                        if_state [unit] = read_xfer;            /* set for read data transfer */
+                    if (dl_classify (*cvptr) == class_write)    /* is this a write command? */
+                        if_state [unit] = write_xfer;           /* set for a write data transfer */
+                    else                                        /* it is a read or status command */
+                        if_state [unit] = read_xfer;            /* set for a read data transfer */
                     }
 
                 break;
 
 
             case amigo_identify:                            /* Amigo Identify */
-                buffer [0] = 0x0003;                        /* store response in buffer */
+                buffer [0] = 0x0003;                        /* store the response in the buffer */
                 cvptr->length = 2;                          /* return two bytes */
 
-                if_state [unit] = read_xfer;                /* ready to transfer data */
+                if_state [unit] = read_xfer;                /* we are ready to transfer the data */
                 uptr->wait = cvptr->cmd_time;               /* schedule the transfer */
 
                 if (DEBUG_PRI (da_dev, DEB_RWSC))
@@ -805,11 +810,11 @@ switch (if_state [unit]) {                                  /* dispatch interfac
 
             case initiate_self_test:                        /* Initiate a self test */
                 sim_cancel (&da_unit [unit]);               /* cancel any operation in progress */
-                dl_clear_controller (cvptr,                 /* hard clear the controller */
+                dl_clear_controller (cvptr,                 /* hard-clear the controller */
                                      &da_unit [unit],
                                      hard_clear);
-                if_dsj [unit] = 2;                          /* set DSJ for self test */
-                if_state [unit] = idle;                     /* command is complete */
+                if_dsj [unit] = 2;                          /* set DSJ for self test completion */
+                if_state [unit] = idle;                     /* the command is complete */
                 di_poll_response (da, unit, SET);           /*   with PPR enabled */
                 break;
 
@@ -817,7 +822,7 @@ switch (if_state [unit]) {                                  /* dispatch interfac
             case amigo_clear:                               /* Amigo clear */
                 dl_idle_controller (cvptr);                 /* idle the controller */
                 if_dsj [unit] = 0;                          /* clear the DSJ value */
-                if_state [unit] = idle;                     /* command is complete */
+                if_state [unit] = idle;                     /* the command is complete */
                 di_poll_response (da, unit, SET);           /*   with PPR enabled */
                 break;
 
@@ -830,23 +835,23 @@ switch (if_state [unit]) {                                  /* dispatch interfac
 
 
     case error_source:                                      /* send data after an error */
-        if (! (di [da].bus_cntl & (BUS_ATN | BUS_NRFD))) {  /* is card ready for data? */
+        if (! (di [da].bus_cntl & (BUS_ATN | BUS_NRFD))) {  /* is the card ready for data? */
             di [da].bus_cntl |= BUS_EOI;                    /* set EOI */
-            di_bus_source (da, 0);                          /* send a dummy byte to the card */
-            if_state [unit] = idle;                         /* command is complete */
+            di_bus_source (da, 0);                          /*   and send a dummy byte to the card */
+            if_state [unit] = idle;                         /* the command is complete */
             }
         break;
 
 
     case read_xfer:                                         /* send read data */
-        if (! (di [da].bus_cntl & (BUS_ATN | BUS_NRFD)))    /* is card ready for data? */
+        if (! (di [da].bus_cntl & (BUS_ATN | BUS_NRFD)))    /* is the card ready for data? */
             switch (if_command [unit]) {                    /* dispatch the interface command */
 
                 case disc_command:                          /* disc read or status commands */
                     data = get_buffer_byte (cvptr);         /* get the next byte from the buffer */
 
-                    if (di_bus_source (da, data) == FALSE)  /* send data to card; is it listening? */
-                        cvptr->eod = SET;                   /* no, so terminate read */
+                    if (di_bus_source (da, data) == FALSE)  /* send the byte to the card; is it listening? */
+                        cvptr->eod = SET;                   /* no, so terminate the read */
 
                     if (cvptr->length == 0 || cvptr->eod == SET) {  /* is the data phase complete? */
                         uptr->PHASE = end_phase;                    /* set the end phase */
@@ -858,7 +863,7 @@ switch (if_state [unit]) {                                  /* dispatch interfac
                         uptr->wait = cvptr->cmd_time;           /*   and reschedule the service */
                         }
 
-                    else                                    /* data phase continues */
+                    else                                    /* the data phase continues */
                         uptr->wait = cvptr->data_time;      /* reschedule the next transfer */
 
                     break;
@@ -872,13 +877,13 @@ switch (if_state [unit]) {                                  /* dispatch interfac
                     if (cvptr->length == 0)                 /* is the transfer complete? */
                         di [da].bus_cntl |= BUS_EOI;        /* set EOI */
 
-                    if (di_bus_source (da, data)            /* send data to card; is it listening? */
-                      && cvptr->length > 0)                 /*   and more to transfer? */
+                    if (di_bus_source (da, data)            /* send the byte to the card; is it listening? */
+                      && cvptr->length > 0)                 /*   and is there more to transfer? */
                         uptr->wait = cvptr->data_time;      /* reschedule the next transfer */
 
-                    else {                                  /* transfer is complete */
-                        if_state [unit] = idle;             /* command is complete */
-                        di_poll_response (da, unit, SET);   /* enable PPR */
+                    else {                                  /* the transfer is complete */
+                        if_state [unit] = idle;             /* the command is complete */
+                        di_poll_response (da, unit, SET);   /* enable the PPR */
                         }
                     break;
 
@@ -886,7 +891,7 @@ switch (if_state [unit]) {                                  /* dispatch interfac
                 case device_specified_jump:
                     di [da].bus_cntl |= BUS_EOI;            /* set EOI */
                     di_bus_source (da, if_dsj [unit]);      /* send the DSJ value to the card */
-                    if_state [unit] = idle;                 /* command is complete */
+                    if_state [unit] = idle;                 /* the command is complete */
                     break;
 
 
@@ -904,10 +909,10 @@ switch (if_state [unit]) {                                  /* dispatch interfac
 
 
     case error_sink:                                        /* absorb data after an error */
-        cvptr->index = 0;                                   /* absorb data until EOI */
+        cvptr->index = 0;                                   /* absorb data until EOI asserts */
 
         if (cvptr->eod == SET)                              /* is the transfer complete? */
-            if_state [unit] = idle;                         /* command is complete */
+            if_state [unit] = idle;                         /* the command is complete */
 
         di_bus_control (da, unit, 0, BUS_NRFD);             /* deny NRFD to allow the card to resume */
         break;
@@ -934,7 +939,7 @@ switch (if_state [unit]) {                                  /* dispatch interfac
             case write_loopback:
                 if (cvptr->eod == SET) {                    /* is the transfer complete? */
                     cvptr->length = 16 - cvptr->length;     /* set the count of bytes transferred */
-                    if_state [unit] = idle;                 /* command is complete */
+                    if_state [unit] = idle;                 /* the command is complete */
                     }
 
                 di_bus_control (da, unit, 0, BUS_NRFD);     /* deny NRFD to allow the card to resume */
@@ -957,8 +962,8 @@ switch (if_state [unit]) {                                  /* dispatch interfac
 if (uptr->wait)                                             /* is service requested? */
     activate_unit (uptr);                                   /* schedule the next event */
 
-if (result == SCPE_IERR && DEBUG_PRI (da_dev, DEB_RWSC)) {  /* internal error? */
-    fprintf (sim_deb, ">>DA rwsc: Unit %d ", unit);
+if (result == SCPE_IERR && DEBUG_PRI (da_dev, DEB_RWSC)) {  /* did an internal error occur? */
+    fprintf (sim_deb, ">>DA rwsc: Unit %d ", unit);         /* report it if debugging */
 
     if (if_state [unit] == command_exec
       && if_command [unit] == disc_command)
@@ -988,7 +993,7 @@ if (if_state [unit] == idle) {                              /* is the command no
             fprintf (sim_deb, ">>DA rwsc: Unit %d %s command completed\n",
                      unit, if_command_name [if_command [unit]]);
 
-    if (release_interface)                                  /* if next command is already pending */
+    if (release_interface)                                  /* if the next command is already pending */
         di_bus_control (da, unit, 0, BUS_NRFD);             /*   deny NRFD to allow the card to resume */
     }
 
@@ -1015,20 +1020,20 @@ t_stat status;
 
 status = di_reset (dptr);                               /* reset the card */
 
-if (status == SCPE_OK && (sim_switches & SWMASK ('P'))) /* card OK and power-on reset? */
-    for (unit = 0; unit < dptr->numunits; unit++) {     /* loop through units */
-        sim_cancel (dptr->units + unit);                /* cancel activation */
+if (status == SCPE_OK && (sim_switches & SWMASK ('P'))) /* is the card OK and is this a power-on reset? */
+    for (unit = 0; unit < dptr->numunits; unit++) {     /* loop through the units */
+        sim_cancel (dptr->units + unit);                /* cancel any current activation */
         dptr->units [unit].CYL = 0;                     /* reset the head position */
         dptr->units [unit].pos = 0;                     /*   to cylinder 0 */
 
-        dl_clear_controller (&icd_cntlr [unit],         /* hard clear the controller */
+        dl_clear_controller (&icd_cntlr [unit],         /* hard-clear the controller */
                              dptr->units + unit,
                              hard_clear);
 
         if_state [unit] = idle;                         /* reset the interface state */
         if_command [unit] = invalid;                    /* reset the interface command */
 
-        if_dsj [unit] = 2;                              /* set DSJ for power up */
+        if_dsj [unit] = 2;                              /* set the DSJ for power up complete */
         }
 
 return status;
@@ -1037,18 +1042,18 @@ return status;
 
 /* Attach a unit to a disc image file.
 
-   The simulator considers an attached unit to be connected to the bus, and an
+   The simulator considers an attached unit to be connected to the bus and an
    unattached unit to be disconnected, so we set the card's acceptor bit for the
    selected unit if the attach is successful.  An attached unit is ready if the
-   heads are loaded and not ready of not.
+   heads are loaded or not ready if not.
 
    This model is slightly different than the MAC (DS) simulation, where an
-   unattached unit is considered "connected but not ready" -- the same indication
-   returned by an attached unit whose heads are unloaded.  Therefore, the
-   situation when the simulator is started is that all DS units are "connected to
-   the controller but not ready," whereas all DA units are "not connected to the
-   controller."  This eliminates the overhead of sending HP-IB messages to unused
-   units.
+   unattached unit is considered "connected but not ready" -- the same
+   indication returned by an attached unit whose heads are unloaded.  Therefore,
+   the situation when the simulator is started is that all DS units are
+   "connected to the controller but not ready," whereas all DA units are "not
+   connected to the bus."  This eliminates the overhead of sending HP-IB
+   messages to unused units.
 
    In tabular form, the simulator responses are:
 
@@ -1082,11 +1087,11 @@ return status;
 t_stat da_attach (UNIT *uptr, char *cptr)
 {
 t_stat result;
-const uint32 unit = uptr - da_unit;                     /* calculate the unit number */
+const int32 unit = uptr - da_unit;                      /* calculate the unit number */
 
 result = dl_attach (&icd_cntlr [unit], uptr, cptr);     /* attach the drive */
 
-if (result == SCPE_OK)                                  /* attach successful? */
+if (result == SCPE_OK)                                  /* was the attach successful? */
     di [da].acceptors |= (1 << unit);                   /* set the unit's accepting bit */
 
 return result;
@@ -1096,18 +1101,18 @@ return result;
 /* Detach a disc image file from a unit.
 
    As explained above, detaching a unit is the hardware equivalent of
-   disconnecting the drive from the bus, so we clear the unit's acceptor bit is
+   disconnecting the drive from the bus, so we clear the unit's acceptor bit if
    the detach is successful.
 */
 
 t_stat da_detach (UNIT *uptr)
 {
 t_stat result;
-const uint32 unit = uptr - da_unit;                     /* calculate the unit number */
+const int32 unit = uptr - da_unit;                      /* calculate the unit number */
 
 result = dl_detach (&icd_cntlr [unit], uptr);           /* detach the drive */
 
-if (result == SCPE_OK) {                                /* detach successful? */
+if (result == SCPE_OK) {                                /* was the detach successful? */
     di [da].acceptors &= ~(1 << unit);                  /* clear the unit's accepting bit */
     di_poll_response (da, unit, CLEAR);                 /*   and its PPR, as it's no longer present */
     }
@@ -1118,8 +1123,8 @@ return result;
 
 /* Boot an Amigo disc drive.
 
-   The ICD disc bootstrap prorgam is loaded from the HP 12992H Boot Loader ROM
-   into memory, the I/O instructions are configured from the interface card
+   The ICD disc bootstrap program is loaded from the HP 12992H Boot Loader ROM
+   into memory, the I/O instructions are configured for the interface card's
    select code, and the program is run to boot from the specified unit.  The
    loader supports booting the disc at bus address 0 only.  Before execution,
    the S register is automatically set as follows:
@@ -1204,11 +1209,11 @@ static const BOOT_ROM da_rom = {
 
 t_stat da_boot (int32 unitno, DEVICE *dptr)
 {
-if (GET_BUSADR (da_unit [unitno].flags) != 0)               /* boot supported on bus address 0 only */
+if (GET_BUSADR (da_unit [unitno].flags) != 0)               /* booting is supported on bus address 0 only */
     return SCPE_NOFNC;                                      /* report "Command not allowed" if attempted */
 
 if (ibl_copy (da_rom, da_dib.select_code))                  /* copy the boot ROM to memory and configure */
-    return SCPE_IERR;                                       /* return an internal error if failed */
+    return SCPE_IERR;                                       /* return an internal error if the copy failed */
 
 SR = SR & (IBL_OPT | IBL_DS_HEAD)                           /* set S to a reasonable value */
   | IBL_DS | IBL_MAN | (da_dib.select_code << IBL_V_DEV);   /*   before boot execution */
@@ -1252,13 +1257,13 @@ return SCPE_OK;
 
 t_stat da_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-const uint32 unit = uptr - da_unit;                         /* calculate the unit number */
-const t_bool load = (value != UNIT_UNLOAD);                 /* true if heads are loading */
+const int32 unit = uptr - da_unit;                          /* calculate the unit number */
+const t_bool load = (value != UNIT_UNLOAD);                 /* true if the heads are loading */
 t_stat result;
 
 result = dl_load_unload (&icd_cntlr [unit], uptr, load);    /* load or unload the heads */
 
-if (result == SCPE_OK && ! load) {                          /* unload successful? */
+if (result == SCPE_OK && ! load) {                          /* was the unload successful? */
     icd_cntlr [unit].status = drive_attention;              /* set Drive Attention status */
 
     if (uptr->OP == end)                                    /* is the controller in idle state 2? */
@@ -1283,20 +1288,21 @@ return result;
    addressed (applying only to those acceptors that have been addressed to
    listen).  Data bytes are accepted only if the unit has been addressed to
    listen.  As we are called for a data transfer or an addressed command only if
-   we are currently listening, the only bytes that we do not accept are talk or
-   listen commands directed to another address, or secondary commands when we
-   are not addressed to listen.
+   we are currently listening, the only bytes that we do not accept are primary
+   talk or listen commands directed to another address, or secondary commands
+   when we are not addressed to listen.
 
    This routine handles the HP-IB protocol.  The type of byte passed is
-   determined by the state of the ATN signal and, if asserted, by the high-order
-   bits of the value.  Most of the work involves decoding secondary commands and
-   their associated data parameters.  The interface state is changed as needed
-   to track the command protocol.  The states processed in this routine are:
+   determined by the state of the ATN signal and, if ATN is asserted, by the
+   high-order bits of the value.  Most of the work involves decoding secondary
+   commands and their associated data parameters.  The interface state is
+   changed as needed to track the command protocol.  The states processed in
+   this routine are:
 
    opcode_wait
    ===========
 
-     A receive disc command secondary has been received, and the interface is
+     A Receive Disc Command secondary has been received, and the interface is
      waiting for the opcode that should follow.
 
    parameter_wait
@@ -1309,19 +1315,19 @@ return result;
    ==========
 
      A disc write command has been received, and the interface is waiting for
-     the receive write data secondary that should follow.
+     the Receive Write Data secondary that should follow.
 
    read_wait
    =========
 
      A disc read command has been received, and the interface is waiting for the
-     send read data secondary that should follow.
+     Send Read Data secondary that should follow.
 
    status_wait
    ===========
 
      A disc status command has been received, and the interface is waiting for
-     the send disc status secondary that should follow.
+     the Send Disc Status secondary that should follow.
 
    write_xfer
    ==========
@@ -1338,18 +1344,18 @@ return result;
 
    Disc commands and parameters are assembled in the sector buffer before being
    passed to the disc library to start the command.  Once the command is
-   started, then the interface state is set either to execute the command or to
-   wait for the receipt of a data transfer secondary before executing, depending
-   on the command.
+   started, the interface state is set either to execute the command or to wait
+   for the receipt of a data transfer secondary before executing, depending on
+   the command.
 
    Two disc command protocol errors are detected.  First, an Illegal Opcode is
-   identified during the check for the expected number of disc command opcode
+   identified during the check for the expected number of disc command
    parameters.  This allows us to sink an arbitrary number of parameter bytes.
-   Second, an I/O Program Error occurs if an unsupported secondary is received,
+   Second, an I/O Program Error occurs if an unsupported secondary is received
    or the HP-IB sequence is incorrect.  The latter occurs if a command has the
-   wrong number of parameters, or a secondary data transfer sequence is invalid.
+   wrong number of parameters or a secondary data transfer sequence is invalid.
 
-   Disc commands that require data transfers (e.g., read, write, request status)
+   Disc commands that require data transfers (e.g., Read, Write, Request Status)
    involve a pair of secondaries.  The first transmits the command, and the
    second transmits or receives the data.  If one occurs without the other, an
    I/O Program Error occurs.
@@ -1360,26 +1366,27 @@ return result;
     - An unsupported talk secondary sends a single data byte tagged with EOI.
 
     - An unsupported listen secondary accepts and discards any accompanying data
-      bytes until EOI or unlisten.
+      bytes until EOI is asserted or an Unlisten is received.
 
     - A supported command with too few parameter bytes or for which the last
       parameter byte is not tagged with EOI (before unlisten) does nothing.
 
     - A supported command with too many parameter bytes accepts and discards
-      excess parameter bytes until EOI or unlisten.
+      excess parameter bytes until EOI is asserted or an Unlisten is received.
 
-    - A read or status command that is not followed by a send data or send
-      status secondary does nothing.  The unexpected secondary is executed
-      normally.
+    - A read or status command that is not followed by a Send Read Data or a
+      Send Disc Status secondary does nothing.  The unexpected secondary is
+      executed normally.
 
-    - A write command that is not followed by a receive data secondary does
-      nothing. The unexpected secondary is executed normally.
+    - A write command that is not followed by a Receive Write Data secondary
+      does nothing.  The unexpected secondary is executed normally.
 
-    - A send data or send status secondary that is not preceded by a read or
-      status command sends a single data byte tagged with EOI.
+    - A Send Read Data or a Send Disc Status secondary that is not preceded by a
+      read or status command sends a single data byte tagged with EOI.
 
-    - A receive data secondary that is not preceded by a write command accepts
-      and discards data bytes until EOI or unlisten.
+    - A Receive Write Data secondary that is not preceded by a write command
+      accepts and discards data bytes until EOI is asserted or an Unlisten is
+      received.
 
    The Amigo command sequence does not provide a byte count for disc read and
    write commands, so the controller continues to source or accept data bytes
@@ -1387,22 +1394,22 @@ return result;
    Untalk.  However, per IEEE-488, a listening device may be unaddressed by IFC,
    by an Unlisten, or by addressing the device to talk, and a talking device may
    be unaddressed by IFC, by addressing another device to talk (or no device via
-   Untalk), or by addressing the device to listen.  Therefore, we keep track of
-   whether the unit stopped talking or listening, and if it has, we check for
-   command termination.
+   Untalk), or by addressing the device to listen.  Therefore, we must keep
+   track of whether the unit stopped talking or listening, and if it has, we
+   check for command termination.
 
    If the controller is unaddressed in the middle of a sector transfer, the read
    or write must be terminated cleanly to ensure that the disc image is
-   coherent.  It is also permissable to untalk the controller before all of the
+   coherent.  It is also permissible to untalk the controller before all of the
    requested status bytes are returned.
 
    In addition, the controller has no way to inform the host that an error has
-   occurred that prevents the command from continuing.  For example, a data
-   error encountered while reading, or a protected track encountered while
-   writing must still source or sink data bytes until the command is terminated
-   by the host.  The controller handles read errors by sourcing a single data
-   byte tagged with EOI, and write errors by sinking data bytes until EOI is
-   seen or the unit is unaddressed.
+   occurred that prevents the command from continuing.  For example, if a data
+   error is encountered while reading or a protected track is encountered while
+   writing, the controller must still source or sink data bytes until the
+   command is terminated by the host.  The controller handles read errors by
+   sourcing a single data byte tagged with EOI and write errors by sinking data
+   bytes until EOI is seen or the unit is unaddressed.
 
    Therefore, if the unit is unaddressed while a read, write, or status command
    is transferring data, the unit service must be scheduled to end the current
@@ -1418,11 +1425,6 @@ return result;
 
     2. It is not necessary to check for listening when processing addressed
        commands, as only listeners are called by the bus source.
-
-    3. The dl_prepare_command routine returns FALSE if the command accesses a
-       busy unit.  However, we check for a busy unit during addressing and hold
-       off the CPU if it is.  Therefore, the unit will never be busy when the
-       routine is called, so a FALSE return will indicate a rejected command.
 */
 
 t_bool da_bus_accept (uint32 unit, uint8 data)
@@ -1469,28 +1471,28 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
         case BUS_LAG:                                       /* listen address group */
             my_address = GET_BUSADR (da_unit [unit].flags); /* get my bus address */
 
-            if (message_address == my_address) {            /* my listen address? */
+            if (message_address == my_address) {            /* is it my listen address? */
                 di [da].listeners |= (1 << unit);           /* set my listener bit */
                 di [da].talker &= ~(1 << unit);             /* clear my talker bit */
 
                 addressed = TRUE;                           /* unit is now addressed */
-                stopped_talking = TRUE;                     /* MLA stops unit from talking */
+                stopped_talking = TRUE;                     /* MLA stops the unit from talking */
 
                 if (DEBUG_PRI (da_dev, DEB_XFER))
                     sprintf (action, "listen %d", message_address);
                 }
 
-            else if (message_address == BUS_UNADDRESS) {    /* unlisten? */
-                di [da].listeners = 0;                      /* clear all listeners */
+            else if (message_address == BUS_UNADDRESS) {    /* is it an Unlisten? */
+                di [da].listeners = 0;                      /* clear all of the listeners */
 
-                stopped_listening = TRUE;                   /* UNL stops unit from listening */
+                stopped_listening = TRUE;                   /* UNL stops the unit from listening */
 
                 if (DEBUG_PRI (da_dev, DEB_XFER))
                     strcpy (action, "unlisten");
                 }
 
-            else                                            /* other listen address */
-                accepted = FALSE;                           /*   is not accepted */
+            else                                            /* other listen addresses */
+                accepted = FALSE;                           /*   are not accepted */
 
             break;
 
@@ -1498,26 +1500,26 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
         case BUS_TAG:                                       /* talk address group */
             my_address = GET_BUSADR (da_unit [unit].flags); /* get my bus address */
 
-            if (message_address == my_address) {            /* my talk address? */
-                di [da].talker = (1 << unit);               /* set my talker bit and clear others */
+            if (message_address == my_address) {            /* is it my talk address? */
+                di [da].talker = (1 << unit);               /* set my talker bit and clear the others */
                 di [da].listeners &= ~(1 << unit);          /* clear my listener bit */
 
-                addressed = TRUE;                           /* unit is now addressed */
-                stopped_listening = TRUE;                   /* MTA stops unit from listening */
+                addressed = TRUE;                           /* the unit is now addressed */
+                stopped_listening = TRUE;                   /* MTA stops the unit from listening */
 
                 if (DEBUG_PRI (da_dev, DEB_XFER))
                     sprintf (action, "talk %d", message_address);
                 }
 
-            else {                                          /* some other talker (or untalk) */
-                di [da].talker &= ~(1 << unit);             /* clear talker */
+            else {                                          /* it is some other talker (or Untalk) */
+                di [da].talker &= ~(1 << unit);             /* clear my talker bit */
 
-                stopped_talking = TRUE;                     /* UNT or OTA stops unit from talking */
+                stopped_talking = TRUE;                     /* UNT or OTA stops the unit from talking */
 
-                if (message_address != BUS_UNADDRESS)       /* other talk address? */
-                    accepted = FALSE;                       /*   is not accepted */
+                if (message_address != BUS_UNADDRESS)       /* other talk addresses */
+                    accepted = FALSE;                       /*   are not accepted */
 
-                else                                        /* untalk */
+                else                                        /* it's an Untalk */
                     if (DEBUG_PRI (da_dev, DEB_XFER))
                         strcpy (action, "untalk");
                 }
@@ -1529,7 +1531,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
             icd_cntlr [unit].index = 0;                     /* reset the buffer index */
 
             if (di [da].listeners & (1 << unit)) {          /* is it a listen secondary? */
-                if (if_state [unit] == write_wait           /* if waiting for a write data secondary */
+                if (if_state [unit] == write_wait           /* if we're waiting for a write data secondary */
                   && message_address != 0x00)               /*   but it's not there, */
                     abort_command (unit, io_program_error,  /*   then abort the pending command */
                                    idle);                   /*   and process the new command */
@@ -1540,8 +1542,8 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                         if (if_state [unit] != write_wait)                      /* if we're not expecting it */
                             abort_command (unit, io_program_error,              /*   abort and sink any data */
                                            error_sink);
-                        else {                                                  /* sequence is correct */
-                            if_state [unit] = command_exec;                     /* now ready to execute */
+                        else {                                                  /* the sequence is correct */
+                            if_state [unit] = command_exec;                     /* the command is ready to execute */
                             da_unit [unit].wait = icd_cntlr [unit].cmd_time;    /* schedule the unit */
                             di_bus_control (da, unit, BUS_NRFD, 0);             /* assert NRFD to hold off the card */
                             }
@@ -1550,36 +1552,36 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                         break;
 
                     case 0x08:                                  /* disc commands */
-                        if_command [unit] = disc_command;       /* set the command */
-                        if_state [unit] = opcode_wait;          /* opcode must follow */
+                        if_command [unit] = disc_command;       /* set the command and wait */
+                        if_state [unit] = opcode_wait;          /*  for the opcode that must follow */
                         break;
 
                     case 0x09:                                  /* CRC (Listen) */
-                        if_command [unit] = crc_listen;         /* set the command */
+                        if_command [unit] = crc_listen;         /* set up the command */
                         if_state [unit] = error_sink;           /* sink any data that will be coming */
                         initiated = TRUE;                       /* log the command initiation */
                         break;
 
                     case 0x10:                                  /* Amigo Clear */
-                        if_command [unit] = amigo_clear;        /* set the command */
+                        if_command [unit] = amigo_clear;        /* set up the command */
                         if_state [unit] = parameter_wait;       /* a parameter must follow */
-                        icd_cntlr [unit].length = 1;            /* expect one (unused) byte */
+                        icd_cntlr [unit].length = 1;            /* set to expect one (unused) byte */
                         break;
 
                     case 0x1E:                                  /* Write Loopback */
-                        if_command [unit] = write_loopback;     /* set the command */
+                        if_command [unit] = write_loopback;     /* set up the command */
                         if_state [unit] = write_xfer;           /* data will be coming */
                         icd_cntlr [unit].length = 16;           /* accept only the first 16 bytes */
                         initiated = TRUE;                       /* log the command initiation */
                         break;
 
                     case 0x1F:                                  /* Initiate Self-Test */
-                        if_command [unit] = initiate_self_test; /* set the command */
+                        if_command [unit] = initiate_self_test; /* set up the command */
                         if_state [unit] = parameter_wait;       /* a parameter must follow */
-                        icd_cntlr [unit].length = 1;            /* expect the test ID byte */
+                        icd_cntlr [unit].length = 1;            /* set to expect the test ID byte */
                         break;
 
-                    default:                                    /* an unsupported listen secondary */
+                    default:                                    /* an unsupported listen secondary was received */
                         abort_command (unit, io_program_error,  /* abort and sink any data */
                                        error_sink);             /*   that might accompany the command */
                         initiated = TRUE;                       /* log the abort initiation */
@@ -1592,7 +1594,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 da_unit [unit].wait = icd_cntlr [unit].cmd_time;    /* these are always scheduled and */
                 initiated = TRUE;                                   /*   logged as initiated */
 
-                if (if_state [unit] == read_wait                    /* if waiting for a send data secondary */
+                if (if_state [unit] == read_wait                    /* if we're waiting for a send data secondary */
                   && message_address != 0x00                        /*   but it's not there */
                   || if_state [unit] == status_wait                 /* or a send status secondary, */
                   && message_address != 0x08)                       /*   but it's not there */
@@ -1604,42 +1606,42 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                     case 0x00:                                      /* Send Read Data */
                         if (if_state [unit] != read_wait)           /* if we're not expecting it */
                             abort_command (unit, io_program_error,  /*   abort and source a data byte */
-                                           error_source);           /*   tagged with EOI */
+                                           error_source);           /*     tagged with EOI */
                         else
-                            if_state [unit] = command_exec;         /* now ready to execute */
+                            if_state [unit] = command_exec;         /* the command is ready to execute */
                         break;
 
                     case 0x08:                                      /* Read Status */
-                        if (if_state [unit] != status_wait)         /* if we're not expecting it */
+                        if (if_state [unit] != status_wait)         /* if we're not expecting it, */
                             abort_command (unit, io_program_error,  /*   abort and source a data byte */
-                                           error_source);           /*   tagged with EOI */
+                                           error_source);           /*     tagged with EOI */
                         else                                        /* all status commands */
                             if_state [unit] = read_xfer;            /*   are ready to transfer data */
                         break;
 
                     case 0x09:                                      /* CRC (Talk) */
-                        if_command [unit] = crc_talk;               /* set the command */
+                        if_command [unit] = crc_talk;               /* set up the command */
                         if_state [unit] = read_xfer;                /* data will be going */
                         break;
 
                     case 0x10:                                      /* Device-Specified Jump */
-                        if_command [unit] = device_specified_jump;  /* set the command */
+                        if_command [unit] = device_specified_jump;  /* set up the command */
                         if_state [unit] = read_xfer;                /* data will be going */
                         break;
 
                     case 0x1E:                                      /* Read Loopback */
-                        if_command [unit] = read_loopback;          /* set the command */
+                        if_command [unit] = read_loopback;          /* set up the command */
                         if_state [unit] = read_xfer;                /* data will be going */
                         break;
 
                     case 0x1F:                                          /* Return Self-Test Result */
-                        if_command [unit] = return_self_test_result;    /* set the command */
+                        if_command [unit] = return_self_test_result;    /* set up the command */
                         if_state [unit] = read_xfer;                    /* data will be going */
                         icd_cntlr [unit].length = 1;                    /* return one byte that indicates */
                         buffer [0] = 0;                                 /*   that the self-test passed */
                         break;
 
-                    default:                                        /* an unsupported talk secondary */
+                    default:                                        /* an unsupported talk secondary was received */
                         abort_command (unit, io_program_error,      /* abort and source a data byte */
                                        error_source);               /*   tagged with EOI */
                         break;
@@ -1652,14 +1654,14 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
 
                 if (di [da].talker == 0 && di [da].listeners == 0       /* if there are no talkers or listeners */
                   && message_address == my_address) {                   /*   and this is my secondary address, */
-                    if_command [unit] = amigo_identify;                 /*   then this is an Amigo ID sequence */
-                    if_state [unit] = command_exec;                     /* set up execution */
+                    if_command [unit] = amigo_identify;                 /*     then this is an Amigo ID sequence */
+                    if_state [unit] = command_exec;                     /* set up for execution */
                     da_unit [unit].wait = icd_cntlr [unit].cmd_time;    /* schedule the unit */
                     initiated = TRUE;                                   /* log the command initiation */
                     }
 
-                else                                                /* an unaddressed secondary */
-                    accepted = FALSE;                               /*   is not accepted */
+                else                                                /* unaddressed secondaries */
+                    accepted = FALSE;                               /*   are not accepted */
                 }
 
 
@@ -1675,7 +1677,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
         }
 
 
-    if (addressed && sim_is_active (&da_unit [unit])) {     /* is the unit being addressed while busy? */
+    if (addressed && sim_is_active (&da_unit [unit])) {     /* is the unit being addressed while it is busy? */
         if_state [unit] = command_wait;                     /* change the interface state to wait */
         di_bus_control (da, unit, BUS_NRFD, 0);             /*   and assert NRFD to hold off the card */
 
@@ -1683,7 +1685,7 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
             fprintf (sim_deb, ">>DA rwsc: Unit %d addressed while controller is busy\n", unit);
         }
 
-    if (stopped_listening) {                                /* was the unit unlistened? */
+    if (stopped_listening) {                                /* was the unit Unlistened? */
         if (icd_cntlr [unit].state == cntlr_busy)           /* if the controller is busy, */
             complete_write (unit);                          /*   then check for write completion */
 
@@ -1695,8 +1697,8 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
             abort_command (unit, io_program_error, idle);   /*   then abort the pending command */
         }
 
-    else if (stopped_talking) {                             /* was the unit untalked? */
-        if (icd_cntlr [unit].state == cntlr_busy)           /* if the controller is busy */
+    else if (stopped_talking) {                             /* was the unit Untalked? */
+        if (icd_cntlr [unit].state == cntlr_busy)           /* if the controller is busy, */
             complete_read (unit);                           /*   then check for read completion */
 
         else if (if_command [unit] == invalid)              /* if a command was aborting, */
@@ -1705,10 +1707,10 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
     }                                                       /* end of bus command processing */
 
 
-else {                                                      /* it is bus data (ATN denied) */
+else {                                                      /* it is bus data (ATN is denied) */
     switch (if_state [unit]) {                              /* dispatch the interface state */
 
-        case opcode_wait:                                   /* wait for an opcode */
+        case opcode_wait:                                   /* waiting for an opcode */
             if (DEBUG_PRI (da_dev, DEB_XFER))
                 sprintf (action, "opcode %02XH", data & DL_OPCODE_MASK);
 
@@ -1716,8 +1718,8 @@ else {                                                      /* it is bus data (A
 
             if (dl_prepare_command (&icd_cntlr [unit],      /* is the command valid? */
                                     da_unit, unit)) {
-                if_state [unit] = parameter_wait;           /* set up to get pad byte */
-                icd_cntlr [unit].index = 0;                 /* reset the word index for byte 1 */
+                if_state [unit] = parameter_wait;           /* set up to get the pad byte */
+                icd_cntlr [unit].index = 0;                 /* reset the word index for the next byte */
                 icd_cntlr [unit].length =                   /* convert the parameter count to bytes */
                   icd_cntlr [unit].length * 2 + 1;          /*   and include the pad byte */
                 }
@@ -1730,7 +1732,7 @@ else {                                                      /* it is bus data (A
             break;
 
 
-        case parameter_wait:                                /* wait for a parameter */
+        case parameter_wait:                                /* waiting for a parameter */
             if (DEBUG_PRI (da_dev, DEB_XFER))
                 sprintf (action, "parameter %02XH", data);
 
@@ -1748,13 +1750,13 @@ else {                                                      /* it is bus data (A
             break;
 
 
-        case write_xfer:                                    /* transfer write data */
+        case write_xfer:                                    /* transferring write data */
             if (icd_cntlr [unit].length > 0)                /* if there is more to transfer */
                 put_buffer_byte (&icd_cntlr [unit], data);  /*   then add the byte to the buffer */
 
             /* fall into error_sink handler */
 
-        case error_sink:                                        /* sink data after an error */
+        case error_sink:                                        /* sinking data after an error */
             if (DEBUG_PRI (da_dev, DEB_XFER))
                 sprintf (action, "data %03o", data);
 
@@ -1767,7 +1769,7 @@ else {                                                      /* it is bus data (A
             break;
 
 
-        default:                                            /* data was received in wrong state */
+        default:                                            /* data was received in the wrong state */
             abort_command (unit, io_program_error,          /* report the error */
                            error_sink);                     /*   and sink any data that follows */
 
@@ -1782,7 +1784,7 @@ if (accepted && DEBUG_PRI (da_dev, DEB_XFER))
     fprintf (sim_deb, ">>DA xfer: HP-IB address %d accepted %s\n",
              GET_BUSADR (da_unit [unit].flags), action);
 
-if (da_unit [unit].wait > 0)                            /* is service requested? */
+if (da_unit [unit].wait > 0)                            /* was service requested? */
     activate_unit (&da_unit [unit]);                    /* schedule the unit */
 
 if (initiated && DEBUG_PRI (da_dev, DEB_RWSC))
@@ -1811,14 +1813,13 @@ return accepted;                                        /* indicate the acceptan
        has asserted NRFD must deny it before a talker may send data.  If the
        interface is sending data and both ATN and NRFD are denied, then we
        reschedule the service routine to send the next byte.
-
 */
 
 void da_bus_respond (CARD_ID card, uint32 unit, uint8 new_cntl)
 {
 if (new_cntl & BUS_IFC) {                               /* is interface clear asserted? */
-    di [da].listeners = 0;                              /* unlisten */
-    di [da].talker = 0;                                 /* untalk */
+    di [da].listeners = 0;                              /* perform an Unlisten */
+    di [da].talker = 0;                                 /*   and an Untalk */
 
     if (icd_cntlr [unit].state == cntlr_busy) {         /* is the controller busy? */
         complete_write (unit);                          /* check for write completion */
@@ -1831,13 +1832,13 @@ if (new_cntl & BUS_IFC) {                               /* is interface clear as
     else if (if_command [unit] == invalid)              /* if a command was aborting, */
         complete_abort (unit);                          /*   then complete it */
 
-    else if (if_state [unit] == opcode_wait             /* if waiting for an opcode */
+    else if (if_state [unit] == opcode_wait             /* if we're waiting for an opcode */
       || if_state [unit] == parameter_wait)             /*   or a parameter, */
         abort_command (unit, io_program_error, idle);   /*   then abort the pending command */
     }
 
-if (! (new_cntl & (BUS_ATN | BUS_NRFD))                 /* in data mode and card is ready for data? */
-  && (if_state [unit] == read_xfer                      /* is interface waiting to send data */
+if (!(new_cntl & (BUS_ATN | BUS_NRFD))                  /* is the card in data mode and ready for data? */
+  && (if_state [unit] == read_xfer                      /* is the interface waiting to send data */
   || if_state [unit] == error_source))                  /*   or source error bytes? */
     da_service (&da_unit [unit]);                       /* start or resume the transfer */
 }
@@ -1849,57 +1850,58 @@ if (! (new_cntl & (BUS_ATN | BUS_NRFD))                 /* in data mode and card
 
 /* Start a command with parameters.
 
-   A command that has been pending until all of its parameters were received is
+   A command that has been waiting for all of its parameters to be received is
    now ready to start.  If this is a disc command, call the disc library to
    validate the parameters and, if they are OK, to start the command.  Status
    commands return the status values in the sector buffer and the number of
    words that were returned in the buffer length, which we convert to a byte
    count.
 
-   If the disc command was accepted, the controller will be busy.  In this case,
+   If the disc command was accepted, the library returns a pointer to the unit
+   to be scheduled.  For an ICD controller, the unit is always the one currently
+   addressed, so we simply test if the return is not NULL.  If it isn't, then we
    set the next interface state as determined by the command that is executing.
    For example, a Read command sets the interface to read_wait status in order
-   to wait until the accompanying Send Read Data secondary is received.  If the
-   controller is not busy, then the command was rejected, so we set DSJ = 1 and
-   leave the interface state in parameter_wait; the controller status will have
-   been set to the reason for rejection.
+   to wait until the accompanying Send Read Data secondary is received.
 
-   If the interface state is command_exec, then the disc command is ready for
-   execution, and we return TRUE to schedule the unit service.  Otherwise, we
-   return FALSE, and the appropriate action will be taken by the caller.
+   If the return is NULL, then the command was rejected, so we set DSJ = 1 and
+   leave the interface state in parameter_wait; the controller status will have
+   been set to the reason for the rejection.
+
+   If the next interface state is command_exec, then the disc command is ready
+   for execution, and we return TRUE to schedule the unit service.  Otherwise,
+   we return FALSE, and the appropriate action will be taken by the caller.
 
    For all other commands, execution begins as soon as the correct parameters
    are received, so we set command_exec state and return TRUE.  (Only Amigo
-   Clear and Inititate Self Test require parameters, so they will be the only
+   Clear and Initiate Self Test require parameters, so they will be the only
    other commands that must be started here.)
 
-set wait = 0 if not executing (e.g., for read wait)
 
    Implementation notes:
 
-    1. The ICD implemenation does not need to differentiate between unit and
+    1. As the ICD implementation does not need to differentiate between unit and
        controller commands, the return value from the dl_start_command routine
-       is not used.
+       is not used other than as an indication of success or failure.
 */
 
 static t_bool start_command (uint32 unit)
 {
-if (if_command [unit] == disc_command) {                        /* starting a disc command? */
-    dl_start_command (&icd_cntlr [unit], da_unit, unit);        /* ask the controller to start the command */
-
-    icd_cntlr [unit].length = icd_cntlr [unit].length * 2;      /* convert return length from words to bytes */
-
-    if (icd_cntlr [unit].state == cntlr_busy)                   /* was the command accepted? */
+if (if_command [unit] == disc_command) {                        /* are we starting a disc command? */
+    if (dl_start_command (&icd_cntlr [unit], da_unit, unit)) {  /* start the command; was it successful? */
+        icd_cntlr [unit].length = icd_cntlr [unit].length * 2;  /* convert the return length from words to bytes */
         if_state [unit] = next_state [icd_cntlr [unit].opcode]; /* set the next interface state */
+        }
+
     else                                                        /* the command was rejected */
         if_dsj [unit] = 1;                                      /*   so indicate an error */
 
-    if (if_state [unit] == command_exec)                        /* if command is executing */
+    if (if_state [unit] == command_exec)                        /* if the command is executing */
         return TRUE;                                            /*   activate the unit */
 
     else {                                                      /* if we must wait */
-        da_unit [unit].wait = 0;                                /*   for another secondary */
-        return FALSE;                                           /*     skip the activation */
+        da_unit [unit].wait = 0;                                /*   for another secondary, */
+        return FALSE;                                           /*   then skip the activation */
         }
     }
 
@@ -1926,7 +1928,7 @@ static void abort_command (uint32 unit, CNTLR_STATUS status, IF_STATE state)
 if_command [unit] = invalid;                            /* indicate an invalid command */
 if_state [unit] = state;                                /* set the interface state as directed */
 if_dsj [unit] = 1;                                      /* set DSJ to indicate an error condition */
-dl_end_command (&icd_cntlr [unit], status);             /* place the disc controller into a wait state */
+dl_end_command (&icd_cntlr [unit], status);             /* place the disc controller into the wait state */
 return;
 }
 
@@ -1967,8 +1969,8 @@ static void complete_read (uint32 unit)
 if ((if_state [unit] == command_exec                        /* is a command executing */
   || if_state [unit] == read_xfer)                          /*   or is data transferring */
   && (dl_classify (icd_cntlr [unit]) == class_read          /* and the controller is executing */
-  ||  dl_classify (icd_cntlr [unit]) == class_status)) {    /*    a read or status? */
-    icd_cntlr [unit].eod = SET;                             /* set the end of data */
+  ||  dl_classify (icd_cntlr [unit]) == class_status)) {    /*    a read or status command? */
+    icd_cntlr [unit].eod = SET;                             /* set the end of data flag */
 
     if_state [unit] = command_exec;                         /* set to execute */
     da_unit [unit].PHASE = end_phase;                       /*   the completion phase */
@@ -2016,7 +2018,7 @@ static void complete_write (uint32 unit)
 if ((if_state [unit] == command_exec                    /* is a command executing */
   || if_state [unit] == write_xfer)                     /*   or is data transferring */
   && dl_classify (icd_cntlr [unit]) == class_write) {   /* and the controller is executing a write? */
-    icd_cntlr [unit].eod = SET;                         /* set the end of data */
+    icd_cntlr [unit].eod = SET;                         /* set the end of data flag */
 
     if_state [unit] = command_exec;                     /* set to execute */
     da_unit [unit].PHASE = end_phase;                   /*   the completion phase */
@@ -2049,7 +2051,7 @@ return;
 static void complete_abort (uint32 unit)
 {
 if (if_state [unit] != idle) {                          /* is the interface busy? */
-    icd_cntlr [unit].eod = SET;                         /* set the end of data */
+    icd_cntlr [unit].eod = SET;                         /* set the end of data flag */
     da_service (&da_unit [unit]);                       /*   and process the abort completion */
     }
 
@@ -2083,7 +2085,7 @@ else                                                    /* the lower byte is nex
 
    The supplied byte is stored in the sector buffer.  The determination of which
    byte of the 16-bit buffer word to store is made by the polarity of the buffer
-   byte count. The count always begins with an even number, as it is set by
+   byte count.  The count always begins with an even number, as it is set by
    doubling the word count returned from the disc library.  Therefore, because
    we decrement the count first, the upper byte is indicated by an odd count,
    and the lower byte is indicated by an even count.  The buffer index is
@@ -2110,7 +2112,7 @@ return;
 
 static t_stat activate_unit (UNIT *uptr)
 {
-uint32 unit;
+int32 unit;
 t_stat result;
 
 if (DEBUG_PRI (da_dev, DEB_SERV)) {

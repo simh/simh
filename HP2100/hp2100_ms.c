@@ -690,7 +690,7 @@ int32 unum;
 t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
 
-unum = uptr - msc_dev.units;                            /* get unit number */
+unum = uptr - msc_unit;                                 /* get unit number */
 
 if ((uptr->FNC != FNC_RWS) && (uptr->flags & UNIT_OFFLINE)) {  /* offline? */
     msc_sta = (msc_sta | STA_REJ) & ~STA_BUSY;          /* reject */
@@ -905,7 +905,7 @@ else
 
 t_stat ms_map_err (UNIT *uptr, t_stat st)
 {
-int32 unum = uptr - msc_dev.units;                      /* get unit number */
+int32 unum = uptr - msc_unit;                           /* get unit number */
 
 if (DEBUG_PRI (msc_dev, DEB_RWS))
     fprintf (sim_deb,

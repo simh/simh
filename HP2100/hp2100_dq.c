@@ -678,7 +678,7 @@ t_stat dqc_svc (UNIT *uptr)
 int32 da, drv, err;
 
 err = 0;                                                /* assume no err */
-drv = uptr - dqc_dev.units;                             /* get drive no */
+drv = uptr - dqc_unit;                                  /* get drive no */
 if (uptr->flags & UNIT_UNLOAD) {                        /* drive down? */
     dqc.command = CLEAR;                                /* clr cch cmd */
     dqcio (&dqc_dib, ioENF, 0);                         /* set cch flg */

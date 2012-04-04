@@ -29,7 +29,7 @@ components and build network capable simulators if they are available.
 
 1.1.3 HP2100 (Dave Bryan)
 
-	- added support for 12821A HP-IP disk controller,
+	- added support for 12821A HP-IB disk controller,
 	  7906H/20H/25H disks
 
 1.1.4 PDP11 and VAX (Mark Pizzolato)

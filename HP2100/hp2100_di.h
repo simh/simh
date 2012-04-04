@@ -1,4 +1,4 @@
-/* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator common definitions
+/* hp2100_di.h: HP 12821A HP-IB Disc Interface simulator definitions
 
    Copyright (c) 2010-2012, J. David Bryan
 
@@ -41,8 +41,8 @@
        only the DA device is implemented.  However, as the 12821A diagnostic
        requires two cards to test I/O fully, a dummy DC device is provided by
        the DA simulator.  It is enabled only when the DA card is configured for
-       diagnostic mode.  This dummy device may be removed when either the DC or
-       MA device is implemented.
+       diagnostic mode.  This dummy device should be removed when either the DC
+       or MA device is implemented.
 */
 
 
@@ -51,19 +51,21 @@
 
 #define FIFO_SIZE       16                              /* FIFO depth */
 
-typedef enum { da, dc, ma,                              /* card IDs */
-               first_card = da,                         /* first card ID */
-               last_card  = ma,                         /* last card ID */
-               card_count } CARD_ID;                    /* count of card IDs */
+typedef enum {
+    da, dc, ma,                                         /* card IDs */
+    first_card = da,                                    /* first card ID */
+    last_card  = ma,                                    /* last card ID */
+    card_count                                          /* count of card IDs */
+    } CARD_ID;
 
 
-/* Device flags and accessors (leaves space for disc/tape flags) */
+/* Device flags and accessors (bits 7-0 are reserved for disc/tape flags) */
 
-#define DEV_V_BUSADR    (DEV_V_UF +  8)                 /* bits 10-8: HP-IB address */
+#define DEV_V_BUSADR    (DEV_V_UF +  8)                 /* bits 10-8: interface HP-IB address */
 #define DEV_V_DIAG      (DEV_V_UF + 11)                 /* bit 11: diagnostic mode */
 #define DEV_V_W1        (DEV_V_UF + 12)                 /* bit 12: DCPC pacing jumper */
 
-#define DEV_M_BUSADR    7                               /* bus address mask */
+#define DEV_M_BUSADR    07                              /* bus address mask */
 
 #define DEV_BUSADR      (DEV_M_BUSADR << DEV_V_BUSADR)
 #define DEV_DIAG        (1 << DEV_V_DIAG)
@@ -73,11 +75,11 @@ typedef enum { da, dc, ma,                              /* card IDs */
 #define SET_DIADR(f)    (((f) & DEV_M_BUSADR) << DEV_V_BUSADR)
 
 
-/* Unit flags and accessors (leaves space for disc/tape flags) */
+/* Unit flags and accessors (bits 7-0 are reserved for disc/tape flags) */
 
-#define UNIT_V_BUSADR   (UNIT_V_UF + 8)                 /* bits 10-8: HP-IB address */
+#define UNIT_V_BUSADR   (UNIT_V_UF + 8)                 /* bits 10-8: unit HP-IB address */
 
-#define UNIT_M_BUSADR   7                               /* bus address mask */
+#define UNIT_M_BUSADR   07                              /* bus address mask */
 
 #define UNIT_BUSADR     (UNIT_M_BUSADR << UNIT_V_BUSADR)
 
@@ -95,10 +97,10 @@ typedef enum { da, dc, ma,                              /* card IDs */
 #define DEB_SERV        (1 << 5)                        /* unit service scheduling calls */
 
 
-/* HP-IB control state bit flags.
+/* HP-IB control line state bit flags.
 
    NOTE that these flags align with the corresponding flags in the DI status
-   register, so don't change the order!
+   register, so don't change the numerical values!
 */
 
 #define BUS_ATN         0001                            /* attention */
@@ -128,7 +130,7 @@ typedef enum { da, dc, ma,                              /* card IDs */
 #define BUS_UCG         0020                            /* universal command group */
 #define BUS_ACG         0000                            /* addressed command group */
 
-#define BUS_UNADDRESS   0037                            /* unlisten and untalk */
+#define BUS_UNADDRESS   0037                            /* unlisten and untalk addresses */
 
 #define PPR(a)          (uint8) (1 << (7 - (a)))        /* parallel poll response */
 
@@ -146,8 +148,10 @@ typedef enum { da, dc, ma,                              /* card IDs */
 #define SET_LOWER(b)    (b)
 #define SET_BOTH(b)     (SET_UPPER (b) | SET_LOWER (b))
 
-typedef enum { upper,                                   /* byte selector */
-               lower } SELECTOR;
+typedef enum {
+    upper,                                              /* upper byte selected */
+    lower                                               /* lower byte selected */
+    } SELECTOR;
 
 
 /* Per-card state variables */
@@ -170,9 +174,9 @@ typedef struct {
     uint32    fifo_count;                               /* FIFO occupancy counter */
     REG      *fifo_reg;                                 /* FIFO register pointer */
 
-    uint32    acceptors;                                /* unit bitmap of bus acceptors */
-    uint32    listeners;                                /* unit bitmap of bus listeners */
-    uint32    talker;                                   /* unit bitmap of bus talker */
+    uint32    acceptors;                                /* unit bitmap of the bus acceptors */
+    uint32    listeners;                                /* unit bitmap of the bus listeners */
+    uint32    talker;                                   /* unit bitmap of the bus talker */
 
     uint8     bus_cntl;                                 /* HP-IB bus control state (ATN, EOI, etc.) */
     uint8     poll_response;                            /* address bitmap of parallel poll responses */
@@ -183,7 +187,7 @@ typedef struct {
 
 /* Disc interface VM global register definitions.
 
-   Include these definitions before any device-specific registers.
+   These definitions should be included before any device-specific registers.
 
 
    Implementation notes:
@@ -222,7 +226,7 @@ typedef struct {
 
 /* Disc interface VM global modifier definitions.
 
-   Include these definitions before any device-specific modifiers.
+   These definitions should be included before any device-specific modifiers.
 */
 
 #define DI_MODS(dev)    \
