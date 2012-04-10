@@ -39,21 +39,21 @@
    The 12821A was a high-speed implementation of the Hewlett-Packard Interface
    Bus (HP-IB, formalized as IEEE Std. 488-1978).  It was used to interface
    HP-IB disc and tape devices, such as the HP 7906H, 7908A, and 7974A, to the
-   HP 1000 running RTE-IVB and RTE-6/VM.  Three device command protocols were
+   HP 1000 running RTE-IVB or RTE-6/VM.  Three device command protocols were
    supported by the I/O drivers: Amigo discs by driver DVA32, CS/80 discs by
    DVM33, and Amigo tapes by DVS23.
 
    In an RTE environment, the 12821A was the system controller.  While
    electrically compatible with the HP-IB specification and capable of receiving
    addressing commands from the bus, the 12821A did not use the full IEEE-488
-   protocol.  Card talker and listener states were set by bits in a control
+   protocol.  Card talker and listener states were set by bits in the control
    register, rather than by receiving talk and listen commands over the bus.
    The bus address of the card could be set via DIP switches, but this feature
    was only used by the diagnostic.
 
    The card supported packed and unpacked transfers across the bus.  Up to four
-   devices could be connected to each card; the limit was imposed by the maximum
-   electrical loading on the bus compatible with the high data rate.
+   devices could be connected to each card; this limit was imposed by the
+   maximum electrical loading on the bus compatible with the high data rate.
 
    The 12821A had a 16-word FIFO buffer and could sustain DCPC transfers of one
    megabyte per second.  Burst transfers by the CPU to fill or empty the FIFO
@@ -69,15 +69,15 @@
    The simulator is logically partitioned into three sets of functions: the
    interface card simulation, the HP-IB bus simulation, and the device
    simulation.  This is the card simulation and the card portion of the HP-IB
-   simulation.  Separate files for the tape and disc devices contain the device
-   simulations and the device portions of the HP-IB simulations.
+   simulation.  Separate modules for the tape and disc devices contain the
+   device simulations and the device portions of the HP-IB simulations.
 
-   This simulation is written to allow the definition of multiple DI cards in a
+   This simulator is written to allow the definition of multiple DI cards in a
    system.  The RTE operating system provided separate I/O drivers for the Amigo
    disc, Amigo tape, and CS/80 disc devices.  As only one I/O driver could
    control a given interface, separate interfaces were required if more than one
-   device class was installed.  For example, it was not possible to install an
-   Amigo disc and an Amigo tape on the same interface card.
+   device class was installed.  For example, it was not possible to control an
+   Amigo disc and an Amigo tape connected to the same interface card.
 
 
    Implementation notes:
@@ -92,7 +92,7 @@
        to be the system controller.  This cannot be changed by the user.
 
     3. The simulator behaves as though card jumper W1 (DCPC pacing) is in
-       position B.  This cannot be changed by the user.
+       position B.  This currently cannot be changed by the user.
 */
 
 
@@ -119,7 +119,7 @@
 /* Control Word Register */
 
 #define CNTL_SRQ        0100000                         /* enable service request interrupt */
-#define CNTL_IFC        0040000                         /* assert IFC, enable IFC interrupt */
+#define CNTL_IFC        0040000                         /* assert IFC or enable IFC interrupt */
 #define CNTL_REN        0020000                         /* assert remote enable */
 #define CNTL_IRL        0010000                         /* enable input-register-loaded interrupt */
 #define CNTL_LBO        0004000                         /* enable last-byte-out interrupt */
@@ -144,8 +144,8 @@
 #define STAT_IRL        0010000                         /* input register loaded */
 #define STAT_LBO        0004000                         /* last byte out */
 #define STAT_LBI        0002000                         /* last byte in */
-#define STAT_EOIBUS     0001000                         /* end or identify */
-#define STAT_ATNBUS     0000400                         /* attention */
+#define STAT_EOIBUS     0001000                         /* end or identify bus state */
+#define STAT_ATNBUS     0000400                         /* attention bus state */
 #define STAT_IFC        0000200                         /* interface clear seen */
 #define STAT_ODD        0000020                         /* odd number of bytes */
 #define STAT_SYSCTL     0000010                         /* system controller */
@@ -167,7 +167,7 @@
 #define DATA_SHIFT       8                              /* left shift count to align DATA_ATN, EOI with tag */
 
 #define TAG_ATN         0000200000                      /* bit 16: attention */
-#define TAG_EOI         0000400000                      /* bit 17: end-or-identify */
+#define TAG_EOI         0000400000                      /* bit 17: end or identify */
 #define TAG_EDT         0001000000                      /* bit 18: end of data transfer */
 #define TAG_LBR         0002000000                      /* bit 19: last byte received */
 
@@ -219,16 +219,16 @@ static void   di_bus_poll    (CARD_ID card);
 
 static void   master_reset (CARD_ID card);
 static void   update_state (CARD_ID card);
-static void   fifo_load    (CARD_ID card, uint16 data, FIFO_ACCESS access);
+static void   fifo_load    (CARD_ID card, uint16 data,  FIFO_ACCESS access);
 static uint16 fifo_unload  (CARD_ID card, FIFO_ACCESS access);
-static void   fprint_bus   (FILE *file, char *format, uint8 cntl);
+static void   fprint_bus   (FILE *file,   char *format, uint8 cntl);
 
 
 
 /* Dummy DC device.
 
-   This dummy device allows the DI diagnostic to test inter-card signals.  Test
-   15 can only be performed if there are two DIs available.
+   This temporary dummy device allows the DI diagnostic to test inter-card
+   signals.  Test 15 can only be performed if there are two DIs available.
 
    This device provides a second "bare" card.  Normally, it is disabled and
    cannot be enabled by the user.  Enabling or disabling DIAG mode on the DA
@@ -331,28 +331,28 @@ DEBTAB di_deb [] = {
    written to the FIFO.  The flip-flop is set by the EDT backplane signal when
    the last cycle of a DCPC transfer is executing, or during programmed output
    transfers when CLF does not accompany IOO in packed mode, or when bit 15 of
-   the data word is set in unpacked mode.  It remains set until cleared by a
-   master reset.  The output of the EDT flip-flop drives the EDT tag input of
+   the data word is set in unpacked mode.  It remains set until it is cleared by
+   a master reset.  The output of the EDT flip-flop drives the EDT tag input of
    the FIFO.
 
    The LBO signal indicates that the final data byte of a transfer has been
    sourced to the bus.  The flip-flop is set when the last byte of the entry
    tagged with EDT has been unloaded from the FIFO.  It is cleared by a master
-   reset, or when an entry not tagged with EDT is unloaded.  The output of the
+   reset or when an entry not tagged with EDT is unloaded.  The output of the
    LBO flip-flop drives the LBO bit in the Status Word.
 
    The LBI signal indicates that the final byte of an input transfer has been
    accepted from the bus.  The flip-flop is set when a byte tagged with EOI is
    received and the EOI bit in the control register is set, or a line-feed byte
    is received and the LF bit in the control register is set.  It is cleared by
-   a master reset, or when neither of these conditions is true.  The input of
-   the LBI flip-flop also drives the LBR (last byte received) tag input of the
-   FIFO, and the output of the flip-flop drives the LBI bit in the Status Word.
+   a master reset or when neither of these conditions is true.  The input of the
+   LBI flip-flop also drives the LBR (last byte received) tag input of the FIFO,
+   and the output of the flip-flop drives the LBI bit in the Status Word.
 
    The EOR signal indicates that the final data word of a transfer is available
    in the Input Data Register.  The flip-flop is set when the last byte of the
    entry tagged with LBR has been unloaded from the FIFO and written to the IDR.
-   It is cleared by a master reset, or when an entry not tagged with LBR is
+   It is cleared by a master reset or when an entry not tagged with LBR is
    unloaded and written to the IDR.  The output of the EOR flip-flop sets the
    flag flip-flop when the IDR is unloaded.
 
@@ -367,21 +367,21 @@ DEBTAB di_deb [] = {
 
     2. The DIAG, T, and L control bits enable a data loopback path on the card.
        An IOO issued to the card unloads a word from the FIFO and then loads the
-       lower byte into both bytes of the FIFO.  The data word output with the
-       IOO instruction is not used.
+       lower byte back into both bytes of the FIFO.  The data word output with
+       the IOO instruction is not used.
 
        In hardware, IOO triggers the FIFO unload and reload; T and L are
-       required only for the loopback path.  If L is not asserted, the FIFO is
-       loaded with 177777 due to the floating bus.  If L is asserted and T is
-       not, the FIFO is loaded with 000000 due to pullups on the DIO lines.
+       required only for the loopback path.  If L is not asserted, then the FIFO
+       is loaded with 177777 due to the floating bus.  If L is asserted and T is
+       not, then the FIFO is loaded with 000000 due to pullups on the DIO lines.
        In simulation, we look only for DIAG and assume that T/L are set
        properly, i.e., unloaded data is reloaded.
 
     3. In hardware, the SRQ and NRFD lines are open-collector and may be driven
        simultaneously from several bus devices.  Simulating this fully would
-       require keeping the state of the lines for each device, and deriving the
-       common bus signals from the logical AND/OR of the state values.
-       Fortunately, some simplifications are possible.
+       require keeping the state of the lines for each device and deriving the
+       common bus signals from the logical OR of the state values.  Fortunately,
+       some simplifications are possible.
 
        The DI asserts SRQ only if control word bit 15 is 1 and bit 0 is 0.
        Other bit combinations deny SRQ; as neither the Amigo nor CS/80 protocols
@@ -434,25 +434,25 @@ DI_STATE * const di_card = &di [card];
 
 uint8 assert, deny;                                         /* new bus control states */
 uint16 data;
-t_bool update_required = TRUE;                              /* TRUE if CLF must update card state */
+t_bool update_required = TRUE;                              /* TRUE if CLF must update the card state */
 
 IOSIGNAL signal;
 IOCYCLE  working_set = IOADDSIR (signal_set);               /* add ioSIR if needed */
 
 while (working_set) {
-    signal = IONEXT (working_set);                          /* isolate next signal */
+    signal = IONEXT (working_set);                          /* isolate the next signal */
 
-    switch (signal) {                                       /* dispatch I/O signal */
+    switch (signal) {                                       /* dispatch an I/O signal */
 
         case ioCLF:                                         /* clear flag flip-flop */
-            di_card->flag    = CLEAR;                       /* clear flag */
+            di_card->flag    = CLEAR;                       /* clear the flag */
             di_card->flagbuf = CLEAR;                       /*   and flag buffer */
 
             if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
                 fprintf (sim_deb, ">>%s cmds: [CLF] Flag cleared\n",
                          dptrs [card]->name);
 
-            if (update_required)                            /* if card state has changed */
+            if (update_required)                            /* if the card state has changed */
                 update_state (card);                        /*   then update the state */
             break;
 
@@ -465,7 +465,7 @@ while (working_set) {
             /* fall into ENF handler */
 
         case ioENF:                                         /* enable flag */
-            di_card->flag    = SET;                         /* set flag */
+            di_card->flag    = SET;                         /* set the flag */
             di_card->flagbuf = SET;                         /*   and flag buffer */
             break;
 
@@ -481,21 +481,21 @@ while (working_set) {
 
 
         case ioIOI:                                         /* I/O data input */
-            if (di_card->control == SET) {                  /* control set = data mode? */
-                data = di_card->input_data_register;        /* read input data register */
-                di_card->status_register &= ~STAT_IRL;      /* clear input register loaded status */
+            if (di_card->control == SET) {                  /* is the card in data mode? */
+                data = di_card->input_data_register;        /* read the input data register */
+                di_card->status_register &= ~STAT_IRL;      /* clear the input register loaded status */
 
-                if (FIFO_EMPTY && di_card->eor == CLEAR) {  /* FIFO empty and end of record not seen? */
+                if (FIFO_EMPTY && di_card->eor == CLEAR) {  /* is the FIFO empty and end of record not seen? */
                     if (di_card->srq == SET && DEBUG_PRJ (dptrs [card], DEB_CMDS))
                         fprintf (sim_deb, ">>%s cmds: SRQ cleared\n",
                                  dptrs [card]->name);
 
                     di_card->srq = CLEAR;                   /* clear SRQ */
-                    update_required = FALSE;                /* card state does not change */
+                    update_required = FALSE;                /* the card state does not change */
                     }
                 }
 
-            else {                                          /* control clear = status mode */
+            else {                                          /* the card is in status mode */
                 di_card->status_register &=                 /* clear the values to be computed, */
                     STAT_IRL | STAT_LBO                     /*   preserving those set elsewhere */
                   | STAT_LBI | STAT_IFC;
@@ -505,14 +505,14 @@ while (working_set) {
                   & (CNTL_CIC | CNTL_TALK | CNTL_LSTN);
 
 
-                if (SW8_SYSCTL)                             /* if SW8 set, card is system controller */
-                    di_card->status_register |= STAT_SYSCTL;
+                if (SW8_SYSCTL)                                 /* if SW8 is set, */
+                    di_card->status_register |= STAT_SYSCTL;    /*   the card is the system controller */
 
                 if (di_card->ibp == lower)                  /* if lower byte input is next */
-                    di_card->status_register |= STAT_ODD;   /*   then last transfer was odd */
+                    di_card->status_register |= STAT_ODD;   /*   then the last transfer was odd */
 
-                di_card->status_register |=                 /* set bus status bits */
-                  (di_card->bus_cntl                        /*   from corresponding bus control lines */
+                di_card->status_register |=                 /* set the bus status bits */
+                  (di_card->bus_cntl                        /*   from the corresponding bus control lines */
                   & (BUS_SRQ | BUS_IFC | BUS_REN
                     | BUS_EOI | BUS_ATN)) << DATA_SHIFT;
 
@@ -524,10 +524,10 @@ while (working_set) {
                          dptrs [card]->name, hold_or_clear,
                          input_state [di_card->control], data);
 
-            if (update_required && !(signal_set & ioCLF))   /* if update and CLF not present, */
-                update_state (card);                        /*   update state, else ioCLF will update */
+            if (update_required && !(signal_set & ioCLF))   /* if an update is required and CLF is not present, */
+                update_state (card);                        /*   update the state, else ioCLF will update it */
 
-            stat_data = IORETURN (SCPE_OK, data);           /* merge in return status */
+            stat_data = IORETURN (SCPE_OK, data);           /* merge in the return status */
             break;
 
 
@@ -539,26 +539,26 @@ while (working_set) {
                          dptrs [card]->name, hold_or_clear,
                          output_state [di_card->control], data);
 
-            if (di_card->control == SET) {                      /* control set = data mode */
+            if (di_card->control == SET) {                      /* is the card in data mode? */
                 if (signal_set & ioEDT)                         /* if end of DCPC transfer */
-                    di_card->edt = SET;                         /*   set EDT flip-flop */
+                    di_card->edt = SET;                         /*   set the EDT flip-flop */
 
-                else if (di_card->cntl_register & CNTL_PACK) {  /* packed transfer? */
+                else if (di_card->cntl_register & CNTL_PACK) {  /* is this a packed transfer? */
                     if (!(signal_set & ioCLF))                  /*   and CLF not given? */
-                        di_card->edt = SET;                     /* set EDT flip-flop */
+                        di_card->edt = SET;                     /* set the EDT flip-flop */
                     }
 
-                else                                            /* unpacked transfer */
-                    if (data & DATA_LBO)                        /*   and last byte out? */
-                        di_card->edt = SET;                     /* set EDT flip-flop */
+                else                                            /* it's an unpacked transfer */
+                    if (data & DATA_LBO)                        /* is the last byte out? */
+                        di_card->edt = SET;                     /* set the EDT flip-flop */
 
-                if (di_card->cntl_register & CNTL_DIAG) {       /* DIAG loopback? */
-                    data = fifo_unload (card, diag_access);     /* unload data from FIFO */
-                    fifo_load (card, data, diag_access);        /*   and load back in */
+                if (di_card->cntl_register & CNTL_DIAG) {       /* set for DIAG loopback? */
+                    data = fifo_unload (card, diag_access);     /* unload data from the FIFO */
+                    fifo_load (card, data, diag_access);        /*   and load it back in */
                     }
 
-                else {                                          /* normal mode */
-                    fifo_load (card, data, cpu_access);         /* load data word into FIFO */
+                else {                                          /* the card is set for normal operation */
+                    fifo_load (card, data, cpu_access);         /* load the data word into the FIFO */
 
                     if (FIFO_FULL && (di_card->bus_cntl & BUS_NRFD)) {  /* FIFO full and listener not ready? */
                         if (di_card->srq == SET && DEBUG_PRJ (dptrs [card], DEB_CMDS))
@@ -566,12 +566,12 @@ while (working_set) {
                                      dptrs [card]->name);
 
                         di_card->srq = CLEAR;                           /* clear SRQ */
-                        update_required = FALSE;                        /* card state does not change */
+                        update_required = FALSE;                        /* the card state does not change */
                         }
                     }
                 }
 
-            else {                                          /* control clear = write control word */
+            else {                                          /* the card is in control mode */
                 assert = 0;                                 /* initialize bus control assertions */
                 deny = 0;                                   /*   and denials */
 
@@ -580,39 +580,39 @@ while (working_set) {
 
                 if (data & CNTL_TALK) {                     /* talking enables ATN and EOI outputs */
                     if ((data & (CNTL_PPE | CNTL_CIC))      /* if parallel poll is enabled */
-                      == (CNTL_PPE | CNTL_CIC))             /*   and card is CIC */
-                        assert = BUS_PPOLL;                 /*   then conduct parallel poll */
+                      == (CNTL_PPE | CNTL_CIC))             /*   and the card is CIC */
+                        assert = BUS_PPOLL;                 /*   then conduct a parallel poll */
 
                     else if ((di_card->cntl_register        /* if PP was enabled */
                       & (CNTL_PPE | CNTL_CIC))              /*   but is not now */
                       == (CNTL_PPE | CNTL_CIC))
-                        deny = BUS_PPOLL;                   /*   then end the parallel poll */
+                        deny = BUS_PPOLL;                   /*     then end the parallel poll */
 
                     else if ((data                          /* if packed mode */
-                      & (CNTL_PACK | CNTL_CIC | CNTL_ATN))  /*   and card is CIC */
-                      == (CNTL_PACK | CNTL_CIC | CNTL_ATN)) /* then ATN control output */
+                      & (CNTL_PACK | CNTL_CIC | CNTL_ATN))  /*   and the card is CIC */
+                      == (CNTL_PACK | CNTL_CIC | CNTL_ATN)) /* then the ATN control output */
                         assert = BUS_ATN;                   /*   is coupled to the bus */
 
                     else                                    /* if none of the above */
-                        deny = BUS_ATN;                     /*   ATN is not driven */
+                        deny = BUS_ATN;                     /*   then ATN is not driven */
                     }
 
-                else                                        /* not talking */
+                else                                        /* the card is not talking */
                     deny = BUS_ATN | BUS_EOI;               /*   so ATN and EOI are disabled */
 
 
-                if (data & CNTL_NRFD)                           /* card not ready set explicitly? */
-                    assert |= BUS_NRFD;                         /* assert NRFD on bus */
+                if (data & CNTL_NRFD)                           /* is card not ready set explicitly? */
+                    assert |= BUS_NRFD;                         /* assert NRFD on the bus */
 
                 else if (di_card->cntl_register & CNTL_NRFD)    /* NRFD was set but is not now? */
-                    deny |= BUS_NRFD;                           /* deny NRFD on bus */
+                    deny |= BUS_NRFD;                           /* deny NRFD on the bus */
 
-                if (FIFO_FULL)                                  /* is FIFO full? */
+                if (FIFO_FULL)                                  /* is the FIFO full? */
                     if (data & CNTL_LSTN)                       /* is card now listening? */
-                        assert |= BUS_NRFD;                     /* listener and full FIFO asserts NRFD */
+                        assert |= BUS_NRFD;                     /* listener and a full FIFO asserts NRFD */
 
-                    else if (di_card->cntl_register & CNTL_LSTN)    /* was listener but is not now? */
-                        deny |= BUS_NRFD;                           /* deny NRFD on bus */
+                    else if (di_card->cntl_register & CNTL_LSTN)    /* was card a listener but is not now? */
+                        deny |= BUS_NRFD;                           /* deny NRFD on the bus */
 
 
                 if (SW8_SYSCTL) {                           /* system controller drives REN and IFC */
@@ -621,35 +621,35 @@ while (working_set) {
                     else                                    /*     coupled to */
                         deny |= BUS_REN;                    /*       the bus */
 
-                    if (data & CNTL_IFC) {                  /* IFC set? */
-                        assert |= BUS_IFC;                  /* assert IFC on bus */
+                    if (data & CNTL_IFC) {                  /* is IFC set? */
+                        assert |= BUS_IFC;                  /* assert IFC on the bus */
 
                         di_card->status_register =
                           di_card->status_register
                           & ~(STAT_LSTN | STAT_TALK)        /* clear listen and talk status */
                           | STAT_IFC;                       /*   and set IFC status */
 
-                        di_card->ifc_timer =                /* start IFC timer by calculating */
-                          sim_gtime () + IFC_TIMEOUT;       /*   IFC stop time (100 microseconds) */
+                        di_card->ifc_timer =                /* start the IFC timer by calculating */
+                          sim_gtime () + IFC_TIMEOUT;       /*   the IFC stop time (now + 100 microseconds) */
                         }
                     }
 
-                if ((data & (CNTL_SRQ | CNTL_CIC)) == CNTL_SRQ) /* service request and not controller? */
-                    assert |= BUS_SRQ;                          /* assert SRQ on bus */
+                if ((data & (CNTL_SRQ | CNTL_CIC)) == CNTL_SRQ) /* if service request and not the controller */
+                    assert |= BUS_SRQ;                          /*   then assert SRQ on the bus */
                 else                                            /* else */
-                    deny |= BUS_SRQ;                            /* deny SRQ on bus */
+                    deny |= BUS_SRQ;                            /*   deny SRQ on the bus */
 
-                di_card->cntl_register = data;                      /* save control word */
-                di_bus_control (card, CONTROLLER, assert, deny);    /* update bus control state */
+                di_card->cntl_register = data;                      /* save the control word */
+                di_bus_control (card, CONTROLLER, assert, deny);    /* update the bus control state */
                 }
 
-            if (update_required && !(signal_set & ioCLF))   /* if update and CLF not present, */
-                update_state (card);                        /*   update state, else ioCLF will update */
+            if (update_required && !(signal_set & ioCLF))   /* if update required and CLF is not present, */
+                update_state (card);                        /*   update the state, else ioCLF will update it */
             break;
 
 
         case ioPOPIO:                                       /* power-on preset to I/O */
-            di_card->flag    = SET;                         /* set flag */
+            di_card->flag    = SET;                         /* set the flag */
             di_card->flagbuf = SET;                         /*   and flag buffer */
 
             if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
@@ -666,19 +666,19 @@ while (working_set) {
             di_card->status_register &=                     /* clear listen and talk status */
               ~(STAT_LSTN | STAT_TALK);
 
-            deny = BUS_SRQ | BUS_REN | BUS_ATN | BUS_EOI;   /* clear lines driven by control register */
+            deny = BUS_SRQ | BUS_REN | BUS_ATN | BUS_EOI;   /* clear the lines driven by the control register */
 
             if (di_card->cntl_register & (CNTL_NRFD | CNTL_LSTN))   /* if asserting NRFD or listening */
-                deny |= BUS_NRFD;                                   /*   deny because we're clearing */
+                deny |= BUS_NRFD;                                   /*   then deny because we're clearing */
 
-            di_card->cntl_register = 0;                     /* clear control word register */
+            di_card->cntl_register = 0;                     /* clear the control word register */
             di_card->control = CLEAR;                       /* clear control */
-            di_card->srq = CLEAR;                           /* clear srq */
+            di_card->srq = CLEAR;                           /* clear SRQ */
 
-            master_reset (card);                            /* master reset */
+            master_reset (card);                            /* perform a master reset */
 
-            di_bus_control (card, CONTROLLER, 0, deny);     /* update bus control state */
-            update_state (card);                            /* update card state */
+            di_bus_control (card, CONTROLLER, 0, deny);     /* update the bus control state */
+            update_state (card);                            /* update the card state */
             break;
 
 
@@ -689,14 +689,14 @@ while (working_set) {
                 fprintf (sim_deb, ">>%s cmds: [CLC%s] Control cleared (configure mode)",
                          dptrs [card]->name, hold_or_clear);
 
-                if (signal_set & ioCLF)                     /* if ioCLF given, */
-                    fputs (", master reset\n", sim_deb);    /*   then report master reset */
+                if (signal_set & ioCLF)                     /* if ioCLF is given, */
+                    fputs (", master reset\n", sim_deb);    /*   then report a master reset */
                 else
                     fputc ('\n', sim_deb);
                 }
 
-            if (signal_set & ioCLF)                         /* if ioCLF given, */
-                master_reset (card);                        /*   then do master reset */
+            if (signal_set & ioCLF)                         /* if ioCLF is given, */
+                master_reset (card);                        /*   then do a master reset */
             break;                                          /*   (ioCLF will call update_state for us) */
 
 
@@ -717,16 +717,16 @@ while (working_set) {
 
 
         case ioSIR:                                         /* set interrupt request */
-            setstdPRL (di [card]);                          /* set standard PRL signal */
-            setstdIRQ (di [card]);                          /* set standard IRQ signal */
+            setstdPRL (di [card]);                          /* set the standard PRL signal */
+            setstdIRQ (di [card]);                          /* set the standard IRQ signal */
 
-            setSRQ (dibptr->select_code,                    /* set SRQ signal from control and SRQ */
+            setSRQ (dibptr->select_code,                    /* set the SRQ signal if control and SRQ are set */
                     di_card->srq == SET && di_card->control == SET);
             break;
 
 
         case ioIAK:                                         /* interrupt acknowledge */
-            di_card->flagbuf = CLEAR;                       /* clear flag buffer */
+            di_card->flagbuf = CLEAR;                       /* clear the flag buffer */
             break;
 
 
@@ -734,7 +734,7 @@ while (working_set) {
             break;                                          /*   are ignored */
         }
 
-    working_set = working_set & ~signal;                    /* remove current signal from set */
+    working_set = working_set & ~signal;                    /* remove the current signal from the set */
     }
 
 return stat_data;
@@ -745,7 +745,7 @@ return stat_data;
 
    During a hardware PRESET, POPIO sets the flag buffer and flag flip-flops, and
    CRS clears the control flip-flop and Control Word Register.  In addition, CRS
-   asserts a master reset on the card.
+   performs a master reset on the card.
 
    PON is not used by the card.
 
@@ -754,33 +754,33 @@ return stat_data;
 
     1. During a power-on reset, a pointer to the FIFO simulation register is
        saved to allow access to the "qptr" field during FIFO loading and
-       unloading.  This enables the SCP to view the FIFO as a circular queue, so
+       unloading.  This enables SCP to view the FIFO as a circular queue, so
        that the bottom word of the FIFO is always displayed as FIFO[0],
        regardless of where it is in the actual FIFO array.
 */
 
 t_stat di_reset (DEVICE *dptr)
 {
-DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
-const CARD_ID card = (CARD_ID) (dibptr->card_index);    /* card number */
+DIB *dibptr = (DIB *) dptr->ctxt;                       /* get the DIB pointer */
+const CARD_ID card = (CARD_ID) (dibptr->card_index);    /* get the card number */
 
-if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
+if (sim_switches & SWMASK ('P')) {                      /* is this a power-on reset? */
     di [card].fifo_reg = find_reg ("FIFO", NULL, dptr); /* find the FIFO register entry */
 
-    if (di [card].fifo_reg == NULL)                     /* not there? */
-        return SCPE_IERR;                               /* is a programming error! */
+    if (di [card].fifo_reg == NULL)                     /* if not there */
+        return SCPE_IERR;                               /*   then this is a programming error! */
     else                                                /* found it */
-        di [card].fifo_reg->qptr = 0;                   /* reset the FIFO bottom index */
+        di [card].fifo_reg->qptr = 0;                   /*   so reset the FIFO bottom index */
 
     di [card].status_register = 0;                      /* clear the status word */
 
     di [card].bus_cntl = 0;                             /* deny the HP-IB control lines */
 
-    di [card].listeners = 0;                            /* clear map of listeners */
-    di [card].talker = 0;                               /* clear map of talker */
-    di [card].poll_response = 0;                        /* clear map of parallel poll responses */
+    di [card].listeners = 0;                            /* clear the map of listeners */
+    di [card].talker = 0;                               /* clear the map of talker */
+    di [card].poll_response = 0;                        /* clear the map of parallel poll responses */
 
-    di [card].ifc_timer = 0.0;                          /* clear IFC timer */
+    di [card].ifc_timer = 0.0;                          /* clear the IFC timer */
     }
 
 IOPRESET (dibptr);                                      /* PRESET the device */
@@ -814,9 +814,9 @@ return SCPE_OK;
        Also, an address cannot be set that duplicates the address of a disabled
        unit (which cannot be displayed without enabling it).
 
-       An alternate method would be to set the new assignments into a "shadow
-       array" that is set into the unit flags (and checked for validity) only
-       when a power-on reset is done.  This does follow the disc and tape
+       An alternate implementation would be to set the new assignments into a
+       "shadow array" that is set into the unit flags (and checked for validity)
+       only when a power-on reset is done.  This would follow the disc and tape
        controller hardware, which reads the HP-IB address switch settings only
        at power-up.
 */
@@ -828,19 +828,19 @@ uint32 index, new_address;
 uint32 old_address = GET_BUSADR (uptr->flags);
 DEVICE *dptr = (DEVICE *) desc;
 
-if (cptr == NULL)                                           /* if address not given */
+if (cptr == NULL)                                           /* if the address is not given */
     return SCPE_ARG;                                        /*   report a missing argument */
 
 new_address = get_uint (cptr, 10, 7, &status);              /* parse the address value */
 
-if (status == SCPE_OK) {                                    /* parse OK? */
-    if (value)                                              /* setting the card address? */
-        dptr->flags = dptr->flags & ~DEV_BUSADR             /* store new address in the device flags */
+if (status == SCPE_OK) {                                    /* is the parse OK? */
+    if (value)                                              /* are we setting the card address? */
+        dptr->flags = dptr->flags & ~DEV_BUSADR             /* store the new address in the device flags */
           | SET_DIADR (new_address);
 
-    else {                                                  /* setting a unit address */
-        for (index = 0; index < dptr->numunits; index++)    /* look through units */
-            if (new_address != old_address                  /*   to ensure address is unique */
+    else {                                                  /* we are setting a unit address */
+        for (index = 0; index < dptr->numunits; index++)    /* look through the units */
+            if (new_address != old_address                  /*   to ensure that the address is unique */
               && new_address == GET_BUSADR (dptr->units [index].flags)) {
                 printf ("Bus address conflict: DA%d\n", index);
 
@@ -850,8 +850,8 @@ if (status == SCPE_OK) {                                    /* parse OK? */
                 return SCPE_NOFNC;                          /* a duplicate address gives an error */
                 }
 
-        uptr->flags = uptr->flags & ~UNIT_BUSADR            /* address is valid; change */
-          | SET_BUSADR (new_address);                       /*   the address in the unit flags */
+        uptr->flags = uptr->flags & ~UNIT_BUSADR            /* the address is valid; change it */
+          | SET_BUSADR (new_address);                       /*   in the unit flags */
         }
     }
 
@@ -869,10 +869,10 @@ t_stat di_show_address (FILE *st, UNIT *uptr, int32 value, void *desc)
 {
 DEVICE *dptr = (DEVICE *) desc;
 
-if (value)                                                  /* card address? */
-    fprintf (st, "address=%d", GET_DIADR (dptr->flags));    /* get from device flags */
-else                                                        /* unit address */
-    fprintf (st, "bus=%d", GET_BUSADR (uptr->flags));       /* get from unit flags */
+if (value)                                                  /* do we want the card address? */
+    fprintf (st, "address=%d", GET_DIADR (dptr->flags));    /* get it from the device flags */
+else                                                        /* we want the unit address */
+    fprintf (st, "bus=%d", GET_BUSADR (uptr->flags));       /* get it from the unit flags */
 
 return SCPE_OK;
 }
@@ -898,14 +898,14 @@ return SCPE_OK;
 
 t_stat di_set_cable (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-if (value) {                                            /* diagnostic cable selected? */
-    ((DEVICE *) desc)->flags |= DEV_DIAG;               /* set diagnostic flag */
-    dc_dev.flags &= ~DEV_DIS;                           /* enable dummy device */
+if (value) {                                            /* is the diagnostic cable selected? */
+    ((DEVICE *) desc)->flags |= DEV_DIAG;               /* set the diagnostic flag */
+    dc_dev.flags &= ~DEV_DIS;                           /* enable the dummy device */
     dc_dev.flags |= DEV_DIAG;                           /*   and set its flag as well */
     }
-else {                                                  /* peripheral cable selected */
-    ((DEVICE *) desc)->flags &= ~DEV_DIAG;              /* clear diagnostic flag */
-    dc_dev.flags |= DEV_DIS;                            /* disable dummy device */
+else {                                                  /* the peripheral cable is selected */
+    ((DEVICE *) desc)->flags &= ~DEV_DIAG;              /* clear the diagnostic flag */
+    dc_dev.flags |= DEV_DIS;                            /* disable the dummy device */
     dc_dev.flags &= ~DEV_DIAG;                          /*  and clear its flag */
     }
 
@@ -921,9 +921,9 @@ return SCPE_OK;
 
 t_stat di_show_cable (FILE *st, UNIT *uptr, int32 value, void *desc)
 {
-if (((DEVICE *) desc)->flags & DEV_DIAG)                /* is cable connected for diagnostics? */
+if (((DEVICE *) desc)->flags & DEV_DIAG)                /* is the cable connected for diagnostics? */
     fputs ("diagnostic cable", st);                     /* report it */
-else                                                    /* cable is connected for normal use */
+else                                                    /* the cable is connected for device use */
     fputs ("HP-IB cable", st);                          /* report the condition */
 
 return SCPE_OK;
@@ -936,13 +936,13 @@ return SCPE_OK;
    In hardware, the HP-IB bus consists of eight control lines and eight data
    lines.  Signals are asserted on the control lines to establish communication
    between a source and one or more acceptors.  For commands, the source is
-   always the controller (the 12821A card), and the acceptors are all connected
-   devices.  For data, the source is the current talker, and the acceptors are
-   one or more current listeners.  A three-wire interlocking handshake enables
-   communication at the rate of the slowest of the multiple acceptors.  The
-   controller conducts a parallel poll by asserting ATN and EOI together.
-   Devices whose parallel poll responses are enabled each assert one of the data
-   lines to indicate that service is required.
+   always the controller (the 12821A card), and the acceptors are all of the
+   connected devices.  For data, the source is the current talker, and the
+   acceptors are one or more current listeners.  A three-wire interlocking
+   handshake enables communication at the rate of the slowest of the multiple
+   acceptors.  The controller conducts a parallel poll by asserting ATN and EOI
+   together.  Devices whose parallel poll responses are enabled each assert one
+   of the data lines to indicate that service is required.
 
    In simulation, a disabled or detached unit logically is not connected to the
    bus.  The card maintains a bitmap of acceptors (all devices currently
@@ -970,18 +970,18 @@ return SCPE_OK;
                         listeners) and FALSE if it was not.  Called by the
                         controller to send commands to devices, and called by
                         the current talker to send data to the listener(s).  ATN
-                        and EOI should be set as required in the control word
-                        before calling.
+                        and EOI should be asserted as required on the bus before
+                        calling.
 
     *_bus_accept --     Accept a data byte from the bus.  Returns TRUE if the
                         byte was accepted and FALSE if it was not.  Called by
                         di_bus_source to handshake between source and acceptor.
-                        If ATN is set in the control word, the byte is a
-                        command; otherwise, it is data.  If EOI is set for a
-                        data byte, it is the last byte of a transmission.
+                        If ATN is asserted on the bus, the byte is a command;
+                        otherwise, it is data.  If EOI is asserted for a data
+                        byte, it is the last byte of a transmission.
 
     di_bus_control --   Set the control lines on the bus.  Called by the system
-                        controller to assert or deny REN or IFC, by the
+                        controller to assert or deny REN or IFC, by the current
                         controller to assert or deny SRQ, NRFD, or ATN and EOI
                         (to conduct or conclude a parallel poll), and by the
                         current listener to assert or deny NRFD.  All connected
@@ -1008,8 +1008,8 @@ return SCPE_OK;
    card is not in diagnostic mode, then the byte is sent to all acceptors (if a
    command) or to all listeners (if data) on the bus.
 
-   An indication is returned showing whether or not there were any acceptors on
-   the bus.
+   The return value indicates whether or not there were any acceptors on the
+   bus.
 
 
    Implementation notes:
@@ -1032,29 +1032,29 @@ if (DEBUG_PRJ (dptrs [card], DEB_XFER)) {
     fprint_bus (sim_deb, "[%s]\n", di [card].bus_cntl);
     }
 
-if (dptrs [card]->flags & DEV_DIAG)                         /* diagnostic run? */
-    for (other = first_card; other <= last_card; other++) { /* look through list of cards */
+if (dptrs [card]->flags & DEV_DIAG)                         /* is this a diagnostic run? */
+    for (other = first_card; other <= last_card; other++) { /* look through the list of cards */
         if (other != card && dptrs [other]                  /*   for the other card */
-          && (dptrs [other]->flags & DEV_DIAG)              /*   that is configured for diagnostic */
+          && (dptrs [other]->flags & DEV_DIAG)              /*   that is configured for diagnostic mode */
           && (di [other].cntl_register & CNTL_LSTN))        /*   and is listening */
-            accepted = di_bus_accept (other, data);         /* call interface acceptor for other card */
+            accepted = di_bus_accept (other, data);         /* call the interface acceptor for the other card */
         }
 
-else if ((di [card].bus_cntl & BUS_PPOLL) != BUS_PPOLL) {   /* normal run; not a fake poll? */
-    if (di [card].cntl_register & CNTL_LSTN)                /* is card a listener? */
-        accepted = di_bus_accept (card, data);              /* call interface acceptor for this card */
+else if ((di [card].bus_cntl & BUS_PPOLL) != BUS_PPOLL) {   /* this is a normal run; not a fake poll? */
+    if (di [card].cntl_register & CNTL_LSTN)                /* is the card a listener? */
+        accepted = di_bus_accept (card, data);              /* call the interface acceptor for this card */
 
-    acceptors = di [card].acceptors;                        /* get map of acceptors */
+    acceptors = di [card].acceptors;                        /* get the map of acceptors */
 
     if (!(di [card].bus_cntl & BUS_ATN)                     /* if a data transfer, */
       || (data & BUS_COMMAND) == BUS_ACG)                   /*   or an addressed command, e.g., SDC */
         acceptors = di [card].listeners;                    /* then limit just to listeners */
 
-    for (unit = 0; acceptors; unit++) {                     /* loop through units */
-        if (acceptors & 1)                                  /* is current unit accepting? */
-            accepted |= (*bus_accept [card]) (unit, data);  /* call acceptor for this card */
+    for (unit = 0; acceptors; unit++) {                     /* loop through the units */
+        if (acceptors & 1)                                  /* is the current unit accepting? */
+            accepted |= (*bus_accept [card]) (unit, data);  /* call the acceptor for this card */
 
-        acceptors = acceptors >> 1;                         /* move to next acceptor */
+        acceptors = acceptors >> 1;                         /* move to the next acceptor */
         }
     }
 
@@ -1114,13 +1114,13 @@ uint32 acceptors, responder;
 t_bool responded;
 uint8 new_state, new_assertions, new_denials;
 
-new_state = di [card].bus_cntl & ~deny | assert;        /* set up new control state */
+new_state = di [card].bus_cntl & ~deny | assert;        /* set up the new control state */
 
-if (new_state == di [card].bus_cntl)                    /* if control state did not change */
+if (new_state == di [card].bus_cntl)                    /* if the control state did not change */
     return;                                             /*   return now */
 
-new_assertions = ~di [card].bus_cntl & assert;          /* get changing assertions */
-new_denials    =  di [card].bus_cntl & deny;            /* get changing denials */
+new_assertions = ~di [card].bus_cntl & assert;          /* get the changing assertions */
+new_denials    =  di [card].bus_cntl & deny;            /* get the changing denials */
 
 di [card].bus_cntl = new_state;                         /* establish the new control state */
 
@@ -1140,31 +1140,31 @@ if (DEBUG_PRJ (dptrs [card], DEB_XFER)) {
     fprint_bus (sim_deb, ", bus is [%s]\n", new_state);
     }
 
-if ((dptrs [card]->flags & DEV_DIAG)                            /* diagnostic mode? */
-  || (new_assertions & ASSERT_SET)                              /*   or changed signals in the */
-  || (new_denials & DENY_SET)) {                                /*   set that must be broadcast? */
-    responded = FALSE;                                          /* assume no response */
+if ((dptrs [card]->flags & DEV_DIAG)                            /* is the card in diagnostic mode? */
+  || (new_assertions & ASSERT_SET)                              /*   or are changed signals in the */
+  || (new_denials & DENY_SET)) {                                /*     set that must be broadcast? */
+    responded = FALSE;                                          /* assume no response was received */
 
-    if (dptrs [card]->flags & DEV_DIAG) {                       /* diagnostic run? */
-        for (other = first_card; other <= last_card; other++)   /* look through list of cards */
+    if (dptrs [card]->flags & DEV_DIAG) {                       /* is this a diagnostic run? */
+        for (other = first_card; other <= last_card; other++)   /* look through the list of cards */
             if (other != card && dptrs [other]                  /*   for the other card */
-              && (dptrs [other]->flags & DEV_DIAG)) {           /*   that is configured for diagnostic */
-                di_bus_respond (other, new_state);              /* notify other card of new control state */
+              && (dptrs [other]->flags & DEV_DIAG)) {           /*     that is configured for diagnostic */
+                di_bus_respond (other, new_state);              /* notify the other card of the new control state */
                 responded = TRUE;                               /*   and note that there was a responder */
                 }
         }
 
-    else {                                                      /* normal run */
-        update_state (card);                                    /* update card for new control state */
+    else {                                                      /* this is a normal run */
+        update_state (card);                                    /* update the card for the new control state */
 
-        acceptors = di [card].acceptors;                        /* get map of acceptors */
-        responded = (acceptors != 0);                           /* set if there are any acceptors */
+        acceptors = di [card].acceptors;                        /* get the map of acceptors */
+        responded = (acceptors != 0);                           /* set response if there are any acceptors */
 
-        for (responder = 0; acceptors; responder++) {               /* loop through units */
-            if ((acceptors & 1) && responder != unit)               /* is current unit accepting? */
-                (*bus_respond [card]) (card, responder, new_state); /* call responder for this card */
+        for (responder = 0; acceptors; responder++) {               /* loop the through units */
+            if ((acceptors & 1) && responder != unit)               /* is the current unit accepting? */
+                (*bus_respond [card]) (card, responder, new_state); /* call the responder for this card */
 
-            acceptors = acceptors >> 1;                         /* move to next acceptor */
+            acceptors = acceptors >> 1;                             /* move to the next acceptor */
             }
         }
 
@@ -1173,7 +1173,7 @@ if ((dptrs [card]->flags & DEV_DIAG)                            /* diagnostic mo
                  dptrs [card]->name);
 }
 
-if ((new_state & BUS_PPOLL) == BUS_PPOLL)               /* parallel poll requested? */
+if ((new_state & BUS_PPOLL) == BUS_PPOLL)               /* was a parallel poll requested? */
     di_bus_poll (card);                                 /* conduct the poll */
 
 return;
@@ -1192,14 +1192,14 @@ void di_poll_response (CARD_ID card, uint32 unit, FLIP_FLOP response)
 const uint32 address = GET_BUSADR (dptrs [card]->units [unit].flags);
 uint32 previous_response = di [card].poll_response;
 
-if (response == SET) {                                  /* enable PPR? */
-    di [card].poll_response |= PPR (address);           /* set response bit */
+if (response == SET) {                                  /* enable the poll response? */
+    di [card].poll_response |= PPR (address);           /* set the response bit */
 
-    if ((di [card].bus_cntl & BUS_PPOLL) == BUS_PPOLL)  /* is parallel poll in progress? */
-        di_bus_poll (card);                             /* conduct with new response */
+    if ((di [card].bus_cntl & BUS_PPOLL) == BUS_PPOLL)  /* is a parallel poll in progress? */
+        di_bus_poll (card);                             /* conduct again with the new response */
     }
-else                                                    /* disable PPR */
-    di [card].poll_response &= ~PPR (address);          /* clear response bit */
+else                                                    /* disable the poll response */
+    di [card].poll_response &= ~PPR (address);          /*   by clearing the response bit */
 
 if (DEBUG_PRJ (dptrs [card], DEB_XFER)
   && previous_response != di [card].poll_response)
@@ -1218,11 +1218,11 @@ return;
 
    A controller asserting ATN and EOI simultaneously on the bus is conducting a
    parallel poll.  In hardware, each device whose poll response is enabled
-   asserts one of the data lines corresponding to its bus address.  The
-   controller terminates the poll by denying ATN and EOI.
+   asserts the data line corresponding to its bus address.  The controller
+   terminates the poll by denying ATN and EOI.
 
    Setting the CIC (controller in charge) and PPE (parallel poll enable) bits in
-   the Control Word Register directs the disc interface to conduct a poll.
+   the Control Word Register direct the disc interface to conduct a poll.
    Setting PPE without CIC enables the poll response for the interface.
 
    In the diagnostic mode, one card is set to conduct the poll, and the other is
@@ -1243,30 +1243,30 @@ CARD_ID other;
 uint8   response;
 
 if ((di [card].cntl_register
-  & (CNTL_PPE | CNTL_CIC)) == CNTL_PPE)                     /* card poll response enabled? */
-    response = di [card].poll_response                      /* add card's response */
+  & (CNTL_PPE | CNTL_CIC)) == CNTL_PPE)                     /* is the card's poll response enabled? */
+    response = di [card].poll_response                      /* add the card's response */
       | PPR (GET_DIADR (dptrs [card]->flags));              /*   to the devices' responses */
 else
-    response = di [card].poll_response;                     /* card disabled, so just use devices */
+    response = di [card].poll_response;                     /* the card response is disabled, so just use devices */
 
-if (dptrs [card]->flags & DEV_DIAG)                         /* diagnostic run? */
-    for (other = first_card; other <= last_card; other++)   /* look through list of cards */
+if (dptrs [card]->flags & DEV_DIAG)                         /* is this a diagnostic run? */
+    for (other = first_card; other <= last_card; other++)   /* look through the list of cards */
         if (other != card && dptrs [other]                  /*   for another card */
-          && (dptrs [other]->flags & DEV_DIAG)              /*   that is configured for diagnostic */
-          && (di [other].cntl_register                      /*   and has PPE asserted */
+          && (dptrs [other]->flags & DEV_DIAG)              /*     that is configured for the diagnostic */
+          && (di [other].cntl_register                      /*       and has PPE asserted */
           & (CNTL_PPE | CNTL_CIC)) == CNTL_PPE)
             response |=                                     /* merge its poll response */
               PPR (GET_DIADR (dptrs [other]->flags));
 
-if (response) {                                             /* poll response indicated? */
+if (response) {                                             /* is a poll response indicated? */
     if (DEBUG_PRJ (dptrs [card], DEB_XFER))
         fprintf (sim_deb, ">>%s xfer: HP-IB parallel poll DIO %03o\n",
                  dptrs [card]->name, response);
 
-    while (di [card].fifo_count != FIFO_SIZE)               /* fill card FIFO with responses */
+    while (di [card].fifo_count != FIFO_SIZE)               /* fill the card FIFO with the responses */
         fifo_load (card, (uint16) response, diag_access);   /*   (hardware feature) */
 
-    update_state (card);                                    /* update card state */
+    update_state (card);                                    /* update the card state */
     }
 
 return;
@@ -1278,7 +1278,7 @@ return;
    The indicated card accepts a byte that has been sourced to the bus.  The byte
    is loaded into the FIFO, and the card state is updated to reflect the load.
 
-   Bus acceptors return TRUE to indicate if the byte was accepted.  A card
+   Bus acceptors return TRUE to indicate that the byte was accepted.  A card
    always accepts a byte, so the routine always returns TRUE.
 */
 
@@ -1288,9 +1288,9 @@ if (DEBUG_PRJ (dptrs [card], DEB_XFER))
     fprintf (sim_deb, ">>%s xfer: HP-IB card %d accepted data %03o \n",
              dptrs [card]->name, card, data);
 
-fifo_load (card, data, bus_access);                     /* load data byte into the FIFO */
+fifo_load (card, data, bus_access);                     /* load the data byte into the FIFO */
 update_state (card);                                    /*   and update the card state */
-return TRUE;                                            /* indicate the byte was accepted */
+return TRUE;                                            /* indicate that the byte was accepted */
 }
 
 
@@ -1303,8 +1303,8 @@ return TRUE;                                            /* indicate the byte was
 
 static void di_bus_respond (CARD_ID card, uint8 new_cntl)
 {
-di [card].bus_cntl = new_cntl;                          /* update bus control */
-update_state (card);                                    /* update card state */
+di [card].bus_cntl = new_cntl;                          /* update the bus control lines */
+update_state (card);                                    /* update the card state */
 return;
 }
 
@@ -1320,11 +1320,11 @@ return;
    The primary use, other than during a PRESET, is to clear the FIFO in
    preparation to changing the card from a listener to a talker or vice versa.
    This ensures that unneeded FIFO data is not transmitted inadvertently to the
-   bus or the CPU.  It is also used when changing the data mode from unpacked to
-   packed to release the byte pointer flip-flops, which are held in the "lower
-   byte" position during unpacked transfers.
+   bus or to the CPU.  It is also used when changing the data mode from unpacked
+   to packed to release the byte pointer flip-flops, which are held in the
+   "lower byte" position during unpacked transfers.
 
-   In hardware, master reset:
+   In hardware, a master reset:
     - clears the EDT, EOR, IRL, LBO, LBI, and IFC flip-flops
     - clears the Input Data Register
     - clears the FIFO
@@ -1339,11 +1339,11 @@ di [card].edt = CLEAR;                                  /* clear the EDT flip-fl
 di [card].eor = CLEAR;                                  /* clear the EOR flip-flop */
 
 if (di [card].cntl_register & CNTL_PACK)                /* if packed mode is set, */
-    di [card].ibp = di [card].obp = upper;              /*   MR sets selectors to the upper byte */
+    di [card].ibp = di [card].obp = upper;              /*   MR sets the selectors to the upper byte */
 else                                                    /* otherwise, unpacked mode overrides */
     di [card].ibp = di [card].obp = lower;              /*   and sets the selectors to the lower byte */
 
-di [card].status_register &=                            /* clear status flip-flops */
+di [card].status_register &=                            /* clear the status flip-flops */
   ~(STAT_IRL | STAT_LBO | STAT_LBI | STAT_IFC);
 
 di [card].input_data_register = 0;                      /* clear the input data register */
@@ -1368,31 +1368,31 @@ return;
    In simulation, this routine must be called whenever the FIFO, card control,
    or bus control state changes.  It determines whether:
 
-    1. the next word from the FIFO should be unloaded into the IDR.  If the card
-       is listening, and the IDR is empty, and the FIFO contains data, then a
-       word is unloaded and stored in the IDR, and the Input Register Loaded
+    1. ...the next word from the FIFO should be unloaded into the IDR.  If the
+       card is listening, and the IDR is empty, and the FIFO contains data, then
+       a word is unloaded and stored in the IDR, and the Input Register Loaded
        status bit is set.
 
-    2. the next word from the FIFO should be unloaded and sourced to the bus.
+    2. ...the next word from the FIFO should be unloaded and sourced to the bus.
        If the card is talking (but not polling), and the listener is ready to
        accept data, and the last byte has not been sent, and the FIFO contains
        data, then a word is unloaded and sourced to the bus.  This occurs
        regardless of whether or not there are any listeners.
 
-    3. an interface clear operation has completed.  If IFC is asserted, and the
-       current simulation time is later than the IFC expiration time, then IFC
-       is denied, and the timer is reset.
+    3. ...an interface clear operation has completed.  If IFC is asserted, and
+       the current simulation time is later than the IFC expiration time, then
+       IFC is denied, and the timer is reset.
 
-    4. the card should assert NRFD to prevent FIFO overflow.  If the card is
+    4. ...the card should assert NRFD to prevent FIFO overflow.  If the card is
        listening, and the FIFO is full, or the last byte has been received, or a
        pause has been explicitly requested, then NRFD is asserted.
 
-    5. the SRQ flip-flop should be set or cleared.  If the card is listening and
-       the Input Data Register has been loaded, or the card is talking and the
-       FIFO is not full, then SRQ is asserted to request a DCPC transfer.
+    5. ...the SRQ flip-flop should be set or cleared.  If the card is listening
+       and the Input Data Register has been loaded, or the card is talking and
+       the FIFO is not full, then SRQ is asserted to request a DCPC transfer.
 
-    6. the flag flip-flop should be set or cleared.  If the Input Data Register
-       has been loaded or the Last Byte Out flip-flop is set and the
+    6. ...the flag flip-flop should be set or cleared.  If the Input Data
+       Register has been loaded or the Last Byte Out flip-flop is set and the
        corresponding Control Word Register IRL or LBO bits are set, or the End
        of Record flip-flop is set and the Input Data Register has been unloaded,
        or SRQ is asserted on the bus and the corresponding Control Word Register
@@ -1424,55 +1424,55 @@ uint8 deny = 0;
 uint16 data;
 FLIP_FLOP previous_state;
 
-if (di_card->cntl_register & CNTL_LSTN) {               /* is card a listener? */
-    if (!(di_card->status_register & STAT_IRL)          /* is IDR empty? */
-      && ! FIFO_EMPTY) {                                /*   and more in FIFO? */
-        data = fifo_unload (card, cpu_access);          /* unload FIFO */
-        di_card->input_data_register = data;            /*   into IDR */
-        di_card->status_register |= STAT_IRL;           /* set input register loaded status */
+if (di_card->cntl_register & CNTL_LSTN) {               /* is the card a listener? */
+    if (!(di_card->status_register & STAT_IRL)          /* is the IDR empty? */
+      && ! FIFO_EMPTY) {                                /*   and data remains in the FIFO? */
+        data = fifo_unload (card, cpu_access);          /* unload the FIFO */
+        di_card->input_data_register = data;            /*   into the IDR */
+        di_card->status_register |= STAT_IRL;           /* set the input register loaded status */
         }
     }
 
-else if ((di_card->cntl_register                        /* is card a talker? */
+else if ((di_card->cntl_register                        /* is the card a talker? */
   & (CNTL_TALK | CNTL_PPE)) == CNTL_TALK)               /*   and not polling? */
     while (! FIFO_EMPTY                                 /* is data remaining in FIFO? */
-      && !(di_card->bus_cntl & BUS_NRFD)                /*   and NRFD denied? */
-      && !(di_card->status_register & STAT_LBO)) {      /*   and last byte not sent? */
-        data = fifo_unload (card, bus_access);          /* unload FIFO byte */
-        di_bus_source (card, (uint8) data);             /* source it to bus */
+      && !(di_card->bus_cntl & BUS_NRFD)                /*   and NRFD is denied? */
+      && !(di_card->status_register & STAT_LBO)) {      /*   and the last byte has not been sent? */
+        data = fifo_unload (card, bus_access);          /* unload a FIFO byte */
+        di_bus_source (card, (uint8) data);             /* source it to the bus */
         }
 
 
-if (di_card->bus_cntl & BUS_IFC                         /* IFC in progress? */
+if (di_card->bus_cntl & BUS_IFC                         /* is an IFC in progress? */
   && di_card->ifc_timer != 0.0                          /*   and I am timing? */
-  && sim_gtime () > di_card->ifc_timer) {               /*   and timeout has elapsed? */
-    deny = BUS_IFC;                                     /* deny IFC on bus */
-    di_card->ifc_timer = 0.0;                           /* clear IFC timer */
-    di_card->status_register &= ~STAT_IFC;              /* clear IFC status */
+  && sim_gtime () > di_card->ifc_timer) {               /*   and has the timeout elapsed? */
+    deny = BUS_IFC;                                     /* deny IFC on the bus */
+    di_card->ifc_timer = 0.0;                           /* clear the IFC timer */
+    di_card->status_register &= ~STAT_IFC;              /*   and clear IFC status */
     }
 
 
-if (di_card->cntl_register & CNTL_LSTN)                 /* is card a listener? */
+if (di_card->cntl_register & CNTL_LSTN)                 /* is the card a listener? */
     if (di_card->cntl_register & CNTL_NRFD              /* if explicitly requested */
-      || di_card->status_register & STAT_LBI            /*   or last byte is in */
-      || FIFO_FULL)                                     /*   or FIFO is full */
+      || di_card->status_register & STAT_LBI            /*   or the last byte is in */
+      || FIFO_FULL)                                     /*   or the FIFO is full */
         assert = BUS_NRFD;                              /*   then assert NRFD */
-    else                                                /* otherwise card is ready for data */
+    else                                                /* otherwise the card is ready for data */
         deny |= BUS_NRFD;                               /*   so deny NRFD */
 
-if (assert != deny)                                     /* any change in bus state? */
-    di_bus_control (card, CONTROLLER, assert, deny);    /* update bus control */
+if (assert != deny)                                     /* was there any change in bus state? */
+    di_bus_control (card, CONTROLLER, assert, deny);    /* update the bus control */
 
 
-previous_state = di_card->srq;                          /* save current SRQ state */
+previous_state = di_card->srq;                          /* save the current SRQ state */
 
-if (di_card->cntl_register & CNTL_LSTN                  /* if card is a listener */
-  && di_card->status_register & STAT_IRL                /*   and input register is loaded, */
-  || di_card->cntl_register & CNTL_TALK                 /* or card is a talker */
-  && ! FIFO_FULL)                                       /*   and FIFO is not full */
+if (di_card->cntl_register & CNTL_LSTN                  /* if the card is a listener */
+  && di_card->status_register & STAT_IRL                /*   and the input register is loaded, */
+  || di_card->cntl_register & CNTL_TALK                 /* or the card is a talker */
+  && ! FIFO_FULL)                                       /*   and the FIFO is not full */
     di_card->srq = SET;                                 /* then request a DCPC cycle */
 else
-    di_card->srq = CLEAR;                               /* else DCPC service is not needed */
+    di_card->srq = CLEAR;                               /* otherwise, DCPC service is not needed */
 
 
 if (DEBUG_PRJ (dptrs [card], DEB_CMDS)
@@ -1481,27 +1481,27 @@ if (DEBUG_PRJ (dptrs [card], DEB_CMDS)
              dptrs [card]->name, di_card->srq == SET ? "set" : "cleared");
 
 
-if (di_card->status_register & STAT_IRL                 /* input register loaded */
-    && di_card->cntl_register & CNTL_IRL                /*   and notification wanted? */
-  || di_card->status_register & STAT_LBO                /* or last byte out */
-    && di_card->cntl_register & CNTL_LBO                /*   and notification wanted? */
-  || di_card->eor == SET                                /* or end of record seen */
-    && !(di_card->status_register & STAT_IRL)           /*   and input register unloaded? */
-  || di_card->bus_cntl & BUS_SRQ                        /* or SRQ is asserted on the bus */
-    && di_card->cntl_register & CNTL_SRQ                /*   and notification wanted */
-    && di_card->cntl_register & CNTL_CIC                /*   and card is not controller? */
-  || !SW8_SYSCTL                                        /* or card is not system controller */
+if (di_card->status_register & STAT_IRL                 /* is the input register loaded */
+    && di_card->cntl_register & CNTL_IRL                /*   and notification is wanted? */
+  || di_card->status_register & STAT_LBO                /* or is the last byte out */
+    && di_card->cntl_register & CNTL_LBO                /*   and notification is wanted? */
+  || di_card->eor == SET                                /* or was the end of record seen */
+    && !(di_card->status_register & STAT_IRL)           /*   and the input register was unloaded? */
+  || di_card->bus_cntl & BUS_SRQ                        /* or is SRQ asserted on the bus */
+    && di_card->cntl_register & CNTL_SRQ                /*   and notification is wanted */
+    && di_card->cntl_register & CNTL_CIC                /*   and the card is not controller? */
+  || !SW8_SYSCTL                                        /* or is the card not the system controller */
     && di_card->bus_cntl & BUS_REN                      /*   and REN is asserted on the bus */
-    && di_card->cntl_register & CNTL_REN                /*   and notification wanted? */
-  || !SW8_SYSCTL                                        /* or card is not system controller */
+    && di_card->cntl_register & CNTL_REN                /*   and notification is wanted? */
+  || !SW8_SYSCTL                                        /* or is the card not the system controller */
     && di_card->status_register & STAT_IFC              /*   and IFC is asserted on the bus */
-    && di_card->cntl_register & CNTL_IFC) {             /*   and notification wanted? */
+    && di_card->cntl_register & CNTL_IFC) {             /*   and notification is wanted? */
 
     if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
         fprintf (sim_deb, ">>%s cmds: Flag set\n",
                  dptrs [card]->name);
 
-    di_io (dibptr, ioENF, 0);                           /* set flag and recalculate interrupts */
+    di_io (dibptr, ioENF, 0);                           /* set the flag and recalculate interrupts */
     }
 
 else if (di_card->srq != previous_state)                /* if SRQ changed state, */
@@ -1610,70 +1610,70 @@ if (FIFO_FULL) {                                        /* is the FIFO already f
         fprintf (sim_deb, ">>%s buf:  Attempted load to full FIFO, data %0*o\n",
                  dptrs [card]->name, (access == bus_access ? 3 : 6), data);
 
-    return;                                             /* return with load ignored */
+    return;                                             /* return with the load ignored */
     }
 
-if (di_card->cntl_register & CNTL_LSTN) {               /* is card receiving? */
-    tag = (di_card->bus_cntl                            /* set tag from bus signals */
-      & (BUS_ATN | BUS_EOI)) << BUS_SHIFT;              /*   shifted to tag locations */
+if (di_card->cntl_register & CNTL_LSTN) {               /* is the card receiving? */
+    tag = (di_card->bus_cntl                            /* set the tag from the bus signals */
+      & (BUS_ATN | BUS_EOI)) << BUS_SHIFT;              /*   shifted to the tag locations */
 
-    if ((di_card->cntl_register & CNTL_EOI              /* EOI detection enabled, */
+    if ((di_card->cntl_register & CNTL_EOI              /* EOI detection is enabled, */
       && di_card->bus_cntl & BUS_EOI)                   /*   and data was tagged with EOI? */
-      || (di_card->cntl_register & CNTL_LF              /* or LF detection enabled, */
-      && GET_LOWER (data) == LF)) {                     /*   and byte is a line feed? */
-        tag = tag | TAG_LBR;                            /* tag as last byte received */
-        di_card->status_register |= STAT_LBI;           /* set last byte in status */
+      || (di_card->cntl_register & CNTL_LF              /* or LF detection is enabled, */
+      && GET_LOWER (data) == LF)) {                     /*   and the byte is a line feed? */
+        tag = tag | TAG_LBR;                            /* tag as the last byte received */
+        di_card->status_register |= STAT_LBI;           /* set the last byte in status */
         }
-    else                                                /* neither termination condition seen */
-        di_card->status_register &= ~STAT_LBI;          /*   so clear last byte in status */
+    else                                                /* neither termination condition was seen */
+        di_card->status_register &= ~STAT_LBI;          /*   so clear the last byte in status */
     }
 
-else                                                    /* card is transmitting */
-    tag = (data & (DATA_ATN | DATA_EOI)) << DATA_SHIFT; /* set tag from data shifted to tag location */
+else                                                    /* the card is transmitting */
+    tag = (data & (DATA_ATN | DATA_EOI)) << DATA_SHIFT; /* set the tag from the data shifted to the tag location */
 
-if (di_card->edt == SET)                                /* end of data transfer? */
-    tag = tag | TAG_EDT;                                /* set EDT tag */
+if (di_card->edt == SET)                                /* is this the end of the data transfer? */
+    tag = tag | TAG_EDT;                                /* set the EDT tag */
 
 
-index = (di_card->fifo_reg->qptr                        /* calculate index */
-          + di_card->fifo_count) % FIFO_SIZE;           /*   of next available location */
+index = (di_card->fifo_reg->qptr                        /* calculate the index */
+          + di_card->fifo_count) % FIFO_SIZE;           /*   of the next available location */
 
-if (access == bus_access) {                             /* bus access? */
-    if (di_card->ibp == upper) {                        /* packed and this is the upper byte? */
-        di_card->ibp = lower;                           /* set lower byte as next */
+if (access == bus_access) {                             /* is this a bus access */
+    if (di_card->ibp == upper) {                        /*   in packed mode for the upper byte? */
+        di_card->ibp = lower;                           /* set the lower byte as next */
 
         if (tag & TAG_LBR)                              /* is this the last byte? */
-            di_card->fifo [index] =                     /* copy to both bytes of FIFO */
-              tag | SET_BOTH (data);                    /*   and store with tag */
-        else {                                          /* more bytes expected */
+            di_card->fifo [index] =                     /* copy to both bytes of the FIFO */
+              tag | SET_BOTH (data);                    /*   and store with the tag */
+        else {                                          /* more bytes are expected */
             di_card->fifo [index] =                     /*   so position this byte */
-              tag | SET_UPPER (data);                   /*   and store with tag */
-            add_word = FALSE;                           /* wait for second byte before adding */
+              tag | SET_UPPER (data);                   /*   and store it with the tag */
+            add_word = FALSE;                           /* wait for the second byte before adding */
             }
         }
 
     else                                                /* this is the lower byte */
-        if (di_card->cntl_register & CNTL_PACK) {       /* packed mode? */
-            di_card->ibp = upper;                       /* set upper byte as next */
+        if (di_card->cntl_register & CNTL_PACK) {       /* is the card in packed mode? */
+            di_card->ibp = upper;                       /* set the upper byte as next */
 
-            di_card->fifo [index] =                     /* merge in data and tag */
+            di_card->fifo [index] =                     /* merge the data and tag values */
               tag | di_card->fifo [index] | SET_LOWER (data);
             }
-        else                                            /* unpacked mode */
+        else                                            /* the card is in unpacked mode */
             di_card->fifo [index] =                     /* position this byte */
-              tag | SET_LOWER (data);                   /*   and store with tag */
+              tag | SET_LOWER (data);                   /*   and store with the tag */
     }
 
-else if (access == cpu_access)                          /* cpu access? */
-    di_card->fifo [index] = tag | data;                 /* store tag and full word in FIFO */
+else if (access == cpu_access)                          /* is this a cpu access? */
+    di_card->fifo [index] = tag | data;                 /* store the tag and full word in the FIFO */
 
-else {                                                  /* diag access */
-    data = SET_BOTH (GET_LOWER (data));                 /* copy lower byte to upper byte */
-    di_card->fifo [index] = tag | data;                 /*   and store tag and full word in FIFO */
+else {                                                  /* must be diagnostic access */
+    data = SET_BOTH (GET_LOWER (data));                 /* copy the lower byte to the upper byte */
+    di_card->fifo [index] = tag | data;                 /*   and store the tag and full word in the FIFO */
     }
 
 if (add_word)                                           /* did we add a word to the FIFO? */
-    di_card->fifo_count = di_card->fifo_count + 1;      /* increment count of words stored */
+    di_card->fifo_count = di_card->fifo_count + 1;      /* increment the count of words stored */
 
 if (DEBUG_PRJ (dptrs [card], DEB_BUF)) {
     fprintf (sim_deb, ">>%s buf:  Data %0*o tag ",
@@ -1746,10 +1746,10 @@ return;
           listening, or asserts the bus EOI line if talking; in packed mode, the
           tag is ignored).
 
-       ATN and EOI tag handling is a bit complex.  If the card is listening in
-       the unpacked mode, the ATN tag substitutes for bit 8 of the data word,
-       and the EOI tag substitutes for bit 9.  In the packed mode, bits 8 and 9
-       are as stored in the FIFO (they are upper-byte data bits).
+       ATN and EOI tag handling is complex.  If the card is listening in the
+       unpacked mode, the ATN tag substitutes for bit 8 of the data word, and
+       the EOI tag substitutes for bit 9.  In the packed mode, bits 8 and 9 are
+       as stored in the FIFO (they are upper-byte data bits).
 
        If the card is talking in the unpacked mode, the ATN tag asserts or
        denies ATN on the bus if the card is the CIC, and the EOI tag asserts or
@@ -1800,7 +1800,7 @@ if (FIFO_EMPTY) {                                       /* is the FIFO already e
     return 0;                                           /* return with no data */
     }
 
-data = di_card->fifo [di_card->fifo_reg->qptr];         /* get tag and data from the FIFO */
+data = di_card->fifo [di_card->fifo_reg->qptr];         /* get the tag and data from the FIFO */
 
 tag = data & TAG_MASK;                                  /* mask the tag to just the tag bits */
 data = data & DMASK;                                    /*   and the data to just the data bits */
@@ -1811,9 +1811,9 @@ if (tag & TAG_EDT                                       /* is this the end of a 
     di_card->status_register |= STAT_LBO;               /* set the last byte out status */
 
 
-if (access == cpu_access) {                             /* cpu access? */
-    if (!(di_card->cntl_register & CNTL_PACK))          /* unpacked data format? */
-        data = data & ~(DATA_ATN | DATA_EOI)            /* substitute ATN/EOI tag values */
+if (access == cpu_access) {                             /* is this a cpu access? */
+    if (!(di_card->cntl_register & CNTL_PACK))          /*   in unpacked mode? */
+        data = data & ~(DATA_ATN | DATA_EOI)            /* substitute the ATN/EOI tag values */
           | (tag & (TAG_ATN | TAG_EOI)) >> DATA_SHIFT;  /*   into the data word */
 
     if (tag & TAG_LBR)                                  /* is this the last byte? */
@@ -1822,7 +1822,7 @@ if (access == cpu_access) {                             /* cpu access? */
         di_card->eor = CLEAR;                           /*     the end-of-record flip-flop */
     }
 
-else if (access == bus_access)                          /* bus access? */
+else if (access == bus_access)                          /* is this a bus access? */
     if (di_card->obp == upper) {                        /* is this the upper byte? */
         di_card->obp = lower;                           /* set the lower byte as next */
         data = GET_UPPER (data);                        /* mask and position the upper byte in the data word */
@@ -1832,11 +1832,11 @@ else if (access == bus_access)                          /* bus access? */
     else {                                              /* this is the lower byte */
         data = GET_LOWER (data);                        /* mask and position it in the data word */
 
-        if (di_card->cntl_register & CNTL_PACK)         /* in packed mode? */
+        if (di_card->cntl_register & CNTL_PACK)         /* is the card in the packed mode? */
             di_card->obp = upper;                       /* set the upper byte as next */
         }
 
-else                                                    /* diagnostic access */
+else                                                    /* must be a diagnostic access */
     data = GET_LOWER (data);                            /* access is to the lower byte only */
 
 
@@ -1857,15 +1857,15 @@ if (DEBUG_PRJ (dptrs [card], DEB_BUF)) {
 
 
 if (di_card->cntl_register & CNTL_TALK)                 /* is the card talking? */
-    if (di_card->cntl_register & CNTL_PACK)             /* in packed mode? */
+    if (di_card->cntl_register & CNTL_PACK)             /* is it in the packed mode? */
         if (di_card->status_register & STAT_LBO         /* yes, is the last byte out? */
-          && di_card->cntl_register & CNTL_EOI)         /*   and EOI control enabled? */
-            di_card->bus_cntl |= BUS_EOI;               /* assert EOI */
+          && di_card->cntl_register & CNTL_EOI)         /*   and is EOI control enabled? */
+            di_card->bus_cntl |= BUS_EOI;               /* assert EOI on the bus */
         else
-            di_card->bus_cntl &= ~BUS_EOI;              /* deny EOI */
+            di_card->bus_cntl &= ~BUS_EOI;              /* deny EOI on the bus */
 
-    else {                                              /* in unpacked mode */
-        if (di_card->cntl_register & CNTL_CIC)          /* is card the controller in charge? */
+    else {                                              /* the card is in the unpacked mode */
+        if (di_card->cntl_register & CNTL_CIC)          /* is the card the controller in charge? */
             di_card->bus_cntl =                         /* assert or deny the ATN bus line */
               di_card->bus_cntl & ~BUS_ATN              /*   from the ATN tag value */
               | (tag & TAG_ATN) >> BUS_SHIFT;
@@ -1908,7 +1908,7 @@ static const char *cntl_names [] = {
 uint32 signal;
 char mnemonics [40];
 
-if (cntl == 0)                                          /* any control signal asserted? */
+if (cntl == 0)                                          /* are any control signals asserted? */
     strcpy (mnemonics, "---");                          /* no; use dashes in lieu of an empty string */
 
 else {                                                  /* one or more signals are asserted */

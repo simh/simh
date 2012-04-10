@@ -985,7 +985,7 @@ return SCPE_OK;
 
 t_stat tty_set_opt (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 u = uptr - tty_dev.units;
+int32 u = uptr - tty_unit;
 
 if (u > TTO) return SCPE_NOFNC;
 if ((u == TTI) && (val == TT_MODE_7P))
@@ -997,7 +997,7 @@ return SCPE_OK;
 
 t_stat tty_set_alf (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 u = uptr - tty_dev.units;
+int32 u = uptr - tty_unit;
 
 if (u != TTI) return SCPE_NOFNC;
 return SCPE_OK;

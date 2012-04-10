@@ -24,7 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   19-Mar-12    JDB     First release
+   30-Mar-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
 
@@ -66,7 +66,7 @@
 #define CYL             u3                              /* current drive cylinder */
 #define STAT            u4                              /* current drive status (Status 2) */
 #define OP              u5                              /* current drive operation in process */
-#define PHASE           u6                              /* current command phase */
+#define PHASE           u6                              /* current drive operation phase */
 
 
 /* Unit flags and accessors */
@@ -78,7 +78,7 @@
 #define UNIT_V_AUTO     (UNIT_V_UF + 5)                 /* bits 5-5: autosize */
 #define DL_V_UF         (UNIT_V_UF + 6)                 /* first free unit flag bit */
 
-#define UNIT_M_MODEL    3                               /* model ID mask */
+#define UNIT_M_MODEL    03                              /* model ID mask */
 
 #define UNIT_MODEL      (UNIT_M_MODEL << UNIT_V_MODEL)
 #define UNIT_WLK        (1 << UNIT_V_WLK)
@@ -96,9 +96,9 @@
 
 #define DL_V_S1SPD      13                              /* bits 15-13: S/P/D flags */
 #define DL_V_S1STAT      8                              /* bits 12- 8: controller status */
-#define DL_V_S1UNIT      0                              /* bits  7- 0: last unit number */
+#define DL_V_S1UNIT      0                              /* bits  3- 0: last unit number */
 
-#define DL_M_S1UNIT     15                              /* unit mask */
+#define DL_M_S1UNIT     017                             /* unit number mask */
 
 #define GET_S1UNIT(v)   (((v) >> DL_V_S1UNIT) & DL_M_S1UNIT)
 
@@ -107,7 +107,7 @@
 #define SET_S1UNIT(v)   ((v) << DL_V_S1UNIT)
 
 
-/* Status-2 accessors (+ = kept in unit status, - = determined dynamically */
+/* Status-2 accessors (+ = kept in unit status, - = determined dynamically) */
 
 #define DL_V_S2ERR      15                              /* bits 15-15: (-) any error flag */
 #define DL_V_S2DTYP      9                              /* bits 12- 9: (-) drive type */
@@ -116,7 +116,7 @@
 #define DL_V_S2FMT       5                              /* bits  5- 5: (-) format enabled flag */
 #define DL_V_S2FAULT     4                              /* bits  4- 4: (+) drive fault flag */
 #define DL_V_S2FS        3                              /* bits  3- 3: (+) first status flag */
-#define DL_V_S2SC        2                              /* bits  2- 2: (+) seek error flag */
+#define DL_V_S2SC        2                              /* bits  2- 2: (+) seek check flag */
 #define DL_V_S2NR        1                              /* bits  1- 1: (-) not ready flag */
 #define DL_V_S2BUSY      0                              /* bits  0- 1: (-) drive busy flag */
 
@@ -195,8 +195,9 @@
 
 typedef enum {
     MAC = 0,
-    ICD,                last_type = ICD,                /* last valid type */
-    TYPE_COUNT                                          /* count of controller types */
+    ICD,
+    last_type = ICD,                                    /* last valid type */
+    type_count                                          /* count of controller types */
     } CNTLR_TYPE;
 
 
@@ -224,7 +225,8 @@ typedef enum {
     load_tio_register      = 023,
     request_disc_address   = 024,
     end                    = 025,
-    wakeup                 = 026, last_opcode = wakeup  /* last valid opcode */
+    wakeup                 = 026,
+    last_opcode            = wakeup                     /* last valid opcode */
     } CNTLR_OPCODE;
 
 #define DL_OPCODE_MASK  037
@@ -235,7 +237,8 @@ typedef enum {
 typedef enum {
     start_phase = 0,
     data_phase,
-    end_phase,          last_phase = end_phase          /* last valid phase */
+    end_phase,
+    last_phase = end_phase                              /* last valid phase */
     } CNTLR_PHASE;
 
 
@@ -324,22 +327,22 @@ typedef struct {
     uint32       verify_count;                          /* count of sectors to verify */
     uint32       poll_unit;                             /* last unit polled for attention */
     uint16      *buffer;                                /* data buffer pointer */
-    uint32       index;                                 /* data buffer index */
-    uint32       length;                                /* data buffer length */
-    UNIT        *aux;                                   /* auxiliary units (controller and timer) */
-    int32        seek_time;                             /* seek delay time (per cylinder) */
+    uint32       index;                                 /* data buffer current index */
+    uint32       length;                                /* data buffer valid length */
+    UNIT        *aux;                                   /* MAC auxiliary units (controller and timer) */
+    int32        seek_time;                             /* per-cylinder seek delay time */
     int32        sector_time;                           /* intersector delay time */
-    int32        cmd_time;                              /* command start delay time */
-    int32        data_time;                             /* data transfer delay time */
-    int32        wait_time;                             /* command wait timeout */
+    int32        cmd_time;                              /* command response time */
+    int32        data_time;                             /* data transfer response time */
+    int32        wait_time;                             /* command wait time */
     } CNTLR_VARS;
 
 
 typedef CNTLR_VARS *CVPTR;                              /* pointer to controller state variables */
 
-/* Controller state variables initialiation.
+/* Controller state variables initialization.
 
-   Parameters are:
+   The parameters are:
 
      ctype  - type of the controller (CNTLR_TYPE)
      bufptr - pointer to the data buffer

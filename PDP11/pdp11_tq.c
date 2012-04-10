@@ -1280,16 +1280,13 @@ return ST_SUC;                                          /* success! */
 void tq_io_complete (UNIT *uptr, t_stat status)
 {
 struct tq_req_results *res = (struct tq_req_results *)uptr->results;
-int32 elapsed = sim_grtime()-uptr->iostarttime;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_io_complete(status=%d)\n", status);
 
 res->io_status = status;
 res->io_complete = 1;
-if (elapsed > tq_xtime)
-    sim_activate (uptr, 0);
-else
-    sim_activate (uptr, tq_xtime-elapsed);
+/* Reschedule for the appropriate delay */
+sim_activate_notbefore (uptr, uptr->iostarttime+tq_xtime);
 }
 
 
@@ -2025,7 +2022,7 @@ t_stat tq_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = sim_tape_attach_ex (uptr, cptr, DBG_TAP);
+r = sim_tape_attach_ex (uptr, cptr, DBG_TAP, 0);
 if (r != SCPE_OK)
     return r;
 if (tq_csta == CST_UP)

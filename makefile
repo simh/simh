@@ -75,11 +75,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     INCPATH:=/usr/include
     LIBPATH:=/usr/lib
     OS_CCDEFS = -D_GNU_SOURCE
+    GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
+    GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
-      GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
-      GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
     else
       ifeq (Linux,$(OSTYPE))
         LIBPATH := $(sort $(foreach lib,$(shell /sbin/ldconfig -p | grep ' => /' | sed 's/^.* => //'),$(dir $(lib))))
@@ -342,7 +342,7 @@ ifneq (3,$(GCC_MAJOR_VERSION))
     CFLAGS_O += -Wno-unused-result
   endif
 endif
-ifeq (clean,$(MAKECMDGOALS))
+ifneq (clean,$(MAKECMDGOALS))
   BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
   $(info ***)
   $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
@@ -446,7 +446,7 @@ VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
-	${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_io_lib.c
 VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 

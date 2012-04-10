@@ -733,9 +733,11 @@ static void _sim_disk_io_flush (UNIT *uptr)
 uint32 f = DK_GET_FMT (uptr);
 
 #if defined (SIM_ASYNCH_IO)
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+
 sim_disk_clr_async (uptr);
 if (sim_asynch_enabled)
-    sim_disk_set_async (uptr, 0);
+    sim_disk_set_async (uptr, ctx->asynch_io_latency);
 #endif
 switch (f) {                                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
@@ -760,7 +762,8 @@ return stat;
 }
 
 
-t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, uint32 dbit, const char *dtype, uint32 pdp11tracksize)
+t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
+                        uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay)
 {
 struct disk_context *ctx;
 DEVICE *dptr;
@@ -797,7 +800,7 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
     vhd = sim_vhd_disk_create_diff (gbuf, cptr);
     if (vhd) {
         sim_vhd_disk_close (vhd);
-        return sim_disk_attach (uptr, gbuf, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize);
+        return sim_disk_attach (uptr, gbuf, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
         }
     return SCPE_ARG;
     }
@@ -816,7 +819,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
     sim_switches |= SWMASK ('R') | SWMASK ('E');
     sim_quiet = TRUE;
     /* First open the source of the copy operation */
-    r = sim_disk_attach (uptr, cptr, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize);
+    r = sim_disk_attach (uptr, cptr, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
     sim_quiet = saved_sim_quiet;
     if (r != SCPE_OK) {
         sim_switches = saved_sim_switches;
@@ -1013,7 +1016,7 @@ if (capac && (capac != (t_addr)-1))
             uptr->capac = capac/ctx->capac_factor;
 
 #if defined (SIM_ASYNCH_IO)
-sim_disk_set_async (uptr, 0);
+sim_disk_set_async (uptr, completion_delay);
 #endif
 uptr->io_flush = _sim_disk_io_flush;
 
@@ -1067,6 +1070,16 @@ if (auto_format)
     sim_disk_set_fmt (uptr, 0, "SIMH", NULL);           /* restore file format */
 if (close_function (fileref) == EOF)
     return SCPE_IOERR;
+return SCPE_OK;
+}
+
+t_stat sim_disk_reset (UNIT *uptr)
+{
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+_sim_disk_io_flush(uptr);
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
 return SCPE_OK;
 }
 

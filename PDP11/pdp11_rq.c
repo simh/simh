@@ -1794,16 +1794,13 @@ return 0;                                               /* success! */
 void rq_io_complete (UNIT *uptr, t_stat status)
 {
 MSC *cp = rq_ctxmap[uptr->cnum];
-int32 elapsed = sim_grtime()-uptr->iostarttime;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_io_complete(status=%d)\n", status);
 
 uptr->io_status = status;
 uptr->io_complete = 1;
-if (elapsed > rq_xtime)
-    sim_activate (uptr, 0);
-else
-    sim_activate (uptr, rq_xtime-elapsed);
+/* Reschedule for the appropriate delay */
+sim_activate_notbefore (uptr, uptr->iostarttime+rq_xtime);
 }
 
 /* Unit service for data transfer commands */
@@ -2487,7 +2484,7 @@ t_stat rq_attach (UNIT *uptr, char *cptr)
 MSC *cp = rq_ctxmap[uptr->cnum];
 t_stat r;
 
-r = sim_disk_attach (uptr, cptr, RQ_NUMBY, sizeof (uint16), (uptr->flags & UNIT_NOAUTO), DBG_DSK, drv_tab[GET_DTYPE (uptr->flags)].name, 0);
+r = sim_disk_attach (uptr, cptr, RQ_NUMBY, sizeof (uint16), (uptr->flags & UNIT_NOAUTO), DBG_DSK, drv_tab[GET_DTYPE (uptr->flags)].name, 0, 0);
 if (r != SCPE_OK)
     return r;
 
@@ -2564,6 +2561,7 @@ rq_clrint (cp);                                         /* clr intr req */
 for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
     uptr = dptr->units + i;
     sim_cancel (uptr);                                  /* clr activity */
+    sim_disk_reset (uptr);
     uptr->cnum = cidx;                                  /* set ctrl index */
     uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP);
     uptr->uf = 0;                                       /* clr unit flags */

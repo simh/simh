@@ -435,10 +435,10 @@ REG xqb_reg[] = {
 };
 
 MTAB xq_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
-		NULL, &show_addr, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-		NULL, &show_vec, NULL },
+  { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
+    NULL, &show_addr, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+    NULL, &show_vec, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xq_setmac, &xq_showmac, NULL },
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", "ETH",

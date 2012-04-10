@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2012-03-23
+                             Last update: 2012-03-25
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6255,5 +6255,28 @@
 
      RESOLUTION:  Modify "cpu_ema_resolve" (hp2100_cpu5.c) to sign-extend the
      16-bit dimension count.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+246. PROBLEM:  SHOW MTC SHOW lists the FORMAT modifier twice.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  Entering the planned SHOW MTC SHOW command results in the
+     following display:
+
+       sim> SHOW MTC SHOW
+       sh{ow} MTC      FORMAT, SC, DEVNO
+       sh{ow} MTCn     FORMAT
+
+     FORMAT is listed both as a device and as a unit modifier.
+
+     CAUSE:  The FORMAT entry in the modifier table contains both the MTAB_VDV
+     and the MTAB_VUN flags.
+
+     RESOLUTION:  Remove the redundant MTAB_VUN flag from the "mtc_mod" array
+     (hp2100_mt.c).
 
      STATUS:  Fixed in version 3.9-0.

@@ -25,6 +25,7 @@
 
    MT           12559A 3030 nine track magnetic tape
 
+   25-Mar-12    JDB     Removed redundant MTAB_VUN from "format" MTAB entry
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    29-Oct-10    JDB     Fixed command scanning error in mtcio ioIOO handler
@@ -220,7 +221,7 @@ REG mtc_reg[] = {
 MTAB mtc_mod[] = {
     { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
     { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD | MTAB_VDV | MTAB_VUN, 0, "FORMAT", "FORMAT",
+    { MTAB_XTD | MTAB_VDV, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &mtd_dev },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &mtd_dev },

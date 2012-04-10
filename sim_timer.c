@@ -80,7 +80,7 @@
 #include <ctype.h>
 
 t_bool sim_idle_enab = FALSE;                           /* global flag */
-t_bool sim_idle_wait = FALSE;                           /* global flag */
+volatile t_bool sim_idle_wait = FALSE;                  /* global flag */
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
@@ -457,7 +457,8 @@ if (done_time.tv_nsec > 1000000000) {
   }
 pthread_mutex_lock (&sim_asynch_lock);
 sim_idle_wait = TRUE;
-pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time);
+if (!pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time))
+  sim_asynch_check = 0;                 /* force check of asynch queue now */
 sim_idle_wait = FALSE;
 pthread_mutex_unlock (&sim_asynch_lock);
 return sim_os_msec() - start_time;

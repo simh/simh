@@ -151,6 +151,7 @@ if ((!callback) || !ctx->asynch_io)
         struct tape_context *ctx =                                      \
                       (struct tape_context *)uptr->tape_ctx;            \
                                                                         \
+        pthread_mutex_lock (&ctx->io_lock);                             \
                                                                         \
         sim_debug (ctx->dbit, ctx->dptr,                                \
       "sim_tape AIO_CALL(op=%d, unit=%d)\n", op, uptr-ctx->dptr->units);\
@@ -168,6 +169,7 @@ if ((!callback) || !ctx->asynch_io)
         ctx->objupdate = _obj;                                          \
         ctx->callback = _callback;                                      \
         pthread_cond_signal (&ctx->io_cond);                            \
+        pthread_mutex_unlock (&ctx->io_lock);                           \
         }                                                               \
     else                                                                \
         if (_callback)                                                  \
@@ -367,9 +369,11 @@ return SCPE_OK;
 static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
 sim_tape_clr_async (uptr);
 if (sim_asynch_enabled)
-    sim_tape_set_async (uptr, 0);
+    sim_tape_set_async (uptr, ctx->asynch_io_latency);
 #endif
 fflush (uptr->fileref);
 }
@@ -378,10 +382,10 @@ fflush (uptr->fileref);
 
 t_stat sim_tape_attach (UNIT *uptr, char *cptr)
 {
-return sim_tape_attach_ex (uptr, cptr, 0);
+return sim_tape_attach_ex (uptr, cptr, 0, 0);
 }
 
-t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit)
+t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay)
 {
 struct tape_context *ctx;
 uint32 objc;
@@ -429,7 +433,7 @@ ctx->dbit = dbit;                                       /* save debug bit */
 sim_tape_rewind (uptr);
 
 #if defined (SIM_ASYNCH_IO)
-sim_tape_set_async (uptr, 0);
+sim_tape_set_async (uptr, completion_delay);
 #endif
 uptr->io_flush = _sim_tape_io_flush;
 
@@ -1711,6 +1715,11 @@ return r;
 t_stat sim_tape_reset (UNIT *uptr)
 {
 MT_CLR_PNU (uptr);
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+_sim_tape_io_flush(uptr);
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
 return SCPE_OK;
 }
 
