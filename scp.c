@@ -105,7 +105,7 @@
    27-Sep-04    RMS     Fixed comma-separation options in set (David Bryan)
    09-Sep-04    RMS     Added -p option for RESET
    13-Aug-04    RMS     Qualified RESTORE detach with SIM_SW_REST
-   17-Jul-04    JDB     [local fix 2] DO cmd file open failure retries with ".sim" appended
+   17-Jul-04    JDB     DO cmd file open failure retries with ".sim" appended
    17-Jul-04    RMS     Added ECHO command (Dave Bryan)
    12-Jul-04    RMS     Fixed problem ATTACHing to read only files
                         (John Dundas)
@@ -245,7 +245,7 @@
 #define SSH_SH          1                               /* show */
 #define SSH_CL          2                               /* clear */
 
-#define MAX_DO_NEST_LVL 10                              /* DO cmd nesting level */
+#define MAX_DO_NEST_LVL 20                              /* DO cmd nesting level */
 #define SRBSIZ          1024                            /* save/restore buffer */
 #define SIM_BRK_INILNT  4096                            /* bpt tbl length */
 #define SIM_BRK_ALLTYP  0xFFFFFFFF
@@ -411,8 +411,12 @@ t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 t_stat step_svc (UNIT *ptr);
 void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[]);
+t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, char *cptr);
+t_stat set_verify (int32 flag, char *cptr);
+t_stat set_message (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
+t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 
 
 /* Global data */
@@ -449,7 +453,10 @@ FILEREF *sim_log_ref = NULL;                            /* log file file referen
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
 static FILE *sim_gotofile;                              /* the currently open do file */
+static int32 sim_goto_line;                             /* the current line number in the currently open do file */
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
+static int32 sim_show_message = 1;                      /* the message display status of the currently open do file */
+static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
 int32 sim_do_depth = 0;
 
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
@@ -619,7 +626,9 @@ static CTAB cmd_table[] = {
       "set console DEL          specify console delete char\n"
       "set console PCHAR        specify console printable chars\n"
       "set console TELNET=port  specify console telnet port\n"
-      "set console TELNET=LOG   specify console telnet logging\n"
+      "set console TELNET=LOG=log_file\n"
+      "                         specify console telnet logging to the\n"
+      "                         specified destination {LOG,STDOUT,DEBUG or filename)\n"
       "set console TELNET=NOLOG disables console telnet logging\n"
       "set console TELNET=BUFFERED[=bufsize]\n"
       "                         specify console telnet buffering\n"
@@ -628,11 +637,12 @@ static CTAB cmd_table[] = {
       "set console TELNET=UNBUFFERED\n"
       "                         disables console telnet buffering\n"
       "set console NOTELNET     disable console telnet\n"
-      "set console LOG          enable console logging\n"
+      "set console LOG=log_file enable console logging to the\n"
+      "                         specified destination {STDOUT,DEBUG or filename)\n"
       "set console NOLOG        disable console logging\n"
       "set console DEBUG=dbg_file\n"
       "                         enable console debugging to the\n"
-      "                         specified destination {LOG,STDOUT,DEBUG or filename)\n"
+      "                         specified destination {LOG,STDOUT or filename)\n"
       "set console NODEBUG      disable console debugging\n"
       "set console {-A}{-I} HALT=<string>\n"
       "                         set a console output string which\n"
@@ -659,6 +669,14 @@ static CTAB cmd_table[] = {
       "set asynch               enable asynchronous I/O\n"
       "set noasynch             disable asynchronous I/O\n"
       "set environment name=val set environment variable\n"
+      "set on                   enables error checking after command execution\n"
+      "set noon                 disables error checking after command execution\n"
+      "set on inherit           enables inheritance of ON state and actions into do command files\n"
+      "set on noinherit         disables inheritance of ON state and actions into do command files\n"
+      "set verify               re-enables display of command file processed commands\n"
+      "set noverify             disables display of command file processed commands\n"
+      "set message              re-enables display of command file error messages\n"
+      "set nomessage            disables display of command file error messages\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -668,8 +686,6 @@ static CTAB cmd_table[] = {
       "set <unit> ENABLED       enable unit\n"
       "set <unit> DISABLED      disable unit\n"
       "set <unit> arg{,arg...}  set unit parameters (see show modifiers)\n"
-      "set on                   enables error checking after command execution\n"
-      "set noon                 disables error checking after command execution\n"
       },
     { "SHOW", &show_cmd, 0,
       "sh{ow} br{eak} <list>    show breakpoints\n"
@@ -693,15 +709,25 @@ static CTAB cmd_table[] = {
       "sh{ow} <unit> {arg,...}  show unit parameters\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
-      "do <file> {arg,arg...}   process command file\n" },
+      "do {-V} {-O} {-E} <file> {arg,arg...}\b"
+      "                         process command file\n" },
     { "GOTO", &goto_cmd, 1,
       "goto <label>             goto label in command file\n" },
     { "RETURN", &return_cmd, 0,
       "return                   return from command file with last command status\n"
       "return {-Q} <status>     return from command file with specific status\n" },
+    { "SHIFT", &shift_cmd, 0,
+      "shift                    shift the command file's positional parameters\n" },
+    { "CALL", &call_cmd, 0,
+      "call                     transfer control to a labeled subroutine\n"
+      "                         a command file.\n" },
     { "ON", &on_cmd, 0,
-      "on <condition> <action>  perform action after condition\n"
+      "on <condition> <action>  perform action(s) after condition\n"
       "on <condition>           clear action for specific condition\n" },
+    { "PROCEED", &noop_cmd, 0,
+      "proceed                  continue command file execution without doing anything\n" },
+    { "IGNORE", &noop_cmd, 0,
+      "ignore                   continue command file execution without doing anything\n" },
     { "ECHO", &echo_cmd, 0,
       "echo <string>            display <string>\n" },
     { "ASSERT", &assert_cmd, 0,
@@ -735,6 +761,7 @@ int setenv(const char *envname, const char *envval, int overwrite)
 int main (int argc, char *argv[])
 {
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr;
+char nbuf[PATH_MAX + 7];
 int32 i, sw;
 t_bool lookswitch;
 t_stat stat, stat_nomessage;
@@ -758,13 +785,13 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         sim_switches = sim_switches | sw;
         }
     else {
-        if ((strlen (argv[i]) + strlen (cbuf) + 1) >= CBUFSIZE) {
+        if ((strlen (argv[i]) + strlen (cbuf) + 3) >= CBUFSIZE) {
             fprintf (stderr, "Argument string too long\n");
             return 0;
             }
         if (*cbuf)                                      /* concat args */
             strcat (cbuf, " "); 
-        strcat (cbuf, argv[i]);
+        sprintf(&cbuf[strlen(cbuf)], "%s%s%s", strchr(argv[i], ' ') ? "\"" : "", argv[i], strchr(argv[i], ' ') ? "\"" : "");
         lookswitch = FALSE;                             /* no more switches */
         }
     }                                                   /* end for */
@@ -812,10 +839,12 @@ if (!sim_quiet) {
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 
+sprintf(nbuf, "%s.rc", sim_name);
+stat = do_cmd (-1, nbuf);                               /* {sim_name}.rc proc cmd file */
 if (*cbuf)                                              /* cmd file arg? */
     stat = do_cmd (0, cbuf);                            /* proc cmd file */
 else if (*argv[0]) {                                    /* sim name arg? */
-    char nbuf[PATH_MAX + 7], *np;                       /* "path.ini" */
+    char *np;                                           /* "path.ini" */
     nbuf[0] = '"';                                      /* starting " */
     strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
     if (np = match_ext (nbuf, "EXE"))                   /* remove .exe */
@@ -846,6 +875,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         stat = cmdp->action (cmdp->arg, cptr);          /* if found, exec */
     else stat = SCPE_UNK;
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+    stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
     if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
@@ -990,10 +1020,15 @@ return SCPE_OK;
 
 t_stat do_cmd (int32 flag, char *fcptr)
 {
+return do_cmd_label (flag, fcptr, NULL);
+}
+
+t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
+{
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp;
-int32 echo, saved_sim_do_echo = sim_do_echo, nargs, errabort, i;
+int32 echo, saved_sim_do_echo = sim_do_echo, saved_sim_show_message = sim_show_message, nargs, errabort, i;
 t_bool interactive, isdo, staying;
 t_stat stat, stat_nomessage;
 char *ocptr;
@@ -1001,9 +1036,8 @@ char *ocptr;
 stat = SCPE_OK;
 staying = TRUE;
 interactive = (flag > 0);                               /* issued interactively? */
-if (interactive) {                                      /* get switches */
+if (interactive)                                        /* get switches */
     GET_SWITCHES (fcptr);
-    }
 echo = sim_switches & SWMASK ('V');                     /* -v means echo */
 
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
@@ -1028,8 +1062,7 @@ for (nargs = 0; nargs < 10; ) {                         /* extract arguments */
 
 if (do_arg [0] == NULL)                                 /* need at least 1 */
     return SCPE_2FARG;
-strcpy (cbuf, do_arg[0]);
-if ((fpin = fopen (cbuf, "r")) == NULL) {               /* file failed to open? */
+if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
     strcat (strcpy (cbuf, do_arg[0]), ".sim");          /* try again with .sim extension */
     if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
         if (flag == 0)                                      /* cmd line file? */
@@ -1044,7 +1077,7 @@ if (flag < 1)                                           /* start at level 1 */
     flag = 1;
 ++sim_do_depth;
 sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1]; /* inherit On mode */
-if (sim_switches & SWMASK ('O')) {                      /* -o means inherit ON condition actions */
+if ((sim_switches & SWMASK ('O')) || sim_on_inherit) {  /* -o means inherit ON condition actions */
     for (i=0; i<SCPE_MAX_ERR; i++) {                    /* replicate any on commands */
         if (sim_on_actions[sim_do_depth-1][i]) {
             sim_on_actions[sim_do_depth][i] = malloc(1+strlen(sim_on_actions[sim_do_depth-1][i]));
@@ -1063,14 +1096,27 @@ if (sim_switches & SWMASK ('O')) {                      /* -o means inherit ON c
         }
     }
 
-strcpy( sim_do_filename[sim_do_depth], cbuf);           /* stash away do file name */
+strcpy( sim_do_filename[sim_do_depth], do_arg[0]);      /* stash away do file name for possible use by 'call' command */
+if (label) {
+    sim_gotofile = fpin;
+    sim_do_echo = echo;
+    stat = goto_cmd (0, label);
+    if (stat != SCPE_OK) {
+        strcpy(cbuf, "RETURN SCPE_ARG");
+        cptr = get_glyph (cbuf, gbuf, 0);               /* get command glyph */
+        cmdp = find_cmd (gbuf);                         /* return the errorStage things to the stat will be returned */
+        goto Cleanup_Return;
+        }
+}
 if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
 do {
     ocptr = cptr = sim_brk_getact (cbuf, CBUFSIZE);     /* get bkpt action */
-    if (!ocptr)                                         /* no pending action? */
-         ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin); /* get cmd line */
+    if (!ocptr) {                                       /* no pending action? */
+        ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin); /* get cmd line */
+        sim_goto_line += 1;
+        }
     sub_args (cbuf, gbuf, CBUFSIZE, do_arg);            /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
@@ -1091,22 +1137,24 @@ do {
     sim_gotofile = fpin;
     sim_do_echo = echo;
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
-        if ((cmdp->action == &return_cmd))              /* RETURN command? */
+        if (cmdp->action == &return_cmd)                /* RETURN command? */
             break;                                      /*    done! */
-/* [JDB local fix 3] begin */
-        if ((cmdp->action == &run_cmd) && !echo)        /* run command and not echoing? */
-            sim_switches = SIM_SW_HIDE;                 /* suppress potential console halt message */
-/* [JDB local fix 3] end */
         isdo = (cmdp->action == &do_cmd);
         if (isdo) {                                     /* DO command? */
             if (flag >= MAX_DO_NEST_LVL)                /* nest too deep? */
                 stat = SCPE_NEST;
-            else stat = do_cmd (flag + 1, cptr);        /* exec DO cmd */
+            else
+                stat = do_cmd (flag + 1, cptr);         /* exec DO cmd */
             }
-        else stat = cmdp->action (cmdp->arg, cptr);     /* exec other cmd */
+        else
+            if (cmdp->action == &shift_cmd)             /* SHIFT command */
+                stat = shift_args(do_arg, sizeof(do_arg)/sizeof(do_arg[0]));
+            else
+                stat = cmdp->action (cmdp->arg, cptr);  /* exec other cmd */
         }
     else stat = SCPE_UNK;                               /* bad cmd given */
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+    stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
     if ((stat != SCPE_OK) ||
         ((cmdp->action != &return_cmd) &&
@@ -1118,9 +1166,9 @@ do {
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
             (!isdo || stat_nomessage)) {                /* and not suppressing messages */
-            printf("%s> %s\n", do_arg[0], ocptr);
+                printf("%s%s%s-%d> %s\n", do_arg[0], sim_goto_line, label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
             if (sim_log)
-                fprintf (sim_log, "%s> %s\n", do_arg[0], ocptr);
+                fprintf (sim_log, "%s%s%s-%d> %s\n", do_arg[0], label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
             }
         }
     switch (stat) {
@@ -1154,10 +1202,12 @@ do {
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     } while (staying);
-
+Cleanup_Return:
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
 sim_do_echo = saved_sim_do_echo;                        /* restore echo state we entered with */
+if (flag >= 0)
+    sim_show_message = saved_sim_show_message;          /* restore message display state we entered with */
 for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
     free (sim_on_actions[sim_do_depth][i]);
     sim_on_actions[sim_do_depth][i] = NULL;
@@ -1220,6 +1270,7 @@ void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
 char gbuf[CBUFSIZE];
 char *ip = instr, *op = tmpbuf, *ap, *oend = tmpbuf + maxstr - 2, *istart;
 char rbuf[CBUFSIZE];
+int i;
 
 while (isspace (*ip))                                   /* skip leading spaces */
     *op++ = *ip++;
@@ -1234,19 +1285,30 @@ for (; *ip && (op < oend); ) {
         if (*ip == '%') {                               /* sub? */
             if ((ip[1] >= '0') && (ip[1] <= ('9'))) {   /* %n = sub */
                 ap = do_arg[ip[1] - '0'];
+                for (i=0; i<ip[1] - '0'; ++i)           /* make sure we're not past the list end */
+                    if (do_arg[i] == NULL) {
+                        ap = NULL;
+                        break;
+                        }
                 ip = ip + 2;
                 }
             else if (ip[1] == '*') {                    /* %1 ... %9 = sub */
-                int i;
-                
                 memset (rbuf, '\0', sizeof(rbuf));
                 ap = rbuf;
                 for (i=1; i<=9; ++i)
                     if (do_arg[i] == NULL)
                         break;
                     else
-                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i])))
-                            sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
+                        if ((sizeof(rbuf)-strlen(rbuf)) < (2 + strlen(do_arg[i]))) {
+                            if (strchr(do_arg[i], ' ')) { /* need to surround this argument with quotes */
+                                char quote = '"';
+                                if (strchr(do_arg[i], quote))
+                                    quote = '\'';
+                                sprintf(&rbuf[strlen(rbuf)], "%s%s\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+                                }
+                            else
+                                sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
+                            }
                         else
                             break;
                 }
@@ -1291,6 +1353,10 @@ for (; *ip && (op < oend); ) {
                         sprintf (rbuf, "%s", sim_do_echo ? "-V" : "");
                         ap = rbuf;
                         }
+                    else if (!strcmp ("SIM_MESSAGE", gbuf)) {
+                        sprintf (rbuf, "%s", sim_show_message ? "" : "-Q");
+                        ap = rbuf;
+                        }
                     }
                 }
             if (ap) {                                   /* non-null arg? */
@@ -1316,6 +1382,15 @@ for (; *ip && (op < oend); ) {
 *op = 0;                                                /* term buffer */
 strcpy (instr, tmpbuf);
 return;
+}
+
+t_stat shift_args (char *do_arg[], size_t arg_count)
+{
+size_t i;
+
+for (i=1; i<arg_count; ++i)
+    do_arg[i] = do_arg[i+1];
+return SCPE_OK;
 }
 
 /* Assert command
@@ -1383,16 +1458,19 @@ t_stat goto_cmd (int32 flag, char *fcptr)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], gbuf1[CBUFSIZE];
 long fpos;
 int32 saved_do_echo = sim_do_echo;
+int32 saved_goto_line = sim_goto_line;
 
-if (NULL == sim_gotofile) return SCPE_UNK;		/* only valid inside of do_cmd */
+if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
 get_glyph (fcptr, gbuf1, 0);
 if ('\0' == gbuf1[0]) return SCPE_ARG;                  /* unspecified goto target */
 fpos = ftell(sim_gotofile);                             /* Save start position */
 rewind(sim_gotofile);                                   /* start search for label */
+sim_goto_line = 0;                                      /* reset line number */
 sim_do_echo = 0;                                        /* Don't echo while searching for label */
 while (1) {
     cptr = read_line (cbuf, CBUFSIZE, sim_gotofile);    /* get cmd line */
     if (cptr == NULL) break;                            /* exit on eof */
+    sim_goto_line += 1;                                 /* record line number */
     if (*cptr == 0) continue;                           /* ignore blank */
     if (*cptr != ':') continue;                         /* ignore non-labels */
     ++cptr;                                             /* skip : */
@@ -1410,6 +1488,7 @@ while (1) {
     }
 sim_do_echo = saved_do_echo;                            /* restore echo mode */
 fseek(sim_gotofile, fpos, SEEK_SET);                    /* resture start position */
+sim_goto_line = saved_goto_line;                        /* restore start line number */
 return SCPE_ARG;
 }
 
@@ -1422,6 +1501,36 @@ return SCPE_ARG;
 t_stat return_cmd (int32 flag, char *fcptr)
 {
 return SCPE_UNK;                                        /* only valid inside of do_cmd */
+}
+
+/* Shift command */
+/* The shift command is invalid unless encountered in a do_cmd context, */
+/* and in that context, it is handled as a special case inside of do_cmd() */
+/* and not dispatched here, so if we get here a shift has been issued from */
+/* interactive input (it is not valid interactively since it would have to */
+/* mess with the program's argv which is owned by the C runtime library */
+
+t_stat shift_cmd (int32 flag, char *fcptr)
+{
+return SCPE_UNK;                                        /* only valid inside of do_cmd */
+}
+
+/* Call command */
+/* The call command is invalid unless encountered in a do_cmd context, */
+/* and in that context, it is handled as a special case inside of do_cmd() */
+/* and not dispatched here, so if we get here a call has been issued from */
+/* interactive input */
+
+t_stat call_cmd (int32 flag, char *fcptr)
+{
+char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
+
+if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
+cptr = get_glyph (fcptr, gbuf, 0);
+if ('\0' == gbuf[0]) return SCPE_ARG;                   /* unspecified goto target */
+sprintf(cbuf, "%s %s", sim_do_filename[sim_do_depth], cptr);
+sim_switches |= SWMASK ('O');                           /* inherit ON state and actions */
+return do_cmd_label (flag, cbuf, gbuf);
 }
 
 /* On command */
@@ -1449,8 +1558,34 @@ else {
 return SCPE_OK;
 }
 
+/* noop command */
+/* The noop command (IGNORE, PROCEED) does nothing */
+
+t_stat noop_cmd (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+return SCPE_OK;                                         /* we're happy doing nothing */
+}
+
+/* Set on/noon routine */
+
 t_stat set_on (int32 flag, char *cptr)
 {
+if ((flag) && (cptr)) {                                 /* Set ON with arg */
+    char gbuf[CBUFSIZE];
+
+    cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
+    if (((MATCH_CMD(gbuf,"INHERIT")) &&
+         (MATCH_CMD(gbuf,"NOINHERIT"))) ||
+        (*cptr))
+        return SCPE_2MARG;
+    if (0 == MATCH_CMD(gbuf,"INHERIT"))
+        sim_on_inherit = 1;
+    if (0 == MATCH_CMD(gbuf,"NOINHERIT"))
+        sim_on_inherit = 0;
+    return SCPE_OK;
+    }
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 sim_on_check[sim_do_depth] = flag;
@@ -1466,6 +1601,30 @@ if ((sim_do_depth != 0) &&
         malloc(1+strlen("RETURN"));                     /* be the action */
     strcpy(sim_on_actions[sim_do_depth][SCPE_AFAIL], "RETURN");
     }
+return SCPE_OK;
+}
+
+/* Set verify/noverify routine */
+
+t_stat set_verify (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+if (flag == sim_do_echo)                                /* already set correctly? */
+    return SCPE_OK;
+sim_do_echo = flag;
+return SCPE_OK;
+}
+
+/* Set message/nomessage routine */
+
+t_stat set_message (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+if (flag == sim_show_message)                           /* already set correctly? */
+    return SCPE_OK;
+sim_show_message = flag;
 return SCPE_OK;
 }
 
@@ -1567,6 +1726,10 @@ static CTAB set_glob_tab[] = {
     { "ENV", &sim_set_environment, 1 },
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
+    { "VERIFY", &set_verify, 1 },
+    { "NOVERIFY", &set_verify, 0 },
+    { "MESSAGE", &set_message, 1 },
+    { "NOMESSAGE", &set_message, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -2095,17 +2258,17 @@ for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_lock (&sim_asynch_lock);
 fprintf (st, "asynchronous pending event queue\n");
-if (sim_asynch_queue == (void *)-1)
+if (sim_asynch_queue == AIO_LIST_END)
     fprintf (st, "Empty\n");
 else {
-    for (uptr = sim_asynch_queue; uptr != (void *)-1; uptr = uptr->a_next) {
+    for (uptr = sim_asynch_queue; uptr != AIO_LIST_END; uptr = uptr->a_next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
             fprintf (st, "  %s", sim_dname (dptr));
             if (dptr->numunits > 1) fprintf (st, " unit %d",
                 (int32) (uptr - dptr->units));
             }
         else fprintf (st, "  Unknown");
-        fprintf (st, " event delay %d, queue time %d\n", uptr->a_event_time, uptr->a_sim_interval);
+        fprintf (st, " event delay %d\n", uptr->a_event_time);
         }
     }
 fprintf (st, "asynch latency: %d nanoseconds\n", sim_asynch_latency);
@@ -2188,6 +2351,8 @@ for (lvl=sim_do_depth; lvl >= 0; --lvl) {
         fprintf(st, "    on ERROR    %s\n", sim_on_actions[lvl][0]);
     fprintf(st, "\n");
     }
+if (sim_on_inherit)
+    fprintf(st, "on state and actions are inherited by nested do commands and subroutines\n");
 return SCPE_OK;
 }
 
@@ -5053,6 +5218,30 @@ t_stat sim_activate_abs (UNIT *uptr, int32 event_time)
 AIO_ACTIVATE (sim_activate_abs, uptr, event_time);
 sim_cancel (uptr);
 return sim_activate (uptr, event_time);
+}
+
+/* sim_activate_notbefore - activate (queue) event even if event already scheduled
+                            but not before the specified time
+
+   Inputs:
+        uptr    =       pointer to unit
+        rtime   =       relative timeout
+   Outputs:
+        reason  =       result (SCPE_OK if ok)
+*/
+
+t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime)
+{
+uint32 rtimenow, urtime = (uint32)rtime;
+
+AIO_ACTIVATE (sim_activate_notbefore, uptr, rtime);
+sim_cancel (uptr);
+rtimenow = sim_grtime();
+sim_cancel (uptr);
+if (0x80000000 <= urtime-rtimenow)
+    return sim_activate (uptr, 0);
+else
+    return sim_activate (uptr, urtime-rtimenow);
 }
 
 /* sim_cancel - cancel (dequeue) event

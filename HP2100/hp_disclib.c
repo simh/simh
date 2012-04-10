@@ -24,7 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   20-Mar-12    JDB     First release
+   28-Mar-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
    References:
@@ -65,6 +65,11 @@
    disc heads, classify commands, and provide opcode and phase name strings for
    debugging.
 
+   Autosizing is supported when attaching a disc image.  If enabled, the model
+   of the drive is set to match the disc image size.  For example, if a 50 MB
+   disc image is attached to a unit set for autosizing, the unit's model will be
+   set to a 7920(H).
+
    The interface simulator declares a structure that contains the state
    variables for a controller.  A MAC controller may handle multiple disc units.
    An ICD controller handles only a single disc unit, but multiple controllers
@@ -79,7 +84,7 @@
    stored in the controller state structure.  The controller maintains the
    current index into the buffer, as well as the length of valid data stored
    there.  Other than setting the length when the controller places data into
-   the buffer, and resetting the index at the start of a sector read or write,
+   the buffer and resetting the index at the start of a sector read or write,
    the interface simulator is free to manipulate these values as desired.
 
    In general, a user of the library is free to read any of the controller state
@@ -87,16 +92,16 @@
    with controller operations, with these exceptions:
 
      Field Name   Description
-     ===========  ========================
+     ===========  ============================
      status       controller status
      eod          end of data flag
      index        data buffer index
      length       data buffer length
-     seek_time    seek delay time
+     seek_time    per-cylinder seek delay time
      sector_time  intersector delay time
-     cmd_time     command start delay time
-     data_time    data transfer delay time
-     wait_time    command wait timeout
+     cmd_time     command response time
+     data_time    data transfer response time
+     wait_time    command wait time
 
    In hardware, the controller executes in three basic states:
 
@@ -121,10 +126,10 @@
 
     3. In command execution, which processes the current command.
 
-       During command execution, waits for input parameters, seek completion,
-       data transfers, and output status words are handled internally.  Each
-       wait is governed by the 1.8 second timer; if it expires, the command is
-       aborted.
+       During command execution, the waits for input parameters, seek
+       completion, data transfers, and output status words are handled
+       internally.  Each wait is governed by the 1.8 second timer; if it
+       expires, the command is aborted.
 
    In simulation, these states are represented by the values cntlr_idle,
    cntlr_wait, and cntlr_busy, respectively.
@@ -134,14 +139,15 @@
    unit of a contiguous array is passed, and the unit number present in the
    command is used to index to the target unit.
 
-   A MAC controller emulation requires an array of two contiguous auxiliary
-   units containing a controller unit and a command wait timeout unit. Commands
+   A MAC controller emulation also requires an array of two contiguous auxiliary
+   units containing a controller unit and a command wait timeout unit.  Commands
    that do not access the drive, such as Address Record, are scheduled on the
    controller unit to allow controller commands to execute while drive units are
-   seeking. The command wait timer limits the amount of time the controller will
-   wait for the interface to supply a command or parameter.  A pointer to the
-   auxiliary unit array is set up during controller state variable
-   initialization.
+   seeking.  The command wait timer limits the amount of time the controller
+   will wait for the interface to supply a command or parameter.  A pointer to
+   the auxiliary unit array is set up during controller state variable
+   initialization.  The auxiliary array may be separate or an extension of the
+   drive unit array.
 
    An ICD controller manages a single unit corresponding to the drive in which
    the controller is integrated.  An interface declares a unit array
@@ -179,9 +185,9 @@
    the caller uses this feature, the field should be reset to zero before the
    next service call.
 
-   The MAC timer unit is activated by the library, and the "wait" field is not
+   The MAC timer unit is activated by the library, and its "wait" field is not
    used.  The timer starts when a command other than End, Seek, or Recalibrate
-   completes, and when the controller is waiting for the interface to supply or
+   completes, or when the controller is waiting for the interface to supply or
    accept a parameter during command execution.  It stops when an End, Seek, or
    Recalibrate command completes, a command is prepared for execution, or the
    final parameter has been supplied or accepted by the interface during command
@@ -190,7 +196,7 @@
    The controller maintains six variables in each drive's unit structure:
 
      wait       -- the current service activation time
-     pos        -- the current file offset
+     pos        -- the current byte offset into the disc image file
      u3 (CYL)   -- the current drive cylinder
      u4 (STAT)  -- the drive status (Status-2)
      u5 (OP)    -- the drive operation in process
@@ -247,32 +253,32 @@
 
 
 
-/* Command accessors (16-bit word) */
+/* Command accessors */
 
 #define DL_V_OPCODE      8                              /* bits 12- 8: general opcode */
 #define DL_V_HOLD        7                              /* bits  7- 7: general hold flag */
 #define DL_V_UNIT        0                              /* bits  3- 0: general unit number */
 
-#define DL_V_SPD        13                              /* bits 15-13: initialize S/P/D flags */
-#define DL_V_CHEAD       6                              /* bits  7- 6: cold load head */
-#define DL_V_CSECT       0                              /* bits  5- 0: cold load sector */
-#define DL_V_FRETRY      4                              /* bits  7- 4: file mask retry count */
-#define DL_V_FDECR       3                              /* bits  3- 3: file mask seek decrement */
-#define DL_V_FSPEN       2                              /* bits  2- 2: file mask sparing enable */
-#define DL_V_FCYLM       1                              /* bits  1- 1: file mask cylinder mode */
-#define DL_V_FAUTSK      0                              /* bits  0- 0: file mask auto seek */
+#define DL_V_SPD        13                              /* bits 15-13: Initialize S/P/D flags */
+#define DL_V_CHEAD       6                              /* bits  7- 6: Cold Load Read head number */
+#define DL_V_CSECT       0                              /* bits  5- 0: Cold Load Read sector number */
+#define DL_V_FRETRY      4                              /* bits  7- 4: Set File Mask retry count */
+#define DL_V_FDECR       3                              /* bits  3- 3: Set File Mask seek decrement */
+#define DL_V_FSPEN       2                              /* bits  2- 2: Set File Mask sparing enable */
+#define DL_V_FCYLM       1                              /* bits  1- 1: Set File Mask cylinder mode */
+#define DL_V_FAUTSK      0                              /* bits  0- 0: Set File Mask auto seek */
 
-#define DL_V_FMASK       0                              /* bits  3- 0: file mask (combined) */
+#define DL_V_FMASK       0                              /* bits  3- 0: Set File Mask (flags combined) */
 
 
-#define DL_M_OPCODE     037
-#define DL_M_UNIT       017
+#define DL_M_OPCODE     037                             /* opcode mask */
+#define DL_M_UNIT       017                             /* unit mask */
 
-#define DL_M_SPD        007
-#define DL_M_CHEAD      003
-#define DL_M_CSECT      077
-#define DL_M_FRETRY     017
-#define DL_M_FMASK      017
+#define DL_M_SPD        007                             /* S/P/D flags mask */
+#define DL_M_CHEAD      003                             /* Cold Load Read head number mask */
+#define DL_M_CSECT      077                             /* Cold Load Read sector number mask */
+#define DL_M_FRETRY     017                             /* Set File Mask retry count mask */
+#define DL_M_FMASK      017                             /* Set File Mask flags mask */
 
 
 #define GET_OPCODE(c)   (CNTLR_OPCODE) (((c) >> DL_V_OPCODE) & DL_M_OPCODE)
@@ -290,13 +296,13 @@
 #define DL_FAUTSK       (1 << DL_V_FAUTSK)
 
 
-/* Parameter accessors (16-bit word) */
+/* Parameter accessors */
 
 #define DL_V_HEAD       8                               /* bits 12- 8: head number */
 #define DL_V_SECTOR     0                               /* bits  7- 0: sector number */
 
-#define DL_M_HEAD       0017
-#define DL_M_SECTOR     0377
+#define DL_M_HEAD       0017                            /* head number mask */
+#define DL_M_SECTOR     0377                            /* sector number mask */
 
 #define GET_HEAD(p)     (((p) >> DL_V_HEAD) & DL_M_HEAD)
 #define GET_SECTOR(p)   (((p) >> DL_V_SECTOR) & DL_M_SECTOR)
@@ -310,15 +316,15 @@
    In hardware, drives report their Drive Type numbers to the controller upon
    receipt of a Request Status tag bus command.  The drive type is used to
    determine the legal range of head and sector addresses (the drive itself will
-   validate the cylinder during seeks).
+   validate the cylinder address during seeks).
 
    In simulation, we set up a table of drive properties and use the model ID as
    an index into the table.  The table is used to validate seek parameters and
    to provide the mapping between CHS addresses and the linear byte addresses
    required by the host file access routines.
 
-   The 7905/06/06H drives consist of removable and fixed platters, whereas the
-   7920/20H/25/25H drives have only removable multi-platter packs.  As a result,
+   The 7905/06(H) drives consist of removable and fixed platters, whereas the
+   7920(H)/25(H) drives have only removable multi-platter packs.  As a result,
    7905/06 drives are almost always accessed in platter mode, i.e., a given
    logical disc area is fully contained on either the removable or fixed
    platter, whereas the 7920/25 drives are almost always accessed in cylinder
@@ -332,12 +338,12 @@
    The simulator maps the tracks on the 7905/06 removable platter (heads 0 and
    1) to the first half of the disc image, and the tracks on the fixed platter
    (heads 2 and, for the 7906 only, 3) to the second half of the image.  For the
-   7906/06H, the cylinder-head order of the tracks is 0-0, 0-1, 1-0, 1-1, ...,
+   7906(H), the cylinder-head order of the tracks is 0-0, 0-1, 1-0, 1-1, ...,
    410-0, 410-1, 0-2, 0-3, 1-2, 1-3, ..., 410-2, 410-3.  The 7905 order is the
    same, except that head 3 tracks are omitted.
 
-   For the 7920/20H/25/25H, all tracks appear in cylinder-head order, e.g., 0-0,
-   0-1, 0-2, 0-3, 0-4, 1-0, 1-1, ..., 822-2, 822-3, 822-4 for the 7920/20H.
+   For the 7920(H)/25(H), all tracks appear in cylinder-head order, e.g., 0-0,
+   0-1, 0-2, 0-3, 0-4, 1-0, 1-1, ..., 822-2, 822-3, 822-4 for the 7920(H).
 
    This variable-access geometry is accomplished by defining additional "heads
    per cylinder" values for the fixed and removable sections of each drive that
@@ -430,7 +436,7 @@ static const DRIVE_PROPERTIES drive_props [] = {
 
 /* Command properties table.
 
-   The validity of each command for a given type of controller is checked
+   The validity of each command for a specified controller type is checked
    against the command properties table when it is prepared.  The table also
    includes the count of inbound and outbound properties, the class of the
    command, and flags to indicate certain common actions that should be taken.
@@ -440,10 +446,10 @@ typedef struct {
     uint32       params_in;                             /* count of input parameters */
     uint32       params_out;                            /* count of output parameters */
     CNTLR_CLASS  classification;                        /* command classification */
-    t_bool       valid [TYPE_COUNT];                    /* per-type command validity */
-    t_bool       clear_status;                          /* command clears status */
+    t_bool       valid [type_count];                    /* per-type command validity */
+    t_bool       clear_status;                          /* command clears the controller status */
     t_bool       unit_field;                            /* command has a unit field */
-    t_bool       unit_check;                            /* command checks unit number validity */
+    t_bool       unit_check;                            /* command checks the unit number validity */
     t_bool       unit_access;                           /* command accesses the drive unit */
     t_bool       seek_wait;                             /* command waits for seek completion */
     } DS_PROPS;
@@ -606,7 +612,7 @@ if (props->clear_status) {                              /* clear the prior contr
     cvptr->spd_unit = SET_S1UNIT (unit);                /* save the unit number for status requests */
     }
 
-if (cvptr->type <= last_type                            /* is the controller type legal? */
+if (cvptr->type <= last_type                            /* is the controller type legal, */
   && props->valid [cvptr->type])                        /*   and the opcode defined for this controller? */
     if (props->unit_check && unit > DL_MAXUNIT)         /* if the unit number is checked and is illegal, */
         dl_end_command (cvptr, unit_unavailable);       /*   end with a unit unavailable error */
@@ -617,13 +623,13 @@ if (cvptr->type <= last_type                            /* is the controller typ
         cvptr->length = props->params_in;               /* set the inbound parameter count */
         cvptr->index = 1;                               /* point at the first parameter element (if any) */
 
-        if (cvptr->type == MAC && cvptr->length) {      /* MAC controller and inbound parameters? */
+        if (cvptr->type == MAC && cvptr->length) {      /* is this a MAC controller with inbound parameters? */
             cvptr->aux [controller].OP = opcode;        /* save the opcode */
             cvptr->aux [controller].PHASE = data_phase; /*   and set the phase for parameter pickup */
             set_timer (cvptr, SET);                     /* start the timer to wait for the first parameter */
             }
 
-        return TRUE;                                    /* command is now prepared for execution */
+        return TRUE;                                    /* the command is now prepared for execution */
         }
 
 else                                                    /* the opcode is undefined */
@@ -649,8 +655,8 @@ return FALSE;                                           /* the preparation has f
    If a seek is in progress on a drive when a command accessing that drive is
    started, the unit pointer is returned but the unit's "wait" field is set to
    zero.  In this case, the unit must not be activated (as it already is).
-   Instead, the unit's opcode and phase fields are set to start the command
-   automatically when the seek completes.
+   Instead, the unit's opcode and phase fields will have been set to start the
+   command automatically when the seek completes.
 
    For commands that return status from the controller, the buffer will contain
    the returned value(s), the buffer index will be zero, and the buffer length
@@ -671,9 +677,9 @@ return FALSE;                                           /* the preparation has f
        permanently offline.
 
     2. Commands that check for a valid unit do some processing before failing
-       with a Status-2 (not ready) error.  For example, the Seek command accepts
-       its parameters from the CPU and sets the CHS values into the controller
-       before failing.
+       with a Status-2 (not ready) error if the unit is invalid.  For example,
+       the Seek command accepts its parameters from the CPU and sets the CHS
+       values into the controller before failing.
 
     3. In hardware, read, write, and recalibrate commands wait in an internal
        loop for a pending seek completion and clear the resulting Attention
@@ -692,7 +698,7 @@ return FALSE;                                           /* the preparation has f
        a seek command with a Seek Check error.  The firmware does not test
        explicitly for Access Not Ready before executing the command, so the
        parameters (e.g., controller CHS addresses) are still set as though the
-       command succeeded.
+       command had succeeded.
 
        A Seek command will return to the Poll Loop with Seek Check status set.
        When the seek in progress completes, the controller will interrupt with
@@ -723,8 +729,8 @@ return FALSE;                                           /* the preparation has f
 
     8. The activation time is set to the intersector time (latency) for read and
        write commands, and to the controller processing time for all others.
-       This time cannot be shorter than 20 instructions, or DVR32 will be unable
-       to start DCPC in time to avoid an over/underrun.
+       The read/write start time cannot be shorter than 20 instructions, or
+       DVR32 will be unable to start DCPC in time to avoid an over/underrun.
 */
 
 UNIT *dl_start_command (CVPTR cvptr, UNIT *units, uint32 unit_limit)
@@ -752,11 +758,11 @@ if (cvptr->type == MAC) {                               /* is this a MAC control
 
 else {                                                  /* for an ICD controller, */
     unit = 0;                                           /*   the unit value is ignored */
-    uptr = units + unit_limit;                          /*   and we use the indicated unit */
+    uptr = units + unit_limit;                          /*     and we use the indicated unit */
     }
 
 if (props->unit_check && !uptr                                  /* if the unit number is checked and is invalid */
-  || props->seek_wait && (drive_status (uptr) & DL_S2STOPS)) {  /*   or if waiting for an offline drive */
+  || props->seek_wait && (drive_status (uptr) & DL_S2STOPS)) {  /*   or if we're waiting for an offline drive */
     dl_end_command (cvptr, status_2_error);                     /*     then the command ends with a Status-2 error */
     uptr = NULL;                                                /* prevent the command from starting */
     }
@@ -788,16 +794,16 @@ cvptr->eod = CLEAR;                                     /* clear the end of data
 switch (cvptr->opcode) {                                /* dispatch the command */
 
     case cold_load_read:
-        cvptr->cylinder = 0;                            /* set cylinder to 0 */
-        cvptr->head = GET_CHEAD (cvptr->buffer [0]);    /* get the head */
+        cvptr->cylinder = 0;                            /* set the cylinder address to 0 */
+        cvptr->head = GET_CHEAD (cvptr->buffer [0]);    /* set the head */
         cvptr->sector = GET_CSECT (cvptr->buffer [0]);  /*   and sector from the command */
 
         if (is_seeking) {                               /* if a seek is in progress, */
             uptr->STAT |= DL_S2SC;                      /*   a Seek Check occurs */
-            cvptr->file_mask = DL_FSPEN;                /* set sparing enabled */
-            uptr->OP = read;                            /* start the read on seek completion  */
+            cvptr->file_mask = DL_FSPEN;                /* enable sparing */
+            uptr->OP = read;                            /* start the read on the seek completion  */
             uptr->PHASE = start_phase;                  /*   and reset the command phase */
-            return uptr;                                /*   to allow the seek to complete normally */
+            return uptr;                                /*     to allow the seek to complete normally */
             }
 
         else                                            /* the drive is not seeking */
@@ -809,7 +815,7 @@ switch (cvptr->opcode) {                                /* dispatch the command 
     case seek:
         cvptr->cylinder = cvptr->buffer [1];            /* get the supplied cylinder */
         cvptr->head = GET_HEAD (cvptr->buffer [2]);     /*   and head */
-        cvptr->sector = GET_SECTOR (cvptr->buffer [2]); /*   and sector */
+        cvptr->sector = GET_SECTOR (cvptr->buffer [2]); /*     and sector addresses */
 
         if (is_seeking) {                               /* if a seek is in progress, */
             uptr->STAT |= DL_S2SC;                      /*   a Seek Check occurs */
@@ -824,10 +830,13 @@ switch (cvptr->opcode) {                                /* dispatch the command 
         cvptr->buffer [0] =                             /* set the Status-1 value */
           cvptr->spd_unit | SET_S1STAT (cvptr->status); /*   into the buffer */
 
-        if (unit > unit_limit)                          /* if the unit number is invalid */
-            rptr = NULL;                                /*   it does not correspond to a unit */
-        else                                            /* otherwise, the unit is valid */
-            rptr = &units [unit];                       /*   so get the address of the referenced unit */
+        if (cvptr->type == MAC)                         /* is this a MAC controller? */
+            if (unit > unit_limit)                      /* if the unit number is invalid */
+                rptr = NULL;                            /*   it does not correspond to a unit */
+            else                                        /* otherwise, the unit is valid */
+                rptr = &units [unit];                   /*   so get the address of the referenced unit */
+        else                                            /* if not a MAC controller */
+            rptr = uptr;                                /*   then the referenced unit is the current unit */
 
         cvptr->buffer [1] = drive_status (rptr);        /* set the Status-2 value */
 
@@ -878,7 +887,7 @@ switch (cvptr->opcode) {                                /* dispatch the command 
     case address_record:
         cvptr->cylinder = cvptr->buffer [1];            /* get the supplied cylinder */
         cvptr->head = GET_HEAD (cvptr->buffer [2]);     /*   and head */
-        cvptr->sector = GET_SECTOR (cvptr->buffer [2]); /*   and sector */
+        cvptr->sector = GET_SECTOR (cvptr->buffer [2]); /*     and sector addresses */
         cvptr->eoc = CLEAR;                             /* clear the end-of-cylinder flag */
         break;
 
@@ -886,8 +895,8 @@ switch (cvptr->opcode) {                                /* dispatch the command 
     case set_file_mask:
         cvptr->file_mask = GET_FMASK (cvptr->buffer [0]);   /* get the supplied file mask */
 
-        if (cvptr->type == MAC)                             /* if a MAC controller */
-            cvptr->retry = GET_FRETRY (cvptr->buffer [0]);  /*   the retry counter is supplied too */
+        if (cvptr->type == MAC)                             /* if this is a MAC controller, */
+            cvptr->retry = GET_FRETRY (cvptr->buffer [0]);  /*   the retry count is supplied too */
         break;
 
 
@@ -904,7 +913,7 @@ switch (cvptr->opcode) {                                /* dispatch the command 
 
 
     default:                                            /* the remaining commands */
-        break;                                          /*   are handled in the service routines */
+        break;                                          /*   are handled by the service routines */
     }
 
 
@@ -926,7 +935,7 @@ else
 
 /* Complete a command.
 
-   The current command is terminated with the indicated status.  The command
+   The current command is completed with the indicated status.  The command
    result status is set, the controller enters the command wait state, and the
    CPU timer is restarted.
 */
@@ -940,14 +949,14 @@ return;
 }
 
 
-/* Poll the drives for attention status.
+/* Poll the drives for Attention status.
 
    If interrupts are enabled on the interface, this routine is called to check
    if any drive is requesting attention.  The routine returns TRUE if a drive is
-   requestion attention and FALSE if not.
+   requesting attention and FALSE if not.
 
    Starting with the last unit requesting attention, each drive is checked in
-   sequence.  If a drive has its Attention status set, the controller sets its
+   sequence.  If a drive has its Attention status set, the controller saves its
    unit number, sets the result status to Drive Attention, and enters the
    command wait state.  The routine returns TRUE to indicate that an interrupt
    should be generated.  The next time the routine is called, the poll begins
@@ -970,12 +979,12 @@ for (unit = 0; unit <= unit_limit; unit++) {                /* check each unit i
         units [cvptr->poll_unit].STAT &= ~DL_S2ATN;         /*   clear the Attention status */
         cvptr->spd_unit = SET_S1UNIT (cvptr->poll_unit);    /* set the controller's unit number */
         cvptr->status = drive_attention;                    /*   and status */
-        cvptr->state = cntlr_wait;                          /*   and wait for a command */
+        cvptr->state = cntlr_wait;                          /*     and wait for a command */
         return TRUE;                                        /* tell the caller to interrupt */
         }
     }
 
-return FALSE;                                               /* no requests, so no interrupt */
+return FALSE;                                               /* no requests, so do not generate an interrupt */
 }
 
 
@@ -989,7 +998,7 @@ return FALSE;                                               /* no requests, so n
    service routine accesses these six variables in the UNIT structure:
 
      wait       -- the current service activation time
-     pos        -- the current file offset
+     pos        -- the current byte offset into the disc image file
      u3 (CYL)   -- the current drive cylinder
      u4 (STAT)  -- the drive status (Status-2)
      u5 (OP)    -- the drive operation in process
@@ -1026,13 +1035,13 @@ return FALSE;                                               /* no requests, so n
 
    An operation in the data phase is in the process of transferring data between
    the CPU and sector buffer.  Because this process is interface-specific, the
-   service routine does nothing (other than validate) with this phase.  It is up
+   service routine does nothing (other than validate) in this phase.  It is up
    to the caller to transition from the data phase to the end phase when the
    transfer is complete.
 
    If an operation is completed, or an error has occurred, the controller state
    on return will be either idle or waiting, instead of busy.  The caller should
-   check the controller state to determine if normal completion or error
+   check the controller status to determine if normal completion or error
    recovery is appropriate.
 
    If the command is continuing, the service activation time will be set
@@ -1072,7 +1081,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
             case seek:
                 if (start_seek (cvptr, uptr, opcode, end_phase)     /* start the seek; if it succeeded, */
                   && (cvptr->type == MAC))                          /*   and this a MAC controller, */
-                    dl_idle_controller (cvptr);                     /* idle until the seek completes */
+                    dl_idle_controller (cvptr);                     /*     then go idle until it completes */
                 break;
 
 
@@ -1101,7 +1110,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
                 result = start_read (cvptr, uptr);                  /* start the sector read */
 
                 if (uptr->PHASE == data_phase) {                    /* did the read start successfully? */
-                    uptr->PHASE = end_phase;                        /* skip the data phase for Verify */
+                    uptr->PHASE = end_phase;                        /* skip the data phase */
                     uptr->wait = cvptr->sector_time                 /* reschedule for the intersector time */
                                    + cvptr->data_time * DL_WPSEC;   /*   plus the data read time */
                     }
@@ -1131,11 +1140,11 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
             case request_disc_address:
             case end:
             case wakeup:
-                dl_service_controller (cvptr, uptr);    /* call the controller for service */
+                dl_service_controller (cvptr, uptr);    /* the controller service handles these */
                 break;
 
 
-            default:                                    /* entered with an invalid state */
+            default:                                    /* we were entered with an invalid state */
                 result = SCPE_IERR;                     /* return an internal (programming) error */
                 break;
             }                                           /* end of operation dispatch */
@@ -1167,7 +1176,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
             case recalibrate:
             case seek:
                 if (cvptr->type == ICD)                         /* is this an ICD controller? */
-                    dl_end_command (cvptr, drive_attention);    /* seek ends with drive attention status */
+                    dl_end_command (cvptr, drive_attention);    /* seeks end with Drive Attention status */
                 else                                            /* if not an ICD controller, */
                     uptr->STAT |= DL_S2ATN;                     /*   set Attention in the unit status */
                 break;
@@ -1182,7 +1191,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
 
             case read_without_verify:
                 if (cvptr->sector == 0)                 /* have we reached the end of the track? */
-                    uptr->OP = read;                    /* begin verifying next time */
+                    uptr->OP = read;                    /* begin verifying the next time */
 
                 end_read (cvptr, uptr);                 /* end the sector read */
                 break;
@@ -1192,7 +1201,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
                 cvptr->verify_count =                   /* decrement the count */
                   (cvptr->verify_count - 1) & DMASK;    /*   modulo 65536 */
 
-                if (cvptr->verify_count == 0)           /* more sectors to verify? */
+                if (cvptr->verify_count == 0)           /* are there more sectors to verify? */
                     cvptr->eod = SET;                   /* no, so terminate the command cleanly */
 
                 end_read (cvptr, uptr);                 /* end the sector read */
@@ -1209,11 +1218,11 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
             case request_status:
             case request_sector_address:
             case request_disc_address:
-                dl_service_controller (cvptr, uptr);    /* call the controller for service */
+                dl_service_controller (cvptr, uptr);    /* the controller service handles these */
                 break;
 
 
-            default:                                    /* entered with an invalid state */
+            default:                                    /* we were entered with an invalid state */
                 result = SCPE_IERR;                     /* return an internal (programming) error */
                 break;
             }                                           /* end of operation dispatch */
@@ -1241,9 +1250,10 @@ return result;                                          /* return the result of 
    to indicate that it is ready for the second word.
 
    For ICD controllers, the controller unit is not used, and all commands are
-   scheduled on the drive unit.  To reduce code duplication, however, the drive
-   unit service calls the controller service directly to handle controller
-   commands.
+   scheduled on the drive unit.  This is possible because ICD controllers always
+   wait for seeks to complete before executing additional commands.  To reduce
+   code duplication, however, the drive unit service calls the controller
+   service directly to handle controller commands.
 
    The service routine validates phase assignments and returns SCPE_IERR
    (Internal Error) if entry is made with an illegal operation phase or a phase
@@ -1268,13 +1278,13 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
     case end_phase:
         switch (opcode) {                               /* dispatch the current operation */
             case request_status:
-                dl_end_command (cvptr, cvptr->status);  /* command is complete with no status change */
+                dl_end_command (cvptr, cvptr->status);  /* the command completes with no status change */
                 break;
 
 
             case clear:
                 dl_clear_controller (cvptr, uptr, soft_clear);  /* clear the controller */
-                dl_end_command (cvptr, normal_completion);      /* command is complete */
+                dl_end_command (cvptr, normal_completion);      /* the command is complete */
                 break;
 
 
@@ -1284,21 +1294,21 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
             case set_file_mask:
             case load_tio_register:
             case request_disc_address:
-                dl_end_command (cvptr, normal_completion);      /* command is complete */
+                dl_end_command (cvptr, normal_completion);      /* the command is complete */
                 break;
 
 
             case end:
-                dl_idle_controller (cvptr);             /* command is complete with controller idle */
+                dl_idle_controller (cvptr);             /* the command completes with the controller idle */
                 break;
 
 
             case wakeup:
-                dl_end_command (cvptr, unit_available); /* command is complete with unit available */
+                dl_end_command (cvptr, unit_available); /* the command completes with Unit Available status */
                 break;
 
 
-            default:                                    /* entered with an invalid state */
+            default:                                    /* we were entered with an invalid state */
                 result = SCPE_IERR;                     /* return an internal (programming) error */
                 break;
             }                                           /* end of operation dispatch */
@@ -1331,7 +1341,7 @@ switch ((CNTLR_PHASE) uptr->PHASE) {                    /* dispatch the phase */
                 break;
 
 
-            default:                                    /* entered with an invalid state */
+            default:                                    /* we were entered with an invalid state */
                 result = SCPE_IERR;                     /* return an internal (programming) error */
                 break;
             }                                           /* end of operation dispatch */
@@ -1346,7 +1356,7 @@ return result;                                          /* return the result of 
 
    The command wait timer service routine is called if the command wait timer
    expires.  This indicates that the CPU did not respond to a parameter transfer
-   or did not issue a new command within the 1.8 second timeout period.  The
+   or did not issue a new command within the ~1.8 second timeout period.  The
    timer is used with the MAC controller to ensure that a hung CPU does not tie
    up the controller, preventing it from servicing other CPUs or drives.  ICD
    controllers do not use the command wait timer; they will wait forever, as
@@ -1368,7 +1378,7 @@ return result;                                          /* return the result of 
 
 t_stat dl_service_timer (CVPTR cvptr, UNIT *uptr)
 {
-sim_cancel (cvptr->aux);                                /* cancel the controller */
+sim_cancel (cvptr->aux);                                /* cancel any controller activation */
 
 dl_idle_controller (cvptr);                             /* idle the controller */
 cvptr->file_mask = 0;                                   /* clear the file mask */
@@ -1393,8 +1403,8 @@ return SCPE_OK;
 
    The first two conditions, called "hard clears," are equivalent and cause a
    firmware restart with the PWRON flag set.  The 13175 interface for the HP
-   1000 asserts CLEAR in response to the backplane CRS signal if the PRESET
-   ENABLE jumper is not installed (which is the usual case).  The third
+   1000 asserts the CLEAR signal in response to the backplane CRS signal if the
+   PRESET ENABLE jumper is not installed (which is the usual case).  The third
    condition also causes a firmware restart but with the PWRON flag clear.  The
    last condition is executed in the command handler and therefore returns to
    the Command Wait Loop instead of the Poll Loop.
@@ -1406,7 +1416,7 @@ return SCPE_OK;
     - issue a Controller Preset to clear all connected drives
     - clear the clock offset
     - clear the file mask
-    - enter the Poll Loop (clears the controller status)
+    - enter the Poll Loop (which clears the controller status)
 
    For a timeout clear, the 13037 controller will:
 
@@ -1414,7 +1424,7 @@ return SCPE_OK;
     - clear the hold bits of any drives held by the interface that timed out
     - clear the clock offset
     - clear the file mask
-    - enter the Poll Loop (clears the controller status)
+    - enter the Poll Loop (which clears the controller status)
 
    For a programmed "soft" clear, the 13037 controller will:
 
@@ -1447,7 +1457,7 @@ return SCPE_OK;
    Implementation notes:
 
     1. The specific 13365 controller actions on hard or soft clears are not
-       documented. Therefore, an ICD controller clear is handled as a MAC
+       documented.  Therefore, an ICD controller clear is handled as a MAC
        controller clear, except that only the current drive is preset (as an ICD
        controller manages only a single drive).
 
@@ -1459,7 +1469,7 @@ return SCPE_OK;
        aborted for a hard or timeout clear, whereas in hardware it would
        complete normally.  This is OK, however, because an internal seek always
        clears the drive's Attention status on completion, so aborting the
-       simulated seek is equivalent to seek completion.
+       simulated seek is equivalent to an immediate seek completion.
 
     4. In simulation, a Controller Preset only resets the specified status bits,
        as the remainder of the hardware actions are not implemented.
@@ -1482,7 +1492,7 @@ if (cvptr->type == ICD)                                 /* is this an ICD contro
 else {                                                  /* a MAC controller clears all units */
     dptr = find_dev_from_unit (uptr);                   /* find the associated device */
 
-    if (dptr == NULL)                                   /* device doesn't exist?!? */
+    if (dptr == NULL)                                   /* the device doesn't exist?!? */
         return SCPE_IERR;                               /* this is an impossible condition! */
     else                                                /* the device was found */
         unit_count = dptr->numunits;                    /*   so get the number of units */
@@ -1534,7 +1544,7 @@ return;
    In simulation, the unit must be attached before the heads may be unloaded or
    loaded.  As the heads should be automatically loaded when a unit is attached
    and unloaded when a unit is detached, this routine must be called after
-   attaching or before detaching.
+   attaching and before detaching.
 
 
    Implementation notes:
@@ -1550,7 +1560,7 @@ return;
 
 t_stat dl_load_unload (CVPTR cvptr, UNIT *uptr, t_bool load)
 {
-if ((uptr->flags & UNIT_ATT) == 0)                      /* must be attached to [un]load */
+if ((uptr->flags & UNIT_ATT) == 0)                      /* the unit must be attached to [un]load */
     return SCPE_UNATT;                                  /* return "Unit not attached" if not */
 
 else if (!(sim_switches & SIM_SW_REST))                 /* modify the flags only if not restoring */
@@ -1585,11 +1595,11 @@ return SCPE_OK;
 
 CNTLR_CLASS dl_classify (CNTLR_VARS cntlr)
 {
-if (cntlr.type <= last_type                             /* if the controller type is legal, */
+if (cntlr.type <= last_type                             /* if the controller type is legal */
   && cntlr.opcode <= last_opcode                        /*   and the opcode is legal */
   && cmd_props [cntlr.opcode].valid [cntlr.type])       /*   and is defined for this controller, */
     return cmd_props [cntlr.opcode].classification;     /*     then return the command classification */
-else                                                    /* type or opcode is illegal */
+else                                                    /* the type or opcode is illegal */
     return class_invalid;                               /*   so return an invalid classification */
 }
 
@@ -1603,11 +1613,11 @@ else                                                    /* type or opcode is ill
 
 const char *dl_opcode_name (CNTLR_TYPE controller, CNTLR_OPCODE opcode)
 {
-if (controller <= last_type                             /* if the controller type is legal, */
+if (controller <= last_type                             /* if the controller type is legal */
   && opcode <= last_opcode                              /*   and the opcode is legal */
   && cmd_props [opcode].valid [controller])             /*   and is defined for this controller, */
     return opcode_name [opcode];                        /*     then return the opcode name */
-else                                                    /* type or opcode is illegal, */
+else                                                    /* the type or opcode is illegal, */
     return invalid_name;                                /*   so return an error indication */
 }
 
@@ -1622,7 +1632,7 @@ const char *dl_phase_name (CNTLR_PHASE phase)
 {
 if (phase <= last_phase)                                /* if the phase is legal, */
     return phase_name [phase];                          /*   return the phase name */
-else                                                    /* phase is illegal, */
+else                                                    /* the phase is illegal, */
     return invalid_name;                                /*   so return an error indication */
 }
 
@@ -1636,9 +1646,9 @@ else                                                    /* phase is illegal, */
    The file specified by the supplied filename is attached to the indicated
    unit.  If the attach was successful, the heads are loaded on the drive.
 
-   If the drive is set to auto-type, the size of the image file is compared to
-   the table of drive capacities to determine which type of drive was used to
-   create it.  If the image file is new, then the previous drive type is
+   If the drive is set to autosize, the size of the image file is compared to
+   the table of drive capacities to determine which model of drive was used to
+   create it.  If the image file is new, then the previous drive model is
    retained.
 */
 
@@ -1654,13 +1664,13 @@ if (result != SCPE_OK)                                      /* did the attach fa
 
 dl_load_unload (cvptr, uptr, TRUE);                         /* if the attach succeeded, load the heads */
 
-if (uptr->flags & UNIT_AUTO) {                              /* is auto-typing desired? */
+if (uptr->flags & UNIT_AUTO) {                              /* is autosizing enabled? */
     size = sim_fsize (uptr->fileref) / sizeof (uint16);     /* get the file size in words */
 
-    if (size > 0)                                           /* a new file retains the current drive type */
-        for (id = 0; id < PROPS_COUNT; id++)                /* find the best fit to the drive types */
+    if (size > 0)                                           /* a new file retains the current drive model */
+        for (id = 0; id < PROPS_COUNT; id++)                /* find the best fit to the drive models */
             if (size <= drive_props [id].words              /* if the file size fits the drive capacity */
-              || id == PROPS_COUNT - 1) {                   /*   or this is the largest drive */
+              || id == PROPS_COUNT - 1) {                   /*   or this is the largest available drive */
                 uptr->capac = drive_props [id].words;       /*     then set the capacity */
                 uptr->flags = (uptr->flags & ~UNIT_MODEL)   /*       and the model */
                   | SET_MODEL (id);
@@ -1668,7 +1678,7 @@ if (uptr->flags & UNIT_AUTO) {                              /* is auto-typing de
                 }
     }
 
-return SCPE_OK;                                             /* unit was successfully attached */
+return SCPE_OK;                                             /* the unit was successfully attached */
 }
 
 
@@ -1694,7 +1704,7 @@ return detach_unit (uptr);                              /*   and detach the unit
 
 t_stat dl_set_model (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-if (uptr->flags & UNIT_ATT)                                 /* cannot alter the disc model */
+if (uptr->flags & UNIT_ATT)                                 /* we cannot alter the disc model */
     return SCPE_ALATT;                                      /*   if the unit is attached */
 
 if (value != UNIT_AUTO)                                     /* if we are not autosizing */
@@ -1760,12 +1770,12 @@ uint32 count, offset;
 t_bool verify;
 const CNTLR_OPCODE opcode = (CNTLR_OPCODE) uptr->OP;
 
-if (cvptr->eod == SET) {                                /* end of data indicated? */
+if (cvptr->eod == SET) {                                /* is the end of data indicated? */
     dl_end_command (cvptr, normal_completion);          /* complete the command */
     return SCPE_OK;
     }
 
-if (opcode == read_full_sector) {                       /* starting a Read Full Sector command? */
+if (opcode == read_full_sector) {                       /* are we starting a Read Full Sector command? */
     if (cvptr->type == ICD)                             /* is this an ICD controller? */
         cvptr->buffer [0] = 0100377;                    /* ICD does not support ECC */
     else
@@ -1773,30 +1783,30 @@ if (opcode == read_full_sector) {                       /* starting a Read Full 
 
     set_address (cvptr, 1);                             /* set the current address into buffer 1-2 */
     offset = 3;                                         /* start the data after the header */
-    verify = FALSE;                                     /* no address verification */
+    verify = FALSE;                                     /* set for no address verification */
     }
 
 else {                                                  /* it's another read command */
     offset = 0;                                         /* data starts at the beginning */
-    verify = (opcode != read_without_verify);           /* verify unless RWV */
+    verify = (opcode != read_without_verify);           /* set for address verification unless it's a RWV */
     }
 
 if (! position_sector (cvptr, uptr, verify))            /* position the sector */
-    return SCPE_OK;                                     /* seek in progress or an error occurred */
+    return SCPE_OK;                                     /* a seek is in progress or an error occurred */
 
 count = sim_fread (cvptr->buffer + offset,              /* read the sector from the image */
-                   sizeof (uint16), DL_WPSEC,           /*  into the sector buffer */
+                   sizeof (uint16), DL_WPSEC,           /*   into the sector buffer */
                    uptr->fileref);
 
-for (count = count + offset; count < cvptr->length; count++)    /* pad sector as needed */
+for (count = count + offset; count < cvptr->length; count++)    /* pad the sector as needed */
     cvptr->buffer [count] = 0;                                  /*   e.g., if reading from a new file */
 
 if (ferror (uptr->fileref))                             /* did a host file system error occur? */
-    return io_error (cvptr, uptr);                      /* set up data error status and stop the simulation */
+    return io_error (cvptr, uptr);                      /* set up the data error status and stop the simulation */
 
 next_sector (cvptr, uptr);                              /* address the next sector */
 
-uptr->PHASE = data_phase;                               /* set up data transfer phase */
+uptr->PHASE = data_phase;                               /* set up the data transfer phase */
 cvptr->index = 0;                                       /* reset the data index */
 
 return SCPE_OK;                                         /* the read was successfully started */
@@ -1823,7 +1833,7 @@ return SCPE_OK;                                         /* the read was successf
 
 static void end_read (CVPTR cvptr, UNIT *uptr)
 {
-if (cvptr->eod == SET)                                  /* end of data indicated? */
+if (cvptr->eod == SET)                                  /* is the end of data indicated? */
     dl_end_command (cvptr, normal_completion);          /* complete the command */
 
 else {                                                  /* reading continues */
@@ -1839,7 +1849,8 @@ return;
 
    The current sector indicated by the controller address is positioned for
    writing from the sector buffer to the disc image file after data transfer
-   from the CPU.
+   from the CPU.  If the end of the track had been reached, and the file mask
+   permits, an auto-seek is scheduled instead to allow the write to continue.
 
    On entry, if writing is not permitted, or formatting is required but not
    enabled, the command is terminated with an error.  Otherwise, the disc image
@@ -1866,14 +1877,14 @@ return;
 
 static void start_write (CVPTR cvptr, UNIT *uptr)
 {
-const t_bool verify = (CNTLR_OPCODE) uptr->OP == write; /* only Write verifies the sector */
+const t_bool verify = (CNTLR_OPCODE) uptr->OP == write; /* only Write verifies the sector address */
 
-if ((uptr->flags & UNIT_WPROT)                          /* is the unit write protected? */
+if ((uptr->flags & UNIT_WPROT)                          /* is the unit write protected, */
   || !verify && !(uptr->flags & UNIT_FMT))              /*   or is formatting required but not enabled? */
     dl_end_command (cvptr, status_2_error);             /* terminate the write with an error */
 
-else if (position_sector (cvptr, uptr, verify)) {       /* write OK; position the sector */
-    uptr->PHASE = data_phase;                           /* position OK; set up data transfer phase */
+else if (position_sector (cvptr, uptr, verify)) {       /* writing is permitted; position the sector */
+    uptr->PHASE = data_phase;                           /* positioning succeeded; set up data transfer phase */
     cvptr->index = 0;                                   /* reset the data index */
     }
 
@@ -1884,17 +1895,16 @@ return;
 /* Finish a write operation on the current sector.
 
    The current sector is written from the sector buffer to the disc image file
-   at the current file position.  If the end of the track had been reached, and
-   the file mask permits, an auto-seek is scheduled instead to allow the write
-   to continue.
+   at the current file position.  The next sector address is then updated to
+   allow writing to continue.
 
    On entry, the drive is checked to ensure that it is ready for the write.
    Then the sector buffer is padded appropriately if a full sector of data was
    not transferred.  The buffer is written to the disc image file at the
    position corresponding to the controller address as set when the sector was
    started.  The write begins at a buffer offset determined by the command (a
-   Write Full Sector leaves room at the start of the buffer for the sector
-   header).
+   Write Full Sector has header words at the start of the buffer that are not
+   written to the disc image).
 
    If the image write failed with a file system error, SCPE_IOERR is returned
    from the service routine to cause a simulation stop; resumption is handled as
@@ -1929,14 +1939,14 @@ if (cvptr->index < DL_WPSEC + offset) {                 /* was a partial sector 
         pad = cvptr->buffer [cvptr->index - 1];         /*   pads with the last word written */
 
     for (count = cvptr->index; count < DL_WPSEC + offset; count++)
-        cvptr->buffer [count] = pad;                    /* pad the sector buffer */
+        cvptr->buffer [count] = pad;                    /* pad the sector buffer as needed */
     }
 
 sim_fwrite (cvptr->buffer + offset, sizeof (uint16),    /* write the sector to the file */
             DL_WPSEC, uptr->fileref);
 
 if (ferror (uptr->fileref))                             /* did a host file system error occur? */
-    return io_error (cvptr, uptr);                      /* set up data error status and stop the simulation */
+    return io_error (cvptr, uptr);                      /* set up the data error status and stop the simulation */
 
 next_sector (cvptr, uptr);                              /* address the next sector */
 
@@ -1952,16 +1962,16 @@ return SCPE_OK;
 }
 
 
-/* Position the disc image file to the current sector.
+/* Position the disc image file at the current sector.
 
-   The image file is positioned to the byte address corresponding to the
+   The image file is positioned at the byte address corresponding to the
    controller's current cylinder, head, and sector address.  Positioning may
-   involve an auto-seek if the prior read or write addressed the final sector in
-   a cylinder.  If a seek is initiated or an error is detected, the routine
+   involve an auto-seek if a prior read or write addressed the final sector in a
+   cylinder.  If a seek is initiated or an error is detected, the routine
    returns FALSE to indicate that the positioning was not performed.  If the
    file was positioned, the routine returns TRUE.
 
-   On entry, if the controller's end-of-cylinder flag is set, the prior read or
+   On entry, if the controller's end-of-cylinder flag is set, a prior read or
    write addressed the final sector in the current cylinder.  If the file mask
    does not permit auto-seeking, the current command is terminated with an End
    of Cylinder error.  Otherwise, the cylinder is incremented or decremented as
@@ -1970,8 +1980,8 @@ return SCPE_OK;
    If the increment or decrement resulted in an out-of-bounds value, the seek
    will return Seek Check status, and the command is terminated with an error.
    If the seek is legal, the routine returns with the disc service scheduled for
-   seek completion and the command state unchanged.  When the service is called,
-   the read or write will continue on the new cylinder.
+   seek completion and the command state unchanged.  When the service is
+   reentered, the read or write will continue on the new cylinder.
 
    If the EOC flag was not set, the drive position is checked against the
    controller position.  If they are different (as may occur with an Address
@@ -2003,34 +2013,34 @@ static t_bool position_sector (CVPTR cvptr, UNIT *uptr, t_bool verify)
 uint32 block;
 uint32 model = GET_MODEL (uptr->flags);
 
-if (cvptr->eoc == SET)                                          /* positioned at the end of a cylinder? */
+if (cvptr->eoc == SET)                                          /* are we at the end of a cylinder? */
     if (cvptr->file_mask & DL_FAUTSK) {                         /* is an auto-seek allowed? */
-        if (cvptr->file_mask & DL_FDECR)                        /* decremental seek? */
-            cvptr->cylinder = (cvptr->cylinder - 1) & DMASK;    /* decrease cylinder with wraparound */
-        else                                                    /* incremental seek */
-            cvptr->cylinder = (cvptr->cylinder + 1) & DMASK;    /* increase cylinder with wraparound */
+        if (cvptr->file_mask & DL_FDECR)                        /* is a decremental seek requested? */
+            cvptr->cylinder = (cvptr->cylinder - 1) & DMASK;    /* decrease the cylinder address with wraparound */
+        else                                                    /* an incremental seek is requested */
+            cvptr->cylinder = (cvptr->cylinder + 1) & DMASK;    /* increase the cylinder address with wraparound */
 
         start_seek (cvptr, uptr,                                /* start the auto-seek */
                    (CNTLR_OPCODE) uptr->OP,                     /*   with the current operation */
-                   (CNTLR_PHASE) uptr->PHASE);                  /*   and phase unchanged */
+                   (CNTLR_PHASE) uptr->PHASE);                  /*     and phase unchanged */
 
         if (uptr->STAT & DL_S2SC)                               /* did a seek check occur? */
-            if (cvptr->type == ICD)                             /* ICD controller? */
-                dl_end_command (cvptr, end_of_cylinder);        /* report as end of cylinder error */
-            else                                                /* MAC controller? */
-                dl_end_command (cvptr, status_2_error);         /* report as Status-2 error */
+            if (cvptr->type == ICD)                             /* is this ICD controller? */
+                dl_end_command (cvptr, end_of_cylinder);        /* report it as an End of Cylinder error */
+            else                                                /* it is a MAC controller */
+                dl_end_command (cvptr, status_2_error);         /* report it as a Status-2 error */
         }
 
-    else                                                        /* file mask does not permit auto-seek */
+    else                                                        /* the file mask does not permit an auto-seek */
         dl_end_command (cvptr, end_of_cylinder);                /*   so terminate with an EOC error */
 
 else if (verify && (uint32) uptr->CYL != cvptr->cylinder) {     /* is the positioner on the wrong cylinder? */
     start_seek (cvptr, uptr,                                    /* start a seek to the correct cylinder */
                (CNTLR_OPCODE) uptr->OP,                         /*   with the current operation */
-               (CNTLR_PHASE) uptr->PHASE);                      /*   and phase unchanged */
+               (CNTLR_PHASE) uptr->PHASE);                      /*     and phase unchanged */
 
     if (uptr->STAT & DL_S2SC)                                   /* did a seek check occur? */
-        dl_end_command (cvptr, status_2_error);                 /* report as Status-2 error */
+        dl_end_command (cvptr, status_2_error);                 /* report a Status-2 error */
     }
 
 else if (((uint32) uptr->CYL >= drive_props [model].cylinders)  /* is the cylinder out of bounds? */
@@ -2043,10 +2053,10 @@ else if (((uint32) uptr->CYL >= drive_props [model].cylinders)  /* is the cylind
 else if (uptr->flags & UNIT_UNLOAD)                     /* is the drive ready for positioning? */
     dl_end_command (cvptr, access_not_ready);           /* terminate the command with an access error */
 
-else {                                                  /* ready to position the image file */
+else {                                                  /* we are ready to position the image file */
     block = TO_BLOCK (uptr->CYL, cvptr->head,           /* calculate the new block position */
                       cvptr->sector, model);            /*   (for inspection only) */
-    uptr->pos = TO_OFFSET (block);                      /*   and then convert to a byte offset */
+    uptr->pos = TO_OFFSET (block);                      /*     and then convert to a byte offset */
 
     sim_fseek (uptr->fileref, uptr->pos, SEEK_SET);     /* set the image file position */
 
@@ -2071,7 +2081,7 @@ return FALSE;                                           /* report that positioni
    The new cylinder address is not set here, because cylinder validation must
    only occur when the next sector is actually accessed.  Otherwise, reading or
    writing the last sector on a track or cylinder with auto-seek disabled would
-   cause an End of Cylinder error even if the transfer ended with that sector.
+   cause an End of Cylinder error, even if the transfer ended with that sector.
    Instead, we set the EOC flag to indicate that a cylinder update is pending.
 
    As a result of this deferred update method, the state of the EOC flag must be
@@ -2084,7 +2094,7 @@ const uint32 model = GET_MODEL (uptr->flags);           /* get the disc model */
 
 cvptr->sector = cvptr->sector + 1;                      /* increment the sector number */
 
-if (cvptr->sector < drive_props [model].sectors)        /* at the end of the track? */
+if (cvptr->sector < drive_props [model].sectors)        /* are we at the end of the track? */
     return;                                             /* no, so the next sector value is OK */
 
 cvptr->sector = 0;                                      /* wrap the sector number */
@@ -2092,7 +2102,7 @@ cvptr->sector = 0;                                      /* wrap the sector numbe
 if (cvptr->file_mask & DL_FCYLM) {                      /* are we in cylinder mode? */
     cvptr->head = cvptr->head + 1;                      /* yes, so increment the head */
 
-    if (cvptr->head < drive_props [model].heads)        /* at the end of the cylinder? */
+    if (cvptr->head < drive_props [model].heads)        /* are we at the end of the cylinder? */
         return;                                         /* no, so the next head value is OK */
 
     cvptr->head = 0;                                    /* wrap the head number */
@@ -2132,7 +2142,7 @@ return;                                                 /*   indicate that an up
    Implementation notes:
 
     1. EOC is not reset for recalibrate so that a reseek will return to the same
-       location as was pending when the recalibrate was done.
+       location as was current when the recalibrate was done.
 
     2. Calculation of the file offset is performed here simply to keep the unit
        position register available for inspection.  The actual file positioning
@@ -2150,14 +2160,14 @@ uint32 block, target_cylinder;
 const uint32 model = GET_MODEL (uptr->flags);           /* get the drive model */
 
 if (uptr->flags & UNIT_UNLOAD) {                        /* are the heads unloaded? */
-    dl_end_command (cvptr, status_2_error);             /* seek ends with Status-2 error */
-    return FALSE;                                       /* drive was not ready */
+    dl_end_command (cvptr, status_2_error);             /* the seek ends with Status-2 error */
+    return FALSE;                                       /*   as the drive was not ready */
     }
 
 if ((CNTLR_OPCODE) uptr->OP == recalibrate)             /* is the unit recalibrating? */
-    target_cylinder = 0;                                /* seek to cylinder 0 and don't reset EOC */
+    target_cylinder = 0;                                /* seek to cylinder 0 and don't reset the EOC flag */
 
-else {                                                  /* Seek command or auto-seek request */
+else {                                                  /* it's a Seek command or an auto-seek request */
     target_cylinder = cvptr->cylinder;                  /* seek to the controller cylinder */
     cvptr->eoc = CLEAR;                                 /* clear the end-of-cylinder flag */
     }
@@ -2167,12 +2177,12 @@ if (target_cylinder >= drive_props [model].cylinders) { /* is the cylinder out o
     uptr->STAT = uptr->STAT | DL_S2SC;                  /*   and set Seek Check status */
     }
 
-else {                                                  /* cylinder value is OK */
+else {                                                  /* the cylinder value is OK */
     delta = abs (uptr->CYL - target_cylinder);          /* calculate the relative movement */
     uptr->CYL = target_cylinder;                        /*   and move the positioner */
 
     if ((cvptr->head >= drive_props [model].heads)          /* if the head */
-      || (cvptr->sector >= drive_props [model].sectors))    /*   or sector is out of bounds, */
+      || (cvptr->sector >= drive_props [model].sectors))    /*   or the sector is out of bounds, */
         uptr->STAT = uptr->STAT | DL_S2SC;                  /*     set Seek Check status */
 
     else {                                              /* the head and sector are OK */
@@ -2184,14 +2194,14 @@ else {                                                  /* cylinder value is OK 
         }
     }
 
-if ((uptr->STAT & DL_S2SC) && cvptr->type == ICD)       /* Seek Check and ICD controller? */
-    dl_end_command (cvptr, status_2_error);             /* command ends with Status-2 error */
+if ((uptr->STAT & DL_S2SC) && cvptr->type == ICD)       /* did a Seek Check occur for an ICD controller? */
+    dl_end_command (cvptr, status_2_error);             /* the command ends with a Status-2 error */
 
-else {                                                  /* seek OK or this is a MAC controller */
-    if (delta == 0)                                     /* if seek is to the same cylinder */
-        delta = 1;                                      /*   schedule as a one-cylinder seek */
+else {                                                  /* the seek was OK or this is a MAC controller */
+    if (delta == 0)                                     /* if the seek is to the same cylinder, */
+        delta = 1;                                      /*   then schedule as a one-cylinder seek */
 
-    uptr->wait = cvptr->seek_time * delta;              /* seek delay is based on the relative movement */
+    uptr->wait = cvptr->seek_time * delta;              /* the seek delay is based on the relative movement */
     }
 
 uptr->OP    = next_opcode;                              /* set the next operation */
@@ -2202,7 +2212,7 @@ return TRUE;                                            /*     and report that t
 
 /* Report an I/O error.
 
-   Errors indicated by the host file system are reported to the console and
+   Errors indicated by the host file system are reported to the console, and
    simulation is stopped with an "I/O error" message.  If the simulation is
    continued, the CPU will receive an Uncorrectable Data Error indication from
    the controller.
@@ -2228,7 +2238,7 @@ return SCPE_IOERR;                                      /* return an I/O error t
    The controller's current cylinder, head, and sector are packed into two words
    and stored in the sector buffer, starting at the index specified.  If the
    end-of-cylinder flag is set, the cylinder is incremented to reflect the
-   auto-seek that will be attempted when the next disc access is made.
+   auto-seek that will be attempted when the next sequential access is made.
 
 
    Implementation notes:
@@ -2240,7 +2250,7 @@ return SCPE_IOERR;                                      /* return an I/O error t
 
 static void set_address (CVPTR cvptr, uint32 index)
 {
-cvptr->buffer [index] = cvptr->cylinder + (cvptr->eoc == SET ? 1 : 0);  /* update the cylinder if EOC */
+cvptr->buffer [index] = cvptr->cylinder + (cvptr->eoc == SET ? 1 : 0);  /* update the cylinder if EOC is set */
 cvptr->buffer [index + 1] = SET_HEAD (cvptr) | SET_SECTOR (cvptr);      /* merge the head and sector */
 return;
 }
@@ -2253,7 +2263,7 @@ return;
    interfaces supply an auxiliary timer unit that is activated when the command
    wait timer is started and cancelled when the timer is stopped.
 
-   ICD interfaces do not use the command wait timer.
+   ICD interfaces do not use the command wait timer or supply an auxiliary unit.
 
 
    Implementation notes:
@@ -2265,10 +2275,10 @@ return;
 static void set_timer (CVPTR cvptr, FLIP_FLOP action)
 {
 if (cvptr->type == MAC)                                 /* is this a MAC controller? */
-    if (action == SET)                                  /* start the timer? */
+    if (action == SET)                                  /* should we start the timer? */
         sim_activate_abs (cvptr->aux + timer,           /* activate the auxiliary unit */
                           cvptr->wait_time);
-    else                                                /* stop the timer */
+    else                                                /* we stop the timer */
         sim_cancel (cvptr->aux + timer);                /*   by canceling the unit */
 return;
 }
@@ -2292,15 +2302,15 @@ return;
 
    Implementation notes:
 
-    1. The Attention, Drive Fault, First Status, and Seek Check flags are stored
-       in the unit status word.  The other status flags are determined
+    1. The Attention, Drive Fault, First Status, and Seek Check bits are stored
+       in the unit status word.  The other status bits are determined
        dynamically.
 
     2. The Drive Busy bit is set if the unit service is scheduled.  In hardware,
        this bit indicates that the heads are not positioned over a track, i.e.,
        that a seek is in progress.  In simulation, the only time a Request
        Status command is allowed is either when the controller is waiting for
-       seek completion or for another command.  In the latter case, unit service
+       seek completion or for a new command.  In the latter case, unit service
        will not be scheduled, so activation can only be for seek completion.
 */
 
@@ -2312,7 +2322,7 @@ uint32 model;
 if (uptr == NULL)                                       /* if the unit is invalid */
     return DL_S2ERR | DL_S2NR;                          /*   then it does not respond */
 
-model = GET_MODEL (uptr->flags);                        /* get the drive type */
+model = GET_MODEL (uptr->flags);                        /* get the drive model */
 status = drive_props [model].type | uptr->STAT;         /* start with the drive type and unit status */
 
 if (uptr->flags & UNIT_WPROT)                           /* is the write protect switch set? */
