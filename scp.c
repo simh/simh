@@ -61,6 +61,7 @@
    17-Aug-08    RMS     Revert RUN/BOOT to standard, rather than powerup, reset
    25-Jul-08    JDB     DO cmd missing params now default to null string
    29-Jun-08    JDB     DO cmd sub_args now allows "\\" to specify literal backslash
+   04-Jun-08    JDB     label the patch delta more clearly
    31-Mar-08    RMS     Fixed bug in local/global register search (Mark Pizzolato)
                         Fixed bug in restore of RO units (Mark Pizzolato)
    06-Feb-08    RMS     Added SET/SHO/NO BR with default argument
@@ -70,6 +71,7 @@
                         Fixed bug in restoration with changed memory size
    08-Mar-07    JDB     Fixed breakpoint actions in DO command file processing
    30-Jan-07    RMS     Fixed bugs in get_ipaddr
+   30-Aug-06    JDB     detach_unit returns SCPE_UNATT if not attached
    17-Oct-06    RMS     Added idle support
    04-Oct-06    JDB     DO cmd failure now echoes cmd unless -q
    14-Jul-06    RMS     Added sim_activate_abs
@@ -2150,7 +2152,7 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
 if (vdelt)
-    fprintf (st, "(%d)", vdelt);
+    fprintf (st, " delta %d", vdelt);
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
 fprintf (st, "\n");
@@ -2846,8 +2848,11 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
-if (!(uptr->flags & UNIT_ATT))                          /* attached? */
-    return SCPE_OK;
+if (!(uptr->flags & UNIT_ATT))                          /* not attached? */
+    if (sim_switches & SIM_SW_REST)                     /* restoring? */
+        return SCPE_OK;                                 /* allow detach */
+    else
+        return SCPE_NOATT;                               /* complain */
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
 if (uptr->flags & UNIT_BUF) {
