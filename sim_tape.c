@@ -1715,6 +1715,11 @@ return r;
 t_stat sim_tape_reset (UNIT *uptr)
 {
 MT_CLR_PNU (uptr);
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+_sim_tape_io_flush(uptr);
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
 return SCPE_OK;
 }
 

@@ -1073,6 +1073,16 @@ if (close_function (fileref) == EOF)
 return SCPE_OK;
 }
 
+t_stat sim_disk_reset (UNIT *uptr)
+{
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+_sim_disk_io_flush(uptr);
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
+return SCPE_OK;
+}
+
 /* Factory bad block table creation routine
 
    This routine writes a DEC standard 044 compliant bad block table on the

@@ -2561,6 +2561,7 @@ rq_clrint (cp);                                         /* clr intr req */
 for (i = 0; i < (RQ_NUMDR + 2); i++) {                  /* init units */
     uptr = dptr->units + i;
     sim_cancel (uptr);                                  /* clr activity */
+    sim_disk_reset (uptr);
     uptr->cnum = cidx;                                  /* set ctrl index */
     uptr->flags = uptr->flags & ~(UNIT_ONL | UNIT_ATP);
     uptr->uf = 0;                                       /* clr unit flags */
