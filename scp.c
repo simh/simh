@@ -817,6 +817,7 @@ if (!sim_quiet) {
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 
+stat = do_cmd (-1, "simh.rc");                          /* simh.rc proc cmd file */
 sprintf(nbuf, "%s.rc", sim_name);
 stat = do_cmd (-1, nbuf);                               /* {sim_name}.rc proc cmd file */
 if (*cbuf)                                              /* cmd file arg? */
@@ -1006,7 +1007,10 @@ t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp;
-int32 echo, saved_sim_do_echo = sim_do_echo, saved_sim_show_message = sim_show_message, nargs, errabort, i;
+int32 echo, nargs, errabort, i;
+int32 saved_sim_do_echo = sim_do_echo, 
+      saved_sim_show_message = sim_show_message,
+      saved_sim_on_inherit = sim_on_inherit;
 t_bool interactive, isdo, staying;
 t_stat stat, stat_nomessage;
 char *ocptr;
@@ -1184,8 +1188,10 @@ Cleanup_Return:
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
 sim_do_echo = saved_sim_do_echo;                        /* restore echo state we entered with */
-if (flag >= 0)
+if (flag >= 0) {
     sim_show_message = saved_sim_show_message;          /* restore message display state we entered with */
+    sim_on_inherit = saved_sim_on_inherit;              /* restore ON inheritance state we entered with */
+    }
 for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
     free (sim_on_actions[sim_do_depth][i]);
     sim_on_actions[sim_do_depth][i] = NULL;
