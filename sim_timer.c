@@ -83,6 +83,7 @@ t_bool sim_idle_enab = FALSE;                           /* global flag */
 volatile t_bool sim_idle_wait = FALSE;                  /* global flag */
 
 static uint32 sim_idle_rate_ms = 0;
+static uint32 sim_os_sleep_min_ms = 0;
 static uint32 sim_idle_stable = SIM_IDLE_STDFLT;
 static uint32 sim_throt_ms_start = 0;
 static uint32 sim_throt_ms_stop = 0;
@@ -155,10 +156,11 @@ return;
 uint32 sim_os_ms_sleep_init (void)
 {
 #if defined (__VAX)
-return 10;                                              /* VAX/VMS is 10ms */
+sim_os_sleep_min_ms = 10;                               /* VAX/VMS is 10ms */
 #else
-return 1;                                               /* Alpha/VMS is 1ms */
+sim_os_sleep_min_ms = 1;                                /* Alpha/VMS is 1ms */
 #endif
+return sim_os_sleep_min_ms;
 }
 
 uint32 sim_os_ms_sleep (unsigned int msec)
@@ -224,6 +226,7 @@ TIMECAPS timers;
 
 if (timeGetDevCaps (&timers, sizeof (timers)) != TIMERR_NOERROR)
     return 0;
+sim_os_sleep_min_ms = timers.wPeriodMin;
 if ((timers.wPeriodMin == 0) || (timers.wPeriodMin > SIM_IDLE_MAX))
     return 0;
 if (timeBeginPeriod (timers.wPeriodMin) != TIMERR_NOERROR)
@@ -234,7 +237,7 @@ Sleep (1);
 Sleep (1);
 Sleep (1);
 Sleep (1);
-return timers.wPeriodMin;                               /* sim_idle_rate_ms */
+return sim_os_sleep_min_ms;                             /* sim_idle_rate_ms */
 }
 
 uint32 sim_os_ms_sleep (unsigned int msec)
@@ -280,7 +283,7 @@ return;
 
 uint32 sim_os_ms_sleep_init (void)
 {
-return FALSE;
+return 0;
 }
 
 uint32 sim_os_ms_sleep (unsigned int msec)
@@ -322,7 +325,7 @@ return;
 
 uint32 sim_os_ms_sleep_init (void)
 {
-return 1;
+return sim_os_sleep_min_ms = 1;
 }
 
 uint32 sim_os_ms_sleep (unsigned int milliseconds)
@@ -392,6 +395,7 @@ for (i = 0, tot = 0; i < sleep1Samples; i++) {
     tot += (t2 - t1);
     }
 tim = (tot + (sleep1Samples - 1)) / sleep1Samples;
+sim_os_sleep_min_ms = tim;
 if (tim > SIM_IDLE_MAX)
     tim = 0;
 return tim;
@@ -631,10 +635,18 @@ t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat r;
 uint32 v;
 
-if (sim_idle_rate_ms == 0)
+if (sim_idle_rate_ms == 0) {
+    printf ("Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
+    if (sim_log)
+        fprintf (sim_log, "Idling is not available, Minimum OS sleep time is %dms\n", sim_os_sleep_min_ms);
     return SCPE_NOFNC;
-if ((val != 0) && (sim_idle_rate_ms > (uint32) val))
+    }
+if ((val != 0) && (sim_idle_rate_ms > (uint32) val)) {
+    printf ("Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
+    if (sim_log)
+        fprintf (sim_log, "Idling is not available, Minimum OS sleep time is %dms, Requied minimum OS sleep is %dms\n", sim_os_sleep_min_ms, val);
     return SCPE_NOFNC;
+    }
 if (cptr) {
     v = (uint32) get_uint (cptr, 10, SIM_IDLE_STMAX, &r);
     if ((r != SCPE_OK) || (v < SIM_IDLE_STMIN))
@@ -663,12 +675,12 @@ return SCPE_OK;
 
 t_stat sim_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (sim_idle_enab) {
+if (sim_idle_enab)
     fprintf (st, "idle enabled");
-    if (sim_switches & SWMASK ('D'))
-        fprintf (st, ", stability wait = %ds, minimum sleep resolution = %dms", sim_idle_stable, sim_idle_rate_ms);
-    }
-else fputs ("idle disabled", st);
+else
+    fprintf (st, "idle disabled");
+if (sim_switches & SWMASK ('D'))
+    fprintf (st, ", stability wait = %ds, minimum sleep resolution = %dms", sim_idle_stable, sim_os_sleep_min_ms);
 return SCPE_OK;
 }
 
@@ -755,11 +767,12 @@ else {
         }
 
     if (sim_switches & SWMASK ('D')) {
-        fprintf (st, "minimum sleep resolution = %d ms\n", sim_idle_rate_ms);
         if (sim_throt_type != 0)
             fprintf (st, "Throttle interval = %d cycles\n", sim_throt_wait);
         }
     }
+if (sim_switches & SWMASK ('D'))
+    fprintf (st, "minimum sleep resolution = %d ms\n", sim_os_sleep_min_ms);
 return SCPE_OK;
 }
 
