@@ -91,7 +91,7 @@
    22-Mar-05    JDB     Modified DO command to allow ten-level nesting
    18-Mar-05    RMS     Moved DETACH tests into detach_unit (Dave Bryan)
                         Revised interface to fprint_sym, fparse_sym
-   13-Mar-05    JDB     [local fix 4] ASSERT now requires a conditional operator
+   13-Mar-05    JDB     ASSERT now requires a conditional operator
    25-Feb-05    JDB     [local fix 3] Added SCPE_CHALT message string
                         [local fix 3] Added halt unit support in show_queue
    07-Feb-05    RMS     Added ASSERT command (Dave Bryan)
@@ -839,6 +839,7 @@ if (!sim_quiet) {
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 
+stat = do_cmd (-1, "simh.rc");                          /* simh.rc proc cmd file */
 sprintf(nbuf, "%s.rc", sim_name);
 stat = do_cmd (-1, nbuf);                               /* {sim_name}.rc proc cmd file */
 if (*cbuf)                                              /* cmd file arg? */
@@ -1028,7 +1029,10 @@ t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp;
-int32 echo, saved_sim_do_echo = sim_do_echo, saved_sim_show_message = sim_show_message, nargs, errabort, i;
+int32 echo, nargs, errabort, i;
+int32 saved_sim_do_echo = sim_do_echo, 
+      saved_sim_show_message = sim_show_message,
+      saved_sim_on_inherit = sim_on_inherit;
 t_bool interactive, isdo, staying;
 t_stat stat, stat_nomessage;
 char *ocptr;
@@ -1206,8 +1210,10 @@ Cleanup_Return:
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
 sim_do_echo = saved_sim_do_echo;                        /* restore echo state we entered with */
-if (flag >= 0)
+if (flag >= 0) {
     sim_show_message = saved_sim_show_message;          /* restore message display state we entered with */
+    sim_on_inherit = saved_sim_on_inherit;              /* restore ON inheritance state we entered with */
+    }
 for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
     free (sim_on_actions[sim_do_depth][i]);
     sim_on_actions[sim_do_depth][i] = NULL;
@@ -1410,9 +1416,7 @@ t_value val;
 t_stat r;
 
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
-/* [JDB local fix 4] begin */
 sim_stab.boolop = -1;                                   /* no relational op dflt */
-/* [JDB local fix 4] end */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get register */
@@ -1439,10 +1443,8 @@ else {
     }
 if (*cptr != 0)                                         /* must be done */
     return SCPE_2MARG;
-/* [JDB local fix 4] begin */
 if (!get_search (gbuf, rptr->radix, &sim_stab) ||       /* parse condition */
     (sim_stab.boolop == -1))                            /* relational op reqd */
-/* [JDB local fix 4] end */
     return SCPE_MISVAL;
 val = get_rval (rptr, idx);                             /* get register value */
 if (test_search (val, &sim_stab))                       /* test condition */

@@ -188,10 +188,6 @@
 #define UNIT_CONH       (1u << UNIT_V_CONH)
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
-#define VAX_IDLE_VMS        0x01
-#define VAX_IDLE_ULT        0x02
-#define VAX_IDLE_ULTOLD     0x04
-#define VAX_IDLE_QUAD       0x08
 
 #define OPND_SIZE       16
 #define INST_SIZE       52
@@ -3428,13 +3424,15 @@ struct os_idle {
 
 static struct os_idle os_tab[] = {
     { "VMS", VAX_IDLE_VMS },
-    { "NETBSD", VAX_IDLE_ULTOLD },
+    { "NETBSDOLD", VAX_IDLE_ULTOLD },
+    { "NETBSD", VAX_IDLE_BSDNEW },
     { "ULTRIX", VAX_IDLE_ULT },
     { "ULTRIXOLD", VAX_IDLE_ULTOLD },
-    { "OPENBSD", VAX_IDLE_QUAD },
+    { "OPENBSDOLD", VAX_IDLE_QUAD },
+    { "OPENBSD", VAX_IDLE_BSDNEW },
     { "QUASIJARUS", VAX_IDLE_QUAD },
     { "32V", VAX_IDLE_QUAD },
-    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD },
+    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD|VAX_IDLE_BSDNEW },
     { NULL, 0 }
     };
 
@@ -3459,10 +3457,8 @@ return sim_set_idle (uptr, val, cptr, desc);
 
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (sim_idle_enab && (cpu_idle_type != 0)) {
+if (sim_idle_enab && (cpu_idle_type != 0))
     fprintf (st, "idle=%s, ", os_tab[cpu_idle_type - 1].name);
-    sim_show_idle (st, uptr, val, desc);
-    }
-else fprintf (st, "idle disabled");
+sim_show_idle (st, uptr, val, desc);
 return SCPE_OK;
 }
