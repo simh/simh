@@ -1146,7 +1146,7 @@ do {
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
             (!isdo || stat_nomessage)) {                /* and not suppressing messages */
-                printf("%s%s%s-%d> %s\n", do_arg[0], sim_goto_line, label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
+            printf("%s%s%s-%d> %s\n", do_arg[0], label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
             if (sim_log)
                 fprintf (sim_log, "%s%s%s-%d> %s\n", do_arg[0], label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
             }
