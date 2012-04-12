@@ -1520,6 +1520,9 @@ switch (prn) {                                          /* case on reg # */
 
     case MT_IPL:                                        /* IPL */
         PSL = (PSL & ~PSL_IPL) | ((val & PSL_M_IPL) << PSL_V_IPL);
+        if ((VAX_IDLE_BSDNEW & cpu_idle_mask) &&        /* New NetBSD and OpenBSD */
+            (val == 1))                                 /* IPL 1 */
+            cpu_idle();                                 /* idle loop */
         break;
 
     case MT_ASTLVL:                                     /* ASTLVL */
