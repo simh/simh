@@ -90,6 +90,7 @@
    22-Mar-05    JDB     Modified DO command to allow ten-level nesting
    18-Mar-05    RMS     Moved DETACH tests into detach_unit (Dave Bryan)
                         Revised interface to fprint_sym, fparse_sym
+   13-Mar-05    JDB     ASSERT now requires a conditional operator
    07-Feb-05    RMS     Added ASSERT command (Dave Bryan)
    02-Feb-05    RMS     Fixed bug in global register search
    26-Dec-04    RMS     Qualified SAVE examine, RESTORE deposit with SIM_SW_REST
@@ -1394,6 +1395,7 @@ t_value val;
 t_stat r;
 
 cptr = get_sim_opt (CMD_OPT_SW|CMD_OPT_DFT, cptr, &r);  /* get sw, default */
+sim_stab.boolop = -1;                                   /* no relational op dflt */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get register */
@@ -1420,7 +1422,8 @@ else {
     }
 if (*cptr != 0)                                         /* must be done */
     return SCPE_2MARG;
-if (!get_search (gbuf, rptr->radix, &sim_stab))         /* parse condition */
+if (!get_search (gbuf, rptr->radix, &sim_stab) ||       /* parse condition */
+    (sim_stab.boolop == -1))                            /* relational op reqd */
     return SCPE_MISVAL;
 val = get_rval (rptr, idx);                             /* get register value */
 if (test_search (val, &sim_stab))                       /* test condition */
