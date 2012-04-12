@@ -1286,7 +1286,7 @@ for (; *ip && (op < oend); ) {
                                 char quote = '"';
                                 if (strchr(do_arg[i], quote))
                                     quote = '\'';
-                                sprintf(&rbuf[strlen(rbuf)], "%s%s\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+                                sprintf(&rbuf[strlen(rbuf)], "%s%s%s%s\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
                                 }
                             else
                                 sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
