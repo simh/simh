@@ -761,7 +761,6 @@ int setenv(const char *envname, const char *envval, int overwrite)
 int main (int argc, char *argv[])
 {
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr;
-char nbuf[PATH_MAX + 7];
 int32 i, sw;
 t_bool lookswitch;
 t_stat stat, stat_nomessage;
@@ -840,12 +839,10 @@ if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 
 stat = do_cmd (-1, "simh.rc");                          /* simh.rc proc cmd file */
-sprintf(nbuf, "%s.rc", sim_name);
-stat = do_cmd (-1, nbuf);                               /* {sim_name}.rc proc cmd file */
 if (*cbuf)                                              /* cmd file arg? */
     stat = do_cmd (0, cbuf);                            /* proc cmd file */
 else if (*argv[0]) {                                    /* sim name arg? */
-    char *np;                                           /* "path.ini" */
+    char nbuf[PATH_MAX + 7], *np;                       /* "path.ini" */
     nbuf[0] = '"';                                      /* starting " */
     strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
     if (np = match_ext (nbuf, "EXE"))                   /* remove .exe */
