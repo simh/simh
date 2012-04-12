@@ -1025,13 +1025,14 @@ return SCPE_OK;
 
 t_stat sim_disk_detach (UNIT *uptr)
 {
-struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+struct disk_context *ctx;
 int (*close_function)(FILE *f);
 FILE *fileref;
 t_bool auto_format;
 
 if (uptr == NULL)
     return SCPE_IERR;
+ctx = (struct disk_context *)uptr->disk_ctx;
 fileref = uptr->fileref;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
