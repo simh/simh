@@ -1652,6 +1652,9 @@ else
 #ifdef O_LARGEFILE
 mode |= O_LARGEFILE;
 #endif
+#ifdef O_DSYNC
+mode |= O_DSYNC;
+#endif
 return (FILE *)((long)open (rawdevicename, mode, 0));
 }
 
