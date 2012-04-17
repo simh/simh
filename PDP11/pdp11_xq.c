@@ -2137,12 +2137,12 @@ void xq_start_receiver(CTLR* xq)
 
   /* start the read service timer or enable asynch reading as appropriate */
   if (xq->var->must_poll)
-    sim_activate(xq->unit, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+    sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
   else
     if ((xq->var->poll == 0) || (xq->var->mode == XQ_T_DELQA_PLUS))
       eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     else
-      sim_activate(xq->unit, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+      sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
 }
 
 void xq_stop_receiver(CTLR* xq)
@@ -2517,7 +2517,7 @@ t_stat xq_svc(UNIT* uptr)
 
   /* resubmit service timer */
   if ((xq->var->must_poll) || (xq->var->poll && (xq->var->mode != XQ_T_DELQA_PLUS)))
-    sim_activate(uptr, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+    sim_activate(uptr, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
 
   return SCPE_OK;
 }
