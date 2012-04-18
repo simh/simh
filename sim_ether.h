@@ -173,10 +173,10 @@
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
-  int     len;                                          /* packet length without CRC */
-  int     used;                                         /* bytes processed (used in packet chaining) */
+  uint32  len;                                          /* packet length without CRC */
+  uint32  used;                                         /* bytes processed (used in packet chaining) */
   int     status;                                       /* transmit/receive status */
-  int     crc_len;                                      /* packet length with CRC */
+  uint32  crc_len;                                      /* packet length with CRC */
 };
 
 struct eth_item {

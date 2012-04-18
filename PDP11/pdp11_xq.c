@@ -606,7 +606,7 @@ void xq_make_checksum(CTLR* xq)
   /* checksum calculation routine detailed in vaxboot.zip/xqbtdrivr.mar */
   uint32  checksum = 0;
   const uint32 wmask = 0xFFFF;
-  int i;
+  size_t i;
 
   for (i = 0; i < sizeof(ETH_MAC); i += 2) {
     checksum <<= 1;
@@ -685,7 +685,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
-  int i;
+  size_t i;
 
   if (xq->var->mode == XQ_T_DELQA_PLUS) {
     eth_mac_fmt(&xq->var->init.phys, buffer);
@@ -2803,7 +2803,7 @@ void xq_debug_setup(CTLR* xq)
 
 void xq_debug_turbo_setup(CTLR* xq)
 {
-  int i;
+  size_t i;
   char  buffer[64] = "";
 
   if (!(sim_deb && (xq->dev->dctrl & DBG_SET)))

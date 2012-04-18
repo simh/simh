@@ -55,7 +55,7 @@
 
 int sim_make_ROM_include(const char *rom_filename,
                          int expected_size,
-                         int expected_checksum,
+                         unsigned int expected_checksum,
                          const char *include_filename, 
                          const char *rom_array_name)
 {
@@ -86,7 +86,7 @@ if (statb.st_size != expected_size) {
     return -1;
     }
 ROMData = malloc (statb.st_size);
-if (statb.st_size != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
+if ((size_t)(statb.st_size) != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
     printf ("Error reading '%s': %s\n", rom_filename, strerror(errno));
     fclose (rFile);
     free (ROMData);
@@ -116,7 +116,7 @@ if (iFile = fopen (include_filename, "r")) {
     IncludeData = malloc (statb.st_size);
 
     while (fgets (line, sizeof(line), iFile)) {
-        int byte;
+        unsigned int byte;
         char *c;
 
         if (memcmp ("0x",line,2))

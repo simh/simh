@@ -219,7 +219,7 @@ return show_vec (st, uptr, ((mp->lines * 2) / arg), desc);
 
 void init_ubus_tab (void)
 {
-int32 i, j;
+size_t i, j;
 
 for (i = 0; i < IPL_HLVL; i++) {                        /* clear intr tab */
     for (j = 0; j < 32; j++) {

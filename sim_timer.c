@@ -689,7 +689,7 @@ return SCPE_OK;
 t_stat sim_set_throt (int32 arg, char *cptr)
 {
 char *tptr, c;
-t_value val, val2;
+t_value val, val2 = 0;
 
 if (arg == 0) {
     if ((cptr != 0) && (*cptr != 0))

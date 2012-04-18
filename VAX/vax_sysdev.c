@@ -409,8 +409,8 @@ DEVICE cso_dev = {
 */
 
 DIB sysd_dib[] = {
-    0, 0, NULL, NULL,
-    2, IVCL (TMR0), 0, { &tmr0_inta, &tmr1_inta }
+    {0, 0, NULL, NULL,
+     2, IVCL (TMR0), 0, { &tmr0_inta, &tmr1_inta } }
     };
 
 UNIT sysd_unit[] = {
