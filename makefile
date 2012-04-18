@@ -81,7 +81,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OSNAME = OSX
       LIBEXT = dylib
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
-      ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '--enable-lto'))
+      ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
         LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
       endif
     else
