@@ -57,6 +57,7 @@
    08-Feb-09    RMS     Fixed warnings in help printouts
    29-Dec-08    RMS     Fixed implementation of MTAB_NC
    24-Nov-08    RMS     Revised RESTORE unit logic for consistency
+   21-Oct-08    JDB     [serial] Added sim_unit_ref global to indicate type of reference
    05-Sep-08    JDB     "detach_all" ignores error status returns if shutting down
    17-Aug-08    RMS     Revert RUN/BOOT to standard, rather than powerup, reset
    25-Jul-08    JDB     DO cmd missing params now default to null string
@@ -414,6 +415,7 @@ t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 
 /* Global data */
 
+UNITREF sim_unit_ref;
 DEVICE *sim_dflt_dev = NULL;
 UNIT *sim_clock_queue = NULL;
 int32 sim_interval = 0;
@@ -2817,6 +2819,7 @@ DEVICE *dptr;
 UNIT *uptr;
 t_stat r;
 
+sim_unit_ref = ref_unit_all;                            /* we will reference all units */
 if ((start < 0) || (start > 1))
     return SCPE_IERR;
 for (i = start; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
@@ -3133,6 +3136,8 @@ t_bool force_restore = sim_switches & SWMASK ('F');
     return SCPE_IOERR;
 #define READ_I(xx) if (sim_fread (&xx, sizeof (xx), 1, rfile) == 0) \
     return SCPE_IOERR;
+
+sim_unit_ref = ref_unit_all;                            /* we will reference all units */
 
 fstat (fileno (rfile), &rstat);
 READ_S (buf);                                           /* [V2.5+] read version */
@@ -4579,6 +4584,9 @@ return NULL;
    Outputs:
         result  =       pointer to device (null if no dev)
         *iptr   =       pointer to unit (null if nx unit)
+
+   The "sim_unit_ref" global is set to the type of reference specified by cptr
+   (device or unit).
 */
 
 DEVICE *find_unit (char *cptr, UNIT **uptr)
@@ -4588,11 +4596,13 @@ char *nptr, *tptr;
 t_stat r;
 DEVICE *dptr;
 
+sim_unit_ref = ref_unit;                                /* assume unit reference */
 if (uptr == NULL)                                       /* arg error? */
     return NULL;
 if (dptr = find_dev (cptr)) {                           /* exact match? */
     if (qdisable (dptr))                                /* disabled? */
         return NULL;
+    sim_unit_ref = ref_dev;                             /* flag device reference */
     *uptr = dptr->units;                                /* unit 0 */
     return dptr;
     }

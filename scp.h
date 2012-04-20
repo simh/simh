@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    05-Dec-10    MP      Added macro invocation of sim_debug 
+   07-Jan-09    JDB     Added UNITREF typedef
    09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
@@ -51,6 +52,10 @@
 #define CMD_OPT_OF      002                             /* output file */
 #define CMD_OPT_SCH     004                             /* search */
 #define CMD_OPT_DFT     010                             /* defaults */
+
+/* unit references */
+
+typedef enum { ref_dev, ref_unit, ref_unit_all } UNITREF;
 
 /* Command processors */
 

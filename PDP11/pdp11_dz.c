@@ -26,6 +26,7 @@
    dz           DZ11 terminal multiplexor
 
    29-Dec-08    RMS     Added MTAB_NC to SET LOG command (Walter Mueller)
+   24-Nov-08    JDB     [serial] Added serial port support
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -231,8 +232,12 @@ MTAB dz_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+//
+    { MTAB_XTD | MTAB_VDV | MTAB_NC, ':', NULL, "CONNECT",
+      &tmxr_attach_line, NULL, &dz_desc },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &dz_desc },
+      &tmxr_detach_line, NULL, &dz_desc },
+//
     { UNIT_ATT, UNIT_ATT, "summary", NULL,
       NULL, &tmxr_show_summ, (void *) &dz_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,

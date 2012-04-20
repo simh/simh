@@ -28,6 +28,9 @@
 
    17-Jan-11    MP      Added buffered line capabilities
    20-Nov-08    RMS     Added three new standardized SHOW routines
+   07-Oct-08    JDB     [serial] Added serial port support to TMXR, TMLN,
+                        added tmxr_attach_line, tmxr_detach_line,
+                        tmxr_line_free, tmxr_mux_free
    27-May-08    JDB     Added lnorder to TMXR structure,
                         added tmxr_set_lnorder and tmxr_set_lnorder
    14-May-08    JDB     Added dptr to TMXR structure
@@ -43,6 +46,8 @@
 
 #ifndef _SIM_TMXR_H_
 #define _SIM_TMXR_H_    0
+
+#include "sim_serial.h"
 
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)
@@ -79,6 +84,8 @@ struct tmln {
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                *txb;                           /* xmt buffer */
     TMXR                *mp;                            /* back pointer to mux */
+    SERHANDLE           serport;                        /* serial port handle */
+    char                *sername;                       /* serial port name */
     };
 
 struct tmxr {
@@ -90,18 +97,25 @@ struct tmxr {
     DEVICE              *dptr;                          /* multiplexer device */
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
     int32               buffered;                       /* Buffered Line Behavior and Buffer Size Flag */
+    uint32              pending;                        /* count of pending serial connections */
     };
 
 int32 tmxr_poll_conn (TMXR *mp);
 void tmxr_reset_ln (TMLN *lp);
+t_stat tmxr_clear_ln (TMXR *mp, TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 void tmxr_poll_rx (TMXR *mp);
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr);
 void tmxr_poll_tx (TMXR *mp);
+int32 tmxr_send_buffered_data (TMLN *lp);
 t_stat tmxr_open_master (TMXR *mp, char *cptr);
 t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
+t_stat tmxr_attach_line (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tmxr_detach_line (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_bool tmxr_line_free (TMLN *lp);
+t_bool tmxr_mux_free (TMXR *mp);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);

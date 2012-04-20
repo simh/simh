@@ -34,6 +34,7 @@
                         of lines available to be 8, 16, 24, or 32.
                         Fixed performance issue avoiding redundant polling
    03-Jan-10    JAD     Eliminate gcc warnings
+   24-Nov-08    JDB     Removed tmxr_send_buffered_data declaration (now in sim_tmxr.h)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -323,8 +324,6 @@ static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-
-int32 tmxr_send_buffered_data (TMLN *lp);
 
 /* SIMH I/O Structures */
 

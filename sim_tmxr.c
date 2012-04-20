@@ -31,6 +31,9 @@
    17-Jan-11    MP      Added Buffered line capabilities
    16-Jan-11    MP      Made option negotiation more reliable
    20-Nov-08    RMS     Added three new standardized SHOW routines
+   05-Nov-08    JDB     [bugfix] Moved logging call after connection check in tmxr_putc_ln
+   03-Nov-08    JDB     [bugfix] Added TMXR null check to tmxr_find_ldsc
+   07-Oct-08    JDB     [serial] Added serial port support
    30-Sep-08    JDB     Reverted tmxr_find_ldsc to original implementation
    27-May-08    JDB     Added line connection order to tmxr_poll_conn,
                         added tmxr_set_lnorder and tmxr_show_lnorder
@@ -57,36 +60,235 @@
 
    This library includes:
 
-   tmxr_poll_conn -     poll for connection
-   tmxr_reset_ln -      reset line
-   tmxr_getc_ln -       get character for line
-   tmxr_poll_rx -       poll receive
-   tmxr_putc_ln -       put character for line
-   tmxr_poll_tx -       poll transmit
-   tmxr_open_master -   open master connection
-   tmxr_close_master -  close master connection
-   tmxr_attach  -       attach terminal multiplexor
-   tmxr_detach  -       detach terminal multiplexor
-   tmxr_ex      -       (null) examine
-   tmxr_dep     -       (null) deposit
-   tmxr_msg     -       send message to socket
-   tmxr_linemsg -       send message to line
-   tmxr_fconns  -       output connection status
-   tmxr_fstats  -       output connection statistics
-   tmxr_dscln   -       disconnect line (SET routine)
-   tmxr_rqln    -       number of available characters for line
-   tmxr_tqln    -       number of buffered characters for line
-   tmxr_set_lnorder -   set line connection order
-   tmxr_show_lnorder -  show line connection order
+   tmxr_poll_conn -             poll for connection
+   tmxr_reset_ln -              reset line (drops Telnet connections only)
+   tmxr_clear_ln -              clear line (drops Telnet and serial connections)
+   tmxr_getc_ln -               get character for line
+   tmxr_poll_rx -               poll receive
+   tmxr_putc_ln -               put character for line
+   tmxr_poll_tx -               poll transmit
+   tmxr_send_buffered_data -    transmit buffered data
+   tmxr_open_master -           open master connection
+   tmxr_close_master -          close master connection
+   tmxr_attach  -               attach terminal multiplexor to listening port
+   tmxr_attach_line -           attach line to serial port
+   tmxr_detach  -               detach terminal multiplexor to listening port
+   tmxr_detach_line -           detach line from serial port
+   tmxr_line_free -             return TRUE if line is disconnected
+   tmxr_mux_free -              return TRUE if mux is disconnected
+   tmxr_ex      -               (null) examine
+   tmxr_dep     -               (null) deposit
+   tmxr_msg     -               send message to socket
+   tmxr_linemsg -               send message to line
+   tmxr_fconns  -               output connection status
+   tmxr_fstats  -               output connection statistics
+   tmxr_set_log -               enable logging for line
+   tmxr_set_nolog -             disable logging for line
+   tmxr_show_log -              show logging status for line
+   tmxr_dscln   -               disconnect line (SET routine)
+   tmxr_rqln    -               number of available characters for line
+   tmxr_tqln    -               number of buffered characters for line
+   tmxr_set_lnorder -           set line connection order
+   tmxr_show_lnorder -          show line connection order
+   tmxr_show_summ -             show connection summary
+   tmxr_show_cstat -            show line connections or status
+   tmxr_show_lines -            show number of lines
 
    All routines are OS-independent.
+
+
+   This library supports the simulation of multiple-line terminal multiplexers.
+   It may also be used to create single-line "multiplexers" to provide
+   additional terminals beyond the simulation console.  Multiplexer lines may be
+   connected to terminal emulators supporting the Telnet protocol via sockets,
+   or to hardware terminals via host serial ports.  Concurrent Telnet and serial
+   connections may be mixed on a given multiplexer.
+
+   When connecting via sockets, the simulated multiplexer is attached to a
+   listening port on the host system:
+
+     sim> attach MUX 23
+     Listening on port 23 (socket nnn)
+
+   Once attached, the listening port must be polled for incoming connections.
+   When a connection attempt is received, it will be associated with the next
+   multiplexer line in the user-specified line order, or with the next line in
+   sequence if no order has been specified.  Individual lines may be forcibly
+   disconnected either by:
+
+     sim> set MUX2 disconnect
+
+   or:
+
+     sim> set MUX disconnect=2
+
+   or the listening port and all Telnet sessions may be detached:
+
+     sim> detach MUX
+
+
+   When connecting via serial ports, individual multiplexer lines are attached
+   to specific host ports using port names appropriate for the host system:
+
+     sim> attach MUX2 com1      (or /dev/ttyS0)
+
+   or:
+
+     sim> set MUX connect=2:com1
+
+   Serial port parameters may be optionally specified:
+
+     sim> attach MUX2 com1;9600-8n1
+
+   If the port parameters are omitted, then the host system defaults for the
+   specified port are used.  The port is allocated during the attach call, but
+   the actual connection is deferred until the multiplexer is polled for
+   connections.
+
+   Individual lines may be disconnected either with:
+
+     sim> detach MUX2
+
+   or:
+
+     sim> set MUX2 disconnect
+
+   or:
+
+     sim> set MUX disconnect=2
+
+
+   This library supports multiplexer device simulators that are modelled in
+   three possible ways:
+
+     1. as single-line devices (e.g., a second TTY)
+
+     2. as multi-line devices with a unit per line and a separate scanner unit
+
+     3. as multi-line devices with only a scanner unit
+
+   Single-line devices may be attached either to a Telnet listening port or to a
+   serial port.  The device attach routine may be passed either a port number or
+   a serial port name.  This routine should call "tmxr_attach" first.  If the
+   return value is SCPE_OK, then a port number was passed and was opened.  If
+   the return value is SCPE_ARG, then a port number was not passed, and
+   "tmxr_attach_line" should be called.  If that return value is SCPE_OK, then a
+   serial port name was passed and was opened.  Otherwise, the attachment
+   failed, and the returned status code value should be reported.
+
+   The device detach routine should call "tmxr_detach_line" first, passing 0 for
+   the "val" parameter.  If the return value is SCPE_OK, then the attached
+   serial port was closed.  If the return value is SCPE_UNATT, then a serial
+   port was not attached, and "tmxr_detach" should be called to close the Telnet
+   listening port.  To maintain compatibility with earlier versions of this
+   library, "tmxr_detach" always returns SCPE_OK, regardless of whether a
+   listening port was attached.
+
+   The system ATTACH and DETACH commands specify the device name, although unit
+   0 is actually passed to the device attach and detach routines.  The in-use
+   status of the multiplexer -- and therefore whether the multiplexer must be
+   polled for input -- may be determined by checking whether the UNIT_ATT flag
+   is present on unit 0.
+
+
+   Multi-line devices with a unit per line and a separate scanner unit attach
+   serial ports to the former and a Telnet listening port to the latter.  Both
+   types of attachments may be made concurrently.  The system ATTACH and DETACH
+   commands are used.
+
+   The programmer may elect to use separate device attach routines for the lines
+   and the scanner or a common attach routine for both.  In the latter case, if
+   the scanner unit is passed, "tmxr_attach" should be called.  Otherwise,
+   "tmxr_attach_line" should be called, passing 0 as the "val" parameter.
+
+   Similarly, either separate or common detach routines may be used.  When a
+   line detach is intended, the detach routine should call "tmxr_detach_line"
+   for the specified unit.  Reception on the specified line should then be
+   inhibited by clearing the "rcve" field.  Finally, "tmxr_mux_free" should be
+   called to determine if the multiplexer is now free (listening port is
+   detached and no other serial connections exist).  If it is, then the input
+   poll may be stopped.
+
+   To detach the scanner, the detach routine should call "tmxr_detach".  Then
+   "tmxr_line_free" should be called for each line, and reception on the line
+   should be inhibited if the routine returns TRUE.  Finally, the multiplexer
+   poll should be stopped if the multiplexer is now free.
+
+   The in-use status of the multiplexer cannot be determined solely by examining
+   the UNIT_ATT flag of the scanner unit, as that reflects only Telnet
+   connections.  Each line must also be checked for serial connections.  The
+   "tmxr_line_free" and "tmxr_mux_free" routines indicate respectively whether a
+   given line or the entire multiplexer is free.
+
+
+   Multi-line devices with only a scanner unit use the system ATTACH and DETACH
+   commands for the Telnet listening port.  For serial ports, SET <dev> CONNECT
+   and SET <dev> DISCONNECT commands are used.  These latter commands are
+   specified in the device MTAB structure and call "tmxr_attach_line" and
+   "tmxr_detach_line", respectively.  Because MTAB processing passes the scanner
+   unit to these routines, the invocations pass a non-zero "val" parameter to
+   indicate that the unit should not be used, and that the line number should be
+   parsed from the command string.  In this mode, "tmxr_detach_line" also serves
+   to disconnect Telnet sessions from lines, so no special processing or calls
+   to "tmxr_dscln" are required.
+
+   In-use status of the multiplexer is determined in the same manner as the
+   unit-per-line case.
+
+
+   Implementation notes:
+
+    1. The system RESTORE command does not restore devices having the DEV_NET
+       flag.  This flag indicates that the device employs host-specific port
+       names that are non-transportable across RESTOREs.
+
+       If a multiplexer specifies DEV_NET, the device connection state will not
+       be altered when a RESTORE is done.  That is, all current connections,
+       including Telnet sessions, will remain untouched, and connections
+       specified at the time of the SAVE will not be reestablished during the
+       RESTORE.  If DEV_NET is not specified, then the system will attempt to
+       restore the attachment state present at the time of the SAVE, including
+       Telnet listening and serial ports.  Telnet client sessions on individual
+       multiplexer lines cannot be reestablished by RESTORE and must be
+       reestablished manually.
+
+    2. Single-line multiplexers should have UNIT_ATTABLE on the unit
+       representing the line, and multi-line unit-per-line multiplexers should
+       not have UNIT_ATTABLE on the units representing the lines.  UNIT_ATTABLE
+       does not affect the attachability when VM-specific attach routines are
+       employed.  UNIT_ATTABLE does control the reporting of attached units for
+       the SHOW <dev> command.
+
+       A single-line device will be either detached, attached to a listening
+       socket, or attached to a serial port.  With UNIT_ATTABLE, the device will
+       be reported as "not attached," "attached to 23" (e.g.), or "attached to
+       COM1" (e.g.), which is desirable.
+
+       A unit-per-line device will report the listening socket as attached to
+       the device (or to a separate device).  The units representing lines
+       either will be connected to a Telnet session or attached to a serial
+       port.  Telnet sessions are not reported by SHOW <dev>, so having
+       UNIT_ATTABLE present will cause each non-serial line to be reported as
+       "not attached," even if there may be a current Telnet connection.  This
+       will be confusing to users.  Without UNIT_ATTABLE, attachment status will
+       be reported only if the line is attached to a serial port, which is
+       preferable.
+
+    3. For devices without a unit per line, the MTAB entry that calls
+       "sim_attach_line" (e.g., CONNECT) should use the MTAB_NC flag to avoid
+       upper-casing the device name.  Device names may be case-sensitive,
+       depending on the host system.
 */
 
+
+#include <ctype.h>
+
 #include "sim_defs.h"
+#include "sim_serial.h"
 #include "sim_sock.h"
+#include "sim_timer.h"
 #include "sim_tmxr.h"
 #include "scp.h"
-#include <ctype.h>
 
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
@@ -129,14 +331,276 @@
 #define TNS_DO          006                             /* DO request pending rejection */
 
 
-void tmxr_rmvrc (TMLN *lp, int32 p);
-int32 tmxr_send_buffered_data (TMLN *lp);
-TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
+
+/* External variables */
 
 extern int32 sim_switches;
 extern char sim_name[];
 extern FILE *sim_log;
-extern uint32 sim_os_msec (void);
+
+
+
+/* Local routines */
+
+
+/* Initialize the line state.
+
+   Reset the line state to represent an idle line.  Note that we do not clear
+   all of the line structure members, so a connected line remains connected
+   after this call.
+
+   Because a line break is represented by a flag in the "receive break status"
+   array, we must zero that array in order to clear any pending break
+   indications.
+*/
+
+static void tmxr_init_line (TMLN *lp)
+{
+lp->tsta = 0;                                           /* init telnet state */
+lp->xmte = 1;                                           /* enable transmit */
+lp->dstb = 0;                                           /* default bin mode */
+lp->rxbpr = lp->rxbpi = lp->rxcnt = 0;                  /* init receive indexes */
+if (!lp->txbfd)                                         /* if not buffered */
+    lp->txbpr = lp->txbpi = lp->txcnt = 0;              /*   init transmit indexes */
+memset (lp->rbr, 0, TMXR_MAXBUF);                       /* clear break status array */
+lp->txdrp = 0;
+if (!lp->mp->buffered) {
+    lp->txbfd = 0;
+    lp->txbsz = TMXR_MAXBUF;
+    lp->txb = (char *)realloc(lp->txb, lp->txbsz);
+    }
+return;
+}
+
+
+/* Report a connection to a line.
+
+   A notification of the form:
+
+      Connected to the <sim> simulator <dev> device, line <n>
+
+   is sent to the newly connected line.  If the device has only one line, the
+   "line <n>" part is omitted.  If the device has not been defined, the "<dev>
+   device" part is omitted.
+*/
+
+static void tmxr_report_connection (TMXR *mp, TMLN *lp, int32 i)
+{
+int32 written, psave;
+char line [20];
+char cmsg[80];
+char dmsg[80] = "";
+char lmsg[80] = "";
+char msgbuf[256];
+
+sprintf (cmsg, "\n\r\nConnected to the %s simulator ", sim_name);
+
+if (mp->dptr) {                                         /* device defined? */
+    sprintf (dmsg, "%s device",                         /* report device name */
+                   sim_dname (mp->dptr));
+
+    if (mp->lines > 1)                                  /* more than one line? */
+        sprintf (lmsg, ", line %d", i);                 /* report the line number */
+    }
+
+sprintf (msgbuf, "%s%s%s\r\n\n", cmsg, dmsg, lmsg);
+
+if (!mp->buffered) {
+    lp->txbpi = 0;                                      /* init buf pointers */
+    lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
+    lp->rxcnt = lp->txcnt = lp->txdrp = 0;              /* init counters */
+    }
+else
+    if (lp->txcnt > lp->txbsz)
+        lp->txbpr = (lp->txbpi + 1) % lp->txbsz;
+    else
+        lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
+
+psave = lp->txbpi;                                      /* save insertion pointer */
+lp->txbpi = lp->txbpr;                                  /* insert connection message */
+tmxr_linemsg (lp, msgbuf);                              /* beginning of buffer */
+lp->txbpi = psave;                                      /* restore insertion pointer */
+
+written = tmxr_send_buffered_data (lp);                 /* send the message */
+
+if (written == 0)                                       /* buffer now empty? */
+    lp->xmte = 1;                                       /* reenable transmission if paused */
+
+lp->txcnt -= (int32)strlen (msgbuf);                    /* adjust statistics */
+return;
+}
+
+
+/* Report a disconnection to a line.
+
+   A notification of the form:
+
+      Disconnected from the <sim> simulator
+
+   is sent to the line about to be disconnected.  We do not flush the buffer
+   here, because the disconnect routines will do that just after calling us.
+*/
+
+static void tmxr_report_disconnection (TMLN *lp)
+{
+tmxr_linemsg (lp, "\r\nDisconnected from the ");        /* report disconnection */
+tmxr_linemsg (lp, sim_name);
+tmxr_linemsg (lp, " simulator\r\n\n");
+return;
+}
+
+
+/* Read from a line.
+
+   Up to "length" characters are read into the character buffer associated with
+   line "lp".  The actual number of characters read is returned.  If no
+   characters are available, 0 is returned.  If an error occurred while reading,
+   -1 is returned.
+
+   If a line break was detected on serial input, the associated receive break
+   status flag will be set.  Line break indication for Telnet connections is
+   embedded in the Telnet protocol and must be determined externally.
+*/
+
+static int32 tmxr_read (TMLN *lp, int32 length)
+{
+int32 i = lp->rxbpi;
+
+if (lp->serport)                                        /* serial port connection? */
+    return sim_read_serial (lp->serport, &(lp->rxb[i]), length, &(lp->rbr[i]));
+else                                                    /* Telnet connection */
+    return sim_read_sock (lp->conn, &(lp->rxb[i]), length);
+}
+
+
+/* Write to a line.
+
+   Up to "length" characters are written from the character buffer associated
+   with "lp".  The actual number of characters written is returned.  If an error
+   occurred while writing, -1 is returned.
+*/
+
+static int32 tmxr_write (TMLN *lp, int32 length)
+{
+int32 written;
+int32 i = lp->txbpr;
+
+if (lp->serport)                                        /* serial port connection? */
+    return sim_write_serial (lp->serport, &(lp->txb[i]), length);
+
+else {                                                  /* Telnet connection */
+    written = sim_write_sock (lp->conn, &(lp->txb[i]), length);
+
+    if (written == SOCKET_ERROR)                        /* did an error occur? */
+        return -1;                                      /* return error indication */
+    else
+        return written;
+    }
+}
+
+
+/* Remove a character from the read buffer.
+
+   The character at position "p" in the read buffer associated with line "lp" is
+   removed by moving all of the following received characters down one position.
+   The receive break status array is adjusted accordingly.
+*/
+
+static void tmxr_rmvrc (TMLN *lp, int32 p)
+{
+for ( ; p < lp->rxbpi; p++) {                           /* work from "p" through end of buffer */
+    lp->rxb[p] = lp->rxb[p + 1];                        /* slide following character down */
+    lp->rbr[p] = lp->rbr[p + 1];                        /* adjust break status too */
+    }
+
+lp->rbr[p] = 0;                                         /* clear potential break from vacated slot */
+lp->rxbpi = lp->rxbpi - 1;                              /* drop buffer insert index */
+return;
+}
+
+
+/* Find a line descriptor indicated by unit or number.
+
+   If "uptr" is NULL, then the line descriptor is determined by the line number
+   passed in "val".  If "uptr" is not NULL, then it must point to a unit
+   associated with a line, and the line descriptor is determined by the unit
+   number, which is derived by the position of the unit in the device's unit
+   array.
+
+   Note: This routine may be called with a UNIT that does not belong to the
+   device indicated in the TMXR structure.  That is, the multiplexer lines may
+   belong to a device other than the one attached to the socket (the HP 2100 MUX
+   device is one example).  Therefore, we must look up the device from the unit
+   at each call, rather than depending on the DEVICE pointer stored in the TMXR.
+*/
+
+static TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp)
+{
+if (mp == NULL)                                         /* invalid multiplexer descriptor? */
+    return NULL;                                        /* programming error! */
+
+if (uptr) {                                             /* called from SET? */
+    DEVICE *dptr = find_dev_from_unit (uptr);           /* find device */
+    if (dptr == NULL) return NULL;                      /* what?? */
+    val = (int32) (uptr - dptr->units);                 /* implicit line # */
+    }
+if ((val < 0) || (val >= mp->lines)) return NULL;       /* invalid line? */
+return mp->ldsc + val;                                  /* line descriptor */
+}
+
+
+/* Get a line descriptor indicated by a string or unit.
+
+   A pointer to the line descriptor associated with multiplexer "mp" and unit
+   "uptr" or specified by string "cptr" is returned.  If "uptr" is non-null,
+   then the unit number within its associated device implies the line number.
+   If "uptr" is null, then the string "cptr" is parsed for a decimal line
+   number.  If the line number is missing, malformed, or outside of the range of
+   line numbers associated with "mp", then NULL is returned with status set to
+   SCPE_ARG.
+
+   Implementation note:
+
+    1. A return status of SCPE_IERR implies a programming error (passing an
+       invalid pointer or an invalid unit).
+*/
+
+static TMLN *tmxr_get_ldsc (UNIT *uptr, char *cptr, TMXR *mp, t_stat *status)
+{
+t_value  ln;
+TMLN    *lp = NULL;
+t_stat   code = SCPE_OK;
+
+if (mp == NULL)                                         /* missing mux descriptor? */
+    code = SCPE_IERR;                                   /* programming error! */
+
+else if (uptr) {                                        /* implied line form? */
+    lp = tmxr_find_ldsc (uptr, mp->lines, mp);          /* determine line from unit */
+
+    if (lp == NULL)                                     /* invalid line number? */
+        code = SCPE_IERR;                               /* programming error! */
+    }
+
+else if (cptr == NULL)                                  /* named line form, parameter supplied? */
+    code = SCPE_ARG;                                    /* no, so report missing */
+
+else {
+    ln = get_uint (cptr, 10, mp->lines - 1, &code);     /* get line number */
+
+    if (code == SCPE_OK)                                /* line number OK? */
+        lp = mp->ldsc + (int32) ln;                     /* use as index to determine line */
+    }
+
+if (status)                                             /* return value pointer supplied? */
+    *status = code;                                     /* store return status value */
+
+return lp;                                              /* return pointer to line descriptor */
+}
+
+
+
+/* Global routines */
+
 
 /* Poll for new connection
 
@@ -150,6 +614,19 @@ extern uint32 sim_os_msec (void);
    If a connection order is defined for the descriptor, and the first value is
    not -1 (indicating default order), then the order array is used to find an
    open line.  Otherwise, a search is made of all lines in numerical sequence.
+
+   Implementation notes:
+
+    1. When a serial port is attached to a line, the connection is made pending
+       until we are called to poll for new connections.  This is because
+       multiplexer service routines recognize new connections only as a result
+       of calls to this routine.
+
+    2. A pending serial (re)connection may also be deferred.  This is needed
+       when a line clear drops DTR, as DTR must remain low for a period of time
+       in order to be recognized by the serial device.  If the "cnms" value
+       specifies a time in the future, the connection is deferred until that
+       time is reached.  This leaves DTR low for the necessary time.
 */
 
 int32 tmxr_poll_conn (TMXR *mp)
@@ -157,12 +634,9 @@ int32 tmxr_poll_conn (TMXR *mp)
 SOCKET newsock;
 TMLN *lp;
 int32 *op;
-int32 i, j, psave;
-uint32 ipaddr;
-char cmsg[80];
-char dmsg[80] = "";
-char lmsg[80] = "";
-char msgbuf[256];
+int32 i, j;
+uint32 ipaddr, current_time;
+t_bool deferrals;
 static char mantra[] = {
     TN_IAC, TN_WILL, TN_LINE,
     TN_IAC, TN_WILL, TN_SGA,
@@ -171,7 +645,38 @@ static char mantra[] = {
     TN_IAC, TN_DO, TN_BIN
     };
 
+/* Check for a pending serial connection */
+
+if (mp->pending) {                                      /* is there a pending serial connection? */
+    current_time = sim_os_msec ();                      /* get the current time */
+    deferrals = FALSE;                                  /* assume no deferrals */
+
+    for (i = 0; i < mp->lines; i++) {                   /* check each line in sequence */
+        lp = mp->ldsc + i;                              /* get pointer to line descriptor */
+
+        if ((lp->serport != 0) && (lp->conn == 0))      /* have handle but no connection? */
+            if (current_time < lp->cnms)                /* time to connect hasn't arrived? */
+                deferrals = TRUE;                       /* note the deferral */
+
+            else {                                      /* line is ready to connect */
+                tmxr_init_line (lp);                    /* init the line state */
+                sim_control_serial (lp->serport, TRUE); /* connect line by raising DTR */
+                lp->conn = 1;                           /* mark as connected */
+                lp->cnms = current_time;                /* record time of connection */
+                tmxr_report_connection (mp, lp, i);     /* report the connection to the line */
+                mp->pending = mp->pending - 1;          /* drop the pending count */
+                return i;                               /* return the line number */
+                }
+        }
+
+    if (deferrals == FALSE)                             /* any deferred connections? */
+        mp->pending = 0;                                /* no, and none pending, so correct count */
+    }
+
+/* Check for a pending Telnet connection */
+
 newsock = sim_accept_conn (mp->master, &ipaddr);        /* poll connect */
+
 if (newsock != INVALID_SOCKET) {                        /* got a live one? */
     op = mp->lnorder;                                   /* get line connection order list pointer */
     i = mp->lines;                                      /* play it safe in case lines == 0 */
@@ -193,63 +698,73 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
         }
     else {
         lp = mp->ldsc + i;                              /* get line desc */
+        tmxr_init_line (lp);                            /* init line */
         lp->conn = newsock;                             /* record connection */
         lp->ipad = ipaddr;                              /* ip address */
-        lp->mp = mp;                                    /* save mux */
         sim_write_sock (newsock, mantra, sizeof(mantra));
         tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
-        sprintf (cmsg, "\n\r\nConnected to the %s simulator ", sim_name);
-
-        if (mp->dptr) {                                 /* device defined? */
-            sprintf (dmsg, "%s device",                 /* report device name */
-                           sim_dname (mp->dptr));
-
-            if (mp->lines > 1)                          /* more than one line? */
-                sprintf (lmsg, ", line %d", i);         /* report the line number */
-            }
-
-        sprintf (msgbuf, "%s%s%s\r\n\n", cmsg, dmsg, lmsg);
+        tmxr_report_connection (mp, lp, i);
         lp->cnms = sim_os_msec ();                      /* time of conn */
-        if (!mp->buffered) {
-            lp->txbpi = 0;                              /* init buf pointers */
-            lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
-            lp->rxcnt = lp->txcnt = lp->txdrp = 0;      /* init counters */
-            }
-        else
-            if (lp->txcnt > lp->txbsz)
-                lp->txbpr = (lp->txbpi + 1) % lp->txbsz;
-            else
-                lp->txbpr = (int32)(lp->txbsz - strlen (msgbuf));
-        lp->tsta = 0;                                   /* init telnet state */
-        lp->xmte = 1;                                   /* enable transmit */
-        lp->dstb = 0;                                   /* default bin mode */
-        psave = lp->txbpi;                              /* save insertion pointer */
-        lp->txbpi = lp->txbpr;                          /* insert connection message */
-        tmxr_linemsg (lp, msgbuf);                      /* beginning of buffer */
-        lp->txbpi = psave;                              /* restore insertion pointer */
-        tmxr_poll_tx (mp);                              /* flush output */
-        lp->txcnt -= (int32)strlen (msgbuf);            /* adjust statistics */
         return i;
         }
     }                                                   /* end if newsock */
-return -1;
+return -1;                                              /* no new connections made */
 }
 
-/* Reset line */
+/* Reset a line.
+
+   A Telnet session associated with line descriptor "lp" is disconnected, and
+   the socket is deallocated.  If the line has a serial connection instead, then
+   no action is taken.
+
+   This routine is provided for backward compatibility.  Use "tmxr_clear_ln" in
+   new code to disconnect both Telnet and serial connections.
+*/
 
 void tmxr_reset_ln (TMLN *lp)
 {
 if (lp->txlog)                                          /* dump log */
     fflush (lp->txlog);
 tmxr_send_buffered_data (lp);                           /* send buffered data */
-sim_close_sock (lp->conn, 0);                           /* reset conn */
-lp->conn = lp->tsta = 0;                                /* reset state */
-lp->rxbpr = lp->rxbpi = 0;
-if (!lp->txbfd) 
-    lp->txbpr = lp->txbpi = 0;
-lp->xmte = 1;
-lp->dstb = 0;
+
+if (!lp->serport) {                                     /* Telnet connection? */
+    sim_close_sock (lp->conn, 0);                       /* close socket */
+    tmxr_init_line (lp);                                /* initialize line state */
+    lp->conn = 0;                                       /* remove socket */
+    }
 return;
+}
+
+/* Clear a line connection.
+
+   The Telnet or serial session associated with multiplexer descriptor "mp" and
+   line descriptor "lp" is disconnected.  An associated Telnet socket is
+   deallocated; a serial port is not, although DTR is dropped to disconnect the
+   attached serial device.  Serial lines will be scheduled for reconnection
+   after a short delay for DTR recognition.
+*/
+
+t_stat tmxr_clear_ln (TMXR *mp, TMLN *lp)
+{
+if ((mp == NULL) || (lp == NULL))                       /* no multiplexer or line descriptors? */
+    return SCPE_IERR;                                   /* programming error! */
+
+if (lp->txlog)                                          /* logging? */
+    fflush (lp->txlog);                                 /* flush log */
+
+tmxr_send_buffered_data (lp);                           /* send any buffered data */
+
+if (lp->serport) {                                      /* serial connection? */
+    sim_control_serial (lp->serport, FALSE);            /* disconnect line by dropping DTR */
+    lp->cnms = sim_os_msec () + 500;                    /* reconnect 500 msec from now */
+    mp->pending = mp->pending + 1;                      /* mark line reconnection as pending */
+    }
+else                                                    /* Telnet connection */
+    sim_close_sock (lp->conn, 0);                       /* close socket */
+
+tmxr_init_line (lp);                                    /* initialize line state */
+lp->conn = 0;                                           /* remove socket or connection flag */
+return SCPE_OK;
 }
 
 /* Get character from specific line
@@ -258,6 +773,12 @@ return;
         *lp     =       pointer to terminal line descriptor
    Output:
         valid + char, 0 if line
+
+   Implementation note:
+
+    1. If a line break was detected coincident with the current character, the
+       receive break status associated with the character is cleared, and
+       SCPE_BREAK is ORed into the return value.
 */
 
 int32 tmxr_getc_ln (TMLN *lp)
@@ -270,8 +791,10 @@ if (lp->conn && lp->rcve) {                             /* conn & enb? */
     if (j) {                                            /* any? */
         tmp = lp->rxb[lp->rxbpr];                       /* get char */
         val = TMXR_VALID | (tmp & 0377);                /* valid + chr */
-        if (lp->rbr[lp->rxbpr])                         /* break? */
-            val = val | SCPE_BREAK;
+        if (lp->rbr[lp->rxbpr]) {                       /* break? */
+            lp->rbr[lp->rxbpr] = 0;                     /* clear status */
+            val = val | SCPE_BREAK;                     /* indicate to caller */
+            }
         lp->rxbpr = lp->rxbpr + 1;                      /* adv pointer */
         }
     }                                                   /* end if conn */
@@ -279,6 +802,7 @@ if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
 return val;
 }
+
 
 /* Poll for input
 
@@ -299,23 +823,25 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
     nbytes = 0;
     if (lp->rxbpi == 0)                                 /* need input? */
-        nbytes = sim_read_sock (lp->conn,               /* yes, read */
-            &(lp->rxb[lp->rxbpi]),                      /* leave spc for */
-            TMXR_MAXBUF - TMXR_GUARD);                  /* Telnet cruft */
+        nbytes = tmxr_read (lp,                         /* yes, read */
+            TMXR_MAXBUF - TMXR_GUARD);                  /* leave spc for Telnet cruft */
     else if (lp->tsta)                                  /* in Telnet seq? */
-        nbytes = sim_read_sock (lp->conn,               /* yes, read to end */
-            &(lp->rxb[lp->rxbpi]),
+        nbytes = tmxr_read (lp,                         /* yes, read to end */
             TMXR_MAXBUF - lp->rxbpi);
-    if (nbytes < 0)                                     /* closed? reset ln */
-        tmxr_reset_ln (lp);
+
+    if (nbytes < 0)                                     /* line error? */
+        tmxr_clear_ln (mp, lp);                         /* disconnect line */
+
     else if (nbytes > 0) {                              /* if data rcvd */
 
         tmxr_debug (TMXR_DBG_RCV, lp, "Received", &(lp->rxb[lp->rxbpi]), nbytes);
 
         j = lp->rxbpi;                                  /* start of data */
-        memset (&lp->rbr[j], 0, nbytes);                /* clear status */
         lp->rxbpi = lp->rxbpi + nbytes;                 /* adv pointers */
         lp->rxcnt = lp->rxcnt + nbytes;
+
+        if (lp->serport)                                /* is this a serial reception? */
+            continue;                                   /* yes, so no further processing needed */
 
 /* Examine new data, remove TELNET cruft before making input available */
 
@@ -425,6 +951,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 return;
 }
 
+
 /* Return count of available characters for line */
 
 int32 tmxr_rqln (TMLN *lp)
@@ -432,17 +959,6 @@ int32 tmxr_rqln (TMLN *lp)
 return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? TMXR_MAXBUF: 0));
 }
 
-/* Remove character p (and matching status) from line l input buffer */
-
-void tmxr_rmvrc (TMLN *lp, int32 p)
-{
-for ( ; p < lp->rxbpi; p++) {
-    lp->rxb[p] = lp->rxb[p + 1];
-    lp->rbr[p] = lp->rbr[p + 1];
-    }
-lp->rxbpi = lp->rxbpi - 1;
-return;
-}
 
 /* Store character in line buffer
 
@@ -451,10 +967,17 @@ return;
         chr     =       characters
    Outputs:
         status  =       ok, connection lost, or stall
+
+   Implementation note:
+
+    1. If the line is not connected, SCPE_LOST is returned.  For serial
+       connections, this may also occur when the connection is pending, either
+       before the first "tmxr_poll_conn" call, or during a DTR drop deferral.
 */
 
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
+// [JDB] isn't this wrong? it's logging the char before it determines if it can output it!
 if (lp->txlog)                                          /* log if available */
     fputc (chr, lp->txlog);
 if ((lp->conn == 0) && (!lp->txbfd))                    /* no conn & not buffered? */
@@ -483,6 +1006,7 @@ if ((lp->txbfd) || (TXBUF_AVAIL(lp) > 1)) {             /* room for char (+ IAC)
 return SCPE_STALL;                                      /* char not sent */
 }
 
+
 /* Poll for output
 
    Inputs:
@@ -507,6 +1031,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 return;
 }
 
+
 /* Send buffered data across network
 
    Inputs:
@@ -522,11 +1047,11 @@ int32 nbytes, sbytes;
 nbytes = tmxr_tqln(lp);                                 /* avail bytes */
 if (nbytes) {                                           /* >0? write */
     if (lp->txbpr < lp->txbpi)                          /* no wrap? */
-        sbytes = sim_write_sock (lp->conn,              /* write all data */
-            &(lp->txb[lp->txbpr]), nbytes);
-    else sbytes = sim_write_sock (lp->conn,             /* write to end buf */
-            &(lp->txb[lp->txbpr]), lp->txbsz - lp->txbpr);
-    if (sbytes != SOCKET_ERROR) {                       /* ok? */
+        sbytes = tmxr_write (lp, nbytes);               /* write all data */
+    else
+        sbytes = tmxr_write (lp, TMXR_MAXBUF - lp->txbpr);  /* write to end buf */
+
+    if (sbytes > 0) {                                   /* ok? */
         tmxr_debug (TMXR_DBG_XMT, lp, "Sent", &(lp->txb[lp->txbpr]), sbytes);
         lp->txbpr = (lp->txbpr + sbytes);               /* update remove ptr */
         if (lp->txbpr >= lp->txbsz)                     /* wrap? */
@@ -534,9 +1059,10 @@ if (nbytes) {                                           /* >0? write */
         lp->txcnt = lp->txcnt + sbytes;                 /* update counts */
         nbytes = nbytes - sbytes;
         }
+
     if (nbytes && (lp->txbpr == 0))     {               /* more data and wrap? */
-        sbytes = sim_write_sock (lp->conn, lp->txb, nbytes);
-        if (sbytes != SOCKET_ERROR) {                   /* ok */
+        sbytes = tmxr_write (lp, nbytes);
+        if (sbytes > 0) {                               /* ok */
             tmxr_debug (TMXR_DBG_XMT, lp, "Sent", lp->txb, sbytes);
             lp->txbpr = (lp->txbpr + sbytes);           /* update remove ptr */
             if (lp->txbpr >= lp->txbsz)                 /* wrap? */
@@ -549,6 +1075,7 @@ if (nbytes) {                                           /* >0? write */
 return nbytes;
 }
 
+
 /* Return count of buffered characters for line */
 
 int32 tmxr_tqln (TMLN *lp)
@@ -556,7 +1083,14 @@ int32 tmxr_tqln (TMLN *lp)
 return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? lp->txbsz: 0));
 }
 
-/* Open master socket */
+
+/* Open a master listening socket.
+
+   A listening socket for the port number described by "cptr" is opened for the
+   multiplexer associated with descriptor "mp".  If the open is successful, all
+   lines not currently possessing serial connections are initialized for Telnet
+   connections.
+*/
 
 t_stat tmxr_open_master (TMXR *mp, char *cptr)
 {
@@ -653,17 +1187,12 @@ mp->port = port;                                        /* save port */
 mp->master = sock;                                      /* save master socket */
 for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
     lp = mp->ldsc + i;
-    lp->conn = lp->tsta = 0;
-    lp->rxbpi = lp->rxbpr = 0;
-    lp->txbpi = lp->txbpr = 0;
-    if (!mp->buffered) {
-        lp->txbfd = lp->txbpi = lp->txbpr = 0;
-        lp->txbsz = TMXR_MAXBUF;
-        lp->txb = (char *)realloc(lp->txb, lp->txbsz);
+
+    if (lp->serport == 0) {                             /* no serial port attached? */
+        lp->mp = mp;                                    /* set the back pointer */
+        tmxr_init_line (lp);                            /* initialize line state */
+        lp->conn = 0;                                   /* clear the socket */
         }
-    lp->rxcnt = lp->txcnt = lp->txdrp = 0;
-    lp->xmte = 1;
-    lp->dstb = 0;
     }
 return SCPE_OK;
 }
@@ -684,7 +1213,7 @@ if (tptr == NULL)                                       /* no more mem? */
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
 if (r != SCPE_OK) {                                     /* error? */
     free (tptr);                                        /* release buf */
-    return SCPE_OPENERR;
+    return r;
     }
 sprintf (pmsg, "%d", mp->port);                         /* copy port */
 if (mp->buffered)
@@ -701,7 +1230,184 @@ if (mp->dptr == NULL)                                   /* has device been set? 
 return SCPE_OK;
 }
 
-/* Close master socket */
+
+/* Attach a line to a serial port.
+
+   Attach a line of the multiplexer associated with descriptor "desc" to a
+   serial port.  Two calling sequences are supported:
+
+    1. If "val" is zero, then "uptr" is implicitly associated with the line
+       number corresponding to the position of the unit in the zero-based array
+       of units belonging to the associated device, and "cptr" points to the
+       serial port name.  For example, if "uptr" points to unit 3 in a given
+       device, and "cptr" points to the string "COM1", then line 3 will be
+       attached to serial port "COM1".
+
+    2. If "val" is non-zero, then "cptr" points to a string that is parsed for
+       an explicit line number and serial port name, and "uptr" is ignored.  The
+       number and name are delimited by the character represented by "val".  For
+       example, if "val" is 58 (':'), and "cptr" points to the string "3:COM1",
+       then line 3 will be attached to serial port "COM1".
+
+   An optional configuration string may be present after the port name.  If
+   present, it must be separated from the port name with a semicolon and has
+   this form:
+
+      <rate>-<charsize><parity><stopbits>
+
+   where:
+
+     rate     = communication rate in bits per second
+     charsize = character size in bits (5-8, including optional parity)
+     parity   = parity designator (N/E/O/M/S for no/even/odd/mark/space parity)
+     stopbits = number of stop bits (1, 1.5, or 2)
+
+   As an example:
+
+     9600-8n1
+
+   The supported rates, sizes, and parity options are host-specific.  If a
+   configuration string is not supplied, then host system defaults are used.
+
+   If the serial port allocation is successful, then if "val" is zero, then the
+   port name is stored in the UNIT structure, and the UNIT_ATT flag is set.  If
+   "val" is non-zero, then this is not done, as there is no unit corresponding
+   to the attached line.
+
+   Implementation notes:
+
+    1. If the device associated with the unit referenced by "uptr" does not have
+       the DEV_NET flag set, then the optional configuration string is saved
+       with the port name in the UNIT structure.  This allows a RESTORE to
+       reconfigure the attached serial port during reattachment.  The combined
+       string will be displayed when the unit is SHOWed.
+
+       If the unit has the DEV_NET flag, the optional configuration string is
+       removed before the attached port name is saved in the UNIT structure, as
+       RESTORE will not reattach the port, and so reconfiguration is not needed.
+
+    2. This function may be called as an MTAB processing routine.
+*/
+
+t_stat tmxr_attach_line (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+TMLN *lp;
+DEVICE *dptr;
+char *pptr, *sptr, *tptr;
+SERHANDLE serport;
+SERCONFIG config = { 0 };
+t_stat status;
+char portname [1024];
+t_bool arg_error = FALSE;
+
+if (val) {                                              /* explicit line? */
+    uptr = NULL;                                        /* indicate to get routine */
+    tptr = strchr (cptr, (char) val);                   /* search for separator */
+
+    if (tptr == NULL)                                   /* not found? */
+        return SCPE_ARG;                                /* report bad argument */
+    else                                                /* found */
+        *tptr = '\0';                                   /* terminate for get_uint */
+    }
+
+lp = tmxr_get_ldsc (uptr, cptr, mp, &status);           /* get referenced line */
+
+if (lp == NULL)                                         /* bad line number? */
+    return status;                                      /* report it */
+
+if (lp->conn)                                           /* line connected via Telnet? */
+    return SCPE_NOFNC;                                  /* command not allowed */
+
+if (val)                                                /* named line form? */
+    cptr = tptr + 1;                                    /* point at port name */
+
+if (cptr == NULL)                                       /* port name missing? */
+    return SCPE_ARG;                                    /* report it */
+
+pptr = get_glyph_nc (cptr, portname, ';');              /* separate port name from optional params */
+
+if (*pptr) {                                                /* parameter string present? */
+    config.baudrate = (uint32) strtotv (pptr, &sptr, 10);   /* parse baud rate */
+    arg_error = (pptr == sptr);                             /* check for bad argument */
+
+    if (*sptr)                                              /* separator present? */
+        sptr++;                                             /* skip it */
+
+    config.charsize = (uint32) strtotv (sptr, &tptr, 10);   /* parse character size */
+    arg_error = arg_error || (sptr == tptr);                /* check for bad argument */
+
+    if (*tptr)                                              /* parity character present? */
+        config.parity = toupper (*tptr++);                  /* save parity character */
+
+    config.stopbits = (uint32) strtotv (tptr, &sptr, 10);   /* parse number of stop bits */
+    arg_error = arg_error || (tptr == sptr);                /* check for bad argument */
+
+    if (arg_error)                                          /* bad conversions? */
+        return SCPE_ARG;                                    /* report argument error */
+
+    else if (strcmp (sptr, ".5") == 0)                      /* 1.5 stop bits requested? */
+        config.stopbits = 0;                                /* code request */
+    }
+
+serport = sim_open_serial (portname);                   /* open the serial port */
+
+if (serport == INVALID_HANDLE)                          /* not a valid port name */
+    return SCPE_OPENERR;                                /* cannot attach */
+
+else {                                                  /* good serial port */
+    if (*pptr) {                                        /* parameter string specified? */
+        status = sim_config_serial (serport, config);   /* set serial configuration */
+
+        if (status != SCPE_OK) {                        /* port configuration error? */
+            sim_close_serial (serport);                 /* close the port */
+            return status;                              /* report error */
+            }
+        }
+
+    if (val == 0) {                                     /* unit implies line? */
+        dptr = find_dev_from_unit (uptr);               /* find associated device */
+
+        if (dptr && (dptr->flags & DEV_NET))            /* will RESTORE be inhibited? */
+            cptr = portname;                            /* yes, so save just port name */
+
+        if (mp->dptr == NULL)                           /* has device been set? */
+            mp->dptr = dptr;                            /* no, so set device now */
+        }
+
+    tptr = (char *) malloc (strlen (cptr) + 1);         /* get buffer for port name and maybe params */
+
+    if (tptr == NULL) {                                 /* allocation problem? */
+        sim_close_serial (serport);                     /* close the port */
+        return SCPE_MEM;                                /* report allocation failure */
+        }
+
+    strcpy (tptr, cptr);                                /* copy the port name into the buffer */
+
+    if (val == 0) {                                     /* unit implies line? */
+        uptr->filename = tptr;                          /* save buffer pointer in UNIT */
+        uptr->flags = uptr->flags | UNIT_ATT;           /* mark unit as attached */
+        }
+
+    lp->mp = mp;                                        /* set the back pointer */
+    tmxr_init_line (lp);                                /* initialize the line state */
+    lp->serport = serport;                              /* set serial port handle */
+    lp->sername = tptr;                                 /* set serial port name */
+    lp->cnms = 0;                                       /* schedule for immediate connection */
+    lp->conn = 0;                                       /* indicate no connection yet */
+    mp->pending = mp->pending + 1;                      /*   but connection is pending */
+    }
+
+return SCPE_OK;                                         /* line has been connected */
+}
+
+
+/* Close a master listening socket.
+
+   The listening socket associated with multiplexer descriptor "mp" is closed
+   and deallocated.  In addition, all current Telnet sessions are disconnected.
+   Serial sessions are not affected.
+*/
 
 t_stat tmxr_close_master (TMXR *mp)
 {
@@ -710,19 +1416,26 @@ TMLN *lp;
 
 for (i = 0; i < mp->lines; i++) {                       /* loop thru conn */
     lp = mp->ldsc + i;
-    if (lp->conn) {
-        tmxr_linemsg (lp, "\r\nDisconnected from the ");
-        tmxr_linemsg (lp, sim_name);
-        tmxr_linemsg (lp, " simulator\r\n\n");
-        tmxr_reset_ln (lp);
-        }                                               /* end if conn */
-    }                                                   /* end for */
+
+    if (!lp->serport && lp->conn) {                     /* not serial and is connected? */
+        tmxr_report_disconnection (lp);                 /* report disconnection */
+        tmxr_reset_ln (lp);                             /* disconnect line */
+        }
+    }
+
 sim_close_sock (mp->master, 1);                         /* close master socket */
 mp->master = 0;
 return SCPE_OK;
 }
 
-/* Detach unit from master socket */
+
+/* Detach unit from master socket.
+
+   Note that we return SCPE_OK, regardless of whether a listening socket was
+   attached.  For single-line multiplexers that may be attached either to a
+   listening socket or to a serial port, call "tmxr_detach_line" first.  If that
+   routine returns SCPE_UNATT, then call "tmxr_detach".
+*/
 
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr)
 {
@@ -734,6 +1447,134 @@ uptr->filename = NULL;
 uptr->flags = uptr->flags & ~UNIT_ATT;                  /* not attached */
 return SCPE_OK;
 }
+
+
+/* Detach a line from serial port.
+
+   Disconnect and detach a line of the multiplexer associated with descriptor
+   "desc" from a serial port.  Two calling sequences are supported:
+
+    1. If "val" is zero, then "uptr" is implicitly associated with the line
+       number corresponding to the position of the unit in the zero-based array
+       of units belonging to the associated device, and "cptr" points to the
+       serial port name.  For example, if "uptr" points to unit 3 in a given
+       device, then line 3 will be detached from the associated serial port.
+
+    2. If "val" is non-zero, then "cptr" points to a string that is parsed for
+       an explicit line number, and "uptr" is ignored.  For example, if "cptr"
+       points to the string "3", then line 3 will be detached from the
+       associated serial port.
+
+   Calling sequence 2 allows serial ports to be used with multiplexers that do
+   not implement unit-per-line.  In this configuration, there is no unit
+   associated with a given line, so the ATTACH and DETACH commands cannot be
+   used.  Instead, SET commands directed to the device must specify the line
+   number and port name to open (e.g., "SET <dev> CONNECT=<n>:<port>") or close
+   (e.g., "SET <dev> DISCONNECT=<n>").  These commands call "tmxr_attach_line"
+   and "tmxr_detach_line", respectively, with non-zero "val" parameters.
+
+   As an aid for this configuration, we do not verify serial port connections
+   when "val" is non-zero.  That is, we will disconnect the line without regard
+   to whether a serial or Telnet connection is present.  Then, if a serial
+   connection was present, the serial port is closed.  This allows the SET
+   DISCONNECT command to be used to disconnect (close) both Telnet and serial
+   sessions.
+
+   Implementation notes:
+
+    1. If "val" is zero, and the specified line is not connected to a serial
+       port, then SCPE_UNATT is returned.  This allows a common VM-provided
+       detach routine in a single-line device to attempt to detach a serial port
+       first, and then, if that fails, to detach a Telnet session via
+       "tmxr_detach".  Note that the latter will always succeed, even if the
+       unit is not attached, and so cannot be called first.
+
+    2. If the serial connection was completed, we drop the line to ensure that a
+       modem will disconnect.  This increments the pending connection count in
+       preparation for reconnecting.  If the connection was not completed, it
+       will still be pending.  In either case, we drop the pending connection
+       count, as we will be closing the serial port.
+
+    3. This function may be called as an MTAB processing routine.
+*/
+
+t_stat tmxr_detach_line (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+TMLN *lp;
+t_stat status;
+
+if (val)                                                /* explicit line? */
+    uptr = NULL;                                        /* indicate to get routine */
+
+lp = tmxr_get_ldsc (uptr, cptr, mp, &status);           /* get referenced line */
+
+if (lp == NULL)                                         /* bad line number? */
+    return status;                                      /* report it */
+
+if (uptr && lp->serport == 0)                           /* serial port attached to unit? */
+    return SCPE_UNATT;                                  /* no, so report status to caller */
+
+if (lp->conn) {                                         /* was connection made? */
+    tmxr_report_disconnection (lp);                     /* report disconnection */
+    tmxr_clear_ln (mp, lp);                             /* close line */
+    }
+
+if (lp->serport) {                                      /* serial port attached? */
+    mp->pending = mp->pending - 1;                      /* drop pending connection count */
+
+    sim_close_serial (lp->serport);                     /* close serial port */
+    lp->serport = 0;                                    /* clear handle */
+    free (lp->sername);                                 /* free port name */
+    lp->sername = 0;                                    /* clear pointer */
+
+    if (uptr) {                                         /* unit implies line? */
+        uptr->filename = NULL;                          /* clear attached name pointer */
+        uptr->flags = uptr->flags & ~UNIT_ATT;          /* no longer attached */
+        }
+    }
+
+return SCPE_OK;
+}
+
+
+/* Check if a line is free.
+
+   A line is free if it is not connected to a Telnet session or a serial port.
+*/
+
+t_bool tmxr_line_free (TMLN *lp)
+{
+return lp && (lp->conn == 0) && (lp->serport == 0);     /* free if no connection */
+}
+
+
+/* Check if a multiplexer is free.
+
+   A multiplexer is free if it is not listening for new Telnet connections and
+   no lines are connected to serial ports.  Note that if the listening socket is
+   detached, then no Telnet sessions can exist, so we only need to check for
+   serial connections on the lines.
+*/
+
+t_bool tmxr_mux_free (TMXR *mp)
+{
+TMLN* lp;
+int32 ln;
+
+if (mp == NULL || mp->master || mp->pending)            /* listening for Telnet or serial connection? */
+    return FALSE;                                       /* not free */
+
+for (ln = 0; ln < mp->lines; ln++) {                    /* check each line for serial connection */
+    lp = mp->ldsc + ln;                                 /* get pointer to line descriptor */
+
+    if (lp->serport)                                    /* serial connection? */
+        return FALSE;                                   /* not free */
+    }
+
+return TRUE;                                            /* no connections, so mux is free */
+}
+
 
 /* Stub examine and deposit */
 
@@ -747,7 +1588,8 @@ t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw)
 return SCPE_NOFNC;
 }
 
-/* Output message to socket or line descriptor */
+
+/* Write a message directly to a socket */
 
 void tmxr_msg (SOCKET sock, char *msg)
 {
@@ -755,6 +1597,9 @@ if (sock)
     sim_write_sock (sock, msg, (int32)strlen (msg));
 return;
 }
+
+
+/* Write a message to a line */
 
 void tmxr_linemsg (TMLN *lp, char *msg)
 {
@@ -765,25 +1610,33 @@ for (len = (int32)strlen (msg); len > 0; --len)
 return;
 }
 
+
 /* Print connections - used only in named SHOW command */
 
 void tmxr_fconns (FILE *st, TMLN *lp, int32 ln)
 {
 if (ln >= 0)
     fprintf (st, "line %d: ", ln);
+
 if (lp->conn) {
     int32 o1, o2, o3, o4, hr, mn, sc;
     uint32 ctime;
 
-    o1 = (lp->ipad >> 24) & 0xFF;
-    o2 = (lp->ipad >> 16) & 0xFF;
-    o3 = (lp->ipad >> 8) & 0xFF;
-    o4 = (lp->ipad) & 0xFF;
+    if (lp->serport)                                    /* serial connection? */
+        fprintf (st, "Serial port %s", lp->sername);    /* print port name */
+
+    else {                                              /* socket connection */
+        o1 = (lp->ipad >> 24) & 0xFF;
+        o2 = (lp->ipad >> 16) & 0xFF;
+        o3 = (lp->ipad >> 8) & 0xFF;
+        o4 = (lp->ipad) & 0xFF;
+        fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
+        }
+
     ctime = (sim_os_msec () - lp->cnms) / 1000;
     hr = ctime / 3600;
     mn = (ctime / 60) % 60;
     sc = ctime % 60;
-    fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
     if (ctime)
         fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);
     }
@@ -792,6 +1645,7 @@ if (lp->txlog)
     fprintf (st, "Logging to %s\n", lp->txlogname);
 return;
 }
+
 
 /* Print statistics - used only in named SHOW command */
 
@@ -822,36 +1676,55 @@ if (lp->txdrp)
 return;
 }
 
-/* Disconnect line */
+
+/* Disconnect a line.
+
+   Disconnect a line of the multiplexer associated with descriptor "desc" from a
+   Telnet session or a serial port.  Two calling sequences are supported:
+
+    1. If "val" is zero, then "uptr" is implicitly associated with the line
+       number corresponding to the position of the unit in the zero-based array
+       of units belonging to the associated device, and "cptr" is ignored.  For
+       example, if "uptr" points to unit 3 in a given device, then line 3 will
+       be disconnected.
+
+    2. If "val" is non-zero, then "cptr" points to a string that is parsed for
+       an explicit line number, and "uptr" is ignored.  For example, if "cptr"
+       points to the string "3", then line 3 will be disconnected.
+
+   If the line was connected to a Telnet session, the socket associated with the
+   line will be closed.  If the line was connected to a serial port, the port
+   will NOT be closed, but DTR will be dropped.  The line will be reconnected
+   after a short delay to allow the serial device to recognize the DTR state
+   change.
+
+   Implementation notes:
+
+    1. This function may be called as an MTAB processing routine.
+*/
 
 t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 TMLN *lp;
-int32 ln;
-t_stat r;
+t_stat status;
 
-if (mp == NULL)
-    return SCPE_IERR;
-if (val) {                                              /* = n form */
-    if (cptr == NULL)
-        return SCPE_ARG;
-    ln = (int32) get_uint (cptr, 10, mp->lines - 1, &r);
-    if (r != SCPE_OK)
-        return SCPE_ARG;
-    lp = mp->ldsc + ln;
+if (val)                                                        /* explicit line? */
+    uptr = NULL;                                                /* indicate to get routine */
+
+lp = tmxr_get_ldsc (uptr, cptr, mp, &status);                   /* get referenced line */
+
+if (lp == NULL)                                                 /* bad line number? */
+    return status;                                              /* report it */
+
+if (lp->conn) {                                                 /* connection active? */
+    tmxr_linemsg (lp, "\r\nOperator disconnected line\r\n\n");  /* report closure */
+    tmxr_clear_ln (mp, lp);                                     /* drop the line */
     }
-else {
-    lp = tmxr_find_ldsc (uptr, 0, mp);
-    if (lp == NULL)
-        return SCPE_IERR;
-    }
-if (lp->conn) {
-    tmxr_linemsg (lp, "\r\nOperator disconnected line\r\n\n");
-    tmxr_reset_ln (lp);
-    }
+
 return SCPE_OK;
 }
+
 
 /* Enable logging for line */
 
@@ -879,6 +1752,7 @@ if (lp->txlog == NULL) {                                /* error? */
 return SCPE_OK;
 }
 
+
 /* Disable logging for line */
 
 t_stat tmxr_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -900,6 +1774,7 @@ if (lp->txlog) {                                        /* logging? */
 return SCPE_OK;
 }
 
+
 /* Show logging status for line */
 
 t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc)
@@ -916,27 +1791,6 @@ else fprintf (st, "no logging");
 return SCPE_OK;
 }
 
-/* Find line descriptor.
-
-   Note: This routine may be called with a UNIT that does not belong to the
-   device indicated in the TMXR structure.  That is, the multiplexer lines may
-   belong to a device other than the one attached to the socket (the HP 2100 MUX
-   device is one example).  Therefore, we must look up the device from the unit
-   at each call, rather than depending on the DPTR stored in the TMXR.
-*/
-
-TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp)
-{
-if (uptr) {                                             /* called from SET? */
-    DEVICE *dptr = find_dev_from_unit (uptr);           /* find device */
-    if (dptr == NULL)                                   /* what?? */
-        return NULL;
-    val = (int32) (uptr - dptr->units);                 /* implicit line # */
-    }
-if ((val < 0) || (val >= mp->lines))                    /* invalid line? */
-    return NULL;
-return mp->ldsc + val;                                  /* line descriptor */
-}
 
 /* Set the line connection order.
 
@@ -1042,6 +1896,7 @@ free (set);                                             /* free set allocation *
 
 return result;
 }
+
 
 /* Show line connection order.
 
@@ -1235,4 +2090,3 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
     }
 }
-
