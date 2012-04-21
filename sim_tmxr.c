@@ -387,7 +387,6 @@ return;
 static void tmxr_report_connection (TMXR *mp, TMLN *lp, int32 i)
 {
 int32 written, psave;
-char line [20];
 char cmsg[80];
 char dmsg[80] = "";
 char lmsg[80] = "";
@@ -977,7 +976,6 @@ return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? TMXR_MAXBUF: 0));
 
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
-// [JDB] isn't this wrong? it's logging the char before it determines if it can output it!
 if (lp->txlog)                                          /* log if available */
     fputc (chr, lp->txlog);
 if ((lp->conn == 0) && (!lp->txbfd))                    /* no conn & not buffered? */
@@ -1049,7 +1047,7 @@ if (nbytes) {                                           /* >0? write */
     if (lp->txbpr < lp->txbpi)                          /* no wrap? */
         sbytes = tmxr_write (lp, nbytes);               /* write all data */
     else
-        sbytes = tmxr_write (lp, TMXR_MAXBUF - lp->txbpr);  /* write to end buf */
+        sbytes = tmxr_write (lp, lp->txbsz - lp->txbpr);/* write to end buf */
 
     if (sbytes > 0) {                                   /* ok? */
         tmxr_debug (TMXR_DBG_XMT, lp, "Sent", &(lp->txb[lp->txbpr]), sbytes);
