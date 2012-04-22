@@ -1300,6 +1300,8 @@ char portname [1024];
 t_bool arg_error = FALSE;
 
 if (val) {                                              /* explicit line? */
+    if (cptr == NULL)                                   /* arguments supplied? */
+        return SCPE_ARG;                                /* report bad argument */
     uptr = NULL;                                        /* indicate to get routine */
     tptr = strchr (cptr, (char) val);                   /* search for separator */
 
@@ -1320,7 +1322,7 @@ if (lp->conn)                                           /* line connected via Te
 if (val)                                                /* named line form? */
     cptr = tptr + 1;                                    /* point at port name */
 
-if (cptr == NULL)                                       /* port name missing? */
+if ((cptr == NULL) || (!*cptr))                         /* port name missing? */
     return SCPE_ARG;                                    /* report it */
 
 pptr = get_glyph_nc (cptr, portname, ';');              /* separate port name from optional params */

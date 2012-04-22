@@ -45,6 +45,7 @@
      sim_read_serial        read from a serial port
      sim_write_serial       write to a serial port
      sim_close_serial       close a serial port
+     sim_show_serial        shows the available host serial ports
 
 
    The calling sequences are as follows:
@@ -102,13 +103,38 @@
    --------------------------------------
 
    The serial port indicated by "port" is closed.
+
+
+   int sim_serial_devices (int max, SERIAL_LIST* list)
+   ---------------------------------------------------
+
+   enumerates the available host serial ports
+
+
+   t_stat sim_show_serial (FILE* st)
+   ---------------------------------
+
+   displays the available host serial ports
+
 */
 
 
 #include "sim_defs.h"
 #include "sim_serial.h"
 
+#include <ctype.h>
 
+#define SER_DEV_NAME_MAX     256                        /* maximum device name size */
+#define SER_DEV_DESC_MAX     256                        /* maximum device description size */
+#define SER_MAX_DEVICE        64                        /* maximum serial devices */
+
+typedef struct serial_list {
+    char    name[SER_DEV_NAME_MAX];
+    char    desc[SER_DEV_DESC_MAX];
+    } SERIAL_LIST;
+
+static int       sim_serial_os_devices (int max, SERIAL_LIST* list);
+static SERHANDLE sim_open_os_serial    (char *name);
 
 /* Generic error message handler.
 
@@ -124,13 +150,198 @@ fprintf (stderr, "Serial: %s fails with error %d\n", routine, error);
 return;
 }
 
+/* Used when sorting a list of serial port names */
+static int _serial_name_compare (const void *pa, const void *pb)
+{
+SERIAL_LIST *a = (SERIAL_LIST *)pa;
+SERIAL_LIST *b = (SERIAL_LIST *)pb;
 
+return strcmp(a->name, b->name);
+}
+
+t_stat sim_show_serial (FILE* st)
+{
+SERIAL_LIST  list[SER_MAX_DEVICE];
+int number = sim_serial_os_devices(SER_MAX_DEVICE, list);
+
+fprintf(st, "Serial devices:\n");
+if (number == -1)
+    fprintf(st, "  serial support not available in simulator\n");
+else
+if (number == 0)
+    fprintf(st, "  no serial devices are available\n");
+else {
+    size_t min, len;
+    int i;
+    for (i=0, min=0; i<number; i++)
+        if ((len = strlen(list[i].name)) > min)
+            min = len;
+    for (i=0; i<number; i++)
+        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+return SCPE_OK;
+}
+
+static char* sim_serial_getname(int number, char* name)
+{
+SERIAL_LIST  list[SER_MAX_DEVICE];
+int count = sim_serial_os_devices(SER_MAX_DEVICE, list);
+
+if (count <= number)
+    return NULL;
+strcpy(name, list[number].name);
+return name;
+}
+
+static char* sim_serial_getname_bydesc(char* desc, char* name)
+{
+SERIAL_LIST  list[SER_MAX_DEVICE];
+int count = sim_serial_os_devices(SER_MAX_DEVICE, list);
+int i;
+size_t j=strlen(desc);
+
+for (i=0; i<count; i++) {
+    int found = 1;
+    size_t k = strlen(list[i].desc);
+
+    if (j != k)
+        continue;
+    for (k=0; k<j; k++)
+        if (tolower(list[i].desc[k]) != tolower(desc[k]))
+            found = 0;
+    if (found == 0)
+        continue;
+
+    /* found a case-insensitive description match */
+    strcpy(name, list[i].name);
+    return name;
+    }
+/* not found */
+return NULL;
+}
+
+/* strncasecmp() is not available on all platforms */
+static int sim_serial_strncasecmp(char* string1, char* string2, size_t len)
+{
+size_t i;
+unsigned char s1, s2;
+
+for (i=0; i<len; i++) {
+    s1 = string1[i];
+    s2 = string2[i];
+    if (islower (s1))
+        s1 = toupper (s1);
+    if (islower (s2))
+        s2 = toupper (s2);
+    if (s1 < s2)
+        return -1;
+    if (s1 > s2)
+        return 1;
+    if (s1 == 0)
+        return 0;
+}
+return 0;
+}
+
+static char* sim_serial_getname_byname(char* name, char* temp)
+{
+SERIAL_LIST  list[SER_MAX_DEVICE];
+int count = sim_serial_os_devices(SER_MAX_DEVICE, list);
+size_t n;
+int i, found;
+
+found = 0;
+n = strlen(name);
+for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (sim_serial_strncasecmp(name, list[i].name, n) == 0)) {
+        found = 1;
+        strcpy(temp, list[i].name); /* only case might be different */
+        }
+    }
+return (found ? temp : NULL);
+}
+
+SERHANDLE sim_open_serial (char *name)
+{
+char temp[1024];
+char *savname = name;
+
+/* translate name of type "serX" to real device name */
+if ((strlen(name) <= 5)
+    && (tolower(name[0]) == 's')
+    && (tolower(name[1]) == 'e')
+    && (tolower(name[2]) == 'r')
+    && (isdigit(name[3]))
+    && (isdigit(name[4]) || (name[4] == '\0'))
+   ) {
+    int num = atoi(&name[3]);
+    savname = sim_serial_getname(num, temp);
+    if (savname == NULL) /* didn't translate */
+        return INVALID_HANDLE;
+    }
+else {
+    /* are they trying to use device description? */
+    savname = sim_serial_getname_bydesc(name, temp);
+    if (savname == NULL) { /* didn't translate */
+        /* probably is not ethX and has no description */
+        savname = sim_serial_getname_byname(name, temp);
+        if (savname == NULL) /* didn't translate */
+          savname = name;
+        }
+    }
+
+return sim_open_os_serial (savname);
+}
 
 /* Windows serial implementation */
 
 
 #if defined (_WIN32)
 
+
+/* Enumerate the available serial ports.
+
+   The serial port names are extracted from the appropriate place in the 
+   windows registry (HKLM\HARDWARE\DEVICEMAP\SERIALCOMM\).  The resulting
+   list is sorted alphabetically by device name (COMn).  The device description 
+   is set to the OS internal name for the COM device.
+
+*/
+
+static int sim_serial_os_devices (int max, SERIAL_LIST* list)
+{
+int ports = 0;
+HKEY hSERIALCOMM;
+
+memset(list, 0, max*sizeof(*list));
+if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_QUERY_VALUE, &hSERIALCOMM) == ERROR_SUCCESS) {
+    DWORD dwIndex = 0;
+    DWORD dwType;
+    DWORD dwValueNameSize = sizeof(list[ports].desc);
+    DWORD dwDataSize = sizeof(list[ports].name);
+	
+    /* Enumerate all the values underneath HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\SERIALCOMM */
+    while (RegEnumValueA(hSERIALCOMM, dwIndex, list[ports].desc, &dwValueNameSize, NULL, &dwType, list[ports].name, &dwDataSize) == ERROR_SUCCESS) {
+        /* String values with non-zero size are the interesting ones */
+        if ((dwType == REG_SZ) && (dwDataSize > 0))
+            if (ports < max)
+                ++ports;
+            else
+                break;
+        /* Besure to clear the working entry before trying again */
+        memset(list[ports].name, 0, sizeof(list[ports].name));
+        memset(list[ports].desc, 0, sizeof(list[ports].desc));
+        dwValueNameSize = sizeof(list[ports].desc);
+        dwDataSize = sizeof(list[ports].name);
+        ++dwIndex;
+        }
+    RegCloseKey(hSERIALCOMM);
+    }
+if (ports) /* Order the list returned alphabetically by the port name */
+    qsort (list, ports, sizeof(list[0]), _serial_name_compare);
+return ports;
+}
 
 /* Open a serial port.
 
@@ -157,7 +368,7 @@ return;
        interest to a DCB retrieved from a call to "GetCommState".
 */
 
-SERHANDLE sim_open_serial (char *name)
+SERHANDLE sim_open_os_serial (char *name)
 {
 SERHANDLE port;
 DCB dcb;
@@ -421,6 +632,44 @@ return;
 
 #elif defined (__unix__)
 
+/* Enumerate the available serial ports.
+
+   The serial port names generated by attempting to open /dev/ttyS0 thru
+   /dev/ttyS53 and /dev/ttyUSB0 thru /dev/ttyUSB0.  Ones we can open and
+   are ttys (as determined by isatty()) are added to the list.  The list 
+   is sorted alphabetically by device name.
+
+*/
+
+static int sim_serial_os_devices (int max, SERIAL_LIST* list)
+{
+int i;
+int port;
+int ports = 0;
+
+memset(list, 0, max*sizeof(*list));
+for (i=0; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/ttyS%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+for (i=0; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/ttyUSB%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+if (ports) /* Order the list returned alphabetically by the port name */
+    qsort (list, ports, sizeof(list[0]), _serial_name_compare);
+return ports;
+}
 
 /* Open a serial port.
 
@@ -442,7 +691,7 @@ return;
        reading.
 */
 
-SERHANDLE sim_open_serial (char *name)
+SERHANDLE sim_open_os_serial (char *name)
 {
 static const tcflag_t i_clear = IGNBRK |                /* ignore BREAK */
                                 BRKINT |                /* signal on BREAK */
