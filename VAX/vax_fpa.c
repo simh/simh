@@ -1,6 +1,6 @@
 /* vax_fpa.c - VAX f_, d_, g_floating instructions
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),

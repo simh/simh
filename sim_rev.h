@@ -36,7 +36,7 @@
 
 patch   date            module(s) and fix(es)
 
-  0     xx-yyy-1       scp.c:
+  0     01-May-2012     scp.c:
                         - added *nix READLINE support (Mark Pizzolato)
                         - fixed handling of DO with no arguments (Dave Bryan)
                         - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
@@ -49,9 +49,14 @@ patch   date            module(s) and fix(es)
 
                         sim_ether.c
                         - major revision (Dave Hittner and Mark Pizzolato)
+                        - fixed array overrun which caused SEGFAULT on hosts with many
+                          devices which libpcap can access.
+                        - fixed duplicate MAC address detection to work reliably on switch
+                          connected LANs
 
                         sim_tmxr.c:
-                        - made option negotiation more reliable (Mark Pizzolato)
+                        - made telnet option negotiation more reliable, VAX simulator now 
+                          works with PuTTY as console (Mark Pizzolato)
 
                         h316_cpu.c:
                         - fixed bugs in MPY, DIV introduced in 3.8-1 (from Theo Engel)
@@ -96,7 +101,7 @@ patch   date            module(s) and fix(es)
                         hp2100_cpu7.c (Dave Bryan):
                         - Corrected "opsize" parameter type in vis_abs
 
-                         hp2100_defs.h (Dave Bryan):
+                        hp2100_defs.h (Dave Bryan):
                         - Added hp_setsc, hp_showsc functions to support SC modifier
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Revised I/O signal enum values for concurrent signals
@@ -112,7 +117,7 @@ patch   date            module(s) and fix(es)
                         hp2100_dp.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to dp_settype
  
-                         hp2100_ds.c (Dave Bryan):
+                        hp2100_ds.c (Dave Bryan):
                         - Rewritten to use the MAC/ICD disc controller library
                         - ioIOO now notifies controller service of parameter output
                         - Corrected SRQ generation and FIFO under/overrun detection
@@ -137,13 +142,14 @@ patch   date            module(s) and fix(es)
                         - Revised for new multi-card paradigm
 
                         hp2100_lps.c (Dave Bryan):
-                         - Revised detection of CLC at last DMA cycle
+                        - Revised detection of CLC at last DMA cycle
                         - Corrected 12566B (DIAG mode) jumper settings
 
                         hp2100_ms.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to ms_settype
  
                         hp2100_mt.c (Dave Bryan):
+                        - Removed redundant MTAB_VUN from "format" MTAB entry
                         - Fixed command scanning error in mtcio ioIOO handler
 
                         hp2100_stddev.c (Dave Bryan):
@@ -165,6 +171,13 @@ patch   date            module(s) and fix(es)
 
                         id_pas.c:
                         - fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
+                        - revised to use clock coscheduling
+
+                        id_tt.c, id_ttc.p:
+                        - revised to use clock coscheduling
+
+                        id_uvc.c:
+                        - added clock coscheduling routine
 
                         1401_cpu.c:
                         - reverted multiple tape indicator implementation
@@ -183,6 +196,9 @@ patch   date            module(s) and fix(es)
 
                         pdp1_stddev.c:
                         - fixed unitialized variable in tty output service (Michael Bloom)
+
+                        pdp10_fe.c:
+                        - revised to use clock coscheduling
 
                         pdp11_defs.h:
                         - fixed priority of PIRQ vs IO; added INT_INTERNALn
@@ -217,8 +233,81 @@ patch   date            module(s) and fix(es)
                         pdp11_ts.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
 
+                        pdp11_tu.c:
+                        - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
+
+                        pdp11_vh.c: (Mark Pizzolato)
+                        - fixed SET VH LINES=n to correctly adjust the number
+                          of lines available to be 8, 16, 24, or 32.
+                        - fixed performance issue avoiding redundant polling
+
+                        pdp11_xq.c: (Mark Pizzolato)
+                        - Fixed missing information from save/restore which
+                          caused operations to not complete correctly after 
+                          a restore until the OS reset the controller.
+                        - Added address conflict check during attach.
+                        - Fixed loopback processing to correctly handle forward packets.
+                        - Fixed interrupt dispatch issue which caused delivered packets 
+                          (in and out) to sometimes not interrupt the CPU after processing.
+                        - Fixed the SCP visibile SA registers to always display the 
+                          ROM mac address, even after it is changed by SET XQ MAC=.
+                        - Added changes so that the Console DELQA diagnostic (>>>TEST 82) 
+                          will succeed.
+                        - Added DELQA-T (aka DELQA Plus) device emulation support.
+                        - Added dropped frame statistics to record when the receiver discards
+                          received packets due to the receiver being disabled, or due to the
+                          XQ device's packet receive queue being full.
+                        - Fixed bug in receive processing when we're not polling.  This could
+                          cause receive processing to never be activated again if we don't 
+                          read all available packets via eth_read each time we get the 
+                          opportunity.
+                        - Added the ability to Coalesce received packet interrupts.  This
+                          is enabled by SET XQ POLL=DELAY=nnn where nnn is a number of 
+                          microseconds to delay the triggering of an interrupt when a packet
+                          is received.
+                        - Added SET XQ POLL=DISABLE (aka SET XQ POLL=0) to operate without 
+                          polling for packet read completion.
+                        - Changed the sanity and id timer mechanisms to use a separate timer
+                          unit so that transmit and recieve activities can be dealt with
+                          by the normal xq_svc routine.
+                          Dynamically determine the timer polling rate based on the 
+                          calibrated tmr_poll and clk_tps values of the simulator.
+                        - Enabled the SET XQ POLL to be meaningful if the simulator currently
+                          doesn't support idling.
+                        - Changed xq_debug_setup to use sim_debug instead of printf so that
+                          all debug output goes to the same place.
+                        - Restored the call to xq_svc after all successful calls to eth_write
+                          to allow receive processing to happen before the next event
+                          service time.  This must have been inadvertently commented out 
+                          while other things were being tested.
+
+                        pdp11_xu.c: (Mark Pizzolato)
+                        - Added SHOW XU FILTERS modifier (Dave Hittner)
+                        - Corrected SELFTEST command, enabling use by VMS 3.7, VMS 4.7, and Ultrix 1.1 (Dave Hittner)
+                        - Added address conflict check during attach.
+                        - Added loopback processing support
+                        - Fixed the fact that no broadcast packets were received by the DEUNA
+                        - Fixed transmitted packets to have the correct source MAC address.
+                        - Fixed incorrect address filter setting calling eth_filter().
+
+                        pdp18b_stddev.c:
+                        - added clock coscheduling
+                        - revised TTI to use clock coscheduling and to fix perpetual CAF bug
+                        
+                        pdp18b_ttx.c:
+                        - revised to use clock coscheduling
+
+                        pdp8_clk.c:
+                        - added clock coscheduling
+
                         pdp8_fpp.c: (Rick Murphy)
                         - many bug fixes; now functional
+
+                        pdp8_tt.c:
+                        - revised to use clock coscheduling and to fix perpetual CAF bug
+
+                        pdp8_ttx.c:
+                        - revised to use clock cosheduling
 
                         pdp8_sys.c:
                         - added link to FPP
@@ -247,6 +336,9 @@ patch   date            module(s) and fix(es)
                         - fixed integer overflow bug in EMODH
                         - fixed POLYH normalizing before add mask bug
 
+                        vax_stddev.c:
+                        - revised to use clock coscheduling
+
                         vax_syscm.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
 
@@ -258,6 +350,7 @@ patch   date            module(s) and fix(es)
 
                         vax780_stddev.c
                         - added REBOOT support (Mark Pizzolato)
+                        - revised to use clock coscheduling
 
                         vaxmod_def.h
                         - moved all Qbus devices to BR4; deleted RP definitions

@@ -1,6 +1,6 @@
 /* pdp11_dc.c: PDP-11 DC11 multiple terminal interface simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dci,dco    DC11 terminal input/output
 
+   18-Apr-2012  RMS     Modified to use clock coscheduling
    17-Aug-2011  RMS     Added AUTOCONFIGURE modifier
    26-Nov-2008  JDB     [serial] Added serial port support
    19-Nov-2008  RMS     Revised for common TMXR show routines
@@ -367,7 +368,7 @@ t_stat dci_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
-sim_activate (uptr, tmxr_poll);                         /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 ln = tmxr_poll_conn (&dcx_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     dcx_ldsc[ln].rcve = 1;                              /* set rcv enb */

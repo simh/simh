@@ -1,6 +1,6 @@
 /* pdp10_tim.c: PDP-10 tim subsystem simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tim          timer subsystem
 
+   18-Apr-12    RMS     Removed absolute scheduling on reset
    18-Jun-07    RMS     Added UNIT_IDLE flag
    03-Nov-06    RMS     Rewritten to support idling
    29-Oct-06    RMS     Added clock coscheduling function
@@ -239,7 +240,7 @@ tim_period = 0;                                         /* clear timer */
 tim_ttg = 0;
 apr_flg = apr_flg & ~APRF_TIM;                          /* clear interrupt */
 tmr_poll = sim_rtc_init (tim_unit.wait);                /* init timer */
-sim_activate_abs (&tim_unit, tmr_poll);                 /* activate unit */
+sim_activate (&tim_unit, tmr_poll);                     /* activate unit */
 tmxr_poll = tmr_poll * tim_mult;                        /* set mux poll */
 return SCPE_OK;
 }

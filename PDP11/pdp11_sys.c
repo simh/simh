@@ -27,7 +27,7 @@
    15-May-08    RMS     Added KE11-A, DC11 support
                         Renamed DL11
    04-Feb-08    RMS     Modified to allow -A, -B use with 8b devices
-   25-Jan-08    RMS     Added RC11, KG11A support (John Dundas)
+   25-Jan-08    RMS     Added RC11, KG11A support from John Dundas
    10-Sep-07    RMS     Cleaned up binary loader
    20-Dec-06    RMS     Added TA11 support
    12-Nov-06    RMS     Fixed operand order in EIS instructions (W.F.J. Mueller)

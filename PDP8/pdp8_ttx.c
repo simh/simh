@@ -1,6 +1,6 @@
 /* pdp8_ttx.c: PDP-8 additional terminals simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    PT08/KL8JA terminal input/output
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    19-Nov-08    RMS     Revised for common TMXR show routines
    07-Jun-06    RMS     Added UNIT_IDLE flag
    06-Jul-06    RMS     Fixed bug in DETACH routine
@@ -60,6 +61,7 @@
 #define TTX_GETLN(x)    (((x) >> 4) & TTX_MASK)
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
+extern int32 tmxr_poll, sim_is_running;
 
 uint8 ttix_buf[TTX_LINES] = { 0 };                      /* input buffers */
 uint8 ttox_buf[TTX_LINES] = { 0 };                      /* output buffers */
@@ -224,8 +226,7 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-temp = sim_rtcn_calb (ttx_tps, TMR_TTX);                /* calibrate */
-sim_activate (uptr, temp);                              /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
 if (ln >= 0)                                            /* got one? rcv enb*/
     ttx_ldsc[ln].rcve = 1;
@@ -249,15 +250,11 @@ return SCPE_OK;
 
 t_stat ttix_reset (DEVICE *dptr)
 {
-int32 t, ln, itto;
+int32 ln, itto;
 
 ttx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
-if (ttix_unit.flags & UNIT_ATT) {                       /* if attached, */
-    if (!sim_is_active (&ttix_unit)) {
-        t = sim_rtcn_init (ttix_unit.wait, TMR_TTX);
-        sim_activate (&ttix_unit, t);                   /* activate */
-        }
-    }
+if (ttix_unit.flags & UNIT_ATT)                         /* if attached, */
+    sim_activate (&ttix_unit, tmxr_poll);               /* activate */
 else sim_cancel (&ttix_unit);                           /* else stop */
 for (ln = 0; ln < TTX_LINES; ln++) {                    /* for all lines */
     ttix_buf[ln] = 0;                                   /* clear buf, */
@@ -358,14 +355,12 @@ return SCPE_OK;
 
 t_stat ttx_attach (UNIT *uptr, char *cptr)
 {
-int32 t;
 t_stat r;
 
 r = tmxr_attach (&ttx_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error */
     return r;
-t = sim_rtcn_init (ttix_unit.wait, TMR_TTX);            /* init calib */
-sim_activate (uptr, t);                                 /* start poll */
+sim_activate (uptr, tmxr_poll);                         /* start poll */
 return SCPE_OK;
 }
 
