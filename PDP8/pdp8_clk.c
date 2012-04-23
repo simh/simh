@@ -1,6 +1,6 @@
 /* pdp8_clk.c: PDP-8 real-time clock simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    clk          real time clock
 
+   18-Apr-12    RMS     Added clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag
    01-Mar-03    RMS     Aded SET/SHOW CLK FREQ support
    04-Oct-02    RMS     Added DIB, device number support
@@ -42,6 +43,8 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 
 int32 clk_tps = 60;                                     /* ticks/second */
 int32 tmxr_poll = 16000;                                /* term mux poll */
+
+extern int32 sim_is_running;
 
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
@@ -150,6 +153,16 @@ tmxr_poll = t;                                          /* set mux poll */
 return SCPE_OK;
 }
 
+/* Clock coscheduling routine */
+
+int32 clk_cosched (int32 wait)
+{
+int32 t;
+
+t = sim_is_active (&clk_unit);
+return (t? t - 1: wait);
+}
+
 /* Reset routine */
 
 t_stat clk_reset (DEVICE *dptr)
@@ -159,9 +172,11 @@ int32 t;
 dev_done = dev_done & ~INT_CLK;                         /* clear done, int */
 int_req = int_req & ~INT_CLK;
 int_enable = int_enable & ~INT_CLK;                     /* clear enable */
-t = sim_rtcn_init (clk_unit.wait, TMR_CLK);
-sim_activate_abs (&clk_unit, t);                        /* activate unit */
-tmxr_poll = t;
+if (!sim_is_running) {                                  /* RESET (not CAF)? */
+    t = sim_rtcn_init (clk_unit.wait, TMR_CLK);
+    sim_activate (&clk_unit, t);                        /* activate unit */
+    tmxr_poll = t;
+    }
 return SCPE_OK;
 }
 

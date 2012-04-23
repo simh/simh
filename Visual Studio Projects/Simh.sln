@@ -53,7 +53,9 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lgp", "lgp.vcproj", "{927C3
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "I7094", "I7094.vcproj", "{927C3BD9-BD0C-4A23-99F9-DEAD402BEEF9}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SWTP", "SWTP.vcproj", "{0ABAF350-853E-4A8F-8435-B583E29FB78C}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "swtp6800mp-a", "swtp6800mp-a.vcproj", "{0ABAF350-853E-4A8F-8435-B583E29FB78C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "swtp6800mp-a2", "swtp6800mp-a2.vcproj", "{A0BAF350-853E-4A8F-8435-B583E29FFACE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

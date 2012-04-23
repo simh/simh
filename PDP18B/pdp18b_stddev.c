@@ -1,6 +1,6 @@
 /* pdp18b_stddev.c: 18b PDP's standard devices
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,8 @@
    tto          teleprinter
    clk          clock
 
+   18-Apr-12    RMS     Added clk_cosched routine
+                        Revised clk and tti scheduling
    18-Jun-07    RMS     Added UNIT_IDLE to console input, clock
    18-Oct-06    RMS     Added PDP-15 programmable duplex control
                         Fixed handling of non-printable characters in KSR mode
@@ -475,6 +477,16 @@ return ((int32) val);
 int32 clk_iors (void)
 {
 return (TST_INT (CLK)? IOS_CLK: 0);
+}
+
+/* Clock coscheduling routine */
+
+int32 clk_cosched (int32 wait)
+{
+int32 t;
+
+t = sim_is_active (&clk_unit);
+return (t? t - 1: wait);
 }
 
 /* Reset routine */
@@ -1002,7 +1014,8 @@ t_stat tti_svc (UNIT *uptr)
 #if defined (KSR28)                                     /* Baudot... */
 int32 in, c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
+                                                        /* continue poll */
 if (tti_2nd) {                                          /* char waiting? */
     uptr->buf = tti_2nd;                                /* return char */
     tti_2nd = 0;                                        /* not waiting */
@@ -1037,7 +1050,8 @@ else {
 #else                                                   /* ASCII... */
 int32 c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
+                                                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 out = c & 0177;                                         /* mask echo to 7b */
@@ -1068,12 +1082,14 @@ return (TST_INT (TTI)? IOS_TTI: 0);
 
 t_stat tti_reset (DEVICE *dptr)
 {
-tti_unit.buf = 0;                                       /* clear buffer */
-tti_2nd = 0;
-tty_shift = 0;                                          /* clear state */
-tti_fdpx = 0;                                           /* clear dpx mode */
 CLR_INT (TTI);                                          /* clear flag */
-sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
+if (!sim_is_running) {                                  /* RESET (not CAF)? */
+    tti_unit.buf = 0;                                   /* clear buffer */
+    tti_2nd = 0;
+    tty_shift = 0;                                      /* clear state */
+    tti_fdpx = 0;                                       /* clear dpx mode */
+    }
+sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
 return SCPE_OK;
 }
 

@@ -1,6 +1,6 @@
 /* id_ttp.c: Interdata PASLA console interface
 
-   Copyright (c) 2000-2008, Robert M. Supnik
+   Copyright (c) 2000-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttp          console (on PAS)
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Sync keyboard to LFC clock
    22-Nov-05    RMS     Revised for new terminal processing routines
@@ -179,7 +180,8 @@ t_stat ttpi_svc (UNIT *uptr)
 {
 int32 c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_poll));   /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_cosched (lfc_poll)));
+                                                        /* continue poll */
 ttp_sta = ttp_sta & ~STA_FR;                            /* clear break */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
@@ -237,7 +239,7 @@ t_stat ttp_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS)
     sim_cancel (&ttp_unit[TTI]);
-else sim_activate_abs (&ttp_unit[TTI], KBD_WAIT (ttp_unit[TTI].wait, lfc_poll));
+else sim_activate (&ttp_unit[TTI], KBD_WAIT (ttp_unit[TTI].wait, lfc_poll));
 sim_cancel (&ttp_unit[TTO]);
 CLR_INT (v_TTP);                                        /* clear int */
 CLR_ENB (v_TTP);

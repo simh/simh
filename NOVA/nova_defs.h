@@ -1,6 +1,6 @@
 /* nova_defs.h: NOVA/Eclipse simulator definitions 
 
-   Copyright (c) 1993-2010, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Mar-12    RMS     Added missing parameters to prototypes (Mark Pizzolato)
    22-May-10    RMS     Added check for 64b definitions
    04-Jul-07    BKR     BUSY/DONE/INTR "convenience" macros added,
                         INT_TRAP added for Nova 3, 4 trap instruction handling,

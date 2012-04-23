@@ -1,6 +1,6 @@
 /* vax_stddev.c: VAX 3900 standard I/O devices
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
    tto          terminal output
    clk          100Hz and TODR clock
 
+   18-Apr-12    RMS     Revised TTI to use clock coscheduling and
+                        remove IORESET bug
    17-Aug-08    RMS     Resync TODR on any clock reset
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    17-Oct-06    RMS     Synced keyboard poll to real-time clock for idling
@@ -61,7 +63,7 @@
 
 extern int32 int_req[IPL_HLVL];
 extern int32 hlt_pin;
-extern int32 sim_switches;
+extern int32 sim_switches, sim_is_running;
 
 int32 tti_csr = 0;                                      /* control/status */
 int32 tto_csr = 0;                                      /* control/status */
@@ -289,7 +291,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
+                                                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK) {                                   /* break? */
@@ -310,7 +313,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
-sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -412,10 +415,12 @@ int32 t;
 todr_resync ();                                         /* resync clock */
 clk_csr = 0;
 CLR_INT (CLK);
-t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init timer */
-sim_activate_abs (&clk_unit, t);                        /* activate unit */
-tmr_poll = t;                                           /* set tmr poll */
-tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+if (!sim_is_running) {                                  /* RESET (not IORESET)? */
+    t = sim_rtcn_init (clk_unit.wait, TMR_CLK);         /* init timer */
+    sim_activate (&clk_unit, t);                        /* activate unit */
+    tmr_poll = t;                                       /* set tmr poll */
+    tmxr_poll = t * TMXR_MULT;                          /* set mux poll */
+    }
 return SCPE_OK;
 }
 

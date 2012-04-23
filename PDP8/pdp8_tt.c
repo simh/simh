@@ -1,6 +1,6 @@
 /* pdp8_tt.c: PDP-8 console terminal simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tti,tto      KL8E terminal input/output
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Synced keyboard to clock
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
@@ -44,7 +45,7 @@
 #include <ctype.h>
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll;
+extern int32 tmxr_poll, sim_is_running;
 
 int32 tti (int32 IR, int32 AC);
 int32 tto (int32 IR, int32 AC);
@@ -175,7 +176,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
+                                                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -195,7 +197,8 @@ tti_unit.buf = 0;
 dev_done = dev_done & ~INT_TTI;                         /* clear done, int */
 int_req = int_req & ~INT_TTI;
 int_enable = int_enable | INT_TTI;                      /* set enable */
-sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
+if (!sim_is_running)                                    /* RESET (not CAF)? */
+    sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmxr_poll));
 return SCPE_OK;
 }
 

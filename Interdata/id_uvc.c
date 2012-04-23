@@ -1,6 +1,6 @@
 /* id_uvc.c: Interdata universal clock
 
-   Copyright (c) 2001-2008, Robert M. Supnik
+   Copyright (c) 2001-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    pic          precision incremental clock
    lfc          line frequency clock
 
+   18-Apr-12    RMS     Added lfc_cosched routine
    18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Oct-06    RMS     Changed LFC to be free running, export tmr_poll
    23-Jul-05    RMS     Fixed {} error in OC
@@ -351,12 +352,22 @@ if (lfc_arm) {                                          /* armed? */
 return SCPE_OK;
 }
 
+/* Clock coscheduling routine */
+
+int32 lfc_cosched (int32 wait)
+{
+int32 t;
+
+t = sim_is_active (&lfc_unit);
+return (t? t - 1: wait);
+}
+
 /* Reset routine */
 
 t_stat lfc_reset (DEVICE *dptr)
 {
 lfc_poll = sim_rtcn_init (lfc_unit.wait, TMR_LFC);
-sim_activate_abs (&lfc_unit, lfc_poll);                 /* init clock */
+sim_activate (&lfc_unit, lfc_poll);                     /* init clock */
 CLR_INT (v_LFC);                                        /* clear int */
 CLR_ENB (v_LFC);                                        /* disable int */
 lfc_arm = 0;                                            /* disarm int */

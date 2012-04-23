@@ -105,6 +105,7 @@ extern FILE *sim_log;
 t_stat xu_rd(int32* data, int32 PA, int32 access);
 t_stat xu_wr(int32  data, int32 PA, int32 access);
 t_stat xu_svc(UNIT * uptr);
+t_stat xu_tmrsvc(UNIT * uptr);
 t_stat xu_reset (DEVICE * dptr);
 t_stat xu_attach (UNIT * uptr, char * cptr);
 t_stat xu_detach (UNIT * uptr);
@@ -132,7 +133,8 @@ DIB xua_dib = { IOBA_XU, IOLN_XU, &xu_rd, &xu_wr,
 1, IVCL (XU), VEC_XU, {&xu_int} };
 
 UNIT xua_unit[] = {
- { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }      /* receive timer */
+ { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
+ { UDATA (&xu_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) }
 };
 
 struct xu_device    xua = {
@@ -185,7 +187,7 @@ DEBTAB xu_debug[] = {
 
 DEVICE xu_dev = {
 	"XU", xua_unit, xua_reg, xu_mod,
-	1, XU_RDX, 8, 1, XU_RDX, 8,
+	2, XU_RDX, 8, 1, XU_RDX, 8,
 	&xu_ex, &xu_dep, &xu_reset,
 	NULL, &xu_attach, &xu_detach,
 	&xua_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
@@ -554,8 +556,6 @@ t_stat xu_svc(UNIT* uptr)
 {
   int queue_size;
   CTLR* xu = xu_unit2ctlr(uptr);
-  const ETH_MAC mop_multicast = {0xAB, 0x00, 0x00, 0x02, 0x00, 0x00};
-  const int one_second = clk_tps * tmr_poll;
 
   /* First pump any queued packets into the system */
   if ((xu->var->ReadQ.count > 0) && ((xu->var->pcsr1 & PCSR1_STATE) == STATE_RUNNING))
@@ -574,26 +574,35 @@ t_stat xu_svc(UNIT* uptr)
   if ((xu->var->ReadQ.count > 0) && ((xu->var->pcsr1 & PCSR1_STATE) == STATE_RUNNING))
     xu_process_receive(xu);
 
-  /* send identity packet when timer expires */
-  if (--xu->var->idtmr <= 0) {
-    if ((xu->var->mode & MODE_DMNT) == 0)           /* if maint msg is not disabled */
-      xu_system_id(xu, mop_multicast, 0);           /*   then send ID packet */
-    xu->var->idtmr = XU_ID_TIMER_VAL * one_second;  /* reset timer */
-  }
-
-  /* has one second timer expired? if so, update stats and reset timer */
-  if (++xu->var->sectmr >= XU_SERVICE_INTERVAL) {
-    upd_stat16 (&xu->var->stats.secs, 1);
-    xu->var->sectmr = 0;
-  }
-
   /* resubmit service timer if controller not halted */
   switch (xu->var->pcsr1 & PCSR1_STATE) {
     case STATE_READY:
     case STATE_RUNNING:
-      sim_activate(&xu->unit[0], tmxr_poll);
+      sim_activate(&xu->unit[0], clk_cosched(tmxr_poll));
       break;
   };
+
+  return SCPE_OK;
+}
+
+t_stat xu_tmrsvc(UNIT* uptr)
+{
+  CTLR* xu = xu_unit2ctlr(uptr);
+  const ETH_MAC mop_multicast = {0xAB, 0x00, 0x00, 0x02, 0x00, 0x00};
+  const int one_second = clk_tps * tmr_poll;
+
+  /* send identity packet when timer expires */
+  if (--xu->var->idtmr <= 0) {
+    if ((xu->var->mode & MODE_DMNT) == 0)           /* if maint msg is not disabled */
+      xu_system_id(xu, mop_multicast, 0);           /*   then send ID packet */
+    xu->var->idtmr = XU_ID_TIMER_VAL;               /* reset timer */
+  }
+
+  /* update stats */
+  upd_stat16 (&xu->var->stats.secs, 1);
+
+  /* resubmit service timer */
+  sim_activate(uptr, one_second);
 
   return SCPE_OK;
 }
@@ -673,6 +682,10 @@ t_stat xu_sw_reset (CTLR* xu)
   /* activate device if not disabled */
   if ((xu->dev->flags & DEV_DIS) == 0) {
     sim_activate_abs(&xu->unit[0], clk_cosched (tmxr_poll));
+
+    /* start service timer */
+    if (xu->var->etherface)
+      sim_activate_abs(&xu->unit[1], tmr_poll * clk_tps);
   }
 
   /* clear load_server address */

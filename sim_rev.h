@@ -36,7 +36,7 @@
 
 patch   date            module(s) and fix(es)
 
-  0     xx-yyy-1       scp.c:
+  0     01-May-2012     scp.c:
                         - added *nix READLINE support (Mark Pizzolato)
                         - fixed handling of DO with no arguments (Dave Bryan)
                         - fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)
@@ -101,7 +101,7 @@ patch   date            module(s) and fix(es)
                         hp2100_cpu7.c (Dave Bryan):
                         - Corrected "opsize" parameter type in vis_abs
 
-                         hp2100_defs.h (Dave Bryan):
+                        hp2100_defs.h (Dave Bryan):
                         - Added hp_setsc, hp_showsc functions to support SC modifier
                         - DMA channels renamed from 0,1 to 1,2 to match documentation
                         - Revised I/O signal enum values for concurrent signals
@@ -117,7 +117,7 @@ patch   date            module(s) and fix(es)
                         hp2100_dp.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to dp_settype
  
-                         hp2100_ds.c (Dave Bryan):
+                        hp2100_ds.c (Dave Bryan):
                         - Rewritten to use the MAC/ICD disc controller library
                         - ioIOO now notifies controller service of parameter output
                         - Corrected SRQ generation and FIFO under/overrun detection
@@ -142,13 +142,14 @@ patch   date            module(s) and fix(es)
                         - Revised for new multi-card paradigm
 
                         hp2100_lps.c (Dave Bryan):
-                         - Revised detection of CLC at last DMA cycle
+                        - Revised detection of CLC at last DMA cycle
                         - Corrected 12566B (DIAG mode) jumper settings
 
                         hp2100_ms.c (Dave Bryan):
                         - Added CNTLR_TYPE cast to ms_settype
  
                         hp2100_mt.c (Dave Bryan):
+                        - Removed redundant MTAB_VUN from "format" MTAB entry
                         - Fixed command scanning error in mtcio ioIOO handler
 
                         hp2100_stddev.c (Dave Bryan):
@@ -170,6 +171,13 @@ patch   date            module(s) and fix(es)
 
                         id_pas.c:
                         - fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
+                        - revised to use clock coscheduling
+
+                        id_tt.c, id_ttc.p:
+                        - revised to use clock coscheduling
+
+                        id_uvc.c:
+                        - added clock coscheduling routine
 
                         1401_cpu.c:
                         - reverted multiple tape indicator implementation
@@ -188,6 +196,9 @@ patch   date            module(s) and fix(es)
 
                         pdp1_stddev.c:
                         - fixed unitialized variable in tty output service (Michael Bloom)
+
+                        pdp10_fe.c:
+                        - revised to use clock coscheduling
 
                         pdp11_defs.h:
                         - fixed priority of PIRQ vs IO; added INT_INTERNALn
@@ -279,8 +290,24 @@ patch   date            module(s) and fix(es)
                         - Fixed transmitted packets to have the correct source MAC address.
                         - Fixed incorrect address filter setting calling eth_filter().
 
+                        pdp18b_stddev.c:
+                        - added clock coscheduling
+                        - revised TTI to use clock coscheduling and to fix perpetual CAF bug
+                        
+                        pdp18b_ttx.c:
+                        - revised to use clock coscheduling
+
+                        pdp8_clk.c:
+                        - added clock coscheduling
+
                         pdp8_fpp.c: (Rick Murphy)
                         - many bug fixes; now functional
+
+                        pdp8_tt.c:
+                        - revised to use clock coscheduling and to fix perpetual CAF bug
+
+                        pdp8_ttx.c:
+                        - revised to use clock cosheduling
 
                         pdp8_sys.c:
                         - added link to FPP
@@ -309,6 +336,9 @@ patch   date            module(s) and fix(es)
                         - fixed integer overflow bug in EMODH
                         - fixed POLYH normalizing before add mask bug
 
+                        vax_stddev.c:
+                        - revised to use clock coscheduling
+
                         vax_syscm.c:
                         - fixed t_addr printouts for 64b big-endian systems (Mark Pizzolato)
 
@@ -320,6 +350,7 @@ patch   date            module(s) and fix(es)
 
                         vax780_stddev.c
                         - added REBOOT support (Mark Pizzolato)
+                        - revised to use clock coscheduling
 
                         vaxmod_def.h
                         - moved all Qbus devices to BR4; deleted RP definitions
