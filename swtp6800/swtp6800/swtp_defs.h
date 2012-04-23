@@ -25,7 +25,7 @@ Copyright (c) 2005-2012, William Beech
 */
 
 #include <ctype.h>
-#include "../../sim_defs.h"             // simulator defs
+#include "sim_defs.h"             // simulator defs
 
 /* Memory */
 
