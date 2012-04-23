@@ -1,6 +1,6 @@
 /* pdp10_fe.c: PDP-10 front end (console terminal) simulator
 
-   Copyright (c) 1993-2007, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fe           KS10 console front end
 
+   18-Apr-12    RMS     Added clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    17-Oct-06    RMS     Synced keyboard to clock for idling
    28-May-04    RMS     Removed SET FE CTRL-C
@@ -142,7 +143,8 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmxr_poll));  /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));  
+                                                        /* continue poll */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
     return temp;
 if (temp & SCPE_BREAK)                                  /* ignore break */
@@ -161,7 +163,7 @@ t_stat fe_reset (DEVICE *dptr)
 fei_unit.buf = feo_unit.buf = 0;
 M[FE_CTYIN] = M[FE_CTYOUT] = 0;
 apr_flg = apr_flg & ~(APRF_ITC | APRF_CON);
-sim_activate_abs (&fei_unit, KBD_WAIT (fei_unit.wait, tmxr_poll));
+sim_activate (&fei_unit, KBD_WAIT (fei_unit.wait, tmxr_poll));
 return SCPE_OK;
 }
 

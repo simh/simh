@@ -1,9 +1,0 @@
-reset
-set cpu hex
-set cpu itrap
-set cpu mtrap
-att dsk 6800boot.dsk
-att dsk1 6800work.dsk
-set cpu MA000
-set dsk1 rw
-g

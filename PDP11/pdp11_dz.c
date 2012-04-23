@@ -435,7 +435,7 @@ if (t) {                                                /* any enabled? */
     dz_update_rcvi ();                                  /* upd rcv intr */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
-    sim_activate (uptr, tmxr_poll);                     /* reactivate */
+    sim_activate (uptr, clk_cosched (tmxr_poll));       /* reactivate */
     }
 return SCPE_OK;
 }

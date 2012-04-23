@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
                         (Mark Pizzolato)
    16-Feb-06    RMS     Added tape capacity checking

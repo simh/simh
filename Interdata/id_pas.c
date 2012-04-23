@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    21-Mar-12    RMS     Fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
@@ -319,7 +320,7 @@ int32 ln, c, out;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, lfc_poll);                          /* continue poll */
+sim_activate (uptr, lfc_cosched (lfc_poll));            /* continue poll */
 ln = tmxr_poll_conn (&pas_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     if ((pasl_unit[ln].flags & UNIT_MDM) &&             /* modem control */
@@ -468,7 +469,7 @@ else {
     pasl_dev.flags = pasl_dev.flags & ~DEV_DIS;
     }
 if (pas_unit.flags & UNIT_ATT)                          /* master att? */
-    sim_activate_abs (&pas_unit, lfc_poll);             /* cosched with clock */
+    sim_activate (&pas_unit, lfc_poll);
 else sim_cancel (&pas_unit);                            /* else stop */
 for (i = 0; i < PAS_LINES; i++)
     pas_reset_ln (i);
@@ -484,7 +485,7 @@ t_stat r;
 r = tmxr_attach (&pas_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error */
     return r;
-sim_activate_abs (uptr, 100);                           /* quick poll */
+sim_activate (uptr, 100);                               /* quick poll */
 return SCPE_OK;
 }
 

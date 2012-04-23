@@ -1,6 +1,6 @@
 /* pdp11_stddev.c: PDP-11 standard I/O devices simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    tti,tto      DL11 terminal input/output
    clk          KW11L (and other) line frequency clock
 
+   18-Apr-12    RMS     Modified to use clock coscheduling
    20-May-08    RMS     Standardized clock delay at 1mips
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
    29-Oct-06	RMS     Synced keyboard and clock
@@ -287,7 +288,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
+                                                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -307,7 +309,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
-sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -475,7 +477,7 @@ clk_tps = clk_default;                                  /* set default tps */
 clk_csr = CSR_DONE;                                     /* set done */
 CLR_INT (CLK);
 sim_rtcn_init (clk_unit.wait, TMR_CLK);                 /* init line clock */
-sim_activate_abs (&clk_unit, clk_unit.wait);            /* activate unit */
+sim_activate (&clk_unit, clk_unit.wait);                /* activate unit */
 tmr_poll = clk_unit.wait;                               /* set timer poll */
 tmxr_poll = clk_unit.wait;                              /* set mux poll */
 return SCPE_OK;

@@ -1,6 +1,6 @@
 /* vax780_stddev.c: VAX 11/780 standard I/O devices
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    todr         TODR clock
    tmr          interval timer
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    28-Sep-11    MP      Generalized setting TODR for all OSes.  
                         Unbound the TODR value from the 100hz clock tick 
                         interrupt.  TODR now behaves like the original 
@@ -461,7 +462,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, tmr_poll));   /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
+                                                        /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -481,7 +483,7 @@ t_stat tti_reset (DEVICE *dptr)
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;
-sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
+sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
@@ -679,7 +681,7 @@ return (t? t - 1: wait);
 t_stat clk_reset (DEVICE *dptr)
 {
 tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
-sim_activate_abs (&clk_unit, tmr_poll);                 /* activate 100Hz unit */
+sim_activate (&clk_unit, tmr_poll);                     /* activate 100Hz unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
 if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is initialized */
     clk_unit.filebuf = calloc(sizeof(TOY), 1);

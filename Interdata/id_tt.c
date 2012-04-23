@@ -1,6 +1,6 @@
 /* id_tt.c: Interdata teletype
 
-   Copyright (c) 2000-2008, Robert M. Supnik
+   Copyright (c) 2000-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tt           console
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input
    18-Oct-06    RMS     Sync keyboard to LFC clock
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
@@ -183,7 +184,8 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 out, temp;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_poll));   /* continue poll */
+sim_activate (uptr, KBD_WAIT (uptr->wait, lfc_cosched (lfc_poll)));
+                                                        /* continue poll */
 tt_sta = tt_sta & ~STA_BRK;                             /* clear break */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
     return temp;
@@ -239,7 +241,7 @@ t_stat tt_reset (DEVICE *dptr)
 {
 if (dptr->flags & DEV_DIS)                              /* dis? cancel poll */
     sim_cancel (&tt_unit[TTI]);
-else sim_activate_abs (&tt_unit[TTI], KBD_WAIT (tt_unit[TTI].wait, lfc_poll));
+else sim_activate (&tt_unit[TTI], KBD_WAIT (tt_unit[TTI].wait, lfc_poll));
 sim_cancel (&tt_unit[TTO]);                             /* cancel output */
 tt_rd = tt_fdpx = 1;                                    /* read, full duplex */
 tt_chp = 0;                                             /* no char */
