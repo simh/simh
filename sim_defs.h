@@ -253,6 +253,7 @@ typedef uint32          t_addr;
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
+#define SCPE_BARE_STATUS(stat) ((stat) & ~(SCPE_NOMESSAGE|SCPE_KFLAG|SCPE_BREAK))
 
 /* Print value format codes */
 

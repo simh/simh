@@ -408,8 +408,10 @@ t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, char *cptr);
 t_stat set_verify (int32 flag, char *cptr);
 t_stat set_message (int32 flag, char *cptr);
+t_stat set_quiet (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
 t_stat do_cmd_label (int32 flag, char *cptr, char *label);
+void int_handler (int signal);
 
 
 /* Global data */
@@ -446,7 +448,7 @@ FILEREF *sim_log_ref = NULL;                            /* log file file referen
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
 static FILE *sim_gotofile;                              /* the currently open do file */
-static int32 sim_goto_line;                             /* the current line number in the currently open do file */
+static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
 static int32 sim_show_message = 1;                      /* the message display status of the currently open do file */
 static int32 sim_on_inherit = 0;                        /* the inherit status of on state and conditions when executing do files */
@@ -455,6 +457,7 @@ int32 sim_do_depth = 0;
 static int32 sim_on_check[MAX_DO_NEST_LVL+1];
 static char *sim_on_actions[MAX_DO_NEST_LVL+1][SCPE_MAX_ERR+1];
 static char sim_do_filename[MAX_DO_NEST_LVL+1][CBUFSIZE];
+static char *sim_do_label[MAX_DO_NEST_LVL+1];
 
 static t_stat sim_last_cmd_stat;                        /* Command Status */
 
@@ -653,9 +656,13 @@ static CTAB cmd_table[] = {
       "set on inherit           enables inheritance of ON state and actions into do command files\n"
       "set on noinherit         disables inheritance of ON state and actions into do command files\n"
       "set verify               re-enables display of command file processed commands\n"
+      "set verbose              re-enables display of command file processed commands\n"
       "set noverify             disables display of command file processed commands\n"
+      "set noverbose            disables display of command file processed commands\n"
       "set message              re-enables display of command file error messages\n"
       "set nomessage            disables display of command file error messages\n"
+      "set quiet                disables suppression of some output and messages\n"
+      "set noquiet              re-enables suppression of some output and messages\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -688,7 +695,7 @@ static CTAB cmd_table[] = {
       "sh{ow} <unit> {arg,...}  show unit parameters\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
-      "do {-V} {-O} {-E} <file> {arg,arg...}\b"
+      "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\b"
       "                         process command file\n" },
     { "GOTO", &goto_cmd, 1,
       "goto <label>             goto label in command file\n" },
@@ -740,6 +747,7 @@ int setenv(const char *envname, const char *envval, int overwrite)
 int main (int argc, char *argv[])
 {
 char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr;
+char nbuf[PATH_MAX + 7];
 int32 i, sw;
 t_bool lookswitch;
 t_stat stat, stat_nomessage;
@@ -817,11 +825,19 @@ if (!sim_quiet) {
 if (sim_dflt_dev == NULL)                               /* if no default */
     sim_dflt_dev = sim_devices[0];
 
-stat = do_cmd (-1, "simh.rc");                          /* simh.rc proc cmd file */
+cptr = getenv("HOME");
+if (cptr == NULL)
+    cptr = getenv("HOMEPATH");
+if (cptr && sizeof (nbuf) > strlen (cptr) + strlen ("/simh.ini") + 1) {
+    sprintf(nbuf, "%s%ssimh.ini", cptr, strchr (cptr, '/') ? "/" : "\\");
+    stat = do_cmd (-1, nbuf) & ~SCPE_NOMESSAGE;         /* simh.ini proc cmd file */
+    }
+if (stat == SCPE_OPENERR)
+    stat = do_cmd (-1, "simh.ini");                     /* simh.ini proc cmd file */
 if (*cbuf)                                              /* cmd file arg? */
     stat = do_cmd (0, cbuf);                            /* proc cmd file */
 else if (*argv[0]) {                                    /* sim name arg? */
-    char nbuf[PATH_MAX + 7], *np;                       /* "path.ini" */
+    char *np;                                           /* "path.ini" */
     nbuf[0] = '"';                                      /* starting " */
     strncpy (nbuf + 1, argv[0], PATH_MAX + 1);          /* copy sim name */
     if (np = match_ext (nbuf, "EXE"))                   /* remove .exe */
@@ -829,6 +845,8 @@ else if (*argv[0]) {                                    /* sim name arg? */
     strcat (nbuf, ".ini\"");                            /* add .ini" */
     stat = do_cmd (-1, nbuf);                           /* proc cmd file */
     }
+
+stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
 
 while (stat != SCPE_EXIT) {                             /* in case exit */
     if (cptr = sim_brk_getact (cbuf, CBUFSIZE))         /* pending action? */
@@ -843,7 +861,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         else break;                                     /* otherwise exit */
     if (*cptr == 0)                                     /* ignore blank */
         continue;
-    sub_args (cbuf, gbuf, CBUFSIZE, argv);
+    sub_args (cbuf, gbuf, sizeof(gbuf), argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "sim> %s\n", cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -853,7 +871,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     else stat = SCPE_UNK;
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
-    stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
+    stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
     if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
         printf ("%s\n", sim_error_text (stat));
@@ -1000,25 +1018,35 @@ t_stat do_cmd (int32 flag, char *fcptr)
 return do_cmd_label (flag, fcptr, NULL);
 }
 
+static char *do_position(void)
+{
+static char cbuf[CBUFSIZE];
+
+sprintf (cbuf, "%s%s%s-%d", sim_do_filename[sim_do_depth], sim_do_label[sim_do_depth] ? "::" : "", sim_do_label[sim_do_depth] ? sim_do_label[sim_do_depth] : "", sim_goto_line[sim_do_depth]);
+return cbuf;
+}
+
 t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
 {
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
-CTAB *cmdp;
+CTAB *cmdp = NULL;
 int32 echo, nargs, errabort, i;
 int32 saved_sim_do_echo = sim_do_echo, 
       saved_sim_show_message = sim_show_message,
-      saved_sim_on_inherit = sim_on_inherit;
-t_bool interactive, isdo, staying;
+      saved_sim_on_inherit = sim_on_inherit,
+      saved_sim_quiet = sim_quiet;
+t_bool staying;
 t_stat stat, stat_nomessage;
 char *ocptr;
 
 stat = SCPE_OK;
 staying = TRUE;
-interactive = (flag > 0);                               /* issued interactively? */
-if (interactive)                                        /* get switches */
-    GET_SWITCHES (fcptr);
-echo = sim_switches & SWMASK ('V');                     /* -v means echo */
+if (flag > 0)                                           /* need switches? */
+    GET_SWITCHES (fcptr);                               /* get switches */
+echo = (sim_switches & SWMASK ('V')) || sim_do_echo;    /* -v means echo */
+sim_quiet = (sim_switches & SWMASK ('Q')) || sim_quiet; /* -q means quiet */
+sim_on_inherit =(sim_switches & SWMASK ('O')) || sim_on_inherit; /* -o means inherit ON condition actions */
 
 errabort = sim_switches & SWMASK ('E');                 /* -e means abort on error */
 
@@ -1045,38 +1073,37 @@ if (do_arg [0] == NULL)                                 /* need at least 1 */
 if ((fpin = fopen (do_arg[0], "r")) == NULL) {          /* file failed to open? */
     strcat (strcpy (cbuf, do_arg[0]), ".sim");          /* try again with .sim extension */
     if ((fpin = fopen (cbuf, "r")) == NULL) {           /* failed a second time? */
-        if (flag == 0)                                      /* cmd line file? */
+        if (flag == 0)                                  /* cmd line file? */
              fprintf (stderr, "Can't open file %s\n", do_arg[0]);
-        if (flag > 1)
-            return SCPE_OPENERR | SCPE_NOMESSAGE;       /* return failure with flag */
-        else
-            return SCPE_OPENERR;                        /* return failure */
+        return SCPE_OPENERR;                            /* return failure */
         }
     }
-if (flag < 1)                                           /* start at level 1 */
-    flag = 1;
-++sim_do_depth;
-sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1]; /* inherit On mode */
-if ((sim_switches & SWMASK ('O')) || sim_on_inherit) {  /* -o means inherit ON condition actions */
-    for (i=0; i<SCPE_MAX_ERR; i++) {                    /* replicate any on commands */
-        if (sim_on_actions[sim_do_depth-1][i]) {
-            sim_on_actions[sim_do_depth][i] = malloc(1+strlen(sim_on_actions[sim_do_depth-1][i]));
-            if (NULL == sim_on_actions[sim_do_depth][i]) {
-                while (--i >= 0) {
-                    free(sim_on_actions[sim_do_depth][i]);
-                    sim_on_actions[sim_do_depth][i] = NULL;
+if (flag >= 0) {                                        /* Only bump nesting from command or nested */
+    ++sim_do_depth;
+    if (sim_on_inherit) {                               /* inherit ON condition actions? */
+        sim_on_check[sim_do_depth] = sim_on_check[sim_do_depth-1]; /* inherit On mode */
+        for (i=0; i<SCPE_MAX_ERR; i++) {                /* replicate any on commands */
+            if (sim_on_actions[sim_do_depth-1][i]) {
+                sim_on_actions[sim_do_depth][i] = malloc(1+strlen(sim_on_actions[sim_do_depth-1][i]));
+                if (NULL == sim_on_actions[sim_do_depth][i]) {
+                    while (--i >= 0) {
+                        free(sim_on_actions[sim_do_depth][i]);
+                        sim_on_actions[sim_do_depth][i] = NULL;
+                        }
+                    sim_on_check[sim_do_depth] = 0;
+                    sim_brk_clract ();                  /* defang breakpoint actions */
+                    --sim_do_depth;                     /* unwind nesting */
+                    return SCPE_MEM;
                     }
-                sim_on_check[sim_do_depth] = 0;
-                sim_brk_clract ();                      /* defang breakpoint actions */
-                --sim_do_depth;                         /* unwind nesting */
-                return SCPE_MEM;
+                strcpy(sim_on_actions[sim_do_depth][i], sim_on_actions[sim_do_depth-1][i]);
                 }
-            strcpy(sim_on_actions[sim_do_depth][i], sim_on_actions[sim_do_depth-1][i]);
             }
         }
     }
 
 strcpy( sim_do_filename[sim_do_depth], do_arg[0]);      /* stash away do file name for possible use by 'call' command */
+sim_do_label[sim_do_depth] = label;                     /* stash away do label for possible use in messages */
+sim_goto_line[sim_do_depth] = 0;
 if (label) {
     sim_gotofile = fpin;
     sim_do_echo = echo;
@@ -1095,9 +1122,9 @@ do {
     ocptr = cptr = sim_brk_getact (cbuf, CBUFSIZE);     /* get bkpt action */
     if (!ocptr) {                                       /* no pending action? */
         ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin); /* get cmd line */
-        sim_goto_line += 1;
+        sim_goto_line[sim_do_depth] += 1;
         }
-    sub_args (cbuf, gbuf, CBUFSIZE, do_arg);            /* substitute args */
+    sub_args (cbuf, gbuf, sizeof(gbuf), do_arg);        /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
@@ -1105,26 +1132,24 @@ do {
     if (*cptr == 0)                                     /* ignore blank */
         continue;
     if (echo) {                                         /* echo if -v */
-        printf("do> %s\n", cptr);
+        printf("%s> %s\n", do_position(), cptr);
         if (sim_log)
-            fprintf (sim_log, "do> %s\n", cptr);
+            fprintf (sim_log, "%s> %s\n", do_position(), cptr);
         }
     if (*cptr == ':')                                   /* ignore label */
         continue;
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
     sim_switches = 0;                                   /* init switches */
-    isdo = FALSE;
     sim_gotofile = fpin;
     sim_do_echo = echo;
     if (cmdp = find_cmd (gbuf)) {                       /* lookup command */
         if (cmdp->action == &return_cmd)                /* RETURN command? */
             break;                                      /*    done! */
-        isdo = (cmdp->action == &do_cmd);
-        if (isdo) {                                     /* DO command? */
-            if (flag >= MAX_DO_NEST_LVL)                /* nest too deep? */
+        if (cmdp->action == &do_cmd) {                  /* DO command? */
+            if (sim_do_depth >= MAX_DO_NEST_LVL)        /* nest too deep? */
                 stat = SCPE_NEST;
             else
-                stat = do_cmd (flag + 1, cptr);         /* exec DO cmd */
+                stat = do_cmd (sim_do_depth+1, cptr);   /* exec DO cmd */
             }
         else
             if (cmdp->action == &shift_cmd)             /* SHIFT command */
@@ -1135,22 +1160,13 @@ do {
     else stat = SCPE_UNK;                               /* bad cmd given */
     stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
-    stat = stat & ~SCPE_NOMESSAGE;                      /* remove possible flag */
+    stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     if ((stat != SCPE_OK) ||
         ((cmdp->action != &return_cmd) &&
          (cmdp->action != &goto_cmd) &&
          (cmdp->action != &on_cmd) &&
          (cmdp->action != &echo_cmd)))
         sim_last_cmd_stat = stat;                       /* save command error status */
-    if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
-        (stat != SCPE_STEP)) {
-        if (!echo && !sim_quiet &&                      /* report if not echoing */
-            (!isdo || stat_nomessage)) {                /* and not suppressing messages */
-            printf("%s%s%s-%d> %s\n", do_arg[0], label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
-            if (sim_log)
-                fprintf (sim_log, "%s%s%s-%d> %s\n", do_arg[0], label ? "::" : "", label ? label : "", sim_goto_line, ocptr);
-            }
-        }
     switch (stat) {
         case SCPE_AFAIL:
             staying = (sim_on_check[sim_do_depth] &&        /* if trap action defined */
@@ -1165,8 +1181,17 @@ do {
         default:
             break;
         }
-    if ((staying || !interactive) &&                   /* report error if staying */
-        (stat >= SCPE_BASE) && !stat_nomessage) {      /* or in cmdline file */
+    if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
+        (stat != SCPE_STEP)) {
+        if (!echo && !sim_quiet &&                      /* report if not echoing */
+            !stat_nomessage) {                          /* and not suppressing messages */
+            printf("%s> %s\n", do_position(), ocptr);
+            if (sim_log)
+                fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
+            }
+        }
+    if ((flag <= 0) &&                                  /* report error if in cmdline/init file */
+        (stat >= SCPE_BASE) && !stat_nomessage) {
         printf ("%s\n", sim_error_text (stat));
         if (sim_log)
             fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -1185,28 +1210,30 @@ do {
 Cleanup_Return:
 fclose (fpin);                                          /* close file */
 sim_gotofile = NULL;
-sim_do_echo = saved_sim_do_echo;                        /* restore echo state we entered with */
 if (flag >= 0) {
+    sim_do_echo = saved_sim_do_echo;                    /* restore echo state we entered with */
     sim_show_message = saved_sim_show_message;          /* restore message display state we entered with */
     sim_on_inherit = saved_sim_on_inherit;              /* restore ON inheritance state we entered with */
     }
-for (i=0; i<SCPE_MAX_ERR; i++) {                        /* release any on commands */
-    free (sim_on_actions[sim_do_depth][i]);
-    sim_on_actions[sim_do_depth][i] = NULL;
+sim_quiet = saved_sim_quiet;                            /* restore quiet mode we entered with */
+if ((flag >= 0) || (!sim_on_inherit)) {
+    for (i=0; i<SCPE_MAX_ERR; i++) {                    /* release any on commands */
+        free (sim_on_actions[sim_do_depth][i]);
+        sim_on_actions[sim_do_depth][i] = NULL;
+        }
+    sim_on_check[sim_do_depth] = 0;                     /* clear on mode */
     }
-sim_on_check[sim_do_depth] = 0;                         /* clear on mode */
+if (flag >= 0)
+    --sim_do_depth;                                     /* unwind nesting */
 sim_brk_clract ();                                      /* defang breakpoint actions */
---sim_do_depth;                                         /* unwind nesting */
-if (cmdp && (cmdp->action == &return_cmd)) {            /* return command? */
-    if (0 == *cptr)                                     /* No Argument? */
-        return stat | SCPE_NOMESSAGE;                   /* return last command status (suppressing message)*/
+if (cmdp && (cmdp->action == &return_cmd) && (0 != *cptr)) { /* return command with argument? */
     sim_string_to_stat (cptr, &stat);
     sim_last_cmd_stat = stat;                           /* save explicit status as command error status */
     if (sim_switches & SWMASK ('Q'))
         stat |= SCPE_NOMESSAGE;                         /* suppress error message display (in caller) if requested */
     return stat;                                        /* return with explicit return status */
     }
-return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
+return stat | SCPE_NOMESSAGE;                           /* suppress message since we've already done that here */
 }
 
 /* Substitute_args - replace %n tokens in 'instr' with the do command's arguments
@@ -1235,7 +1262,9 @@ return (stat == SCPE_EXIT) ? SCPE_EXIT : SCPE_OK;
           %CTIME%             Www Mmm dd hh:mm:ss yyyy
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
-          %SIM_VERIFY%        The Verify mode of the current Do command file
+          %SIM_VERIFY%        The Verify/Verbose mode of the current Do command file
+          %SIM_VERBOSE%       The Verify/Verbose mode of the current Do command file
+          %SIM_QUIET%         The Quiet mode of the current Do command file
    Environment variable lookups are done first with the precise name between 
    the % characters and if that fails, then the name between the % characters
    is upcased and a lookup of that valus is attempted.
@@ -1286,7 +1315,7 @@ for (; *ip && (op < oend); ) {
                                 char quote = '"';
                                 if (strchr(do_arg[i], quote))
                                     quote = '\'';
-                                sprintf(&rbuf[strlen(rbuf)], "%s%s%s%s\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
+                                sprintf(&rbuf[strlen(rbuf)], "%s%c%s%c\"", (i != 1) ? " " : "", quote, do_arg[i], quote);
                                 }
                             else
                                 sprintf(&rbuf[strlen(rbuf)], "%s%s", (i != 1) ? " " : "", do_arg[i]);
@@ -1333,6 +1362,14 @@ for (; *ip && (op < oend); ) {
                         }
                     else if (!strcmp ("SIM_VERIFY", gbuf)) {
                         sprintf (rbuf, "%s", sim_do_echo ? "-V" : "");
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("SIM_VERBOSE", gbuf)) {
+                        sprintf (rbuf, "%s", sim_do_echo ? "-V" : "");
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("SIM_QUIET", gbuf)) {
+                        sprintf (rbuf, "%s", sim_quiet ? "-Q" : "");
                         ap = rbuf;
                         }
                     else if (!strcmp ("SIM_MESSAGE", gbuf)) {
@@ -1436,19 +1473,19 @@ t_stat goto_cmd (int32 flag, char *fcptr)
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], gbuf1[CBUFSIZE];
 long fpos;
 int32 saved_do_echo = sim_do_echo;
-int32 saved_goto_line = sim_goto_line;
+int32 saved_goto_line = sim_goto_line[sim_do_depth];
 
 if (NULL == sim_gotofile) return SCPE_UNK;              /* only valid inside of do_cmd */
 get_glyph (fcptr, gbuf1, 0);
 if ('\0' == gbuf1[0]) return SCPE_ARG;                  /* unspecified goto target */
 fpos = ftell(sim_gotofile);                             /* Save start position */
 rewind(sim_gotofile);                                   /* start search for label */
-sim_goto_line = 0;                                      /* reset line number */
+sim_goto_line[sim_do_depth] = 0;                        /* reset line number */
 sim_do_echo = 0;                                        /* Don't echo while searching for label */
 while (1) {
     cptr = read_line (cbuf, CBUFSIZE, sim_gotofile);    /* get cmd line */
     if (cptr == NULL) break;                            /* exit on eof */
-    sim_goto_line += 1;                                 /* record line number */
+    sim_goto_line[sim_do_depth] += 1;                   /* record line number */
     if (*cptr == 0) continue;                           /* ignore blank */
     if (*cptr != ':') continue;                         /* ignore non-labels */
     ++cptr;                                             /* skip : */
@@ -1458,15 +1495,15 @@ while (1) {
         sim_brk_clract ();                              /* goto defangs current actions */
         sim_do_echo = saved_do_echo;                    /* restore echo mode */
         if (sim_do_echo)                                /* echo if -v */
-            printf("do> %s\n", cbuf);
+            printf("%s> %s\n", do_position(), cbuf);
         if (sim_do_echo && sim_log)
-            fprintf (sim_log, "do> %s\n", cbuf);
+            fprintf (sim_log, "%s> %s\n", do_position(), cbuf);
         return SCPE_OK;
         }
     }
 sim_do_echo = saved_do_echo;                            /* restore echo mode */
 fseek(sim_gotofile, fpos, SEEK_SET);                    /* resture start position */
-sim_goto_line = saved_goto_line;                        /* restore start line number */
+sim_goto_line[sim_do_depth] = saved_goto_line;          /* restore start line number */
 return SCPE_ARG;
 }
 
@@ -1550,7 +1587,7 @@ return SCPE_OK;                                         /* we're happy doing not
 
 t_stat set_on (int32 flag, char *cptr)
 {
-if ((flag) && (cptr)) {                                 /* Set ON with arg */
+if ((flag) && (cptr) && (*cptr)) {                      /* Set ON with arg */
     char gbuf[CBUFSIZE];
 
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -1558,9 +1595,9 @@ if ((flag) && (cptr)) {                                 /* Set ON with arg */
          (MATCH_CMD(gbuf,"NOINHERIT"))) ||
         (*cptr))
         return SCPE_2MARG;
-    if (0 == MATCH_CMD(gbuf,"INHERIT"))
+    if ((gbuf[0]) && (0 == MATCH_CMD(gbuf,"INHERIT")))
         sim_on_inherit = 1;
-    if (0 == MATCH_CMD(gbuf,"NOINHERIT"))
+    if ((gbuf[0]) && (0 == MATCH_CMD(gbuf,"NOINHERIT")))
         sim_on_inherit = 0;
     return SCPE_OK;
     }
@@ -1603,6 +1640,18 @@ if (cptr && (*cptr != 0))                               /* now eol? */
 if (flag == sim_show_message)                           /* already set correctly? */
     return SCPE_OK;
 sim_show_message = flag;
+return SCPE_OK;
+}
+
+/* Set quiet/noquiet routine */
+
+t_stat set_quiet (int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))                               /* now eol? */
+    return SCPE_2MARG;
+if (flag == sim_quiet)                                  /* already set correctly? */
+    return SCPE_OK;
+sim_quiet = flag;
 return SCPE_OK;
 }
 
@@ -1705,9 +1754,13 @@ static CTAB set_glob_tab[] = {
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
     { "VERIFY", &set_verify, 1 },
+    { "VEBOSE", &set_verify, 1 },
     { "NOVERIFY", &set_verify, 0 },
+    { "NOVEBOSE", &set_verify, 0 },
     { "MESSAGE", &set_message, 1 },
     { "NOMESSAGE", &set_message, 0 },
+    { "QUIET", &set_quiet, 1 },
+    { "NOQUIET", &set_quiet, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -3394,7 +3447,6 @@ t_value pcv;
 t_stat r;
 DEVICE *dptr;
 UNIT *uptr;
-void int_handler (int signal);
 
 GET_SWITCHES (cptr);                                    /* get switches */
 sim_step = 0;
@@ -4310,9 +4362,9 @@ while (isspace (*cptr))                                 /* trim leading spc */
     cptr++;
 if (*cptr == ';') {                                     /* ignore comment */
     if (sim_do_echo)                                    /* echo comments if -v */
-        printf("do> %s\n", cptr);
+        printf("%s> %s\n", do_position(), cptr);
     if (sim_do_echo && sim_log)
-        fprintf (sim_log, "do> %s\n", cptr);
+        fprintf (sim_log, "%s> %s\n", do_position(), cptr);
     *cptr = 0;
     }
 
