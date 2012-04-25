@@ -257,6 +257,7 @@ typedef uint32          t_addr;
 #define SCPE_KFLAG      0x1000                          /* tti data flag */
 #define SCPE_BREAK      0x2000                          /* tti break flag */
 #define SCPE_NOMESSAGE  0x10000000                      /* message display supression flag */
+#define SCPE_BARE_STATUS(stat) ((stat) & ~(SCPE_NOMESSAGE|SCPE_KFLAG|SCPE_BREAK))
 
 /* Print value format codes */
 
@@ -638,7 +639,7 @@ extern int32 sim_asynch_inst_latency;
         if (uptr->a_check_completion)                                            \
           uptr->a_check_completion (uptr);                                       \
       }                                                                          \
-    } else 0
+    } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                                   \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) {           \
       if (uptr->a_next) {                                                        \
@@ -663,7 +664,7 @@ extern int32 sim_asynch_inst_latency;
       if (sim_idle_wait)                                                         \
         pthread_cond_signal (&sim_asynch_wake);                                  \
       return SCPE_OK;                                                            \
-    } else 0
+    } else (void)0
 #else /* !USE_AIO_INTRINSICS */
 /* This approach uses a pthread mutex to manage access to the link list     */
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
@@ -692,7 +693,7 @@ extern int32 sim_asynch_inst_latency;
           }                                                                      \
       }                                                                          \
       pthread_mutex_unlock (&sim_asynch_lock);                                   \
-    } else 0
+    } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
       pthread_mutex_lock (&sim_asynch_lock);                           \
@@ -708,20 +709,20 @@ extern int32 sim_asynch_inst_latency;
         pthread_cond_signal (&sim_asynch_wake);                        \
       pthread_mutex_unlock (&sim_asynch_lock);                         \
       return SCPE_OK;                                                  \
-    } else 0
+    } else (void)0
 #endif /* USE_AIO_INTRINSICS */
 #define AIO_VALIDATE if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) abort()
 #define AIO_CHECK_EVENT                                                \
     if (0 > --sim_asynch_check) {                                      \
       AIO_UPDATE_QUEUE;                                                \
       sim_asynch_check = sim_asynch_inst_latency;                      \
-    } else 0
+    } else (void)0
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)                                                   \
     if (1) {                                                                                    \
       sim_asynch_inst_latency = (int32)((((double)(instpersec))*sim_asynch_latency)/1000000000);\
       if (sim_asynch_inst_latency == 0)                                                         \
         sim_asynch_inst_latency = 1;                                                            \
-    } else 0
+    } else (void)0
 #else /* !SIM_ASYNCH_IO */
 #define AIO_UPDATE_QUEUE
 #define AIO_ACTIVATE(caller, uptr, event_time)

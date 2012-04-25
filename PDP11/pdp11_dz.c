@@ -157,7 +157,7 @@ uint32 dz_rxi = 0;                                      /* rcv interrupts */
 uint32 dz_txi = 0;                                      /* xmt interrupts */
 int32 dz_mctl = 0;                                      /* modem ctrl enabled */
 int32 dz_auto = 0;                                      /* autodiscon enabled */
-TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { 0 };              /* line descriptors */
+TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { {0} };            /* line descriptors */
 TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, dz_ldsc };  /* mux descriptor */
 
 /* debugging bitmaps */
@@ -435,7 +435,7 @@ if (t) {                                                /* any enabled? */
     dz_update_rcvi ();                                  /* upd rcv intr */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
-    sim_activate (uptr, tmxr_poll);                     /* reactivate */
+    sim_activate (uptr, clk_cosched (tmxr_poll));       /* reactivate */
     }
 return SCPE_OK;
 }

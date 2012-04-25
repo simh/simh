@@ -2110,6 +2110,7 @@ return rq_putpkt (cp, pkt, TRUE);
 
 t_bool rq_deqf (MSC *cp, int32 *pkt)
 {
+*pkt = 0;
 if (cp->freq == 0)                                      /* no free pkts?? */
     return rq_fatal (cp, PE_NSR);
 cp->pbsy = cp->pbsy + 1;                                /* cnt busy pkts */
@@ -2160,6 +2161,7 @@ t_bool rq_getpkt (MSC *cp, int32 *pkt)
 {
 uint32 addr, desc;
 
+*pkt = 0;
 if (!rq_getdesc (cp, &cp->cq, &desc))                   /* get cmd desc */
     return ERR;
 if ((desc & UQ_DESC_OWN) == 0) {                        /* none */
@@ -2222,6 +2224,7 @@ t_bool rq_getdesc (MSC *cp, struct uq_ring *ring, uint32 *desc)
 uint32 addr = ring->ba + ring->idx;
 uint16 d[2];
 
+*desc = 0;
 if (Map_ReadW (addr, 4, d))                             /* fetch desc */
     return rq_fatal (cp, PE_QRE);                       /* err? dead */
 *desc = ((uint32) d[0]) | (((uint32) d[1]) << 16);

@@ -1,6 +1,6 @@
 /* vax780_uba.c: VAX 11/780 Unibus adapter
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    uba                  DW780 Unibus adapter
 
+   25-Mar-12    RMS     Added parameter to int_ack prototype (Mark Pizzolata)
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    28-May-08    RMS     Inlined physical memory routines
    25-Jan-08    RMS     Fixed declarations (Mark Pizzolato)

@@ -2,7 +2,7 @@
 
    Modified from the original NOVA simulator by Robert Supnik.
 
-   Copyright (c) 1998-2006, Charles E Owen
+   Copyright (c) 1998-2012, Charles E Owen
    Portions Copyright (c) 1993-2002, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -28,8 +28,9 @@
 
    cpu          Eclipse central processor
 
-   07-Jun-06    RMS     Fixed bug in DIVS (found by Mark Hittinger)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   25-Mar-12    RMS     Fixed declarations (Mark Pizzolato)
+   07-Jun-06    RMS     Fixed bug in DIVS (Mark Hittinger)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    25-Aug-05    RMS     Fixed DIVS overflow cases
    29-Nov-03    CEO     Corrected POPJ and Bit operations bugs
    26-Nov-03    CEO     Added FPU and PIT devices 

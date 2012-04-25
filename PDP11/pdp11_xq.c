@@ -606,7 +606,7 @@ void xq_make_checksum(CTLR* xq)
   /* checksum calculation routine detailed in vaxboot.zip/xqbtdrivr.mar */
   uint32  checksum = 0;
   const uint32 wmask = 0xFFFF;
-  int i;
+  size_t i;
 
   for (i = 0; i < sizeof(ETH_MAC); i += 2) {
     checksum <<= 1;
@@ -685,7 +685,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
-  int i;
+  size_t i;
 
   if (xq->var->mode == XQ_T_DELQA_PLUS) {
     eth_mac_fmt(&xq->var->init.phys, buffer);
@@ -2137,12 +2137,12 @@ void xq_start_receiver(CTLR* xq)
 
   /* start the read service timer or enable asynch reading as appropriate */
   if (xq->var->must_poll)
-    sim_activate(xq->unit, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+    sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
   else
     if ((xq->var->poll == 0) || (xq->var->mode == XQ_T_DELQA_PLUS))
       eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     else
-      sim_activate(xq->unit, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+      sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
 }
 
 void xq_stop_receiver(CTLR* xq)
@@ -2517,7 +2517,7 @@ t_stat xq_svc(UNIT* uptr)
 
   /* resubmit service timer */
   if ((xq->var->must_poll) || (xq->var->poll && (xq->var->mode != XQ_T_DELQA_PLUS)))
-    sim_activate(uptr, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+    sim_activate(uptr, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
 
   return SCPE_OK;
 }
@@ -2803,7 +2803,7 @@ void xq_debug_setup(CTLR* xq)
 
 void xq_debug_turbo_setup(CTLR* xq)
 {
-  int i;
+  size_t i;
   char  buffer[64] = "";
 
   if (!(sim_deb && (xq->dev->dctrl & DBG_SET)))

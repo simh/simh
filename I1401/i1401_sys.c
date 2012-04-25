@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Mar-12    RMS     Fixed && -> & in test (Peter Schorn)
    20-Sep-05    RMS     Revised for new code tables
    04-Jan-05    WVS     Added address argument support
    14-Nov-04    WVS     Added data printout support

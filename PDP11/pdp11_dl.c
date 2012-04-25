@@ -1,6 +1,6 @@
 /* pdp11_dl.c: PDP-11 multiple terminal interface simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dli,dlo      DL11 terminal input/output
 
+   18-Apr-2012  RMS     Modified to use clock coscheduling
    17-Aug-2011  RMS     Added AUTOCONFIGURE modifier
    19-Nov-2008  RMS     Revised for common TMXR show routines
                         Revised to autoconfigure vectors
@@ -330,7 +331,7 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, tmxr_poll);                         /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 ln = tmxr_poll_conn (&dlx_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? rcv enb */
     dlx_ldsc[ln].rcve = 1;

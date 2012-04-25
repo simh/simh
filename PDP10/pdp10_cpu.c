@@ -1,6 +1,6 @@
 /* pdp10_cpu.c: PDP-10 CPU simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,9 +25,10 @@
 
    cpu          KS10 central processor
 
+   25-Mar-12    RMS     Added missing parameters to prototypes (Mark Pizzolato)
    17-Jul-07    RMS     Fixed non-portable usage in SHOW HISTORY
    28-Apr-07    RMS     Removed clock initialization
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
                         Fixed warning in MOVNI
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    10-Nov-04    RMS     Added instruction history

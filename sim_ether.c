@@ -375,7 +375,7 @@ extern FILE *sim_log;
 
 t_stat eth_mac_scan (ETH_MAC* mac, char* strmac)
 {
-  int a0, a1, a2, a3, a4, a5;
+  unsigned int a0, a1, a2, a3, a4, a5;
   const ETH_MAC zeros = {0,0,0,0,0,0};
   const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   ETH_MAC newmac;
@@ -881,11 +881,13 @@ static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
 static char*   (*p_pcap_lib_version) (void);
 
 /* load function pointer from DLL */
-void load_function(char* function, void** func_ptr) {
+typedef int (*_func)();
+
+void load_function(char* function, _func* func_ptr) {
 #ifdef _WIN32
-    *func_ptr = GetProcAddress(hLib, function);
+    *func_ptr = (_func)GetProcAddress(hLib, function);
 #else
-    *func_ptr = dlsym(hLib, function);
+    *func_ptr = (_func)dlsym(hLib, function);
 #endif
     if (*func_ptr == 0) {
     char* msg = "Eth: Failed to find function '%s' in %s\r\n";
@@ -930,28 +932,28 @@ int load_pcap(void) {
       }
 
       /* load required functions; sets dll_load=3 on error */
-      load_function("pcap_close",        (void**) &p_pcap_close);
-      load_function("pcap_compile",      (void**) &p_pcap_compile);
-      load_function("pcap_datalink",     (void**) &p_pcap_datalink);
-      load_function("pcap_dispatch",     (void**) &p_pcap_dispatch);
-      load_function("pcap_findalldevs",  (void**) &p_pcap_findalldevs);
-      load_function("pcap_freealldevs",  (void**) &p_pcap_freealldevs);
-      load_function("pcap_freecode",     (void**) &p_pcap_freecode);
-      load_function("pcap_geterr",       (void**) &p_pcap_geterr);
-      load_function("pcap_lookupnet",    (void**) &p_pcap_lookupnet);
-      load_function("pcap_open_live",    (void**) &p_pcap_open_live);
+      load_function("pcap_close",        (_func *) &p_pcap_close);
+      load_function("pcap_compile",      (_func *) &p_pcap_compile);
+      load_function("pcap_datalink",     (_func *) &p_pcap_datalink);
+      load_function("pcap_dispatch",     (_func *) &p_pcap_dispatch);
+      load_function("pcap_findalldevs",  (_func *) &p_pcap_findalldevs);
+      load_function("pcap_freealldevs",  (_func *) &p_pcap_freealldevs);
+      load_function("pcap_freecode",     (_func *) &p_pcap_freecode);
+      load_function("pcap_geterr",       (_func *) &p_pcap_geterr);
+      load_function("pcap_lookupnet",    (_func *) &p_pcap_lookupnet);
+      load_function("pcap_open_live",    (_func *) &p_pcap_open_live);
 #ifdef _WIN32
-      load_function("pcap_setmintocopy", (void**) &p_pcap_setmintocopy);
-      load_function("pcap_getevent",     (void**) &p_pcap_getevent);
+      load_function("pcap_setmintocopy", (_func *) &p_pcap_setmintocopy);
+      load_function("pcap_getevent",     (_func *) &p_pcap_getevent);
 #else
 #ifdef MUST_DO_SELECT
-      load_function("pcap_get_selectable_fd",     (void**) &p_pcap_get_selectable_fd);
+      load_function("pcap_get_selectable_fd",     (_func *) &p_pcap_get_selectable_fd);
 #endif
-      load_function("pcap_fileno",       (void**) &p_pcap_fileno);
+      load_function("pcap_fileno",       (_func *) &p_pcap_fileno);
 #endif
-      load_function("pcap_sendpacket",   (void**) &p_pcap_sendpacket);
-      load_function("pcap_setfilter",    (void**) &p_pcap_setfilter);
-      load_function("pcap_lib_version",  (void**) &p_pcap_lib_version);
+      load_function("pcap_sendpacket",   (_func *) &p_pcap_sendpacket);
+      load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
+      load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
 
       if (lib_loaded == 1) {
         /* log successful load */
@@ -1147,7 +1149,7 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
   int               Status;
   int               ReturnValue;
 #ifdef _WIN32
-  HINSTANCE         hDll;         /* handle to DLL */
+  HMODULE           hDll;         /* handle to DLL */
 #else
   static void       *hDll = NULL; /* handle to Library */
   typedef int BOOLEAN;
@@ -1158,14 +1160,14 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 
 #ifdef _WIN32
   hDll = LoadLibraryA("packet.dll");
-  p_PacketOpenAdapter = (void *)GetProcAddress(hDll, "PacketOpenAdapter");
-  p_PacketCloseAdapter = (void *)GetProcAddress(hDll, "PacketCloseAdapter");
-  p_PacketRequest = (void *)GetProcAddress(hDll, "PacketRequest");
+  p_PacketOpenAdapter = (LPADAPTER (*)(char *AdapterName))GetProcAddress(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))GetProcAddress(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))GetProcAddress(hDll, "PacketRequest");
 #else
   hDll = dlopen("packet.dll", RTLD_NOW);
-  p_PacketOpenAdapter = (void *)dlsym(hDll, "PacketOpenAdapter");
-  p_PacketCloseAdapter = (void *)dlsym(hDll, "PacketCloseAdapter");
-  p_PacketRequest = (void *)dlsym(hDll, "PacketRequest");
+  p_PacketOpenAdapter = (LPADAPTER (*)(char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))dlsym(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))dlsym(hDll, "PacketRequest");
 #endif
   
   /* Open the selected adapter */
@@ -1382,7 +1384,7 @@ static void *
 _eth_reader(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
-int status;
+int status = 0;
 int sched_policy;
 struct sched_param sched_priority;
 #if defined (_WIN32)
@@ -2270,11 +2272,12 @@ while (size > 1) {
   size -= sizeof(*buffer);
 }
 if (size) {
-  uint8 endbytes[2];
+  uint16 endword;
+  uint8 *endbytes = (uint8 *)&endword;
 
   endbytes[0] = *((uint8 *)buffer);
   endbytes[1] = 0;
-  cksum += *((uint16 *)endbytes);
+  cksum += endword;
   }
 
 /* Do a little shuffling  */
@@ -2608,6 +2611,10 @@ switch (dev->eth_api) {
     /* AUTODIN II hash mode? */
     if ((dev->hash_filter) && (!to_me) && (data[0] & 0x01))
       to_me = _eth_hash_lookup(dev->hash, data);
+    break;
+  default:
+    bpf_used = to_me = 0;                           /* Should NEVER happen */
+    abort();
     break;
   }
 
@@ -3024,7 +3031,7 @@ for (i=0; i<used; ++i) {
 /* replace device description with user-defined adapter name (if defined) */
 for (i=0; i<used; i++) {
   char regkey[2048];
-  char regval[2048];
+  unsigned char regval[2048];
   LONG status;
   DWORD reglen, regtype;
   HKEY reghnd;
@@ -3037,7 +3044,7 @@ for (i=0; i<used; i++) {
      registry key, rather than hardcoding the string as we do here. */
   if (list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
     sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
-             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
+             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%s\\Connection", list[i].name+
              strlen( "\\Device\\NPF_" ) );
     if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS)
       continue;

@@ -301,7 +301,8 @@ return SCPE_ARG;
 
 t_stat sim_disk_show_fmt (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-int32 i, f = DK_GET_FMT (uptr);
+int32 f = DK_GET_FMT (uptr);
+size_t i;
 
 for (i = 0; i < DKUF_N_FMT; i++)
     if (fmts[i].fmtval == f) {
@@ -1025,13 +1026,14 @@ return SCPE_OK;
 
 t_stat sim_disk_detach (UNIT *uptr)
 {
-struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+struct disk_context *ctx;
 int (*close_function)(FILE *f);
 FILE *fileref;
 t_bool auto_format;
 
 if (uptr == NULL)
     return SCPE_IERR;
+ctx = (struct disk_context *)uptr->disk_ctx;
 fileref = uptr->fileref;
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
@@ -1043,6 +1045,8 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_RAW:                                    /* Physical */
         close_function = sim_os_disk_close_raw;
         break;
+    default:
+        return SCPE_IERR;
         }
 if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
@@ -1651,6 +1655,9 @@ else
 #ifdef O_LARGEFILE
 mode |= O_LARGEFILE;
 #endif
+#ifdef O_DSYNC
+mode |= O_DSYNC;
+#endif
 return (FILE *)((long)open (rawdevicename, mode, 0));
 }
 
@@ -2178,6 +2185,8 @@ static t_stat ReadFilePosition(FILE *File, void *buf, size_t bufsize, size_t *by
 uint32 err = sim_fseek (File, (t_addr)position, SEEK_SET);
 size_t i;
 
+if (bytesread)
+    *bytesread = 0;
 if (!err) {
     i = fread (buf, 1, bufsize, File);
     err = ferror (File);
@@ -2192,6 +2201,8 @@ static t_stat WriteFilePosition(FILE *File, void *buf, size_t bufsize, size_t *b
 uint32 err = sim_fseek (File, (t_addr)position, SEEK_SET);
 size_t i;
 
+if (byteswritten)
+    *byteswritten = 0;
 if (!err) {
     i = fwrite (buf, 1, bufsize, File);
     err = ferror (File);
@@ -2631,9 +2642,9 @@ RPC_STATUS
 (RPC_ENTRY *UuidCreate_c) (void *);
 
 if (!UuidCreate_c) {
-    HINSTANCE hDll;
+    HMODULE hDll;
     hDll = LoadLibraryA("rpcrt4.dll");
-    UuidCreate_c = (void *)GetProcAddress(hDll, "UuidCreate");
+    UuidCreate_c = (RPC_STATUS (RPC_ENTRY *) (void *))GetProcAddress(hDll, "UuidCreate");
     }
 if (UuidCreate_c)
     UuidCreate_c(uuidaddr);
