@@ -412,7 +412,7 @@ t_stat set_quiet (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
 t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 void int_handler (int signal);
-
+void run_cmd_message (const char *unechod_cmdline, t_stat r);
 
 /* Global data */
 
@@ -578,15 +578,15 @@ static CTAB cmd_table[] = {
     { "EVALUATE", &eval_cmd, 0,
       "ev{aluate} <expr>        evaluate symbolic expression\n" },
     { "RUN", &run_cmd, RU_RUN,
-      "ru{n} {new PC}           reset and start simulation\n" },
+      "ru{n} {new PC}           reset and start simulation\n", &run_cmd_message },
     { "GO", &run_cmd, RU_GO,
-      "go {new PC}              start simulation\n" }, 
+      "go {new PC}              start simulation\n", &run_cmd_message }, 
     { "STEP", &run_cmd, RU_STEP,
-      "s{tep} {n}               simulate n instructions\n" },
+      "s{tep} {n}               simulate n instructions\n", &run_cmd_message },
     { "CONT", &run_cmd, RU_CONT,
-      "c{ont}                   continue simulation\n" },
+      "c{ont}                   continue simulation\n", &run_cmd_message },
     { "BOOT", &run_cmd, RU_BOOT,
-      "b{oot} <unit>            bootstrap unit\n" },
+      "b{oot} <unit>            bootstrap unit\n", &run_cmd_message },
     { "BREAK", &brk_cmd, SSH_ST,
       "br{eak} <list>           set breakpoints\n" },
     { "NOBREAK", &brk_cmd, SSH_CL,
@@ -874,9 +874,13 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
     if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
-        printf ("%s\n", sim_error_text (stat));
-        if (sim_log)
-            fprintf (sim_log, "%s\n", sim_error_text (stat));
+        if (cmdp->message)                              /* special message handler? */
+            cmdp->message (NULL, stat);
+        else {
+            printf ("%s\n", sim_error_text (stat));
+            if (sim_log)
+                fprintf (sim_log, "%s\n", sim_error_text (stat));
+            }
         }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
@@ -1184,7 +1188,8 @@ do {
     if ((stat >= SCPE_BASE) && (stat != SCPE_EXIT) &&   /* error from cmd? */
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
-            !stat_nomessage) {                          /* and not suppressing messages */
+            !stat_nomessage &&                          /* and not suppressing messages */
+            !cmdp->message) {                           /* and not handling them specially */
             printf("%s> %s\n", do_position(), ocptr);
             if (sim_log)
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
@@ -1192,9 +1197,14 @@ do {
         }
     if ((flag <= 0) &&                                  /* report error if in cmdline/init file */
         (stat >= SCPE_BASE) && !stat_nomessage) {
-        printf ("%s\n", sim_error_text (stat));
-        if (sim_log)
-            fprintf (sim_log, "%s\n", sim_error_text (stat));
+        if (cmdp->message) {                            /* special message handler */
+            cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
+            }
+        else {
+            printf ("%s\n", sim_error_text (stat));
+            if (sim_log)
+                fprintf (sim_log, "%s\n", sim_error_text (stat));
+            }
         }
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
@@ -3580,15 +3590,25 @@ if (sim_clock_queue != NULL) {                          /* update sim time */
 else {
     UPDATE_SIM_TIME (noqueue_time);
     }
+return r;
+}
+
+/* run command message handler */
+
+void
+run_cmd_message (const char *unechoed_cmdline, t_stat r)
+{
 #if defined (VMS)
 printf ("\n");
 #endif
-if (!(r & SCPE_NOMESSAGE)) {
-    fprint_stopped (stdout, r);                         /* print msg */
-    if (sim_log)                                        /* log if enabled */
-        fprint_stopped (sim_log, r);
-    }
-return r | SCPE_NOMESSAGE;
+if (unechoed_cmdline) {
+    printf("%s> %s\n", do_position(), unechoed_cmdline);
+    if (sim_log)
+        fprintf (sim_log, "%s> %s\n", do_position(), unechoed_cmdline);
+     }
+fprint_stopped (stdout, r);                         /* print msg */
+if (sim_log)                                        /* log if enabled */
+    fprint_stopped (sim_log, r);
 }
 
 /* Common setup for RUN or BOOT */

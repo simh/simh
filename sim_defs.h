@@ -432,6 +432,8 @@ struct sim_ctab {
                                                         /* action routine */
     int32               arg;                            /* argument */
     char                *help;                          /* help string */
+    void                (*message)(const char *unechoed_cmdline, t_stat stat);
+                                                        /* message printing routine */
     };
 
 struct sim_c1tab {
