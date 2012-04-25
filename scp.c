@@ -215,6 +215,7 @@
 
 #include "sim_defs.h"
 #include "sim_rev.h"
+#include "sim_ether.h"
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
@@ -693,6 +694,7 @@ static CTAB cmd_table[] = {
       "sh{ow} <dev> SHOW        show device SHOW commands\n"
       "sh{ow} <dev> {arg,...}   show device parameters\n"
       "sh{ow} <unit> {arg,...}  show unit parameters\n"
+      "sh{ow} ethernet          show ethernet devices\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
       "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\b"
@@ -2035,6 +2037,7 @@ static SHTAB show_glob_tab[] = {
     { "DEBUG", &sim_show_debug, 0 },                    /* deprecated */
     { "THROTTLE", &sim_show_throt, 0 },
     { "ASYNCH", &sim_show_asynch, 0 },
+    { "ETHERNET", &eth_show_devices, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };

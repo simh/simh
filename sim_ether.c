@@ -637,11 +637,52 @@ char* eth_getname_byname(char* name, char* temp)
   return (found ? temp : NULL);
 }
 
+char* eth_getdesc_byname(char* name, char* temp)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list);
+  size_t n;
+  int i, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+      found = 1;
+      strcpy(temp, list[i].desc);
+    }
+  }
+  return (found ? temp : NULL);
+}
+
 void eth_zero(ETH_DEV* dev)
 {
   /* set all members to NULL OR 0 */
   memset(dev, 0, sizeof(ETH_DEV));
   dev->reflections = -1;                          /* not established yet */
+}
+
+static ETH_DEV **eth_open_devices = NULL;
+static eth_open_device_count = 0;
+
+static void _eth_add_to_open_list (ETH_DEV* dev)
+{
+eth_open_devices = realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
+eth_open_devices[eth_open_device_count++] = dev;
+}
+
+static void _eth_remove_from_open_list (ETH_DEV* dev)
+{
+int i, j;
+
+for (i=0; i<eth_open_device_count; ++i)
+    if (eth_open_devices[i] == dev) {
+        for (j=i+1; j<eth_open_device_count; ++j)
+            eth_open_devices[j-1] = eth_open_devices[j];
+        --eth_open_device_count;
+        break;
+        }
 }
 
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
@@ -661,9 +702,27 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," %2d     %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name);
+      }
     }
   return SCPE_OK;
+}
+
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+{
+return eth_show (st, uptr, val, desc);
 }
 
 t_stat ethq_init(ETH_QUE* que, int max)
@@ -1800,6 +1859,7 @@ if (dev->eth_api == ETH_API_PCAP) {
   ioctl(pcap_fileno(dev->handle), BIOCIMMEDIATE, &v);
   }
 #endif
+_eth_add_to_open_list (dev);
 return SCPE_OK;
 }
 
@@ -1862,7 +1922,7 @@ if (sim_log) fprintf (sim_log, msg, dev->name);
 /* clean up the mess */
 free(dev->name);
 eth_zero(dev);
-
+_eth_remove_from_open_list (dev);
 return SCPE_OK;
 }
 
