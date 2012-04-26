@@ -47,7 +47,8 @@
 #ifndef _SIM_TMXR_H_
 #define _SIM_TMXR_H_    0
 
-#include "sim_serial.h"
+#include "sim_sock.h"                                   /* We need sockets */
+#include "sim_serial.h"                                 /* We need serial I/O (SERHANDLE) */
 
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)
