@@ -702,7 +702,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st," %2d     %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
     }
   if (eth_open_device_count) {
     int i;
@@ -712,9 +712,9 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
     for (i=0; i<eth_open_device_count; i++) {
       d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
       if (d)
-        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name, d);
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
       else
-        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name);
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
       }
     }
   return SCPE_OK;

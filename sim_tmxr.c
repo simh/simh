@@ -1299,6 +1299,8 @@ t_stat status;
 char portname [1024];
 t_bool arg_error = FALSE;
 
+dptr = find_dev_from_unit (uptr);                       /* find associated device */
+
 if (val) {                                              /* explicit line? */
     if (cptr == NULL)                                   /* arguments supplied? */
         return SCPE_ARG;                                /* report bad argument */
@@ -1350,7 +1352,7 @@ if (*pptr) {                                                /* parameter string 
         config.stopbits = 0;                                /* code request */
     }
 
-serport = sim_open_serial (portname);                   /* open the serial port */
+serport = sim_open_serial (portname, lp);               /* open the serial port */
 
 if (serport == INVALID_HANDLE)                          /* not a valid port name */
     return SCPE_OPENERR;                                /* cannot attach */
@@ -1366,14 +1368,11 @@ else {                                                  /* good serial port */
         }
 
     if (val == 0) {                                     /* unit implies line? */
-        dptr = find_dev_from_unit (uptr);               /* find associated device */
-
         if (dptr && (dptr->flags & DEV_NET))            /* will RESTORE be inhibited? */
             cptr = portname;                            /* yes, so save just port name */
-
-        if (mp->dptr == NULL)                           /* has device been set? */
-            mp->dptr = dptr;                            /* no, so set device now */
         }
+    if (mp->dptr == NULL)                               /* has device been set? */
+        mp->dptr = dptr;                                /* no, so set device now */
 
     tptr = (char *) malloc (strlen (cptr) + 1);         /* get buffer for port name and maybe params */
 

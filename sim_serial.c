@@ -111,7 +111,7 @@
    enumerates the available host serial ports
 
 
-   t_stat sim_show_serial (FILE* st)
+   t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
    ---------------------------------
 
    displays the available host serial ports
@@ -121,6 +121,7 @@
 
 #include "sim_defs.h"
 #include "sim_serial.h"
+#include "sim_tmxr.h"
 
 #include <ctype.h>
 
@@ -135,6 +136,40 @@ typedef struct serial_list {
 
 static int       sim_serial_os_devices (int max, SERIAL_LIST* list);
 static SERHANDLE sim_open_os_serial    (char *name);
+static void      sim_close_os_serial    (SERHANDLE port);
+
+
+static struct open_serial_device {
+    SERHANDLE port;
+    TMLN *line;
+    char name[SER_DEV_NAME_MAX];
+    char desc[SER_DEV_DESC_MAX];
+    } *serial_open_devices = NULL;
+static serial_open_device_count = 0;
+
+static void _serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *desc)
+{
+serial_open_devices = realloc(serial_open_devices, (++serial_open_device_count)*sizeof(*serial_open_devices));
+memset(&serial_open_devices[serial_open_device_count-1], 0, sizeof(serial_open_devices[serial_open_device_count-1]));
+serial_open_devices[serial_open_device_count-1].port = port;
+serial_open_devices[serial_open_device_count-1].line = line;
+strcpy(serial_open_devices[serial_open_device_count-1].name, name);
+if (desc)
+    strcpy(serial_open_devices[serial_open_device_count-1].desc, desc);
+}
+
+static void _serial_remove_from_open_list (SERHANDLE port)
+{
+int i, j;
+
+for (i=0; i<serial_open_device_count; ++i)
+    if (serial_open_devices[i].port == port) {
+        for (j=i+1; j<serial_open_device_count; ++j)
+            serial_open_devices[j-1] = serial_open_devices[j];
+        --serial_open_device_count;
+        break;
+        }
+}
 
 /* Generic error message handler.
 
@@ -159,33 +194,35 @@ SERIAL_LIST *b = (SERIAL_LIST *)pb;
 return strcmp(a->name, b->name);
 }
 
-t_stat sim_show_serial (FILE* st)
+static int sim_serial_devices(int max, SERIAL_LIST *list)
 {
-SERIAL_LIST  list[SER_MAX_DEVICE];
-int number = sim_serial_os_devices(SER_MAX_DEVICE, list);
+int i, j, ports = sim_serial_os_devices(max, list);
 
-fprintf(st, "Serial devices:\n");
-if (number == -1)
-    fprintf(st, "  serial support not available in simulator\n");
-else
-if (number == 0)
-    fprintf(st, "  no serial devices are available\n");
-else {
-    size_t min, len;
-    int i;
-    for (i=0, min=0; i<number; i++)
-        if ((len = strlen(list[i].name)) > min)
-            min = len;
-    for (i=0; i<number; i++)
-        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+/* Open ports may not show up in the list returned by sim_serial_os_devices 
+   so we add the open ports to the list removing duplicates before sorting 
+   the resulting list */
+
+for (i=0; i<serial_open_device_count; ++i) {
+    for (j=0; j<ports; ++j)
+        if (0 == strcmp(serial_open_devices[i].name, list[j].name))
+            break;
+    if (j<ports)
+        continue;
+    if (ports >= max)
+        break;
+    strcpy(list[ports].name, serial_open_devices[i].name);
+    strcpy(list[ports].desc, serial_open_devices[i].desc);
+    ++ports;
     }
-return SCPE_OK;
+if (ports) /* Order the list returned alphabetically by the port name */
+    qsort (list, ports, sizeof(list[0]), _serial_name_compare);
+return ports;
 }
 
 static char* sim_serial_getname(int number, char* name)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
-int count = sim_serial_os_devices(SER_MAX_DEVICE, list);
+int count = sim_serial_devices(SER_MAX_DEVICE, list);
 
 if (count <= number)
     return NULL;
@@ -196,7 +233,7 @@ return name;
 static char* sim_serial_getname_bydesc(char* desc, char* name)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
-int count = sim_serial_os_devices(SER_MAX_DEVICE, list);
+int count = sim_serial_devices(SER_MAX_DEVICE, list);
 int i;
 size_t j=strlen(desc);
 
@@ -246,7 +283,7 @@ return 0;
 static char* sim_serial_getname_byname(char* name, char* temp)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
-int count = sim_serial_os_devices(SER_MAX_DEVICE, list);
+int count = sim_serial_devices(SER_MAX_DEVICE, list);
 size_t n;
 int i, found;
 
@@ -262,10 +299,67 @@ for (i=0; i<count && !found; i++) {
 return (found ? temp : NULL);
 }
 
-SERHANDLE sim_open_serial (char *name)
+char* sim_serial_getdesc_byname(char* name, char* temp)
 {
-char temp[1024];
+SERIAL_LIST  list[SER_MAX_DEVICE];
+int count = sim_serial_devices(SER_MAX_DEVICE, list);
+size_t n;
+int i, found;
+
+found = 0;
+n = strlen(name);
+for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (sim_serial_strncasecmp(name, list[i].name, n) == 0)) {
+        found = 1;
+        strcpy(temp, list[i].desc);
+        }
+    }
+  return (found ? temp : NULL);
+}
+
+t_stat sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+{
+SERIAL_LIST  list[SER_MAX_DEVICE];
+int number = sim_serial_devices(SER_MAX_DEVICE, list);
+
+fprintf(st, "Serial devices:\n");
+if (number == -1)
+    fprintf(st, "  serial support not available in simulator\n");
+else
+if (number == 0)
+    fprintf(st, "  no serial devices are available\n");
+else {
+    size_t min, len;
+    int i;
+    for (i=0, min=0; i<number; i++)
+        if ((len = strlen(list[i].name)) > min)
+            min = len;
+    for (i=0; i<number; i++)
+        fprintf(st," ser%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+if (serial_open_device_count) {
+    int i;
+    char desc[SER_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open Serial Devices:\n");
+    for (i=0; i<serial_open_device_count; i++) {
+        d = sim_serial_getdesc_byname(serial_open_devices[i].name, desc);
+        if (d)
+            fprintf(st, " %s\tLn%02d %s (%s)\n", serial_open_devices[i].line->mp->dptr->name, (int)(serial_open_devices[i].line->mp->ldsc-serial_open_devices[i].line), serial_open_devices[i].line->sername, d);
+        else
+            fprintf(st, " %s\tLn%02d %s\n", serial_open_devices[i].line->mp->dptr->name, (int)(serial_open_devices[i].line->mp->ldsc-serial_open_devices[i].line), serial_open_devices[i].line->sername);
+        }
+    }
+return SCPE_OK;
+}
+
+SERHANDLE sim_open_serial (char *name, TMLN *lp)
+{
+char temp1[1024], temp2[1024];
 char *savname = name;
+char *savdesc = NULL;
+SERHANDLE port;
 
 /* translate name of type "serX" to real device name */
 if ((strlen(name) <= 5)
@@ -276,22 +370,36 @@ if ((strlen(name) <= 5)
     && (isdigit(name[4]) || (name[4] == '\0'))
    ) {
     int num = atoi(&name[3]);
-    savname = sim_serial_getname(num, temp);
+    savname = sim_serial_getname(num, temp1);
     if (savname == NULL) /* didn't translate */
         return INVALID_HANDLE;
+    savdesc = sim_serial_getdesc_byname (savname, temp2);
     }
 else {
     /* are they trying to use device description? */
-    savname = sim_serial_getname_bydesc(name, temp);
+    savname = sim_serial_getname_bydesc(name, temp1);
     if (savname == NULL) { /* didn't translate */
-        /* probably is not ethX and has no description */
-        savname = sim_serial_getname_byname(name, temp);
+        /* probably is not serX and has no description */
+        savname = sim_serial_getname_byname(name, temp1);
         if (savname == NULL) /* didn't translate */
-          savname = name;
+            savname = name;
+        else
+            savdesc = sim_serial_getdesc_byname(savname, temp2);
         }
+    else
+        savdesc = name;
     }
 
-return sim_open_os_serial (savname);
+port = sim_open_os_serial (savname);
+if (port != INVALID_HANDLE)
+    _serial_add_to_open_list (port, lp, savname, savdesc);
+return port;
+}
+
+void sim_close_serial (SERHANDLE port)
+{
+sim_close_os_serial (port);
+_serial_remove_from_open_list (port);
 }
 
 /* Windows serial implementation */
@@ -338,8 +446,6 @@ if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_
         }
     RegCloseKey(hSERIALCOMM);
     }
-if (ports) /* Order the list returned alphabetically by the port name */
-    qsort (list, ports, sizeof(list[0]), _serial_name_compare);
 return ports;
 }
 
@@ -619,7 +725,7 @@ else
    The serial port is closed.  Errors are ignored.
 */
 
-void sim_close_serial (SERHANDLE port)
+void sim_close_os_serial (SERHANDLE port)
 {
 CloseHandle (port);                                     /* close the port */
 return;
@@ -666,8 +772,6 @@ for (i=0; (ports < max) && (i < 64); ++i) {
         close (port);
         }
     }
-if (ports) /* Order the list returned alphabetically by the port name */
-    qsort (list, ports, sizeof(list[0]), _serial_name_compare);
 return ports;
 }
 
@@ -998,7 +1102,7 @@ return (int32) written;                                     /* return number of 
    The serial port is closed.  Errors are ignored.
 */
 
-void sim_close_serial (SERHANDLE port)
+void sim_close_os_serial (SERHANDLE port)
 {
 close (port);                                           /* close the port */
 return;
@@ -1010,6 +1114,19 @@ return;
 
 #else
 
+/* Enumerate the available serial ports.
+
+   The serial port names are extracted from the appropriate place in the 
+   windows registry (HKLM\HARDWARE\DEVICEMAP\SERIALCOMM\).  The resulting
+   list is sorted alphabetically by device name (COMn).  The device description 
+   is set to the OS internal name for the COM device.
+
+*/
+
+static int sim_serial_os_devices (int max, SERIAL_LIST* list)
+{
+return -1;
+}
 
 /* Open a serial port */
 
@@ -1053,7 +1170,7 @@ return -1;
 
 /* Close a serial port */
 
-void sim_close_serial (SERHANDLE port)
+void sim_close_os_serial (SERHANDLE port)
 {
 return;
 }
