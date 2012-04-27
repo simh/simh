@@ -706,7 +706,7 @@ if ( DKP_TRACE(1) )
 				  "write"
 				: ((uptr->FUNC == FCCY_SEEK) ?
 					  "seek"
-					: "<???>"
+					: "<?\?\?>"
 				  )
 			  )
 		),
@@ -871,7 +871,7 @@ do  {
                   "read"
                 : ((uptr->FUNC == FCCY_WRITE) ?
                       "write"
-                    : "<???>")
+                    : "<?\?\?>")
             ),
             (unsigned) (uptr->CYL),
             (unsigned) (GET_SURF(dkp_ussc, dtype)),
