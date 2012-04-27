@@ -67,6 +67,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSNAME = windows-build
   endif
   GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
+  COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
@@ -87,6 +88,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
       ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
         LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
+      endif
+      # OSX's clang compiler has different means of determining options than gcc
+      # gccm so hard set options here
+      ifneq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version'))
+        COMPILER_NAME = Apple clang version $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$4 }')
+        CFLAGS_O = -Wno-comment -Wno-parentheses
       endif
     else
       ifeq (Linux,$(OSTYPE))
@@ -304,7 +311,11 @@ ifneq ($(DEBUG),)
   CFLAGS_O = -O0
   BUILD_FEATURES = - debugging support
 else
-  CFLAGS_O = -O2
+  ifneq (clang,$(findstring clang,$(COMPILER_NAME)))
+    CFLAGS_O = -O2
+  else
+    CFLAGS_O := -O4 $(CFLAGS_O) -fno-strict-overflow -flto -fwhole-program
+  endif
   LDFLAGS_O = 
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
   ifneq (3,$(GCC_MAJOR_VERSION))
@@ -351,7 +362,7 @@ ifneq (3,$(GCC_MAJOR_VERSION))
   endif
 endif
 ifneq (clean,$(MAKECMDGOALS))
-  BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
+  BUILD_FEATURES := $(BUILD_FEATURES). $(COMPILER_NAME)
   $(info ***)
   $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
   $(info *** $(BUILD_FEATURES).)
