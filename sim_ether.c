@@ -720,7 +720,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
   return SCPE_OK;
 }
 
-t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
 {
 return eth_show (st, uptr, val, desc);
 }
