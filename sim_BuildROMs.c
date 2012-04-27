@@ -108,7 +108,7 @@ if ((expected_checksum != 0) && (checksum != expected_checksum)) {
  * If the target include file already exists, determine if it contains the exact
  * data in the base ROM image.  If so, then we are already done
  */
-if (iFile = fopen (include_filename, "r")) {
+if (NULL != (iFile = fopen (include_filename, "r"))) {
     unsigned char *IncludeData = NULL;
     char line[256];
     int Difference = 0;

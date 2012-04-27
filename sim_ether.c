@@ -664,7 +664,7 @@ void eth_zero(ETH_DEV* dev)
 }
 
 static ETH_DEV **eth_open_devices = NULL;
-static eth_open_device_count = 0;
+static int eth_open_device_count = 0;
 
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
@@ -1394,7 +1394,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
       system(command);
-      if (f = fopen("NIC.hwaddr", "r")) {
+      if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
             char *p1, *p2;
@@ -1580,7 +1580,7 @@ sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
-  while (request = dev->write_requests) {
+  while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
@@ -1889,11 +1889,11 @@ pthread_mutex_destroy (&dev->writer_lock);
 pthread_cond_destroy (&dev->writer_cond);
 if (1) {
   struct write_request *buffer;
-   while (buffer = dev->write_buffers) {
+   while (NULL != (buffer = dev->write_buffers)) {
     dev->write_buffers = buffer->next;
     free(buffer);
     }
-  while (buffer = dev->write_requests) {
+  while (NULL != (buffer = dev->write_requests)) {
     dev->write_requests = buffer->next;
     free(buffer);
     }
@@ -2146,10 +2146,10 @@ if (!dev) return SCPE_UNATT;
 
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
-if (request = dev->write_buffers)
+if (NULL != (request = dev->write_buffers))
   dev->write_buffers = request->next;
 pthread_mutex_unlock (&dev->writer_lock);
-if (!request)
+if (NULL == request)
   request = malloc(sizeof(*request));
 
 /* Copy buffer contents */

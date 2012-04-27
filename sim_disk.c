@@ -2550,13 +2550,13 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
 
     if (!hVHD)
         return (FILE *)hVHD;
-    if (Status = GetVHDFooter (szVHDPath, 
-                               &hVHD->Footer, 
-                               &hVHD->Dynamic, 
-                               &hVHD->BAT,
-                               NULL,
-                               hVHD->ParentVHDPath,
-                               sizeof (hVHD->ParentVHDPath)))
+    if (0 != (Status = GetVHDFooter (szVHDPath, 
+                                     &hVHD->Footer, 
+                                     &hVHD->Dynamic, 
+                                     &hVHD->BAT,
+                                     NULL,
+                                     hVHD->ParentVHDPath,
+                                     sizeof (hVHD->ParentVHDPath))))
         goto Cleanup_Return;
     if (NtoHl (hVHD->Footer.DiskType) == VHD_DT_Differencing) {
         hVHD->Parent = (VHDHANDLE)sim_vhd_disk_open (hVHD->ParentVHDPath, "rb");
@@ -2702,7 +2702,7 @@ if (SizeInBytes > ((uint64)(1024*1024*1024))*2040) {
     Status = EFBIG;
     goto Cleanup_Return;
     }
-if (File = sim_fopen (szVHDPath, "rb")) {
+if (NULL != (File = sim_fopen (szVHDPath, "rb"))) {
     fclose (File);
     File = NULL;
     Status = EEXIST;
@@ -2877,13 +2877,13 @@ char *FullVHDPath = NULL;
 size_t i, RelativeMatch, UpDirectories, LocatorsWritten = 0;
 int64 LocatorPosition;
 
-if (Status = GetVHDFooter (szParentVHDPath, 
-                           &ParentFooter, 
-                           &ParentDynamic, 
-                           NULL, 
-                           &ParentTimeStamp,
-                           NULL, 
-                           0))
+if (0 != (Status = GetVHDFooter (szParentVHDPath, 
+                                 &ParentFooter, 
+                                 &ParentDynamic, 
+                                 NULL, 
+                                 &ParentTimeStamp,
+                                 NULL, 
+                                 0)))
     goto Cleanup_Return;
 hVHD = CreateVirtualDisk (szVHDPath,
                           (uint32)(NtoHll(ParentFooter.CurrentSize)/BytesPerSector),

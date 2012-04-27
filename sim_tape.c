@@ -761,7 +761,7 @@ t_stat st;
 sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecf(unit=%d, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
 
 opos = uptr->pos;                                       /* old position */
-if (st = sim_tape_rdlntf (uptr, &tbc))                  /* read rec lnt */
+if (MTSE_OK != (st = sim_tape_rdlntf (uptr, &tbc)))     /* read rec lnt */
     return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max) {                                        /* rec out of range? */
@@ -823,7 +823,7 @@ t_stat st;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecr(unit=%d, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
 
-if (st = sim_tape_rdlntr (uptr, &tbc))                  /* read rec lnt */
+if (MTSE_OK != (st = sim_tape_rdlntr (uptr, &tbc)))     /* read rec lnt */
     return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
