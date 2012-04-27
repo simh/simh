@@ -3982,7 +3982,7 @@ if (rptr->flags & REG_RO)
 if (flag & EX_I) {
     cptr = read_line (gbuf, CBUFSIZE, stdin);
     if (sim_log)
-        fprintf (sim_log, (cptr? "%s\n": "\n"), cptr);
+        fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
         return 1;
     if (*cptr == 0)                                     /* success */
@@ -4200,7 +4200,7 @@ if (dptr == NULL)
 if (flag & EX_I) {
     cptr = read_line (gbuf, CBUFSIZE, stdin);
     if (sim_log)
-        fprintf (sim_log, (cptr? "%s\n": "\n"), cptr);
+        fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
         return 1;
     if (*cptr == 0)                                     /* success */
