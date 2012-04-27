@@ -1225,8 +1225,8 @@ for (i = 0; i <= end; i++) {                            /* loop thru string */
         }
     if ((i == end) && ((lnt & 1) == 0))
         c = c & 0xF;
-/*    if (((c & 0xF0) > 0x90) ||                          /* check hi digit */
-/*        ((c & 0x0F) > 0x09))                            /* check lo digit */    
+/*    if (((c & 0xF0) > 0x90) ||                        *//* check hi digit */
+/*        ((c & 0x0F) > 0x09))                          *//* check lo digit */    
 /*        RSVD_OPND_FAULT; */
     src->val[i / 4] = src->val[i / 4] | (c << ((i % 4) * 8));
     }                                                   /* end for */

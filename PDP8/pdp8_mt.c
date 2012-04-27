@@ -120,7 +120,7 @@
 #define STA_CPE         (00002 << 12)                   /* compare error */
 #define STA_ILL         (00001 << 12)                   /* illegal */
 #define STA_9TK         00040                           /* 9 track */
-/* #define STA_BAD      00020                           /* bad tape?? */
+/* #define STA_BAD      00020                         *//* bad tape?? */
 #define STA_INC         00010                           /* increment error */
 #define STA_LAT         00004                           /* lateral par error */
 #define STA_CRC         00002                           /* CRC error */

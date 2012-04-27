@@ -493,10 +493,10 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* offline? */
 change = (uptr->USTAT ^ newsta) & STA_MON;              /* changes? */
 uptr->USTAT = newsta & STA_DYN;                         /* update status */
 if (change) {
-/*  if (mta_ep) {                                       /* if polling */
-/*      u = uptr - mta_dev.units;                       /* unit num */
-/*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT);
-/*      set polling interupt...
+/*  if (mta_ep) {                                     *//* if polling */
+/*      u = uptr - mta_dev.units;                     *//* unit num */
+/*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT); */
+/*      set polling interupt...                       */
 /*      }                                               */
     mta_sta = mta_sta | STA_CHG;                        /* flag change */
     }

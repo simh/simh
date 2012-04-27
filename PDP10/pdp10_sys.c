@@ -118,7 +118,7 @@ const char *sim_stop_messages[] = {
 #define EXE_DIR 01776                                   /* EXE directory */
 #define EXE_VEC 01775                                   /* EXE entry vec */
 #define EXE_PDV 01774                                   /* EXE ignored */
-#define EXE_END 01777                                   /* EXE end
+#define EXE_END 01777                                   /* EXE end */
 
 /* RIM10 loader
 

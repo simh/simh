@@ -587,9 +587,9 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 /* Unibus I/O constants */
 
 #define READ            0                               /* PDP11 compatible */
-/* #define READC        1                               /* console read */
+/* #define READC        1                             *//* console read */
 #define WRITE           2
-/* #define WRITEC       3                               /* console write */
+/* #define WRITEC       3                             *//* console write */
 #define WRITEB          4
 #define IO_V_UBA        18                              /* UBA in I/O addr */
 #define IO_N_UBA        16                              /* max num of UBA's */

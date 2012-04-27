@@ -96,7 +96,7 @@
 /* Drive status, ^ = dynamic, * = in unit status */
 
 #define STD_WRP         0x80                            /* ^write prot */
-/*                      0x40                            /* unused */
+/*                      0x40                          *//* unused */
 #define STD_ACH         0x20                            /* alt chan busy NI */
 #define STD_UNS         0x10                            /* *unsafe */
 #define STD_NRDY        0x08                            /* ^not ready */

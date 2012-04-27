@@ -377,7 +377,7 @@ if (f == MTC_UNLOAD) {                                  /* unload? */
     }
 else if (f == MTC_REWIND)                               /* rewind */
     uptr->USTAT = uptr->USTAT | STA_REW;                /* rewinding */
-/* else /* uncomment this else if rewind/unload don't set done */
+/* else *//* uncomment this else if rewind/unload don't set done */
 tm_cmd = tm_cmd & ~MTC_DONE;                            /* clear done */
 CLR_INT (TM);                                           /* clear int */
 sim_activate (uptr, tm_time);                           /* start io */

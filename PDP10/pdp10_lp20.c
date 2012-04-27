@@ -58,10 +58,10 @@
 #define TX_DMASK        07777
 #define TX_V_FL         8                               /* flags */
 #define TX_M_FL         017
-/* define TX_INTR       04000                           /* interrupt */
+/* define TX_INTR       04000                         *//* interrupt */
 #define TX_DELH         02000                           /* delimiter */
-/* define TX_XLAT       01000                           /* translate */
-/* define TX_DVFU       00400                           /* DAVFU */
+/* define TX_XLAT       01000                         *//* translate */
+/* define TX_DVFU       00400                         *//* DAVFU */
 #define TX_SLEW         00020                           /* chan vs slew */
 #define TX_VMASK        00017                           /* spacing mask */
 #define TX_CHR          0                               /* states: pr char */
