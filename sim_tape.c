@@ -335,6 +335,7 @@ if (ctx->asynch_io) {
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
     pthread_create (&ctx->io_thread, &attr, _tape_io, (void *)uptr);
     pthread_attr_destroy(&attr);
+    sim_os_ms_sleep(50); /* Give the _tape_io thread a chance to stabilize */
     }
 uptr->a_check_completion = _tape_completion_dispatch;
 #endif

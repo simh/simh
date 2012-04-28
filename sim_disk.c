@@ -428,6 +428,7 @@ if (ctx->asynch_io) {
     pthread_create (&ctx->io_thread, &attr, _disk_io, (void *)uptr);
     pthread_attr_destroy(&attr);
     uptr->a_check_completion = _disk_completion_dispatch;
+    sim_os_ms_sleep(50); /* Give the _disk_io thread a chance to stabilize */
     }
 #endif
 return SCPE_OK;
