@@ -125,6 +125,7 @@ struct tape_context {
     pthread_t           io_thread;          /* I/O Thread Id */
     pthread_mutex_t     io_lock;
     pthread_cond_t      io_cond;
+    pthread_cond_t      startup_cond;
     int                 io_top;
     uint8               *buf;
     uint32              *bc;
@@ -211,6 +212,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
     sim_debug (ctx->dbit, ctx->dptr, "_tape_io(unit=%d) starting\n", uptr-ctx->dptr->units);
 
     pthread_mutex_lock (&ctx->io_lock);
+    pthread_cond_signal (&ctx->startup_cond);   /* Signal we're ready to go */
     while (1) {
         pthread_cond_wait (&ctx->io_cond, &ctx->io_lock);
         if (ctx->io_top == TOP_DONE)
@@ -331,11 +333,15 @@ ctx->asynch_io_latency = latency;
 if (ctx->asynch_io) {
     pthread_mutex_init (&ctx->io_lock, NULL);
     pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_cond_init (&ctx->startup_cond, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_mutex_lock (&ctx->io_lock);
     pthread_create (&ctx->io_thread, &attr, _tape_io, (void *)uptr);
     pthread_attr_destroy(&attr);
-    sim_os_ms_sleep(50); /* Give the _tape_io thread a chance to stabilize */
+    pthread_cond_wait (&ctx->startup_cond, &ctx->io_lock); /* Wait for thread to stabilize */
+    pthread_mutex_unlock (&ctx->io_lock);
+    pthread_cond_destroy (&ctx->startup_cond);
     }
 uptr->a_check_completion = _tape_completion_dispatch;
 #endif
@@ -362,6 +368,7 @@ if (ctx->asynch_io) {
     pthread_join (ctx->io_thread, NULL);
     pthread_mutex_destroy (&ctx->io_lock);
     pthread_cond_destroy (&ctx->io_cond);
+    pthread_cond_destroy (&ctx->startup_cond);
     }
 return SCPE_OK;
 #endif
