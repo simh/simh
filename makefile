@@ -23,6 +23,10 @@
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
+# OSX and other environments may have the LLVM (clang) compiler 
+# installed.  If you want to build with the clang compiler, invoke
+# make with GCC=clang.
+#
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
@@ -66,8 +70,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSTYPE = cygwin
     OSNAME = windows-build
   endif
-  GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
-  COMPILER_NAME = GCC Version: $(GCC_VERSION)
+  ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version'))
+    GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
+    COMPILER_NAME = GCC Version: $(GCC_VERSION)
+  else
+    COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 }')
+    CLANG_VERSION = $(word 3,$(COMPILER_NAME))
+    ifeq (,$(findstring .,$(CLANG_VERSION)))
+      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
+      CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+    endif
+  endif
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
@@ -86,14 +99,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OSNAME = OSX
       LIBEXT = dylib
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
-      ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
-        LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
-      endif
-      # OSX's clang compiler has different means of determining options than gcc
-      # gccm so hard set options here
-      ifneq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version'))
-        COMPILER_NAME = Apple clang version $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$4 }')
-        CFLAGS_O = -Wno-comment -Wno-parentheses
+      ifneq (,$(GCC_VERSION))
+        ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
+          LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
+        endif
       endif
     else
       ifeq (Linux,$(OSTYPE))
@@ -314,7 +323,11 @@ else
   ifneq (clang,$(findstring clang,$(COMPILER_NAME)))
     CFLAGS_O = -O2
   else
-    CFLAGS_O := -O4 $(CFLAGS_O) -fno-strict-overflow -flto -fwhole-program
+    ifeq (Darwin,$(OSTYPE))
+      CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
+    else
+      CFLAGS_O := -O2 -fno-strict-overflow 
+    endif
   endif
   LDFLAGS_O = 
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
