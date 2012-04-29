@@ -650,7 +650,7 @@ entry = IR & 017;                                   /* mask to entry point */
 pattern = op_vma[entry];                            /* get operand pattern */
 
 if (pattern != OP_N)
-    if (reason = cpu_ops (pattern, op, intrq))      /* get instruction operands */
+    if ((reason = cpu_ops (pattern, op, intrq)))    /* get instruction operands */
         return reason;
 
 if (debug) {                                            /* debugging? */
@@ -1361,7 +1361,7 @@ entry = IR & 017;                                       /* mask to entry point *
 pattern = op_ema[entry];                                /* get operand pattern */
 
 if (pattern != OP_N)
-    if (reason = cpu_ops (pattern, op, intrq))          /* get instruction operands */
+    if ((reason = cpu_ops (pattern, op, intrq)))        /* get instruction operands */
         return reason;
 
 if (debug) {                                            /* debugging? */

@@ -1187,7 +1187,7 @@ t_stat xq_process_setup(CTLR* xq)
 
     xq->var->setup.multicast = (0 != (len & XQ_SETUP_MC));
     xq->var->setup.promiscuous = (0 != (len & XQ_SETUP_PM));
-    if (led = (len & XQ_SETUP_LD) >> 2) {
+    if ((led = (len & XQ_SETUP_LD) >> 2)) {
       switch (led) {
         case 1: xq->var->setup.l1 = 0; break;
         case 2: xq->var->setup.l2 = 0; break;

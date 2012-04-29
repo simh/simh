@@ -992,7 +992,7 @@ switch (j) {                                            /* case on class */
                 disp = (disp - addr) & 0177777;
             else return SCPE_ARG;
             }
-        if ((disp & 1) || (disp > 0400) && (disp < 0177402))
+        if ((disp & 1) || ((disp > 0400) && (disp < 0177402)))
             return SCPE_ARG;
         val[0] = val[0] | (((disp - 2) >> 1) & 0377);
         break;

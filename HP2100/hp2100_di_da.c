@@ -1594,10 +1594,10 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 da_unit [unit].wait = icd_cntlr [unit].cmd_time;    /* these are always scheduled and */
                 initiated = TRUE;                                   /*   logged as initiated */
 
-                if (if_state [unit] == read_wait                    /* if we're waiting for a send data secondary */
-                  && message_address != 0x00                        /*   but it's not there */
-                  || if_state [unit] == status_wait                 /* or a send status secondary, */
-                  && message_address != 0x08)                       /*   but it's not there */
+                if (((if_state [unit] == read_wait) &&              /* if we're waiting for a send data secondary */
+                     (message_address != 0x00)) ||                  /*   but it's not there */
+                    ((if_state [unit] == status_wait) &&            /* or a send status secondary, */
+                     (message_address != 0x08)))                    /*   but it's not there */
                     abort_command (unit, io_program_error,          /*   then abort the pending command */
                                    idle);                           /*   and process the new command */
 

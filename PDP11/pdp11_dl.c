@@ -346,7 +346,7 @@ if (ln >= 0) {                                          /* got one? rcv enb */
 tmxr_poll_rx (&dlx_desc);                               /* poll for input */
 for (ln = 0; ln < DLX_LINES; ln++) {                    /* loop thru lines */
     if (dlx_ldsc[ln].conn) {                            /* connected? */
-        if (temp = tmxr_getc_ln (&dlx_ldsc[ln])) {      /* get char */
+        if ((temp = tmxr_getc_ln (&dlx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = DLIBUF_ERR|DLIBUF_RBRK;
             else c = sim_tt_inpcvt (temp, TT_GET_MODE (dlo_unit[ln].flags));

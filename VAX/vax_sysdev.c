@@ -1564,7 +1564,7 @@ if (*rom == 0) {                                        /* no boot? */
 #ifndef DONT_USE_INTERNAL_ROM
         FILE *f;
 
-        if (f = sim_fopen ("ka655x.bin", "wb")) {
+        if ((f = sim_fopen ("ka655x.bin", "wb"))) {
             printf ("Saving boot code to ka655x.bin\n");
             if (sim_log)
                 fprintf (sim_log, "Saving boot code to ka655x.bin\n");

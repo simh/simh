@@ -394,10 +394,10 @@ entry = IR & 017;                                       /* mask to entry point *
 pattern = op_os[entry];                                 /* get operand pattern */
 
 if (pattern != OP_N)
-    if (reason = cpu_ops (pattern, op, intrq))          /* get instruction operands */
+    if ((reason = cpu_ops (pattern, op, intrq)))        /* get instruction operands */
         return reason;
 
-tbg_tick = tbg_tick || (IR == 0105357) && iotrap;       /* set TBG interrupting flag */
+tbg_tick = tbg_tick || ((IR == 0105357) && iotrap);     /* set TBG interrupting flag */
 
 debug_print = (DEBUG_PRI (cpu_dev, DEB_OS) && !tbg_tick) ||
               (DEBUG_PRI (cpu_dev, DEB_OSTBG) && tbg_tick);
@@ -544,7 +544,7 @@ switch (entry) {                                        /* decode IR<3:0> */
         for (i = 0; i < count; i++) {
             ma = ReadW (PC);                            /* get operand address */
 
-            if (reason = resolve (ma, &ma, intrq)) {    /* resolve indirect */
+            if ((reason = resolve (ma, &ma, intrq))) {  /* resolve indirect */
                 PC = err_PC;                            /* IRQ restarts instruction */
                 break;
                 }
@@ -620,8 +620,8 @@ switch (entry) {                                        /* decode IR<3:0> */
         while ((AR != 0) && ((AR & SIGN) == 0)) {       /* end of list or bad list? */
             key = ReadW ((AR + op[1].word) & VAMASK);   /* get key value */
 
-            if ((E == 0) && (key == op[0].word) ||      /* for E = 0, key = arg? */
-                (E != 0) && (key >  op[0].word))        /* for E = 1, key > arg? */
+            if (((E == 0) && (key == op[0].word)) ||    /* for E = 0, key = arg? */
+                ((E != 0) && (key >  op[0].word)))      /* for E = 1, key > arg? */
                 break;                                  /* search is done */
 
             BR = AR;                                    /* B = last link */
@@ -710,7 +710,7 @@ switch (entry) {                                        /* decode IR<3:0> */
                 ma = ReadW (sa);                        /* get addr of actual */
                 sa = (sa + 1) & VAMASK;                 /* increment address */
 
-                if (reason = resolve (ma, &ma, intrq)) {    /* resolve indirect */
+                if ((reason = resolve (ma, &ma, intrq))) {  /* resolve indirect */
                     PC = err_PC;                            /* irq restarts instruction */
                     break;
                     }

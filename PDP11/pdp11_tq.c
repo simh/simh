@@ -828,7 +828,7 @@ else if (mdf & ~tq_cmf[cmd]) {                          /* invalid mod? */
     sts = ST_CMD | I_MODF;                              /* ill mods */
     }
 else {                                                  /* valid cmd */
-    if (uptr = tq_getucb (lu)) {                        /* valid unit? */
+    if ((uptr = tq_getucb (lu))) {                      /* valid unit? */
         if (q && (tq_cmf[cmd] & CMF_SEQ) &&             /* queueing, seq, */
             (uptr->cpkt || uptr->pktq)) {               /* and active? */
             tq_enqt (&uptr->pktq, pkt);                 /* do later */
@@ -909,7 +909,7 @@ UNIT *uptr;
 sim_debug(DBG_TRC, &tq_dev, "tq_abo\n");
 
 tpkt = 0;                                               /* set no mtch */
-if (uptr = tq_getucb (lu)) {                            /* get unit */
+if ((uptr = tq_getucb (lu))) {                          /* get unit */
     if (uptr->cpkt &&                                   /* curr pkt? */
         (GETP32 (uptr->cpkt, CMD_REFL) == ref)) {       /* match ref? */
         tpkt = uptr->cpkt;                              /* save match */
@@ -922,8 +922,8 @@ if (uptr = tq_getucb (lu)) {                            /* get unit */
         tpkt = uptr->pktq;                              /* save match */
         uptr->pktq = tq_pkt[tpkt].link;                 /* unlink */
         }
-    else if (prv = uptr->pktq) {                        /* srch pkt q */
-        while (tpkt = tq_pkt[prv].link) {               /* walk list */
+    else if ((prv = uptr->pktq)) {                      /* srch pkt q */
+        while ((tpkt = tq_pkt[prv].link)) {             /* walk list */
             if (GETP32 (tpkt, RSP_REFL) == ref) {       /* match ref? */
                 tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
                     break;
@@ -953,7 +953,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_avl\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if (uptr->flags & UNIT_SXC)                         /* ser exc pending? */
         sts = ST_SXC;
     else {
@@ -1012,7 +1012,7 @@ if (tq_pkt[pkt].d[CMD_MOD] & MD_NXU) {                  /* next unit? */
         tq_pkt[pkt].d[RSP_UN] = lu;
         }
     }
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
             sts = ST_OFL | SB_OFL_NV;                   /* offl no vol */
     else if (uptr->flags & UNIT_ONL)                    /* online */
@@ -1039,7 +1039,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_onl\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
         sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
     else if (uptr->flags & UNIT_ONL)                    /* already online? */
@@ -1070,7 +1070,7 @@ if (tq_pkt[pkt].d[SCC_MSV])                             /* MSCP ver = 0? */
 else {
     tq_cflgs = (tq_cflgs & CF_RPL) |                    /* hack ctrl flgs */
         tq_pkt[pkt].d[SCC_CFL];
-    if (tq_htmo = tq_pkt[pkt].d[SCC_TMO])               /* set timeout */
+    if ((tq_htmo = tq_pkt[pkt].d[SCC_TMO]))             /* set timeout */
         tq_htmo = tq_htmo + 2;                          /* if nz, round up */
     tq_pkt[pkt].d[SCC_CFL] = tq_cflgs;                  /* return flags */
     tq_pkt[pkt].d[SCC_TMO] = TQ_DCTMO;                  /* ctrl timeout */
@@ -1096,7 +1096,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_suc\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
         sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
     else {
@@ -1120,7 +1120,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_flu\n");
 
-if (uptr = tq_getucb (lu))                              /* unit exist? */
+if ((uptr = tq_getucb (lu)))                            /* unit exist? */
     sts = tq_mot_valid (uptr, OP_FLU);                  /* validate req */
 else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_FLU | OP_END, tq_efl (uptr), sts, FLU_LNT, UQ_TYP_SEQ);
@@ -1138,7 +1138,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_erase\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     sts = tq_mot_valid (uptr, cmd);                     /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
         uptr->cpkt = pkt;                               /* op in progress */
@@ -1162,7 +1162,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_wtm\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     objp = uptr->objp;                                  /* position op */
     sts = tq_mot_valid (uptr, OP_WTM);                  /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
@@ -1188,7 +1188,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_pos\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     objp = uptr->objp;                                  /* position op */
     sts = tq_mot_valid (uptr, OP_POS);                  /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
@@ -1224,7 +1224,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_rw\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     objp = uptr->objp;                                  /* position op */
     sts = tq_mot_valid (uptr, cmd);                     /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
@@ -1363,7 +1363,7 @@ switch (cmd) {                                          /* case on command */
             }
         else wbc = res->tbc;
         if (cmd == OP_RD) {                             /* read? */
-            if (t = Map_WriteB (ba, wbc, res->tqxb)) {  /* store, nxm? */
+            if ((t = Map_WriteB (ba, wbc, res->tqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_BCL, wbc - t);          /* adj bc */
                 if (tq_hbe (uptr, ba + wbc - t))        /* post err log */
                     tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, res->tbc);        
@@ -1402,7 +1402,7 @@ switch (cmd) {                                          /* case on command */
 
     case OP_WR:                                         /* write */
         if (!io_complete) { /* Top half processing */
-            if (t = Map_ReadB (ba, bc, res->tqxb)) {    /* fetch buf, nxm? */
+            if ((t = Map_ReadB (ba, bc, res->tqxb))) {  /* fetch buf, nxm? */
                 PUTP32 (pkt, RW_BCL, 0);                /* no bytes xfer'd */
                 if (tq_hbe (uptr, ba + bc - t))         /* post err log */
                     tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);     
@@ -2291,11 +2291,11 @@ if ((uptr->flags & UNIT_ONL) == 0) {
 if (uptr->cpkt) {
     fprintf (st, "Unit %d current ", u);
     tq_show_pkt (st, uptr->cpkt);
-    if (pkt = uptr->pktq) {
+    if ((pkt = uptr->pktq)) {
         do {
             fprintf (st, "Unit %d queued ", u);
             tq_show_pkt (st, pkt);
-            } while (pkt = tq_pkt[pkt].link);
+            } while ((pkt = tq_pkt[pkt].link));
         }
     }
 else fprintf (st, "Unit %d queues are empty\n", u);
@@ -2320,7 +2320,7 @@ if (val & TQ_SH_RI) {
     tq_show_ring (st, &tq_rq);
     }
 if (val & TQ_SH_FR) {
-    if (pkt = tq_freq) {
+    if ((pkt = tq_freq)) {
         for (i = 0; pkt != 0; i++, pkt = tq_pkt[pkt].link) {
             if (i == 0)
                 fprintf (st, "Free queue = %d", pkt);
@@ -2333,11 +2333,11 @@ if (val & TQ_SH_FR) {
     else fprintf (st, "Free queue is empty\n");
     }
 if (val & TQ_SH_RS) {
-    if (pkt = tq_rspq) {
+    if ((pkt = tq_rspq)) {
         do {
             fprintf (st, "Response ");
             tq_show_pkt (st, pkt);
-            } while (pkt = tq_pkt[pkt].link);
+            } while ((pkt = tq_pkt[pkt].link));
         }
     else fprintf (st, "Response queue is empty\n");
     }

@@ -942,7 +942,7 @@ t_stat r;
 if (tty_mode & TM_PRI) {                                /* printing? */
     c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit[TTO].flags));
     if (c >= 0) {                                       /* valid? */
-        if (r = sim_putchar_s (c)) return r;            /* output char */
+        if ((r = sim_putchar_s (c))) return r;          /* output char */
         tty_unit[TTO].pos = tty_unit[TTO].pos + 1;
         }
     }

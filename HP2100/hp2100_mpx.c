@@ -1926,8 +1926,8 @@ if (fast_binary_read) {                                     /* fast binary read 
 else {                                                      /* normal service */
     tmxr_poll_tx (&mpx_desc);                               /* output any accumulated characters */
 
-    if ((buf_avail (iowrite, port) < 2) &&                  /* more to transmit? */
-        !(mpx_flags [port] & (FL_WAITACK | FL_XOFF)) ||     /*   and transmission not suspended */
+    if (((buf_avail (iowrite, port) < 2) &&                 /* more to transmit? */
+         !(mpx_flags [port] & (FL_WAITACK | FL_XOFF))) ||   /*   and transmission not suspended */
         tmxr_rqln (&mpx_ldsc [port]))                       /* or more to receive? */
         sim_activate (uptr, uptr->wait);                    /* reschedule service */
     else

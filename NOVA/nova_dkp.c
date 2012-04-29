@@ -908,7 +908,7 @@ do  {
     if (uptr->FUNC == FCCY_READ) {                      /* read? */
             awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr->fileref);
             for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
-            if (err = ferror (uptr->fileref))
+            if ((err = ferror (uptr->fileref)))
                 break;
             for (dx = 0; dx < DKP_NUMWD; dx++) {            /* loop thru buffer */
                 pa = MapAddr (dkp_map, (dkp_ma & AMASK));
@@ -924,7 +924,7 @@ do  {
                 dkp_ma = (dkp_ma + 1) & AMASK;
                 }
             fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref))
+            if ((err = ferror (uptr->fileref)))
                 break;
             }
 

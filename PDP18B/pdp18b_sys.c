@@ -1009,7 +1009,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_OPR:                                   /* operate */
-            if (sp = (inst & 03730))
+            if ((sp = (inst & 03730)))
                 fprintf (of, "%s", opcode[i]);
             fprint_opr (of, inst & 014047, I_V_OPR, sp);
             break;

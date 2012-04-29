@@ -1054,7 +1054,7 @@ for (i = OPTDEV; i <= MAXDEV; i++)                      /* default optional devi
 
 dtab [PWR] = &pwrf_dib;                                 /* for now, powerfail is always present */
 
-for (i = 0; dptr = sim_devices [i]; i++) {              /* loop thru dev */
+for (i = 0; (dptr = sim_devices [i]); i++) {            /* loop thru dev */
     dibptr = (DIB *) dptr->ctxt;                        /* get DIB */
 
     if (dibptr && !(dptr->flags & DEV_DIS)) {           /* handler exists and device is enabled? */
@@ -1464,17 +1464,17 @@ while (reason == SCPE_OK) {                             /* loop until halted */
 */
 
         if ((sim_idle_enab) && (intrq == 0))                /* idle enabled w/o pending irq? */
-            if (((PC == err_PC) ||                          /* RTE through RTE-IVB */
-                 ((PC == (err_PC - 1)) &&                   /* RTE-6/VM */
-                  ((ReadW (PC) & I_MRG) == I_ISZ))) &&      /* RTE jump target */
-                (mp_fence == CLEAR) && (M [xeqt] == 0) &&   /* RTE idle indications */
-                (M [tbg] == clk_dib.select_code) ||         /* RTE verification */
+            if ((((PC == err_PC) ||                         /* RTE through RTE-IVB */
+                  ((PC == (err_PC - 1)) &&                  /* RTE-6/VM */
+                   ((ReadW (PC) & I_MRG) == I_ISZ))) &&     /* RTE jump target */
+                 (mp_fence == CLEAR) && (M [xeqt] == 0) &&  /* RTE idle indications */
+                 (M [tbg] == clk_dib.select_code)) ||       /* RTE verification */
 
-                (PC == (err_PC - 3)) &&                     /* DOS through DOS-III */
-                (ReadW (PC) == I_STF) &&                    /* DOS jump target */
-                (AR == 0177777) && (BR == 0177777) &&       /* DOS idle indication */
-                (M [m64] == 0177700) &&                     /* DOS verification */
-                (M [p64] == 0000100))                       /* DOS verification */
+                ((PC == (err_PC - 3)) &&                    /* DOS through DOS-III */
+                 (ReadW (PC) == I_STF) &&                   /* DOS jump target */
+                 (AR == 0177777) && (BR == 0177777) &&      /* DOS idle indication */
+                 (M [m64] == 0177700) &&                    /* DOS verification */
+                 (M [p64] == 0000100)))                     /* DOS verification */
 
                 sim_idle (TMR_POLL, FALSE);                 /* idle the simulator */
         break;
@@ -3351,7 +3351,7 @@ t_stat status;
 uint32 ioresult;
 IOCYCLE signals;
 
-if (bytes && !even || dma [ch].cw3 != DMASK) {          /* normal cycle? */
+if ((bytes && !even) || (dma [ch].cw3 != DMASK)) {      /* normal cycle? */
     if (input)                                          /* input cycle? */
         signals = ioIOI | ioCLF;                        /* assert IOI and CLF */
     else                                                /* output cycle */
@@ -3611,7 +3611,7 @@ uint32 i, j, k;
 t_bool is_conflict = FALSE;
 uint32 conflicts[MAXDEV + 1] = { 0 };
 
-for (i = 0; dptr = sim_devices[i]; i++) {
+for (i = 0; (dptr = sim_devices[i]); i++) {
     dibptr = (DIB *) dptr->ctxt;
     if (dibptr && !(dptr->flags & DEV_DIS))
         if (++conflicts[dibptr->select_code] > 1)
@@ -3629,7 +3629,7 @@ if (is_conflict) {
             if (sim_log)
                 fprintf (sim_log, "Select code %o conflict:", i);
 
-            for (j = 0; dptr = sim_devices[j]; j++) {
+            for (j = 0; (dptr = sim_devices[j]); j++) {
                 dibptr = (DIB *) dptr->ctxt;
                 if (dibptr && !(dptr->flags & DEV_DIS) && (i == dibptr->select_code)) {
                     if (k < conflicts[i]) {

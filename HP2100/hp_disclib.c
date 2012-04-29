@@ -761,8 +761,8 @@ else {                                                  /* for an ICD controller
     uptr = units + unit_limit;                          /*     and we use the indicated unit */
     }
 
-if (props->unit_check && !uptr                                  /* if the unit number is checked and is invalid */
-  || props->seek_wait && (drive_status (uptr) & DL_S2STOPS)) {  /*   or if we're waiting for an offline drive */
+if ((props->unit_check && !uptr) ||                             /* if the unit number is checked and is invalid */
+    (props->seek_wait && (drive_status (uptr) & DL_S2STOPS))) { /*   or if we're waiting for an offline drive */
     dl_end_command (cvptr, status_2_error);                     /*     then the command ends with a Status-2 error */
     uptr = NULL;                                                /* prevent the command from starting */
     }
@@ -1879,8 +1879,8 @@ static void start_write (CVPTR cvptr, UNIT *uptr)
 {
 const t_bool verify = (CNTLR_OPCODE) uptr->OP == write; /* only Write verifies the sector address */
 
-if ((uptr->flags & UNIT_WPROT)                          /* is the unit write protected, */
-  || !verify && !(uptr->flags & UNIT_FMT))              /*   or is formatting required but not enabled? */
+if ((uptr->flags & UNIT_WPROT) ||                       /* is the unit write protected, */
+    (!verify && !(uptr->flags & UNIT_FMT)))             /*   or is formatting required but not enabled? */
     dl_end_command (cvptr, status_2_error);             /* terminate the write with an error */
 
 else if (position_sector (cvptr, uptr, verify)) {       /* writing is permitted; position the sector */

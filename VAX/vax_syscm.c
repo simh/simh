@@ -610,7 +610,7 @@ switch (j) {                                            /* case on class */
             return SCPE_ARG;
         if ((pflag & A_REL) == 0)
             disp = (disp - ad32) & 0177777;
-        if ((disp & 1) || (disp > 0400) && (disp < 0177402))
+        if ((disp & 1) || ((disp > 0400) && (disp < 0177402)))
             return SCPE_ARG;
         val[0] = val[0] | (((disp - 2) >> 1) & 0377);
         break;

@@ -395,7 +395,7 @@ t_stat r = SCPE_OK;
 
 if (ptp_ldr) {                                          /* need leader? */
     for (i = 0; i < 12; i++) {                          /* punch leader */
-        if (r = ptp_out (0))
+        if ((r = ptp_out (0)))
             break;
         }
     }
