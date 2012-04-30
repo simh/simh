@@ -784,6 +784,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         }
     }                                                   /* end for */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
+sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
 
 AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
