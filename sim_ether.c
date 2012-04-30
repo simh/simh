@@ -637,11 +637,52 @@ char* eth_getname_byname(char* name, char* temp)
   return (found ? temp : NULL);
 }
 
+char* eth_getdesc_byname(char* name, char* temp)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list);
+  size_t n;
+  int i, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+      found = 1;
+      strcpy(temp, list[i].desc);
+    }
+  }
+  return (found ? temp : NULL);
+}
+
 void eth_zero(ETH_DEV* dev)
 {
   /* set all members to NULL OR 0 */
   memset(dev, 0, sizeof(ETH_DEV));
   dev->reflections = -1;                          /* not established yet */
+}
+
+static ETH_DEV **eth_open_devices = NULL;
+static int eth_open_device_count = 0;
+
+static void _eth_add_to_open_list (ETH_DEV* dev)
+{
+eth_open_devices = realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
+eth_open_devices[eth_open_device_count++] = dev;
+}
+
+static void _eth_remove_from_open_list (ETH_DEV* dev)
+{
+int i, j;
+
+for (i=0; i<eth_open_device_count; ++i)
+    if (eth_open_devices[i] == dev) {
+        for (j=i+1; j<eth_open_device_count; ++j)
+            eth_open_devices[j-1] = eth_open_devices[j];
+        --eth_open_device_count;
+        break;
+        }
 }
 
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
@@ -661,9 +702,27 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," %2d     %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name);
+      }
     }
   return SCPE_OK;
+}
+
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+{
+return eth_show (st, uptr, val, desc);
 }
 
 t_stat ethq_init(ETH_QUE* que, int max)
@@ -1335,7 +1394,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
       system(command);
-      if (f = fopen("NIC.hwaddr", "r")) {
+      if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
             char *p1, *p2;
@@ -1521,7 +1580,7 @@ sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
-  while (request = dev->write_requests) {
+  while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
@@ -1800,6 +1859,7 @@ if (dev->eth_api == ETH_API_PCAP) {
   ioctl(pcap_fileno(dev->handle), BIOCIMMEDIATE, &v);
   }
 #endif
+_eth_add_to_open_list (dev);
 return SCPE_OK;
 }
 
@@ -1829,11 +1889,11 @@ pthread_mutex_destroy (&dev->writer_lock);
 pthread_cond_destroy (&dev->writer_cond);
 if (1) {
   struct write_request *buffer;
-   while (buffer = dev->write_buffers) {
+   while (NULL != (buffer = dev->write_buffers)) {
     dev->write_buffers = buffer->next;
     free(buffer);
     }
-  while (buffer = dev->write_requests) {
+  while (NULL != (buffer = dev->write_requests)) {
     dev->write_requests = buffer->next;
     free(buffer);
     }
@@ -1862,7 +1922,7 @@ if (sim_log) fprintf (sim_log, msg, dev->name);
 /* clean up the mess */
 free(dev->name);
 eth_zero(dev);
-
+_eth_remove_from_open_list (dev);
 return SCPE_OK;
 }
 
@@ -2086,10 +2146,10 @@ if (!dev) return SCPE_UNATT;
 
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
-if (request = dev->write_buffers)
+if (NULL != (request = dev->write_buffers))
   dev->write_buffers = request->next;
 pthread_mutex_unlock (&dev->writer_lock);
-if (!request)
+if (NULL == request)
   request = malloc(sizeof(*request));
 
 /* Copy buffer contents */
