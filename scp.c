@@ -71,9 +71,9 @@
                         Fixed bug in restoration with changed memory size
    08-Mar-07    JDB     Fixed breakpoint actions in DO command file processing
    30-Jan-07    RMS     Fixed bugs in get_ipaddr
-   30-Aug-06    JDB     detach_unit returns SCPE_UNATT if not attached
    17-Oct-06    RMS     Added idle support
    04-Oct-06    JDB     DO cmd failure now echoes cmd unless -q
+   30-Aug-06    JDB     detach_unit returns SCPE_UNATT if not attached
    14-Jul-06    RMS     Added sim_activate_abs
    02-Jun-06    JDB     Fixed do_cmd to exit nested files on assertion failure
                         Added -E switch to do_cmd to exit on any error
@@ -1202,8 +1202,8 @@ do {
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
             }
         }
-    if ((flag <= 0) &&                                  /* report error if in cmdline/init file */
-        (stat >= SCPE_BASE) && !stat_nomessage) {
+    if ((staying || (flag <= 0)) &&                     /* if not exiting or in cmdline/init file */
+        (stat >= SCPE_BASE) && !stat_nomessage) {       /* report error */
         if (cmdp->message) {                            /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
             }
@@ -3613,7 +3613,7 @@ if (unechoed_cmdline) {
     printf("%s> %s\n", do_position(), unechoed_cmdline);
     if (sim_log)
         fprintf (sim_log, "%s> %s\n", do_position(), unechoed_cmdline);
-     }
+    }
 fprint_stopped (stdout, r);                         /* print msg */
 if (sim_log)                                        /* log if enabled */
     fprint_stopped (sim_log, r);
