@@ -1202,8 +1202,7 @@ do {
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
             }
         }
-    if ((staying || (flag <= 0)) &&                     /* if not exiting or in cmdline/init file */
-        (stat >= SCPE_BASE) && !stat_nomessage) {       /* report error */
+    if ((stat >= SCPE_BASE) && !stat_nomessage) {       /* report error if not suppressed */
         if (cmdp->message) {                            /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
             }
