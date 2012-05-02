@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    29-Dec-08    RMS     Fixed failure to clear cpu_bme on RESET (Walter Mueller)
    22-Apr-08    RMS     Fixed MMR0 treatment in RESET (Walter Mueller)

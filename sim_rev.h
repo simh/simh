@@ -191,6 +191,9 @@ patch   date            module(s) and fix(es)
                         - fixed backspace over tapemark not to set EOR (Van Snyder)
                         - added no rewind option (Van Snyder)
 
+                        i1401_sys.c:
+                        - fixed misuse of & instead of && in decode (Peter Schorn)
+
                         pdp1_cpu.c:
                         - fixed misuse of & instead of && in Ea_ch (Michael Bloom)
 
@@ -204,7 +207,8 @@ patch   date            module(s) and fix(es)
                         - fixed priority of PIRQ vs IO; added INT_INTERNALn
 
                         pdp11_io.c:
-                        - fixed Qbus interrupts to treat all IO devices as BR4
+                        - fixed Qbus interrupts to treat all IO devices (except clock) as BR4
+			- fixed order of int_internal (Jordi Guillaumes i Pons)
 
                         ppd11_rf.c
                         - fixed bug in updating mem addr extension (Peter Schorn)
@@ -319,7 +323,7 @@ patch   date            module(s) and fix(es)
                         - fixed bug in scan function decode (Peter Schorn)
 
                         vax_cpu.c:
-                        - revised idle design Mark Pizzolato)
+                        - revised idle design (Mark Pizzolato)
                         - fixed bug in SET CPU IDLE
                         - fixed failure to clear PSL<tp> in BPT, XFC
 
