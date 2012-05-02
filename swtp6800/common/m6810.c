@@ -111,12 +111,12 @@ t_stat m6810_reset (DEVICE *dptr)
 
 int32 m6810_get_mbyte(int32 offset)
 {
-    int32 val;
+    int32 val, org, len;
 
     if (m6810_dev.dctrl & DEBUG_read)
         printf("m6810_get_mbyte: offset=%04X\n", offset);
-    if (((t_addr)offset) < m6810_unit.capac) {
-        val = *((uint8 *)(m6810_unit.filebuf) + offset) & 0xFF;
+    if (offset < m6810_unit.capac) {
+        val = *(uint8 *)(m6810_unit.filebuf + offset) & 0xFF;
         if (m6810_dev.dctrl & DEBUG_read)
             printf("val=%04X\n", val);
         return val;
@@ -133,8 +133,8 @@ void m6810_put_mbyte(int32 offset, int32 val)
 {
     if (m6810_dev.dctrl & DEBUG_write)
         printf("m6810_put_mbyte: offset=%04X, val=%02X\n", offset, val);
-    if ((t_addr)offset < m6810_unit.capac) {
-        *((uint8 *)(m6810_unit.filebuf) + offset) = val & 0xFF;
+    if (offset < m6810_unit.capac) {
+        *(uint8 *)(m6810_unit.filebuf + offset) = val & 0xFF;
         return;
     } else {
         if (m6810_dev.dctrl & DEBUG_write)

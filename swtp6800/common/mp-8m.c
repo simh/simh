@@ -120,7 +120,7 @@ t_stat mp_8m_reset (DEVICE *dptr)
             }
             for (j=0; j<8192; j++) {    /* fill pattern for testing */
                 val = (0xA0 |  i);
-                *((uint8 *)(uptr->filebuf) + j) = val & 0xFF;
+                *(uint8 *)(uptr->filebuf + j) = val & 0xFF;
             }
         }
         if (mp_8m_dev.dctrl & DEBUG_flow)
@@ -151,7 +151,7 @@ int32 mp_8m_get_mbyte(int32 addr)
         org = uptr->u3;
         len = uptr->capac - 1;
         if ((addr >= org) && (addr <= org + len)) {
-            val = *((uint8 *)(uptr->filebuf) + (addr - org));
+            val = *(uint8 *)(uptr->filebuf + (addr - org));
             if (mp_8m_dev.dctrl & DEBUG_read)
                 printf(" val=%04X\n", val);
             return (val & 0xFF);
@@ -177,7 +177,7 @@ int32 mp_8m_get_mword(int32 addr)
 
 void mp_8m_put_mbyte(int32 addr, int32 val)
 {
-    int32 org, len;
+    int32 org, len, type;
     int32 i;
     UNIT *uptr;
 
@@ -188,7 +188,7 @@ void mp_8m_put_mbyte(int32 addr, int32 val)
         org = uptr->u3;
         len = uptr->capac - 1;
         if ((addr >= org) && (addr < org + len)) {
-            *((uint8 *)(uptr->filebuf) + (addr - org)) = val & 0xFF;
+            *(uint8 *)(uptr->filebuf + (addr - org)) = val & 0xFF;
             if (mp_8m_dev.dctrl & DEBUG_write)
                 printf("\n");
             return;

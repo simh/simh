@@ -144,7 +144,7 @@ t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc)
     if (val == UNIT_NONE)
         BOOTROM_unit.capac = 0;         /* set EPROM size */
     else
-        BOOTROM_unit.capac = 0x200 << ((val >> UNIT_V_MSIZE) - 1); /* set EPROM size */
+        BOOTROM_unit.capac = 0x200 << (val >> UNIT_V_MSIZE) - 1; /* set EPROM size */
     if (BOOTROM_unit.filebuf) {         /* free buffer */
         free (BOOTROM_unit.filebuf);
         BOOTROM_unit.filebuf = NULL;
@@ -161,9 +161,9 @@ t_stat BOOTROM_config (UNIT *uptr, int32 val, char *cptr, void *desc)
 
 t_stat BOOTROM_reset (DEVICE *dptr)
 {
-    t_addr j;
-    int c;
+    int j, c;
     FILE *fp;
+    t_stat r;
 
     if (BOOTROM_dev.dctrl & DEBUG_flow)
         printf("BOOTROM_reset: \n");
@@ -195,7 +195,7 @@ t_stat BOOTROM_reset (DEVICE *dptr)
     j = 0;                              /* load EPROM file */
     c = fgetc(fp);
     while (c != EOF) {
-        *((uint8 *)(BOOTROM_unit.filebuf) + j++) = c & 0xFF;
+        *(uint8 *)(BOOTROM_unit.filebuf + j++) = c & 0xFF;
         c = fgetc(fp);
         if (j > BOOTROM_unit.capac) {
             printf("\tImage is too large - Load truncated!!!\n");
@@ -222,7 +222,7 @@ int32 BOOTROM_get_mbyte(int32 offset)
     }
     if (BOOTROM_dev.dctrl & DEBUG_read)
         printf("BOOTROM_get_mbyte: offset=%04X\n", offset);
-    val = *((uint8 *)(BOOTROM_unit.filebuf) + offset) & 0xFF;
+    val = *(uint8 *)(BOOTROM_unit.filebuf + offset) & 0xFF;
     if (BOOTROM_dev.dctrl & DEBUG_read)
         printf("BOOTROM_get_mbyte: Normal val=%02X\n", val);
     return val;

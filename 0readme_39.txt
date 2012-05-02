@@ -29,19 +29,17 @@ components and build network capable simulators if they are available.
 
 1.1.3 HP2100 (Dave Bryan)
 
-	- added support for 12821A HP-IP disk controller,
+	- added support for 12821A HP-IB disk controller,
 	  7906H/20H/25H disks
 
 1.1.4 PDP11 and VAX (Mark Pizzolato)
 
-        - Added DELQA-Plus device.
+        - added DELQA-Plus device
 
 1.1.5 IA64 VMS Ethernet Support
 
-        - Identified compiler version issues and added IA64 support (Matt Burke)
+        - identified compiler version issues and added IA64 support (Matt Burke)
         
-1.1.6 Visual Studio Projects (Mark Pizzolato)
-
 
 2. Bugs Fixed
 
@@ -51,10 +49,10 @@ in the source module sim_rev.h.
 
 3. Status Report
 
-This is the last release of SimH for which I will be sole editor. After this
+This is the last release of SimH for which I will be lead editor. After this
 release, the source is moving to a public repository:
 
-
+https://github.com/markpizz/simh
 
 under the general editorship of Dave Hittner and Mark Pizzolato. The status
 of the individual simulators is as follows:
@@ -170,19 +168,22 @@ Bill Beech
 3.25 Sigma 32b
 
 Incomplete; more work is needed on the peripherals for accuracy.
+Included in the beta simulators package.
 
 3.26 Alpha
 
-Incomplete; essentially just an EV-5 (21164) chip emulator.
+Incomplete; essentially just an EV-5 (21164) chip emulator. Included
+in the beta simulators package.
 
 3.27 SAGE
 
-Beta.
+Incomplete. Included in the beta simulators package.
 
 3.28 SC1
 
 Internal simulator for SiCortex supercomputer; intended as an example
-of implementing an SMP system in the current SimH structure.
+of implementing an SMP system in the current SimH structure. Included
+in the beta simulators package.
 
 
 4. Suggestions for Future Work

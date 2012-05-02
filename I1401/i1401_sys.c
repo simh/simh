@@ -402,7 +402,7 @@ if (op >= 64)                                           /* successful? */
     return SCPE_ARG;
 val[0] = op | WM;                                       /* store opcode */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get addr or d */
-if (((op_table[op] && IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
+if (((op_table[op] & IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
      (get_addr (gbuf, &val[1]) == SCPE_OK)) {
         cptr = get_glyph (cptr, gbuf, 0);               /* get addr or d */
         if (get_addr (gbuf, &val[4]) == SCPE_OK) {

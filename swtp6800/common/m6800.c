@@ -120,7 +120,7 @@ int32 int_req = 0;                      /* Interrupt request */
 int32 mem_fault = 0;                    /* memory fault flag */
 
 extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 /* function prototypes */
 
@@ -1892,7 +1892,7 @@ void condevalVa(int32 op1, int32 op2)
 {
     if (get_flag(CF))
         COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80)) || (
-            ((op1 & 0x80) == 0) && ((op2 & 0x80) == 0)));
+            (op1 & 0x80 == 0) && (op2 & 0x80 == 0)));
 }
 
 /* test and set V for subtraction */
@@ -1900,8 +1900,8 @@ void condevalVa(int32 op1, int32 op2)
 void condevalVs(int32 op1, int32 op2)
 {
     if (get_flag(CF))
-        COND_SET_FLAG_V(((op1 & 0x80) && ((op2 & 0x80) == 0)) || 
-            (((op1 & 0x80) == 0) && (op2 & 0x80)));
+        COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80 == 0)) || 
+            ((op1 & 0x80 == 0) && (op2 & 0x80)));
 }
 
 /* calls from the simulator */

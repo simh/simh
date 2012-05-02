@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    29-Dec-08    RMS     Fixed failure to clear cpu_bme on RESET (Walter Mueller)
    22-Apr-08    RMS     Fixed MMR0 treatment in RESET (Walter Mueller)
@@ -1292,7 +1293,7 @@ while (reason == 0)  {
             break;
 
         case 070:                                       /* CSM */
-            if (CPUT (HAS_CSM) && (MMR3 & MMR3_CSM) || (cm != MD_KER)) {
+            if ((CPUT (HAS_CSM) && (MMR3 & MMR3_CSM)) || (cm != MD_KER)) {
                 dst = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
                 PSW = get_PSW () & ~PSW_CC;             /* PSW, cc = 0 */
                 STACKFILE[cm] = SP;
