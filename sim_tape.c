@@ -368,7 +368,6 @@ if (ctx->asynch_io) {
     pthread_join (ctx->io_thread, NULL);
     pthread_mutex_destroy (&ctx->io_lock);
     pthread_cond_destroy (&ctx->io_cond);
-    pthread_cond_destroy (&ctx->startup_cond);
     }
 return SCPE_OK;
 #endif
