@@ -881,7 +881,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
     if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
-        if (cmdp->message)                              /* special message handler? */
+        if (cmdp && cmdp->message)                      /* special message handler? */
             cmdp->message (NULL, stat);
         else {
             printf ("%s\n", sim_error_text (stat));
@@ -1196,14 +1196,14 @@ do {
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
             !stat_nomessage &&                          /* and not suppressing messages */
-            !cmdp->message) {                           /* and not handling them specially */
+            !(cmdp && cmdp->message)) {                 /* and not handling them specially */
             printf("%s> %s\n", do_position(), ocptr);
             if (sim_log)
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
             }
         }
     if ((stat >= SCPE_BASE) && !stat_nomessage) {       /* report error if not suppressed */
-        if (cmdp->message) {                            /* special message handler */
+        if (cmdp && cmdp->message) {                    /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
             }
         else {
