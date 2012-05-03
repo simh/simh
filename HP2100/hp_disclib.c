@@ -24,7 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   28-Mar-12    JDB     First release
+   02-May-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
    References:
@@ -1822,13 +1822,26 @@ return SCPE_OK;                                         /* the read was successf
 
    Implementation notes:
 
-    1. The intersector time is required to allow the ICD interface to set the
-       end-of-data flag before the next sector begins.  The CPU must have enough
-       time to receive the last byte of the current sector and then unaddress
-       the disc controller before the first byte of the next sector is sent.  If
-       the time is not long enough, the sector address will be incremented twice
-       (e.g., a 128-word read of sector 0 will terminate with sector 2 as the
-       next sector instead of sector 1).
+    1. The CPU indicates the end of a read data transfer to an ICD controller by
+       untalking the drive.  The untalk is done by the driver as soon as the
+       DCPC completion interrupt is processed.  However, the time from the final
+       DCPC transfer through driver entry to the point where the untalk is
+       asserted on the bus varies from 80 instructions (RTE-6/VM with OS
+       microcode and the buffer in the system map) to 152 instructions (RTE-IVB
+       with the buffer in the user map).  The untalk must occur before the start
+       of the next sector, or the drive will begin the data transfer.
+
+       Normally, this is not a problem, as the driver clears the FIFO of any
+       received data after DCPC completion.  However, if the file mask disables
+       auto-seeking (or the last sector on the drive had been read), then the
+       controller will indicate an End of Cylinder error if the untalk does not
+       precede the start of the next sector.
+
+       The RTE driver (DVA32) and various utilities that manage the disc
+       directly (e.g., SWTCH) do not appear to account for these bogus errors.
+       Therefore, we work around the issue by extending the intersector delay
+       to allow time for an potential untalk whenever the next access will
+       require an auto-seek.
 */
 
 static void end_read (CVPTR cvptr, UNIT *uptr)
@@ -1838,7 +1851,11 @@ if (cvptr->eod == SET)                                  /* is the end of data in
 
 else {                                                  /* reading continues */
     uptr->PHASE = start_phase;                          /* reset to the start phase */
-    uptr->wait = cvptr->sector_time;                    /* delay for the intersector time */
+    
+    if (cvptr->eoc && cvptr->type)                      /* at the end of the cylinder and ICD controller? */
+        uptr->wait = DL_EOC_TIME;                       /* delay for the end-of-cylinder time */
+    else                                                /* not at EOC or not an ICD controller */
+        uptr->wait = cvptr->sector_time;                /* delay for the intersector time */
     }
 
 return;

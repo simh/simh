@@ -24,7 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   30-Mar-12    JDB     First release
+   02-May-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
 
@@ -53,6 +53,7 @@
 
 /* Default controller times */
 
+#define DL_EOC_TIME     160                             /* end-of-cylinder delay time */
 #define DL_SEEK_TIME    100                             /* seek delay time (per cylinder) */
 #define DL_SECTOR_TIME   27                             /* intersector delay time */
 #define DL_CMD_TIME       3                             /* command start delay time */
