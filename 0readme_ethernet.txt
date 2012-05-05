@@ -207,7 +207,7 @@ Building on Windows:
 
  The contents of the windows-build directory can be downloaded from:
 
-    https://github.com/downloads/markpizz/simh/windows-build.zip
+    https://github.com/downloads/simh/simh/windows-build.zip
 
 
  There are Windows batch files provided to initiate compiles using the MinGW
