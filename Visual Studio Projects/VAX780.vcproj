@@ -388,10 +388,6 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
-				RelativePath="..\dec_dz.h"
-				>
-			</File>
-			<File
 				RelativePath="..\PDP11\pdp11_io_lib.h"
 				>
 			</File>
