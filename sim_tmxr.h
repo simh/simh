@@ -1,4 +1,4 @@
-/* sim_tmxr.h: terminal multiplexor definitions
+/* sim_tmxr.h: terminal multiplexer definitions
 
    Copyright (c) 2001-2008, Robert M Supnik
 
@@ -44,6 +44,8 @@
 #ifndef _SIM_TMXR_H_
 #define _SIM_TMXR_H_    0
 
+#include "sim_sock.h"
+
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)
 #define TMXR_MAXBUF     256                             /* buffer size */
@@ -51,6 +53,12 @@
 
 #define TMXR_DBG_XMT    0x10000                         /* Debug Transmit Data */
 #define TMXR_DBG_RCV    0x20000                         /* Debug Received Data */
+#define TMXR_DBG_TRC    0x40000                         /* Debug trace routine calls */
+
+/* Unit flags */
+
+#define TMUF_V_NOASYNCH   (UNIT_V_UF + 12)            /* Asynch Disabled unit */
+#define TMUF_NOASYNCH     (1u << TMUF_V_NOASYNCH)
 
 typedef struct tmln TMLN;
 typedef struct tmxr TMXR;
@@ -79,6 +87,7 @@ struct tmln {
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                *txb;                           /* xmt buffer */
     TMXR                *mp;                            /* back pointer to mux */
+    UNIT                *uptr;                          /* pointer to receive poll unit */
     };
 
 struct tmxr {
@@ -88,8 +97,11 @@ struct tmxr {
     TMLN                *ldsc;                          /* line descriptors */
     int32               *lnorder;                       /* line connection order */
     DEVICE              *dptr;                          /* multiplexer device */
+    UNIT                *uptr;                          /* polling unit */
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
+    int32               txcount;                        /* count of transmit bytes */
     int32               buffered;                       /* Buffered Line Behavior and Buffer Size Flag */
+    int32               sessions;                       /* count of tcp connections received */
     };
 
 int32 tmxr_poll_conn (TMXR *mp);
@@ -100,8 +112,10 @@ t_stat tmxr_putc_ln (TMLN *lp, int32 chr);
 void tmxr_poll_tx (TMXR *mp);
 t_stat tmxr_open_master (TMXR *mp, char *cptr);
 t_stat tmxr_close_master (TMXR *mp);
-t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr);
+t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
+t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
+t_stat tmxr_set_console_input_unit (UNIT *uptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);
@@ -119,7 +133,27 @@ t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
-void tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
+t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
+t_stat tmxr_activate (UNIT *uptr, int32 interval);
+t_stat tmxr_change_async (void);
+t_stat tmxr_startup (void);
+t_stat tmxr_shutdown (void);
+t_stat tmxr_start_poll (void);
+t_stat tmxr_stop_poll (void);
+void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
+extern FILE *sim_deb;                                   /* debug file */
+#define tmxr_debug(dbits, lp, msg, buf, bufsize) if (sim_deb && (lp)->mp->dptr && ((dbits) & (lp)->mp->dptr->dctrl)) _tmxr_debug (dbits, lp, msg, buf, bufsize); else (void)0
+#define tmxr_debug_trace(mp, msg) if (sim_deb && (mp)->dptr && (TMXR_DBG_TRC & (mp)->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, mp->dptr, "%s\n", (msg)); else (void)0
+#define tmxr_debug_trace_line(lp, msg) if (sim_deb && (lp)->mp && (lp)->mp->dptr && (TMXR_DBG_TRC & (lp)->mp->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, (lp)->mp->dptr, "%s\n", (msg)); else (void)0
 
+#if defined(SIM_ASYNCH_IO) && !defined(NO_ASYNCH_MUX)
+#define tmxr_attach(mp, uptr, cptr) tmxr_attach_ex(mp, uptr, cptr, TRUE)
+#if (!defined(NOT_MUX_USING_CODE))
+#define sim_activate tmxr_activate
+#endif
+#else
+#define tmxr_attach(mp, uptr, cptr) tmxr_attach_ex(mp, uptr, cptr, FALSE)
 #endif
 
+
+#endif /* _SIM_TMXR_H_ */

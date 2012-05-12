@@ -21,22 +21,27 @@ Features.
      point of view) at least 'n' instructions after it was initiated.
    
 Benefits.
-   Allows a simulator to execute simulated instructions concurrently 
-   with I/O operations which may take numerous milliseconds to perform.
-   Allows a simulated device to potentially avoid polling for the arrival
-   of data.  Polling consumes host processor CPU cycles which may better
-   be spent executing simulated instructions or letting other host 
-   processes run.  Measurements made of available instruction execution
-   easily demonstrate the benefits of parallel instruction and I/O 
-   activities.  A VAX simulator with a process running a disk intensive
-   application in one process was able to process 11 X the number of 
-   Dhrystone operations with Asynch I/O enabled.
+   - Allows a simulator to execute simulated instructions concurrently 
+     with I/O operations which may take numerous milliseconds to perform.
+   - Allows a simulated device to potentially avoid polling for the 
+     arrival of data.  Polling consumes host processor CPU cycles which 
+     may better be spent executing simulated instructions or letting 
+     other host processes run.  Measurements made of available 
+     instruction execution easily demonstrate the benefits of parallel
+     instruction and I/O activities.  A VAX simulator with a process 
+     running a disk intensive application in one process was able to 
+     run (in another process) 11 times the number of Dhrystone operations 
+     with Asynch I/O enabled vs not enabled.
+   - Allows simulator clock ticks to track wall clock was precisely as 
+     possible under varying I/O load and activities.
 
 Asynch I/O is provided through a callback model.  
 SimH Libraries which provide Asynch I/O support:
    sim_disk
    sim_tape
    sim_ether
+   sim_console
+   sim_tmxr
 
 Requirements to use:
 The Simulator's instruction loop needs to be modified to include a single
@@ -78,6 +83,7 @@ to enable viewing and setting of these variables via scp:
     { DRDATA (INST_LATENCY, sim_asynch_inst_latency, 32), PV_LEFT },
 #endif
 
+Programming Disk and Tape devices to leverage Asynch I/O
 
 Naming conventions:
 All of the routines implemented in sim_disk and sim_tape have been kept
@@ -142,14 +148,6 @@ information must be referenced in both the top and bottom half code paths
 then it must either be recomputed prior to the top/bottom half check
 or not stored in local variables of the unit service routine.
 
-Run time requirements to use SIM_ASYNCH_IO.
-The Posix threads API (pthreads) is required for asynchronous execution.
-Most *nix platforms have these APIs available and on these platforms
-simh is typically built with these available since on these platforms, 
-pthreads is required for simh networking support.  Windows can also 
-utilize the pthreads APIs if the compile and run time support for the
-win32Pthreads package has been installed on the build system.
-
 Sample Asynch I/O device implementations.
 The pdp11_rq.c module has been refactored to leverage the asynch I/O
 features of the sim_disk library.  The impact to this code to adopt the
@@ -166,4 +164,111 @@ This issue was addressed by adding additional routines to the physical
 device layer (in sim_tape.c) which combined these multiple operations.
 This approach will dovetail well with a potential future addition of 
 operations on physical tapes as yet another supported tape format.
+
+Programming Console and Multiplexer devices to leverage Asynch I/O to 
+minimize 'unproductive' polling.
+
+There are two goals for asynchronous Multiplexer I/O: 1) Minimize polling
+to only happen when data is available, not arbitrarily on every clock tick, 
+and 2) to have polling actually happen as soon as data may be available.  
+In most cases no effort is required to add Asynch I/O support to a 
+multiplexer device emulation.  If a device emulation takes the normal 
+model of polling for arriving data on every simulated clock tick, then if
+Asynch I/O is enabled, then device will operate asynchronously and behave 
+well.  There is one restriction in this model.  Specifically,  the device 
+emulation logic can't expect that there will be a particular number (clock 
+tick rate maybe) of invocations of a unit service routine to perform polls 
+in any interval of time (this is what we're trying to change, right?).  
+Therefore presumptions about measuring time by counting polls is not 
+valid.  If a device needs to manage time related activities, then the 
+device should create a separate unit which is dedicated to the timing 
+activities and which explicitly schedules a different unit service routine 
+for those activities as needed.  Such scheduled polling should only be 
+enabled when actual timing is required. 
+
+A device which is unprepared to operate asynchronously can specifically
+disable multiplexer Asynch I/O for that device by explicitly defining 
+NO_ASYNCH_MUX at compile time.  This can be defined at the top of a 
+particular device emulation which isn't capable of asynch operation, or 
+it can be defined globally on the compile command line for the simulator.
+Alternatively, if a specific Multiplexer device doesn't function correctly 
+under the multiplexer asynchronous environment and it will never be 
+revised to operate correctly, it may set the TMUF_NOASYNCH bit in its 
+unit flags field.
+
+Console I/O can operate asynchronously if the simulator notifies the 
+tmxr/console subsystem which device unit is used by the simulator to poll 
+for console input.  This is done by including sim_tmxr.h in the source 
+module which contains the console input device definition and calling 
+tmxr_set_console_input_unit().  tmxr_set_console_input_unit would usually 
+be called in a device reset routine.
+
+Some devices will need a small amount of extra coding to leverage the 
+Multiplexer Asynch I/O capabilties.  Devices which require extra coding
+have one or more of the following characteristics:
+- they poll for input data on a different unit (or units) than the unit 
+  which was provided when tmxr_attach was called with.
+- they poll for connections on a different unit than the unit which was
+  provided when tmxr_attach was called with.
+
+The extra coding required for proper operation is to call 
+tmxr_set_line_unit() to associate the appropriate input polling unit to 
+the respective multiplexer line.
+
+sim_tmxr consumers:
+  - Altair Z80 SIO   devices = 1, units = 1,      lines = 4,  flagbits = 8, Untested Asynch
+  - HP2100 BACI      devices = 1, units = 1,      lines = 1,  flagbits = 3, Untested Asynch
+  - HP2100 MPX       devices = 1, units = 10,     lines = 8,  flagbits = 2, Untested Asynch
+  - HP2100 MUX       devices = 3, units = 1/16/1, lines = 16, flagbits = 4, Untested Asynch
+  - I7094 COM        devices = 2, units = 4/33,   lines = 33, flagbits = 4, Untested Asynch
+  - Interdata PAS    devices = 2, units = 1/32,   lines = 32, flagbits = 3, Untested Asynch
+  - Nova QTY         devices = 1, units = 1,      lines = 64, flagbits = 1, Untested Asynch
+  - Nova TT1         devices = 2, units = 1/1,    lines = 1,  flagbits = 1, Untested Asynch
+  - PDP-1 DCS        devices = 2, units = 1/32,   lines = 32, flagbits = 0, Untested Asynch
+  - PDP-8 TTX        devices = 2, units = 1/4,    lines = 4,  flagbits = 0, Untested Asynch
+  - PDP-11 DC        devices = 2, units = 1/16,   lines = 16, flagbits = 5, Untested Asynch
+  - PDP-11 DL        devices = 2, units = 1/16,   lines = 16, flagbits = 3, Untested Asynch
+  - PDP-11 DZ        devices = 1, units = 1/1,    lines = 32, flagbits = 0, Good Asynch
+  - PDP-11 VH        devices = 1, units = 4,      lines = 32, flagbits = 4, Good Asynch
+  - PDP-18b TT1      devices = 2, units = 1/16,   lines = 16, flagbits = 0, Untested Asynch
+  - SDS MUX          devices = 2, units = 1/32,   lines = 32, flagbits = 0, Untested Asynch
+  - sim_console                                                             Good Asynch
+  
+Program Clock Devices to leverage Asynsh I/O
+
+simh's concept of time is calibrated by counting the number of 
+instructions which the simulator can execute in a given amount of wall 
+clock time.  Once this is determined, the appropriate value is continually 
+recalibrated and used throughout a simulator to schedule device time 
+related delays as needed.  Historically, this was fine until modern 
+processors started having dynamically variable processor clock rates.
+On such host systems, the simulator's concept of time passing can vary 
+drastically, which may cause dramatic drifting of the simulated operating 
+system's concept of time.  Once all devices are disconnected from the 
+calibrated clock's instruction count, the only concern for time in the
+simulated system is that it's clock tick be as accurate as possible.
+This has worked well in the past, however each simulator was burdened 
+with providing code which facilitated managing the concept of the 
+relationship between the number of instructions executed and the passage 
+of wall clock time.  To accomodate the needs of activities or events which 
+should be measured against wall clock time (vs specific number of 
+instructions executed), the simulator framework has been extended to 
+specifically provide event scheduling based on elapsed wall time. A new 
+API can be used by devices to schedule unit event delivery after the 
+passage of a specific amount of wall clock time.  The 
+api sim_activate_after() provides this capability.  This capability is 
+not limited to being available ONLY when compiling with SIM_SYNCH_IO 
+defined.  When SIM_ASYNCH_IO is defined, this facility is implemented by 
+a thread which drives the delivery of these events from the host system's 
+clock ticks (interpolated as needed to accomodate hosts with relatively 
+large clock ticks).  When SIM_ASYNCH_IO is not defined, this facility is 
+implemented using the traditional simh calibrated clock approach.
+
+Run time requirements to use SIM_ASYNCH_IO.
+The Posix threads API (pthreads) is required for asynchronous execution.
+Most *nix platforms have these APIs available and on these platforms
+simh is typically built with these available since on these platforms, 
+pthreads is required for simh networking support.  Windows can also 
+utilize the pthreads APIs if the compile and run time support for the
+win32Pthreads package has been installed on the build system.
 

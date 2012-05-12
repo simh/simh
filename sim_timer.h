@@ -85,6 +85,7 @@ void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
+t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
 t_bool sim_idle (uint32 tmr, t_bool sin_cyc);
 t_stat sim_set_throt (int32 arg, char *cptr);
 t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr);
@@ -97,5 +98,11 @@ uint32 sim_os_msec (void);
 void sim_os_sleep (unsigned int sec);
 uint32 sim_os_ms_sleep (unsigned int msec);
 uint32 sim_os_ms_sleep_init (void);
+
+extern t_bool sim_idle_enab;                        /* idle enabled flag */
+extern volatile t_bool sim_idle_wait;               /* idle waiting flag */
+extern int32 *sim_tmr_poll;                         /* pointer to instructions per clock tick */
+extern int32 *sim_clk_tps;                          /* pointer to clock ticks per second */
+
 
 #endif

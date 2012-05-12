@@ -85,8 +85,10 @@ t_stat echo_cmd (int32 flag, char *ptr);
 
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
+t_stat _sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
+t_stat sim_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
 int32 sim_is_active (UNIT *uptr);
 double sim_gtime (void);
@@ -113,6 +115,7 @@ CTAB *find_cmd (char *gbuf);
 DEVICE *find_dev (char *ptr);
 DEVICE *find_unit (char *ptr, UNIT **uptr);
 DEVICE *find_dev_from_unit (UNIT *uptr);
+t_stat sim_register_internal_device (DEVICE *dptr);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 CTAB *find_ctab (CTAB *tab, char *gbuf);
 C1TAB *find_c1tab (C1TAB *tab, char *gbuf);

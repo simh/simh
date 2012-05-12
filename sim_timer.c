@@ -81,6 +81,8 @@
 
 t_bool sim_idle_enab = FALSE;                           /* global flag */
 volatile t_bool sim_idle_wait = FALSE;                  /* global flag */
+int32 *sim_tmr_poll = NULL;                             /* global */
+int32 *sim_clk_tps = NULL;                              /* global */
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_os_sleep_min_ms = 0;
@@ -509,6 +511,10 @@ rtc_based[tmr] = time;
 rtc_currd[tmr] = time;
 rtc_initd[tmr] = time;
 rtc_elapsed[tmr] = 0;
+if (!sim_tmr_poll)
+    sim_tmr_poll = &rtc_currd[tmr];
+if (!sim_clk_tps)
+    sim_clk_tps = &rtc_hz[tmr];
 return time;
 }
 
@@ -576,6 +582,32 @@ t_bool sim_timer_init (void)
 sim_idle_enab = FALSE;                                  /* init idle off */
 sim_idle_rate_ms = sim_os_ms_sleep_init ();             /* get OS timer rate */
 return (sim_idle_rate_ms != 0);
+}
+
+/* sim_show_timers - show running timer information */
+
+t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+{
+int tmr;
+
+for (tmr=0; tmr<SIM_NTIMERS; ++tmr) {
+    if (0 == rtc_initd[tmr])
+        continue;
+    
+    fprintf (st, "%sTimer %d:\n", rtc_hz[tmr] ? "Calibrated " : "Uncalibrated ", tmr);
+    if (rtc_hz[tmr]) {
+        fprintf (st, "  Running at:         %dhz\n", rtc_hz[tmr]);
+        fprintf (st, "  Current Ticks:      %d\n",   rtc_ticks[tmr]);
+        }
+    fprintf (st, "  Real Time:          %u\n",   rtc_rtime[tmr]);
+    fprintf (st, "  Virtual Time:       %u\n",   rtc_vtime[tmr]);
+    fprintf (st, "  Next Interval:      %u\n",   rtc_nxintv[tmr]);
+    fprintf (st, "  Base Delay:         %d\n",   rtc_based[tmr]);
+    fprintf (st, "  Current Delay:      %d\n",   rtc_currd[tmr]);
+    fprintf (st, "  Initial Delay:      %d\n",   rtc_initd[tmr]);
+    fprintf (st, "  Seconds Running:    %u\n",   rtc_elapsed[tmr]);
+    }
+return SCPE_OK;
 }
 
 /* sim_idle - idle simulator until next event or for specified interval

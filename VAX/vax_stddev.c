@@ -340,6 +340,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_input_unit (&tti_unit);
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);

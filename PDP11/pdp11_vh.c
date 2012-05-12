@@ -82,7 +82,6 @@ extern int32    int_req[IPL_HLVL];
 extern uint32    cpu_opt;
 #endif
 
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 
 /* imports from pdp11_stddev.c: */
@@ -293,12 +292,14 @@ static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
 #define DBG_INT  0x0002                                 /* display transfer requests */
+#define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 
 DEBTAB vh_debug[] = {
   {"REG",    DBG_REG},
   {"INT",    DBG_INT},
+  {"TRC",    DBG_TRC},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
   {0}
@@ -308,6 +309,7 @@ DEBTAB vh_debug[] = {
 static t_stat vh_rd (int32 *data, int32 PA, int32 access);
 static t_stat vh_wr (int32 data, int32 PA, int32 access);
 static t_stat vh_svc (UNIT *uptr);
+static t_stat vh_timersvc (UNIT *uptr);
 static int32 vh_rxinta (void);
 static int32 vh_txinta (void);
 static t_stat vh_clear (int32 vh, t_bool flag);
@@ -341,6 +343,7 @@ static DIB vh_dib = {
 
 static UNIT vh_unit[VH_MUXES] = {
     { UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
+    { UDATA (&vh_timersvc, 0, 0) },
 };
 
 static const REG vh_reg[] = {
@@ -838,9 +841,9 @@ static t_stat vh_wr (   int32   data,
             if ((vh_unit[vh].flags & UNIT_MODEDHU) && (data & CSR_SKIP))
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
-                sim_activate (&vh_unit[vh], clk_cosched (tmxr_poll));
-            /* vh_mcount[vh] = 72; */ /* 1.2 seconds */
+                sim_activate (&vh_unit[0], clk_cosched (tmxr_poll));
             vh_mcount[vh] = MS2SIMH (1200); /* 1.2 seconds */
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
@@ -872,6 +875,7 @@ static t_stat vh_wr (   int32   data,
             break;
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (vh_unit[vh].flags & UNIT_MODEDHU) {
@@ -916,6 +920,7 @@ static t_stat vh_wr (   int32   data,
     case 2:     /* LPR */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -942,6 +947,7 @@ static t_stat vh_wr (   int32   data,
     case 3:     /* STAT/FIFODATA */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -965,6 +971,7 @@ static t_stat vh_wr (   int32   data,
     case 4:     /* LNCTRL */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)   
@@ -1032,6 +1039,7 @@ static t_stat vh_wr (   int32   data,
     case 5:     /* TBUFFAD1 */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)   
@@ -1047,6 +1055,7 @@ static t_stat vh_wr (   int32   data,
     case 6:     /* TBUFFAD2 */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1067,6 +1076,7 @@ static t_stat vh_wr (   int32   data,
     case 7:     /* TBUFFCT */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
+            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1125,19 +1135,35 @@ static void doDMA ( int32   vh,
 
 /* Perform many of the functions of PROC2 */
 
-static t_stat vh_svc (  UNIT    *uptr   )
+static t_stat vh_timersvc (  UNIT    *uptr   )
 {
-    int32   vh, newln, i;
+    int32   vh, again;
+
+    sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_timersvc()\n");
 
     /* scan all muxes for countdown reset */
+    again = 0;
     for (vh = 0; vh < vh_desc.lines/VH_LINES; vh++) {
         if (vh_csr[vh] & CSR_MASTER_RESET) {
-            if (vh_mcount[vh] != 0)
+            if (vh_mcount[vh] != 0) {
                 vh_mcount[vh] -= 1;
+                ++again;
+                }
             else
                 vh_clear (vh, FALSE);
         }
     }
+    if (again)
+        sim_activate (uptr, clk_cosched (tmxr_poll)); /* requeue ourselves */
+    return (SCPE_OK);
+}
+
+static t_stat vh_svc (  UNIT    *uptr   )
+{
+    int32   vh, newln, i;
+
+    sim_debug(DBG_TRC, find_dev_from_unit(uptr), "vh_svc()\n");
+
     /* sample every 10ms for modem changes (new connections) */
     newln = tmxr_poll_conn (&vh_desc);
     if (newln >= 0) {

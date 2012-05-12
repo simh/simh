@@ -213,6 +213,8 @@
 
 /* Macros and data structures */
 
+#define NOT_MUX_USING_CODE /* sim_tmxr library provider or agnostic */
+
 #include "sim_defs.h"
 #include "sim_rev.h"
 #include "sim_ether.h"
@@ -287,8 +289,12 @@
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t sim_tmxr_poll_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sim_tmxr_poll_cond = PTHREAD_COND_INITIALIZER;
+int32 sim_tmxr_poll_count;
 pthread_t sim_asynch_main_threadid;
-struct sim_unit *sim_asynch_queue = NULL;
+UNIT *sim_asynch_queue = NULL;
+UNIT *sim_wallclock_queue = NULL;
 t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
@@ -634,12 +640,11 @@ static CTAB cmd_table[] = {
       "set console LOG=log_file enable console logging to the\n"
       "                         specified destination {STDOUT,DEBUG or filename)\n"
       "set console NOLOG        disable console logging\n"
-      "set console DEBUG=dbg_file\n"
-      "                         enable console debugging to the\n"
-      "                         specified destination {LOG,STDOUT or filename)\n"
-      "set console NODEBUG      disable console debugging\n"
-      "set log log_file         specify the log destination\n"
-      "                         (STDOUT,DEBUG or filename)\n"
+      "set console DEBUG{=TRC;XMT;RCV}\n"
+      "                         enable console debugging of the\n"
+      "                         specified debug bit flags\n"
+      "set console NODEBUG{=TRC;XMT;RCV}\n"
+      "                         disable console debugging bits indicated\n"
       "set nolog                disables any currently active logging\n"
       "set debug debug_file     specify the debug destination\n"
       "                         (STDOUT,LOG or filename)\n"
@@ -881,7 +886,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
     if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
-        if (cmdp->message)                              /* special message handler? */
+        if (cmdp && cmdp->message)                      /* special message handler? */
             cmdp->message (NULL, stat);
         else {
             printf ("%s\n", sim_error_text (stat));
@@ -1196,14 +1201,14 @@ do {
         (stat != SCPE_STEP)) {
         if (!echo && !sim_quiet &&                      /* report if not echoing */
             !stat_nomessage &&                          /* and not suppressing messages */
-            !cmdp->message) {                           /* and not handling them specially */
+            !(cmdp && cmdp->message)) {                 /* and not handling them specially */
             printf("%s> %s\n", do_position(), ocptr);
             if (sim_log)
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
             }
         }
     if ((stat >= SCPE_BASE) && !stat_nomessage) {       /* report error if not suppressed */
-        if (cmdp->message) {                            /* special message handler */
+        if (cmdp && cmdp->message) {                    /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
             }
         else {
@@ -1681,6 +1686,7 @@ if (cptr && (*cptr != 0))                               /* now eol? */
 if (flag == sim_asynch_enabled)                         /* already set correctly? */
     return SCPE_OK;
 sim_asynch_enabled = flag;
+tmxr_change_async ();
 if (1) {
     uint32 i, j;
     DEVICE *dptr;
@@ -2042,6 +2048,9 @@ static SHTAB show_glob_tab[] = {
     { "THROTTLE", &sim_show_throt, 0 },
     { "ASYNCH", &sim_show_asynch, 0 },
     { "ETHERNET", &eth_show_devices, 0 },
+    { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
+    { "MUX", &tmxr_show_open_devices, 0 },
+    { "TIMERS", &sim_show_timers, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };
@@ -2277,28 +2286,46 @@ int32 accum;
 
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
-if (sim_clock_queue == NULL) {
+if (sim_clock_queue == NULL)
     fprintf (st, "%s event queue empty, time = %.0f\n",
         sim_name, sim_time);
-    return SCPE_OK;
-    }
-fprintf (st, "%s event queue status, time = %.0f\n",
-     sim_name, sim_time);
-accum = 0;
-for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
-    if (uptr == &sim_step_unit)
-        fprintf (st, "  Step timer");
-    else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
-        fprintf (st, "  %s", sim_dname (dptr));
-        if (dptr->numunits > 1)
-            fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+else {
+    fprintf (st, "%s event queue status, time = %.0f\n",
+         sim_name, sim_time);
+    accum = 0;
+    for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
+        if (uptr == &sim_step_unit)
+            fprintf (st, "  Step timer");
+        else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+            fprintf (st, "  %s", sim_dname (dptr));
+            if (dptr->numunits > 1)
+                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+            }
+        else fprintf (st, "  Unknown");
+        fprintf (st, " at %d\n", accum + uptr->time);
+        accum = accum + uptr->time;
         }
-    else fprintf (st, "  Unknown");
-    fprintf (st, " at %d\n", accum + uptr->time);
-    accum = accum + uptr->time;
     }
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_lock (&sim_asynch_lock);
+if (sim_wallclock_queue == NULL)
+    fprintf (st, "%s wall clock event queue empty, time = %.0f\n",
+        sim_name, sim_time);
+else {
+    fprintf (st, "%s wall clock event queue status, time = %.0f\n",
+         sim_name, sim_time);
+    accum = 0;
+    for (uptr = sim_wallclock_queue; uptr != NULL; uptr = uptr->next) {
+        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+            fprintf (st, "  %s", sim_dname (dptr));
+            if (dptr->numunits > 1)
+                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+            }
+        else fprintf (st, "  Unknown");
+        fprintf (st, " after %d usec\n", accum + uptr->time);
+        accum = accum + uptr->time;
+        }
+    }
 fprintf (st, "asynchronous pending event queue\n");
 if (sim_asynch_queue == AIO_LIST_END)
     fprintf (st, "Empty\n");
@@ -3118,8 +3145,10 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
                 for (l = 0; (l < SRBSIZ) && (k < high); l++,
                      k = k + (dptr->aincr)) {           /* check for 0 block */
                     r = dptr->examine (&val, k, uptr, SIM_SW_REST);
-                    if (r != SCPE_OK)
+                    if (r != SCPE_OK) {
+                        free (mbuf);
                         return r;
+                        }
                     if (val) zeroflg = FALSE;
                     SZ_STORE (sz, val, mbuf, l);
                     }                                   /* end for l */
@@ -3358,19 +3387,26 @@ for ( ;; ) {                                            /* device loop */
             if ((mbuf = calloc (SRBSIZ, sz)) == NULL)
                 return SCPE_MEM;
             for (k = 0; k < high; ) {                   /* loop thru mem */
-                READ_I (blkcnt);                        /* block count */
+                if (sim_fread (&blkcnt, sizeof (blkcnt), 1, rfile) == 0) {
+                    free (mbuf);
+                    return SCPE_IOERR;
+                    }
                 if (blkcnt < 0)                         /* compressed? */
                     limit = -blkcnt;
                 else limit = (int32)sim_fread (mbuf, sz, blkcnt, rfile);
-                if (limit <= 0)                         /* invalid or err? */
+                if (limit <= 0) {                       /* invalid or err? */
+                    free (mbuf);
                     return SCPE_IOERR;
+                    }
                 for (j = 0; j < limit; j++, k = k + (dptr->aincr)) {
                     if (blkcnt < 0)                     /* compressed? */
                         val = 0;
                     else SZ_LOAD (sz, val, mbuf, j);    /* saved value */
                     r = dptr->deposit (val, k, uptr, SIM_SW_REST);
-                    if (r != SCPE_OK)
+                    if (r != SCPE_OK) {
+                        free (mbuf);
                         return r;
+                        }
                     }                                   /* end for j */
                 }                                       /* end for k */
             free (mbuf);                                /* dealloc buffer */
@@ -3533,23 +3569,32 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
         }
     }
 stop_cpu = 0;
+sim_is_running = 1;                                     /* flag running */
 if (sim_ttrun () != SCPE_OK) {                          /* set console mode */
     sim_ttcmd ();
+    sim_is_running = 0;                                 /* flag idle */
     return SCPE_TTYERR;
     }
 if ((r = sim_check_console (30)) != SCPE_OK) {          /* check console, error? */
     sim_ttcmd ();
+    sim_is_running = 0;                                 /* flag idle */
     return r;
     }
 if (signal (SIGINT, int_handler) == SIG_ERR) {          /* set WRU */
+    sim_ttcmd ();
+    sim_is_running = 0;                                 /* flag idle */
     return SCPE_SIGERR;
     }
 #ifdef SIGHUP
 if (signal (SIGHUP, int_handler) == SIG_ERR) {          /* set WRU */
+    sim_ttcmd ();
+    sim_is_running = 0;                                 /* flag idle */
     return SCPE_SIGERR;
     }
 #endif
 if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
+    sim_ttcmd ();
+    sim_is_running = 0;                                 /* flag idle */
     return SCPE_SIGERR;
     }
 if (sim_step)                                           /* set step timer */
@@ -3558,7 +3603,6 @@ fflush(stdout);                                         /* flush stdout */
 if (sim_log)                                            /* flush log if enabled */
     fflush (sim_log);
 sim_throt_sched ();                                     /* set throttle */
-sim_is_running = 1;                                     /* flag running */
 sim_brk_clract ();                                      /* defang actions */
 sim_rtcn_init_all ();                                   /* re-init clocks */
 r = sim_instr();
@@ -4697,6 +4741,32 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
 return NULL;
 }
 
+DEVICE **sim_internal_devices = NULL;
+uint32 sim_internal_device_count = 0;
+
+/* sim_register_internal_device   Add device to internal device list
+
+   Inputs:
+        dptr    =       pointer to device
+*/
+
+t_stat sim_register_internal_device (DEVICE *dptr)
+{
+uint32 i;
+
+for (i = 0; (sim_devices[i] != NULL); ++i)
+    if (sim_devices[i] == dptr)
+        return SCPE_OK;
+for (i = 0; i < sim_internal_device_count; ++i)
+    if (sim_internal_devices[i] == dptr)
+        return SCPE_OK;
+++sim_internal_device_count;
+sim_internal_devices = realloc(sim_internal_devices, sim_internal_device_count*sizeof(*sim_internal_devices));
+sim_internal_devices[sim_internal_device_count-1] = dptr;
+sim_internal_devices[sim_internal_device_count] = NULL;
+return SCPE_OK;
+}
+
 /* Find_dev_from_unit   find device for unit
 
    Inputs:
@@ -4712,7 +4782,14 @@ uint32 i, j;
 
 if (uptr == NULL)
     return NULL;
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+for (i = 0; (dptr = sim_devices[i]) != NULL; ++i) {
+    for (j = 0; j < dptr->numunits; j++) {
+        if (uptr == (dptr->units + j))
+            return dptr;
+        }
+    }
+for (i = 0; i<sim_internal_device_count; ++i) {
+    dptr = sim_internal_devices[i];
     for (j = 0; j < dptr->numunits; j++) {
         if (uptr == (dptr->units + j))
             return dptr;
@@ -5147,6 +5224,10 @@ return SCPE_OK;
 /* Event queue package
 
         sim_activate            add entry to event queue
+        sim_activate_abs        add entry to event queue even if event already scheduled
+        sim_activate_notbefure  add entry to event queue even if event already scheduled
+                                but not before the specified time
+        sim_activate_after      add entry to event queue after a specified amount of wall time
         sim_cancel              remove entry from event queue
         sim_process_event       process entries on event queue
         sim_is_active           see if entry is on event queue
@@ -5196,9 +5277,11 @@ do {
     if (sim_clock_queue != NULL)
         sim_interval = sim_clock_queue->time;
     else sim_interval = noqueue_time = NOQUEUE_WAIT;
+    AIO_POLL_BEGIN(uptr);
     if (uptr->action != NULL)
         reason = uptr->action (uptr);
     else reason = SCPE_OK;
+    AIO_POLL_COMPLETE(uptr, reason);
     } while ((reason == SCPE_OK) && (sim_interval == 0));
 
 /* Empty queue forces sim_interval != 0 */
@@ -5214,6 +5297,11 @@ return reason;
    Outputs:
         reason  =       result (SCPE_OK if ok)
 */
+
+t_stat _sim_activate (UNIT *uptr, int32 event_time)
+{
+return sim_activate (uptr, event_time);
+}
 
 t_stat sim_activate (UNIT *uptr, int32 event_time)
 {
@@ -5291,6 +5379,74 @@ if (0x80000000 <= urtime-rtimenow)
     return sim_activate (uptr, 0);
 else
     return sim_activate (uptr, urtime-rtimenow);
+}
+
+
+/* sim_activate_after - activate (queue) event
+
+   Inputs:
+        uptr    =       pointer to unit
+        usec_delay =    relative timeout (in microseconds)
+   Outputs:
+        reason  =       result (SCPE_OK if ok)
+*/
+
+t_stat sim_activate_after (UNIT *uptr, int32 usec_delay)
+{
+#if defined(SIM_ASYNCH_IO)
+int32 inst_delay;
+int32 inst_per_sec = (*sim_tmr_poll)*(*sim_clk_tps);
+
+if (0 == inst_per_sec)
+    inst_per_sec = 1000;
+/* compute instruction count avoiding overflow */
+if ((0 == (usec_delay%1000000)) || /* whole seconds? */
+    (usec_delay > 100000000))      /* more than 100 seconds */
+    inst_delay = inst_per_sec*(usec_delay/1000000);
+else
+    if ((0 == (usec_delay%1000)) || /* whole milliseconds seconds? */
+        (usec_delay > 1000000))     /* more than a second */
+        inst_delay = (inst_per_sec*(usec_delay/1000))/1000;
+    else                            /* microseconds */
+        inst_delay = (inst_per_sec*usec_delay)/1000000;
+return sim_activate (uptr, inst_delay);
+#else
+UNIT *cptr, *prvptr;
+int32 accum;
+
+if (sim_is_active (uptr))                               /* already active? */
+    return SCPE_OK;
+pthread_mutex_lock (&sim_asynch_lock);
+if (sim_wallclock_queue == NULL) {
+    UPDATE_SIM_TIME (noqueue_time);
+    }
+else  {                                                 /* update sim time */
+    UPDATE_SIM_TIME (sim_clock_queue->time);
+    }
+
+prvptr = NULL;
+accum = 0;
+for (cptr = sim_wallclock_queue; cptr != NULL; cptr = cptr->next) {
+    if (usec_delay < (accum + cptr->time))
+        break;
+    accum = accum + cptr->time;
+    prvptr = cptr;
+    }
+if (prvptr == NULL) {                                   /* insert at head */
+    cptr = uptr->next = sim_wallclock_queue;
+    sim_wallclock_queue = uptr;
+    }
+else {
+    cptr = uptr->next = prvptr->next;                   /* insert at prvptr */
+    prvptr->next = uptr;
+    }
+uptr->time = usec_delay - accum;
+if (cptr != NULL)
+    cptr->time = cptr->time - uptr->time;
+if (prvptr == NULL) /* Need to wake timer thread to time first element on list */
+pthread_mutex_unlock (&sim_asynch_lock);
+#endif
+return SCPE_OK;
 }
 
 /* sim_cancel - cancel (dequeue) event

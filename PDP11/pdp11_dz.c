@@ -163,12 +163,14 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, dz_ldsc };  /* mux descriptor */
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
 #define DBG_INT  0x0002                                 /* display transfer requests */
+#define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 
 DEBTAB dz_debug[] = {
   {"REG",    DBG_REG},
   {"INT",    DBG_INT},
+  {"TRC",    DBG_TRC},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
   {0}
@@ -420,6 +422,8 @@ return SCPE_OK;
 t_stat dz_svc (UNIT *uptr)
 {
 int32 dz, t, newln;
+
+sim_debug(DBG_TRC, find_dev_from_unit(uptr), "dz_svc()\n");
 
 for (dz = t = 0; dz < DZ_MUXES; dz++)                   /* check enabled */
     t = t | (dz_csr[dz] & CSR_MSE);

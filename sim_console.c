@@ -118,9 +118,20 @@
 */
 
 #include "sim_defs.h"
-#include "sim_sock.h"
 #include "sim_tmxr.h"
+#include "sim_timer.h"
 #include <ctype.h>
+
+/* Forward Declaraations of Platform specific routines */
+
+t_stat sim_os_poll_kbd (void);
+t_bool sim_os_poll_kbd_ready (int ms_timeout);
+t_stat sim_os_putchar (int32 out);
+t_stat sim_os_ttinit (void);
+t_stat sim_os_ttrun (void);
+t_stat sim_os_ttcmd (void);
+t_stat sim_os_ttclose (void);
+t_bool sim_os_ttisatty (void);
 
 #define KMAP_WRU        0
 #define KMAP_BRK        1
@@ -136,14 +147,46 @@ int32 sim_del_char = '\b';                              /* delete character */
 #else
 int32 sim_del_char = 0177;
 #endif
-TMLN sim_con_ldsc = { 0 };                              /* console line descr */
-TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc };         /* console line mux */
+
+t_stat sim_con_poll_svc (UNIT *uptr);                               /* console connection poll routine */
+UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };           /* console connection unit */
+/* debugging bitmaps */
+#define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
+#define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
+#define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+
+DEBTAB sim_con_debug[] = {
+  {"TRC",    DBG_TRC},
+  {"XMT",    DBG_XMT},
+  {"RCV",    DBG_RCV},
+  {0}
+};
+
+DEVICE sim_con_telnet = {"Console Telnet", &sim_con_unit, NULL, NULL, 1, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, DEV_DEBUG, 0, sim_con_debug};
+TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
+TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
+
+/* Unit service for console connection polling */
+
+t_stat sim_con_poll_svc (UNIT *uptr)
+{
+if (sim_con_tmxr.master == 0)                           /* not Telnet? done */
+    return SCPE_OK;
+if (tmxr_poll_conn (&sim_con_tmxr) >= 0)                /* poll connect */
+    sim_con_ldsc.rcve = 1;                              /* rcv enabled */
+sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
+return SCPE_OK;
+}
+
 
 extern volatile int32 stop_cpu;
 extern int32 sim_quiet;
 extern FILE *sim_log, *sim_deb;
 extern FILEREF *sim_log_ref, *sim_deb_ref;
 extern DEVICE *sim_devices[];
+extern t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+extern t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+
 
 /* Set/show data structures */
 
@@ -156,8 +199,8 @@ static CTAB set_con_tab[] = {
     { "NOTELNET", &sim_set_notelnet, 0 },
     { "LOG", &sim_set_logon, 0 },
     { "NOLOG", &sim_set_logoff, 0 },
-    { "DEBUG", &sim_set_debon, 0 },
-    { "NODEBUG", &sim_set_deboff, 0 },
+    { "DEBUG", &sim_set_cons_debug, 1 },
+    { "NODEBUG", &sim_set_cons_debug, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -168,7 +211,7 @@ static SHTAB show_con_tab[] = {
     { "PCHAR", &sim_show_pchar, 0 },
     { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
-    { "DEBUG", &sim_show_debug, 0 },
+    { "DEBUG", &sim_show_cons_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { NULL, NULL, 0 }
     };
@@ -431,7 +474,9 @@ while (*cptr != 0) {                                    /* do all mods */
     if (isdigit (*gbuf)) {
         if (sim_con_tmxr.master)                        /* already open? */
             sim_set_notelnet (0, NULL);                 /* close first */
-        return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
+        r = tmxr_attach (&sim_con_tmxr, &sim_con_unit, gbuf);/* open master socket */
+        sim_activate_after(&sim_con_unit, 1000000);     /* check for connection in 1 second */
+        return r;
         }
     else
         if ((ctptr = find_ctab (set_con_telnet_tab, gbuf))) { /* match? */
@@ -476,6 +521,28 @@ else {
 return SCPE_OK;
 }
 
+/* Show console Debug status */
+
+t_stat sim_show_cons_debug (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+return show_dev_debug (st, &sim_con_telnet, sim_con_telnet.units, flag, cptr);
+}
+
+/* Set console to Debug  */
+
+t_stat sim_set_cons_debug (int32 flg, char *cptr)
+{
+t_stat r = set_dev_debug (&sim_con_telnet, sim_con_telnet.units, flg, cptr);
+
+if ((r == SCPE_OK) && (sim_con_ldsc.uptr != &sim_con_unit)) {
+    DEVICE *dptr = find_dev_from_unit(sim_con_ldsc.uptr);
+
+    dptr->dctrl = sim_con_telnet.dctrl;
+    if (dptr->debflags == NULL)
+        dptr->debflags = sim_con_telnet.debflags;
+    }
+return r;
+}
 
 /* Set console to Buffering  */
 
@@ -564,7 +631,7 @@ if (strcmp (gbuf, "LOG") == 0) {                        /* output to log? */
         ++(*pref)->refcount;
     }
 else if (strcmp (gbuf, "DEBUG") == 0) {                 /* output to debug? */
-    if (sim_deb == NULL)                              /* any debug? */
+    if (sim_deb == NULL)                                /* any debug? */
         return SCPE_ARG;
     *pf = sim_deb;
     *pref = sim_deb_ref;
@@ -685,8 +752,14 @@ t_stat sim_poll_kbd (void)
 int32 c;
 
 c = sim_os_poll_kbd ();                                 /* get character */
-if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0))     /* ^E or not Telnet? */
+if ((c == SCPE_STOP) || (sim_con_tmxr.master == 0)) {   /* ^E or not Telnet? */
+    if (c & SCPE_KFLAG)
+        sim_debug (DBG_RCV, &sim_con_telnet, "Received: '%c'\n", c);
+    else
+        if (c == SCPE_STOP)
+            sim_debug (DBG_RCV, &sim_con_telnet, "Received: - STOP\n");
     return c;                                           /* in-window */
+    }
 if (sim_con_ldsc.conn == 0) {                           /* no Telnet conn? */
     if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
         return SCPE_LOST;                               /* connection lost */
@@ -708,6 +781,7 @@ t_stat sim_putchar (int32 c)
 if (sim_con_tmxr.master == 0) {                         /* not Telnet? */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
+    sim_debug (DBG_XMT, &sim_con_telnet, "Sending: '%c'\n", c);
     return sim_os_putchar (c);                          /* in-window version */
     }
 if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
@@ -730,6 +804,7 @@ t_stat r;
 if (sim_con_tmxr.master == 0) {                         /* not Telnet? */
     if (sim_log)                                        /* log file? */
         fputc (c, sim_log);
+    sim_debug (DBG_XMT, &sim_con_telnet, "Sending: '%c'\n", c);
     return sim_os_putchar (c);                          /* in-window version */
     }
 if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
@@ -789,6 +864,139 @@ else c = c & 0377;
 return c;
 }
 
+
+#if defined(SIM_ASYNCH_IO)
+extern pthread_mutex_t     sim_tmxr_poll_lock;
+extern pthread_cond_t      sim_tmxr_poll_cond;
+extern int32               sim_tmxr_poll_count;
+extern t_bool              sim_tmxr_poll_running;
+extern pthread_t           sim_console_poll_thread;       /* Keyboard Polling Thread Id */
+extern pthread_cond_t      sim_console_startup_cond;
+extern t_bool              sim_console_poll_running;
+extern int32 sim_is_running;
+
+static void *
+_console_poll(void *arg)
+{
+int sched_policy;
+struct sched_param sched_priority;
+int poll_timeout_count = 0;
+int wait_count = 0;
+
+/* Boost Priority for this I/O thread vs the CPU instruction execution 
+   thread which, in general, won't be readily yielding the processor when 
+   this thread needs to run */
+pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
+++sched_priority.sched_priority;
+pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+
+sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - starting\n");
+
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+pthread_cond_signal (&sim_console_startup_cond);   /* Signal we're ready to go */
+while (sim_asynch_enabled) {
+    DEVICE *d;
+
+    /* If we started something, let it finish before polling again */
+    if (wait_count) {
+        pthread_cond_wait (&sim_tmxr_poll_cond, &sim_tmxr_poll_lock);
+        sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - continuing with ti\n");
+        }
+
+    if (!sim_is_running)
+        break;
+
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+    wait_count = 0;
+    if (sim_os_poll_kbd_ready (1000)) {
+        sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - Keyboard Data available\n");
+        pthread_mutex_lock (&sim_tmxr_poll_lock);
+        ++wait_count;
+        if (!sim_con_ldsc.uptr->a_polling_now) {
+            sim_con_ldsc.uptr->a_polling_now = TRUE;
+            sim_con_ldsc.uptr->a_poll_waiter_count = 1;
+            d = find_dev_from_unit(sim_con_ldsc.uptr);
+            sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - Activating %s\n", d->name);
+            _sim_activate (sim_con_ldsc.uptr, 0);
+            }
+        else
+            ++sim_con_ldsc.uptr->a_poll_waiter_count;
+        }
+    else
+        pthread_mutex_lock (&sim_tmxr_poll_lock);
+
+    sim_tmxr_poll_count += wait_count;
+    }
+pthread_mutex_unlock (&sim_tmxr_poll_lock);
+
+sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - exiting\n");
+
+return NULL;
+}
+
+
+#endif
+
+
+t_stat sim_ttinit (void)
+{
+sim_register_internal_device (&sim_con_telnet);
+tmxr_startup ();
+return sim_os_ttinit ();
+}
+
+t_stat sim_ttrun (void)
+{
+if (!sim_con_tmxr.ldsc->uptr)                           /* If simulator didn't declare its input polling unit */
+    sim_con_unit.flags &= ~UNIT_TM_POLL;                /* we can't poll asynchronously */
+#if defined(SIM_ASYNCH_IO)
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+if (sim_asynch_enabled) {
+    pthread_attr_t attr;
+
+    pthread_cond_init (&sim_console_startup_cond, NULL);
+    pthread_attr_init (&attr);
+    pthread_attr_setscope (&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_create (&sim_console_poll_thread, &attr, _console_poll, NULL);
+    pthread_attr_destroy( &attr);
+    pthread_cond_wait (&sim_console_startup_cond, &sim_tmxr_poll_lock); /* Wait for thread to stabilize */
+    pthread_cond_destroy (&sim_console_startup_cond);
+    sim_console_poll_running = TRUE;
+    }
+pthread_mutex_unlock (&sim_tmxr_poll_lock);
+#endif
+tmxr_start_poll ();
+return sim_os_ttrun ();
+}
+
+t_stat sim_ttcmd (void)
+{
+#if defined(SIM_ASYNCH_IO)
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+if (sim_console_poll_running) {
+    pthread_cond_signal (&sim_tmxr_poll_cond);
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+    pthread_join (sim_console_poll_thread, NULL);
+    sim_console_poll_running = FALSE;
+    }
+else
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+#endif
+tmxr_stop_poll ();
+return sim_os_ttcmd ();
+}
+
+t_stat sim_ttclose (void)
+{
+tmxr_shutdown ();
+return sim_os_ttclose ();
+}
+
+t_bool sim_ttisatty (void)
+{
+return sim_os_ttisatty ();
+}
+
 /* VMS routines, from Ben Thomas, with fixes from Robert Alan Byer */
 
 #if defined (VMS)
@@ -796,6 +1004,7 @@ return c;
 #if defined(__VAX)
 #define sys$assign SYS$ASSIGN
 #define sys$qiow SYS$QIOW
+#define sys$dassgn SYS$DASSGN
 #endif
 
 #include <descrip.h>
@@ -808,6 +1017,7 @@ return c;
 
 #define EFN 0
 uint32 tty_chan = 0;
+int buffered_character = 0;
 
 typedef struct {
     unsigned short sense_count;
@@ -824,7 +1034,7 @@ typedef struct {
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
 
-t_stat sim_ttinit (void)
+t_stat sim_os_ttinit (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -867,17 +1077,19 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
 return SCPE_OK;
 }
 
-t_stat sim_ttclose (void)
+t_stat sim_os_ttclose (void)
 {
-return sim_ttcmd ();
+sim_ttcmd ();
+sys$dassgn (tty_chan);
+return SCPE_OK;
 }
 
-t_bool sim_ttisatty (void)
+t_bool sim_os_ttisatty (void)
 {
 return isatty (fileno (stdin));
 }
 
-t_stat sim_os_poll_kbd (void)
+t_stat sim_os_poll_kbd_data (void)
 {
 unsigned int status, term[2];
 unsigned char buf[4];
@@ -901,6 +1113,40 @@ if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
 return (buf[0] | SCPE_KFLAG);
 }
+
+t_stat sim_os_poll_kbd (void)
+{
+t_stat response;
+
+if (response = buffered_character) {
+    buffered_character = 0;
+    return response;
+    }
+return sim_os_poll_kbd_data ();
+}
+
+t_bool sim_os_poll_kbd_ready (int ms_timeout)
+{
+unsigned int status, term[2];
+unsigned char buf[4];
+IOSB iosb;
+
+term[0] = 0; term[1] = 0;
+status = sys$qiow (EFN, tty_chan,
+    IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
+    &iosb, 0, 0, buf, 1, (ms_timeout+999)/1000, term, 0, 0);
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+    return FALSE;
+if (buf[0] == sim_int_char)
+    buffered_character = SCPE_STOP;
+else
+    if (sim_brk_char && (buf[0] == sim_brk_char))
+        buffered_character = SCPE_BREAK;
+    else
+        buffered_character = (buf[0] | SCPE_KFLAG)
+return TRUE;
+}
+
 
 t_stat sim_os_putchar (int32 out)
 {
@@ -958,7 +1204,7 @@ ControlHandler(DWORD dwCtrlType)
     return FALSE;
     }
 
-t_stat sim_ttinit (void)
+t_stat sim_os_ttinit (void)
 {
 SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
@@ -969,7 +1215,7 @@ if ((std_input) &&                                      /* Not Background proces
 return SCPE_OK;
 }
  
-t_stat sim_ttrun (void)
+t_stat sim_os_ttrun (void)
 {
 if ((std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE) &&
@@ -984,7 +1230,7 @@ SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
-t_stat sim_ttcmd (void)
+t_stat sim_os_ttcmd (void)
 {
 if (sim_log) {
     fflush (sim_log);
@@ -998,12 +1244,12 @@ if ((std_input) &&                                      /* If Not Background pro
 return SCPE_OK;
 }
 
-t_stat sim_ttclose (void)
+t_stat sim_os_ttclose (void)
 {
 return SCPE_OK;
 }
 
-t_bool sim_ttisatty (void)
+t_bool sim_os_ttisatty (void)
 {
 DWORD Mode;
 
@@ -1016,7 +1262,7 @@ int c = -1;
 DWORD nkbevents, nkbevent;
 INPUT_RECORD rec;
 
-\
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd()\n");
 
 if ((std_input == NULL) ||                              /* No keyboard for */
     (std_input == INVALID_HANDLE_VALUE))                /* background processes */
@@ -1053,6 +1299,17 @@ if ((sim_brk_char && ((c & 0177) == sim_brk_char)) || (c & SCPE_BREAK))
 return c | SCPE_KFLAG;
 }
 
+t_bool sim_os_poll_kbd_ready (int ms_timeout)
+{
+sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd_ready()\n");
+if ((std_input == NULL) ||                              /* No keyboard for */
+    (std_input == INVALID_HANDLE_VALUE)) {              /* background processes */
+    Sleep (ms_timeout);
+    return FALSE;
+    }
+return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
+}
+
 t_stat sim_os_putchar (int32 c)
 {
 DWORD unused;
@@ -1068,27 +1325,27 @@ return SCPE_OK;
 
 #include <conio.h>
 
-t_stat sim_ttinit (void)
+t_stat sim_os_ttinit (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_ttrun (void)
+t_stat sim_os_ttrun (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_ttcmd (void)
+t_stat sim_os_ttcmd (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_ttclose (void)
+t_stat sim_os_ttclose (void)
 {
 return SCPE_OK;
 }
 
-t_bool sim_ttisatty (void)
+t_bool sim_os_ttisatty (void)
 {
 return 1;
 }
@@ -1122,6 +1379,12 @@ if ((c & 0177) == sim_int_char)
 if (sim_brk_char && ((c & 0177) == sim_brk_char))
     return SCPE_BREAK;
 return c | SCPE_KFLAG;
+}
+
+t_bool sim_os_poll_kbd_ready (int ms_timeout)   /* Don't know how to do this on this platform */
+{
+sim_os_ms_sleep (MIN(20,ms_timeout));           /* Wait a little */
+return TRUE;                                    /* force a poll */
 }
 
 t_stat sim_os_putchar (int32 c)
@@ -1251,7 +1514,7 @@ int ps_getch(void) {
 
 /* Note that this only works if the call to sim_ttinit comes before any output to the console */
 
-t_stat sim_ttinit (void) {
+t_stat sim_os_ttinit (void) {
     int i;
     /* this blank will later be replaced by the number of characters */
     char title[50] = " ";
@@ -1274,22 +1537,22 @@ t_stat sim_ttinit (void) {
     return SCPE_OK;
 }
 
-t_stat sim_ttrun (void)
+t_stat sim_os_ttrun (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_ttcmd (void)
+t_stat sim_os_ttcmd (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_ttclose (void)
+t_stat sim_os_ttclose (void)
 {
 return SCPE_OK;
 }
 
-t_bool sim_ttisatty (void)
+t_bool sim_os_ttisatty (void)
 {
 return 1;
 }
@@ -1307,6 +1570,12 @@ if ((c & 0177) == sim_int_char) return SCPE_STOP;
 if (sim_brk_char && ((c & 0177) == sim_brk_char))
     return SCPE_BREAK;
 return c | SCPE_KFLAG;
+}
+
+t_bool sim_os_poll_kbd_ready (int ms_timeout)   /* Don't know how to do this on this platform */
+{
+sim_os_ms_sleep (MIN(20,ms_timeout));           /* Wait a little */
+return TRUE;                                    /* force a poll */
 }
 
 t_stat sim_os_putchar (int32 c)
@@ -1331,7 +1600,7 @@ struct tchars cmdtchars,runtchars;                      /* V7 editing */
 struct ltchars cmdltchars,runltchars;                   /* 4.2 BSD editing */
 int cmdfl,runfl;                                        /* TTY flags */
 
-t_stat sim_ttinit (void)
+t_stat sim_os_ttinit (void)
 {
 cmdfl = fcntl (0, F_GETFL, 0);                          /* get old flags  and status */
 runfl = cmdfl | FNDELAY;
@@ -1358,7 +1627,7 @@ runltchars.t_lnextc = 0xFF;
 return SCPE_OK;                                         /* return success */
 }
 
-t_stat sim_ttrun (void)
+t_stat sim_os_ttrun (void)
 {
 runtchars.t_intrc = sim_int_char;                       /* in case changed */
 fcntl (0, F_SETFL, runfl);                              /* non-block mode */
@@ -1372,7 +1641,7 @@ nice (10);                                              /* lower priority */
 return SCPE_OK;
 }
 
-t_stat sim_ttcmd (void)
+t_stat sim_os_ttcmd (void)
 {
 nice (-10);                                             /* restore priority */
 fcntl (0, F_SETFL, cmdfl);                              /* block mode */
@@ -1385,12 +1654,12 @@ if (ioctl (0, TIOCSLTC, &cmdltchars) < 0)
 return SCPE_OK;
 }
 
-t_stat sim_ttclose (void)
+t_stat sim_os_ttclose (void)
 {
 return sim_ttcmd ();
 }
 
-t_bool sim_ttisatty (void)
+t_bool sim_os_ttisatty (void)
 {
 return isatty (0);
 }
@@ -1405,6 +1674,22 @@ if (status != 1) return SCPE_OK;
 if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
 else return (buf[0] | SCPE_KFLAG);
+}
+
+t_bool sim_os_poll_kbd_ready (int ms_timeout)
+{
+fd_set readfds;
+struct timeval timeout;
+
+if (!isatty (0)) {                           /* skip if !tty */
+    sim_os_ms_sleep (ms_timeout);
+    return FALSE;
+    }
+FD_ZERO (&readfds);
+FD_SET (0, &readfds);
+timeout.tv_sec = 0;
+timeout.tv_usec = ms_timeout*1000;
+return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
 t_stat sim_os_putchar (int32 out)
@@ -1426,7 +1711,7 @@ return SCPE_OK;
 struct termios cmdtty, runtty;
 static int prior_norm = 1;
 
-t_stat sim_ttinit (void)
+t_stat sim_os_ttinit (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
@@ -1468,7 +1753,7 @@ runtty.c_cc[VSTATUS] = 0;
 return SCPE_OK;
 }
 
-t_stat sim_ttrun (void)
+t_stat sim_os_ttrun (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
@@ -1483,7 +1768,7 @@ if (prior_norm) {                                       /* at normal pri? */
 return SCPE_OK;
 }
 
-t_stat sim_ttcmd (void)
+t_stat sim_os_ttcmd (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
@@ -1497,12 +1782,12 @@ if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0)
 return SCPE_OK;
 }
 
-t_stat sim_ttclose (void)
+t_stat sim_os_ttclose (void)
 {
 return sim_ttcmd ();
 }
 
-t_bool sim_ttisatty(void)
+t_bool sim_os_ttisatty (void)
 {
 return isatty (fileno (stdin));
 }
@@ -1517,6 +1802,22 @@ if (status != 1) return SCPE_OK;
 if (sim_brk_char && (buf[0] == sim_brk_char))
     return SCPE_BREAK;
 else return (buf[0] | SCPE_KFLAG);
+}
+
+t_bool sim_os_poll_kbd_ready (int ms_timeout)
+{
+fd_set readfds;
+struct timeval timeout;
+
+if (!sim_os_ttisatty()) {                   /* skip if !tty */
+    sim_os_ms_sleep (ms_timeout);
+    return FALSE;
+    }
+FD_ZERO (&readfds);
+FD_SET (0, &readfds);
+timeout.tv_sec = 0;
+timeout.tv_usec = ms_timeout*1000;
+return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
 t_stat sim_os_putchar (int32 out)

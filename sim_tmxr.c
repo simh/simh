@@ -1,4 +1,4 @@
-/* sim_tmxr.c: Telnet terminal multiplexor library
+/* sim_tmxr.c: Telnet terminal multiplexer library
 
    Copyright (c) 2001-2011, Robert M Supnik
 
@@ -57,33 +57,37 @@
 
    This library includes:
 
-   tmxr_poll_conn -     poll for connection
-   tmxr_reset_ln -      reset line
-   tmxr_getc_ln -       get character for line
-   tmxr_poll_rx -       poll receive
-   tmxr_putc_ln -       put character for line
-   tmxr_poll_tx -       poll transmit
-   tmxr_open_master -   open master connection
-   tmxr_close_master -  close master connection
-   tmxr_attach  -       attach terminal multiplexor
-   tmxr_detach  -       detach terminal multiplexor
-   tmxr_ex      -       (null) examine
-   tmxr_dep     -       (null) deposit
-   tmxr_msg     -       send message to socket
-   tmxr_linemsg -       send message to line
-   tmxr_fconns  -       output connection status
-   tmxr_fstats  -       output connection statistics
-   tmxr_dscln   -       disconnect line (SET routine)
-   tmxr_rqln    -       number of available characters for line
-   tmxr_tqln    -       number of buffered characters for line
-   tmxr_set_lnorder -   set line connection order
-   tmxr_show_lnorder -  show line connection order
+   tmxr_poll_conn -         poll for connection
+   tmxr_reset_ln -          reset line
+   tmxr_getc_ln -           get character for line
+   tmxr_poll_rx -           poll receive
+   tmxr_putc_ln -           put character for line
+   tmxr_poll_tx -           poll transmit
+   tmxr_open_master -       open master connection
+   tmxr_close_master -      close master connection
+   tmxr_attach  -           attach terminal multiplexer
+   tmxr_detach  -           detach terminal multiplexer
+   tmxr_ex      -           (null) examine
+   tmxr_dep     -           (null) deposit
+   tmxr_msg     -           send message to socket
+   tmxr_linemsg -           send message to line
+   tmxr_fconns  -           output connection status
+   tmxr_fstats  -           output connection statistics
+   tmxr_dscln   -           disconnect line (SET routine)
+   tmxr_rqln    -           number of available characters for line
+   tmxr_tqln    -           number of buffered characters for line
+   tmxr_set_lnorder -       set line connection order
+   tmxr_show_lnorder -      show line connection order
+   tmxr_show_open_devices - show info about all open tmxr devices 
+   tmxr_startup -           initialize the tmxr library
+   tmxr_shutdown -          shutdown the tmxr library
 
    All routines are OS-independent.
 */
 
+#define NOT_MUX_USING_CODE /* sim_tmxr library define */
+
 #include "sim_defs.h"
-#include "sim_sock.h"
 #include "sim_tmxr.h"
 #include "scp.h"
 #include <ctype.h>
@@ -134,6 +138,7 @@ int32 tmxr_send_buffered_data (TMLN *lp);
 TMLN *tmxr_find_ldsc (UNIT *uptr, int32 val, TMXR *mp);
 
 extern int32 sim_switches;
+extern int32 sim_is_running;
 extern char sim_name[];
 extern FILE *sim_log;
 extern uint32 sim_os_msec (void);
@@ -143,7 +148,7 @@ extern uint32 sim_os_msec (void);
    Called from unit service routine to test for new connection
 
    Inputs:
-        *mp     =       pointer to terminal multiplexor descriptor
+        *mp     =       pointer to terminal multiplexer descriptor
    Outputs:
         line number activated, -1 if none
 
@@ -171,10 +176,12 @@ static char mantra[] = {
     TN_IAC, TN_DO, TN_BIN
     };
 
+tmxr_debug_trace (mp, "tmxr_poll_conn()");
 newsock = sim_accept_conn (mp->master, &ipaddr);        /* poll connect */
 if (newsock != INVALID_SOCKET) {                        /* got a live one? */
     op = mp->lnorder;                                   /* get line connection order list pointer */
     i = mp->lines;                                      /* play it safe in case lines == 0 */
+    ++mp->sessions;                                     /* count the new session */
 
     for (j = 0; j < mp->lines; j++, i++) {              /* find next avail line */
         if (op && (*op >= 0) && (*op < mp->lines))      /* order list present and valid? */
@@ -239,6 +246,7 @@ return -1;
 
 void tmxr_reset_ln (TMLN *lp)
 {
+tmxr_debug_trace_line (lp, "tmxr_reset_ln()");
 if (lp->txlog)                                          /* dump log */
     fflush (lp->txlog);
 tmxr_send_buffered_data (lp);                           /* send buffered data */
@@ -265,6 +273,7 @@ int32 tmxr_getc_ln (TMLN *lp)
 int32 j, val = 0;
 uint32 tmp;
 
+tmxr_debug_trace_line (lp, "tmxr_getc_ln()");
 if (lp->conn && lp->rcve) {                             /* conn & enb? */
     j = lp->rxbpi - lp->rxbpr;                          /* # input chrs */
     if (j) {                                            /* any? */
@@ -283,7 +292,7 @@ return val;
 /* Poll for input
 
    Inputs:
-        *mp     =       pointer to terminal multiplexor descriptor
+        *mp     =       pointer to terminal multiplexer descriptor
    Outputs:     none
 */
 
@@ -292,9 +301,10 @@ void tmxr_poll_rx (TMXR *mp)
 int32 i, nbytes, j;
 TMLN *lp;
 
+tmxr_debug_trace (mp, "tmxr_poll_rx()");
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     lp = mp->ldsc + i;                                  /* get line desc */
-    if (!lp->conn || !lp->rcve)                         /* skip if !conn */
+    if (!lp->conn)                                      /* skip if !conn */
         continue;
 
     nbytes = 0;
@@ -415,6 +425,11 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
             }                                           /* end for char */
             if (nbytes != (lp->rxbpi-lp->rxbpr))
                 tmxr_debug (TMXR_DBG_RCV, lp, "Remaining", &(lp->rxb[lp->rxbpi]), lp->rxbpi-lp->rxbpr);
+            if (!lp->rcve) {
+                nbytes = lp->rxbpi-lp->rxbpr;
+                lp->rxbpi = lp->rxbpi - nbytes;         /* reverse pointers */
+                tmxr_debug (TMXR_DBG_RCV, lp, "Receive Disabled...Discarding", &(lp->rxb[lp->rxbpi]), nbytes);
+                }
         }                                               /* end else nbytes */
     }                                                   /* end for lines */
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
@@ -448,35 +463,40 @@ return;
 
    Inputs:
         *lp     =       pointer to line descriptor
-        chr     =       characters
+        chr     =       character
    Outputs:
         status  =       ok, connection lost, or stall
 */
 
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
+if ((lp->conn == 0) &&                                  /* no conn &  */
+    (!(lp->mp && lp->mp->buffered))) {                  /* not buffered? */
+    ++lp->txdrp;                                        /* lost */
+    return SCPE_LOST;
+    }
+tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
 if (lp->txlog)                                          /* log if available */
     fputc (chr, lp->txlog);
-if ((lp->conn == 0) && (!lp->txbfd))                    /* no conn & not buffered? */
-    if (lp->txlog)                                      /* if it was logged, we got it */           
-        return SCPE_OK;
-    else {
-        ++lp->txdrp;                                    /* lost */
-        return SCPE_LOST;
-        }
 #define TXBUF_AVAIL(lp) (lp->txbsz - tmxr_tqln (lp))
 #define TXBUF_CHAR(lp, c) {                               \
     lp->txb[lp->txbpi++] = (char)(c);                     \
+    ++lp->mp->txcount;                                    \
     lp->txbpi %= lp->txbsz;                               \
-    if (lp->txbpi == lp->txbpr)                           \
-        lp->txbpr = (1+lp->txbpr)%lp->txbsz, ++lp->txdrp; \
+    if (lp->txbpi == lp->txbpr) {                         \
+        lp->txbpr = (1+lp->txbpr)%lp->txbsz;              \
+        ++lp->txdrp;                                      \
+        }                                                 \
     }
 if ((lp->txbfd) || (TXBUF_AVAIL(lp) > 1)) {             /* room for char (+ IAC)? */
     if (TN_IAC == (char) chr)                           /* char == IAC ? */
         TXBUF_CHAR (lp, TN_IAC);                        /* stuff extra IAC char */
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
-    if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */
+    if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD)) {/* near full? */
         lp->xmte = 0;                                   /* disable line */
+        if (0 == tmxr_send_buffered_data (lp))          /* try to flush now */
+            lp->xmte = 1;                               /* re-enable since empty now */
+        }
     return SCPE_OK;                                     /* char sent */
     }
 ++lp->txdrp; lp->xmte = 0;                              /* no room, dsbl line */
@@ -486,7 +506,7 @@ return SCPE_STALL;                                      /* char not sent */
 /* Poll for output
 
    Inputs:
-        *mp     =       pointer to terminal multiplexor descriptor
+        *mp     =       pointer to terminal multiplexer descriptor
    Outputs:
         none
 */
@@ -496,6 +516,7 @@ void tmxr_poll_tx (TMXR *mp)
 int32 i, nbytes;
 TMLN *lp;
 
+tmxr_debug_trace (mp, "tmxr_poll_tx()");
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     lp = mp->ldsc + i;                                  /* get line desc */
     if (lp->conn == 0)                                  /* skip if !conn */
@@ -503,6 +524,11 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
         nbytes = tmxr_send_buffered_data (lp);          /* buffered bytes */
         if (nbytes == 0)                                /* buf empty? enab line */
             lp->xmte = 1;
+        if (lp->uptr && 
+            (lp->uptr->flags & UNIT_TM_POLL) &&
+            sim_asynch_enabled &&
+            tmxr_rqln (lp))
+            _sim_activate (lp->uptr, 0);
         }                                               /* end for */
 return;
 }
@@ -519,6 +545,7 @@ int32 tmxr_send_buffered_data (TMLN *lp)
 {
 int32 nbytes, sbytes;
 
+tmxr_debug_trace_line (lp, "tmxr_send_buffered_data()");
 nbytes = tmxr_tqln(lp);                                 /* avail bytes */
 if (nbytes) {                                           /* >0? write */
     if (lp->txbpr < lp->txbpi)                          /* no wrap? */
@@ -565,6 +592,7 @@ SOCKET sock;
 TMLN *lp;
 t_stat r;
 
+tmxr_debug_trace (mp, "tmxr_open_master()");
 if (!isdigit(*cptr)) {
     char gbuf[CBUFSIZE];
     cptr = get_glyph (cptr, gbuf, '=');
@@ -653,6 +681,7 @@ mp->port = port;                                        /* save port */
 mp->master = sock;                                      /* save master socket */
 for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
     lp = mp->ldsc + i;
+    lp->mp = mp;
     lp->conn = lp->tsta = 0;
     lp->rxbpi = lp->rxbpr = 0;
     lp->txbpi = lp->txbpr = 0;
@@ -668,9 +697,333 @@ for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
 return SCPE_OK;
 }
 
+t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll)
+{
+if ((line < 0) || (line >= mp->lines))
+    return SCPE_ARG;
+mp->ldsc[line].uptr = uptr_poll;
+return SCPE_OK;
+}
+
+t_stat tmxr_set_console_input_unit (UNIT *uptr)
+{
+extern TMLN sim_con_ldsc;
+
+sim_con_ldsc.uptr = uptr;
+if (!(uptr->flags & UNIT_TM_POLL)) {
+    uptr->flags |= UNIT_TM_POLL;                    /* tag as polling unit */
+    }
+return SCPE_OK;
+}
+
+
+static TMXR **tmxr_open_devices = NULL;
+static int tmxr_open_device_count = 0;
+
+#if defined(SIM_ASYNCH_IO)
+pthread_t           sim_tmxr_poll_thread;          /* Polling Thread Id */
+pthread_mutex_t     sim_tmxr_poll_lock;
+pthread_cond_t      sim_tmxr_poll_cond;
+pthread_cond_t      sim_tmxr_startup_cond;
+int32               sim_tmxr_poll_count = 0;
+t_bool              sim_tmxr_poll_running = FALSE;
+pthread_t           sim_console_poll_thread;       /* Keyboard Polling Thread Id */
+pthread_cond_t      sim_console_startup_cond;
+t_bool              sim_console_poll_running = FALSE;
+
+static void *
+_tmxr_poll(void *arg)
+{
+int sched_policy;
+struct sched_param sched_priority;
+struct timeval timeout;
+int timeout_usec;
+DEVICE *dptr = tmxr_open_devices[0]->dptr;
+UNIT **units = NULL;
+UNIT **activated = NULL;
+SOCKET *sockets = NULL;
+int wait_count = 0;
+
+/* Boost Priority for this I/O thread vs the CPU instruction execution 
+   thread which, in general, won't be readily yielding the processor when 
+   this thread needs to run */
+pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
+++sched_priority.sched_priority;
+pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+
+sim_debug (TMXR_DBG_TRC, dptr, "_tmxr_poll() - starting\n");
+
+units = calloc(FD_SETSIZE, sizeof(*units));
+activated = calloc(FD_SETSIZE, sizeof(*activated));
+sockets = calloc(FD_SETSIZE, sizeof(*sockets));
+timeout_usec = 1000000;
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+pthread_cond_signal (&sim_tmxr_startup_cond);   /* Signal we're ready to go */
+while (sim_asynch_enabled) {
+    int i, j, status;
+    fd_set readfds, errorfds;
+    int socket_count;
+    SOCKET max_socket_fd;
+    TMXR *mp;
+    DEVICE *d;
+
+    /* If we started something we should wait for, let it finish before polling again */
+    if (wait_count) {
+        pthread_cond_wait (&sim_tmxr_poll_cond, &sim_tmxr_poll_lock);
+        sim_debug (TMXR_DBG_TRC, dptr, "_tmxr_poll() - continuing with timeout of %dms\n", timeout_usec/1000);
+        }
+    if ((tmxr_open_device_count == 0) || (!sim_is_running))
+        break;
+    FD_ZERO (&readfds);
+    FD_ZERO (&errorfds);
+    for (i=max_socket_fd=socket_count=0; i<tmxr_open_device_count; ++i) {
+        mp = tmxr_open_devices[i];
+        if ((mp->master) && (mp->uptr->flags&UNIT_TM_POLL)) {
+            units[socket_count] = mp->uptr;
+            sockets[socket_count] = mp->master;
+            FD_SET (mp->master, &readfds);
+            FD_SET (mp->master, &errorfds);
+            if (mp->master > max_socket_fd)
+                max_socket_fd = mp->master;
+            ++socket_count;
+            }
+        for (j=0; j<mp->lines; ++j) {
+            if (mp->ldsc[j].conn) {
+                units[socket_count] = mp->ldsc[j].uptr;
+                if (units[socket_count] == NULL)
+                    units[socket_count] = mp->uptr;
+                sockets[socket_count] = mp->ldsc[j].conn;
+                FD_SET (mp->ldsc[j].conn, &readfds);
+                FD_SET (mp->ldsc[j].conn, &errorfds);
+                if (mp->ldsc[j].conn > max_socket_fd)
+                    max_socket_fd = mp->ldsc[j].conn;
+                ++socket_count;
+                }
+            }
+        }
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+    if (timeout_usec > 1000000)
+        timeout_usec = 1000000;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = timeout_usec;
+    status = select(1+(int)max_socket_fd, &readfds, NULL, &errorfds, &timeout);
+    wait_count=0;
+    pthread_mutex_lock (&sim_tmxr_poll_lock);
+    switch (status) {
+        case 0:     /* timeout */
+            for (i=max_socket_fd=socket_count=0; i<tmxr_open_device_count; ++i) {
+                mp = tmxr_open_devices[i];
+                if (mp->master) {
+                    if (!mp->uptr->a_polling_now) {
+                        mp->uptr->a_polling_now = TRUE;
+                        mp->uptr->a_poll_waiter_count = 0;
+                        d = find_dev_from_unit(mp->uptr);
+                        sim_debug (TMXR_DBG_TRC, d, "_tmxr_poll() - Activating %s%d to poll connect\n", d->name, (int)(mp->uptr-d->units));
+                        _sim_activate (mp->uptr, 0);
+                        }
+                    if (mp->txcount) {
+                        timeout_usec = 10000; /* Wait 10ms next time (this gets doubled below) */
+                        mp->txcount = 0;
+                        }
+                    }
+                for (j=0; j<mp->lines; ++j) {
+                    if ((mp->ldsc[j].conn) && (mp->ldsc[j].uptr)) {
+                        if (tmxr_tqln(&mp->ldsc[j]) || tmxr_rqln (&mp->ldsc[j])) {
+                            timeout_usec = 10000; /* Wait 10ms next time (this gets doubled below) */
+                            /* More than one socket can be associated with the 
+                               same unit.  Make sure to only activate it one time */
+                            if (!mp->ldsc[j].uptr->a_polling_now) {
+                                mp->ldsc[j].uptr->a_polling_now = TRUE;
+                                mp->ldsc[j].uptr->a_poll_waiter_count = 0;
+                                d = find_dev_from_unit(mp->ldsc[j].uptr);
+                                sim_debug (TMXR_DBG_TRC, d, "_tmxr_poll() - Line %d Activating %s%d to poll data: %d/%d\n", 
+                                    j, d->name, (int)(mp->ldsc[j].uptr-d->units), tmxr_tqln(&mp->ldsc[j]), tmxr_rqln (&mp->ldsc[j]));
+                                _sim_activate (mp->ldsc[j].uptr, 0);
+                                }
+                            }
+                        }
+                    }
+                }
+            sim_debug (TMXR_DBG_TRC, dptr, "_tmxr_poll() - Poll Timeout - %dms\n", timeout_usec/1000);
+            timeout_usec *= 2;     /* Double timeout time */  
+            break;
+        case SOCKET_ERROR:
+            abort();
+            break;
+        default:
+            wait_count = 0;
+            for (i=0; i<socket_count; ++i) {
+                if (FD_ISSET(sockets[i], &readfds) || 
+                    FD_ISSET(sockets[i], &errorfds)) {
+                    /* More than one socket can be associated with the 
+                       same unit.  Only activate one time */
+                    for (j=0; j<wait_count; ++j)
+                        if (activated[j] == units[i])
+                            break;
+                    if (j == wait_count) {
+                        activated[j] = units[i];
+                        ++wait_count;
+                        if (!activated[j]->a_polling_now) {
+                            activated[j]->a_polling_now = TRUE;
+                            activated[j]->a_poll_waiter_count = 1;
+                            d = find_dev_from_unit(activated[j]);
+                            sim_debug (TMXR_DBG_TRC, d, "_tmxr_poll() - Activating for data %s%d\n", d->name, (int)(activated[j]-d->units));
+                            _sim_activate (activated[j], 0);
+                            }
+                        else
+                            ++activated[j]->a_poll_waiter_count;
+                        }
+                    }
+                }
+            if (wait_count)
+                timeout_usec = 10000; /* Wait 10ms next time */
+            break;
+        }
+    sim_tmxr_poll_count += wait_count;
+    }
+pthread_mutex_unlock (&sim_tmxr_poll_lock);
+free(units);
+free(activated);
+free(sockets);
+
+sim_debug (TMXR_DBG_TRC, dptr, "_tmxr_poll() - exiting\n");
+
+return NULL;
+}
+#endif
+t_stat tmxr_start_poll (void)
+{
+#if defined(SIM_ASYNCH_IO)
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+if ((tmxr_open_device_count > 0) && 
+    sim_asynch_enabled           && 
+    sim_is_running               && 
+    !sim_tmxr_poll_running) {
+    pthread_attr_t attr;
+
+    pthread_cond_init (&sim_tmxr_startup_cond, NULL);
+    pthread_attr_init (&attr);
+    pthread_attr_setscope (&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_create (&sim_tmxr_poll_thread, &attr, _tmxr_poll, NULL);
+    pthread_attr_destroy( &attr);
+    pthread_cond_wait (&sim_tmxr_startup_cond, &sim_tmxr_poll_lock); /* Wait for thread to stabilize */
+    pthread_cond_destroy (&sim_tmxr_startup_cond);
+    sim_tmxr_poll_running = TRUE;
+    }
+pthread_mutex_unlock (&sim_tmxr_poll_lock);
+#endif
+return SCPE_OK;
+}
+
+t_stat tmxr_stop_poll (void)
+{
+#if defined(SIM_ASYNCH_IO)
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+if (sim_tmxr_poll_running) {
+    pthread_cond_signal (&sim_tmxr_poll_cond);
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+    pthread_join (sim_tmxr_poll_thread, NULL);
+    sim_tmxr_poll_running = FALSE;
+    }
+else
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+#endif
+return SCPE_OK;
+}
+
+static void _tmxr_add_to_open_list (TMXR* mux)
+{
+tmxr_open_devices = realloc(tmxr_open_devices, (tmxr_open_device_count+1)*sizeof(*tmxr_open_devices));
+tmxr_open_devices[tmxr_open_device_count++] = mux;
+if ((tmxr_open_device_count == 1) && (sim_asynch_enabled))
+    tmxr_start_poll ();
+}
+
+static void _tmxr_remove_from_open_list (TMXR* mux)
+{
+int i, j;
+
+#if defined(SIM_ASYNCH_IO)
+tmxr_stop_poll ();
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+#endif
+--tmxr_open_device_count;
+for (i=0; i<tmxr_open_device_count+1; ++i)
+    if (tmxr_open_devices[i] == mux) {
+        for (j=i+1; j<tmxr_open_device_count; ++j)
+            tmxr_open_devices[j-1] = tmxr_open_devices[j];
+        break;
+        }
+#if defined(SIM_ASYNCH_IO)
+pthread_mutex_unlock (&sim_tmxr_poll_lock);
+#endif
+}
+
+t_stat tmxr_change_async (void)
+{
+#if defined(SIM_ASYNCH_IO)
+if (sim_asynch_enabled)
+    tmxr_start_poll ();
+else
+    tmxr_stop_poll ();
+#endif
+return SCPE_OK;
+}
+
+t_stat tmxr_startup (void)
+{
+return SCPE_OK;
+}
+
+t_stat tmxr_shutdown (void)
+{
+if (tmxr_open_device_count)
+    return SCPE_IERR;
+return SCPE_OK;
+}
+
+t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+{
+int i, j;
+
+if (0 == tmxr_open_device_count)
+    fprintf(st, "No Attached Multiplexer Devices\n");
+else {
+    for (i=0; i<tmxr_open_device_count; ++i) {
+        TMXR *mp = tmxr_open_devices[i];
+        TMLN *lp;
+
+        fprintf(st, "Multiplexer device: %s", mp->dptr->name);
+        fprintf(st, ", attached to %s, ", mp->uptr->filename);
+        tmxr_show_lines(st, NULL, 0, mp);
+        fprintf(st, ", ");
+        tmxr_show_summ(st, NULL, 0, mp);
+        fprintf(st, ", sessions=%d\n", mp->sessions);
+        for (j = 0; j < mp->lines; j++) {
+            lp = mp->ldsc + j;
+            fprintf (st, "Line: %d", j);
+            if (lp->uptr && (lp->uptr != lp->mp->uptr)) {
+                DEVICE *dptr = find_dev_from_unit (lp->uptr);
+                fprintf (st, " - Unit: %s%d\n", dptr->name, (int)(lp->uptr-dptr->units));
+                }
+            else
+                fprintf (st, "\n");
+            if (!lp->conn)
+                continue;
+            tmxr_fconns (st, lp, j);
+            tmxr_fstats (st, lp, -1);
+            }
+        }
+    }
+return SCPE_OK;
+}
+
+
+
+
 /* Attach unit to master socket */
 
-t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr)
+t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async)
 {
 char* tptr;
 t_stat r;
@@ -681,6 +1034,7 @@ tptr = (char *) malloc (strlen (cptr) +                 /* get string buf */
                         sizeof(bmsg) + sizeof(lmsg));
 if (tptr == NULL)                                       /* no more mem? */
     return SCPE_MEM;
+mp->uptr = uptr;                                        /* save unit for polling */
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
 if (r != SCPE_OK) {                                     /* error? */
     free (tptr);                                        /* release buf */
@@ -694,10 +1048,13 @@ if (mp->logfiletmpl[0])
 sprintf (tptr, "%s%s%s", pmsg, bmsg, lmsg);             /* assemble all */
 uptr->filename = tptr;                                  /* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
+if (!(uptr->flags & TMUF_NOASYNCH) && async)            /* if asynch not disabled */
+    uptr->flags |= UNIT_TM_POLL;                        /* tag as polling unit */
 
 if (mp->dptr == NULL)                                   /* has device been set? */
     mp->dptr = find_dev_from_unit (uptr);               /* no, so set device now */
 
+_tmxr_add_to_open_list (mp);
 return SCPE_OK;
 }
 
@@ -719,6 +1076,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru conn */
     }                                                   /* end for */
 sim_close_sock (mp->master, 1);                         /* close master socket */
 mp->master = 0;
+_tmxr_remove_from_open_list (mp);
 return SCPE_OK;
 }
 
@@ -731,9 +1089,23 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
 tmxr_close_master (mp);                                 /* close master socket */
 free (uptr->filename);                                  /* free port string */
 uptr->filename = NULL;
-uptr->flags = uptr->flags & ~UNIT_ATT;                  /* not attached */
+uptr->flags = uptr->flags & ~(UNIT_ATT|UNIT_TM_POLL);   /* not attached, no polling */
 return SCPE_OK;
 }
+
+t_stat tmxr_activate (UNIT *uptr, int32 interval)
+{
+#if defined(SIM_ASYNCH_IO)
+if ((!(uptr->flags & UNIT_TM_POLL)) || 
+    (!sim_asynch_enabled)) {
+    return _sim_activate (uptr, interval);
+    }
+return SCPE_OK;
+#else
+return _sim_activate (uptr, interval);
+#endif
+}
+
 
 /* Stub examine and deposit */
 
@@ -833,6 +1205,7 @@ t_stat r;
 
 if (mp == NULL)
     return SCPE_IERR;
+tmxr_debug_trace (mp, "tmxr_dscln()");
 if (val) {                                              /* = n form */
     if (cptr == NULL)
         return SCPE_ARG;
@@ -1119,9 +1492,7 @@ if (mp == NULL)
     return SCPE_IERR;
 for (i = t = 0; i < mp->lines; i++)
     t = t + (mp->ldsc[i].conn != 0);
-if (t == 1)
-    fprintf (st, "1 connection");
-else fprintf (st, "%d connections", t);
+fprintf (st, "%d connection%s", t, (t != 1) ? "s" : "");
 return SCPE_OK;
 }
 
@@ -1210,7 +1581,7 @@ while (*string)
     tmxr_buf_debug_char (*string++);
 }
 
-void tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize)
+void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize)
 {
 if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     int i, j;
@@ -1235,4 +1606,3 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
     }
 }
-
