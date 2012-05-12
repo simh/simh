@@ -26,6 +26,7 @@
 
    DQ           12565A 2883 disk system
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
@@ -100,7 +101,7 @@
 #define CW_V_FNC        12                              /* function */
 #define CW_M_FNC        017
 #define CW_GETFNC(x)    (((x) >> CW_V_FNC) & CW_M_FNC)
-/*                      000                           *//* unused */
+/*                      000                                (unused) */
 #define  FNC_STA        001                             /* status check */
 #define  FNC_RCL        002                             /* recalibrate */
 #define  FNC_SEEK       003                             /* seek */
@@ -530,7 +531,9 @@ void dq_goc (int32 fnc, int32 drv, int32 time)
 {
 int32 t;
 
-if ((t = sim_is_active (&dqc_unit[drv]))) {             /* still seeking? */
+t = sim_is_active (&dqc_unit[drv]);
+
+if (t) {                                                /* still seeking? */
     sim_cancel (&dqc_unit[drv]);                        /* cancel */
     time = time + t;                                    /* include seek time */
     }
@@ -740,10 +743,13 @@ switch (uptr->FNC) {                                    /* case function */
             dqc_rars = (dqc_rars + 1) % DQ_NUMSC;       /* incr sector */
             if (dqc_rars == 0)                          /* wrap? incr head */
                 dqc_uhed[drv] = dqc_rarh = dqc_rarh + 1;
-            if ((err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET))) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)
+                break;
             fxread (dqxb, sizeof (int16), DQ_NUMWD, uptr->fileref);
-            if ((err = ferror (uptr->fileref))) break;
+            err = ferror (uptr->fileref);
+            if (err)
+                break;
             }
         dqd_ibuf = dqxb[dq_ptr++];                      /* get word */
         if (dq_ptr >= DQ_NUMWD) {                       /* end of sector? */
@@ -786,10 +792,13 @@ switch (uptr->FNC) {                                    /* case function */
             dqc_rars = (dqc_rars + 1) % DQ_NUMSC;       /* incr sector */
             if (dqc_rars == 0)                          /* wrap? incr head */
                 dqc_uhed[drv] = dqc_rarh = dqc_rarh + 1;
-            if ((err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET))) return TRUE;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)
+                break;
             fxwrite (dqxb, sizeof (int16), DQ_NUMWD, uptr->fileref);
-            if ((err = ferror (uptr->fileref))) break;
+            err = ferror (uptr->fileref);
+            if (err)
+                break;
             dq_ptr = 0;
             }
         if (dqd.command && dqd_xfer) {                  /* dch on, xfer? */

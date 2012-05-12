@@ -25,6 +25,7 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   07-May-12    JDB     Cancel the intersector delay if an untalk is received
    29-Mar-12    JDB     First release
    04-Nov-11    JDB     Created DA device
 
@@ -1594,10 +1595,10 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 da_unit [unit].wait = icd_cntlr [unit].cmd_time;    /* these are always scheduled and */
                 initiated = TRUE;                                   /*   logged as initiated */
 
-                if (((if_state [unit] == read_wait) &&              /* if we're waiting for a send data secondary */
-                     (message_address != 0x00)) ||                  /*   but it's not there */
-                    ((if_state [unit] == status_wait) &&            /* or a send status secondary, */
-                     (message_address != 0x08)))                    /*   but it's not there */
+                if (if_state [unit] == read_wait                    /* if we're waiting for a send data secondary */
+                  && message_address != 0x00                        /*   but it's not there */
+                  || if_state [unit] == status_wait                 /* or a send status secondary, */
+                  && message_address != 0x08)                       /*   but it's not there */
                     abort_command (unit, io_program_error,          /*   then abort the pending command */
                                    idle);                           /*   and process the new command */
 
@@ -1962,6 +1963,11 @@ return;
 
     2. There is no need to test if we are processing a disc command, as the
        controller would not be busy otherwise.
+
+    3. If an auto-seek will be needed to continue the read, but the seek will
+       fail, then an extra delay is inserted before the service call to start
+       the next sector.  Once an Untalk is received, this delay is no longer
+       needed, so it is cancelled before rescheduling the service routine.
 */
 
 static void complete_read (uint32 unit)
@@ -1974,7 +1980,9 @@ if ((if_state [unit] == command_exec                        /* is a command exec
 
     if_state [unit] = command_exec;                         /* set to execute */
     da_unit [unit].PHASE = end_phase;                       /*   the completion phase */
-    da_unit [unit].wait = icd_cntlr [unit].data_time;       /* ensure that the controller will finish */
+
+    sim_cancel (&da_unit [unit]);                           /* cancel the EOT delay */
+    da_unit [unit].wait = icd_cntlr [unit].data_time;       /* reschedule for completion */
     }
 
 return;

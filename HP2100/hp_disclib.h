@@ -24,7 +24,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   30-Mar-12    JDB     First release
+   07-May-12    JDB     Added end-of-track delay time as a controller variable
+   02-May-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
 
@@ -53,6 +54,7 @@
 
 /* Default controller times */
 
+#define DL_EOT_TIME     160                             /* end-of-track delay time */
 #define DL_SEEK_TIME    100                             /* seek delay time (per cylinder) */
 #define DL_SECTOR_TIME   27                             /* intersector delay time */
 #define DL_CMD_TIME       3                             /* command start delay time */
@@ -330,6 +332,7 @@ typedef struct {
     uint32       index;                                 /* data buffer current index */
     uint32       length;                                /* data buffer valid length */
     UNIT        *aux;                                   /* MAC auxiliary units (controller and timer) */
+    int32        eot_time;                              /* end-of-track read delay time */
     int32        seek_time;                             /* per-cylinder seek delay time */
     int32        sector_time;                           /* intersector delay time */
     int32        cmd_time;                              /* command response time */
@@ -354,7 +357,7 @@ typedef CNTLR_VARS *CVPTR;                              /* pointer to controller
           CLEAR, CLEAR, \
           0, 0, 0, 0, 0, 0, 0, 0, \
           (bufptr), 0, 0, (auxptr), \
-          DL_SEEK_TIME, DL_SECTOR_TIME, \
+          DL_EOT_TIME, DL_SEEK_TIME, DL_SECTOR_TIME, \
           DL_CMD_TIME, DL_DATA_TIME, DL_WAIT_TIME
 
 

@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-May-12    JDB     Quieted warnings for assignments in conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added hp_setsc, hp_showsc functions to support SC modifier
    15-Dec-11    JDB     Added DA and dummy DC devices

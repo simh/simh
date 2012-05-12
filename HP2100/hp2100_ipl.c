@@ -25,6 +25,7 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CARD_INDEX casts to dib.card_index
    07-Apr-11    JDB     A failed STC may now be retried
@@ -623,7 +624,8 @@ uptr->filename = tptr;                                  /* save */
 sim_activate (uptr, POLL_FIRST);                        /* activate first poll "immediately" */
 if (sim_switches & SWMASK ('W')) {                      /* wait? */
     for (i = 0; i < 30; i++) {                          /* check for 30 sec */
-        if ((t = ipl_check_conn (uptr)))                /* established? */
+        t = ipl_check_conn (uptr);
+        if (t)                                          /* established? */
             break;
         if ((i % 10) == 0)                              /* status every 10 sec */
             printf ("Waiting for connnection\n");

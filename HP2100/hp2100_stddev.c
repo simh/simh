@@ -28,6 +28,7 @@
    TTY          12531C buffered teleprinter interface
    CLK          12539C time base generator
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    12-Feb-12    JDB     Add TBG as a logical name for the CLK device
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling
@@ -942,7 +943,9 @@ t_stat r;
 if (tty_mode & TM_PRI) {                                /* printing? */
     c = sim_tt_outcvt (c, TT_GET_MODE (tty_unit[TTO].flags));
     if (c >= 0) {                                       /* valid? */
-        if ((r = sim_putchar_s (c))) return r;          /* output char */
+        r = sim_putchar_s (c);                          /* output char */
+        if (r != SCPE_OK)
+            return r;
         tty_unit[TTO].pos = tty_unit[TTO].pos + 1;
         }
     }
@@ -1114,7 +1117,7 @@ while (working_set) {
 
                 if ((clk_unit.flags & UNIT_DIAG) == 0)          /* calibrated? */
                     if (clk_select == 2)                        /* 10 msec. interval? */
-                        clk_tick = sync_poll (INITIAL);         /* sync  poll */
+                        clk_tick = sync_poll (INITIAL);         /* sync poll */
                     else
                         sim_rtcn_init (clk_tick, TMR_CLK);      /* initialize timer */
 

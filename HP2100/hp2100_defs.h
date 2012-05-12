@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
    10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
    28-Mar-11    JDB     Tidied up signal handling
    29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
@@ -70,6 +71,14 @@
 #define _HP2100_DEFS_H_ 0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+
+/* Required to quell Mark's Mystery Compiler's precedence warnings */
+
+#if defined (__GNUC__)
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
+#endif
 
 
 /* Simulator stop and notification codes */
