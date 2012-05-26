@@ -58,35 +58,44 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #endif
 
 
-#define SIM_NTIMERS     8                               /* # timers */
-#define SIM_TMAX        500                             /* max timer makeup */
+#define SIM_NTIMERS     8                           /* # timers */
+#define SIM_TMAX        500                         /* max timer makeup */
 
-#define SIM_IDLE_CAL    10                              /* ms to calibrate */
-#define SIM_IDLE_MAX    10                              /* max granularity idle */
-#define SIM_IDLE_STMIN  10                              /* min sec for stability */
-#define SIM_IDLE_STDFLT 20                              /* dft sec for stability */
-#define SIM_IDLE_STMAX  600                             /* max sec for stability */
+#define SIM_INITIAL_IPS 50000                       /* uncalibrated assumption */
+                                                    /* about instructions per second */
 
-#define SIM_THROT_WINIT 1000                            /* cycles to skip */
-#define SIM_THROT_WST   10000                           /* initial wait */
-#define SIM_THROT_WMUL  4                               /* multiplier */
-#define SIM_THROT_WMIN  100                             /* min wait */
-#define SIM_THROT_MSMIN 10                              /* min for measurement */
-#define SIM_THROT_NONE  0                               /* throttle parameters */
-#define SIM_THROT_MCYC  1                               /* MegaCycles Per Sec */
-#define SIM_THROT_KCYC  2                               /* KiloCycles Per Sec */
-#define SIM_THROT_PCT   3                               /* Max Percent of host CPU */
-#define SIM_THROT_SPC   4                               /* Specific periodic Delay */
+#define SIM_IDLE_CAL    10                          /* ms to calibrate */
+#define SIM_IDLE_MAX    10                          /* max granularity idle */
+#define SIM_IDLE_STMIN  10                          /* min sec for stability */
+#define SIM_IDLE_STDFLT 20                          /* dft sec for stability */
+#define SIM_IDLE_STMAX  600                         /* max sec for stability */
+
+#define SIM_THROT_WINIT 1000                        /* cycles to skip */
+#define SIM_THROT_WST   10000                       /* initial wait */
+#define SIM_THROT_WMUL  4                           /* multiplier */
+#define SIM_THROT_WMIN  100                         /* min wait */
+#define SIM_THROT_MSMIN 10                          /* min for measurement */
+#define SIM_THROT_NONE  0                           /* throttle parameters */
+#define SIM_THROT_MCYC  1                           /* MegaCycles Per Sec */
+#define SIM_THROT_KCYC  2                           /* KiloCycles Per Sec */
+#define SIM_THROT_PCT   3                           /* Max Percent of host CPU */
+#define SIM_THROT_SPC   4                           /* Specific periodic Delay */
+
+#define TIMER_DBG_IDLE  1                           /* Debug Flag for Idle Debugging */
+#define TIMER_DBG_QUEUE 2                           /* Debug Flag for Asynch Queue Debugging */
 
 t_bool sim_timer_init (void);
 void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);
+#if defined(SIM_ASYNCH_IO)
+double sim_timenow_double (void);
+#endif
 int32 sim_rtcn_init (int32 time, int32 tmr);
 void sim_rtcn_init_all (void);
 int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
 t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
-t_bool sim_idle (uint32 tmr, t_bool sin_cyc);
+t_bool sim_idle (int32 tmr, t_bool sin_cyc);
 t_stat sim_set_throt (int32 arg, char *cptr);
 t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr);
 t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -98,11 +107,14 @@ uint32 sim_os_msec (void);
 void sim_os_sleep (unsigned int sec);
 uint32 sim_os_ms_sleep (unsigned int msec);
 uint32 sim_os_ms_sleep_init (void);
+void sim_start_timer_services (void);
+void sim_stop_timer_services (void);
+t_stat sim_timer_change_asynch (void);
+t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
+int32 sim_timer_inst_per_sec (void);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */
-extern int32 *sim_tmr_poll;                         /* pointer to instructions per clock tick */
-extern int32 *sim_clk_tps;                          /* pointer to clock ticks per second */
-
+extern DEVICE sim_timer_dev;
 
 #endif

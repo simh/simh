@@ -267,7 +267,7 @@ typedef uint32          t_addr;
 #define KBD_MAX_WAIT    500000
 #define SERIAL_IN_WAIT  100                             /* serial in time */
 #define SERIAL_OUT_WAIT 100                             /* serial output */
-#define NOQUEUE_WAIT    10000                           /* min check time */
+#define NOQUEUE_WAIT    1000000                         /* min check time */
 #define KBD_LIM_WAIT(x) (((x) > KBD_MAX_WAIT)? KBD_MAX_WAIT: (x))
 #define KBD_WAIT(w,s)   ((w)? w: KBD_LIM_WAIT (s))
 
@@ -278,6 +278,14 @@ typedef uint32          t_addr;
 /* String match */
 
 #define MATCH_CMD(ptr,cmd) strncmp ((ptr), (cmd), strlen (ptr))
+
+/* End of Linked List/Queue value                           */
+/* Chosen for 2 reasons:                                    */
+/*     1 - to not be NULL, this allowing the NULL value to  */
+/*         indicate inclusion on a list                     */
+/* and                                                      */
+/*     2 - to not be a valid/possible pointer (alignment)   */
+#define QUEUE_LIST_END ((void *)1)
 
 /* Device data structure */
 
@@ -376,33 +384,38 @@ struct sim_unit {
     t_bool              a_polling_now;                  /* polling active flag */
     int32               a_poll_waiter_count;            /* count of polling threads */
                                                         /* waiting for this unit */
+    /* Asynchronous Timer control */
+    double              a_due_time;                     /* due time for timer event */
+    double              a_skew;                         /* accumulated skew being corrected */
+    double              a_last_fired_time;              /* time last event fired */
+    int32               a_usec_delay;                   /* time delay for timer event */
 #endif
     };
 
 /* Unit flags */
 
-#define UNIT_V_UF_31    12                              /* dev spec, V3.1 */
-#define UNIT_V_UF       16                              /* device specific */
-#define UNIT_V_RSV      31                              /* reserved!! */
+#define UNIT_V_UF_31    12              /* dev spec, V3.1 */
+#define UNIT_V_UF       16              /* device specific */
+#define UNIT_V_RSV      31              /* reserved!! */
 
-#define UNIT_ATTABLE    0000001                         /* attachable */
-#define UNIT_RO         0000002                         /* read only */
-#define UNIT_FIX        0000004                         /* fixed capacity */
-#define UNIT_SEQ        0000010                         /* sequential */
-#define UNIT_ATT        0000020                         /* attached */
-#define UNIT_BINK       0000040                         /* K = power of 2 */
-#define UNIT_BUFABLE    0000100                         /* bufferable */
-#define UNIT_MUSTBUF    0000200                         /* must buffer */
-#define UNIT_BUF        0000400                         /* buffered */
-#define UNIT_ROABLE     0001000                         /* read only ok */
-#define UNIT_DISABLE    0002000                         /* disable-able */
-#define UNIT_DIS        0004000                         /* disabled */
-#define UNIT_RAW        0010000                         /* raw mode */
-#define UNIT_TEXT       0020000                         /* text mode */
-#define UNIT_IDLE       0040000                         /* idle eligible */
-#define UNIT_TM_POLL    0100000                         /* TMXR Polling unit */
-                                                        /* This flag is ONLY set dynamically */
-                                                        /* it should NOT be set via initialization */
+#define UNIT_ATTABLE    0000001         /* attachable */
+#define UNIT_RO         0000002         /* read only */
+#define UNIT_FIX        0000004         /* fixed capacity */
+#define UNIT_SEQ        0000010         /* sequential */
+#define UNIT_ATT        0000020         /* attached */
+#define UNIT_BINK       0000040         /* K = power of 2 */
+#define UNIT_BUFABLE    0000100         /* bufferable */
+#define UNIT_MUSTBUF    0000200         /* must buffer */
+#define UNIT_BUF        0000400         /* buffered */
+#define UNIT_ROABLE     0001000         /* read only ok */
+#define UNIT_DISABLE    0002000         /* disable-able */
+#define UNIT_DIS        0004000         /* disabled */
+#define UNIT_RAW        0010000         /* raw mode */
+#define UNIT_TEXT       0020000         /* text mode */
+#define UNIT_IDLE       0040000         /* idle eligible */
+#define UNIT_TM_POLL    0100000         /* TMXR Polling unit */
+                                        /* This flag is ONLY set dynamically */
+                                        /* it should NOT be set via initialization */
 
 #define UNIT_UFMASK_31  (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
@@ -523,7 +536,7 @@ struct sim_fileref {
 
 /* The following macros define structure contents */
 
-#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,0
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,NULL,0,0
 
 #if defined (__STDC__) || defined (_WIN32)
 #define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1
@@ -564,50 +577,119 @@ typedef struct sim_fileref FILEREF;
 #include "scp.h"
 #include "sim_console.h"
 #include "sim_timer.h"
+#include "sim_ether.h"
 #include "sim_fio.h"
 
 /* Asynch/Threaded I/O support */
+
+extern t_bool sim_asynch_enabled;
 
 #if defined (SIM_ASYNCH_IO)
 #include <pthread.h>
 #include "sim_tmxr.h"
 
 extern pthread_mutex_t sim_asynch_lock;
-extern pthread_cond_t sim_asynch_wake;
+extern pthread_cond_t sim_idle_wake;
+extern pthread_mutex_t sim_timer_lock;
+extern pthread_cond_t sim_timer_wake;
+extern t_bool sim_timer_event_canceled;
 extern int32 sim_tmxr_poll_count;
 extern pthread_cond_t sim_tmxr_poll_cond;
 extern pthread_mutex_t sim_tmxr_poll_lock;
 extern pthread_t sim_asynch_main_threadid;
-extern struct sim_unit *sim_asynch_queue;
+extern UNIT * volatile sim_asynch_queue;
 extern volatile t_bool sim_idle_wait;
-extern t_bool sim_asynch_enabled;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
 
-#define AIO_LIST_END ((void *)1)    /* Chosen to deliberately not be a valid pointer (alignment) */
 #define AIO_INIT                                                  \
     if (1) {                                                      \
       sim_asynch_main_threadid = pthread_self();                  \
+      sim_asynch_enabled = TRUE;                                  \
       /* Empty list/list end uses the point value (void *)1.      \
          This allows NULL in an entry's a_next pointer to         \
          indicate that the entry is not currently in any list */  \
-      sim_asynch_queue = AIO_LIST_END;                            \
+      sim_asynch_queue = QUEUE_LIST_END;                          \
       }                                                           \
     else                                                          \
       (void)0
 #define AIO_CLEANUP                                               \
     if (1) {                                                      \
       pthread_mutex_destroy(&sim_asynch_lock);                    \
-      pthread_cond_destroy(&sim_asynch_wake);                     \
+      pthread_cond_destroy(&sim_idle_wake);                       \
+      pthread_mutex_destroy(&sim_timer_lock);                     \
+      pthread_cond_destroy(&sim_timer_wake);                      \
       pthread_mutex_destroy(&sim_tmxr_poll_lock);                 \
       pthread_cond_destroy(&sim_tmxr_poll_cond);                  \
       }                                                           \
     else                                                          \
       (void)0
-#define AIO_POLL_BEGIN(uptr)                                      \
-    do {
-#define AIO_POLL_COMPLETE(uptr, reason)                           \
+#define AIO_LOCK                                                  \
+    pthread_mutex_lock(&sim_asynch_lock)
+#define AIO_UNLOCK                                                \
+    pthread_mutex_unlock(&sim_asynch_lock)
+#define AIO_CANCEL(uptr)                                          \
+    if (1) {                                                      \
+        if (((uptr)->flags & UNIT_TM_POLL) &&                     \
+            !((uptr)->next) && !((uptr)->a_next)) {               \
+            (uptr)->a_polling_now = FALSE;                        \
+            sim_tmxr_poll_count -= (uptr)->a_poll_waiter_count;   \
+            (uptr)->a_poll_waiter_count = 0;                      \
+            }                                                     \
+        if (sim_is_active_bool (uptr)) {                          \
+            UNIT *cptr, *nptr;                                    \
+            AIO_UPDATE_QUEUE;                                     \
+            pthread_mutex_lock (&sim_timer_lock);                 \
+            nptr = QUEUE_LIST_END;                                \
+            if ((uptr) == sim_wallclock_queue) {                  \
+                sim_wallclock_queue = (uptr)->next;               \
+                (uptr)->next = NULL;                              \
+                }                                                 \
+            else                                                  \
+                for (cptr = sim_wallclock_queue;                  \
+                    (cptr != QUEUE_LIST_END);                     \
+                    cptr = cptr->next)                            \
+                    if (cptr->next == (uptr)) {                   \
+                        cptr->next = (uptr)->next;                \
+                        nptr = cptr;                              \
+                        (uptr)->next = NULL;                      \
+                        break;                                    \
+                        }                                         \
+            if (nptr == QUEUE_LIST_END) {                         \
+                sim_timer_event_canceled = TRUE;                  \
+                pthread_cond_signal (&sim_timer_wake);            \
+                }                                                 \
+            if ((uptr)->next == NULL)                             \
+                (uptr)->a_due_time = (uptr)->a_usec_delay = 0;    \
+            pthread_mutex_unlock (&sim_timer_lock);               \
+            }                                                     \
+        }                                                         \
+    else                                                          \
+        (void)0
+#define AIO_RETURN_TIME(uptr)                                     \
+    if (1) {                                                      \
+        pthread_mutex_lock (&sim_timer_lock);                     \
+        for (cptr = sim_wallclock_queue;                          \
+             cptr != QUEUE_LIST_END;                              \
+             cptr = cptr->next)                                   \
+            if ((uptr) == cptr) {                                 \
+                int32 inst_per_sec = sim_timer_inst_per_sec ();   \
+                int32 result;                                     \
+                                                                  \
+                result = (int32)(((uptr)->a_due_time - sim_timenow_double())*inst_per_sec);\
+                pthread_mutex_unlock (&sim_timer_lock);           \
+                return result + 1;                                \
+                }                                                 \
+        pthread_mutex_unlock (&sim_timer_lock);                   \
+        if ((uptr)->a_next) /* On asynch queue? */                \
+            return (uptr)->a_event_time + 1;                      \
+        }                                                         \
+    else                                                          \
+        (void)0
+#define AIO_EVENT_BEGIN(uptr)                                     \
+    do {                                                          
+#define AIO_EVENT_COMPLETE(uptr, reason)                          \
         if (uptr->flags & UNIT_TM_POLL) {                         \
             pthread_mutex_lock (&sim_tmxr_poll_lock);             \
             uptr->a_polling_now = FALSE;                          \
@@ -619,6 +701,7 @@ extern int32 sim_asynch_inst_latency;
                 }                                                 \
             pthread_mutex_unlock (&sim_tmxr_poll_lock);           \
             }                                                     \
+        AIO_UPDATE_QUEUE;                                         \
         } while (0)
 
 #if defined(__DECC_VER)
@@ -630,7 +713,7 @@ extern int32 sim_asynch_inst_latency;
 #if defined(_WIN32) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
 #define USE_AIO_INTRINSICS 1
 #endif
-#ifdef USE_AIO_INTRINSICS
+#if defined(USE_AIO_INTRINSICS) && !defined(DONT_USE_AIO_INTRINSICS)
 /* This approach uses intrinsics to manage access to the link list head     */
 /* sim_asynch_queue.  This implementation is a completely lock free design  */
 /* which avoids the potential ABA issues.                                   */
@@ -649,13 +732,13 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_QUEUE_VAL InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL)
 #define AIO_QUEUE_SET(val, queue) InterlockedCompareExchangePointer(&sim_asynch_queue, val, queue)
 #define AIO_UPDATE_QUEUE                                                         \
-    if (AIO_QUEUE_VAL != AIO_LIST_END) { /* List !Empty */                       \
+    if (AIO_QUEUE_VAL != QUEUE_LIST_END) { /* List !Empty */                     \
       UNIT *q, *uptr;                                                            \
       int32 a_event_time;                                                        \
       do                                                                         \
         q = AIO_QUEUE_VAL;                                                       \
-        while (q != AIO_QUEUE_SET(AIO_LIST_END, q));                             \
-      while (q != AIO_LIST_END) {   /* List !Empty */                            \
+        while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));                           \
+      while (q != QUEUE_LIST_END) {   /* List !Empty */                          \
         uptr = q;                                                                \
         q = q->a_next;                                                           \
         uptr->a_next = NULL;        /* hygiene */                                \
@@ -673,27 +756,34 @@ extern int32 sim_asynch_inst_latency;
     } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                                   \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) {           \
+      DEVICE *d;                                                                 \
+      if (sim_deb)                                                               \
+          d = find_dev_from_unit(uptr);                                          \
+      sim_debug (TIMER_DBG_QUEUE, &sim_timer_dev, "asynch event on %s after %d instructions\n", d->name, event_time);\
       if (uptr->a_next) {                               /* already queued? */    \
         uptr->a_activate_call = sim_activate_abs;                                \
       } else {                                                                   \
         UNIT *q, *qe;                                                            \
         uptr->a_event_time = event_time;                                         \
-        uptr->a_activate_call = sim_activate;                                    \
-        uptr->a_next = AIO_LIST_END;                    /* Mark as on list */    \
+        uptr->a_activate_call = caller;                                          \
+        uptr->a_next = QUEUE_LIST_END;                  /* Mark as on list */    \
         do {                                                                     \
           do                                                                     \
             q = AIO_QUEUE_VAL;                                                   \
-            while (q != AIO_QUEUE_SET(AIO_LIST_END, q));/* Grab current list */  \
-          for (qe = uptr; qe->a_next != AIO_LIST_END; qe = qe->a_next);          \
+            while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));/* Grab current list */\
+          for (qe = uptr; qe->a_next != QUEUE_LIST_END; qe = qe->a_next);        \
           qe->a_next = q;                               /* append current list */\
           do                                                                     \
             q = AIO_QUEUE_VAL;                                                   \
             while (q != AIO_QUEUE_SET(uptr, q));                                 \
           uptr = q;                                                              \
-          } while (uptr != AIO_LIST_END);                                        \
+          } while (uptr != QUEUE_LIST_END);                                      \
       }                                                                          \
-      if (sim_idle_wait)                                                         \
-        pthread_cond_signal (&sim_asynch_wake);                                  \
+      sim_asynch_check = 0;                             /* try to force check */ \
+      if (sim_idle_wait) {                                                       \
+        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", d->name, event_time);\
+        pthread_cond_signal (&sim_idle_wake);                                    \
+        }                                                                        \
       return SCPE_OK;                                                            \
     } else (void)0
 #else /* !USE_AIO_INTRINSICS */
@@ -704,11 +794,11 @@ extern int32 sim_asynch_inst_latency;
     if (1) {                                                                     \
       UNIT *uptr;                                                                \
       pthread_mutex_lock (&sim_asynch_lock);                                     \
-      while (sim_asynch_queue != AIO_LIST_END) { /* List !Empty */               \
+      while (sim_asynch_queue != QUEUE_LIST_END) { /* List !Empty */             \
         int32 a_event_time;                                                      \
         uptr = sim_asynch_queue;                                                 \
         sim_asynch_queue = uptr->a_next;                                         \
-        uptr->a_next = NULL;                                                     \
+        uptr->a_next = NULL;            /* hygiene */                            \
         if (uptr->a_activate_call != &sim_activate_notbefore) {                  \
           a_event_time = uptr->a_event_time-((sim_asynch_inst_latency+1)/2);     \
           if (a_event_time < 0)                                                  \
@@ -716,12 +806,11 @@ extern int32 sim_asynch_inst_latency;
           }                                                                      \
         else                                                                     \
           a_event_time = uptr->a_event_time;                                     \
+        pthread_mutex_unlock (&sim_asynch_lock);                                 \
         uptr->a_activate_call (uptr, a_event_time);                              \
-        if (uptr->a_check_completion) {                                          \
-          pthread_mutex_unlock (&sim_asynch_lock);                               \
+        if (uptr->a_check_completion)                                            \
           uptr->a_check_completion (uptr);                                       \
-          pthread_mutex_lock (&sim_asynch_lock);                                 \
-          }                                                                      \
+        pthread_mutex_lock (&sim_asynch_lock);                                   \
       }                                                                          \
       pthread_mutex_unlock (&sim_asynch_lock);                                   \
     } else (void)0
@@ -737,8 +826,9 @@ extern int32 sim_asynch_inst_latency;
         sim_asynch_queue = uptr;                                       \
       }                                                                \
       if (sim_idle_wait)                                               \
-        pthread_cond_signal (&sim_asynch_wake);                        \
+        pthread_cond_signal (&sim_idle_wake);                          \
       pthread_mutex_unlock (&sim_asynch_lock);                         \
+      sim_asynch_check = 0;                                            \
       return SCPE_OK;                                                  \
     } else (void)0
 #endif /* USE_AIO_INTRINSICS */
@@ -761,8 +851,12 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_CHECK_EVENT
 #define AIO_INIT
 #define AIO_CLEANUP
-#define AIO_POLL_BEGIN(uptr)
-#define AIO_POLL_COMPLETE(uptr)
+#define AIO_LOCK
+#define AIO_UNLOCK
+#define AIO_CANCEL(uptr)
+#define AIO_RETURN_TIME(uptr)
+#define AIO_EVENT_BEGIN(uptr)
+#define AIO_EVENT_COMPLETE(uptr, reason)
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)
 #endif /* SIM_ASYNCH_IO */
 

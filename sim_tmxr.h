@@ -53,12 +53,16 @@
 
 #define TMXR_DBG_XMT    0x10000                         /* Debug Transmit Data */
 #define TMXR_DBG_RCV    0x20000                         /* Debug Received Data */
-#define TMXR_DBG_TRC    0x40000                         /* Debug trace routine calls */
+#define TMXR_DBG_ASY    0x40000                         /* Debug Received Data */
+#define TMXR_DBG_TRC    0x80000                         /* Debug trace routine calls */
 
 /* Unit flags */
 
-#define TMUF_V_NOASYNCH   (UNIT_V_UF + 12)            /* Asynch Disabled unit */
-#define TMUF_NOASYNCH     (1u << TMUF_V_NOASYNCH)
+#define TMUF_V_NOASYNCH   (UNIT_V_UF + 12)              /* Asynch Disabled unit */
+#define TMUF_NOASYNCH     (1u << TMUF_V_NOASYNCH)       /* This flag can be defined */
+                                                        /* statically in a unit's flag field */
+                                                        /* This will disable the unit from */
+                                                        /* supporting asynchronmous mux behaviors */
 
 typedef struct tmln TMLN;
 typedef struct tmxr TMXR;
@@ -135,6 +139,7 @@ t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
+t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat tmxr_change_async (void);
 t_stat tmxr_startup (void);
 t_stat tmxr_shutdown (void);
@@ -150,6 +155,7 @@ extern FILE *sim_deb;                                   /* debug file */
 #define tmxr_attach(mp, uptr, cptr) tmxr_attach_ex(mp, uptr, cptr, TRUE)
 #if (!defined(NOT_MUX_USING_CODE))
 #define sim_activate tmxr_activate
+#define sim_activate_after tmxr_activate_after
 #endif
 #else
 #define tmxr_attach(mp, uptr, cptr) tmxr_attach_ex(mp, uptr, cptr, FALSE)

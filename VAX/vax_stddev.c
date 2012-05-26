@@ -397,7 +397,7 @@ int32 t;
 if (clk_csr & CSR_IE)
     SET_INT (CLK);
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
+sim_activate_after (&clk_unit, 1000000/clk_tps);        /* reactivate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
 if (!todr_blow && todr_reg)                             /* if running? */
@@ -502,7 +502,7 @@ clk_csr = 0;
 CLR_INT (CLK);
 if (!sim_is_running) {                                  /* RESET (not IORESET)? */
     t = sim_rtcn_init (clk_unit.wait, TMR_CLK);         /* init timer */
-    sim_activate (&clk_unit, t);                        /* activate unit */
+    sim_activate_after (&clk_unit, 1000000/clk_tps);    /* activate unit */
     tmr_poll = t;                                       /* set tmr poll */
     tmxr_poll = t * TMXR_MULT;                          /* set mux poll */
     }

@@ -650,8 +650,7 @@ while (reason == 0) {                                   /* loop until halted */
             }
 
         if (PSW & PSW_WAIT) {                           /* wait state? */
-            if (sim_idle_enab)                          /* idling enabled? */
-                sim_idle (TMR_LFC, TRUE);
+            sim_idle (TMR_LFC, TRUE);                   /* idling */
             else sim_interval = sim_interval - 1;       /* no, count cycle */
             continue;
             }

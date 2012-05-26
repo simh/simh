@@ -35,7 +35,6 @@ Benefits.
    - Allows simulator clock ticks to track wall clock was precisely as 
      possible under varying I/O load and activities.
 
-Asynch I/O is provided through a callback model.  
 SimH Libraries which provide Asynch I/O support:
    sim_disk
    sim_tape
@@ -84,6 +83,9 @@ to enable viewing and setting of these variables via scp:
 #endif
 
 Programming Disk and Tape devices to leverage Asynch I/O
+
+Asynch disk and tape I/O is provided through a callback model.  The callback
+is invoked when the desired I/O operation has completed.
 
 Naming conventions:
 All of the routines implemented in sim_disk and sim_tape have been kept
@@ -174,7 +176,7 @@ and 2) to have polling actually happen as soon as data may be available.
 In most cases no effort is required to add Asynch I/O support to a 
 multiplexer device emulation.  If a device emulation takes the normal 
 model of polling for arriving data on every simulated clock tick, then if
-Asynch I/O is enabled, then device will operate asynchronously and behave 
+Asynch I/O is enabled, the device will operate asynchronously and behave 
 well.  There is one restriction in this model.  Specifically,  the device 
 emulation logic can't expect that there will be a particular number (clock 
 tick rate maybe) of invocations of a unit service routine to perform polls 
@@ -207,9 +209,9 @@ Some devices will need a small amount of extra coding to leverage the
 Multiplexer Asynch I/O capabilties.  Devices which require extra coding
 have one or more of the following characteristics:
 - they poll for input data on a different unit (or units) than the unit 
-  which was provided when tmxr_attach was called with.
+  which was provided when tmxr_attach was called.
 - they poll for connections on a different unit than the unit which was
-  provided when tmxr_attach was called with.
+  provided when tmxr_attach was called.
 
 The extra coding required for proper operation is to call 
 tmxr_set_line_unit() to associate the appropriate input polling unit to 
@@ -243,26 +245,33 @@ recalibrated and used throughout a simulator to schedule device time
 related delays as needed.  Historically, this was fine until modern 
 processors started having dynamically variable processor clock rates.
 On such host systems, the simulator's concept of time passing can vary 
-drastically, which may cause dramatic drifting of the simulated operating 
-system's concept of time.  Once all devices are disconnected from the 
-calibrated clock's instruction count, the only concern for time in the
-simulated system is that it's clock tick be as accurate as possible.
-This has worked well in the past, however each simulator was burdened 
-with providing code which facilitated managing the concept of the 
-relationship between the number of instructions executed and the passage 
-of wall clock time.  To accomodate the needs of activities or events which 
-should be measured against wall clock time (vs specific number of 
-instructions executed), the simulator framework has been extended to 
-specifically provide event scheduling based on elapsed wall time. A new 
-API can be used by devices to schedule unit event delivery after the 
-passage of a specific amount of wall clock time.  The 
-api sim_activate_after() provides this capability.  This capability is 
-not limited to being available ONLY when compiling with SIM_SYNCH_IO 
-defined.  When SIM_ASYNCH_IO is defined, this facility is implemented by 
-a thread which drives the delivery of these events from the host system's 
-clock ticks (interpolated as needed to accomodate hosts with relatively 
-large clock ticks).  When SIM_ASYNCH_IO is not defined, this facility is 
-implemented using the traditional simh calibrated clock approach.
+drastically.  This dynamic adjustment of the host system's execution rate
+may cause dramatic drifting of the simulated operating system's concept 
+of time.  Once all devices are disconnected from the calibrated clock's 
+instruction count, the only concern for time in the simulated system is 
+that it's clock tick be as accurate as possible.  This has worked well 
+in the past, however each simulator was burdened with providing code 
+which facilitated managing the concept of the relationship between the 
+number of instructions executed and the passage of wall clock time.  
+To accomodate the needs of activities or events which should be measured 
+against wall clock time (vs specific number of instructions executed), 
+the simulator framework has been extended to specifically provide event 
+scheduling based on elapsed wall time. A new API can be used by devices 
+to schedule unit event delivery after the passage of a specific amount 
+of wall clock time.  The api sim_activate_after() provides this 
+capability.  This capability is not limited to being available ONLY when 
+compiling with SIM_SYNCH_IO defined.  When SIM_ASYNCH_IO is defined, this 
+facility is implemented by a thread which drives the delivery of these 
+events from the host system's clock ticks (interpolated as needed to 
+accomodate hosts with relatively large clock ticks).  When SIM_ASYNCH_IO 
+is not defined, this facility is implemented using the traditional simh 
+calibrated clock approach.  This new approach has been measured to provide
+clocks which drift far less than the drift realized in prior simh versions.  
+Using the released simh v3.9-0 vax simulator with idling enabled, the clock 
+drifted some 4 minutes in 35 minutes time (approximately 10%).  The same OS 
+disk also running with idling enabled booted for 4 hours had less that 5 
+seconds of clock drift (approximately 0.03%).
+
 
 Run time requirements to use SIM_ASYNCH_IO.
 The Posix threads API (pthreads) is required for asynchronous execution.

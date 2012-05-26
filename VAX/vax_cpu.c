@@ -3129,8 +3129,7 @@ return;
 
 t_stat cpu_idle_svc (UNIT *uptr)
 {
-if (sim_idle_enab)
-    sim_idle (TMR_CLK, FALSE);
+sim_idle (TMR_CLK, FALSE);
 return SCPE_OK;
 }
 

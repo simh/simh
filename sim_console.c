@@ -154,15 +154,25 @@ UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };           /* console c
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_ASY  TMXR_DBG_ASY                           /* asynchronous thread activity */
 
 DEBTAB sim_con_debug[] = {
   {"TRC",    DBG_TRC},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"ASY",    DBG_ASY},
   {0}
 };
 
-DEVICE sim_con_telnet = {"Console Telnet", &sim_con_unit, NULL, NULL, 1, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, DEV_DEBUG, 0, sim_con_debug};
+MTAB sim_con_mod[] = {
+  { 0 },
+};
+
+DEVICE sim_con_telnet = {
+    "CON-TEL", &sim_con_unit, NULL, sim_con_mod, 
+    1, 0, 0, 0, 0, 0, 
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, sim_con_debug};
 TMLN sim_con_ldsc = { 0 };                                          /* console line descr */
 TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console line mux */
 
@@ -184,8 +194,6 @@ extern int32 sim_quiet;
 extern FILE *sim_log, *sim_deb;
 extern FILEREF *sim_log_ref, *sim_deb_ref;
 extern DEVICE *sim_devices[];
-extern t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-extern t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 
 /* Set/show data structures */
@@ -199,8 +207,8 @@ static CTAB set_con_tab[] = {
     { "NOTELNET", &sim_set_notelnet, 0 },
     { "LOG", &sim_set_logon, 0 },
     { "NOLOG", &sim_set_logoff, 0 },
-    { "DEBUG", &sim_set_cons_debug, 1 },
-    { "NODEBUG", &sim_set_cons_debug, 0 },
+    { "DEBUG", &sim_set_debon, 0 },
+    { "NODEBUG", &sim_set_deboff, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -211,7 +219,7 @@ static SHTAB show_con_tab[] = {
     { "PCHAR", &sim_show_pchar, 0 },
     { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
-    { "DEBUG", &sim_show_cons_debug, 0 },
+    { "DEBUG", &sim_show_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { NULL, NULL, 0 }
     };
@@ -521,29 +529,6 @@ else {
 return SCPE_OK;
 }
 
-/* Show console Debug status */
-
-t_stat sim_show_cons_debug (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
-{
-return show_dev_debug (st, &sim_con_telnet, sim_con_telnet.units, flag, cptr);
-}
-
-/* Set console to Debug  */
-
-t_stat sim_set_cons_debug (int32 flg, char *cptr)
-{
-t_stat r = set_dev_debug (&sim_con_telnet, sim_con_telnet.units, flg, cptr);
-
-if ((r == SCPE_OK) && (sim_con_ldsc.uptr != &sim_con_unit)) {
-    DEVICE *dptr = find_dev_from_unit(sim_con_ldsc.uptr);
-
-    dptr->dctrl = sim_con_telnet.dctrl;
-    if (dptr->debflags == NULL)
-        dptr->debflags = sim_con_telnet.debflags;
-    }
-return r;
-}
-
 /* Set console to Buffering  */
 
 t_stat sim_set_cons_buff (int32 flg, char *cptr)
@@ -713,6 +698,14 @@ if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered
                 fflush (sim_log);
                 }
             }
+        else {
+            printf ("Running\r\n");                     /* print transition */
+            fflush (stdout);
+            if (sim_log) {                              /* log file? */
+                fprintf (sim_log, "Running\n");
+                fflush (sim_log);
+                }
+            }
         return SCPE_OK;
         }
     }
@@ -870,10 +863,11 @@ extern pthread_mutex_t     sim_tmxr_poll_lock;
 extern pthread_cond_t      sim_tmxr_poll_cond;
 extern int32               sim_tmxr_poll_count;
 extern t_bool              sim_tmxr_poll_running;
-extern pthread_t           sim_console_poll_thread;       /* Keyboard Polling Thread Id */
-extern pthread_cond_t      sim_console_startup_cond;
-extern t_bool              sim_console_poll_running;
 extern int32 sim_is_running;
+
+pthread_t           sim_console_poll_thread;       /* Keyboard Polling Thread Id */
+t_bool              sim_console_poll_running = FALSE;
+pthread_cond_t      sim_console_startup_cond;
 
 static void *
 _console_poll(void *arg)
@@ -882,6 +876,7 @@ int sched_policy;
 struct sched_param sched_priority;
 int poll_timeout_count = 0;
 int wait_count = 0;
+DEVICE *d;
 
 /* Boost Priority for this I/O thread vs the CPU instruction execution 
    thread which, in general, won't be readily yielding the processor when 
@@ -890,37 +885,47 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
-sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - starting\n");
+sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - starting\n");
 
 pthread_mutex_lock (&sim_tmxr_poll_lock);
 pthread_cond_signal (&sim_console_startup_cond);   /* Signal we're ready to go */
 while (sim_asynch_enabled) {
-    DEVICE *d;
+
+    if (!sim_is_running) {
+        if (wait_count) {
+            sim_debug (DBG_ASY, d, "_console_poll() - Removing interest in %s. Other interest: %d\n", d->name, sim_con_ldsc.uptr->a_poll_waiter_count);
+            --sim_con_ldsc.uptr->a_poll_waiter_count;
+            --sim_tmxr_poll_count;
+            }
+        break;
+        }
 
     /* If we started something, let it finish before polling again */
     if (wait_count) {
         pthread_cond_wait (&sim_tmxr_poll_cond, &sim_tmxr_poll_lock);
-        sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - continuing with ti\n");
+        sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - continuing with after wait\n");
         }
-
-    if (!sim_is_running)
-        break;
 
     pthread_mutex_unlock (&sim_tmxr_poll_lock);
     wait_count = 0;
     if (sim_os_poll_kbd_ready (1000)) {
-        sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - Keyboard Data available\n");
+        sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - Keyboard Data available\n");
         pthread_mutex_lock (&sim_tmxr_poll_lock);
         ++wait_count;
         if (!sim_con_ldsc.uptr->a_polling_now) {
             sim_con_ldsc.uptr->a_polling_now = TRUE;
             sim_con_ldsc.uptr->a_poll_waiter_count = 1;
             d = find_dev_from_unit(sim_con_ldsc.uptr);
-            sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - Activating %s\n", d->name);
+            sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - Activating %s\n", d->name);
+            pthread_mutex_unlock (&sim_tmxr_poll_lock);
             _sim_activate (sim_con_ldsc.uptr, 0);
+            pthread_mutex_lock (&sim_tmxr_poll_lock);
             }
-        else
+        else {
+            d = find_dev_from_unit(sim_con_ldsc.uptr);
+            sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - Already Activated %s %d times\n", d->name, sim_con_ldsc.uptr->a_poll_waiter_count);
             ++sim_con_ldsc.uptr->a_poll_waiter_count;
+            }
         }
     else
         pthread_mutex_lock (&sim_tmxr_poll_lock);
@@ -929,7 +934,7 @@ while (sim_asynch_enabled) {
     }
 pthread_mutex_unlock (&sim_tmxr_poll_lock);
 
-sim_debug (DBG_TRC, &sim_con_telnet, "_console_poll() - exiting\n");
+sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - exiting\n");
 
 return NULL;
 }
@@ -1687,8 +1692,8 @@ if (!isatty (0)) {                           /* skip if !tty */
     }
 FD_ZERO (&readfds);
 FD_SET (0, &readfds);
-timeout.tv_sec = 0;
-timeout.tv_usec = ms_timeout*1000;
+timeout.tv_sec = (ms_timeout*1000)/1000000;
+timeout.tv_usec = (ms_timeout*1000)%1000000;
 return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
@@ -1815,8 +1820,8 @@ if (!sim_os_ttisatty()) {                   /* skip if !tty */
     }
 FD_ZERO (&readfds);
 FD_SET (0, &readfds);
-timeout.tv_sec = 0;
-timeout.tv_usec = ms_timeout*1000;
+timeout.tv_sec = (ms_timeout*1000)/1000000;
+timeout.tv_usec = (ms_timeout*1000)%1000000;
 return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
