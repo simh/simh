@@ -588,10 +588,15 @@ SDS = ${SDSD}/sds_cpu.c ${SDSD}/sds_drm.c ${SDSD}/sds_dsk.c ${SDSD}/sds_io.c \
 	${SDSD}/sds_stddev.c ${SDSD}/sds_sys.c
 SDS_OPT = -I ${SDSD}
 
-SWTPD = swtp
-SWTP = ${SWTPD}/swtp_cpu.c ${SWTPD}/swtp_dsk.c ${SWTPD}/swtp_sio.c \
-	${SWTPD}/swtp_sys.c
-SWTP_OPT = -I ${SWTPD}
+SWTP6800D = swtp6800/swtp6800
+SWTP6800C = swtp6800/common
+SWTP6800MP-A = ${SWTP6800C}/mp-a.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
+	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a_sys.c \
+	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c
+SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
+	${SWTP6800C}/bootrom.c ${SWTP6800C}/dc-4.c ${SWTP6800C}/mp-s.c ${SWTP6800D}/mp-a2_sys.c \
+	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
+SWTP6800_OPT = -I ${SWTP6800D}
 
 
 #
@@ -600,7 +605,7 @@ SWTP_OPT = -I ${SWTPD}
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
 	altair altairz80 gri i7094 ibm1130 id16 \
-	id32 sds lgp h316 swtp
+	id32 sds lgp h316 swtp6800mp-a swtp6800mp-a2
 
 all : ${ALL}
 
@@ -789,8 +794,15 @@ ${BIN}sds${EXE} : ${SDS} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SDS} ${SIM} ${SDS_OPT} -o $@ ${LDFLAGS}
 
-swtp : ${BIN}swtp${EXE}
+swtp6800mp-a : ${BIN}swtp6800mp-a${EXE}
 
-${BIN}swtp${EXE} : ${SWTP} ${SIM}
+${BIN}swtp6800mp-a${EXE} : ${SWTP6800MP-A} ${SIM}
 	${MKDIRBIN}
-	${CC} ${SWTP} ${SIM} ${SWTP_OPT} -o $@ ${LDFLAGS}
+	${CC} ${SWTP6800MP-A} ${SIM} ${SWTP6800_OPT} -o $@ ${LDFLAGS}
+
+swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
+
+${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} -o $@ ${LDFLAGS}
+
