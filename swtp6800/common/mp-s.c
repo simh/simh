@@ -1,6 +1,6 @@
-/*  mp-s.c: SWTP MP-S serial I/O card emulator
+/*  mp-s.c: SWTP MP-S serial I/O card simulator
 
-    Copyright (c) 2005-2011, William Beech
+    Copyright (c) 2005-2012, William Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -136,6 +136,7 @@ DEVICE ptr_dev = {
 
 UNIT ptp_unit = { UDATA (&ptp_svc, UNIT_SEQ + UNIT_ATTABLE, 0), KBD_POLL_WAIT
 };
+
 DEVICE ptp_dev = {
     "PTP", &ptp_unit, NULL, NULL,
     1, 10, 31, 1, 8, 8,
@@ -149,13 +150,17 @@ int32 sio_svc (UNIT *uptr)
 {
     int32 temp;
 
+//    printf("+++sio_svc() sio_unit.wait=%08X\n", sio_unit.wait);
     sim_activate (&sio_unit, sio_unit.wait); // continue poll
-    if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
+    if ((temp = sim_poll_kbd ()) < SCPE_KFLAG) {
+//        printf("sim_poll_kbd()=%08X\n", temp);
         return temp;                    // no char or error?
+    }
     sio_unit.buf = temp & 0xFF;         // Save char
     sio_unit.u3 |= 0x01;                // Set RXF flag
     /* Do any special character handling here */
     sio_unit.pos++;                     // step character count
+//    printf("SCPE_OK with sio_unit.pos=%08X\n", sio_unit.pos);
     return SCPE_OK;
 }
 
@@ -165,6 +170,7 @@ int32 ptr_svc (UNIT *uptr)
 {
     int32 temp;
 
+//    printf("+++ptr_svc()\n");
     sim_activate (&ptr_unit, ptr_unit.wait); // continue poll
     if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)
         return temp;                    // no char or error?
@@ -179,6 +185,7 @@ int32 ptr_svc (UNIT *uptr)
 
 int32 ptp_svc (UNIT *uptr)
 {
+//    printf("+++ptp_svc()\n");
     return SCPE_OK;
 }
 
@@ -188,6 +195,7 @@ int32 sio_reset (DEVICE *dptr)
 {
     sio_unit.buf = 0;                   // Data buffer
     sio_unit.u3 = 0x02;                 // Status buffer
+    sio_unit.wait = 10000;
     sim_activate (&sio_unit, sio_unit.wait); // activate unit
     return SCPE_OK;
 }
@@ -198,8 +206,8 @@ int32 ptr_reset (DEVICE *dptr)
 {
     ptr_unit.buf = 0;
     ptr_unit.u3 = 0x02;
-    sim_activate (&ptr_unit, ptr_unit.wait); // activate unit
-//    sim_cancel (&ptr_unit);             // deactivate unit
+//    sim_activate (&ptr_unit, ptr_unit.wait); // activate unit
+    sim_cancel (&ptr_unit);             // deactivate unit
     return SCPE_OK;
 }
 
@@ -209,8 +217,8 @@ int32 ptp_reset (DEVICE *dptr)
 {
     ptp_unit.buf = 0;
     ptp_unit.u3 = 0x02;
-    sim_activate (&ptp_unit, ptp_unit.wait); // activate unit
-//    sim_cancel (&ptp_unit);             // deactivate unit
+//    sim_activate (&ptp_unit, ptp_unit.wait); // activate unit
+    sim_cancel (&ptp_unit);             // deactivate unit
     return SCPE_OK;
 }
 

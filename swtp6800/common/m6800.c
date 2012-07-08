@@ -318,8 +318,10 @@ int32 sim_instr (void)
     while (reason == 0) {               /* loop until halted */
 //    dump_regs1();
         if (sim_interval <= 0)          /* check clock queue */
-            if (reason = sim_process_event ()) 
+            if (reason = sim_process_event ()) {
+//                printf("sim_process_event()=%08X\n", reason);
                 break;
+            }
             if (mem_fault) {            /* memory fault? */
                 mem_fault = 0;          /* reset fault flag */
                 reason = STOP_MEMORY;
