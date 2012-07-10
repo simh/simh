@@ -3159,6 +3159,7 @@ pcap_if_t* dev;
 char errbuf[PCAP_ERRBUF_SIZE];
 
 memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
@@ -3166,6 +3167,11 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   if (sim_log) fprintf (sim_log, msg, errbuf);
   }
 else {
+  if (errbuf[0]) {
+    char* msg = "Eth: pcap_findalldevs warning: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+    }
   /* copy device list into the passed structure */
   for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
