@@ -894,7 +894,7 @@ UNIT rqb_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -966,7 +966,7 @@ UNIT rqc_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -1038,7 +1038,7 @@ UNIT rqd_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
