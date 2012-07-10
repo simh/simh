@@ -3167,11 +3167,6 @@ if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   if (sim_log) fprintf (sim_log, msg, errbuf);
   }
 else {
-  if (errbuf[0]) {
-    char* msg = "Eth: pcap_findalldevs warning: %s\r\n";
-    printf (msg, errbuf);
-    if (sim_log) fprintf (sim_log, msg, errbuf);
-    }
   /* copy device list into the passed structure */
   for (i=0, dev=alldevs; dev && (i < max); dev=dev->next, ++i) {
     if ((dev->flags & PCAP_IF_LOOPBACK) || (!strcmp("any", dev->name))) continue;
@@ -3189,6 +3184,13 @@ else {
 
 /* Add any host specific devices and/or validate those already found */
 i = eth_host_devices(i, max, list);
+
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((i == 0) && (errbuf[0])) {
+    char* msg = "Eth: pcap_findalldevs warning: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+    }
 
 /* return device count */
 return i;
