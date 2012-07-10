@@ -269,7 +269,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
-    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
+    MKDIRBIN = mkdir -p BIN
   endif
 else
   #Win32 Environments (via MinGW32)
