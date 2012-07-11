@@ -130,7 +130,7 @@ t_stat i2716_attach (UNIT *uptr, char *cptr)
     j = 0;                              /* load EPROM file */
     c = fgetc(fp);
     while (c != EOF) {
-        *(uint8 *)(uptr->filebuf + j++) = c & 0xFF;
+        *((uint8 *)(uptr->filebuf) + j++) = c & 0xFF;
         c = fgetc(fp);
         if (j > 2048) {
             printf("\tImage is too large - Load truncated!!!\n");
@@ -150,8 +150,7 @@ t_stat i2716_attach (UNIT *uptr, char *cptr)
 
 t_stat i2716_reset (DEVICE *dptr)
 {
-    int32 i, j, c, base;
-    t_stat r;
+    int32 i, base;
     UNIT *uptr;
 
     if (i2716_dev.dctrl & DEBUG_flow)
@@ -207,7 +206,7 @@ int32 i2716_get_mbyte(int32 offset)
                     printf("i2716_get_mbyte: EPROM not configured\n");
                 return 0xFF;
             } else {
-                val = *(uint8 *)(uptr->filebuf + (offset - org));
+                val = *((uint8 *)(uptr->filebuf) + (offset - org));
                 if (i2716_dev.dctrl & DEBUG_read)
                     printf(" val=%04X\n", val);
                 return (val & 0xFF);

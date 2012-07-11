@@ -77,7 +77,7 @@
 #define UNIT_V_MSTOP    (UNIT_V_UF+1)   /* Stop on Invalid memory? */
 #define UNIT_MSTOP      (1 << UNIT_V_MSTOP)
 
-/*  Flag values to set proper positions in CCR */
+/* Flag values to set proper positions in CCR */
 #define HF      0x20
 #define IF      0x10
 #define NF      0x08
@@ -85,7 +85,7 @@
 #define VF      0x02
 #define CF      0x01
 
-/*  Macros to handle the flags in the CCR */
+/* Macros to handle the flags in the CCR */
 #define CCR_ALWAYS_ON       (0xC0)        /* for 6800 */
 #define CCR_MSK (HF|IF|NF|ZF|VF|CF)
 #define TOGGLE_FLAG(FLAG)   (CCR ^= FLAG)
@@ -105,7 +105,7 @@
 #define COND_SET_FLAG_V(COND) \
     if (COND) SET_FLAG(VF); else CLR_FLAG(VF)
 
-/*  local global variables */
+/* local global variables */
 
 int32 A = 0;                            /* Accumulator A */
 int32 B = 0;                            /* Accumulator B */
@@ -122,7 +122,7 @@ int32 mem_fault = 0;                    /* memory fault flag */
 extern int32 sim_int_char;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
-/*  function prototypes */
+/* function prototypes */
 
 t_stat m6800_reset (DEVICE *dptr);
 void dump_regs(void);
@@ -145,7 +145,7 @@ int32 get_flag(int32 flag);
 void condevalVa(int32 op1, int32 op2);
 void condevalVs(int32 op1, int32 op2);
 
-/*  external routines */
+/* external routines */
 
 extern void CPU_BD_put_mbyte(int32 addr, int32 val);
 extern void CPU_BD_put_mword(int32 addr, int32 val);
@@ -153,12 +153,12 @@ extern int32 CPU_BD_get_mbyte(int32 addr);
 extern int32 CPU_BD_get_mword(int32 addr);
 extern int32 sim_switches;
 
-/*  CPU data structures
+/* CPU data structures
 
-    m6800_dev       CPU device descriptor
-    m6800_unit      CPU unit descriptor
-    m6800_reg       CPU register list
-    m6800_mod       CPU modifiers list */
+   m6800_dev        CPU device descriptor
+   m6800_unit       CPU unit descriptor
+   m6800_reg        CPU register list
+   m6800_mod        CPU modifiers list */
 
 UNIT m6800_unit = { UDATA (NULL, 0, 0) };
 
@@ -303,8 +303,6 @@ int32 oplen[256] = {
 3,3,3,0,3,3,3,3,3,3,3,3,0,0,3,3
 };
 
-/*  simulator instruction decode routine */
-
 int32 sim_instr (void)
 {
     extern int32 sim_interval;
@@ -318,10 +316,8 @@ int32 sim_instr (void)
     while (reason == 0) {               /* loop until halted */
 //    dump_regs1();
         if (sim_interval <= 0)          /* check clock queue */
-            if (reason = sim_process_event ()) {
-//                printf("sim_process_event()=%08X\n", reason);
+            if (reason = sim_process_event ()) 
                 break;
-            }
             if (mem_fault) {            /* memory fault? */
                 mem_fault = 0;          /* reset fault flag */
                 reason = STOP_MEMORY;
@@ -1742,7 +1738,7 @@ int32 fetch_byte(int32 flag)
 {
     uint8 val;
 
-    val = CPU_BD_get_mbyte(PC) & 0xFF;  /* fetch byte */
+    val = CPU_BD_get_mbyte(PC) & 0xFF;   /* fetch byte */
     if (m6800_dev.dctrl & DEBUG_asm) {  /* display source code */
         switch (flag) {
             case 0:                     /* opcode fetch */
@@ -1762,7 +1758,7 @@ int32 fetch_word(void)
 {
     uint16 val;
 
-    val = CPU_BD_get_mbyte(PC) << 8;    /* fetch high byte */
+    val = CPU_BD_get_mbyte(PC) << 8;     /* fetch high byte */
     val |= CPU_BD_get_mbyte(PC + 1) & 0xFF; /* fetch low byte */
     if (m6800_dev.dctrl & DEBUG_asm)
         printf("0%04XH", val);
@@ -1804,8 +1800,8 @@ uint16 pop_word(void)
     return res;
 }
 
-/*  This routine does the jump to relative offset if the condition is
-    met.  Otherwise, execution continues at the current PC. */
+/*        this routine does the jump to relative offset if the condition is
+        met.  Otherwise, execution continues at the current PC. */
 
 void go_rel(int32 cond)
 {
@@ -1817,7 +1813,7 @@ void go_rel(int32 cond)
     PC &= ADDRMASK;
 }
 
-/*  returns the relative offset sign-extended */
+/* returns the relative offset sign-extended */
 
 int32 get_rel_addr(void)
 {
@@ -1829,14 +1825,14 @@ int32 get_rel_addr(void)
     return temp & ADDRMASK;
 }
 
-/*  returns the value at the direct address pointed to by PC */
+/* returns the value at the direct address pointed to by PC */
 
 int32 get_dir_val(void)
 {
     return CPU_BD_get_mbyte(get_dir_addr());
 }
 
-/*  returns the direct address pointed to by PC */
+/* returns the direct address pointed to by PC */
 
 int32 get_dir_addr(void)
 {
@@ -1846,14 +1842,14 @@ int32 get_dir_addr(void)
     return temp & 0xFF;
 }
 
-/*  returns the value at the indirect address pointed to by PC */
+/* returns the value at the indirect address pointed to by PC */
 
 int32 get_indir_val(void)
 {
     return CPU_BD_get_mbyte(get_indir_addr());
 }
 
-/*  returns the indirect address pointed to by PC or immediate byte */
+/* returns the indirect address pointed to by PC or immediate byte */
 
 int32 get_indir_addr(void)
 {
@@ -1863,14 +1859,14 @@ int32 get_indir_addr(void)
     return temp;
 }
 
-/*  returns the value at the extended address pointed to by PC */
+/* returns the value at the extended address pointed to by PC */
 
 int32 get_ext_val(void)
 {
     return CPU_BD_get_mbyte(get_ext_addr());
 }
 
-/*  returns the extended address pointed to by PC or immediate word */
+/* returns the extended address pointed to by PC or immediate word */
 
 int32 get_ext_addr(void)
 {
@@ -1880,7 +1876,7 @@ int32 get_ext_addr(void)
     return temp;
 }
 
-/*  return 1 for flag set or 0 for flag clear */
+/* return 1 for flag set or 0 for flag clear */
 
 int32 get_flag(int32 flg)
 {
@@ -1890,27 +1886,27 @@ int32 get_flag(int32 flg)
         return 0;
 }
 
-/*  test and set V for addition */
+/* test and set V for addition */
 
 void condevalVa(int32 op1, int32 op2)
 {
     if (get_flag(CF))
         COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80)) || (
-            (op1 & 0x80 == 0) && (op2 & 0x80 == 0)));
+            ((op1 & 0x80) == 0) && ((op2 & 0x80) == 0)));
 }
 
-/*  test and set V for subtraction */
+/* test and set V for subtraction */
 
 void condevalVs(int32 op1, int32 op2)
 {
     if (get_flag(CF))
-        COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80 == 0)) || 
-            ((op1 & 0x80 == 0) && (op2 & 0x80)));
+        COND_SET_FLAG_V(((op1 & 0x80) && ((op2 & 0x80) == 0)) || 
+            (((op1 & 0x80) == 0) && (op2 & 0x80)));
 }
 
-/*  calls from the simulator */
+/* calls from the simulator */
 
-/*  Reset routine */
+/* Reset routine */
 
 t_stat m6800_reset (DEVICE *dptr)
 {
@@ -1926,9 +1922,9 @@ t_stat m6800_reset (DEVICE *dptr)
 }
 
 
-/*  This is the dumper/loader. This command uses the -h to signify a
-    hex dump/load vice a binary one.  If no address is given to load, it 
-    takes the address from the hex record or the current PC for binary.
+/* This is the dumper/loader. This command uses the -h to signify a
+	hex dump/load vice a binary one.  If no address is given to load, it 
+	takes the address from the hex record or the current PC for binary.
 */
 
 int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
@@ -1946,7 +1942,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
     return (SCPE_OK);
 }
 
-/*  Symbolic output
+/* Symbolic output
 
     Inputs:
         *of     =   output stream
@@ -2002,7 +1998,7 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw)
         return SCPE_ARG;
 }
 
-/*  Symbolic input
+/* Symbolic input
 
     Inputs:
         *cptr   =   pointer to input string
@@ -2019,4 +2015,4 @@ int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
     return (-2);
 }
 
-/*  end of m6800.c */
+/* end of m6800.c */

@@ -368,7 +368,6 @@ t_stat dsk_reset (DEVICE *dptr)
 int32 fdcdrv(int32 io, int32 data)
 {
     static long pos;
-    char buf[128];
 
     if (io) {                           /* write to DC-4 drive register */
         if (dsk_dev.dctrl & DEBUG_write)
@@ -394,9 +393,9 @@ int32 fdcdrv(int32 io, int32 data)
         sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
         dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
         dsk_unit[cur_dsk].pos = 0;      /* clear counter */
-        spt = *(uint8 *)(dsk_unit[cur_dsk].filebuf + MAXSEC) & 0xFF;
+        spt = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + MAXSEC) & 0xFF;
         heds = 0;
-        cpd = *(uint8 *)(dsk_unit[cur_dsk].filebuf + MAXCYL) & 0xFF;
+        cpd = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + MAXCYL) & 0xFF;
         trksiz = spt * SECSIZ;
         dsksiz = trksiz * cpd;
         if (dsk_dev.dctrl & DEBUG_read)
@@ -538,7 +537,7 @@ int32 fdcdata(int32 io, int32 data)
         if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes to buffer */
             if (dsk_dev.dctrl & DEBUG_write)
                 printf("\nfdcdata: Writing byte %d of %02X", dsk_unit[cur_dsk].pos, data);
-            *(uint8 *)(dsk_unit[cur_dsk].filebuf + dsk_unit[cur_dsk].pos) = data; /* byte into buffer */
+            *((uint8 *)(dsk_unit[cur_dsk].filebuf) + dsk_unit[cur_dsk].pos) = data; /* byte into buffer */
             dsk_unit[cur_dsk].pos++;    /* step counter */
             if (dsk_unit[cur_dsk].pos == SECSIZ) {
                 dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ);
@@ -555,7 +554,7 @@ int32 fdcdata(int32 io, int32 data)
     if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes from buffer */
         if (dsk_dev.dctrl & DEBUG_read)
             printf("\nfdcdata: Reading byte %d u3=%02X", dsk_unit[cur_dsk].pos, dsk_unit[cur_dsk].u3);
-        val = *(uint8 *)(dsk_unit[cur_dsk].filebuf + dsk_unit[cur_dsk].pos) & 0xFF;
+        val = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + dsk_unit[cur_dsk].pos) & 0xFF;
         dsk_unit[cur_dsk].pos++;        /* step counter */
         if (dsk_unit[cur_dsk].pos == SECSIZ) { /* done? */
             dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
