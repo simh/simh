@@ -1,6 +1,6 @@
 /*  bootrom.c: Boot ROM simulator for Motorola processors
 
-    Copyright (c) 2010-2011, William A. Beech
+    Copyright (c) 2010-2012, William A. Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -24,8 +24,8 @@
     in this Software without prior written authorization from William A. Beech.
 
     These functions support a single simulated 2704 to 2764 EPROM device on 
-    an 8-bit computer system..  This device allows the the device buffer to 
-    be loaded from a binary file containing the emulated EPROM code.
+    an 8-bit computer system..  This device allows the buffer to be loaded from
+    a binary file containing the emulated EPROM code.
 
     These functions support a simulated 2704, 2708, 2716, 2732 or 2764 EPROM 
     device on a CPU board.  The byte get and put routines use an offset into 

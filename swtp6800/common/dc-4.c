@@ -1,6 +1,6 @@
 /*  dc4.c: SWTP DC-4 FDC Simulator
 
-    Copyright (c) 2005-2011, William A. Beech
+    Copyright (c) 2005-2012, William A. Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -551,18 +551,18 @@ int32 fdcdata(int32 io, int32 data)
         }
         return 0;
     } else {                            /* read byte from fdc */
-    if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes from buffer */
-        if (dsk_dev.dctrl & DEBUG_read)
-            printf("\nfdcdata: Reading byte %d u3=%02X", dsk_unit[cur_dsk].pos, dsk_unit[cur_dsk].u3);
-        val = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + dsk_unit[cur_dsk].pos) & 0xFF;
-        dsk_unit[cur_dsk].pos++;        /* step counter */
-        if (dsk_unit[cur_dsk].pos == SECSIZ) { /* done? */
-            dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
-            if (dsk_dev.dctrl & DEBUG_write)
-                printf("\nfdcdata: Sector read complete");
-        }
-        return val;
-    } else
+        if (dsk_unit[cur_dsk].pos < SECSIZ) { /* copy bytes from buffer */
+            if (dsk_dev.dctrl & DEBUG_read)
+                printf("\nfdcdata: Reading byte %d u3=%02X", dsk_unit[cur_dsk].pos, dsk_unit[cur_dsk].u3);
+            val = *((uint8 *)(dsk_unit[cur_dsk].filebuf) + dsk_unit[cur_dsk].pos) & 0xFF;
+            dsk_unit[cur_dsk].pos++;        /* step counter */
+            if (dsk_unit[cur_dsk].pos == SECSIZ) { /* done? */
+                dsk_unit[cur_dsk].u3 &= ~(BUSY | DRQ); /* clear flags */
+                if (dsk_dev.dctrl & DEBUG_write)
+                    printf("\nfdcdata: Sector read complete");
+            }
+            return val;
+        } else
         return 0;
     }
 }

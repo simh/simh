@@ -1,6 +1,6 @@
 /*  i2716.c: Intel 2716 EPROM simulator for 8-bit processors
 
-    Copyright (c) 2011, William A. Beech
+    Copyright (c) 2011-2012, William A. Beech
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
