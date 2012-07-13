@@ -839,3 +839,4 @@ swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
