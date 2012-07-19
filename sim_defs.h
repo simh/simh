@@ -515,7 +515,7 @@ struct sim_fileref {
 
 /* The following macros define structure contents */
 
-#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,0
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,NULL,0,0
 
 #if defined (__STDC__) || defined (_WIN32)
 #define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1
