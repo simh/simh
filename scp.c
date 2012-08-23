@@ -2555,15 +2555,13 @@ return SCPE_OK;
 
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-#if defined(_WIN32)
-char *wd = _getcwd(NULL, 0);
-fprintf (st, "%s\n", wd);
-free(wd);
-#else
 char buffer[PATH_MAX];
+#if defined(_WIN32)
+char *wd = _getcwd(buffer, PATH_MAX);
+#else
 char *wd = getcwd(buffer, PATH_MAX);
-fprintf (st, "%s\n", wd);
 #endif
+fprintf (st, "%s\n", wd);
 return SCPE_OK;
 }
 
