@@ -2556,11 +2556,7 @@ return SCPE_OK;
 t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 char buffer[PATH_MAX];
-#if defined(_WIN32)
-char *wd = _getcwd(buffer, PATH_MAX);
-#else
 char *wd = getcwd(buffer, PATH_MAX);
-#endif
 fprintf (st, "%s\n", wd);
 return SCPE_OK;
 }
@@ -2570,11 +2566,7 @@ t_stat set_default_cmd (int32 flg, char *cptr)
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 sim_trim_endspc(cptr);
-#if defined(_WIN32)
-if (_chdir(cptr) != 0) {
-#else
 if (chdir(cptr) != 0) {
-#endif
     printf("Unable to change to: %s\n", cptr);
     return SCPE_IOERR & SCPE_NOMESSAGE;
 } 
