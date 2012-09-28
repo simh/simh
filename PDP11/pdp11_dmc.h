@@ -1,4 +1,4 @@
-/* vax_dmc.h: DMC11 Emulation
+/* pdp11_dmc.h: DMC11 Emulation
   ------------------------------------------------------------------------------
 
    Copyright (c) 2011, Robert M. A. Jarratt
@@ -34,8 +34,8 @@
 // addresses of the DZ and DMC.
 
 
-#ifndef _VAX_DMC_H
-#define _VAX_DMC_H
+#ifndef _PDP11_DMC_H
+#define _PDP11_DMC_H
 
 #if defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"

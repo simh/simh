@@ -1,4 +1,4 @@
-/* vax_dmc.c: DMC11 Emulation
+/* pdp11_dmc.c: DMC11 Emulation
   ------------------------------------------------------------------------------
 
    Copyright (c) 2011, Robert M. A. Jarratt
@@ -77,19 +77,7 @@ The other test was to configure DECnet on VMS 4.6 and do SET HOST.
 #include <time.h>
 #include <ctype.h>
 
-#include "vax_dmc.h"
-
-#if defined (_WIN32)                                    /* Windows */
-#include <winsock2.h>
-#include <Ws2tcpip.h>
-#elif defined (__GNUC__)                                  /* GCC */
-#include <sys/socket.h>                                 /* for sockets */
-#include <netinet/in.h>                                 /* for sockaddr_in */
-#define SD_BOTH SHUT_RDWR
-#define _stricmp strcasecmp
-#else
-#pragma message( "Unknown environment" )
-#endif
+#include "pdp11_dmc.h"
 
 #define POLL 1000
 #define TRACE_BYTES_PER_LINE 16
@@ -128,11 +116,9 @@ typedef struct
 	int isPrimary;
 	SOCKET socket; // socket used bidirectionally
 	int receive_readable;
-	int receive_port;
+	char *receive_port;
 	int transmit_writeable;
 	char transmit_host[80];
-	int transmit_address;
-	int transmit_port;
 	int transmit_is_loopback; /* if true the transmit socket is the loopback to the receive */
 	int speed; /* bits per second in each direction, 0 for no limit */
 	int last_second;
@@ -538,66 +524,24 @@ CTLR *dmc_get_controller_from_device(DEVICE *device)
 t_stat dmc_showtransmit (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
 	CTLR *controller = dmc_get_controller_from_unit(uptr);
-	fprintf(st, "TRANSMIT=%s:%d", controller->line->transmit_host, controller->line->transmit_port);
+	fprintf(st, "TRANSMIT=%s", controller->line->transmit_host);
 	return SCPE_OK;
 }
 
 t_stat dmc_settransmit (UNIT* uptr, int32 val, char* cptr, void* desc)
 {
-	char *port;
 	t_stat status = SCPE_OK;
+    char host[CBUFSIZE], port[CBUFSIZE];
 	CTLR *controller = dmc_get_controller_from_unit(uptr);
 
 	if (!cptr) return SCPE_IERR;
 	if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-	port = strchr(cptr, ':');
-	if (port == NULL)
-	{
-		status = SCPE_ARG;
-	}
-	else
-	{
-		*port++ = '\0';
-		if (sscanf(port, "%d", &controller->line->transmit_port) != 1)
-		{
-			status = SCPE_ARG;
-		}
-		else
-		{
-			static SOCKET dummysocket = INVALID_SOCKET; /* used to get a WASStartup done to allow getaddrinfo to work */
-			struct addrinfo *result = NULL;
-			struct addrinfo hints;
-			int iresult;
-			strncpy(controller->line->transmit_host, cptr, sizeof(controller->line->transmit_host)-1);
-
-			if (dummysocket == INVALID_SOCKET)
-				if ((dummysocket = sim_create_sock()) == INVALID_SOCKET)		/* create and keep a socket, to force initialization */
-					status = SCPE_IERR;									/* of socket library (e.g on Win32 call WSAStartup), else gethostbyname fails */
-			if (status == SCPE_OK)
-			{
-				memset( &hints, 0, sizeof(hints) );
-				hints.ai_family = AF_INET;
-				hints.ai_socktype = SOCK_STREAM;
-				hints.ai_protocol = IPPROTO_TCP;
-
-				iresult = getaddrinfo(cptr, port, &hints, &result);
-				if (iresult != 0)
-				{
-					printf("getaddrinfo failed: %d\n", iresult);
-					status = SCPE_IERR;
-				}
-				else
-				{
-					struct sockaddr_in *in_addr = (struct sockaddr_in *)result->ai_addr;
-#if defined (_WIN32)
-					controller->line->transmit_address = ntohl(in_addr->sin_addr.S_un.S_addr);
-#else
-					controller->line->transmit_address = ntohl(in_addr->sin_addr.s_addr);
-#endif
-				}
-			}
-		}
-	}
+    status = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL);
+    if (status != SCPE_OK)
+        return status;
+    if (host[0] == '\0')
+        return SCPE_ARG;
+	strncpy(controller->line->transmit_host, cptr, sizeof(controller->line->transmit_host)-1);
 
 	return status;
 }
@@ -791,22 +735,17 @@ t_stat dmc_showlinemode (FILE* st, UNIT* uptr, int32 val, void* desc)
 
 t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc)
 {
-	char buf[80];
 	t_stat status = SCPE_OK;
 	CTLR *controller = dmc_get_controller_from_unit(uptr);
 
 	if (!cptr) return SCPE_IERR;
 	if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-	if (sscanf(cptr, "%s", &buf) != 1)
-	{
-		status = SCPE_ARG;
-	}
 
-	if (_stricmp(buf, "PRIMARY") == 0)
+	if (strcmp(cptr, "PRIMARY") == 0)
 	{
 		controller->line->isPrimary = 1;
 	}
-	else if (_stricmp(buf, "SECONDARY") == 0)
+	else if (strcmp(cptr, "SECONDARY") == 0)
 	{
 		controller->line->isPrimary = 0;
 	}
@@ -1591,13 +1530,13 @@ void dmc_buffer_queue_get_stats(BUFFER_QUEUE *q, int *available, int *contains_d
 	}
 }
 
-t_stat dmc_open_master_socket(CTLR *controller, int port)
+t_stat dmc_open_master_socket(CTLR *controller, char *port)
 {
 	t_stat ans;
 	ans = SCPE_OK;
 	if (controller->master_socket == INVALID_SOCKET)
 	{
-		controller->master_socket = sim_master_sock(port);
+		controller->master_socket = sim_master_sock(port, &ans);
 		if (controller->master_socket == INVALID_SOCKET)
 		{
 			sim_debug(DBG_WRN, controller->device, "Failed to open master socket\n");
@@ -1605,7 +1544,7 @@ t_stat dmc_open_master_socket(CTLR *controller, int port)
 		}
 		else
 		{
-			printf ("DMC-11 %s listening on port %d (socket %d)\n", controller->device->name, port, controller->master_socket);
+			printf ("DMC-11 %s listening on port %s (socket %d)\n", controller->device->name, port, controller->master_socket);
 		}
 	}
 
@@ -1647,14 +1586,14 @@ int dmc_get_receive_socket(CTLR *controller, int forRead)
 	int ans = 0;
 	if (controller->line->socket == INVALID_SOCKET)
 	{
-		uint32 ipaddr;
+		char *ipaddr;
 		//sim_debug(DBG_SOK, controller->device, "Trying to open receive socket\n");
 		controller->line->socket = sim_accept_conn (controller->master_socket, &ipaddr); /* poll connect */
 		if (controller->line->socket != INVALID_SOCKET)
 		{
-    		if (ipaddr != controller->line->transmit_address)
+    		if (strcmp(ipaddr, controller->line->transmit_host))
 	    	{
-		    	sim_debug(DBG_WRN, controller->device, "Received connection from unexpected source IP %d. Closing the connection.\n", ipaddr);
+		    	sim_debug(DBG_WRN, controller->device, "Received connection from unexpected source IP %s. Closing the connection.\n", ipaddr);
                 dmc_close_receive(controller, "Unathorized connection");
 		    }
 			else
@@ -1662,6 +1601,7 @@ int dmc_get_receive_socket(CTLR *controller, int forRead)
 			    sim_debug(DBG_SOK, controller->device, "Opened receive socket %d\n", controller->line->socket);
 			    controller->line->receive_readable = FALSE;
 			}
+            free(ipaddr);
 		}
 	}
 
@@ -1703,18 +1643,20 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
 
 	if (controller->line->socket == INVALID_SOCKET && (time(NULL) - controller->line->last_connect_attempt) > controller->connect_poll_interval)
 	{
-		int port;
-		int addr;
+		char hostport[CBUFSIZE];
 
 		controller->line->transmit_is_loopback = is_loopback;
-		port = (is_loopback) ? controller->line->receive_port : controller->line->transmit_port;
-		addr = (is_loopback) ? 0x7F000001 /* 127.0.0.1 */ : controller->line->transmit_address;
-		sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to port %d, address %d\n", port, addr);
+		
 		controller->line->last_connect_attempt = time(NULL);
-		controller->line->socket = sim_connect_sock(addr, port);
+        if (is_loopback)
+            sprintf(hostport, "localhost:%s", controller->line->receive_port);
+        else
+            sprintf(hostport, "%s", controller->line->transmit_host);
+        sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to address:port %s\n", hostport);
+        controller->line->socket = sim_connect_sock(hostport, NULL, NULL);
 		if (controller->line->socket != INVALID_SOCKET)
 		{
-			sim_debug(DBG_SOK, controller->device, "Opened transmit socket to port %d, socket %d\n", port, controller->line->socket);
+			sim_debug(DBG_SOK, controller->device, "Opened transmit socket to port %d, socket %d\n", hostport, controller->line->socket);
 			controller->line->transmit_writeable = FALSE;
 		}
 	}
@@ -1776,11 +1718,7 @@ void dmc_error_and_close_receive(CTLR *controller, char *format)
 
 void dmc_close_transmit(CTLR *controller, char *reason)
 {
-	sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %d, socket %d, reason: %s\n", controller->line->transmit_port, controller->line->socket, reason);
-	#if defined (_WIN32)
-	WSAAsyncSelect(controller->line->socket, NULL, 0, FD_CLOSE);
-    #endif
-	shutdown(controller->line->socket, SD_BOTH);
+	sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %s, socket %d, reason: %s\n", controller->line->transmit_host, controller->line->socket, reason);
 	sim_close_sock(controller->line->socket, FALSE);
 	controller->line->socket = INVALID_SOCKET;
 
@@ -2308,24 +2246,15 @@ t_stat dmc_attach (UNIT *uptr, char *cptr)
 {
 	CTLR *controller = dmc_get_controller_from_unit(uptr);
 	t_stat ans = SCPE_OK;
-	int port;
 
-	port = (int32) get_uint (cptr, 10, 65535, &ans); /* get port */
-	if ((ans != SCPE_OK) || (port == 0))
+    ans = dmc_open_master_socket(controller, cptr);
+	if (ans == SCPE_OK)
 	{
-		ans = SCPE_ARG;
-	}
-	else
-	{
-		ans = dmc_open_master_socket(controller, port);
-		if (ans == SCPE_OK)
-		{
-			controller->line->receive_port = port;
-			controller->line->socket = INVALID_SOCKET;
-			uptr->flags = uptr->flags | UNIT_ATT; /* set unit attached flag */
-			uptr->filename = (char *)malloc(strlen(cptr)+1);
-			strcpy(uptr->filename, cptr);
-		}
+		controller->line->socket = INVALID_SOCKET;
+		uptr->flags = uptr->flags | UNIT_ATT; /* set unit attached flag */
+		uptr->filename = (char *)malloc(strlen(cptr)+1);
+		strcpy(uptr->filename, cptr);
+		controller->line->receive_port = uptr->filename;
 	}
 
 	return ans;
