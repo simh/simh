@@ -158,7 +158,7 @@ SOCKET newsock;
 TMLN *lp;
 int32 *op;
 int32 i, j, psave;
-uint32 ipaddr;
+char *address;
 char cmsg[80];
 char dmsg[80] = "";
 char lmsg[80] = "";
@@ -171,7 +171,7 @@ static char mantra[] = {
     TN_IAC, TN_DO, TN_BIN
     };
 
-newsock = sim_accept_conn (mp->master, &ipaddr);        /* poll connect */
+newsock = sim_accept_conn (mp->master, &address);       /* poll connect */
 if (newsock != INVALID_SOCKET) {                        /* got a live one? */
     op = mp->lnorder;                                   /* get line connection order list pointer */
     i = mp->lines;                                      /* play it safe in case lines == 0 */
@@ -194,7 +194,7 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
     else {
         lp = mp->ldsc + i;                              /* get line desc */
         lp->conn = newsock;                             /* record connection */
-        lp->ipad = ipaddr;                              /* ip address */
+        lp->ipad = address;                             /* ip address */
         lp->mp = mp;                                    /* save mux */
         sim_write_sock (newsock, mantra, sizeof(mantra));
         tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
@@ -243,6 +243,8 @@ if (lp->txlog)                                          /* dump log */
     fflush (lp->txlog);
 tmxr_send_buffered_data (lp);                           /* send buffered data */
 sim_close_sock (lp->conn, 0);                           /* reset conn */
+free (lp->ipad);
+lp->ipad = NULL;
 lp->conn = lp->tsta = 0;                                /* reset state */
 lp->rxbpr = lp->rxbpi = 0;
 if (!lp->txbfd) 
@@ -560,13 +562,15 @@ return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? lp->txbsz: 0));
 
 t_stat tmxr_open_master (TMXR *mp, char *cptr)
 {
-int32 i, port;
+int32 i;
 SOCKET sock;
 TMLN *lp;
 t_stat r;
 
 if (!isdigit(*cptr)) {
     char gbuf[CBUFSIZE];
+    char *init_cptr = cptr;
+
     cptr = get_glyph (cptr, gbuf, '=');
     if (0 == MATCH_CMD (gbuf, "LOG")) {
         if ((NULL == cptr) || ('\0' == *cptr))
@@ -638,18 +642,20 @@ if (!isdigit(*cptr)) {
             }
         return SCPE_OK;
         }
-    return SCPE_ARG;
+    if (SCPE_OK != sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL))
+        return SCPE_ARG;
+    cptr = init_cptr;
     }
-port = (int32) get_uint (cptr, 10, 65535, &r);          /* get port */
-if ((r != SCPE_OK) || (port == 0))
-    return SCPE_ARG;
-sock = sim_master_sock (port);                          /* make master socket */
+sock = sim_master_sock (cptr, &r);                      /* make master socket */
+if (r != SCPE_OK)
+    return r;
 if (sock == INVALID_SOCKET)                             /* open error */
     return SCPE_OPENERR;
-printf ("Listening on port %d (socket %d)\n", port, sock);
+printf ("Listening on port %s (socket %d)\n", cptr, sock);
 if (sim_log)
-    fprintf (sim_log, "Listening on port %d (socket %d)\n", port, sock);
-mp->port = port;                                        /* save port */
+    fprintf (sim_log, "Listening on port %s (socket %d)\n", cptr, sock);
+mp->port = calloc(1, 1+strlen(cptr));                   /* save port */
+strcpy(mp->port, cptr);
 mp->master = sock;                                      /* save master socket */
 for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
     lp = mp->ldsc + i;
@@ -674,7 +680,7 @@ t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr)
 {
 char* tptr;
 t_stat r;
-char pmsg[20], bmsg[32] = "", lmsg[64+PATH_MAX] = "";
+char pmsg[256], bmsg[32] = "", lmsg[64+PATH_MAX] = "";
 
 tptr = (char *) malloc (strlen (cptr) +                 /* get string buf */
                         sizeof(pmsg) + 
@@ -686,7 +692,7 @@ if (r != SCPE_OK) {                                     /* error? */
     free (tptr);                                        /* release buf */
     return SCPE_OPENERR;
     }
-sprintf (pmsg, "%d", mp->port);                         /* copy port */
+sprintf (pmsg, "%s", mp->port);                         /* copy port */
 if (mp->buffered)
     sprintf (bmsg, ", buffered=%d", mp->buffered);      /* buffer info */
 if (mp->logfiletmpl[0])
@@ -772,18 +778,14 @@ void tmxr_fconns (FILE *st, TMLN *lp, int32 ln)
 if (ln >= 0)
     fprintf (st, "line %d: ", ln);
 if (lp->conn) {
-    int32 o1, o2, o3, o4, hr, mn, sc;
+    int32 hr, mn, sc;
     uint32 ctime;
 
-    o1 = (lp->ipad >> 24) & 0xFF;
-    o2 = (lp->ipad >> 16) & 0xFF;
-    o3 = (lp->ipad >> 8) & 0xFF;
-    o4 = (lp->ipad) & 0xFF;
     ctime = (sim_os_msec () - lp->cnms) / 1000;
     hr = ctime / 3600;
     mn = (ctime / 60) % 60;
     sc = ctime % 60;
-    fprintf (st, "IP address %d.%d.%d.%d", o1, o2, o3, o4);
+    fprintf (st, "IP address %s", lp->ipad);
     if (ctime)
         fprintf (st, ", connected %02d:%02d:%02d\n", hr, mn, sc);
     }

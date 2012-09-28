@@ -942,7 +942,7 @@ static char*   (*p_pcap_lib_version) (void);
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-void load_function(char* function, _func* func_ptr) {
+static void load_function(char* function, _func* func_ptr) {
 #ifdef _WIN32
     *func_ptr = (_func)GetProcAddress(hLib, function);
 #else

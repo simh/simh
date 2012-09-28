@@ -216,6 +216,7 @@
 #include "sim_defs.h"
 #include "sim_rev.h"
 #include "sim_ether.h"
+#include "sim_sock.h"
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
@@ -786,6 +787,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
 
+sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
@@ -899,6 +901,7 @@ sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
+sim_cleanup_sock ();                                    /* cleanup sockets */
 return 0;
 }
 
@@ -4572,69 +4575,6 @@ else {
 if (term && (*tptr++ != term))
     return NULL;
 return tptr;
-}
-
-/* get_ipaddr           IP address:port
-
-   Inputs:
-        cptr    =       pointer to input string
-   Outputs:
-        ipa     =       pointer to IP address (may be NULL), 0 = none
-        ipp     =       pointer to IP port (may be NULL), 0 = none
-        result  =       status
-*/
-
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp)
-{
-char gbuf[CBUFSIZE];
-char *addrp, *portp, *octetp;
-uint32 i, addr, port, octet;
-t_stat r;
-
-if ((cptr == NULL) || (*cptr == 0))
-    return SCPE_ARG;
-strncpy (gbuf, cptr, CBUFSIZE);
-addrp = gbuf;                                           /* default addr */
-if ((portp = strchr (gbuf, ':')))                       /* x:y? split */
-    *portp++ = 0;
-else if (strchr (gbuf, '.'))                            /* x.y...? */
-    portp = NULL;
-else {
-    portp = gbuf;                                       /* port only */
-    addrp = NULL;                                       /* no addr */
-    }
-if (portp) {                                            /* port string? */
-    if (ipp == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    port = (int32) get_uint (portp, 10, 65535, &r);
-    if ((r != SCPE_OK) || (port == 0))
-        return SCPE_ARG;
-    }
-else port = 0;
-if (addrp) {                                            /* addr string? */
-    if (ipa == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    for (i = addr = 0; i < 4; i++) {                    /* four octets */
-        octetp = strchr (addrp, '.');                   /* find octet end */
-        if (octetp != NULL)                             /* split string */
-            *octetp++ = 0;
-        else if (i < 3)                                 /* except last */
-            return SCPE_ARG;
-        octet = (int32) get_uint (addrp, 10, 255, &r);
-        if (r != SCPE_OK)
-            return SCPE_ARG;
-        addr = (addr << 8) | octet;
-        addrp = octetp;
-        }
-    if (((addr & 0377) == 0) || ((addr & 0377) == 255))
-        return SCPE_ARG;
-    }
-else addr = 0;
-if (ipp)                                                /* return req values */
-    *ipp = port;
-if (ipa)
-    *ipa = addr;
-return SCPE_OK;   
 }
 
 /* Find_device          find device matching input string

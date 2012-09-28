@@ -85,9 +85,6 @@
 #include "ibm1130_defs.h"
 #include "sim_sock.h"										/* include path must include main simh directory */
 #include <ctype.h>
-#ifndef INADDR_NONE
-#define INADDR_NONE ((unsigned long)-1)
-#endif
 
 #define DEBUG_SCA_FLUSH			0x0001						/* debugging options */
 #define DEBUG_SCA_TRANSMIT		0x0002
@@ -106,7 +103,7 @@
 /* #define DEBUG_SCA			(DEBUG_SCA_TIMERS|DEBUG_SCA_FLUSH|DEBUG_SCA_TRANSMIT|DEBUG_SCA_CHECK_INDATA|DEBUG_SCA_RECEIVE_SYNC|DEBUG_SCA_RECEIVE_DATA|DEBUG_SCA_XIO_INITR|DEBUG_SCA_XIO_INITW) */
 #define DEBUG_SCA			(DEBUG_SCA_TIMERS|DEBUG_SCA_FLUSH|DEBUG_SCA_CHECK_INDATA|DEBUG_SCA_XIO_INITR|DEBUG_SCA_XIO_INITW)
 
-#define SCA_DEFAULT_PORT		2703						/* default socket, This is the number of the IBM 360's BSC device */
+#define SCA_DEFAULT_PORT		"2703"						/* default socket, This is the number of the IBM 360's BSC device */
 
 #define MAX_SYNS				 100						/* number of consecutive syn's after which we stop buffering them */
 
@@ -164,7 +161,7 @@ static uint32 sca_state  = SCA_STATE_IDLE;
 static uint8  sichar     = 0;								/* sync/idle character */
 static uint8  rcvd_char  = 0;								/* most recently received character */
 static uint8  sca_frame  = 8;
-static uint16 sca_port   = SCA_DEFAULT_PORT;				/* listening port number */
+static char sca_port[CBUFSIZE];                             /* listening port */
 static int32  sca_keepalive = 0;							/* keepalive SYN packet period in msec, default = 0 (disabled) */
 static SCA_TIMER_STATE sca_timer_state[3];					/* current timer state */
 static int    sca_timer_endtime[3];							/* clocktime when timeout is to occur if state is RUNNING */
@@ -221,7 +218,7 @@ REG sca_reg[] = {														/* DEVICE STATE/SETTABLE PARAMETERS: */
 	{ DRDATA (SCASTATE,  sca_state,  32), PV_LEFT },					/* current state */
 	{ DRDATA (CTIME,     sca_cwait,  32), PV_LEFT },					/* inter-character wait */
 	{ DRDATA (ITIME,     sca_iwait,  32), PV_LEFT },					/* idle wait (polling interval for socket connects) */
-	{ DRDATA (SCASOCKET, sca_port,   16), PV_LEFT },					/* listening port number */
+    { BRDATA (SCASOCKET, sca_port,   8, 8, sizeof(sca_port)) },			/* listening port number */
 	{ DRDATA (KEEPALIVE, sca_keepalive, 32), PV_LEFT },					/* keepalive packet period in msec */
 	{ NULL }  };
 
@@ -317,7 +314,7 @@ static void sca_socket_error (void)
 			free(sca_unit.filename);
 
 		if (sca_unit.flags & UNIT_LISTEN) {
-			sprintf(name, "(Listening on port %d)", sca_port);
+			sprintf(name, "(Listening on port %s)", sca_port);
 			sca_unit.filename = mstring(name);
 			printf("%s\n", name);
 		}
@@ -454,99 +451,75 @@ static t_stat sca_reset (DEVICE *dptr)
 
 static t_stat sca_attach (UNIT *uptr, char *cptr)
 {
+    char host[CBUFSIZE], port[CBUFSIZE];
 	t_bool do_listen;
-    char *colon;
-	uint32 ipaddr;
-	int32 port;
-	struct hostent *he;
-	char name[256];
-	static SOCKET sdummy = INVALID_SOCKET;
-	fd_set wr_set, err_set;
+	char name[CBUFSIZE];
+    t_stat r;
 
 	do_listen = sim_switches & SWMASK('L');		/* -l means listen mode */
 
 	if (sca_unit.flags & UNIT_ATT)				/* if already attached, detach */
 		detach_unit(&sca_unit);
 
-	if (do_listen) {							/* if listen mode, string specifies socket number (only; otherwise it's a dummy argument) */
-		if (isdigit(*cptr)) {					/* if digits specified, extract port number */
-			port = atoi(cptr);
-			if (port <= 0 || port > 65535)
-				return SCPE_ARG;
-			else
-				sca_port = port;
-		}
+	if (do_listen) {							/* if listen mode, string specifies port number (only; otherwise it's a dummy argument) */
+        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT);
+        if (r != SCPE_OK)
+            return r;
+        if ((0 == strcmp(port, cptr)) && (0 == strcmp(port, "dummy")))
+            strcpy(port, SCA_DEFAULT_PORT);
+
+        sprintf(sca_port, "%s%s%s:%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", port);
+
 		/* else if nondigits specified, ignore... but the command has to have something there otherwise the core scp */
 		/* attach_cmd() routine complains "too few arguments". */
 
-		if ((sca_lsock = sim_master_sock(sca_port)) == INVALID_SOCKET)
+		sca_lsock = sim_master_sock(sca_port, &r);
+        if (r != SCPE_OK)
+            return r;
+		if (sca_lsock == INVALID_SOCKET)
 			return SCPE_OPENERR;
 		
 		SETBIT(sca_unit.flags, UNIT_LISTEN);	/* note that we are listening, not yet connected */
 
-		sprintf(name, "(Listening on port %d)", sca_port);
-		sca_unit.filename = mstring(name);
-		printf("%s\n", name);
+		sprintf(name, "(Listening on port %s)", sca_port);
+        sca_unit.filename = mstring(name);
+		printf("%s\n", sca_unit.filename);
 
 	}
 	else {
-		while (*cptr && *cptr <= ' ')
+        while (*cptr && *cptr <= ' ')
 			cptr++;
 
 		if (! *cptr)
 			return SCPE_2FARG;
 
-		if ((colon = strchr(cptr, ':')) != NULL) {
-			*colon++ = '\0';					/* clip hostname at colon */
+        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT);
+        if (r != SCPE_OK)
+            return r;
+        if ((0 == strcmp(cptr, port)) && (0 == strcmp(host, ""))) {
+            strcpy(host, port);
+            strcpy(port, SCA_DEFAULT_PORT);
+        }
 
-			port = atoi(colon);					/* extract port number that follows it */
-			if (port <= 0 || port > 65535)
-				return SCPE_ARG;
-			else
-				sca_port = port;
-		}
+        sprintf(sca_port, "%s%s%s:%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", port);
 
-		if (sdummy == INVALID_SOCKET)
-			if ((sdummy = sim_create_sock()) == INVALID_SOCKET)		/* create and keep a socket, to force initialization */
-				return SCPE_IERR;									/* of socket library (e.g on Win32 call WSAStartup), else gethostbyname fails */
-
-		if (get_ipaddr(cptr, &ipaddr, NULL) != SCPE_OK) {			/* try to parse hostname as dotted decimal nnn.nnn.nnn.nnn */
-			if ((he = gethostbyname(cptr)) == NULL)					/* if not decimal, look up name through DNS */
-				return SCPE_OPENERR;
-		
-			if ((ipaddr = * (unsigned long *) he->h_addr_list[0]) == INADDR_NONE)
-				return SCPE_OPENERR;
-
-			ipaddr = ntohl(ipaddr);									/* convert to host byte order; gethostbyname() gives us network order */
-		}
-
-		if ((sca_sock = sim_connect_sock(ipaddr, sca_port)) == INVALID_SOCKET)
+		if ((sca_sock = sim_connect_sock(sca_port, NULL, NULL)) == INVALID_SOCKET)
 			return SCPE_OPENERR;
 
 		/* sim_connect_sock() sets socket to nonblocking before initiating the connect, so
 		 * the connect is pending when it returns. For outgoing connections, the attach command should wait
-		 * until the connection succeeds or fails. We use "accept" to wait and find out which way it goes...
+		 * until the connection succeeds or fails. We use "sim_check_conn" to wait and find out which way it goes...
 		 */
 
-		FD_ZERO(&wr_set);								/* we are only interested in info for sca_sock */
-		FD_ZERO(&err_set);
-		FD_SET(sca_sock, &wr_set);
-		FD_SET(sca_sock, &err_set);
+        while (0 == sim_check_conn(sca_sock, 0))/* wait for connection to complete or fail */
+            sim_os_ms_sleep(1000);
 
-		select(3, NULL, &wr_set, &err_set, NULL);		/* wait for connection to complete or fail */
-
-		if (FD_ISSET(sca_sock, &wr_set)) {				/* sca_sock appears in "writable" set -- connect completed */
-			sprintf(name, "%s:%d", cptr, sca_port);
+		if (1 == sim_check_conn(sca_sock, 0)) {	/* sca_sock appears in "writable" set -- connect completed */
+            sprintf(name, "%s%s%s:%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", port);
 			sca_unit.filename = mstring(name);
 			SETBIT(sca_dsw, SCA_DSW_READY);
 		}
-		else if (FD_ISSET(sca_sock, &err_set)) {		/* sca_sock appears in "error" set -- connect failed */
-			sim_close_sock(sca_sock, TRUE);
-			sca_sock = INVALID_SOCKET;
-			return SCPE_OPENERR;
-		}
-		else {											/* if we get here my assumption about how select works is wrong */
-			printf("SCA_SOCK NOT FOUND IN WR_SET -OR- ERR_SET, CODING IN IBM1130_SCA IS WRONG\n");
+		else {                                  /* sca_sock appears in "error" set -- connect failed */
 			sim_close_sock(sca_sock, TRUE);
 			sca_sock = INVALID_SOCKET;
 			return SCPE_OPENERR;
@@ -610,22 +583,17 @@ static t_stat sca_detach (UNIT *uptr)
 
 static void sca_check_connect (void)
 {
-	uint32 ipaddr;
-	char name[100];
+	char *connectaddress;
 
-	if ((sca_sock = sim_accept_conn(sca_lsock, &ipaddr)) == INVALID_SOCKET)
+	if ((sca_sock = sim_accept_conn(sca_lsock, &connectaddress)) == INVALID_SOCKET)
 		return;
 
-	ipaddr = htonl(ipaddr);								/* convert to network order so we can print it */
-
-	sprintf(name, "%d.%d.%d.%d", ipaddr & 0xFF, (ipaddr >> 8) & 0xFF, (ipaddr >> 16) & 0xFF, (ipaddr >> 24) & 0xFF);
-
-	printf("(SCA connection from %s)\n", name);
+	printf("(SCA connection from %s)\n", connectaddress);
 
 	if (sca_unit.filename != NULL)
 		free(sca_unit.filename);
 
-	sca_unit.filename = mstring(name);
+	sca_unit.filename = connectaddress;
 
 	SETBIT(sca_dsw, SCA_DSW_READY);						/* indicate active connection  */
 

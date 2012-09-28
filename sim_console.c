@@ -428,18 +428,20 @@ while (*cptr != 0) {                                    /* do all mods */
     if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
-    if (isdigit (*gbuf)) {
-        if (sim_con_tmxr.master)                        /* already open? */
-            sim_set_notelnet (0, NULL);                 /* close first */
-        return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
+    if ((ctptr = find_ctab (set_con_telnet_tab, gbuf))) { /* match? */
+        r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
+        if (r != SCPE_OK)
+            return r;
         }
-    else
-        if ((ctptr = find_ctab (set_con_telnet_tab, gbuf))) { /* match? */
-            r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
-            if (r != SCPE_OK)
-                return r;
+    else {
+        r = sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL);
+        if (r == SCPE_OK) {
+            if (sim_con_tmxr.master)                        /* already open? */
+                sim_set_notelnet (0, NULL);                 /* close first */
+            return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
             }
-        else return SCPE_NOPARAM;
+        return SCPE_NOPARAM;
+        }
     }
 return SCPE_OK;
 }
@@ -465,9 +467,9 @@ if (sim_con_tmxr.master == 0)
     fprintf (st, "Connected to console window\n");
 else {
     if (sim_con_ldsc.conn == 0)
-        fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
+        fprintf (st, "Listening on port %s\n", sim_con_tmxr.port);
     else {
-        fprintf (st, "Listening on port %d, connected to socket %d\n",
+        fprintf (st, "Listening on port %s, connected to socket %d\n",
             sim_con_tmxr.port, sim_con_ldsc.conn);
         tmxr_fconns (st, &sim_con_ldsc, -1);
         }
