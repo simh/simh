@@ -1,0 +1,2344 @@
+/* vax_dmc.c: DMC11 Emulation
+  ------------------------------------------------------------------------------
+
+   Copyright (c) 2011, Robert M. A. Jarratt
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the name of the author shall not be
+   used in advertising or otherwise to promote the sale, use or other dealings
+   in this Software without prior written authorization from the author.
+
+  ------------------------------------------------------------------------------
+
+
+I/O is done through sockets so that the remote system can be on the same host machine. The device starts polling for
+incoming connections when it receives its first read buffer. The device opens the connection for writing when it receives
+the first write buffer.
+
+Transmit and receive buffers are added to their respective queues and the polling method in dmc_svc() checks for input
+and sends any output.
+
+On the wire the format is a 2-byte block length followed by that number of bytes. Some of the diagnostics expect to receive
+the same number of bytes in a buffer as were sent by the other end. Using sockets without a block length can cause the
+buffers to coalesce and then the buffer lengths in the diagnostics fail. The block length is always sent in network byte
+order.
+
+Tested with two diagnostics. To run the diagnostics set the default directory to SYS$MAINTENANCE, run ESSAA and then
+configure it for the DMC-11 with the following commands:
+
+The above commands can be put into a COM file in SYS$MAINTENANCE (works on VMS 3.0 but not 4.6, not sure why).
+
+ATT DW780 SBI DW0 3 4
+ATT DMC11 DW0 XMA0 760070 300 5
+SELECT XMA0
+(if putting these into a COM file to be executed by ESSAA add a "DS> " prefix)
+
+
+The first is EVDCA which takes no parameters. Invoke it with the command R EVDCA. This diagnostic uses the DMC-11 loopback
+functionality and the transmit port is not used when LU LOOP is enabled. Seems to work only under later versions of VMS
+such as 4.6, does not work on 3.0.
+
+The second is EVDMC, invoke this with the command R EVDMC. For this I used the following commands inside the diagnostic:
+
+RUN MODE=TRAN on one machine
+RUN MODE=REC on the other (unless the one instance is configured with the ports looping back).
+
+You can add /PASS=n to the above commands to get the diagnostic to send and receive more buffers.
+
+The other test was to configure DECnet on VMS 4.6 and do SET HOST.
+*/
+
+// TODO: Copyright notices
+// TODO: Compile on other platforms
+// TODO: Avoid need for manifests and newest runtime, compile with 2003
+// TODO: Investigate line number and set parameters at the unit level (?)
+// TODO: Multipoint. In this case perhaps don't need transmit port, allow all lines to connect to port on control node.
+// TODO: Show active connections like DZ does, for multipoint.
+// TODO: Test MOP.
+// TODO: Implement actual DDCMP protocol and run over UDP.
+// TODO: Allow NCP SHOW COUNTERS to work (think this is the base address thing)
+
+#include <time.h>
+#include <ctype.h>
+
+#include "vax_dmc.h"
+
+#if defined (_WIN32)                                    /* Windows */
+#include <winsock2.h>
+#include <Ws2tcpip.h>
+#elif defined (__GNUC__)                                  /* GCC */
+#include <sys/socket.h>                                 /* for sockets */
+#include <netinet/in.h>                                 /* for sockaddr_in */
+#define SD_BOTH SHUT_RDWR
+#define _stricmp strcasecmp
+#else
+#pragma message( "Unknown environment" )
+#endif
+
+#define POLL 1000
+#define TRACE_BYTES_PER_LINE 16
+
+struct csrs {
+	uint16 sel0;
+	uint16 sel2;
+	uint16 sel4;
+	uint16 sel6;
+};
+
+typedef struct csrs CSRS;
+
+typedef enum
+{
+	Initialised, /* after MASTER CLEAR */
+	Running      /* after any transmit or receive buffer has been supplied */
+} ControllerState;
+
+typedef enum
+{ 
+	Idle,
+	InputTransfer,
+	OutputTransfer
+} TransferState;
+
+typedef enum
+{
+	Available, /* when empty or partially filled on read */
+	ContainsData,
+	TransferInProgress
+} BufferState;
+
+typedef struct
+{
+	int isPrimary;
+	SOCKET socket; // socket used bidirectionally
+	int receive_readable;
+	int receive_port;
+	int transmit_writeable;
+	char transmit_host[80];
+	int transmit_address;
+	int transmit_port;
+	int transmit_is_loopback; /* if true the transmit socket is the loopback to the receive */
+	int speed; /* bits per second in each direction, 0 for no limit */
+	int last_second;
+	int bytes_sent_in_last_second;
+	int bytes_received_in_last_second;
+	time_t last_connect_attempt;
+} LINE;
+
+/* A partially filled buffer (during a read from the socket) will have block_len_bytes_read = 1 or actual_bytes_transferred < actual_block_len */
+typedef struct buffer
+{
+	uint32 address;           /* unibus address of the buffer */
+	uint16 count;             /* size of the buffer passed to the device by the driver */
+	uint16 actual_block_len;  /* actual length of the received block */
+	uint8 *transfer_buffer;   /* the buffer into which data is received or from which it is transmitted*/
+	int block_len_bytes_read; /* the number of bytes read so far for the block length */
+	int actual_bytes_transferred;    /* the number of bytes from the actual block that have been read or written so far*/
+	struct buffer *next;      /* next buffer in the queue */
+	BufferState state;        /* state of this buffer */
+	int is_loopback;          /* loopback was requested when this buffer was queued */
+} BUFFER;
+
+typedef struct
+{
+	char * name;
+	BUFFER queue[BUFFER_QUEUE_SIZE];
+	int head;
+	int tail;
+	int count;
+	struct dmc_controller *controller; /* back pointer to the containing controller */
+} BUFFER_QUEUE;
+
+typedef struct
+{
+	int started;
+	clock_t start_time;
+	clock_t cumulative_time;
+} TIMER;
+
+typedef struct
+{
+	TIMER between_polls_timer;
+	TIMER poll_timer;
+	uint32 poll_count;
+
+} UNIT_STATS;
+
+typedef enum
+{
+	DMC,
+	DMR,
+	DMP
+} DEVTYPE;
+
+struct dmc_controller {
+	CSRS *csrs;
+	DEVICE *device;
+	ControllerState state;
+	TransferState transfer_state; /* current transfer state (type of transfer) */
+	int transfer_type;
+	int transfer_in_io; // remembers IN I/O setting at start of input transfer as host changes it during transfer!
+	LINE *line;
+	BUFFER_QUEUE *receive_queue;
+	BUFFER_QUEUE *transmit_queue;
+	SOCKET master_socket;
+	int32 svc_poll_interval;
+	int32 connect_poll_interval;
+	DEVTYPE dev_type;
+	uint32 rxi;
+	uint32 txi;
+	uint32 buffers_received_from_net;
+	uint32 buffers_transmitted_to_net;
+	uint32 receive_buffer_output_transfers_completed;
+	uint32 transmit_buffer_output_transfers_completed;
+	uint32 receive_buffer_input_transfers_completed;
+	uint32 transmit_buffer_input_transfers_completed;
+};
+
+typedef struct dmc_controller CTLR;
+
+t_stat dmc_rd(int32* data, int32 PA, int32 access);
+t_stat dmc_wr(int32  data, int32 PA, int32 access);
+t_stat dmc_svc(UNIT * uptr);
+t_stat dmc_reset (DEVICE * dptr);
+t_stat dmc_attach (UNIT * uptr, char * cptr);
+t_stat dmc_detach (UNIT * uptr);
+int32 dmc_rxint (void);
+int32 dmc_txint (void);
+t_stat dmc_settransmit (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showtransmit (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showstats (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setpoll (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showpoll (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setconnectpoll (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showconnectpoll (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showlinemode (FILE* st, UNIT* uptr, int32 val, void* desc);
+int dmc_is_dmc(CTLR *controller);
+int dmc_is_rqi_set(CTLR *controller);
+int dmc_is_rdyi_set(CTLR *controller);
+int dmc_is_iei_set(CTLR *controller);
+int dmc_is_ieo_set(CTLR *controller);
+void dmc_process_command(CTLR *controller);
+int dmc_buffer_fill_receive_buffers(CTLR *controller);
+void dmc_start_transfer_receive_buffer(CTLR *controller);
+int dmc_buffer_send_transmit_buffers(CTLR *controller);
+void dmc_buffer_queue_init(CTLR *controller, BUFFER_QUEUE *q, char *name);
+BUFFER *dmc_buffer_queue_head(BUFFER_QUEUE *q);
+int dmc_buffer_queue_full(BUFFER_QUEUE *q);
+void dmc_buffer_queue_get_stats(BUFFER_QUEUE *q, int *available, int *contains_data, int *transfer_in_progress);
+void dmc_start_transfer_transmit_buffer(CTLR *controller);
+void dmc_error_and_close_receive(CTLR *controller, char *format);
+void dmc_close_receive(CTLR *controller, char *reason);
+void dmc_close_transmit(CTLR *controller, char *reason);
+int dmc_get_socket(CTLR *controller, int forRead);
+int dmc_get_receive_socket(CTLR *controller, int forRead);
+int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead);
+void dmc_line_update_speed_stats(LINE *line);
+UNIT_STATS *dmc_get_unit_stats(UNIT *uptr);
+void dmc_set_unit_stats(UNIT *uptr, UNIT_STATS *stats);
+
+DEBTAB dmc_debug[] = {
+	{"TRACE",  DBG_TRC},
+	{"WARN",   DBG_WRN},
+	{"REG",    DBG_REG},
+	{"INFO",   DBG_INF},
+	{"DATA",   DBG_DAT},
+	{"DATASUM",DBG_DTS},
+	{"SOCKET", DBG_SOK},
+	{"CONNECT", DBG_CON},
+	{0}
+};
+
+UNIT dmc_unit[] = {
+	{ UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },
+	{ UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },
+	{ UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },
+	{ UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }
+};
+
+UNIT dmp_unit[] = {
+	{ UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }
+};
+
+CSRS dmc_csrs[DMC_NUMDEVICE];
+
+CSRS dmp_csrs[DMP_NUMDEVICE];
+
+REG dmca_reg[] = {
+	{ HRDATA (SEL0, dmc_csrs[0].sel0, 16) },
+	{ HRDATA (SEL2, dmc_csrs[0].sel2, 16) },
+	{ HRDATA (SEL4, dmc_csrs[0].sel4, 16) },
+	{ HRDATA (SEL6, dmc_csrs[0].sel6, 16) },
+	{ GRDATA (BSEL0, dmc_csrs[0].sel0, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL1, dmc_csrs[0].sel0, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL2, dmc_csrs[0].sel2, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL3, dmc_csrs[0].sel2, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL4, dmc_csrs[0].sel4, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL5, dmc_csrs[0].sel4, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL6, dmc_csrs[0].sel6, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL7, dmc_csrs[0].sel6, DEV_RDX, 8, 8) },
+	{ NULL }  };
+
+REG dmcb_reg[] = {
+	{ HRDATA (SEL0, dmc_csrs[1].sel0, 16) },
+	{ HRDATA (SEL2, dmc_csrs[1].sel2, 16) },
+	{ HRDATA (SEL4, dmc_csrs[1].sel4, 16) },
+	{ HRDATA (SEL6, dmc_csrs[1].sel6, 16) },
+	{ GRDATA (BSEL0, dmc_csrs[1].sel0, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL1, dmc_csrs[1].sel0, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL2, dmc_csrs[1].sel2, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL3, dmc_csrs[1].sel2, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL4, dmc_csrs[1].sel4, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL5, dmc_csrs[1].sel4, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL6, dmc_csrs[1].sel6, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL7, dmc_csrs[1].sel6, DEV_RDX, 8, 8) },
+	{ NULL }  };
+
+REG dmcc_reg[] = {
+	{ HRDATA (SEL0, dmc_csrs[2].sel0, 16) },
+	{ HRDATA (SEL2, dmc_csrs[2].sel2, 16) },
+	{ HRDATA (SEL4, dmc_csrs[2].sel4, 16) },
+	{ HRDATA (SEL6, dmc_csrs[2].sel6, 16) },
+	{ GRDATA (BSEL0, dmc_csrs[2].sel0, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL1, dmc_csrs[2].sel0, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL2, dmc_csrs[2].sel2, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL3, dmc_csrs[2].sel2, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL4, dmc_csrs[2].sel4, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL5, dmc_csrs[2].sel4, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL6, dmc_csrs[2].sel6, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL7, dmc_csrs[2].sel6, DEV_RDX, 8, 8) },
+	{ NULL }  };
+
+REG dmcd_reg[] = {
+	{ HRDATA (SEL0, dmc_csrs[3].sel0, 16) },
+	{ HRDATA (SEL2, dmc_csrs[3].sel2, 16) },
+	{ HRDATA (SEL4, dmc_csrs[3].sel4, 16) },
+	{ HRDATA (SEL6, dmc_csrs[3].sel6, 16) },
+	{ GRDATA (BSEL0, dmc_csrs[3].sel0, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL1, dmc_csrs[3].sel0, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL2, dmc_csrs[3].sel2, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL3, dmc_csrs[3].sel2, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL4, dmc_csrs[3].sel4, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL5, dmc_csrs[3].sel4, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL6, dmc_csrs[3].sel6, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL7, dmc_csrs[3].sel6, DEV_RDX, 8, 8) },
+	{ NULL }  };
+
+REG dmp_reg[] = {
+	{ HRDATA (SEL0, dmc_csrs[3].sel0, 16) },
+	{ HRDATA (SEL2, dmc_csrs[3].sel2, 16) },
+	{ HRDATA (SEL4, dmc_csrs[3].sel4, 16) },
+	{ HRDATA (SEL6, dmc_csrs[3].sel6, 16) },
+	{ GRDATA (BSEL0, dmc_csrs[3].sel0, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL1, dmc_csrs[3].sel0, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL2, dmc_csrs[3].sel2, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL3, dmc_csrs[3].sel2, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL4, dmc_csrs[3].sel4, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL5, dmc_csrs[3].sel4, DEV_RDX, 8, 8) },
+	{ GRDATA (BSEL6, dmc_csrs[3].sel6, DEV_RDX, 8, 0) },
+	{ GRDATA (BSEL7, dmc_csrs[3].sel6, DEV_RDX, 8, 8) },
+	{ NULL }  };
+
+MTAB dmc_mod[] = {
+	{ MTAB_XTD | MTAB_VDV, 0, "TRANSMIT", "TRANSMIT=address:port" ,&dmc_settransmit, &dmc_showtransmit, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "SPEED", "SPEED" ,&dmc_setspeed, &dmc_showspeed, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE" ,&dmc_settype, &dmc_showtype, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "LINEMODE", "LINEMODE" ,&dmc_setlinemode, &dmc_showlinemode, NULL },
+	{ MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATS", "STATS" ,&dmc_setstats, &dmc_showstats, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL" ,&dmc_setpoll, &dmc_showpoll, NULL },
+	{ MTAB_XTD | MTAB_VDV, 0, "CONNECTPOLL", "CONNECTPOLL" ,&dmc_setconnectpoll, &dmc_showconnectpoll, NULL },
+    { MTAB_XTD | MTAB_VDV, 006, "ADDRESS", "ADDRESS", &set_addr, &show_addr, NULL },
+    { MTAB_XTD  |MTAB_VDV, 0, "VECTOR", "VECTOR", &set_vec, &show_vec, NULL },
+	{ 0 },
+};
+
+DIB dmc_dib[] =
+{
+	{ IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} },
+	{ IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} },
+	{ IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} },
+	{ IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} }
+};
+
+DIB dmp_dib[] =
+{
+	{ IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} }
+};
+
+DEVICE dmc_dev[] =
+{
+	{ "DMA", &dmc_unit[0], dmca_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+	NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
+	&dmc_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+	{ "DMB", &dmc_unit[1], dmcb_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+	NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
+	&dmc_dib[1], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+	{ "DMC", &dmc_unit[2], dmcc_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+	NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
+	&dmc_dib[2], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+	{ "DMD", &dmc_unit[3], dmcd_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+	NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
+	&dmc_dib[3], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
+};
+
+DEVICE dmp_dev[] =
+{
+	{ "DMP", &dmp_unit[0], dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+	NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
+	&dmp_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
+};
+
+LINE dmc_line[DMC_NUMDEVICE];
+
+BUFFER_QUEUE dmc_receive_queues[DMC_NUMDEVICE];
+BUFFER_QUEUE dmc_transmit_queues[DMC_NUMDEVICE];
+
+LINE dmp_line[DMP_NUMDEVICE];
+
+BUFFER_QUEUE dmp_receive_queues[DMP_NUMDEVICE];
+BUFFER_QUEUE dmp_transmit_queues[DMP_NUMDEVICE];
+
+CTLR dmc_ctrls[] =
+{
+	{ &dmc_csrs[0], &dmc_dev[0], Initialised, Idle, 0, 0, &dmc_line[0], &dmc_receive_queues[0], &dmc_transmit_queues[0], INVALID_SOCKET, -1, 30, DMC },
+	{ &dmc_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], INVALID_SOCKET, -1, 30, DMC },
+	{ &dmc_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], INVALID_SOCKET, -1, 30, DMC },
+	{ &dmc_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], INVALID_SOCKET, -1, 30, DMC },
+	{ &dmp_csrs[0], &dmp_dev[0], Initialised, Idle, 0, 0, &dmp_line[0], &dmp_receive_queues[0], &dmp_transmit_queues[0], INVALID_SOCKET, -1, 30, DMP }
+};
+
+UNIT_STATS *dmc_get_unit_stats(UNIT *uptr)
+{
+	UNIT_STATS *ans = NULL;
+#ifdef USE_ADDR64
+	ans = (UNIT_STATS *)(((t_uint64)uptr->u3 << 32) | uptr->u4);
+#else
+    ans = (UNIT_STATS *)(uptr->u3);
+#endif
+	return ans;
+}
+
+void dmc_set_unit_stats(UNIT *uptr, UNIT_STATS *stats)
+{
+#ifdef USE_ADDR64
+	uptr->u3 = (int32)((t_uint64)stats >> 32);
+	uptr->u4 = (int32)((t_uint64)stats & 0xFFFFFFFF);
+#else
+    uptr->u3 = (int32)stats;
+#endif
+}
+
+void dmc_reset_unit_stats(UNIT_STATS *s)
+{
+    s->between_polls_timer.started = FALSE;
+	s->poll_timer.started = FALSE;
+	s->poll_count = 0;
+}
+
+int dmc_timer_started(TIMER *t)
+{
+	return t->started;
+}
+
+void dmc_timer_start(TIMER *t)
+{
+	t->start_time = clock();
+	t->cumulative_time = 0;
+	t->started = TRUE;
+}
+
+void dmc_timer_stop(TIMER *t)
+{
+	clock_t end_time = clock();
+	t->cumulative_time += end_time - t->start_time;
+}
+
+void dmc_timer_resume(TIMER *t)
+{
+	t->start_time = clock();
+}
+
+double dmc_timer_cumulative_seconds(TIMER *t)
+{
+	return (double)t->cumulative_time/CLOCKS_PER_SEC;
+}
+
+int dmc_is_dmc(CTLR *controller)
+{
+	return controller->dev_type != DMP;
+}
+
+CTLR *dmc_get_controller_from_unit(UNIT *unit)
+{
+	int i;
+	CTLR *ans = NULL;
+	for (i = 0; i < DMC_NUMDEVICE + DMP_NUMDEVICE; i++)
+	{
+		if (dmc_ctrls[i].device->units == unit)
+		{
+			ans = &dmc_ctrls[i];
+			break;
+		}
+	}
+
+	return ans;
+}
+
+CTLR* dmc_get_controller_from_address(uint32 address)
+{
+	int i;
+	for (i=0; i<DMC_NUMDEVICE + DMP_NUMDEVICE; i++)
+	{
+		DIB *dib = (DIB *)dmc_ctrls[i].device->ctxt;
+		if ((address >= dib->ba) && (address < (dib->ba + dib->lnt)))
+			return &dmc_ctrls[i];
+	}
+	/* not found */
+	return 0;
+}
+
+CTLR *dmc_get_controller_from_device(DEVICE *device)
+{
+	int i;
+	CTLR *ans = NULL;
+	for (i = 0; i < DMC_NUMDEVICE + DMP_NUMDEVICE; i++)
+	{
+		if (dmc_ctrls[i].device == device)
+		{
+			ans = &dmc_ctrls[i];
+			break;
+		}
+	}
+
+	return ans;
+}
+
+t_stat dmc_showtransmit (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	fprintf(st, "TRANSMIT=%s:%d", controller->line->transmit_host, controller->line->transmit_port);
+	return SCPE_OK;
+}
+
+t_stat dmc_settransmit (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	char *port;
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+	if (!cptr) return SCPE_IERR;
+	if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+	port = strchr(cptr, ':');
+	if (port == NULL)
+	{
+		status = SCPE_ARG;
+	}
+	else
+	{
+		*port++ = '\0';
+		if (sscanf(port, "%d", &controller->line->transmit_port) != 1)
+		{
+			status = SCPE_ARG;
+		}
+		else
+		{
+			static SOCKET dummysocket = INVALID_SOCKET; /* used to get a WASStartup done to allow getaddrinfo to work */
+			struct addrinfo *result = NULL;
+			struct addrinfo hints;
+			int iresult;
+			strncpy(controller->line->transmit_host, cptr, sizeof(controller->line->transmit_host)-1);
+
+			if (dummysocket == INVALID_SOCKET)
+				if ((dummysocket = sim_create_sock()) == INVALID_SOCKET)		/* create and keep a socket, to force initialization */
+					status = SCPE_IERR;									/* of socket library (e.g on Win32 call WSAStartup), else gethostbyname fails */
+			if (status == SCPE_OK)
+			{
+				memset( &hints, 0, sizeof(hints) );
+				hints.ai_family = AF_INET;
+				hints.ai_socktype = SOCK_STREAM;
+				hints.ai_protocol = IPPROTO_TCP;
+
+				iresult = getaddrinfo(cptr, port, &hints, &result);
+				if (iresult != 0)
+				{
+					printf("getaddrinfo failed: %d\n", iresult);
+					status = SCPE_IERR;
+				}
+				else
+				{
+					struct sockaddr_in *in_addr = (struct sockaddr_in *)result->ai_addr;
+#if defined (_WIN32)
+					controller->line->transmit_address = ntohl(in_addr->sin_addr.S_un.S_addr);
+#else
+					controller->line->transmit_address = ntohl(in_addr->sin_addr.s_addr);
+#endif
+				}
+			}
+		}
+	}
+
+	return status;
+}
+
+t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	fprintf(st, "SPEED=%d", controller->line->speed);
+	return SCPE_OK;
+}
+
+t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+	if (!cptr) return SCPE_IERR;
+	if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+	if (sscanf(cptr, "%d", &controller->line->speed) != 1)
+	{
+		status = SCPE_ARG;
+	}
+
+	return status;
+}
+
+t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	switch (controller->dev_type)
+	{
+	case DMC:
+		{
+	        fprintf(st, "TYPE=DMC");
+			break;
+		}
+	case DMR:
+		{
+	        fprintf(st, "TYPE=DMR");
+			break;
+		}
+	case DMP:
+		{
+	        fprintf(st, "TYPE=DMP");
+			break;
+		}
+	default:
+		{
+	        fprintf(st, "TYPE=???");
+			break;
+		}
+	}
+	return SCPE_OK;
+}
+
+t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	char buf[80];
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+	if (!cptr) return SCPE_IERR;
+	if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+	if (sscanf(cptr, "%s", buf) != 1)
+	{
+		status = SCPE_ARG;
+	}
+	else
+	{
+		if (strcmp(buf,"DMC")==0)
+		{
+			controller->dev_type = DMC;
+		}
+		else if  (strcmp(buf,"DMR")==0)
+		{
+			controller->dev_type = DMR;
+		}
+		else if  (strcmp(buf,"DMP")==0)
+		{
+			controller->dev_type = DMP;
+		}
+		else
+		{
+			status = SCPE_ARG;
+		}
+	}
+
+	return status;
+}
+
+t_stat dmc_showstats (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	TIMER *poll_timer = &dmc_get_unit_stats(uptr)->poll_timer;
+	TIMER *between_polls_timer = &dmc_get_unit_stats(uptr)->between_polls_timer;
+	uint32 poll_count = dmc_get_unit_stats(uptr)->poll_count;
+
+	if (dmc_timer_started(between_polls_timer) && poll_count > 0)
+	{
+	    fprintf(st, "Average time between polls=%f (sec)\n", dmc_timer_cumulative_seconds(between_polls_timer)/poll_count);
+	}
+	else
+	{
+	    fprintf(st, "Average time between polls=n/a\n");
+	}
+
+	if (dmc_timer_started(poll_timer) && poll_count > 0)
+	{
+	    fprintf(st, "Average time within poll=%f (sec)\n", dmc_timer_cumulative_seconds(poll_timer)/poll_count);
+	}
+	else
+	{
+	    fprintf(st, "Average time within poll=n/a\n");
+	}
+
+	fprintf(st, "Buffers received from the network=%d\n", controller->buffers_received_from_net);
+	fprintf(st, "Buffers sent to the network=%d\n", controller->buffers_transmitted_to_net);
+	fprintf(st, "Output transfers completed for receive buffers=%d\n", controller->receive_buffer_output_transfers_completed);
+	fprintf(st, "Output transfers completed for transmit buffers=%d\n", controller->transmit_buffer_output_transfers_completed);
+	fprintf(st, "Input transfers completed for receive buffers=%d\n", controller->receive_buffer_input_transfers_completed);
+	fprintf(st, "Input transfers completed for transmit buffers=%d\n", controller->transmit_buffer_input_transfers_completed);
+
+	return SCPE_OK;
+}
+
+t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+    dmc_reset_unit_stats(dmc_get_unit_stats(uptr));
+
+    controller->receive_buffer_output_transfers_completed = 0;
+    controller->transmit_buffer_output_transfers_completed = 0;
+    controller->receive_buffer_input_transfers_completed = 0;
+    controller->transmit_buffer_input_transfers_completed = 0;
+
+	printf("Statistics reset\n" );
+
+	return status;
+}
+
+t_stat dmc_showpoll (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	fprintf(st, "POLL=%d", controller->svc_poll_interval);
+	return SCPE_OK;
+}
+
+t_stat dmc_setpoll (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+	if (!cptr) return SCPE_IERR;
+	if (sscanf(cptr, "%d", &controller->svc_poll_interval) != 1)
+	{
+		status = SCPE_ARG;
+	}
+
+	return status;
+}
+
+t_stat dmc_showconnectpoll (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	fprintf(st, "CONNECTPOLL=%d", controller->connect_poll_interval);
+	return SCPE_OK;
+}
+
+t_stat dmc_setconnectpoll (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+	if (!cptr) return SCPE_IERR;
+	if (sscanf(cptr, "%d", &controller->connect_poll_interval) != 1)
+	{
+		status = SCPE_ARG;
+	}
+
+	return status;
+}
+
+t_stat dmc_showlinemode (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	fprintf(st, "LINEMODE=%s", controller->line->isPrimary? "PRIMARY" : "SECONDARY");
+	return SCPE_OK;
+}
+
+t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+	char buf[80];
+	t_stat status = SCPE_OK;
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+
+	if (!cptr) return SCPE_IERR;
+	if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+	if (sscanf(cptr, "%s", &buf) != 1)
+	{
+		status = SCPE_ARG;
+	}
+
+	if (_stricmp(buf, "PRIMARY") == 0)
+	{
+		controller->line->isPrimary = 1;
+	}
+	else if (_stricmp(buf, "SECONDARY") == 0)
+	{
+		controller->line->isPrimary = 0;
+	}
+	else
+	{
+		status = SCPE_ARG;
+	}
+
+	return status;
+}
+
+void dmc_setrxint(CTLR *controller)
+{
+	controller->rxi = 1;
+	SET_INT(DMCRX);
+}
+
+void dmc_clrrxint(CTLR *controller)
+{
+	controller->rxi = 0;
+	CLR_INT(DMCRX);
+}
+
+void dmc_settxint(CTLR *controller)
+{
+	controller->txi = 1;
+	SET_INT(DMCTX);
+}
+
+void dmc_clrtxint(CTLR *controller)
+{
+	controller->txi = 0;
+	CLR_INT(DMCTX);
+}
+
+int dmc_getsel(int addr)
+{
+	return (addr >> 1) & 03;
+}
+
+uint16 dmc_bitfld(int data, int start_bit, int length)
+{
+	uint16 ans = data >> start_bit;
+	uint32 mask = (1 << (length))-1;
+	ans &= mask;
+	return ans;
+}
+
+void dmc_dumpregsel0(CTLR *controller, int trace_level, char * prefix, uint16 data)
+{
+	char *type_str = "";
+	uint16 type = dmc_bitfld(data, SEL0_TYPEI_BIT, 2);
+
+	if (dmc_is_dmc(controller))
+	{
+		if (dmc_is_rqi_set(controller))
+		{
+			if (type==TYPE_BACCI)
+				type_str = "BA/CC I";
+			else if (type==TYPE_CNTLI)
+				type_str = "CNTL I";
+			else if (type==TYPE_BASEI)
+				type_str = "BASE I";
+			else
+				type_str = "?????";
+		}
+
+		sim_debug(
+			trace_level,
+			controller->device,
+			"%s SEL0 (0x%04x) %s%s%s%s%s%s%s%s\n",
+			prefix,
+			data,
+			dmc_bitfld(data, SEL0_RUN_BIT, 1) ? "RUN " : "",
+			dmc_bitfld(data, SEL0_MCLR_BIT, 1) ? "MCLR " : "",
+			dmc_bitfld(data, SEL0_LU_LOOP_BIT, 1) ? "LU LOOP " : "",
+			dmc_bitfld(data, SEL0_RDI_BIT, 1) ? "RDI " : "",
+			dmc_bitfld(data, SEL0_DMC_IEI_BIT, 1) ? "IEI " : "",
+			dmc_bitfld(data, SEL0_DMC_RQI_BIT, 1) ? "RQI " : "",
+			dmc_bitfld(data, SEL0_IN_IO_BIT, 1) ? "IN I/O " : "",
+			type_str
+			);
+	}
+	else
+	{
+		sim_debug(
+			trace_level,
+			controller->device,
+			"%s SEL0 (0x%04x) %s%s%s%s%s%s\n",
+			prefix,
+			data,
+			dmc_bitfld(data, SEL0_RUN_BIT, 1) ? "RUN " : "",
+			dmc_bitfld(data, SEL0_MCLR_BIT, 1) ? "MCLR " : "",
+			dmc_bitfld(data, SEL0_LU_LOOP_BIT, 1) ? "LU LOOP " : "",
+			dmc_bitfld(data, SEL0_DMP_RQI_BIT, 1) ? "RQI " : "",
+			dmc_bitfld(data, SEL0_DMP_IEO_BIT, 1) ? "IEO " : "",
+			dmc_bitfld(data, SEL0_DMP_IEI_BIT, 1) ? "IEI " : ""
+			);
+	}
+}
+
+void dmc_dumpregsel2(CTLR *controller, int trace_level, char *prefix, uint16 data)
+{
+	char *type_str = "";
+	uint16 type = dmc_bitfld(data, SEL2_TYPEO_BIT, 2);
+
+	if (type==TYPE_BACCO)
+		type_str = "BA/CC O";
+	else if (type==TYPE_CNTLO)
+		type_str = "CNTL O";
+	else
+		type_str = "?????";
+
+	sim_debug(
+		trace_level,
+		controller->device,
+		"%s SEL2 (0x%04x) PRIO=%d LINE=%d %s%s%s%s\n",
+		prefix,
+		data,
+		dmc_bitfld(data, SEL2_PRIO_BIT, SEL2_PRIO_BIT_LENGTH),
+		dmc_bitfld(data, SEL2_LINE_BIT, SEL2_LINE_BIT_LENGTH),
+		dmc_bitfld(data, SEL2_RDO_BIT, 1) ? "RDO " : "",
+		dmc_bitfld(data, SEL2_IEO_BIT, 1) ? "IEO " : "",
+		dmc_bitfld(data, SEL2_OUT_IO_BIT, 1) ? "OUT I/O " : "",
+		type_str
+		);
+}
+
+void dmc_dumpregsel4(CTLR *controller, int trace_level, char *prefix, uint16 data)
+{
+	sim_debug(trace_level, controller->device, "%s SEL4 (0x%04x)\n", prefix, data);
+}
+
+void dmc_dumpregsel6(CTLR *controller, int trace_level, char *prefix, uint16 data)
+{
+	sim_debug(
+		trace_level,
+		controller->device,
+		"%s SEL6 (0x%04x) %s\n",
+		prefix,
+		data,
+		dmc_bitfld(data, SEL6_LOST_DATA_BIT, 1) ? "LOST_DATA " : "");
+}
+
+uint16 dmc_getreg(CTLR *controller, int reg, int ext)
+{
+	uint16 ans = 0;
+	switch (dmc_getsel(reg))
+	{
+	case 00:
+		ans = controller->csrs->sel0;
+		if (ext) dmc_dumpregsel0(controller, DBG_REG, "Getting", ans);
+		break;
+	case 01:
+		ans = controller->csrs->sel2;
+		if (ext) dmc_dumpregsel2(controller, DBG_REG, "Getting", ans);
+		break;
+	case 02:
+		ans = controller->csrs->sel4;
+		if (ext) dmc_dumpregsel4(controller, DBG_REG, "Getting", ans);
+		break;
+	case 03:
+		ans = controller->csrs->sel6;
+		if (ext) dmc_dumpregsel6(controller, DBG_REG, "Getting", ans);
+		break;
+	default:
+		{
+			sim_debug(DBG_WRN, controller->device, "dmc_getreg(). Invalid register %d", reg);
+		}
+	}
+
+	return ans;
+}
+
+void dmc_setreg(CTLR *controller, int reg, uint16 data, int ext)
+{
+	char *trace = (ext) ? "Writing" : "Setting";
+	switch (dmc_getsel(reg))
+	{
+	case 00:
+		dmc_dumpregsel0(controller, DBG_REG, trace, data);
+		controller->csrs->sel0 = data;
+		break;
+	case 01:
+		dmc_dumpregsel2(controller, DBG_REG, trace, data);
+		controller->csrs->sel2 = data;
+		break;
+	case 02:
+		dmc_dumpregsel4(controller, DBG_REG, trace, data);
+		controller->csrs->sel4 = data;
+		break;
+	case 03:
+		dmc_dumpregsel6(controller, DBG_REG, trace, data);
+		controller->csrs->sel6 = data;
+		break;
+	default:
+		{
+			sim_debug(DBG_WRN, controller->device, "dmc_setreg(). Invalid register %d", reg);
+		}
+	}
+}
+
+int dmc_is_master_clear_set(CTLR *controller)
+{
+	return controller->csrs->sel0 & MASTER_CLEAR_MASK;
+}
+
+int dmc_is_lu_loop_set(CTLR *controller)
+{
+	return controller->csrs->sel0 & LU_LOOP_MASK;
+}
+
+int dmc_is_rqi_set(CTLR *controller)
+{
+	int ans = 0;
+	if (dmc_is_dmc(controller))
+	{
+		ans = controller->csrs->sel0 & DMC_RQI_MASK;
+	}
+	else
+	{
+		ans = controller->csrs->sel0 & DMP_RQI_MASK;
+	}
+	return ans;
+}
+
+int dmc_is_rdyi_set(CTLR *controller)
+{
+	int ans = 0;
+	if (dmc_is_dmc(controller))
+	{
+		ans = controller->csrs->sel0 & DMC_RDYI_MASK;
+	}
+	else
+	{
+		ans = controller->csrs->sel2 & DMP_RDYI_MASK;
+	}
+	return ans;
+}
+
+int dmc_is_iei_set(CTLR *controller)
+{
+	int ans = 0;
+	if (dmc_is_dmc(controller))
+	{
+		ans = controller->csrs->sel0 & DMC_IEI_MASK;
+	}
+	else
+	{
+		ans = controller->csrs->sel0 & DMP_IEI_MASK;
+	}
+
+	return ans;
+}
+int dmc_is_ieo_set(CTLR *controller)
+{
+	int ans = 0;
+	if (dmc_is_dmc(controller))
+	{
+		ans = controller->csrs->sel2 & DMC_IEO_MASK;
+	}
+	else
+	{
+		ans = controller->csrs->sel0 & DMP_IEO_MASK;
+	}
+
+	return ans;
+}
+int dmc_is_in_io_set(CTLR *controller)
+{
+	int ans = 0;
+	if (dmc_is_dmc(controller))
+    {
+		ans = controller->csrs->sel0 & DMC_IN_IO_MASK;
+	}
+	else
+	{
+		ans = !controller->csrs->sel2 & DMP_IN_IO_MASK;
+	}
+
+	return ans;
+}
+int dmc_is_out_io_set(CTLR *controller)
+{
+	int ans = controller->csrs->sel2 & OUT_IO_MASK;
+	return ans;
+}
+
+int dmc_is_rdyo_set(CTLR *controller)
+{
+	return controller->csrs->sel2 & DMC_RDYO_MASK;
+}
+
+void dmc_set_rdyi(CTLR *controller)
+{
+	if (dmc_is_dmc(controller))
+	{
+	    dmc_setreg(controller, 0, controller->csrs->sel0 | DMC_RDYI_MASK, 0);
+	}
+	else
+	{
+	    dmc_setreg(controller, 2, controller->csrs->sel2 | DMP_RDYI_MASK, 0);
+	}
+
+	if (dmc_is_iei_set(controller))
+	{
+		dmc_setrxint(controller);
+	}
+}
+
+void dmc_clear_rdyi(CTLR *controller)
+{
+	if (dmc_is_dmc(controller))
+	{
+        dmc_setreg(controller, 0, controller->csrs->sel0 & ~DMC_RDYI_MASK, 0);
+	}
+	else
+	{
+        dmc_setreg(controller, 2, controller->csrs->sel2 & ~DMP_RDYI_MASK, 0);
+	}
+}
+
+void dmc_set_rdyo(CTLR *controller)
+{
+	dmc_setreg(controller, 2, controller->csrs->sel2 | DMC_RDYO_MASK, 0);
+
+	if (dmc_is_ieo_set(controller))
+	{
+		dmc_settxint(controller);
+	}
+}
+
+void dmc_set_lost_data(CTLR *controller)
+{
+	dmc_setreg(controller, 6, controller->csrs->sel6 | LOST_DATA_MASK, 0);
+}
+
+void dmc_clear_master_clear(CTLR *controller)
+{
+	dmc_setreg(controller, 0, controller->csrs->sel0 & ~MASTER_CLEAR_MASK, 0);
+}
+
+void dmc_set_run(CTLR *controller)
+{
+	dmc_setreg(controller, 0, controller->csrs->sel0 | RUN_MASK, 0);
+}
+
+int dmc_get_input_transfer_type(CTLR *controller)
+{
+	int ans = 0;
+
+	if (dmc_is_dmc(controller))
+	{
+		ans = controller->csrs->sel0 & DMC_TYPE_INPUT_MASK;
+	}
+	else
+	{
+		ans = controller->csrs->sel2 & DMP_TYPE_INPUT_MASK;
+	}
+
+	return ans;
+}
+int dmc_get_output_transfer_type(CTLR *controller)
+{
+	return controller->csrs->sel2 & TYPE_OUTPUT_MASK;
+}
+void dmc_set_type_output(CTLR *controller, int type)
+{
+	dmc_setreg(controller, 2, controller->csrs->sel2 | (type & TYPE_OUTPUT_MASK), 0);
+}
+
+void dmc_set_out_io(CTLR *controller)
+{
+	dmc_setreg(controller, 2, controller->csrs->sel2 | OUT_IO_MASK, 0);
+}
+
+void dmc_clear_out_io(CTLR *controller)
+{
+	dmc_setreg(controller, 2, controller->csrs->sel2 & ~OUT_IO_MASK, 0);
+}
+
+void dmc_process_master_clear(CTLR *controller)
+{
+	sim_debug(DBG_INF, controller->device, "Master clear\n");
+	dmc_clear_master_clear(controller);
+	controller->state = Initialised;
+	dmc_setreg(controller, 0, 0, 0);
+	if (controller->dev_type == DMR)
+	{
+		 /* DMR-11 indicates microdiagnostics complete when this is set */
+		dmc_setreg(controller, 2, 0x8000, 0);
+	}
+	else
+	{
+		/* preserve contents of BSEL3 if DMC-11 */
+		dmc_setreg(controller, 2, controller->csrs->sel2 & 0xFF00, 0);
+	}
+	if (controller->dev_type == DMP)
+	{
+		dmc_setreg(controller, 4, 077, 0);
+	}
+	else
+	{
+		dmc_setreg(controller, 4, 0, 0);
+	}
+
+	if (controller->dev_type == DMP)
+	{
+		dmc_setreg(controller, 6, 0305, 0);
+	}
+	else
+	{
+		dmc_setreg(controller, 6, 0, 0);
+	}
+	dmc_buffer_queue_init(controller, controller->receive_queue, "receive");
+	dmc_buffer_queue_init(controller, controller->transmit_queue, "transmit");
+	//dmc_close_receive(controller, "master clear");
+	//dmc_close_transmit(controller, "master clear");
+
+	controller->transfer_state = Idle;
+	dmc_set_run(controller);
+
+	sim_cancel (controller->device->units);                                  /* stop poll */
+	sim_activate_abs(controller->device->units, clk_cosched (controller->svc_poll_interval));
+}
+
+void dmc_start_input_transfer(CTLR *controller)
+{
+	int ok = 1;
+	int type = dmc_get_input_transfer_type(controller);
+
+	/* if this is a BA/CC I then check that the relevant queue has room first */
+	if (type == TYPE_BACCI)
+	{
+		ok = (dmc_is_in_io_set(controller) && !dmc_buffer_queue_full(controller->receive_queue))
+			||
+			(!dmc_is_in_io_set(controller) && !dmc_buffer_queue_full(controller->transmit_queue));
+	}
+
+	if (ok)
+	{
+		sim_debug(DBG_INF, controller->device, "Starting input transfer\n");
+		controller->transfer_state = InputTransfer;
+		controller->transfer_type = type;
+		controller->transfer_in_io = dmc_is_in_io_set(controller);
+		dmc_set_rdyi(controller);
+	}
+	else
+	{
+		sim_debug(DBG_WRN, controller->device, "Input transfer request not granted as queue is full\n");
+	}
+}
+
+void dmc_start_data_output_transfer(CTLR *controller, uint32 addr, int16 count, int is_receive)
+{
+	if (is_receive)
+	{
+		sim_debug(DBG_INF, controller->device, "Starting data output transfer for receive, address=0x%08x, count=%d\n", addr, count);
+		dmc_set_out_io(controller);
+	}
+	else
+	{
+		sim_debug(DBG_INF, controller->device, "Starting data output transfer for transmit, address=0x%08x, count=%d\n", addr, count);
+		dmc_clear_out_io(controller); 
+	}
+
+	dmc_setreg(controller, 4, addr & 0xFFFF, 0);
+	dmc_setreg(controller, 6, (((addr & 0x30000)) >> 2) | count, 0);
+	controller->transfer_state = OutputTransfer;
+	dmc_set_type_output(controller, TYPE_BACCO);
+	dmc_set_rdyo(controller);
+}
+
+void dmc_start_control_output_transfer(CTLR *controller)
+{
+	sim_debug(DBG_INF, controller->device, "Starting control output transfer\n");
+	controller->transfer_state = OutputTransfer;
+	dmc_set_type_output(controller, TYPE_CNTLO);
+	dmc_set_rdyo(controller);
+}
+
+t_stat dmc_svc(UNIT* uptr)
+{
+	CTLR *controller;
+
+	TIMER *poll_timer = &dmc_get_unit_stats(uptr)->poll_timer;
+	TIMER *between_polls_timer = &dmc_get_unit_stats(uptr)->between_polls_timer;
+
+	if (dmc_timer_started(between_polls_timer))
+	{
+		dmc_timer_stop(between_polls_timer);
+	}
+
+	if (dmc_timer_started(poll_timer))
+	{
+		dmc_timer_resume(poll_timer);
+	}
+	else
+	{
+		dmc_timer_start(poll_timer);
+	}
+
+	controller = dmc_get_controller_from_unit(uptr);
+
+	dmc_line_update_speed_stats(controller->line);
+
+	if (dmc_buffer_fill_receive_buffers(controller))
+	{
+//		poll = 200; /* if we received data then lets poll quicker as there seems to be some activity */
+	}
+	if (controller->transfer_state == Idle) dmc_start_transfer_receive_buffer(controller);
+
+	if (dmc_buffer_send_transmit_buffers(controller))
+	{
+//		poll = 200; /* if we transmitted data then lets poll quicker as there seems to be some activity */
+	}
+	if (controller->transfer_state == Idle) dmc_start_transfer_transmit_buffer(controller);
+
+	/* resubmit service timer */
+	sim_activate(controller->device->units, controller->svc_poll_interval);
+
+	dmc_timer_stop(poll_timer);
+	if (dmc_timer_started(between_polls_timer))
+	{
+		dmc_timer_resume(between_polls_timer);
+	}
+	else
+	{
+		dmc_timer_start(between_polls_timer);
+	}
+    dmc_get_unit_stats(uptr)->poll_count++;
+
+	return SCPE_OK;
+}
+
+void dmc_line_update_speed_stats(LINE *line)
+{
+	clock_t current = clock();
+	int current_second = current / CLOCKS_PER_SEC;
+	if (current_second != line->last_second)
+	{
+		line->bytes_received_in_last_second = 0;
+		line->bytes_sent_in_last_second = 0;
+		line->last_second = current_second;
+	}
+}
+
+/* given the number of  bytes sent/received in the last second, the number of bytes to send or receive and the line speed, calculate how many bytes can be sent/received now */
+int dmc_line_speed_calculate_byte_length(int bytes_in_last_second, int num_bytes, int speed)
+{
+	int ans;
+
+	if (speed == 0)
+	{
+		ans = num_bytes;
+	}
+	else
+	{
+		int clocks_this_second = clock() % CLOCKS_PER_SEC;
+		int allowable_bytes_to_date = ((speed/8) * clocks_this_second)/CLOCKS_PER_SEC;
+		int allowed_bytes = allowable_bytes_to_date - bytes_in_last_second;
+		if (allowed_bytes < 0)
+		{
+			allowed_bytes = 0;
+		}
+
+		if (num_bytes > allowed_bytes)
+		{
+			ans = allowed_bytes;
+		}
+		else
+		{
+			ans = num_bytes;
+		}
+//sim_debug(DBG_WRN, dmc_ctrls[0].device, "Bytes in last second %4d, clocks this sec %3d allowable bytes %4d, requested %4d allowed %4d\n", bytes_in_last_second, clocks_this_second, allowable_bytes_to_date, num_bytes, ans);
+	}
+
+	return ans;
+}
+
+void dmc_buffer_trace_line(int tracelevel, CTLR *controller, uint8 *buf, int length, char *prefix)
+{
+	char hex[TRACE_BYTES_PER_LINE*3+1];
+	char ascii[TRACE_BYTES_PER_LINE+1];
+	//char ts[9];
+	//time_t t;
+	int i;
+	hex[0] = 0;
+	ascii[TRACE_BYTES_PER_LINE] = 0;
+
+	//t = time(NULL);
+	//strftime(ts, 9, "%H:%M:%S", localtime(&t));
+	for (i = 0; i<TRACE_BYTES_PER_LINE; i++)
+	{
+		if (i>=length)
+		{
+			strcat(hex, "   ");
+			ascii[i] = ' ';
+		}
+		else
+		{
+		    char hexByte[4];
+			sprintf(hexByte, "%02X ", buf[i]);
+			strcat(hex, hexByte);
+			if (isprint(buf[i]))
+			{
+				ascii[i] = (char)buf[i];
+			}
+			else
+			{
+				ascii[i] = '.';
+			}
+		}
+	}
+
+	sim_debug(tracelevel, controller->device, "%s %s  %s\n", prefix, hex, ascii);
+}
+
+void dmc_buffer_trace(CTLR *controller, uint8 *buf, int length, char *prefix)
+{
+	int i;
+	if (length >= 0 && controller->device->dctrl & DBG_DAT)
+	{
+		for(i = 0; i < length / TRACE_BYTES_PER_LINE; i++)
+		{
+			dmc_buffer_trace_line(DBG_DAT, controller, buf + i*TRACE_BYTES_PER_LINE, TRACE_BYTES_PER_LINE, prefix);
+		}
+
+		if (length %TRACE_BYTES_PER_LINE > 0)
+		{
+			dmc_buffer_trace_line(DBG_DAT, controller, buf + length/TRACE_BYTES_PER_LINE, length % TRACE_BYTES_PER_LINE, prefix);
+		}
+	}
+	else if (length >= 0 && controller->device->dctrl & DBG_DTS)
+	{
+		char prefix2[80];
+		sprintf(prefix2, "%s (len=%d)", prefix, length);
+		dmc_buffer_trace_line(DBG_DTS, controller, buf, (length > TRACE_BYTES_PER_LINE)? TRACE_BYTES_PER_LINE : length, prefix2);
+	}
+}
+
+void dmc_buffer_queue_init(CTLR *controller, BUFFER_QUEUE *q, char *name)
+{
+	q->name = name;
+	q->head = 0;
+	q->tail = 0;
+	q->count = 0;
+	q->controller = controller;
+}
+
+int dmc_buffer_queue_full(BUFFER_QUEUE *q)
+{
+	return q->count > BUFFER_QUEUE_SIZE;
+}
+
+void dmc_buffer_queue_add(BUFFER_QUEUE *q, uint32 address, uint16 count)
+{
+	if (!dmc_buffer_queue_full(q))
+	{
+		int new_buffer = 0;
+		if (q->count > 0)
+		{
+			int last_buffer = q->tail;
+			new_buffer = (q->tail +1) % BUFFER_QUEUE_SIZE;
+
+			/* Link last buffer to the new buffer */
+			q->queue[last_buffer].next = &q->queue[new_buffer];
+		}
+		else
+		{
+			q->head = 0;
+			new_buffer = 0;
+		}
+
+		q->tail = new_buffer;
+		q->queue[new_buffer].address = address;
+		q->queue[new_buffer].count = count;
+		q->queue[new_buffer].actual_block_len = 0;
+		q->queue[new_buffer].transfer_buffer = NULL;
+		q->queue[new_buffer].block_len_bytes_read = 0;
+		q->queue[new_buffer].actual_bytes_transferred = 0;
+		q->queue[new_buffer].next = NULL;
+		q->queue[new_buffer].state = Available;
+		q->queue[new_buffer].is_loopback = dmc_is_lu_loop_set(q->controller);
+		q->count++;
+		sim_debug(DBG_INF, q->controller->device, "Queued %s buffer address=0x%08x count=%d\n", q->name, address, count);
+	}
+	else
+	{
+		sim_debug(DBG_WRN, q->controller->device, "Failed to queue %s buffer, queue full\n", q->name);
+		// TODO: Report error here.
+	}
+}
+
+void dmc_buffer_queue_release_head(BUFFER_QUEUE *q)
+{
+	if (q->count > 0)
+	{
+		q->head = (q->head + 1) % BUFFER_QUEUE_SIZE;
+		q->count--;
+	}
+	else
+	{
+		sim_debug(DBG_INF, q->controller->device, "Failed to release %s buffer, queue already empty\n", q->name);
+	}
+}
+
+BUFFER *dmc_buffer_queue_head(BUFFER_QUEUE *q)
+{
+	BUFFER *ans = NULL;
+	if (q->count >0)
+	{
+		ans = &q->queue[q->head];
+	}
+
+	return ans;
+}
+
+BUFFER *dmc_buffer_queue_find_first_available(BUFFER_QUEUE *q)
+{
+	BUFFER *ans = dmc_buffer_queue_head(q);
+	while (ans != NULL)
+	{
+		if (ans->state == Available)
+		{
+			break;
+		}
+
+		ans = ans->next;
+	}
+
+	return ans;
+}
+
+BUFFER *dmc_buffer_queue_find_first_contains_data(BUFFER_QUEUE *q)
+{
+	BUFFER *ans = dmc_buffer_queue_head(q);
+	while (ans != NULL)
+	{
+		if (ans->state == ContainsData)
+		{
+			break;
+		}
+
+		ans = ans->next;
+	}
+
+	return ans;
+}
+
+void dmc_buffer_queue_get_stats(BUFFER_QUEUE *q, int *available, int *contains_data, int *transfer_in_progress)
+{
+	BUFFER *buf = dmc_buffer_queue_head(q);
+    *available = 0;
+	*contains_data = 0;
+	*transfer_in_progress = 0;
+
+	while (buf != NULL)
+	{
+		switch (buf->state)
+		{
+		case Available:
+			{
+				(*available)++;
+				break;
+			}
+
+		case ContainsData:
+			{
+				(*contains_data)++;
+				break;
+			}
+
+		case TransferInProgress:
+			{
+				(*transfer_in_progress)++;
+				break;
+			}
+		}
+
+		buf = buf->next;
+	}
+}
+
+t_stat dmc_open_master_socket(CTLR *controller, int port)
+{
+	t_stat ans;
+	ans = SCPE_OK;
+	if (controller->master_socket == INVALID_SOCKET)
+	{
+		controller->master_socket = sim_master_sock(port);
+		if (controller->master_socket == INVALID_SOCKET)
+		{
+			sim_debug(DBG_WRN, controller->device, "Failed to open master socket\n");
+			ans = SCPE_OPENERR;
+		}
+		else
+		{
+			printf ("DMC-11 %s listening on port %d (socket %d)\n", controller->device->name, port, controller->master_socket);
+		}
+	}
+
+	return ans;
+}
+
+t_stat dmc_close_master_socket(CTLR *controller)
+{
+	sim_close_sock (controller->master_socket, TRUE);
+	controller->master_socket = INVALID_SOCKET;
+	return SCPE_OK;
+}
+
+// Gets the bidirectional socket and handles arbitration of determining which socket to use.
+int dmc_get_socket(CTLR *controller, int forRead)
+{
+	static int lastans = 0;
+	int ans = 0;
+    if (controller->line->isPrimary)
+	{
+		ans = dmc_get_transmit_socket(controller, 0, forRead); // TODO: After change to single socket, loopback may not work.
+	}
+	else
+	{
+		ans = dmc_get_receive_socket(controller, forRead); // TODO: After change to single socket, loopback may not work.
+	}
+
+	if (lastans != ans)
+	{
+sim_debug(DBG_SOK, controller->device, "Get Socket forread=%d, changed to %d\n", forRead, ans);
+	}
+	lastans = ans;
+
+    return ans;
+}
+
+int dmc_get_receive_socket(CTLR *controller, int forRead)
+{
+	int ans = 0;
+	if (controller->line->socket == INVALID_SOCKET)
+	{
+		uint32 ipaddr;
+		//sim_debug(DBG_SOK, controller->device, "Trying to open receive socket\n");
+		controller->line->socket = sim_accept_conn (controller->master_socket, &ipaddr); /* poll connect */
+		if (controller->line->socket != INVALID_SOCKET)
+		{
+    		if (ipaddr != controller->line->transmit_address)
+	    	{
+		    	sim_debug(DBG_WRN, controller->device, "Received connection from unexpected source IP %d. Closing the connection.\n", ipaddr);
+                dmc_close_receive(controller, "Unathorized connection");
+		    }
+			else
+			{
+			    sim_debug(DBG_SOK, controller->device, "Opened receive socket %d\n", controller->line->socket);
+			    controller->line->receive_readable = FALSE;
+			}
+		}
+	}
+
+	if (controller->line->socket != INVALID_SOCKET)
+	{
+		int readable = sim_check_conn(controller->line->socket, forRead);
+		if (readable == 0) /* Still opening */
+		{
+			// Socket is still being opened, or is open but there is no data ready to be read.
+			ans = 0;
+		}
+		else if (readable == -1) /* Failed to open */
+		{
+		    dmc_close_receive(controller, "failed to connect");
+			ans = 0;
+		}
+		else /* connected */
+		{
+			if (!controller->line->receive_readable)
+			{
+		        sim_debug(DBG_CON, controller->device, "Receive socket is now readable\n");
+			}
+			controller->line->receive_readable = TRUE;
+			ans = 1;
+		}
+	}
+
+	return ans;
+}
+
+int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
+{
+	int ans = 0;
+	/* close transmit socket if there is a change in the loopback setting */
+	if (is_loopback ^ controller->line->transmit_is_loopback)
+	{
+		dmc_close_transmit(controller, "loopback change");
+	}
+
+	if (controller->line->socket == INVALID_SOCKET && (time(NULL) - controller->line->last_connect_attempt) > controller->connect_poll_interval)
+	{
+		int port;
+		int addr;
+
+		controller->line->transmit_is_loopback = is_loopback;
+		port = (is_loopback) ? controller->line->receive_port : controller->line->transmit_port;
+		addr = (is_loopback) ? 0x7F000001 /* 127.0.0.1 */ : controller->line->transmit_address;
+		sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to port %d, address %d\n", port, addr);
+		controller->line->last_connect_attempt = time(NULL);
+		controller->line->socket = sim_connect_sock(addr, port);
+		if (controller->line->socket != INVALID_SOCKET)
+		{
+			sim_debug(DBG_SOK, controller->device, "Opened transmit socket to port %d, socket %d\n", port, controller->line->socket);
+			controller->line->transmit_writeable = FALSE;
+		}
+	}
+
+	if (controller->line->socket != INVALID_SOCKET)
+	{
+		int writeable = sim_check_conn(controller->line->socket, forRead);
+		if (writeable == 0) /* Still opening */
+		{
+		    //sim_debug(DBG_SOK, controller->device, "Waiting for transmit socket to become writeable\n");
+			ans = 0;
+		}
+		else if (writeable == -1) /* Failed to open */
+		{
+		    dmc_close_transmit(controller, "failed to connect");
+			ans = 0;
+		}
+		else /* connected */
+		{
+			if (!controller->line->transmit_writeable)
+			{
+		        sim_debug(DBG_CON, controller->device, "Transmit socket is now writeable\n");
+			}
+			controller->line->transmit_writeable = TRUE;
+			ans = 1;
+		}
+	}
+
+	return ans;
+}
+
+void dmc_close_receive(CTLR *controller, char *reason)
+{
+	sim_debug(DBG_SOK, controller->device, "Closing receive socket on port %d, socket %d, reason: %s\n", controller->line->receive_port, controller->line->socket, reason);
+	sim_close_sock(controller->line->socket, FALSE);
+	controller->line->socket = INVALID_SOCKET;
+
+	if (controller->line->receive_readable)
+	{
+	    sim_debug(DBG_CON, controller->device, "Readable receive socket closed, reason: %s\n", reason);
+	}
+	controller->line->receive_readable = FALSE;
+}
+
+void dmc_error_and_close_receive(CTLR *controller, char *format)
+{
+    int err = WSAGetLastError(); 
+	char errmsg[80];
+	sprintf(errmsg, format, err);
+	if (controller->line->isPrimary)
+	{
+        dmc_close_transmit(controller, errmsg);
+	}
+	else
+	{
+	    dmc_close_receive(controller, errmsg);
+	}
+}
+
+void dmc_close_transmit(CTLR *controller, char *reason)
+{
+	sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %d, socket %d, reason: %s\n", controller->line->transmit_port, controller->line->socket, reason);
+	#if defined (_WIN32)
+	WSAAsyncSelect(controller->line->socket, NULL, 0, FD_CLOSE);
+    #endif
+	shutdown(controller->line->socket, SD_BOTH);
+	sim_close_sock(controller->line->socket, FALSE);
+	controller->line->socket = INVALID_SOCKET;
+
+	if (controller->line->transmit_writeable)
+	{
+	    sim_debug(DBG_CON, controller->device, "Writeable transmit socket closed, reason: %s\n", reason);
+	}
+	controller->line->transmit_writeable = FALSE;
+}
+
+/* returns true if some data was received */
+int dmc_buffer_fill_receive_buffers(CTLR *controller)
+{
+	int ans = FALSE;
+	int socket;
+	if (controller->state == Initialised)
+	{
+		/* accept any inbound connection but just throw away any data */
+	    if (dmc_get_socket(controller, TRUE))
+		{
+			char buffer[1000];
+			int bytes_read = 0;
+			socket = controller->line->socket;
+			bytes_read = sim_read_sock(socket, buffer, sizeof(buffer));
+			if (bytes_read < 0)
+			{
+printf("Socket error was when trying to fill receive buffers when controller initialised.\n");
+				//dmc_error_and_close_receive(controller, "read error, code=%d");
+			}
+			else if (bytes_read > 0)
+			{
+	            sim_debug(DBG_SOK, controller->device, "Discarding received data while controller is not running\n");
+			}
+		}
+	}
+	else
+	{
+		BUFFER *buffer = dmc_buffer_queue_find_first_available(controller->receive_queue);
+		while (buffer != NULL && buffer->state == Available)
+		{
+			if (dmc_get_socket(controller, TRUE))
+			{
+				int bytes_read = 0;
+				int lost_data = 0;
+
+			    socket = controller->line->socket;
+				/* read block length and allocate buffer */
+				if (buffer->block_len_bytes_read < sizeof(buffer->actual_block_len))
+				{
+					char *start_addr = ((char *)&buffer->actual_block_len) + buffer->block_len_bytes_read;
+					bytes_read = sim_read_sock(socket, start_addr, sizeof(buffer->actual_block_len) - buffer->block_len_bytes_read);
+					if (bytes_read >= 0)
+					{
+						buffer->block_len_bytes_read += bytes_read;
+						if (buffer->block_len_bytes_read == sizeof(buffer->actual_block_len))
+						{
+							buffer->actual_block_len = ntohs(buffer->actual_block_len);
+							if (buffer->actual_block_len > buffer->count)
+							{
+								sim_debug(DBG_WRN, controller->device, "LOST DATA, buffer available has %d bytes, but the block is %d bytes\n", buffer->count, buffer->actual_block_len);
+								dmc_setreg(controller, 4, 0, 0);
+								dmc_setreg(controller, 6, 0, 0);
+								dmc_set_lost_data(controller);
+								dmc_start_control_output_transfer(controller);
+								lost_data = 1;
+							}
+
+							if (buffer->actual_block_len > 0)
+							{
+								buffer->transfer_buffer = (uint8 *)malloc(buffer->actual_block_len); /* read full buffer regardless, so bad buffer is flushed */
+							}
+						}
+					}
+					else
+					{
+//printf("Socket error was when trying to read the header.\n");
+					}
+				}
+				else
+				{
+					lost_data = buffer->actual_block_len > buffer->count; /* need to preserve this variable if need more than one attempt to read the buffer */
+				}
+
+				/* read the actual block */
+				if (buffer->block_len_bytes_read == sizeof(buffer->actual_block_len))
+				{
+					bytes_read = 0;
+					if (buffer->actual_block_len > 0)
+					{
+						int bytes_to_read = dmc_line_speed_calculate_byte_length(controller->line->bytes_received_in_last_second, buffer->actual_block_len - buffer->actual_bytes_transferred, controller->line->speed);
+						if (bytes_to_read > 0)
+						{
+							bytes_read = sim_read_sock(controller->line->socket, buffer->transfer_buffer + buffer->actual_bytes_transferred, bytes_to_read);
+						}
+					}
+
+					if (bytes_read >= 0)
+					{
+						buffer->actual_bytes_transferred += bytes_read;
+						controller->line->bytes_received_in_last_second += bytes_read;
+
+						if (buffer->actual_bytes_transferred >= buffer->actual_block_len)
+						{
+							dmc_buffer_trace(controller, buffer->transfer_buffer, buffer->actual_bytes_transferred, "REC ");
+							controller->buffers_received_from_net++;
+							buffer->state = ContainsData;
+							if (!lost_data)
+							{
+								Map_WriteB(buffer->address, buffer->actual_bytes_transferred, buffer->transfer_buffer);
+							}
+							else
+							{
+								buffer->actual_block_len = 0; /* so an empty buffer is returned to the driver */
+							}
+
+							if (buffer->actual_block_len > 0)
+							{
+								free(buffer->transfer_buffer);
+								buffer->transfer_buffer = NULL;
+							}
+
+							ans = TRUE;
+						}
+					}
+					else
+					{
+printf("Socket error was when trying to fill receive buffers when trying to read the body.\n");
+					}
+				}
+
+				/* Only close the socket if there was an error or no more data */
+				if (bytes_read < 0)
+				{
+					dmc_error_and_close_receive(controller, "read error, code=%d");
+					break;
+				}
+
+				/* if buffer is incomplete do not try to read any more buffers and continue filling this one later */
+				if (buffer->state == Available)
+				{
+					break; /* leave buffer available and continue filling it later */
+				}
+			}
+			else
+			{
+				break;
+			}
+
+			buffer = buffer ->next;
+		}
+	}
+
+	return ans;
+}
+
+/* returns true if some data was actually sent */
+int dmc_buffer_send_transmit_buffers(CTLR *controller)
+{
+	int ans = FALSE;
+	int socket;
+	/* when transmit buffer is queued it is marked as available, not as ContainsData */
+	BUFFER *buffer = dmc_buffer_queue_find_first_available(controller->transmit_queue);
+	while (buffer != NULL)
+	{
+		if (dmc_get_socket(controller, FALSE)) // TODO: , buffer->is_loopback);
+		{
+			int bytes = 0;
+			uint16 block_len;
+			int total_buffer_len = (buffer->count > 0) ? buffer->count + sizeof(block_len) : 0;
+
+		    socket = controller->line->socket;
+			/* only send the buffer if it actually has some data, sometimes get zero length buffers - don't send these */
+			if (total_buffer_len > 0)
+			{
+				if (buffer->actual_bytes_transferred <= 0)
+				{
+					/* construct buffer and include block length bytes */
+					buffer->transfer_buffer = (uint8 *)malloc(total_buffer_len);
+					block_len = htons(buffer->count);
+					memcpy(buffer->transfer_buffer, (char *)&block_len, sizeof(block_len));
+					Map_ReadB(buffer->address, buffer->count, buffer->transfer_buffer + sizeof(block_len));
+				}
+
+				bytes = sim_write_sock (controller->line->socket, buffer->transfer_buffer + buffer->actual_bytes_transferred, buffer->count + sizeof(block_len) - buffer->actual_bytes_transferred);
+				if (bytes >= 0)
+				{
+					buffer->actual_bytes_transferred += bytes;
+				}
+
+				if (buffer->actual_bytes_transferred >= total_buffer_len || bytes < 0)
+				{
+				    dmc_buffer_trace(controller, buffer->transfer_buffer+sizeof(block_len), buffer->count, "TRAN");
+					free(buffer->transfer_buffer);
+				}
+			}
+
+			if (buffer->actual_bytes_transferred >= total_buffer_len)
+			{
+				controller->buffers_transmitted_to_net++;
+				buffer->state = ContainsData; // so won't try to transmit again
+				ans = TRUE;
+			}
+			else if (bytes < 0)
+			{
+				int err = WSAGetLastError (); 
+				char errmsg[80];
+				sprintf(errmsg, "write failure, code=%d", err);
+
+				dmc_close_transmit(controller, errmsg);
+				break;
+			}
+			else
+			{
+				break; /* poll again later to send more bytes */
+			}
+
+		}
+		else
+		{
+			break;
+		}
+
+		buffer = buffer ->next;
+	}
+
+	return ans;
+}
+
+void dmc_start_transfer_receive_buffer(CTLR *controller)
+{
+	BUFFER *head = dmc_buffer_queue_head(controller->receive_queue);
+	if (head != NULL)
+	{
+		if (head->state == ContainsData)
+		{
+			head->state = TransferInProgress;
+			dmc_start_data_output_transfer(controller, head->address, head->actual_block_len, TRUE);
+		}
+	}
+}
+
+void dmc_start_transfer_transmit_buffer(CTLR *controller)
+{
+	BUFFER *head = dmc_buffer_queue_head(controller->transmit_queue);
+	if (head != NULL)
+	{
+		if (head->state == ContainsData)
+		{
+			head->state = TransferInProgress;
+			dmc_start_data_output_transfer(controller, head->address, head->count, FALSE);
+		}
+	}
+}
+
+void dmc_check_for_output_transfer_completion(CTLR *controller)
+{
+	if (!dmc_is_rdyo_set(controller))
+	{
+		sim_debug(DBG_INF, controller->device, "Output transfer completed\n");
+		controller->transfer_state = Idle;
+		if (dmc_get_output_transfer_type(controller) == TYPE_BACCO)
+		{
+			if (dmc_is_out_io_set(controller))
+			{
+				dmc_buffer_queue_release_head(controller->receive_queue);
+				controller->receive_buffer_output_transfers_completed++;
+			}
+			else
+			{
+				dmc_buffer_queue_release_head(controller->transmit_queue);
+				controller->transmit_buffer_output_transfers_completed++;
+			}
+		}
+		dmc_process_command(controller); // check for any input transfers
+	}
+}
+
+void dmc_process_input_transfer_completion(CTLR *controller)
+{
+	if (dmc_is_dmc(controller))
+	{
+		if (!dmc_is_rqi_set(controller))
+		{
+			uint16 sel4 = controller->csrs->sel4;
+			uint16 sel6 = controller->csrs->sel6;
+			dmc_clear_rdyi(controller);
+			//dmc_clrrxint();
+			if (controller->transfer_type == TYPE_BASEI)
+			{
+				//int i;
+				uint32 baseaddr = sel6 >> 14 | sel4;
+				uint16 count = sel6 & 0x3FFF;
+				sim_debug(DBG_INF, controller->device, "Completing Base In input transfer, base address=0x%08x count=%d\n", baseaddr, count);
+				//for (i = 0; i < count; i++)
+				//{
+				//	uint8 t = ((uint8)i + 1)*2;
+				//	Map_WriteB(baseaddr + i, 1, &t);
+				//}
+			}
+			else if (controller->transfer_type == TYPE_BACCI)
+			{
+				uint32 addr = sel6 >> 14 | sel4;
+				uint16 count = sel6 & 0x3FFF;
+				if (controller->transfer_in_io != dmc_is_in_io_set(controller))
+				{
+					sim_debug(DBG_TRC, controller->device, "IN IO MISMATCH\n");
+				}
+
+				controller->transfer_in_io = dmc_is_in_io_set(controller); // using evdmc the flag is set when the transfer completes - not when it starts, evdca seems to set in only at the start of the transfer - clearing it when it completes
+				controller->state = Running;
+				if (controller->transfer_in_io)
+				{
+					dmc_buffer_queue_add(controller->receive_queue, addr, count);
+					dmc_buffer_fill_receive_buffers(controller);
+					controller->receive_buffer_input_transfers_completed++;
+				}
+				else
+				{
+					dmc_buffer_queue_add(controller->transmit_queue, addr, count);
+					dmc_buffer_send_transmit_buffers(controller);
+					controller->transmit_buffer_input_transfers_completed++;
+				}
+			}
+
+			controller->transfer_state = Idle;
+		}
+	}
+	else
+	{
+		if (!dmc_is_rdyi_set(controller))
+		{
+			uint16 sel4 = controller->csrs->sel4;
+			uint16 sel6 = controller->csrs->sel6;
+			//dmc_clrrxint();
+			if (controller->transfer_type == TYPE_DMP_MODE)
+			{
+				uint16 mode = sel6 & DMP_TYPE_INPUT_MASK;
+				char * duplex = (mode & 1) ? "Full-Duplex" : "Half-Duplex";
+				char * config;
+				if (mode & 4)
+				{
+					config = "Point-to-point";
+				}
+				else
+				{
+					config = (mode & 2) ? "Tributary station" : "Control Station";
+				}
+
+				sim_debug(DBG_INF, controller->device, "Completing Mode input transfer, %s %s\n", duplex, config);
+			}
+			else if (controller->transfer_type == TYPE_DMP_CONTROL)
+			{
+				sim_debug(DBG_WRN, controller->device, "Control command (not processed yet)\n");
+			}
+			else if (controller->transfer_type == TYPE_DMP_RECEIVE)
+			{
+				sim_debug(DBG_WRN, controller->device, "Receive Buffer command (not processed yet)\n");
+			}
+			else if (controller->transfer_type == TYPE_DMP_TRANSMIT)
+			{
+				sim_debug(DBG_WRN, controller->device, "Transmit Buffer command (not processed yet)\n");
+			}
+			else
+			{
+				sim_debug(DBG_WRN, controller->device, "Unrecognised command code %hu\n", controller->transfer_type);
+			}
+
+			controller->transfer_state = Idle;
+		}
+	}
+}
+
+void dmc_process_command(CTLR *controller)
+{
+	if (dmc_is_master_clear_set(controller))
+	{
+		dmc_process_master_clear(controller);
+	}
+	else
+	{
+		if (controller->transfer_state == InputTransfer)
+		{
+			dmc_process_input_transfer_completion(controller);
+		}
+		else if (controller->transfer_state == OutputTransfer)
+		{
+			dmc_check_for_output_transfer_completion(controller);
+		}
+		else if (dmc_is_rqi_set(controller))
+		{
+			dmc_start_input_transfer(controller);
+		}
+	}
+}
+
+t_stat dmc_rd(int32 *data, int32 PA, int32 access)
+{
+	CTLR *controller = dmc_get_controller_from_address(PA);
+	int reg = PA & 07;
+	sim_debug(DBG_TRC, controller->device, "dmc_rd(), addr=0x%x access=%d\n", PA, access);
+	*data = dmc_getreg(controller, PA, 1);
+
+	return SCPE_OK;
+}
+
+t_stat dmc_wr(int32 data, int32 PA, int32 access)
+{
+	CTLR *controller = dmc_get_controller_from_address(PA);
+	int reg = PA & 07;
+	uint16 oldValue = dmc_getreg(controller, PA, 0);
+	if (access == WRITE)
+	{
+		sim_debug(DBG_TRC, controller->device, "dmc_wr(), addr=0x%08x, SEL%d, data=0x%04x\n", PA, reg, data);
+	}
+	else
+	{
+		sim_debug(DBG_TRC, controller->device, "dmc_wr(), addr=0x%08x, BSEL%d, data=%04x\n", PA, reg, data);
+	}
+
+	if (access == WRITE)
+	{
+		if (PA & 1)
+			sim_debug(DBG_WRN, controller->device, "dmc_wr(), Unexpected non-16-bit write access to SEL%d\n", reg);
+		dmc_setreg(controller, PA, data, 1);
+	}
+	else
+	{
+		uint16 mask;
+		if (PA & 1)
+		{
+			mask = 0xFF00;
+			data = data << 8;
+		}
+		else
+		{
+			mask = 0x00FF;
+		}
+
+		dmc_setreg(controller, PA, (oldValue & ~mask) | (data & mask), 1);
+	}
+
+	if (dmc_getsel(reg) == 0 || dmc_getsel(reg) == 1)
+	{
+		dmc_process_command(controller);
+	}
+
+	return SCPE_OK;
+}
+
+int32 dmc_rxint (void)
+{
+	int i;
+	int32 ans = 0; /* no interrupt request active */
+	for (i=0; i<DMC_NUMDEVICE; i++)
+	{
+		CTLR *controller = &dmc_ctrls[i];
+		if (controller->rxi != 0)
+		{
+			DIB *dib = (DIB *)controller->device->ctxt;
+			ans = dib->vec;
+			dmc_clrrxint(controller);
+			break;
+		}
+	}
+
+	return ans;
+	}
+
+int32 dmc_txint (void)
+{
+	int i;
+	int32 ans = 0; /* no interrupt request active */
+	for (i=0; i<DMC_NUMDEVICE; i++)
+	{
+		CTLR *controller = &dmc_ctrls[i];
+		if (controller->txi != 0)
+		{
+			DIB *dib = (DIB *)controller->device->ctxt;
+			ans = dib->vec + 4;
+			dmc_clrtxint(controller);
+			break;
+		}
+	}
+
+	return ans;
+
+	//int32 ans = 0; /* no interrupt request active */
+	//if (controller->txi != 0)
+	//{
+	//	DIB *dib = (DIB *)controller->device->ctxt;
+	//	ans = dib->vec + 4;
+	//	dmc_clrtxint();
+	//}
+
+	//return ans;
+}
+
+t_stat dmc_reset (DEVICE *dptr)
+{
+	t_stat ans = SCPE_OK;
+	//int32 ndev;
+	CTLR *controller = dmc_get_controller_from_device(dptr);
+
+	sim_debug(DBG_TRC, dptr, "dmc_reset()\n");
+
+	if (dmc_get_unit_stats(dptr->units) == NULL)
+	{
+		dmc_set_unit_stats(dptr->units, (UNIT_STATS *)malloc(sizeof(UNIT_STATS)));
+		dmc_reset_unit_stats(dmc_get_unit_stats(dptr->units));
+	}
+
+	dmc_clrrxint(controller);
+	dmc_clrtxint(controller);
+	sim_cancel (controller->device->units); /* stop poll */
+	if (controller->svc_poll_interval == -1) controller->svc_poll_interval = POLL;
+
+	if (!(dptr->flags & DEV_DIS))
+	{
+        ans = auto_config (dptr->name, DMC_UNITSPERDEVICE);
+	}
+	return ans;
+}
+
+t_stat dmc_attach (UNIT *uptr, char *cptr)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	t_stat ans = SCPE_OK;
+	int port;
+
+	port = (int32) get_uint (cptr, 10, 65535, &ans); /* get port */
+	if ((ans != SCPE_OK) || (port == 0))
+	{
+		ans = SCPE_ARG;
+	}
+	else
+	{
+		ans = dmc_open_master_socket(controller, port);
+		if (ans == SCPE_OK)
+		{
+			controller->line->receive_port = port;
+			controller->line->socket = INVALID_SOCKET;
+			uptr->flags = uptr->flags | UNIT_ATT; /* set unit attached flag */
+			uptr->filename = (char *)malloc(strlen(cptr)+1);
+			strcpy(uptr->filename, cptr);
+		}
+	}
+
+	return ans;
+}
+
+t_stat dmc_detach (UNIT *uptr)
+{
+	CTLR *controller = dmc_get_controller_from_unit(uptr);
+	dmc_close_master_socket(controller);
+	uptr->flags = uptr->flags & ~UNIT_ATT; /* clear unit attached flag */
+	free(uptr->filename);
+	uptr->filename = NULL;
+
+	return SCPE_OK;
+}
+
