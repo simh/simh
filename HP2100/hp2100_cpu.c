@@ -29,6 +29,7 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    13-Jan-12    JDB     Minor speedup in "is_mapped"
                         Added casts to cpu_mod, dmasio, dmapio, cpu_reset, dma_reset
    07-Apr-11    JDB     Fixed I/O return status bug for DMA cycles
@@ -1054,7 +1055,8 @@ for (i = OPTDEV; i <= MAXDEV; i++)                      /* default optional devi
 
 dtab [PWR] = &pwrf_dib;                                 /* for now, powerfail is always present */
 
-for (i = 0; dptr = sim_devices [i]; i++) {              /* loop thru dev */
+for (i = 0; sim_devices [i] != NULL; i++) {             /* loop thru dev */
+    dptr = sim_devices [i];
     dibptr = (DIB *) dptr->ctxt;                        /* get DIB */
 
     if (dibptr && !(dptr->flags & DEV_DIS)) {           /* handler exists and device is enabled? */
@@ -3609,30 +3611,32 @@ DEVICE *dptr;
 DIB *dibptr;
 uint32 i, j, k;
 t_bool is_conflict = FALSE;
-uint32 conflicts[MAXDEV + 1] = { 0 };
+uint32 conflicts [MAXDEV + 1] = { 0 };
 
-for (i = 0; dptr = sim_devices[i]; i++) {
+for (i = 0; sim_devices [i] != NULL; i++) {
+    dptr = sim_devices [i];
     dibptr = (DIB *) dptr->ctxt;
     if (dibptr && !(dptr->flags & DEV_DIS))
-        if (++conflicts[dibptr->select_code] > 1)
+        if (++conflicts [dibptr->select_code] > 1)
             is_conflict = TRUE;
     }
 
 if (is_conflict) {
     sim_ttcmd();
     for (i = 0; i <= MAXDEV; i++) {
-        if (conflicts[i] > 1) {
-            k = conflicts[i];
+        if (conflicts [i] > 1) {
+            k = conflicts [i];
 
             printf ("Select code %o conflict:", i);
 
             if (sim_log)
                 fprintf (sim_log, "Select code %o conflict:", i);
 
-            for (j = 0; dptr = sim_devices[j]; j++) {
+            for (j = 0; sim_devices [j] != NULL; j++) {
+                dptr = sim_devices [j];
                 dibptr = (DIB *) dptr->ctxt;
-                if (dibptr && !(dptr->flags & DEV_DIS) && (i == dibptr->select_code)) {
-                    if (k < conflicts[i]) {
+                if (dibptr && !(dptr->flags & DEV_DIS) && i == dibptr->select_code) {
+                    if (k < conflicts [i]) {
                         printf (" and");
 
                         if (sim_log)

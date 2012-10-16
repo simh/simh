@@ -218,8 +218,8 @@ int32 dsk10(int32 io, int32 data)
     cur_disk = data & 0x0F;
     if (data & 0x80) {
         cur_flags[cur_disk] = 0;                        /* Disable drive */
-        cur_sect[cur_disk = 0377];
-        cur_byte[cur_disk = 0377];
+        cur_sect[cur_disk] = 0377;
+        cur_byte[cur_disk] = 0377;
         return (0);
     }
     cur_flags[cur_disk] = 0x1A;                         /* Enable: head move true */

@@ -111,7 +111,6 @@ char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
 t_value strtotv (char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 CTAB *find_cmd (char *gbuf);

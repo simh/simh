@@ -145,7 +145,7 @@ static struct open_serial_device {
     char name[SER_DEV_NAME_MAX];
     char desc[SER_DEV_DESC_MAX];
     } *serial_open_devices = NULL;
-static serial_open_device_count = 0;
+static int serial_open_device_count = 0;
 
 static void _serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *desc)
 {
@@ -318,7 +318,7 @@ for (i=0; i<count && !found; i++) {
   return (found ? temp : NULL);
 }
 
-t_stat sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+t_stat sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int number = sim_serial_devices(SER_MAX_DEVICE, list);

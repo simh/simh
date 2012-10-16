@@ -1041,7 +1041,7 @@ void xu_process_receive(CTLR* xu)
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_receive(), buffers: %d\n", xu->var->rrlen);
 
-/* xu_dump_rxring(xu); /* debug receive ring */
+/* xu_dump_rxring(xu); *//* debug receive ring */
 
   /* process only when in the running state, and host buffers are available */
   if ((state != STATE_RUNNING) || no_buffers)
@@ -1213,7 +1213,7 @@ void xu_process_transmit(CTLR* xu)
   t_stat rstatus, wstatus;
 
   sim_debug(DBG_TRC, xu->dev, "xu_process_transmit()\n");
-/* xu_dump_txring(xu); /* debug receive ring */
+/* xu_dump_txring(xu); *//* debug receive ring */
 
   for (;;) {
 

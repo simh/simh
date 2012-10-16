@@ -992,7 +992,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (ba >= uptr->hwmark)
                 uptr->hwmark = ba + 1;
             }
-/*      else                                            /* ignore hdr */ 
+/*      else                                          *//* ignore hdr */ 
         sim_activate (uptr, DT_WSIZE * dt_ltime);
         DT_SETDONE;                                     /* set done */
         break;

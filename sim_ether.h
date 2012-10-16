@@ -291,7 +291,7 @@ void eth_packet_trace_ex (ETH_DEV* dev, const uint8 *msg, int len, char* txt, in
 t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices */
                  int32 val, void* desc);
 t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */
-                         UNIT* uptr, int32 val, void* desc);
+                         UNIT* uptr, int32 val, char* desc);
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
 void eth_mac_fmt      (ETH_MAC* add, char* buffer);     /* format ethernet mac address */

@@ -594,7 +594,7 @@ if ((temp = getc (ptr_unit.fileref)) == EOF) {          /* end of file? */
 if (ptr_state == 0) {                                   /* ASCII */
     if (ptr_unit.flags & UNIT_RASCII) {                 /* want parity? */
         ptr_unit.buf = temp = temp & 0177;              /* parity off */
-        while (temp = temp & (temp - 1))
+        while ((temp = temp & (temp - 1)))
             ptr_unit.buf = ptr_unit.buf ^ 0200;         /* count bits */
         ptr_unit.buf = ptr_unit.buf ^ 0200;             /* set even parity */
         }

@@ -664,7 +664,7 @@ void eth_zero(ETH_DEV* dev)
 }
 
 static ETH_DEV **eth_open_devices = NULL;
-static eth_open_device_count = 0;
+static int eth_open_device_count = 0;
 
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
@@ -717,10 +717,23 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
         fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
       }
     }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name);
+      }
+    }
   return SCPE_OK;
 }
 
-t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc)
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
 {
 return eth_show (st, uptr, val, desc);
 }
@@ -942,7 +955,7 @@ static char*   (*p_pcap_lib_version) (void);
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-void load_function(char* function, _func* func_ptr) {
+static void load_function(char* function, _func* func_ptr) {
 #ifdef _WIN32
     *func_ptr = (_func)GetProcAddress(hLib, function);
 #else
@@ -1394,7 +1407,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
       system(command);
-      if (f = fopen("NIC.hwaddr", "r")) {
+      if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
             char *p1, *p2;
@@ -1580,7 +1593,7 @@ sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
-  while (request = dev->write_requests) {
+  while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
@@ -1889,11 +1902,11 @@ pthread_mutex_destroy (&dev->writer_lock);
 pthread_cond_destroy (&dev->writer_cond);
 if (1) {
   struct write_request *buffer;
-   while (buffer = dev->write_buffers) {
+   while (NULL != (buffer = dev->write_buffers)) {
     dev->write_buffers = buffer->next;
     free(buffer);
     }
-  while (buffer = dev->write_requests) {
+  while (NULL != (buffer = dev->write_requests)) {
     dev->write_requests = buffer->next;
     free(buffer);
     }
@@ -2146,10 +2159,10 @@ if (!dev) return SCPE_UNATT;
 
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
-if (request = dev->write_buffers)
+if (NULL != (request = dev->write_buffers))
   dev->write_buffers = request->next;
 pthread_mutex_unlock (&dev->writer_lock);
-if (!request)
+if (NULL == request)
   request = malloc(sizeof(*request));
 
 /* Copy buffer contents */
@@ -3159,6 +3172,7 @@ pcap_if_t* dev;
 char errbuf[PCAP_ERRBUF_SIZE];
 
 memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
@@ -3183,6 +3197,13 @@ else {
 
 /* Add any host specific devices and/or validate those already found */
 i = eth_host_devices(i, max, list);
+
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((i == 0) && (errbuf[0])) {
+    char* msg = "Eth: pcap_findalldevs warning: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+    }
 
 /* return device count */
 return i;

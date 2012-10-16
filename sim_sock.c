@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    22-Jun-10    RMS     Fixed types in sim_accept_conn (from Mark Pizzolato)
    19-Nov-05    RMS     Added conditional for OpenBSD (from Federico G. Schwindt)
    16-Aug-05    RMS     Fixed spurious SIGPIPE signal error in Unix
@@ -43,6 +44,24 @@
 #include "sim_sock.h"
 #include <signal.h>
 
+extern FILE *sim_log;
+
+#if defined(AF_INET6) && defined(_WIN32)
+#include <ws2tcpip.h>
+#endif
+
+#ifndef WSAAPI
+#define WSAAPI
+#endif
+
+#if defined(SHUT_RDWR) && !defined(SD_BOTH)
+#define SD_BOTH SHUT_RDWR
+#endif
+
+#ifndef   NI_MAXHOST
+#define   NI_MAXHOST 1025
+#endif
+
 /* OS dependent routines
 
    sim_master_sock      create master socket
@@ -54,23 +73,118 @@
    sim_msg_sock         send message to socket
 */
 
-int32 sim_sock_cnt = 0;
+/* OS independent routines
+
+   sim_parse_addr       parse a hostname/ipaddress from port and apply defaults
+*/
+
+/* sim_parse_addr       host:port
+
+   Presumption is that the input, if it doesn't contain a ':' character is a port specifier.
+   If the host field contains one or more colon characters (i.e. it is an IPv6 address), 
+   the IPv6 address MUST be enclosed in square bracket characters (i.e. Domain Literal format)
+
+   Inputs:
+        cptr    =       pointer to input string
+        default_host
+                =       optional pointer to default host if none specified
+        host_len =      length of host buffer
+        default_port
+                =       optional pointer to default host if none specified
+        port_len =      length of port buffer
+   Outputs:
+        host    =       pointer to buffer for IP address (may be NULL), 0 = none
+        port    =       pointer to buffer for IP port (may be NULL), 0 = none
+        result  =       status
+*/
+
+t_stat sim_parse_addr (const char *cptr, char *host, size_t host_len, const char *default_host, char *port, size_t port_len, const char *default_port)
+{
+char gbuf[CBUFSIZE];
+char *hostp, *portp;
+char *endc;
+unsigned long portval;
+
+if ((cptr == NULL) || (*cptr == 0))
+    return SCPE_ARG;
+if ((host != NULL) && (host_len != 0))
+    memset (host, 0, host_len);
+if ((port != NULL) && (port_len != 0))
+    memset (port, 0, port_len);
+strncpy (gbuf, cptr, CBUFSIZE);
+hostp = gbuf;                                           /* default addr */
+portp = NULL;
+if ((portp = strrchr (gbuf, ':')) &&                    /* x:y? split */
+    (NULL == strchr (portp, ']'))) {
+    *portp++ = 0;
+    if (*portp == '\0')
+        portp = (char *)default_port;
+    }
+else
+    if (default_port)
+        portp = (char *)default_port;
+    else {
+        portp = gbuf;
+        hostp = NULL;
+        }
+if (portp != NULL) {
+    portval = strtoul(portp, &endc, 10);
+    if ((*endc == '\0') && ((portval == 0) || (portval > 65535)))
+        return SCPE_ARG;                                /* value too big */
+    if (*endc != '\0') {
+        struct servent *se = getservbyname(portp, "tcp");
+
+        if (se == NULL)
+            return SCPE_ARG;                            /* invalid service name */
+        }
+    }
+if (port)                                               /* port wanted? */
+    if (portp != NULL) {
+        if (strlen(portp) >= port_len)
+            return SCPE_ARG;                            /* no room */
+        else
+            strcpy (port, portp);
+        }
+if (hostp != NULL) {
+    if (']' == hostp[strlen(hostp)-1]) {
+        if ('[' != hostp[0])
+            return SCPE_ARG;                            /* invalid domain literal */
+        strcpy(hostp, hostp+1);                         /* remove brackets from domain literal host */
+        hostp[strlen(hostp)-1] = '\0';
+        }
+    }
+if (host)                                               /* host wanted? */
+    if (hostp != NULL)
+        if (strlen(hostp) >= host_len)
+            return SCPE_ARG;                            /* no room */
+        else
+            strcpy (host, hostp);
+return SCPE_OK;   
+}
 
 /* First, all the non-implemented versions */
 
 #if defined (__OS2__) && !defined (__EMX__)
 
-SOCKET sim_master_sock (int32 port)
+void sim_init_sock (void)
+{
+}
+
+void sim_cleanup_sock (void)
+{
+}
+
+SOCKET sim_master_sock (const char *hostport, t_stat *parse_status)
 {
 return INVALID_SOCKET;
 }
 
-SOCKET sim_connect_sock (int32 ip, int32 port)
+SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port)
 {
 return INVALID_SOCKET;
 }
 
-SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
+SOCKET sim_accept_conn (SOCKET master, char **connectaddr);
 {
 return INVALID_SOCKET;
 }
@@ -90,11 +204,6 @@ void sim_close_sock (SOCKET sock, t_bool master)
 return;
 }
 
-int32 sim_setnonblock (SOCKET sock)
-{
-return SOCKET_ERROR;
-}
-
 #else                                                   /* endif unimpl */
 
 /* UNIX, Win32, Macintosh, VMS, OS2 (Berkeley socket) routines */
@@ -108,30 +217,383 @@ sim_close_sock (s, flg);
 return INVALID_SOCKET;
 }
 
-SOCKET sim_create_sock (void)
+static void    (WSAAPI *p_freeaddrinfo) (struct addrinfo *ai);
+
+static int     (WSAAPI *p_getaddrinfo) (const char *hostname,
+                                 const char *service,
+                                 const struct addrinfo *hints,
+                                 struct addrinfo **res);
+
+static int     (WSAAPI *p_getnameinfo) (const struct sockaddr *sa, socklen_t salen,
+                                 char *host, size_t hostlen,
+                                 char *serv, size_t servlen,
+                                 int flags);
+
+
+static void    WSAAPI s_freeaddrinfo (struct addrinfo *ai)
 {
-SOCKET newsock;
-int32 err;
+struct addrinfo *a, *an;
 
-#if defined (_WIN32)
-WORD wVersionRequested; 
-WSADATA wsaData; 
-wVersionRequested = MAKEWORD (1, 1); 
+for (a=ai; a != NULL; a=an) {
+    an = a->ai_next;
+    free (a->ai_canonname);
+    free (a->ai_addr);
+    free (a);
+    }
+}
 
-if (sim_sock_cnt == 0) {
-    err = WSAStartup (wVersionRequested, &wsaData);     /* start Winsock */ 
-    if (err != 0) {
-        printf ("Winsock: startup error %d\n", err);
-        return INVALID_SOCKET;
+static int     WSAAPI s_getaddrinfo (const char *hostname,
+                                     const char *service,
+                                     const struct addrinfo *hints,
+                                     struct addrinfo **res)
+{
+struct hostent *he;
+struct servent *se;
+struct sockaddr_in *sin;
+struct addrinfo *result = NULL;
+struct addrinfo *ai, *lai;
+struct addrinfo dhints;
+struct in_addr ipaddr;
+struct in_addr *fixed[2];
+struct in_addr **ips;
+struct in_addr **ip;
+const char *cname = NULL;
+int port = 0;
+
+// Validate parameters
+if ((hostname == NULL) && (service == NULL))
+    return EAI_NONAME;
+
+if (hints) {
+    if ((hints->ai_family != PF_INET) && (hints->ai_family != PF_UNSPEC))
+        return EAI_FAMILY;
+    switch (hints->ai_socktype)
+        {
+        default:
+            return EAI_SOCKTYPE;
+        case SOCK_DGRAM:
+        case SOCK_STREAM:
+        case 0:
+            break;
         }
     }
-sim_sock_cnt = sim_sock_cnt + 1;
+else {
+    hints = &dhints;
+    memset(&dhints, 0, sizeof(dhints));
+    dhints.ai_family = PF_UNSPEC;
+    }
+if (service) {
+    char *c;
+
+    port = strtoul(service, &c, 10);
+    if ((port == 0) && (*c != '\0') && (hints->ai_flags & AI_NUMERICSERV))
+        return EAI_NONAME;
+    if ((port == 0) || (*c != '\0')) {
+        switch (hints->ai_socktype)
+            {
+            case SOCK_DGRAM:
+                se = getservbyname(service, "udp");
+                break;
+            case SOCK_STREAM:
+            case 0:
+                se = getservbyname(service, "tcp");
+                break;
+            }
+        if (NULL == se)
+            return EAI_SERVICE;
+        port = se->s_port;
+        }
+    }
+
+if (hostname) {
+    if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) || 
+        (0 == strcmp("255.255.255.255", hostname))) {
+        fixed[0] = &ipaddr;
+        fixed[1] = NULL;
+        }
+    else {
+        if ((0xffffffff != (ipaddr.s_addr = inet_addr(hostname))) || 
+            (0 == strcmp("255.255.255.255", hostname))) {
+            fixed[0] = &ipaddr;
+            fixed[1] = NULL;
+            if ((hints->ai_flags & AI_CANONNAME) && !(hints->ai_flags & AI_NUMERICHOST)) {
+                he = gethostbyaddr((char *)&ipaddr, 4, AF_INET);
+                if (NULL != he)
+                    cname = he->h_name;
+                else
+                    cname = hostname;
+                }
+            ips = fixed;
+            }
+        else {
+            if (hints->ai_flags & AI_NUMERICHOST)
+                return EAI_NONAME;
+            he = gethostbyname(hostname);
+            if (he) {
+                ips = (struct in_addr **)he->h_addr_list;
+                if (hints->ai_flags & AI_CANONNAME)
+                    cname = he->h_name;
+                }
+            else {
+                switch (h_errno)
+                    {
+                    case HOST_NOT_FOUND:
+                    case NO_DATA:
+                        return EAI_NONAME;
+                    case TRY_AGAIN:
+                        return EAI_AGAIN;
+                    default:
+                        return EAI_FAIL;
+                    }
+                }
+            }
+        }
+    }
+else {
+    if (hints->ai_flags & AI_PASSIVE)
+        ipaddr.s_addr = htonl(INADDR_ANY);
+    else
+        ipaddr.s_addr = htonl(INADDR_LOOPBACK);
+    fixed[0] = &ipaddr;
+    fixed[1] = NULL;
+    ips = fixed;
+    }
+for (ip=ips; *ip != NULL; ++ip) {
+    ai = calloc(1, sizeof(*ai));
+    if (NULL == ai) {
+        s_freeaddrinfo(result);
+        return EAI_MEMORY;
+        }
+    ai->ai_family = PF_INET;
+    ai->ai_socktype = hints->ai_socktype;
+    ai->ai_protocol = hints->ai_protocol;
+    ai->ai_addr = NULL;
+    ai->ai_addrlen = sizeof(struct sockaddr_in);
+    ai->ai_canonname = NULL;
+    ai->ai_next = NULL;
+    ai->ai_addr = calloc(1, sizeof(struct sockaddr_in));
+    if (NULL == ai->ai_addr) {
+        free(ai);
+        s_freeaddrinfo(result);
+        return EAI_MEMORY;
+        }
+    sin = (struct sockaddr_in *)ai->ai_addr;
+    sin->sin_family = PF_INET;
+    sin->sin_port = port;
+    memcpy(&sin->sin_addr, *ip, sizeof(sin->sin_addr));
+    if (NULL == result)
+        result = ai;
+    else
+        lai->ai_next = ai;
+    lai = ai;
+    }
+if (cname) {
+    result->ai_canonname = calloc(1, strlen(cname)+1);
+    if (NULL == result->ai_canonname) {
+        s_freeaddrinfo(result);
+        return EAI_MEMORY;
+        }
+    strcpy(result->ai_canonname, cname);
+    }
+*res = result;
+return 0;
+}
+
+#ifndef EAI_OVERFLOW
+#define EAI_OVERFLOW WSAENAMETOOLONG
+#endif
+
+static int     WSAAPI s_getnameinfo (const struct sockaddr *sa, socklen_t salen,
+                                     char *host, size_t hostlen,
+                                     char *serv, size_t servlen,
+                                     int flags)
+{
+struct hostent *he;
+struct servent *se = NULL;
+struct sockaddr_in *sin = (struct sockaddr_in *)sa;
+
+if (sin->sin_family != PF_INET)
+    return EAI_FAMILY;
+if ((NULL == host) && (NULL == serv))
+    return EAI_NONAME;
+if ((serv) && (servlen > 0)) {
+    if (flags & NI_NUMERICSERV)
+        se = NULL;
+    else
+        if (flags & NI_DGRAM)
+            se = getservbyport(sin->sin_port, "udp");
+        else
+            se = getservbyport(sin->sin_port, "tcp");
+    if (se) {
+        if (servlen <= strlen(se->s_name))
+            return EAI_OVERFLOW;
+        strcpy(serv, se->s_name);
+        }
+    else {
+        char buf[16];
+
+        sprintf(buf, "%d", ntohs(sin->sin_port));
+        if (servlen <= strlen(buf))
+            return EAI_OVERFLOW;
+        strcpy(serv, buf);
+        }
+    }
+if ((host) && (hostlen > 0)) {
+    if (flags & NI_NUMERICHOST)
+        he = NULL;
+    else
+        he = gethostbyaddr((char *)&sin->sin_addr, 4, AF_INET);
+    if (he) {
+        if (hostlen < strlen(he->h_name)+1)
+            return EAI_OVERFLOW;
+        strcpy(host, he->h_name);
+        }
+    else {
+        if (flags & NI_NAMEREQD)
+            return EAI_NONAME;
+        if (hostlen < strlen(inet_ntoa(sin->sin_addr))+1)
+            return EAI_OVERFLOW;
+        strcpy(host, inet_ntoa(sin->sin_addr));
+        }
+    }
+return 0;
+}
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+
+/* Dynamic DLL load variables */
+static HINSTANCE hLib = 0;                      /* handle to DLL */
+static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
+static char* lib_name = "Ws2_32.dll";
+
+/* load function pointer from DLL */
+typedef int (*_func)();
+
+static void load_function(char* function, _func* func_ptr) {
+    *func_ptr = (_func)GetProcAddress(hLib, function);
+    if (*func_ptr == 0) {
+    char* msg = "Sockets: Failed to find function '%s' in %s\r\n";
+
+    printf (msg, function, lib_name);
+    if (sim_log) fprintf (sim_log, msg, function, lib_name);
+    lib_loaded = 3;
+  }
+}
+
+/* load Ws2_32.dll as required */
+int load_ws2(void) {
+  switch(lib_loaded) {
+    case 0:                  /* not loaded */
+            /* attempt to load DLL */
+#ifdef _WIN32
+      hLib = LoadLibraryA(lib_name);
+#else
+      hLib = dlopen(lib_name, RTLD_NOW);
+#endif
+      if (hLib == 0) {
+        /* failed to load DLL */
+        char* msg  = "Sockets: Failed to load %s\r\n";
+
+        printf (msg, lib_name);
+        if (sim_log) 
+          fprintf (sim_log, msg, lib_name);
+        lib_loaded = 2;
+        break;
+      } else {
+        /* library loaded OK */
+        lib_loaded = 1;
+      }
+
+      /* load required functions; sets dll_load=3 on error */
+      load_function("getaddrinfo",       (_func *) &p_getaddrinfo);
+      load_function("getnameinfo",       (_func *) &p_getnameinfo);
+      load_function("freeaddrinfo",      (_func *) &p_freeaddrinfo);
+
+      if (lib_loaded != 1) {
+        /* unsuccessful load, connect stubs */
+        p_getaddrinfo = s_getaddrinfo;
+        p_getnameinfo = s_getnameinfo;
+        p_freeaddrinfo = s_freeaddrinfo;
+      }
+      break;
+    default:                /* loaded or failed */
+      break;
+  }
+  return (lib_loaded == 1) ? 1 : 0;
+}
+#endif
+
+void sim_init_sock (void)
+{
+#if defined (_WIN32)
+int err;
+WORD wVersionRequested; 
+WSADATA wsaData; 
+wVersionRequested = MAKEWORD (2, 2);
+
+
+err = WSAStartup (wVersionRequested, &wsaData);         /* start Winsock */ 
+if (err != 0)
+    printf ("Winsock: startup error %d\n", err);
+#if defined(AF_INET6)
+load_ws2 ();
+#endif                                                  /* endif AF_INET6 */
 #endif                                                  /* endif Win32 */
 #if defined (SIGPIPE)
 signal (SIGPIPE, SIG_IGN);                              /* no pipe signals */
 #endif
+}
 
-newsock = socket (AF_INET, SOCK_STREAM, 0);             /* create socket */
+void sim_cleanup_sock (void)
+{
+#if defined (_WIN32)
+WSACleanup ();
+#endif
+}
+
+#if defined (_WIN32)                                    /* Windows */
+static int32 sim_setnonblock (SOCKET sock)
+{
+unsigned long non_block = 1;
+
+return ioctlsocket (sock, FIONBIO, &non_block);         /* set nonblocking */
+}
+
+#elif defined (VMS)                                     /* VMS */
+static int32 sim_setnonblock (SOCKET sock)
+{
+int non_block = 1;
+
+return ioctl (sock, FIONBIO, &non_block);               /* set nonblocking */
+}
+
+#else                                                   /* Mac, Unix, OS/2 */
+static int32 sim_setnonblock (SOCKET sock)
+{
+int32 fl, sta;
+
+fl = fcntl (sock, F_GETFL,0);                           /* get flags */
+if (fl == -1)
+    return SOCKET_ERROR;
+sta = fcntl (sock, F_SETFL, fl | O_NONBLOCK);           /* set nonblock */
+if (sta == -1)
+    return SOCKET_ERROR;
+#if !defined (macintosh) && !defined (__EMX__)          /* Unix only */
+sta = fcntl (sock, F_SETOWN, getpid());                 /* set ownership */
+if (sta == -1)
+    return SOCKET_ERROR;
+#endif
+return 0;
+}
+
+#endif                                                  /* endif !Win32 && !VMS */
+
+static SOCKET sim_create_sock (int af)
+{
+SOCKET newsock;
+int32 err;
+
+newsock = socket (af, SOCK_STREAM, 0);                  /* create socket */
 if (newsock == INVALID_SOCKET) {                        /* socket error? */
     err = WSAGetLastError ();
     printf ("Sockets: socket error %d\n", err);
@@ -140,21 +602,49 @@ if (newsock == INVALID_SOCKET) {                        /* socket error? */
 return newsock;
 }
 
-SOCKET sim_master_sock (int32 port)
-{
-SOCKET newsock;
-struct sockaddr_in name;
-int32 sta;
+/*
+   Some platforms and/or network stacks have varying support for listening on 
+   an IPv6 socket and receiving connections from both IPv4 and IPv6 client 
+   connections.  This is known as IPv4-Mapped.  Some platforms claim such 
+   support (i.e. some Windows versions), but it doesn't work in all cases.
+*/
 
-newsock = sim_create_sock ();                           /* create socket */
-if (newsock == INVALID_SOCKET)                          /* socket error? */
+SOCKET sim_master_sock (const char *hostport, t_stat *parse_status)
+{
+SOCKET newsock = INVALID_SOCKET;
+int32 sta;
+char host[CBUFSIZE], port[CBUFSIZE];
+t_stat r;
+struct addrinfo hints;
+struct addrinfo *result = NULL;
+
+r = sim_parse_addr (hostport, host, sizeof(host), NULL, port, sizeof(port), NULL);
+if (parse_status)
+    *parse_status = r;
+if (r != SCPE_OK)
     return newsock;
 
-name.sin_family = AF_INET;                              /* name socket */
-name.sin_port = htons ((unsigned short) port);          /* insert port */
-name.sin_addr.s_addr = htonl (INADDR_ANY);              /* insert addr */
-
-sta = bind (newsock, (struct sockaddr *) &name, sizeof (name));
+memset(&hints, 0, sizeof(hints));
+hints.ai_flags = AI_PASSIVE;
+hints.ai_family = AF_UNSPEC;
+hints.ai_protocol = IPPROTO_TCP;
+hints.ai_socktype = SOCK_STREAM;
+if (p_getaddrinfo(host[0] ? host : NULL, port[0] ? port : NULL, &hints, &result)) {
+    if (parse_status)
+        *parse_status = SCPE_ARG;
+    return newsock;
+    }
+newsock = sim_create_sock (result->ai_family);          /* create socket */
+if (newsock == INVALID_SOCKET) {                        /* socket error? */
+    p_freeaddrinfo(result);
+    return newsock;
+    }
+if (result->ai_family == AF_INET6) {
+    int off = FALSE;
+    sta = setsockopt (newsock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
+    }
+sta = bind (newsock, result->ai_addr, result->ai_addrlen);
+p_freeaddrinfo(result);
 if (sta == SOCKET_ERROR)                                /* bind error? */
     return sim_err_sock (newsock, "bind", 1);
 sta = sim_setnonblock (newsock);                        /* set nonblocking */
@@ -166,24 +656,38 @@ if (sta == SOCKET_ERROR)                                /* listen error? */
 return newsock;                                         /* got it! */
 }
 
-SOCKET sim_connect_sock (int32 ip, int32 port)
+SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port)
 {
-SOCKET newsock;
-struct sockaddr_in name;
+SOCKET newsock = INVALID_SOCKET;
 int32 sta;
+char host[CBUFSIZE], port[CBUFSIZE];
+t_stat r;
+struct addrinfo hints;
+struct addrinfo *result = NULL;
 
-newsock = sim_create_sock ();                           /* create socket */
-if (newsock == INVALID_SOCKET)                          /* socket error? */
+r = sim_parse_addr (hostport, host, sizeof(host), default_host, port, sizeof(port), default_port);
+if (r != SCPE_OK)
     return newsock;
 
-name.sin_family = AF_INET;                              /* name socket */
-name.sin_port = htons ((unsigned short) port);          /* insert port */
-name.sin_addr.s_addr = htonl (ip);                      /* insert addr */
+memset(&hints, 0, sizeof(hints));
+hints.ai_family = AF_UNSPEC;
+hints.ai_protocol = IPPROTO_TCP;
+hints.ai_socktype = SOCK_STREAM;
+if (p_getaddrinfo(host[0] ? host : NULL, port[0] ? port : NULL, &hints, &result))
+    return newsock;
+newsock = sim_create_sock (result->ai_family);          /* create socket */
+if (newsock == INVALID_SOCKET) {                        /* socket error? */
+    p_freeaddrinfo (result);
+    return newsock;
+    }
 
 sta = sim_setnonblock (newsock);                        /* set nonblocking */
-if (sta == SOCKET_ERROR)                                /* fcntl error? */
+if (sta == SOCKET_ERROR) {                              /* fcntl error? */
+    p_freeaddrinfo (result);
     return sim_err_sock (newsock, "fcntl", 1);
-sta = connect (newsock, (struct sockaddr *) &name, sizeof (name));
+    }
+sta = connect (newsock, result->ai_addr, result->ai_addrlen);
+p_freeaddrinfo (result);
 if ((sta == SOCKET_ERROR) && 
     (WSAGetLastError () != WSAEWOULDBLOCK) &&
     (WSAGetLastError () != WSAEINPROGRESS))
@@ -192,7 +696,7 @@ if ((sta == SOCKET_ERROR) &&
 return newsock;                                         /* got it! */
 }
 
-SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr)
+SOCKET sim_accept_conn (SOCKET master, char **connectaddr)
 {
 int32 sta, err;
 #if defined (macintosh) || defined (__linux) || \
@@ -206,11 +710,12 @@ int size;
 size_t size; 
 #endif
 SOCKET newsock;
-struct sockaddr_in clientname;
+struct sockaddr_storage clientname;
 
 if (master == 0)                                        /* not attached? */
     return INVALID_SOCKET;
 size = sizeof (clientname);
+memset (&clientname, 0, sizeof(clientname));
 newsock = accept (master, (struct sockaddr *) &clientname, &size);
 if (newsock == INVALID_SOCKET) {                        /* error? */
     err = WSAGetLastError ();
@@ -218,8 +723,14 @@ if (newsock == INVALID_SOCKET) {                        /* error? */
         printf ("Sockets: accept error %d\n", err);
     return INVALID_SOCKET;
     }
-if (ipaddr != NULL)
-    *ipaddr = ntohl (clientname.sin_addr.s_addr);
+if (connectaddr != NULL) {
+    *connectaddr = calloc(1, NI_MAXHOST+1);
+#ifdef AF_INET6
+    p_getnameinfo((struct sockaddr *)&clientname, size, *connectaddr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+#else
+    strcpy(*connectaddr, inet_ntoa(((struct sockaddr_in *)&connectaddr)->s_addr));
+#endif
+    }
 
 sta = sim_setnonblock (newsock);                        /* set nonblocking */
 if (sta == SOCKET_ERROR)                                /* fcntl error? */
@@ -273,56 +784,8 @@ return send (sock, msg, nbytes, 0);
 
 void sim_close_sock (SOCKET sock, t_bool master)
 {
-#if defined (_WIN32)
+shutdown(sock, SD_BOTH);
 closesocket (sock);
-if (master) {
-    sim_sock_cnt = sim_sock_cnt - 1;
-    if (sim_sock_cnt <= 0) {
-        WSACleanup ();
-        sim_sock_cnt = 0;
-        }
-    }
-#else
-close (sock);
-#endif
-return;
 }
-
-#if defined (_WIN32)                                    /* Windows */
-int32 sim_setnonblock (SOCKET sock)
-{
-unsigned long non_block = 1;
-
-return ioctlsocket (sock, FIONBIO, &non_block);         /* set nonblocking */
-}
-
-#elif defined (VMS)                                     /* VMS */
-int32 sim_setnonblock (SOCKET sock)
-{
-int non_block = 1;
-
-return ioctl (sock, FIONBIO, &non_block);               /* set nonblocking */
-}
-
-#else                                                   /* Mac, Unix, OS/2 */
-int32 sim_setnonblock (SOCKET sock)
-{
-int32 fl, sta;
-
-fl = fcntl (sock, F_GETFL,0);                           /* get flags */
-if (fl == -1)
-    return SOCKET_ERROR;
-sta = fcntl (sock, F_SETFL, fl | O_NONBLOCK);           /* set nonblock */
-if (sta == -1)
-    return SOCKET_ERROR;
-#if !defined (macintosh) && !defined (__EMX__)          /* Unix only */
-sta = fcntl (sock, F_SETOWN, getpid());                 /* set ownership */
-if (sta == -1)
-    return SOCKET_ERROR;
-#endif
-return 0;
-}
-
-#endif                                                  /* endif !Win32 && !VMS */
 
 #endif                                                  /* end else !implemented */

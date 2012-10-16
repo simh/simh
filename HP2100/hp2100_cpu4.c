@@ -25,6 +25,7 @@
 
    CPU4         Floating Point Processor and Scientific Instruction Set
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    06-Feb-12    JDB     Added OPSIZE casts to fp_accum calls in .FPWR/.TPWR
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -260,9 +261,12 @@ else
 
 entry = opcode & 0177;                                  /* map to <6:0> */
 
-if (op_fpp[entry] != OP_N)
-    if (reason = cpu_ops (op_fpp[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_fpp [entry] != OP_N) {
+    reason = cpu_ops (op_fpp [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<6:0> */
     case 0000:                                          /* FAD 105000 (OP_RF) */
@@ -599,9 +603,12 @@ static const OP t_one  = { { 0040000, 0000000, 0000000, 0000002 } };   /* DEY 1.
 
 entry = IR & 017;                                       /* mask to entry point */
 
-if (op_sis[entry] != OP_N)
-    if (reason = cpu_ops (op_sis[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_sis [entry] != OP_N) {
+    reason = cpu_ops (op_sis [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<3:0> */
 

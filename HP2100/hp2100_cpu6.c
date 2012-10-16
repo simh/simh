@@ -1,6 +1,6 @@
 /* hp2100_cpu6.c: HP 1000 RTE-6/VM OS instructions
 
-   Copyright (c) 2006-2010, J. David Bryan
+   Copyright (c) 2006-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU6         RTE-6/VM OS instructions
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
    18-Sep-08    JDB     Corrected .SIP debug formatting
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
@@ -393,9 +394,12 @@ static t_bool tbg_tick = FALSE;                         /* set if processing TBG
 entry = IR & 017;                                       /* mask to entry point */
 pattern = op_os[entry];                                 /* get operand pattern */
 
-if (pattern != OP_N)
-    if (reason = cpu_ops (pattern, op, intrq))          /* get instruction operands */
-        return reason;
+if (pattern != OP_N) {
+    reason = cpu_ops (pattern, op, intrq);              /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 tbg_tick = tbg_tick || (IR == 0105357) && iotrap;       /* set TBG interrupting flag */
 
@@ -544,7 +548,9 @@ switch (entry) {                                        /* decode IR<3:0> */
         for (i = 0; i < count; i++) {
             ma = ReadW (PC);                            /* get operand address */
 
-            if (reason = resolve (ma, &ma, intrq)) {    /* resolve indirect */
+            reason = resolve (ma, &ma, intrq);          /* resolve indirect */
+
+            if (reason != SCPE_OK) {                    /* resolution failed? */
                 PC = err_PC;                            /* IRQ restarts instruction */
                 break;
                 }
@@ -710,8 +716,10 @@ switch (entry) {                                        /* decode IR<3:0> */
                 ma = ReadW (sa);                        /* get addr of actual */
                 sa = (sa + 1) & VAMASK;                 /* increment address */
 
-                if (reason = resolve (ma, &ma, intrq)) {    /* resolve indirect */
-                    PC = err_PC;                            /* irq restarts instruction */
+                reason = resolve (ma, &ma, intrq);      /* resolve indirect */
+
+                if (reason != SCPE_OK) {                /* resolution failed? */
+                    PC = err_PC;                        /* irq restarts instruction */
                     break;
                     }
 

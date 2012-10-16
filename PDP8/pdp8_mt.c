@@ -120,7 +120,7 @@
 #define STA_CPE         (00002 << 12)                   /* compare error */
 #define STA_ILL         (00001 << 12)                   /* illegal */
 #define STA_9TK         00040                           /* 9 track */
-/* #define STA_BAD      00020                           /* bad tape?? */
+/* #define STA_BAD      00020                         *//* bad tape?? */
 #define STA_INC         00010                           /* increment error */
 #define STA_LAT         00004                           /* lateral par error */
 #define STA_CRC         00002                           /* CRC error */
@@ -453,7 +453,7 @@ switch (f) {                                            /* case on function */
                 mtxb[p++] = M[xma] & 077;
                 }
             }
-        if (st = sim_tape_wrrecf (uptr, mtxb, tbc)) {   /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, mtxb, tbc))) { /* write rec, err? */
             r = mt_map_err (uptr, st);                  /* map error */
             xma = GET_EMA (mt_cu) + mt_ca;              /* restore xma */
             }
@@ -461,14 +461,14 @@ switch (f) {                                            /* case on function */
         break;
 
     case FN_WREOF:
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;
 
     case FN_SPACEF:                                     /* space forward */
         do {
             mt_wc = (mt_wc + 1) & 07777;                /* incr wc */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* space rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* space rec fwd, err? */
                 r = mt_map_err (uptr, st);              /* map error */
                 break;                                  /* stop */
                 }
@@ -478,7 +478,7 @@ switch (f) {                                            /* case on function */
     case FN_SPACER:                                     /* space reverse */
         do {
             mt_wc = (mt_wc + 1) & 07777;                /* incr wc */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* space rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* space rec rev, err? */
                 r = mt_map_err (uptr, st);              /* map error */
                 break;                                  /* stop */
                 }

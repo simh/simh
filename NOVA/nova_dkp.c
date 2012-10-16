@@ -25,6 +25,7 @@
 
    dkp          moving head disk
 
+   27-Apr-12    RMS     Changed ??? string digraphs to ?, per C rules
    04-Jul-04    BKR     device name changed to DG's DKP from DEC's DP,
                         DEV_SET/CLR/INTR macro use started,
                         fixed 'P' pulse code and secret quirks,
@@ -706,7 +707,7 @@ if ( DKP_TRACE(1) )
 				  "write"
 				: ((uptr->FUNC == FCCY_SEEK) ?
 					  "seek"
-					: "<???>"
+					: "<?>"
 				  )
 			  )
 		),
@@ -871,7 +872,7 @@ do  {
                   "read"
                 : ((uptr->FUNC == FCCY_WRITE) ?
                       "write"
-                    : "<???>")
+                    : "<?>")
             ),
             (unsigned) (uptr->CYL),
             (unsigned) (GET_SURF(dkp_ussc, dtype)),
@@ -908,7 +909,7 @@ do  {
     if (uptr->FUNC == FCCY_READ) {                      /* read? */
             awc = fxread (tbuf, sizeof(uint16), DKP_NUMWD, uptr->fileref);
             for ( ; awc < DKP_NUMWD; awc++) tbuf[awc] = 0;
-            if (err = ferror (uptr->fileref))
+            if ((err = ferror (uptr->fileref)))
                 break;
             for (dx = 0; dx < DKP_NUMWD; dx++) {            /* loop thru buffer */
                 pa = MapAddr (dkp_map, (dkp_ma & AMASK));
@@ -924,7 +925,7 @@ do  {
                 dkp_ma = (dkp_ma + 1) & AMASK;
                 }
             fxwrite (tbuf, sizeof(int16), DKP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref))
+            if ((err = ferror (uptr->fileref)))
                 break;
             }
 

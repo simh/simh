@@ -84,9 +84,8 @@ typedef struct serial_config {                          /* serial port configura
     uint32 stopbits;                                    /* 0/1/2 stop bits (0 implies 1.5) */
     } SERCONFIG;
 
-typedef struct tmln TMLN;
-
 /* Global routines */
+#include "sim_tmxr.h"                                   /* need TMLN definition */
 
 extern SERHANDLE sim_open_serial    (char *name, TMLN *lp);
 extern t_stat    sim_config_serial  (SERHANDLE port, SERCONFIG config);
@@ -94,6 +93,6 @@ extern t_bool    sim_control_serial (SERHANDLE port, t_bool connect);
 extern int32     sim_read_serial    (SERHANDLE port, char *buffer, int32 count, char *brk);
 extern int32     sim_write_serial   (SERHANDLE port, char *buffer, int32 count);
 extern void      sim_close_serial   (SERHANDLE port);
-extern t_stat    sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, void* desc);
+extern t_stat    sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
 
 #endif

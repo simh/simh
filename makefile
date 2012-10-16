@@ -23,6 +23,10 @@
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.
 #
+# OSX and other environments may have the LLVM (clang) compiler 
+# installed.  If you want to build with the clang compiler, invoke
+# make with GCC=clang.
+#
 # Internal ROM support can be disabled if GNU make is invoked with
 # DONT_USE_ROMS=1 on the command line.
 #
@@ -66,7 +70,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSTYPE = cygwin
     OSNAME = windows-build
   endif
-  GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
+  ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version'))
+    GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
+    COMPILER_NAME = GCC Version: $(GCC_VERSION)
+  else
+    COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 }')
+    CLANG_VERSION = $(word 3,$(COMPILER_NAME))
+    ifeq (,$(findstring .,$(CLANG_VERSION)))
+      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
+      CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+    endif
+  endif
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
@@ -85,8 +99,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OSNAME = OSX
       LIBEXT = dylib
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
-      ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
-        LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
+      ifneq (,$(GCC_VERSION))
+        ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
+          LTO_EXCLUDE_VERSIONS += $(GCC_VERSION)
+        endif
       endif
     else
       ifeq (Linux,$(OSTYPE))
@@ -253,7 +269,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
-    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
+    MKDIRBIN = mkdir -p BIN
   endif
 else
   #Win32 Environments (via MinGW32)
@@ -304,7 +320,15 @@ ifneq ($(DEBUG),)
   CFLAGS_O = -O0
   BUILD_FEATURES = - debugging support
 else
-  CFLAGS_O = -O2
+  ifneq (clang,$(findstring clang,$(COMPILER_NAME)))
+    CFLAGS_O = -O2
+  else
+    ifeq (Darwin,$(OSTYPE))
+      CFLAGS_O += -O4 -fno-strict-overflow -flto -fwhole-program
+    else
+      CFLAGS_O := -O2 -fno-strict-overflow 
+    endif
+  endif
   LDFLAGS_O = 
   GCC_MAJOR_VERSION = $(firstword $(subst  ., ,$(GCC_VERSION)))
   ifneq (3,$(GCC_MAJOR_VERSION))
@@ -351,7 +375,7 @@ ifneq (3,$(GCC_MAJOR_VERSION))
   endif
 endif
 ifneq (clean,$(MAKECMDGOALS))
-  BUILD_FEATURES := $(BUILD_FEATURES). GCC Version: $(GCC_VERSION)
+  BUILD_FEATURES := $(BUILD_FEATURES). $(COMPILER_NAME)
   $(info ***)
   $(info *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with:)
   $(info *** $(BUILD_FEATURES).)
@@ -456,7 +480,7 @@ VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
-	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \${PDP11D}/pdp11_io_lib.c
 VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -815,3 +839,4 @@ swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+

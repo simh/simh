@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    04-Jun-08    RMS     Addes sim_create_sock, for IBM 1130
    14-Apr-05    RMS     Added WSAEINPROGRESS (from Tim Riker)
    20-Aug-04    HV      Added missing definition for OS/2 (from Holger Veit)
@@ -49,16 +50,18 @@
 
 #elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */
 #define WSAGetLastError()       errno                   /* Windows macros */
+#define closesocket     close 
 #define SOCKET          int32
 #define WSAEWOULDBLOCK  EWOULDBLOCK
 #define WSAEINPROGRESS  EINPROGRESS
-#define INVALID_SOCKET  -1 
+#define INVALID_SOCKET  ((SOCKET)-1) 
 #define SOCKET_ERROR    -1
 #include <sys/types.h>                                  /* for fcntl, getpid */
 #include <sys/socket.h>                                 /* for sockets */
 #include <fcntl.h>
 #include <unistd.h>
 #include <netinet/in.h>                                 /* for sockaddr_in */
+#include <arpa/inet.h>                                  /* for inet_addr and inet_ntoa */
 #include <netdb.h>
 #include <sys/time.h>                                   /* for EMX */
 #endif
@@ -75,14 +78,15 @@
 #endif
 #endif
 
-SOCKET sim_master_sock (int32 port);
-SOCKET sim_connect_sock (int32 ip, int32 port);
-SOCKET sim_create_sock (void);
-SOCKET sim_accept_conn (SOCKET master, uint32 *ipaddr);
+t_stat sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, const char *default_port);
+SOCKET sim_master_sock (const char *hostport, t_stat *parse_status);
+SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port);
+SOCKET sim_accept_conn (SOCKET master, char **connectaddr);
 int32 sim_check_conn (SOCKET sock, t_bool rd);
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);
 int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes);
 void sim_close_sock (SOCKET sock, t_bool master);
-int32 sim_setnonblock (SOCKET sock);
+void sim_init_sock (void);
+void sim_cleanup_sock (void);
 
 #endif

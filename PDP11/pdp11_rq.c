@@ -894,7 +894,7 @@ UNIT rqb_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -966,7 +966,7 @@ UNIT rqc_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -1038,7 +1038,7 @@ UNIT rqd_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -1442,7 +1442,7 @@ DEVICE *dptr = rq_devmap[cp->cnum];
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_abo\n");
 
 tpkt = 0;                                               /* set no mtch */
-if (uptr = rq_getucb (cp, lu)) {                        /* get unit */
+if ((uptr = rq_getucb (cp, lu))) {                      /* get unit */
     if (uptr->cpkt &&                                   /* curr pkt? */
         (GETP32 (uptr->cpkt, CMD_REFL) == ref)) {       /* match ref? */
         tpkt = uptr->cpkt;                              /* save match */
@@ -1455,8 +1455,8 @@ if (uptr = rq_getucb (cp, lu)) {                        /* get unit */
         tpkt = uptr->pktq;                              /* save match */
         uptr->pktq = cp->pak[tpkt].link;                /* unlink */
         }
-    else if (prv = uptr->pktq) {                        /* srch pkt q */
-        while (tpkt = cp->pak[prv].link) {              /* walk list */
+    else if ((prv = uptr->pktq)) {                      /* srch pkt q */
+        while ((tpkt = cp->pak[prv].link)) {            /* walk list */
             if (GETP32 (tpkt, RSP_REFL) == ref) {       /* match? unlink */
                 cp->pak[prv].link = cp->pak[tpkt].link;
                 break;
@@ -1486,7 +1486,7 @@ UNIT *uptr;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_avl\n");
 
-if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
+if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
     if (q && uptr->cpkt) {                              /* need to queue? */
         rq_enqt (cp, &uptr->pktq, pkt);                 /* do later */
         return OK;
@@ -1546,7 +1546,7 @@ if (cp->pak[pkt].d[CMD_MOD] & MD_NXU) {                 /* next unit? */
         cp->pak[pkt].d[RSP_UN] = lu;
         }
     }
-if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
+if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
         sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
     else if (uptr->flags & UNIT_ONL)                    /* online */
@@ -1583,7 +1583,7 @@ UNIT *uptr;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_onl\n");
 
-if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
+if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
     if (q && uptr->cpkt) {                              /* need to queue? */
         rq_enqt (cp, &uptr->pktq, pkt);                 /* do later */
         return OK;
@@ -1626,7 +1626,7 @@ else {
     cmd = GETP (pkt, CMD_OPC, OPC);                     /* get opcode */
     cp->cflgs = (cp->cflgs & CF_RPL) |                  /* hack ctrl flgs */
         cp->pak[pkt].d[SCC_CFL];
-    if (cp->htmo = cp->pak[pkt].d[SCC_TMO])             /* set timeout */
+    if ((cp->htmo = cp->pak[pkt].d[SCC_TMO]))           /* set timeout */
         cp->htmo = cp->htmo + 2;                        /* if nz, round up */
     cp->pak[pkt].d[SCC_CFL] = cp->cflgs;                /* return flags */
     cp->pak[pkt].d[SCC_TMO] = RQ_DCTMO;                 /* ctrl timeout */
@@ -1655,7 +1655,7 @@ UNIT *uptr;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_suc\n");
 
-if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
+if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
     if (q && uptr->cpkt) {                              /* need to queue? */
         rq_enqt (cp, &uptr->pktq, pkt);                 /* do later */
         return OK;
@@ -1686,7 +1686,7 @@ UNIT *uptr;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_fmt\n");
 
-if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
+if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
     if (q && uptr->cpkt) {                              /* need to queue? */
         rq_enqt (cp, &uptr->pktq, pkt);                 /* do later */
         return OK;
@@ -1722,7 +1722,7 @@ UNIT *uptr;
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_rw(lu=%d, pkt=%d, queue=%s)\n", lu, pkt, q?"yes" : "no");
 
-if (uptr = rq_getucb (cp, lu)) {                        /* unit exist? */
+if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
     if (q && uptr->cpkt) {                              /* need to queue? */
         sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_rw - queued\n");
         rq_enqt (cp, &uptr->pktq, pkt);                 /* do later */
@@ -1769,7 +1769,7 @@ if (bc & 1)                                             /* odd byte cnt? */
     return (ST_HST | SB_HST_OC);
 if (bc & 0xF0000000)                                    /* 'reasonable' bc? */
     return (ST_CMD | I_BCNT);
-/* if (lbn & 0xF0000000) return (ST_CMD | I_LBN);       /* 'reasonable' lbn? */
+/* if (lbn & 0xF0000000) return (ST_CMD | I_LBN);     *//* 'reasonable' lbn? */
 if (lbn >= maxlbn) {                                    /* accessing RCT? */
     if (lbn >= (maxlbn + drv_tab[dtyp].rcts))           /* beyond copy 1? */
         return (ST_CMD | I_LBN);                        /* lbn err */
@@ -1854,7 +1854,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
 
     else if (cmd == OP_WR) {                            /* write? */
         t = Map_ReadW (ba, tbc, uptr->rqxb);            /* fetch buffer */
-        if (abc = tbc - t) {                            /* any xfer? */
+        if ((abc = tbc - t)) {                          /* any xfer? */
             wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
             for (i = (abc >> 1); i < wwc; i++)
                 ((uint16 *)(uptr->rqxb))[i] = 0;
@@ -1889,7 +1889,7 @@ else { /* Bottom End (After I/O processing) */
     else {
         sim_disk_data_trace(uptr, uptr->rqxb, bl, tbc, "sim_disk_rdsect", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
         if ((cmd == OP_RD) && !err) {                   /* read? */
-            if (t = Map_WriteW (ba, tbc, uptr->rqxb)) { /* store, nxm? */
+            if ((t = Map_WriteW (ba, tbc, uptr->rqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_WBCL, bc - (tbc - t));  /* adj bc */
                 PUTP32 (pkt, RW_WBAL, ba + (tbc - t));  /* adj ba */
                 if (rq_hbe (cp, uptr))                  /* post err log */
@@ -2746,11 +2746,11 @@ if ((uptr->flags & UNIT_ONL) == 0) {
 if (uptr->cpkt) {
     fprintf (st, "Unit %d current ", u);
     rq_show_pkt (st, cp, uptr->cpkt);
-    if (pkt = uptr->pktq) {
+    if ((pkt = uptr->pktq)) {
         do {
             fprintf (st, "Unit %d queued ", u);
             rq_show_pkt (st, cp, pkt);
-            } while (pkt = cp->pak[pkt].link);
+            } while ((pkt = cp->pak[pkt].link));
         }
     }
 else fprintf (st, "Unit %d queues are empty\n", u);
@@ -2777,7 +2777,7 @@ if (val & RQ_SH_RI) {
     rq_show_ring (st, &cp->rq);
     }
 if (val & RQ_SH_FR) {
-    if (pkt = cp->freq) {
+    if ((pkt = cp->freq)) {
         for (i = 0; pkt != 0; i++, pkt = cp->pak[pkt].link) {
             if (i == 0)
                 fprintf (st, "Free queue = %d", pkt);
@@ -2790,11 +2790,11 @@ if (val & RQ_SH_FR) {
     else fprintf (st, "Free queue is empty\n");
     }
 if (val & RQ_SH_RS) {
-    if (pkt = cp->rspq) {
+    if ((pkt = cp->rspq)) {
         do {
             fprintf (st, "Response ");
             rq_show_pkt (st, cp, pkt);
-            } while (pkt = cp->pak[pkt].link);
+            } while ((pkt = cp->pak[pkt].link));
         }
     else fprintf (st, "Response queue is empty\n");
     }

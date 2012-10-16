@@ -1173,7 +1173,7 @@ const char *force[] = { "S^", "I^", "B^", "W^", "L^", NULL };
 
 *r = SCPE_OK;                                           /* assume ok */
 M1C ('@', SP_IND);                                      /* look for @ */
-if (tptr = parse_rnum (cptr, &rn)) {                    /* look for Rn */
+if ((tptr = parse_rnum (cptr, &rn))) {                  /* look for Rn */
     if (*cptr == '[') {                                 /* look for [Rx] */
         cptr = parse_rnum (++cptr, &index);
         if ((cptr == NULL) || (*cptr++ != ']'))

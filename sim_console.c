@@ -208,10 +208,10 @@ if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph_nc (cptr, gbuf, ',');              /* get modifier */
-    if (cvptr = strchr (gbuf, '='))                     /* = value? */
+    if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
-    if (ctptr = find_ctab (set_con_tab, gbuf)) {        /* match? */
+    if ((ctptr = find_ctab (set_con_tab, gbuf))) {      /* match? */
         r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
         if (r != SCPE_OK)
             return r;
@@ -236,7 +236,7 @@ if (*cptr == 0) {                                       /* show all */
     }
 while (*cptr != 0) {
     cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
-    if (shptr = find_shtab (show_con_tab, gbuf))
+    if ((shptr = find_shtab (show_con_tab, gbuf)))
         shptr->action (st, dptr, uptr, shptr->arg, cptr);
     else return SCPE_NOPARAM;
     }
@@ -425,21 +425,23 @@ if ((cptr == NULL) || (*cptr == 0))
     return SCPE_2FARG;
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph_nc (cptr, gbuf, ',');              /* get modifier */
-    if (cvptr = strchr (gbuf, '='))                     /* = value? */
+    if ((cvptr = strchr (gbuf, '=')))                   /* = value? */
         *cvptr++ = 0;
     get_glyph (gbuf, gbuf, 0);                          /* modifier to UC */
-    if (isdigit (*gbuf)) {
-        if (sim_con_tmxr.master)                        /* already open? */
-            sim_set_notelnet (0, NULL);                 /* close first */
-        return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
+    if ((ctptr = find_ctab (set_con_telnet_tab, gbuf))) { /* match? */
+        r = ctptr->action (ctptr->arg, cvptr);      /* do the rest */
+        if (r != SCPE_OK)
+            return r;
         }
-    else
-        if (ctptr = find_ctab (set_con_telnet_tab, gbuf)) { /* match? */
-            r = ctptr->action (ctptr->arg, cvptr);          /* do the rest */
-            if (r != SCPE_OK)
-                return r;
+    else {
+        r = sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL);
+        if (r == SCPE_OK) {
+            if (sim_con_tmxr.master)                        /* already open? */
+                sim_set_notelnet (0, NULL);                 /* close first */
+            return tmxr_open_master (&sim_con_tmxr, gbuf);  /* open master socket */
             }
-        else return SCPE_NOPARAM;
+        return SCPE_NOPARAM;
+        }
     }
 return SCPE_OK;
 }
@@ -465,9 +467,9 @@ if (sim_con_tmxr.master == 0)
     fprintf (st, "Connected to console window\n");
 else {
     if (sim_con_ldsc.conn == 0)
-        fprintf (st, "Listening on port %d\n", sim_con_tmxr.port);
+        fprintf (st, "Listening on port %s\n", sim_con_tmxr.port);
     else {
-        fprintf (st, "Listening on port %d, connected to socket %d\n",
+        fprintf (st, "Listening on port %s, connected to socket %d\n",
             sim_con_tmxr.port, sim_con_ldsc.conn);
         tmxr_fconns (st, &sim_con_ldsc, -1);
         }
@@ -696,7 +698,7 @@ if (sim_con_ldsc.conn == 0) {                           /* no Telnet conn? */
         return SCPE_OK;                                 /* unconnected and buffered - nothing to receive */
     }
 tmxr_poll_rx (&sim_con_tmxr);                           /* poll for input */
-if (c = tmxr_getc_ln (&sim_con_ldsc))                   /* any char? */ 
+if ((c = tmxr_getc_ln (&sim_con_ldsc)))                 /* any char? */ 
     return (c & (SCPE_BREAK | 0377)) | SCPE_KFLAG;
 return SCPE_OK;
 }

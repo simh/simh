@@ -702,7 +702,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
     fprintf(st, "Filters:\n");
     for (i=0; i<XQ_FILTER_MAX; i++) {
       eth_mac_fmt((ETH_MAC*)xq->var->setup.macs[i], buffer);
-      fprintf(st, "  [%2d]: %s\n", i, buffer);
+      fprintf(st, "  [%2d]: %s\n", (int)i, buffer);
     }
     if (xq->var->setup.multicast)
       fprintf(st, "All Multicast Receive Mode\n");
@@ -1187,7 +1187,7 @@ t_stat xq_process_setup(CTLR* xq)
 
     xq->var->setup.multicast = (0 != (len & XQ_SETUP_MC));
     xq->var->setup.promiscuous = (0 != (len & XQ_SETUP_PM));
-    if (led = (len & XQ_SETUP_LD) >> 2) {
+    if ((led = (len & XQ_SETUP_LD) >> 2)) {
       switch (led) {
         case 1: xq->var->setup.l1 = 0; break;
         case 2: xq->var->setup.l2 = 0; break;
@@ -2072,6 +2072,9 @@ t_stat xq_process_bootrom (CTLR* xq)
 
       /* set to next bdl (implicit chain) */
       xq->var->rbdl_ba += 12;
+      break;
+
+    default:
       break;
   } /* switch */
 

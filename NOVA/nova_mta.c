@@ -412,7 +412,7 @@ else switch (c) {                                       /* case on command */
             mtxb[p++] = M[pa] & 0377;
             mta_ma = (mta_ma + 1) & AMASK;
             }
-        if (st = sim_tape_wrrecf (uptr, mtxb, tbc)) {   /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, mtxb, tbc))) { /* write rec, err? */
             r = mta_map_err (uptr, st);                 /* map error */
             mta_ma = (mta_ma - wc) & AMASK;             /* restore wc */
             }
@@ -421,7 +421,7 @@ else switch (c) {                                       /* case on command */
         break;
 
     case CU_WREOF:                                      /* write eof */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = mta_map_err (uptr, st);                 /* map error */
         else mta_upddsta (uptr, uptr->USTAT | STA_EOF | STA_RDY);
         break;
@@ -435,7 +435,7 @@ else switch (c) {                                       /* case on command */
     case CU_SPACEF:                                     /* space forward */
         do {
             mta_wc = (mta_wc + 1) & DMASK;              /* incr wc */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* space rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* space rec fwd, err? */
                 r = mta_map_err (uptr, st);             /* map error */
                 break;
                 }
@@ -447,7 +447,7 @@ else switch (c) {                                       /* case on command */
     case CU_SPACER:                                     /* space reverse */
         do {
             mta_wc = (mta_wc + 1) & DMASK;              /* incr wc */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* space rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* space rec rev, err? */
                 r = mta_map_err (uptr, st);             /* map error */
                 break;
                 }
@@ -493,10 +493,10 @@ if ((uptr->flags & UNIT_ATT) == 0)                      /* offline? */
 change = (uptr->USTAT ^ newsta) & STA_MON;              /* changes? */
 uptr->USTAT = newsta & STA_DYN;                         /* update status */
 if (change) {
-/*  if (mta_ep) {                                       /* if polling */
-/*      u = uptr - mta_dev.units;                       /* unit num */
-/*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT);
-/*      set polling interupt...
+/*  if (mta_ep) {                                     *//* if polling */
+/*      u = uptr - mta_dev.units;                     *//* unit num */
+/*      mta_sta = (mta_sta & ~STA_UNIT) | (u << STA_V_UNIT); */
+/*      set polling interupt...                       */
 /*      }                                               */
     mta_sta = mta_sta | STA_CHG;                        /* flag change */
     }

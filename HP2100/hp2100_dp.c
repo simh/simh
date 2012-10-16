@@ -26,6 +26,7 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CNTLR_TYPE cast to dp_settype
    28-Mar-11    JDB     Tidied up signal handling
@@ -190,7 +191,7 @@
 #define STA_PROT        0002000                         /* protected (13210) */
 #define STA_SKI         0001000                         /* incomplete NI (u) */
 #define STA_SKE         0000400                         /* seek error */
-/*                      0000200                         /* unused */
+/*                      0000200                            (unused) */
 #define STA_NRDY        0000100                         /* not ready (d) */
 #define STA_EOC         0000040                         /* end of cylinder */
 #define STA_AER         0000020                         /* addr error */
@@ -694,7 +695,8 @@ void dp_goc (int32 fnc, int32 drv, int32 time)
 {
 int32 t;
 
-if (t = sim_is_active (&dpc_unit[drv])) {               /* still seeking? */
+t = sim_is_active (&dpc_unit[drv]);
+if (t) {                                                /* still seeking? */
     sim_cancel (&dpc_unit[drv]);                        /* stop seek */
     dpc_sta[drv] = dpc_sta[drv] & ~STA_BSY;             /* clear busy */
     time = time + t;                                    /* include seek time */
@@ -906,10 +908,13 @@ switch (uptr->FNC) {                                    /* case function */
                 dpc_rarh = dpc_rarh ^ 1;                /* incr head */
                 dpc_eoc = ((dpc_rarh & 1) == 0);        /* calc eoc */
                 }
-            if (err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET)) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)                                    /* error? */
+                 break;
             fxread (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;
+            err = ferror (uptr->fileref);
+            if (err)                                    /* error? */
+                 break;
             }
         dpd_ibuf = dpxb[dp_ptr++];                      /* get word */
         if (dp_ptr >= DP_NUMWD) {                       /* end of sector? */
@@ -953,10 +958,13 @@ switch (uptr->FNC) {                                    /* case function */
                 dpc_rarh = dpc_rarh ^ 1;                /* incr head */
                 dpc_eoc = ((dpc_rarh & 1) == 0);        /* calc eoc */
                 }
-            if (err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET)) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)                                    /* error? */
+                 break;
             fxwrite (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;    /* error? */
+            err = ferror (uptr->fileref);
+            if (err)                                    /* error? */
+                 break;
             dp_ptr = 0;                                 /* next sector */
             }
         if (dpd.command && dpd_xfer)                    /* dch on, xfer? */

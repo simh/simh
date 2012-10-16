@@ -1,6 +1,6 @@
 /* hp2100_cpu2.c: HP 2100/1000 FP/DMS/EIG/IOP instructions
 
-   Copyright (c) 2005-2008, Robert M. Supnik
+   Copyright (c) 2005-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    CPU2         Floating-point, dynamic mapping, extended, and I/O processor
                 instructions
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    05-Aug-08    JDB     Updated mp_dms_jmp calling sequence
@@ -243,9 +244,12 @@ uint32 i, t, mapi, mapj;
 absel = (IR & I_AB)? 1: 0;                              /* get A/B select */
 entry = IR & 037;                                       /* mask to entry point */
 
-if (op_dms[entry] != OP_N)
-    if (reason = cpu_ops (op_dms[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_dms [entry] != OP_N) {
+    reason = cpu_ops (op_dms [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<3:0> */
 
@@ -609,9 +613,12 @@ int32 sop1, sop2;
 absel = (IR & I_AB)? 1: 0;                              /* get A/B select */
 entry = IR & 037;                                       /* mask to entry point */
 
-if (op_eig[entry] != OP_N)
-    if (reason = cpu_ops (op_eig[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_eig [entry] != OP_N) {
+    reason = cpu_ops (op_eig [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<4:0> */
 
@@ -988,9 +995,12 @@ else if (entry <= 057)                                  /* IR = 10x440-457? */
 
 entry = entry - 060;                                    /* offset 10x460-477 */
 
-if (op_iop[entry] != OP_N)
-    if (reason = cpu_ops (op_iop[entry], op, intrq))    /* get instruction operands */
-        return reason;
+if (op_iop [entry] != OP_N) {
+    reason = cpu_ops (op_iop [entry], op, intrq);       /* get instruction operands */
+
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<5:0> */
 

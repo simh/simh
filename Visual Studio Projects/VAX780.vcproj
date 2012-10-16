@@ -206,6 +206,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_dmc.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dz.c"
 				>
 			</File>
@@ -392,7 +396,7 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
-				RelativePath="..\dec_dz.h"
+				RelativePath="..\PDP11\pdp11_dmc.h"
 				>
 			</File>
 			<File

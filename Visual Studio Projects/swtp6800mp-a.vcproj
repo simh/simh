@@ -64,10 +64,10 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\swtp6800.exe"
+				OutputFile="$(OutDir)\swtp6800mp-a.exe"
 				LinkIncremental="2"
 				GenerateDebugInformation="true"
-				ProgramDatabaseFile="$(OutDir)\swtp68000.pdb"
+				ProgramDatabaseFile="$(OutDir)\swtp6800mp-a.pdb"
 				SubSystem="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
@@ -145,7 +145,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\swtp68000.exe"
+				OutputFile="$(OutDir)\swtp6800mp-a.exe"
 				LinkIncremental="1"
 				GenerateDebugInformation="true"
 				SubSystem="1"

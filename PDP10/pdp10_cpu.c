@@ -705,7 +705,7 @@ pager_tc = FALSE;                                       /* not in trap cycle */
 pflgs = 0;                                              /* not in PXCT */
 xct_cnt = 0;                                            /* count XCT's */
 if (sim_interval <= 0) {                                /* check clock queue */
-    if (i = sim_process_event ())                       /* error?  stop sim */
+    if ((i = sim_process_event ()))                     /* error?  stop sim */
         ABORT (i);
     pi_eval ();                                         /* eval pi system */
     }
@@ -719,7 +719,7 @@ if (sim_interval <= 0) {                                /* check clock queue */
 if (qintr) {
     int32 vec, uba;
     pager_pi = TRUE;                                    /* flag in pi seq */
-    if (vec = pi_ub_vec (qintr, &uba)) {                /* Unibus interrupt? */
+    if ((vec = pi_ub_vec (qintr, &uba))) {              /* Unibus interrupt? */
         mb = ReadP (epta + EPT_UBIT + uba);             /* get dispatch table */
         if (mb == 0)                                    /* invalid? stop */
             ABORT (STOP_ZERINT);
@@ -865,8 +865,8 @@ case 0037:  Write (040, UUOWORD, MM_CUR);               /* store op, ac, ea */
 
 /* Floating point, bytes, multiple precision (0100 - 0177) */
 
-/* case 0100:   MUUO                                    /* UJEN */
-/* case 0101:   MUUO                                    /* unassigned */
+/* case 0100:   MUUO                                  *//* UJEN */
+/* case 0101:   MUUO                                  *//* unassigned */
 case 0102:  if (Q_ITS && !TSTF (F_USR)) {               /* GFAD (KL), XCTRI (ITS) */
                 inst = Read (ea, MM_OPND);
                 pflgs = pflgs | ac;
@@ -879,10 +879,10 @@ case 0103:  if (Q_ITS && !TSTF (F_USR)) {               /* GFSB (KL), XCTR (ITS)
                 goto XCT;
                 }
             goto MUUO;
-/* case 0104:   MUUO                                    /* JSYS (T20) */
+/* case 0104:   MUUO                                  *//* JSYS (T20) */
 case 0105:  AC(ac) = adjsp (AC(ac), ea); break;         /* ADJSP */
-/* case 0106:   MUUO                                    /* GFMP (KL)*/
-/* case 0107:   MUUO                                    /* GFDV (KL) */
+/* case 0106:   MUUO                                  *//* GFMP (KL)*/
+/* case 0107:   MUUO                                  *//* GFDV (KL) */
 case 0110:  RD2; dfad (ac, rs, 0); break;               /* DFAD */
 case 0111:  RD2; dfad (ac, rs, 1); break;               /* DFSB */
 case 0112:  RD2; dfmp (ac, rs); break;                  /* DFMP */
@@ -909,8 +909,8 @@ case 0124:  G2AC; WR2; break;                           /* DMOVEM */
 case 0125:  G2AC; DMOVN (rs); WR2; DMOVNF; break;       /* DMOVNM */
 case 0126:  RD; fix (ac, mb, 1); break;                 /* FIXR */
 case 0127:  RD; AC(ac) = fltr (mb); break;              /* FLTR */
-/* case 0130:   MUUO                                    /* UFA */
-/* case 0131:   MUUO                                    /* DFN */
+/* case 0130:   MUUO                                  *//* UFA */
+/* case 0131:   MUUO                                  *//* DFN */
 case 0132:  AC(ac) = fsc (AC(ac), ea); break;           /* FSC */
 case 0133:  if (!ac)                                    /* IBP */
                 ibp (ea, pflgs);
@@ -920,7 +920,7 @@ case 0135:  LDB; break;                                 /* LDB */
 case 0136:  CIBP; DPB; CLRF (F_FPD); break;             /* IDBP */
 case 0137:  DPB; break;                                 /* DPB */
 case 0140:  RD; AC(ac) = FAD (mb); break;               /* FAD */
-/* case 0141:   MUUO                                    /* FADL */
+/* case 0141:   MUUO                                  *//* FADL */
 case 0142:  RM; mb = FAD (mb); WR; break;               /* FADM */
 case 0143:  RM; AC(ac) = FAD (mb); WRAC; break;         /* FADB */
 case 0144:  RD; AC(ac) = FADR (mb); break;              /* FADR */
@@ -928,7 +928,7 @@ case 0145:  AC(ac) = FADR (IMS); break;                 /* FADRI */
 case 0146:  RM; mb = FADR (mb); WR; break;              /* FADRM */
 case 0147:  RM; AC(ac) = FADR (mb); WRAC; break;        /* FADRB */
 case 0150:  RD; AC(ac) = FSB (mb); break;               /* FSB */
-/* case 0151:   MUUO                                    /* FSBL */
+/* case 0151:   MUUO                                  *//* FSBL */
 case 0152:  RM; mb = FSB (mb); WR; break;               /* FSBM */
 case 0153:  RM; AC(ac) = FSB (mb); WRAC; break;         /* FSBB */
 case 0154:  RD; AC(ac) = FSBR (mb); break;              /* FSBR */
@@ -936,7 +936,7 @@ case 0155:  AC(ac) = FSBR (IMS);  break;                /* FSBRI */
 case 0156:  RM; mb = FSBR (mb); WR; break;              /* FSBRM */
 case 0157:  RM; AC(ac) = FSBR (mb); WRAC; break;        /* FSBRB */
 case 0160:  RD; AC(ac) = FMP (mb); break;               /* FMP */
-/* case 0161:   MUUO                                    /* FMPL */
+/* case 0161:   MUUO                                  *//* FMPL */
 case 0162:  RM; mb = FMP (mb); WR; break;               /* FMPM */
 case 0163:  RM; AC(ac) = FMP (mb); WRAC; break;         /* FMPB */
 case 0164:  RD; AC(ac) = FMPR (mb); break;              /* FMPR */
@@ -944,7 +944,7 @@ case 0165:  AC(ac) = FMPR (IMS); break;                 /* FMPRI */
 case 0166:  RM; mb = FMPR (mb); WR; break;              /* FMPRM */
 case 0167:  RM; AC(ac) = FMPR (mb); WRAC; break;        /* FMPRB */
 case 0170:  RD; if (FDV (mb)) S1AC; break;              /* FDV */
-/* case 0171:   MUUO                                    /* FDVL */
+/* case 0171:   MUUO                                  *//* FDVL */
 case 0172:  RM; if (FDV (mb)) WR1; break;               /* FDVM */
 case 0173:  RM; if (FDV (mb)) { S1AC; WRAC; } break;    /* FDVB */
 case 0174:  RD; if (FDVR (mb)) S1AC; break;             /* FDVR */
@@ -1008,7 +1008,7 @@ case 0250:  RM; WRAC; AC(ac) = mb; break;               /* EXCH */
 case 0251:  blt (ac, ea, pflgs); break;                 /* BLT */
 case 0252:  AOBAC; if (TGE (AC(ac))) JUMP (ea); break;  /* AOBJP */
 case 0253:  AOBAC; if (TL (AC(ac))) JUMP (ea); break;   /* AOBJN */
-/* case 0254:   /* shown later                          /* JRST */
+/* case 0254: *//* shown later                        *//* JRST */
 case 0255:  if (flags & (ac << 14)) {                   /* JFCL */
                 JUMP (ea);
                 CLRF (ac << 14);
@@ -2019,7 +2019,7 @@ int32 test_int (void)
 int32 t;
 
 if (sim_interval <= 0) {                                /* check queue */
-    if (t = sim_process_event ())                       /* IO event? */
+    if ((t = sim_process_event ()))                     /* IO event? */
         return t;
     if (pi_eval ())                                     /* interrupt? */
         return (INTERRUPT);

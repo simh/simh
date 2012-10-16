@@ -313,7 +313,7 @@ int32 sim_instr (void)
 
     while (reason == 0) {                               /* loop until halted */
         if (sim_interval <= 0) {                        /* check clock queue */
-            if (reason = sim_process_event ()) break;
+            if ((reason = sim_process_event ())) break;
         }
 
         if (int_req > 0) {                              /* interrupt? */

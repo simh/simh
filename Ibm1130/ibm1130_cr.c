@@ -2580,7 +2580,8 @@ static t_stat pcr_svc (UNIT *uptr)
 			break;
 
 		case OP_READING:
-			if (pcr_nready >= 2) {							/* if there is a whole column buffered, simulate column interrupt/* pcr_trigger_interrupt_0 - simulate a read response interrupt so OS will read queued column data */
+			if (pcr_nready >= 2) {						/* if there is a whole column buffered, simulate column interrupt*/
+											/* pcr_trigger_interrupt_0 - simulate a read response interrupt so OS will read queued column data */
 
 				pcr_trigger_interrupt_0();
 				sim_activate(&cr_unit, cr_wait);			/* keep checking frequently */

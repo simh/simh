@@ -108,6 +108,7 @@ struct disk_context {
     pthread_t           io_thread;          /* I/O Thread Id */
     pthread_mutex_t     io_lock;
     pthread_cond_t      io_cond;
+    pthread_cond_t      startup_cond;
     int                 io_dop;
     uint8               *buf;
     t_seccnt            *rsects;
@@ -176,6 +177,7 @@ pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) starting\n", uptr-ctx->dptr->units);
 
 pthread_mutex_lock (&ctx->io_lock);
+pthread_cond_signal (&ctx->startup_cond);   /* Signal we're ready to go */
 while (ctx->asynch_io) {
     pthread_cond_wait (&ctx->io_cond, &ctx->io_lock);
     if (ctx->io_dop == DOP_DONE)
@@ -423,10 +425,15 @@ ctx->asynch_io_latency = latency;
 if (ctx->asynch_io) {
     pthread_mutex_init (&ctx->io_lock, NULL);
     pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_cond_init (&ctx->startup_cond, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_mutex_lock (&ctx->io_lock);
     pthread_create (&ctx->io_thread, &attr, _disk_io, (void *)uptr);
     pthread_attr_destroy(&attr);
+    pthread_cond_wait (&ctx->startup_cond, &ctx->io_lock); /* Wait for thread to stabilize */
+    pthread_mutex_unlock (&ctx->io_lock);
+    pthread_cond_destroy (&ctx->startup_cond);
     uptr->a_check_completion = _disk_completion_dispatch;
     }
 #endif
@@ -2550,13 +2557,13 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
 
     if (!hVHD)
         return (FILE *)hVHD;
-    if (Status = GetVHDFooter (szVHDPath, 
-                               &hVHD->Footer, 
-                               &hVHD->Dynamic, 
-                               &hVHD->BAT,
-                               NULL,
-                               hVHD->ParentVHDPath,
-                               sizeof (hVHD->ParentVHDPath)))
+    if (0 != (Status = GetVHDFooter (szVHDPath, 
+                                     &hVHD->Footer, 
+                                     &hVHD->Dynamic, 
+                                     &hVHD->BAT,
+                                     NULL,
+                                     hVHD->ParentVHDPath,
+                                     sizeof (hVHD->ParentVHDPath))))
         goto Cleanup_Return;
     if (NtoHl (hVHD->Footer.DiskType) == VHD_DT_Differencing) {
         hVHD->Parent = (VHDHANDLE)sim_vhd_disk_open (hVHD->ParentVHDPath, "rb");
@@ -2702,7 +2709,7 @@ if (SizeInBytes > ((uint64)(1024*1024*1024))*2040) {
     Status = EFBIG;
     goto Cleanup_Return;
     }
-if (File = sim_fopen (szVHDPath, "rb")) {
+if (NULL != (File = sim_fopen (szVHDPath, "rb"))) {
     fclose (File);
     File = NULL;
     Status = EEXIST;
@@ -2877,13 +2884,13 @@ char *FullVHDPath = NULL;
 size_t i, RelativeMatch, UpDirectories, LocatorsWritten = 0;
 int64 LocatorPosition;
 
-if (Status = GetVHDFooter (szParentVHDPath, 
-                           &ParentFooter, 
-                           &ParentDynamic, 
-                           NULL, 
-                           &ParentTimeStamp,
-                           NULL, 
-                           0))
+if (0 != (Status = GetVHDFooter (szParentVHDPath, 
+                                 &ParentFooter, 
+                                 &ParentDynamic, 
+                                 NULL, 
+                                 &ParentTimeStamp,
+                                 NULL, 
+                                 0)))
     goto Cleanup_Return;
 hVHD = CreateVirtualDisk (szVHDPath,
                           (uint32)(NtoHll(ParentFooter.CurrentSize)/BytesPerSector),
@@ -2895,11 +2902,11 @@ if (!hVHD) {
     }
 LocatorPosition = NtoHll (hVHD->Dynamic.TableOffset)+BytesPerSector*((NtoHl (hVHD->Dynamic.MaxTableEntries)*sizeof(*hVHD->BAT)+BytesPerSector-1)/BytesPerSector);
 hVHD->Dynamic.Checksum = 0;
-RelativeParentVHDPath = calloc (1, BytesPerSector+1);
-FullParentVHDPath = calloc (1, BytesPerSector+1);
-RelativeParentVHDPathBuffer = calloc (1, BytesPerSector);
-FullParentVHDPathBuffer = calloc (1, BytesPerSector);
-FullVHDPath = calloc (1, BytesPerSector+1);
+RelativeParentVHDPath = calloc (1, BytesPerSector+2);
+FullParentVHDPath = calloc (1, BytesPerSector+2);
+RelativeParentVHDPathBuffer = calloc (1, BytesPerSector+2);
+FullParentVHDPathBuffer = calloc (1, BytesPerSector+2);
+FullVHDPath = calloc (1, BytesPerSector+2);
 ExpandToFullPath (szParentVHDPath, FullParentVHDPath, BytesPerSector);
 for (i=0; i < strlen (FullParentVHDPath); i++)
     hVHD->Dynamic.ParentUnicodeName[i*2+1] = FullParentVHDPath[i];
@@ -3233,8 +3240,13 @@ while (sects) {
         }
     SectorsInWrite = 1;
     if (hVHD->BAT[BlockNumber] == VHD_BAT_FREE_ENTRY) {
-        void *BitMap = NULL;
+        uint8 *BitMap = NULL;
+        uint32 BitMapBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
+        uint8 *BitMapBuffer = NULL;
         void *BlockData = NULL;
+        uint8 *BATUpdateBufferAddress;
+        uint32 BATUpdateBufferSize;
+        uint64 BATUpdateStorageAddress;
 
         if (!hVHD->Parent && BufferIsZeros(buf, SectorSize))
             goto IO_Done;
@@ -3242,28 +3254,51 @@ while (sects) {
         BlockOffset = sim_fsize_ex (hVHD->File);
         if (((int64)BlockOffset) == -1)
             return SCPE_IOERR;
-        BitMap = malloc(BitMapSectors*SectorSize);
+        if (BitMapSectors*SectorSize > BitMapBufferSize)
+            BitMapBufferSize = BitMapSectors*SectorSize;
+        BitMapBuffer = calloc(1, BitMapBufferSize + SectorSize*SectorsPerBlock);
+        if (BitMapBufferSize > BitMapSectors*SectorSize)
+            BitMap = BitMapBuffer + BitMapBufferSize-BitMapBytes;
+        else
+            BitMap = BitMapBuffer;
         memset(BitMap, 0xFF, BitMapBytes);
         BlockOffset -= sizeof(hVHD->Footer);
-        /* align the data portion of the block to the desired alignment */
-        /* compute the address of the data portion of the block */
-        BlockOffset += BitMapSectors*SectorSize;
-        /* round up this address to the desired alignment */
-        BlockOffset += VHD_DATA_BLOCK_ALIGNMENT-1;
-        BlockOffset &= ~(VHD_DATA_BLOCK_ALIGNMENT-1);
-        /* the actual block address is the beginning of the block bitmap */
+        if (0 == (BlockOffset & ~(VHD_DATA_BLOCK_ALIGNMENT-1)))
+            {  // Already aligned, so use padded BitMapBuffer
+            if (WriteFilePosition(hVHD->File,
+                                  BitMapBuffer,
+                                  BitMapBufferSize + SectorSize*SectorsPerBlock,
+                                  NULL,
+                                  BlockOffset)) {
+                free (BitMapBuffer);
+                return SCPE_IOERR;
+                }
+            BlockOffset += BitMapBufferSize;
+            }
+        else
+            {
+            // align the data portion of the block to the desired alignment
+            // compute the address of the data portion of the block
+            BlockOffset += BitMapSectors*SectorSize;
+            // round up this address to the desired alignment
+            BlockOffset += VHD_DATA_BLOCK_ALIGNMENT-1;
+            BlockOffset &= ~(VHD_DATA_BLOCK_ALIGNMENT-1);
+            BlockOffset -= BitMapSectors*SectorSize;
+            if (WriteFilePosition(hVHD->File,
+                                  BitMap,
+                                  SectorSize * (BitMapSectors + SectorsPerBlock),
+                                  NULL,
+                                  BlockOffset)) {
+                free (BitMapBuffer);
+                return SCPE_IOERR;
+                }
+            BlockOffset += BitMapSectors*SectorSize;
+            }
+        free(BitMapBuffer);
+        BitMapBuffer = BitMap = NULL;
+        /* the BAT block address is the beginning of the block bitmap */
         BlockOffset -= BitMapSectors*SectorSize;
         hVHD->BAT[BlockNumber] = NtoHl((uint32)(BlockOffset/SectorSize));
-        if (WriteFilePosition(hVHD->File,
-                              BitMap,
-                              BitMapSectors*SectorSize,
-                              NULL,
-                              BlockOffset)) {
-            free (BitMap);
-            return SCPE_IOERR;
-            }
-        free(BitMap);
-        BitMap = NULL;
         BlockOffset += SectorSize * (SectorsPerBlock + BitMapSectors);
         if (WriteFilePosition(hVHD->File,
                               &hVHD->Footer,
@@ -3271,11 +3306,17 @@ while (sects) {
                               NULL,
                               BlockOffset))
             goto Fatal_IO_Error;
+        BATUpdateBufferAddress = ((uint8 *)hVHD->BAT) + 
+            (((((size_t)&hVHD->BAT[BlockNumber]) - ((size_t)hVHD->BAT) + VHD_DATA_BLOCK_ALIGNMENT - 1)/VHD_DATA_BLOCK_ALIGNMENT)*VHD_DATA_BLOCK_ALIGNMENT);
+        BATUpdateBufferSize = SectorSize*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries)+511)/512);
+        if (BATUpdateBufferSize > VHD_DATA_BLOCK_ALIGNMENT)
+            BATUpdateBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
+        BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset) + BATUpdateBufferAddress - ((uint8 *)hVHD->BAT);
         if (WriteFilePosition(hVHD->File,
-                              hVHD->BAT,
-                              SectorSize*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries)+511)/512),
+                              BATUpdateBufferAddress,
+                              BATUpdateBufferSize,
                               NULL,
-                              NtoHll(hVHD->Dynamic.TableOffset)))
+                              BATUpdateStorageAddress))
             goto Fatal_IO_Error;
         if (hVHD->Parent)
             { /* Need to populate data block contents from parent VHD */

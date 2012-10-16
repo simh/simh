@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Mar-12    RMS     Fixed order of int_internal (Jordi Guillaumes i Pons)
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    12-Dec-11    RMS     Fixed Qbus interrupts to treat all IO devices as BR4
    19-Nov-08    RMS     Moved I/O support routines to I/O library
@@ -83,8 +84,8 @@ static const int32 pirq_bit[7] = {
     };
 
 static const int32 int_internal[IPL_HLVL] = {
-    INT_INTERNAL7, INT_INTERNAL6, INT_INTERNAL5, INT_INTERNAL4,
-    INT_INTERNAL3, INT_INTERNAL2, INT_INTERNAL1, 0
+    0,             INT_INTERNAL1, INT_INTERNAL2, INT_INTERNAL3,
+    INT_INTERNAL4, INT_INTERNAL5, INT_INTERNAL6, INT_INTERNAL7
     };
 
 /* I/O page lookup and linkage routines
@@ -372,17 +373,17 @@ init_ubus_tab ();                                       /* init Unibus tables */
 init_mbus_tab ();                                       /* init Massbus tables */
 for (i = 0; i < 7; i++)                                 /* seed PIRQ intr */
     int_vec[i + 1][pirq_bit[i]] = VEC_PIRQ;
-if (r = cpu_build_dib ())                               /* build CPU entries */
+if ((r = cpu_build_dib ()))                             /* build CPU entries */
     return r;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_MBUS) {                   /* Massbus? */
-            if (r = build_mbus_tab (dptr, dibp))        /* add to Mbus tab */
+            if ((r = build_mbus_tab (dptr, dibp)))      /* add to Mbus tab */
                 return r;
             }
         else {                                          /* no, Unibus */
-            if (r = build_ubus_tab (dptr, dibp))        /* add to Unibus tab */
+            if ((r = build_ubus_tab (dptr, dibp)))      /* add to Unibus tab */
                 return r;
             }
         }                                               /* end if enabled */

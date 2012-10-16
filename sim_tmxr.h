@@ -44,11 +44,12 @@
                         added tmxr_rqln, tmxr_tqln
 */
 
+#include "sim_serial.h"                                 /* We need serial I/O (SERHANDLE) */
+
 #ifndef _SIM_TMXR_H_
 #define _SIM_TMXR_H_    0
 
 #include "sim_sock.h"                                   /* We need sockets */
-#include "sim_serial.h"                                 /* We need serial I/O (SERHANDLE) */
 
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)
@@ -63,7 +64,7 @@ typedef struct tmxr TMXR;
 
 struct tmln {
     SOCKET              conn;                           /* line conn */
-    uint32              ipad;                           /* IP address */
+    char                *ipad;                          /* IP address */
     uint32              cnms;                           /* conn time */
     int32               tsta;                           /* Telnet state */
     int32               rcve;                           /* rcv enable */
@@ -91,7 +92,7 @@ struct tmln {
 
 struct tmxr {
     int32               lines;                          /* # lines */
-    int32               port;                           /* listening port */
+    char                *port;                          /* listening port */
     SOCKET              master;                         /* master socket */
     TMLN                *ldsc;                          /* line descriptors */
     int32               *lnorder;                       /* line connection order */

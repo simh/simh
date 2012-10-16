@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2012-03-25
+                             Last update: 2012-05-07
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6280,3 +6280,29 @@
      (hp2100_mt.c).
 
      STATUS:  Fixed in version 3.9-0.
+
+
+
+247. PROBLEM:  The ICD disc read end-of-track delay is not optimal.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  To avoid End of Cylinder errors when reading the last sector
+     of a track, the ICD controller must delay more than the usual intersector
+     time to allow the OS driver to send an Untalk if a read is to be
+     terminated.  Currently, the longer delay is used if an end-of-cylinder
+     condition is present.  However, the delay is needed only if the resulting
+     seek attempt would cause an error if the read is continued; the normal
+     delay should be used if the seek is permitted and would succeed.
+
+     Also, if the host does send an Untalk during this time, the longer delay
+     should be cancelled, and command termination should be scheduled for
+     immediate processing.
+
+     CAUSE:  Suboptimal implementation.
+
+     RESOLUTION:  Modify "end_read" (hp_disclib.c) to use the longer time only
+     if the seek would fail, and modify "complete_read" (hp2100_di_da.c) to
+     cancel the intersector delay and schedule the completion phase immediately.
+
+     STATUS:  Patches prepared 2012-05-07.

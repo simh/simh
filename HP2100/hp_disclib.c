@@ -24,7 +24,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
-   28-Mar-12    JDB     First release
+   07-May-12    JDB     Corrected end-of-track delay time logic
+   02-May-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
 
    References:
@@ -1817,28 +1818,61 @@ return SCPE_OK;                                         /* the read was successf
 
    On entry, the end-of-data flag is checked.  If it is set, the current read is
    completed.  Otherwise, the command phase is reset to start the next sector,
-   and the disc service is scheduled to allow for the intersector delay.
+   and the disc service is set to allow for the intersector delay.
 
 
    Implementation notes:
 
-    1. The intersector time is required to allow the ICD interface to set the
-       end-of-data flag before the next sector begins.  The CPU must have enough
-       time to receive the last byte of the current sector and then unaddress
-       the disc controller before the first byte of the next sector is sent.  If
-       the time is not long enough, the sector address will be incremented twice
-       (e.g., a 128-word read of sector 0 will terminate with sector 2 as the
-       next sector instead of sector 1).
+    1. The CPU indicates the end of a read data transfer to an ICD controller by
+       untalking the drive.  The untalk is done by the driver as soon as the
+       DCPC completion interrupt is processed.  However, the time from the final
+       DCPC transfer through driver entry to the point where the untalk is
+       asserted on the bus varies from 80 instructions (RTE-6/VM with OS
+       microcode and the buffer in the system map) to 152 instructions (RTE-IVB
+       with the buffer in the user map).  The untalk must occur before the start
+       of the next sector, or the drive will begin the data transfer.
+
+       Normally, this is not a problem, as the driver clears the FIFO of any
+       received data after DCPC completion.  However, if the read terminates
+       after the last sector of a track, and accessing the next sector would
+       require an intervening seek, and the file mask disables auto-seeking or
+       an enabled seek would move the positioner beyond the drive limits, then
+       the controller will indicate an End of Cylinder error if the untalk does
+       not arrive before the seek is initiated.
+
+       The RTE driver (DVA32) and various utilities that manage the disc
+       directly (e.g., SWTCH) do not appear to account for these bogus errors,
+       so the ICD controller hardware must avoid them in some unknown manner.
+       We work around the issue by extending the intersector delay to allow time
+       for a potential untalk whenever the next access would otherwise fail.
+
+       Note that this issue does not occur with writes because DCPC completion
+       asserts EOI concurrently with the final data byte to terminate the
+       command.
 */
 
 static void end_read (CVPTR cvptr, UNIT *uptr)
 {
+uint32 limit;
+
 if (cvptr->eod == SET)                                  /* is the end of data indicated? */
     dl_end_command (cvptr, normal_completion);          /* complete the command */
 
 else {                                                  /* reading continues */
     uptr->PHASE = start_phase;                          /* reset to the start phase */
     uptr->wait = cvptr->sector_time;                    /* delay for the intersector time */
+
+    if (cvptr->eoc == SET && cvptr->type == ICD) {      /* seek will be required and controller is ICD? */
+        if (!(cvptr->file_mask & DL_FAUTSK))            /* if auto-seek is disabled */
+            limit = cvptr->cylinder;                    /*   then the limit is the current cylinder */
+        else if (cvptr->file_mask & DL_FDECR)           /* else if enabled and decremental seek */
+            limit = 0;                                  /*   then the limit is cylinder 0 */
+        else                                            /* else the enabled limit is the last cylinder */
+            limit = drive_props [GET_MODEL (uptr->flags)].cylinders;
+
+        if (cvptr->cylinder == limit)                   /* is positioner at the limit? */
+            uptr->wait = cvptr->eot_time;               /* seek will fail; delay to allow CPU to untalk */
+        }
     }
 
 return;
@@ -1964,12 +1998,12 @@ return SCPE_OK;
 
 /* Position the disc image file at the current sector.
 
-   The image file is positioned at the byte address corresponding to the
-   controller's current cylinder, head, and sector address.  Positioning may
-   involve an auto-seek if a prior read or write addressed the final sector in a
-   cylinder.  If a seek is initiated or an error is detected, the routine
-   returns FALSE to indicate that the positioning was not performed.  If the
-   file was positioned, the routine returns TRUE.
+   The image file is positioned at the byte address corresponding to the drive's
+   current cylinder and the controller's current head and sector addresses.
+   Positioning may involve an auto-seek if a prior read or write addressed the
+   final sector of a cylinder.  If a seek is initiated or an error is detected,
+   the routine returns FALSE to indicate that the positioning was not performed.
+   If the file was positioned, the routine returns TRUE.
 
    On entry, if the controller's end-of-cylinder flag is set, a prior read or
    write addressed the final sector in the current cylinder.  If the file mask
@@ -1983,21 +2017,23 @@ return SCPE_OK;
    seek completion and the command state unchanged.  When the service is
    reentered, the read or write will continue on the new cylinder.
 
-   If the EOC flag was not set, the drive position is checked against the
-   controller position.  If they are different (as may occur with an Address
-   Record command that specified a different location than the last Seek
-   command), a seek is started to the correct cylinder, and the routine returns
-   with the disc service scheduled for seek completion as above.
+   If the EOC flag was not set, the drive's position is checked against the
+   controller's position if address verification is requested.  If they are
+   different (as may occur with an Address Record command that specified a
+   different location than the last Seek command), a seek is started to the
+   correct cylinder, and the routine returns with the disc service scheduled for
+   seek completion as above.
 
-   If the drive and controller positions agree, the controller CHS address is
-   validated against the drive limits.  If they are invalid, Seek Check status
-   is set, and the command is terminated with an error.
+   If the drive and controller positions agree or verification is not requested,
+   the CHS addresses are validated against the drive limits.  If they are
+   invalid, Seek Check status is set, and the command is terminated with an
+   error.
 
-   If the address is valid, the drive is checked to ensure that it is ready for
-   positioning.  If it is, the the byte offset in the image file is calculated
-   from the CHS address, and the file is positioned.  The disc service is
-   scheduled to begin the data transfer, and the routine returns TRUE to
-   indicate that the file position was set.
+   If the addresses are valid, the drive is checked to ensure that it is ready
+   for positioning.  If it is, the the byte offset in the image file is
+   calculated from the CHS address, and the file is positioned.  The disc
+   service is scheduled to begin the data transfer, and the routine returns TRUE
+   to indicate that the file position was set.
 
 
    Implementation notes:

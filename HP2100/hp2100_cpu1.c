@@ -1,6 +1,6 @@
 /* hp2100_cpu1.c: HP 2100/1000 EAU simulator and UIG dispatcher
 
-   Copyright (c) 2005-2008, Robert M. Supnik
+   Copyright (c) 2005-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU1         Extended arithmetic and optional microcode dispatchers
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Moved option-present tests to UIG dispatchers
                         Call "user microcode" dispatcher for unclaimed UIG instructions
@@ -245,14 +246,15 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
 
         case 010:                                       /* MPY 100200 (OP_K) */
         MPY:
-            if (reason = cpu_ops (OP_K, op, intrq))     /* get operand */
-                break;
-            sop1 = SEXT (AR);                           /* sext AR */
-            sop2 = SEXT (op[0].word);                   /* sext mem */
-            sop1 = sop1 * sop2;                         /* signed mpy */
-            BR = (sop1 >> 16) & DMASK;                  /* to BR'AR */
-            AR = sop1 & DMASK;
-            O = 0;                                      /* no overflow */
+            reason = cpu_ops (OP_K, op, intrq);         /* get operand */
+            if (reason == SCPE_OK) {                    /* successful eval? */
+                sop1 = SEXT (AR);                       /* sext AR */
+                sop2 = SEXT (op[0].word);               /* sext mem */
+                sop1 = sop1 * sop2;                     /* signed mpy */
+                BR = (sop1 >> 16) & DMASK;              /* to BR'AR */
+                AR = sop1 & DMASK;
+                O = 0;                                  /* no overflow */
+                }
             break;
 
         default:                                        /* others undefined */
@@ -262,9 +264,11 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
         break;
 
     case 0201:                                          /* DIV 100400 (OP_K) */
-        if (reason = cpu_ops (OP_K, op, intrq))         /* get operand */
+        reason = cpu_ops (OP_K, op, intrq);             /* get operand */
+        if (reason != SCPE_OK)                          /* eval failed? */
             break;
-        if (rs = qs = BR & SIGN) {                      /* save divd sign, neg? */
+        rs = qs = BR & SIGN;                            /* save divd sign */
+        if (rs) {                                       /* neg? */
             AR = (~AR + 1) & DMASK;                     /* make B'A pos */
             BR = (~BR + (AR == 0)) & DMASK;             /* make divd pos */
             }
@@ -317,17 +321,19 @@ switch ((IR >> 8) & 0377) {                             /* decode IR<15:8> */
         break;
 
     case 0210:                                          /* DLD 104200 (OP_D) */
-        if (reason = cpu_ops (OP_D, op, intrq))         /* get operand */
-            break;
-        AR = (op[0].dword >> 16) & DMASK;               /* load AR */
-        BR = op[0].dword & DMASK;                       /* load BR */
+        reason = cpu_ops (OP_D, op, intrq);             /* get operand */
+        if (reason == SCPE_OK) {                        /* successful eval? */
+            AR = (op[0].dword >> 16) & DMASK;           /* load AR */
+            BR = op[0].dword & DMASK;                   /* load BR */
+            }
         break;
 
     case 0211:                                          /* DST 104400 (OP_A) */
-        if (reason = cpu_ops (OP_A, op, intrq))         /* get operand */
-            break;
-        WriteW (op[0].word, AR);                        /* store AR */
-        WriteW ((op[0].word + 1) & VAMASK, BR);         /* store BR */
+        reason = cpu_ops (OP_A, op, intrq);             /* get operand */
+        if (reason == SCPE_OK) {                        /* successful eval? */
+            WriteW (op[0].word, AR);                    /* store AR */
+            WriteW ((op[0].word + 1) & VAMASK, BR);     /* store BR */
+            }
         break;
 
     default:                                            /* should never get here */
@@ -733,9 +739,11 @@ uint32 i, MA;
 for (i = 0; i < OP_N_F; i++) {
     flags = pattern & OP_M_FLAGS;                       /* get operand pattern */
 
-    if (flags >= OP_ADR)                                /* address operand? */
-        if (reason = resolve (ReadW (PC), &MA, irq))    /* resolve indirects */
+    if (flags >= OP_ADR) {                              /* address operand? */
+        reason = resolve (ReadW (PC), &MA, irq);        /* resolve indirects */
+        if (reason != SCPE_OK)                          /* resolution failed? */
             return reason;
+        }
 
     switch (flags) {
         case OP_NUL:                                    /* null operand */
