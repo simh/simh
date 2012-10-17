@@ -24,7 +24,6 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    05-Dec-10    MP      Added macro invocation of sim_debug 
-   07-Jan-09    JDB     Added UNITREF typedef
    09-Aug-06    JDB     Added assign_device and deassign_device
    14-Jul-06    RMS     Added sim_activate_abs
    06-Jan-06    RMS     Added fprint_stopped_gen
@@ -52,10 +51,6 @@
 #define CMD_OPT_OF      002                             /* output file */
 #define CMD_OPT_SCH     004                             /* search */
 #define CMD_OPT_DFT     010                             /* defaults */
-
-/* unit references */
-
-typedef enum { ref_dev, ref_unit, ref_unit_all } UNITREF;
 
 /* Command processors */
 
@@ -90,9 +85,13 @@ t_stat echo_cmd (int32 flag, char *ptr);
 
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
+t_stat _sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
+t_stat sim_activate_after (UNIT *uptr, int32 usecs_walltime);
+t_stat _sim_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
+t_bool sim_is_active_bool (UNIT *uptr);
 int32 sim_is_active (UNIT *uptr);
 double sim_gtime (void);
 uint32 sim_grtime (void);
@@ -104,6 +103,7 @@ t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
 char *sim_dname (DEVICE *dptr);
+char *sim_uname (UNIT *dptr);
 t_stat get_yn (char *ques, t_stat deflt);
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
 char *get_glyph (char *iptr, char *optr, char mchar);
@@ -111,12 +111,13 @@ char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
-t_value strtotv (char *cptr, char **endptr, uint32 radix);
+t_value strtotv (const char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 CTAB *find_cmd (char *gbuf);
 DEVICE *find_dev (char *ptr);
 DEVICE *find_unit (char *ptr, UNIT **uptr);
 DEVICE *find_dev_from_unit (UNIT *uptr);
+t_stat sim_register_internal_device (DEVICE *dptr);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 CTAB *find_ctab (CTAB *tab, char *gbuf);
 C1TAB *find_c1tab (C1TAB *tab, char *gbuf);

@@ -32,7 +32,6 @@
    27-Oct-10    JDB     Revised I/O signal enum values for concurrent signals
                         Revised I/O macros for new signal handling
    09-Oct-10    JDB     Added DA and DC device select code assignments
-   21-Oct-08    JDB     [serial] Added "sim_unit_ref" external
    07-Sep-08    JDB     Added POLL_FIRST to indicate immediate connection attempt
    15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.h
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
@@ -457,11 +456,10 @@ extern uint32 dev_prl [2], dev_irq [2], dev_srq [2];    /* I/O signal vectors */
 
 /* Simulator state */
 
-extern FILE   *sim_deb;
-extern FILE   *sim_log;
-extern int32   sim_step;
-extern int32   sim_switches;
-extern UNITREF sim_unit_ref;
+extern FILE *sim_deb;
+extern FILE *sim_log;
+extern int32 sim_step;
+extern int32 sim_switches;
 
 /* CPU functions */
 

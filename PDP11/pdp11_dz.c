@@ -26,7 +26,6 @@
    dz           DZ11 terminal multiplexor
 
    29-Dec-08    RMS     Added MTAB_NC to SET LOG command (Walter Mueller)
-   24-Nov-08    JDB     [serial] Added serial port support
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -166,12 +165,16 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, dz_ldsc };  /* mux descriptor */
 #define DBG_INT  0x0002                                 /* display transfer requests */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
+#define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
 DEBTAB dz_debug[] = {
   {"REG",    DBG_REG},
   {"INT",    DBG_INT},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"TRC",    DBG_TRC},
+  {"ASY",    DBG_ASY},
   {0}
 };
 
@@ -232,12 +235,8 @@ MTAB dz_mod[] = {
     { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
     { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
     { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
-//
-    { MTAB_XTD | MTAB_VDV | MTAB_NC, ':', NULL, "CONNECT",
-      &tmxr_attach_line, NULL, &dz_desc },
     { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_detach_line, NULL, &dz_desc },
-//
+      &tmxr_dscln, NULL, &dz_desc },
     { UNIT_ATT, UNIT_ATT, "summary", NULL,
       NULL, &tmxr_show_summ, (void *) &dz_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
@@ -268,7 +267,7 @@ DEVICE dz_dev = {
     1, DEV_RDX, 8, 1, DEV_RDX, 8,
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
-    &dz_dib, DEV_FLTA | DEV_DISABLE | DEV_NET | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &dz_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
     0, dz_debug
     };
 

@@ -29,8 +29,6 @@
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
-   19-Nov-08    JDB     [serial] Removed DEV_NET to allow restoration of listening port
-   20-Oct-08    JDB     [serial] Added serial port support
    09-Oct-08    JDB     "muxl_unit" defined one too many units (17 instead of 16)
    10-Sep-08    JDB     SHOW MUX CONN/STAT with SET MUX DIAG is no longer disallowed
    07-Sep-08    JDB     Changed Telnet poll to connect immediately after reset or attach
@@ -329,7 +327,6 @@ t_stat muxo_svc (UNIT *uptr);
 t_stat muxc_reset (DEVICE *dptr);
 t_stat mux_attach (UNIT *uptr, char *cptr);
 t_stat mux_detach (UNIT *uptr);
-t_stat muxl_detach (UNIT *uptr);
 t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 
@@ -433,8 +430,8 @@ DEVICE muxl_dev = {
     NULL,                                   /* deposit routine */
     &muxc_reset,                            /* reset routine */
     NULL,                                   /* boot routine */
-    &mux_attach,                            /* attach routine */
-    &muxl_detach,                           /* detach routine */
+    NULL,                                   /* attach routine */
+    NULL,                                   /* detach routine */
     &muxl_dib,                              /* device information block */
     DEV_DISABLE,                            /* device flags */
     0,                                      /* debug control flags */
@@ -459,9 +456,9 @@ DEVICE muxl_dev = {
 
 DEVICE muxu_dev;
 
-int32 mux_order [MUX_LINES] = { -1 };                                   /* connection order */
-TMLN  mux_ldsc  [MUX_LINES] = { { 0 } };                                /* line descriptors */
-TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order, &muxu_dev };   /* device descriptor */
+int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
+TMLN  mux_ldsc  [MUX_LINES] = { { 0 } };                    /* line descriptors */
+TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
 
 UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_FIRST };
 
@@ -923,7 +920,7 @@ while (working_set) {
                     (old & DTR) &&                              /* DTR drop? */
                     !(muxc_ota[ln] & DTR)) {
                     tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
-                    tmxr_clear_ln (&mux_desc, &mux_ldsc[ln]);   /* disconnect line */
+                    tmxr_reset_ln (&mux_ldsc[ln]);              /* reset line */
                     muxc_lia[ln] = 0;                           /* dataset off */
                     }
                 }                                               /* end update */
@@ -1308,12 +1305,12 @@ IOPRESET (dibptr);                                      /* PRESET device (does n
 
 muxc_chan = muxc_scan = 0;                              /* init modem scan */
 
-if (tmxr_mux_free (&mux_desc))                          /* any lines attached? */
-    sim_cancel (&muxu_unit);                            /* no, so stop poll */
-else {                                                  /* attached or listening */
+if (muxu_unit.flags & UNIT_ATT) {                       /* master att? */
     muxu_unit.wait = POLL_FIRST;                        /* set up poll */
-    sim_activate (&muxu_unit, muxu_unit.wait);          /* start poll immediately */
+    sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
     }
+else
+    sim_cancel (&muxu_unit);                            /* else stop */
 
 for (i = 0; i < MUX_LINES; i++)
     mux_reset_ln (i);                                   /* reset lines 0-15 */
@@ -1325,23 +1322,20 @@ return SCPE_OK;
 }
 
 
-/* Attach master unit or line */
+/* Attach master unit */
 
 t_stat mux_attach (UNIT *uptr, char *cptr)
 {
 t_stat status = SCPE_OK;
 
-if (muxu_unit.flags & UNIT_DIAG)                            /* diag mode? */
-    return SCPE_NOFNC;                                      /* command not allowed */
+if (muxu_unit.flags & UNIT_DIAG)                        /* diag mode? */
+    return SCPE_NOFNC;                                  /* command not allowed */
 
-if (uptr == &muxu_unit)                                     /* master unit? */
-    status = tmxr_attach (&mux_desc, uptr, cptr);           /* attach socket */
-else
-    status = tmxr_attach_line (uptr, 0, cptr, &mux_desc);   /* attach line */
+status = tmxr_attach (&mux_desc, uptr, cptr);           /* attach */
 
-if (status == SCPE_OK) {                                    /* attach successful? */
-    muxu_unit.wait = POLL_FIRST;                            /* set up poll */
-    sim_activate (&muxu_unit, muxu_unit.wait);              /* start poll immediately */
+if (status == SCPE_OK) {
+    muxu_unit.wait = POLL_FIRST;                        /* set up poll */
+    sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
     }
 
 return status;
@@ -1352,45 +1346,13 @@ return status;
 
 t_stat mux_detach (UNIT *uptr)
 {
-uint32 ln;
-t_stat status;
-t_bool free = TRUE;
+int32 i;
+t_stat r;
 
-status = tmxr_detach (&mux_desc, uptr);                 /* detach unit */
-
-if (status == SCPE_OK) {
-    for (ln = 0; ln < MUX_LINES; ln++)                  /* loop through lines */
-        if (tmxr_line_free (&mux_ldsc[ln]))             /* is line free? */
-            mux_ldsc[ln].rcve = 0;                      /* yes, so disable rcv as line was reset */
-        else
-            free = FALSE;                               /* mux isn't free if line is in use */
-
-    if (free)                                           /* all lines free? */
-        sim_cancel (uptr);                              /* stop poll */
-    }
-
-return status;
-}
-
-
-/* Detach line */
-
-t_stat muxl_detach (UNIT *uptr)
-{
-uint32 ln;
-t_stat status;
-
-status = tmxr_detach_line (uptr, 0, NULL, &mux_desc);   /* detach line */
-
-if (status == SCPE_OK) {
-    ln = uptr - muxl_unit;                              /* determine line number */
-    mux_ldsc[ln].rcve = 0;                              /* disable line reception */
-
-    if (tmxr_mux_free (&mux_desc))                      /* all lines free and not listening? */
-        sim_cancel (&muxu_unit);                        /* stop poll */
-    }
-
-return status;
+r = tmxr_detach (&mux_desc, uptr);                      /* detach */
+for (i = 0; i < MUX_LINES; i++) mux_ldsc[i].rcve = 0;   /* disable rcv */
+sim_cancel (uptr);                                      /* stop poll */
+return r;
 }
 
 
@@ -1405,7 +1367,7 @@ return status;
    for normal character transfers, which is undesirable.
 
    Therefore, to enable diagnostic mode, we must force a disconnect of the
-   master socket and all Telnet and serial lines, which clears the connection
+   master socket and any connected Telnet lines, which clears the connection
    flags on all lines.  Then we set the "transmission enabled" flags on all
    lines to enable output character processing for the diagnostic.  (Normally,
    all of the flags are set when the multiplexer is first attached.  Until then,
@@ -1418,12 +1380,9 @@ t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc)
 int32 ln;
 
 if (val) {                                              /* set diag? */
-    mux_detach (uptr);                                  /* detach Telnet lines */
-
-    for (ln = 0; ln < MUX_LINES; ln++) {
-        muxl_detach (&muxl_unit[ln]);                   /* detach all serial lines */
-        mux_ldsc[ln].xmte = 1;                          /* enable transmission on all lines */
-        }
+    mux_detach (uptr);                                  /* detach lines */
+    for (ln = 0; ln < MUX_LINES; ln++)                  /* enable transmission */
+        mux_ldsc[ln].xmte = 1;                          /* on all lines */
     }
 else {                                                  /* set term */
     for (ln = 0; ln < MUX_LINES; ln++)                  /* clear connections */

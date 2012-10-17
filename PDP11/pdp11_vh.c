@@ -296,12 +296,16 @@ static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
 #define DBG_INT  0x0002                                 /* display transfer requests */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
+#define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
 DEBTAB vh_debug[] = {
   {"REG",    DBG_REG},
   {"INT",    DBG_INT},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"TRC",    DBG_TRC},
+  {"ASY",    DBG_ASY},
   {0}
 };
 
@@ -407,7 +411,7 @@ DEVICE vh_dev = {
     &vh_attach,     /* attach routine */
     &vh_detach,     /* detach routine */
     (void *)&vh_dib,/* context */
-    DEV_FLTA | DEV_DISABLE | DEV_DIS |DEV_NET | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
+    DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
     0, vh_debug
 };
 

@@ -30,10 +30,9 @@
 #ifndef _SIM_SERIAL_H_
 #define _SIM_SERIAL_H_    0
 
-/* Windows definitions */
-
 #if defined (_WIN32)
 
+/* Windows definitions */
 
 /* We need the basic Win32 definitions, but including "windows.h" also includes
    "winsock.h" as well.  However, "sim_sock.h" explicitly includes "winsock2.h,"
@@ -52,13 +51,12 @@ typedef HANDLE SERHANDLE;
 #define INVALID_HANDLE  INVALID_HANDLE_VALUE
 
 
+#elif defined (__unix__) || defined(__APPLE__)
+
 /* UNIX definitions */
 
-#elif defined (__unix__)
-
-
 #include <fcntl.h>
-#include <termio.h>
+#include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 
@@ -67,29 +65,24 @@ typedef int SERHANDLE;
 #define INVALID_HANDLE  -1
 
 
-/* Non-implemented definitions */
-
 #else
 
+/* Non-implemented definitions */
+
 typedef int SERHANDLE;
+
+#define INVALID_HANDLE  -1
 
 #endif
 
 /* Common definitions */
 
-typedef struct serial_config {                          /* serial port configuration */
-    uint32 baudrate;                                    /* baud rate */
-    uint32 charsize;                                    /* character size in bits */
-    char   parity;                                      /* parity (N/O/E/M/S) */
-    uint32 stopbits;                                    /* 0/1/2 stop bits (0 implies 1.5) */
-    } SERCONFIG;
-
 /* Global routines */
-#include "sim_tmxr.h"                                   /* need TMLN definition */
+#include "sim_tmxr.h"                                   /* need TMLN definition and modem definitions */
 
-extern SERHANDLE sim_open_serial    (char *name, TMLN *lp);
-extern t_stat    sim_config_serial  (SERHANDLE port, SERCONFIG config);
-extern t_bool    sim_control_serial (SERHANDLE port, t_bool connect);
+extern SERHANDLE sim_open_serial    (char *name, TMLN *lp, t_stat *status);
+extern t_stat    sim_config_serial  (SERHANDLE port, const char *config);
+extern t_stat    sim_control_serial (SERHANDLE port, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
 extern int32     sim_read_serial    (SERHANDLE port, char *buffer, int32 count, char *brk);
 extern int32     sim_write_serial   (SERHANDLE port, char *buffer, int32 count);
 extern void      sim_close_serial   (SERHANDLE port);

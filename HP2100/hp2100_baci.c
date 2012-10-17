@@ -29,8 +29,6 @@
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
-   19-Nov-08    JDB     [serial] Removed DEV_NET to allow restoration of listening port
-   17-Oct-08    JDB     [serial] Added serial port support
    11-Sep-08    JDB     Fixed STC,C losing interrupt request on BREAK
    07-Sep-08    JDB     Fixed IN_LOOPBACK conflict with netinet/in.h
                         Changed Telnet poll to connect immediately after reset or attach
@@ -80,13 +78,13 @@
    an "external rate" that is equivalent to 9600 baud, as most terminals were
    set to their maximum speeds.
 
-   We support the 12966A connected to an HP terminal emulator via Telnet or a
-   serial port.  Internally, we model the BACI as a terminal multiplexer with
-   one line.  The simulation is complicated by the half-duplex nature of the
-   card (there is only one FIFO, used selectively either for transmission or
-   reception) and the double-buffered UART (a Western Digital TR1863A), which
-   has holding registers as well as a shift registers for transmission and
-   reception.  We model both sets of device registers.
+   We support the 12966A connected to an HP terminal emulator via Telnet.
+   Internally, we model the BACI as a terminal multiplexer with one line.  The
+   simulation is complicated by the half-duplex nature of the card (there is
+   only one FIFO, used selectively either for transmission or reception) and the
+   double-buffered UART (a Western Digital TR1863A), which has holding registers
+   as well as a shift registers for transmission and reception.  We model both
+   sets of device registers.
 
    During an output operation, the first character output to the card passes
    through the FIFO and into the transmitter holding register.  Subsequent
@@ -115,12 +113,12 @@
    as an "optimized (fast) timing" option.  Optimization makes three
    improvements:
 
-    1. On output, characters in the FIFO are emptied into the line buffer as a
+    1. On output, characters in the FIFO are emptied into the Telnet buffer as a
        block, rather than one character per service call, and on input, all of
-       the characters available in the line buffer are loaded into the FIFO as a
-       block.
+       the characters available in the Telnet buffer are loaded into the FIFO as
+       a block.
 
-    2. The ENQ/ACK handshake is done locally, without involving the terminal
+    2. The ENQ/ACK handshake is done locally, without involving the Telnet
        client.
 
     3. Input occurring during an output operation is delayed until the second or
@@ -320,7 +318,7 @@
 /* Unit references */
 
 #define baci_term       baci_unit[0]                    /* terminal I/O unit */
-#define baci_poll       baci_unit[1]                    /* line polling unit */
+#define baci_poll       baci_unit[1]                    /* Telnet polling unit */
 
 
 /* BACI state variables */
@@ -393,11 +391,11 @@ t_stat baci_detach (UNIT *uptr);
    baci_deb     BACI debug list
    baci_dev     BACI device descriptor
 
-   Two units are used: one to handle character I/O via the multiplexer library,
-   and another to poll for connections and input.  The character I/O service
-   routine runs only when there are characters to read or write.  It operates at
-   the approximate baud rate of the terminal (in CPU instructions per second) in
-   order to be compatible with the OS drivers.  The line poll must run
+   Two units are used: one to handle character I/O via the Telnet library, and
+   another to poll for connections and input.  The character I/O service routine
+   runs only when there are characters to read or write.  It operates at the
+   approximate baud rate of the terminal (in CPU instructions per second) in
+   order to be compatible with the OS drivers.  The Telnet poll must run
    continuously, but it can operate much more slowly, as the only requirement is
    that it must not present a perceptible lag to human input.  To be compatible
    with CPU idling, it is co-scheduled with the master poll timer, which uses a
@@ -406,14 +404,14 @@ t_stat baci_detach (UNIT *uptr);
 
 DEVICE baci_dev;
 
-TMLN baci_ldsc = { 0 };                                             /* line descriptor */
-TMXR baci_desc = { 1, 0, 0, &baci_ldsc, NULL, &baci_dev };          /* device descriptor */
+TMLN baci_ldsc = { 0 };                                 /* line descriptor */
+TMXR baci_desc = { 1, 0, 0, &baci_ldsc };               /* device descriptor */
 
 DIB baci_dib = { &baci_io, BACI, 0 };
 
 UNIT baci_unit[] = {
     { UDATA (&baci_term_svc, UNIT_ATTABLE | UNIT_FASTTIME, 0) },    /* terminal I/O unit */
-    { UDATA (&baci_poll_svc, UNIT_DIS, POLL_FIRST) }                /* line poll unit */
+    { UDATA (&baci_poll_svc, UNIT_DIS, POLL_FIRST) }                /* Telnet poll unit */
     };
 
 REG baci_reg[] = {
@@ -771,7 +769,7 @@ return stat_data;
    The terminal service routine is used to transmit and receive characters.
 
    In terminal mode, it is started when a character is ready for output or when
-   the line poll routine determines that there are characters ready for input
+   the Telnet poll routine determines that there are characters ready for input
    and stopped when there are no more characters to output or input.  When the
    terminal is quiescent, this routine does not run.
 
@@ -811,11 +809,11 @@ return stat_data;
    first character after an ENQ is not an ACK.
 
    Finally, fast timing enables buffer combining.  For output, all characters
-   present in the FIFO are unloaded into the line buffer before initiating a
-   packet send.  For input, all characters present in the line buffer are loaded
-   into the FIFO.  This reduces network traffic and decreases simulator overhead
-   (there is only one service routine entry per block, rather than one per
-   character).
+   present in the FIFO are unloaded into the Telnet buffer before initiating a
+   packet send.  For input, all characters present in the Telnet buffer are
+   loaded into the FIFO.  This reduces network traffic and decreases simulator
+   overhead (there is only one service routine entry per block, rather than one
+   per character).
 
    In fast output mode, it is imperative that not less than 1500 instructions
    elapse between the first character load to the FIFO and the initiation of
@@ -978,11 +976,12 @@ return status;
 }
 
 
-/* BACI line poll service.
+/* BACI Telnet poll service.
 
-   This service routine is used to poll for connections and incoming characters.
-   If characters are available, the terminal I/O service routine is scheduled.
-   It starts when the line is attached and stops when the line is detached.
+   This service routine is used to poll for Telnet connections and incoming
+   characters.  If characters are available, the terminal I/O service routine is
+   scheduled.  It starts when the socket is attached and stops when the socket
+   is detached.
 
    As there is only one line, we only poll for a new connection when the line is
    disconnected.
@@ -1029,56 +1028,41 @@ baci_term.wait = service_time (baci_icw);               /* set terminal I/O time
 
 if (baci_term.flags & UNIT_ATT) {                       /* device attached? */
     baci_poll.wait = POLL_FIRST;                        /* set up poll */
-    sim_activate (&baci_poll, baci_poll.wait);          /* start line poll immediately */
+    sim_activate (&baci_poll, baci_poll.wait);          /* start Telnet poll immediately */
     }
 else
-    sim_cancel (&baci_poll);                            /* else stop line poll */
+    sim_cancel (&baci_poll);                            /* else stop Telnet poll */
 
 return SCPE_OK;
 }
 
 
-/* Attach line */
+/* Attach controller */
 
 t_stat baci_attach (UNIT *uptr, char *cptr)
 {
 t_stat status = SCPE_OK;
 
-if (uptr->flags & UNIT_DIS)                                 /* unit disabled? */
-    return SCPE_UDIS;                                       /* report it */
+status = tmxr_attach (&baci_desc, uptr, cptr);          /* attach to socket */
 
-status = tmxr_attach (&baci_desc, uptr, cptr);              /* try to attach to socket */
-
-if (status == SCPE_ARG)                                     /* invalid numeric port supplied? */
-    status = tmxr_attach_line (uptr, 0, cptr, &baci_desc);  /* try to attach to serial port */
-
-if (status == SCPE_OK) {                                    /* attach successful? */
-    baci_poll.wait = POLL_FIRST;                            /* set up poll */
-    sim_activate (&baci_poll, baci_poll.wait);              /* start line poll immediately */
+if (status == SCPE_OK) {
+    baci_poll.wait = POLL_FIRST;                        /* set up poll */
+    sim_activate (&baci_poll, baci_poll.wait);          /* start Telnet poll immediately */
     }
 return status;
 }
 
-
-/* Detach line */
+/* Detach controller */
 
 t_stat baci_detach (UNIT *uptr)
 {
 t_stat status;
 
-if (uptr->flags & UNIT_DIS)                             /* unit disabled? */
-    return SCPE_UDIS;                                   /* report it */
-
-status = tmxr_detach_line (uptr, 0, NULL, &baci_desc);  /* attempt to detach serial line */
-
-if (status == SCPE_UNATT)                               /* not attached to serial? */
-    status = tmxr_detach (&baci_desc, uptr);            /* attempt to detach listening socket */
-
+status = tmxr_detach (&baci_desc, uptr);                /* detach socket */
 baci_ldsc.rcve = 0;                                     /* disable line reception */
-sim_cancel (&baci_poll);                                /* stop line poll */
+sim_cancel (&baci_poll);                                /* stop Telnet poll */
 return status;
 }
-
 
 /* Local routines */
 

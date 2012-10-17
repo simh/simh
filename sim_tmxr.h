@@ -26,11 +26,11 @@
    Based on the original DZ11 simulator by Thord Nilson, as updated by
    Arthur Krewat.
 
+   10-Oct-12    MP      Added extended attach support for serial, per line 
+                        listener and outgoing connections
    17-Jan-11    MP      Added buffered line capabilities
    20-Nov-08    RMS     Added three new standardized SHOW routines
-   07-Oct-08    JDB     [serial] Added serial port support to TMXR, TMLN,
-                        added tmxr_attach_line, tmxr_detach_line,
-                        tmxr_line_free, tmxr_mux_free
+   07-Oct-08    JDB     Added serial port support to TMXR, TMLN
    27-May-08    JDB     Added lnorder to TMXR structure,
                         added tmxr_set_lnorder and tmxr_set_lnorder
    14-May-08    JDB     Added dptr to TMXR structure
@@ -56,8 +56,32 @@
 #define TMXR_MAXBUF     256                             /* buffer size */
 #define TMXR_GUARD      12                              /* buffer guard */
 
+#define TMXR_DTR_DROP_TIME 500                          /* milliseconds to drop DTR for 'pseudo' modem control */
+#define TMXR_CONNECT_POLL_INTERVAL 1000                 /* milliseconds between connection polls */
+
 #define TMXR_DBG_XMT    0x10000                         /* Debug Transmit Data */
 #define TMXR_DBG_RCV    0x20000                         /* Debug Received Data */
+#define TMXR_DBG_ASY    0x40000                         /* Debug Asynchronous Activities */
+#define TMXR_DBG_TRC    0x80000                         /* Debug trace routine calls */
+
+/* Modem Control Bits */
+
+#define TMXR_MDM_DTR        0x01    /* Data Terminal Ready */
+#define TMXR_MDM_RTS        0x02    /* Request To Send     */
+#define TMXR_MDM_DCD        0x04    /* Data Carrier Detect */
+#define TMXR_MDM_RNG        0x08    /* Ring Indicator      */
+#define TMXR_MDM_CTS        0x10    /* Clear To Send       */
+#define TMXR_MDM_DSR        0x20    /* Data Set Ready      */
+#define TMXR_MDM_INCOMING   (TMXR_MDM_DCD|TMXR_MDM_RNG|TMXR_MDM_CTS|TMXR_MDM_DSR)  /* Settable Modem Bits */
+#define TMXR_MDM_OUTGOING   (TMXR_MDM_DTR|TMXR_MDM_DTR)  /* Settable Modem Bits */
+
+/* Unit flags */
+
+#define TMUF_V_NOASYNCH   (UNIT_V_UF + 12)              /* Asynch Disabled unit */
+#define TMUF_NOASYNCH     (1u << TMUF_V_NOASYNCH)       /* This flag can be defined */
+                                                        /* statically in a unit's flag field */
+                                                        /* This will disable the unit from */
+                                                        /* supporting asynchronmous mux behaviors */
 
 typedef struct tmln TMLN;
 typedef struct tmxr TMXR;
@@ -65,11 +89,15 @@ typedef struct tmxr TMXR;
 struct tmln {
     SOCKET              conn;                           /* line conn */
     char                *ipad;                          /* IP address */
+    SOCKET              master;                         /* line specific master socket */
+    char                *port;                          /* line specific listening port */
+    int32               sessions;                       /* count of tcp connections received */
     uint32              cnms;                           /* conn time */
     int32               tsta;                           /* Telnet state */
     int32               rcve;                           /* rcv enable */
     int32               xmte;                           /* xmt enable */
     int32               dstb;                           /* disable Tlnt bin */
+    t_bool              notelnet;                       /* raw binary data (no telnet interpretation) */
     int32               rxbpr;                          /* rcv buf remove */
     int32               rxbpi;                          /* rcv buf insert */
     int32               rxcnt;                          /* rcv count */
@@ -86,8 +114,12 @@ struct tmln {
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                *txb;                           /* xmt buffer */
     TMXR                *mp;                            /* back pointer to mux */
+    char                *serconfig;                     /* line config */
     SERHANDLE           serport;                        /* serial port handle */
-    char                *sername;                       /* serial port name */
+    SOCKET              connecting;                     /* Outgoing socket while connecting */
+    char                *destination;                   /* Outgoing destination address:port */
+    UNIT                *uptr;                          /* input polling unit (default to mp->uptr) */
+    UNIT                *o_uptr;                        /* output polling unit (default to lp->uptr)*/
     };
 
 struct tmxr {
@@ -97,14 +129,17 @@ struct tmxr {
     TMLN                *ldsc;                          /* line descriptors */
     int32               *lnorder;                       /* line connection order */
     DEVICE              *dptr;                          /* multiplexer device */
+    UNIT                *uptr;                          /* polling unit (connection) */
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
     int32               buffered;                       /* Buffered Line Behavior and Buffer Size Flag */
-    uint32              pending;                        /* count of pending serial connections */
+    int32               sessions;                       /* count of tcp connections received */
+    uint32              last_poll_time;                 /* time of last connection poll */
+    t_bool              notelnet;                       /* default telnet capability for incoming connections */
+    t_bool              modem_control;                  /* multiplexer supports modem control behaviors */
     };
 
 int32 tmxr_poll_conn (TMXR *mp);
-void tmxr_reset_ln (TMLN *lp);
-t_stat tmxr_clear_ln (TMXR *mp, TMLN *lp);
+t_stat tmxr_reset_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 void tmxr_poll_rx (TMXR *mp);
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr);
@@ -114,10 +149,12 @@ t_stat tmxr_open_master (TMXR *mp, char *cptr);
 t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
-t_stat tmxr_attach_line (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tmxr_detach_line (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_bool tmxr_line_free (TMLN *lp);
-t_bool tmxr_mux_free (TMXR *mp);
+t_stat tmxr_set_modem_control_passthru (TMXR *mp);
+t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
+t_stat tmxr_set_config_line (TMLN *lp, char *config);
+t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
+t_stat tmxr_set_line_output_unit (TMXR *mp, int line, UNIT *uptr_poll);
+t_stat tmxr_set_console_input_unit (UNIT *uptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);
@@ -135,7 +172,16 @@ t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_cstat (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
-void tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
+t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
+t_stat tmxr_startup (void);
+t_stat tmxr_shutdown (void);
+t_stat tmxr_start_poll (void);
+t_stat tmxr_stop_poll (void);
+void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
+extern FILE *sim_deb;                                   /* debug file */
+#define tmxr_debug(dbits, lp, msg, buf, bufsize) if (sim_deb && (lp)->mp->dptr && ((dbits) & (lp)->mp->dptr->dctrl)) _tmxr_debug (dbits, lp, msg, buf, bufsize); else (void)0
+#define tmxr_debug_trace(mp, msg) if (sim_deb && (mp)->dptr && (TMXR_DBG_TRC & (mp)->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, mp->dptr, "%s\n", (msg)); else (void)0
+#define tmxr_debug_trace_line(lp, msg) if (sim_deb && (lp)->mp && (lp)->mp->dptr && (TMXR_DBG_TRC & (lp)->mp->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, (lp)->mp->dptr, "%s\n", (msg)); else (void)0
 
 #endif
 

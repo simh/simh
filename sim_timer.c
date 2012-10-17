@@ -79,8 +79,10 @@
 #include "sim_defs.h"
 #include <ctype.h>
 
-t_bool sim_idle_enab = FALSE;                           /* global flag */
-volatile t_bool sim_idle_wait = FALSE;                  /* global flag */
+t_bool sim_idle_enab = FALSE;                       /* global flag */
+volatile t_bool sim_idle_wait = FALSE;              /* global flag */
+
+static int32 sim_calb_tmr = -1;                     /* the system calibrated timer */
 
 static uint32 sim_idle_rate_ms = 0;
 static uint32 sim_os_sleep_min_ms = 0;
@@ -866,3 +868,97 @@ switch (sim_throt_state) {
 sim_activate (uptr, sim_throt_wait);                    /* reschedule */
 return SCPE_OK;
 }
+
+/* Instruction Execution rate. */
+/*  returns a double since it is mostly used in double expressions and
+    to avoid overflow if/when strange timing delays might produce unexpected results */
+
+double sim_timer_inst_per_sec (void)
+{
+double inst_per_sec = SIM_INITIAL_IPS;
+
+if (sim_calb_tmr == -1)
+    return inst_per_sec;
+inst_per_sec = ((double)rtc_currd[sim_calb_tmr])*rtc_hz[sim_calb_tmr];
+if (0 == inst_per_sec)
+    inst_per_sec = SIM_INITIAL_IPS;
+return inst_per_sec;
+}
+
+t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay)
+{
+int32 inst_delay;
+double inst_per_sec;
+
+AIO_VALIDATE;
+if (sim_is_active_bool (uptr))                          /* already active? */
+    return SCPE_OK;
+inst_per_sec = sim_timer_inst_per_sec ();
+inst_delay = (int32)((inst_per_sec*usec_delay)/1000000.0);
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
+if ((sim_calb_tmr == -1) ||                             /* if No timer initialized
+    (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */
+    (rtc_elapsed[sim_calb_tmr] < sim_idle_stable) ||    /*    or not idle stable yet */
+    (!(sim_asynch_enabled && sim_asynch_timer))) {      /*    or asynch disabled */
+    sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after() - activating %s after %d instructions\n", 
+               sim_uname(uptr), inst_delay);
+    return _sim_activate (uptr, inst_delay);            /* queue it now */
+    }
+if (1) {
+    struct timespec now;
+    double d_now;
+
+    clock_gettime (CLOCK_REALTIME, &now);
+    d_now = _timespec_to_double (&now);
+    /* Determine if this is a clock tick like invocation 
+       or an ocaisional measured device delay */
+    if ((uptr->a_usec_delay == usec_delay) &&
+        (uptr->a_due_time != 0.0)          &&
+        (1)) {
+        double d_delay = ((double)usec_delay)/1000000.0;
+
+        uptr->a_due_time += d_delay;
+        if (uptr->a_due_time < (d_now + d_delay*0.1)) { /* Accumulate lost time */
+            uptr->a_skew += (d_now + d_delay*0.1) - uptr->a_due_time;
+            uptr->a_due_time = d_now + d_delay/10.0;
+            if (uptr->a_skew > 30.0) { /* Gap too big? */
+                uptr->a_usec_delay = usec_delay;
+                uptr->a_skew = uptr->a_last_fired_time = 0.0;
+                uptr->a_due_time = d_now + (double)(usec_delay)/1000000.0;
+                }
+            if (uptr->a_skew > rtc_clock_skew_max[sim_calb_tmr])
+                rtc_clock_skew_max[sim_calb_tmr] = uptr->a_skew;
+            }
+        else {
+            if (uptr->a_skew > 0.0) { /* Lost time to make up? */
+                if (uptr->a_skew > d_delay*0.9) {
+                    uptr->a_skew -= d_delay*0.9;
+                    uptr->a_due_time -= d_delay*0.9;
+                    }
+                else {
+                    uptr->a_due_time -= uptr->a_skew;
+                    uptr->a_skew = 0.0;
+                    }
+                }
+            }
+        }
+    else {
+        uptr->a_usec_delay = usec_delay;
+        uptr->a_skew = uptr->a_last_fired_time = 0.0;
+        uptr->a_due_time = d_now + (double)(usec_delay)/1000000.0;
+        }
+    uptr->time = usec_delay;
+
+    sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after() - queue addition %s at %.6f\n", 
+               sim_uname(uptr), uptr->a_due_time);
+    }
+pthread_mutex_lock (&sim_timer_lock);
+sim_wallclock_entry = uptr;
+pthread_mutex_unlock (&sim_timer_lock);
+pthread_cond_signal (&sim_timer_wake);                  /* wake the timer thread to deal with it */
+return SCPE_OK;
+#else
+return _sim_activate (uptr, inst_delay);                /* queue it now */
+#endif
+}
+

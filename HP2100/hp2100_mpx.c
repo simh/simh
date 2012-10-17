@@ -29,9 +29,7 @@
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
-   19-Nov-08    JDB     [serial] Removed DEV_NET to allow restoration of listening port
    14-Nov-08    JDB     Cleaned up VC++ size mismatch warnings for zero assignments
-   20-Oct-08    JDB     [serial] Added serial port support
    03-Oct-08    JDB     Fixed logic for ENQ/XOFF transmit wait
    07-Sep-08    JDB     Changed Telnet poll to connect immediately after reset or attach
    10-Aug-08    JDB     Added REG_FIT to register variables < 32-bit size
@@ -59,8 +57,8 @@
    character editing, echoing, ENQ/ACK handshaking, and read terminator
    detection, substantially reducing the load on the CPU over the earlier 12920
    multiplexer.  It was supported by HP under RTE-MIII, RTE-IVB, and RTE-6/VM.
-   Under simulation, it connects with HP terminal emulators via Telnet or serial
-   ports.
+   Under simulation, it connects with HP terminal emulators via Telnet to a
+   user-specified port.
 
    The single interface card contained a Z80 CPU, DMA controller, CTC, four
    two-channel SIO UARTs, 16K of RAM, 8K of ROM, and I/O backplane latches and
@@ -201,7 +199,7 @@
 #define MPX_CNTLS       2                               /* number of control units */
 
 #define mpx_cntl        (mpx_unit [MPX_PORTS + 0])      /* controller unit */
-#define mpx_poll        (mpx_unit [MPX_PORTS + 1])      /* polling unit */
+#define mpx_poll        (mpx_unit [MPX_PORTS + 1])      /* Telnet polling unit */
 
 
 /* Character constants */
@@ -613,16 +611,16 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
    mpx_dev      MPX device descriptor
 
    The first eight units correspond to the eight multiplexer line ports.  These
-   handle character I/O via the multiplexer library.  A ninth unit acts as the
-   card controller, executing commands and transferring data to and from the I/O
-   buffers.  A tenth unit is responsible for polling for connections and line
-   I/O.  It also holds the master socket for Telnet connections.
+   handle character I/O via the Telnet library.  A ninth unit acts as the card
+   controller, executing commands and transferring data to and from the I/O
+   buffers.  A tenth unit is responsible for polling for connections and socket
+   I/O.  It also holds the master socket.
 
    The character I/O service routines run only when there are characters to read
    or write.  They operate at the approximate baud rates of the terminals (in
    CPU instructions per second) in order to be compatible with the OS drivers.
    The controller service routine runs only when a command is executing or a
-   data transfer to or from the CPU is in progress.  The poll service must run
+   data transfer to or from the CPU is in progress.  The Telnet poll must run
    continuously, but it may operate much more slowly, as the only requirement is
    that it must not present a perceptible lag to human input.  To be compatible
    with CPU idling, it is co-scheduled with the master poll timer, which uses a
@@ -634,9 +632,9 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
 
 DEVICE mpx_dev;
 
-int32 mpx_order [MPX_PORTS] = { -1 };                                   /* connection order */
-TMLN  mpx_ldsc  [MPX_PORTS] = { { 0 } };                                /* line descriptors */
-TMXR  mpx_desc = { MPX_PORTS, 0, 0, mpx_ldsc, mpx_order, &mpx_dev };    /* device descriptor */
+int32 mpx_order [MPX_PORTS] = { -1 };                       /* connection order */
+TMLN  mpx_ldsc [MPX_PORTS] = { { 0 } };                     /* line descriptors */
+TMXR  mpx_desc = { MPX_PORTS, 0, 0, mpx_ldsc, mpx_order };  /* device descriptor */
 
 DIB mpx_dib = { &mpx_io, MPX };
 
@@ -650,7 +648,7 @@ UNIT mpx_unit [] = {
     { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 6 */
     { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 7 */
     { UDATA (&mpx_cntl_svc, UNIT_DIS, 0) },                         /* controller unit */
-    { UDATA (&mpx_poll_svc, UNIT_ATTABLE | UNIT_DIS, POLL_FIRST) }  /* line poll unit */
+    { UDATA (&mpx_poll_svc, UNIT_ATTABLE | UNIT_DIS, POLL_FIRST) }  /* Telnet poll unit */
     };
 
 REG mpx_reg [] = {
@@ -1604,20 +1602,21 @@ return SCPE_OK;
 /* Multiplexer line service.
 
    The line service routine is used to transmit and receive characters.  It is
-   started when a buffer is ready for output or when the poll service routine
+   started when a buffer is ready for output or when the Telnet poll routine
    determines that there are characters ready for input, and it is stopped when
    there are no more characters to output or input.  When a line is quiescent,
    this routine does not run.  Service times are selected to approximate the
    baud rate setting of the multiplexer port.
 
    "Fast timing" mode enables three optimizations.  First, buffered characters
-   are transferred in blocks, rather than a character at a time; this reduces
-   line traffic and decreases simulator overhead (there is only one service
-   routine entry per block, rather than one per character).  Second, ENQ/ACK
-   handshaking is done locally, without involving the client.  Third, when
-   editing and echo is enabled, entering BS echoes a backspace, a space, and a
-   backspace, and entering DEL echoes a backslash, a carriage return, and a line
-   feed, providing better compatibility with prior RTE terminal drivers.
+   are transferred via Telnet in blocks, rather than a character at a time; this
+   reduces network traffic and decreases simulator overhead (there is only one
+   service routine entry per block, rather than one per character).  Second,
+   ENQ/ACK handshaking is done locally, without involving the Telnet client.
+   Third, when editing and echo is enabled, entering BS echoes a backspace, a
+   space, and a backspace, and entering DEL echoes a backslash, a carriage
+   return, and a line feed, providing better compatibility with prior RTE
+   terminal drivers.
 
    Each read and write buffer begins with a reserved header byte that stores
    per-buffer information, such as whether handshaking should be suppressed
@@ -1631,7 +1630,7 @@ return SCPE_OK;
    write buffer is freed, and a UI check is made if the controller is idle, in
    case a write buffer request is pending.
 
-   For input, the character is retrieved from the line buffer.  If a BREAK was
+   For input, the character is retrieved from the Telnet buffer.  If a BREAK was
    received, break status is set, and the character is discarded (the current
    multiplexer library implementation always returns a NUL with a BREAK
    indication).  If the character is an XOFF, and XON/XOFF pacing is enabled, a
@@ -1940,11 +1939,11 @@ return SCPE_OK;
 }
 
 
-/* Poll service.
+/* Telnet poll service.
 
-   This service routine is used to poll for connections and incoming characters.
-   It is started when the listening socket or a serial line is attached and is
-   stopped when the socket and all lines are detached.
+   This service routine is used to poll for Telnet connections and incoming
+   characters.  It starts when the socket is attached and stops when the socket
+   is detached.
 
    Each line is then checked for a pending ENQ/ACK handshake.  If one is
    pending, the ACK counter is incremented, and if it times out, another ENQ is
@@ -2008,10 +2007,10 @@ return SCPE_OK;
     1. Under simulation, we also clear the input buffer register, even though
        the hardware doesn't.
 
-    2. We set up the first poll for connections to occur "immediately" upon
-       execution, so that clients will be connected before execution begins.
-       Otherwise, a fast program may access the multiplexer before the poll
-       service routine activates.
+    2. We set up the first poll for Telnet connections to occur "immediately"
+       upon execution, so that clients will be connected before execution
+       begins.  Otherwise, a fast program may access the multiplexer before the
+       poll service routine activates.
 
     3. We must set the "emptying_flags" and "filling_flags" values here, because
        they cannot be initialized statically, even though the values are
@@ -2031,129 +2030,83 @@ IOPRESET (&mpx_dib);                                    /* PRESET device (does n
 
 mpx_ibuf = 0;                                           /* clear input buffer */
 
-if (tmxr_mux_free (&mpx_desc))                          /* any lines attached? */
-    sim_cancel (&mpx_poll);                             /* no, so stop poll */
-else {                                                  /* attached or listening */
+if (mpx_poll.flags & UNIT_ATT) {                        /* network attached? */
     mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
+    sim_activate (&mpx_poll, mpx_poll.wait);            /* start Telnet poll immediately */
     }
+else
+    sim_cancel (&mpx_poll);                             /* else stop Telnet poll */
 
 return SCPE_OK;
 }
 
 
-/* Attach the multiplexer or a line.
+/* Attach the multiplexer to a Telnet port.
 
    We are called by the ATTACH MPX <port> command to attach the multiplexer to
-   the listening port indicated by <port> and by ATTACH MPX<n> <ser> to attach
-   line <n> to serial port <ser>.  Logically, it is the multiplexer device that
-   is attached; however, SIMH only allows units to be attached.  This makes
-   sense for devices such as tape drives, where the attached media is a property
-   of a specific drive.  In our case, though, the listening port is a property
-   of the multiplexer card, not of any given serial line.
+   the listening port indicated by <port>.  Logically, it is the multiplexer
+   device that is attached; however, SIMH only allows units to be attached.
+   This makes sense for devices such as tape drives, where the attached media is
+   a property of a specific drive.  In our case, though, the listening port is a
+   property of the multiplexer card, not of any given serial line.  As ATTACH
+   MPX is equivalent to ATTACH MPX0, the port would, by default, be attached to
+   the first serial line and be reported there in a SHOW MPX command.
 
-   To preserve the logical picture, we attach the listening port to the poll
-   unit (unit 9), which is normally disabled to inhibit its display.  Serial
-   ports are attached to line units 0-7 normally.  Attachment is reported by the
-   "mpx_status" routine below.
+   To preserve the logical picture, we attach the port to the Telnet poll unit,
+   which is normally disabled to inhibit its display.  Attaching to a disabled
+   unit is not allowed, so we first enable the unit, then attach it, then
+   disable it again.  Attachment is reported by the "mpx_status" routine below.
 
-   The connection poll service routine is synchronized with the other input
-   polling devices in the simulator to facilitate idling.
-
-   Implementation notes:
-
-    1. ATTACH MPX will pass a pointer unit 0.  This is because the common
-       simulator code treats ATTACH MPX as equivalent to ATTACH MPX0.  We
-       differentiate these cases by examining the "sim_unit_ref" global to see
-       if a device was referenced.
-
-    2. Directly attempting to attach to units 8 (controller) or 9 (poll) will be
-       rejected.
-
-    3. If we are being called as part of RESTORE processing, we may see a
-       request to attach the poll unit (unit 9).  This will occur if unit 9 was
-       attached when the SAVE was done.  In this case, the SIM_SW_REST flag will
-       be set in "sim_switches", and we will allow the call to succeed.
-
-    4. If the poll unit is attached, it will be enabled as part of RESTORE
-       processing.  We always unilaterally disable this unit to ensure that it
-       remains hidden.
+   The Telnet poll service routine is synchronized with the other input polling
+   devices in the simulator to facilitate idling.
 */
 
 t_stat mpx_attach (UNIT *uptr, char *cptr)
 {
 t_stat status = SCPE_OK;
 
-if ((uptr == &mpx_cntl) ||                                  /* attaching controller? */
-    (uptr == &mpx_poll) && !(sim_switches & SIM_SW_REST))   /*   or poll unit directly? */
-    return SCPE_NOATT;                                      /* disallow */
+if (uptr != mpx_unit)                                   /* not unit 0? */
+    return SCPE_NOATT;                                  /* can't attach */
 
-if (sim_unit_ref == ref_dev || (uptr == &mpx_poll)) {       /* device attach or poll restore request? */
-    status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);      /* attach to socket */
-    mpx_poll.flags = mpx_poll.flags | UNIT_DIS;             /* disable unit */
-    }
-
-else                                                        /* line attach request */
-    status = tmxr_attach_line (uptr, 0, cptr, &mpx_desc);   /* attach line */
+mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;            /* enable unit */
+status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);      /* attach to socket */
+mpx_poll.flags = mpx_poll.flags | UNIT_DIS;             /* disable unit */
 
 if (status == SCPE_OK) {
-    mpx_poll.wait = POLL_FIRST;                             /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);                /* start poll immediately */
+    mpx_poll.wait = POLL_FIRST;                         /* set up poll */
+    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
     }
 return status;
 }
 
 
-/* Detach the multiplexer or a line.
+/* Detach the multiplexer.
 
-   We are called by the DETACH MPX command to detach the listening port and all
-   Telnet sessions and by the DETACH MPX<n> to detach a serial port from line
-   <n>.  We will also be called by DETACH ALL, RESTORE, and during simulator
-   shutdown.  For DETACH ALL and RESTORE, we must not fail the call, or
-   processing of other units will cease.
-   
-   Implementation notes:
+   Normally, we are called by the DETACH MPX command, which is equivalent to
+   DETACH MPX0.  However, we may be called with other units in two cases.
 
-    1. Because DETACH MPX will pass unit 0, we check the "sim_unit_ref" global
-       to see if MPX or MPX0 was specified in the command.
-
-    2. Directly attempting to detach unit 8 (controller) will be rejected.  We
-       cannot fail a direct DETACH MPX9 (poll unit), because we cannot tell that
-       case apart from a DETACH ALL (a RESTORE will have the SIM_SW_REST flag
-       set in "sim_switches").
-
-    3. During simulator shutdown, we will be called for units 0-8 (detach_all in
-       scp.c calls the detach routines of all units that do NOT have
-       UNIT_ATTABLE), as well as for unit 9 if it is attached.
+   A DETACH ALL command will call us for unit 9 (the poll unit) if it is
+   attached.  Also, during simulator shutdown, we will be called for units 0-8
+   (detach_all in scp.c calls the detach routines of all units that do NOT have
+   UNIT_ATTABLE), as well as for unit 9 if it is attached.  In both cases, it is
+   imperative that we return SCPE_OK, otherwise any remaining device detaches
+   will not be performed.
 */
 
 t_stat mpx_detach (UNIT *uptr)
 {
-uint32 ln;
-t_stat status;
-t_bool mux_free = TRUE;
+t_stat status = SCPE_OK;
+int32 i;
 
-if (uptr == &mpx_cntl)                                      /* detaching controller directly? */
-    return SCPE_NOATT;                                      /* disallow */
+if ((uptr == mpx_unit) || (uptr == &mpx_poll)) {        /* base unit or poll unit? */
+    status = tmxr_detach (&mpx_desc, &mpx_poll);        /* detach socket */
 
-if (sim_unit_ref == ref_dev || uptr == &mpx_poll)           /* device detach or detach all request? */
-    status = tmxr_detach (&mpx_desc, &mpx_poll);            /* detach socket */
+    for (i = 0; i < MPX_PORTS; i++) {
+        mpx_ldsc [i].rcve = 0;                          /* disable line reception */
+        sim_cancel (&mpx_unit [i]);                     /* cancel any scheduled I/O */
+        }
 
-else                                                        /* line detach request */
-    status = tmxr_detach_line (uptr, 0, NULL, &mpx_desc);   /* detach line */
-
-if (status == SCPE_OK) {
-    for (ln = 0; ln < MPX_PORTS; ln++)                      /* loop through lines */
-        if (tmxr_line_free (&mpx_ldsc[ln])) {               /* is line free? */
-            mpx_ldsc[ln].rcve = 0;                          /* disable rcv as line was reset */
-            sim_cancel (&mpx_unit [ln]);                    /* cancel any scheduled I/O */
-            }
-
-        else
-            mux_free = FALSE;                               /* mux isn't free if line is in use */
-
-    if (mux_free && !(mpx_poll.flags & UNIT_ATT))           /* all lines free and not listening? */
-        sim_cancel (&mpx_poll);                             /* stop poll */
+    sim_cancel (&mpx_poll);                             /* stop Telnet poll */
     }
 
 return status;
@@ -2214,7 +2167,7 @@ return SCPE_OK;
 /* Local routines */
 
 
-/* Poll for new connections */
+/* Poll for new Telnet connections */
 
 static void poll_connection (void)
 {

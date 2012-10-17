@@ -27,7 +27,6 @@
 
    18-Apr-2012  RMS     Modified to use clock coscheduling
    17-Aug-2011  RMS     Added AUTOCONFIGURE modifier
-   26-Nov-2008  JDB     [serial] Added serial port support
    19-Nov-2008  RMS     Revised for common TMXR show routines
                         Revised to autoconfigure vectors
 
@@ -132,7 +131,6 @@ t_stat dci_svc (UNIT *uptr);
 t_stat dco_svc (UNIT *uptr);
 t_stat dcx_attach (UNIT *uptr, char *cptr);
 t_stat dcx_detach (UNIT *uptr);
-t_stat dcl_detach (UNIT *uptr);
 t_stat dcx_set_lines (UNIT *uptr, int32 val, char *cptr, void *desc);
 void dcx_enbdis (int32 dis);
 void dci_clr_int (int32 ln);
@@ -254,7 +252,7 @@ DEVICE dco_dev = {
     "DCO", dco_unit, dco_reg, dco_mod,
     DCX_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
-    NULL, &dcx_attach, &dcl_detach,
+    NULL, NULL, NULL,
     NULL, DEV_UBUS | DEV_DISABLE | DEV_DIS
     };
 
@@ -368,6 +366,8 @@ t_stat dci_svc (UNIT *uptr)
 {
 int32 ln, c, temp;
 
+if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
+    return SCPE_OK;
 sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 ln = tmxr_poll_conn (&dcx_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
@@ -510,12 +510,9 @@ t_stat dcx_reset (DEVICE *dptr)
 int32 ln;
 
 dcx_enbdis (dptr->flags & DEV_DIS);                     /* sync enables */
-//
-if (tmxr_mux_free (&dcx_desc))                          /* any lines attached? */
-    sim_cancel (&dci_unit);                             /* no, so stop poll */
-else                                                    /* attached or listening */
-    sim_activate (&dci_unit, tmxr_poll);                /* start poll immediately */
-//
+sim_cancel (&dci_unit);                                 /* assume stop */
+if (dci_unit.flags & UNIT_ATT)                          /* if attached, */
+    sim_activate (&dci_unit, tmxr_poll);                /* activate */
 for (ln = 0; ln < DCX_LINES; ln++)                      /* for all lines */
     dcx_reset_ln (ln);
 return auto_config (dci_dev.name, dcx_desc.lines);      /* auto config */
@@ -535,22 +532,16 @@ dco_clr_int (ln);
 return;
 }
 
-/* Attach master unit or line */
+/* Attach master unit */
 
 t_stat dcx_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-//
-if (uptr == &dci_unit)                                  /* master unit? */
-    r = tmxr_attach (&dcx_desc, uptr, cptr);            /* attach socket */
-else
-    r = tmxr_attach_line (uptr, 0, cptr, &dcx_desc);    /* attach line */
-//
-
+r = tmxr_attach (&dcx_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error? */
     return r;
-sim_activate (&dci_unit, tmxr_poll);                    /* start poll */
+sim_activate (uptr, tmxr_poll);                         /* start poll */
 return SCPE_OK;
 }
 
@@ -560,47 +551,13 @@ t_stat dcx_detach (UNIT *uptr)
 {
 int32 i;
 t_stat r;
-t_bool free = TRUE;
 
 r = tmxr_detach (&dcx_desc, uptr);                      /* detach */
-
-//
-if (r == SCPE_OK) {
-    for (i = 0; i < DCX_LINES; i++)                     /* loop through lines */
-        if (tmxr_line_free (&dcx_ldsc[i]))              /* is line free? */
-            dcx_ldsc[i].rcve = 0;                       /* yes, so disable rcv as line was reset */
-        else
-            free = FALSE;                               /* mux isn't free if line is in use */
-
-    if (free)                                           /* all lines free? */
-        sim_cancel (uptr);                              /* stop poll */
-    }
-//
-
+for (i = 0; i < DCX_LINES; i++)                         /* all lines, */
+    dcx_ldsc[i].rcve = 0;                               /* disable rcv */
+sim_cancel (uptr);                                      /* stop poll */
 return r;
 }
-
-/* Detach line */
-
-//
-t_stat dcl_detach (UNIT *uptr)
-{
-uint32 ln;
-t_stat status;
-
-status = tmxr_detach_line (uptr, 0, NULL, &dcx_desc);   /* detach line */
-
-if (status == SCPE_OK) {
-    ln = uptr - dco_unit;                               /* determine line number */
-    dcx_ldsc[ln].rcve = 0;                              /* disable line reception */
-
-    if (tmxr_mux_free (&dcx_desc))                      /* all lines free and not listening? */
-        sim_cancel (&dci_unit);                         /* stop poll */
-    }
-
-return status;
-}
-//
 
 /* Enable/disable device */
 

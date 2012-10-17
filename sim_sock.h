@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Oct-12    MP      Added definitions needed to detect possible tcp 
+                        connect failures
    25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    04-Jun-08    RMS     Addes sim_create_sock, for IBM 1130
    14-Apr-05    RMS     Added WSAEINPROGRESS (from Tim Riker)
@@ -54,6 +56,9 @@
 #define SOCKET          int32
 #define WSAEWOULDBLOCK  EWOULDBLOCK
 #define WSAEINPROGRESS  EINPROGRESS
+#define WSAETIMEDOUT    ETIMEDOUT
+#define WSAECONNREFUSED ECONNREFUSED
+#define WSAEHOSTUNREACH EHOSTUNREACH
 #define INVALID_SOCKET  ((SOCKET)-1) 
 #define SOCKET_ERROR    -1
 #include <sys/types.h>                                  /* for fcntl, getpid */

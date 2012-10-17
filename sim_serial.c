@@ -41,7 +41,7 @@
 
      sim_open_serial        open a serial port
      sim_config_serial      change baud rate and character framing configuration
-     sim_control_serial     connect or disconnect a serial port (controls DTR)
+     sim_control_serial     manipulate and/or return the modem bits on a serial port
      sim_read_serial        read from a serial port
      sim_write_serial       write to a serial port
      sim_close_serial       close a serial port
@@ -60,8 +60,8 @@
    returned.
 
 
-   t_stat sim_config_serial (SERHANDLE port, SERCONFIG config)
-   -----------------------------------------------------------
+   t_stat sim_config_serial (SERHANDLE port, const char *config)
+   -------------------------------------------------------------
 
    The baud rate and framing parameters (character size, parity, and number of
    stop bits) of the serial port associated with "port" are set.  If any
@@ -70,13 +70,17 @@
    is returned.  If the configuration is successful, SCPE_OK is returned.
 
 
-   t_bool sim_control_serial (SERHANDLE port, t_bool connect)
-   ----------------------------------------------------------
+   sim_control_serial (SERHANDLE port, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
+   -------------------------------------------------------------------------------------------------
 
-   If "connect" is TRUE, the DTR (modem control) line of the serial port
-   associated with "port" is asserted.  If "connect" is false, the line is
-   denied.  If the DTR change is successful, the function returns TRUE.  FALSE
-   is returned if an error occurs.
+   The DTR and RTS line of the serial port is set or cleared as indicated in 
+   the respective bits_to_set or bits_to_clear parameters.  If the 
+   incoming_bits parameter is not NULL, then the modem status bits DCD, RNG, 
+   DSR and CTS are returned.
+
+   If unreasonable or nonsense bits_to_set or bits_to_clear bits are 
+   specified, then the return status is SCPE_ARG;
+   If an error occurs, SCPE_IOERR is returned.
 
 
    int32 sim_read_serial (SERHANDLE port, char *buffer, int32 count, char *brk)
@@ -134,9 +138,17 @@ typedef struct serial_list {
     char    desc[SER_DEV_DESC_MAX];
     } SERIAL_LIST;
 
+typedef struct serial_config {                          /* serial port configuration */
+    uint32 baudrate;                                    /* baud rate */
+    uint32 charsize;                                    /* character size in bits */
+    char   parity;                                      /* parity (N/O/E/M/S) */
+    uint32 stopbits;                                    /* 0/1/2 stop bits (0 implies 1.5) */
+    } SERCONFIG;
+
 static int       sim_serial_os_devices (int max, SERIAL_LIST* list);
 static SERHANDLE sim_open_os_serial    (char *name);
-static void      sim_close_os_serial    (SERHANDLE port);
+static void      sim_close_os_serial   (SERHANDLE port);
+static t_stat    sim_config_os_serial  (SERHANDLE port, SERCONFIG config);
 
 
 static struct open_serial_device {
@@ -147,7 +159,17 @@ static struct open_serial_device {
     } *serial_open_devices = NULL;
 static int serial_open_device_count = 0;
 
-static void _serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *desc)
+static struct open_serial_device *_get_open_device (SERHANDLE port)
+{
+int i;
+
+for (i=0; i<serial_open_device_count; ++i)
+    if (serial_open_devices[i].port == port)
+        return &serial_open_devices[i];
+return NULL;
+}
+
+static struct open_serial_device *_serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *desc)
 {
 serial_open_devices = realloc(serial_open_devices, (++serial_open_device_count)*sizeof(*serial_open_devices));
 memset(&serial_open_devices[serial_open_device_count-1], 0, sizeof(serial_open_devices[serial_open_device_count-1]));
@@ -156,6 +178,7 @@ serial_open_devices[serial_open_device_count-1].line = line;
 strcpy(serial_open_devices[serial_open_device_count-1].name, name);
 if (desc)
     strcpy(serial_open_devices[serial_open_device_count-1].desc, desc);
+return &serial_open_devices[serial_open_device_count-1];
 }
 
 static void _serial_remove_from_open_list (SERHANDLE port)
@@ -194,7 +217,7 @@ SERIAL_LIST *b = (SERIAL_LIST *)pb;
 return strcmp(a->name, b->name);
 }
 
-static int sim_serial_devices(int max, SERIAL_LIST *list)
+static int sim_serial_devices (int max, SERIAL_LIST *list)
 {
 int i, j, ports = sim_serial_os_devices(max, list);
 
@@ -219,7 +242,7 @@ if (ports) /* Order the list returned alphabetically by the port name */
 return ports;
 }
 
-static char* sim_serial_getname(int number, char* name)
+static char* sim_serial_getname (int number, char* name)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int count = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -230,7 +253,7 @@ strcpy(name, list[number].name);
 return name;
 }
 
-static char* sim_serial_getname_bydesc(char* desc, char* name)
+static char* sim_serial_getname_bydesc (char* desc, char* name)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int count = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -258,7 +281,7 @@ return NULL;
 }
 
 /* strncasecmp() is not available on all platforms */
-static int sim_serial_strncasecmp(char* string1, char* string2, size_t len)
+static int sim_serial_strncasecmp (char* string1, char* string2, size_t len)
 {
 size_t i;
 unsigned char s1, s2;
@@ -280,7 +303,7 @@ for (i=0; i<len; i++) {
 return 0;
 }
 
-static char* sim_serial_getname_byname(char* name, char* temp)
+static char* sim_serial_getname_byname (char* name, char* temp)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int count = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -299,7 +322,7 @@ for (i=0; i<count && !found; i++) {
 return (found ? temp : NULL);
 }
 
-char* sim_serial_getdesc_byname(char* name, char* temp)
+char* sim_serial_getdesc_byname (char* name, char* temp)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int count = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -318,7 +341,7 @@ for (i=0; i<count && !found; i++) {
   return (found ? temp : NULL);
 }
 
-t_stat sim_show_serial    (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+t_stat sim_show_serial (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
 {
 SERIAL_LIST  list[SER_MAX_DEVICE];
 int number = sim_serial_devices(SER_MAX_DEVICE, list);
@@ -336,7 +359,7 @@ else {
         if ((len = strlen(list[i].name)) > min)
             min = len;
     for (i=0; i<number; i++)
-        fprintf(st," ser%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," ser%d\t%-*s%s%s%s\n", i, (int)min, list[i].name, list[i].desc[0] ? " (" : "", list[i].desc, list[i].desc[0] ? ")" : "");
     }
 if (serial_open_device_count) {
     int i;
@@ -345,54 +368,86 @@ if (serial_open_device_count) {
     fprintf(st,"Open Serial Devices:\n");
     for (i=0; i<serial_open_device_count; i++) {
         d = sim_serial_getdesc_byname(serial_open_devices[i].name, desc);
-        if (d)
-            fprintf(st, " %s\tLn%02d %s (%s)\n", serial_open_devices[i].line->mp->dptr->name, (int)(serial_open_devices[i].line->mp->ldsc-serial_open_devices[i].line), serial_open_devices[i].line->sername, d);
-        else
-            fprintf(st, " %s\tLn%02d %s\n", serial_open_devices[i].line->mp->dptr->name, (int)(serial_open_devices[i].line->mp->ldsc-serial_open_devices[i].line), serial_open_devices[i].line->sername);
+        fprintf(st, " %s\tLn%02d %s%s%s%s\tConfig: %s\n", serial_open_devices[i].line->mp->dptr->name, (int)(serial_open_devices[i].line->mp->ldsc-serial_open_devices[i].line),
+                    serial_open_devices[i].line->destination, d ? " {" : "", d ? d : "", d ? ")" : "", serial_open_devices[i].line->serconfig);
         }
     }
 return SCPE_OK;
 }
 
-SERHANDLE sim_open_serial (char *name, TMLN *lp)
+SERHANDLE sim_open_serial (char *name, TMLN *lp, t_stat *stat)
 {
-char temp1[1024], temp2[1024];
+char temp1[1024], temp2[1024], devname [1024];
 char *savname = name;
 char *savdesc = NULL;
-SERHANDLE port;
+SERHANDLE port = INVALID_HANDLE;
+char *config;
+t_stat status;
+
+config = get_glyph_nc (name, devname, ';');             /* separate port name from optional config params */
+
+if ((config == NULL) || (*config == '\0'))
+    config = "9600-8N1";
+
+if (stat)
+    *stat = SCPE_OK;
 
 /* translate name of type "serX" to real device name */
-if ((strlen(name) <= 5)
-    && (tolower(name[0]) == 's')
-    && (tolower(name[1]) == 'e')
-    && (tolower(name[2]) == 'r')
-    && (isdigit(name[3]))
-    && (isdigit(name[4]) || (name[4] == '\0'))
+if ((strlen(devname) <= 5)
+    && (tolower(devname[0]) == 's')
+    && (tolower(devname[1]) == 'e')
+    && (tolower(devname[2]) == 'r')
+    && (isdigit(devname[3]))
+    && (isdigit(devname[4]) || (devname[4] == '\0'))
    ) {
-    int num = atoi(&name[3]);
+    int num = atoi(&devname[3]);
     savname = sim_serial_getname(num, temp1);
-    if (savname == NULL) /* didn't translate */
-        return INVALID_HANDLE;
+    if (savname == NULL) {                              /* didn't translate */
+        if (stat)
+            *stat = SCPE_OPENERR;
+        return port;
+        }
     savdesc = sim_serial_getdesc_byname (savname, temp2);
     }
 else {
     /* are they trying to use device description? */
-    savname = sim_serial_getname_bydesc(name, temp1);
-    if (savname == NULL) { /* didn't translate */
+    savname = sim_serial_getname_bydesc(devname, temp1);
+    if (savname == NULL) {                              /* didn't translate */
         /* probably is not serX and has no description */
-        savname = sim_serial_getname_byname(name, temp1);
+        savname = sim_serial_getname_byname(devname, temp1);
         if (savname == NULL) /* didn't translate */
-            savname = name;
+            savname = devname;
         else
             savdesc = sim_serial_getdesc_byname(savname, temp2);
         }
     else
-        savdesc = name;
+        savdesc = devname;
     }
 
 port = sim_open_os_serial (savname);
+
+if (port == INVALID_HANDLE) {
+    if (stat)
+        *stat = SCPE_OPENERR;
+    return port;
+    }
+
+status = sim_config_serial (port, config);              /* set serial configuration */
+
+if (status != SCPE_OK) {                                /* port configuration error? */
+    sim_close_serial (port);                            /* close the port */
+    if (stat)
+        *stat = status;
+    port = INVALID_HANDLE;                              /* report error */
+    }
+
+if ((port != INVALID_HANDLE) && (*config) && (lp)) {
+    lp->serconfig = realloc (lp->serconfig, 1 + strlen (config));
+    strcpy (lp->serconfig, config);
+    }
 if (port != INVALID_HANDLE)
-    _serial_add_to_open_list (port, lp, savname, savdesc);
+    _serial_add_to_open_list (port, lp, savname, config);
+
 return port;
 }
 
@@ -402,11 +457,51 @@ sim_close_os_serial (port);
 _serial_remove_from_open_list (port);
 }
 
-/* Windows serial implementation */
+t_stat sim_config_serial  (SERHANDLE port, const char *sconfig)
+{
+const char *pptr;
+char *sptr, *tptr;
+SERCONFIG config = { 0 };
+t_bool arg_error = FALSE;
+t_stat r;
+struct open_serial_device *dev;
 
+if ((sconfig == NULL) || (*sconfig == '\0'))
+    sconfig = "9600-8N1";                               /* default settings */
+pptr = sconfig;
+
+config.baudrate = (uint32)strtotv (pptr, &sptr, 10);    /* parse baud rate */
+arg_error = (pptr == sptr);                             /* check for bad argument */
+
+if (*sptr)                                              /* separator present? */
+    sptr++;                                             /* skip it */
+
+config.charsize = (uint32)strtotv (sptr, &tptr, 10);    /* parse character size */
+arg_error = arg_error || (sptr == tptr);                /* check for bad argument */
+
+if (*tptr)                                              /* parity character present? */
+    config.parity = toupper (*tptr++);                  /* save parity character */
+
+config.stopbits = (uint32)strtotv (tptr, &sptr, 10);    /* parse number of stop bits */
+arg_error = arg_error || (tptr == sptr);                /* check for bad argument */
+
+if (arg_error)                                          /* bad conversions? */
+    return SCPE_ARG;                                    /* report argument error */
+if (strcmp (sptr, ".5") == 0)                           /* 1.5 stop bits requested? */
+    config.stopbits = 0;                                /* code request */
+
+r = sim_config_os_serial (port, config);
+dev = _get_open_device (port);
+if (dev) {
+    dev->line->serconfig = realloc (dev->line->serconfig, 1 + strlen (sconfig));
+    strcpy (dev->line->serconfig, sconfig);
+    }
+return r;
+}
 
 #if defined (_WIN32)
 
+/* Windows serial implementation */
 
 /* Enumerate the available serial ports.
 
@@ -566,7 +661,7 @@ return port;                                            /* return port handle on
        1.5 stop bits.
 */
 
-t_stat sim_config_serial (SERHANDLE port, SERCONFIG config)
+t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 static const struct {
     char parity;
@@ -628,20 +723,54 @@ return SCPE_OK;                                         /* return success status
 
 /* Control a serial port.
 
-   The DTR line of the serial port is set or cleared.  If "connect" is true,
-   then the line is set to enable the serial device.  If "connect" is false, the
-   line is disabled to disconnect the device.  If the line change was
-   successful, the function returns TRUE.
+   The DTR and RTS line of the serial port is set or cleared as indicated in 
+   the respective bits_to_set or bits_to_clear parameters.  If the 
+   incoming_bits parameter is not NULL, then the modem status bits DCD, RNG, 
+   DSR and CTS are returned.
+
+   If unreasonable or nonsense bits_to_set or bits_to_clear bits are 
+   specified, then the return status is SCPE_ARG;
+   If an error occurs, SCPE_IOERR is returned.
 */
 
-t_bool sim_control_serial (SERHANDLE port, t_bool connect)
+t_stat sim_control_serial (SERHANDLE port, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
-if (!EscapeCommFunction (port, connect ? SETDTR : CLRDTR)) {
-    sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
-    return FALSE;
+if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits */
+    (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
+    (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
+    return SCPE_ARG;
+if (bits_to_set&TMXR_MDM_DTR)
+    if (!EscapeCommFunction (port, SETDTR)) {
+        sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
+        return SCPE_IOERR;
+        }
+if (bits_to_clear&TMXR_MDM_DTR)
+    if (!EscapeCommFunction (port, CLRDTR)) {
+        sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
+        return SCPE_IOERR;
+        }
+if (bits_to_set&TMXR_MDM_RTS)
+    if (!EscapeCommFunction (port, SETRTS)) {
+        sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
+        return SCPE_IOERR;
+        }
+if (bits_to_clear&TMXR_MDM_RTS)
+    if (!EscapeCommFunction (port, CLRRTS)) {
+        sim_error_serial ("EscapeCommFunction", (int) GetLastError ());
+        return SCPE_IOERR;
+        }
+if (incoming_bits) {
+    DWORD ModemStat;
+    if (GetCommModemStatus (port, &ModemStat)) {
+        sim_error_serial ("GetCommModemStatus", (int) GetLastError ());
+        return SCPE_IOERR;
+        }
+    *incoming_bits = ((ModemStat&MS_CTS_ON)  ? TMXR_MDM_CTS : 0) |
+                     ((ModemStat&MS_DSR_ON)  ? TMXR_MDM_DSR : 0) |
+                     ((ModemStat&MS_RING_ON) ? TMXR_MDM_RNG : 0) |
+                     ((ModemStat&MS_RLSD_ON) ? TMXR_MDM_DCD : 0);
     }
-
-return TRUE;
+return SCPE_OK;
 }
 
 
@@ -733,10 +862,9 @@ return;
 
 
 
+#elif defined (__unix__) || defined(__APPLE__)
+
 /* UNIX implementation */
-
-
-#elif defined (__unix__)
 
 /* Enumerate the available serial ports.
 
@@ -765,6 +893,15 @@ for (i=0; (ports < max) && (i < 64); ++i) {
     }
 for (i=0; (ports < max) && (i < 64); ++i) {
     sprintf (list[ports].name, "/dev/ttyUSB%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+for (i=1; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/tty.serial%d", i);
     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
     if (port != -1) {                                   /* open OK? */
         if (isatty (port))                              /* is device a TTY? */
@@ -907,7 +1044,7 @@ return port;                                            /* return port fd for su
 
 */
 
-t_stat sim_config_serial (SERHANDLE port, SERCONFIG config)
+t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 struct termios tio;
 int32 i;
@@ -983,30 +1120,52 @@ return SCPE_OK;                                         /* configuration set suc
 
 /* Control a serial port.
 
-   The DTR line of the serial port is set or cleared.  If "connect" is true,
-   then the line is set to enable the serial device.  If "connect" is false, the
-   line is disabled to disconnect the device.  If the line change was
-   successful, the function returns TRUE.
+   The DTR and RTS line of the serial port is set or cleared as indicated in 
+   the respective bits_to_set or bits_to_clear parameters.  If the 
+   incoming_bits parameter is not NULL, then the modem status bits DCD, RNG, 
+   DSR and CTS are returned.
+
+   If unreasonable or nonsense bits_to_set or bits_to_clear bits are 
+   specified, then the return status is SCPE_ARG;
+   If an error occurs, SCPE_IOERR is returned.
 */
 
-t_bool sim_control_serial (SERHANDLE port, t_bool connect)
+t_stat sim_control_serial (SERHANDLE port, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
-int request;
-static const int dtr = TIOCM_DTR;
+int bits;
 
-if (connect)                                            /* request for DTR set? */
-    request = TIOCMBIS;                                 /* use "set" control request */
-else                                                    /* DTR clear */
-    request = TIOCMBIC;                                 /* use "clear" control request */
-
-if (ioctl (port, request, &dtr)) {                      /* set or clear the DTR line */
-    if (errno != EINVAL)                                /* DTR control not supported? */
-        sim_error_serial ("ioctl", errno);              /* no, so report unexpected error */
-
-    return FALSE;                                       /* return failure status */
+if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits */
+    (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
+    (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
+    return SCPE_ARG;
+if (bits_to_set) {
+    bits = ((bits_to_set&TMXR_MDM_DTR) ? TIOCM_DTR : 0) |
+           ((bits_to_set&TMXR_MDM_RTS) ? TIOCM_RTS : 0);
+    if (ioctl (port, TIOCMBIS, &bits)) {            /* set the desired bits */
+        sim_error_serial ("ioctl", errno);          /* report unexpected error */
+        return SCPE_IOERR;                          /* return failure status */
+        }
+    }
+if (bits_to_clear) {
+    bits = ((bits_to_clear&TMXR_MDM_DTR) ? TIOCM_DTR : 0) |
+           ((bits_to_clear&TMXR_MDM_RTS) ? TIOCM_RTS : 0);
+    if (ioctl (port, TIOCMBIC, &bits)) {            /* clear the desired bits */
+        sim_error_serial ("ioctl", errno);          /* report unexpected error */
+        return SCPE_IOERR;                          /* return failure status */
+        }
+    }
+if (incoming_bits) {
+    if (ioctl (port, TIOCMGET, &bits)) {            /* get the modem bits */
+        sim_error_serial ("ioctl", errno);          /* report unexpected error */
+        return SCPE_IOERR;                          /* return failure status */
+        }
+    *incoming_bits = ((bits&TIOCM_CTS) ? TMXR_MDM_CTS : 0) |
+                     ((bits&TIOCM_DSR) ? TMXR_MDM_DSR : 0) |
+                     ((bits&TIOCM_RNG) ? TMXR_MDM_RNG : 0) |
+                     ((bits&TIOCM_CAR) ? TMXR_MDM_DCD : 0);
     }
 
-return TRUE;                                            /* control request succeeded */
+return SCPE_OK;
 }
 
 
@@ -1109,19 +1268,11 @@ return;
 }
 
 
+#else
 
 /* Non-implemented stubs */
 
-#else
-
-/* Enumerate the available serial ports.
-
-   The serial port names are extracted from the appropriate place in the 
-   windows registry (HKLM\HARDWARE\DEVICEMAP\SERIALCOMM\).  The resulting
-   list is sorted alphabetically by device name (COMn).  The device description 
-   is set to the OS internal name for the COM device.
-
-*/
+/* Enumerate the available serial ports. */
 
 static int sim_serial_os_devices (int max, SERIAL_LIST* list)
 {
@@ -1130,7 +1281,7 @@ return -1;
 
 /* Open a serial port */
 
-SERHANDLE sim_open_serial (char *name)
+SERHANDLE sim_open_os_serial (char *name)
 {
 return INVALID_HANDLE;
 }
@@ -1138,7 +1289,7 @@ return INVALID_HANDLE;
 
 /* Configure a serial port */
 
-t_stat sim_config_serial (SERHANDLE port, SERCONFIG config)
+t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 return SCPE_IERR;
 }
@@ -1146,9 +1297,9 @@ return SCPE_IERR;
 
 /* Control a serial port */
 
-t_bool sim_control_serial (SERHANDLE port, t_bool connect)
+t_stat sim_control_serial (SERHANDLE port, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
-return FALSE;
+return SCPE_NOFNC;
 }
 
 

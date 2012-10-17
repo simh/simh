@@ -55,6 +55,8 @@ t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_kmap (int32 flag, char *cptr);
 t_stat sim_set_telnet (int32 flag, char *cptr);
 t_stat sim_set_notelnet (int32 flag, char *cptr);
+t_stat sim_set_serial (int32 flag, char *cptr);
+t_stat sim_set_noserial (int32 flag, char *cptr);
 t_stat sim_set_logon (int32 flag, char *cptr);
 t_stat sim_set_logoff (int32 flag, char *cptr);
 t_stat sim_set_debon (int32 flag, char *cptr);

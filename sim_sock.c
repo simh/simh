@@ -23,6 +23,8 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Oct-12    MP      Added definitions needed to detect possible tcp 
+                        connect failures
    25-Sep-12    MP      Reworked for RFC3493 interfaces supporting IPv6 and IPv4
    22-Jun-10    RMS     Fixed types in sim_accept_conn (from Mark Pizzolato)
    19-Nov-05    RMS     Added conditional for OpenBSD (from Federico G. Schwindt)
@@ -538,7 +540,11 @@ if (err != 0)
 #if defined(AF_INET6)
 load_ws2 ();
 #endif                                                  /* endif AF_INET6 */
-#endif                                                  /* endif Win32 */
+#else                                                   /* Use native addrinfo APIs */
+    p_getaddrinfo = (void *)getaddrinfo;
+    p_getnameinfo = (void *)getnameinfo;
+    p_freeaddrinfo = (void *)freeaddrinfo;
+#endif                                                  /* endif _WIN32 */
 #if defined (SIGPIPE)
 signal (SIGPIPE, SIG_IGN);                              /* no pipe signals */
 #endif
@@ -771,7 +777,10 @@ if (rbytes == SOCKET_ERROR) {
     err = WSAGetLastError ();
     if (err == WSAEWOULDBLOCK)                          /* no data */
         return 0;
-    printf ("Sockets: read error %d\n", err);
+    if ((err != WSAETIMEDOUT) &&                        /* expected errors after a connect failure */
+        (err != WSAEHOSTUNREACH) &&
+        (err != WSAECONNREFUSED))
+        printf ("Sockets: read error %d\n", err);
     return -1;
     }
 return rbytes;
