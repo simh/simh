@@ -71,6 +71,7 @@
    tmxr_poll_tx -                       poll transmit
    tmxr_send_buffered_data -            transmit buffered data
    tmxr_set_modem_control_passthru -    enable modem control on a multiplexer
+   tmxr_clear_modem_control_passthru -  disable modem control on a multiplexer
    tmxr_set_get_modem_bits -            set and/or get a line modem bits
    tmxr_set_config_line -               set port speed, character size, parity and stop bits
    tmxr_open_master -                   open master connection
@@ -867,11 +868,53 @@ return SCPE_OK;
     2  Calling this API enables the tmxr_set_get_modem_bits and
        tmxr_set_config_line APIs.
 
-
 */
 t_stat tmxr_set_modem_control_passthru (TMXR *mp)
 {
 mp->modem_control = TRUE;
+return SCPE_OK;
+}
+
+/* Disable modem control pass thru
+
+   Inputs:
+        none
+        
+   Output:
+        none
+
+   Implementation note:
+
+    1  Calling this API enables this library's direct manipulation 
+       of DTR (&RTS) on serial ports.
+
+    2  Calling this API disables the tmxr_set_get_modem_bits and
+       tmxr_set_config_line APIs.
+
+    3  This API will only change the state of the modem control processing
+       of this library if there are no listening ports, serial ports or 
+       outgoing connecctions associated with the specified multiplexer
+
+*/
+t_stat tmxr_clear_modem_control_passthru (TMXR *mp)
+{
+int i;
+
+if (!mp->modem_control)
+    return SCPE_OK;
+if (mp->master)
+    return SCPE_ALATT;
+for (i=0; i<mp->lines; ++i) {
+    TMLN *lp;
+
+    lp = mp->ldsc + i;
+    if ((lp->master)     || 
+        (lp->conn)       || 
+        (lp->connecting) ||
+        (lp->serport))
+        return SCPE_ALATT;
+    }
+mp->modem_control = FALSE;
 return SCPE_OK;
 }
 
@@ -2116,6 +2159,7 @@ if (lp->txlog == NULL) {                                /* error? */
     free (lp->txlogname);                               /* free buffer */
     return SCPE_OPENERR;
     }
+lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return SCPE_OK;
 }
 
@@ -2138,6 +2182,7 @@ if (lp->txlog) {                                        /* logging? */
     lp->txlog = NULL;
     lp->txlogname = NULL;
     }
+lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return SCPE_OK;
 }
 

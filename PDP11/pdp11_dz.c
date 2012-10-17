@@ -119,9 +119,26 @@ extern int32 int_req[IPL_HLVL];
 #define RBUF_VALID      0100000                         /* rcv valid */
 #define RBUF_MBZ        0004000
 
+char *dz_charsizes[] = {"5", "6", "7", "8"};
+char *dz_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200", 
+                        "1800", "2000", "2400", "3600", "4800", "7200", "9600", "19200"};
+char *dz_parity[] = {"N", "E", "N", "O"};
+char *dz_stopbits[] = {"1", "2", "1", "1.5"};
+
 /* DZLPR - 160102 - line parameter register, write only, word access only */
 
 #define LPR_V_LINE      0                               /* line */
+#define LPR_V_SPEED     8                               /* speed code */
+#define LPR_M_SPEED     0007400                         /* speed code mask */
+#define LPR_V_CHARSIZE  3                               /* char size code */
+#define LPR_M_CHARSIZE  0000030                         /* char size code mask */
+#define LPR_V_STOPBITS  5                               /* stop bits code */
+#define LPR_V_PARENB    6                               /* parity enable */
+#define LPR_V_PARODD    7                               /* parity odd */
+#define LPR_GETSPD(x)   dz_baudrates[((x) & LPR_M_SPEED) >> LPR_V_SPEED]
+#define LPR_GETCHARSIZE(x) dz_charsizes[((x) & LPR_M_CHARSIZE) >> LPR_V_CHARSIZE]
+#define LPR_GETPARITY(x) dz_parity[(((x) >> LPR_V_PARENB) & 1) | (((x) >> (LPR_V_PARODD-1)) & 2)]
+#define LPR_GETSTOPBITS(x) dz_stopbits[(((x) >> LPR_V_STOPBITS) & 1) + (((((x) & LPR_M_CHARSIZE) >> LPR_V_CHARSIZE) == 5) ? 2 : 0)]
 #define LPR_LPAR        0007770                         /* line pars - NI */
 #define LPR_RCVE        0010000                         /* receive enb */
 #define LPR_GETLN(x)    (((x) >> LPR_V_LINE) & DZ_LNOMASK)
@@ -281,6 +298,7 @@ static char *dz_wr_regs[] =
 
 t_stat dz_rd (int32 *data, int32 PA, int32 access)
 {
+int i;
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
@@ -310,6 +328,20 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
 
     case 03:                                            /* MSR */
+        if (dz_mctl)
+            for (i=0; i<DZ_LINES; ++i) {                /* Gather line status bits for each line */
+                int line;
+                int32 modem_bits;
+                TMLN *lp;
+                
+                line = (dz * DZ_LINES) + i;
+                lp = &dz_ldsc[line];                    /* get line desc */
+                tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
+
+                dz_msr[dz] &= ~((1 << (MSR_V_RI + i)) | (1 << (MSR_V_CD + i)));
+                dz_msr[dz] |= ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0) | 
+                              ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0);
+                }
         *data = dz_msr[dz];
         break;
         }
@@ -323,6 +355,7 @@ t_stat dz_wr (int32 data, int32 PA, int32 access)
 {
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
 int32 i, c, line;
+char lineconfig[16];
 TMLN *lp;
 
 sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
@@ -358,6 +391,11 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (dz_lpr[dz] & LPR_RCVE)                      /* rcv enb? on */
             lp->rcve = 1;
         else lp->rcve = 0;                              /* else line off */
+        if (dz_mctl) {
+            sprintf(lineconfig, "%s-%s%s%s", LPR_GETSPD(data), LPR_GETCHARSIZE(data), LPR_GETPARITY(data), LPR_GETSTOPBITS(data));
+            if (!lp->serconfig || (0 != strcmp(lp->serconfig, lineconfig))) /* config changed? */
+                tmxr_set_config_line (lp, lineconfig);  /* set it */
+            }
         tmxr_poll_rx (&dz_desc);                        /* poll input */
         dz_update_rcvi ();                              /* update rx intr */
         break;
@@ -367,23 +405,20 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             (dz_tcr[dz] & 0377) | (data << 8):
             (dz_tcr[dz] & ~0377) | data;
         if (dz_mctl) {                                  /* modem ctl? */
-            dz_msr[dz] |= ((data & 0177400) &           /* dcd |= dtr & ring */
-                ((dz_msr[dz] & DZ_LMASK) << MSR_V_CD));
-            dz_msr[dz] &=  ~(data >> TCR_V_DTR);        /* ring &= ~dtr */
-            if (dz_auto) {                              /* auto disconnect? */
-                int32 drop;
-                drop = (dz_tcr[dz] & ~data) >> TCR_V_DTR; /* drop = dtr & ~data */
-                for (i = 0; i < DZ_LINES; i++) {        /* drop hangups */
-                    line = (dz * DZ_LINES) + i;         /* get line num */
-                    lp = &dz_ldsc[line];                /* get line desc */
-                    if (lp->conn && (drop & (1 << i))) {
-                        tmxr_linemsg (lp, "\r\nLine hangup\r\n");
-                        tmxr_reset_ln (lp);             /* reset line, cdet */
-                        dz_msr[dz] &= ~(1 << (i + MSR_V_CD));
-                        }                               /* end if drop */
-                    }                                   /* end for */
-                }                                       /* end if auto */
-            }                                           /* end if modem */
+            int32 changed = data ^ dz_tcr[dz];
+
+            for (i = 0; i < DZ_LINES; i++) {
+                if (0 == (changed & (1 << (TCR_V_DTR + i))))
+                    continue;                           /* line unchanged skip */
+                line = (dz * DZ_LINES) + i;             /* get line num */
+                lp = &dz_ldsc[line];                    /* get line desc */
+                if (data & (1 << (TCR_V_DTR + i)))
+                    tmxr_set_get_modem_bits (lp, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
+                else
+                    if (dz_auto)
+                        tmxr_set_get_modem_bits (lp, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);
+                }
+            }
         dz_tcr[dz] = data;
         tmxr_poll_tx (&dz_desc);                        /* poll output */
         dz_update_xmti ();                              /* update int */
@@ -423,7 +458,7 @@ return SCPE_OK;
 
 t_stat dz_svc (UNIT *uptr)
 {
-int32 dz, t, newln;
+int32 dz, t, newln, muxln;
 
 for (dz = t = 0; dz < DZ_MUXES; dz++)                   /* check enabled */
     t = t | (dz_csr[dz] & CSR_MSE);
@@ -431,9 +466,10 @@ if (t) {                                                /* any enabled? */
     newln = tmxr_poll_conn (&dz_desc);                  /* poll connect */
     if ((newln >= 0) && dz_mctl) {                      /* got a live one? */
         dz = newln / DZ_LINES;                          /* get mux num */
-        if (dz_tcr[dz] & (1 << (newln + TCR_V_DTR)))    /* DTR set? */
-            dz_msr[dz] |= (1 << (newln + MSR_V_CD));    /* set cdet */
-        else dz_msr[dz] |= (1 << newln);                /* set ring */
+        muxln = newln % DZ_LINES;                       /* get line in mux */
+        if (dz_tcr[dz] & (1 << (muxln + TCR_V_DTR)))    /* DTR set? */
+            dz_msr[dz] |= (1 << (muxln + MSR_V_CD));    /* set cdet */
+        else dz_msr[dz] |= (1 << (muxln + MSR_V_RI));   /* set ring */
         }
     tmxr_poll_rx (&dz_desc);                            /* poll input */
     dz_update_rcvi ();                                  /* upd rcv intr */
@@ -627,13 +663,17 @@ return auto_config (dptr->name, ndev);                  /* auto config */
 
 t_stat dz_attach (UNIT *uptr, char *cptr)
 {
+int32 dz, muxln;
 t_stat r;
 extern int32 sim_switches;
 
-dz_mctl = dz_auto = 0;                                  /* modem ctl off */
+if (sim_switches & SWMASK ('M'))                        /* modem control? */
+    tmxr_set_modem_control_passthru (&dz_desc);
 r = tmxr_attach (&dz_desc, uptr, cptr);                 /* attach mux */
-if (r != SCPE_OK)                                       /* error? */
+if (r != SCPE_OK) {                                     /* error? */
+    tmxr_clear_modem_control_passthru (&dz_desc);
     return r;
+    }
 if (sim_switches & SWMASK ('M')) {                      /* modem control? */
     dz_mctl = 1;
     printf ("Modem control activated\n");
@@ -646,6 +686,18 @@ if (sim_switches & SWMASK ('M')) {                      /* modem control? */
             fprintf (sim_log, "Auto disconnect activated\n");
         }
     }
+
+for (dz = 0; dz < DZ_MUXES; dz++) {
+    if (!dz_mctl || (0 == (dz_csr[dz] & CSR_MSE)))      /* enabled? */
+        continue;
+    for (muxln = 0; muxln < DZ_LINES; muxln++) {
+        if (dz_tcr[dz] & (1 << (muxln + TCR_V_DTR))) {
+            TMLN *lp = &dz_ldsc[(dz * DZ_LINES) + muxln];
+
+            tmxr_set_get_modem_bits (lp, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
+            }
+        }
+    }
 return SCPE_OK;
 }
 
@@ -653,6 +705,7 @@ return SCPE_OK;
 
 t_stat dz_detach (UNIT *uptr)
 {
+dz_mctl = dz_auto = 0;                                  /* modem ctl off */
 return tmxr_detach (&dz_desc, uptr);
 }
 

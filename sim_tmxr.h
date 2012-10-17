@@ -150,6 +150,7 @@ t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_attach (TMXR *mp, UNIT *uptr, char *cptr);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
 t_stat tmxr_set_modem_control_passthru (TMXR *mp);
+t_stat tmxr_clear_modem_control_passthru (TMXR *mp);
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits);
 t_stat tmxr_set_config_line (TMLN *lp, char *config);
 t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
