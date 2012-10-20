@@ -1265,7 +1265,7 @@ if (nbytes) {                                           /* >0? write */
     else
         sbytes = tmxr_write (lp, lp->txbsz - lp->txbpr);/* write to end buf */
 
-    if (sbytes > 0) {                                   /* ok? */
+    if (sbytes >= 0) {                                  /* ok? */
         tmxr_debug (TMXR_DBG_XMT, lp, "Sent", &(lp->txb[lp->txbpr]), sbytes);
         lp->txbpr = (lp->txbpr + sbytes);               /* update remove ptr */
         if (lp->txbpr >= lp->txbsz)                     /* wrap? */
@@ -1273,7 +1273,6 @@ if (nbytes) {                                           /* >0? write */
         lp->txcnt = lp->txcnt + sbytes;                 /* update counts */
         nbytes = nbytes - sbytes;
         }
-
     if (nbytes && (lp->txbpr == 0))     {               /* more data and wrap? */
         sbytes = tmxr_write (lp, nbytes);
         if (sbytes > 0) {                               /* ok */
@@ -1423,7 +1422,7 @@ while (*tptr) {
         sim_close_sock (sock, 1);
         strcpy(listen, port);
         cptr = get_glyph (cptr, option, ';');
-        if (cptr && (0 == MATCH_CMD (option, "NOTELNET")))
+        if (option[0] && (0 == MATCH_CMD (option, "NOTELNET")))
             listennotelnet = TRUE;
         }
     if (line == -1) {

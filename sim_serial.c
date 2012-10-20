@@ -1249,7 +1249,7 @@ int written;
 
 written = write (port, (void *) buffer, (size_t) count);    /* write the buffer to the serial port */
 
-if (written == -1)                                          /* write error? */
+if ((written == -1) && (errno != EAGAIN))                   /* write error? */
     sim_error_serial ("write", errno);                      /* report unexpected error */
 
 return (int32) written;                                     /* return number of characters written */
