@@ -27,7 +27,7 @@
                 (PDP-15) RF15/RS09
 
    04-Oct-06    RMS     Fixed bug, DSCD does not clear function register
-   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
+   15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    14-Jan-04    RMS     Revised IO device call interface
                         Changed sim_fsize calling sequence
    26-Oct-03    RMS     Cleaned up buffer copy code

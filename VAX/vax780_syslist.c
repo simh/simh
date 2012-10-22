@@ -1,4 +1,4 @@
-/* vax_syslist.c: VAX device list
+/* vax780_syslist.c: VAX 780 device list
 
    Copyright (c) 1998-2008, Robert M Supnik
 
@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
+   17-May-06    RMS     Added CR11/CD11 support (John Dundas)
    01-Oct-04    RMS     Cloned from vax_sys.c
 */
 
@@ -52,6 +52,7 @@ extern DEVICE ts_dev;
 extern DEVICE tq_dev;
 extern DEVICE tu_dev;
 extern DEVICE dz_dev;
+extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
 
 extern int32 sim_switches;
@@ -74,6 +75,7 @@ DEVICE *sim_devices[] = {
     &tto_dev,
     &fl_dev,
     &dz_dev,
+    &vh_dev,
     &cr_dev,
     &lpt_dev,
     &rp_dev,

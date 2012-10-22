@@ -1093,7 +1093,7 @@ switch (td_state) {                                     /* case on state */
         if (td_txsize > 0)
             td_state = TD_WRITE1;
         else {                                          /* check whole number of blocks written */
-            if (td_olen = (512 - (td_offset % 512)) != 512) {
+            if ((td_olen = (512 - (td_offset % 512)) != 512)) {
                 for (i = 0; i < td_olen; i++)
                     fbuf[da + i] = 0;                   /* zero fill */
                 da = da + td_olen;

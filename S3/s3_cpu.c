@@ -1,6 +1,6 @@
 /* s3_cpu.c: IBM System/3 CPU simulator
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
    HPL & SLC instruction code Copyright (c) 2001 by Henk Stegeman
    Decimal Arithmetic Copyright (c) 2000 by Roger Bowler
 
@@ -28,6 +28,8 @@
    ------------------------------------------------------------------------------
 
    cpu          System/3 (models 10 and 15)  central processor
+
+   19-Mar-12    RMS     Changed int to int32 in declarations (Mark Pizzolato)
 
    The IBM System/3 was a popular small-business computing system introduced
    in 1969 as an entry-level system for businesses that could not afford
@@ -381,7 +383,7 @@ int32 debug_reg = 0;                                    /* set for debug/trace *
 int32 debug_flag = 0;                                   /* 1 when trace.log open */
 FILE *trace;
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -525,7 +527,7 @@ reason = 0;
 
 while (reason == 0) {                                   /* loop until halted */
 if (sim_interval <= 0) {                                /* check clock queue */
-    if (reason = sim_process_event ()) break;
+    if ((reason = sim_process_event ())) break;
 }
 
 if (int_req) {                                          /* interrupt? */

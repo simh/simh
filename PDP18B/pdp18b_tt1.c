@@ -1,6 +1,6 @@
 /* pdp18b_ttx.c: PDP-9/15 additional terminals simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ttix,ttox    LT15/LT19 terminal input/output
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
@@ -214,14 +215,14 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, tmxr_poll);                         /* continue poll */
+sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
 ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
 if (ln >= 0)                                            /* got one? rcv enab */
     ttx_ldsc[ln].rcve = 1;
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
 for (ln = 0; ln < TTX_MAXL; ln++) {                     /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
-        if (temp = tmxr_getc_ln (&ttx_ldsc[ln])) {      /* get char */
+        if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = 0;
             else c = sim_tt_inpcvt (temp, TT_GET_MODE (ttox_unit[ln].flags) | TTUF_KSR);

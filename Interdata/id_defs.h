@@ -1,6 +1,6 @@
 /* id_defs.h: Interdata 16b/32b simulator definitions
 
-   Copyright (c) 2000-2010, Robert M. Supnik
+   Copyright (c) 2000-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Carl Friend and Al Kossow,
    who provided key documents about the Interdata product line.
 
+   18-Apr-12    RMS     Added clock coschedule prototype
    22-May-10    RMS     Added check for 64b definitions
    09-Mar-06    RMS     Increased register sets to architectural limit
    25-Jan-04    RMS     Removed local logging support
@@ -482,5 +483,7 @@ t_stat set_sch (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_sch (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+int32 lfc_cosched (int32 wait);
 
 #endif

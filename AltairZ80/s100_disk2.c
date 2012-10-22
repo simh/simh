@@ -174,10 +174,6 @@ static MTAB disk2_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(disk2_dev.dctrl & level) {   \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB disk2_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -313,7 +309,7 @@ t_stat disk2_detach(UNIT *uptr)
 
 static int32 disk2dev(const int32 port, const int32 io, const int32 data)
 {
-/*  TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " IO %s, Port %02x" NLP, PCX, io ? "WR" : "RD", port)); */
+/*  sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT " IO %s, Port %02x\n", PCX, io ? "WR" : "RD", port); */
     if(io) {
         DISK2_Write(port, data);
         return 0;
@@ -343,7 +339,8 @@ static uint8 DISK2_Read(const uint32 Addr)
             cData |= (disk2_info->seek_complete == 0) ? 0x04 : 0x00;
             cData |= (disk2_info->write_fault) << 1;
             cData |= ((pDrive->track != 0) || (disk2_info->seek_complete == 0)) ? 0x01 : 0x00;
-            TRACE_PRINT(STATUS_MSG, ("DISK2: " ADDRESS_FORMAT " RD STATUS = 0x%02x" NLP, PCX, cData));
+            sim_debug(STATUS_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                      " RD STATUS = 0x%02x\n", PCX, cData);
 
             disk2_info->seek_complete = 1;
             break;
@@ -357,8 +354,9 @@ static uint8 DISK2_Read(const uint32 Addr)
                     pDrive->track --;
                 }
             }
-            TRACE_PRINT(SEEK_MSG, ("DISK2: " ADDRESS_FORMAT " Step %s, Track=%d" NLP,
-                PCX, disk2_info->ctl_op & 0x04 ? "IN" : "OUT", pDrive->track));
+            sim_debug(SEEK_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                      " Step %s, Track=%d\n", PCX,
+                      disk2_info->ctl_op & 0x04 ? "IN" : "OUT", pDrive->track);
             disk2_info->seek_complete = 0;
             cData = 0xFF;           /* Return High-Z data */
             break;
@@ -399,13 +397,11 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                 disk2_info->timeout = 0;
             }
             disk2_info->ctl_us = (cData & 0x03);
-            TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " ATTN*=%d, RUN=%d, OP=%d, FAULT_CLR=%d, US=%d" NLP,
-                PCX,
-                disk2_info->ctl_attn,
-                disk2_info->ctl_run,
-                disk2_info->ctl_op,
-                disk2_info->ctl_fault_clr,
-                disk2_info->ctl_us));
+            sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                      " ATTN*=%d, RUN=%d, OP=%d, FAULT_CLR=%d, US=%d\n",
+                      PCX, disk2_info->ctl_attn, disk2_info->ctl_run,
+                      disk2_info->ctl_op, disk2_info->ctl_fault_clr,
+                      disk2_info->ctl_us);
 
             /* FIXME: seek_complete = 1 is needed by CP/M, but why? Also, maybe related,
              *        there appears to be a bug in the seeking logic.  For some reason, the
@@ -428,21 +424,20 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
 
                 switch(disk2_info->ctl_op) {
                     case DISK2_CMD_NULL:
-                        TRACE_PRINT(CMD_MSG, ("DISK2: " ADDRESS_FORMAT " NULL Command" NLP, PCX));
+                        sim_debug(CMD_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                  " NULL Command\n", PCX);
                         break;
                     case DISK2_CMD_READ_DATA:
-                        TRACE_PRINT(RD_DATA_MSG, ("DISK2: " ADDRESS_FORMAT " READ_DATA: (C:%d/H:%d/S:%d)" NLP,
-                            PCX,
-                            disk2_info->cyl,
-                            disk2_info->head,
-                            disk2_info->sector));
+                        sim_debug(RD_DATA_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                  " READ_DATA: (C:%d/H:%d/S:%d)\n", PCX, disk2_info->cyl, disk2_info->head, disk2_info->sector);
                         if(disk2_info->head_sel != disk2_info->head) {
-                            printf("DISK2: " ADDRESS_FORMAT " READ_DATA: head_sel != head" NLP, PCX);
+                            printf("DISK2: " ADDRESS_FORMAT
+                                   " READ_DATA: head_sel != head" NLP, PCX);
                         }
                         /* See FIXME above... that might be why this does not work properly... */
                         if(disk2_info->cyl != pDrive->track) { /* problem, should not happen, see above */
-                            TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " READ_DATA: cyl=%d, track=%d" NLP,
-                                PCX, disk2_info->cyl, pDrive->track));
+                            sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                      " READ_DATA: cyl=%d, track=%d\n", PCX, disk2_info->cyl, pDrive->track);
                             pDrive->track = disk2_info->cyl; /* update track */
                         }
                         sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
@@ -450,15 +445,18 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             /* Read sector */
                             rtn = sim_fread(sdata.raw, 1, (pDrive->sectsize + 3), (pDrive->uptr)->fileref);
                             if (rtn != (size_t)(pDrive->sectsize + 3)) {
-                                TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " READ_DATA: sim_fread error." NLP, PCX));
+                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                          " READ_DATA: sim_fread error.\n", PCX);
                             }
                             if(sdata.u.header[2] == disk2_info->sector) {
                                 if(sdata.u.header[0] != disk2_info->cyl) { /*pDrive->track) { */
-                                    printf("DISK2: " ADDRESS_FORMAT " READ_DATA Incorrect header: track" NLP, PCX);
+                                    printf("DISK2: " ADDRESS_FORMAT
+                                           " READ_DATA Incorrect header: track" NLP, PCX);
                                     disk2_info->timeout = 1;
                                 }
                                 if(sdata.u.header[1] != disk2_info->head) {
-                                    printf("DISK2: " ADDRESS_FORMAT " READ_DATA Incorrect header: head" NLP, PCX);
+                                    printf("DISK2: " ADDRESS_FORMAT
+                                           " READ_DATA Incorrect header: head" NLP, PCX);
                                     disk2_info->timeout = 1;
                                 }
 
@@ -466,24 +464,22 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                                 break;
                             }
                             if(i == pDrive->nsectors) {
-                                printf("DISK2: " ADDRESS_FORMAT " Sector not found" NLP, PCX);
+                                printf("DISK2: " ADDRESS_FORMAT
+                                       " Sector not found" NLP, PCX);
                                 disk2_info->timeout = 1;
                             }
                         }
 
                         break;
                     case DISK2_CMD_WRITE_DATA:
-                        TRACE_PRINT(WR_DATA_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_DATA: (C:%d/H:%d/S:%d)" NLP,
-                            PCX,
-                            disk2_info->cyl,
-                            disk2_info->head,
-                            disk2_info->sector));
+                        sim_debug(WR_DATA_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                  " WRITE_DATA: (C:%d/H:%d/S:%d)\n", PCX, disk2_info->cyl, disk2_info->head, disk2_info->sector);
                         if(disk2_info->head_sel != disk2_info->head) {
                             printf("DISK2: " ADDRESS_FORMAT " WRITE_DATA: head_sel != head" NLP, PCX);
                         }
                         if(disk2_info->cyl != pDrive->track) { /* problem, should not happen, see above */
-                            TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_DATA = 0x%02x, cyl=%d, track=%d" NLP,
-                                PCX, cData, disk2_info->cyl, pDrive->track));
+                            sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                      " WRITE_DATA = 0x%02x, cyl=%d, track=%d\n", PCX, cData, disk2_info->cyl, pDrive->track);
                             pDrive->track = disk2_info->cyl; /* update track */
                        }
 
@@ -493,15 +489,18 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             file_offset = ftell((pDrive->uptr)->fileref);
                             rtn = sim_fread(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
                             if (rtn != 3) {
-                                TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_DATA: sim_fread error." NLP, PCX));
+                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                          " WRITE_DATA: sim_fread error.\n", PCX);
                             }
                             if(sdata.u.header[2] == disk2_info->sector) {
                                 if(sdata.u.header[0] != disk2_info->cyl) {
-                                    printf("DISK2: " ADDRESS_FORMAT " WRITE_DATA Incorrect header: track" NLP, PCX);
+                                    printf("DISK2: " ADDRESS_FORMAT
+                                           " WRITE_DATA Incorrect header: track" NLP, PCX);
                                     disk2_info->timeout = 1;
                                 }
                                 if(sdata.u.header[1] != disk2_info->head) {
-                                    printf("DISK2: " ADDRESS_FORMAT " WRITE_DATA Incorrect header: head" NLP, PCX);
+                                    printf("DISK2: " ADDRESS_FORMAT
+                                           " WRITE_DATA Incorrect header: head" NLP, PCX);
                                     disk2_info->timeout = 1;
                                 }
 
@@ -512,7 +511,8 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             }
                             rtn = sim_fread(sdata.raw, 1, pDrive->sectsize, (pDrive->uptr)->fileref);
                             if (rtn != (size_t)(pDrive->sectsize)) {
-                                TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_DATA: sim_fread error." NLP, PCX));
+                                sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                          " WRITE_DATA: sim_fread error.\n", PCX);
                             }
                             if(i == pDrive->nsectors) {
                                 printf("DISK2: " ADDRESS_FORMAT " Sector not found" NLP, PCX);
@@ -522,12 +522,10 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                         break;
                     case DISK2_CMD_WRITE_HEADER:
                         track_offset = pDrive->track * pDrive->nheads * pDrive->nsectors * (pDrive->sectsize + 3);
-                        TRACE_PRINT(CMD_MSG, ("DISK2: " ADDRESS_FORMAT " WRITE_HEADER Command: track=%d (%d), Head=%d, Sector=%d" NLP,
-                            PCX,
-                            pDrive->track,
-                            disk2_info->cyl,
-                            disk2_info->head_sel,
-                            disk2_info->hdr_sector));
+                        sim_debug(CMD_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                  " WRITE_HEADER Command: track=%d (%d), Head=%d, Sector=%d\n",
+                                  PCX, pDrive->track, disk2_info->cyl,
+                                  disk2_info->head_sel, disk2_info->hdr_sector);
 
                         i = disk2_info->hdr_sector;
                         selchan_dma(sdata.raw, 3);
@@ -542,11 +540,13 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                         break;
                     case DISK2_CMD_READ_HEADER:
                         track_offset = pDrive->track * pDrive->nheads * pDrive->nsectors * (pDrive->sectsize + 3);
-                        TRACE_PRINT(CMD_MSG, ("DISK2: " ADDRESS_FORMAT " READ_HEADER Command" NLP, PCX));
+                        sim_debug(CMD_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                  " READ_HEADER Command\n", PCX);
                         sim_fseek((pDrive->uptr)->fileref, track_offset + (disk2_info->head_sel * pDrive->nsectors * (pDrive->sectsize + 3)), SEEK_SET);
                         rtn = sim_fread(sdata.raw, 1, 3, (pDrive->uptr)->fileref);
                         if (rtn != 3) {
-                            TRACE_PRINT(ERROR_MSG, ("DISK2: " ADDRESS_FORMAT " READ_HEADER: sim_fread error." NLP, PCX));
+                            sim_debug(ERROR_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                                      " READ_HEADER: sim_fread error.\n", PCX);
                         }
                         selchan_dma(sdata.raw, 3);
 
@@ -578,33 +578,36 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
                             disk2_info->sel_drive = 3;
                             break;
                         default:
-                            printf("DISK2: " ADDRESS_FORMAT " Error, invalid drive select=0x%x" NLP, PCX, cData >> 4);
+                            printf("DISK2: " ADDRESS_FORMAT
+                                   " Error, invalid drive select=0x%x" NLP, PCX, cData >> 4);
                             break;
                     }
 
                     disk2_info->head_sel = cData & 0x0F;
 
-                    TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " Write DATA [DRIVE]=%d, Head=%d" NLP,
-                        PCX, disk2_info->sel_drive, disk2_info->head));
+                    sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                              " Write DATA [DRIVE]=%d, Head=%d\n",
+                              PCX, disk2_info->sel_drive, disk2_info->head);
                     break;
                 case DISK2_OP_CYL:
                     disk2_info->cyl = cData;
-                    TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " Write DATA [CYL] = %02x" NLP,
-                        PCX, cData));
+                    sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                              " Write DATA [CYL] = %02x\n", PCX, cData);
                     break;
                 case DISK2_OP_HEAD:
                     disk2_info->head = cData;
-                    TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " Write DATA [HEAD] = %02x" NLP,
-                        PCX, cData));
+                    sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                              " Write DATA [HEAD] = %02x\n", PCX, cData);
                     break;
                 case DISK2_OP_SECTOR:
                     disk2_info->sector = cData;
-                    TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " Write Register [SECTOR] = %02x" NLP,
-                        PCX, cData));
+                    sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                              " Write Register [SECTOR] = %02x\n", PCX, cData);
                     break;
                 default:
-                    TRACE_PRINT(VERBOSE_MSG, ("DISK2: " ADDRESS_FORMAT " Write Register unknown op [%d] = %02x" NLP,
-                        PCX, disk2_info->ctl_op, cData));
+                    sim_debug(VERBOSE_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+                              " Write Register unknown op [%d] = %02x\n",
+                              PCX, disk2_info->ctl_op, cData);
                     break;
             }
     }
@@ -616,7 +619,8 @@ static uint8 DISK2_Write(const uint32 Addr, uint8 cData)
 
 static void raise_disk2_interrupt(void)
 {
-    TRACE_PRINT(IRQ_MSG, ("DISK2: " ADDRESS_FORMAT " Interrupt" NLP, PCX));
+    sim_debug(IRQ_MSG, &disk2_dev, "DISK2: " ADDRESS_FORMAT
+              " Interrupt\n", PCX);
 
     raise_ss1_interrupt(SS1_VI1_INT);
 

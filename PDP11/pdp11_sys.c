@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    15-May-08    RMS     Added KE11-A, DC11 support
                         Renamed DL11
@@ -30,13 +31,13 @@
    25-Jan-08    RMS     Added RC11, KG11A support from John Dundas
    10-Sep-07    RMS     Cleaned up binary loader
    20-Dec-06    RMS     Added TA11 support
-   12-Nov-06    RMS     Fixed operand order in EIS instructions (found by W.F.J. Mueller)
+   12-Nov-06    RMS     Fixed operand order in EIS instructions (W.F.J. Mueller)
    14-Jul-06    RMS     Reordered device list
    06-Jul-06    RMS     Added multiple KL11/DL11 support
    26-Jun-06    RMS     Added RF11 support
-   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
+   17-May-06    RMS     Added CR11/CD11 support (John Dundas)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   22-Jul-05    RMS     Fixed missing , in initializer (from Doug Gwyn)
+   22-Jul-05    RMS     Fixed missing , in initializer (Doug Gwyn)
    22-Dec-03    RMS     Added second DEUNA/DELUA support
    18-Oct-03    RMS     Added DECtape off reel message
    06-May-03    RMS     Added support for second DEQNA/DELQA
@@ -992,7 +993,7 @@ switch (j) {                                            /* case on class */
                 disp = (disp - addr) & 0177777;
             else return SCPE_ARG;
             }
-        if ((disp & 1) || (disp > 0400) && (disp < 0177402))
+        if ((disp & 1) || ((disp > 0400) && (disp < 0177402)))
             return SCPE_ARG;
         val[0] = val[0] | (((disp - 2) >> 1) & 0377);
         break;

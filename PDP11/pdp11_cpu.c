@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,19 +25,21 @@
 
    cpu          PDP-11 CPU
 
-   29-Dec-08    RMS     Fixed failure to clear cpu_bme on RESET (found by Walter Mueller)
-   22-Apr-08    RMS     Fixed MMR0 treatment in RESET (found by Walter Mueller)
-   02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
+   29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
+   19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
+   29-Dec-08    RMS     Fixed failure to clear cpu_bme on RESET (Walter Mueller)
+   22-Apr-08    RMS     Fixed MMR0 treatment in RESET (Walter Mueller)
+   02-Feb-08    RMS     Fixed DMA memory address limit test (John Dundas)
    28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
    18-Oct-06    RMS     Fixed bug in ASH -32 C value
    24-May-06    RMS     Added instruction history
    03-May-06    RMS     Fixed XOR operand fetch order for 11/70-style systems
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    19-May-05    RMS     Replaced WAIT clock queue check with API call
-   19-Jan-05    RMS     Fixed bug(s) in RESET for 11/70 (reported by Tim Chapman)
-   22-Dec-04    RMS     Fixed WAIT to work in all modes (from John Dundas)
+   19-Jan-05    RMS     Fixed bug(s) in RESET for 11/70 (Tim Chapman)
+   22-Dec-04    RMS     Fixed WAIT to work in all modes (John Dundas)
    02-Oct-04    RMS     Added model emulation
    25-Jan-04    RMS     Removed local debug logging support
    29-Dec-03    RMS     Formalized 18b Qbus support
@@ -47,19 +49,19 @@
    01-Feb-03    RMS     Changed R display to follow PSW<rs>, added SP display
    19-Jan-03    RMS     Changed mode definitions for Apple Dev Kit conflict
    05-Jan-03    RMS     Added memory size restore support
-   17-Oct-02    RMS     Fixed bug in examine/deposit (found by Hans Pufal)
+   17-Oct-02    RMS     Fixed bug in examine/deposit (Hans Pufal)
    08-Oct-02    RMS     Revised to build dib_tab dynamically
                         Added SHOW IOSPACE
    09-Sep-02    RMS     Added KW11P support
    14-Jul-02    RMS     Fixed bug in MMR0 error status load
    03-Jun-02    RMS     Fixed relocation add overflow, added PS<15:12> = 1111
                         special case logic to MFPI and removed it from MTPI
-                        (found by John Dundas)
-   29-Apr-02    RMS     More fixes to DIV and ASH/ASHC (found by John Dundas)
+                        (John Dundas)
+   29-Apr-02    RMS     More fixes to DIV and ASH/ASHC (John Dundas)
    28-Apr-02    RMS     Fixed bugs in illegal instruction 000010 and in
-                        write-only memory pages (found by Wolfgang Helbig)
+                        write-only memory pages (Wolfgang Helbig)
    21-Apr-02    RMS     Fixed bugs in DIV by zero, DIV overflow, TSTSET, RTS,
-                        ASHC -32, and red zone trap (found by John Dundas)
+                        ASHC -32, and red zone trap (John Dundas)
    04-Mar-02    RMS     Changed double operand evaluation order for M+
    23-Feb-02    RMS     Fixed bug in MAINT, CPUERR, MEMERR read
    28-Jan-02    RMS     Revised for multiple timers; fixed calc_MMR1 macros
@@ -81,7 +83,7 @@
    05-Apr-01    RMS     Added TS11/TSV05 support
    05-Mar-01    RMS     Added clock calibration support
    11-Feb-01    RMS     Added DECtape support
-   25-Jan-01    RMS     Fixed 4M memory definition (found by Eric Smith)
+   25-Jan-01    RMS     Fixed 4M memory definition (Eric Smith)
    14-Apr-99    RMS     Changed t_addr to unsigned
    18-Aug-98    RMS     Added CIS support
    09-May-98    RMS     Fixed bug in DIV overflow test
@@ -304,7 +306,7 @@ t_addr cpu_memsize = INIMEMSIZE;                        /* last mem addr */
 extern int32 CPUERR, MAINT;
 extern int32 sim_interval;
 extern int32 sim_int_char;
-extern uint32 sim_switches;
+extern int32 sim_switches;
 extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern t_bool sim_idle_enab;
 extern DEVICE *sim_devices[];
@@ -730,7 +732,7 @@ while (reason == 0)  {
 
     if (trap_req) {                                     /* check traps, ints */
         trapea = 0;                                     /* assume srch fails */
-        if (t = trap_req & TRAP_ALL) {                  /* if a trap */
+        if ((t = trap_req & TRAP_ALL)) {                /* if a trap */
             for (trapnum = 0; trapnum < TRAP_V_MAX; trapnum++) {
                 if ((t >> trapnum) & 1) {               /* trap set? */
                     trapea = trap_vec[trapnum];         /* get vec, clr */
@@ -1291,7 +1293,7 @@ while (reason == 0)  {
             break;
 
         case 070:                                       /* CSM */
-            if (CPUT (HAS_CSM) && (MMR3 & MMR3_CSM) || (cm != MD_KER)) {
+            if ((CPUT (HAS_CSM) && (MMR3 & MMR3_CSM)) || (cm != MD_KER)) {
                 dst = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
                 PSW = get_PSW () & ~PSW_CC;             /* PSW, cc = 0 */
                 STACKFILE[cm] = SP;

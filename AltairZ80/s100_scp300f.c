@@ -120,10 +120,6 @@ static MTAB scp300f_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(scp300f_dev.dctrl & level) { \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB scp300f_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -151,7 +147,7 @@ static t_stat scp300f_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
-    TRACE_PRINT(VERBOSE_MSG, ("SCP300F: Reset." NLP));
+    sim_debug(VERBOSE_MSG, &scp300f_dev, "SCP300F: Reset.\n");
 
     if(dptr->flags & DEV_DIS) { /* Disconnect I/O Ports */
         sim_map_resource(pnp->io_base, pnp->io_size, RESOURCE_TYPE_IO, &scp300fdev, TRUE);
@@ -321,7 +317,7 @@ static uint8 scp300f_rom[SCP300F_ROM_SIZE] = {
     if(write) {
         if(scp300f_info->rom_enabled)
         {
-            TRACE_PRINT(ROM_MSG, ("SCP300F: " ADDRESS_FORMAT " WR ROM[0x%05x]: Cannot write to ROM." NLP, PCX, Addr));
+            sim_debug(ROM_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " WR ROM[0x%05x]: Cannot write to ROM.\n", PCX, Addr);
         } else {
         }
         return 0;
@@ -370,38 +366,38 @@ static uint8 SCP300F_Read(const uint32 Addr)
     switch(Addr & SCP300F_IO_MASK) {
         case SCP300F_MPIC_0:
         case SCP300F_MPIC_1:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " Master 8259 DATA RD[%02x]: not implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " Master 8259 DATA RD[%02x]: not implemented.\n", PCX, Addr);
             break;
         case SCP300F_SPIC_0:
         case SCP300F_SPIC_1:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " Slave 8259 DATA RD[%02x]: not implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " Slave 8259 DATA RD[%02x]: not implemented.\n", PCX, Addr);
             break;
         case SCP300F_9513_DATA:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " 9513 DATA RD[%02x]: not implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " 9513 DATA RD[%02x]: not implemented.\n", PCX, Addr);
             break;
         case SCP300F_9513_STATUS:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " 9513 STAT RD[%02x]: not implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " 9513 STAT RD[%02x]: not implemented.\n", PCX, Addr);
             break;
         case SCP300F_UART_DATA:     /* UART is handled by the 2SIO, if this gets called, then the 2SIO was not */
         case SCP300F_UART_STATUS:   /* configured properly. */
-            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD[%02x]: UART not configured properly." NLP, PCX, Addr));
+            sim_debug(VERBOSE_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " RD[%02x]: UART not configured properly.\n", PCX, Addr);
             break;
         case SCP300F_PIO_DATA:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " PIO DATA RD[%02x]: not implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " PIO DATA RD[%02x]: not implemented.\n", PCX, Addr);
             break;
         case SCP300F_PIO_STATUS:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " PIO STATUS RD[%02x]: not implemented." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " PIO STATUS RD[%02x]: not implemented.\n", PCX, Addr);
             break;
         case SCP300F_EPROM_DIS:
-            TRACE_PRINT(ROM_MSG, ("SCP300F: " ADDRESS_FORMAT " EPROM DIS RD: EPROM Disabled." NLP, PCX));
+            sim_debug(ROM_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " EPROM DIS RD: EPROM Disabled.\n", PCX);
             scp300f_info->rom_enabled = 0;
             break;
         case SCP300F_SENSE_SW:      /* Sense Switch */
             cData = scp300f_sr;
-            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD: Sense Switch=0x%02x" NLP, PCX, cData));
+            sim_debug(VERBOSE_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " RD: Sense Switch=0x%02x\n", PCX, cData);
             break;
         default:
-            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " RD[%02x]: not Implemented." NLP, PCX, Addr));
+            sim_debug(VERBOSE_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " RD[%02x]: not Implemented.\n", PCX, Addr);
             break;
     }
 
@@ -415,37 +411,37 @@ static uint8 SCP300F_Write(const uint32 Addr, uint8 cData)
     switch(Addr & SCP300F_IO_MASK) {
         case SCP300F_MPIC_0:
         case SCP300F_MPIC_1:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " Master 8259 DATA WR[%02x]=%02x: not implemented." NLP, PCX, Addr, cData));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " Master 8259 DATA WR[%02x]=%02x: not implemented.\n", PCX, Addr, cData);
             break;
         case SCP300F_SPIC_0:
         case SCP300F_SPIC_1:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " Slave 8259 DATA WR[%02x]=%02x: not implemented." NLP, PCX, Addr, cData));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " Slave 8259 DATA WR[%02x]=%02x: not implemented.\n", PCX, Addr, cData);
             break;
         case SCP300F_9513_DATA:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " 9513 DATA WR[%02x]=%02x: not implemented." NLP, PCX, Addr, cData));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " 9513 DATA WR[%02x]=%02x: not implemented.\n", PCX, Addr, cData);
             break;
         case SCP300F_9513_STATUS:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " 9513 STAT WR[%02x]=%02x: not implemented." NLP, PCX, Addr, cData));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " 9513 STAT WR[%02x]=%02x: not implemented.\n", PCX, Addr, cData);
             break;
         case SCP300F_UART_DATA:     /* UART is handled by the 2SIO, if this gets called, then the 2SIO was not */
         case SCP300F_UART_STATUS:   /* configured properly. */
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[%02x]: UART not configured properly." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " WR[%02x]: UART not configured properly.\n", PCX, Addr);
             break;
         case SCP300F_PIO_DATA:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " PIO DATA WR[%02x]=%02x: not implemented." NLP, PCX, Addr, cData));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " PIO DATA WR[%02x]=%02x: not implemented.\n", PCX, Addr, cData);
             break;
         case SCP300F_PIO_STATUS:
-            TRACE_PRINT(UART_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to PIO STATUS." NLP, PCX, Addr));
+            sim_debug(UART_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to PIO STATUS.\n", PCX, Addr);
             break;
         case SCP300F_EPROM_DIS:
-            TRACE_PRINT(ROM_MSG, ("SCP300F: " ADDRESS_FORMAT " EPROM DIS WR: EPROM Disabled." NLP, PCX));
+            sim_debug(ROM_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " EPROM DIS WR: EPROM Disabled.\n", PCX);
             scp300f_info->rom_enabled = 0;
             break;
         case SCP300F_SENSE_SW:
-            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to SR." NLP, PCX, Addr));
+            sim_debug(VERBOSE_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " WR[%02x]: Cannot write to SR.\n", PCX, Addr);
             break;
         default:
-            TRACE_PRINT(VERBOSE_MSG, ("SCP300F: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented." NLP, PCX, Addr, cData));
+            sim_debug(VERBOSE_MSG, &scp300f_dev, "SCP300F: " ADDRESS_FORMAT " WR[0x%02x]=0x%02x: not Implemented.\n", PCX, Addr, cData);
             break;
     }
 

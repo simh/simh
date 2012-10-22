@@ -26,7 +26,7 @@
    cpu          PDP-4/7/9/15 central processor
 
    28-Apr-07    RMS     Removed clock initialization
-   26-Dec-06    RMS     Fixed boundary test in KT15/XVM (reported by Andrew Warkentin)
+   26-Dec-06    RMS     Fixed boundary test in KT15/XVM (Andrew Warkentin)
    30-Oct-06    RMS     Added idle and infinite loop detection
    08-Oct-06    RMS     Added RDCLK instruction
                         Fixed bug, PC off by one on fetch mem mmgt error
@@ -34,7 +34,7 @@
                         PDP-15 sets API 4 on CAL only if 0-3 inactive
                         CAF clears memory management mode register
    27-Jun-06    RMS     Reset clears AC, L, and MQ
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    22-Jul-05    RMS     Removed AAS, error in V1 reference manual
    06-Nov-04    RMS     Added =n to SHOW HISTORY
@@ -56,14 +56,14 @@
                         Fixed memory protect/skip interaction
                         Fixed CAF not to reset CPU
    12-Mar-03    RMS     Added logical name support
-   18-Feb-03    RMS     Fixed three EAE bugs (found by Hans Pufal)
+   18-Feb-03    RMS     Fixed three EAE bugs (Hans Pufal)
    05-Oct-02    RMS     Added DIBs, device number support
    25-Jul-02    RMS     Added DECtape support for PDP-4
    06-Jan-02    RMS     Revised enable/disable support
    30-Dec-01    RMS     Added old PC queue
    30-Nov-01    RMS     Added extended SET/SHOW support
    25-Nov-01    RMS     Revised interrupt structure
-   19-Sep-01    RMS     Fixed bug in EAE (found by Dave Conroy)
+   19-Sep-01    RMS     Fixed bug in EAE (Dave Conroy)
    17-Sep-01    RMS     Fixed typo in conditional
    10-Aug-01    RMS     Removed register from declarations
    17-Jul-01    RMS     Moved function prototype
@@ -604,7 +604,7 @@ while (reason == 0) {                                   /* loop until halted */
     int32 link_init, fill;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         api_int = api_eval (&int_pend);                 /* eval API */
         }
@@ -2132,7 +2132,7 @@ if (usmd && (sw & SWMASK ('V'))) {
         addr = RelocXVM (addr, REL_C);
     else if (RELOC)
         addr = Reloc15 (addr, REL_C);
-    if ((int32) addr < 0)
+    if (((int32) addr) < 0)
         return STOP_MME;
     }
 #endif
@@ -2153,7 +2153,7 @@ if (usmd && (sw & SWMASK ('V'))) {
         addr = RelocXVM (addr, REL_C);
     else if (RELOC)
         addr = Reloc15 (addr, REL_C);
-    if ((int32) addr < 0)
+    if (((int32) addr) < 0)
         return STOP_MME;
     }
 #endif

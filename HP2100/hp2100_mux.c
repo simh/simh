@@ -1,6 +1,6 @@
 /* hp2100_mux.c: HP 2100 12920A terminal multiplexor simulator
 
-   Copyright (c) 2002-2008, Robert M Supnik
+   Copyright (c) 2002-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    MUX,MUXL,MUXM        12920A terminal multiplexor
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
    09-Oct-08    JDB     "muxl_unit" defined one too many units (17 instead of 16)
    10-Sep-08    JDB     SHOW MUX CONN/STAT with SET MUX DIAG is no longer disallowed
@@ -265,9 +268,11 @@ static const uint8 odd_par [256] = {
 
 /* Multiplexer controller state variables */
 
-FLIP_FLOP muxl_control = CLEAR;
-FLIP_FLOP muxl_flag = CLEAR;
-FLIP_FLOP muxl_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } muxl = { CLEAR, CLEAR, CLEAR };
 
 uint32 muxl_ibuf = 0;                                   /* low in: rcv data */
 uint32 muxl_obuf = 0;                                   /* low out: param */
@@ -275,9 +280,11 @@ uint32 muxl_obuf = 0;                                   /* low out: param */
 uint32 muxu_ibuf = 0;                                   /* upr in: status */
 uint32 muxu_obuf = 0;                                   /* upr out: chan */
 
-FLIP_FLOP muxc_control = CLEAR;
-FLIP_FLOP muxc_flag = CLEAR;
-FLIP_FLOP muxc_flagbuf = CLEAR;
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } muxc = { CLEAR, CLEAR, CLEAR };
 
 uint32 muxc_chan = 0;                                   /* ctrl chan */
 uint32 muxc_scan = 0;                                   /* ctrl scan */
@@ -311,9 +318,10 @@ void mux_diag (int32 c);
 
 /* Multiplexer global routines */
 
-uint32 muxlio (uint32 select_code, IOSIG signal, uint32 data);
-uint32 muxuio (uint32 select_code, IOSIG signal, uint32 data);
-uint32 muxcio (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER muxlio;
+IOHANDLER muxuio;
+IOHANDLER muxcio;
+
 t_stat muxi_svc (UNIT *uptr);
 t_stat muxo_svc (UNIT *uptr);
 t_stat muxc_reset (DEVICE *dptr);
@@ -322,20 +330,15 @@ t_stat mux_detach (UNIT *uptr);
 t_stat mux_setdiag (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 
-/* MUX data structures.
+/* MUXL/MUXU device information block.
 
-   mux_order   MUX line connection order table
-   mux_ldsc    MUX line descriptors
-   mux_desc    MUX multiplexer descriptor
+   The DIBs of adjacent cards must be contained in an array, so they are defined
+   here and referenced in the lower and upper card device structures.
 */
 
-int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
-TMLN  mux_ldsc [MUX_LINES] = { { 0 } };                     /* line descriptors */
-TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
-
 DIB mux_dib[] = {
-    { MUXL, &muxlio },
-    { MUXU, &muxuio }
+    { &muxlio, MUXL },
+    { &muxuio, MUXU }
     };
 
 #define muxl_dib mux_dib[0]
@@ -350,6 +353,8 @@ DIB mux_dib[] = {
    muxl_mod     MUXL modifier list
    muxl_dev     MUXL device descriptor
 */
+
+TMXR mux_desc;
 
 DEVICE muxl_dev;
 
@@ -373,9 +378,9 @@ UNIT muxl_unit[] = {
     };
 
 REG muxl_reg[] = {
-    { FLDATA (CTL, muxl_control, 0) },
-    { FLDATA (FLG, muxl_flag,    0) },
-    { FLDATA (FBF, muxl_flagbuf, 0) },
+    { FLDATA (CTL, muxl.control, 0) },
+    { FLDATA (FLG, muxl.flag,    0) },
+    { FLDATA (FBF, muxl.flagbuf, 0) },
     { BRDATA (STA, mux_sta, 8, 16, MUX_LINES + MUX_ILINES) },
     { BRDATA (RPAR, mux_rpar, 8, 16, MUX_LINES + MUX_ILINES) },
     { BRDATA (XPAR, mux_xpar, 8, 16, MUX_LINES) },
@@ -386,7 +391,8 @@ REG muxl_reg[] = {
     { BRDATA (BDFR, mux_defer, 8, 1, MUX_LINES) },
     { URDATA (TIME, muxl_unit[0].wait, 10, 24, 0,
               MUX_LINES, REG_NZ + PV_LEFT) },
-    { ORDATA (DEVNO, muxl_dib.devno, 6), REG_HRO },
+    { ORDATA (SC, muxl_dib.select_code, 6), REG_HRO },
+    { ORDATA (DEVNO, muxl_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -402,8 +408,9 @@ MTAB muxl_mod[] = {
     { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, "LOG", "LOG",   &tmxr_set_log,   &tmxr_show_log, &mux_desc },
     { MTAB_XTD | MTAB_VUN | MTAB_NC, 0, NULL,  "NOLOG", &tmxr_set_nolog, NULL,           &mux_desc },
 
-    { MTAB_XTD | MTAB_VUN, 0, NULL,    "DISCONNECT", &tmxr_dscln, NULL,        &mux_desc },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",      &hp_setdev,  &hp_showdev, &muxl_dev },
+    { MTAB_XTD | MTAB_VUN,            0, NULL,    "DISCONNECT", &tmxr_dscln, NULL,        &mux_desc },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",         &hp_setsc,   &hp_showsc,  &muxl_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO",      &hp_setdev,  &hp_showdev, &muxl_dev },
 
     { 0 }
     };
@@ -435,6 +442,10 @@ DEVICE muxl_dev = {
 
 /* MUXU data structures
 
+   mux_order    MUX line connection order table
+   mux_ldsc     MUX terminal multiplexer line descriptors
+   mux_desc     MUX terminal multiplexer device descriptor
+
    muxu_dib     MUXU device information block
    muxu_unit    MUXU unit list
    muxu_reg     MUXU register list
@@ -445,12 +456,17 @@ DEVICE muxl_dev = {
 
 DEVICE muxu_dev;
 
+int32 mux_order [MUX_LINES] = { -1 };                       /* connection order */
+TMLN  mux_ldsc  [MUX_LINES] = { { 0 } };                    /* line descriptors */
+TMXR  mux_desc = { MUX_LINES, 0, 0, mux_ldsc, mux_order };  /* device descriptor */
+
 UNIT muxu_unit = { UDATA (&muxi_svc, UNIT_ATTABLE, 0), POLL_FIRST };
 
 REG muxu_reg[] = {
     { ORDATA (IBUF, muxu_ibuf, 16) },
     { ORDATA (OBUF, muxu_obuf, 16) },
-    { ORDATA (DEVNO, muxu_dib.devno, 6), REG_HRO },
+    { ORDATA (SC, muxu_dib.select_code, 6), REG_HRO },
+    { ORDATA (DEVNO, muxu_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -464,7 +480,8 @@ MTAB muxu_mod[] = {
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mux_desc },
     { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mux_desc },
-    { MTAB_XTD | MTAB_VDV,            1, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &muxl_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",          "SC",         &hp_setsc,   &hp_showsc,       &muxl_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &muxl_dev },
 
     { 0 }
     };
@@ -494,7 +511,7 @@ DEVICE muxu_dev = {
     &mux_attach,                            /* attach routine */
     &mux_detach,                            /* detach routine */
     &muxu_dib,                              /* device information block */
-    DEV_NET | DEV_DISABLE | DEV_DEBUG,      /* device flags */
+    DEV_DISABLE | DEV_DEBUG,                /* device flags */
     0,                                      /* debug control flags */
     muxu_deb,                               /* debug flag name table */
     NULL,                                   /* memory size change routine */
@@ -512,24 +529,26 @@ DEVICE muxu_dev = {
 
 DEVICE muxc_dev;
 
-DIB muxc_dib = { MUXC, &muxcio };
+DIB muxc_dib = { &muxcio, MUXC };
 
 UNIT muxc_unit = { UDATA (NULL, 0, 0) };
 
 REG muxc_reg[] = {
-    { FLDATA (CTL, muxc_control, 0) },
-    { FLDATA (FLG, muxc_flag,    0) },
-    { FLDATA (FBF, muxc_flagbuf, 0) },
+    { FLDATA (CTL, muxc.control, 0) },
+    { FLDATA (FLG, muxc.flag,    0) },
+    { FLDATA (FBF, muxc.flagbuf, 0) },
     { FLDATA (SCAN, muxc_scan, 0) },
     { ORDATA (CHAN, muxc_chan, 4) },
     { BRDATA (DSO, muxc_ota, 8, 6, MUX_LINES) },
     { BRDATA (DSI, muxc_lia, 8, 2, MUX_LINES) },
-    { ORDATA (DEVNO, muxc_dib.devno, 6), REG_HRO },
+    { ORDATA (SC, muxc_dib.select_code, 6), REG_HRO },
+    { ORDATA (DEVNO, muxc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB muxc_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &muxc_dev },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &muxc_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &muxc_dev },
     { 0 }
     };
 
@@ -570,191 +589,190 @@ DEVICE muxc_dev = {
        to these 128K CRS invocations.
 */
 
-uint32 muxlio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 muxlio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
 int32 ln;
-const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 static uint32 crs_count = 0;                            /* cntr for ioCRS repeat */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
-
-    case ioCLF:                                         /* clear flag flip-flop */
-        muxl_flag = muxl_flagbuf = CLEAR;
-
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fputs (">>MUXl cmds: [CLF] Flag cleared\n", sim_deb);
-
-        mux_data_int ();                                /* look for new int */
-        break;
-
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        muxl_flag = muxl_flagbuf = SET;
-
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fputs (">>MUXl cmds: [STF] Flag set\n", sim_deb);
-        break;
-
-
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (muxl);
-        break;
-
-
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (muxl);
-        break;
-
-
-    case ioIOI:                                         /* I/O data input */
-        data = muxl_ibuf;
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXl cpu:  [LIx%s] Data = %06o\n", hold_or_clear, data);
-        break;
-
-
-    case ioIOO:                                         /* I/O data output */
-        muxl_obuf = data;                               /* store data */
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            if (data & OTL_P)
-                fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Parameter = %06o\n", hold_or_clear, data);
-            else
-                fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Data = %06o\n", hold_or_clear, data);
-        break;
-
-
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        muxl_flag = muxl_flagbuf = SET;                 /* set flag andflag buffer */
-                                                        /* fall into CRS handler */
-
-    case ioCRS:                                         /* control reset */
-        if (crs_count)                                  /* already reset? */
-            break;                                      /* skip redundant clear */
-
-        muxl_control = CLEAR;                           /* clear control flip-flop */
-
-        for (ln = 0; ln < MUX_LINES; ln++) {            /* clear transmit info */
-            mux_xbuf[ln] = mux_xpar[ln] = 0;
-            muxc_ota[ln] = muxc_lia[ln] = mux_xdon[ln] = 0;
-            }
-
-        for (ln = 0; ln < (MUX_LINES + MUX_ILINES); ln++) {
-            mux_rbuf[ln] = mux_rpar[ln] = 0;            /* clear receive info */
-            mux_sta[ln] = mux_rchp[ln] = 0;
-            }
-        break;
-
-
-    case ioCLC:                                         /* clear control flip-flop */
-        muxl_control = CLEAR;
-
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MUXl cmds: [CLC%s] Data interrupt inhibited\n", hold_or_clear);
-        break;
-
-
-    case ioSTC:                                         /* set control flip-flop */
-        muxl_control = SET;                             /* set control */
-
-        ln = MUX_CHAN (muxu_obuf);                      /* get chan # */
-
-        if (muxl_obuf & OTL_TX) {                       /* transmit? */
-            if (ln < MUX_LINES) {                       /* line valid? */
-                if (muxl_obuf & OTL_P) {                /* parameter? */
-                    mux_xpar[ln] = muxl_obuf;           /* store param value */
-                    if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                        fprintf (sim_deb,
-                            ">>MUXl cmds: [STC%s] Transmit channel %d parameter %06o stored\n",
-                            hold_or_clear, ln, muxl_obuf);
-                    }
-
-                else {                                          /* data */
-                    if (mux_xpar[ln] & OTL_TPAR)                /* parity requested? */
-                        muxl_obuf =                             /* add parity bit */
-                            muxl_obuf & ~OTL_PAR |
-                            XMT_PAR(muxl_obuf);
-                    mux_xbuf[ln] = muxl_obuf;                   /* load buffer */
-
-                    if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
-                        mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
-                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                            fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data overrun\n",
-                                              hold_or_clear, ln);
-                        }
-                    else {
-                        if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
-                            mux_ldsc[ln].conn = 1;              /* connect this line */
-                        sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
-                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                            fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data %06o scheduled\n",
-                                              hold_or_clear, ln, muxl_obuf);
-                        }
-                    }
-                }
-            else if (DEBUG_PRI (muxu_dev, DEB_CMDS))            /* line invalid */
-                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d invalid\n", hold_or_clear, ln);
-            }
-
-        else                                                /* receive */
-            if (ln < (MUX_LINES + MUX_ILINES)) {            /* line valid? */
-                if (muxl_obuf & OTL_P) {                    /* parameter? */
-                    mux_rpar[ln] = muxl_obuf;               /* store param value */
-                    if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-                        fprintf (sim_deb,
-                            ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o stored\n",
-                            hold_or_clear, ln, muxl_obuf);
-                    }
-
-                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))    /* data (invalid action) */
-                    fprintf (sim_deb,
-                        ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o invalid action\n",
-                        hold_or_clear, ln, muxl_obuf);
-                }
-
-            else if (DEBUG_PRI (muxu_dev, DEB_CMDS))        /* line invalid */
-                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Receive channel %d invalid\n", hold_or_clear, ln);
-        break;
-
-
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, muxl);                  /* set standard PRL signal */
-        setstdIRQ (select_code, muxl);                  /* set standard IRQ signal */
-        setstdSRQ (select_code, muxl);                  /* set standard SRQ signal */
-        break;
-
-
-    case ioIAK:                                         /* interrupt acknowledge */
-        muxl_flagbuf = CLEAR;
-        break;
-
-
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
-    }
-
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    muxlio (select_code, ioCLF, 0);                     /* issue CLF */
-
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    muxlio (select_code, ioSIR, 0);                     /* set interrupt request */
-
-
-if (signal == ioCRS)                                    /* control reset? */
-    crs_count = crs_count + 1;                          /* increment count */
-
-else if (crs_count && (signal != ioSIR)) {              /* counting CRSes? */
+if (crs_count && !(signal_set & ioCRS)) {               /* counting CRSes and not present? */
     if (DEBUG_PRI (muxu_dev, DEB_CMDS))                 /* report reset count */
         fprintf (sim_deb, ">>MUXl cmds: [CRS] Multiplexer reset %d times\n",
                           crs_count);
+
     crs_count = 0;                                      /* clear counter */
     }
 
-return data;
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
+
+    switch (signal) {                                   /* dispatch I/O signal */
+
+        case ioCLF:                                     /* clear flag flip-flop */
+            muxl.flag = muxl.flagbuf = CLEAR;
+
+            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                fputs (">>MUXl cmds: [CLF] Flag cleared\n", sim_deb);
+
+            mux_data_int ();                            /* look for new int */
+            break;
+
+
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            muxl.flag = muxl.flagbuf = SET;
+
+            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                fputs (">>MUXl cmds: [STF] Flag set\n", sim_deb);
+            break;
+
+
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (muxl);
+            break;
+
+
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (muxl);
+            break;
+
+
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, muxl_ibuf);  /* merge in return status */
+
+            if (DEBUG_PRI (muxu_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MUXl cpu:  [LIx%s] Data = %06o\n", hold_or_clear, muxl_ibuf);
+            break;
+
+
+        case ioIOO:                                     /* I/O data output */
+            muxl_obuf = IODATA (stat_data);             /* store data */
+
+            if (DEBUG_PRI (muxu_dev, DEB_CPU))
+                if (muxl_obuf & OTL_P)
+                    fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Parameter = %06o\n", hold_or_clear, muxl_obuf);
+                else
+                    fprintf (sim_deb, ">>MUXl cpu:  [OTx%s] Data = %06o\n", hold_or_clear, muxl_obuf);
+            break;
+
+
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            muxl.flag = muxl.flagbuf = SET;             /* set flag andflag buffer */
+            break;
+
+
+        case ioCRS:                                     /* control reset */
+            if (crs_count == 0) {                       /* first reset? */
+                muxl.control = CLEAR;                   /* clear control flip-flop */
+
+                for (ln = 0; ln < MUX_LINES; ln++) {    /* clear transmit info */
+                    mux_xbuf[ln] = mux_xpar[ln] = 0;
+                    muxc_ota[ln] = muxc_lia[ln] = mux_xdon[ln] = 0;
+                    }
+
+                for (ln = 0; ln < (MUX_LINES + MUX_ILINES); ln++) {
+                    mux_rbuf[ln] = mux_rpar[ln] = 0;    /* clear receive info */
+                    mux_sta[ln] = mux_rchp[ln] = 0;
+                    }
+                }
+
+            crs_count = crs_count + 1;                  /* increment count */
+            break;
+
+
+        case ioCLC:                                     /* clear control flip-flop */
+            muxl.control = CLEAR;
+
+            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                fprintf (sim_deb, ">>MUXl cmds: [CLC%s] Data interrupt inhibited\n", hold_or_clear);
+            break;
+
+
+        case ioSTC:                                                 /* set control flip-flop */
+            muxl.control = SET;                                     /* set control */
+
+            ln = MUX_CHAN (muxu_obuf);                              /* get chan # */
+
+            if (muxl_obuf & OTL_TX) {                               /* transmit? */
+                if (ln < MUX_LINES) {                               /* line valid? */
+                    if (muxl_obuf & OTL_P) {                        /* parameter? */
+                        mux_xpar[ln] = muxl_obuf;                   /* store param value */
+                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                            fprintf (sim_deb,
+                                ">>MUXl cmds: [STC%s] Transmit channel %d parameter %06o stored\n",
+                                hold_or_clear, ln, muxl_obuf);
+                        }
+
+                    else {                                          /* data */
+                        if (mux_xpar[ln] & OTL_TPAR)                /* parity requested? */
+                            muxl_obuf =                             /* add parity bit */
+                                muxl_obuf & ~OTL_PAR |
+                                XMT_PAR(muxl_obuf);
+                        mux_xbuf[ln] = muxl_obuf;                   /* load buffer */
+
+                        if (sim_is_active (&muxl_unit[ln])) {       /* still working? */
+                            mux_sta[ln] = mux_sta[ln] | LIU_LOST;   /* char lost */
+                            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data overrun\n",
+                                                  hold_or_clear, ln);
+                            }
+                        else {
+                            if (muxu_unit.flags & UNIT_DIAG)        /* loopback? */
+                                mux_ldsc[ln].conn = 1;              /* connect this line */
+                            sim_activate (&muxl_unit[ln], muxl_unit[ln].wait);
+                            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                                fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d data %06o scheduled\n",
+                                                  hold_or_clear, ln, muxl_obuf);
+                            }
+                        }
+                    }
+                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))            /* line invalid */
+                    fprintf (sim_deb, ">>MUXl cmds: [STC%s] Transmit channel %d invalid\n", hold_or_clear, ln);
+                }
+
+            else                                                    /* receive */
+                if (ln < (MUX_LINES + MUX_ILINES)) {                /* line valid? */
+                    if (muxl_obuf & OTL_P) {                        /* parameter? */
+                        mux_rpar[ln] = muxl_obuf;                   /* store param value */
+                        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                            fprintf (sim_deb,
+                                ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o stored\n",
+                                hold_or_clear, ln, muxl_obuf);
+                        }
+
+                    else if (DEBUG_PRI (muxu_dev, DEB_CMDS))        /* data (invalid action) */
+                        fprintf (sim_deb,
+                            ">>MUXl cmds: [STC%s] Receive channel %d parameter %06o invalid action\n",
+                            hold_or_clear, ln, muxl_obuf);
+                    }
+
+                else if (DEBUG_PRI (muxu_dev, DEB_CMDS))            /* line invalid */
+                    fprintf (sim_deb, ">>MUXl cmds: [STC%s] Receive channel %d invalid\n", hold_or_clear, ln);
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (muxl);                           /* set standard PRL signal */
+            setstdIRQ (muxl);                           /* set standard IRQ signal */
+            setstdSRQ (muxl);                           /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            muxl.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
+    }
+
+return stat_data;
 }
 
 
@@ -771,34 +789,41 @@ return data;
        the lower data card CRS handler.
 */
 
-uint32 muxuio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 muxuio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioIOI:                                         /* I/O data input */
-        data = muxu_ibuf;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXu cpu:  [LIx] Status = %06o, channel = %d\n",
-                              data, MUX_CHAN(data));
-        break;
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, muxu_ibuf);  /* merge in return status */
 
-
-    case ioIOO:                                         /* I/O data output */
-        muxu_obuf = data;                               /* store data */
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXu cpu:  [OTx] Data channel = %d\n", MUX_CHAN(data));
-        break;
+            if (DEBUG_PRI (muxu_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MUXu cpu:  [LIx] Status = %06o, channel = %d\n",
+                                  muxu_ibuf, MUX_CHAN(muxu_ibuf));
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioIOO:                                     /* I/O data output */
+            muxu_obuf = IODATA (stat_data);             /* store data */
+
+            if (DEBUG_PRI (muxu_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MUXu cpu:  [OTx] Data channel = %d\n", MUX_CHAN(muxu_obuf));
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-return data;
+return stat_data;
 }
 
 
@@ -809,139 +834,142 @@ return data;
    test is performed after IOO processing.
 */
 
-uint32 muxcio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 muxcio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
+uint16 data;
 int32 ln, old;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        muxc_flag = muxc_flagbuf = CLEAR;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fputs (">>MUXc cmds: [CLF] Flag cleared\n", sim_deb);
+        case ioCLF:                                     /* clear flag flip-flop */
+            muxc.flag = muxc.flagbuf = CLEAR;
 
-        mux_ctrl_int ();                                /* look for new int */
-        break;
+            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                fputs (">>MUXc cmds: [CLF] Flag cleared\n", sim_deb);
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        muxc_flag = muxc_flagbuf = SET;
-
-        if (DEBUG_PRI (muxu_dev, DEB_CMDS))
-            fputs (">>MUXc cmds: [STF] Flag set\n", sim_deb);
-        break;
+            mux_ctrl_int ();                            /* look for new int */
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (muxc);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            muxc.flag = muxc.flagbuf = SET;
+
+            if (DEBUG_PRI (muxu_dev, DEB_CMDS))
+                fputs (">>MUXc cmds: [STF] Flag set\n", sim_deb);
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (muxc);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (muxc);
+            break;
 
 
-    case ioIOI:                                                 /* I/O data input */
-        data = LIC_MBO | PUT_CCH (muxc_chan) |                  /* mbo, chan num */
-               LIC_TSTI (muxc_chan) |                           /* I2, I1 */
-               (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) |    /* ES2, ES1 */
-               (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1));       /* S2, S1 */
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXc cpu:  [LIx%s] Status = %06o, channel = %d\n",
-                              hold_or_clear, data, muxc_chan);
-
-        muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;           /* incr channel */
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (muxc);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        ln = muxc_chan = OTC_CHAN (data);               /* set channel */
+        case ioIOI:                                                 /* I/O data input */
+            data = LIC_MBO | PUT_CCH (muxc_chan) |                  /* mbo, chan num */
+                   LIC_TSTI (muxc_chan) |                           /* I2, I1 */
+                   (muxc_ota[muxc_chan] & (OTC_ES2 | OTC_ES1)) |    /* ES2, ES1 */
+                   (muxc_lia[muxc_chan] & (LIC_S2 | LIC_S1));       /* S2, S1 */
 
-        if (data & OTC_SCAN) muxc_scan = 1;             /* set scan flag */
-        else muxc_scan = 0;
+            if (DEBUG_PRI (muxu_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MUXc cpu:  [LIx%s] Status = %06o, channel = %d\n",
+                                  hold_or_clear, data, muxc_chan);
 
-        if (data & OTC_UPD) {                           /* update? */
-            old = muxc_ota[ln];                         /* save prior val */
-            muxc_ota[ln] =                              /* save ESn,SSn */
-                (muxc_ota[ln] & ~OTC_RW) | (data & OTC_RW);
-
-            if (data & OTC_EC2)                         /* if EC2, upd C2 */
-                muxc_ota[ln] =
-                    (muxc_ota[ln] & ~OTC_C2) | (data & OTC_C2);
-
-            if (data & OTC_EC1)                         /* if EC1, upd C1 */
-                muxc_ota[ln] =
-                    (muxc_ota[ln] & ~OTC_C1) | (data & OTC_C1);
-
-            if (muxu_unit.flags & UNIT_DIAG)            /* loopback? */
-                muxc_lia[ln ^ 1] =                      /* set S1, S2 to C1, C2 */
-                    (muxc_lia[ln ^ 1] & ~(LIC_S2 | LIC_S1)) |
-                    (muxc_ota[ln] & (OTC_C1 | OTC_C2)) >> OTC_V_C;
-
-            else if ((muxl_unit[ln].flags & UNIT_MDM) &&    /* modem ctrl? */
-                (old & DTR) &&                              /* DTR drop? */
-                !(muxc_ota[ln] & DTR)) {
-                tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
-                tmxr_reset_ln (&mux_ldsc[ln]);              /* reset line */
-                muxc_lia[ln] = 0;                           /* dataset off */
-                }
-            }                                               /* end update */
-
-        if (DEBUG_PRI (muxu_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MUXc cpu:  [OTx%s] Parameter = %06o, channel = %d\n",
-                              hold_or_clear, data, ln);
-
-        if ((muxu_unit.flags & UNIT_DIAG) && (!muxc_flag))  /* loopback and flag clear? */
-            mux_ctrl_int ();                                /* status chg may interrupt */
-        break;
+            muxc_chan = (muxc_chan + 1) & LIC_M_CHAN;               /* incr channel */
+            stat_data = IORETURN (SCPE_OK, data);                   /* merge in return status */
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        muxc_flag = muxc_flagbuf = SET;                 /* set flag and flag buffer */
-                                                        /* fall into CRS handler */
+        case ioIOO:                                             /* I/O data output */
+            data = IODATA (stat_data);                          /* clear supplied status */
+            ln = muxc_chan = OTC_CHAN (data);                   /* set channel */
 
-    case ioCRS:                                         /* control reset */
-                                                        /* fall into CLC handler */
+            if (data & OTC_SCAN) muxc_scan = 1;                 /* set scan flag */
+            else muxc_scan = 0;
 
-    case ioCLC:                                         /* clear control flip-flop */
-        muxc_control = CLEAR;
-        break;
+            if (data & OTC_UPD) {                               /* update? */
+                old = muxc_ota[ln];                             /* save prior val */
+                muxc_ota[ln] =                                  /* save ESn,SSn */
+                    (muxc_ota[ln] & ~OTC_RW) | (data & OTC_RW);
+
+                if (data & OTC_EC2)                             /* if EC2, upd C2 */
+                    muxc_ota[ln] =
+                        (muxc_ota[ln] & ~OTC_C2) | (data & OTC_C2);
+
+                if (data & OTC_EC1)                             /* if EC1, upd C1 */
+                    muxc_ota[ln] =
+                        (muxc_ota[ln] & ~OTC_C1) | (data & OTC_C1);
+
+                if (muxu_unit.flags & UNIT_DIAG)                /* loopback? */
+                    muxc_lia[ln ^ 1] =                          /* set S1, S2 to C1, C2 */
+                        (muxc_lia[ln ^ 1] & ~(LIC_S2 | LIC_S1)) |
+                        (muxc_ota[ln] & (OTC_C1 | OTC_C2)) >> OTC_V_C;
+
+                else if ((muxl_unit[ln].flags & UNIT_MDM) &&    /* modem ctrl? */
+                    (old & DTR) &&                              /* DTR drop? */
+                    !(muxc_ota[ln] & DTR)) {
+                    tmxr_linemsg (&mux_ldsc[ln], "\r\nLine hangup\r\n");
+                    tmxr_reset_ln (&mux_ldsc[ln]);              /* reset line */
+                    muxc_lia[ln] = 0;                           /* dataset off */
+                    }
+                }                                               /* end update */
+
+            if (DEBUG_PRI (muxu_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MUXc cpu:  [OTx%s] Parameter = %06o, channel = %d\n",
+                                  hold_or_clear, data, ln);
+
+            if ((muxu_unit.flags & UNIT_DIAG) && (!muxc.flag))  /* loopback and flag clear? */
+                mux_ctrl_int ();                                /* status chg may interrupt */
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        muxc_control = SET;
-        break;
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            muxc.flag = muxc.flagbuf = SET;             /* set flag and flag buffer */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, muxc);                  /* set standard PRL signal */
-        setstdIRQ (select_code, muxc);                  /* set standard IRQ signal */
-        setstdSRQ (select_code, muxc);                  /* set standard SRQ signal */
-        break;
+        case ioCRS:                                     /* control reset */
+        case ioCLC:                                     /* clear control flip-flop */
+            muxc.control = CLEAR;
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        muxc_flagbuf = CLEAR;
-        break;
+        case ioSTC:                                     /* set control flip-flop */
+            muxc.control = SET;
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (muxc);                           /* set standard PRL signal */
+            setstdIRQ (muxc);                           /* set standard IRQ signal */
+            setstdSRQ (muxc);                           /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            muxc.flagbuf = CLEAR;
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    muxcio (select_code, ioCLF, 0);                     /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    muxcio (select_code, ioSIR, 0);                     /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -959,8 +987,6 @@ t_bool loopback;
 loopback = ((muxu_unit.flags & UNIT_DIAG) != 0);        /* diagnostic mode? */
 
 if (!loopback) {                                        /* terminal mode? */
-    if ((uptr->flags & UNIT_ATT) == 0) return SCPE_OK;  /* attached? */
-
     if (uptr->wait == POLL_FIRST)                       /* first poll? */
         uptr->wait = sync_poll (INITIAL);               /* initial synchronization */
     else                                                /* not first */
@@ -1004,8 +1030,8 @@ for (ln = 0; ln < MUX_LINES; ln++) {                    /* loop thru lines */
             muxc_lia[ln] = 0;                           /* line disconnected */
     }
 
-if (!muxl_flag) mux_data_int ();                        /* scan for data int */
-if (!muxc_flag) mux_ctrl_int ();                        /* scan modem */
+if (!muxl.flag) mux_data_int ();                        /* scan for data int */
+if (!muxc.flag) mux_ctrl_int ();                        /* scan modem */
 return SCPE_OK;
 }
 
@@ -1066,7 +1092,7 @@ if (mux_ldsc[ln].conn) {                                /* connected? */
         }
     }
 
-if (!muxl_flag) mux_data_int ();                        /* scan for int */
+if (!muxl.flag) mux_data_int ();                        /* scan for int */
 return SCPE_OK;
 }
 
@@ -1143,7 +1169,7 @@ for (i = 0; i < MUX_LINES; i++) {                       /* rcv lines */
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
             fprintf (sim_deb, ">>MUXl cmds: Receive channel %d interrupt requested\n", i);
 
-        muxlio (muxl_dib.devno, ioENF, 0);              /* interrupt */
+        muxlio (&muxl_dib, ioENF, 0);                   /* interrupt */
         return;
         }
     }
@@ -1159,7 +1185,7 @@ for (i = 0; i < MUX_LINES; i++) {                       /* xmt lines */
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
             fprintf (sim_deb, ">>MUXl cmds: Transmit channel %d interrupt requested\n", i);
 
-        muxlio (muxl_dib.devno, ioENF, 0);              /* interrupt */
+        muxlio (&muxl_dib, ioENF, 0);                   /* interrupt */
         return;
         }
     }
@@ -1175,7 +1201,7 @@ for (i = MUX_LINES; i < (MUX_LINES + MUX_ILINES); i++) {    /* diag lines */
         if (DEBUG_PRI (muxu_dev, DEB_CMDS))
             fprintf (sim_deb, ">>MUXl cmds: Receive channel %d interrupt requested\n", i);
 
-        muxlio (muxl_dib.devno, ioENF, 0);                  /* interrupt */
+        muxlio (&muxl_dib, ioENF, 0);                       /* interrupt */
         return;
         }
     }
@@ -1208,7 +1234,7 @@ for (i = 0; i < line_count; i++) {
                 ">>MUXc cmds: Control channel %d interrupt requested (poll = %d)\n",
                 muxc_chan, i + 1);
 
-        muxcio (muxc_dib.devno, ioENF, 0);              /* set flag */
+        muxcio (&muxc_dib, ioENF, 0);                   /* set flag */
         break;
         }
     }
@@ -1260,6 +1286,7 @@ return;
 t_stat muxc_reset (DEVICE *dptr)
 {
 int32 i;
+DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
 
 if (dptr == &muxc_dev) {                                /* make all consistent */
     hp_enbdis_pair (dptr, &muxl_dev);
@@ -1274,12 +1301,7 @@ else {
     hp_enbdis_pair (dptr, &muxl_dev);
     }
 
-if (dptr == &muxl_dev)                                  /* lower data reset? */
-    muxlio (muxl_dib.devno, ioPOPIO, 0);                /* send POPIO signal to lower data card */
-else if (dptr == &muxu_dev)                             /* upper data reset? */
-    muxuio (muxu_dib.devno, ioPOPIO, 0);                /* send POPIO signal to upper data card */
-else                                                    /* control card reset */
-    muxcio (muxc_dib.devno, ioPOPIO, 0);                /* send POPIO signal to control card */
+IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
 
 muxc_chan = muxc_scan = 0;                              /* init modem scan */
 
@@ -1316,7 +1338,7 @@ if (status == SCPE_OK) {
     sim_activate (&muxu_unit, muxu_unit.wait);          /* start Telnet poll immediately */
     }
 
-return SCPE_OK;
+return status;
 }
 
 

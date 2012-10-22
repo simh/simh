@@ -217,7 +217,7 @@ REG sca_reg[] = {														/* DEVICE STATE/SETTABLE PARAMETERS: */
 	{ HRDATA (SCADSW,    sca_dsw,    16) },								/* device status word */
 	{ DRDATA (SICHAR,    sichar,      8), PV_LEFT },					/* sync/idle character */
 	{ DRDATA (RCVDCHAR,  rcvd_char,   8), PV_LEFT },					/* most recently received character */
-	{ DRDATA (FRAME,     sca_frame,   8), PV_LEFT },					/* frame bits (6, 7 or 8)
+	{ DRDATA (FRAME,     sca_frame,   8), PV_LEFT },					/* frame bits (6, 7 or 8) */
 	{ DRDATA (SCASTATE,  sca_state,  32), PV_LEFT },					/* current state */
 	{ DRDATA (CTIME,     sca_cwait,  32), PV_LEFT },					/* inter-character wait */
 	{ DRDATA (ITIME,     sca_iwait,  32), PV_LEFT },					/* idle wait (polling interval for socket connects) */

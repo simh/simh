@@ -782,7 +782,6 @@ void rp_io_complete (UNIT *uptr, t_stat status)
 {
 uptr->io_status = status;
 uptr->io_complete = 1;
-sim_activate (uptr, 0);
 }
 
 /* Service unit timeout
@@ -1030,7 +1029,7 @@ t_stat r;
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = sim_disk_attach (uptr, cptr, RP_NUMWD * sizeof (uint16), 
                      sizeof (uint16), TRUE, 0, 
-                     drv_tab[GET_DTYPE (uptr->flags)].name, drv_tab[GET_DTYPE (uptr->flags)].sect);
+                     drv_tab[GET_DTYPE (uptr->flags)].name, drv_tab[GET_DTYPE (uptr->flags)].sect, 0);
 if (r != SCPE_OK)                                       /* error? */
     return r;
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */

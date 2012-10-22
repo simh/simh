@@ -1,6 +1,6 @@
 /* id_fd.c: Interdata floppy disk simulator
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    fd           M46-630 floppy disk
+
+   19-Mar-12    RMS     Fixed macro naming conflict (Mark Pizzolato)
 
    A diskette consists of 77 tracks, each with 26 sectors of 128B.  The
    Interdata floppy uses a logical record numbering scheme from 1 to 2002.
@@ -75,11 +77,11 @@
 
 #define STA_WRP         0x80                            /* *write prot */
 #define STA_DEF         0x40                            /* def track NI */
-#define STA_DEL         0x20                            /* del record */
+#define STA_DLR         0x20                            /* del record */
 #define STA_ERR         0x10                            /* error */
 #define STA_IDL         0x02                            /* idle */
 #define STA_OFL         0x01                            /* fault */
-#define STA_MASK        (STA_DEF|STA_DEL|STA_ERR|STA_BSY|STA_IDL)
+#define STA_MASK        (STA_DEF|STA_DLR|STA_ERR|STA_BSY|STA_IDL)
 #define SET_EX          (STA_ERR)                       /* set EX */
 
 /* Extended status, 6 bytes, * = dynamic */
@@ -329,7 +331,7 @@ switch (fnc) {                                          /* case on function */
         for (i = 0; i < FD_NUMBY; i++)                  /* read sector */
             fdxb[i] = fbuf[da + i];
         if (fbuf[FD_SIZE  + uptr->LRN - 1]) {           /* deleted? set err */
-            fd_sta = fd_sta | STA_DEL;
+            fd_sta = fd_sta | STA_DLR;
             fd_es[u][0] = fd_es[u][0] | ES0_DEL;
             }
         fd_es[u][2] = GET_SEC (uptr->LRN);              /* set ext sec/trk */

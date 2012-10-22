@@ -133,10 +133,12 @@
 				EnableIntrinsicFunctions="true"
 				FavorSizeOrSpeed="1"
 				OmitFramePointers="true"
+				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
 				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_780;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO"
 				StringPooling="true"
 				RuntimeLibrary="0"
+				BufferSecurityCheck="false"
 				EnableFunctionLevelLinking="true"
 				UsePrecompiledHeader="0"
 				WarningLevel="3"
@@ -164,6 +166,7 @@
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"
+				LinkTimeCodeGeneration="1"
 				RandomizedBaseAddress="1"
 				DataExecutionPrevention="0"
 				TargetMachine="1"
@@ -251,6 +254,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_vh.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_xu.c"
 				>
 			</File>
@@ -270,6 +277,7 @@
 					>
 					<Tool
 						Name="VCCLCompilerTool"
+						WholeProgramOptimization="false"
 						PreprocessorDefinitions="HAVE_PTW32_CONFIG_H;PTW32_BUILD_INLINED;PTW32_STATIC_LIB;__CLEANUP_C;$(NOINHERIT)"
 					/>
 				</FileConfiguration>
@@ -379,10 +387,6 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
-			<File
-				RelativePath="..\dec_dz.h"
-				>
-			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_io_lib.h"
 				>

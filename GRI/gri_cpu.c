@@ -27,7 +27,7 @@
 
    14-Jan-08    RMS     Added GRI-99 support
    28-Apr-07    RMS     Removed clock initialization
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    18-Jul-04    RMS     Fixed missing ao_update calls in AX, AY write
    17-Jul-04    RMS     Revised MSR, EAO based on additional documentation
    14-Mar-03    RMS     Fixed bug in SC queue tracking
@@ -421,7 +421,7 @@ ao_update ();                                           /* update AO */
 while (reason == 0) {                                   /* loop until halted */
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         }
 

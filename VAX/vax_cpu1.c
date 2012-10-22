@@ -1,6 +1,6 @@
 /* vax_cpu1.c: VAX complex instructions
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,13 +23,14 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   15-Mar-12    RMS     Fixed potential integer overflow in LDPCTX (Mark Pizzolato)
    25-Nov-11    RMS     Added VEC_QBUS test in interrupt handler
-   23-Mar-11    RMS     Revised idle design (from Mark Pizzolato)
+   23-Mar-11    RMS     Revised idle design (Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Separated base register access checks for 11/780
    10-May-06    RMS     Added access check on system PTE for 11/780
                         Added mbz check in LDPCTX for 11/780
-   22-Sep-06    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-06    RMS     Fixed declarations (Sterling Garwood)
    30-Sep-04    RMS     Added conditionals for full VAX
                         Moved emulation to vax_cis.c
                         Moved model-specific IPRs to system module
@@ -37,8 +38,8 @@
                         Fixed EXTxV, INSV double register PC reference fault
    30-Apr-02    RMS     Fixed interrupt/exception handler to clear traps
    17-Apr-02    RMS     Fixed pos > 31 test in bit fields (should be unsigned)
-   14-Apr-02    RMS     Fixed prv_mode handling for interrupts (found by Tim Stark)
-                        Fixed PROBEx to mask mode to 2b (found by Kevin Handy)
+   14-Apr-02    RMS     Fixed prv_mode handling for interrupts (Tim Stark)
+                        Fixed PROBEx to mask mode to 2b (Kevin Handy)
 
    This module contains the instruction simulators for
 
@@ -1137,7 +1138,7 @@ else {
         SP = KSP;                                       /* new stack */
         }
     }
-if (ei == IE_INT) {                                     /* if int, new IPL */
+if (ei > 0) {                                           /* if int, new IPL */
     int32 newipl;
     if (VEC_QBUS && ((vec & VEC_Q) != 0))               /* Qbus and Qbus vector? */
         newipl = PSL_IPL17;                             /* force IPL 17 */
@@ -1274,7 +1275,7 @@ return newpsl & CC_MASK;                                /* set new cc */
 
 void op_ldpctx (int32 acc)
 {
-int32 newpc, newpsl, pcbpa, t;
+uint32 newpc, newpsl, pcbpa, t;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
@@ -1519,6 +1520,10 @@ switch (prn) {                                          /* case on reg # */
 
     case MT_IPL:                                        /* IPL */
         PSL = (PSL & ~PSL_IPL) | ((val & PSL_M_IPL) << PSL_V_IPL);
+        if ((VAX_IDLE_BSDNEW & cpu_idle_mask) &&        /* New NetBSD and OpenBSD */
+            (0 != (PC & 0x80000000)) &&                 /* System Space (Not BOOT ROM) */
+            (val == 1))                                 /* IPL 1 */
+            cpu_idle();                                 /* idle loop */
         break;
 
     case MT_ASTLVL:                                     /* ASTLVL */

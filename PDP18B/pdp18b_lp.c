@@ -36,7 +36,7 @@
    05-Feb-03    RMS     Added LP09, fixed conditionalization
    05-Oct-02    RMS     Added DIB, device number support
    30-May-02    RMS     Widened POS to 32b
-   03-Feb-02    RMS     Fixed typo (found by Robert Alan Byer)
+   03-Feb-02    RMS     Fixed typo (Robert Alan Byer)
    25-Nov-01    RMS     Revised interrupt structure
    19-Sep-01    RMS     Fixed bug in 647
    13-Feb-01    RMS     Revised for register arrays

@@ -1,6 +1,6 @@
 /* sds_sys.c: SDS 940 simulator interface
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -22,6 +22,8 @@
    Except as contained in this notice, the name of Robert M Supnik shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
+
+   19-Mar-12    RMS     Fixed declarations of CCT arrays (Mark Pizzolato)
 */
 
 #include "sds_defs.h"
@@ -154,7 +156,8 @@ t_stat sim_load_cct (FILE *fileref)
 {
 int32 col, rpt, ptr, mask, cctbuf[CCT_LNT];
 t_stat r;
-extern int32 lpt_ccl, lpt_ccp, lpt_cct[CCT_LNT];
+extern int32 lpt_ccl, lpt_ccp;
+extern uint8 lpt_cct[CCT_LNT];
 char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE];
 
 ptr = 0;

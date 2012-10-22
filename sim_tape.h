@@ -121,7 +121,7 @@ typedef void (*TAPE_PCALLBACK)(UNIT *unit, t_stat status);
 
 /* Prototypes */
 
-t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit);
+t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay);
 t_stat sim_tape_attach (UNIT *uptr, char *cptr);
 t_stat sim_tape_detach (UNIT *uptr);
 t_stat sim_tape_rdrecf (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max);

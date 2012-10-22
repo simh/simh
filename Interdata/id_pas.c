@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2008, Robert M Supnik
+   Copyright (c) 2001-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   18-Apr-12    RMS     Revised to use clock coscheduling
+   21-Mar-12    RMS     Fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    18-Oct-06    RMS     Synced PASLA to clock
@@ -318,7 +320,7 @@ int32 ln, c, out;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, lfc_poll);                          /* continue poll */
+sim_activate (uptr, lfc_cosched (lfc_poll));            /* continue poll */
 ln = tmxr_poll_conn (&pas_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     if ((pasl_unit[ln].flags & UNIT_MDM) &&             /* modem control */
@@ -332,7 +334,7 @@ if (ln >= 0) {                                          /* got one? */
 tmxr_poll_rx (&pas_desc);                               /* poll for input */
 for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
     if (pas_ldsc[ln].conn) {                            /* connected? */
-        if (c = tmxr_getc_ln (&pas_ldsc[ln])) {         /* any char? */
+        if ((c = tmxr_getc_ln (&pas_ldsc[ln]))) {       /* any char? */
             pas_sta[ln] = pas_sta[ln] & ~(STA_FR | STA_PF);
             if (pas_rchp[ln])
                 pas_sta[ln] = pas_sta[ln] | STA_OVR;
@@ -345,7 +347,7 @@ for (ln = 0; ln < PAS_ENAB; ln++) {                     /* loop thru lines */
             else {                                      /* normal */
                 out = c & 0x7F;                         /* echo is 7b */
                 c = sim_tt_inpcvt (c, TT_GET_MODE (pasl_unit[ln].flags));
-                if (TT_GET_MODE (pasl_unit[ln].flags) != TT_MODE_8B)
+                if (TT_GET_MODE (pasl_unit[ln].flags) != TTUF_MODE_8B)
                     c = pas_par (pas_cmd[ln], c);       /* apply parity */
                 pas_rbuf[ln] = c;                       /* save char */
                 pas_rchp[ln] = 1;                       /* char pending */
@@ -378,7 +380,7 @@ uint32 ln = uptr - pasl_unit;                           /* line # */
 if (pas_ldsc[ln].conn) {                                /* connected? */
     if (pas_ldsc[ln].xmte) {                            /* xmt enabled? */
         TMLN *lp = &pas_ldsc[ln];                       /* get line */
-        if (TT_GET_MODE (pasl_unit[ln].flags) == TT_MODE_8B)
+        if (TT_GET_MODE (pasl_unit[ln].flags) == TTUF_MODE_8B)
             c = pas_par (pas_cmd[ln], pas_xbuf[ln]);    /* apply parity */
         else c = sim_tt_outcvt (pas_xbuf[ln], TT_GET_MODE (pasl_unit[ln].flags));
         if (c >= 0) {
@@ -467,7 +469,7 @@ else {
     pasl_dev.flags = pasl_dev.flags & ~DEV_DIS;
     }
 if (pas_unit.flags & UNIT_ATT)                          /* master att? */
-    sim_activate_abs (&pas_unit, lfc_poll);             /* cosched with clock */
+    sim_activate (&pas_unit, lfc_poll);
 else sim_cancel (&pas_unit);                            /* else stop */
 for (i = 0; i < PAS_LINES; i++)
     pas_reset_ln (i);
@@ -483,7 +485,7 @@ t_stat r;
 r = tmxr_attach (&pas_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error */
     return r;
-sim_activate_abs (uptr, 100);                           /* quick poll */
+sim_activate (uptr, 100);                               /* quick poll */
 return SCPE_OK;
 }
 

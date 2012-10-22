@@ -1,6 +1,6 @@
 /* i7094_clk.c: IBM 7094 clock
 
-   Copyright (c) 2003-2008, Robert M. Supnik
+   Copyright (c) 2003-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    clk          RPQ F89349 interval timer
                 Chronolog calendar clock
+
+   25-Mar-11    RMS     According to RPQ, clock clears on RESET
 */
 
 #include "i7094_defs.h"
@@ -68,9 +70,9 @@ t_uint64 ctr;
 
 if ((clk_dev.flags & DEV_DIS) == 0) {                   /* clock enabled? */
     ctr = ReadP (CLK_CTR);
-    ctr = (ctr + 1) & DMASK;                            /* increment */
+    ctr = (ctr + 1) & MMASK;                            /* increment */
     WriteP (CLK_CTR, ctr);
-    if ((ctr & MMASK) == 0)                             /* overflow? req trap */
+    if (ctr == 0)                                       /* overflow? req trap */
         chtr_clk = 1;
     sim_activate (uptr, sim_rtcn_calb (CLK_TPS, TMR_CLK)); /* reactivate unit */
     }
@@ -126,6 +128,9 @@ t_stat clk_reset (DEVICE *dptr)
 chtr_clk = 0;
 if (clk_dev.flags & DEV_DIS)
     sim_cancel (&clk_unit);
-else sim_activate (&clk_unit, sim_rtcn_init (clk_unit.wait, TMR_CLK));
+else {
+    sim_activate (&clk_unit, sim_rtcn_init (clk_unit.wait, TMR_CLK));
+    WriteP (CLK_CTR, 0);
+    }
 return SCPE_OK;
 }

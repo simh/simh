@@ -34,12 +34,12 @@
    30-Jul-03    RMS     Fixed FPM class mask
    18-Jul-03    RMS     Added FP15 support
    02-Mar-03    RMS     Split loaders apart for greater flexibility
-   09-Feb-03    RMS     Fixed bug in FMTASC (found by Hans Pufal)
+   09-Feb-03    RMS     Fixed bug in FMTASC (Hans Pufal)
    31-Jan-03    RMS     Added support for RB09
    05-Oct-02    RMS     Added variable device number support
    25-Jul-02    RMS     Added PDP-4 DECtape support
    10-Feb-02    RMS     Added PDP-7 DECtape IOT's
-   03-Feb-02    RMS     Fixed typo (found by Robert Alan Byer)
+   03-Feb-02    RMS     Fixed typo (Robert Alan Byer)
    17-Sep-01    RMS     Removed multiconsole support
    27-May-01    RMS     Added second Teletype support
    18-May-01    RMS     Added PDP-9,-15 API IOT's
@@ -49,8 +49,7 @@
    30-Nov-00    RMS     Added PDP-9,-15 RIM/BIN loader format
    30-Oct-00    RMS     Added support for examine to file
    27-Oct-98    RMS     V2.4 load interface
-   20-Oct-97    RMS     Fixed endian dependence in RIM loader
-                        (found by Michael Somos)
+   20-Oct-97    RMS     Fixed endian dependence in RIM loader (Michael Somos)
 */
 
 #include "pdp18b_defs.h"
@@ -1010,7 +1009,7 @@ for (i = 0; opc_val[i] >= 0; i++) {                     /* loop thru ops */
             break;
 
         case I_V_OPR:                                   /* operate */
-            if (sp = (inst & 03730))
+            if ((sp = (inst & 03730)))
                 fprintf (of, "%s", opcode[i]);
             fprint_opr (of, inst & 014047, I_V_OPR, sp);
             break;

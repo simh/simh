@@ -1,6 +1,6 @@
                       SIMH/HP 21XX DIAGNOSTICS PERFORMANCE
                       ====================================
-                             Last update: 2008-08-07
+                             Last update: 2012-03-30
 
 
 The HP 24396 diagnostic suite has been run against the SIMH HP 21xx simulation.
@@ -70,7 +70,7 @@ The results of the diagnostic runs are summarized below:
 103116  12967 Synchronous Interface              1438    -    No simulation
 103017  12966 Asynchronous Data Set              1519  3.8-0  Passed
 103121  12968 Asynchronous Comm. Interface       1602    -    No simulation
-103024  12821 ICD Disc Interface                 1928    -    No simulation
+103024  12821 ICD Disc Interface                 1928  3.9-0  Passed
 
 104000  2600 Keyboard Display Terminal           1615    -    No simulation
 104003  Teleprinter                              1509  3.2-3  Partial
@@ -127,10 +127,12 @@ offline diagnostics:
                                               Date    Host    Date  SIMH
 Part Number  Diagnostic Name                  Code  Op. Sys.  Code  Vers.  Result
 -----------  -------------------------------  ----  --------  ----  -----  ----------
-92067-16013  Extended Memory Area Firmware    1805  RTE-IVB   5010  3.8-0  Passed
-92084-16423  Virtual Memory Area Firmware     2121  RTE-6/VM  6200  3.8-0  Passed
 12824-16002  Vector Instruction Set Firmware  2026  RTE-IVB   5010  3.8-0  Passed
+91711-12032  ICD/MAC Disc Diagnostic          2201  RTE-IVB   5010  3.9-0  Partial
+92067-16013  Extended Memory Area Firmware    1805  RTE-IVB   5010  3.8-0  Passed
+
 12829-16006  Vector Instruction Set Firmware  2226  RTE-6/VM  6200  3.8-0  Passed
+92084-16423  Virtual Memory Area Firmware     2121  RTE-6/VM  6200  3.8-0  Passed
 92835-16006  SIGNAL/1000 Firmware Diagnostic  2040  RTE-6/VM  6200  3.8-0  Passed
 
 
@@ -1232,6 +1234,105 @@ TEST REPORT:    BUFFERED ASYNC COMM INTFC DIAG
 
                 H025 BI-O COMP
                 PASS 000001
+
+TEST RESULT:    Passed.
+
+
+
+-------------------------------------
+DSN 103024 - 12821 ICD Disc Interface
+-------------------------------------
+
+TESTED DEVICE:  DA, DC (hp2100_di.c, hp2100_di_da.c)
+
+CONFIGURATION:  sim> set DA DIAG
+                sim> set DA ADDRESS=5
+                sim> deposit S 000000
+                sim> reset
+                sim> go 100
+
+TEST REPORT:    *** HPIB 12821A DIAGNOSTIC ***
+
+                INSTRUCTIONS:
+
+                     1. ENTER ? WHEN YOU NEED MORE INFORMATION.
+
+                     2. INDICATE OCTAL VALUES BY A FINAL B (E.G. 13B).
+
+                     3. SET SR BIT 15 ON TO LOOP ON DIAGNOSTIC,
+                        TOGGLE ON,OFF TO BREAK OUT OF A SINGLE TEST
+                        LOOP (CONVERSATIONAL-MODE).
+
+                     4. SET SR BIT 14 TO SUPPRESS PRESET TEST
+
+                     5. SET SR BIT 13 T0 PRINT ONLY ERROR MESSAGES
+                        (EXCEPT CONFIGURATION MESSAGES).
+
+                     6. SET SR BIT 12 TO DELAY 1 SECOND BETWEEN TESTS
+
+                IS THE FIRST CARD IN SELECT CODE 43B?
+                IF YES, INPUT CARRIAGE RETURN
+                OTHERWISE, INPUT THE CORRECT SELECT CODE.. [CR entered]
+
+                INPUT THE LAST OCTAL DIGIT OF THE BUS
+                ADDRESS (0-7 DERIVED FROM S1-S3) ... 5
+
+                IS THE SECOND CARD IN SELECT CODE 44B?
+                IF YES, INPUT CARRIAGE RETURN
+                IF NO SECOND CARD, INPUT 77B
+                IF DIAGNOSTIC GUESSED INCORRECTLY AND THERE IS
+                A SECOND CARD, ENTER CORRECT SELECT CODE... [CR entered]
+
+                INPUT THE LAST OCTAL DIGIT OF THE BUS
+                ADDRESS (0-7 DERIVED FROM S1-S3) ... 0
+
+
+                PROGRAM OPTIONS:
+
+                    CR  - CARRIAGE RETURN- (DEFAULT) EXECUTE DIAG.
+                          FROM TEST 0.
+
+                     N  - BEGIN EXECUTION FROM TEST N
+
+                    LN  - LOOP ON TEST N
+                          (TOGGLE SW BIT 15 TO REGAIN CONTROL)
+
+                     E  - EXIT PROGRAM WITH HLT77
+                          (PRESS RUN TO RE-ENTER PROGRAM)
+
+                     F  - FORCE TESTING TO SECOND BOARD
+
+                     G  - GO BACK AND RETEST BOARD ONE
+
+                     R  - GO BACK TO RECONFIGURATION SECTION
+
+                ? [CR entered]
+
+                 PRESS HALT,PRESET,RUN WITHIN 10 SECONDS !
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> reset
+                sim> go
+
+                 TESTING COMPLETED ON SELECT CODE 43B
+
+                 PRESS HALT,PRESET,RUN WITHIN 10 SECONDS !
+
+                [CTRL+E]
+                Simulation stopped
+
+                sim> reset
+                sim> go
+
+                 TESTING COMPLETED ON SELECT CODE 44B
+
+                (T15)..DI TO HP-IB TO DI TEST PASSES !
+
+                ? E
+
+                HALT instruction 102077
 
 TEST RESULT:    Passed.
 
@@ -3397,6 +3498,546 @@ system.
 
 
 
+--------------------------------------------------
+VISOD - Vector Instruction Set Firmware Diagnostic
+--------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu7.c)
+
+BINARY FILE:    12824-16002 Rev. 2026
+
+HOST SYSTEM:    RTE-IVB Rev. 5010
+
+CONFIGURATION:  sim> set CPU 1000-F
+                sim> set CPU VIS
+                sim> go
+
+TEST REPORT:    VIS ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
+
+TEST RESULT:    Passed.
+
+
+
+------------------------------
+DIAG - ICD/MAC Disc Diagnostic
+------------------------------
+
+TESTED DEVICE:  DA (hp2100_di.c, hp2100_di_da.c)
+
+BINARY FILE:    91711-12032 Rev. 2201
+
+HOST SYSTEM:    RTE-IVB Rev. 5010
+
+CONFIGURATION:  sim> set DA1 7906H
+                sim> set DA1 FORMAT
+                sim> attach DA1 scratch.U1.7906H.disc
+                sim> go
+
+TEST REPORT:    DIAG :  HP-IB DISC DIAGNOSTIC
+
+                DIAG :  CAUTION:  DATA COULD BE DESTROYED ON THE DISC TESTED.
+                DIAG :  REMOVABLE MEDIA SHOULD BE REPLACED.
+
+                DIAG :  List LU (0 for none) ? 0
+                DIAG :  Do you want to trace disc operations ? YES
+                DIAG :  Start trace at what step ? 0
+                DIAG :  Trace operations which are not part of the test steps ? NO
+                DIAG :  Stop after first failure ? NO
+                DIAG :  Disc LU ? 14
+                DIAG :  Disc address ? 1
+                DIAG :  Drive model number ? 06
+                DIAG :  Do you want to run the interactive part of the test ? YES
+
+                DIAG :  LU  14   address 1    select code 12    7906 drive
+
+                DIAG :  CHECK THAT ALL SWITCHES ARE SET CORRECTLY.
+                DIAG :  THE RUN/STOP SWITCH SHOULD BE IN THE RUN POSITION.
+                DIAG :  THE FORMAT SWITCH SHOULD BE ON.
+                DIAG :  THE PROTECT/READ ONLY SWITCH SHOULD BE OFF.
+                DIAG :  Type <space>,<return>
+
+                DIAG :  Beginning part 1 of diagnostic.
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  WRITE LOOPBACK REC  length    10
+                DIAG :  READ LOOPBACK REC   length     8
+                DIAG :  test data read      test passed
+                DIAG :  STEP   0 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  INITIATE SELF TEST
+                DIAG :  RETURN DSJ                                                 2
+                DIAG :  RTN SELF-TEST RES   result 0
+                DIAG :  RETURN DSJ                                                 2
+                DIAG :  STEP   1 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  REQUEST STATUS      drive type 0               0   0  40   0
+                DIAG :  IDENTIFY            result      3              0   0  40   0
+                DIAG :  STEP   3 PASSED
+
+                DIAG :  Part 1 of diagnostic completed.
+
+                DIAG :  Information for test track selection.
+                DIAG :  Drive address limits:
+                DIAG :    cylinders:   0 - 410     heads:  0 - 3    sectors:  0 - 47
+                DIAG :  First and last tracks on LU:
+                DIAG :    cylinder   0  head 0  (track   0)
+                DIAG :    cylinder  49  head 1  (track  99)
+                DIAG :  First and last spares on LU:
+                DIAG :    cylinder  50  head 0
+                DIAG :    cylinder  49  head 1  (track  99)
+                DIAG :  Heads on LU (first - last):  0 - 1
+                DIAG :  Searching entire LU for file directory:
+                DIAG :  NO DIRECTORY OR UNABLE TO READ DIRECTORY ON TEST LU
+                DIAG :  First and last tracks available for testing:
+                DIAG :    cylinder   0  head 0  (track   0)
+                DIAG :    cylinder  49  head 1  (track  99)
+                DIAG :  Default test tracks:
+                DIAG :    cylinder  49  head 0  (track  98)
+                DIAG :    cylinder  49  head 1  (track  99)
+                DIAG :  Use default test tracks ? YES
+
+                DIAG :  Checking test track preambles.
+                DIAG :  Test track preambles are OK.
+
+                DIAG :  Beginning part 2 of diagnostic.
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  STEP   4 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  REQUEST DISC ADDR   cy  49 hd 0 sec  0         0   0  40   0
+                DIAG :  STEP   5 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  RECALIBRATE                                                0
+                DIAG :  REQUEST STATUS      drive type 0               0  37  40   0
+                DIAG :  STEP   6 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  REQUEST SECTOR ADDR sec  6                     0   0  40   0
+                DIAG :  STEP   7 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  CLEAR (OPCODE)
+                DIAG :  RETURN DSJ                                                 2
+                DIAG :  RETURN DSJ                                                 2
+                DIAG :  REQUEST STATUS      drive type 0               0   0  40   0
+                DIAG :  STEP   8 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   138               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 0 sec  0 spd 0
+                DIAG :  STEP   9 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  WRITE FULL SECTOR   length   138               0   0  40   0
+                DIAG :  STEP  10 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count     1         0   0  40   0
+                DIAG :  STEP  11 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ                length   128               0   0  40   0
+                DIAG :  STEP  12 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ WITH OFFSET    length   128 offset  55    0   0  40   0
+                DIAG :  STEP  13 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ WITHOUT VERIFY length   128               0   0  40   0
+                DIAG :  STEP  14 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask  0                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0  14  40   1
+                DIAG :  STEP  16 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask  2                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0   0  40   0
+                DIAG :  STEP  17 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask  2                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 3 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0  14  40   1
+                DIAG :  STEP  18 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask  3                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 3 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0   0  40   0
+                DIAG :  REQUEST DISC ADDR   cy  50 hd 0 sec  1         0   0  40   0
+                DIAG :  STEP  19 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask 11                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0   0  40   0
+                DIAG :  REQUEST DISC ADDR   cy  48 hd 0 sec  1         0   0  40   0
+                DIAG :  STEP  20 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 1         1   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 0 sec  0 spd 0
+                DIAG :  STEP  21 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 0 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 4         4   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  22 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 2         2   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  25 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 0 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 6         6   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  26 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 3         3   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  28 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 0 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 4         4   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  30 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 0 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 0         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 0 sec  0 spd 0
+                DIAG :  SET FILE MASK       mask  0                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ                length   128               0   0  40   0
+                DIAG :  STEP  31 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 0         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  SET FILE MASK       mask  0                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ                length   128               0   0  40   0
+                DIAG :  STEP  32 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  WRITE               length   128               0   0  40   0
+                DIAG :  STEP  35 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  READ                length   128               0   0  40   0
+                DIAG :  test data read      test passed
+                DIAG :  STEP  36 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy   1 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy   1 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy   2 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy   2 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy   4 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy   4 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy   8 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy   8 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy  16 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy  16 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy  32 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy  32 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy  64 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy  64 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy 128 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy 128 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy 256 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy 256 hd 0 sec  0         0   0  40   0
+                DIAG :  SEEK                cy 410 hd 0 sec  0         0  37  40   0
+                DIAG :  REQUEST DISC ADDR   cy 410 hd 0 sec  0         0   0  40   0
+                DIAG :  STEP  40 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count     1         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count     2         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count     4         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count     8         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count    16         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count    32         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  VERIFY              sector count    48         0   0  40   0
+                DIAG :  STEP  45 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  secondary           HP-IB value 162
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 163
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 164
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 165
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 166
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 167
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 170
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 171
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 172
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 173
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 174
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  secondary           HP-IB value 175
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  STEP  49 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  opcode              HP-IB value   1
+                DIAG :  REQUEST STATUS      drive type 0               0  37  40   0
+                DIAG :  opcode              HP-IB value  15
+                DIAG :  REQUEST STATUS      drive type 0               0   1  40   0
+                DIAG :  opcode              HP-IB value  26
+                DIAG :  REQUEST STATUS      drive type 0               0   1  40   0
+                DIAG :  STEP  50 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  48 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 0         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  52 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 0 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 0         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  54 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 0         0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  SET FILE MASK       mask  0                    0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ                length   128               0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  5         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   138               0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  WRITE FULL SECTOR   length   138               0   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  1         0  37  40   0
+                DIAG :  READ                length   128               0   0  40   0
+                DIAG :  STEP  55 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  read without SRD
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  STEP  56 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SWD without write
+                DIAG :  REQUEST STATUS      drive type 0               0  12  40   0
+                DIAG :  STEP  57 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask  3                    0   0  40   0
+                DIAG :  SEEK                cy 410 hd 3 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0  14  44   1
+                DIAG :  STEP  59 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SET FILE MASK       mask 11                    0   0  44   0
+                DIAG :  SEEK                cy   0 hd 3 sec 47         0  37  40   0
+                DIAG :  READ FULL SECTOR    length   140               0  14  44   1
+                DIAG :  STEP  60 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 4 sec  0         0  23  44   1
+                DIAG :  SEEK                cy   0 hd 0 sec  0         0  37  40   0
+                DIAG :  STEP  72 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy 411 hd 1 sec  0         0  23  44   1
+                DIAG :  SEEK                cy   0 hd 0 sec  0         0  37  40   0
+                DIAG :  STEP  73 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec 49         0  23  44   1
+                DIAG :  SEEK                cy   0 hd 0 sec  0         0  37  40   0
+                DIAG :  STEP  74 PASSED
+
+                DIAG :  Part 2 of diagnostic completed.
+
+                DIAG :  Beginning part 3 of diagnostic (interactive).
+
+                DIAG :  PUT RUN/STOP SWITCH IN STOP POSITION
+                DIAG :  Type <space>,<return>
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  REQUEST STATUS      drive type 0               0  37 243   0
+                DIAG :  STEP  80 PASSED
+
+
+                DIAG :  PUT RUN/STOP SWITCH IN RUN POSITION
+                DIAG :  Type <space>,<return>
+                DIAG :  WAITING FOR THE DRIVE TO BE READY
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  RETURN DSJ                                                 0
+                DIAG :  REQUEST STATUS      drive type 0               0   0  50   0
+                DIAG :  STEP  81 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  ADDRESS RECORD      cy  49 hd 1 sec  0         0   0  40   0
+                DIAG :  INITIALIZE          length  6144 spd 2         2   0  40   0
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37  40   0
+                DIAG :  READ FULL SECTOR    length     3               0   0  40   0
+                DIAG :  decode preamble     cy  49 hd 1 sec  0 spd 0
+                DIAG :  STEP  82 FAILED
+
+
+                DIAG :  TURN OFF FORMAT SWITCH
+                DIAG :  Type <space>,<return>
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  REQUEST STATUS      drive type 0               0   0   0   0
+                DIAG :  STEP  83 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37   0   0
+                DIAG :  WRITE               length     1               0   0   0   0
+                DIAG :  STEP  84 FAILED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37   0   0
+                DIAG :  WRITE FULL SECTOR   length     1               0  23   0   1
+                DIAG :  STEP  85 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 1 sec  0         0  37   0   0
+                DIAG :  INITIALIZE          length     1 spd 0         0  23   0   1
+                DIAG :  STEP  86 PASSED
+
+
+                DIAG :  TURN ON FORMAT SWITCH
+                DIAG :  Type <space>,<return>
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  REQUEST STATUS      drive type 0               0   0  40   0
+                DIAG :  STEP  87 PASSED
+
+
+                DIAG :  TURN ON UPPER PLATTER PROTECT SWITCH
+                DIAG :  Type <space>,<return>
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37 140   0
+                DIAG :  STEP  89 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37 140   0
+                DIAG :  WRITE               length     1               0  23 140   1
+                DIAG :  STEP  90 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37 140   0
+                DIAG :  WRITE FULL SECTOR   length     1               0  23 140   1
+                DIAG :  STEP  91 PASSED
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37 140   0
+                DIAG :  INITIALIZE          length     1 spd 0         0  23 140   1
+                DIAG :  STEP  92 PASSED
+
+
+                DIAG :  TURN OFF PROTECT READ ONLY SWITCH
+                DIAG :  Type <space>,<return>
+
+                DIAG :  operation           parameters/results        spd cs  ds  DSJ
+                DIAG :  SEEK                cy  49 hd 0 sec  0         0  37  40   0
+                DIAG :  STEP  97 PASSED
+
+                DIAG :  Part 3 of diagnostic completed.
+
+                DIAG :  Cleaning up.
+
+                DIAG :  DIAGNOSTIC TERMINATED.  15 FAILURES DETECTED.
+
+TEST RESULT:    Partially passed.
+
+TEST NOTES:     Steps 11-14 test CRC generation and checking.  Steps 21 and 28
+                test the defective cylinder bit.  Steps 22 and 26 test the spare
+                cylinder bit.  Steps 25, 82, and 84 test the protected cylinder
+                bit.  Step 30 tests track sparing.  Steps 52, 54, and 55 test
+                cylinder, head, and sector miscompares by writing incorrect
+                preambles.  These features are not simulated.
+
+
+
 ------------------------------------------------
 #EMA - Extended Memory Array Firmware Diagnostic
 ------------------------------------------------
@@ -3411,6 +4052,26 @@ CONFIGURATION:  sim> set CPU EMA
                 sim> go
 
 TEST REPORT:    EMA ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
+
+TEST RESULT:    Passed.
+
+
+
+--------------------------------------------------
+VISOD - Vector Instruction Set Firmware Diagnostic
+--------------------------------------------------
+
+TESTED DEVICE:  CPU (hp2100_cpu7.c)
+
+BINARY FILE:    12829-16006 Rev. 2226
+
+HOST SYSTEM:    RTE-6/VM Rev. 6200
+
+CONFIGURATION:  sim> set CPU 1000-F
+                sim> set CPU VIS
+                sim> go
+
+TEST REPORT:    VIS ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
 
 TEST RESULT:    Passed.
 
@@ -3440,46 +4101,6 @@ TEST REPORT:    VMACK  - VMA FIRMWARE DIAGNOSTIC, FIRMWARE REV#   003
                 VMACK  - .PMAP     NO ERRORS DETECTED    PASS#     1
                 VMACK  - .IMAP     NO ERRORS DETECTED    PASS#     1
                 VMACK  - .JMAP     NO ERRORS DETECTED    PASS#     1
-
-TEST RESULT:    Passed.
-
-
-
---------------------------------------------------
-VISOD - Vector Instruction Set Firmware Diagnostic
---------------------------------------------------
-
-TESTED DEVICE:  CPU (hp2100_cpu7.c)
-
-BINARY FILE:    12824-16002 Rev. 2026
-
-HOST SYSTEM:    RTE-IVB Rev. 5010
-
-CONFIGURATION:  sim> set CPU 1000-F
-                sim> set CPU VIS
-                sim> go
-
-TEST REPORT:    VIS ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
-
-TEST RESULT:    Passed.
-
-
-
---------------------------------------------------
-VISOD - Vector Instruction Set Firmware Diagnostic
---------------------------------------------------
-
-TESTED DEVICE:  CPU (hp2100_cpu7.c)
-
-BINARY FILE:    12829-16006 Rev. 2226
-
-HOST SYSTEM:    RTE-6/VM Rev. 6200
-
-CONFIGURATION:  sim> set CPU 1000-F
-                sim> set CPU VIS
-                sim> go
-
-TEST REPORT:    VIS ON-LINE DIAGNOSTIC SUCCESSFUL COMPLETION
 
 TEST RESULT:    Passed.
 

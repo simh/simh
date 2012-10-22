@@ -1,6 +1,6 @@
 /* vax_io.c: VAX 3900 Qbus IO simulator
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,9 @@
 
    qba          Qbus adapter
 
+   25-Mar-12    RMS     Added parameter to int_ack prototype (Mark Pizzolata)
    28-May-08    RMS     Inlined physical memory routines
-   25-Jan-08    RMS     Fixed declarations (from Mark Pizzolato)
+   25-Jan-08    RMS     Fixed declarations (Mark Pizzolato)
    03-Dec-05    RMS     Added SHOW QBA VIRT and ex/dep via map
    05-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
@@ -34,11 +35,11 @@
                         Moved mem_err, crd_err interrupts here from vax_cpu.c
    09-Sep-04    RMS     Integrated powerup into RESET (with -p)
    05-Sep-04    RMS     Added CRD interrupt handling
-   28-May-04    RMS     Revised I/O dispatching (from John Dundas)
+   28-May-04    RMS     Revised I/O dispatching (John Dundas)
    21-Mar-04    RMS     Added RXV21 support
    21-Dec-03    RMS     Fixed bug in autoconfigure vector assignment; added controls
-   21-Nov-03    RMS     Added check for interrupt slot conflict (found by Dave Hittner)
-   29-Oct-03    RMS     Fixed WriteX declaration (found by Mark Pizzolato)
+   21-Nov-03    RMS     Added check for interrupt slot conflict (Dave Hittner)
+   29-Oct-03    RMS     Fixed WriteX declaration (Mark Pizzolato)
    19-Apr-03    RMS     Added optimized byte and word DMA routines
    12-Mar-03    RMS     Added logical name support
    22-Dec-02    RMS     Added console halt support
@@ -188,7 +189,7 @@ t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 
 /* Interrupt request to interrupt action map */
 
-int32 (*int_ack[IPL_HLVL][32])();                       /* int ack routines */
+int32 (*int_ack[IPL_HLVL][32])(void);                   /* int ack routines */
 
 /* Interrupt request to vector map */
 
@@ -791,7 +792,7 @@ init_ubus_tab ();                                       /* init bus tables */
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
-        if (r = build_ubus_tab (dptr, dibp))            /* add to bus tab */
+        if ((r = build_ubus_tab (dptr, dibp)))          /* add to bus tab */
             return r;
         }                                               /* end if enabled */
     }                                                   /* end for */

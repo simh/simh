@@ -26,8 +26,8 @@
    com          7750 controller
    coml         7750 lines
 
-   12-Aug-2010  RMS     Major rewrite for CTSS (from Dave Pitts)
-   19-Nov-2008  RMS     Revised for common TMXR show routines
+   12-Aug-10    RMS     Major rewrite for CTSS (Dave Pitts)
+   19-Nov-08    RMS     Revised for common TMXR show routines
 
    This module implements an abstract simulator for the IBM 7750 communications
    computer as used by the CTSS system.  The 7750 supports up to 112 lines;
@@ -1175,7 +1175,7 @@ char name[20];
 ln = uptr - coml_dev.units;
 sprintf (name, val? "Output queue %d": "Input queue %d", ln);
 lh = val? &com_outq[ln]: &com_inpq[ln];
-if (entc = com_show_qsumm (st, lh, name)) {
+if ((entc = com_show_qsumm (st, lh, name))) {
     for (i = 0, next = lh->head; next != 0;
          i++, next = com_pkt[next].next) {
         if ((i % 8) == 0)

@@ -24,21 +24,21 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    19-Mar-11    RMS     Reverted multiple tape indicator implementation
-   20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (from Van Snyder)
+   20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (Van Snyder)
    07-Nov-10    RMS     Fixed divide not to clear word marks in quotient
-   24-Apr-10    RMS     Revised divide algorithm (from Van Snyder)
-   11-Jul-08    RMS     Added missing A magtape modifier (from Van Snyder)
-                        Fixed tape indicator implementation (from Bob Abeles)
-                        Fixed bug in ZA and ZS (from Bob Abeles)
+   24-Apr-10    RMS     Revised divide algorithm (Van Snyder)
+   11-Jul-08    RMS     Added missing A magtape modifier (Van Snyder)
+                        Fixed tape indicator implementation (Bob Abeles)
+                        Fixed bug in ZA and ZS (Bob Abeles)
    07-Jul-07    RMS     Removed restriction on load-mode binary tape
    28-Jun-07    RMS     Added support for SS overlap modifiers
-   22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
-   06-Mar-06    RMS     Fixed bug in divide (found by Van Snyder)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
+   06-Mar-06    RMS     Fixed bug in divide (Van Snyder)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    01-Sep-05	RMS     Removed error stops in MCE
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    02-Jun-05    RMS     Fixed SSB-SSG clearing on RESET
-                        (reported by Ralph Reinke)
+                        (Ralph Reinke)
    14-Nov-04    WVS     Added column binary support, debug support
    06-Nov-04    RMS     Added instruction history
    12-Jul-03    RMS     Moved ASCII/BCD tables to included file
@@ -266,6 +266,7 @@ REG cpu_reg[] = {
     { FLDATA (IOCHK, iochk, 0) },
     { FLDATA (PRCHK, prchk, 0) },
     { FLDATA (HBPEND, hb_pend, 0) },
+    { BRDATA (IND, ind, 8, 32, 64), REG_HIDDEN + PV_LEFT },
     { BRDATA (ISQ, pcq, 10, 14, PCQ_SIZE), REG_RO+REG_CIRC },
     { DRDATA (ISQP, pcq_p, 6), REG_HRO },
     { ORDATA (WRU, sim_int_char, 8) },
@@ -546,7 +547,7 @@ while (reason == 0) {                                   /* loop until halted */
 
     saved_IS = IS;                                      /* commit prev instr */
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         }
 
@@ -1038,7 +1039,7 @@ CHECK_LENGTH:
 */
 
     case OP_R:                                          /* read */
-        if (reason = iomod (ilnt, D, r_mod))            /* valid modifier? */
+        if ((reason = iomod (ilnt, D, r_mod)))          /* valid modifier? */
             break;
         reason = read_card (ilnt, D);                   /* read card */
         BS = CDR_BUF + CDR_WIDTH;
@@ -1048,7 +1049,7 @@ CHECK_LENGTH:
         break;
 
     case OP_W:                                          /* write */
-        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+        if ((reason = iomod (ilnt, D, w_mod)))          /* valid modifier? */
             break;
         reason = write_line (ilnt, D);                  /* print line */
         BS = LPT_BUF + LPT_WIDTH;
@@ -1058,7 +1059,7 @@ CHECK_LENGTH:
         break;
 
     case OP_P:                                          /* punch */
-        if (reason = iomod (ilnt, D, p_mod))            /* valid modifier? */
+        if ((reason = iomod (ilnt, D, p_mod)))          /* valid modifier? */
             break;
         reason = punch_card (ilnt, D);                  /* punch card */
         BS = CDP_BUF + CDP_WIDTH;
@@ -1068,7 +1069,7 @@ CHECK_LENGTH:
         break;
 
     case OP_WR:                                         /* write and read */
-        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+        if ((reason = iomod (ilnt, D, w_mod)))          /* valid modifier? */
             break;
         reason = write_line (ilnt, D);                  /* print line */
         r1 = read_card (ilnt, D);                       /* read card */
@@ -1081,7 +1082,7 @@ CHECK_LENGTH:
         break;
 
     case OP_WP:                                         /* write and punch */
-        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+        if ((reason = iomod (ilnt, D, w_mod)))          /* valid modifier? */
             break;
         reason = write_line (ilnt, D);                  /* print line */
         r1 = punch_card (ilnt, D);                      /* punch card */
@@ -1094,7 +1095,7 @@ CHECK_LENGTH:
         break;
 
     case OP_RP:                                         /* read and punch */
-        if (reason = iomod (ilnt, D, NULL))             /* valid modifier? */
+        if ((reason = iomod (ilnt, D, NULL)))           /* valid modifier? */
             break;
         reason = read_card (ilnt, D);                   /* read card */
         r1 = punch_card (ilnt, D);                      /* punch card */
@@ -1107,7 +1108,7 @@ CHECK_LENGTH:
         break;
 
     case OP_WRP:                                        /* write, read, punch */
-        if (reason = iomod (ilnt, D, w_mod))            /* valid modifier? */
+        if ((reason = iomod (ilnt, D, w_mod)))          /* valid modifier? */
             break;
         reason = write_line (ilnt, D);                  /* print line */
         r1 = read_card (ilnt, D);                       /* read card */
@@ -1121,9 +1122,9 @@ CHECK_LENGTH:
         break;
 
     case OP_SS:                                         /* select stacker */
-        if (reason = iomod (ilnt, D, ss_mod))           /* valid modifier? */
+        if ((reason = iomod (ilnt, D, ss_mod)))         /* valid modifier? */
             break;
-        if (reason = select_stack (D))                  /* sel stack, error? */
+        if ((reason = select_stack (D)))                /* sel stack, error? */
             break;
         if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
             BRANCH;
@@ -1131,7 +1132,7 @@ CHECK_LENGTH:
         break;
 
     case OP_CC:                                         /* carriage control */
-        if (reason = carriage_control (D))              /* car ctrl, error? */
+        if ((reason = carriage_control (D)))            /* car ctrl, error? */
             break;
         if ((ilnt == 4) || (ilnt == 5)) {               /* check for branch */
             BRANCH;
@@ -1153,7 +1154,7 @@ CHECK_LENGTH:
             reason = STOP_INVL;
         else if (ioind != BCD_PERCNT)                   /* valid dev addr? */
             reason = STOP_INVA;
-        else if (reason = iomod (ilnt, D, mtf_mod))     /* valid modifier? */
+        else if ((reason = iomod (ilnt, D, mtf_mod)))   /* valid modifier? */
             break;
         if (dev == IO_MT)                               /* BCD? */
             reason = mt_func (unit, 0, D);

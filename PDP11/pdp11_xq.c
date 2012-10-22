@@ -606,7 +606,7 @@ void xq_make_checksum(CTLR* xq)
   /* checksum calculation routine detailed in vaxboot.zip/xqbtdrivr.mar */
   uint32  checksum = 0;
   const uint32 wmask = 0xFFFF;
-  int i;
+  size_t i;
 
   for (i = 0; i < sizeof(ETH_MAC); i += 2) {
     checksum <<= 1;
@@ -685,7 +685,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
   char  buffer[20];
-  int i;
+  size_t i;
 
   if (xq->var->mode == XQ_T_DELQA_PLUS) {
     eth_mac_fmt(&xq->var->init.phys, buffer);
@@ -702,7 +702,7 @@ t_stat xq_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc)
     fprintf(st, "Filters:\n");
     for (i=0; i<XQ_FILTER_MAX; i++) {
       eth_mac_fmt((ETH_MAC*)xq->var->setup.macs[i], buffer);
-      fprintf(st, "  [%2d]: %s\n", i, buffer);
+      fprintf(st, "  [%2d]: %s\n", (int)i, buffer);
     }
     if (xq->var->setup.multicast)
       fprintf(st, "All Multicast Receive Mode\n");
@@ -1132,7 +1132,6 @@ t_stat xq_process_setup(CTLR* xq)
   int i,j;
   int count = 0;
   float secs;
-  t_stat status;
   uint32 saved_debug = xq->dev->dctrl;
   ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
   ETH_MAC filters[XQ_FILTER_MAX + 1];
@@ -1188,7 +1187,7 @@ t_stat xq_process_setup(CTLR* xq)
 
     xq->var->setup.multicast = (0 != (len & XQ_SETUP_MC));
     xq->var->setup.promiscuous = (0 != (len & XQ_SETUP_PM));
-    if (led = (len & XQ_SETUP_LD) >> 2) {
+    if ((led = (len & XQ_SETUP_LD) >> 2)) {
       switch (led) {
         case 1: xq->var->setup.l1 = 0; break;
         case 2: xq->var->setup.l2 = 0; break;
@@ -1225,11 +1224,11 @@ t_stat xq_process_setup(CTLR* xq)
   for (i = 0; i < XQ_FILTER_MAX; i++)
     if (memcmp(zeros, &xq->var->setup.macs[i], sizeof(ETH_MAC)))
       memcpy (filters[count++], xq->var->setup.macs[i], sizeof(ETH_MAC));
-  status = eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
+  eth_filter (xq->var->etherface, count, filters, xq->var->setup.multicast, xq->var->setup.promiscuous);
 
   /* process MOP information */
   if (xq->var->write_buffer.msg[0])
-    status = xq_process_mop(xq);
+    xq_process_mop(xq);
 
   /* mark setup block valid */
   xq->var->setup.valid = 1;
@@ -1366,7 +1365,6 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
 {
   int i;
   int32 rstatus, wstatus;
-  t_stat status;
 
   sim_debug(DBG_TRC, xq->dev, "xq_dispatch_rbdl()\n");
 
@@ -1394,7 +1392,7 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
 
   /* process any waiting packets in receive queue */
   if (xq->var->ReadQ.count)
-    status = xq_process_rbdl(xq);
+    xq_process_rbdl(xq);
 
   return SCPE_OK;
 }
@@ -2075,6 +2073,9 @@ t_stat xq_process_bootrom (CTLR* xq)
       /* set to next bdl (implicit chain) */
       xq->var->rbdl_ba += 12;
       break;
+
+    default:
+      break;
   } /* switch */
 
   /* --------------------------- Done, finish up -----------------------------*/
@@ -2139,12 +2140,12 @@ void xq_start_receiver(CTLR* xq)
 
   /* start the read service timer or enable asynch reading as appropriate */
   if (xq->var->must_poll)
-    sim_activate(xq->unit, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+    sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
   else
     if ((xq->var->poll == 0) || (xq->var->mode == XQ_T_DELQA_PLUS))
       eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     else
-      sim_activate(xq->unit, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+      sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
 }
 
 void xq_stop_receiver(CTLR* xq)
@@ -2250,7 +2251,6 @@ t_stat xq_wr_icr(CTLR* xq, int32 data)
 
 t_stat xq_wr(int32 data, int32 PA, int32 access)
 {
-  t_stat status;
   CTLR* xq = xq_pa2ctlr(PA);
   int index = (PA >> 1) & 07;   /* word index */
 
@@ -2266,19 +2266,19 @@ t_stat xq_wr(int32 data, int32 PA, int32 access)
           xq->var->iba = (xq->var->iba & 0xFFFF) | ((data & 0xFFFF) << 16);
           break;
         case 2:   /* ICR */
-          status = xq_wr_icr(xq, data);
+          xq_wr_icr(xq, data);
           break;
         case 3:
           break;
         case 4:   /* SRQR */
-          status = xq_wr_srqr(xq, data);
+          xq_wr_srqr(xq, data);
           break;
         case 5:
           break;
         case 6:
           break;
         case 7:   /* ARQR */
-          status = xq_wr_arqr(xq, data);
+          xq_wr_arqr(xq, data);
           break;
       }
       break;
@@ -2304,20 +2304,20 @@ t_stat xq_wr(int32 data, int32 PA, int32 access)
           break;
         case 3:   /* receive bdl high bits */
           xq->var->rbdl[1] = data;
-          status = xq_dispatch_rbdl(xq); /* start receive operation */
+          xq_dispatch_rbdl(xq); /* start receive operation */
           break;
         case 4:   /* transmit bdl low bits */
           xq->var->xbdl[0] = data;
           break;
         case 5:   /* transmit bdl high bits */
           xq->var->xbdl[1] = data;
-          status = xq_dispatch_xbdl(xq); /* start transmit operation */
+          xq_dispatch_xbdl(xq); /* start transmit operation */
           break;
         case 6:   /* vector address register */
-          status = xq_wr_var(xq, data);
+          xq_wr_var(xq, data);
           break;
         case 7:   /* control and status register */
-          status = xq_wr_csr(xq, data);
+          xq_wr_csr(xq, data);
           break;
       }
       break;
@@ -2520,7 +2520,7 @@ t_stat xq_svc(UNIT* uptr)
 
   /* resubmit service timer */
   if ((xq->var->must_poll) || (xq->var->poll && (xq->var->mode != XQ_T_DELQA_PLUS)))
-    sim_activate(uptr, (sim_idle_enab ? tmxr_poll : (tmr_poll*clk_tps)/xq->var->poll));
+    sim_activate(uptr, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
 
   return SCPE_OK;
 }
@@ -2582,7 +2582,10 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
   strcpy(tptr, cptr);
 
   xq->var->etherface = (ETH_DEV *) malloc(sizeof(ETH_DEV));
-  if (!xq->var->etherface) return SCPE_MEM;
+  if (!xq->var->etherface) {
+    free(tptr);
+    return SCPE_MEM;
+    }
 
   status = eth_open(xq->var->etherface, cptr, xq->dev, DBG_ETH);
   if (status != SCPE_OK) {
@@ -2611,6 +2614,7 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
     printf("%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s, change the MAC address to a unique value\n", xq->dev->name, buf);
     eth_close(xq->var->etherface);
+    free(tptr);
     free(xq->var->etherface);
     xq->var->etherface = NULL;
     return SCPE_NOATT;
@@ -2623,8 +2627,13 @@ t_stat xq_attach(UNIT* uptr, char* cptr)
 
   /* init read queue (first time only) */
   status = ethq_init(&xq->var->ReadQ, XQ_QUE_MAX);
-  if (status != SCPE_OK)
+  if (status != SCPE_OK) {
+    eth_close(xq->var->etherface);
+    free(tptr);
+    free(xq->var->etherface);
+    xq->var->etherface = NULL;
     return status;
+    }
 
   if (xq->var->mode == XQ_T_DELQA_PLUS)
     eth_filter_hash (xq->var->etherface, 1, &xq->var->init.phys, 0, xq->var->init.mode & XQ_IN_MO_PRO, &xq->var->init.hash_filter);
@@ -2797,7 +2806,7 @@ void xq_debug_setup(CTLR* xq)
 
 void xq_debug_turbo_setup(CTLR* xq)
 {
-  int i;
+  size_t i;
   char  buffer[64] = "";
 
   if (!(sim_deb && (xq->dev->dctrl & DBG_SET)))

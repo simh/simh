@@ -535,7 +535,7 @@ if ((func >= RBCS_READ) && (err == 0)) {                /* read (no hdr)? */
     err = ferror (uptr->fileref);
     for ( ; i < wc; i++)                                /* fill buffer */
         rbxb[i] = 0;
-    if (t = Map_WriteW (ma, wc << 1, rbxb)) {           /* store buffer */
+    if ((t = Map_WriteW (ma, wc << 1, rbxb))) {         /* store buffer */
         rbcs = rbcs | RBCS_ERR | RBCS_NXM;              /* nxm */
         wc = wc - t;                                    /* adjust wc */
         }
@@ -543,7 +543,7 @@ if ((func >= RBCS_READ) && (err == 0)) {                /* read (no hdr)? */
 
 if ((func == RBCS_WRITE) && (err == 0)) {               /* write? */
     sim_debug(DBG_CMD, &rb_dev, "Write, CYL=%d, TRK=%d, SECT=%d, WC=%d, DA=%d\n", GET_CYL(rbda), GET_TRACK(rbda), GET_SECT(rbda), wc, da);
-    if (t = Map_ReadW (ma, wc << 1, rbxb)) {            /* fetch buffer */
+    if ((t = Map_ReadW (ma, wc << 1, rbxb))) {          /* fetch buffer */
         rbcs = rbcs | RBCS_ERR | RBCS_NXM;              /* nxm */
         wc = wc - t;                                    /* adj xfer lnt */
         }

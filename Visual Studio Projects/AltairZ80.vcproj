@@ -238,10 +238,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\AltairZ80\insnsa.c"
-				>
-			</File>
-			<File
 				RelativePath="..\AltairZ80\insnsd.c"
 				>
 			</File>

@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
 
    18-Apr-11    MP      Fixed t_addr printouts for 64b big-endian systems
    17-May-07    RMS     CS1 DVA resides in device, not MBA
-   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
+   29-Apr-07    RMS     Fixed bug in setting FCE on TMK Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
    12-Nov-05    RMS     Changed default formatter to TM03 (for VMS)
    31-Oct-05    RMS     Fixed address width for large files
@@ -647,7 +647,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_SPACEF:                                    /* space forward */
         do {
             tufc = (tufc + 1) & 0177777;                /* incr fc */
-            if (st = sim_tape_sprecf (uptr, &tbc)) {    /* space rec fwd, err? */
+            if ((st = sim_tape_sprecf (uptr, &tbc))) {  /* space rec fwd, err? */
                 r = tu_map_err (drv, st, 0);            /* map error */
                 break;
                 }
@@ -660,7 +660,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_SPACER:                                    /* space reverse */
         do {
             tufc = (tufc + 1) & 0177777;                /* incr wc */
-            if (st = sim_tape_sprecr (uptr, &tbc)) {    /* space rec rev, err? */
+            if ((st = sim_tape_sprecr (uptr, &tbc))) {  /* space rec rev, err? */
                 r = tu_map_err (drv, st, 0);            /* map error */
                 break;
                 }
@@ -671,7 +671,7 @@ switch (fnc) {                                          /* case on function */
         break;
 
     case FNC_WREOF:                                     /* write end of file */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = tu_map_err (drv, st, 0);                /* map error */
         break;
 
@@ -687,7 +687,7 @@ switch (fnc) {                                          /* case on function */
         tufc = 0;                                       /* clear frame count */
         if ((uptr->UDENS == TC_1600) && sim_tape_bot (uptr))
             tufs = tufs | FS_ID;                        /* PE BOT? ID burst */
-        if (st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR)) { /* read fwd */
+        if ((st = sim_tape_rdrecf (uptr, xbuf, &tbc, MT_MAXFR))) {/* read fwd */
             if (st == MTSE_TMK)                         /* tmk also sets FCE */
                 tu_set_er (ER_FCE);
             r = tu_map_err (drv, st, 1);                /* map error */
@@ -739,7 +739,7 @@ switch (fnc) {                                          /* case on function */
 				}
             tbc = xbc;
             }
-        if (st = sim_tape_wrrecf (uptr, xbuf, tbc))     /* write rec, err? */
+        if ((st = sim_tape_wrrecf (uptr, xbuf, tbc)))   /* write rec, err? */
             r = tu_map_err (drv, st, 1);                /* map error */
         else {
             tufc = (tufc + tbc) & 0177777;
@@ -751,7 +751,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_READR:                                     /* read reverse */
     case FNC_WCHKR:                                     /* wcheck = read */
         tufc = 0;                                       /* clear frame count */
-        if (st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR)) { /* read rev */
+        if ((st = sim_tape_rdrecr (uptr, xbuf + 4, &tbc, MT_MAXFR))) {/* read rev */
             if (st == MTSE_TMK)                         /* tmk also sets FCE */
                 tu_set_er (ER_FCE);
             r = tu_map_err (drv, st, 1);                /* map error */

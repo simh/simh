@@ -1,6 +1,6 @@
 /* h316_mt.c: H316/516 magnetic tape simulator
 
-   Copyright (c) 2003-2008, Robert M. Supnik
+   Copyright (c) 2003-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,10 +25,11 @@
 
    mt           516-4100 seven track magnetic tape
 
-   09-Jun-07    RMS     Fixed bug in write without stop (from Theo Engel)
+   19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
+   09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking
    26-Aug-05    RMS     Revised to use API for write lock check
-   08-Feb-05    RMS     Fixed error reporting from OCP (found by Philipp Hachtmann)
+   08-Feb-05    RMS     Fixed error reporting from OCP (Philipp Hachtmann)
    01-Dec-04    RMS     Fixed bug in DMA/DMC support
 
    Magnetic tapes are represented as a series of variable records
@@ -82,7 +83,8 @@
 #define STA_BOT         0000002                         /* beg of tape */
 #define STA_EOT         0000001                         /* end of tape */
 
-extern int32 dev_int, dev_enb, chan_req;
+extern int32 dev_int, dev_enb;
+extern uint32 chan_req;
 extern int32 stop_inst;
 
 uint32 mt_buf = 0;                                      /* data buffer */
@@ -369,17 +371,17 @@ switch (uptr->FNC) {                                    /* case on function */
         return SCPE_OK;
 
     case FNC_WEOF:                                      /* write file mark */
-        if (st = sim_tape_wrtmk (uptr))                 /* write tmk, err? */
+        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;                                          /* sched end motion */
 
     case FNC_FSR:                                       /* space fwd rec */
-        if (st = sim_tape_sprecf (uptr, &tbc))          /* space fwd, err? */
+        if ((st = sim_tape_sprecf (uptr, &tbc)))        /* space fwd, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;                                          /* sched end motion */
 
     case FNC_BSR:                                       /* space rev rec */
-        if (st = sim_tape_sprecr (uptr, &tbc))          /* space rev, err? */
+        if ((st = sim_tape_sprecr (uptr, &tbc)))        /* space rev, err? */
             r = mt_map_err (uptr, st);                  /* map error */
         break;                                          /* sched end motion */
 
@@ -453,7 +455,7 @@ switch (uptr->FNC) {                                    /* case on function */
                 mt_wrwd (uptr, mt_buf);
             else mt_rdy = 0;                            /* rdy must be clr */
             if (mt_ptr) {                               /* any data? */
-                if (st = sim_tape_wrrecf (uptr, mtxb, mt_ptr))  /* write, err? */
+                if ((st = sim_tape_wrrecf (uptr, mtxb, mt_ptr)))/* write, err? */
                     r = mt_map_err (uptr, st);          /* map error */
                 }
             break;                                      /* sched end motion */

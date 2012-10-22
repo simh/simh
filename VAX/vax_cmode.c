@@ -27,7 +27,7 @@
    On a subset VAX, this module forces a fault if REI attempts to set PSL<cm>.
 
    28-May-08    RMS     Inlined physical memory routines
-   25-Jan-08    RMS     Fixed declaration (from Mark Pizzolato)
+   25-Jan-08    RMS     Fixed declaration (Mark Pizzolato)
    03-May-06    RMS     Fixed omission of SXT
                         Fixed order of operand fetching in XOR
    24-Aug-04    RMS     Cloned from PDP-11 CPU
@@ -621,7 +621,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
             else src2 = RdMemW (GeteaW (dstspec));
             src2 = src2 & 077;
             src = RdRegW (srcspec);                     /* get src */
-            if (sign = ((src & WSIGN)? 1: 0))
+            if ((sign = ((src & WSIGN)? 1: 0)))
                 src = src | ~WMASK;
             if (src2 == 0) {                            /* [0] */
                 dst = src;                              /* result */

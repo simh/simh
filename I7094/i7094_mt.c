@@ -1,6 +1,6 @@
 /* i7094_mt.c: IBM 7094 magnetic tape simulator
 
-   Copyright (c) 2003-2008, Robert M Supnik
+   Copyright (c) 2003-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    mt           magtape simulator
 
-   16-Jul-10    RMS     Fixed handling of BSR, BSF (from Dave Pitts)
+   19-Mar-12    RMS     Fixed declaration of sel_name (Mark Pizzolato)
+   16-Jul-10    RMS     Fixed handling of BSR, BSF (Dave Pitts)
 */
 
 #include "i7094_defs.h"
@@ -72,7 +73,7 @@ extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
 extern FILE *sim_deb;
-extern char *sel_name[];
+extern const char *sel_name[];
 
 t_stat mt_chsel (uint32 ch, uint32 sel, uint32 unit);
 t_stat mt_chwr (uint32 ch, t_uint64 val, uint32 flags);
@@ -563,7 +564,7 @@ switch (uptr->UST) {                                    /* case on state */
             bc = chrono_rd (xb, MT_MAXFR);              /* read clock */
         else {                                          /* real tape */
             r = sim_tape_rdrecf (uptr, xb, &bc, MT_MAXFR); /* read record */
-            if (r = mt_map_err (uptr, r))               /* map status */
+            if ((r = mt_map_err (uptr, r)))             /* map status */
                 return r;
             if (mt_unit[ch] == 0)                       /* disconnected? */
                 return SCPE_OK;
@@ -735,7 +736,7 @@ if (mt_bptr[ch]) {                                      /* any data? */
     if (xb == NULL)
         return SCPE_IERR;
     r = sim_tape_wrrecf (uptr, xb, mt_bptr[ch]);        /* write record */
-    if (r = mt_map_err (uptr, r))                       /* map error */
+    if ((r = mt_map_err (uptr, r)))                     /* map error */
         return r;
     }
 uptr->UST = CHSL_WRS|CHSL_3RD;                          /* next state */

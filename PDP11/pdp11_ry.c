@@ -25,9 +25,9 @@
 
    ry           RX211/RXV21/RX02 floppy disk
 
-   15-May-06    RMS     Fixed bug in autosize attach (reported by David Gesswein)
+   15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    07-Jul-05    RMS     Removed extraneous externs
-   18-Feb-05    RMS     Fixed bug in boot code (reported by Graham Toal)
+   18-Feb-05    RMS     Fixed bug in boot code (Graham Toal)
    30-Sep-04    RMS     Revised Unibus interface
    21-Mar-04    RMS     Added VAX support
    29-Dec-03    RMS     Added RXV21 support
@@ -223,13 +223,18 @@ MTAB ry_mod[] = {
     { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
     { (UNIT_AUTO+UNIT_DEN), 0, NULL, "SINGLE", &ry_set_size },
     { (UNIT_AUTO+UNIT_DEN), UNIT_DEN, NULL, "DOUBLE", &ry_set_size },
+#if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
-#if defined (VM_PDP11)
     { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
       &set_addr_flt, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+      &set_vec, &show_vec, NULL },
+#else
+    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+      NULL, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+      NULL, &show_vec, NULL },
 #endif
     { 0 }
     };

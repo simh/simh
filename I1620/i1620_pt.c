@@ -1,6 +1,6 @@
 /* i1620_pt.c: IBM 1621/1624 paper tape reader/punch simulator
 
-   Copyright (c) 2002-2008, Robert M Supnik
+   Copyright (c) 2002-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   19-Mar-12    RMS     Fixed declaration of io_stop (Mark Pizzolato)
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    25-Apr-03    RMS     Revised for extended file support
 */
@@ -363,7 +364,7 @@ const static uint8 boot_rom[] = {
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
+extern uint32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];

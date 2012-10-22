@@ -1,6 +1,6 @@
 /* vax_syscm.c: PDP-11 compatibility mode symbolic decode and parse
 
-   Copyright (c) 1993-2010, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,9 +23,10 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
-                        (found by Mark Pizzolato)
-   12-Nov-06    RMS     Fixed operand order in EIS instructions (found by W.F.J. Mueller)
+                        (Mark Pizzolato)
+   12-Nov-06    RMS     Fixed operand order in EIS instructions (W.F.J. Mueller)
    27-Sep-05	RMS     Fixed warnings compiling with 64b addresses
    15-Sep-04    RMS     Cloned from pdp11_sys.c
 */
@@ -610,7 +611,7 @@ switch (j) {                                            /* case on class */
             return SCPE_ARG;
         if ((pflag & A_REL) == 0)
             disp = (disp - ad32) & 0177777;
-        if ((disp & 1) || (disp > 0400) && (disp < 0177402))
+        if ((disp & 1) || ((disp > 0400) && (disp < 0177402)))
             return SCPE_ARG;
         val[0] = val[0] | (((disp - 2) >> 1) & 0377);
         break;

@@ -1,6 +1,6 @@
 /* i7094_cd.c: IBM 711/721 card reader/punch
 
-   Copyright (c) 2003-2008, Robert M. Supnik
+   Copyright (c) 2003-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    cdr          711 card reader
    cdp          721 card punch
 
+   19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    19-Jan-07    RMS     Added UNIT_TEXT
    13-Jul-06    RMS     Fixed problem with 80 column full cards
 
@@ -87,7 +88,7 @@ t_stat cd_attach (UNIT *uptr, char *cptr);
 t_stat cd_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 char colbin_to_bcd (uint32 cb);
 
-extern uint32 sim_switches;
+extern int32 sim_switches;
 extern uint32 PC;
 extern uint32 ind_ioc;
 extern char bcd_to_ascii_a[64];

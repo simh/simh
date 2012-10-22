@@ -27,12 +27,12 @@
 
    20-May-08    RMS     Added JCSR default for KDJ11B, KDJ11E
    22-Apr-08    RMS     Fixed write behavior of 11/70 MBRK, LOSIZE, HISIZE
-                        (found by Walter Mueller)
+                        (Walter Mueller)
    29-Apr-07    RMS     Don't run bus setup routine during RESTORE
    30-Aug-05    RMS     Added additional 11/60 registers
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   15-Feb-05    RMS     Fixed bug in SHOW MODEL (from Sergey Okhapkin)
-   19-Jan-05    RMS     Added variable SYSID, MBRK write (from Tim Chapman)
+   15-Feb-05    RMS     Fixed bug in SHOW MODEL (Sergey Okhapkin)
+   19-Jan-05    RMS     Added variable SYSID, MBRK write (Tim Chapman)
 
    This module includes CPU- and system-specific registers, such as the Unibus
    map and control registers on 22b Unibus systems, the board registers for the
@@ -1075,7 +1075,7 @@ t_stat r;
 for (i = 0; cnf_tab[i].dib != NULL; i++) {              /* loop thru config tab */
     if (((cnf_tab[i].cpum == 0) || (cpu_type & cnf_tab[i].cpum)) &&
         ((cnf_tab[i].optm == 0) || (cpu_opt & cnf_tab[i].optm))) {
-        if (r = build_ubus_tab (&cpu_dev, cnf_tab[i].dib)) /* add to dispatch tab */
+        if ((r = build_ubus_tab (&cpu_dev, cnf_tab[i].dib)))/* add to dispatch tab */
              return r;
         }
     }

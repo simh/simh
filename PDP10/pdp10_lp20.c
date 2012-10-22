@@ -58,10 +58,10 @@
 #define TX_DMASK        07777
 #define TX_V_FL         8                               /* flags */
 #define TX_M_FL         017
-/* define TX_INTR       04000                           /* interrupt */
+/* define TX_INTR       04000                         *//* interrupt */
 #define TX_DELH         02000                           /* delimiter */
-/* define TX_XLAT       01000                           /* translate */
-/* define TX_DVFU       00400                           /* DAVFU */
+/* define TX_XLAT       01000                         *//* translate */
+/* define TX_DVFU       00400                         *//* DAVFU */
 #define TX_SLEW         00020                           /* chan vs slew */
 #define TX_VMASK        00017                           /* spacing mask */
 #define TX_CHR          0                               /* states: pr char */
@@ -563,7 +563,7 @@ lp20_unit.pos = ftell (lp20_unit.fileref);              /* print 'n' newlines */
 if (dvuadv)                                             /* update DAVFU ptr */
     dvptr = (dvptr + cnt) % dvlnt;
 if (davfu[dvptr] & (1 << DV_TOF)) {                     /* at top of form? */
-    if (lppagc = (lppagc - 1) & PAGC_MASK) {            /* decr page cntr */
+    if ((lppagc = (lppagc - 1) & PAGC_MASK)) {          /* decr page cntr */
         lpcsa = lpcsa & ~CSA_PZRO;                      /* update status */
         return TRUE;
         }
@@ -592,7 +592,7 @@ for (i = 0; i < dvlnt; i++) {                           /* search DAVFU */
             lp20_adv (1, FALSE);
         fputc ('\f', lp20_unit.fileref);                /* print form feed */
         lp20_unit.pos = ftell (lp20_unit.fileref); 
-        if (lppagc = (lppagc - 1) & PAGC_MASK) {        /* decr page cntr */
+        if ((lppagc = (lppagc - 1) & PAGC_MASK)) {      /* decr page cntr */
             lpcsa = lpcsa & ~CSA_PZRO;                  /* update status */
             return TRUE;
             }

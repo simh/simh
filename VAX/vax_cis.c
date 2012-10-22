@@ -29,7 +29,7 @@
    16-Oct-08    RMS     Fixed bug in ASHP left overflow calc (Word/NibbleLShift)
                         Fixed bug in DIVx (LntDstr calculation)
    28-May-08    RMS     Inlined physical memory routines
-   16-May-06    RMS     Fixed bug in length calculation (found by Tim Stark)
+   16-May-06    RMS     Fixed bug in length calculation (Tim Stark)
    03-May-06    RMS     Fixed MOVTC, MOVTUC to preserve cc's through page faults
                         Fixed MOVTUC to stop on translated == escape
                         Fixed CVTPL to set registers before destination reg write
@@ -38,7 +38,7 @@
                         Fixed EDITPC EO$BLANK_ZERO count, cc test
                         Fixed EDITPC EO$INSERT to insert fill instead of blank
                         Fixed EDITPC EO$LOAD_PLUS/MINUS to skip character
-                        (all reported by Tim Stark)
+                        (Tim Stark)
    12-Apr-04    RMS     Cloned from pdp11_cis.c and vax_cpu1.c
 
    Zero length decimal strings require either zero bytes (trailing) or one byte
@@ -331,7 +331,7 @@ switch (opc) {                                          /* case on opcode */
             R[3] = (R[3] + 1) & LMASK;                  /* next string char */
             if (i >= sim_interval) {                    /* done with interval? */
                 sim_interval = 0;
-                if (r = sim_process_event ()) {         /* presumably WRU */
+                if ((r = sim_process_event ())) {       /* presumably WRU */
                     PC = fault_PC;                      /* backup up PC */
                     ABORT (r);                          /* abort flushes IB */
                     }
@@ -1225,8 +1225,8 @@ for (i = 0; i <= end; i++) {                            /* loop thru string */
         }
     if ((i == end) && ((lnt & 1) == 0))
         c = c & 0xF;
-/*    if (((c & 0xF0) > 0x90) ||                          /* check hi digit */
-/*        ((c & 0x0F) > 0x09))                            /* check lo digit */    
+/*    if (((c & 0xF0) > 0x90) ||                        *//* check hi digit */
+/*        ((c & 0x0F) > 0x09))                          *//* check lo digit */    
 /*        RSVD_OPND_FAULT; */
     src->val[i / 4] = src->val[i / 4] | (c << ((i % 4) * 8));
     }                                                   /* end for */
@@ -1550,7 +1550,7 @@ uint32 NibbleRshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, nc;
 
-if (s = sc * 4) {
+if ((s = sc * 4)) {
     for (i = DSTRMAX; i >= 0; i--) {
         nc = (dsrc->val[i] << (32 - s)) & LMASK;
         dsrc->val[i] = ((dsrc->val[i] >> s) |
@@ -1574,7 +1574,7 @@ uint32 NibbleLshift (DSTR *dsrc, int32 sc, uint32 cin)
 {
 int32 i, s, nc;
 
-if (s = sc * 4) {
+if ((s = sc * 4)) {
     for (i = 0; i < DSTRLNT; i++) {
         nc = dsrc->val[i] >> (32 - s);
         dsrc->val[i] = ((dsrc->val[i] << s) |

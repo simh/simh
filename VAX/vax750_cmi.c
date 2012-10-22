@@ -33,6 +33,10 @@
 
 #include "vax_defs.h"
 
+#ifndef DONT_USE_INTERNAL_ROM
+#include "vax_vmb_exe.h"
+#endif
+
 /* 11/750 specific IPRs */
 
 #define CMIERR_CRD            0x00000001
@@ -74,6 +78,9 @@ static struct boot_dev boot_tab[] = {
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },
+    { "RQB", BOOT_UDA, 1 << 24 },
+    { "RQC", BOOT_UDA, 1 << 24 },
+    { "RQD", BOOT_UDA, 1 << 24 },
     { "TQ", BOOT_TK, 1 << 24 },
     { "TD", BOOT_TD, 0 },
     { NULL }
@@ -178,7 +185,7 @@ CTAB vax750_cmd[] = {
    reads a vector register that contains the Unibus vector
    for that IPL.
 
-/* Find highest priority vectorable interrupt */
+   Find highest priority vectorable interrupt */
 
 int32 eval_int (void)
 {
@@ -577,7 +584,7 @@ uint32 ba;
 t_stat r;
 
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
-if (slptr = strchr (gbuf, '/')) {                       /* found slash? */
+if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
     regptr = strchr (ptr, '/');                         /* locate orig */
     *slptr = 0;                                         /* zero in string */
     }
@@ -631,8 +638,26 @@ printf ("Loading boot code from vmb.exe\n");
 if (sim_log) fprintf (sim_log, 
     "Loading boot code from vmb.exe\n");
 r = load_cmd (0, "-O vmb.exe 200");
-if (r != SCPE_OK)
+if (r != SCPE_OK) {
+#ifndef DONT_USE_INTERNAL_ROM
+    FILE *f;
+
+    if ((f = sim_fopen ("vmb.exe", "wb"))) {
+        printf ("Saving boot code to vmb.exe\n");
+        if (sim_log)
+            fprintf (sim_log, "Saving boot code to vmb.exe\n");
+        sim_fwrite (vax_vmb_exe, sizeof(vax_vmb_exe[0]), sizeof(vax_vmb_exe)/sizeof(vax_vmb_exe[0]), f);
+        fclose (f);
+        printf ("Loading boot code from vmb.exe\n");
+        if (sim_log)
+            fprintf (sim_log, "Loading boot code from vmb.exe\n");
+        r = load_cmd (0, "-O vmb.exe 200");
+        if (r == SCPE_OK)
+            SP = PC = 512;
+        }
+#endif
     return r;
+    }
 SP = PC = 512;
 return SCPE_OK;
 }
@@ -719,15 +744,15 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_NEXUS) {                  /* Nexus? */
-            if (r = build_nexus_tab (dptr, dibp))       /* add to dispatch table */
+            if ((r = build_nexus_tab (dptr, dibp)))     /* add to dispatch table */
                 return r;
             }
         else if (dptr->flags & DEV_MBUS) {              /* Massbus? */
-            if (r = build_mbus_tab (dptr, dibp))
+            if ((r = build_mbus_tab (dptr, dibp)))
                 return r;
             }
         else {                                          /* no, Unibus device */
-            if (r = build_ubus_tab (dptr, dibp))        /* add to dispatch tab */
+            if ((r = build_ubus_tab (dptr, dibp)))      /* add to dispatch tab */
                 return r;
             }                                           /* end else */
         }                                               /* end if enabled */

@@ -89,7 +89,7 @@ example there now exists the routines:
   t_stat sim_tape_rdrecf_a (UNIT *uptr, uint8 *buf, t_mtrlnt *bc, t_mtrlnt max, TAPE_PCALLBACK callback);
 
 The Purpose of the callback function is to record the I/O completion status
-and then to schedule the activation of the unit.
+and then to schedule the activation of the unit.  
 
 Considerations:
 Avoiding multiple concurrent users of the unit structure.  While asynch
@@ -108,7 +108,13 @@ The callback routine must save the I/O completion status in a place
 which the next invocation of the unit service routine will reference 
 and act on it.  This allows device code to return error conditions
 back to scp in a consistent way without regard to how the callback 
-routine (and the actual I/O) may have been executed.
+routine (and the actual I/O) may have been executed.  When the callback
+routine is called, it will already be on the simulator event queue with
+an event time which was specified when the unit was attached or via a 
+call to sim_disk_set_async.  If no value has been specified then it
+will have been scheduled with a delay time of 0.  If a different event 
+firing time is desired, then the callback completion routine should 
+call sim_activate_abs to schedule the event at the appropriate time.
 
 Required change in device coding.
 Devices which wish to leverage the benefits of asynch I/O must rearrange

@@ -29,13 +29,13 @@
    27-Oct-06    RMS     Added idle support
                         Removed separate PASLA clock
    09-Mar-06	RMS     Added 8 register bank support for 8/32
-   06-Feb-06    RMS     Fixed bug in DH (found by Mark Hittinger)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   06-Feb-06    RMS     Fixed bug in DH (Mark Hittinger)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    10-Mar-05    RMS     Fixed bug in initial memory allocation
-                RMS     Fixed bug in show history routine (from Mark Hittinger)
+                RMS     Fixed bug in show history routine (Mark Hittinger)
                 RMS     Revised examine/deposit to do words rather than bytes
-   18-Feb-05    RMS     Fixed branches to mask new PC (from Greg Johnson)
+   18-Feb-05    RMS     Fixed branches to mask new PC (Greg Johnson)
    06-Nov-04    RMS     Added =n to SHOW HISTORY
    25-Jan-04    RMS     Revised for device debug support
    31-Dec-03    RMS     Fixed bug in cpu_set_hist
@@ -664,7 +664,7 @@ while (reason == 0) {                                   /* loop until halted */
     int32 sr, st;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         int_eval ();
         }

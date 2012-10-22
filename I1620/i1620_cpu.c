@@ -26,15 +26,15 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
-   28-May-06    RMS     Fixed bug in cpu history (found by Peter Schorn)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   28-May-06    RMS     Fixed bug in cpu history Peter Schorn)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
    26-Mar-04    RMS     Fixed warnings with -std=c99
-   02-Nov-03    RMS     Fixed bug in branch digit (found by Dave Babcock)
-   21-Aug-03    RMS     Fixed bug in immediate index add (found by Michael Short)
+   02-Nov-03    RMS     Fixed bug in branch digit (Dave Babcock)
+   21-Aug-03    RMS     Fixed bug in immediate index add (Michael Short)
    25-Apr-03    RMS     Changed t_addr to uint32 throughout
-   18-Oct-02    RMS     Fixed bugs in invalid result testing (found by Hans Pufal)
+   18-Oct-02    RMS     Fixed bugs in invalid result testing (Hans Pufal)
 
    The simulated register state for the IBM 1620 is:
 
@@ -476,7 +476,7 @@ while (reason == 0) {                                   /* loop until halted */
 
     saved_PC = PC;                                      /* commit prev instr */
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         }
 

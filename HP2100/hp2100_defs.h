@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,15 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
+   12-Feb-12    JDB     Added MA device select code assignment
+                        Added ma_boot_ext() declaration
+   10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
+   28-Mar-11    JDB     Tidied up signal handling
+   29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
+   27-Oct-10    JDB     Revised I/O signal enum values for concurrent signals
+                        Revised I/O macros for new signal handling
+   09-Oct-10    JDB     Added DA and DC device select code assignments
    07-Sep-08    JDB     Added POLL_FIRST to indicate immediate connection attempt
    15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.h
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
@@ -64,6 +73,15 @@
 #define _HP2100_DEFS_H_ 0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+
+/* Required to quell clang precedence warnings */
+
+#if defined (__GNUC__)
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
+#endif
 
 
 /* Simulator stop and notification codes */
@@ -128,87 +146,18 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define soOTX           6                               /* output from A/B */
 #define soCTL           7                               /* set/clear control */
 
-
-/* I/O backplane signals.
-
-   The IOSIG declarations mirror the I/O backplane signals.  These are sent to
-   the device I/O signal handlers for action.  Normally, only one signal may be
-   sent at a time.  However, the ioCLF signal may be added (arithmetically) to
-   another signal; the handlers will process the other signal first and then the
-   CLF signal.
-
-   Implementation notes:
-
-    1. The first valid signal must have a value > 0, and ioCLF must be
-       enumerated last, so that adding ioCLF produces a result > ioCLF.
-
-    2. The signals are structured so that all those that might change the
-       interrupt state are enumerated after ioSIR.  The handlers will detect
-       this and add an ioSIR signal automatically.
-
-    3. In hardware, the POPIO signal is asserted concurrently with the CRS
-       signal.  Under simulation, ioPOPIO implies ioCRS, so the handlers are
-       structured to fall from POPIO handling into CRS handling.  It is not
-       necessary to send both signals for a PRESET.
-
-    4. In hardware, the SIR signal is generated unconditionally every T5 period
-       to time the setting of the IRQ flip-flop.  Under simulation, ioSIR is
-       sent to set the PRL, IRQ, and SRQ signals as indicated by the interface
-       logic.  It is necessary to send ioSIR only when that logic indicates a
-       change in one or more of the three signals.
-
-    5. In hardware, the ENF signal is unconditionally generated every T2 period
-       to time the setting of the flag flip-flop and to reset the IRQ flip-flop.
-       If the flag buffer flip-flip is set, then flag will be set by ENF.  If
-       the flag buffer is clear, ENF will not affect flag.  Under simulation,
-       ioENF is sent to set the flag buffer and flag flip-flops.  For those
-       interfaces where this action is identical to that provided by STF, the
-       ioENF handler may simply fall into the ioSTF handler.
-
-    6. The ioSKF signal is never sent to an I/O device.  Rather, it is returned
-       from the device if the SFC or SFS condition is true.
-
-    7. A device will receive ioNONE when a HLT instruction is executed, and the
-       H/C bit is clear (i.e., no CLF generated).
-*/
-
-typedef enum { CLEAR, SET } FLIP_FLOP;                  /* flip-flop type and values */
-
-typedef enum { ioNONE,                                  /* no signal asserted */
-               ioSKF,                                   /* skip on flag */
-               ioSFC,                                   /* skip if flag is clear */
-               ioSFS,                                   /* skip if flag is set */
-               ioIOI,                                   /* I/O data input */
-               ioIOO,                                   /* I/O data output */
-               ioEDT,                                   /* end data transfer */
-               ioSIR,                                   /* set interrupt request */
-               ioIAK,                                   /* interrupt acknowledge */
-               ioCRS,                                   /* control reset */
-               ioPOPIO,                                 /* power-on preset to I/O */
-               ioCLC,                                   /* clear control flip-flop */
-               ioSTC,                                   /* set control flip-flop */
-               ioENF,                                   /* enable flag */
-               ioSTF,                                   /* set flag flip-flop */
-               ioCLF } IOSIG;                           /* clear flag flip-flop */
-
-/* I/O devices - fixed assignments */
+/* I/O devices - fixed select code assignments */
 
 #define CPU             000                             /* interrupt control */
 #define OVF             001                             /* overflow */
-#define DMALT0          002                             /* DMA 0 alternate */
-#define DMALT1          003                             /* DMA 1 alternate */
+#define DMALT1          002                             /* DMA 1 alternate */
+#define DMALT2          003                             /* DMA 2 alternate */
 #define PWR             004                             /* power fail */
 #define PRO             005                             /* parity/mem protect */
-#define DMA0            006                             /* DMA channel 0 */
-#define DMA1            007                             /* DMA channel 1 */
-#define OPTDEV          DMALT0                          /* start of optional devices */
-#define VARDEV          (DMA1 + 1)                      /* start of var assign */
-#define M_NXDEV         (INT_M (CPU) | INT_M (OVF) | \
-                         INT_M (DMALT0) | INT_M (DMALT1))
-#define M_FXDEV         (M_NXDEV | INT_M (PWR) | INT_M (PRO) | \
-                         INT_M (DMA0) | INT_M (DMA1))
+#define DMA1            006                             /* DMA channel 1 */
+#define DMA2            007                             /* DMA channel 2 */
 
-/* I/O devices - variable assignment defaults */
+/* I/O devices - variable select code assignment defaults */
 
 #define PTR             010                             /* 12597A-002 paper tape reader */
 #define TTY             011                             /* 12531C teleprinter */
@@ -235,63 +184,270 @@ typedef enum { ioNONE,                                  /* no signal asserted */
 #define MUXL            040                             /* 12920A lower data */
 #define MUXU            041                             /* 12920A upper data */
 #define MUXC            042                             /* 12920A control */
+#define DI_DA           043                             /* 12821A Disc Interface with Amigo disc devices */
+#define DI_DC           044                             /* 12821A Disc Interface with CS/80 disc and tape devices */
+#define DI_MA           045                             /* 12821A Disc Interface with Amigo mag tape devices */
+
+#define OPTDEV          002                             /* start of optional devices */
+#define CRSDEV          006                             /* start of devices that receive CRS */
+#define VARDEV          010                             /* start of variable assignments */
+#define MAXDEV          077                             /* end of select code range */
 
 /* IBL assignments */
 
-#define IBL_V_SEL       14                              /* ROM select */
+#define IBL_V_SEL       14                              /* ROM select <15:14> */
 #define IBL_M_SEL       03
-#define IBL_PTR         0000000                         /* PTR */
-#define IBL_DP          0040000                         /* disk: DP */
-#define IBL_DQ          0060000                         /* disk: DQ */
-#define IBL_MS          0100000                         /* option 0: MS */
-#define IBL_DS          0140000                         /* option 1: DS */
-#define IBL_MAN         0010000                         /* RPL/man boot */
-#define IBL_V_DEV       6                               /* dev in <11:6> */
+#define IBL_PTR         0000000                         /* ROM 0: 12992K paper tape reader (PTR) */
+#define IBL_DP          0040000                         /* ROM 1: 12992A 7900 disc (DP) */
+#define IBL_DQ          0060000                         /* ROM 1: 12992A 2883 disc (DQ) */
+#define IBL_MS          0100000                         /* ROM 2: 12992D 7970 tape (MS) */
+#define IBL_DS          0140000                         /* ROM 3: 12992B 7905/06/20/25 disc (DS) */
+#define IBL_MAN         0010000                         /* RPL/manual boot <13:12> */
+#define IBL_V_DEV       6                               /* select code <11:6> */
 #define IBL_OPT         0000070                         /* options in <5:3> */
-#define IBL_DP_REM      0000001                         /* DP removable */
-#define IBL_DS_HEAD     0000003                         /* DS head number */
-#define IBL_LNT         64                              /* boot ROM length */
+#define IBL_DP_REM      0000001                         /* DP removable <0:0> */
+#define IBL_DS_HEAD     0000003                         /* DS head number <1:0> */
+#define IBL_LNT         64                              /* boot ROM length in words */
 #define IBL_MASK        (IBL_LNT - 1)                   /* boot length mask */
 #define IBL_DPC         (IBL_LNT - 2)                   /* DMA ctrl word */
 #define IBL_END         (IBL_LNT - 1)                   /* last location */
 
 typedef uint16 BOOT_ROM [IBL_LNT];                      /* boot ROM data */
 
-/* Dynamic device information table */
 
-typedef uint32 IODISP (uint32 select_code, IOSIG signal, uint32 data);  /* I/O signal dispatch function */
+/* I/O backplane signals.
 
-typedef struct {
-    uint32 devno;                                       /* device select code */
-    IODISP *iot;                                        /* pointer to I/O signal dispatcher */
-    } DIB;
+   The IOSIGNAL declarations mirror the hardware I/O backplane signals.  A set
+   of one or more signals forms an IOCYCLE that is sent to a device IOHANDLER
+   for action.  The CPU and DMA dispatch one signal set to the target device
+   handler per I/O cycle.  A CPU cycle consists of either one or two signals; if
+   present, the second signal will be CLF.  A DMA cycle consists of from two to
+   five signals.  In addition, a front-panel PRESET or power-on reset dispatches
+   two or three signals, respectively.
 
-/* I/O macros */
+   In hardware, signals are assigned to one or more specific I/O T-periods, and
+   some signals are asserted concurrently.  For example, a programmed STC sc,C
+   instruction asserts the STC and CLF signals together in period T4.  Under
+   simulation, signals are ORed to form an I/O cycle; in this example, the
+   signal handler would receive an IOCYCLE value of "ioSTC | ioCLF".
 
-#define IOBASE(S)       ((S) > ioCLF ? (S) - ioCLF : (S))   /* base signal from compound signal */
+   Hardware allows parallel action for concurrent signals.  Under simulation, a
+   "concurrent" set of signals is processed sequentially by the signal handler
+   in order of ascending numerical value.  Although assigned T-periods differ
+   between programmed I/O and DMA I/O cycles, a single processing order is used.
+   The order of execution generally follows the order of T-period assertion,
+   except that ioSIR is processed after all other signals that may affect the
+   interrupt request chain.
 
-#define INT_V(x)        ((x) & 037)                         /* device bit position */
-#define INT_M(x)        (1u << INT_V (x))                   /* device bit mask */
+   Implementation notes:
 
-#define setSKF(B)       data = (uint32) ((B) ? ioSKF : ioNONE)
+    1. The ioCLF signal must be processed after ioSFS/ioSFC to ensure that a
+       true skip test generates ioSKF before the flag is cleared, and after
+       ioIOI/ioIOO/ioSTC/ioCLC to meet the requirement that executing an
+       instruction having the H/C bit set is equivalent to executing the same
+       instruction with the H/C bit clear and then a CLF instruction.
 
-#define setPRL(S,B)     dev_prl[(S)/32] = dev_prl[(S)/32] & ~INT_M (S) | (((B) & 1) << INT_V (S))
-#define setIRQ(S,B)     dev_irq[(S)/32] = dev_irq[(S)/32] & ~INT_M (S) | (((B) & 1) << INT_V (S))
-#define setSRQ(S,B)     dev_srq[(S)/32] = dev_srq[(S)/32] & ~INT_M (S) | (((B) & 1) << INT_V (S))
+    2. The ioSKF signal is never sent to an I/O handler.  Rather, it is returned
+       from the handler if the SFC or SFS condition is true.  If the condition
+       is false, ioNONE is returned instead.  As these two values are returned
+       in the 16-bit data portion of the returned value, their assigned values
+       must be <= 100000 octal.
 
-#define setstdSKF(N)    setSKF ((base_signal == ioSFC) && !N ## _flag || \
-                                (base_signal == ioSFS) && N ## _flag)
+    3. An I/O handler will receive ioCRS as a result of a CLC 0 instruction,
+       ioPOPIO and ioCRS as a result of a RESET command, and ioPON, ioPOPIO, and
+       ioCRS as a result of a RESET -P command.
 
-#define setstdPRL(S,N)  setPRL ((S), !(N ## _control & N ## _flag));
-#define setstdIRQ(S,N)  setIRQ ((S), N ## _control & N ## _flag & N ## _flagbuf);
-#define setstdSRQ(S,N)  setSRQ ((S), N ## _flag);
+    4. An I/O handler will receive ioNONE when a HLT instruction is executed
+       that has the H/C bit clear (i.e., no CLF generated).
 
-#define PRL(S)          ((dev_prl[(S)/32] >> INT_V (S)) & 1)
-#define IRQ(S)          ((dev_irq[(S)/32] >> INT_V (S)) & 1)
-#define SRQ(S)          ((dev_srq[(S)/32] >> INT_V (S)) & 1)
+    5. In hardware, the SIR signal is generated unconditionally every T5 period
+       to time the setting of the IRQ flip-flop.  Under simulation, ioSIR
+       indicates that the I/O handler must set the PRL, IRQ, and SRQ signals as
+       required by the interface logic.  ioSIR must be included in the I/O cycle
+       if any of the flip-flops affecting these signals are changed and the
+       interface supports interrupts or DMA transfers.
 
-#define IOT_V_REASON    16
-#define IORETURN(F,V)   ((F) ? (V) : SCPE_OK)           /* stop on I/O error */
+    6. In hardware, the ENF signal is unconditionally generated every T2 period
+       to time the setting of the flag flip-flop and to reset the IRQ flip-flop.
+       If the flag buffer flip-flip is set, then flag will be set by ENF.  If
+       the flag buffer is clear, ENF will not affect flag.  Under simulation,
+       ioENF is sent to set the flag buffer and flag flip-flops.  For those
+       interfaces where this action is identical to that provided by STF, the
+       ioENF handler may simply fall into the ioSTF handler.
+
+    7. In hardware, the PON signal is asserted continuously while the CPU is
+       operating.  Under simulation, ioPON is asserted only at simulator
+       initialization or when processing a RESET -P command.
+*/
+
+typedef enum { ioNONE  = 0000000,                       /* -- -- -- -- -- no signal asserted */
+               ioPON   = 0000001,                       /* T2 T3 T4 T5 T6 power on normal */
+               ioENF   = 0000002,                       /* T2 -- -- -- -- enable flag */
+               ioIOI   = 0000004,                       /* -- -- T4 T5 -- I/O data input (CPU)
+                                                           T2 T3 -- -- -- I/O data input (DMA) */
+               ioIOO   = 0000010,                       /* -- T3 T4 -- -- I/O data output */
+               ioSKF   = 0000020,                       /* -- T3 T4 T5 -- skip on flag */
+               ioSFS   = 0000040,                       /* -- T3 T4 T5 -- skip if flag is set */
+               ioSFC   = 0000100,                       /* -- T3 T4 T5 -- skip if flag is clear */
+               ioSTC   = 0000200,                       /* -- -- T4 -- -- set control flip-flop (CPU)
+                                                           -- T3 -- -- -- set control flip-flop (DMA) */
+               ioCLC   = 0000400,                       /* -- -- T4 -- -- clear control flip-flop (CPU)
+                                                           -- T3 T4 -- -- clear control flip-flop (DMA) */
+               ioSTF   = 0001000,                       /* -- T3 -- -- -- set flag flip-flop */
+               ioCLF   = 0002000,                       /* -- -- T4 -- -- clear flag flip-flop (CPU)
+                                                           -- T3 -- -- -- clear flag flip-flop (DMA) */
+               ioEDT   = 0004000,                       /* -- -- T4 -- -- end data transfer */
+               ioCRS   = 0010000,                       /* -- -- -- T5 -- control reset */
+               ioPOPIO = 0020000,                       /* -- -- -- T5 -- power-on preset to I/O */
+               ioIAK   = 0040000,                       /* -- -- -- -- T6 interrupt acknowledge */
+               ioSIR   = 0100000 } IOSIGNAL;            /* -- -- -- T5 -- set interrupt request */
+
+
+typedef uint32 IOCYCLE;                                 /* a set of signals forming one I/O cycle */
+
+#define IOIRQSET        (ioSTC | ioCLC | ioENF | \
+                         ioSTF | ioCLF | ioIAK | \
+                         ioCRS | ioPOPIO | ioPON)       /* signals that may affect interrupt state */
+
+
+/* I/O structures */
+
+typedef enum { CLEAR, SET } FLIP_FLOP;                  /* flip-flop type and values */
+
+typedef struct dib DIB;                                 /* incomplete definition */
+
+typedef uint32 IOHANDLER (DIB     *dibptr,              /* I/O signal handler prototype */
+                          IOCYCLE signal_set,
+                          uint32  stat_data);
+
+struct dib {                                            /* Device information block */
+    IOHANDLER  *io_handler;                             /* pointer to device's I/O signal handler */
+    uint32     select_code;                             /* device's select code */
+    uint32     card_index;                              /* device's card index for state variables */
+    };
+
+
+/* I/O signal and status macros.
+
+   The following macros are useful in I/O signal handlers and unit service
+   routines.  The parameter definition symbols employed are:
+
+     I = an IOCYCLE value
+     E = a t_stat error status value
+     D = a uint16 data value
+     C = a uint32 combined status and data value
+     P = a pointer to a DIB structure
+     B = a Boolean test value
+
+   Implementation notes:
+
+    1. The IONEXT macro isolates the next signal in sequence to process from the
+       I/O cycle I.
+
+    2. The IOADDSIR macro adds an ioSIR signal to the I/O cycle I if it
+       contains signals that might change the interrupt state.
+
+    3. The IORETURN macro forms the combined status and data value to be
+       returned by a handler from the t_stat error code E and the 16-bit data
+       value D.
+
+    4. The IOSTATUS macro isolates the t_stat error code from a combined status
+       and data value value C.
+
+    5. The IODATA macro isolates the 16-bit data value from a combined status
+       and data value value C.
+
+    6. The IOPOWERON macro calls signal handler P->H with DIB pointer P to
+       process a power-on reset action.
+
+    7. The IOPRESET macro calls signal handler P->H with DIB pointer P to
+       process a front-panel PRESET action.
+
+    8. The IOERROR macro returns t_stat error code E from a unit service routine
+       if the Boolean test B is true.
+*/
+
+#define IONEXT(I)       (IOSIGNAL) ((I) & (IOCYCLE) (- (int32) (I)))        /* extract next I/O signal to handle */
+#define IOADDSIR(I)     ((I) & IOIRQSET ? (I) | ioSIR : (I))                /* add SIR if IRQ state might change */
+
+#define IORETURN(E,D)   ((uint32) ((E) << 16 | (D) & DMASK))                /* form I/O handler return value */
+#define IOSTATUS(C)     ((t_stat) ((C) >> 16) & DMASK)                      /* extract I/O status from combined value */
+#define IODATA(C)       ((uint16) ((C) & DMASK))                            /* extract data from combined value */
+
+#define IOPOWERON(P)    (P)->io_handler ((P), ioPON | ioPOPIO | ioCRS, 0)   /* send power-on signals to handler */
+#define IOPRESET(P)     (P)->io_handler ((P), ioPOPIO | ioCRS, 0)           /* send PRESET signals to handler */
+#define IOERROR(B,E)    ((B) ? (E) : SCPE_OK)                               /* stop on I/O error if enabled */
+
+
+/* I/O signal logic macros.
+
+   The following macros implement the logic for the SKF, PRL, IRQ, and SRQ
+   signals.  Both standard and general logic macros are provided.  The parameter
+   definition symbols employed are:
+
+     S = a uint32 select code value
+     B = a Boolean test value
+     N = a name of a structure containing the standard flip-flops
+
+   Implementation notes:
+
+    1. The setSKF macro sets the Skip on Flag signal in the return data value if
+       the Boolean value B is true.
+
+    2. The setPRL macro sets the Priority Low signal for select code S to the
+       Boolean value B.
+
+    3. The setIRQ macro sets the Interrupt Request signal for select code S to
+       the Boolean value B.
+
+    4. The setSRQ macro sets the Service Request signal for select code S to the
+       Boolean value B.
+
+    5. The PRL macro returns the Priority Low signal for select code S as a
+       Boolean value.
+
+    6. The IRQ macro returns the Interrupt Request signal for select code S as a
+       Boolean value.
+
+    7. The SRQ macro returns the Service Request signal for select code S as a
+       Boolean value.
+
+    8. The setstdSKF macro sets Skip on Flag signal in the return data value if
+       the flag state in structure N matches the current skip test condition.
+
+    9. The setstdPRL macro sets the Priority Low signal for the select code
+       referenced by "dibptr" using the standard logic and the control and flag
+       states in structure N.
+
+   10. The setstdIRQ macro sets the Interrupt Request signal for the select code
+       referenced by "dibptr" using the standard logic and the control, flag,
+       and flag buffer states in structure N.
+
+   11. The setstdSRQ macro sets the Service Request signal for the select code
+       referenced by "dibptr" using the standard logic and the flag state in
+       structure N.
+*/
+
+#define BIT_V(S)        ((S) & 037)                                     /* convert select code to bit position */
+#define BIT_M(S)        (1u << BIT_V (S))                               /* convert select code to bit mask */
+
+#define setSKF(B)       stat_data = IORETURN (SCPE_OK, (uint16) ((B) ? ioSKF : ioNONE))
+
+#define setPRL(S,B)     dev_prl[(S)/32] = dev_prl[(S)/32] & ~BIT_M (S) | (((B) & 1) << BIT_V (S))
+#define setIRQ(S,B)     dev_irq[(S)/32] = dev_irq[(S)/32] & ~BIT_M (S) | (((B) & 1) << BIT_V (S))
+#define setSRQ(S,B)     dev_srq[(S)/32] = dev_srq[(S)/32] & ~BIT_M (S) | (((B) & 1) << BIT_V (S))
+
+#define PRL(S)          ((dev_prl[(S)/32] >> BIT_V (S)) & 1)
+#define IRQ(S)          ((dev_irq[(S)/32] >> BIT_V (S)) & 1)
+#define SRQ(S)          ((dev_srq[(S)/32] >> BIT_V (S)) & 1)
+
+#define setstdSKF(N)    setSKF ((signal == ioSFC) && !N.flag || \
+                                (signal == ioSFS) && N.flag)
+
+#define setstdPRL(N)    setPRL (dibptr->select_code, !(N.control & N.flag));
+#define setstdIRQ(N)    setIRQ (dibptr->select_code, N.control & N.flag & N.flagbuf);
+#define setstdSRQ(N)    setSRQ (dibptr->select_code, N.flag);
+
 
 /* CPU state */
 
@@ -314,11 +470,14 @@ extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 
 extern t_stat      fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 extern const char *fmt_char   (uint8 ch);
+extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat      hp_setdev  (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
 
-/* Standard device functions */
+/* Device-specific functions */
 
-extern int32 sync_poll (POLLMODE poll_mode);
+extern int32  sync_poll   (POLLMODE poll_mode);
+extern t_stat ma_boot_ext (uint32 SR);
 
 #endif

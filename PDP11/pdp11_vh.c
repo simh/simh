@@ -1,6 +1,6 @@
 /* pdp11_vh.c: DHQ11 asynchronous terminal multiplexor simulator
 
-   Copyright (c) 2004-2010, John A. Dundas III
+   Copyright (c) 2004-2012, John A. Dundas III
    Portions derived from work by Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -79,7 +79,7 @@ extern int32    int_req[IPL_HLVL];
 #if defined (VM_PDP11)
 #include "pdp11_defs.h"
 extern int32    int_req[IPL_HLVL];
-extern int32    cpu_opt;
+extern uint32    cpu_opt;
 #endif
 
 #include "sim_sock.h"

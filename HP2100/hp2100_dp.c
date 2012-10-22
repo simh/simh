@@ -1,6 +1,6 @@
 /* hp2100_dp.c: HP 2100 12557A/13210A disk simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,11 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   09-May-12    JDB     Separated assignments from conditional expressions
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Added CNTLR_TYPE cast to dp_settype
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    10-Aug-08    JDB     Added REG_FIT to register variables < 32-bit size
    26-Jun-08    JDB     Rewrote device I/O to model backplane signals
    28-Dec-06    JDB     Added ioCRS state to I/O decoders
@@ -129,7 +134,7 @@
 #define DP_NUMWD        (1 << DP_N_NUMWD)               /* words/sector */
 #define DP_NUMSC2       12                              /* sectors/srf 12557 */
 #define DP_NUMSC3       24                              /* sectors/srf 13210 */
-#define DP_NUMSC        (dp_ctype? DP_NUMSC3: DP_NUMSC2)
+#define DP_NUMSC        (dp_ctype ? DP_NUMSC3 : DP_NUMSC2)
 #define DP_NUMSF        4                               /* surfaces/cylinder */
 #define DP_NUMCY        203                             /* cylinders/disk */
 #define DP_SIZE2        (DP_NUMSF * DP_NUMCY * DP_NUMSC2 * DP_NUMWD)
@@ -169,11 +174,11 @@
 #define DA_V_SC         0                               /* sector */
 #define DA_M_SC2        017
 #define DA_M_SC3        037
-#define DA_M_SC         (dp_ctype? DA_M_SC3: DA_M_SC2)
+#define DA_M_SC         (dp_ctype ? DA_M_SC3 : DA_M_SC2)
 #define DA_GETSC(x)     (((x) >> DA_V_SC) & DA_M_SC)
 #define DA_CKMASK2      037                             /* check mask */
 #define DA_CKMASK3      077
-#define DA_CKMASK       (dp_ctype? DA_CKMASK3: DA_CKMASK2)
+#define DA_CKMASK       (dp_ctype ? DA_CKMASK3 : DA_CKMASK2)
 
 /* Status in dpc_sta[drv], (u) = unused in 13210, (d) = dynamic */
 
@@ -186,7 +191,7 @@
 #define STA_PROT        0002000                         /* protected (13210) */
 #define STA_SKI         0001000                         /* incomplete NI (u) */
 #define STA_SKE         0000400                         /* seek error */
-/*                      0000200                         /* unused */
+/*                      0000200                            (unused) */
 #define STA_NRDY        0000100                         /* not ready (d) */
 #define STA_EOC         0000040                         /* end of cylinder */
 #define STA_AER         0000020                         /* addr error */
@@ -206,12 +211,21 @@
 #define STA_UNLOADED    (dp_ctype ? (STA_NRDY | STA_BSY) : STA_NRDY)
 #define STA_MBZ13       (STA_ATN | STA_RWU | STA_SKI)   /* zero in 13210 */
 
-FLIP_FLOP dpc_command = CLEAR;                          /* cch command flip-flop */
-FLIP_FLOP dpc_control = CLEAR;                          /* cch control flip-flop */
-FLIP_FLOP dpc_flag = CLEAR;                             /* cch flag flip-flop */
-FLIP_FLOP dpc_flagbuf = CLEAR;                          /* cch flag buffer flip-flop */
+struct {
+    FLIP_FLOP command;                                  /* cch command flip-flop */
+    FLIP_FLOP control;                                  /* cch control flip-flop */
+    FLIP_FLOP flag;                                     /* cch flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* cch flag buffer flip-flop */
+    } dpc = { CLEAR, CLEAR, CLEAR, CLEAR };
 
-enum { A12557, A13210 } dp_ctype = A13210;              /* ctrl type */
+/* Controller types */
+
+typedef enum {
+    A12557,
+    A13210
+    } CNTLR_TYPE;
+
+CNTLR_TYPE dp_ctype = A13210;                           /* ctrl type */
 int32 dpc_busy = 0;                                     /* cch unit */
 int32 dpc_poll = 0;                                     /* cch poll enable */
 int32 dpc_cnt = 0;                                      /* check count */
@@ -223,10 +237,12 @@ int32 dpc_dtime = 2;                                    /* dch time */
 int32 dpd_obuf = 0, dpd_ibuf = 0;                       /* dch buffers */
 int32 dpc_obuf = 0;                                     /* cch buffers */
 
-FLIP_FLOP dpd_command = CLEAR;                          /* dch command flip-flop */
-FLIP_FLOP dpd_control = CLEAR;                          /* dch control flip-flop */
-FLIP_FLOP dpd_flag = CLEAR;                             /* dch flag flip-flop */
-FLIP_FLOP dpd_flagbuf = CLEAR;                          /* dch flag buffer flip-flop */
+struct {
+    FLIP_FLOP command;                                  /* dch command flip-flop */
+    FLIP_FLOP control;                                  /* dch control flip-flop */
+    FLIP_FLOP flag;                                     /* dch flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* dch flag buffer flip-flop */
+    } dpd = { CLEAR, CLEAR, CLEAR, CLEAR };
 
 int32 dpd_xfer = 0;                                     /* xfer in prog */
 int32 dpd_wval = 0;                                     /* write data valid */
@@ -239,8 +255,10 @@ uint16 dpc_sta[DP_NUMDRV] = { 0 };                      /* status regs */
 uint16 dpxb[DP_NUMWD];                                  /* sector buffer */
 
 DEVICE dpd_dev, dpc_dev;
-uint32 dpdio (uint32 select_code, IOSIG signal, uint32 data);
-uint32 dpcio (uint32 select_code, IOSIG signal, uint32 data);
+
+IOHANDLER dpdio;
+IOHANDLER dpcio;
+
 t_stat dpc_svc (UNIT *uptr);
 t_stat dpd_svc (UNIT *uptr);
 t_stat dpc_reset (DEVICE *dptr);
@@ -261,8 +279,8 @@ t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc);
 */
 
 DIB dp_dib[] = {
-    { DPD, &dpdio },
-    { DPC, &dpcio }
+    { &dpdio, DPD },
+    { &dpcio, DPC }
     };
 
 #define dpd_dib dp_dib[0]
@@ -275,19 +293,20 @@ REG dpd_reg[] = {
     { ORDATA (OBUF, dpd_obuf, 16) },
     { BRDATA (DBUF, dpxb, 8, 16, DP_NUMWD) },
     { DRDATA (BPTR, dp_ptr, DP_N_NUMWD) },
-    { FLDATA (CMD, dpd_command, 0) },
-    { FLDATA (CTL, dpd_control, 0) },
-    { FLDATA (FLG, dpd_flag,    0) },
-    { FLDATA (FBF, dpd_flagbuf, 0) },
+    { FLDATA (CMD, dpd.command, 0) },
+    { FLDATA (CTL, dpd.control, 0) },
+    { FLDATA (FLG, dpd.flag,    0) },
+    { FLDATA (FBF, dpd.flagbuf, 0) },
     { FLDATA (XFER, dpd_xfer, 0) },
     { FLDATA (WVAL, dpd_wval, 0) },
-    { ORDATA (DEVNO, dpd_dib.devno, 6), REG_HRO },
+    { ORDATA (SC, dpd_dib.select_code, 6), REG_HRO },
+    { ORDATA (DEVNO, dpd_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
 MTAB dpd_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &dpd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dpd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dpd_dev },
     { 0 }
     };
 
@@ -322,10 +341,10 @@ REG dpc_reg[] = {
     { ORDATA (OBUF, dpc_obuf, 16) },
     { ORDATA (BUSY, dpc_busy, 4), REG_RO },
     { ORDATA (CNT, dpc_cnt, 5) },
-    { FLDATA (CMD, dpc_command, 0) },
-    { FLDATA (CTL, dpc_control, 0) },
-    { FLDATA (FLG, dpc_flag,    0) },
-    { FLDATA (FBF, dpc_flagbuf, 0) },
+    { FLDATA (CMD, dpc.command, 0) },
+    { FLDATA (CTL, dpc.control, 0) },
+    { FLDATA (FLG, dpc.flag,    0) },
+    { FLDATA (FBF, dpc.flagbuf, 0) },
     { FLDATA (EOC, dpc_eoc, 0) },
     { FLDATA (POLL, dpc_poll, 0) },
     { DRDATA (RARC, dpc_rarc, 8), PV_RZRO | REG_FIT },
@@ -342,7 +361,8 @@ REG dpc_reg[] = {
               DP_NUMDRV, REG_HRO) },
     { URDATA (CAPAC, dpc_unit[0].capac, 10, T_ADDR_W, 0,
               DP_NUMDRV, PV_LEFT | REG_HRO) },
-    { ORDATA (DEVNO, dpc_dib.devno, 6), REG_HRO },
+    { ORDATA (SC, dpc_dib.select_code, 6), REG_HRO },
+    { ORDATA (DEVNO, dpc_dib.select_code, 6), REG_HRO },
     { NULL }
     };
 
@@ -357,8 +377,8 @@ MTAB dpc_mod[] = {
       &dp_settype, NULL, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
       NULL, &dp_showtype, NULL },
-    { MTAB_XTD | MTAB_VDV, 1, "DEVNO", "DEVNO",
-      &hp_setdev, &hp_showdev, &dpd_dev },
+    { MTAB_XTD | MTAB_VDV,            1, "SC",    "SC",    &hp_setsc,  &hp_showsc,  &dpd_dev },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "DEVNO", "DEVNO", &hp_setdev, &hp_showdev, &dpd_dev },
     { 0 }
     };
 
@@ -389,112 +409,114 @@ DEVICE dpc_dev = {
        register.
 */
 
-uint32 dpdio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 dpdio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        dpd_flag = dpd_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        dpd_flag = dpd_flagbuf = SET;
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            dpd.flag = dpd.flagbuf = CLEAR;
+            break;
 
 
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (dpd);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            dpd.flag = dpd.flagbuf = SET;
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (dpd);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (dpd);
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = dpd_ibuf;
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (dpd);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        dpd_obuf = data;
-
-        if (!dpc_busy || dpd_xfer)                      /* if !overrun */
-            dpd_wval = 1;                               /* valid */
-        break;
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, dpd_ibuf);   /* merge in return status */
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        dpd_flag = dpd_flagbuf = SET;                   /* set flag buffer and flag */
+        case ioIOO:                                     /* I/O data output */
+            dpd_obuf = IODATA (stat_data);              /* clear supplied status */
 
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpd_obuf = 0;                               /* clear output buffer */
-                                                        /* fall into CRS handler */
-
-    case ioCRS:                                         /* control reset */
-        dpd_command = CLEAR;                            /* clear command */
-
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpd_control = CLEAR;                        /* clear control */
-
-        else {                                          /* 13210 */
-            dpc_rarc = 0;                               /* clear controller cylinder address */
-            dpc_ucyl [CW_GETDRV (dpc_obuf)] = 0;        /* clear last drive addressed cylinder */
-            }
-        break;
+            if (!dpc_busy || dpd_xfer)                  /* if !overrun */
+                dpd_wval = 1;                           /* valid */
+            break;
 
 
-    case ioCLC:                                         /* clear control flip-flop */
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpd_control = CLEAR;                        /* clear control */
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            dpd.flag = dpd.flagbuf = SET;               /* set flag buffer and flag */
 
-        dpd_xfer = 0;                                   /* clr xfer in progress */
-        break;
-
-
-    case ioSTC:                                         /* set control flip-flop */
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpd_control = SET;                          /* set control */
-
-        dpd_command = SET;                              /* set cmd */
-
-        if (dpc_busy && !dpd_xfer)                      /* overrun? */
-            dpc_sta[dpc_busy - 1] |= STA_OVR;
-        break;
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpd_obuf = 0;                           /* clear output buffer */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        if (dp_ctype == A12557) {                       /* 12557? */
-            setstdPRL (select_code, dpd);               /* set standard PRL signal */
-            setstdIRQ (select_code, dpd);               /* set standard IRQ signal */
-            }
+        case ioCRS:                                     /* control reset */
+            dpd.command = CLEAR;                        /* clear command */
 
-        setstdSRQ (select_code, dpd);                   /* set standard SRQ signal */
-        break;
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpd.control = CLEAR;                    /* clear control */
 
-
-    case ioIAK:                                         /* interrupt acknowledge */
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpd_flagbuf = CLEAR;                        /* clear flag buffer */
-        break;
+            else {                                      /* 13210 */
+                dpc_rarc = 0;                           /* clear controller cylinder address */
+                dpc_ucyl [CW_GETDRV (dpc_obuf)] = 0;    /* clear last drive addressed cylinder */
+                }
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioCLC:                                     /* clear control flip-flop */
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpd.control = CLEAR;                    /* clear control */
+
+            dpd_xfer = 0;                               /* clr xfer in progress */
+            break;
+
+
+        case ioSTC:                                     /* set control flip-flop */
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpd.control = SET;                      /* set control */
+
+            dpd.command = SET;                          /* set cmd */
+
+            if (dpc_busy && !dpd_xfer)                  /* overrun? */
+                dpc_sta[dpc_busy - 1] |= STA_OVR;
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            if (dp_ctype == A12557) {                   /* 12557? */
+                setstdPRL (dpd);                        /* set standard PRL signal */
+                setstdIRQ (dpd);                        /* set standard IRQ signal */
+                }
+
+            setstdSRQ (dpd);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpd.flagbuf = CLEAR;                    /* clear flag buffer */
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    dpdio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    dpdio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -515,139 +537,144 @@ return data;
        to interrupt.
 */
 
-uint32 dpcio (uint32 select_code, IOSIG signal, uint32 data)
+uint32 dpcio (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+uint16 data;
 int32 i, fnc, drv;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        dpc_flag = dpc_flagbuf = CLEAR;
-        break;
+    switch (signal) {                                   /* dispatch I/O signal */
 
-
-    case ioSTF:                                         /* set flag flip-flop */
-    case ioENF:                                         /* enable flag */
-        dpc_flag = dpc_flagbuf = SET;
-        break;
-
-
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (dpc);
-        break;
+        case ioCLF:                                     /* clear flag flip-flop */
+            dpc.flag = dpc.flagbuf = CLEAR;
+            break;
 
 
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (dpc);
-        break;
+        case ioSTF:                                     /* set flag flip-flop */
+        case ioENF:                                     /* enable flag */
+            dpc.flag = dpc.flagbuf = SET;
+            break;
 
 
-    case ioIOI:                                         /* I/O data input */
-        data = 0;
-
-        for (i = 0; i < DP_NUMDRV; i++)                 /* form attention register value */
-            if (dpc_sta[i] & STA_ATN) data = data | (1 << i);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (dpc);
+            break;
 
 
-    case ioIOO:                                         /* I/O data output */
-        dpc_obuf = data;
-
-        if (dp_ctype == A13210)                         /* 13210? */
-            dpcio (select_code, ioCLC, 0);              /* OTx causes CLC */
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (dpc);
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-        dpc_flag = dpc_flagbuf = SET;                   /* set flag buffer and flag */
+        case ioIOI:                                     /* I/O data input */
+            data = 0;
 
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpd_obuf = 0;                               /* clear output buffer */
-                                                        /* fall into CRS handler */
+            for (i = 0; i < DP_NUMDRV; i++)             /* form attention register value */
+                if (dpc_sta[i] & STA_ATN) data = data | (1 << i);
 
-    case ioCRS:                                         /* control reset */
-        dpc_control = CLEAR;                            /* clear control */
-
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpc_command = CLEAR;                        /* clear command */
-        break;
+            stat_data = IORETURN (SCPE_OK, data);       /* merge in return status */
+            break;
 
 
-    case ioCLC:                                         /* clear control flip-flop */
-        dpc_control = CLEAR;                            /* clr ctl */
+        case ioIOO:                                     /* I/O data output */
+            dpc_obuf = IODATA (stat_data);              /* clear supplied status */
 
-        if (dp_ctype == A12557)                         /* 12557? */
-            dpc_command = CLEAR;                        /* cancel non-seek */
-
-        if (dpc_busy)
-            sim_cancel (&dpc_unit[dpc_busy - 1]);
-
-        sim_cancel (&dpd_unit);                         /* cancel dch */
-        dpd_xfer = 0;                                   /* clr dch xfer */
-        dpc_busy = 0;                                   /* clr cch busy */
-        dpc_poll = 0;                                   /* clr cch poll */
-        break;
+            if (dp_ctype == A13210)                     /* 13210? */
+                dpcio (dibptr, ioCLC, 0);               /* OTx causes CLC */
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        dpc_control = SET;                              /* set ctl */
+        case ioPOPIO:                                   /* power-on preset to I/O */
+            dpc.flag = dpc.flagbuf = SET;               /* set flag buffer and flag */
 
-        if ((dp_ctype == A13210) || !dpc_command) {     /* 13210 or command is clear? */
             if (dp_ctype == A12557)                     /* 12557? */
-                dpc_command = SET;                      /* set command */
-
-            drv = CW_GETDRV (dpc_obuf);                 /* get fnc, drv */
-            fnc = CW_GETFNC (dpc_obuf);                 /* from cmd word */
-
-            switch (fnc) {                              /* case on fnc */
-
-                case FNC_SEEK:                          /* seek */
-                    dpc_poll = 1;                       /* enable polling */
-                    dp_god (fnc, drv, dpc_dtime);       /* sched dch xfr */
-                    break;
-
-                case FNC_STA:                           /* rd sta */
-                    if (dp_ctype == A13210)             /* 13210? clr dch flag */
-                        dpdio (dpd_dib.devno, ioCLF, 0);
-
-                case FNC_CHK:                           /* check */
-                case FNC_AR:                            /* addr rec */
-                    dp_god (fnc, drv, dpc_dtime);       /* sched dch xfr */
-                    break;
-
-                case FNC_RD: case FNC_WD:               /* read, write */
-                case FNC_REF: case FNC_INIT:            /* refine, init */
-                    dp_goc (fnc, drv, dpc_ctime);       /* sched drive */
-                    break;
-                }                                       /* end case */
-            }                                           /* end if */
-        break;
+                dpd_obuf = 0;                           /* clear output buffer */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, dpc);                   /* set standard PRL signal */
-        setstdIRQ (select_code, dpc);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, dpc);                   /* set standard SRQ signal */
-        break;
+        case ioCRS:                                     /* control reset */
+            dpc.control = CLEAR;                        /* clear control */
+
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpc.command = CLEAR;                    /* clear command */
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        dpc_flagbuf = CLEAR;                            /* clear flag buffer */
-        break;
+        case ioCLC:                                     /* clear control flip-flop */
+            dpc.control = CLEAR;                        /* clr ctl */
+
+            if (dp_ctype == A12557)                     /* 12557? */
+                dpc.command = CLEAR;                    /* cancel non-seek */
+
+            if (dpc_busy)
+                sim_cancel (&dpc_unit[dpc_busy - 1]);
+
+            sim_cancel (&dpd_unit);                     /* cancel dch */
+            dpd_xfer = 0;                               /* clr dch xfer */
+            dpc_busy = 0;                               /* clr cch busy */
+            dpc_poll = 0;                               /* clr cch poll */
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioSTC:                                     /* set control flip-flop */
+            dpc.control = SET;                          /* set ctl */
+
+            if ((dp_ctype == A13210) || !dpc.command) { /* 13210 or command is clear? */
+                if (dp_ctype == A12557)                 /* 12557? */
+                    dpc.command = SET;                  /* set command */
+
+                drv = CW_GETDRV (dpc_obuf);             /* get fnc, drv */
+                fnc = CW_GETFNC (dpc_obuf);             /* from cmd word */
+
+                switch (fnc) {                          /* case on fnc */
+
+                    case FNC_SEEK:                      /* seek */
+                        dpc_poll = 1;                   /* enable polling */
+                        dp_god (fnc, drv, dpc_dtime);   /* sched dch xfr */
+                        break;
+
+                    case FNC_STA:                       /* rd sta */
+                        if (dp_ctype == A13210)         /* 13210? clr dch flag */
+                            dpdio (&dpd_dib, ioCLF, 0);
+
+                    case FNC_CHK:                       /* check */
+                    case FNC_AR:                        /* addr rec */
+                        dp_god (fnc, drv, dpc_dtime);   /* sched dch xfr */
+                        break;
+
+                    case FNC_RD: case FNC_WD:           /* read, write */
+                    case FNC_REF: case FNC_INIT:        /* refine, init */
+                        dp_goc (fnc, drv, dpc_ctime);   /* sched drive */
+                        break;
+                    }                                   /* end case */
+                }                                       /* end if */
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (dpc);                            /* set standard PRL signal */
+            setstdIRQ (dpc);                            /* set standard IRQ signal */
+            setstdSRQ (dpc);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            dpc.flagbuf = CLEAR;                        /* clear flag buffer */
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    dpcio (select_code, ioCLF, 0);                      /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    dpcio (select_code, ioSIR, 0);                      /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -668,7 +695,8 @@ void dp_goc (int32 fnc, int32 drv, int32 time)
 {
 int32 t;
 
-if (t = sim_is_active (&dpc_unit[drv])) {               /* still seeking? */
+t = sim_is_active (&dpc_unit[drv]);
+if (t) {                                                /* still seeking? */
     sim_cancel (&dpc_unit[drv]);                        /* stop seek */
     dpc_sta[drv] = dpc_sta[drv] & ~STA_BSY;             /* clear busy */
     time = time + t;                                    /* include seek time */
@@ -712,12 +740,12 @@ switch (uptr->FNC) {                                    /* case function */
 
     case FNC_AR:                                        /* arec, need cyl */
     case FNC_SEEK:                                      /* seek, need cyl */
-        if (dpd_command) {                              /* dch active? */
+        if (dpd.command) {                              /* dch active? */
             dpc_rarc = DA_GETCYL (dpd_obuf);            /* set RAR from cyl word */
             dpd_wval = 0;                               /* clr data valid */
 
-            dpd_command = CLEAR;                        /* clr dch cmd */
-            dpdio (dpd_dib.devno, ioENF, 0);            /* set dch flg */
+            dpd.command = CLEAR;                        /* clr dch cmd */
+            dpdio (&dpd_dib, ioENF, 0);                 /* set dch flg */
 
             if (uptr->FNC == FNC_AR) uptr->FNC = FNC_AR1;
             else uptr->FNC = FNC_SEEK1;                 /* advance state */
@@ -727,17 +755,17 @@ switch (uptr->FNC) {                                    /* case function */
 
     case FNC_AR1:                                       /* arec, need hd/sec */
     case FNC_SEEK1:                                     /* seek, need hd/sec */
-        if (dpd_command) {                              /* dch active? */
+        if (dpd.command) {                              /* dch active? */
             dpc_rarh = DA_GETHD (dpd_obuf);             /* set RAR from head */
             dpc_rars = DA_GETSC (dpd_obuf);             /* set RAR from sector */
             dpd_wval = 0;                               /* clr data valid */
 
-            dpd_command = CLEAR;                        /* clr dch cmd */
-            dpdio (dpd_dib.devno, ioENF, 0);            /* set dch flg */
+            dpd.command = CLEAR;                        /* clr dch cmd */
+            dpdio (&dpd_dib, ioENF, 0);                 /* set dch flg */
 
             if (uptr->FNC == FNC_AR1) {
-                dpc_command = CLEAR;                    /* clr cch cmd */
-                dpcio (dpc_dib.devno, ioENF, 0);        /* set cch flg */
+                dpc.command = CLEAR;                    /* clr cch cmd */
+                dpcio (&dpc_dib, ioENF, 0);             /* set cch flg */
 
                 dpc_sta[drv] = dpc_sta[drv] | STA_ATN;  /* set drv attn */
                 break;                                  /* done if Address Record */
@@ -766,7 +794,7 @@ switch (uptr->FNC) {                                    /* case function */
         break;
 
     case FNC_STA:                                       /* read status */
-        if (dpd_command || (dp_ctype == A13210)) {      /* dch act or 13210? */
+        if (dpd.command || (dp_ctype == A13210)) {      /* dch act or 13210? */
             if ((dpc_unit[drv].flags & UNIT_UNLOAD) == 0) {  /* drive up? */
                 dpd_ibuf = dpc_sta[drv] & ~STA_ERR;     /* clear err */
                 if (dp_ctype == A13210) dpd_ibuf =      /* 13210? */
@@ -777,9 +805,9 @@ switch (uptr->FNC) {                                    /* case function */
             if (dpd_ibuf & STA_ANYERR)                  /* errors? set flg */
                 dpd_ibuf = dpd_ibuf | STA_ERR;
 
-            dpc_command = CLEAR;                        /* clr cch cmd */
-            dpd_command = CLEAR;                        /* clr dch cmd */
-            dpdio (dpd_dib.devno, ioENF, 0);            /* set dch flg */
+            dpc.command = CLEAR;                        /* clr cch cmd */
+            dpd.command = CLEAR;                        /* clr dch cmd */
+            dpdio (&dpd_dib, ioENF, 0);                 /* set dch flg */
             }
 
         dpc_sta[drv] = dpc_sta[drv] &                   /* clr sta flags */
@@ -789,14 +817,14 @@ switch (uptr->FNC) {                                    /* case function */
         dpc_poll = 1;                                   /* enable polling */
         for (i = 0; i < DP_NUMDRV; i++) {               /* loop thru drives */
             if (dpc_sta[i] & STA_ATN) {                 /* any ATN set? */
-                dpcio (dpc_dib.devno, ioENF, 0);        /* set cch flg */
+                dpcio (&dpc_dib, ioENF, 0);             /* set cch flg */
                 break;
                 }
             }
         break;
 
     case FNC_CHK:                                       /* check, need cnt */
-        if (dpd_command) {                              /* dch active? */
+        if (dpd.command) {                              /* dch active? */
             dpc_cnt = dpd_obuf & DA_CKMASK;             /* get count */
             dpd_wval = 0;                               /* clr data valid */
             dp_goc (FNC_CHK1, drv, dpc_xtime);          /* sched drv */
@@ -833,11 +861,11 @@ t_stat dpc_svc (UNIT *uptr)
 int32 da, drv, err;
 
 err = 0;                                                /* assume no err */
-drv = uptr - dpc_dev.units;                             /* get drive no */
+drv = uptr - dpc_unit;                                  /* get drive no */
 if (uptr->flags & UNIT_UNLOAD) {                        /* drive down? */
 
-    dpc_command = CLEAR;                                /* clr cch cmd */
-    dpcio (dpc_dib.devno, ioENF, 0);                    /* set cch flg */
+    dpc.command = CLEAR;                                /* clr cch cmd */
+    dpcio (&dpc_dib, ioENF, 0);                         /* set cch flg */
 
     dpc_sta[drv] = 0;                                   /* clr status */
     dpc_busy = 0;                                       /* ctlr is free */
@@ -852,8 +880,8 @@ switch (uptr->FNC) {                                    /* case function */
         dpc_sta[drv] = (dpc_sta[drv] | STA_ATN) & ~STA_BSY;  /* fall into cmpl */
     case FNC_SEEK3:                                     /* seek complete */
         if (dpc_poll) {                                 /* polling enabled? */
-            dpc_command = CLEAR;                        /* clr cch cmd */
-            dpcio (dpc_dib.devno, ioENF, 0);            /* set cch flg */
+            dpc.command = CLEAR;                        /* clr cch cmd */
+            dpcio (&dpc_dib, ioENF, 0);                 /* set cch flg */
             }
         return SCPE_OK;
 
@@ -863,7 +891,7 @@ switch (uptr->FNC) {                                    /* case function */
     case FNC_RD:                                        /* read */
     case FNC_CHK1:                                      /* check */
         if (dp_ptr == 0) {                              /* new sector? */
-            if (!dpd_command && (uptr->FNC != FNC_CHK1)) break;
+            if (!dpd.command && (uptr->FNC != FNC_CHK1)) break;
             if (dpc_rarc != dpc_ucyl[drv])              /* RAR cyl miscompare? */
                 dpc_sta[drv] = dpc_sta[drv] | STA_AER;  /* set flag, read */
             if (dpc_rars >= DP_NUMSC) {                 /* bad sector? */
@@ -880,10 +908,13 @@ switch (uptr->FNC) {                                    /* case function */
                 dpc_rarh = dpc_rarh ^ 1;                /* incr head */
                 dpc_eoc = ((dpc_rarh & 1) == 0);        /* calc eoc */
                 }
-            if (err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET)) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)                                    /* error? */
+                 break;
             fxread (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;
+            err = ferror (uptr->fileref);
+            if (err)                                    /* error? */
+                 break;
             }
         dpd_ibuf = dpxb[dp_ptr++];                      /* get word */
         if (dp_ptr >= DP_NUMWD) {                       /* end of sector? */
@@ -893,17 +924,17 @@ switch (uptr->FNC) {                                    /* case function */
                 }
             dp_ptr = 0;                                 /* wrap buf ptr */
             }
-        if (dpd_command && dpd_xfer)                    /* dch on, xfer? */
-            dpdio (dpd_dib.devno, ioENF, 0);            /* set dch flg */
+        if (dpd.command && dpd_xfer)                    /* dch on, xfer? */
+            dpdio (&dpd_dib, ioENF, 0);                 /* set dch flg */
 
-        dpd_command = CLEAR;                            /* clr dch cmd */
+        dpd.command = CLEAR;                            /* clr dch cmd */
         sim_activate (uptr, dpc_xtime);                 /* sched next word */
         return SCPE_OK;
 
     case FNC_INIT:                                      /* init */
     case FNC_WD:                                        /* write */
         if (dp_ptr == 0) {                              /* start sector? */
-            if (!dpd_command && !dpd_wval) break;       /* xfer done? */
+            if (!dpd.command && !dpd_wval) break;       /* xfer done? */
             if (uptr->flags & UNIT_WPRT) {              /* wr prot? */
                 dpc_sta[drv] = dpc_sta[drv] | STA_FLG;  /* set status */
                 break;                                  /* done */
@@ -927,16 +958,19 @@ switch (uptr->FNC) {                                    /* case function */
                 dpc_rarh = dpc_rarh ^ 1;                /* incr head */
                 dpc_eoc = ((dpc_rarh & 1) == 0);        /* calc eoc */
                 }
-            if (err = fseek (uptr->fileref, da * sizeof (int16),
-                SEEK_SET)) break;
+            err = fseek (uptr->fileref, da * sizeof (int16), SEEK_SET);
+            if (err)                                    /* error? */
+                 break;
             fxwrite (dpxb, sizeof (int16), DP_NUMWD, uptr->fileref);
-            if (err = ferror (uptr->fileref)) break;    /* error? */
+            err = ferror (uptr->fileref);
+            if (err)                                    /* error? */
+                 break;
             dp_ptr = 0;                                 /* next sector */
             }
-        if (dpd_command && dpd_xfer)                    /* dch on, xfer? */
-            dpdio (dpd_dib.devno, ioENF, 0);            /* set dch flg */
+        if (dpd.command && dpd_xfer)                    /* dch on, xfer? */
+            dpdio (&dpd_dib, ioENF, 0);                 /* set dch flg */
 
-        dpd_command = CLEAR;                            /* clr dch cmd */
+        dpd.command = CLEAR;                            /* clr dch cmd */
         sim_activate (uptr, dpc_xtime);                 /* sched next word */
         return SCPE_OK;
 
@@ -946,8 +980,8 @@ switch (uptr->FNC) {                                    /* case function */
 
 dpc_sta[drv] = dpc_sta[drv] | STA_ATN;                  /* set ATN */
 
-dpc_command = CLEAR;                                    /* clr cch cmd */
-dpcio (dpc_dib.devno, ioENF, 0);                        /* set cch flg */
+dpc.command = CLEAR;                                    /* clr cch cmd */
+dpcio (&dpc_dib, ioENF, 0);                             /* set cch flg */
 
 dpc_busy = 0;                                           /* ctlr is free */
 dpd_xfer = dpd_wval = 0;
@@ -966,21 +1000,18 @@ return SCPE_OK;
 t_stat dpc_reset (DEVICE *dptr)
 {
 int32 drv;
+DIB *dibptr = (DIB *) dptr->ctxt;                       /* DIB pointer */
 
 hp_enbdis_pair (dptr,                                   /* make pair cons */
-    (dptr == &dpd_dev)? &dpc_dev: &dpd_dev);
+    (dptr == &dpd_dev) ? &dpc_dev : &dpd_dev);
 
-if (sim_switches & SWMASK ('P')) {                      /* PON reset? */
-    dpd_ibuf = 0;                                       /* clear buffers */
-    dpd_obuf = 0;
-    dpc_obuf = 0;
+if (sim_switches & SWMASK ('P')) {                      /* initialization reset? */
+    dpd_ibuf = dpd_obuf = 0;                            /* clear buffers */
+    dpc_obuf = 0;                                       /* clear buffer */
     dpc_rarc = dpc_rarh = dpc_rars = 0;                 /* clear RAR */
     }
 
-if (dptr == &dpc_dev)                                   /* command channel reset? */
-    dpcio (dpc_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to command channel */
-else                                                    /* data channel reset */
-    dpdio (dpd_dib.devno, ioPOPIO, 0);                  /* send POPIO signal to data channel */
+IOPRESET (dibptr);                                      /* PRESET device (does not use PON) */
 
 dpc_busy = 0;                                           /* reset controller state */
 dpc_poll = 0;
@@ -1029,7 +1060,7 @@ return detach_unit (uptr);                              /* detach unit */
 
 t_stat dpc_load_unload (UNIT *uptr, int32 value, char *cptr, void *desc)
 {
-uint32 drv;
+int32 drv;
 
 if ((uptr->flags & UNIT_ATT) == 0) return SCPE_UNATT;   /* must be attached to load */
 
@@ -1037,10 +1068,10 @@ if (value == UNIT_UNLOAD)                               /* unload heads? */
     uptr->flags = uptr->flags | UNIT_UNLOAD;            /* indicate unload */
 else {                                                  /* load heads */
     uptr->flags = uptr->flags & ~UNIT_UNLOAD;           /* indicate load */
-    drv = uptr - dpc_dev.units;                         /* get drive no */
+    drv = uptr - dpc_unit;                              /* get drive no */
     dpc_sta[drv] = dpc_sta[drv] | STA_ATN | STA_1ST;    /* update status */
     if (dpc_poll)                                       /* polling enabled? */
-        dpcio (dpc_dib.devno, ioENF, 0);                /* set flag */
+        dpcio (&dpc_dib, ioENF, 0);                     /* set flag */
     }
 return SCPE_OK;
 }
@@ -1052,13 +1083,18 @@ t_stat dp_settype (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 i;
 
-if ((val < 0) || (val > 1) || (cptr != NULL)) return SCPE_ARG;
+if ((val < 0) || (val > 1) || (cptr != NULL))
+    return SCPE_ARG;
+
 for (i = 0; i < DP_NUMDRV; i++) {
-    if (dpc_unit[i].flags & UNIT_ATT) return SCPE_ALATT;
+    if (dpc_unit[i].flags & UNIT_ATT)
+        return SCPE_ALATT;
     }
+
 for (i = 0; i < DP_NUMDRV; i++)
     dpc_unit[i].capac = (val? DP_SIZE3: DP_SIZE2);
-dp_ctype = val;
+
+dp_ctype = (CNTLR_TYPE) val;
 return SCPE_OK;
 }
 
@@ -1067,8 +1103,11 @@ return SCPE_OK;
 
 t_stat dp_showtype (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (dp_ctype == A13210) fprintf (st, "13210A");
-else fprintf (st, "12557A");
+if (dp_ctype == A13210)
+    fprintf (st, "13210A");
+else
+    fprintf (st, "12557A");
+
 return SCPE_OK;
 }
 
@@ -1144,7 +1183,7 @@ t_stat dpc_boot (int32 unitno, DEVICE *dptr)
 int32 dev;
 
 if (unitno != 0) return SCPE_NOFNC;                     /* only unit 0 */
-dev = dpd_dib.devno;                                    /* get data chan dev */
+dev = dpd_dib.select_code;                              /* get data chan dev */
 if (ibl_copy (dp_rom, dev)) return SCPE_IERR;           /* copy boot to memory */
 SR = (SR & IBL_OPT) | IBL_DP | (dev << IBL_V_DEV);      /* set SR */
 if (sim_switches & SWMASK ('R')) SR = SR | IBL_DP_REM;  /* boot from removable? */

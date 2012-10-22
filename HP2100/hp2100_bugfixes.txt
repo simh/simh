@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2008-09-30
+                             Last update: 2012-05-07
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -138,8 +138,8 @@
      the "ex -u" and "ex -s" commands reveals the same data in both sets of
      locations.  The "ex" command isn't using the DMS maps properly.
 
-     CAUSE:  String constants are used instead of character constants, preventing
-     the DMS map switches from being recognized.
+     CAUSE:  String constants are used instead of character constants,
+     preventing the DMS map switches from being recognized.
 
      RESOLUTION:  Modify "hp2100_cpu.c" to use character constants rather than
      string constants in "dms_cons" so that DMS map switches work correctly.
@@ -151,14 +151,14 @@
      program.  The EXEC target is below the MP fence, and the expected action is
      an MP violation interrupt that is recognized and processed by the system as
      a legal call to the system executive.  However, the MP violation isn't
-     occurring, so the SJP instruction at the actual EXEC entry point (present to
-     catch EXEC calls made with the interrupt system off) is attempted, and that
-     causes the DM violation, due to execution of a protected instruction from
-     the user map.
+     occurring, so the SJP instruction at the actual EXEC entry point (present
+     to catch EXEC calls made with the interrupt system off) is attempted, and
+     that causes the DM violation, due to execution of a protected instruction
+     from the user map.
 
      CAUSE:  Memory writes aren't being checked for an MP violation if DMS is
-     enabled, i.e., if DMS is enabled, and the page is writable, then whether the
-     target is below the MP fence is not checked.
+     enabled, i.e., if DMS is enabled, and the page is writable, then whether
+     the target is below the MP fence is not checked.
 
      RESOLUTION:  Modify "hp2100_cpu.c" to do MP check on all writes after DMS
      translation and violation checks are done (so, to pass, the page must be
@@ -430,7 +430,7 @@
      RESOLUTION:  Alter "ptr_svc" (hp2100_stddev.c) to fail if STOP_IOE is set,
      or to supply feed frames upon encountering the end of the attached file.
      "SET PTR TRLLIM" sets the maximum number of feed frames to supply.  Note
-     that RTE needs at least 30 feed frames before signalling EOT.
+     that RTE needs at least 30 feed frames before signaling EOT.
 
      STATUS:  Fixed in version 3.2-1.
 
@@ -706,8 +706,8 @@
      the simulator doesn't supply it explicitly in this case.
 
      The HP "7900A Disc Drive Operating and Service Manual" (07900-90002) says,
-     in section 4-67, "Attention is set high everytime a seek has been completed
-     and Access Ready comes high."
+     in section 4-67, "Attention is set high every time a seek has been
+     completed and Access Ready comes high."
 
      TSB code loads the "drive attention" word from the command channel to create
      a "request status" command.  The code assumes that either bit 0 or bit 1
@@ -848,9 +848,9 @@
      from issuing a WRITE command until the first data is requested).  Most of
      these are reported as diagnostic failures.
 
-     CAUSE:  I/O time modelling is not done properly.  In some cases, the times
+     CAUSE:  I/O time modeling is not done properly.  In some cases, the times
      indicated are incorrect.  In others, certain characteristics (e.g., that
-     operations from BOT take longer, due to the initial gap) aren't modelled at
+     operations from BOT take longer, due to the initial gap) aren't modeled at
      all.
 
      RESOLUTION:  Revise "mscio" and "msc_svc" (hp2100_ms.c) to model actual I/O
@@ -1200,12 +1200,13 @@
      ready (i.e., when the unit is attached).
 
      CAUSE:  Section 4-67 of the "7900A Disc Drive Operating and Service Manual"
-     (HP 07900-90002) says, "Attention is set high everytime a seek has completed
-     and Access Ready comes high."  This includes the initial head-loading seek
-     when the drive becomes ready.  The "Troubleshooting Diagrams (Sheet 2 of 4)"
-     on page 5-17 show that after the heads load, Drive Ready, First Status,
-     Access Ready (a.k.a. not Busy), and Attention are asserted.  The
-     corresponding code in "dpc_attach" sets First Status but not Attention.
+     (HP 07900-90002) says, "Attention is set high every time a seek has
+     completed and Access Ready comes high."  This includes the initial
+     head-loading seek when the drive becomes ready.  The "Troubleshooting
+     Diagrams (Sheet 2 of 4)" on page 5-17 show that after the heads load, Drive
+     Ready, First Status, Access Ready (a.k.a. not Busy), and Attention are
+     asserted.  The corresponding code in "dpc_attach" sets First Status but not
+     Attention.
 
      In addition, the last diagnostic command prior to the loop is a STATUS
      CHECK.  This leaves the 13210A interface polling for attention bits, and
@@ -1332,7 +1333,7 @@
 
 
 
- 51. PROBLEM:  The diagnostic configurator mis-identifies the host CPU.
+ 51. PROBLEM:  The diagnostic configurator misidentifies the host CPU.
 
      VERSION:  3.2-3
 
@@ -1509,7 +1510,7 @@
      missing the option to indicate that commas are glyph separators.
 
      RESOLUTION:  Modify the appropriate calls to "get_glyph" (scp.c,
-     sim_console.c) to specify ',' as the the "optional end of glyph character"
+     sim_console.c) to specify ',' as the "optional end of glyph character"
      parameter.
 
      STATUS:  Fixed in version 3.3-0.
@@ -2154,7 +2155,7 @@
      conclusion of writes when using the 12606 interface.  This is an artifact of
      the interface design.
 
-     CAUSE:  The status return from the 12606 interface is not modelled properly.
+     CAUSE:  The status return from the 12606 interface is not modeled properly.
 
      RESOLUTION:  Modify "drv_svc" (hp2100_dr.c) to return DRS_PER at the
      conclusion of writes when configured as a 2770/2771 disk.
@@ -2542,7 +2543,7 @@
      Section I, Paragraph 4-17, "Store Field", of the "HP 1000 M/E/F-Series
      Computers Engineering and Reference Documentation" (HP 92851-90001) says:
 
-       "The A and B addressable flip-slops (ABFF) [38A] can be clocked at the
+       "The A and B addressable flip-flops (ABFF) [38A] can be clocked at the
         end of every microcycle.  Addresses 0 and 1 are detected on the M-bus and
         the flip-flops are set accordingly.  When DCPC uses the M-bus the ABFFST
         signal is suppressed."
@@ -3867,7 +3868,7 @@
      the terminal multiplexer.
 
      RESOLUTION:  Modify the "ioEDT" handler in "iplio" (hp2100_ipl.c) to sleep
-     for one millisecond before signalling a DMA completion interrupt for an
+     for one millisecond before signaling a DMA completion interrupt for an
      output transfer.  This allows the SP time to pulse the IPL before the IOP
      processes the DMA completion interrupt.  Modify "dma_cycle" (hp2100_cpu.c)
      to pass the DMA channel number and I/O direction flag in the "dat"
@@ -4385,10 +4386,11 @@
 
      CAUSE:  The "exdep_cmd" routine is calling "find_reg_glob" if the
      "find_reg" routine returns a not-found error for the selected device.
-     "find_reg_glob" searches for a unique name among all devices and returns
-     it if found.
+     "find_reg_glob" searches for a unique name among all devices and returns it
+     if found.
 
-     RESOLUTION:  None.
+     RESOLUTION:  Modify "exdep_cmd" (scp.c) to search for a global register
+     name only if the device was not explicitly specified.
 
      STATUS:  Fixed in version 3.8-0.
 
@@ -4432,7 +4434,7 @@
      (except for binary mode).  A correct negotiation mechanism must be
      implemented to handle the variety of Telnet clients properly.
 
-     WORKAROUND:  Modify the TNS_SKIP case in "tmxr_poll_rx" (sim_txmxr.c) to
+     RESOLUTION:  Modify the TNS_SKIP case in "tmxr_poll_rx" (sim_txmxr.c) to
      skip only LF or NUL following CR.  Any other character is processed as is.
 
      STATUS:  Fixed in version 3.8-0.
@@ -4711,7 +4713,7 @@
 
 
 191. PROBLEM:  The action of certain I/O cards (e.g., the 12936A Privileged
-     Interrupt Fence) cannot be modelled by SIMH.
+     Interrupt Fence) cannot be modeled by SIMH.
 
      VERSION:  3.8-0
 
@@ -4722,7 +4724,7 @@
 
      CAUSE:  The hardware has I/O signals for interrupt request (IRQ) and
      interrupt priority to lower-priority devices (PRL).  These signals are not
-     modelled directly in SIMH.  Rather, they are implied by control, flag, and
+     modeled directly in SIMH.  Rather, they are implied by control, flag, and
      flag buffer set (for IRQ) and control and flag set (for PRL).  If an I/O
      card does not follow these conventions, then the proper action cannot be
      simulated.
@@ -5065,7 +5067,7 @@
      VERSION:  3.8-0
 
      OBSERVATION:  The A and B register values are stored in two places: as
-     "uint16 ABREG[2]" duing execution, and as "uint32 saved_AR" and "uint32
+     "uint16 ABREG[2]" during execution, and as "uint32 saved_AR" and "uint32
      saved_BR" between executions.  The latter was to accommodate the
      requirement that register variables must be 32 bits in size.  That
      requirement was removed in version 3.5-2 for registers declared with the
@@ -5208,10 +5210,10 @@
 
      VERSION:  3.8-0
 
-     OBSERVATION:  Page 2-6 of the 12559A 9-Track Magnetic Tape Unit Interface
-     Kit Operating and Service Manual says that the CLR command channel flag
-     flip-flop when the command completes.  The MT simulator does not, so the
-     command channel does not interrupt.
+     OBSERVATION:  Page 2-5 of the 12559A 9-Track Magnetic Tape Unit Interface
+     Kit Operating and Service Manual says that the command channel flag
+     flip-flop sets when the CLR command completes.  The MT simulator does not
+     do this, so the command channel does not interrupt.
 
      CAUSE:  Coding error.
 
@@ -5319,7 +5321,7 @@
 
      This second interrupt would normally be allowed, as the STC sc,C
      instruction clears the "interrupt lockout" flag that was set when the first
-     interupt was generated.  However, the STC signal handler checks for
+     interrupt was generated.  However, the STC signal handler checks for
      interrupt status between the STC and the succeeding CLF, rather than after
      the CLF.  The result is that the STC clears lockout, then the FIFO status
      sets the flag and lockout, and then the CLF clears the flag, leaving
@@ -5351,3 +5353,956 @@
      to the "interrupt trap cell" execution path.
 
      STATUS:  Fixed in version 3.8-1.
+
+
+
+213. PROBLEM:  A DO command without a filename prints the wrong error message.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The DO command requires a file argument and zero or more
+     parameter arguments.  Entering DO without the file argument should print
+     "Too few arguments," as other commands that require arguments do (e.g.,
+     ATTACH, BOOT, etc.).  Instead, it prints "File open error."
+
+     CAUSE:  A test in "do_cmd" attempts to detect when no arguments are passed
+     and return SCPE_2FARG in response, but the test always fails.  As a result,
+     "fopen" is called with a NULL filename parameter.  The call fails,
+     resulting in the "File open error" message.
+
+     The test follows the initialization of the "do_arg" array and depends on
+     initialization stopping when a null argument is encountered.  The bug fix
+     of 25-Jul-2008 ("DO cmd missing params now default to null string")
+     modified "do_arg" initialization to cover the entire array.  Therefore, the
+     test to determine if "do_arg" was not initialized (which implies that the
+     file argument was not passed) never trips.
+
+     RESOLUTION:  Modify "do_arg" (scp.c) to test "do_arg[0]" for NULL and to
+     return SCPE_2FARG if so.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+214. PROBLEM:  DMA/DCPC cannot steal consecutive I/O cycles.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  All DMA and DCPC cards are capable of stealing consecutive
+     I/O cycles, presuming that SRQ is asserted at the proper time before each
+     cycle.  The current SIMH implementation of DMA/DCPC is capable of stealing
+     only every other cycle, even if SRQ is asserted continuously.  The 12821A
+     Disc Interface diagnostic checks for consecutive cycle-steal capability and
+     fails when run.
+
+     CAUSE:  Each pass through the instruction simulation loop does a device
+     timeout check, then a potential DMA cycle, and then an instruction cycle.
+     The device timeout calls the card unit service routine, which sets SRQ and
+     schedules the next service.  The SRQ is then processed with the DMA cycle,
+     which dispatches ioIOI/IOO and ioCLF to the device.  At the end of the DMA
+     cycle, the next instruction is executed.
+
+     A device capable of transferring data continuously would leave SRQ asserted
+     after the I/O cycle.  But because SRQ is not checked after the DMA cycle,
+     the next instruction execution is performed unconditionally.  Therefore,
+     even with continuous SRQ assertion, the simulator will interleave DMA
+     cycles and instructions.
+
+     RESOLUTION:  Modify the instruction execution loop (hp2100_cpu.c) to
+     recalculate SRQ requests after each DMA cycle, and if a request is still
+     pending, skip instruction execution. This allows consecutive DMA cycles
+     without intervening instruction executions if SRQ is asserted continuously.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+215. PROBLEM:  DMA/DCPC does not give priority to channel 1 during contention.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  Dual-channel DMA/DCPC cards give priority to channel 1 if
+     both channels are requesting a DMA cycle.  If channel 1 SRQ is asserted
+     continuously, then no channel 2 cycles will occur until channel 1
+     completes.
+
+     Under simulation, channel cycle requests alternate unconditionally.  If
+     channel 2 requests a DMA cycle, it will always be granted, regardless of
+     any pending channel 1 requests.
+
+     CAUSE:  Each pass through the instruction simulation loop checks for a
+     channel 1 request and then a channel 2 request, dispatching DMA cycles as
+     indicated.  The check for a channel 2 request should not occur if a channel
+     1 request is still pending at the end of its DMA cycle.
+
+     RESOLUTION:  Modify the instruction execution loop (hp2100_cpu.c) to
+     inhibit DMA channel 2 if a channel 1 request is still pending after a
+     channel 1 cycle.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+216. ENHANCEMENT:  Rename DMA channels 0 and 1 to 1 and 2 to match the
+     documentation.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The HP 2100 simulator presents DMA0 and DMA1 as the DMA
+     devices.  However, all HP literature refers to these as channel 1 and
+     channel 2.
+
+     RESOLUTION:  Modify the device names (hp2100_cpu.c, hp2100_defs.h, and
+     hp2100_sys.c) from 0 and 1 to 1 and 2 to align with HP usage.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+217. PROBLEM:  The comments for "cpu_set_idle" (hp2100_cpu.c) are obsolete.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The comments for the above routine note the requirement for
+     clock stabilization.  This was added in 3.8-1, but the comments were not
+     changed.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Removed obsolete comments.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+218. PROBLEM:  The 12578A DMA device is modeled incorrectly.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The 12578A DMA device simulation incorporates a latency
+     counter that delays the first DMA cycle for one instruction after the STC
+     is issued to enable the channel.  This is incorrect; if SRQ is already
+     asserted, the first cycle occurs immediately after the channel is enabled.
+
+     CAUSE:  Incorrect understanding.
+
+     RESOLUTION:  Modify hp2100_cpu.c to remove the latency counter.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+219. PROBLEM:  DMA IOO and CLF/EDT signals are not concurrent.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  A DMA transfer to the 12821A Disc Interface should not set
+     the end-of-data-transfer flip-flop on the DI card until the last word has
+     been sent.  Instead, each word transferred sets the flip-flop.
+
+     CAUSE:  In the packed output mode, the end-of-data-transfer flip-flop is
+     set either if the the OTx instruction does not clear the flag (i.e., if OTA
+     used instead of OTA,C), or if the DMA EDT signal is asserted.  DMA
+     transfers are programmed to clear the flag with each write to prevent the
+     flip-flop from setting until the EDT signal asserts when the last word is
+     output.
+
+     In hardware, CLF or EDT is asserted concurrently with IOO.  In simulation,
+     "dma_cycle" calls the device's I/O signal handler with ioIOO, then with
+     ioCLF, and then, for the last cycle only, with ioEDT.  At the time that the
+     handler receives ioIOO, it has no way of knowing whether ioCLF will follow.
+     Therefore, the DI sets its end-of-data-transfer flip-flop on the first word
+     transferred instead of on the last word transferred.
+
+     The fundamental problem is that DMA hardware may assert multiple concurrent
+     signals, upon which I/O card designs may test and act, but simulation
+     serializes the signals and therefore prevents concurrency detection.
+
+     RESOLUTION:  Modify "dma_cycle" (hp2100_cpu.c) to send one set of
+     concurrent I/O signals to the target handler for each DMA I/O cycle, and
+     modify all I/O device handlers to allow processing of multiple concurrent
+     signals.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+220. ENHANCEMENT:  Enhance the I/O signal dispatcher to provide for multiple
+     devices controlled by the same device signal handler.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  Currently, the DCPC, IPL, and DI simulations control multiple
+     devices.  The first two control a pair of devices each and determine the
+     desired device by checking the select code.  The DI will control three,
+     complicating the test that would have to be done at each signal handler
+     entry.
+
+     RESOLUTION:  Modify "devdisp" (hp2100_cpu.c) to pass the Device Information
+     Block (DIB) pointer instead of the select code to device signal handlers,
+     and modify all signal handlers accordingly.  Modify all device DIBs to add
+     card numbers to allow for multiple-device handlers.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+221. PROBLEM:  The LPS diagnostic mode is modeled incorrectly.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The 12578A DMA simulation was modified to remove the latency
+     from enabling a channel to issuing the first DMA cycle.  After this change
+     was made, the card failed DMA diagnostic test 17.
+
+     CAUSE:  The LPS device offers a diagnostic mode that simulates a 12566B
+     Microcircuit Interface card equipped with a loopback connector.  This
+     configuration is used for a number of diagnostics that require an I/O card
+     in addition to the card under test.  Typically, this is to test I/O or
+     interrupt capability.  Jumpers on the card configure it for the diagnostic
+     response expected.  The SET LPS DIAG mode configures the card properly for
+     all diagnostics except the 12578A DMA diagnostic.
+
+     SET LPS DIAG simulates jumper W1 in position C and W2 in position B.  In
+     these positions, an STC will set the card flag one instruction later.  When
+     used for a DMA transfer, instructions and DMA cycles will interleave 1:1,
+     i.e., DMA will steal every other cycle.
+
+     The 12578A diagnostic requires jumper W1 in position B and W2 in position
+     C.  In these positions, an STC will set the card flag two instructions
+     later, so DMA will steal every third cycle, allowing two instructions
+     between DMA cycles.  The 12578A diagnostic depends on this and will report
+     errors otherwise.
+
+     RESOLUTION:  Modify "lpsio" (hp2100_lps.c) to schedule device service in
+     DIAG mode in three instructions if the CPU is a 2114, 2115, or 2116 and in
+     two instructions otherwise.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+222. PROBLEM:  The 12821A Disc Interface diagnostic aborts with "Unit not
+     attached."
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The 12821A Disc Interface diagnostic locates the card to test
+     by issuing a CLC sc,C / OTA sc / LIA sc sequence to each card in the card
+     cage; this writes a zero value and then looks for a specific response that
+     is characteristic of the DI.  When the zero value is written to the MT
+     device (HP 3030 tape drive), it responds with "Unit not attached."
+
+     CAUSE:  The MT device is unusual in that commands are executed when they
+     are written to the card, rather than in response to STC.  Therefore, when
+     the zero value is written, the MT device attempts to interpret that value
+     as a command.
+
+     The IOO processor checks for a valid command before proceeding.  Zero is
+     not a valid command, but the check is not coded properly.  The search
+     through the command table loops for the number of bytes in the table, not
+     for the number of entries.  One of the values beyond the end of the table
+     equals zero, so the command is considered valid, and unit service is
+     scheduled.  The unit service routine determines that the unit is not
+     attached and returns an error code, causing a simulator stop.
+
+     RESOLUTION:  Modify "mtcio" (hp2100_mt.c) to use the count of command table
+     entries as the loop count.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+223. ENHANCEMENT:  Consolidate reporting of consecutive CRS signals.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  HP 2000 Time Shared BASIC begins its start sequence by
+     issuing 128K CLC 0 instructions.  This sequence is required by the 12920A
+     Terminal Multiplexer.  If debugging is enabled, the IPL device writes 128K
+     lines to the log file.  It would be more helpful if the ioCRS processor
+     detected consecutive calls and summarized them in a single line.
+
+     RESOLUTION:  Modify "iplio" (hp2100_ipl.c) to add a CRS invocation counter
+     and to report a single debug line for consecutive CRS calls.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+224. PROBLEM:  Simulation stops are ignored during DMA cycles.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  An I/O routine may return an error code other than SCPE_OK to
+     stop the simulator.  For example, IPL may return SCPE_IOERR if STC is
+     issued to a card with a disconnected socket.  If the device is invoked via
+     programmed I/O, an error value return will cause a simulation stop.  If the
+     device is invoked by DMA, it will not.
+
+     CAUSE:  The "iogrp" function returns the status code to the instruction
+     loop, but the "dma_cycle" function ignores status returns from the I/O
+     handlers.
+
+     RESOLUTION:  Modify "dma_cycle" (hp2100_cpu.c) to return the status from
+     the device signal handler, and modify "sim_instr" to stop instruction
+     execution if the returned status is not SCPE_OK.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+225. PROBLEM:  Simulation stops do not always preserve the CPU state for
+     restarting.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  If the CPU simulator is stopped by certain errors, e.g., an
+     unimplemented instruction execution, simulation control returns with the
+     CPU state set as it was just prior to the error.  This allows the error to
+     be corrected and simulation to be resumed.  It also allows identification
+     of the problem instruction.
+
+     Other errors, e.g., SCPE_IOERR returned by the IPL device signal handler,
+     stop the CPU after processing the offending instruction.  In this case, the
+     PC points to the instruction after the offending instruction, so
+     identification, correction, and resumption are more difficult.  DMA cycles
+     are also affected, as DMA registers are updated even if the I/O cycle
+     fails.
+
+     CAUSE:  The CPU instruction and DMA cycle routines do not back out properly
+     when a simulation stop is indicated by a device signal handler.
+
+     RESOLUTION:  Modify "sim_instr" (hp2100_cpu.c) to back out the current
+     instruction if it indicates a simulation stop (except for the HLT
+     instruction), modify "dma_cycle" to update the address and word count only
+     if the I/O cycle completes successfully, and modify "iplio" (hp2100_ipl.c)
+     to allow for restarting of a failed I/O cycle.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+226. PROBLEM:  The comments for the floating-point divide routine are
+     incomplete.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  In the comments for the "divide" function in "hp2100_fp1.c",
+     the explanation of the simulation implementation trails off with, "The
+     resulting 32-bit quotient is ..."  It appears that the comments were never
+     finished before release.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Expanded and completed the comments in the "divide" function
+     (hp2100_fp1.c).
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+227. PROBLEM: The 13037 disc controller returns incorrect status for a disabled
+     drive.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The same "unit present; heads unloaded" status is reported
+     for both an enabled but unattached unit and a disabled unit.  The latter
+     should report "unit not present" status.
+
+     CAUSE:  SIMH initially defines the DS device as having eight 7905 drives
+     connected to the controller.  Each drive reports "heads unloaded" status
+     (Status-2 bits 1-0 = 11) until it has a disc image attached.  If a unit is
+     disabled, it continues to report "heads unloaded" status.  It should be
+     reporting "unit not present" (Status-2 bits 1-0 = 10) status.
+
+     RESOLUTION:  Modify "ds_updds2" (hp2100_ds.c) to report an "enabled and
+     unloaded" condition as Not Ready and Busy, and a "disabled" condition as
+     Not Ready only.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+228. PROBLEM:  The 13037 disc controller returns incorrect status for an
+     auto-seek beyond the drive limits.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  When an auto-seek causes the disc address to move beyond the
+     drive limits, the wrong status is returned.  For example, the following
+     OPDSN program:
+
+       SM,3         -- set file mask to auto-seek, cylinder mode, incremental
+       SK,410,2,47  -- seek to last sector of the drive
+       RD,256       -- read two sectors
+       EN
+
+     ...results in Cylinder Compare Error status; status-2 shows a seek check.
+     The result is identical if SM,1 (surface auto-seek, rather than cylinder
+     auto-seek) is used.
+
+     If the RD,256 is replaced by RF,276, the result is Normal Completion and a
+     seek check.  The resulting disc address is 411,0,1.
+
+     If decremental seeks are used:
+
+       SM,13        -- set file mask to auto-seek, cylinder mode, decremental
+       SK,0,2,47    -- seek to last sector of the first cylinder
+       RD,256       -- read two sectors
+       EN
+
+     ...the status return is the same as above.
+
+     In each of these cases, the result should be Status-2 (Seek Check) on the
+     second sector transfer.
+
+     CAUSE:  If an auto-seek exceeds the drive bounds, a seek check is correctly
+     detected, but it is not reported back to the host.
+
+     RESOLUTION:  Modify "ds_start_rw" (hp2100_ds.c) to check for Seek Check on
+     an auto-seek and to report Status-2 if set.  Also, a reseek resulting from
+     a cylinder miscompare now either succeeds if the cylinder is valid or
+     reports Status-2 and Seek Check if the cylinder is invalid.  Finally, an
+     invalid head or sector value reports Status-2 and Seek Check instead of
+     Head-Sector Compare Error (Head-Sector and Cylinder Compare Errors can only
+     occur during sparing operations which are not supported in simulation).
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+229. PROBLEM: The 13037 Read Without Verify command does not verify the address
+     when a track boundary is crossed.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The Read Without Verify command is identical to the Read
+     command except that it skips address verification before beginning the
+     read.  If the read continues past a track boundary and auto-seek is
+     enabled, the new track location should be verified.  This does not occur.
+     The following OPDSN program illustrates the problem:
+
+       SM,3           -- set file mask to auto-seek, cylinder mode, incremental
+       SK,0,0,47      -- seek to last sector on cylinder 0 head 0
+       DB,128,000047  -- fill the sector buffer with the CHS address
+       WD,128         -- write sector 0/0/47
+       DB,128,000100  -- fill the sector buffer with the CHS address
+       WD,128         -- write sector 0/1/0
+       SK,1,0,47      -- seek to the last sector on cylinder 1 head 0
+       DB,128,100047  -- fill the sector buffer with the CHS address
+       WD,128         -- write sector 1/0/47
+       DB,128,100100  -- fill the sector buffer with the CHS address
+       WD,128         -- write sector 1/1/0
+       SK,0,0,47      -- seek to last sector on cylinder 0 head 0
+       AR,1,0,47      -- change controller address to cylinder 1
+       RW,256         -- read two sectors
+       DR,120,135     -- display end of first sector and start of second sector
+       EN
+
+     If address verification is performed at the end of track 0, the second
+     sector will be read from 1,1,0 instead of 0,1,0 because of the cylinder
+     miscompare after the auto-seek:
+
+       0120: 000047  000047  000047  000047  000047  000047  000047  000047
+       0128: 100100  100100  100100  100100  100100  100100  100100  100100
+
+     However, the above program prints:
+
+       0120: 000047  000047  000047  000047  000047  000047  000047  000047
+       0128: 000100  000100  000100  000100  000100  000100  000100  000100
+
+     ...indicating that address verification was not done for either sector.
+     Note that if the Read Without Verify above is changed to Read (RD,256), the
+     result is:
+
+       0120: 100047  100047  100047  100047  100047  100047  100047  100047
+       0128: 100100  100100  100100  100100  100100  100100  100100  100100
+
+     ...indicating that address verification was done correctly for the first
+     sector.
+
+     CAUSE:  The Read Without Verify handler disables address verification for
+     the entire transfer.  It should be disabled only until a track switch
+     occurs.
+
+     RESOLUTION:  Modify the Read Without Verify command handler in "ds_svc_u"
+     (hp2100_ds.c) to begin verifying if a track boundary is crossed.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+230. PROBLEM:  The 13037 Request Sector Address command does not check the unit
+     number.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The Request Sector Address command accepts invalid, unloaded,
+     or missing units without reporting status errors.  Also, the specified unit
+     number is not reported in the status-1 field of a subsequent Request Status
+     command.  Assuming that unit "ds1" is not attached (heads unloaded) and
+     unit "ds2" is disabled, the following OPDSN programs illustrate the
+     problem:
+
+       SD,1
+       RA
+       ST
+       SC,0001001100000001,1XXXXXX000X00011
+       DR,0
+       EN
+
+       SD,2
+       RA
+       ST
+       SC,0001001100000010,1XXXXXX000X00010
+       DR,0
+       EN
+
+       SD,10
+       RA
+       ST
+       SC
+       DR,0
+       EN
+
+     All of these should return Status-2 but instead return Normal Completion.
+
+       SD,15
+       RA
+       ST
+       SC,0001011100001111,1XXXXXX000X00010
+       DR,0
+       EN
+
+     This should return Unit Unavailable but instead returns Normal Completion.
+
+     CAUSE:  The Request Sector Address command handler is not checking the unit
+     range or status.
+
+     RESOLUTION:  Modify "ds_docmd" (hp2100_ds.c) to set the unit number into
+     the status-1 field and to check for invalid units and report Unit
+     Unavailable if so.  Modify "ds_svc_u" to check that the heads are loaded on
+     the target unit and report Status-2 if not.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+231. PROBLEM:  The 13037 Wakeup command does not check the unit number.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The Wakeup command accepts invalid units without reporting
+     status errors.  Also, the specified unit number is not reported in the
+     status-1 field of a subsequent Request Status command.
+
+     CAUSE:  The Wakeup command handler is not checking the unit range.
+
+     RESOLUTION:  Modify "ds_docmd" (hp2100_ds.c) to set the unit number into
+     the status-1 field and to check for invalid units and report Unit
+     Unavailable if so.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+232. PROBLEM:  SHOW <dev> doesn't show the unit number when all but one unit are
+     disabled.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  For multi-unit devices, the SHOW <dev> command prints device
+     information on the first line and then prints each unit's information on
+     succeeding lines.  For single-unit devices, the device and unit information
+     are combined on one line, as the device name is allowed as a synonym for
+     unit 0.  However, if a multi-unit device has all but one unit disabled, the
+     SHOW <dev> command reports the remaining unit as though the device had only
+     one unit, implying that the enabled unit is unit 0.
+
+     For example, HP device DQC has two units.  Attaching a file to unit 1 and
+     disabling unit 0 produces this output for the SHOW DQC command:
+
+       DQC, devno=24/25, 11MW, attached to file.tmp, heads loaded, write enabled
+
+     There is no indication that the file is attached to unit 1, and indeed if
+     the attachment and disabled units are reversed, the command output is the
+     same as above.
+
+     CAUSE:  Routine "show_device" (scp.c) combines the device and unit display
+     when a device has only one enabled unit.  This is intended to hide the
+     implementation detail of single-unit devices, e.g., paper tape readers,
+     while allowing additional permanently-disabled units to be used by the
+     device for scheduling.  However, it should not combine the device and units
+     when user-disabled units exist.
+
+     RESOLUTION:  Modify "show_device" (scp.c) to count units that have been
+     disabled by the user instead of units that may be disabled by the user, and
+     to report the unit number if user-disabled units are present.  Also change
+     the count of reported units from the number of enabled units to the sum of
+     the enabled and user-disabled units.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+233. ENHANCEMENT:  Add a simulation of the ICD series of disc drives and the
+     12821A Disc Interface.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The ICD drives were lower-cost versions of the earlier MAC
+     drives that incorporated single-drive controllers in the drive chassis.
+     This obviated the requirement for the separate 13037 disc controller.  They
+     were interfaced via the 12821A HP-IB Disc Interface card; this card was
+     also used to interface CS/80 disc and Amigo tape drives, such as the 7912
+     and 7974A.
+
+     The addition of an ICD simulation allows preparation and direct exchange of
+     image files with the "HPDrive" disc emulator to enable hardware CPUs to run
+     with emulated drives.
+
+     RESOLUTION:  Add a simulation of the 12821A Disc Interface (hp2100_di.c
+     and hp2100_di.h).  Add the DA device to simulate the ICD disc drives and
+     the ICD disc loader ROM (hp2100_di_da.c).  Generalize the controller code
+     in the DS simulation into a common disc simulation library (hp_disclib.c
+     and hp_disclib.h).  Alter "hp2100_sys.c" and "hp2100_defs.h" to add the
+     device structure and default select code assignment.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+234. ENHANCEMENT:  Revise the simulator and documentation to use the term
+     "select code" instead of "device number."
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The HP2100 simulator and documentation use the terms "device
+     number," "device address," and "DEVNO" to refer to the I/O addresses of the
+     CPU interface cards.  These terms are alien to HP users; all of the CPU and
+     interface documentation, from the 2116 through the 1000, use the term
+     "select code" for this property.
+
+     With the addition of the 12821A disc interface and associated HP-IB drives,
+     the terms in use are now confusing as well.  The switches on the drives
+     that set the bus addresses are labelled, "HP-IB DEVICE ADDRESS."  Other HP
+     disc and tape drive manuals refer to "unit addresses" or "unit numbers" to
+     indicate the addresses that differentiate multiple drives on a given
+     interface.
+
+     It would be clearer, especially to new users, if the existing terms were
+     deprecated in preference to "select code" in the simulator and
+     documentation.
+
+     RESOLUTION:  Modify all I/O device simulators to add "SC" as an alias for
+     "DEVNO" in the register and modifier tables, retaining "DEVNO" to preserve
+     backward compatibility with existing procedures and command files.  Add
+     MTAB_NMO to the DEVNO modifier entry so that it does not appear in EXAMINE
+     or SHOW lists but can still be displayed or modified if requested
+     explicitly.  Add hp_setsc and hp_showsc functions (hp2100_sys.c) to set and
+     show the select code, and modify hp_setdev and hp_showdev to call hp_setsc
+     and hp_showsc, respectively, and to work around newline suppression for
+     MTAB_NMO entries.  Modify the documentation to change device number
+     references to select code references.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+235. ENHANCEMENT:  Deprecate the device name CLK in favor of TBG.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The CLK device provides a simulation of the 12539C Time Base
+     Generator interface.  This interface is universally known to HP users as
+     the TBG.  It would be clearer for these users if the device were named TBG.
+
+     RESOLUTION:  Modify clk_dev (hp_stddev.c) to add "TBG" as the logical name.
+     This still allows use of the CLK name for existing command files.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+236. PROBLEM:  The 13037 disc controller indicates a data under/overrun
+     incorrectly.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The 13037 disc simulator monitors the data transfer during a
+     read or write operation.  A data overrun is indicated if SRQ is still set
+     when a data transfer is ready, indicating that the previous transfer has
+     not been handled yet by DCPC.  However, the interface contains a 16-word
+     FIFO, so an overrun should be indicated only if the FIFO is full when a
+     read transfer is ready or empty when a write transfer is ready.
+
+     A read transfer writes a word to the FIFO and sets SRQ.  Currently, DCPC
+     must remove the word and clear SRQ before the next read transfer occurs,
+     even though 15 empty slots still remain in the FIFO.  Similarly, a write
+     transfer reads a word from the FIFO and sets SRQ.  DCPC must supply the
+     next word and clear SRQ before the next write transfer occurs, even though
+     available words may remain in the FIFO.  Effectively, the FIFO doesn't
+     exist, as the simulator treats it as a single-word register.
+
+     Moreover, the SRQ generation logic does not attempt to keep the FIFO full
+     for a write or empty for a read.  If DCPC activity on the other channel
+     delays the DS channel, even by one word, an overrun is indicated, even
+     though available space remains in the FIFO.
+
+     CAUSE:  Incomplete FIFO implementation.
+
+     RESOLUTION:  Modify the read and write data transfer logic (hp2100_ds.c) to
+     indicate a data overrun when the FIFO is full or empty, respectively, and
+     extend the SRQ logic to continue requesting DCPC transfers until the FIFO
+     is empty (read) or has five words present (write), as in the hardware.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+237. PROBLEM:  The 13037 disc controller Clear command clears too much.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  In hardware, the Clear command issues a Controller Preset
+     (CPS) tag to all connected disc drives.  The description of CPS says that
+     it clears drive faults, the drive head and sector registers, the drive
+     illegal head and sector address flip-flops, and the seek check, first
+     status, drive fault, and attention status bits.  In simulation, the
+     "ds_clear" routine clears the drive current cylinder register and all
+     status bits.
+
+     CAUSE:  Incorrect implementation.
+
+     RESOLUTION:  Modify "ds_clear" (hp_disclib.c) to clear just the indicted
+     drive status.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+238. PROBLEM: The 13037 Recalibrate command clears the End-of-Cylinder flag.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The 13037 disc controller provides the Recalibrate command to
+     recover from Cylinder Compare errors.  Recalibrate does not alter the
+     cylinder, head, or sector address in the controller.  This allows a Read to
+     follow the Recalibrate directly without requiring an intervening Seek.
+
+     However, the DS simulator clears the EOC flag.  This flag indicates that
+     the controller cylinder address must be incremented before it is used by
+     the read or write routines.  Therefore, a Read following a Recalibrate will
+     begin at the wrong address if the last successful read ended after the
+     last sector on a track.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify the "ds_opflags" table (hp2100_ds.c) to remove the
+     CMF_CLREC flag from the Recalibrate entry.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+239. PROBLEM:  The 13037 Request Status command reports Normal Completion for an
+     invalid unit.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The Request Status command includes a unit number field to
+     specify the disc drive whose status is returned in the second word.  The
+     unit number is checked for validity, and a "unit not present" status is
+     returned if the number is invalid.  However, if the unit number is illegal
+     (i.e., > 10), the command sets Normal Completion status instead of Unit
+     Unavailable status.
+
+     CAUSE:  The status is set without checking for unit number legality.
+
+     RESOLUTION:  Modify "ds_svc_c" (hp2100_ds.c) to set Unit Unavailable status
+     if the supplied unit number is greater than 10.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+240. PROBLEM:  The 13037 Cold Load Read and Seek commands do not set Seek Check
+     if issued while a seek is in progress.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  In hardware, the read, write, and recalibrate commands wait
+     for seek completion if they are issued while the heads are positioning.
+     The Cold Load Read and Seek commands do not; they issue a seek to the drive
+     without checking.  The drive rejects a seek while the heads are in motion
+     and sets Seek Check status.  In simulation, however, the Cold Load Read and
+     Seek commands wait for seek completion before seeking.
+
+     CAUSE:  Oversight.
+
+     RESOLUTION:  Modify the "ds_opflags" table (hp2100_ds.c) to remove the
+     CMF_UIDLE flag from the Cold Load Read and Seek entries, and modify
+     "ds_docmd" to check for a seek in progress when processing the Cold Load
+     Read and Seek commands.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+241. PROBLEM:  A 13037 Seek command followed by Read does not set the busy flag.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  In hardware, a Read command (e.g.) may be issued while a seek
+     is in progress.  The controller firmware sets the busy flag to indicate
+     that the command was accepted.  In simulation, however, the Read command is
+     not started until the seek is complete, so the busy flag is clear.  A
+     program checking the busy flag will conclude that the Read was rejected.
+
+     CAUSE:  The busy flag is set after the check for a seek in progress, and
+     the firmware wait is modeled by leaving the command pending on the
+     interface until the seek completes.
+
+     RESOLUTION:  Modify "ds_docmd" (hp2100_ds.c) to eliminate the command
+     holdoff and instead model the wait for seek completion by changing the unit
+     function from "seek completion" to "read initiation" (e.g.).
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+242. ENHANCEMENT:  Modify the 13037 disc simulator to use the common disc
+     controller library.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The 13037 (MAC) and 13365 (ICD) disc controllers are almost
+     identical.  Altering the DS simulator to use the controller library
+     introduced with the DA simulator would reduce code size, ease maintenance,
+     and ensure that controller bug fixes propagate to both simulators.
+
+     RESOLUTION:  Modify the 13037 simulator (hp2100_ds.c) to call routines in
+     the common disc controller library (hp_disclib.c).
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+243. ENHANCEMENT:  Add debug printout support to the 13037 disc simulator.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  Debugging the disc controller behavior would be easier if the
+     internal state of the simulator was observable and recordable.
+
+     RESOLUTION:  Modify "hp2100_ds.c" to add debug-mode printouts.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+244. ENHANCEMENT:  Eliminate the poll for parameters to 13037 disc commands.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  The DS simulator repeatedly polls the CPU interface for the
+     parameters to certain disc commands, such as Seek.  It would be more
+     efficient to wait for a parameter to be output by the CPU.
+
+     RESOLUTION:  Modify "ds_io" (hp2100_ds.c) to activate the controller
+     service only when a parameter word has been received with an ioIOO signal.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+245. PROBLEM:  The EMA diagnostic sometimes aborts with a DM error.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  Running the RTE-IV EMA diagnostic "#EMA" may abort with a DMS
+     violation:
+
+       DM VIOL = 160377
+       DM INST = 105257
+       ABE 177750      15 1
+       XYO 116123   72137 0
+       DM    #EMA   16521
+       #EMA  ABORTED
+
+     The abort occurs in test 8, which executes the .EMAP instruction and passes
+     a negative number of dimensions.
+
+     CAUSE:  The test supplies a dimension count of -32768.  The offset of the
+     specified array element is calculated by the "cpu_ema_resolve" routine by
+     iterating through the array subscripts.  The 16-bit word containing the
+     dimension count is loaded into a 32-bit signed integer variable as an
+     unsigned value.  Therefore, +32678 dimensions are assumed.  However, only
+     one subscript value is supplied in the call, so subsequent instructions
+     after the call are interpreted as subscript addresses, yielding random
+     values from memory.  Also, the array descriptor only defines one subscript,
+     so subsequent memory values are interpreted as subscript bounds and element
+     counts.
+
+     If one of subscript offsets evaluates to a negative value, the routine
+     returns FALSE, and the instruction fails.  The diagnostic interprets the
+     cause of the failure as the negative dimension count and passes test 8.
+
+     However, if a subscript address points at a protected page of memory, the
+     instruction causes a DM violation when the value is retrieved.
+
+     RESOLUTION:  Modify "cpu_ema_resolve" (hp2100_cpu5.c) to sign-extend the
+     16-bit dimension count.
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+246. PROBLEM:  SHOW MTC SHOW lists the FORMAT modifier twice.
+
+     VERSION:  3.8-1
+
+     OBSERVATION:  Entering the planned SHOW MTC SHOW command results in the
+     following display:
+
+       sim> SHOW MTC SHOW
+       sh{ow} MTC      FORMAT, SC, DEVNO
+       sh{ow} MTCn     FORMAT
+
+     FORMAT is listed both as a device and as a unit modifier.
+
+     CAUSE:  The FORMAT entry in the modifier table contains both the MTAB_VDV
+     and the MTAB_VUN flags.
+
+     RESOLUTION:  Remove the redundant MTAB_VUN flag from the "mtc_mod" array
+     (hp2100_mt.c).
+
+     STATUS:  Fixed in version 3.9-0.
+
+
+
+247. PROBLEM:  The ICD disc read end-of-track delay is not optimal.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  To avoid End of Cylinder errors when reading the last sector
+     of a track, the ICD controller must delay more than the usual intersector
+     time to allow the OS driver to send an Untalk if a read is to be
+     terminated.  Currently, the longer delay is used if an end-of-cylinder
+     condition is present.  However, the delay is needed only if the resulting
+     seek attempt would cause an error if the read is continued; the normal
+     delay should be used if the seek is permitted and would succeed.
+
+     Also, if the host does send an Untalk during this time, the longer delay
+     should be cancelled, and command termination should be scheduled for
+     immediate processing.
+
+     CAUSE:  Suboptimal implementation.
+
+     RESOLUTION:  Modify "end_read" (hp_disclib.c) to use the longer time only
+     if the seek would fail, and modify "complete_read" (hp2100_di_da.c) to
+     cancel the intersector delay and schedule the completion phase immediately.
+
+     STATUS:  Patches prepared 2012-05-07.

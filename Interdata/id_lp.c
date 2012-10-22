@@ -25,7 +25,7 @@
 
    lpt          M46-206 line printer
 
-   27-May-08    RMS     Fixed bug in printing test (from Davis Johnson)
+   27-May-08    RMS     Fixed bug in printing test (Davis Johnson)
    19-Jan-07    RMS     Added UNIT_TEXT flag
    25-Apr-03    RMS     Revised for extended file support
 */

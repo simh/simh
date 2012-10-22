@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2010, Peter Schorn
+    Copyright (c) 2002-2011, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -152,18 +152,20 @@ void install_ALTAIRbootROM(void);
 /* currently selected drive (values are 0 .. NUM_OF_DSK)
    current_disk < NUM_OF_DSK implies that the corresponding disk is attached to a file */
 static int32 current_disk                   = NUM_OF_DSK;
-static int32 current_track  [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
-static int32 current_sector [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
-static int32 current_byte   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
-static int32 current_flag   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
+static int32 current_track  [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static int32 current_sector [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static int32 current_byte   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static int32 current_flag   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static uint8 tracks         [NUM_OF_DSK]    = { MAX_TRACKS, MAX_TRACKS, MAX_TRACKS, MAX_TRACKS,
+                                                MAX_TRACKS, MAX_TRACKS, MAX_TRACKS, MAX_TRACKS,
+                                                MAX_TRACKS, MAX_TRACKS, MAX_TRACKS, MAX_TRACKS,
                                                 MAX_TRACKS, MAX_TRACKS, MAX_TRACKS, MAX_TRACKS };
 static int32 in9_count                      = 0;
 static int32 in9_message                    = FALSE;
 static int32 dirty                          = FALSE;    /* TRUE when buffer has unwritten data in it    */
 static int32 warnLevelDSK                   = 3;
-static int32 warnLock       [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
-static int32 warnAttached   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0};
+static int32 warnLock       [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static int32 warnAttached   [NUM_OF_DSK]    = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 static int32 warnDSK10                      = 0;
 static int32 warnDSK11                      = 0;
 static int32 warnDSK12                      = 0;
@@ -215,7 +217,15 @@ static UNIT dsk_unit[] = {
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
     { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
-    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) }
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
+    { UDATA (NULL, UNIT_FIX + UNIT_ATTABLE + UNIT_DISABLE + UNIT_ROABLE, MAX_DSK_SIZE) },
 };
 
 static REG dsk_reg[] = {
@@ -244,10 +254,6 @@ static MTAB dsk_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if (dsk_dev.dctrl & level) {    \
-                                        printf args;                \
-                                    }
-
 /* Debug Flags */
 static DEBTAB dsk_dt[] = {
     { "IN",             IN_MSG              },
@@ -262,7 +268,7 @@ static DEBTAB dsk_dt[] = {
 
 DEVICE dsk_dev = {
     "DSK", dsk_unit, dsk_reg, dsk_mod,
-    8, 10, 31, 1, 8, 8,
+    NUM_OF_DSK, 10, 31, 1, 8, 8,
     NULL, NULL, &dsk_reset,
     &dsk_boot, NULL, NULL,
     NULL, (DEV_DISABLE | DEV_DEBUG), 0,
@@ -281,6 +287,11 @@ static t_stat dsk_reset(DEVICE *dptr) {
     for (i = 0; i < NUM_OF_DSK; i++) {
         warnLock[i]     = 0;
         warnAttached[i] = 0;
+        current_track[i] = 0;
+        current_sector[i] = 0;
+        current_byte[i] = 0;
+        current_flag[i] = 0;
+        tracks[i] = MAX_TRACKS;
     }
     warnDSK10       = 0;
     warnDSK11       = 0;
@@ -332,23 +343,30 @@ static void writebuf(void) {
         dskbuf[i++] = 0;
     uptr = dsk_dev.units + current_disk;
     if (((uptr -> flags) & UNIT_DSK_WLK) == 0) { /* write enabled */
-        TRACE_PRINT(WRITE_MSG, ("DSK%i: " ADDRESS_FORMAT " OUT 0x0a (WRITE) D%d T%d S%d" NLP, current_disk, PCX,
-                                current_disk, current_track[current_disk], current_sector[current_disk]));
+        sim_debug(WRITE_MSG, &dsk_dev,
+                  "DSK%i: " ADDRESS_FORMAT " OUT 0x0a (WRITE) D%d T%d S%d\n",
+                  current_disk, PCX, current_disk,
+                  current_track[current_disk], current_sector[current_disk]);
         if (dskseek(uptr)) {
-            printf("DSK%i: " ADDRESS_FORMAT " fseek failed D%d T%d S%d" NLP, current_disk,
-                   PCX, current_disk, current_track[current_disk], current_sector[current_disk]);
+            sim_debug(VERBOSE_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT " fseek failed D%d T%d S%d\n",
+                      current_disk, PCX, current_disk,
+                      current_track[current_disk], current_sector[current_disk]);
         }
         rtn = sim_fwrite(dskbuf, 1, DSK_SECTSIZE, uptr -> fileref);
         if (rtn != DSK_SECTSIZE) {
-            printf("DSK%i: " ADDRESS_FORMAT " sim_fwrite failed T%d S%d Return=%d" NLP, current_disk,
-                   PCX, current_track[current_disk], current_sector[current_disk], rtn);
+            sim_debug(VERBOSE_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT " sim_fwrite failed T%d S%d Return=%d\n",
+                      current_disk, PCX, current_track[current_disk],
+                      current_sector[current_disk], rtn);
         }
     }
     else if ( (dsk_dev.dctrl & VERBOSE_MSG) && (warnLock[current_disk] < warnLevelDSK) ) {
         /* write locked - print warning message if required */
         warnLock[current_disk]++;
-/*05*/  printf("DSK%i: " ADDRESS_FORMAT " Attempt to write to locked DSK%d - ignored." NLP,
-                current_disk, PCX, current_disk);
+        sim_debug(VERBOSE_MSG, &dsk_dev,
+                  "DSK%i: " ADDRESS_FORMAT " Attempt to write to locked DSK%d - ignored.\n",
+                  current_disk, PCX, current_disk);
     }
     current_flag[current_disk]  &= 0xfe;    /* ENWD off */
     current_byte[current_disk]  = 0xff;
@@ -381,8 +399,10 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
         if (current_disk >= NUM_OF_DSK) {
             if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK10 < warnLevelDSK)) {
                 warnDSK10++;
-/*01*/          printf("DSK%i: " ADDRESS_FORMAT " Attempt of IN 0x08 on unattached disk - ignored." NLP,
-                        current_disk, PCX);
+                sim_debug(VERBOSE_MSG, &dsk_dev,
+                          "DSK%i: " ADDRESS_FORMAT
+                          " Attempt of IN 0x08 on unattached disk - ignored.\n",
+                          current_disk, PCX);
             }
             return 0xff;                                /* no drive selected - can do nothing */
         }
@@ -392,14 +412,16 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
     /* OUT: Controller set/reset/enable/disable */
     if (dirty)    /* implies that current_disk < NUM_OF_DSK */
         writebuf();
-    TRACE_PRINT(OUT_MSG, ("DSK%i: " ADDRESS_FORMAT " OUT 0x08: %x" NLP, current_disk, PCX, data));
+    sim_debug(OUT_MSG, &dsk_dev, "DSK%i: " ADDRESS_FORMAT " OUT 0x08: %x\n", current_disk, PCX, data);
     current_disk = data & NUM_OF_DSK_MASK; /* 0 <= current_disk < NUM_OF_DSK */
     current_disk_flags = (dsk_dev.units + current_disk) -> flags;
     if ((current_disk_flags & UNIT_ATT) == 0) { /* nothing attached? */
         if ( (dsk_dev.dctrl & VERBOSE_MSG) && (warnAttached[current_disk] < warnLevelDSK) ) {
             warnAttached[current_disk]++;
-/*02*/      printf("DSK%i: " ADDRESS_FORMAT " Attempt to select unattached DSK%d - ignored." NLP,
-                    current_disk, PCX, current_disk);
+            sim_debug(VERBOSE_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT
+                      " Attempt to select unattached DSK%d - ignored.\n",
+                      current_disk, PCX, current_disk);
         }
         current_disk = NUM_OF_DSK;
     }
@@ -407,8 +429,8 @@ int32 dsk10(const int32 port, const int32 io, const int32 data) {
         current_sector[current_disk]    = 0xff; /* reset internal counters */
         current_byte[current_disk]      = 0xff;
         current_flag[current_disk]      = data & 0x80   ?   0       /* disable drive                            */ :
-            (current_track[current_disk] == 0           ?   0x5a    /* enable: head move true, track 0 if there */ :
-                                                            0x1a);  /* enable: head move true                   */
+        (current_track[current_disk] == 0           ?   0x5a    /* enable: head move true, track 0 if there */ :
+         0x1a);  /* enable: head move true                   */
     }
     return 0;   /* ignored since OUT */
 }
@@ -419,8 +441,10 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
     if (current_disk >= NUM_OF_DSK) {
         if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK11 < warnLevelDSK)) {
             warnDSK11++;
-/*03*/      printf("DSK%i: " ADDRESS_FORMAT " Attempt of %s 0x09 on unattached disk - ignored." NLP,
-                 current_disk, PCX, selectInOut(io));
+            sim_debug(VERBOSE_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT
+                      " Attempt of %s 0x09 on unattached disk - ignored.\n",
+                      current_disk, PCX, selectInOut(io));
         }
         return 0;               /* no drive selected - can do nothing */
     }
@@ -430,10 +454,11 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
         in9_count++;
         if ((dsk_dev.dctrl & SECTOR_STUCK_MSG) && (in9_count > 2 * DSK_SECT) && (!in9_message)) {
             in9_message = TRUE;
-            printf("DSK%i: " ADDRESS_FORMAT " Looping on sector find." NLP,
-                    current_disk, PCX);
+            sim_debug(SECTOR_STUCK_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT " Looping on sector find.\n",
+                   current_disk, PCX);
         }
-        TRACE_PRINT(IN_MSG, ("DSK%i: " ADDRESS_FORMAT " IN 0x09" NLP,  current_disk, PCX));
+        sim_debug(IN_MSG, &dsk_dev, "DSK%i: " ADDRESS_FORMAT " IN 0x09\n", current_disk, PCX);
         if (dirty)  /* implies that current_disk < NUM_OF_DSK */
             writebuf();
         if (current_flag[current_disk] & 0x04) {    /* head loaded? */
@@ -442,7 +467,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
                 current_sector[current_disk] = 0;
             current_byte[current_disk] = 0xff;
             return (((current_sector[current_disk] << 1) & 0x3e)    /* return 'sector true' bit = 0 (true) */
-                | 0xc0);                                            /* set on 'unused' bits */
+                    | 0xc0);                                            /* set on 'unused' bits */
         } else
             return 0;                                               /* head not loaded - return 0 */
     }
@@ -450,12 +475,12 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
     in9_count = 0;
     /* drive functions */
 
-    TRACE_PRINT(OUT_MSG, ("DSK%i: " ADDRESS_FORMAT " OUT 0x09: %x" NLP, current_disk, PCX, data));
+    sim_debug(OUT_MSG, &dsk_dev, "DSK%i: " ADDRESS_FORMAT " OUT 0x09: %x\n", current_disk, PCX, data);
     if (data & 0x01) {      /* step head in                             */
-        if ((dsk_dev.dctrl & TRACK_STUCK_MSG) && (current_track[current_disk] == (tracks[current_disk] - 1))) {
-            printf("DSK%i: " ADDRESS_FORMAT " Unnecessary step in." NLP,
-                    current_disk, PCX);
-        }
+        if (current_track[current_disk] == (tracks[current_disk] - 1))
+            sim_debug(TRACK_STUCK_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT " Unnecessary step in.\n",
+                   current_disk, PCX);
         current_track[current_disk]++;
         if (current_track[current_disk] > (tracks[current_disk] - 1))
             current_track[current_disk] = (tracks[current_disk] - 1);
@@ -466,9 +491,10 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
     }
 
     if (data & 0x02) {      /* step head out                            */
-        if ((dsk_dev.dctrl & TRACK_STUCK_MSG) && (current_track[current_disk] == 0)) {
-           printf("DSK%i: " ADDRESS_FORMAT " Unnecessary step out." NLP, current_disk, PCX);
-        }
+        if (current_track[current_disk] == 0)
+            sim_debug(TRACK_STUCK_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT " Unnecessary step out.\n",
+                      current_disk, PCX);
         current_track[current_disk]--;
         if (current_track[current_disk] < 0) {
             current_track[current_disk] = 0;
@@ -513,8 +539,10 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
     if (current_disk >= NUM_OF_DSK) {
         if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK12 < warnLevelDSK)) {
             warnDSK12++;
-/*04*/      printf("DSK%i: " ADDRESS_FORMAT " Attempt of %s 0x0a on unattached disk - ignored." NLP,
-                    current_disk, PCX, selectInOut(io));
+            sim_debug(VERBOSE_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT
+                      " Attempt of %s 0x0a on unattached disk - ignored.\n",
+                      current_disk, PCX, selectInOut(io));
         }
         return 0;
     }
@@ -525,24 +553,29 @@ int32 dsk12(const int32 port, const int32 io, const int32 data) {
     if (io == 0) {
         if (current_byte[current_disk] >= DSK_SECTSIZE) {
             /* physically read the sector */
-            TRACE_PRINT(READ_MSG,
-                        ("DSK%i: " ADDRESS_FORMAT " IN 0x0a (READ) D%d T%d S%d" NLP, current_disk,
-                         PCX, current_disk, current_track[current_disk], current_sector[current_disk]));
+            sim_debug(READ_MSG, &dsk_dev,
+                      "DSK%i: " ADDRESS_FORMAT " IN 0x0a (READ) D%d T%d S%d\n",
+                      current_disk, PCX, current_disk,
+                      current_track[current_disk], current_sector[current_disk]);
             for (i = 0; i < DSK_SECTSIZE; i++)
                 dskbuf[i] = 0;
             if (dskseek(uptr)) {
                 if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK12 < warnLevelDSK)) {
                     warnDSK12++;
-                    printf("DSK%i: " ADDRESS_FORMAT " fseek error D%d T%d S%d" NLP, current_disk,
-                           PCX, current_disk, current_track[current_disk], current_sector[current_disk]);
+                    sim_debug(VERBOSE_MSG, &dsk_dev,
+                              "DSK%i: " ADDRESS_FORMAT " fseek error D%d T%d S%d\n",
+                              current_disk, PCX, current_disk,
+                              current_track[current_disk], current_sector[current_disk]);
                 }
             }
             rtn = sim_fread(dskbuf, 1, DSK_SECTSIZE, uptr -> fileref);
             if (rtn != DSK_SECTSIZE) {
                 if ((dsk_dev.dctrl & VERBOSE_MSG) && (warnDSK12 < warnLevelDSK)) {
                     warnDSK12++;
-                    printf("DSK%i: " ADDRESS_FORMAT " sim_fread error D%d T%d S%d" NLP, current_disk,
-                           PCX, current_disk, current_track[current_disk], current_sector[current_disk]);
+                    sim_debug(VERBOSE_MSG, &dsk_dev,
+                              "DSK%i: " ADDRESS_FORMAT " sim_fread error D%d T%d S%d\n",
+                              current_disk, PCX, current_disk,
+                              current_track[current_disk], current_sector[current_disk]);
                 }
             }
             current_byte[current_disk] = 0;

@@ -1,6 +1,6 @@
 /* pdp11_io.c: PDP-11 I/O simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,19 +23,21 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   12-Dec-11    RMS     Fixed interrupts to treat all Qbus devices as BR4
+   27-Mar-12    RMS     Fixed order of int_internal (Jordi Guillaumes i Pons)
+   19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
+   12-Dec-11    RMS     Fixed Qbus interrupts to treat all IO devices as BR4
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    16-May-08    RMS     Added multiple DC11 support
                         Renamed DL11 in autoconfigure
-   02-Feb-08    RMS     Fixed DMA memory address limit test (found by John Dundas)
+   02-Feb-08    RMS     Fixed DMA memory address limit test (John Dundas)
    06-Jul-06    RMS     Added multiple KL11/DL11 support
    15-Oct-05    RMS     Fixed bug in autoconfiguration (missing XU)
    25-Jul-05    RMS     Revised autoconfiguration algorithm and interface
    30-Sep-04    RMS     Revised Unibus interface
-   28-May-04    RMS     Revised I/O dispatching (from John Dundas)
+   28-May-04    RMS     Revised I/O dispatching (John Dundas)
    25-Jan-04    RMS     Removed local debug logging support
    21-Dec-03    RMS     Fixed bug in autoconfigure vector assignment; added controls
-   21-Nov-03    RMS     Added check for interrupt slot conflict (found by Dave Hittner)
+   21-Nov-03    RMS     Added check for interrupt slot conflict (Dave Hittner)
    12-Mar-03    RMS     Added logical name support
    08-Oct-02    RMS     Trimmed I/O bus addresses
                         Added support for dynamic tables
@@ -52,7 +54,8 @@
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern int32 ub_map[UBM_LNT_LW];
-extern int32 cpu_opt, cpu_bme;
+extern uint32 cpu_opt;
+extern int32 cpu_bme;
 extern int32 trap_req, ipl;
 extern int32 cpu_log;
 extern int32 autcon_enb;
@@ -81,8 +84,8 @@ static const int32 pirq_bit[7] = {
     };
 
 static const int32 int_internal[IPL_HLVL] = {
-    INT_INTERNAL7, INT_INTERNAL6, INT_INTERNAL5, INT_INTERNAL4,
-    INT_INTERNAL3, INT_INTERNAL2, INT_INTERNAL1, 0
+    0,             INT_INTERNAL1, INT_INTERNAL2, INT_INTERNAL3,
+    INT_INTERNAL4, INT_INTERNAL5, INT_INTERNAL6, INT_INTERNAL7
     };
 
 /* I/O page lookup and linkage routines
@@ -370,17 +373,17 @@ init_ubus_tab ();                                       /* init Unibus tables */
 init_mbus_tab ();                                       /* init Massbus tables */
 for (i = 0; i < 7; i++)                                 /* seed PIRQ intr */
     int_vec[i + 1][pirq_bit[i]] = VEC_PIRQ;
-if (r = cpu_build_dib ())                               /* build CPU entries */
+if ((r = cpu_build_dib ()))                             /* build CPU entries */
     return r;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_MBUS) {                   /* Massbus? */
-            if (r = build_mbus_tab (dptr, dibp))        /* add to Mbus tab */
+            if ((r = build_mbus_tab (dptr, dibp)))      /* add to Mbus tab */
                 return r;
             }
         else {                                          /* no, Unibus */
-            if (r = build_ubus_tab (dptr, dibp))        /* add to Unibus tab */
+            if ((r = build_ubus_tab (dptr, dibp)))      /* add to Unibus tab */
                 return r;
             }
         }                                               /* end if enabled */

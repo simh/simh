@@ -211,7 +211,7 @@
 #define CMD_REFL        2                               /* ref # */
 #define CMD_REFH        3
 #define CMD_UN          4                               /* unit # */
-/*                      5                               /* reserved */
+/*                      5                             *//* reserved */
 #define CMD_OPC         6                               /* opcode */
 #define CMD_MOD         7                               /* modifier */
 
@@ -256,14 +256,14 @@
 /* Flush - 10 W status (8 undefined) */
 
 #define FLU_LNT         32
-/*                      8 - 15                          /* reserved */
+/*                      8 - 15                        *//* reserved */
 #define FLU_POSL        16                              /* position */
 #define FLU_POSH        17
 
 /* Write tape mark - 10W status (8 undefined) */
 
 #define WTM_LNT         32
-/*                      8 - 15                          /* reserved */
+/*                      8 - 15                        *//* reserved */
 #define WTM_POSL        16                              /* position */
 #define WTM_POSH        17
 
@@ -399,8 +399,8 @@
 #define RW_BAH          11
 #define RW_MAPL         12                              /* map table */
 #define RW_MAPH         13
-/*                      14                              /* reserved */
-/*                      15                              /* reserved */
+/*                      14                            *//* reserved */
+/*                      15                            *//* reserved */
 
 /* Disk specific parameters */
 

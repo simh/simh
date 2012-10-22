@@ -129,7 +129,7 @@
                       likely run faster (given that modern host CPUs are 
                       multi-core and have someplace to do this work in parallel).
   MUST_DO_SELECT    - Specifies that, when USE_READER_THREAD is active,  
-                      select() should be used to determin when available 
+                      select() should be used to determine when available 
                       packets are ready for reading.  Otherwise, we depend 
                       on the libpcap/kernel packet timeout specified on 
                       pcap_open_live.  If USE_READER_THREAD is not set, then 
@@ -163,6 +163,13 @@
 
   Modification history:
 
+  30-Mar-12  MP   Added host NIC address determination on supported VMS platforms
+  01-Mar-12  MP   Made host NIC address determination on *nix platforms more 
+                  robust.
+  01-Mar-12  MP   Added host NIC address determination work when building 
+                  under Cygwin
+  01-Mar-12  AGN  Add conditionals for Cygwin dynamic loading of wpcap.dll
+  01-Mar-12  AGN  Specify the full /usr/lib for dlopen under Apple Mac OS X.
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   29-Oct-11  MP   Added support for integrated Tap networking interfaces on OSX
@@ -193,11 +200,11 @@
                   network traffic from the host and/or from hosts on the LAN.  These
                   new TOE features are: LSO (Large Send Offload) and Jumbo packet
                   fragmentation support.  These features allow a simulated network
-                  device to suuport traffic when a host leverages a NIC's Large 
+                  device to support traffic when a host leverages a NIC's Large 
                   Send Offload capabilities to fregment and/or segment outgoing 
                   network traffic.  Additionally a simulated network device can 
                   reasonably exist on a LAN which is configured to use Jumbo frames.
-  21-May-10  MP   Added functionslity to fixup IP header checksums to accomodate 
+  21-May-10  MP   Added functionality to fixup IP header checksums to accomodate 
                   packets from a host with a NIC which has TOE (TCP Offload Engine)
                   enabled which is expected to implement the checksum computations
                   in hardware.  Since we catch packets before they arrive at the
@@ -368,7 +375,7 @@ extern FILE *sim_log;
 
 t_stat eth_mac_scan (ETH_MAC* mac, char* strmac)
 {
-  int a0, a1, a2, a3, a4, a5;
+  unsigned int a0, a1, a2, a3, a4, a5;
   const ETH_MAC zeros = {0,0,0,0,0,0};
   const ETH_MAC ones  = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
   ETH_MAC newmac;
@@ -630,11 +637,52 @@ char* eth_getname_byname(char* name, char* temp)
   return (found ? temp : NULL);
 }
 
+char* eth_getdesc_byname(char* name, char* temp)
+{
+  ETH_LIST  list[ETH_MAX_DEVICE];
+  int count = eth_devices(ETH_MAX_DEVICE, list);
+  size_t n;
+  int i, found;
+
+  found = 0;
+  n = strlen(name);
+  for (i=0; i<count && !found; i++) {
+    if ((n == strlen(list[i].name)) &&
+        (eth_strncasecmp(name, list[i].name, n) == 0)) {
+      found = 1;
+      strcpy(temp, list[i].desc);
+    }
+  }
+  return (found ? temp : NULL);
+}
+
 void eth_zero(ETH_DEV* dev)
 {
   /* set all members to NULL OR 0 */
   memset(dev, 0, sizeof(ETH_DEV));
   dev->reflections = -1;                          /* not established yet */
+}
+
+static ETH_DEV **eth_open_devices = NULL;
+static int eth_open_device_count = 0;
+
+static void _eth_add_to_open_list (ETH_DEV* dev)
+{
+eth_open_devices = realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
+eth_open_devices[eth_open_device_count++] = dev;
+}
+
+static void _eth_remove_from_open_list (ETH_DEV* dev)
+{
+int i, j;
+
+for (i=0; i<eth_open_device_count; ++i)
+    if (eth_open_devices[i] == dev) {
+        for (j=i+1; j<eth_open_device_count; ++j)
+            eth_open_devices[j-1] = eth_open_devices[j];
+        --eth_open_device_count;
+        break;
+        }
 }
 
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
@@ -654,9 +702,27 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st," %2d  %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," %2d     %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name);
+      }
     }
   return SCPE_OK;
+}
+
+t_stat eth_show_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc)
+{
+return eth_show (st, uptr, val, desc);
 }
 
 t_stat ethq_init(ETH_QUE* que, int max)
@@ -817,13 +883,13 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 #include <winreg.h>
 #endif
 
-#if defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN))
-/* Dynamic DLL loading technique and modified source comes from
-   Etherial/WireShark capture_pcap.c */
-
 #ifdef HAVE_DLOPEN
 #include <dlfcn.h>
 #endif
+
+#if defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN))
+/* Dynamic DLL loading technique and modified source comes from
+   Etherial/WireShark capture_pcap.c */
 
 /* Dynamic DLL load variables */
 #ifdef _WIN32
@@ -833,15 +899,17 @@ static void *hLib = 0;                      /* handle to Library */
 #endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
 static char* lib_name =
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap.dll";
+#elif defined(__APPLE__)
+                          "/usr/lib/libpcap.A.dylib";
 #else
 #define __STR_QUOTE(tok) #tok
 #define __STR(tok) __STR_QUOTE(tok)
                           "libpcap." __STR(HAVE_DLOPEN);
 #endif
 static char* no_pcap = 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__CYGWIN__)
                           "wpcap load failure";
 #else
                           "libpcap load failure";
@@ -862,7 +930,9 @@ static pcap_t* (*p_pcap_open_live) (const char *, int, int, int, char *);
 static int     (*p_pcap_setmintocopy) (pcap_t* handle, int);
 static HANDLE  (*p_pcap_getevent) (pcap_t *);
 #else
+#ifdef MUST_DO_SELECT
 static int     (*p_pcap_get_selectable_fd) (pcap_t *);
+#endif
 static int     (*p_pcap_fileno) (pcap_t *);
 #endif
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
@@ -870,11 +940,13 @@ static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
 static char*   (*p_pcap_lib_version) (void);
 
 /* load function pointer from DLL */
-void load_function(char* function, void** func_ptr) {
+typedef int (*_func)();
+
+void load_function(char* function, _func* func_ptr) {
 #ifdef _WIN32
-    *func_ptr = GetProcAddress(hLib, function);
+    *func_ptr = (_func)GetProcAddress(hLib, function);
 #else
-    *func_ptr = dlsym(hLib, function);
+    *func_ptr = (_func)dlsym(hLib, function);
 #endif
     if (*func_ptr == 0) {
     char* msg = "Eth: Failed to find function '%s' in %s\r\n";
@@ -919,26 +991,28 @@ int load_pcap(void) {
       }
 
       /* load required functions; sets dll_load=3 on error */
-      load_function("pcap_close",        (void**) &p_pcap_close);
-      load_function("pcap_compile",      (void**) &p_pcap_compile);
-      load_function("pcap_datalink",     (void**) &p_pcap_datalink);
-      load_function("pcap_dispatch",     (void**) &p_pcap_dispatch);
-      load_function("pcap_findalldevs",  (void**) &p_pcap_findalldevs);
-      load_function("pcap_freealldevs",  (void**) &p_pcap_freealldevs);
-      load_function("pcap_freecode",     (void**) &p_pcap_freecode);
-      load_function("pcap_geterr",       (void**) &p_pcap_geterr);
-      load_function("pcap_lookupnet",    (void**) &p_pcap_lookupnet);
-      load_function("pcap_open_live",    (void**) &p_pcap_open_live);
+      load_function("pcap_close",        (_func *) &p_pcap_close);
+      load_function("pcap_compile",      (_func *) &p_pcap_compile);
+      load_function("pcap_datalink",     (_func *) &p_pcap_datalink);
+      load_function("pcap_dispatch",     (_func *) &p_pcap_dispatch);
+      load_function("pcap_findalldevs",  (_func *) &p_pcap_findalldevs);
+      load_function("pcap_freealldevs",  (_func *) &p_pcap_freealldevs);
+      load_function("pcap_freecode",     (_func *) &p_pcap_freecode);
+      load_function("pcap_geterr",       (_func *) &p_pcap_geterr);
+      load_function("pcap_lookupnet",    (_func *) &p_pcap_lookupnet);
+      load_function("pcap_open_live",    (_func *) &p_pcap_open_live);
 #ifdef _WIN32
-      load_function("pcap_setmintocopy", (void**) &p_pcap_setmintocopy);
-      load_function("pcap_getevent",     (void**) &p_pcap_getevent);
+      load_function("pcap_setmintocopy", (_func *) &p_pcap_setmintocopy);
+      load_function("pcap_getevent",     (_func *) &p_pcap_getevent);
 #else
-      load_function("pcap_get_selectable_fd",     (void**) &p_pcap_get_selectable_fd);
-      load_function("pcap_fileno",       (void**) &p_pcap_fileno);
+#ifdef MUST_DO_SELECT
+      load_function("pcap_get_selectable_fd",     (_func *) &p_pcap_get_selectable_fd);
 #endif
-      load_function("pcap_sendpacket",   (void**) &p_pcap_sendpacket);
-      load_function("pcap_setfilter",    (void**) &p_pcap_setfilter);
-      load_function("pcap_lib_version",  (void**) &p_pcap_lib_version);
+      load_function("pcap_fileno",       (_func *) &p_pcap_fileno);
+#endif
+      load_function("pcap_sendpacket",   (_func *) &p_pcap_sendpacket);
+      load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
+      load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
 
       if (lib_loaded == 1) {
         /* log successful load */
@@ -1054,6 +1128,7 @@ HANDLE pcap_getevent(pcap_t* a) {
 }
 
 #else
+#ifdef MUST_DO_SELECT
 int pcap_get_selectable_fd(pcap_t* a) {
   if (load_pcap() != 0) {
     return p_pcap_get_selectable_fd(a);
@@ -1061,6 +1136,7 @@ int pcap_get_selectable_fd(pcap_t* a) {
     return 0;
   }
 }
+#endif
 
 int pcap_fileno(pcap_t * a) {
   if (load_pcap() != 0) {
@@ -1112,32 +1188,57 @@ int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 }
 #endif /* !HAS_PCAP_SENDPACKET */
 
-#ifdef _WIN32
-#include <Packet32.h>
-#include <ntddndis.h>
+#if defined(_WIN32) || defined(__CYGWIN__)
+/* extracted from WinPcap's Packet32.h */
+struct _PACKET_OID_DATA {
+    uint32 Oid;					///< OID code. See the Microsoft DDK documentation or the file ntddndis.h
+								///< for a complete list of valid codes.
+    uint32 Length;				///< Length of the data field
+    uint8 Data[1];				///< variable-lenght field that contains the information passed to or received 
+								///< from the adapter.
+}; 
+typedef struct _PACKET_OID_DATA PACKET_OID_DATA, *PPACKET_OID_DATA;
+typedef void **LPADAPTER;
+#define OID_802_3_CURRENT_ADDRESS               0x01010102 /* Extracted from ntddmdis.h */
 
-static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
+static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 {
   LPADAPTER         lpAdapter;
   PPACKET_OID_DATA  OidData;
-  BOOLEAN           Status;
+  int               Status;
   int               ReturnValue;
-  HINSTANCE         hDll;         /* handle to DLL */
-  LPADAPTER (*p_PacketOpenAdapter)(PCHAR AdapterName);
-  VOID (*p_PacketCloseAdapter)(LPADAPTER lpAdapter);
-  BOOLEAN (*p_PacketRequest)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData);
+#ifdef _WIN32
+  HMODULE           hDll;         /* handle to DLL */
+#else
+  static void       *hDll = NULL; /* handle to Library */
+  typedef int BOOLEAN;
+#endif
+  LPADAPTER (*p_PacketOpenAdapter)(char *AdapterName);
+  void (*p_PacketCloseAdapter)(LPADAPTER lpAdapter);
+  int (*p_PacketRequest)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData);
 
-  hDll = LoadLibrary(TEXT("packet.dll"));
-  p_PacketOpenAdapter = (void *)GetProcAddress(hDll, "PacketOpenAdapter");
-  p_PacketCloseAdapter = (void *)GetProcAddress(hDll, "PacketCloseAdapter");
-  p_PacketRequest = (void *)GetProcAddress(hDll, "PacketRequest");
+#ifdef _WIN32
+  hDll = LoadLibraryA("packet.dll");
+  p_PacketOpenAdapter = (LPADAPTER (*)(char *AdapterName))GetProcAddress(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))GetProcAddress(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))GetProcAddress(hDll, "PacketRequest");
+#else
+  hDll = dlopen("packet.dll", RTLD_NOW);
+  p_PacketOpenAdapter = (LPADAPTER (*)(char *AdapterName))dlsym(hDll, "PacketOpenAdapter");
+  p_PacketCloseAdapter = (void (*)(LPADAPTER lpAdapter))dlsym(hDll, "PacketCloseAdapter");
+  p_PacketRequest = (int (*)(LPADAPTER  AdapterObject,BOOLEAN Set,PPACKET_OID_DATA  OidData))dlsym(hDll, "PacketRequest");
+#endif
   
   /* Open the selected adapter */
 
   lpAdapter =   p_PacketOpenAdapter(AdapterName);
 
-  if (!lpAdapter || (lpAdapter->hFile == INVALID_HANDLE_VALUE)) {
-    FreeLibrary(hDll);
+  if (!lpAdapter || (*lpAdapter == (void *)-1)) {
+#ifdef _WIN32
+      FreeLibrary(hDll);
+#else
+      dlclose(hDll);
+#endif
     return -1;
   }
 
@@ -1146,7 +1247,11 @@ static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
   OidData = malloc(6 + sizeof(PACKET_OID_DATA));
   if (OidData == NULL) {
     p_PacketCloseAdapter(lpAdapter);
+#ifdef _WIN32
     FreeLibrary(hDll);
+#else
+    dlclose(hDll);
+#endif
     return -1;
   }
 
@@ -1166,8 +1271,100 @@ static int pcap_mac_if_win32(char *AdapterName, UCHAR MACAddress[6])
 
   free(OidData);
   p_PacketCloseAdapter(lpAdapter);
+#ifdef _WIN32
   FreeLibrary(hDll);
+#else
+  dlclose(hDll);
+#endif
   return ReturnValue;
+}
+#endif  /* defined(_WIN32) || defined(__CYGWIN__) */
+
+#if defined (__VMS) && !defined(__VAX)
+#include <descrip.h>
+#include <iodef.h>
+#include <ssdef.h>
+#include <starlet.h>
+#include <stdio.h>
+#include <stsdef.h>
+#include <nmadef.h>
+
+static int pcap_mac_if_vms(char *AdapterName, unsigned char MACAddress[6])
+{
+  char VMS_Device[16];
+  $DESCRIPTOR(Device, VMS_Device);
+  unsigned short iosb[4];
+  unsigned short *w;
+  unsigned char *pha = NULL;
+  unsigned char *hwa = NULL;
+  int tmpval;
+  int status;
+  unsigned short characteristics[512];
+  long chardesc[] = {sizeof(characteristics), (long)&characteristics};
+  unsigned short chan;
+#pragma member_alignment save
+#pragma nomember_alignment
+  static struct {
+    short fmt;
+    long val_fmt;
+    short pty;
+    long val_pty;
+    short pad;
+    long val_pad;
+    } setup  = {
+        NMA$C_PCLI_FMT, NMA$C_LINFM_ETH,
+        NMA$C_PCLI_PTY, 0x0090,
+        NMA$C_PCLI_PAD, NMA$C_STATE_OFF,
+    };
+#pragma member_alignment restore
+    long setupdesc[] = {sizeof(setup), (long)&setup};
+
+  /* Convert Interface Name to VMS Device Name */
+  /* This is a name shuffle */
+  /*   WE0 becomes EWA0:    */
+  /*   SE1 becomes ESB0:    */
+  /*   XE0 becomes EXA0:    */
+  tmpval = (int)(AdapterName[2]-'0');
+  if ((tmpval < 0) || (tmpval > 25))
+    return -1;
+  VMS_Device[0] = toupper(AdapterName[1]);
+  VMS_Device[1] = toupper(AdapterName[0]);
+  VMS_Device[2] = 'A' + tmpval;
+  VMS_Device[3] = '0';
+  VMS_Device[4] = '\0';
+  VMS_Device[5] = '\0';
+  Device.dsc$w_length = strlen(VMS_Device);
+  if (!$VMS_STATUS_SUCCESS( sys$assign (&Device, &chan, 0, 0, 0) ))
+    return -1;
+  status = sys$qiow (0, chan, IO$_SETMODE|IO$M_CTRL|IO$M_STARTUP, &iosb, 0, 0, 
+                     0, &setupdesc, 0, 0, 0, 0);
+  if ((!$VMS_STATUS_SUCCESS(status)) || (!$VMS_STATUS_SUCCESS(iosb[0]))) {
+    sys$dassgn(chan);
+    return -1;
+    }
+  status = sys$qiow (0, chan, IO$_SENSEMODE|IO$M_CTRL, &iosb, 0, 0, 
+                     0, &chardesc, 0, 0, 0, 0);
+  sys$dassgn(chan);
+  if ((!$VMS_STATUS_SUCCESS(status)) || (!$VMS_STATUS_SUCCESS(iosb[0])))
+    return -1;
+  for (w=characteristics; w < &characteristics[iosb[1]]; ) {
+    if ((((*w)&0xFFF) == NMA$C_PCLI_HWA) && (6 == *(w+1)))
+      hwa = (unsigned char *)(w + 2);
+    if ((((*w)&0xFFF) == NMA$C_PCLI_PHA) && (6 == *(w+1)))
+      pha = (unsigned char *)(w + 2);
+    if (((*w)&0x1000) == 0)
+      w += 3;                       /* Skip over Longword Parameter */
+    else
+      w += (2 + ((1 + *(w+1))/2));  /* Skip over String Parameter */
+    }
+  if (pha != NULL)                  /* Prefer Physical Address */
+    memcpy(MACAddress, pha, 6);
+  else
+    if (hwa != NULL)                /* Fallback to Hardware Address */
+      memcpy(MACAddress, hwa, 6);
+    else
+      return -1;
+  return 0;
 }
 #endif
 
@@ -1175,44 +1372,58 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
-#ifdef _WIN32
-  if (!pcap_mac_if_win32(devname, (UCHAR *)&dev->host_nic_phy_hw_addr))
+#if defined(_WIN32) || defined(__CYGWIN__)
+  if (!pcap_mac_if_win32(devname, dev->host_nic_phy_hw_addr))
     dev->have_host_nic_phy_addr = 1;
-#elif !defined (__VMS)
+#elif defined (__VMS) && !defined(__VAX)
+  if (!pcap_mac_if_vms(devname, dev->host_nic_phy_hw_addr))
+    dev->have_host_nic_phy_addr = 1;
+#elif !defined(__CYGWIN__) && !defined(__VMS)
   if (1) {
     char command[1024];
     FILE *f;
+    int i;
+    char *patterns[] = {
+        "grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]",
+        "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
+        NULL};
 
     if (0 == strncmp("vde:", devname, 4))
       return;
     memset(command, 0, sizeof(command));
-    snprintf(command, sizeof(command)-1, "ifconfig %s | grep [0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F]:[0-9a-fA-F][0-9a-fA-F] >NIC.hwaddr", devname);
-    system(command);
-    if (f = fopen("NIC.hwaddr", "r")) {
-      if (fgets(command, sizeof(command)-1, f)) {
-        char *p1, *p2;
-        
-        p1 = strchr(command, ':');
-        while (p1) {
-          p2 = strchr(p1+1, ':');
-          if (p2 == p1+3) {
-            int mac_bytes[6];
-            if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
-              dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
-              dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
-              dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
-              dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
-              dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
-              dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
-              dev->have_host_nic_phy_addr = 1;
+    for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
+      snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
+      system(command);
+      if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
+        while (0 == dev->have_host_nic_phy_addr) {
+          if (fgets(command, sizeof(command)-1, f)) {
+            char *p1, *p2;
+
+            p1 = strchr(command, ':');
+            while (p1) {
+              p2 = strchr(p1+1, ':');
+              if (p2 <= p1+3) {
+                int mac_bytes[6];
+                if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
+                  dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
+                  dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
+                  dev->host_nic_phy_hw_addr[2] = mac_bytes[2];
+                  dev->host_nic_phy_hw_addr[3] = mac_bytes[3];
+                  dev->host_nic_phy_hw_addr[4] = mac_bytes[4];
+                  dev->host_nic_phy_hw_addr[5] = mac_bytes[5];
+                  dev->have_host_nic_phy_addr = 1;
+                  }
+                break;
+                }
+              p1 = p2;
               }
-            break;
             }
-          p1 = p2;
+          else
+            break;
           }
+        fclose(f);
+        remove("NIC.hwaddr");
         }
-      fclose(f);
-      remove("NIC.hwaddr");
       }
     }
 #endif
@@ -1232,7 +1443,7 @@ static void *
 _eth_reader(void *arg)
 {
 ETH_DEV* volatile dev = (ETH_DEV*)arg;
-int status;
+int status = 0;
 int sched_policy;
 struct sched_param sched_priority;
 #if defined (_WIN32)
@@ -1369,7 +1580,7 @@ sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 pthread_mutex_lock (&dev->writer_lock);
 while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
-  while (request = dev->write_requests) {
+  while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
     dev->write_requests = request->next;
     pthread_mutex_unlock (&dev->writer_lock);
@@ -1523,11 +1734,14 @@ if (0 == strncmp("tap:", savname, 4)) {
 
       memset (&ifr, 0, sizeof(ifr));
       ifr.ifr_addr.sa_family = AF_INET;
-      strncpy(ifr.ifr_name, savname+4, sizeof(ifr.ifr_name));
+      strncpy(ifr.ifr_name, savname, sizeof(ifr.ifr_name));
       if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
         if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
           ifr.ifr_flags |= IFF_UP;
-          ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr);
+          if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
+            strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+            close(tun);
+            }
           }
         close(s);
         }
@@ -1645,6 +1859,7 @@ if (dev->eth_api == ETH_API_PCAP) {
   ioctl(pcap_fileno(dev->handle), BIOCIMMEDIATE, &v);
   }
 #endif
+_eth_add_to_open_list (dev);
 return SCPE_OK;
 }
 
@@ -1652,12 +1867,13 @@ t_stat eth_close(ETH_DEV* dev)
 {
 char* msg = "Eth: closed %s\r\n";
 pcap_t *pcap;
-int pcap_fd = dev->fd_handle;
+int pcap_fd;
 
 /* make sure device exists */
 if (!dev) return SCPE_UNATT;
 
 /* close the device */
+pcap_fd = dev->fd_handle;                   /* save handle to possibly close later */
 pcap = (pcap_t *)dev->handle;
 dev->handle = NULL;
 dev->fd_handle = 0;
@@ -1673,11 +1889,11 @@ pthread_mutex_destroy (&dev->writer_lock);
 pthread_cond_destroy (&dev->writer_cond);
 if (1) {
   struct write_request *buffer;
-   while (buffer = dev->write_buffers) {
+   while (NULL != (buffer = dev->write_buffers)) {
     dev->write_buffers = buffer->next;
     free(buffer);
     }
-  while (buffer = dev->write_requests) {
+  while (NULL != (buffer = dev->write_requests)) {
     dev->write_requests = buffer->next;
     free(buffer);
     }
@@ -1706,7 +1922,7 @@ if (sim_log) fprintf (sim_log, msg, dev->name);
 /* clean up the mess */
 free(dev->name);
 eth_zero(dev);
-
+_eth_remove_from_open_list (dev);
 return SCPE_OK;
 }
 
@@ -1798,9 +2014,12 @@ eth_filter(dev, 1, (ETH_MAC *)mac, 0, 0);
 status = _eth_write (dev, &send, NULL);
 if (status != SCPE_OK) {
   char *msg;
-  msg = "Eth: Error Transmitting packet: %s\r\n"
+  msg = (dev->eth_api == ETH_API_PCAP) ?
+      "Eth: Error Transmitting packet: %s\r\n"
         "You may need to run as root, or install a libpcap version\r\n"
-        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n";
+        "which is at least 0.9 from your OS vendor or www.tcpdump.org\r\n" :
+      "Eth: Error Transmitting packet: %s\r\n"
+        "You may need to run as root.\r\n";
   printf(msg, strerror(errno));
   if (sim_log) fprintf (sim_log, msg, strerror(errno));
   return status;
@@ -1927,10 +2146,10 @@ if (!dev) return SCPE_UNATT;
 
 /* Get a buffer */
 pthread_mutex_lock (&dev->writer_lock);
-if (request = dev->write_buffers)
+if (NULL != (request = dev->write_buffers))
   dev->write_buffers = request->next;
 pthread_mutex_unlock (&dev->writer_lock);
-if (!request)
+if (NULL == request)
   request = malloc(sizeof(*request));
 
 /* Copy buffer contents */
@@ -2113,11 +2332,12 @@ while (size > 1) {
   size -= sizeof(*buffer);
 }
 if (size) {
-  uint8 endbytes[2];
+  uint16 endword;
+  uint8 *endbytes = (uint8 *)&endword;
 
   endbytes[0] = *((uint8 *)buffer);
   endbytes[1] = 0;
-  cksum += *((uint16 *)endbytes);
+  cksum += endword;
   }
 
 /* Do a little shuffling  */
@@ -2451,6 +2671,10 @@ switch (dev->eth_api) {
     /* AUTODIN II hash mode? */
     if ((dev->hash_filter) && (!to_me) && (data[0] & 0x01))
       to_me = _eth_hash_lookup(dev->hash, data);
+    break;
+  default:
+    bpf_used = to_me = 0;                           /* Should NEVER happen */
+    abort();
     break;
   }
 
@@ -2867,7 +3091,7 @@ for (i=0; i<used; ++i) {
 /* replace device description with user-defined adapter name (if defined) */
 for (i=0; i<used; i++) {
   char regkey[2048];
-  char regval[2048];
+  unsigned char regval[2048];
   LONG status;
   DWORD reglen, regtype;
   HKEY reghnd;
@@ -2880,7 +3104,7 @@ for (i=0; i<used; i++) {
      registry key, rather than hardcoding the string as we do here. */
   if (list[i].name[strlen( "\\Device\\NPF_" )] == '{') {
     sprintf( regkey, "SYSTEM\\CurrentControlSet\\Control\\Network\\"
-             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%hs\\Connection", list[i].name+
+             "{4D36E972-E325-11CE-BFC1-08002BE10318}\\%s\\Connection", list[i].name+
              strlen( "\\Device\\NPF_" ) );
     if ((status = RegOpenKeyExA (HKEY_LOCAL_MACHINE, regkey, 0, KEY_QUERY_VALUE, &reghnd)) != ERROR_SUCCESS)
       continue;
@@ -2935,6 +3159,7 @@ pcap_if_t* dev;
 char errbuf[PCAP_ERRBUF_SIZE];
 
 memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
@@ -2959,6 +3184,13 @@ else {
 
 /* Add any host specific devices and/or validate those already found */
 i = eth_host_devices(i, max, list);
+
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((i == 0) && (errbuf[0])) {
+    char* msg = "Eth: pcap_findalldevs warning: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+    }
 
 /* return device count */
 return i;

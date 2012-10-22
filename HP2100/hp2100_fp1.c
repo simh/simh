@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2008, J. David Bryan
+   Copyright (c) 2005-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,8 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   06-Feb-12    JDB     Added missing precision on constant "one" in fp_trun
+   21-Jun-11    JDB     Completed the comments for divide; no code changes
    08-Jun-08    JDB     Quieted bogus gcc warning in fp_exec
    10-May-08    JDB     Fixed uninitialized return in fp_accum when setting
    19-Mar-08    JDB     Reworked "complement" to avoid inlining bug in gcc-4.x
@@ -153,7 +155,7 @@
    initial letters of the instructions (F/X/T) to indicate the precision used.
 
    The FPP hardware consisted of two circuit boards that interfaced to the main
-   CPU via the Microprogammable Processor Port (MPP) that had been introduced
+   CPU via the Microprogrammable Processor Port (MPP) that had been introduced
    with the 1000 E-Series.  One board contained argument registers and ALUs,
    split into separate mantissa and exponent parts.  The other contained a state
    machine sequencer.  FPP results were copied automatically to the argument
@@ -675,9 +677,9 @@ return;
    two operands.  If the magnitude of the difference between the exponents is
    greater than the number of significant bits, then the smaller number has been
    scaled to zero (swamped), and so the sum is simply the larger operand.
-   Otherwise, the sum is computed and checked for overflow, which has occured if
-   the signs of the operands are the same but differ from that of the result.
-   Scaling and renormalization is perfomed if overflow occurred.
+   Otherwise, the sum is computed and checked for overflow, which has occurred
+   if the signs of the operands are the same but differ from that of the result.
+   Scaling and renormalization is performed if overflow occurred.
 */
 
 static void add (FPU *sum, FPU augend, FPU addend)
@@ -727,11 +729,11 @@ return;
 
    The single-precision firmware (FMP) operates differently from the firmware
    extended-precision (.XMPY) and the hardware multiplies of any precision.
-   Firmware implementations form 16-bit x 16-bit = 32-bit partial products and
-   sum them to form the result.  The hardware uses a series of shifts and adds.
-   This means that firmware FMP and hardware FMP return slightly different
-   values, as may be seen by attempting to run the firmware FMP diagnostic on
-   the FPP.
+   Firmware implementations use the MPY micro-order to form 16-bit x 16-bit =
+   32-bit partial products and sum them to form the result.  The hardware uses a
+   series of shifts and adds.  This means that firmware FMP and hardware FMP
+   return slightly different values, as may be seen by attempting to run the
+   firmware FMP diagnostic on the FPP.
 
    The FMP microcode calls a signed multiply routine to calculate three partial
    products (all but LSB * LSB).  Because the LSBs are unsigned, i.e., all bits
@@ -779,7 +781,7 @@ return;
    The basic FPP hardware algorithm scans the multiplier and adds a shifted copy
    of the multiplicand whenever a one-bit is detected.  To avoid successive adds
    when a string of ones is encountered (because adds are more expensive than
-   shifts), the hardware instead adds the multiplicand shifted by N+1+P and
+   shifts), the hardware instead adds the multiplicand shifted by N + 1 + P and
    subtracts the multiplicand shifted by P to obtain the equivalent value with a
    maximum of two operations.
 
@@ -884,16 +886,32 @@ return;
 
    As with multiply, the single-precision firmware (FDV) operates differently
    from the firmware extended-precision (.XDIV) and the hardware divisions of
-   any precision.  Firmware implementations utilize a "divide and correct"
-   algorithm, wherein the quotient is estimated and then corrected by comparing
-   the dividend to the product of the quotient and the divisor.  The hardware
-   uses a series of shifts and subtracts.  This means that firmware FDV and
-   hardware FDV once again return slightly different values.
+   any precision.  Firmware implementations use the DIV micro-order to form
+   32-bit / 16-bit = 16-bit quotients and 16-bit remainders.  These are used in
+   a "divide and correct" algorithm, wherein the quotient is estimated and then
+   corrected by comparing the dividend to the product of the quotient and the
+   divisor.  The hardware uses a series of shifts and subtracts.  This means
+   that firmware FDV and hardware FDV once again return slightly different
+   values.
 
    Under simulation, the classic divide-and-correct method is employed, using
-   64-bit / 32-bit = 32-bit divisions.  This involves dividing the 64-bit
-   dividend "a1a2a3a4" by the first 32-bit digit "b1b2" of the 64-bit divisor
-   "b1b2b3b4".  The resulting 32-bit quotient is ...
+   64-bit / 32-bit = 32-bit divisions.  This method considers the 64-bit
+   dividend and divisor each to consist of two 32-bit "digits."  The 64-bit
+   dividend "a1a2a3a4" is divided by the first 32-bit digit "b1b2" of the 64-bit
+   divisor "b1b2b3b4", yielding a 32-bit trial quotient digit and a 32-bit
+   remainder digit.  A correction is developed by subtracting the product of the
+   second 32-bit digit "b3b4" of the divisor and the trial quotient digit from
+   the remainder (we take advantage of the eight bits vacated by the exponent
+   during unpacking to ensure that this product will not overflow into the sign
+   bit).  If the remainder is negative, the trial quotient is too large, so it
+   is decremented, and the (full 64-bit) divisor is added to the correction.
+   This is repeated until the correction is non-negative, indicating that the
+   first quotient digit is correct.  The process is then repeated using the
+   remainder as the dividend to develop the second 32-bit digit of the quotient.
+   The two digits are then concatenated for produce the final 64-bit value.
+
+   (See, "Divide-and-Correct Methods for Multiple Precision Division" by Marvin
+   L. Stein, Communications of the ACM, August 1964 for background.)
 
    The microcoded single-precision division avoids overflows by right-shifting
    some values, which leads to a loss of precision in the LSBs.  We duplicate
@@ -1365,7 +1383,7 @@ return 0;
 }
 
 
- /* Complement an unpacked mantissa.
+/* Complement an unpacked mantissa.
 
    An unpacked mantissa is passed as a "packed" number with a zero exponent.
    The exponent increment, i.e., either zero or one, depending on whether a
@@ -1404,7 +1422,7 @@ uint32 fp_trun (OP *result, OP source, OPSIZE precision)
 {
 t_bool bits_lost;
 FPU unpacked;
-FPU one = { FP_ONEHALF, 1, 0 };                         /* 0.5 * 2 ** 1 = 1.0 */
+FPU one = { FP_ONEHALF, 1, fp_t };                      /* 0.5 * 2 ** 1 = 1.0 */
 OP zero = { { 0, 0, 0, 0, 0 } };                        /* 0.0 */
 t_uint64 mask = mant_mask[precision] & ~FP_MSIGN;
 

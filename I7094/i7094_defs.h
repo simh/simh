@@ -1,6 +1,6 @@
 /* i7094_defs.h: IBM 7094 simulator definitions
 
-   Copyright (c) 2003-2010, Robert M Supnik
+   Copyright (c) 2003-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
    helped to reconstruct the CTSS hardware RPQ's.  Dave Pitts gets special
    thanks for patiently coaching me through IBSYS debug.
    
+   25-Mar-11    RMS     Updated SDC mask based on 7230 documentation
    22-May-10    RMS     Added check for 64b addresses
 
 */
@@ -419,7 +420,7 @@ typedef struct {
 #define CHF_M_LCC       077
 
 #define CHF_CLR_7909    07775000177                     /* 7909 clear flags */
-#define CHF_SDC_7909    07776000000                     /* 7909 SDC flags */
+#define CHF_SDC_7909    07777600000                     /* 7909 SDC flags */
 
 /* Channel characteristics (in dev.flags) */
 

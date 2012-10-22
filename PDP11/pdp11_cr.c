@@ -589,7 +589,7 @@ static t_bool readCardASCII (   FILE    *fp,
                                 char    *ccard,
                                 char    *acard    )
 {
-    int    c, col;
+    int    c = 0, col;
 
     assert (colStart < colEnd);
     assert (colStart >= 1);

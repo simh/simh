@@ -1,6 +1,6 @@
 /* i1401_sys.c: IBM 1401 simulator interface
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,15 +23,16 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   25-Mar-12    RMS     Fixed && -> & in test (Peter Schorn)
    20-Sep-05    RMS     Revised for new code tables
    04-Jan-05    WVS     Added address argument support
    14-Nov-04    WVS     Added data printout support
    16-Mar-03    RMS     Fixed mnemonic for MCS
    03-Jun-02    RMS     Added 1311 support
-   18-May-02    RMS     Added -D feature from Van Snyder
-   26-Jan-02    RMS     Fixed H, NOP with no trailing wm (found by Van Snyder)
+   18-May-02    RMS     Added -D feature (Van Snyder)
+   26-Jan-02    RMS     Fixed H, NOP with no trailing wm (Van Snyder)
    17-Sep-01    RMS     Removed multiconsole support
-   13-Jul-01    RMS     Fixed bug in symbolic output (found by Peter Schorn)
+   13-Jul-01    RMS     Fixed bug in symbolic output (Peter Schorn)
    27-May-01    RMS     Added multiconsole support
    14-Mar-01    RMS     Revised load/dump interface (again)
    30-Oct-00    RMS     Added support for examine to file
@@ -401,7 +402,7 @@ if (op >= 64)                                           /* successful? */
     return SCPE_ARG;
 val[0] = op | WM;                                       /* store opcode */
 cptr = get_glyph (cptr, gbuf, 0);                       /* get addr or d */
-if (((op_table[op] && IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
+if (((op_table[op] & IO) && (get_io (gbuf, &val[1]) == SCPE_OK)) ||
      (get_addr (gbuf, &val[1]) == SCPE_OK)) {
         cptr = get_glyph (cptr, gbuf, 0);               /* get addr or d */
         if (get_addr (gbuf, &val[4]) == SCPE_OK) {

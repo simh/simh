@@ -1,6 +1,6 @@
 /* s3_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 2001-2005, Charles E. Owen
+   Copyright (c) 2001-2012, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1403 line printer
 
+   19-Mar-12    RMS     Fixed declaration of conversion tables (Mark Pizzolato)
    25-Apr-03    RMS     Revised for extended file support
    08-Oct-02    RMS     Added impossible function catcher
 */
@@ -41,7 +42,7 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat write_line (int32 ilnt, int32 mod);
 t_stat space (int32 lines, int32 lflag);
 t_stat carriage_control (int32 action, int32 mod);
-extern unsigned char ebcdic_to_ascii[256];
+extern unsigned char ebcdic_to_ascii[];
 
 #define UNIT_V_PCHAIN   (UNIT_V_UF + 0)
 #define UNIT_M_PCHAIN   03
@@ -114,7 +115,7 @@ int32 lpt (int32 op, int32 m, int32 n, int32 data)
     switch (op) {
         case 0:                                         /* SIO 1403 */
             iodata = 0;
-            printf("\0");
+//            printf("\0");
             switch (n) {
                 case 0x00:                              /* Spacing only */
                     if (data > 0 && data < 4)

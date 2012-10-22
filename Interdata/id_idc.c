@@ -25,8 +25,8 @@
 
    idc          MSM/IDC disk controller
 
-   03-Apr-06    RMS     Fixed WD/WH handling (found by Davis Johnson)
-   30-Mar-06    RMS     Fixed bug, nop command should be ignored (found by Davis Johnson)
+   03-Apr-06    RMS     Fixed WD/WH handling (Davis Johnson)
+   30-Mar-06    RMS     Fixed bug, nop command should be ignored (Davis Johnson)
    25-Apr-03    RMS     Revised for extended file support
    16-Feb-03    RMS     Fixed read to test transfer ok before selch operation
 
@@ -96,7 +96,7 @@
 /* Drive status, ^ = dynamic, * = in unit status */
 
 #define STD_WRP         0x80                            /* ^write prot */
-/*                      0x40                            /* unused */
+/*                      0x40                          *//* unused */
 #define STD_ACH         0x20                            /* alt chan busy NI */
 #define STD_UNS         0x10                            /* *unsafe */
 #define STD_NRDY        0x08                            /* ^not ready */
@@ -576,7 +576,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
         if (sch_actv (idc_dib.sch, idc_dib.dno)) {      /* sch transfer? */
             if (idc_dter (uptr, idc_1st))               /* dte? done */
                 return SCPE_OK;
-            if (r = idc_rds (uptr))                     /* read sec, err? */
+            if ((r = idc_rds (uptr)))                   /* read sec, err? */
                 return r;
             idc_1st = 0;
             t = sch_wrmem (idc_dib.sch, idcxb, IDC_NUMBY); /* write mem */
@@ -595,7 +595,7 @@ switch (uptr->FNC & CMC_MASK) {                         /* case on func */
                 return SCPE_OK;
             idc_bptr = sch_rdmem (idc_dib.sch, idcxb, IDC_NUMBY); /* read mem */
             idc_db = idcxb[idc_bptr - 1];               /* last byte */
-            if (r = idc_wds (uptr))                     /* write sec, err? */
+            if ((r = idc_wds (uptr)))                   /* write sec, err? */
                 return r;
             idc_1st = 0;
             if (sch_actv (idc_dib.sch, idc_dib.dno)) {  /* more to do? */       

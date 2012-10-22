@@ -35,7 +35,7 @@
 #include "vax_defs.h"
 
 #ifndef DONT_USE_INTERNAL_ROM
-#include "vax780_vmb_exe.h"
+#include "vax_vmb_exe.h"
 #endif
 
 static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
@@ -146,7 +146,7 @@ CTAB vax730_cmd[] = {
    - internal device interrupts (CPU, console, clock, console storage)
    - external device interrupts (Unibus)
 
-/* Find highest priority vectorable interrupt */
+   Find highest priority vectorable interrupt */
 
 int32 eval_int (void)
 {
@@ -499,7 +499,7 @@ uint32 ba;
 t_stat r;
 
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
-if (slptr = strchr (gbuf, '/')) {                       /* found slash? */
+if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
     regptr = strchr (ptr, '/');                         /* locate orig */
     *slptr = 0;                                         /* zero in string */
     }
@@ -553,11 +553,11 @@ if (r != SCPE_OK) {
 #ifndef DONT_USE_INTERNAL_ROM
     FILE *f;
 
-    if (f = sim_fopen ("vmb.exe", "wb")) {
+    if ((f = sim_fopen ("vmb.exe", "wb"))) {
         printf ("Saving boot code to vmb.exe\n");
         if (sim_log)
             fprintf (sim_log, "Saving boot code to vmb.exe\n");
-        sim_fwrite (vax780_vmb_exe, sizeof(vax780_vmb_exe[0]), sizeof(vax780_vmb_exe)/sizeof(vax780_vmb_exe[0]), f);
+        sim_fwrite (vax_vmb_exe, sizeof(vax_vmb_exe[0]), sizeof(vax_vmb_exe)/sizeof(vax_vmb_exe[0]), f);
         fclose (f);
         printf ("Loading boot code from vmb.exe\n");
         if (sim_log)
@@ -652,11 +652,11 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_NEXUS) {                  /* Nexus? */
-            if (r = build_nexus_tab (dptr, dibp))       /* add to dispatch table */
+            if ((r = build_nexus_tab (dptr, dibp)))     /* add to dispatch table */
                 return r;
             }
         else {                                          /* no, Unibus device */
-            if (r = build_ubus_tab (dptr, dibp))        /* add to dispatch tab */
+            if ((r = build_ubus_tab (dptr, dibp)))      /* add to dispatch tab */
                 return r;
             }                                           /* end else */
         }                                               /* end if enabled */

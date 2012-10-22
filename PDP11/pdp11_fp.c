@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    04-Oct-04    RMS     Added FIS instructions
    19-Jan-03    RMS     Changed mode definitions for Apple Dev Kit conflict
    08-Oct-02    RMS     Fixed macro definitions
@@ -438,7 +438,7 @@ switch ((IR >> 8) & 017) {                              /* decode IR<11:8> */
         else fac.l = ReadI (GeteaFP (dstspec, leni), dstspec, leni);
         fac.h = 0;
         if (fac.l) {
-            if (sign = GET_SIGN_L (fac.l))
+            if ((sign = GET_SIGN_L (fac.l)))
                 fac.l = (fac.l ^ 0xFFFFFFFF) + 1;
             for (i = 0; GET_SIGN_L (fac.l) == 0; i++)
                 fac.l = fac.l << 1;

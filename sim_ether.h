@@ -28,6 +28,7 @@
 
   Modification history:
 
+  01-Mar-12  AGN  Cygwin doesn't have non-blocking pcap I/O pcap (it uses WinPcap)
   17-Nov-11  MP   Added dynamic loading of libpcap on *nix platforms
   30-Oct-11  MP   Added support for vde (Virtual Distributed Ethernet) networking
   18-Apr-11  MP   Fixed race condition with self loopback packets in 
@@ -72,16 +73,25 @@
 #if defined(__NetBSD__) || defined (__OpenBSD__) || defined (__FreeBSD__)
 #define xBSD 1
 #endif
-#if !defined(__FreeBSD__) && !defined(_WIN32) && !defined(VMS)
+#if !defined(__FreeBSD__) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__) && !defined(__APPLE__)
 #define USE_SETNONBLOCK 1
+#endif
+
+/* cygwin dowsn't have the right features to use the threaded network I/O */
+#if defined(__CYGWIN__)
+#define DONT_USE_READER_THREAD
 #endif
 
 #if (((defined(__sun__) && defined(__i386__)) || defined(__linux)) && !defined(DONT_USE_READER_THREAD))
 #define USE_READER_THREAD 1
 #endif
 
+#if defined(DONT_USE_READER_THREAD)
+#undef USE_READER_THREAD
+#endif
+
 /* make common winpcap code a bit easier to read in this file */
-#if defined(_WIN32) || defined(VMS)
+#if defined(_WIN32) || defined(VMS) || defined(__CYGWIN__)
 #define PCAP_READ_TIMEOUT -1
 #else
 #define PCAP_READ_TIMEOUT  1
@@ -94,7 +104,7 @@
 #endif /* USE_SETNONBLOCK */
 #undef PCAP_READ_TIMEOUT
 #define PCAP_READ_TIMEOUT 15
-#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
+#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
 #define MUST_DO_SELECT 1
 #endif
 #endif /* USE_READER_THREAD */
@@ -163,10 +173,10 @@
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
-  int     len;                                          /* packet length without CRC */
-  int     used;                                         /* bytes processed (used in packet chaining) */
+  uint32  len;                                          /* packet length without CRC */
+  uint32  used;                                         /* bytes processed (used in packet chaining) */
   int     status;                                       /* transmit/receive status */
-  int     crc_len;                                      /* packet length with CRC */
+  uint32  crc_len;                                      /* packet length with CRC */
 };
 
 struct eth_item {
@@ -278,8 +288,10 @@ uint32 eth_crc32(uint32 crc, const void* vbuf, size_t len); /* Compute Ethernet 
 
 void eth_packet_trace (ETH_DEV* dev, const uint8 *msg, int len, char* txt); /* trace ethernet packet header+crc */
 void eth_packet_trace_ex (ETH_DEV* dev, const uint8 *msg, int len, char* txt, int detail, uint32 reason); /* trace ethernet packet */
-t_stat eth_show  (FILE* st, UNIT* uptr,                 /* show ethernet devices */
-                  int32 val, void* desc);
+t_stat eth_show (FILE* st, UNIT* uptr,                  /* show ethernet devices */
+                 int32 val, void* desc);
+t_stat eth_show_devices (FILE* st, DEVICE *dptr,        /* show ethernet devices */
+                         UNIT* uptr, int32 val, char* desc);
 void eth_show_dev (FILE*st, ETH_DEV* dev);              /* show ethernet device state */
 
 void eth_mac_fmt      (ETH_MAC* add, char* buffer);     /* format ethernet mac address */

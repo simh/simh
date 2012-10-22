@@ -1,6 +1,6 @@
 /* altair_cpu.c: MITS Altair Intel 8080 CPU simulator
 
-   Copyright (c) 1997-2005, Charles E. Owen
+   Copyright (c) 1997-2012, Charles E. Owen
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          8080 CPU
 
+   19-Mar-12    RMS     Fixed data type for breakpoint variables
    08-Oct-02    RMS     Tied off spurious compiler warnings
 
    The register state for the 8080 CPU is:
@@ -107,7 +108,7 @@ int32 chip = 0;                                         /* 0 = 8080 chip, 1 = z8
 int32 PCX;                                              /* External view of PC */
 
 extern int32 sim_int_char;
-extern int32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
+extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 /* function prototypes */
 
@@ -312,7 +313,7 @@ int32 sim_instr (void)
 
     while (reason == 0) {                               /* loop until halted */
         if (sim_interval <= 0) {                        /* check clock queue */
-            if (reason = sim_process_event ()) break;
+            if ((reason = sim_process_event ())) break;
         }
 
         if (int_req > 0) {                              /* interrupt? */

@@ -125,6 +125,7 @@ struct tape_context {
     pthread_t           io_thread;          /* I/O Thread Id */
     pthread_mutex_t     io_lock;
     pthread_cond_t      io_cond;
+    pthread_cond_t      startup_cond;
     int                 io_top;
     uint8               *buf;
     uint32              *bc;
@@ -151,6 +152,7 @@ if ((!callback) || !ctx->asynch_io)
         struct tape_context *ctx =                                      \
                       (struct tape_context *)uptr->tape_ctx;            \
                                                                         \
+        pthread_mutex_lock (&ctx->io_lock);                             \
                                                                         \
         sim_debug (ctx->dbit, ctx->dptr,                                \
       "sim_tape AIO_CALL(op=%d, unit=%d)\n", op, uptr-ctx->dptr->units);\
@@ -168,6 +170,7 @@ if ((!callback) || !ctx->asynch_io)
         ctx->objupdate = _obj;                                          \
         ctx->callback = _callback;                                      \
         pthread_cond_signal (&ctx->io_cond);                            \
+        pthread_mutex_unlock (&ctx->io_lock);                           \
         }                                                               \
     else                                                                \
         if (_callback)                                                  \
@@ -209,6 +212,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
     sim_debug (ctx->dbit, ctx->dptr, "_tape_io(unit=%d) starting\n", uptr-ctx->dptr->units);
 
     pthread_mutex_lock (&ctx->io_lock);
+    pthread_cond_signal (&ctx->startup_cond);   /* Signal we're ready to go */
     while (1) {
         pthread_cond_wait (&ctx->io_cond, &ctx->io_lock);
         if (ctx->io_top == TOP_DONE)
@@ -329,10 +333,15 @@ ctx->asynch_io_latency = latency;
 if (ctx->asynch_io) {
     pthread_mutex_init (&ctx->io_lock, NULL);
     pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_cond_init (&ctx->startup_cond, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    pthread_mutex_lock (&ctx->io_lock);
     pthread_create (&ctx->io_thread, &attr, _tape_io, (void *)uptr);
     pthread_attr_destroy(&attr);
+    pthread_cond_wait (&ctx->startup_cond, &ctx->io_lock); /* Wait for thread to stabilize */
+    pthread_mutex_unlock (&ctx->io_lock);
+    pthread_cond_destroy (&ctx->startup_cond);
     }
 uptr->a_check_completion = _tape_completion_dispatch;
 #endif
@@ -367,9 +376,11 @@ return SCPE_OK;
 static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
 sim_tape_clr_async (uptr);
 if (sim_asynch_enabled)
-    sim_tape_set_async (uptr, 0);
+    sim_tape_set_async (uptr, ctx->asynch_io_latency);
 #endif
 fflush (uptr->fileref);
 }
@@ -378,10 +389,10 @@ fflush (uptr->fileref);
 
 t_stat sim_tape_attach (UNIT *uptr, char *cptr)
 {
-return sim_tape_attach_ex (uptr, cptr, 0);
+return sim_tape_attach_ex (uptr, cptr, 0, 0);
 }
 
-t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit)
+t_stat sim_tape_attach_ex (UNIT *uptr, char *cptr, uint32 dbit, int completion_delay)
 {
 struct tape_context *ctx;
 uint32 objc;
@@ -429,7 +440,7 @@ ctx->dbit = dbit;                                       /* save debug bit */
 sim_tape_rewind (uptr);
 
 #if defined (SIM_ASYNCH_IO)
-sim_tape_set_async (uptr, 0);
+sim_tape_set_async (uptr, completion_delay);
 #endif
 uptr->io_flush = _sim_tape_io_flush;
 
@@ -757,7 +768,7 @@ t_stat st;
 sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecf(unit=%d, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
 
 opos = uptr->pos;                                       /* old position */
-if (st = sim_tape_rdlntf (uptr, &tbc))                  /* read rec lnt */
+if (MTSE_OK != (st = sim_tape_rdlntf (uptr, &tbc)))     /* read rec lnt */
     return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max) {                                        /* rec out of range? */
@@ -819,7 +830,7 @@ t_stat st;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rdrecr(unit=%d, buf=%p, max=%d)\n", uptr-ctx->dptr->units, buf, max);
 
-if (st = sim_tape_rdlntr (uptr, &tbc))                  /* read rec lnt */
+if (MTSE_OK != (st = sim_tape_rdlntr (uptr, &tbc)))     /* read rec lnt */
     return st;
 *bc = rbc = MTR_L (tbc);                                /* strip error flag */
 if (rbc > max)                                          /* rec out of range? */
@@ -1711,6 +1722,11 @@ return r;
 t_stat sim_tape_reset (UNIT *uptr)
 {
 MT_CLR_PNU (uptr);
+if (!(uptr->flags & UNIT_ATT))                          /* attached? */
+    return SCPE_OK;
+_sim_tape_io_flush(uptr);
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
 return SCPE_OK;
 }
 

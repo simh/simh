@@ -1,6 +1,6 @@
 /* hp2100_cpu0.c: HP 1000 user microcode and unimplemented instruction set stubs
 
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    CPU0         User microcode and unimplemented firmware options
 
+   09-May-12    JDB     Separated assignments from conditional expressions
+   04-Nov-10    JDB     Removed DS note regarding PIF card (is now implemented)
    18-Sep-08    JDB     .FLUN and self-tests for VIS and SIGNAL are NOP if not present
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
@@ -81,8 +83,7 @@
    the cards.
 
    Implementation of the DS instructions will also require simulation of the
-   12665A Hardwired Serial Data Interface Card and the 12620A RTE Privileged
-   Interrupt Fence.  These are required for DS/1000.
+   12665A Hardwired Serial Data Interface Card.
 
    Option implementation by CPU was as follows:
 
@@ -98,6 +99,7 @@
              105521   105301   "Closed loop" (trap cell handler)
              105522   105302   [unknown]
      [test]  105524   105304   [self test]
+               --     105310   7974 boot loader ROM extension
 
    Notes:
 
@@ -128,9 +130,11 @@ uint32 entry;
 
 entry = IR & 017;                                       /* mask to entry point */
 
-if (op_ds[entry] != OP_N)
-    if (reason = cpu_ops (op_ds[entry], op, intrq))     /* get instruction operands */
-        return reason;
+if (op_ds [entry] != OP_N) {
+    reason = cpu_ops (op_ds[entry], op, intrq);         /* get instruction operands */
+    if (reason != SCPE_OK)                              /* did the evaluation fail? */
+        return reason;                                  /* return the reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<3:0> */
 
@@ -180,33 +184,33 @@ t_stat reason = SCPE_OK;
 if (UNIT_CPU_TYPE == UNIT_TYPE_211X)                    /* 2116/15/14 CPU? */
     return stop_inst;                                   /* user microprograms not supported */
 
-switch (IR) {                                           /* opcodes for firmware detection */
-    case 0105226:                                       /* FFP .FLUN */
-    case 0105355:                                       /* RTE-6/VM OS self-test */
-    case 0105477:                                       /* VIS self-test */
-    case 0105617:                                       /* SIGNAL/1000 self-test */
+switch (IR) {
+    case 0105226:                                       /* firmware detection: FFP .FLUN */
+    case 0105355:                                       /* firmware detection: RTE-6/VM OS self-test */
+    case 0105477:                                       /* firmware detection: VIS self-test */
+    case 0105617:                                       /* firmware detection: SIGNAL/1000 self-test */
         return SCPE_OK;                                 /* execute as NOP */
     }
 
 switch ((IR >> 4) & 037) {                              /* decode IR<8:4> */
 
-/*  case 000:                                           /* 105000-105017 */
-/*      return cpu_user_00 (IR, intrq);                 /* uncomment to handle instruction */
+/*  case 000:                                           ** 105000-105017 */
+/*      return cpu_user_00 (IR, intrq);                 ** uncomment to handle instruction */
 
-/*  case 001:                                           /* 105020-105037 */
-/*      return cpu_user_01 (IR, intrq);                 /* uncomment to handle instruction */
+/*  case 001:                                           ** 105020-105037 */
+/*      return cpu_user_01 (IR, intrq);                 ** uncomment to handle instruction */
 
-/*  case 0nn:                                           /* other cases as needed */
-/*      return cpu_user_nn (IR, intrq);                 /* uncomment to handle instruction */
+/*  case 0nn:                                           ** other cases as needed */
+/*      return cpu_user_nn (IR, intrq);                 ** uncomment to handle instruction */
 
     case 020:                                           /* 10x400-10x417 */
         return cpu_user_20 (IR, intrq);                 /* call sample dispatcher */
 
-/*  case 021:                                           /* 10x420-10x437 */
-/*      return cpu_user_21 (IR, intrq);                 /* uncomment to handle instruction */
+/*  case 021:                                           ** 10x420-10x437 */
+/*      return cpu_user_21 (IR, intrq);                 ** uncomment to handle instruction */
 
-/*  case 0nn:                                           /* other cases as needed */
-/*      return cpu_user_nn (IR, intrq);                 /* uncomment to handle instruction */
+/*  case 0nn:                                           ** other cases as needed */
+/*      return cpu_user_nn (IR, intrq);                 ** uncomment to handle instruction */
 
     default:                                            /* others undefined */
         reason = stop_inst;
@@ -242,20 +246,22 @@ uint32 entry;
 
 entry = IR & 017;                                       /* mask to entry point */
 
-if (op_user_20 [entry] != OP_N)
-    if (reason = cpu_ops (op_user_20 [entry], op, intrq))   /* get instruction operands */
-        return reason;
+if (op_user_20 [entry] != OP_N) {
+    reason = cpu_ops (op_user_20 [entry], op, intrq);   /* get instruction operands */
+    if (reason != SCPE_OK)                              /* did the evaluation fail? */
+        return reason;                                  /* return the reason for failure */
+    }
 
 switch (entry) {                                        /* decode IR<4:0> */
 
     case 000:                                           /* 10x400 */
-/*      break;                                          /* uncomment to handle instruction */
+/*      break;                                          ** uncomment to handle instruction */
 
     case 001:                                           /* 10x401 */
-/*      break;                                          /* uncomment to handle instruction */
+/*      break;                                          ** uncomment to handle instruction */
 
-/*  case 0nn:                                           /* other cases as needed */
-/*      break;                                          /* uncomment to handle instruction */
+/*  case 0nn:                                           ** other cases as needed */
+/*      break;                                          ** uncomment to handle instruction */
 
     default:                                            /* others undefined */
         reason = stop_inst;

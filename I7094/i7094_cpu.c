@@ -1,6 +1,6 @@
 /* i7094_cpu.c: IBM 7094 CPU simulator
 
-   Copyright (c) 2003-2010, Robert M. Supnik
+   Copyright (c) 2003-2011, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,10 @@
 
    cpu          7094 central processor
 
-   16-Jul-10    RMS     Fixed PSE, MSE user mode protection (found by Dave Pitts)
+   31-Dec-11    RMS     Select traps have priority over protect traps
+                        Added SRI, SPI
+                        Fixed user mode and relocation from CTSS RPQ documentation
+   16-Jul-10    RMS     Fixed user mode protection (Dave Pitts)
                         Fixed issues in storage nullification mode
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added additional expanded core instructions
@@ -57,6 +60,9 @@
    protection, and relocation.  Additional state:
 
    USER                 user mode
+   RELOCM               relocation mode
+   USER_BUF             user mode buffer
+   RELOC_BUF            relocation buffer
    INST_BASE            instruction memory select (A vs B core)
    DATA_BASE            data memory select (A vs B core)
    IND_RELOC<0:6>       relocation value (block number)
@@ -121,8 +127,8 @@
         ch_flags[0..7]  flags for channels A..H
         chtr_enab       channel trap enables
         chtr_inht       channel trap inhibit due to trap (cleared by RCT)
-        chtr_inhi       channel trap inhibit due to XEC, ENAB, RCT, RDS,
-                        or WDS (cleared after one instruction)
+        chtr_inhi       channel trap inhibit due to XEC, ENB, RCT, LRI,
+                        LPI, SEA, SEB (cleared after one instruction)
 
       Channel traps are summarized in variable chtr_pend.
 
@@ -179,6 +185,9 @@ uint32 ind_dvc = 0;                                     /* divide check */
 uint32 ind_ioc = 0;                                     /* IO check */
 uint32 cpu_model = I_9X|I_94;                           /* CPU type */
 uint32 mode_user = 0;                                   /* (CTSS) user mode */
+uint32 mode_reloc = 0;                                  /* (CTSS) relocation mode */
+uint32 user_buf = 0;                                    /* (CTSS) user mode buffer */
+uint32 reloc_buf = 0;                                   /* (CTSS) reloc mode buffer */
 uint32 ind_reloc = 0;                                   /* (CTSS) relocation */
 uint32 ind_start = 0;                                   /* (CTSS) prot start */
 uint32 ind_limit = 0;                                   /* (CTSS) prot limit */
@@ -307,6 +316,9 @@ REG cpu_reg[] = {
     { FLDATA (CHTR_INHI, chtr_inhi, 0) },
     { ORDATA (CHTR_ENAB, chtr_enab, 30) },
     { FLDATA (USERM, mode_user, 0) },
+    { FLDATA (RELOCM, mode_reloc, 0) },
+    { FLDATA (USERBUF, user_buf, 0) },
+    { FLDATA (RELOCBUF, reloc_buf, 0) },
     { FLDATA (IMEM, inst_base, BCORE_V) },
     { FLDATA (DMEM, data_base, BCORE_V) },
     { GRDATA (RELOC, ind_reloc, 8, VA_N_BLK, VA_V_BLK) },
@@ -572,8 +584,8 @@ const uint8 op_flags[1024] = {
  I_XNR|I_CT, 0         , 0         , 0         ,
  0         , 0         , 0         , 0         ,
  0         , 0         , 0         , 0         ,
- I_XN      , 0         , I_XNR|I_9X, I_XN|I_94 ,        /* -600 */
- 0         , 0         , 0         , 0         ,
+ I_XN      , I_CT      , I_XNR|I_9X, I_XN|I_94 ,        /* -600 */
+ I_CT      , 0         , 0         , 0         ,
  0         , 0         , 0         , 0         ,
  0         , 0         , 0         , 0         ,
  I_XNR|I_9X, 0         , 0         , 0         ,        /* -620 */
@@ -652,14 +664,14 @@ while (reason == SCPE_OK) {                             /* loop until error */
         }
 
     if (sim_interval <= 0) {                            /* intv cnt expired? */
-        if (reason = sim_process_event ())              /* process events */
+        if ((reason = sim_process_event ()))            /* process events */
             break;
         chtr_pend = chtr_eval (NULL);                   /* eval chan traps */
         }
 
     for (i = 0; ch_req && (i < NUM_CHAN); i++) {        /* loop thru channels */
         if (ch_req & REQ_CH (i)) {                      /* channel request? */
-            if (reason = ch_proc (i))
+            if ((reason = ch_proc (i)))
                 break;
             }
         chtr_pend = chtr_eval (NULL);
@@ -684,6 +696,10 @@ while (reason == SCPE_OK) {                             /* loop until error */
         if (chtr_inhi) {                                /* 1 cycle inhibit? */
             chtr_inhi = 0;                              /* clear */
             chtr_pend = chtr_eval (NULL);               /* re-evaluate */
+            }
+        else if (cpu_model & I_CT) {                    /* CTSS? */
+            mode_user = user_buf;                       /* load modes from buffers */
+            mode_reloc = reloc_buf;
             }
         oldPC = PC;                                     /* save current PC */
         PC = (PC + 1) & EAMASK;                         /* increment PC */
@@ -945,9 +961,15 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 00101:                                     /* (CTSS) TIA */
             if (prot_trap (0))                          /* not user mode? */
                 break;
-            PCQ_ENTRY;
-            PC = ea;
-            inst_base = 0;
+            if (mode_ttrap) {                           /* trap? */
+                WriteTA (TRAP_STD_SAV, oldPC);          /* save PC */
+                TrapXfr (TRAP_TRA_PC);                  /* trap */
+                }
+            else {
+                PCQ_ENTRY;
+                PC = ea;
+                inst_base = 0;
+                }
             break;
 
         case 00114: case 00115: case 00116: case 00117: /* CVR */
@@ -1267,6 +1289,9 @@ while (reason == SCPE_OK) {                             /* loop until error */
             if (prot_trap (0))                          /* user mode? */
                 break;
             ind_reloc = ((uint32) SR) & VA_BLK;
+            reloc_buf = 1;                              /* set mode buffer */
+            chtr_inhi = 1;                              /* delay traps */
+            chtr_pend = 0;                              /* no trap now */
             break;
 
         case 00564:                                     /* ENB */
@@ -1380,6 +1405,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 /* Negative instructions */
 
         case 01021:                                     /* ESNT */
+            if (prot_trap (0))                          /* user mode? */
+                break;
             mode_storn = 1;                             /* enter nullification */
             PCQ_ENTRY;
             PC = ea;                                    /* branch, no trap */
@@ -1431,10 +1458,15 @@ while (reason == SCPE_OK) {                             /* loop until error */
         case 01101:                                     /* (CTSS) TIB */
             if (prot_trap (0))                          /* user mode? */
                 break;
-            PCQ_ENTRY;
-            PC = ea;
-            mode_user = 1;
-            inst_base = BCORE_BASE;
+            if (mode_ttrap) {                           /* trap? */
+                WriteTA (TRAP_STD_SAV, oldPC);          /* save PC */
+                TrapXfr (TRAP_TRA_PC);                  /* trap */
+                }
+            else {
+                PCQ_ENTRY;
+                PC = ea;
+                inst_base = BCORE_BASE;
+                }
             break;
 
         case 01114: case 01115: case 01116: case 01117: /* CAQ */
@@ -1624,10 +1656,19 @@ while (reason == SCPE_OK) {                             /* loop until error */
                 break;
             ind_start = ((uint32) SR) & VA_BLK;
             ind_limit = (GET_DEC (SR) & VA_BLK) | VA_OFF;
+            user_buf = 1;                               /* set mode buffer */
+            chtr_inhi = 1;                              /* delay traps */
+            chtr_pend = 0;                              /* no trap now */
             break;
 
         case 01600:                                     /* STQ */
             Write (ea, MQ);
+            break;
+
+        case 01601:                                     /* SRI (CTSS) */
+            SR = ind_reloc & VA_BLK;
+            /* add reloc mode in bit 1 */
+            Write (ea, SR);
             break;
 
         case 01602:                                     /* ORS */
@@ -1640,6 +1681,13 @@ while (reason == SCPE_OK) {                             /* loop until error */
             if (!Write (ea, SR))
                 break;
             Write ((ea + 1) & EAMASK, MQ);
+            break;
+
+        case 01604:                                     /* SPI (CTSS) */
+            SR = (((t_uint64) (ind_limit & VA_BLK)) << INST_V_DEC) |
+                ((t_uint64) (ind_start & VA_BLK));
+            /* add prot mode in bit 2 */
+            Write (ea, SR);
             break;
 
         case 01620:                                     /* SLQ */
@@ -1833,10 +1881,8 @@ while (reason == SCPE_OK) {                             /* loop until error */
 
         case 00640: case 00641: case 00642: case 00643: /* SCHx */
         case 01640: case 01641: case 01642: case 01643:
-            if (prot_trap (0))                          /* user mode? */
-                break;
-             ch = ((op & 03) << 1) | ((op >> 9) & 01);
-             if ((reason = ch_op_store (ch, &SR)) == SCPE_OK)
+            ch = ((op & 03) << 1) | ((op >> 9) & 01);
+            if ((reason = ch_op_store (ch, &SR)) == SCPE_OK)
                 Write (ea, SR);
             break;
 
@@ -1848,7 +1894,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00762:                                     /* RDS */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_ds (ch, CHSL_RDS, GET_U_UNIT (ea));
@@ -1856,7 +1902,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00764:                                     /* BSR */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_BSR, GET_U_UNIT (ea));
@@ -1864,7 +1910,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00766:                                     /* WRS */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_ds (ch, CHSL_WRS, GET_U_UNIT (ea));
@@ -1872,7 +1918,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00770:                                     /* WEF */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_WEF, GET_U_UNIT (ea));
@@ -1880,7 +1926,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00772:                                     /* REW */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_REW, GET_U_UNIT (ea));
@@ -1888,7 +1934,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01764:                                     /* BSF */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_BSF, GET_U_UNIT (ea));
@@ -1896,7 +1942,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 01772:                                     /* RUN */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_RUN, GET_U_UNIT (ea));
@@ -1904,7 +1950,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
             break;
 
         case 00776:                                     /* SDN */
-            if (prot_trap (0) || sel_trap (PC))
+            if (sel_trap (0) || prot_trap (PC))         /* select takes priority */
                 break;
             ch = GET_U_CH (IR);
             reason = ch_op_nds (ch, CHSL_SDN, GET_U_UNIT (ea));
@@ -1927,13 +1973,13 @@ while (reason == SCPE_OK) {                             /* loop until error */
             t_stat r;
             for (i = 0; (i < HALT_IO_LIMIT) && !ch_qidle (); i++) {
                 sim_interval = 0;
-                if (r = sim_process_event ())           /* process events */
+                if ((r = sim_process_event ()))         /* process events */
                     return r;
                 chtr_pend = chtr_eval (NULL);           /* eval chan traps */
                 while (ch_req) {                        /* until no ch req */
                     for (j = 0; j < NUM_CHAN; j++) {    /* loop thru channels */
                         if (ch_req & REQ_CH (j)) {      /* channel request? */
-                            if (r = ch_proc (j))
+                            if ((r = ch_proc (j)))
                                 return r;
                             }
                         chtr_pend = chtr_eval (NULL);
@@ -2069,7 +2115,8 @@ WriteP (pa, mem);
 mode_ctrap = 0;
 mode_strap = 0;
 mode_storn = 0;
-mode_user = 0;
+mode_user = user_buf = 0;
+mode_reloc = reloc_buf = 0;
 inst_base = 0;
 data_base = 0;
 return;
@@ -2121,7 +2168,8 @@ PC = newpc;
 mode_ctrap = 0;
 mode_strap = 0;
 mode_storn = 0;
-mode_user = 0;
+mode_user = user_buf = 0;
+mode_reloc = reloc_buf = 0;
 inst_base = 0;
 data_base = 0;
 return;
@@ -2131,12 +2179,11 @@ return;
 
 t_bool ReadI (uint32 va, t_uint64 *val)
 {
-if (mode_user) {
+if (mode_reloc)
     va = (va + ind_reloc) & AMASK;
-    if ((va < ind_start) || (va > ind_limit)) {
-        prot_trap (0);
-        return FALSE;
-        }
+if (mode_user && ((va < ind_start) || (va > ind_limit))) {
+    prot_trap (0);
+    return FALSE;
     }
 *val = M[va | inst_base];
 return TRUE;
@@ -2146,12 +2193,11 @@ return TRUE;
 
 t_bool Read (uint32 va, t_uint64 *val)
 {
-if (mode_user) {
+if (mode_reloc)
     va = (va + ind_reloc) & AMASK;
-    if ((va < ind_start) || (va > ind_limit))  {
-        prot_trap (0);
-        return FALSE;
-        }
+if (mode_user && ((va < ind_start) || (va > ind_limit))) {
+    prot_trap (0);
+    return FALSE;
     }
 *val = M[va | data_base];
 return TRUE;
@@ -2161,12 +2207,11 @@ return TRUE;
 
 t_bool Write (uint32 va, t_uint64 dat)
 {
-if (mode_user) {
+if (mode_reloc)
     va = (va + ind_reloc) & AMASK;
-    if ((va < ind_start) || (va > ind_limit))  {
-        prot_trap (0);
-        return FALSE;
-        }
+if (mode_user && ((va < ind_start) || (va > ind_limit))) {
+    prot_trap (0);
+    return FALSE;
     }
 M[va | data_base] = dat;
 return TRUE;
@@ -2191,7 +2236,8 @@ mode_storn = 0;
 if (cpu_model & (I_94|I_CT))
     mode_multi = 0;
 else mode_multi = 1;
-mode_user = 0;
+mode_user = user_buf = 0;
+mode_reloc = reloc_buf = 0;
 inst_base = 0;
 data_base = 0;
 ch_req = 0;
@@ -2220,8 +2266,7 @@ if (vptr == NULL)
     return SCPE_ARG;
 if ((sw & (SWMASK ('A') | SWMASK ('B')))? (ea > AMASK): (ea >= MEMSIZE))
     return SCPE_NXM;
-if ((sw & SWMASK ('B')) ||
-    ((sw & SWMASK ('V')) && mode_user && inst_base))
+if (sw & SWMASK ('B'))
     ea = ea | BCORE_BASE;
 *vptr = M[ea] & DMASK;
 return SCPE_OK;
@@ -2393,7 +2438,7 @@ if (pc & HIST_PC) {                                     /* instruction? */
         }
     fputc ('\n', st);                                   /* end line */
     }                                                   /* end if instruction */
-else if (ch = HIST_CH (pc)) {                           /* channel? */
+else if ((ch = HIST_CH (pc))) {                         /* channel? */
     fprintf (st, "CH%c ", 'A' + ch - 1);
     fprintf (st, "%05o  ", pc & AMASK);
     fputs ("                                              ", st);

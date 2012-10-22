@@ -27,6 +27,7 @@
 
    23-Jan-12    MP      Added missing support for Logical EOT detection while
                         positioning.
+   17-Aug-11    RMS     Added CAPACITY modifier
    05-Mar-11    MP      Added missing state for proper save/restore
    01-Mar-11    MP      - Migrated complex physical tape activities to sim_tape
                         - adopted use of asynch I/O interfaces from sim_tape
@@ -48,10 +49,10 @@
    16-Feb-06    RMS     Revised for new magtape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   22-Jul-05    RMS     Fixed warning from Solaris C (from Doug Gwyn)
+   22-Jul-05    RMS     Fixed warning from Solaris C (Doug Gwyn)
    30-Sep-04    RMS     Revised Unibus interface
-   12-Jun-04    RMS     Fixed bug in reporting write protect (reported by Lyle Bickley)
-   18-Apr-04    RMS     Fixed TQK70 media ID and model byte (found by Robert Schaffrath)
+   12-Jun-04    RMS     Fixed bug in reporting write protect (Lyle Bickley)
+   18-Apr-04    RMS     Fixed TQK70 media ID and model byte (Robert Schaffrath)
    26-Mar-04    RMS     Fixed warnings with -std=c99
    25-Jan-04    RMS     Revised for device debug support
    19-May-03    RMS     Revised for new conditional compilation scheme
@@ -62,7 +63,7 @@
    22-Feb-03    RMS     Fixed ordering bug in queue process
                         Fixed flags table to allow MD_CSE everywhere
    09-Jan-03    RMS     Fixed bug in transfer end packet status
-   17-Oct-02    RMS     Fixed bug in read reverse (found by Hans Pufal)
+   17-Oct-02    RMS     Fixed bug in read reverse (Hans Pufal)
 */
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
@@ -82,7 +83,7 @@
 #include "pdp11_defs.h"
 #define INIT_TYPE       TQ5_TYPE
 #define INIT_CAP        TQ5_CAP
-extern int32 cpu_opt;
+extern uint32 cpu_opt;
 #endif
 
 #include "pdp11_uqssp.h"
@@ -419,10 +420,10 @@ DIB tq_dib = {
     };
 
 UNIT tq_unit[] = {
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
-    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, 0), INIT_CAP },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
+    { UDATA (&tq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE|UNIT_ROABLE, INIT_CAP) },
     { UDATA (&tq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&tq_quesvc, UNIT_IDLE|UNIT_DIS, 0) }
     };
@@ -499,9 +500,13 @@ MTAB tq_mod[] = {
       NULL, &tq_show_unitq, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
+    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
+      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
+      &set_addr_flt, NULL, NULL },
 #else
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
       NULL, &show_addr, NULL },
@@ -823,13 +828,13 @@ else if (mdf & ~tq_cmf[cmd]) {                          /* invalid mod? */
     sts = ST_CMD | I_MODF;                              /* ill mods */
     }
 else {                                                  /* valid cmd */
-    if (uptr = tq_getucb (lu)) {                        /* valid unit? */
+    if ((uptr = tq_getucb (lu))) {                      /* valid unit? */
         if (q && (tq_cmf[cmd] & CMF_SEQ) &&             /* queueing, seq, */
             (uptr->cpkt || uptr->pktq)) {               /* and active? */
             tq_enqt (&uptr->pktq, pkt);                 /* do later */
             return OK;
             }
-/*      if (tq_cmf[cmd] & MD_CDL)                       /* clr cch lost? */
+/*      if (tq_cmf[cmd] & MD_CDL)                     *//* clr cch lost? */
 /*          uptr->flags = uptr->flags & ~UNIT_CDL; */
         if ((mdf & MD_CSE) && (uptr->flags & UNIT_SXC)) /* clr ser exc? */
             uptr->flags = uptr->flags & ~UNIT_SXC;
@@ -904,7 +909,7 @@ UNIT *uptr;
 sim_debug(DBG_TRC, &tq_dev, "tq_abo\n");
 
 tpkt = 0;                                               /* set no mtch */
-if (uptr = tq_getucb (lu)) {                            /* get unit */
+if ((uptr = tq_getucb (lu))) {                          /* get unit */
     if (uptr->cpkt &&                                   /* curr pkt? */
         (GETP32 (uptr->cpkt, CMD_REFL) == ref)) {       /* match ref? */
         tpkt = uptr->cpkt;                              /* save match */
@@ -917,8 +922,8 @@ if (uptr = tq_getucb (lu)) {                            /* get unit */
         tpkt = uptr->pktq;                              /* save match */
         uptr->pktq = tq_pkt[tpkt].link;                 /* unlink */
         }
-    else if (prv = uptr->pktq) {                        /* srch pkt q */
-        while (tpkt = tq_pkt[prv].link) {               /* walk list */
+    else if ((prv = uptr->pktq)) {                      /* srch pkt q */
+        while ((tpkt = tq_pkt[prv].link)) {             /* walk list */
             if (GETP32 (tpkt, RSP_REFL) == ref) {       /* match ref? */
                 tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
                     break;
@@ -948,7 +953,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_avl\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if (uptr->flags & UNIT_SXC)                         /* ser exc pending? */
         sts = ST_SXC;
     else {
@@ -1007,7 +1012,7 @@ if (tq_pkt[pkt].d[CMD_MOD] & MD_NXU) {                  /* next unit? */
         tq_pkt[pkt].d[RSP_UN] = lu;
         }
     }
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
             sts = ST_OFL | SB_OFL_NV;                   /* offl no vol */
     else if (uptr->flags & UNIT_ONL)                    /* online */
@@ -1034,7 +1039,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_onl\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
         sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
     else if (uptr->flags & UNIT_ONL)                    /* already online? */
@@ -1065,7 +1070,7 @@ if (tq_pkt[pkt].d[SCC_MSV])                             /* MSCP ver = 0? */
 else {
     tq_cflgs = (tq_cflgs & CF_RPL) |                    /* hack ctrl flgs */
         tq_pkt[pkt].d[SCC_CFL];
-    if (tq_htmo = tq_pkt[pkt].d[SCC_TMO])               /* set timeout */
+    if ((tq_htmo = tq_pkt[pkt].d[SCC_TMO]))             /* set timeout */
         tq_htmo = tq_htmo + 2;                          /* if nz, round up */
     tq_pkt[pkt].d[SCC_CFL] = tq_cflgs;                  /* return flags */
     tq_pkt[pkt].d[SCC_TMO] = TQ_DCTMO;                  /* ctrl timeout */
@@ -1091,7 +1096,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_suc\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     if ((uptr->flags & UNIT_ATT) == 0)                  /* not attached? */
         sts = ST_OFL | SB_OFL_NV;                       /* offl no vol */
     else {
@@ -1115,7 +1120,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_flu\n");
 
-if (uptr = tq_getucb (lu))                              /* unit exist? */
+if ((uptr = tq_getucb (lu)))                            /* unit exist? */
     sts = tq_mot_valid (uptr, OP_FLU);                  /* validate req */
 else sts = ST_OFL;                                      /* offline */
 tq_putr (pkt, OP_FLU | OP_END, tq_efl (uptr), sts, FLU_LNT, UQ_TYP_SEQ);
@@ -1133,7 +1138,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_erase\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     sts = tq_mot_valid (uptr, cmd);                     /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
         uptr->cpkt = pkt;                               /* op in progress */
@@ -1157,7 +1162,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_wtm\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     objp = uptr->objp;                                  /* position op */
     sts = tq_mot_valid (uptr, OP_WTM);                  /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
@@ -1183,7 +1188,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_pos\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     objp = uptr->objp;                                  /* position op */
     sts = tq_mot_valid (uptr, OP_POS);                  /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
@@ -1219,7 +1224,7 @@ UNIT *uptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_rw\n");
 
-if (uptr = tq_getucb (lu)) {                            /* unit exist? */
+if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     objp = uptr->objp;                                  /* position op */
     sts = tq_mot_valid (uptr, cmd);                     /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
@@ -1275,16 +1280,13 @@ return ST_SUC;                                          /* success! */
 void tq_io_complete (UNIT *uptr, t_stat status)
 {
 struct tq_req_results *res = (struct tq_req_results *)uptr->results;
-int32 elapsed = sim_grtime()-uptr->iostarttime;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_io_complete(status=%d)\n", status);
 
 res->io_status = status;
 res->io_complete = 1;
-if (elapsed > tq_xtime)
-    sim_activate (uptr, 0);
-else
-    sim_activate (uptr, tq_xtime-elapsed);
+/* Reschedule for the appropriate delay */
+sim_activate_notbefore (uptr, uptr->iostarttime+tq_xtime);
 }
 
 
@@ -1361,7 +1363,7 @@ switch (cmd) {                                          /* case on command */
             }
         else wbc = res->tbc;
         if (cmd == OP_RD) {                             /* read? */
-            if (t = Map_WriteB (ba, wbc, res->tqxb)) {  /* store, nxm? */
+            if ((t = Map_WriteB (ba, wbc, res->tqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_BCL, wbc - t);          /* adj bc */
                 if (tq_hbe (uptr, ba + wbc - t))        /* post err log */
                     tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, res->tbc);        
@@ -1400,7 +1402,7 @@ switch (cmd) {                                          /* case on command */
 
     case OP_WR:                                         /* write */
         if (!io_complete) { /* Top half processing */
-            if (t = Map_ReadB (ba, bc, res->tqxb)) {    /* fetch buf, nxm? */
+            if ((t = Map_ReadB (ba, bc, res->tqxb))) {  /* fetch buf, nxm? */
                 PUTP32 (pkt, RW_BCL, 0);                /* no bytes xfer'd */
                 if (tq_hbe (uptr, ba + bc - t))         /* post err log */
                     tq_mot_end (uptr, EF_LOG, ST_HST | SB_HST_NXM, bc);     
@@ -2020,7 +2022,7 @@ t_stat tq_attach (UNIT *uptr, char *cptr)
 {
 t_stat r;
 
-r = sim_tape_attach_ex (uptr, cptr, DBG_TAP);
+r = sim_tape_attach_ex (uptr, cptr, DBG_TAP, 0);
 if (r != SCPE_OK)
     return r;
 if (tq_csta == CST_UP)
@@ -2289,11 +2291,11 @@ if ((uptr->flags & UNIT_ONL) == 0) {
 if (uptr->cpkt) {
     fprintf (st, "Unit %d current ", u);
     tq_show_pkt (st, uptr->cpkt);
-    if (pkt = uptr->pktq) {
+    if ((pkt = uptr->pktq)) {
         do {
             fprintf (st, "Unit %d queued ", u);
             tq_show_pkt (st, pkt);
-            } while (pkt = tq_pkt[pkt].link);
+            } while ((pkt = tq_pkt[pkt].link));
         }
     }
 else fprintf (st, "Unit %d queues are empty\n", u);
@@ -2318,7 +2320,7 @@ if (val & TQ_SH_RI) {
     tq_show_ring (st, &tq_rq);
     }
 if (val & TQ_SH_FR) {
-    if (pkt = tq_freq) {
+    if ((pkt = tq_freq)) {
         for (i = 0; pkt != 0; i++, pkt = tq_pkt[pkt].link) {
             if (i == 0)
                 fprintf (st, "Free queue = %d", pkt);
@@ -2331,11 +2333,11 @@ if (val & TQ_SH_FR) {
     else fprintf (st, "Free queue is empty\n");
     }
 if (val & TQ_SH_RS) {
-    if (pkt = tq_rspq) {
+    if ((pkt = tq_rspq)) {
         do {
             fprintf (st, "Response ");
             tq_show_pkt (st, pkt);
-            } while (pkt = tq_pkt[pkt].link);
+            } while ((pkt = tq_pkt[pkt].link));
         }
     else fprintf (st, "Response queue is empty\n");
     }

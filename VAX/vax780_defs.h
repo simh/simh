@@ -287,6 +287,8 @@ typedef struct {
 #define IOLN_RQC        004
 #define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
+#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHU11 */
+#define IOLN_VH         020
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* UDA50 */
 #define IOLN_RQ         004
 #define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
@@ -334,6 +336,8 @@ typedef struct {
 #define INT_V_PTR       1
 #define INT_V_PTP       2
 #define INT_V_CR        3
+#define INT_V_VHRX      4
+#define INT_V_VHTX      5
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -345,6 +349,8 @@ typedef struct {
 #define INT_RY          (1u << INT_V_RY)
 #define INT_XU          (1u << INT_V_XU)
 #define INT_LPT         (1u << INT_V_LPT)
+#define INT_VHRX        (1u << INT_V_VHRX)
+#define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
 #define INT_CR          (1u << INT_V_CR)
@@ -362,6 +368,8 @@ typedef struct {
 #define IPL_PTR         (0x14 - IPL_HMIN)
 #define IPL_PTP         (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
+#define IPL_VHRX        (0x14 - IPL_HMIN)
+#define IPL_VHTX        (0x14 - IPL_HMIN)
 
 /* Device vectors */
 
@@ -382,6 +390,8 @@ typedef struct {
 #define VEC_RY          0264
 #define VEC_DZRX        0300
 #define VEC_DZTX        0304
+#define VEC_VHRX        0310
+#define VEC_VHTX        0314
 
 /* Interrupt macros */
 

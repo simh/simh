@@ -72,7 +72,10 @@ t_stat brk_cmd (int32 flag, char *ptr);
 t_stat do_cmd (int32 flag, char *ptr);
 t_stat goto_cmd (int32 flag, char *ptr);
 t_stat return_cmd (int32 flag, char *ptr);
+t_stat shift_cmd (int32 flag, char *ptr);
+t_stat call_cmd (int32 flag, char *ptr);
 t_stat on_cmd (int32 flag, char *ptr);
+t_stat noop_cmd (int32 flag, char *ptr);
 t_stat assert_cmd (int32 flag, char *ptr);
 t_stat help_cmd (int32 flag, char *ptr);
 t_stat spawn_cmd (int32 flag, char *ptr);
@@ -83,6 +86,7 @@ t_stat echo_cmd (int32 flag, char *ptr);
 t_stat sim_process_event (void);
 t_stat sim_activate (UNIT *uptr, int32 interval);
 t_stat sim_activate_abs (UNIT *uptr, int32 interval);
+t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
 t_stat sim_cancel (UNIT *uptr);
 int32 sim_is_active (UNIT *uptr);
 double sim_gtime (void);
@@ -131,7 +135,7 @@ void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 #else
 void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 extern FILE *sim_deb;                                   /* debug file */
-#define sim_debug(dbits, dptr, ...) if (sim_deb && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__)
+#define sim_debug(dbits, dptr, ...) if (sim_deb && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__); else (void)0
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 

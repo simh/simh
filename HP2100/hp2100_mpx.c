@@ -1,6 +1,6 @@
 /* hp2100_mpx.c: HP 12792C eight-channel asynchronous multiplexer simulator
 
-   Copyright (c) 2008, J. David Bryan
+   Copyright (c) 2008-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,9 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+   28-Mar-11    JDB     Tidied up signal handling
+   26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
    14-Nov-08    JDB     Cleaned up VC++ size mismatch warnings for zero assignments
    03-Oct-08    JDB     Fixed logic for ENQ/XOFF transmit wait
@@ -103,9 +106,9 @@
    The simulation provides both the "realistic timing" described above, as well
    as an optimized "fast timing" option.  Optimization makes three improvements:
 
-     1. Buffered characters are transferred via Telnet in blocks.
+     1. Buffered characters are transferred in blocks.
 
-     2. ENQ/ACK handshaking is done locally without involving the Telnet client.
+     2. ENQ/ACK handshaking is done locally without involving the client.
 
      3. BS and DEL respond visually more like prior RTE terminal drivers.
 
@@ -517,10 +520,11 @@ uint32 mpx_portkey = 0;                                 /* current port's key */
 t_bool mpx_uien = FALSE;                                /* unsolicited interrupts enabled */
 uint32 mpx_uicode = 0;                                  /* unsolicited interrupt reason and port */
 
-FLIP_FLOP mpx_control = CLEAR;                          /* control flip-flop */
-FLIP_FLOP mpx_flag    = CLEAR;                          /* flag flip-flop */
-FLIP_FLOP mpx_flagbuf = CLEAR;                          /* flag buffer flip-flop */
-
+struct {
+    FLIP_FLOP control;                                  /* control flip-flop */
+    FLIP_FLOP flag;                                     /* flag flip-flop */
+    FLIP_FLOP flagbuf;                                  /* flag buffer flip-flop */
+    } mpx = { CLEAR, CLEAR, CLEAR };
 
 /* Multiplexer per-line state variables */
 
@@ -581,7 +585,7 @@ static uint32 buf_avail  (IO_OPER rw, uint32 port);
 
 /* Multiplexer global routines */
 
-uint32 mpx_io (uint32 select_code, IOSIG signal, uint32 data);
+IOHANDLER mpx_io;
 
 t_stat mpx_line_svc  (UNIT   *uptr);
 t_stat mpx_cntl_svc  (UNIT   *uptr);
@@ -596,15 +600,15 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
 
 /* MPX data structures.
 
-   mpx_order   MPX line connection order table
-   mpx_ldsc    MPX line descriptors
-   mpx_desc    MPX multiplexer descriptor
-   mpx_dib     MPX device information block
-   mpx_unit    MPX unit list
-   mpx_reg     MPX register list
-   mpx_mod     MPX modifier list
-   mpx_deb     MPX debug list
-   mpx_dev     MPX device descriptor
+   mpx_order    MPX line connection order table
+   mpx_ldsc     MPX terminal multiplexer line descriptors
+   mpx_desc     MPX terminal multiplexer device descriptor
+   mpx_dib      MPX device information block
+   mpx_unit     MPX unit list
+   mpx_reg      MPX register list
+   mpx_mod      MPX modifier list
+   mpx_deb      MPX debug list
+   mpx_dev      MPX device descriptor
 
    The first eight units correspond to the eight multiplexer line ports.  These
    handle character I/O via the Telnet library.  A ninth unit acts as the card
@@ -623,18 +627,16 @@ t_stat mpx_show_frev (FILE   *st,   UNIT  *uptr, int32  val,  void *desc);
    ten millisecond period.
 
    The controller and poll units are hidden by disabling them, so as to present
-   a logical picture of the multiplexer to the user.  However, we cannot attach
-   to a disabled unit, so the poll unit is enabled prior to attaching and
-   disabled thereafter.
+   a logical picture of the multiplexer to the user.
 */
+
+DEVICE mpx_dev;
 
 int32 mpx_order [MPX_PORTS] = { -1 };                       /* connection order */
 TMLN  mpx_ldsc [MPX_PORTS] = { { 0 } };                     /* line descriptors */
 TMXR  mpx_desc = { MPX_PORTS, 0, 0, mpx_ldsc, mpx_order };  /* device descriptor */
 
-DIB mpx_dib = { MPX, &mpx_io };
-
-DEVICE mpx_dev;
+DIB mpx_dib = { &mpx_io, MPX };
 
 UNIT mpx_unit [] = {
     { UDATA (&mpx_line_svc, UNIT_FASTTIME, 0) },                    /* terminal I/O line 0 */
@@ -682,10 +684,11 @@ REG mpx_reg [] = {
     { BRDATA (SEP, mpx_sep,   10, 10, MPX_PORTS * 2) },
     { BRDATA (PUT, mpx_put,   10, 10, MPX_PORTS * 2) },
 
-    { FLDATA (CTL,   mpx_control,   0) },
-    { FLDATA (FLG,   mpx_flag,      0) },
-    { FLDATA (FBF,   mpx_flagbuf,   0) },
-    { ORDATA (DEVNO, mpx_dib.devno, 6), REG_HRO },
+    { FLDATA (CTL,   mpx.control,         0)  },
+    { FLDATA (FLG,   mpx.flag,            0)  },
+    { FLDATA (FBF,   mpx.flagbuf,         0)  },
+    { ORDATA (SC,    mpx_dib.select_code, 6), REG_HRO },
+    { ORDATA (DEVNO, mpx_dib.select_code, 6), REG_HRO },
 
     { BRDATA (CONNORD, mpx_order, 10, 32, MPX_PORTS), REG_HRO },
     { NULL }
@@ -708,7 +711,8 @@ MTAB mpx_mod [] = {
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,         NULL,        &tmxr_show_cstat, &mpx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS",  NULL,         NULL,        &tmxr_show_cstat, &mpx_desc },
     { MTAB_XTD | MTAB_VDV,            1, NULL,          "DISCONNECT", &tmxr_dscln, NULL,             &mpx_desc },
-    { MTAB_XTD | MTAB_VDV,            0, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &mpx_dev  },
+    { MTAB_XTD | MTAB_VDV,            0, "SC",          "SC",         &hp_setsc,   &hp_showsc,       &mpx_dev  },
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "DEVNO",       "DEVNO",      &hp_setdev,  &hp_showdev,      &mpx_dev  },
 
     { 0 }
     };
@@ -739,12 +743,11 @@ DEVICE mpx_dev = {
     &mpx_attach,                            /* attach routine */
     &mpx_detach,                            /* detach routine */
     &mpx_dib,                               /* device information block */
-    DEV_NET | DEV_DEBUG | DEV_DISABLE,      /* device flags */
+    DEV_DEBUG | DEV_DISABLE,                /* device flags */
     0,                                      /* debug control flags */
     mpx_deb,                                /* debug flag name table */
     NULL,                                   /* memory size change routine */
     NULL };                                 /* logical device name */
-
 
 
 /* I/O signal handler.
@@ -798,161 +801,156 @@ DEVICE mpx_dev = {
 
     2. The "Fast binary read" command inhibits all other commands until the card
        is reset.
-
-    3. The card does not respond to POPIO.  However, as PRESET asserts POPIO and
-       CRS together, we fall into the latter from the former.
 */
 
-uint32 mpx_io (uint32 select_code, IOSIG signal, uint32 data)
+uint32 mpx_io (DIB *dibptr, IOCYCLE signal_set, uint32 stat_data)
 {
 static const char *output_state [] = { "Command", "Command override", "Parameter", "Data" };
 static const char *input_state  [] = { "Status",  "Invalid status",   "Parameter", "Data" };
-const char *hold_or_clear = (signal > ioCLF ? ",C" : "");
-const IOSIG base_signal = IOBASE (signal);              /* derive base signal */
+const char *hold_or_clear = (signal_set & ioCLF ? ",C" : "");
 int32 delay;
+IOSIGNAL signal;
+IOCYCLE  working_set = IOADDSIR (signal_set);           /* add ioSIR if needed */
 
-switch (base_signal) {                                  /* dispatch base I/O signal */
+while (working_set) {
+    signal = IONEXT (working_set);                      /* isolate next signal */
 
-    case ioCLF:                                         /* clear flag flip-flop */
-        mpx_flag = mpx_flagbuf = CLEAR;                 /* clear flag and flag buffer */
+    switch (signal) {                                   /* dispatch I/O signal */
 
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fputs (">>MPX cmds: [CLF] Flag cleared\n", sim_deb);
-        break;
-
-
-    case ioSTF:                                         /* set flag flip-flop */
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fputs (">>MPX cmds: [STF] Flag set\n", sim_deb);
-                                                        /* fall into ENF */
-
-    case ioENF:                                         /* enable flag */
-        mpx_flag = mpx_flagbuf = SET;                   /* set flag and flag buffer */
-        break;
-
-
-    case ioSFC:                                         /* skip if flag is clear */
-        setstdSKF (mpx);
-        break;
-
-
-    case ioSFS:                                         /* skip if flag is set */
-        setstdSKF (mpx);
-        break;
-
-
-    case ioIOI:                                         /* I/O data input */
-        data = mpx_ibuf;                                /* return info */
-
-        if (DEBUG_PRI (mpx_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MPX cpu:  [LIx%s] %s = %06o\n",
-                              hold_or_clear, input_state [mpx_state], data);
-
-        if (mpx_state == exec)                          /* if this is input data word */
-            sim_activate (&mpx_cntl, DATA_DELAY);       /*   continue transmission */
-        break;
-
-
-    case ioIOO:                                         /* I/O data output */
-        if (DEBUG_PRI (mpx_dev, DEB_CPU))
-            fprintf (sim_deb, ">>MPX cpu:  [OTx%s] %s = %06o\n",
-                              hold_or_clear, output_state [mpx_state], data);
-
-        mpx_obuf = data;                                /* save word */
-
-        if (mpx_state == param) {                       /* if this is parameter word */
-            sim_activate (&mpx_cntl, CMD_DELAY);        /*   do command now */
+        case ioCLF:                                     /* clear flag flip-flop */
+            mpx.flag = mpx.flagbuf = CLEAR;             /* clear flag and flag buffer */
 
             if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-                fprintf (sim_deb, ">>MPX cmds: [OTx%s] Command %03o parameter %06o scheduled, "
-                                  "time = %d\n", hold_or_clear, mpx_cmd, mpx_obuf, CMD_DELAY);
-            }
-
-        else if (mpx_state == exec)                     /* else if this is output data word */
-            sim_activate (&mpx_cntl, DATA_DELAY);       /*   then do transmission */
-        break;
+                fputs (">>MPX cmds: [CLF] Flag cleared\n", sim_deb);
+            break;
 
 
-    case ioPOPIO:                                       /* power-on preset to I/O */
-                                                        /* fall into CRS handler */
+        case ioSTF:                                     /* set flag flip-flop */
+            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
+                fputs (">>MPX cmds: [STF] Flag set\n", sim_deb);
+                                                        /* fall into ENF */
 
-    case ioCRS:                                         /* control reset */
-        controller_reset ();                            /* reset firmware to power-on defaults */
-        mpx_obuf = 0;                                   /* clear output buffer */
-
-        mpx_control = CLEAR;                            /* clear control */
-        mpx_flagbuf = CLEAR;                            /* clear flag buffer */
-        mpx_flag    = CLEAR;                            /* clear flag */
-
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fputs (">>MPX cmds: [CRS] Controller reset\n", sim_deb);
-        break;
+        case ioENF:                                     /* enable flag */
+            mpx.flag = mpx.flagbuf = SET;               /* set flag and flag buffer */
+            break;
 
 
-    case ioCLC:                                         /* clear control flip-flop */
-        mpx_control = CLEAR;                            /* clear control */
-
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MPX cmds: [CLC%s] Control cleared\n", hold_or_clear);
-        break;
+        case ioSFC:                                     /* skip if flag is clear */
+            setstdSKF (mpx);
+            break;
 
 
-    case ioSTC:                                         /* set control flip-flop */
-        mpx_control = SET;                              /* set control */
-
-        if (mpx_cmd == CMD_BINARY_READ)                 /* executing fast binary read? */
-            break;                                      /* further command execution inhibited */
-
-        mpx_cmd = GET_OPCODE (mpx_obuf);                /* get command opcode */
-        mpx_portkey = GET_KEY (mpx_obuf);               /* get port key */
-
-        if (mpx_state == cmd)                           /* already scheduled? */
-            sim_cancel (&mpx_cntl);                     /* cancel to get full delay */
-
-        mpx_state = cmd;                                /* set command state */
-
-        if (mpx_cmd & CMD_TWO_WORDS)                    /* two-word command? */
-            delay = PARAM_DELAY;                        /* specify parameter wait */
-        else                                            /* one-word command */
-            delay = CMD_DELAY;                          /* specify command wait */
-
-        sim_activate (&mpx_cntl, delay);                /* schedule command */
-
-        if (DEBUG_PRI (mpx_dev, DEB_CMDS))
-            fprintf (sim_deb, ">>MPX cmds: [STC%s] Command %03o key %d scheduled, "
-                              "time = %d\n", hold_or_clear, mpx_cmd, mpx_portkey, delay);
-        break;
+        case ioSFS:                                     /* skip if flag is set */
+            setstdSKF (mpx);
+            break;
 
 
-    case ioEDT:                                         /* end data transfer */
-        if (DEBUG_PRI (mpx_dev, DEB_CPU))
-            fputs (">>MPX cpu:  [EDT] DCPC transfer ended\n", sim_deb);
-        break;
+        case ioIOI:                                     /* I/O data input */
+            stat_data = IORETURN (SCPE_OK, mpx_ibuf);   /* return info */
+
+            if (DEBUG_PRI (mpx_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MPX cpu:  [LIx%s] %s = %06o\n",
+                                  hold_or_clear, input_state [mpx_state], mpx_ibuf);
+
+            if (mpx_state == exec)                      /* if this is input data word */
+                sim_activate (&mpx_cntl, DATA_DELAY);   /*   continue transmission */
+            break;
 
 
-    case ioSIR:                                         /* set interrupt request */
-        setstdPRL (select_code, mpx);                   /* set standard PRL signal */
-        setstdIRQ (select_code, mpx);                   /* set standard IRQ signal */
-        setstdSRQ (select_code, mpx);                   /* set standard SRQ signal */
-        break;
+        case ioIOO:                                     /* I/O data output */
+            mpx_obuf = IODATA (stat_data);              /* save word */
+
+            if (DEBUG_PRI (mpx_dev, DEB_CPU))
+                fprintf (sim_deb, ">>MPX cpu:  [OTx%s] %s = %06o\n",
+                                  hold_or_clear, output_state [mpx_state], mpx_obuf);
+
+            if (mpx_state == param) {                   /* if this is parameter word */
+                sim_activate (&mpx_cntl, CMD_DELAY);    /*   do command now */
+
+                if (DEBUG_PRI (mpx_dev, DEB_CMDS))
+                    fprintf (sim_deb, ">>MPX cmds: [OTx%s] Command %03o parameter %06o scheduled, "
+                                      "time = %d\n", hold_or_clear, mpx_cmd, mpx_obuf, CMD_DELAY);
+                }
+
+            else if (mpx_state == exec)                 /* else if this is output data word */
+                sim_activate (&mpx_cntl, DATA_DELAY);   /*   then do transmission */
+            break;
 
 
-    case ioIAK:                                         /* interrupt acknowledge */
-        mpx_flagbuf = CLEAR;                            /* clear flag buffer */
-        break;
+        case ioCRS:                                     /* control reset */
+            controller_reset ();                        /* reset firmware to power-on defaults */
+            mpx_obuf = 0;                               /* clear output buffer */
+
+            mpx.control = CLEAR;                        /* clear control */
+            mpx.flagbuf = CLEAR;                        /* clear flag buffer */
+            mpx.flag    = CLEAR;                        /* clear flag */
+
+            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
+                fputs (">>MPX cmds: [CRS] Controller reset\n", sim_deb);
+            break;
 
 
-    default:                                            /* all other signals */
-        break;                                          /*   are ignored */
+        case ioCLC:                                     /* clear control flip-flop */
+            mpx.control = CLEAR;                        /* clear control */
+
+            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
+                fprintf (sim_deb, ">>MPX cmds: [CLC%s] Control cleared\n", hold_or_clear);
+            break;
+
+
+        case ioSTC:                                     /* set control flip-flop */
+            mpx.control = SET;                          /* set control */
+
+            if (mpx_cmd == CMD_BINARY_READ)             /* executing fast binary read? */
+                break;                                  /* further command execution inhibited */
+
+            mpx_cmd = GET_OPCODE (mpx_obuf);            /* get command opcode */
+            mpx_portkey = GET_KEY (mpx_obuf);           /* get port key */
+
+            if (mpx_state == cmd)                       /* already scheduled? */
+                sim_cancel (&mpx_cntl);                 /* cancel to get full delay */
+
+            mpx_state = cmd;                            /* set command state */
+
+            if (mpx_cmd & CMD_TWO_WORDS)                /* two-word command? */
+                delay = PARAM_DELAY;                    /* specify parameter wait */
+            else                                        /* one-word command */
+                delay = CMD_DELAY;                      /* specify command wait */
+
+            sim_activate (&mpx_cntl, delay);            /* schedule command */
+
+            if (DEBUG_PRI (mpx_dev, DEB_CMDS))
+                fprintf (sim_deb, ">>MPX cmds: [STC%s] Command %03o key %d scheduled, "
+                                  "time = %d\n", hold_or_clear, mpx_cmd, mpx_portkey, delay);
+            break;
+
+
+        case ioEDT:                                     /* end data transfer */
+            if (DEBUG_PRI (mpx_dev, DEB_CPU))
+                fputs (">>MPX cpu:  [EDT] DCPC transfer ended\n", sim_deb);
+            break;
+
+
+        case ioSIR:                                     /* set interrupt request */
+            setstdPRL (mpx);                            /* set standard PRL signal */
+            setstdIRQ (mpx);                            /* set standard IRQ signal */
+            setstdSRQ (mpx);                            /* set standard SRQ signal */
+            break;
+
+
+        case ioIAK:                                     /* interrupt acknowledge */
+            mpx.flagbuf = CLEAR;                        /* clear flag buffer */
+            break;
+
+
+        default:                                        /* all other signals */
+            break;                                      /*   are ignored */
+        }
+
+    working_set = working_set & ~signal;                /* remove current signal from set */
     }
 
-
-if (signal > ioCLF)                                     /* multiple signals? */
-    mpx_io (select_code, ioCLF, 0);                     /* issue CLF */
-else if (signal > ioSIR)                                /* signal affected interrupt status? */
-    mpx_io (select_code, ioSIR, 0);                     /* set interrupt request */
-
-return data;
+return stat_data;
 }
 
 
@@ -1591,7 +1589,7 @@ if (DEBUG_PRI (mpx_dev, DEB_CMDS) &&                    /* debug print? */
     }
 
 if (set_flag) {
-    mpx_io (mpx_dib.devno, ioENF, 0);                   /* set device flag */
+    mpx_io (&mpx_dib, ioENF, 0);                        /* set device flag */
 
     if (DEBUG_PRI (mpx_dev, DEB_CMDS))
         fputs (">>MPX cmds: Flag set\n", sim_deb);
@@ -1660,7 +1658,7 @@ return SCPE_OK;
 
 t_stat mpx_line_svc (UNIT *uptr)
 {
-const uint32 port = uptr - mpx_unit;                            /* port number */
+const  int32 port = uptr - mpx_unit;                            /* port number */
 const uint16 rt = mpx_rcvtype [port];                           /* receive type for port */
 const uint32 data_bits = 5 + GET_BPC (mpx_config [port]);       /* number of data bits */
 const uint32 data_mask = (1 << data_bits) - 1;                  /* mask for data bits */
@@ -1909,7 +1907,7 @@ if (fast_binary_read) {                                     /* fast binary read 
                 mpx_ibuf = mpx_ibuf | (chx & DMASK8);       /* merge it into word */
                 mpx_flags [0] |= FL_HAVEBUF;                /* mark buffer as ready */
 
-                mpx_io (mpx_dib.devno, ioENF, 0);           /* set device flag */
+                mpx_io (&mpx_dib, ioENF, 0);                /* set device flag */
 
                 if (DEBUG_PRI (mpx_dev, DEB_CMDS))
                     fputs (">>MPX cmds: Flag and SRQ set\n", sim_deb);
@@ -2021,14 +2019,14 @@ return SCPE_OK;
 
 t_stat mpx_reset (DEVICE *dptr)
 {
-if (sim_switches & SWMASK ('P')) {                      /* PON reset? */
+if (sim_switches & SWMASK ('P')) {                      /* power-on reset? */
     emptying_flags [ioread]  = FL_RDEMPT;               /* initialize buffer flags constants */
     emptying_flags [iowrite] = FL_WREMPT;
     filling_flags  [ioread]  = FL_RDFILL;
     filling_flags  [iowrite] = FL_WRFILL;
     }
 
-mpx_io (mpx_dib.devno, ioPOPIO, 0);                     /* send POPIO signal */
+IOPRESET (&mpx_dib);                                    /* PRESET device (does not use PON) */
 
 mpx_ibuf = 0;                                           /* clear input buffer */
 
@@ -2055,7 +2053,7 @@ return SCPE_OK;
    the first serial line and be reported there in a SHOW MPX command.
 
    To preserve the logical picture, we attach the port to the Telnet poll unit,
-   which is normally disabled, inhibiting its display.  Attaching to a disabled
+   which is normally disabled to inhibit its display.  Attaching to a disabled
    unit is not allowed, so we first enable the unit, then attach it, then
    disable it again.  Attachment is reported by the "mpx_status" routine below.
 
@@ -2076,7 +2074,7 @@ mpx_poll.flags = mpx_poll.flags | UNIT_DIS;             /* disable unit */
 
 if (status == SCPE_OK) {
     mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start Telnet poll immediately */
+    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
     }
 return status;
 }
@@ -2232,9 +2230,9 @@ return;
 
 /* Calculate service time from baud rate.
 
-   Service times are based on 1580 instructions per second, which is the 1000
-   E-Series execution speed.  Baud rate 0 means "don't change" and is handled by
-   the "Set port key" command executor.
+   Service times are based on 1580 instructions per millisecond, which is the
+   1000 E-Series execution speed.  Baud rate 0 means "don't change" and is
+   handled by the "Set port key" command executor.
 
    Baud rate settings of 13-15 are marked as "reserved" in the user manual, but
    the firmware defines these as 38400, 9600, and 9600 baud, respectively.
@@ -2242,9 +2240,8 @@ return;
 
 static uint32 service_time (uint16 control_word)
 {
-/*           Baud Rates 0- 7 :    --,     50,     75,    110,  134.5,    150,   300,  1200,
-             Baud Rates 8-15 :  1800,   2400,   4800,   9600,  19200,  38400,  9600,  9600
-*/
+/*           Baud Rates 0- 7 :    --,     50,     75,    110,  134.5,    150,   300,  1200, */
+/*           Baud Rates 8-15 :  1800,   2400,   4800,   9600,  19200,  38400,  9600,  9600  */
 static const int32 ticks [] = {    0, 316000, 210667, 143636, 117472, 105333, 52667, 13167,
                                 8778,   6583,   3292,   1646,    823,    411,  1646,  1646 };
 

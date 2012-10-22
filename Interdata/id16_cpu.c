@@ -28,15 +28,15 @@
    28-Apr-07    RMS     Removed clock initialization
    27-Oct-06    RMS     Added idle support
                         Removed separate PASLA clock
-   06-Feb-06    RMS     Fixed bug in DH (found by Mark Hittinger)
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   06-Feb-06    RMS     Fixed bug in DH (Mark Hittinger)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    25-Aug-05    RMS     Fixed DH integer overflow cases
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
-   10-Mar-05    RMS     Fixed bug in show history routine (from Mark Hittinger)
+   10-Mar-05    RMS     Fixed bug in show history routine (Mark Hittinger)
                         Revised examine/deposit to do words rather than bytes
    07-Nov-04    RMS     Added instruction history
    22-Sep-03    RMS     Added additional instruction decode types
-   07-Feb-03    RMS     Fixed bug in SETM, SETMR (found by Mark Pizzolato)
+   07-Feb-03    RMS     Fixed bug in SETM, SETMR (Mark Pizzolato)
 
    The register state for the Interdata 16b CPU is:
 
@@ -604,7 +604,7 @@ while (reason == 0) {                                   /* loop until halted */
     int32 sr, st;
 
     if (sim_interval <= 0) {                            /* check clock queue */
-        if (reason = sim_process_event ())
+        if ((reason = sim_process_event ()))
             break;
         int_eval ();
         }

@@ -24,7 +24,6 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    22-May-10    RMS     Added check for 64b definitions
-
 */
 
 #ifndef _LGP_DEFS_H_

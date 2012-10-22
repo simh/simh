@@ -1,6 +1,6 @@
 /* vax_cpu.c: VAX CPU
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -35,7 +35,9 @@
                         approach taken in the other BSD derived OSes.  
                         Determining a reasonable idle detection pattern does 
                         not seem possible for these versions.
-   23-Mar-11    RMS     Revised for new idle design (from Mark Pizzolato)
+   13-Sep-11    RMS     Fixed XFC, BPT to clear PSL<tp> before exception
+                        (Camiel Vanderhoeven)
+   23-Mar-11    RMS     Revised for new idle design (Mark Pizzolato)
    05-Jan-11    MP      Added Asynch I/O support
    24-Apr-10    RMS     Added OLDVMS idle timer option
                         Fixed bug in SET CPU IDLE
@@ -44,7 +46,7 @@
    13-Aug-07    RMS     Fixed bug in read access g-format indexed specifiers
    28-Apr-07    RMS     Removed clock initialization
    29-Oct-06    RMS     Added idle support
-   22-May-06    RMS     Fixed format error in CPU history (found by Peter Schorn)
+   22-May-06    RMS     Fixed format error in CPU history (Peter Schorn)
    10-May-06    RMS     Added -kesu switches for virtual addressing modes
                         Fixed bugs in examine virtual
                         Rewrote history function for greater usability
@@ -54,32 +56,31 @@
                         Fixed ACBD/G to test correct operand
                         Fixed access checking on modify-class specifiers
                         Fixed branch displacements in history buffer
-                        (all reported by Tim Stark)
+                        (Tim Stark)
    17-Nov-05    RMS     Fixed CVTfi with integer overflow to trap if PSW<iv> set
    13-Nov-05    RMS     Fixed breakpoint test with 64b addresses
    25-Oct-05    RMS     Removed cpu_extmem
-   22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
+   22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    13-Jan-05    RMS     Fixed initial state of cpu_extmem
    06-Nov-04    RMS     Added =n to SHOW HISTORY
    30-Sep-04    RMS     Added octaword specifier decodes and instructions
                         Moved model-specific routines to system module
    02-Sep-04    RMS     Fixed bug in EMODD/G, second word of quad dst not probed
-   28-Jun-04    RMS     Fixed bug in DIVBx, DIVWx (reported by Peter Trimmel)
+   28-Jun-04    RMS     Fixed bug in DIVBx, DIVWx (Peter Trimmel)
    18-Apr-04    RMS     Added octaword macros
    25-Jan-04    RMS     Removed local debug logging support
                 RMS,MP  Added extended physical memory support
    31-Dec-03    RMS     Fixed bug in set_cpu_hist
    21-Dec-03    RMS     Added autoconfiguration controls
-   29-Oct-03    RMS     Fixed WriteB declaration (found by Mark Pizzolato)
+   29-Oct-03    RMS     Fixed WriteB declaration (Mark Pizzolato)
    23-Sep-03    RMS     Revised instruction history for dynamic sizing
    17-May-03    RMS     Fixed operand order in EMODx
    23-Apr-03    RMS     Revised for 32b/64b t_addr
    05-Jan-02    RMS     Added memory size restore support
-   25-Dec-02    RMS     Added instruction history (from Mark Pizzolato)
+   25-Dec-02    RMS     Added instruction history (Mark Pizzolato)
    29-Sep-02    RMS     Revised to build dib_tab dynamically
-   14-Jul-02    RMS     Added halt to console, infinite loop detection
-                        (from Mark Pizzolato)
+   14-Jul-02    RMS     Added halt to console, infinite loop detection (Mark Pizzolato)
    02-May-02    RMS     Fixed bug in indexed autoincrement register logging
    30-Apr-02    RMS     Added TODR powerup routine
    18-Apr-02    RMS     Cleanup ambiguous signed left shifts
@@ -187,10 +188,6 @@
 #define UNIT_CONH       (1u << UNIT_V_CONH)
 #define UNIT_MSIZE      (1u << UNIT_V_MSIZE)
 #define GET_CUR         acc = ACC_MASK (PSL_GETCUR (PSL))
-#define VAX_IDLE_VMS        0x01
-#define VAX_IDLE_ULT        0x02
-#define VAX_IDLE_ULTOLD     0x04
-#define VAX_IDLE_QUAD       0x08
 
 #define OPND_SIZE       16
 #define INST_SIZE       52
@@ -500,7 +497,7 @@ DEVICE cpu_dev = {
 t_stat sim_instr (void)
 {
 volatile int32 opc, cc;                                 /* used by setjmp */
-int32 acc;                                              /* set by setjmp */
+volatile int32 acc;                                     /* set by setjmp */
 int abortval;
 t_stat r;
 
@@ -616,7 +613,7 @@ for ( ;; ) {
         }
     fault_PC = PC;
     recqptr = 0;                                        /* clr recovery q */
-    AIO_CHECK_EVENT;
+    AIO_CHECK_EVENT;                                    /* queue async events */
     if (sim_interval <= 0) {                            /* chk clock queue */
         temp = sim_process_event ();
         if (temp)
@@ -634,7 +631,7 @@ for ( ;; ) {
 */
 
     if (trpirq) {                                       /* trap or interrupt? */
-        if (temp = GET_TRAP (trpirq)) {                 /* trap? */
+        if ((temp = GET_TRAP (trpirq))) {               /* trap? */
             cc = intexc (SCB_ARITH, cc, 0, IE_EXC);     /* take, clear trap */
             GET_CUR;                                    /* set cur mode */
             in_ie = 1;
@@ -642,7 +639,7 @@ for ( ;; ) {
             SP = SP - 4;
             in_ie = 0;
             }
-        else if (temp = GET_IRQL (trpirq)) {            /* interrupt? */
+        else if ((temp = GET_IRQL (trpirq))) {          /* interrupt? */
             int32 vec;
             if (temp == IPL_HLTPIN) {                   /* console halt? */
                 hlt_pin = 0;                            /* clear intr */
@@ -1576,7 +1573,7 @@ for ( ;; ) {
 
     case TSTL:
         CC_IIZZ_L (op0);                                /* set cc's */
-        if ((cc == CC_Z) &&
+        if ((cc == CC_Z) &&                             /* zero result and */
             ((((cpu_idle_mask & VAX_IDLE_ULTOLD) &&     /* running Old Ultrix or friends? */
                (PSL_GETIPL (PSL) == 0x1)) ||            /*  at IPL 1? */
               ((cpu_idle_mask & VAX_IDLE_QUAD) &&       /* running Quasijarus or friends? */
@@ -2544,12 +2541,14 @@ for ( ;; ) {
 
     case BPT:
         SETPC (fault_PC);
+        PSL = PSL & ~PSL_TP;                                /* clear <tp> */
         cc = intexc (SCB_BPT, cc, 0, IE_EXC);
         GET_CUR;
         break;
 
     case XFC:
         SETPC (fault_PC);
+        PSL = PSL & ~PSL_TP;                                /* clear <tp> */
         cc = intexc (SCB_XFC, cc, 0, IE_EXC);
         GET_CUR;
         break;
@@ -3416,13 +3415,15 @@ struct os_idle {
 
 static struct os_idle os_tab[] = {
     { "VMS", VAX_IDLE_VMS },
-    { "NETBSD", VAX_IDLE_ULTOLD },
+    { "NETBSDOLD", VAX_IDLE_ULTOLD },
+    { "NETBSD", VAX_IDLE_BSDNEW },
     { "ULTRIX", VAX_IDLE_ULT },
     { "ULTRIXOLD", VAX_IDLE_ULTOLD },
-    { "OPENBSD", VAX_IDLE_QUAD },
+    { "OPENBSDOLD", VAX_IDLE_QUAD },
+    { "OPENBSD", VAX_IDLE_BSDNEW },
     { "QUASIJARUS", VAX_IDLE_QUAD },
     { "32V", VAX_IDLE_QUAD },
-    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD },
+    { "ALL", VAX_IDLE_VMS|VAX_IDLE_ULTOLD|VAX_IDLE_ULT|VAX_IDLE_QUAD|VAX_IDLE_BSDNEW },
     { NULL, 0 }
     };
 
@@ -3447,10 +3448,8 @@ return sim_set_idle (uptr, val, cptr, desc);
 
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-if (sim_idle_enab && (cpu_idle_type != 0)) {
+if (sim_idle_enab && (cpu_idle_type != 0))
     fprintf (st, "idle=%s, ", os_tab[cpu_idle_type - 1].name);
-    sim_show_idle (st, uptr, val, desc);
-    }
-else fprintf (st, "idle disabled");
+sim_show_idle (st, uptr, val, desc);
 return SCPE_OK;
 }

@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
    Copyright (c) 2008, Holger Veit
-   Copyright (c) 2006-2008, J. David Bryan
+   Copyright (c) 2006-2012, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   09-May-12    JDB     Separated assignments from conditional expressions
+   06-Feb-12    JDB     Corrected "opsize" parameter type in vis_abs
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
    05-Sep-08    JDB     Removed option-present tests (now in UIG dispatchers)
    30-Apr-08    JDB     Updated SIGNAL code from Holger
@@ -192,7 +194,7 @@ for (i=0; i<n; i++) {
 
 #define GET_MSIGN(op) ((op)->fpk[0] & 0100000)
 
-static void vis_abs(OP* in, uint32 opsize)
+static void vis_abs(OP* in, OPSIZE opsize)
 {
 uint32 sign = GET_MSIGN(in);                             /* get sign */
 if (sign) (void)fp_pcom(in, opsize);                     /* if negative, make positive */
@@ -382,16 +384,18 @@ if (entry==0) {                                          /* retrieve sub opcode 
         subcode = AR;                                    /*   for reentry */
     PC = (PC + 1) & VAMASK;                              /* bump to real argument list */
     pattern = (subcode & 0400) ? OP_AAKAKK : OP_AKAKAKK; /* scalar or vector operation */
-}
+    }
 
-if (pattern != OP_N)
+if (pattern != OP_N) {
     if (op_ftnret[entry]) {                              /* most VIS instrs ignore RTN addr */
         ret = ReadOp(PC, in_s);
         rtn = rtn1 = ret.word;                           /* but save it just in case */
         PC = (PC + 1) & VAMASK;                          /* move to next argument */
+        }
+    reason = cpu_ops (pattern, op, intrq);               /* get instruction operands */
+    if (reason != SCPE_OK)                               /* evaluation failed? */
+        return reason;                                   /* return reason for failure */
     }
-    if (reason = cpu_ops (pattern, op, intrq))           /* get instruction operands */
-        return reason;
 
 if (debug) {                                             /* debugging? */
     fprintf (sim_deb, ">>CPU VIS: IR = %06o/%06o (",     /* print preamble and IR */
@@ -651,9 +655,11 @@ t_bool debug = DEBUG_PRI (cpu_dev, DEB_SIG);
 
 entry = IR & 017;                                  /* mask to entry point */
 
-if (op_signal[entry] != OP_N)
-    if (reason = cpu_ops (op_signal[entry], op, intrq)) /* get instruction operands */
-        return reason;
+if (op_signal [entry] != OP_N) {
+    reason = cpu_ops (op_signal [entry], op, intrq);    /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 if (debug) {                                             /* debugging? */
     fprintf (sim_deb, ">>CPU SIG: IR = %06o (", IR);     /* print preamble and IR */

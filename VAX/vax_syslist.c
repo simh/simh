@@ -1,4 +1,4 @@
-/* vax_sys.c: VAX simulator interface
+/* vax_syslist.c: VAX device list
 
    Copyright (c) 1998-2008, Robert M Supnik
 
@@ -24,7 +24,7 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    17-Oct-06    RMS     Re-ordered device list
-   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
+   17-May-06    RMS     Added CR11/CD11 support (John Dundas)
    01-Oct-2004  RMS     Cloned from vax_sys.c
 */
 

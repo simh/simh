@@ -237,10 +237,6 @@ static MTAB disk3_mod[] = {
     { 0 }
 };
 
-#define TRACE_PRINT(level, args)    if(disk3_dev.dctrl & level) {   \
-                                       printf args;                 \
-                                    }
-
 /* Debug Flags */
 static DEBTAB disk3_dt[] = {
     { "ERROR",  ERROR_MSG },
@@ -384,7 +380,8 @@ t_stat disk3_detach(UNIT *uptr)
 
 static int32 disk3dev(const int32 port, const int32 io, const int32 data)
 {
-    TRACE_PRINT(VERBOSE_MSG, ("DISK3: " ADDRESS_FORMAT " IO %s, Port %02x" NLP, PCX, io ? "WR" : "RD", port));
+    sim_debug(VERBOSE_MSG, &disk3_dev, "DISK3: " ADDRESS_FORMAT
+              " IO %s, Port %02x\n", PCX, io ? "WR" : "RD", port);
     if(io) {
         DISK3_Write(port, data);
         return 0;
@@ -417,13 +414,13 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
     next_link |= disk3_info->iopb[DISK3_IOPB_LINK+1] << 8;
     next_link |= disk3_info->iopb[DISK3_IOPB_LINK+2] << 16;
 
-    TRACE_PRINT(VERBOSE_MSG, ("DISK3[%d]: LINK=0x%05x, NEXT=0x%05x, CMD=%x, %s DMA@0x%05x\n",
-        disk3_info->sel_drive,
-        disk3_info->link_addr,
-        next_link,
-        disk3_info->iopb[DISK3_IOPB_CMD] & DISK3_CMD_MASK,
-        (disk3_info->iopb[DISK3_IOPB_CMD] & DISK3_REQUEST_IRQ) ? "IRQ" : "POLL",
-        disk3_info->dma_addr));
+    sim_debug(VERBOSE_MSG, &disk3_dev, "DISK3[%d]: LINK=0x%05x, NEXT=0x%05x, CMD=%x, %s DMA@0x%05x\n",
+              disk3_info->sel_drive,
+              disk3_info->link_addr,
+              next_link,
+              disk3_info->iopb[DISK3_IOPB_CMD] & DISK3_CMD_MASK,
+              (disk3_info->iopb[DISK3_IOPB_CMD] & DISK3_REQUEST_IRQ) ? "IRQ" : "POLL",
+              disk3_info->dma_addr);
 
     pDrive = &disk3_info->drive[disk3_info->sel_drive];
 
@@ -432,30 +429,33 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
         /* Perform command */
         switch(cmd & DISK3_CMD_MASK) {
             case DISK3_CODE_NOOP:
-                TRACE_PRINT(VERBOSE_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " NOOP" NLP, disk3_info->sel_drive, PCX));
+                sim_debug(VERBOSE_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                          " NOOP\n", disk3_info->sel_drive, PCX);
                 break;
             case DISK3_CODE_VERSION:
                 break;
             case DISK3_CODE_GLOBAL:
-                TRACE_PRINT(CMD_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " GLOBAL" NLP, disk3_info->sel_drive, PCX));
+                sim_debug(CMD_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                          " GLOBAL\n", disk3_info->sel_drive, PCX);
 
                 disk3_info->mode = disk3_info->iopb[DISK3_IOPB_ARG1];
                 disk3_info->retries = disk3_info->iopb[DISK3_IOPB_ARG2];
                 disk3_info->ndrives = disk3_info->iopb[DISK3_IOPB_ARG3];
 
-                TRACE_PRINT(SPECIFY_MSG, ("        Mode: 0x%02x" NLP, disk3_info->mode));
-                TRACE_PRINT(SPECIFY_MSG, ("   # Retries: 0x%02x" NLP, disk3_info->retries));
-                TRACE_PRINT(SPECIFY_MSG, ("    # Drives: 0x%02x" NLP, disk3_info->ndrives));
+                sim_debug(SPECIFY_MSG, &disk3_dev, "        Mode: 0x%02x\n", disk3_info->mode);
+                sim_debug(SPECIFY_MSG, &disk3_dev, "   # Retries: 0x%02x\n", disk3_info->retries);
+                sim_debug(SPECIFY_MSG, &disk3_dev, "    # Drives: 0x%02x\n", disk3_info->ndrives);
 
                 if(disk3_info->mode == DISK3_MODE_ABS) {
-                    TRACE_PRINT(ERROR_MSG, ("DISK3: Absolute addressing not supported." NLP));
+                    sim_debug(ERROR_MSG, &disk3_dev, "DISK3: Absolute addressing not supported.\n");
                 }
 
                 break;
             case DISK3_CODE_SPECIFY:
                 {
                     uint8 specify_data[22];
-                    TRACE_PRINT(CMD_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " SPECIFY" NLP, disk3_info->sel_drive, PCX));
+                    sim_debug(CMD_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                              " SPECIFY\n", disk3_info->sel_drive, PCX);
 
                     for(i = 0; i < 22; i++) {
                         specify_data[i] = GetByteDMA(disk3_info->dma_addr + i);
@@ -467,32 +467,36 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                     pDrive->ntracks = specify_data[10] | (specify_data[11] << 8);
                     pDrive->res_tracks = specify_data[18] | (specify_data[19] << 8);
 
-                    TRACE_PRINT(SPECIFY_MSG, ("    Sectsize: %d" NLP, pDrive->sectsize));
-                    TRACE_PRINT(SPECIFY_MSG, ("     Sectors: %d" NLP, pDrive->nsectors));
-                    TRACE_PRINT(SPECIFY_MSG, ("       Heads: %d" NLP, pDrive->nheads));
-                    TRACE_PRINT(SPECIFY_MSG, ("      Tracks: %d" NLP, pDrive->ntracks));
-                    TRACE_PRINT(SPECIFY_MSG, ("    Reserved: %d" NLP, pDrive->res_tracks));
+                    sim_debug(SPECIFY_MSG, &disk3_dev, "    Sectsize: %d\n", pDrive->sectsize);
+                    sim_debug(SPECIFY_MSG, &disk3_dev, "     Sectors: %d\n", pDrive->nsectors);
+                    sim_debug(SPECIFY_MSG, &disk3_dev, "       Heads: %d\n", pDrive->nheads);
+                    sim_debug(SPECIFY_MSG, &disk3_dev, "      Tracks: %d\n", pDrive->ntracks);
+                    sim_debug(SPECIFY_MSG, &disk3_dev, "    Reserved: %d\n", pDrive->res_tracks);
                     break;
                 }
             case DISK3_CODE_HOME:
                 pDrive->track = 0;
-                TRACE_PRINT(SEEK_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " HOME" NLP, disk3_info->sel_drive, PCX));
+                sim_debug(SEEK_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                          " HOME\n", disk3_info->sel_drive, PCX);
                 break;
             case DISK3_CODE_SEEK:
                 pDrive->track = disk3_info->iopb[DISK3_IOPB_ARG1];
                 pDrive->track |= (disk3_info->iopb[DISK3_IOPB_ARG2] << 8);
 
                 if(pDrive->track > pDrive->ntracks) {
-                    TRACE_PRINT(ERROR_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " SEEK ERROR %d not found" NLP, disk3_info->sel_drive, PCX, pDrive->track));
+                    sim_debug(ERROR_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                              " SEEK ERROR %d not found\n", disk3_info->sel_drive, PCX, pDrive->track);
                     pDrive->track = pDrive->ntracks - 1;
                     result = DISK3_STATUS_TIMEOUT;
                 } else {
-                    TRACE_PRINT(SEEK_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " SEEK %d" NLP, disk3_info->sel_drive, PCX, pDrive->track));
+                    sim_debug(SEEK_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                              " SEEK %d\n", disk3_info->sel_drive, PCX, pDrive->track);
                 }
                 break;
             case DISK3_CODE_READ_HDR:
             {
-                TRACE_PRINT(CMD_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " READ HEADER: %d" NLP, pDrive->track, PCX, pDrive->track >> 8));
+                sim_debug(CMD_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                          " READ HEADER: %d\n", pDrive->track, PCX, pDrive->track >> 8);
                 PutByteDMA(disk3_info->dma_addr + 0, pDrive->track & 0xFF);
                 PutByteDMA(disk3_info->dma_addr + 1, (pDrive->track >> 8) & 0xFF);
                 PutByteDMA(disk3_info->dma_addr + 2, 0);
@@ -510,7 +514,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 size_t rtn;
 
                 if(disk3_info->mode == DISK3_MODE_ABS) {
-                    TRACE_PRINT(ERROR_MSG, ("DISK3: Absolute addressing not supported." NLP));
+                    sim_debug(ERROR_MSG, &disk3_dev, "DISK3: Absolute addressing not supported.\n");
                     break;
                 }
 
@@ -532,16 +536,15 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                 if(disk3_info->iopb[DISK3_IOPB_ARG1] == 1) { /* Read */
                     rtn = sim_fread(dataBuffer, 1, xfr_len, (pDrive->uptr)->fileref);
 
-                    TRACE_PRINT(RD_DATA_MSG,
-                                ("DISK3[%d]: " ADDRESS_FORMAT "  READ @0x%05x T:%04d/S:%04d/#:%d %s" NLP,
-                                 disk3_info->sel_drive,
-                                 PCX,
-                                 disk3_info->dma_addr,
-                                 pDrive->cur_track,
-                                 pDrive->cur_sect,
-                                 pDrive->xfr_nsects,
-                                 rtn == (size_t)xfr_len ? "OK" : "NOK"
-                                 ));
+                    sim_debug(RD_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                              "  READ @0x%05x T:%04d/S:%04d/#:%d %s\n",
+                              disk3_info->sel_drive,
+                              PCX,
+                              disk3_info->dma_addr,
+                              pDrive->cur_track,
+                              pDrive->cur_sect,
+                              pDrive->xfr_nsects,
+                              rtn == (size_t)xfr_len ? "OK" : "NOK" );
 
 
                     /* Perform DMA Transfer */
@@ -549,14 +552,8 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
                         PutByteDMA(disk3_info->dma_addr + xfr_count, dataBuffer[xfr_count]);
                     }
                 } else { /* Write */
-                    TRACE_PRINT(WR_DATA_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " WRITE @0x%05x T:%04d/S:%04d/#:%d" NLP,
-                        disk3_info->sel_drive,
-                        PCX,
-                        disk3_info->dma_addr,
-                        pDrive->cur_track,
-                        pDrive->cur_sect,
-                        pDrive->xfr_nsects
-                        ));
+                    sim_debug(WR_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                              " WRITE @0x%05x T:%04d/S:%04d/#:%d\n", disk3_info->sel_drive, PCX, disk3_info->dma_addr, pDrive->cur_track, pDrive->cur_sect, pDrive->xfr_nsects );
 
                     /* Perform DMA Transfer */
                     for(xfr_count = 0;xfr_count < xfr_len; xfr_count++) {
@@ -596,14 +593,14 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
 
                 data_len = pDrive->nsectors * pDrive->sectsize;
 
-                TRACE_PRINT(WR_DATA_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " FORMAT T:%d/H:%d/Fill=0x%02x/Len=%d" NLP,
-                    disk3_info->sel_drive,
-                    PCX,
-                    pDrive->track,
-                    disk3_info->iopb[DISK3_IOPB_ARG3],
-                    disk3_info->iopb[DISK3_IOPB_ARG2],
-                    data_len
-                    ));
+                sim_debug(WR_DATA_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                          " FORMAT T:%d/H:%d/Fill=0x%02x/Len=%d\n",
+                          disk3_info->sel_drive,
+                          PCX,
+                          pDrive->track,
+                          disk3_info->iopb[DISK3_IOPB_ARG3],
+                          disk3_info->iopb[DISK3_IOPB_ARG2],
+                          data_len);
 
                 file_offset = (pDrive->track * (pDrive->nheads) * data_len); /* Calculate offset based on current track */
                 file_offset += (disk3_info->iopb[DISK3_IOPB_ARG3] * data_len);
@@ -627,7 +624,11 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
             case DISK3_CODE_EXAMINE:
             case DISK3_CODE_MODIFY:
             default:
-                TRACE_PRINT(ERROR_MSG, ("DISK3[%d]: " ADDRESS_FORMAT " CMD=%x Unsupported" NLP, disk3_info->sel_drive, PCX, cmd & DISK3_CMD_MASK));
+                sim_debug(ERROR_MSG, &disk3_dev, "DISK3[%d]: " ADDRESS_FORMAT
+                          " CMD=%x Unsupported\n",
+                          disk3_info->sel_drive,
+                          PCX,
+                          cmd & DISK3_CMD_MASK);
                 break;
         }
     } else { /* Drive not ready */
@@ -654,7 +655,7 @@ static uint8 DISK3_Write(const uint32 Addr, uint8 cData)
 
 static void raise_disk3_interrupt(void)
 {
-    TRACE_PRINT(IRQ_MSG, ("DISK3: " ADDRESS_FORMAT " Interrupt" NLP, PCX));
+    sim_debug(IRQ_MSG, &disk3_dev, "DISK3: " ADDRESS_FORMAT " Interrupt\n", PCX);
 
     raise_ss1_interrupt(SS1_VI1_INT);
 

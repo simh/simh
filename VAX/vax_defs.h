@@ -1,6 +1,6 @@
 /* vax_defs.h: VAX architecture definitions file
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2011, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Stephen Shirron, Antonio
    Carlini, and Kevin Peterson in providing specifications for the Qbus VAX's
 
+   05-Nov-11    RMS     Added PSL_IPL17 definition
    09-May-06    RMS     Added system PTE ACV error code
    03-May-06    RMS     Added EDITPC get/put cc's macros
    03-Nov-05    RMS     Added 780 stop codes
@@ -472,7 +473,7 @@
 #define PR_PACV         2                               /* pte ACV (780) */
 #define PR_PLNV         3                               /* pte len viol */
 #define PR_TNV          4                               /* TNV */
-/* #define PR_TB        5                               /* impossible */
+/* #define PR_TB        5                             *//* impossible */
 #define PR_PTNV         6                               /* pte TNV */
 #define PR_OK           7                               /* ok */
 #define MM_PARAM(w,p)   (((w)? 4: 0) | ((p) & 3))       /* fault param */
@@ -716,6 +717,14 @@ enum opcodes {
             else if ((s1) == (s2)) cc = CC_Z; \
             else cc = 0; \
             if (((uint32) s1) < ((uint32) s2)) cc = cc | CC_C
+
+#define VAX_IDLE_VMS        0x01
+#define VAX_IDLE_ULT        0x02
+#define VAX_IDLE_ULTOLD     0x04
+#define VAX_IDLE_QUAD       0x08
+#define VAX_IDLE_BSDNEW     0x10
+extern uint32 cpu_idle_mask;                            /* idle mask */
+void cpu_idle (void);
 
 /* Model dependent definitions */
 
