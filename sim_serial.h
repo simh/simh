@@ -65,6 +65,14 @@ typedef int SERHANDLE;
 #define INVALID_HANDLE  -1
 
 
+#elif defined (VMS)
+
+/* VMS definitions */
+
+typedef int SERHANDLE;
+
+#define INVALID_HANDLE  (uint32)(-1)
+
 #else
 
 /* Non-implemented definitions */
