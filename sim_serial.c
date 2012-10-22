@@ -1268,7 +1268,7 @@ return;
 }
 
 
-#elif defined (__VMS__)
+#elif defined (VMS)
 
 /* VMS implementation */
 
@@ -1303,6 +1303,12 @@ typedef struct {
     unsigned short count;
     unsigned int dev_status; } IOSB;
 
+typedef struct {
+    unsigned short buffer_size;
+    unsigned short item_code;
+    void *buffer_address;
+    void *return_length_address;
+    } ITEM;
 
 /* Enumerate the available serial ports.
 
@@ -1319,17 +1325,30 @@ $DESCRIPTOR (wild, "*");
 char devstr[sizeof(list[0].name)];
 $DESCRIPTOR (device, devstr);
 int ports;
+IOSB iosb;
 uint32 status;
+uint32 devsts;
+#define UCB$M_TEMPLATE 0x2000       /* Device is a template device */
+#define UCB$M_ONLINE   0x0010       /* Device is online */
+uint32 devtype;
+uint32 devdepend;
+#define DEV$M_RTM 0x20000000
+uint32 devnamlen = 0;
 t_bool done = FALSE;
-struct _generic_64 context;
+uint32 context[2];
 uint32 devclass = DC$_TERM; /* Only interested in terminal devices */
-ILE3 select_items[] = { {sizeof (devclass), DVS$_DEVCLASS, &devclass, NULL},
-                        {                0,             0,      NULL, NULL}};
+ITEM select_items[] = { {sizeof (devclass), DVS$_DEVCLASS, &devclass, NULL},
+                        {                  0,               0,        NULL, NULL}};
+ITEM valid_items[] =  { {    sizeof (devsts),        DVI$_STS,     &devsts, NULL},
+                        {     sizeof(devstr),     DVI$_DEVNAM,      devstr, &devnamlen},
+                        {    sizeof(devtype),    DVI$_DEVTYPE,    &devtype, NULL},
+                        {  sizeof(devdepend),  DVI$_DEVDEPEND,  &devdepend, NULL},
+                        {                  0,               0,        NULL, NULL}};
 
-memset(&context, 0, sizeof(context));
+memset(context, 0, sizeof(context));
 memset(devstr, 0, sizeof(devstr));
 memset(list, 0, max*sizeof(*list));
-for (ports=0; (ports < max) && !done; ++ports) {
+for (ports=0; (ports < max); ++ports) {
     device.dsc$w_length = sizeof (devstr) - 1;
     status = sys$device_scan (&device,
                               &device.dsc$w_length,
@@ -1345,11 +1364,29 @@ for (ports=0; (ports < max) && !done; ++ports) {
             if (0 == (status&1))
                 done = TRUE;
             else {
-                devstr[device.dsc$w_length] = '\0';
-                strcpy (list[ports].name, devstr);
+                status = sys$getdviw (0, 0, &device, valid_items, &iosb, NULL, 0, NULL);
+                if (status == SS$_NORMAL)
+                    status = iosb.status;
+                if (status != SS$_NORMAL) {
+                    done = TRUE;
+                    break;
+                    }
+                device.dsc$w_length = devnamlen;
+                if ((0 == (devsts & UCB$M_TEMPLATE)) &&
+                    (0 != (devsts & UCB$M_ONLINE)) &&
+                    (0 == (devdepend & DEV$M_RTM)) {
+                    devstr[device.dsc$w_length] = '\0';
+                    strcpy (list[ports].name, devstr);
+                    while (list[ports].name[0] == '_')
+                        strcpy (list[ports].name, list[ports].name+1);
+                    }
+                else
+                    --ports;
                 }
             break;
         }
+    if (done)
+        break;
     }
 return ports;
 }
@@ -1376,7 +1413,7 @@ uint32 chan = 0;
 IOSB iosb;
 $DESCRIPTOR (devnam, name);
 uint32 devclass;
-ILE3 items[] = { {sizeof (devclass), DVI$_DEVCLASS, &devclass, NULL},
+ITEM items[] = { {sizeof (devclass), DVI$_DEVCLASS, &devclass, NULL},
                  {                0,             0,      NULL, NULL}};
 SENSE_BUF start_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
@@ -1398,12 +1435,12 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) {
     sys$dassgn (chan);
     return INVALID_HANDLE;
     }
-run_mode = cmd_mode;
-run_mode.stat = cmd_mode.stat | TT$M_NOECHO & ~(TT$M_HOSTSYNC | TT$M_TTSYNC | TT$M_HALFDUP);
-run_mode.stat2 = cmd_mode.stat2 | TT2$M_PASTHRU;
+run_mode = start_mode;
+run_mode.stat = start_mode.stat | TT$M_NOECHO & ~(TT$M_HOSTSYNC | TT$M_TTSYNC | TT$M_HALFDUP);
+run_mode.stat2 = start_mode.stat2 | TT2$M_PASTHRU;
 status = sys$qiow (0, chan, IO$_SETMODE, &iosb, 0, 0,
     &run_mode, sizeof (run_mode), 0, 0, 0, 0);
-if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
+if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL)) {
     sys$dassgn (chan);
     return INVALID_HANDLE;
     }
@@ -1434,7 +1471,7 @@ uint32 status, speed, parity, charsize, stopbits;
 IOSB iosb;
 static const struct {
     uint32  rate;
-    speed_t rate_code;
+    uint32  rate_code;
     } baud_map [] =
         { { 50,     TT$C_BAUD_50     }, { 75,     TT$C_BAUD_75     }, { 110,    TT$C_BAUD_110    }, {  134,   TT$C_BAUD_134   },
           { 150,    TT$C_BAUD_150    }, { 300,    TT$C_BAUD_300    }, {  600,   TT$C_BAUD_600    }, {  1200,  TT$C_BAUD_1200  },
@@ -1444,7 +1481,7 @@ static const struct {
 
 static const int32 baud_count = sizeof (baud_map) / sizeof (baud_map [0]);
 
-status = sys$qiow (0, tty_chan, IO$_SENSEMODE, &iosb, 0, 0, &sense, sizeof(sense), 0, NULL, 0, 0);
+status = sys$qiow (0, port, IO$_SENSEMODE, &iosb, 0, 0, &sense, sizeof(sense), 0, NULL, 0, 0);
 if (status == SS$_NORMAL)
     status = iosb.status;
 if (status != SS$_NORMAL) {
@@ -1485,7 +1522,7 @@ switch (config.parity) {                                /* assign parity */
     }
 
 
-case (config.stopbits) {
+switch (config.stopbits) {
     case 1:                                             /* one stop bit? */
         stopbits = 0;
         break;
@@ -1638,8 +1675,8 @@ unsigned char buf[4];
 IOSB iosb;
 uint32 devsts = 0;
 #define UCB$M_BSY   0x100           /* Device I/O busy flag */
-ILE3 items[] = { {sizeof (devclass), DVI$_STS, &devsts, NULL},
-                 {                0,             0,      NULL, NULL}};
+ITEM items[] = { {sizeof (devsts), DVI$_STS, &devsts, NULL},
+                 {              0,        0,    NULL, NULL}};
 
 status = sys$getdviw (0, port, NULL, items, &iosb, NULL, 0, 0);
 if (status == SS$_NORMAL)
@@ -1680,7 +1717,7 @@ return;
 
 static int sim_serial_os_devices (int max, SERIAL_LIST* list)
 {
-return -1;
+return 0;
 }
 
 /* Open a serial port */
