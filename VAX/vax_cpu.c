@@ -473,21 +473,7 @@ MTAB cpu_mod[] = {
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
     { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &cpu_set_idle, &cpu_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
-#if defined (VAX_730)
-    { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size },
-#endif
-    { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size },
-#if !defined (VAX_780)
-    { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size },
-#endif
+    MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,

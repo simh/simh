@@ -428,15 +428,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\VAX\VAX730_defs.h"
+				RelativePath="..\VAX\vax730_defs.h"
 				>
 			</File>
 			<File
 				RelativePath="..\VAX\vax_defs.h"
-				>
-			</File>
-			<File
-				RelativePath="..\VAX\vaxmod_defs.h"
 				>
 			</File>
 		</Filter>

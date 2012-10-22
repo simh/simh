@@ -124,6 +124,9 @@
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }
 
 /* Unibus I/O registers */
 

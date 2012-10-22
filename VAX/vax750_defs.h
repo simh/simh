@@ -1,6 +1,7 @@
-/* vax780_defs.h: VAX 780 model-specific definitions file
+/* vax750_defs.h: VAX 750 model-specific definitions file
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2010-2011, Matt Burke
+   This module incorporates code from SimH, Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -14,56 +15,50 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
-   ROBERT M SUPNIK BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   THE AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-   Except as contained in this notice, the name of Robert M Supnik shall not be
+   Except as contained in this notice, the name(s) of the author(s) shall not be
    used in advertising or otherwise to promote the sale, use or other dealings
-   in this Software without prior written authorization from Robert M Supnik.
+   in this Software without prior written authorization from the author(s).
 
-   05-Nov-11    RMS     Added VEC_QBUS definition
-   19-Nov-08    RMS     Moved I/O support routines to I/O library
-   29-Apr-07    RMS     Modified model-specific reserved operand check macros
-                        to reflect 780 microcode patches (found by Naoki Hamada)
-   29-Oct-06    RMS     Added clock coscheduler function
-   17-May-06    RMS     Added CR11/CD11 support (from John Dundas)
-   10-May-06    RMS     Added model-specific reserved operand check macros
+   21-Oct-2012  MB      First Version
 
-   This file covers the VAX 11/780, the first VAX.
+   This file covers the VAX 11/750, the second VAX.
 
    System memory map
 
-        0000 0000 - 1FFF FFFF           main memory
-
-        2000 0000 - 2001 FFFF           nexus register space
-        2002 0000 - 200F FFFF           reserved
-        2010 0000 - 2013 FFFF           Unibus address space, Unibus 0
-        2014 0000 - 2017 FFFF           Unibus address space, Unibus 1
-        2018 0000 - 201B FFFF           Unibus address space, Unibus 2
-        201C 0000 - 201F FFFF           Unibus address space, Unibus 3
-        2020 0000 - 3FFF FFFF           reserved
+          00 0000 - 7F FFFF             main memory
+          80 0000 - EF FFFF             reserved
+          F0 0000 - F0 FFFF             writeable control store
+          F1 0000 - F1 FFFF             reserved
+          F2 0000 - F2 0010             memory controller
+          F2 0400 - F2 07FF             bootstrap ROM
+          F2 8000 - F2 88FF             Massbus adapter 0
+          F2 A000 - F2 A8FF             Massbus adapter 1
+          F2 C000 - F2 C8FF             Massbus adapter 2
+          F3 0000 - F3 09FF             Unibus adapter 0
+          F3 2000 - F3 29FF             Unibus adapter 1
 */
 
 #ifndef FULL_VAX
 #define FULL_VAX        1
 #endif
 
-#ifndef _VAX_780_DEFS_H_
-#define _VAX_780_DEFS_H_        1
+#ifndef _VAX_750_DEFS_H_
+#define _VAX_750_DEFS_H_        1
 
 /* Microcode constructs */
 
-#define VAX780_SID      (1 << 24)                       /* system ID */
-#define VAX780_ECO      (7 << 19)                       /* ucode revision */
-#define VAX780_PLANT    (0 << 12)                       /* plant (Salem NH) */
-#define VAX780_SN       (1234)
+#define VAX750_SID      (2 << 24)                       /* system ID */
+#define VAX750_MICRO    (99 << 8)                       /* ucode revision */
+#define VAX750_HWREV    (156)                           /* hw revision */
 #define CON_HLTPIN      0x0200                          /* external CPU halt */
 #define CON_HLTINS      0x0600                          /* HALT instruction */
-#define MCHK_RD_F       0x00                            /* read fault */
-#define MCHK_RD_A       0xF4                            /* read abort */
-#define MCHK_IBUF       0x0D                            /* read istream */
+#define MCHK_CSPE       0x01                            /* control store parity error */
+#define MCHK_BPE        0x02                            /* bus error or tb/cache parity error */
 #define VER_FPLA        0x0C                            /* FPLA version */
 #define VER_WCSP        (VER_FPLA)                      /* WCS primary version */
 #define VER_WCSS        0x12                            /* WCS secondary version */
@@ -81,11 +76,11 @@
 #define NEXUS_NUM       16                              /* number of nexus */
 #define MCTL_NUM        2                               /* number of mem ctrl */
 #define MBA_NUM         2                               /* number of MBA's */
-#define TR_MCTL0        1                               /* nexus assignments */
-#define TR_MCTL1        2
-#define TR_UBA          3
-#define TR_MBA0         8
-#define TR_MBA1         9
+#define TR_MCTL         0                               /* nexus assignments */
+#define TR_MBA0         4
+#define TR_MBA1         5
+#define TR_UBA          8
+#define TR_CI           15
 #define NEXUS_HLVL      (IPL_HMAX - IPL_HMIN + 1)
 #define SCB_NEXUS       0x100                           /* nexus intr base */
 #define SBI_FAULTS      0xFC000000                      /* SBI fault flags */
@@ -100,6 +95,7 @@
 #define IPL_UBA         (0x15 - IPL_HMIN)
 #define IPL_MBA0        (0x15 - IPL_HMIN)
 #define IPL_MBA1        (0x15 - IPL_HMIN)
+#define IPL_CI          (0x15 - IPL_HMIN)
 
 /* Nexus interrupt macros */
 
@@ -108,18 +104,17 @@
 
 /* Machine specific IPRs */
 
+#define MT_CSRS         28                              /* Console storage */
+#define MT_CSRD         29
+#define MT_CSTS         30
+#define MT_CSTD         31
+#define MT_CMIE         23                              /* CMI error */
+#define MT_TBDR         36                              /* TB disable */
+#define MT_CADR         37                              /* Cache disable */
+#define MT_MCESR        38                              /* MCHK err sts */
+#define MT_CAER         39                              /* Cache error */
 #define MT_ACCS         40                              /* FPA control */
-#define MT_ACCR         41                              /* FPA maint */
-#define MT_WCSA         44                              /* WCS address */
-#define MT_WCSD         45                              /* WCS data */
-#define MT_SBIFS        48                              /* SBI fault status */
-#define MT_SBIS         49                              /* SBI silo */
-#define MT_SBISC        50                              /* SBI silo comparator */
-#define MT_SBIMT        51                              /* SBI maint */
-#define MT_SBIER        52                              /* SBI error */
-#define MT_SBITA        53                              /* SBI timeout addr */
-#define MT_SBIQC        54                              /* SBI timeout clear */
-#define MT_MBRK         60                              /* microbreak */
+#define MT_IORESET      55                              /* Unibus Init */
 
 /* Machine specific reserved operand tests */
 
@@ -143,19 +138,17 @@
 
 /* Memory */
 
-#define MAXMEMWIDTH     23                              /* max mem, MS780C */
+#define MAXMEMWIDTH     21                              /* max mem, 16k chips */
 #define MAXMEMSIZE      (1 << MAXMEMWIDTH)
-#define MAXMEMWIDTH_X   27                              /* max mem, MS780E */
+#define MAXMEMWIDTH_X   23                              /* max mem, 64k chips */
 #define MAXMEMSIZE_X    (1 << MAXMEMWIDTH_X)
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }
 
 /* Unibus I/O registers */
 
@@ -165,23 +158,25 @@
 #define IOPAGEAWIDTH    13                              /* IO addr width */
 #define IOPAGESIZE      (1u << IOPAGEAWIDTH)            /* IO page length */
 #define IOPAGEMASK      (IOPAGESIZE - 1)                /* IO addr mask */
-#define UBADDRBASE      0x20100000                      /* Unibus addr base */
-#define IOPAGEBASE      0x2013E000                      /* IO page base */
+#define UBADDRBASE      0xFC0000                        /* Unibus addr base */
+#define IOPAGEBASE      0xFFE000                        /* IO page base */
 #define ADDR_IS_IO(x)   ((((uint32) (x)) >= UBADDRBASE) && \
                         (((uint32) (x)) < (UBADDRBASE + UBADDRSIZE)))
 #define ADDR_IS_IOP(x)  (((uint32) (x)) >= IOPAGEBASE)
 
 /* Nexus register space */
 
-#define REGAWIDTH       17                              /* REG addr width */
+#define REGAWIDTH       19                              /* REG addr width */
 #define REG_V_NEXUS     13                              /* nexus number */
 #define REG_M_NEXUS     0xF
 #define REG_V_OFS       2                               /* register number */
 #define REG_M_OFS       0x7FF   
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
-#define REGBASE         0x20000000                      /* REG addr base */
+#define REGBASE         0xF00000                        /* REG addr base */
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
+#define NEXUSBASE       (REGBASE + 0x20000)
+#define NEXUSSIZE       0x2000
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
 #define NEXUS_GETOFS(x) (((x) >> REG_V_OFS) & REG_M_OFS)
 
@@ -189,13 +184,9 @@
 
 #define ROMAWIDTH       12                              /* ROM addr width */
 #define ROMSIZE         (1u << ROMAWIDTH)               /* ROM size */
-#define ROM0BASE        (REGBASE + (TR_MCTL0 << REG_V_NEXUS) + 0x1000)
-#define ROM1BASE        (REGBASE + (TR_MCTL1 << REG_V_NEXUS) + 0x1000)
-#define ADDR_IS_ROM0(x) ((((uint32) (x)) >= ROM0BASE) && \
-                        (((uint32) (x)) < (ROM0BASE + ROMSIZE)))
-#define ADDR_IS_ROM1(x) ((((uint32) (x)) >= ROM1BASE) && \
-                        (((uint32) (x)) < (ROM1BASE + ROMSIZE)))
-#define ADDR_IS_ROM(x)  (ADDR_IS_ROM0 (x) || ADDR_IS_ROM1 (x))
+#define ROMBASE         (REGBASE + (TR_MCTL << REG_V_NEXUS) + 0x400)
+#define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
+                        (((uint32) (x)) < (ROMBASE + ROMSIZE)))
 
 /* Other address spaces */
 
@@ -238,10 +229,12 @@
 #define DEV_V_MBUS      (DEV_V_UF + 1)                  /* Massbus */
 #define DEV_V_NEXUS     (DEV_V_UF + 2)                  /* Nexus */
 #define DEV_V_FLTA      (DEV_V_UF + 3)                  /* flt addr */
-#define DEV_V_FFUF      (DEV_V_UF + 4)                  /* first free flag */
+#define DEV_V_CI        (DEV_V_UF + 4)                  /* CI */
+#define DEV_V_FFUF      (DEV_V_UF + 5)                  /* first free flag */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_MBUS        (1u << DEV_V_MBUS)
 #define DEV_NEXUS       (1u << DEV_V_NEXUS)
+#define DEV_CI          (1u << DEV_V_CI)
 #define DEV_FLTA        (1u << DEV_V_FLTA)
 #define DEV_QBUS        (0)
 #define DEV_Q18         (0)
@@ -366,22 +359,22 @@ typedef struct {
 /* Device vectors */
 
 #define VEC_QBUS        0
-#define VEC_Q           0000
-#define VEC_PTR         0070
-#define VEC_PTP         0074
-#define VEC_XQ          0120
-#define VEC_XU          0120
-#define VEC_RQ          0154
-#define VEC_RL          0160
-#define VEC_LPT         0200
-#define VEC_HK          0210
-#define VEC_TS          0224
-#define VEC_CR          0230
-#define VEC_TQ          0260
-#define VEC_RX          0264
-#define VEC_RY          0264
-#define VEC_DZRX        0300
-#define VEC_DZTX        0304
+#define VEC_Q           0x200
+#define VEC_PTR         (VEC_Q + 0070)
+#define VEC_PTP         (VEC_Q + 0074)
+#define VEC_XQ          (VEC_Q + 0120)
+#define VEC_XU          (VEC_Q + 0120)
+#define VEC_RQ          (VEC_Q + 0154)
+#define VEC_RL          (VEC_Q + 0160)
+#define VEC_LPT         (VEC_Q + 0200)
+#define VEC_HK          (VEC_Q + 0210)
+#define VEC_TS          (VEC_Q + 0224)
+#define VEC_CR          (VEC_Q + 0230)
+#define VEC_TQ          (VEC_Q + 0260)
+#define VEC_RX          (VEC_Q + 0264)
+#define VEC_RY          (VEC_Q + 0264)
+#define VEC_DZRX        (VEC_Q + 0300)
+#define VEC_DZTX        (VEC_Q + 0304)
 
 /* Interrupt macros */
 
@@ -414,6 +407,8 @@ typedef struct {
 #define BOOT_RL         2
 #define BOOT_UDA        17
 #define BOOT_TK         18
+#define BOOT_CI         32
+#define BOOT_TD         64
 
 /* Function prototypes for virtual memory interface */
 

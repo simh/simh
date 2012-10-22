@@ -117,6 +117,15 @@
 #define INITMEMSIZE     (1 << 24)                       /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size }
+
 
 /* Cache diagnostic space */
 

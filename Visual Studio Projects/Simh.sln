@@ -70,6 +70,11 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VAX730", "VAX730.vcproj", "
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VAX750", "VAX750.vcproj", "{43A9CF64-5705-4FB7-B837-ED9AAFF97DAC}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -196,6 +201,10 @@ Global
 		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Debug|Win32.Build.0 = Debug|Win32
 		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Release|Win32.ActiveCfg = Release|Win32
 		{C526F7F2-9476-44BC-B1E9-9522B693BEA7}.Release|Win32.Build.0 = Release|Win32
+		{43A9CF64-5705-4FB7-B837-ED9AAFF97DAC}.Debug|Win32.ActiveCfg = Debug|Win32
+		{43A9CF64-5705-4FB7-B837-ED9AAFF97DAC}.Debug|Win32.Build.0 = Debug|Win32
+		{43A9CF64-5705-4FB7-B837-ED9AAFF97DAC}.Release|Win32.ActiveCfg = Release|Win32
+		{43A9CF64-5705-4FB7-B837-ED9AAFF97DAC}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

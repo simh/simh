@@ -1,4 +1,4 @@
-/* vax780_mba.c: VAX 11/780 Massbus adapter
+/* vax7x0_mba.c: VAX 11/780 snf VAX 11/750 Massbus adapter
 
    Copyright (c) 2004-2008, Robert M Supnik
 
@@ -272,7 +272,9 @@ t_stat r;
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
     printf (">>MBA%d: invalid adapter read mask, pa = %X, lnt = %d\r\n", mb, pa, lnt);
+#if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
+#endif
     return SCPE_OK;
     }
 if (mb >= MBA_NUM)                                      /* valid? */
@@ -365,7 +367,9 @@ t_bool cs1dt;
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
     printf (">>MBA%d: invalid adapter write mask, pa = %X, lnt = %d\r\n", mb, pa, lnt);
+#if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
+#endif
     return SCPE_OK;
     }
 if (mb >= MBA_NUM)                                      /* valid? */

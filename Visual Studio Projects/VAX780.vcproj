@@ -315,10 +315,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\VAX\vax780_mba.c"
-				>
-			</File>
-			<File
 				RelativePath="..\VAX\vax780_mem.c"
 				>
 			</File>
@@ -336,6 +332,10 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax780_uba.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax7x0_mba.c"
 				>
 			</File>
 			<File
@@ -449,10 +449,6 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_defs.h"
-				>
-			</File>
-			<File
-				RelativePath="..\VAX\vaxmod_defs.h"
 				>
 			</File>
 		</Filter>
