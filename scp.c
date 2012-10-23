@@ -221,6 +221,11 @@
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include <sys/stat.h>
 
 #if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
@@ -330,6 +335,8 @@ t_stat set_dev_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_unit_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat ssh_break (FILE *st, char *cptr, int32 flg);
+t_stat set_default_cmd (int32 flg, char *cptr);
+t_stat pwd_cmd (int32 flg, char *cptr);
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr);
 t_stat show_config (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_queue (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -343,6 +350,7 @@ t_stat show_dev_logicals (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *
 t_stat show_dev_modifiers (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
@@ -617,6 +625,10 @@ static CTAB cmd_table[] = {
       "exi{t}|q{uit}|by{e}      exit from simulation\n" },
     { "QUIT", &exit_cmd, 0, NULL },
     { "BYE", &exit_cmd, 0, NULL },
+    { "CD", &set_default_cmd, 0,
+      "cd                       set the current directory\n" },
+    { "PWD", &pwd_cmd, 0, 
+      "pwd                      show current directory\n" },
     { "SET", &set_cmd, 0,
       "set console arg{,arg...} set console options\n"
       "set console WRU          specify console drop to simh char\n"
@@ -646,6 +658,7 @@ static CTAB cmd_table[] = {
       "                         enable console debugging to the\n"
       "                         specified destination {LOG,STDOUT or filename)\n"
       "set console NODEBUG      disable console debugging\n"
+      "set default <dir>        set the current directory\n"
       "set log log_file         specify the log destination\n"
       "                         (STDOUT,DEBUG or filename)\n"
       "set nolog                disables any currently active logging\n"
@@ -695,6 +708,7 @@ static CTAB cmd_table[] = {
       "sh{ow} th{rottle}        show simulation rate\n" 
       "sh{ow} a{synch}          show asynchronouse I/O state\n" 
       "sh{ow} ve{rsion}         show simulator version\n" 
+      "sh{ow} def{ault}         show current directory\n" 
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
       "sh{ow} <dev> MODIFIERS   show device modifiers\n"
@@ -1767,6 +1781,7 @@ C1TAB *ctbr, *glbr;
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
     { "BREAK", &brk_cmd, SSH_ST },
+    { "DEFAULT", &set_default_cmd, 1 },
     { "NOBREAK", &brk_cmd, SSH_CL },
     { "TELNET", &sim_set_telnet, 0 },                   /* deprecated */
     { "NOTELNET", &sim_set_notelnet, 0 },               /* deprecated */
@@ -2046,6 +2061,7 @@ static SHTAB show_glob_tab[] = {
     { "NAMES", &show_log_names, 0 },
     { "SHOW", &show_show_commands, 0 },
     { "VERSION", &show_version, 1 },
+    { "DEFAULT", &show_default, 0 },
     { "CONSOLE", &sim_show_console, 0 },
     { "BREAK", &show_break, 0 },
     { "LOG", &sim_show_log, 0 },                        /* deprecated */
@@ -2557,6 +2573,33 @@ if (dptr->modifiers) {
         fprintf (st, "\n");
     }
 return SCPE_OK;
+}
+
+/* Show/change the current working directiory commands */
+
+t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char buffer[PATH_MAX];
+char *wd = getcwd(buffer, PATH_MAX);
+fprintf (st, "%s\n", wd);
+return SCPE_OK;
+}
+
+t_stat set_default_cmd (int32 flg, char *cptr)
+{
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+sim_trim_endspc(cptr);
+if (chdir(cptr) != 0) {
+    printf("Unable to change to: %s\n", cptr);
+    return SCPE_IOERR & SCPE_NOMESSAGE;
+} 
+return SCPE_OK;
+}
+
+t_stat pwd_cmd (int32 flg, char *cptr)
+{
+return show_cmd (0, "DEFAULT");
 }
 
 /* Breakpoint commands */
