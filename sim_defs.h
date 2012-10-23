@@ -588,7 +588,7 @@ extern int32 sim_asynch_inst_latency;
 /* Thread local storage */
 #if defined(__GNUC__) && !defined(__APPLE__)
 #define AIO_TLS __thread
-#elif defined(__DECC_VER) || defined(_MSC_VER)
+#elif defined(_MSC_VER)
 #define AIO_TLS __declspec(thread)
 #else
 /* Other compiler environment, then don't worry about thread local storage. */
