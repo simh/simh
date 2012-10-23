@@ -119,6 +119,7 @@
 
 #include "sim_defs.h"
 #include "sim_tmxr.h"
+#include "sim_timer.h"
 #include <ctype.h>
 
 /* Forward Declaraations of Platform specific routines */
@@ -211,8 +212,8 @@ static CTAB set_con_tab[] = {
     { "NOSERIAL", &sim_set_noserial, 0 },
     { "LOG", &sim_set_logon, 0 },
     { "NOLOG", &sim_set_logoff, 0 },
-    { "DEBUG", &sim_set_debon, 0 },
-    { "NODEBUG", &sim_set_deboff, 0 },
+    { "DEBUG", &sim_set_cons_debug, 1 },
+    { "NODEBUG", &sim_set_cons_debug, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -223,7 +224,7 @@ static SHTAB show_con_tab[] = {
     { "PCHAR", &sim_show_pchar, 0 },
     { "LOG", &sim_show_cons_log, 0 },
     { "TELNET", &sim_show_telnet, 0 },
-    { "DEBUG", &sim_show_debug, 0 },
+    { "DEBUG", &sim_show_cons_debug, 0 },
     { "BUFFERED", &sim_show_cons_buff, 0 },
     { NULL, NULL, 0 }
     };
@@ -609,6 +610,20 @@ if (!sim_con_tmxr.buffered)
 else
     fprintf (st, "Buffer Size = %d\n", sim_con_tmxr.buffered);
 return SCPE_OK;
+}
+
+/* Set console Debug Mode */
+
+t_stat sim_set_cons_debug (int32 flg, char *cptr)
+{
+return set_dev_debug (&sim_con_telnet, &sim_con_unit, flg, cptr);
+}
+
+t_stat sim_show_cons_debug (FILE *st, DEVICE *dunused, UNIT *uunused, int32 flag, char *cptr)
+{
+if (cptr && (*cptr != 0))
+    return SCPE_2MARG;
+return show_dev_debug (st, &sim_con_telnet, &sim_con_unit, flag, cptr);
 }
 
 /* Set console to Serial port (and parameters) */
@@ -1040,7 +1055,7 @@ run_mode.stat2 = cmd_mode.stat2 | TT2$M_PASTHRU;
 return SCPE_OK;
 }
 
-t_stat sim_ttrun (void)
+t_stat sim_os_ttrun (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -1052,7 +1067,7 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
 return SCPE_OK;
 }
 
-t_stat sim_ttcmd (void)
+t_stat sim_os_ttcmd (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -1130,7 +1145,7 @@ else
     if (sim_brk_char && (buf[0] == sim_brk_char))
         buffered_character = SCPE_BREAK;
     else
-        buffered_character = (buf[0] | SCPE_KFLAG)
+        buffered_character = (buf[0] | SCPE_KFLAG);
 return TRUE;
 }
 
