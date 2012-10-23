@@ -1950,7 +1950,8 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
         }
     }
 
-sim_close_sock (mp->master, 1);                         /* close master socket */
+if (mp->master)
+    sim_close_sock (mp->master, 1);                     /* close master socket */
 mp->master = 0;
 free (mp->port);
 mp->port = NULL;
