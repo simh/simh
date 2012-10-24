@@ -3333,7 +3333,7 @@ if (v32) {                                              /* [V3.2+] time as strin
     }
 else READ_I (sim_time);                                 /* sim time */
 READ_I (sim_rtime);                                     /* [V2.6+] sim rel time */
-
+detach_all (0, 0);                                      /* Detach everything to start from a consistent state */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0)                                    /* last? */
