@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    07-May-12    JDB     Added end-of-track delay time as a controller variable
    02-May-12    JDB     First release
    09-Nov-11    JDB     Created disc controller common library from DS simulator
@@ -206,29 +207,29 @@ typedef enum {
 /* Controller opcodes */
 
 typedef enum {
-    cold_load_read         = 000,
-    recalibrate            = 001,
-    seek                   = 002,
-    request_status         = 003,
-    request_sector_address = 004,
-    read                   = 005,
-    read_full_sector       = 006,
-    verify                 = 007,
-    write                  = 010,
-    write_full_sector      = 011,
-    clear                  = 012,
-    initialize             = 013,
-    address_record         = 014,
-    request_syndrome       = 015,
-    read_with_offset       = 016,
-    set_file_mask          = 017,
-    invalid_opcode         = 020,
-    read_without_verify    = 022,
-    load_tio_register      = 023,
-    request_disc_address   = 024,
-    end                    = 025,
-    wakeup                 = 026,
-    last_opcode            = wakeup                     /* last valid opcode */
+    Cold_Load_Read         = 000,
+    Recalibrate            = 001,
+    Seek                   = 002,
+    Request_Status         = 003,
+    Request_Sector_Address = 004,
+    Read                   = 005,
+    Read_Full_Sector       = 006,
+    Verify                 = 007,
+    Write                  = 010,
+    Write_Full_Sector      = 011,
+    Clear                  = 012,
+    Initialize             = 013,
+    Address_Record         = 014,
+    Request_Syndrome       = 015,
+    Read_With_Offset       = 016,
+    Set_File_Mask          = 017,
+    Invalid_Opcode         = 020,
+    Read_Without_Verify    = 022,
+    Load_TIO_Register      = 023,
+    Request_Disc_Address   = 024,
+    End                    = 025,
+    Wakeup                 = 026,
+    Last_Opcode            = Wakeup                     /* last valid opcode */
     } CNTLR_OPCODE;
 
 #define DL_OPCODE_MASK  037
@@ -353,7 +354,7 @@ typedef CNTLR_VARS *CVPTR;                              /* pointer to controller
 */
 
 #define CNTLR_INIT(ctype,bufptr,auxptr) \
-          (ctype), cntlr_idle, end, normal_completion, \
+          (ctype), cntlr_idle, End, normal_completion, \
           CLEAR, CLEAR, \
           0, 0, 0, 0, 0, 0, 0, 0, \
           (bufptr), 0, 0, (auxptr), \
