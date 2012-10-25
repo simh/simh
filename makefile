@@ -98,6 +98,14 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
+      ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
+        INCPATH += /opt/local/include
+        OS_CCDEFS += -I/opt/local/include
+      endif
+      ifeq (libopt,$(shell if $(TEST) -d /opt/local/lib; then echo libopt; fi))
+        LIBPATH += /opt/local/lib
+        OS_LDFLAGS += -L/opt/local/lib
+      endif
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
       ifneq (,$(GCC_VERSION))
         ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
