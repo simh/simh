@@ -734,6 +734,8 @@ void cpu_idle (void);
 #include "vax750_defs.h"
 #elif defined (VAX_730)
 #include "vax730_defs.h"
+#elif defined (VAX_610)
+#include "vax610_defs.h"
 #else
 #include "vaxmod_defs.h"
 #endif

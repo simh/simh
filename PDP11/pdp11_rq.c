@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   24-Oct-12    MB      Added mapped transfers for VAX
    07-Mar-11    MP      Added working behaviors for removable device types.
                         This allows physical CDROM's to come online and be 
                         ejected.
@@ -137,6 +138,8 @@ extern uint32 cpu_opt;
 #define RQ_NUMDR        4                               /* # drives */
 #define RQ_NUMBY        512                             /* bytes per block */
 #define RQ_MAXFR        (1 << 16)                       /* max xfer */
+#define RQ_MAPXFER      (1 << 31)                       /* mapped xfer */
+#define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
 #define UNIT_V_ONL      (UNIT_V_UF + 0)                 /* online */
 #define UNIT_V_WLK      (UNIT_V_UF + 1)                 /* hwre write lock */
@@ -707,6 +710,10 @@ t_bool rq_getdesc (MSC *cp, struct uq_ring *ring, uint32 *desc);
 t_bool rq_putdesc (MSC *cp, struct uq_ring *ring, uint32 desc);
 int32 rq_rw_valid (MSC *cp, int32 pkt, UNIT *uptr, uint32 cmd);
 t_bool rq_rw_end (MSC *cp, UNIT *uptr, uint32 flg, uint32 sts);
+uint32 rq_map_ba (uint32 ba, uint32 ma);
+int32 rq_readb (uint32 ba, int32 bc, uint32 ma, uint8 *buf);
+int32 rq_readw (uint32 ba, int32 bc, uint32 ma, uint16 *buf);
+int32 rq_writew (uint32 ba, int32 bc, uint32 ma, uint16 *buf);
 void rq_putr (MSC *cp, int32 pkt, uint32 cmd, uint32 flg,
     uint32 sts, uint32 lnt, uint32 typ);
 void rq_putr_unit (MSC *cp, int32 pkt, UNIT *uptr, uint32 lu, t_bool all);
@@ -1737,6 +1744,8 @@ if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
         cp->pak[pkt].d[RW_WBCH] = cp->pak[pkt].d[RW_BCH];
         cp->pak[pkt].d[RW_WBLL] = cp->pak[pkt].d[RW_LBNL];
         cp->pak[pkt].d[RW_WBLH] = cp->pak[pkt].d[RW_LBNH];
+        cp->pak[pkt].d[RW_WMPL] = cp->pak[pkt].d[RW_MAPL];
+        cp->pak[pkt].d[RW_WMPH] = cp->pak[pkt].d[RW_MAPH];
         uptr->iostarttime = sim_grtime();
         sim_activate (uptr, 0);                         /* activate */
         sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_rw - started\n");
@@ -1803,6 +1812,100 @@ uptr->io_complete = 1;
 sim_activate_notbefore (uptr, uptr->iostarttime+rq_xtime);
 }
 
+/* Map buffer address */
+
+uint32 rq_map_ba (uint32 ba, uint32 ma)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 idx;
+uint32 rg;
+
+idx = (VA_GETVPN(ba) << 2);                            /* map register index */
+rg = ReadL (ma + idx);                                 /* map register */
+if (rg & PTE_V)                                        /* valid? */
+    return ((rg & RQ_M_PFN) << VA_N_OFF) | (ba & VA_M_OFF);
+#endif
+return 0;
+}
+
+/* Read byte buffer from memory */
+
+int32 rq_readb (uint32 ba, int32 bc, uint32 ma, uint8 *buf)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 lbc, t, tbc = 0;
+uint32 pba;
+
+if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
+    while (tbc < bc) {
+        if (!(pba = rq_map_ba (ba, ma)))                /* get physical ba */
+            return (bc - tbc);
+        lbc = 0x200 - (ba & VA_M_OFF);                  /* bc for this tx */
+        if (lbc > (bc - tbc)) lbc = (bc - tbc);
+        t = Map_ReadB (pba, lbc, buf);
+        tbc += (lbc - t);                               /* bytes xfer'd so far */
+        if (t) return (bc - tbc);                       /* incomplete xfer? */
+        ba += lbc;
+        buf += lbc;
+        }
+    return 0;
+    }
+#endif
+return Map_ReadB (ba, bc, buf);                         /* unmapped xfer */
+}
+
+/* Read word buffer from memory */
+
+int32 rq_readw (uint32 ba, int32 bc, uint32 ma, uint16 *buf)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 lbc, t, tbc = 0;
+uint32 pba;
+
+if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
+    while (tbc < bc) {
+        if (!(pba = rq_map_ba (ba, ma)))                /* get physical ba */
+            return (bc - tbc);
+        lbc = 0x200 - (ba & VA_M_OFF);                  /* bc for this tx */
+        if (lbc > (bc - tbc)) lbc = (bc - tbc);
+        t = Map_ReadW (pba, lbc, buf);
+        tbc += (lbc - t);                               /* bytes xfer'd so far */
+        if (t) return (bc - tbc);                       /* incomplete xfer? */
+        ba += lbc;
+        buf += (lbc >> 1);
+        }
+    return 0;
+    }
+#endif
+return Map_ReadW (ba, bc, buf);                         /* unmapped xfer */
+}
+
+/* Write word buffer to memory */
+
+int32 rq_writew (uint32 ba, int32 bc, uint32 ma, uint16 *buf)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 lbc, t, tbc = 0;
+uint32 pba;
+
+if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
+    while (tbc < bc) {
+        if (!(pba = rq_map_ba (ba, ma)))                /* get physical ba */
+            return (bc - tbc);
+        lbc = 0x200 - (ba & VA_M_OFF);                  /* bc for this tx */
+        if (lbc > (bc - tbc)) lbc = (bc - tbc);
+        t = Map_WriteW (pba, lbc, buf);
+        tbc += (lbc - t);                               /* bytes xfer'd so far */
+        if (t) return (bc - tbc);                       /* incomplete xfer? */
+        ba += lbc;
+        buf += (lbc >> 1);
+        }
+    return 0;
+    }
+#endif
+return Map_WriteW (ba, bc, buf);                        /* unmapped xfer */
+}
+
 /* Unit service for data transfer commands */
 
 t_stat rq_svc (UNIT *uptr)
@@ -1815,6 +1918,7 @@ uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* get cmd */
 uint32 ba = GETP32 (pkt, RW_WBAL);                      /* buf addr */
 uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
+uint32 ma = GETP32 (pkt, RW_WMPL);                      /* block addr */
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%d, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
            uptr-rq_devmap[cp->cnum]->units, pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
@@ -1853,7 +1957,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
         }
 
     else if (cmd == OP_WR) {                            /* write? */
-        t = Map_ReadW (ba, tbc, uptr->rqxb);            /* fetch buffer */
+        t = rq_readw (ba, tbc, ma, uptr->rqxb);         /* fetch buffer */
         if ((abc = tbc - t)) {                          /* any xfer? */
             wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
             for (i = (abc >> 1); i < wwc; i++)
@@ -1875,7 +1979,7 @@ else { /* Bottom End (After I/O processing) */
         }
 
     else if (cmd == OP_WR) {                            /* write? */
-        t = Map_ReadW (ba, tbc, uptr->rqxb);            /* fetch buffer */
+        t = rq_readw (ba, tbc, ma, uptr->rqxb);         /* fetch buffer */
         abc = tbc - t;                                  /* any xfer? */
         if (t) {                                        /* nxm? */
             PUTP32 (pkt, RW_WBCL, bc - abc);            /* adj bc */
@@ -1889,7 +1993,7 @@ else { /* Bottom End (After I/O processing) */
     else {
         sim_disk_data_trace(uptr, uptr->rqxb, bl, tbc, "sim_disk_rdsect", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
         if ((cmd == OP_RD) && !err) {                   /* read? */
-            if ((t = Map_WriteW (ba, tbc, uptr->rqxb))) {/* store, nxm? */
+            if ((t = rq_writew (ba, tbc, ma, uptr->rqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_WBCL, bc - (tbc - t));  /* adj bc */
                 PUTP32 (pkt, RW_WBAL, ba + (tbc - t));  /* adj ba */
                 if (rq_hbe (cp, uptr))                  /* post err log */
@@ -1900,7 +2004,7 @@ else { /* Bottom End (After I/O processing) */
         else if ((cmd == OP_CMP) && !err) {             /* compare? */
             uint8 dby, mby;
             for (i = 0; i < tbc; i++) {                 /* loop */
-                if (Map_ReadB (ba + i, 1, &mby)) {      /* fetch, nxm? */
+                if (rq_readb (ba + i, 1, ma, &mby)) {   /* fetch, nxm? */
                     PUTP32 (pkt, RW_WBCL, bc - i);      /* adj bc */
                     PUTP32 (pkt, RW_WBAL, bc - i);      /* adj ba */
                     if (rq_hbe (cp, uptr))              /* post err log */
@@ -1957,6 +2061,8 @@ cp->pak[pkt].d[RW_WBCL] = 0;
 cp->pak[pkt].d[RW_WBCH] = 0;
 cp->pak[pkt].d[RW_WBLL] = 0;
 cp->pak[pkt].d[RW_WBLH] = 0;
+cp->pak[pkt].d[RW_WMPL] = 0;
+cp->pak[pkt].d[RW_WMPH] = 0;
 rq_putr (cp, pkt, cmd | OP_END, flg, sts, RW_LNT_D, UQ_TYP_SEQ); /* fill pkt */
 if (!rq_putpkt (cp, pkt, TRUE))                         /* send pkt */
     return ERR;

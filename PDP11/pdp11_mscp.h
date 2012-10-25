@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-12    MB      Added working map base address
    09-Jan-03    RMS     Tape read/write end pkt is longer than disk read/write
    20-Sep-02    RMS     Merged TMSCP definitions
 */
@@ -412,6 +413,8 @@
 #define RW_WBAH         21
 #define RW_WBLL         22                              /* working lbn */
 #define RW_WBLH         23
+#define RW_WMPL         24                              /* working map */
+#define RW_WMPH         25
 
 /* Tape specific status */
 

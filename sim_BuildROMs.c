@@ -40,6 +40,7 @@
 struct ROM_File_Descriptor {
     char *BinaryName;    char *IncludeFileName;   size_t expected_size; unsigned int checksum;  char *ArrayName;} ROMs[] = {
    {"VAX/ka655x.bin",    "VAX/vax_ka655x_bin.h",                131072,            0xFF7673B6, "vax_ka655x_bin"},
+   {"VAX/ka610.bin",     "VAX/vax_ka610_bin.h",                  16384,            0xFFEF3312, "vax_ka610_bin"},
    {"VAX/vmb.exe",       "VAX/vax_vmb_exe.h",                    44544,            0xFFC014CC, "vax_vmb_exe"},
    };
 
@@ -152,12 +153,12 @@ for (i=0; i<statb.st_size; ++i)
     checksum += ROMData[i];
 checksum = ~checksum;
 sprintf (include_filename, "%s.h", rom_filename);
-if ((c = strchr (include_filename, '.')))
-    *c = '_';
-if (!(c = strchr (rom_filename, '/')))
-    c = strchr (rom_filename, '/');
-strcpy (array_name, c);
+strcpy (array_name, rom_filename);
 if ((c = strchr (array_name, '.')))
+    *c = '_';
+if ((c = strchr (array_name, '/')))
+    *c = '_';
+if ((c = strchr (array_name, '\\')))
     *c = '_';
 printf ("The ROMs array entry for this new ROM image file should look something like:\n");
 printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
