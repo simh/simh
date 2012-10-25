@@ -122,7 +122,7 @@ t_stat (*iodispW[IOPAGESIZE >> 1])(int32 dat, int32 ad, int32 md);
 
 /* Unibus interrupt request to interrupt action map */
 
-int32 (*int_ack[IPL_HLVL][32])();                       /* int ack routines */
+int32 (*int_ack[IPL_HLVL][32])(void);                   /* int ack routines */
 
 /* Unibus interrupt request to vector map */
 
