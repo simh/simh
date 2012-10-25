@@ -276,6 +276,7 @@ else
   GCC = gcc
   GCC_Path := $(dir $(shell where gcc.exe))
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
+  COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
     PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
