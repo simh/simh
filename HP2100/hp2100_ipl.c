@@ -25,6 +25,7 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   25-Oct-12    JDB     Removed DEV_NET to allow restoration of listening ports
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CARD_INDEX casts to dib.card_index
@@ -188,7 +189,7 @@ DEVICE ipli_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &ipli_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    &ipli_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
     0, ipl_deb, NULL, NULL
     };
 
@@ -217,7 +218,7 @@ DEVICE iplo_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &iplo_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    &iplo_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
     0, ipl_deb, NULL, NULL
     };
 
