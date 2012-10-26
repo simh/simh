@@ -150,6 +150,7 @@ REG cmi_reg[] = {
     { HRDATA (NREQ16, nexus_req[2], 16) },
     { HRDATA (NREQ17, nexus_req[3], 16) },
     { HRDATA (CMIERR, cmi_err, 32) },
+    { BRDATA (BOOTCMD, cpu_boot_cmd, 16, 8, CBUFSIZE), REG_HRO },
     { NULL }
     };
 

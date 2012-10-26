@@ -97,6 +97,7 @@ REG sysd_reg[] = {
     { HRDATA (CONISP, conisp, 32) },
     { HRDATA (CONPC, conpc, 32) },
     { HRDATA (CONPSL, conpsl, 32) },
+    { BRDATA (BOOTCMD, cpu_boot_cmd, 16, 8, CBUFSIZE), REG_HRO },
     { NULL }
     };
 
