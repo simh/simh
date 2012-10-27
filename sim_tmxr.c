@@ -392,7 +392,7 @@ return;
 
 static void tmxr_report_connection (TMXR *mp, TMLN *lp)
 {
-int32 written, psave;
+int32 unwritten, psave;
 char cmsg[80];
 char dmsg[80] = "";
 char lmsg[80] = "";
@@ -428,9 +428,9 @@ lp->txbpi = lp->txbpr;                                  /* insert connection mes
 tmxr_linemsg (lp, msgbuf);                              /* beginning of buffer */
 lp->txbpi = psave;                                      /* restore insertion pointer */
 
-written = tmxr_send_buffered_data (lp);                 /* send the message */
+unwritten = tmxr_send_buffered_data (lp);               /* send the message */
 
-if (written == 0)                                       /* buffer now empty? */
+if (unwritten == 0)                                     /* buffer now empty? */
     lp->xmte = 1;                                       /* reenable transmission if paused */
 
 lp->txcnt -= (int32)strlen (msgbuf);                    /* adjust statistics */
@@ -816,19 +816,27 @@ return -1;                                              /* no new connections ma
    DTR is dropped and raised again after 500ms to signal the attached serial device.  
 */
 
-t_stat tmxr_reset_ln (TMLN *lp)
+static t_stat tmxr_reset_ln_ex (TMLN *lp, t_bool closeserial)
 {
-tmxr_debug_trace_line (lp, "tmxr_reset_ln()");
-
 if (lp->txlog)                                          /* logging? */
     fflush (lp->txlog);                                 /* flush log */
 
 tmxr_send_buffered_data (lp);                           /* send any buffered data */
 
-if ((lp->serport) && (!lp->mp->modem_control)) {        /* serial connection? */
-    sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
-    sim_os_ms_sleep (TMXR_DTR_DROP_TIME);
-    sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);/* raise DTR and RTS */
+if (lp->serport) {
+    if (closeserial) {
+        sim_close_serial (lp->serport);
+        lp->serport = 0;
+        free (lp->serconfig);
+        lp->serconfig = NULL;
+        lp->cnms = 0;
+        }
+    else
+        if (!lp->mp->modem_control) {                   /* serial connection? */
+            sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
+            sim_os_ms_sleep (TMXR_DTR_DROP_TIME);
+            sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);/* raise DTR and RTS */
+            }
     }
 else                                                    /* Telnet connection */
     if (lp->conn) {
@@ -850,6 +858,18 @@ else {
     lp->conn = 0;                                       /* remove socket or connection flag */
     }
 return SCPE_OK;
+}
+
+t_stat tmxr_close_ln (TMLN *lp)
+{
+tmxr_debug_trace_line (lp, "tmxr_close_ln()");
+return tmxr_reset_ln_ex (lp, TRUE);
+}
+
+t_stat tmxr_reset_ln (TMLN *lp)
+{
+tmxr_debug_trace_line (lp, "tmxr_reset_ln()");
+return tmxr_reset_ln_ex (lp, FALSE);
 }
 
 /* Enable modem control pass thru
@@ -1048,7 +1068,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
             TMXR_MAXBUF - lp->rxbpi);
 
     if (nbytes < 0)                                     /* line error? */
-        tmxr_reset_ln (lp);                             /* disconnect line */
+        tmxr_close_ln (lp);                             /* disconnect line */
 
     else if (nbytes > 0) {                              /* if data rcvd */
 
@@ -1272,6 +1292,10 @@ if (nbytes) {                                           /* >0? write */
             lp->txbpr = 0;
         lp->txcnt = lp->txcnt + sbytes;                 /* update counts */
         nbytes = nbytes - sbytes;
+        }
+    if (sbytes < 0) {                                   /* I/O Error? */
+        tmxr_close_ln (lp);                             /*  close line/port on error */
+        return nbytes;                                  /*  done now. */
         }
     if (nbytes && (lp->txbpr == 0))     {               /* more data and wrap? */
         sbytes = tmxr_write (lp, nbytes);
@@ -1843,7 +1867,10 @@ if (r != SCPE_OK) {                                     /* error? */
 mp->uptr = uptr;                                        /* save unit for polling */
 uptr->filename = _mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
-if (mp->lines > 1)
+if ((mp->lines > 1) ||
+    ((mp->master == 0) &&
+     (mp->ldsc[0].connecting == 0) &&
+     (mp->ldsc[0].serport == 0)))
     uptr->flags = uptr->flags | UNIT_ATTMULT;           /* allow multiple attach commands */
 
 if (mp->dptr == NULL)                                   /* has device been set? */
