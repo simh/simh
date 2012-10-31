@@ -113,7 +113,7 @@ DEVICE sysd_dev = {
 
 CTAB vax610_cmd[] = {
     { "BOOT", &vax610_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n" },
+      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
     { NULL }
     };
 

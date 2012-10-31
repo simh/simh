@@ -420,7 +420,6 @@ t_stat set_quiet (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
 t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 void int_handler (int signal);
-void run_cmd_message (const char *unechod_cmdline, t_stat r);
 
 /* Global data */
 
@@ -889,15 +888,15 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
-    if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
-        if (cmdp && cmdp->message)                      /* special message handler? */
-            cmdp->message (NULL, stat);
-        else {
-            printf ("%s\n", sim_error_text (stat));
-            if (sim_log)
-                fprintf (sim_log, "%s\n", sim_error_text (stat));
-            }
-        }
+    if (!stat_nomessage)                                /* displaying message status? */
+        if (cmdp && (cmdp->message))                    /* special message handler? */
+            cmdp->message (NULL, stat);                 /* let it deal with display */
+        else
+            if (stat >= SCPE_BASE) {                    /* error? */
+                printf ("%s\n", sim_error_text (stat));
+                if (sim_log)
+                    fprintf (sim_log, "%s\n", sim_error_text (stat));
+                }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
@@ -1211,15 +1210,15 @@ do {
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
             }
         }
-    if ((stat >= SCPE_BASE) && !stat_nomessage) {       /* report error if not suppressed */
-        if (cmdp && cmdp->message) {                    /* special message handler */
+    if (!stat_nomessage) {                              /* report error if not suppressed */
+        if (cmdp && cmdp->message)                      /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
-            }
-        else {
-            printf ("%s\n", sim_error_text (stat));
-            if (sim_log)
-                fprintf (sim_log, "%s\n", sim_error_text (stat));
-            }
+        else
+            if (stat >= SCPE_BASE) {                    /* report error if not suppressed */
+                printf ("%s\n", sim_error_text (stat));
+                if (sim_log)
+                    fprintf (sim_log, "%s\n", sim_error_text (stat));
+                }
         }
     if (staying &&
         (sim_on_check[sim_do_depth]) && 

@@ -203,7 +203,7 @@ DEVICE sbi_dev = {
 
 CTAB vax780_cmd[] = {
     { "BOOT", &vax780_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n" },
+      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
     { "FLOAD", &vax780_fload, 0,
       "fl{oad} <file> {<start>} load file from console floppy\n" },
     { NULL }

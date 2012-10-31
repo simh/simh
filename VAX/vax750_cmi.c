@@ -166,7 +166,7 @@ DEVICE cmi_dev = {
 
 CTAB vax750_cmd[] = {
     { "BOOT", &vax750_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n" },
+      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
     { NULL }
     };
 

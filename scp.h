@@ -59,6 +59,7 @@ t_stat exdep_cmd (int32 flag, char *ptr);
 t_stat eval_cmd (int32 flag, char *ptr);
 t_stat load_cmd (int32 flag, char *ptr);
 t_stat run_cmd (int32 flag, char *ptr);
+void run_cmd_message (const char *unechod_cmdline, t_stat r);
 t_stat attach_cmd (int32 flag, char *ptr);
 t_stat detach_cmd (int32 flag, char *ptr);
 t_stat assign_cmd (int32 flag, char *ptr);
