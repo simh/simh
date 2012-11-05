@@ -739,5 +739,8 @@ void cpu_idle (void);
 #else
 #include "vaxmod_defs.h"
 #endif
+#ifndef CPU_MODEL_MODIFIERS
+#define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
+#endif
 
 #endif                                                  /* _VAX_DEFS_H */

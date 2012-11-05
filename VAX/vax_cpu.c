@@ -475,6 +475,7 @@ MTAB cpu_mod[] = {
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt },
+    CPU_MODEL_MODIFIERS /* Model specific cpu modifiers from vaxXXX_defs.h */
     { 0 }
     };
 
