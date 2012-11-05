@@ -46,10 +46,20 @@
 #define TXDB_M_SEL      0xF
 #define  TXDB_MISC      0xF                             /* console misc */
 #define MISC_MASK        0xFF                           /* console data mask */
+#define  MISC_NOOP0      0x0                            /* no operation */
+#define  MISC_NOOP1      0x1                            /* no operation */
 #define  MISC_BOOT       0x2                            /* reboot */
 #define  MISC_CLWS       0x3                            /* clear warm start */
 #define  MISC_CLCS       0x4                            /* clear cold start */
 #define  MISC_SWDN       0x5                            /* software done */
+#define  MISC_LEDS0      0x8                            /* LEDs 000 (all on) */
+#define  MISC_LEDS1      0x9                            /* LEDs 001 (on,  on,  off) */
+#define  MISC_LEDS2      0xA                            /* LEDs 010 (on, off,   on)*/
+#define  MISC_LEDS3      0xB                            /* LEDs 011 (on, off,  off)*/
+#define  MISC_LEDS4      0xC                            /* LEDs 100 (off, on,   on)*/
+#define  MISC_LEDS5      0xD                            /* LEDs 101 (off, on,  off)*/
+#define  MISC_LEDS6      0xE                            /* LEDs 110 (off, off,  on)*/
+#define  MISC_LEDS7      0xF                            /* LEDs 111 (all off)*/
 #define TXDB_SEL        (TXDB_M_SEL << TXDB_V_SEL)      /* non-terminal */
 #define TXDB_GETSEL(x)  (((x) >> TXDB_V_SEL) & TXDB_M_SEL)
 #define CLKCSR_IMP      (CSR_IE)                        /* real-time clock */
@@ -65,6 +75,7 @@ extern int32 p1;
 
 int32 tti_csr = 0;                                      /* control/status */
 int32 tto_csr = 0;                                      /* control/status */
+int32 tto_leds = 0;                                     /* processor board LEDs */
 int32 clk_csr = 0;                                      /* control/status */
 int32 clk_tps = 100;                                    /* ticks/second */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
@@ -274,8 +285,27 @@ if (sel == TXDB_MISC) {                                 /* misc function? */
     case MISC_BOOT:
         con_halt (0, 0);                                /* set up reboot */
         break;
+    case MISC_LEDS0: case MISC_LEDS1: case MISC_LEDS2: case MISC_LEDS3:
+    case MISC_LEDS4: case MISC_LEDS5: case MISC_LEDS6: case MISC_LEDS7:
+        tto_leds = 0x7 & (~((data & MISC_MASK)-MISC_LEDS0));
+        sim_putchar ('.');
+        sim_putchar ('0' + tto_leds);
+        sim_putchar ('.');
+        break;
         }
     }
+else
+    if (sel != 0)
+        RSVD_OPND_FAULT;
+
+}
+
+t_stat cpu_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "leds=%d(%s,%s,%s)", tto_leds, tto_leds&4 ? "ON" : "OFF", 
+                                            tto_leds&2 ? "ON" : "OFF", 
+                                            tto_leds&1 ? "ON" : "OFF");
+return SCPE_OK;
 }
 
 /* Terminal input routines

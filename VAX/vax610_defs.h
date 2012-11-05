@@ -97,6 +97,10 @@
                         { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,    \
+                              NULL, &cpu_show_leds },                \
+                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,   \
+                              NULL, &cpu_show_model },
 
 /* Qbus I/O page */
 
@@ -385,6 +389,9 @@ int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
 int32 clk_cosched (int32 wait);
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #include "pdp11_io_lib.h"
 
