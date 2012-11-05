@@ -420,6 +420,7 @@ t_stat set_quiet (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
 t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 void int_handler (int signal);
+t_stat set_prompt (int32 flag, char *cptr);
 
 /* Global data */
 
@@ -454,6 +455,7 @@ FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
+char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
@@ -671,6 +673,7 @@ static CTAB cmd_table[] = {
       "set nomessage            disables display of command file error messages\n"
       "set quiet                disables suppression of some output and messages\n"
       "set noquiet              re-enables suppression of some output and messages\n"
+      "set prompt \"string\"      sets an alternate simulator prompt string\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -767,6 +770,7 @@ CTAB *cmdp;
 argc = ccommand (&argv);
 #endif
 
+set_prompt (0, "sim>");                                 /* start with set standard prompt */
 *cbuf = 0;                                              /* init arg buffer */
 sim_switches = 0;                                       /* init switches */
 lookswitch = TRUE;
@@ -865,12 +869,12 @@ stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag 
 
 while (stat != SCPE_EXIT) {                             /* in case exit */
     if ((cptr = sim_brk_getact (cbuf, CBUFSIZE)))       /* pending action? */
-        printf ("sim> %s\n", cptr);                     /* echo */
+        printf ("%s%s\n", sim_prompt, cptr);           /* echo */
     else if (sim_vm_read != NULL) {                     /* sim routine? */
-        printf ("sim> ");                               /* prompt */
+        printf ("%s", sim_prompt);                     /* prompt */
         cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
         }
-    else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
+    else cptr = read_line_p (sim_prompt, cbuf, CBUFSIZE, stdin);/* read with prmopt*/
     if (cptr == NULL)                                   /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
@@ -878,7 +882,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         continue;
     sub_args (cbuf, gbuf, sizeof(gbuf), argv);
     if (sim_log)                                        /* log cmd */
-        fprintf (sim_log, "sim> %s\n", cptr);
+        fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
     sim_switches = 0;                                   /* init switches */
     if ((cmdp = find_cmd (gbuf)))                       /* lookup command */
@@ -908,6 +912,28 @@ sim_set_notelnet (0, NULL);                             /* close Telnet */
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
 return 0;
+}
+
+/* Set prompt routine */
+
+t_stat set_prompt (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE];
+
+if ((!cptr) || (*cptr == '\0'))
+    return SCPE_ARG;
+
+cptr = get_glyph_nc (cptr, gbuf, '"');                  /* get quote delimted token */
+if (gbuf[0] == '\0') {                                  /* Token started with quote */
+    gbuf[sizeof (gbuf)-1] = '\0';
+    strncpy (gbuf, cptr, sizeof (gbuf)-1);
+    cptr = strchr (gbuf, '"');
+    if (cptr)
+        *cptr = '\0';
+    }
+sim_prompt = realloc (sim_prompt, strlen (gbuf) + 2);   /* nul terminator and trailing blank */
+sprintf (sim_prompt, "%s ", gbuf);
+return SCPE_OK;
 }
 
 /* Find command routine */
@@ -1786,6 +1812,7 @@ static CTAB set_glob_tab[] = {
     { "NOMESSAGE", &set_message, 0 },
     { "QUIET", &set_quiet, 1 },
     { "NOQUIET", &set_quiet, 0 },
+    { "PROMPT", &set_prompt, 0 },
     { NULL, NULL, 0 }
     };
 
