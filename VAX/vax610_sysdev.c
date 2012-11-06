@@ -41,7 +41,8 @@
 /* MicroVAX I boot device definitions */
 
 struct boot_dev {
-    char                *name;
+    char                *devname;
+    char                *devalias;
     int32               code;
     };
 
@@ -60,8 +61,9 @@ int32 conisp, conpc, conpsl;                            /* console reg */
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
 
 static struct boot_dev boot_tab[] = {
-    { "RQ", 0x00415544 },                               /* DUAn */
-    { "XQ", 0x00415158 },                               /* XQAn */
+    { "RQ",  "DUA", 0x00415544 },                       /* DUAn */
+    { "RQ",  "DU",  0x00415544 },                       /* DUAn */
+    { "XQ",  "XQA", 0x00415158 },                       /* XQAn */
     { NULL }
     };
 
@@ -342,26 +344,26 @@ return run_cmd (flag, "CPU");
 
 t_stat vax610_boot_parse (int32 flag, char *ptr)
 {
-char gbuf[CBUFSIZE];
+char gbuf[CBUFSIZE], dbuf[CBUFSIZE], rbuf[CBUFSIZE];
 char *slptr, *regptr;
 int32 i, r5v, unitno;
 DEVICE *dptr;
 UNIT *uptr;
-DIB *dibp;
 t_stat r;
 
-regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
-if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
-    regptr = strchr (ptr, '/');                         /* locate orig */
-    *slptr = 0;                                         /* zero in string */
+if (ptr && (*ptr == '/')) {                             /* handle "BOOT /R5:n DEV" format */
+    ptr = get_glyph (ptr, rbuf, 0);                     /* get glyph */
+    regptr = rbuf;
+    ptr = get_glyph (ptr, gbuf, 0);                     /* get glyph */
     }
-dptr = find_unit (gbuf, &uptr);                         /* find device */
-if ((dptr == NULL) || (uptr == NULL))
-    return SCPE_ARG;
-dibp = (DIB *) dptr->ctxt;                              /* get DIB */
-if (dibp == NULL)
-    return SCPE_ARG;
-unitno = (int32) (uptr - dptr->units);
+else {                                                  /* handle "BOOT DEV /R5:n" format */
+    regptr = get_glyph (ptr, gbuf, 0);                  /* get glyph */
+    if ((slptr = strchr (gbuf, '/'))) {                 /* found slash? */
+        regptr = strchr (ptr, '/');                     /* locate orig */
+        *slptr = 0;                                     /* zero in string */
+        }
+    }
+/* parse R5 parameter value */
 r5v = 0;
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
     (strncmp (regptr, "/R5=", 4) == 0) ||
@@ -371,10 +373,33 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
+else if (*regptr == '/') {
+    r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
+    if (r != SCPE_OK)
+        return r;
+    }
 else if (*regptr != 0)
     return SCPE_ARG;
-for (i = 0; boot_tab[i].name != NULL; i++) {
-    if (strcmp (dptr->name, boot_tab[i].name) == 0) {
+if (gbuf[0]) {
+    unitno = -1;
+    for (i = 0; boot_tab[i].devname != NULL; i++) {
+        if (memcmp (gbuf, boot_tab[i].devalias, strlen(boot_tab[i].devalias)) == 0) {
+            sprintf(dbuf, "%s%s", boot_tab[i].devname, gbuf + strlen(boot_tab[i].devalias));
+            dptr = find_unit (dbuf, &uptr);
+            if ((dptr == NULL) || (uptr == NULL))
+                return SCPE_ARG;
+            unitno = (int32) (uptr - dptr->units);
+            }
+        if ((unitno == -1) && 
+            (memcmp (gbuf, boot_tab[i].devname, strlen(boot_tab[i].devname)) == 0)) {
+            sprintf(dbuf, "%s%s", boot_tab[i].devname, gbuf + strlen(boot_tab[i].devname));
+            dptr = find_unit (dbuf, &uptr);
+            if ((dptr == NULL) || (uptr == NULL))
+                return SCPE_ARG;
+            unitno = (int32) (uptr - dptr->units);
+            }
+        if (unitno == -1)
+            continue;
         R[0] = boot_tab[i].code | (('0' + unitno) << 24);
         R[1] = 0xC0;
         R[2] = 0;
@@ -383,6 +408,15 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
         R[5] = r5v;
         return SCPE_OK;
         }
+    }
+else {
+    R[0] = 0;
+    R[1] = 0xC0;
+    R[2] = 0;
+    R[3] = 0;
+    R[4] = 0;
+    R[5] = r5v;
+    return SCPE_OK;
     }
 return SCPE_NOFNC;
 }
