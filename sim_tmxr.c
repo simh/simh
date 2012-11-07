@@ -850,6 +850,7 @@ if (lp->serport) {
         free (lp->serconfig);
         lp->serconfig = NULL;
         lp->cnms = 0;
+        lp->rcve = lp->xmte = 0;
         }
     else
         if (!lp->mp->modem_control) {                   /* serial connection? */
@@ -862,6 +863,7 @@ else                                                    /* Telnet connection */
     if (lp->conn) {
         sim_close_sock (lp->conn, 0);                   /* close socket */
         lp->conn = 0;
+        lp->rcve = lp->xmte = 0;
         }
 free(lp->ipad);
 lp->ipad = NULL;
