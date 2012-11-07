@@ -313,7 +313,7 @@ typedef struct {
 #define IOLN_PTR        004
 #define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
 #define IOLN_PTP        004
-#define IOBA_DMC        (IOPAGEBASE + 0760060)
+#define IOBA_DMC        (IOPAGEBASE + 0760060)          /* DMC11 */
 #define IOLN_DMC        010
 
 /* Interrupt assignments; within each level, priority is right to left */
