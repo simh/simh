@@ -733,6 +733,8 @@ if (connectaddr != NULL) {
     *connectaddr = calloc(1, NI_MAXHOST+1);
 #ifdef AF_INET6
     p_getnameinfo((struct sockaddr *)&clientname, size, *connectaddr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+    if (0 == memcmp("::ffff:", *connectaddr, 7))        /* is this a IPv4-mapped IPv6 address? */
+        strcpy(*connectaddr, 7+*connectaddr);           /* prefer bare IPv4 address if possible */
 #else
     strcpy(*connectaddr, inet_ntoa(((struct sockaddr_in *)&connectaddr)->s_addr));
 #endif
