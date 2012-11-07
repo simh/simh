@@ -275,9 +275,9 @@ typedef uint32          t_addr;
 
 #define SWMASK(x) (1u << (((int) (x)) - ((int) 'A')))
 
-/* String match */
+/* String match - at least one character required */
 
-#define MATCH_CMD(ptr,cmd) strncmp ((ptr), (cmd), strlen (ptr))
+#define MATCH_CMD(ptr,cmd) (*(ptr) && strncmp ((ptr), (cmd), strlen (ptr)))
 
 /* End of Linked List/Queue value                           */
 /* Chosen for 2 reasons:                                    */
