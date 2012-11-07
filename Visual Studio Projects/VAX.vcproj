@@ -208,6 +208,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_dmc.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dz.c"
 				>
 			</File>
@@ -365,6 +369,10 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
+			<File
+				RelativePath="..\PDP11\pdp11_dmc.h"
+				>
+			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_io_lib.h"
 				>

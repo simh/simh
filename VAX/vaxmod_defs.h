@@ -318,6 +318,8 @@ typedef struct {
 #define IOLN_PTR        004
 #define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
 #define IOLN_PTP        004
+#define IOBA_DMC        (IOPAGEBASE + 017060)           /* DMC11 */
+#define IOLN_DMC        010
 
 /* The KA65x maintains 4 separate hardware IPL levels, IPL 17 to IPL 14;
    however, DEC Qbus controllers all interrupt on IPL 14
@@ -356,6 +358,8 @@ typedef struct {
 #define INT_V_VHTX      18 
 #define INT_V_QDSS      19                              /* QDSS */
 #define INT_V_CR        20
+#define INT_V_DMCRX     21                              /* DMC11 */
+#define INT_V_DMCTX     22
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -379,6 +383,8 @@ typedef struct {
 #define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_QDSS        (1u << INT_V_QDSS)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_DMCRX       (1u << INT_V_DMCRX)
+#define INT_DMCTX       (1u << INT_V_DMCTX)
 
 #define IPL_CLK         (0x16 - IPL_HMIN)                       /* relative IPL */
 #define IPL_RQ          (0x14 - IPL_HMIN)
@@ -402,6 +408,8 @@ typedef struct {
 #define IPL_VHTX        (0x14 - IPL_HMIN)
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
+#define IPL_DMCRX       (0x14 - IPL_HMIN)
+#define IPL_DMCTX       (0x14 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */
@@ -428,6 +436,8 @@ typedef struct {
 #define VEC_DZTX        (VEC_Q + 0304)
 #define VEC_VHRX        (VEC_Q + 0310)   
 #define VEC_VHTX        (VEC_Q + 0314)
+#define VEC_DMCRX       (VEC_Q + 0310)
+#define VEC_DMCTX       (VEC_Q + 0314)
 
 /* Interrupt macros */
 
