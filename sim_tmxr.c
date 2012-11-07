@@ -698,6 +698,7 @@ TMLN *lp;
 int32 *op;
 int32 i, j;
 char *address;
+char msg[512];
 uint32 poll_time = sim_os_msec ();
 static char mantra[] = {
     TN_IAC, TN_WILL, TN_LINE,
@@ -719,6 +720,8 @@ mp->last_poll_time = poll_time;
 newsock = sim_accept_conn (mp->master, &address);       /* poll connect */
 
 if (newsock != INVALID_SOCKET) {                        /* got a live one? */
+    sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
+    tmxr_debug_trace (mp, msg);
     op = mp->lnorder;                                   /* get line connection order list pointer */
     i = mp->lines;                                      /* play it safe in case lines == 0 */
     ++mp->sessions;                                     /* count the new session */
@@ -738,6 +741,7 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
 
     if (i >= mp->lines) {                               /* all busy? */
         tmxr_msg (newsock, "All connections busy\r\n");
+        tmxr_debug_trace (mp, "tmxr_poll_conn() - All connections busy");
         sim_close_sock (newsock, 0);
         free (address);
         }
@@ -783,8 +787,23 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
     newsock = sim_accept_conn (lp->master, &address);   /* poll connect */
 
     if (newsock != INVALID_SOCKET) {                    /* got a live one? */
+        sprintf (msg, "tmxr_poll_conn() - Line Connection from %s", address);
+        tmxr_debug_trace_line (lp, msg);
         ++mp->sessions;                                 /* count the new session */
 
+        if (lp->destination) {                          /* Virtual Null Modem Cable? */
+            char host[CBUFSIZE];
+
+            sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL);
+            if (strcmp(address, host)) {
+                tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
+                sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
+                tmxr_debug_trace_line (lp, msg);
+                sim_close_sock (newsock, 0);
+                free (address);
+                continue;                               /* Move on to next line */
+                }
+            }
         if (lp->conn == 0) {                            /* is the line available? */
             tmxr_init_line (lp);                        /* init line */
             lp->conn = newsock;                         /* record connection */
@@ -799,6 +818,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
             }
         else {
             tmxr_msg (newsock, "Line connection busy\r\n");
+            tmxr_debug_trace_line (lp, "tmxr_poll_conn() - Line connection busy");
             sim_close_sock (newsock, 0);
             free (address);
             }
