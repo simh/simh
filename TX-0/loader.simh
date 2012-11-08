@@ -1,0 +1,6 @@
+; TX-0 Loader Routine, pp20 of TX0_funcDescr.pdf
+att petr test.tap
+set cpu debug=readin
+;boot petr
+;s 500
+;d pc 20

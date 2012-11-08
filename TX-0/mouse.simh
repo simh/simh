@@ -1,0 +1,13 @@
+; TX-0 Initialization file for the Mouse Maze Game
+att petr bin_newMouse_3-22-66.bin
+
+; The mouse maze game mode is manipulated under TAC control.
+; 400014 = Erase Wall mode.
+; 400021 = Write Cheese mode.
+; 400022 = Write Mouse mode.
+; 400002 = "do mouse" (start the mouse searching.)
+
+; Start in "Erase Wall" mode
+d tac 400014
+boot petr
+
