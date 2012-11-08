@@ -3,7 +3,7 @@
 	ProjectType="Visual C++"
 	Version="9.00"
 	Name="TX-0"
-	ProjectGUID="{BC7F37AD-7414-43C3-829D-214CD1113D67}"
+	ProjectGUID="{24BC7F75-FB56-44A9-BB7C-78AE6A694D0C}"
 	RootNamespace="TX-0"
 	Keyword="Win32Proj"
 	TargetFrameworkVersion="131072"
@@ -32,6 +32,9 @@
 			/>
 			<Tool
 				Name="VCXMLDataGeneratorTool"
+			/>
+			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
 			/>
 			<Tool
 				Name="VCMIDLTool"
@@ -109,6 +112,9 @@
 				Name="VCXMLDataGeneratorTool"
 			/>
 			<Tool
+				Name="VCWebServiceProxyGeneratorTool"
+			/>
+			<Tool
 				Name="VCMIDLTool"
 			/>
 			<Tool
@@ -178,23 +184,7 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
-				RelativePath="..\TX-0\tx0_cpu.c"
-				>
-			</File>
-			<File
-				RelativePath="..\TX-0\tx0_dpy.c"
-				>
-			</File>
-			<File
-				RelativePath="..\TX-0\tx0_stddev.c"
-				>
-			</File>
-			<File
-				RelativePath="..\TX-0\tx0_sys.c"
-				>
-			</File>
-			<File
-				RelativePath="..\TX-0\tx0_sys_orig.c"
+				RelativePath="..\display\display.c"
 				>
 			</File>
 			<File
@@ -226,7 +216,23 @@
 				>
 			</File>
 			<File
-				RelativePath="..\display\display.c"
+				RelativePath="..\TX-0\tx0_cpu.c"
+				>
+			</File>
+			<File
+				RelativePath="..\TX-0\tx0_dpy.c"
+				>
+			</File>
+			<File
+				RelativePath="..\TX-0\tx0_stddev.c"
+				>
+			</File>
+			<File
+				RelativePath="..\TX-0\tx0_sys.c"
+				>
+			</File>
+			<File
+				RelativePath="..\TX-0\tx0_sys_orig.c"
 				>
 			</File>
 			<File
@@ -238,10 +244,6 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
-			<File
-				RelativePath="..\TX-0\tx0_defs.h"
-				>
-			</File>
 			<File
 				RelativePath="..\scp.h"
 				>
@@ -280,6 +282,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\TX-0\tx0_defs.h"
 				>
 			</File>
 		</Filter>
