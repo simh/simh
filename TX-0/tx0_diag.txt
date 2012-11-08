@@ -1,0 +1,16 @@
+
+Programs that are known to work well:
+
+bin_tic-tac-toe_new_code_12-16-61.bin, seems to fully work:
+    sim> boot petr
+    sim> g (will halt with 205200 in LR)
+    sim> e lr
+    LR:     205200
+    sim> g (again to start game.)
+bin_tstDisplay.bin, makes a diagonal line on the DPY
+bin_lightGunTst.bin, can draw on screen with light pen.
+
+
+bin_newMouse_3-22-66.bin - These kind of work, but mouse gives up easy
+bin_newMouse_8-14-61.bin - and can crash on complex mazes.  Sim bug
+    somewhere.

@@ -1,0 +1,75 @@
+# $Id: smakefile,v 1.17 2004/01/24 08:31:56 phil Exp - revised by DAG
+
+# Makefile for test programs (standard Unix "make" version)
+
+# Unix:
+#	comment out Windows defs, uncomment Unix defs,
+#	edit Unix defs to fit your compiler/library environment, then
+#	(g)make
+#
+# Win32 (Cygwin)
+#	comment out Unix defs, uncomment Windows defs, then
+#	make
+#
+# Win32 (MINGW)
+#	comment out Unix defs, uncomment Windows defs, then
+#	mingw32-make
+
+DISP_DEFS=-DTEST_DIS=DIS_VR48 -DTEST_RES=RES_HALF # -DDEBUG_VT11
+
+#Unix environments
+CC=cc # gcc -Wunused
+#X11BASE=/usr/X11R6
+#X11LIBDIR=$(X11BASE)/lib
+#X11INCDIR=$(X11BASE)/include
+LIBS=-lXt -lX11 -lm # -L$(X11LIBDIR)
+OSFLAGS=-I$(X11INCDIR)
+DRIVER=x11.o
+EXT=
+PROF=-g # -pg
+OPT=-O # -O2
+CFLAGS=$(OPT) $(PROF) $(OSFLAGS) $(DISP_DEFS)
+CC=cc # gcc -Wunused
+LDFLAGS=$(PROF)
+
+##Win32 environments
+#LIBS=-lgdi32
+#OSFLAGS=
+#DRIVER=win32.o
+#EXT=.exe
+#PROF=-g # -pg
+#OPT=-O2
+#CFLAGS=$(OPT) $(PROF) $(OSFLAGS) $(DISP_DEFS)
+#CC=gcc -Wunused
+LDFLAGS=$(PROF)
+
+ALL=	munch$(EXT) vt11$(EXT)
+ALL:	$(ALL)
+
+# munching squares; see README file for
+# how to use console switches
+
+MUNCH=$(DRIVER) display.o test.o
+munch$(EXT): $(MUNCH)
+	$(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
+
+VT11=$(DRIVER) vt11.o vttest.o display.o
+vt11$(EXT): $(VT11)
+	$(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
+
+display.o: display.h ws.h
+vt11.o: display.h vt11.h
+x11.o: ws.h display.h
+win32.o: ws.h
+test.o: display.h vt11.h
+vttest.o: display.h vt11.h vtmacs.h
+
+clean:
+	rm -f *.o *~ .#*	# Unix
+#	if exist *.o del /q *.o		# Win32
+#	if exist *~ del /q *~		# Win32
+#	if exist .#* del /q .#*		# Win32
+
+clobber: clean
+	rm -f $(ALL)		# Unix
+#	if exist *.exe del /q *.exe	# Win32

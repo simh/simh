@@ -1,0 +1,166 @@
+$Id: README,v 1.15 2004/02/09 07:20:18 phil Exp $
+
+XY Display Simulation
+Simulates XY plotting displays used on DEC PDP systems.
+
+   Copyright (c) 2003-2004, Philip L. Budne and Douglas A. Gwyn
+
+   Permission is hereby granted, free of charge, to any person obtaining a
+   copy of this software and associated documentation files (the "Software"),
+   to deal in the Software without restriction, including without limitation
+   the rights to use, copy, modify, merge, publish, distribute, sublicense,
+   and/or sell copies of the Software, and to permit persons to whom the
+   Software is furnished to do so, subject to the following conditions:
+
+   The above copyright notice and this permission notice shall be included in
+   all copies or substantial portions of the Software.
+
+   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+   THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+   IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+   CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+   Except as contained in this notice, the names of the authors shall
+   not be used in advertising or otherwise to promote the sale, use or
+   other dealings in this Software without prior written authorization
+   from the authors.
+
+Phil Budne <phil@ultimate.com>
+Douglas A Gwyn <gwyn@arl.army.mil>
+February 5, 2004
+
+Designed for use with Bob Supnik's SIMH, but the code should be easily
+portable, and usable standalone (see vttest.c for an example).
+
+Display code is provided for X11 (Unix/VMS) and Win32.
+We're not GUI programmers, so the code is PRIMITIVE!!
+
+Started from VC8E simulator by Douglas W. Jones
+(distribution 5, of Feb 4, 1997);
+
+	This PDP8 Emulator was written by Douglas W. Jones at the
+	University of Iowa.  It is distributed as freeware, of
+	uncertain function and uncertain utility.
+
+Original phosphor decay constants for Type 30 display from XMame 0.72.1
+
+VT11 support GREATLY enhanced (and VT48 support added) and
+other general improvements from Douglas A Gwyn.
+
+In the interest of fair play we have supplied two makefiles (neither
+of which is named Makefile nor makefile), one which works under all
+flavors of "make" (after necessary editing, in the traditional manner),
+and one which functions only under the GNU version of make (sometimes
+installed as "gmake", but the default "make" on many systems).  We have
+not added a third flavor which uses BSD make enhancements, because our
+deeply held roots (over 40 combined years of Unix experience by the
+authors) demand that things should work on all platforms.  Both the
+Linux and Windows worlds violate this simple credo (everything works so
+long as you use OUR preferred software), and many current users may not
+even realize that editing Makefiles used to be de rigeur.  Since the
+GNU environment is widely available and "gmake" has features that
+support automatic configuration for multiple platforms, we have
+supplied thr GNU-specific variant with the expectation that many users
+will find it more convenient.  You can copy or link whichever flavor of
+makefile suits your taste to whichever spelling of "makefile" suits
+your fancy, or invoke "make" with the -f flag specifying the desired
+makefile.
+
+To compile test programs:
+========================
+On Unix:
+	# edit smakefile to match your environment
+	make -f smakefile
+or
+	gmake -f gmakefile
+
+On Win32 (using Cygwin);
+	make -f gmakefile WIN32=1
+
+On Win32 (using MINGW):
+	# edit smakefile to match your environment
+	make -f smakefile
+or
+	mingw32-make -f gmakefile WIN32=1
+or
+	execute build-mingw.bat in a DOS command window
+
+creates:
+
+	munch:	standalone simulation of PDP-1 munching squares;
+		examines console "test switches" (see next section)
+
+	vt11:	sequences through VT11/VS60 simulator test displays;
+		shows how the diplay-processor simulator can be used
+		from applications other than PDP-11 simulators
+
+Console switches:
+================
+
+Upto 18 simulated console switches, toggled by hitting keys:
+
+123 456 789 qwe rty uio
+
+space bar clears all switches.
+
+Spacewar Switches:
+=================
+
+Key presses for simulated Spacewar control box switches;
+
+action				player
+				1	2
+rotate clockwise		a	k
+rotate counter clockwise	s	l
+fire engines			d	;
+launch torpedo			f	'
+hyperspace (both at once)	as	kl
+
+Light pen:
+=========
+
+The light pen is active when any mouse button is held down.
+
+Mouse button 1 acts as a "tip switch" for models so equipped (VS60).
+The light pen may be dragged while active.
+
+Too many compile time parameters:
+================================
+
+Read the comments in display.c for more explanations!!
+
+DISPLAY_TYPE	default display type, one of:
+		DIS_VR14, DIS_VR17, DIS_VR20, DIS_VR48, DIS_TYPE30, DIS_TYPE340
+		selects screen characteristics (phosphor, dimensions).
+
+		Only affects programs which do not make an expicit
+		display_init() call.
+
+PIX_SCALE	one of RES_FULL, RES_HALF, RES_QUARTER, RES_EIGHTH
+		selects default display scaling factor.
+
+PEN_RADIUS	default radius of light pen in (scaled) pixels
+
+MAXELAPSED	Upper limit in real microseconds between polls/delays
+MINELAPSED	Lower limit in real microseconds between polls/delays
+MINDELAY	Lower limit in real microseconds for attempted delay
+MAXDELAY	Upper limit in real microseconds for attempted delay
+GAINSHIFT	delay_check increment/decrement gain factor
+
+In display system support (x11.c, win32.c);
+
+PIX_SIZE	selects displayed pixel size (default 1)
+		makes screen larger, useful when display scaled to small size
+
+Programming interface:
+=====================
+
+see display.h
+
+Source repository:
+=================
+
+Up-to-date Sources are available by anonymous CVS.
+See http://www.ultimate.com/phil/xy/
