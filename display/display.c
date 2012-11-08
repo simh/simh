@@ -85,9 +85,9 @@
 #define ELEMENTS(X) (sizeof(X)/sizeof(X[0]))
 
 struct phosphor {
-    float red, green, blue;
-    float level;			/* decay level (0.5 for half life) */
-    float t_level;			/* seconds to decay to level */
+    double red, green, blue;
+    double level;			/* decay level (0.5 for half life) */
+    double t_level;			/* seconds to decay to level */
 };
 
 struct color {
@@ -545,7 +545,7 @@ display_delay(int t, int slowdown)
 #endif /* DEBUG_DELAY defined */
 	}
     }
-    else if (elapsed < MINELAPSED || slowdown && delay < MINDELAY) {
+    else if ((elapsed < MINELAPSED) || (slowdown && (delay < MINDELAY))) {
 	/* too little elapsed time passed, or delta very small */
 	int gain = delay_check>>GAINSHIFT;
 	if (gain == 0)
@@ -783,13 +783,13 @@ phosphor_init(struct phosphor *phosphors, int nphosphors, int color)
 	      * for each of R G and B to be greater than 1.0
 	      */
 
-	     r = rr * level_scale[ilevel] * 0xffff;
+	     r = (int)(rr * level_scale[ilevel] * 0xffff);
 	     if (r > 0xffff) r = 0xffff;
 
-	     g = rg * level_scale[ilevel] * 0xffff;
+	     g = (int)(rg * level_scale[ilevel] * 0xffff);
 	     if (g > 0xffff) g = 0xffff;
 
-	     b = rb * level_scale[ilevel] * 0xffff;
+	     b = (int)(rb * level_scale[ilevel] * 0xffff);
 	     if (b > 0xffff) b = 0xffff;
 
 	     cp = ws_color_rgb(r, g, b);

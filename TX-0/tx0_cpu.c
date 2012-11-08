@@ -466,7 +466,9 @@ t_stat sim_instr (void)
     while (reason == 0) {                                   /* loop until halted */
 
         if (sim_interval <= 0) {                            /* check clock queue */
-            if (reason = sim_process_event ()) break;
+            reason = sim_process_event ();
+            if (reason != SCPE_OK)
+                break;
         }
 
         if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
@@ -699,8 +701,8 @@ t_stat sim_instr (void)
                     break;
                 case 2:     /* tsx (Transfer and set Index) */
                     XR = PC & 0017777;  /* XR[4] = 0; */
+                    TRACE_PRINT(TRN_MSG, ("[%06o] TSX: PC=%06o, XR=%05o\n", PC-1, y, XR));
                     PC = y;
-                    TRACE_PRINT(TRN_MSG, ("[%06o] TSX: PC=%06o, XR=%05o\n", PC, XR));
                     inst_ctr.tsx++;
                     break;
                 case 3:     /* tix (Transfer and Index) */
@@ -807,8 +809,8 @@ t_stat sim_instr (void)
                 case IOS_SEL:
                     { /* These are used for Magtape control.
                          Magtape is compatible with IBM 709.  Maybe the SIMH 7090 magtape can be leveraged. */
-                        int32 CLRA = (op && 0100000);
-                        int32 BINDEC = (op && 020);
+                        int32 CLRA = (op & 0100000);
+                        int32 BINDEC = (op & 020);
                         int32 device = op & 03;
                         int32 tape_ord = (op >> 2) & 03;
                         char *tape_cmd[] = {"Backspace Tape", "Read/Select Tape", "Rewind Tape", "Write/Select Tape" };
@@ -1006,7 +1008,7 @@ t_stat sim_instr (void)
     TRACE_PRINT(COUNTERS_MSG, ("TRN=%d, TZE=%d, TSX=%d, TIX=%d, TRA=%d, TRX=%d, TLV=%d\n",
         inst_ctr.trn, inst_ctr.tze, inst_ctr.tsx, inst_ctr.tix, inst_ctr.tra, inst_ctr.trx, inst_ctr.tlv));
     TRACE_PRINT(COUNTERS_MSG, ("CLA=%d, AMB=%d, CYR=%d, SHR=%d, MBL=%d, XMB=%d, COM=%d, PAD=%d, CRY=%d, ANB=%d, ORB=%d, LMB=%d, MBX=%d\n",
-        inst_ctr.cla = inst_ctr.amb, inst_ctr.cyr, inst_ctr.shr, inst_ctr.mbl, inst_ctr.xmb, inst_ctr.com, inst_ctr.pad, inst_ctr.cry, inst_ctr.anb, inst_ctr.orb, inst_ctr.lmb, inst_ctr.mbx));
+        inst_ctr.cla, inst_ctr.amb, inst_ctr.cyr, inst_ctr.shr, inst_ctr.mbl, inst_ctr.xmb, inst_ctr.com, inst_ctr.pad, inst_ctr.cry, inst_ctr.anb, inst_ctr.orb, inst_ctr.lmb, inst_ctr.mbx));
 
     return reason;
 }
@@ -1222,13 +1224,13 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
         if (result == NULL) return SCPE_ARG;
 
         for (j = lo; j <= hi; j++) {
-            if (_putw(j, fileref)== EOF) return SCPE_IOERR;
-            if (_putw(M[j], fileref) == EOF) return SCPE_IOERR;
+            if (putw(j, fileref)== EOF) return SCPE_IOERR;
+            if (putw(M[j], fileref) == EOF) return SCPE_IOERR;
         }
     } else {
         lo = strtotv(cptr, &result, 8) & 0xFFFF;
         for (j = lo; !feof(fileref); j++) {
-            if ((word = _getw(fileref)) == EOF) break;
+            if ((word = getw(fileref)) == EOF) break;
             M[j] = word;
         }
     }
@@ -1374,7 +1376,9 @@ t_stat sim_opr_orig(int32 op)
             AC |= petr(1, 0, 0);
             break;
         case OOPR_DIS:
+#ifdef USE_DISPLAY
             LP = dpy (AC);  /* Display point on the CRT */
+#endif /* USE_DISPLAY */
             break;
         }
     }
