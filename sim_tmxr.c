@@ -708,10 +708,10 @@ static char mantra[] = {
     TN_IAC, TN_DO, TN_BIN
     };
 
-tmxr_debug_trace (mp, "tmxr_poll_conn()");
-
 if ((poll_time - mp->last_poll_time) < TMXR_CONNECT_POLL_INTERVAL)
     return -1;                          /* */
+
+tmxr_debug_trace (mp, "tmxr_poll_conn()");
 
 mp->last_poll_time = poll_time;
 
@@ -765,21 +765,18 @@ if (newsock != INVALID_SOCKET) {                        /* got a live one? */
 for (i = 0; i < mp->lines; i++) {                       /* check each line in sequence */
     lp = mp->ldsc + i;                                  /* get pointer to line descriptor */
 
-    if (0 == lp->master) {                              /* not listening? */
-        if (lp->connecting) {                           /* connecting? */
-            switch (sim_check_conn(lp->connecting, FALSE))
-                {
-                case 1:                                 /* successful connection */
-                    lp->conn = lp->connecting;          /* it now looks normal */
-                    lp->connecting = 0;
-                    lp->cnms = sim_os_msec ();
-                    break;
-                case -1:                                /* failed connection */
-                    tmxr_reset_ln (lp);                 /* retry */
-                    break;
-                }
+    if (lp->connecting) {                           /* connecting? */
+        switch (sim_check_conn(lp->connecting, FALSE))
+            {
+            case 1:                                 /* successful connection */
+                lp->conn = lp->connecting;          /* it now looks normal */
+                lp->connecting = 0;
+                lp->cnms = sim_os_msec ();
+                break;
+            case -1:                                /* failed connection */
+                tmxr_reset_ln (lp);                 /* retry */
+                break;
             }
-        continue;                                       /* skip this line */
         }
 
     /* Check for a pending Telnet connection */
@@ -802,6 +799,10 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 sim_close_sock (newsock, 0);
                 free (address);
                 continue;                               /* Move on to next line */
+                }
+            if (lp->connecting) {
+                sim_close_sock (lp->connecting, 0);     /* abort our as yet unconnnected socket */
+                lp->connecting = 0;
                 }
             }
         if (lp->conn == 0) {                            /* is the line available? */
@@ -1089,8 +1090,10 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
         nbytes = tmxr_read (lp,                         /* yes, read to end */
             TMXR_MAXBUF - lp->rxbpi);
 
-    if (nbytes < 0)                                     /* line error? */
+    if (nbytes < 0) {                                   /* line error? */
+        lp->txbpi = lp->txbpr = 0;                      /* Drop the data we already know we can't send */
         tmxr_close_ln (lp);                             /* disconnect line */
+        }
 
     else if (nbytes > 0) {                              /* if data rcvd */
 
@@ -1316,6 +1319,7 @@ if (nbytes) {                                           /* >0? write */
         nbytes = nbytes - sbytes;
         }
     if (sbytes < 0) {                                   /* I/O Error? */
+        lp->txbpi = lp->txbpr = 0;                      /* Drop the data we already know we can't send */
         tmxr_close_ln (lp);                             /*  close line/port on error */
         return nbytes;                                  /*  done now. */
         }
@@ -1445,7 +1449,9 @@ while (*tptr) {
                         sim_close_sock (sock, 0);
                     else
                         return SCPE_ARG;
-                    if (cptr && (0 == MATCH_CMD (cptr, "NOTELNET")))
+                    if (cptr)
+                        get_glyph (cptr, cptr, 0);          /* upcase this string */
+                    if (0 == MATCH_CMD (cptr, "NOTELNET"))
                         notelnet = TRUE;
                     cptr = hostport;
                     }
@@ -1455,7 +1461,9 @@ while (*tptr) {
             cptr = get_glyph (gbuf, port, ';');
             if (SCPE_OK != sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL))
                 return SCPE_ARG;
-            if (cptr && (0 == MATCH_CMD (cptr, "NOTELNET")))
+            if (cptr)
+                get_glyph (cptr, cptr, 0);                  /* upcase this string */
+            if (0 == MATCH_CMD (cptr, "NOTELNET"))
                 listennotelnet = TRUE;
             cptr = init_cptr;
             }
@@ -1468,7 +1476,7 @@ while (*tptr) {
         sim_close_sock (sock, 1);
         strcpy(listen, port);
         cptr = get_glyph (cptr, option, ';');
-        if (option[0] && (0 == MATCH_CMD (option, "NOTELNET")))
+        if (0 == MATCH_CMD (option, "NOTELNET"))
             listennotelnet = TRUE;
         }
     if (line == -1) {
