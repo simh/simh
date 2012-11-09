@@ -40,6 +40,8 @@
 struct ROM_File_Descriptor {
     char *BinaryName;    char *IncludeFileName;   size_t expected_size; unsigned int checksum;  char *ArrayName;} ROMs[] = {
    {"VAX/ka655x.bin",    "VAX/vax_ka655x_bin.h",                131072,            0xFF7673B6, "vax_ka655x_bin"},
+   {"VAX/ka620.bin",     "VAX/vax_ka620_bin.h",                  65536,            0xFF7F930F, "vax_ka620_bin"},
+   {"VAX/ka630.bin",     "VAX/vax_ka630_bin.h",                  65536,            0xFF7F73EF, "vax_ka630_bin"},
    {"VAX/ka610.bin",     "VAX/vax_ka610_bin.h",                  16384,            0xFFEF3312, "vax_ka610_bin"},
    {"VAX/vmb.exe",       "VAX/vax_vmb_exe.h",                    44544,            0xFFC014CC, "vax_vmb_exe"},
    };
@@ -62,13 +64,17 @@ int sim_read_ROM_include(const char *include_filename,
                          int *psize,
                          unsigned char **pROMData,
                          unsigned int *pchecksum,
-                         char **prom_array_name)
+                         char **prom_array_name,
+                         int *defines_found)
 {
 FILE *iFile;
 char line[256];
 size_t i;
 size_t bytes_written = 0;
 size_t allocated_size = 0;
+int define_size_found = 0;
+int define_filename_found = 0;
+int define_array_found = 0;
 
 *psize = 0;
 *pchecksum = 0;
@@ -85,6 +91,13 @@ while (fgets (line, sizeof(line)-1, iFile)) {
 
     switch (line[0]) {
         case '#':
+            if (0 == strncmp ("#define BOOT_CODE_SIZE ", line, 23))
+                define_size_found = 1;
+            if (0 == strncmp ("#define BOOT_CODE_FILENAME ", line, 27))
+                define_filename_found = 1;
+            if (0 == strncmp ("#define BOOT_CODE_ARRAY ", line, 24))
+                define_array_found = 1;
+            break;
         case ' ':
         case '/':
         case '*':
@@ -118,6 +131,7 @@ for (i=0; i<bytes_written; ++i)
     *pchecksum += *(*pROMData + i);
 *pchecksum = ~*pchecksum;
 *psize = bytes_written;
+*defines_found = (3 == (define_size_found + define_filename_found + define_array_found));
 return 0;
 }
 
@@ -152,14 +166,21 @@ fclose (rFile);
 for (i=0; i<statb.st_size; ++i)
     checksum += ROMData[i];
 checksum = ~checksum;
-sprintf (include_filename, "%s.h", rom_filename);
+while ((c = strchr (rom_filename, '\\')))
+    *c = '/';
 strcpy (array_name, rom_filename);
+for (c=array_name; *c; ++c)
+    if (isupper(*c))
+        *c = tolower(*c);
 if ((c = strchr (array_name, '.')))
     *c = '_';
 if ((c = strchr (array_name, '/')))
     *c = '_';
-if ((c = strchr (array_name, '\\')))
-    *c = '_';
+sprintf (include_filename, "%s.h", rom_filename);
+if ((c = strrchr (include_filename, '/')))
+    sprintf (c+1, "%s.h", array_name);
+else
+    sprintf (include_filename, "%s.h", array_name);
 printf ("The ROMs array entry for this new ROM image file should look something like:\n");
 printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
         rom_filename, include_filename, (int)(statb.st_size), checksum, array_name);
@@ -179,11 +200,13 @@ int bytes_written = 0;
 int include_bytes;
 int c;
 struct stat statb;
+const char *load_filename;
 unsigned char *ROMData = NULL;
 unsigned char *include_ROMData = NULL;
 char *include_array_name = NULL;
 unsigned int checksum = 0;
 unsigned int include_checksum;
+int defines_found;
 
 if (NULL == (rFile = fopen (rom_filename, "rb"))) {
     printf ("Error Opening ROM binary file '%s' for input: %s\n", rom_filename, strerror(errno));
@@ -191,11 +214,13 @@ if (NULL == (rFile = fopen (rom_filename, "rb"))) {
                                   &include_bytes,
                                   &include_ROMData,
                                   &include_checksum,
-                                  &include_array_name))
+                                  &include_array_name,
+                                  &defines_found))
         return -1;
     c = ((include_checksum == expected_checksum) && 
          (include_bytes == expected_size) &&
-         (0 == strcmp(include_array_name, rom_array_name)));
+         (0 == strcmp(include_array_name, rom_array_name)) &&
+         defines_found);
     free(include_ROMData);
     free(include_array_name);
     if (!c)
@@ -244,11 +269,13 @@ if (0 == sim_read_ROM_include(include_filename,
                               &include_bytes,
                               &include_ROMData,
                               &include_checksum,
-                              &include_array_name)) {
+                              &include_array_name,
+                              &defines_found)) {
     c = ((include_checksum == expected_checksum) && 
          (include_bytes == expected_size) &&
          (0 == strcmp (include_array_name, rom_array_name)) &&
-         (0 == memcmp (include_ROMData, ROMData, include_bytes)));
+         (0 == memcmp (include_ROMData, ROMData, include_bytes)) &&
+         defines_found);
     free(include_ROMData);
     free(include_array_name);
     if (c) {
@@ -261,6 +288,11 @@ if (NULL == (iFile = fopen (include_filename, "w"))) {
     printf ("Error Opening '%s' for output: %s\n", include_filename, strerror(errno));
     return -1;
     }
+load_filename = strrchr (rom_filename, '/');
+if (load_filename)
+    ++load_filename;
+else
+    load_filename = rom_filename;
 time (&now);
 fprintf (iFile, "#ifndef ROM_%s_H\n", rom_array_name);
 fprintf (iFile, "#define ROM_%s_H 0\n", rom_array_name);
@@ -270,6 +302,9 @@ fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(
 fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\n", (int)statb.st_size, (int)statb.st_size, checksum);
 fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\n");
 fprintf (iFile, "*/\n");
+fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\n", (int)statb.st_size);
+fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\n", load_filename);
+fprintf (iFile, "#define BOOT_CODE_ARRAY %s\n", rom_array_name);
 fprintf (iFile, "unsigned char %s[] = {", rom_array_name);
 for (bytes_written=0;bytes_written<statb.st_size; ++bytes_written) {
     c = ROMData[bytes_written];

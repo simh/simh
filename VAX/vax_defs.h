@@ -736,11 +736,19 @@ void cpu_idle (void);
 #include "vax730_defs.h"
 #elif defined (VAX_610)
 #include "vax610_defs.h"
-#else
+#elif defined (VAX_620) || defined (VAX_630)
+#include "vax630_defs.h"
+#else /* VAX 3900 */
 #include "vaxmod_defs.h"
 #endif
 #ifndef CPU_MODEL_MODIFIERS
 #define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
 #endif
+
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_ARRAY NULL
+#define BOOT_CODE_SIZE 0
+#endif
+extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset);
 
 #endif                                                  /* _VAX_DEFS_H */

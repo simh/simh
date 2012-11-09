@@ -490,6 +490,17 @@ VAX610 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_io_lib.c
 VAX610_OPT = -DVM_VAX -DVAX_610 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
+VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c ${VAXD}/vax_syscm.c \
+	${VAXD}/vax_watch.c ${VAXD}/vax630_stddev.c ${VAXD}/vax630_sysdev.c \
+	${VAXD}/vax630_io.c ${VAXD}/vax630_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_vh.c \
+	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_io_lib.c
+VAX620_OPT = -DVM_VAX -DVAX_620 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
@@ -685,8 +696,8 @@ SWTP6800_OPT = -I ${SWTP6800D}
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax610 vax730 vax750 vax780 nova eclipse \
-	hp2100 i1401 i1620 s3 altair altairz80 gri \
+	vax vax610 vax620 vax630 vax730 vax750 vax780 \
+	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
 	swtp6800mp-a swtp6800mp-a2
 
@@ -780,6 +791,18 @@ vax610 : ${BIN}vax610${EXE}
 ${BIN}vax610${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
+
+vax620 : ${BIN}vax620${EXE}
+
+${BIN}vax620${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
+
+vax630 : ${BIN}vax630${EXE}
+
+${BIN}vax630${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
 
 vax730 : ${BIN}vax730${EXE}
 

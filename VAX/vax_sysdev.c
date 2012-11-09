@@ -54,12 +54,26 @@
 
 #include "vax_defs.h"
 
-#ifndef DONT_USE_INTERNAL_ROM
-#include "vax_ka655x_bin.h"
-#endif
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_FILENAME "ka655x.bin"
+#else /* !DONT_USE_INTERNAL_ROM */
+#include "vax_ka655x_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
 
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
+
+extern CTAB *sim_vm_cmd;
+
+t_stat vax_boot (int32 flag, char *ptr);
+
+/* Special boot command, overrides regular boot */
+
+CTAB vax_cmd[] = {
+    { "BOOT", &vax_boot, RU_BOOT,
+      "bo{ot}                   boot simulator\n", &run_cmd_message },
+    { NULL }
+    };
 
 /* Console storage control/status */
 
@@ -1541,6 +1555,23 @@ JUMP (ROMBASE);                                         /* PC = 20040000 */
 return 0;                                               /* new cc = 0 */
 }
 
+/* Special boot command - linked into SCP by initial reset
+
+   Syntax: BOOT {CPU}
+
+*/
+
+t_stat vax_boot (int32 flag, char *ptr)
+{
+char gbuf[CBUFSIZE];
+
+get_glyph (ptr, gbuf, 0);                           /* get glyph */
+if (gbuf[0] && strcmp (gbuf, "CPU"))
+    return SCPE_ARG;                                /* Only can specify CPU device */
+return run_cmd (flag, "CPU");
+}
+
+
 /* Bootstrap */
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
@@ -1556,28 +1587,9 @@ conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL)
     return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
-    printf ("Loading boot code from ka655x.bin\n");
-    if (sim_log)
-        fprintf (sim_log, "Loading boot code from ka655x.bin\n");
-    r = load_cmd (0, "-R ka655x.bin");
-    if (r != SCPE_OK) {
-#ifndef DONT_USE_INTERNAL_ROM
-        FILE *f;
-
-        if ((f = sim_fopen ("ka655x.bin", "wb"))) {
-            printf ("Saving boot code to ka655x.bin\n");
-            if (sim_log)
-                fprintf (sim_log, "Saving boot code to ka655x.bin\n");
-            sim_fwrite (vax_ka655x_bin, sizeof(vax_ka655x_bin[0]), sizeof(vax_ka655x_bin)/sizeof(vax_ka655x_bin[0]), f);
-            fclose (f);
-            printf ("Loading boot code from ka655x.bin\n");
-            if (sim_log)
-                fprintf (sim_log, "Loading boot code from ka655x.bin\n");
-            r = load_cmd (0, "-R ka655x.bin");
-            }
-#endif
+    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
+    if (r != SCPE_OK)
         return r;
-        }
     }
 sysd_powerup ();
 return SCPE_OK;
@@ -1603,6 +1615,7 @@ cso_csr = CSR_DONE;
 cso_unit.buf = 0;
 sim_cancel (&cso_unit);
 CLR_INT (CSO);
+sim_vm_cmd = vax_cmd;
 return SCPE_OK;
 }
 

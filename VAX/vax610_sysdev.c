@@ -34,9 +34,11 @@
 #include "vax_defs.h"
 #include <time.h>
 
-#ifndef DONT_USE_INTERNAL_ROM
-#include "vax_ka610_bin.h"
-#endif
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_FILENAME "ka610.bin"
+#else /* !DONT_USE_INTERNAL_ROM */
+#include "vax_ka610_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
 
 /* MicroVAX I boot device definitions */
 
@@ -466,30 +468,9 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-printf ("Loading boot code from ka610.bin\n");
-if (sim_log) fprintf (sim_log, 
-    "Loading boot code from ka610.bin\n");
-r = load_cmd (0, "-O ka610.bin 200");
-if (r != SCPE_OK) {
-#ifndef DONT_USE_INTERNAL_ROM
-    FILE *f;
-
-    if ((f = sim_fopen ("ka610.bin", "wb"))) {
-        printf ("Saving boot code to ka610.bin\n");
-        if (sim_log)
-            fprintf (sim_log, "Saving boot code to ka610.bin\n");
-        sim_fwrite (vax_ka610_bin, sizeof(vax_ka610_bin[0]), sizeof(vax_ka610_bin)/sizeof(vax_ka610_bin[0]), f);
-        fclose (f);
-        printf ("Loading boot code from ka610.bin\n");
-        if (sim_log)
-            fprintf (sim_log, "Loading boot code from ka610.bin\n");
-        r = load_cmd (0, "-O ka610.bin 200");
-        if (r == SCPE_OK)
-            SP = PC = 512;
-        }
-#endif
+r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
+if (r != SCPE_OK)
     return r;
-    }
 SP = PC = 512;
 AP = 1;
 return SCPE_OK;
