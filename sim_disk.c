@@ -3244,14 +3244,13 @@ while (sects) {
     uint32 BitMapBytes = (7+(NtoHl (hVHD->Dynamic.BlockSize)/SectorSize))/8;
     uint32 BitMapSectors = (BitMapBytes+SectorSize-1)/SectorSize;
 
-    SectorsInRead = 1;
+    SectorsInRead = SectorsPerBlock - lba%SectorsPerBlock;
+    if (SectorsInRead > sects)
+        SectorsInRead = sects;
     if (hVHD->BAT[BlockNumber] == VHD_BAT_FREE_ENTRY) {
         if (!hVHD->Parent)
-            memset (buf, 0, SectorSize);
+            memset (buf, 0, SectorSize*SectorSize);
         else {
-            SectorsInRead = SectorsPerBlock - lba%SectorsPerBlock;
-            if (SectorsInRead > sects)
-                SectorsInRead = sects;
             if (ReadVirtualDiskSectors(hVHD->Parent,
                                        buf,
                                        SectorsInRead,
@@ -3266,9 +3265,6 @@ while (sects) {
         }
     else {
         BlockOffset = SectorSize*((uint64)(NtoHl (hVHD->BAT[BlockNumber]) + lba%SectorsPerBlock + BitMapSectors));
-        SectorsInRead = SectorsPerBlock - lba%SectorsPerBlock;
-        if (SectorsInRead > sects)
-            SectorsInRead = sects;
         if (ReadFilePosition(hVHD->File,
                              buf,
                              SectorsInRead*SectorSize,
