@@ -244,6 +244,7 @@ static t_stat sim_vhd_disk_implemented (void);
 static FILE *sim_vhd_disk_open (const char *rawdevicename, const char *openmode);
 static FILE *sim_vhd_disk_create (const char *szVHDPath, t_addr desiredsize);
 static FILE *sim_vhd_disk_create_diff (const char *szVHDPath, const char *szParentVHDPath);
+static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD);
 static int sim_vhd_disk_close (FILE *f);
 static void sim_vhd_disk_flush (FILE *f);
 static t_addr sim_vhd_disk_size (FILE *f);
@@ -812,7 +813,7 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
         }
     return SCPE_ARG;
     }
-if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & copy contents? */
+else if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & copy contents? */
     char gbuf[CBUFSIZE];
     FILE *vhd;
     int saved_sim_switches = sim_switches;
@@ -883,6 +884,24 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         /* fall through and open/return the newly created & copied vhd */
         }
     }
+else if (sim_switches & SWMASK ('M')) {                 /* merge difference disk? */
+    char gbuf[CBUFSIZE], *Parent;
+    FILE *vhd;
+
+    sim_switches = sim_switches & ~(SWMASK ('M'));
+    get_glyph_nc (cptr, gbuf, 0);                       /* get spec */
+    vhd = sim_vhd_disk_merge (gbuf, &Parent);
+    if (vhd) {
+        t_stat r;
+
+        sim_vhd_disk_close (vhd);
+        r = sim_disk_attach (uptr, Parent, sector_size, xfer_element_size, dontautosize, dbit, dtype, pdp11tracksize, completion_delay);
+        free (Parent);
+        return r;
+        }
+    return SCPE_ARG;
+    }
+
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* SIMH format */
         if (NULL == (uptr->fileref = sim_vhd_disk_open (cptr, "rb"))) {
@@ -1820,7 +1839,12 @@ static t_stat sim_vhd_disk_implemented (void)
 return SCPE_NOFNC;
 }
 
-static FILE *sim_vhd_disk_open (const char *rawdevicename, const char *openmode)
+static FILE *sim_vhd_disk_open (const char *vhdfilename, const char *openmode)
+{
+return NULL;
+}
+
+static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
 {
 return NULL;
 }
@@ -2591,6 +2615,127 @@ Cleanup_Return:
     return (FILE *)hVHD;
     }
 
+static t_stat
+WriteVirtualDiskSectors(VHDHANDLE hVHD,
+                        uint8 *buf,
+                        t_seccnt sects,
+                        t_seccnt *sectswritten,
+                        uint32 SectorSize,
+                        t_lba lba);
+
+static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
+    {
+    VHDHANDLE hVHD = calloc (1, sizeof(*hVHD));
+    VHDHANDLE Parent = NULL;
+    int Status;
+    uint32 SectorSize, SectorsPerBlock, BlockSize, BlockNumber, BitMapBytes, BitMapSectors, BlocksToMerge, NeededBlock;
+    uint64 BlockOffset;
+    size_t BytesRead, SectorsWritten;
+    void *BlockData = NULL;
+
+    if (!hVHD)
+        return (FILE *)hVHD;
+    if (0 != (Status = GetVHDFooter (szVHDPath, 
+                                     &hVHD->Footer, 
+                                     &hVHD->Dynamic, 
+                                     &hVHD->BAT,
+                                     NULL,
+                                     hVHD->ParentVHDPath,
+                                     sizeof (hVHD->ParentVHDPath))))
+        goto Cleanup_Return;
+    if (NtoHl (hVHD->Footer.DiskType) != VHD_DT_Differencing) {
+        Status = EINVAL;
+        goto Cleanup_Return;
+        }
+    if (hVHD->Footer.SavedState) {
+        Status = EAGAIN;                                /* Busy */
+        goto Cleanup_Return;
+        }
+    SectorSize = 512;
+    BlockSize = NtoHl (hVHD->Dynamic.BlockSize);
+    BlockData = malloc (BlockSize*SectorSize);
+    if (NULL == BlockData) {
+        Status = errno;
+        goto Cleanup_Return;
+        }
+    Parent = (VHDHANDLE)sim_vhd_disk_open (hVHD->ParentVHDPath, "rb+");
+    if (!Parent) {
+        Status = errno;
+        goto Cleanup_Return;
+        }
+    hVHD->File = sim_fopen (szVHDPath, "rb");
+    if (!hVHD->File) {
+        Status = errno;
+        goto Cleanup_Return;
+        }
+    SectorsPerBlock = NtoHl (hVHD->Dynamic.BlockSize)/SectorSize;
+    BitMapBytes = (7+(NtoHl (hVHD->Dynamic.BlockSize)/SectorSize))/8;
+    BitMapSectors = (BitMapBytes+SectorSize-1)/SectorSize;
+    for (BlockNumber=BlocksToMerge=0; BlockNumber< NtoHl (hVHD->Dynamic.MaxTableEntries); ++BlockNumber) {
+        if (hVHD->BAT[BlockNumber] == VHD_BAT_FREE_ENTRY)
+            continue;
+        ++BlocksToMerge;
+        }
+    if (!sim_quiet)
+        printf ("Merging %s\ninto %s\n", szVHDPath, hVHD->ParentVHDPath);
+    for (BlockNumber=NeededBlock=0; BlockNumber < NtoHl (hVHD->Dynamic.MaxTableEntries); ++BlockNumber) {
+        uint32 BlockSectors = SectorsPerBlock;
+
+        if (hVHD->BAT[BlockNumber] == VHD_BAT_FREE_ENTRY)
+            continue;
+        ++NeededBlock;
+        BlockOffset = SectorSize*((uint64)(NtoHl (hVHD->BAT[BlockNumber]) + BitMapSectors));
+        if ((BlockNumber*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
+            BlockSectors = (uint32)(((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize - (BlockNumber*SectorsPerBlock));
+        if (ReadFilePosition(hVHD->File,
+                             BlockData,
+                             SectorSize*BlockSectors,
+                             &BytesRead,
+                             BlockOffset))
+            break;
+        if (WriteVirtualDiskSectors (Parent, 
+                                     BlockData, 
+                                     BlockSectors, 
+                                     &SectorsWritten, 
+                                     SectorSize, 
+                                     SectorsPerBlock*BlockNumber))
+            break;
+        if (!sim_quiet)
+            printf ("Merged %dMB.  %d%% complete.\r", (int)(((float)NeededBlock*SectorsPerBlock)*SectorSize/1000000), (int)((NeededBlock*100)/BlocksToMerge));
+        hVHD->BAT[BlockNumber] = VHD_BAT_FREE_ENTRY;
+        }
+    if (BlockNumber < NtoHl (hVHD->Dynamic.MaxTableEntries)) {
+        Status = errno;
+        }
+    else {
+        Status = 0;
+        if (!sim_quiet)
+            printf ("Merged %dMB.  100%% complete.\n", (int)(((float)NeededBlock*SectorsPerBlock)*SectorSize/1000000));
+        fclose (hVHD->File);
+        hVHD->File = NULL;
+        remove (szVHDPath);
+        *ParentVHD = malloc (strlen (hVHD->ParentVHDPath)+1);
+        strcpy (*ParentVHD, hVHD->ParentVHDPath);
+        }
+Cleanup_Return:
+    free (BlockData);
+    if (hVHD->File)
+        fclose (hVHD->File);
+    if (Status) {
+        free (hVHD->BAT);
+        free (hVHD);
+        hVHD = NULL;
+        sim_vhd_disk_close ((FILE *)Parent);
+        }
+    else {
+        free (hVHD->BAT);
+        free (hVHD);
+        hVHD = Parent;
+        }
+    errno = Status;
+    return (FILE *)hVHD;
+    }
+
 static int sim_vhd_disk_close (FILE *f)
 {
 VHDHANDLE hVHD = (VHDHANDLE)f;
@@ -3306,11 +3451,12 @@ while (sects) {
                               NULL,
                               BlockOffset))
             goto Fatal_IO_Error;
+        /* Write back just the aligned sector which contains the updated BAT entry */
         BATUpdateBufferAddress = ((uint8 *)hVHD->BAT) + 
-            (((((size_t)&hVHD->BAT[BlockNumber]) - ((size_t)hVHD->BAT) + VHD_DATA_BLOCK_ALIGNMENT - 1)/VHD_DATA_BLOCK_ALIGNMENT)*VHD_DATA_BLOCK_ALIGNMENT);
-        BATUpdateBufferSize = SectorSize*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries)+511)/512);
-        if (BATUpdateBufferSize > VHD_DATA_BLOCK_ALIGNMENT)
-            BATUpdateBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
+            (((((size_t)&hVHD->BAT[BlockNumber]) - (size_t)hVHD->BAT)/VHD_DATA_BLOCK_ALIGNMENT)*VHD_DATA_BLOCK_ALIGNMENT);
+        BATUpdateBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
+        if ((size_t)(BATUpdateBufferAddress - (uint8 *)hVHD->BAT + BATUpdateBufferSize) > 512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512))
+            BATUpdateBufferSize = 512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512) - (BATUpdateBufferAddress - ((uint8 *)hVHD->BAT));
         BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset) + BATUpdateBufferAddress - ((uint8 *)hVHD->BAT);
         if (WriteFilePosition(hVHD->File,
                               BATUpdateBufferAddress,
@@ -3320,17 +3466,22 @@ while (sects) {
             goto Fatal_IO_Error;
         if (hVHD->Parent)
             { /* Need to populate data block contents from parent VHD */
+            uint32 BlockSectors = SectorsPerBlock;
+
             BlockData = malloc(SectorsPerBlock*SectorSize);
+
+            if (((lba/SectorsPerBlock)*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
+                BlockSectors = (uint32)(((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize - (lba/SectorsPerBlock)*SectorsPerBlock);
             if (ReadVirtualDiskSectors(hVHD->Parent,
                                        BlockData, 
-                                       SectorsPerBlock,
+                                       BlockSectors,
                                        NULL,
                                        SectorSize,
                                        (lba/SectorsPerBlock)*SectorsPerBlock))
                 goto Fatal_IO_Error;
             if (WriteVirtualDiskSectors(hVHD,
                                         BlockData, 
-                                        SectorsPerBlock,
+                                        BlockSectors,
                                         NULL,
                                         SectorSize,
                                         (lba/SectorsPerBlock)*SectorsPerBlock))
