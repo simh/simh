@@ -356,7 +356,7 @@ patch   date            module(s) and fix(es)
                         - moved all Qbus devices to BR4; deleted RP definitions
 
 
-/* V3.8 revision history
+   V3.8 revision history
 
   1     08-Feb-09       scp.c:
                         - revised RESTORE unit logic for consistency
@@ -709,7 +709,7 @@ patch   date            module(s) and fix(es)
                         - fixed declarations (Mark Pizzolato)
 
 
-/* V3.7 revision history 
+   V3.7 revision history 
 
   3     02-Sep-07       scp.c:
                         - fixed bug in SET THROTTLE command
@@ -981,7 +981,7 @@ patch   date            module(s) and fix(es)
                         - fixed operand order in EIS instructions (W.F.J. Mueller)
 
 
-/* V3.6 revision history 
+   V3.6 revision history 
 
   1     25-Jul-06       sim_console.c:
                         - implemented SET/SHOW PCHAR
@@ -1155,7 +1155,7 @@ patch   date            module(s) and fix(es)
                         - fixed bug in reported VA on faulting cross-page write
 
 
-/* V3.5 revision history 
+   V3.5 revision history 
 
 patch   date            module(s) and fix(es)
 
@@ -1291,7 +1291,7 @@ patch   date            module(s) and fix(es)
 
                         vax_io.c: revised autoconfiguration algorithm and interface
 
-/* V3.4 revision history 
+   V3.4 revision history 
 
   0     01-May-04       scp.c:
                         - fixed ASSERT code
@@ -1329,7 +1329,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_tu.c: fixed error reporting
 
-/* V3.3 revision history 
+   V3.3 revision history 
 
   2     08-Mar-05       scp.c: added ASSERT command (Dave Bryan)
 
@@ -1581,7 +1581,7 @@ patch   date            module(s) and fix(es)
                         - split from vax_sys.c
                         - removed PTR, PTP
 
-/* V3.2 revision history 
+   V3.2 revision history 
 
   3     03-Sep-04       scp.c:
                         - added ECHO command (Dave Bryan)
@@ -1780,7 +1780,7 @@ patch   date            module(s) and fix(es)
                         - added PC read fault in EXTxV
                         - fixed PC write fault in INSV
 
-/* V3.1 revision history
+   V3.1 revision history
 
   0     29-Dec-03       sim_defs.h, scp.c: added output stall status
 
@@ -1893,7 +1893,7 @@ patch   date            module(s) and fix(es)
                         - revised instruction decoding
                         - added instruction history
 
-/* V3.0 revision history 
+   V3.0 revision history 
 
   2     15-Sep-03       scp.c:
                         - fixed end-of-file problem in dep, idep
@@ -2059,7 +2059,7 @@ patch   date            module(s) and fix(es)
 
                         gri_cpu.c: fixed bug in SC queue pointer management
 
-/* V2.10 revision history
+   V2.10 revision history
 
   4     03-Mar-03       scp.c
                         - added .ini startup file capability
@@ -2357,7 +2357,7 @@ patch   date            module(s) and fix(es)
 
                         IBM 1620: first release
 
-/* V2.9 revision history
+   V2.9 revision history
 
   11    20-Jul-02       i1401_mt.c: on read, end of record stores group mark
                            without word mark (Van Snyder)

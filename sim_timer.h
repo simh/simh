@@ -111,7 +111,9 @@ void sim_start_timer_services (void);
 void sim_stop_timer_services (void);
 t_stat sim_timer_change_asynch (void);
 t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
-int32 sim_timer_inst_per_sec (void);
+t_stat sim_register_clock_unit (UNIT *uptr);
+t_stat sim_clock_coschedule (UNIT *uptr, int32 interval);
+double sim_timer_inst_per_sec (void);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */

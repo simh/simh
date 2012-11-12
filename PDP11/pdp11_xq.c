@@ -435,10 +435,10 @@ REG xqb_reg[] = {
 };
 
 MTAB xq_mod[] = {
-	{ MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
-		NULL, &show_addr, NULL },
-	{ MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-		NULL, &show_vec, NULL },
+  { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
+    NULL, &show_addr, NULL },
+  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+    NULL, &show_vec, NULL },
   { MTAB_XTD | MTAB_VDV, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xq_setmac, &xq_showmac, NULL },
   { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", "ETH",
@@ -2139,13 +2139,20 @@ void xq_start_receiver(CTLR* xq)
     return;
 
   /* start the read service timer or enable asynch reading as appropriate */
-  if (xq->var->must_poll)
-    sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
+  if (xq->var->must_poll) {
+    if (sim_idle_enab)
+      sim_clock_coschedule(xq->unit, tmxr_poll);
+    else
+      sim_activate(xq->unit, (tmr_poll*clk_tps)/xq->var->poll);
+    }
   else
     if ((xq->var->poll == 0) || (xq->var->mode == XQ_T_DELQA_PLUS))
       eth_set_async(xq->var->etherface, xq->var->coalesce_latency_ticks);
     else
-      sim_activate(xq->unit, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
+      if (sim_idle_enab)
+        sim_clock_coschedule(xq->unit, tmxr_poll);
+      else
+        sim_activate(xq->unit, (tmr_poll*clk_tps)/xq->var->poll);
 }
 
 void xq_stop_receiver(CTLR* xq)
@@ -2520,7 +2527,10 @@ t_stat xq_svc(UNIT* uptr)
 
   /* resubmit service timer */
   if ((xq->var->must_poll) || (xq->var->poll && (xq->var->mode != XQ_T_DELQA_PLUS)))
-    sim_activate(uptr, (sim_idle_enab ? clk_cosched(tmxr_poll) : (tmr_poll*clk_tps)/xq->var->poll));
+    if (sim_idle_enab)
+      sim_clock_coschedule(uptr, tmxr_poll);
+    else
+      sim_activate(uptr, (tmr_poll*clk_tps)/xq->var->poll);
 
   return SCPE_OK;
 }

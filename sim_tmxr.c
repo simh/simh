@@ -699,6 +699,25 @@ for (i = 0; i < mp->lines; i++) {                       /* initialize lines */
 return SCPE_OK;
 }
 
+/* Declare which unit polls for input 
+
+   Inputs:
+        *mp     =       the mux
+        line    =       the line number
+        *uptr_poll =    the unit which polls
+
+   Outputs:
+        none
+
+   Implementation note:
+
+        Only devices which poll on a unit different from the unit provided
+        at MUX attach time need call this function.  Calling this API is
+        necessary for asynchronous multiplexer support and unnecessary 
+        otherwise.
+
+*/
+
 t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll)
 {
 if ((line < 0) || (line >= mp->lines))
@@ -717,6 +736,33 @@ if (!(uptr->flags & UNIT_TM_POLL)) {
     }
 else
     sim_cancel (uptr);
+return SCPE_OK;
+}
+
+/* Declare which unit polls for output 
+
+   Inputs:
+        *mp     =       the mux
+        line    =       the line number
+        *uptr_poll =    the unit which polls for output
+
+   Outputs:
+        none
+
+   Implementation note:
+
+        Only devices which poll on a unit different from the unit provided
+        at MUX attach time need call this function AND different from the
+        unit which polls for input.  Calling this API is necessary for 
+        asynchronous multiplexer support and unnecessary otherwise.
+
+*/
+
+t_stat tmxr_set_line_output_unit (TMXR *mp, int line, UNIT *uptr_poll)
+{
+if ((line < 0) || (line >= mp->lines))
+    return SCPE_ARG;
+mp->ldsc[line].o_uptr = uptr_poll;
 return SCPE_OK;
 }
 
@@ -770,7 +816,7 @@ while (sim_asynch_enabled) {
 
     if ((tmxr_open_device_count == 0) || (!sim_is_running)) {
         for (j=0; j<wait_count; ++j) {
-            sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Removing interest in %s%d. Other interest: %d\n", d->name, (int)(activated[j]-d->units), activated[j]->a_poll_waiter_count);
+            sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Removing interest in %s. Other interest: %d\n", sim_uname(activated[j]), activated[j]->a_poll_waiter_count);
             --activated[j]->a_poll_waiter_count;
             --sim_tmxr_poll_count;
             }
@@ -827,7 +873,7 @@ while (sim_asynch_enabled) {
                         mp->uptr->a_polling_now = TRUE;
                         mp->uptr->a_poll_waiter_count = 0;
                         d = find_dev_from_unit(mp->uptr);
-                        sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Activating %s%d to poll connect\n", d->name, (int)(mp->uptr-d->units));
+                        sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Activating %s to poll connect\n", sim_uname(mp->uptr));
                         pthread_mutex_unlock (&sim_tmxr_poll_lock);
                         _sim_activate (mp->uptr, 0);
                         pthread_mutex_lock (&sim_tmxr_poll_lock);
@@ -847,8 +893,8 @@ while (sim_asynch_enabled) {
                                 mp->ldsc[j].uptr->a_polling_now = TRUE;
                                 mp->ldsc[j].uptr->a_poll_waiter_count = 0;
                                 d = find_dev_from_unit(mp->ldsc[j].uptr);
-                                sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Line %d Activating %s%d to poll data: %d/%d\n", 
-                                    j, d->name, (int)(mp->ldsc[j].uptr-d->units), tmxr_tqln(&mp->ldsc[j]), tmxr_rqln (&mp->ldsc[j]));
+                                sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Line %d Activating %s to poll data: %d/%d\n", 
+                                    j, sim_uname(mp->ldsc[j].uptr), tmxr_tqln(&mp->ldsc[j]), tmxr_rqln (&mp->ldsc[j]));
                                 pthread_mutex_unlock (&sim_tmxr_poll_lock);
                                 _sim_activate (mp->ldsc[j].uptr, 0);
                                 pthread_mutex_lock (&sim_tmxr_poll_lock);
@@ -884,14 +930,14 @@ while (sim_asynch_enabled) {
                             activated[j]->a_polling_now = TRUE;
                             activated[j]->a_poll_waiter_count = 1;
                             d = find_dev_from_unit(activated[j]);
-                            sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Activating for data %s%d\n", d->name, (int)(activated[j]-d->units));
+                            sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Activating for data %s\n", sim_uname(activated[j]));
                             pthread_mutex_unlock (&sim_tmxr_poll_lock);
                             _sim_activate (activated[j], 0);
                             pthread_mutex_lock (&sim_tmxr_poll_lock);
                             }
                         else {
                             d = find_dev_from_unit(activated[j]);
-                            sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Already Activated %s%d %d times\n", d->name, (int)(activated[j]-d->units), activated[j]->a_poll_waiter_count);
+                            sim_debug (TMXR_DBG_ASY, d, "_tmxr_poll() - Already Activated %s%d %d times\n", sim_uname(activated[j]), activated[j]->a_poll_waiter_count);
                             ++activated[j]->a_poll_waiter_count;
                             }
                         }
@@ -1040,10 +1086,8 @@ else {
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
             fprintf (st, "Line: %d", j);
-            if (lp->uptr && (lp->uptr != lp->mp->uptr)) {
-                DEVICE *dptr = find_dev_from_unit (lp->uptr);
-                fprintf (st, " - Unit: %s%d\n", dptr->name, (int)(lp->uptr-dptr->units));
-                }
+            if (lp->uptr && (lp->uptr != lp->mp->uptr))
+                fprintf (st, " - Unit: %s\n", sim_uname (lp->uptr));
             else
                 fprintf (st, "\n");
             if (!lp->conn)
@@ -1154,6 +1198,19 @@ if ((!(uptr->flags & UNIT_TM_POLL)) ||
 return SCPE_OK;
 #else
 return _sim_activate_after (uptr, usecs_walltime);
+#endif
+}
+
+t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
+{
+#if defined(SIM_ASYNCH_IO)
+if ((!(uptr->flags & UNIT_TM_POLL)) || 
+    (!sim_asynch_enabled)) {
+    return sim_clock_coschedule (uptr, interval);
+    }
+return SCPE_OK;
+#else
+return sim_clock_coschedule (uptr, interval);
 #endif
 }
 

@@ -321,7 +321,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
+sim_clock_coschedule (uptr, KBD_WAIT (uptr->wait, tmr_poll));
                                                         /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
@@ -403,16 +403,6 @@ tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
 if (!todr_blow && todr_reg)                             /* if running? */
     todr_reg = todr_reg + 1;                            /* incr TODR */
 return SCPE_OK;
-}
-
-/* Clock coscheduling routine */
-
-int32 clk_cosched (int32 wait)
-{
-int32 t;
-
-t = sim_is_active (&clk_unit);
-return (t? t - 1: wait);
 }
 
 int32 todr_rd (void)
@@ -498,6 +488,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
+sim_register_clock_unit (&clk_unit);
 clk_csr = 0;
 CLR_INT (CLK);
 if (!sim_is_running) {                                  /* RESET (not IORESET)? */

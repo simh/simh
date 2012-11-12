@@ -491,6 +491,8 @@ DEBTAB cpu_deb[] = {
     { "INTEXC", LOG_CPU_I },
     { "REI", LOG_CPU_R },
     { "CONTEXT", LOG_CPU_P },
+    { "EVENT", SIM_DBG_EVENT },
+    { "ACTIVATE", SIM_DBG_ACTIVATE },
     { NULL, 0 }
     };
 

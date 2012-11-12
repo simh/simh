@@ -343,7 +343,7 @@ static DIB vh_dib = {
 
 static UNIT vh_unit[VH_MUXES] = {
     { UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
-    { UDATA (&vh_timersvc, 0, 0) },
+    { UDATA (&vh_timersvc, UNIT_IDLE, 0) },
 };
 
 static const REG vh_reg[] = {
@@ -841,9 +841,9 @@ static t_stat vh_wr (   int32   data,
             if ((vh_unit[vh].flags & UNIT_MODEDHU) && (data & CSR_SKIP))
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
-                sim_activate (&vh_unit[0], clk_cosched (tmxr_poll));
+                sim_clock_coschedule (&vh_unit[0], tmxr_poll);
             vh_mcount[vh] = MS2SIMH (1200); /* 1.2 seconds */
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
@@ -875,7 +875,7 @@ static t_stat vh_wr (   int32   data,
             break;
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (vh_unit[vh].flags & UNIT_MODEDHU) {
@@ -920,7 +920,7 @@ static t_stat vh_wr (   int32   data,
     case 2:     /* LPR */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -947,7 +947,7 @@ static t_stat vh_wr (   int32   data,
     case 3:     /* STAT/FIFODATA */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -971,7 +971,7 @@ static t_stat vh_wr (   int32   data,
     case 4:     /* LNCTRL */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)   
@@ -1039,7 +1039,7 @@ static t_stat vh_wr (   int32   data,
     case 5:     /* TBUFFAD1 */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)   
@@ -1055,7 +1055,7 @@ static t_stat vh_wr (   int32   data,
     case 6:     /* TBUFFAD2 */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1076,7 +1076,7 @@ static t_stat vh_wr (   int32   data,
     case 7:     /* TBUFFCT */
         if ((data == RESET_ABORT) && (vh_csr[vh] & CSR_MASTER_RESET)) {
             vh_mcount[vh] = 1;
-            sim_activate (&vh_unit[1], clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
             break;
         }
         if (CSR_GETCHAN (vh_csr[vh]) >= VH_LINES)
@@ -1154,7 +1154,7 @@ static t_stat vh_timersvc (  UNIT    *uptr   )
         }
     }
     if (again)
-        sim_activate (uptr, clk_cosched (tmxr_poll)); /* requeue ourselves */
+        sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
     return (SCPE_OK);
 }
 

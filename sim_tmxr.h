@@ -91,7 +91,8 @@ struct tmln {
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                *txb;                           /* xmt buffer */
     TMXR                *mp;                            /* back pointer to mux */
-    UNIT                *uptr;                          /* pointer to receive poll unit */
+    UNIT                *uptr;                          /* input polling unit (default to mp->uptr) */
+    UNIT                *o_uptr;                        /* output polling unit (default to lp->uptr)*/
     };
 
 struct tmxr {
@@ -101,7 +102,7 @@ struct tmxr {
     TMLN                *ldsc;                          /* line descriptors */
     int32               *lnorder;                       /* line connection order */
     DEVICE              *dptr;                          /* multiplexer device */
-    UNIT                *uptr;                          /* polling unit */
+    UNIT                *uptr;                          /* polling unit (connection) */
     char                logfiletmpl[FILENAME_MAX];      /* template logfile name */
     int32               txcount;                        /* count of transmit bytes */
     int32               buffered;                       /* Buffered Line Behavior and Buffer Size Flag */
@@ -119,6 +120,7 @@ t_stat tmxr_close_master (TMXR *mp);
 t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async);
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr);
 t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
+t_stat tmxr_set_line_output_unit (TMXR *mp, int line, UNIT *uptr_poll);
 t_stat tmxr_set_console_input_unit (UNIT *uptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -140,6 +142,7 @@ t_stat tmxr_show_lines (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_open_devices (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
 t_stat tmxr_activate (UNIT *uptr, int32 interval);
 t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime);
+t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval);
 t_stat tmxr_change_async (void);
 t_stat tmxr_startup (void);
 t_stat tmxr_shutdown (void);
@@ -156,6 +159,7 @@ extern FILE *sim_deb;                                   /* debug file */
 #if (!defined(NOT_MUX_USING_CODE))
 #define sim_activate tmxr_activate
 #define sim_activate_after tmxr_activate_after
+#define sim_clock_coschedule tmxr_clock_coschedule 
 #endif
 #else
 #define tmxr_attach(mp, uptr, cptr) tmxr_attach_ex(mp, uptr, cptr, FALSE)

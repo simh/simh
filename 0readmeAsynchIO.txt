@@ -272,6 +272,34 @@ drifted some 4 minutes in 35 minutes time (approximately 10%).  The same OS
 disk also running with idling enabled booted for 4 hours had less that 5 
 seconds of clock drift (approximately 0.03%).
 
+Co-Scheduling Clock and Multiplexer (or other devices)
+
+Many simulator devices have needs to periodically executed with timing on the
+order of the simulated system's clock ticks.  There are numerous reasons for
+this type of execution.  Meanwhile, many of these events aren't particular 
+about exactly when they execute as long as they execute frequently enough.
+Frequently executing events has the potential to interfere with a simulator's
+attempts to idle when the simulated system isn't actually doing useful work.
+
+Interactions with attempts to 'co-schedule' multiplexer polling with clock
+ticks can cause strange simulator behaviors.  These strange behaviors only 
+happen under a combination of conditions:
+  1) a multiplexer device is defined in the simulator configuration,
+  2) the multiplexor device is NOT attached, and thus is not being managed by
+     the asynchronous multiplexer support
+  3) the multiplexer device schedules polling (co-scheduled) when not 
+     attached (such polling will never produce anything input).
+In prior simh versions support for clock co-scheduling was implmented 
+separately by each simulator, and usually was expressed by code of the form:
+    sim_activate (uptr, clk_cosched (tmxr_poll));
+As a part of asynchronous timer support, the simulator framework has been 
+extended to generically provide clock co-scheduling support.  The use of this
+new capability requires an initial call (usually in the clock device reset 
+routing) of the form: 
+    sim_register_clock_unit (&clk_unit);
+Once the clock unit has been registered, co-scheduling is achieved by replacing
+the earlier sim_activate with the following:
+    sim_clock_coschedule (&dz_unit, tmxr_poll);
 
 Run time requirements to use SIM_ASYNCH_IO.
 The Posix threads API (pthreads) is required for asynchronous execution.

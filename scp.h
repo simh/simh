@@ -103,6 +103,7 @@ t_stat deassign_device (DEVICE *dptr);
 t_stat reset_all (uint32 start_device);
 t_stat reset_all_p (uint32 start_device);
 char *sim_dname (DEVICE *dptr);
+char *sim_uname (UNIT *dptr);
 t_stat get_yn (char *ques, t_stat deflt);
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
 char *get_glyph (char *iptr, char *optr, char mchar);

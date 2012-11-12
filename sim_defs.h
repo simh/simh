@@ -527,6 +527,9 @@ struct sim_debtab {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
 
+#define SIM_DBG_EVENT       0x10000
+#define SIM_DBG_ACTIVATE    0x20000
+
 /* File Reference */
 struct sim_fileref {
     char                name[CBUFSIZE];                 /* file name */
@@ -579,6 +582,7 @@ typedef struct sim_fileref FILEREF;
 #include "sim_timer.h"
 #include "sim_ether.h"
 #include "sim_fio.h"
+#include "sim_tmxr.h"
 
 /* Asynch/Threaded I/O support */
 
@@ -598,10 +602,24 @@ extern pthread_cond_t sim_tmxr_poll_cond;
 extern pthread_mutex_t sim_tmxr_poll_lock;
 extern pthread_t sim_asynch_main_threadid;
 extern UNIT * volatile sim_asynch_queue;
+extern UNIT * volatile sim_clock_cosched_queue;
 extern volatile t_bool sim_idle_wait;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
+
+/* Thread local storage */
+#if defined(__GNUC__) && !defined(__APPLE__)
+#define AIO_TLS __thread
+#elif defined(__DECC_VER) || defined(_MSC_VER)
+#define AIO_TLS __declspec(thread)
+#else
+/* Other compiler environment, then don't worry about thread local storage. */
+/* It is primarily used only used in debugging messages */
+#define AIO_TLS
+#endif
+
+
 
 #define AIO_INIT                                                  \
     if (1) {                                                      \
@@ -662,6 +680,23 @@ extern int32 sim_asynch_inst_latency;
                 }                                                 \
             if ((uptr)->next == NULL)                             \
                 (uptr)->a_due_time = (uptr)->a_usec_delay = 0;    \
+            else {                                                \
+                nptr = QUEUE_LIST_END;                            \
+                if ((uptr) == sim_clock_cosched_queue) {          \
+                    sim_clock_cosched_queue = (uptr)->next;       \
+                    (uptr)->next = NULL;                          \
+                    }                                             \
+                else                                              \
+                    for (cptr = sim_clock_cosched_queue;          \
+                        (cptr != QUEUE_LIST_END);                 \
+                        cptr = cptr->next)                        \
+                        if (cptr->next == (uptr)) {               \
+                            cptr->next = (uptr)->next;            \
+                            nptr = cptr;                          \
+                            (uptr)->next = NULL;                  \
+                            break;                                \
+                            }                                     \
+                }                                                 \
             pthread_mutex_unlock (&sim_timer_lock);               \
             }                                                     \
         }                                                         \
@@ -674,10 +709,12 @@ extern int32 sim_asynch_inst_latency;
              cptr != QUEUE_LIST_END;                              \
              cptr = cptr->next)                                   \
             if ((uptr) == cptr) {                                 \
-                int32 inst_per_sec = sim_timer_inst_per_sec ();   \
+                double inst_per_sec = sim_timer_inst_per_sec ();  \
                 int32 result;                                     \
                                                                   \
                 result = (int32)(((uptr)->a_due_time - sim_timenow_double())*inst_per_sec);\
+                if (result < 0)                                   \
+                    result = 0;                                   \
                 pthread_mutex_unlock (&sim_timer_lock);           \
                 return result + 1;                                \
                 }                                                 \
@@ -756,10 +793,8 @@ extern int32 sim_asynch_inst_latency;
     } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                                   \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) {           \
-      DEVICE *d;                                                                 \
-      if (sim_deb)                                                               \
-          d = find_dev_from_unit(uptr);                                          \
-      sim_debug (TIMER_DBG_QUEUE, &sim_timer_dev, "asynch event on %s after %d instructions\n", d->name, event_time);\
+      UNIT *ouptr = (uptr);                                                      \
+      sim_debug (TIMER_DBG_QUEUE, &sim_timer_dev, "asynch event on %s after %d instructions\n", sim_uname(uptr), event_time);\
       if (uptr->a_next) {                               /* already queued? */    \
         uptr->a_activate_call = sim_activate_abs;                                \
       } else {                                                                   \
@@ -781,7 +816,7 @@ extern int32 sim_asynch_inst_latency;
       }                                                                          \
       sim_asynch_check = 0;                             /* try to force check */ \
       if (sim_idle_wait) {                                                       \
-        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", d->name, event_time);\
+        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(ouptr), event_time);\
         pthread_cond_signal (&sim_idle_wake);                                    \
         }                                                                        \
       return SCPE_OK;                                                            \
@@ -858,6 +893,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_EVENT_BEGIN(uptr)
 #define AIO_EVENT_COMPLETE(uptr, reason)
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)
+#define AIO_TLS
 #endif /* SIM_ASYNCH_IO */
 
 #endif

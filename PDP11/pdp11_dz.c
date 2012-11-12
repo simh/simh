@@ -334,7 +334,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if (data & CSR_CLR)                             /* clr? reset */
             dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
-            sim_activate (&dz_unit, clk_cosched (tmxr_poll));
+            sim_clock_coschedule (&dz_unit, tmxr_poll);
         else dz_csr[dz] &= ~(CSR_SA | CSR_RDONE | CSR_TRDY);
         if ((data & CSR_RIE) == 0)                      /* RIE = 0? */
             dz_clr_rxint (dz);
@@ -439,7 +439,7 @@ if (t) {                                                /* any enabled? */
     dz_update_rcvi ();                                  /* upd rcv intr */
     tmxr_poll_tx (&dz_desc);                            /* poll output */
     dz_update_xmti ();                                  /* upd xmt intr */
-    sim_activate (uptr, clk_cosched (tmxr_poll));       /* reactivate */
+    sim_clock_coschedule (uptr, tmxr_poll);             /* reactivate */
     }
 return SCPE_OK;
 }
