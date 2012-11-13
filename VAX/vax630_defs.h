@@ -47,8 +47,8 @@
 #undef FULL_VAX
 #endif
 
-#ifndef _VAXMOD_DEFS_H_
-#define _VAXMOD_DEFS_H_ 1
+#ifndef _VAX_630_DEFS_H_
+#define _VAX_630_DEFS_H_ 1
 
 /* Microcode constructs */
 
@@ -172,8 +172,6 @@
 #define LP_MBZ84_TEST(r)
 #define LP_MBZ92_TEST(r)
 
-#define SCB_VALID       (ADDR_IS_MEM(SCBB) || ADDR_IS_ROM(SCBB))
-
 /* Qbus I/O modes */
 
 #define READ            0                               /* PDP-11 compatibility */
@@ -196,10 +194,6 @@
 /* Timers */
 
 #define TMR_CLK         0                               /* 100Hz clock */
-
-/* Internal I/O interrupts */
-
-#define IPL_CLKINT      0x16                            /* clock IPL */
 
 /* I/O system definitions */
 
@@ -286,7 +280,8 @@ typedef struct {
 #define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
 #define IOLN_PTP        004
 
-/* The KA65x maintains 4 separate hardware IPL levels, IPL 17 to IPL 14
+/* The KA620/KA630 maintains 4 separate hardware IPL levels, IPL 17 to IPL 14;
+   however, DEC Qbus controllers all interrupt on IPL 14
    Within each IPL, priority is right to left
 */
 
@@ -298,39 +293,37 @@ typedef struct {
 
 /* IPL 15 */
 
+/* IPL 14 - devices through RY are IPL 15 on Unibus systems */
+
 #define INT_V_RQ        0                               /* RQDX3 */
 #define INT_V_RL        1                               /* RLV12/RL02 */
 #define INT_V_DZRX      2                               /* DZ11 */
 #define INT_V_DZTX      3
-#define INT_V_RP        4                               /* RP,RM drives */
-#define INT_V_TS        5                               /* TS11/TSV05 */
-#define INT_V_TQ        6                               /* TMSCP */
-#define INT_V_XQ        7                               /* DEQNA/DELQA */
-#define INT_V_RY        8                               /* RXV21 */
+#define INT_V_TS        4                               /* TS11/TSV05 */
+#define INT_V_TQ        5                               /* TMSCP */
+#define INT_V_XQ        6                               /* DEQNA/DELQA */
+#define INT_V_RY        7                               /* RXV21 */
 
-/* IPL 14 */
-
-#define INT_V_TTI       0                               /* console */
-#define INT_V_TTO       1
-#define INT_V_PTR       2                               /* PC11 */
-#define INT_V_PTP       3
-#define INT_V_LPT       4                               /* LP11 */
-#define INT_V_CSI       5                               /* SSC cons UART */
-#define INT_V_CSO       6
-#define INT_V_TMR0      7                               /* SSC timers */
-#define INT_V_TMR1      8
-#define INT_V_VHRX      9                               /* DHQ11 */
-#define INT_V_VHTX      10 
-#define INT_V_QDSS      11                              /* QDSS */
-#define INT_V_CR        12
-#define INT_V_QVSS      13                              /* QVSS */
+#define INT_V_TTI       8                               /* console */
+#define INT_V_TTO       9
+#define INT_V_PTR       10                              /* PC11 */
+#define INT_V_PTP       11
+#define INT_V_LPT       12                              /* LP11 */
+#define INT_V_CSI       13                              /* SSC cons UART */
+#define INT_V_CSO       14
+#define INT_V_TMR0      15                              /* SSC timers */
+#define INT_V_TMR1      16
+#define INT_V_VHRX      17                              /* DHQ11 */
+#define INT_V_VHTX      18 
+#define INT_V_QDSS      19                              /* QDSS */
+#define INT_V_CR        20
+#define INT_V_QVSS      21                              /* QVSS */
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
 #define INT_RL          (1u << INT_V_RL)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
-#define INT_RP          (1u << INT_V_RP)
 #define INT_TS          (1u << INT_V_TS)
 #define INT_TQ          (1u << INT_V_TQ)
 #define INT_XQ          (1u << INT_V_XQ)
@@ -351,15 +344,14 @@ typedef struct {
 #define INT_QVSS        (1u << INT_V_QVSS)
 
 #define IPL_CLK         (0x16 - IPL_HMIN)                       /* relative IPL */
-#define IPL_RQ          (0x15 - IPL_HMIN)
-#define IPL_RL          (0x15 - IPL_HMIN)
-#define IPL_DZRX        (0x15 - IPL_HMIN)
-#define IPL_DZTX        (0x15 - IPL_HMIN)
-#define IPL_RP          (0x15 - IPL_HMIN)
-#define IPL_TS          (0x15 - IPL_HMIN)
-#define IPL_TQ          (0x15 - IPL_HMIN)
-#define IPL_XQ          (0x15 - IPL_HMIN)
-#define IPL_RY          (0x15 - IPL_HMIN)
+#define IPL_RQ          (0x14 - IPL_HMIN)
+#define IPL_RL          (0x14 - IPL_HMIN)
+#define IPL_DZRX        (0x14 - IPL_HMIN)
+#define IPL_DZTX        (0x14 - IPL_HMIN)
+#define IPL_TS          (0x14 - IPL_HMIN)
+#define IPL_TQ          (0x14 - IPL_HMIN)
+#define IPL_XQ          (0x14 - IPL_HMIN)
+#define IPL_RY          (0x14 - IPL_HMIN)
 #define IPL_TTI         (0x14 - IPL_HMIN)
 #define IPL_TTO         (0x14 - IPL_HMIN)
 #define IPL_PTR         (0x14 - IPL_HMIN)
@@ -393,7 +385,6 @@ typedef struct {
 #define VEC_LPT         (VEC_Q + 0200)
 #define VEC_TS          (VEC_Q + 0224)
 #define VEC_CR          (VEC_Q + 0230)
-#define VEC_RP          (VEC_Q + 0254)
 #define VEC_TQ          (VEC_Q + 0260)
 #define VEC_RX          (VEC_Q + 0264)
 #define VEC_RY          (VEC_Q + 0264)
