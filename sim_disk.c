@@ -136,7 +136,7 @@ if ((!callback) || !ctx->asynch_io)
                                                                 \
         sim_debug (ctx->dbit, ctx->dptr,                        \
       "sim_disk AIO_CALL(op=%d, unit=%d, lba=0x%X, sects=%d)\n",\
-                   op, uptr-ctx->dptr->units, _lba, _sects);    \
+                op, (int)(uptr-ctx->dptr->units), _lba, _sects);\
                                                                 \
         if (ctx->callback)                                      \
             abort(); /* horrible mistake, stop */               \
@@ -174,7 +174,7 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
-sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) starting\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) starting\n", (int)(uptr-ctx->dptr->units));
 
 pthread_mutex_lock (&ctx->io_lock);
 pthread_cond_signal (&ctx->startup_cond);   /* Signal we're ready to go */
@@ -200,7 +200,7 @@ while (ctx->asynch_io) {
     }
 pthread_mutex_unlock (&ctx->io_lock);
 
-sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) exiting\n", uptr-ctx->dptr->units);
+sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) exiting\n", (int)(uptr-ctx->dptr->units));
 
 return NULL;
 }
@@ -221,7 +221,7 @@ static void _disk_completion_dispatch (UNIT *uptr)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 DISK_PCALLBACK callback = ctx->callback;
 
-sim_debug (ctx->dbit, ctx->dptr, "_disk_completion_dispatch(unit=%d, dop=%d, callback=%p)\n", uptr-ctx->dptr->units, ctx->io_dop, ctx->callback);
+sim_debug (ctx->dbit, ctx->dptr, "_disk_completion_dispatch(unit=%d, dop=%d, callback=%p)\n", (int)(uptr-ctx->dptr->units), ctx->io_dop, ctx->callback);
 
 if (ctx->io_dop != DOP_DONE)
     abort();                                            /* horribly wrong, stop */
@@ -263,6 +263,8 @@ static t_stat sim_os_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *s
 static t_stat sim_os_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
 static t_stat sim_os_disk_info_raw (FILE *f, uint32 *sector_size, uint32 *removable);
 static t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec);
+static char *HostPathToVhdPath (const char *szHostPath, char *szVhdPath, size_t VhdPathSize);
+static char *VhdPathToHostPath (const char *szVhdPath, char *szHostPath, size_t HostPathSize);
 
 struct sim_disk_fmt {
     char                *name;                          /* name */
@@ -475,7 +477,7 @@ uint32 err, tbc;
 size_t i;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "_sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "_sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 da = ((t_addr)lba) * ctx->sector_size;
 tbc = sects * ctx->sector_size;
@@ -499,7 +501,7 @@ t_stat r;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 t_seccnt sread;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 if ((sects == 1) &&                                     /* Single sector reads */
     (lba >= (uptr->capac*ctx->capac_factor)/ctx->sector_size)) {/* beyond the end of the disk */
@@ -532,7 +534,7 @@ if ((0 == (ctx->sector_size & (ctx->storage_sector_size - 1))) ||   /* Sector Al
     return r;
     }
 else { /* Unaligned and/or partial sector transfers */
-    uint8 *tbuf = malloc (sects*ctx->sector_size + 2*ctx->storage_sector_size);
+    uint8 *tbuf = (uint8*) malloc (sects*ctx->sector_size + 2*ctx->storage_sector_size);
     t_lba sspsts = ctx->storage_sector_size/ctx->sector_size; /* sim sectors in a storage sector */
     t_lba tlba = lba & ~(sspsts - 1);
     t_seccnt tsects = sects + (lba - tlba);
@@ -591,7 +593,7 @@ uint32 err, tbc;
 size_t i;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "_sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "_sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 da = ((t_addr)lba) * ctx->sector_size;
 tbc = sects * ctx->sector_size;
@@ -614,7 +616,7 @@ uint32 f = DK_GET_FMT (uptr);
 t_stat r;
 uint8 *tbuf = NULL;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 if (f == DKUF_F_STD)
     return _sim_disk_wrsect (uptr, lba, buf, sectswritten, sects);
@@ -632,7 +634,7 @@ if ((0 == (ctx->sector_size & (ctx->storage_sector_size - 1))) ||   /* Sector Al
                 return SCPE_NOFNC;
             }
 
-    tbuf = malloc (sects * ctx->sector_size);
+    tbuf = (uint8*) malloc (sects * ctx->sector_size);
     if (NULL == tbuf)
         return SCPE_MEM;
     sim_buf_copy_swapped (tbuf, buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
@@ -654,7 +656,7 @@ else { /* Unaligned and/or partial sector transfers */
     t_lba tlba = lba & ~(sspsts - 1);
     t_seccnt tsects = sects + (lba - tlba);
 
-    tbuf = malloc (sects*ctx->sector_size + 2*ctx->storage_sector_size);
+    tbuf = (uint8*) malloc (sects*ctx->sector_size + 2*ctx->storage_sector_size);
     tsects = (tsects + (sspsts - 1)) & ~(sspsts - 1);
     if (sectswritten)
         *sectswritten = 0;
@@ -813,7 +815,7 @@ if (sim_switches & SWMASK ('D')) {                      /* create difference dis
         }
     return SCPE_ARG;
     }
-else if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & copy contents? */
+if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & copy contents? */
     char gbuf[CBUFSIZE];
     FILE *vhd;
     int saved_sim_switches = sim_switches;
@@ -844,7 +846,7 @@ else if (sim_switches & SWMASK ('C')) {                      /* create vhd disk 
         return SCPE_OPENERR;
         }
     else {
-        uint8 *copy_buf = malloc (1024*1024);
+        uint8 *copy_buf = (uint8*) malloc (1024*1024);
         t_lba lba;
         t_seccnt sectors_per_buffer = (t_seccnt)((1024*1024)/sector_size);
         t_lba total_sectors = (t_lba)((uptr->capac*capac_factor)/sector_size);
@@ -1170,7 +1172,7 @@ void sim_disk_data_trace(UNIT *uptr, const uint8 *data, size_t lba, size_t len, 
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 if (ctx->dptr->dctrl & reason) {
-    sim_debug (reason, ctx->dptr, "%s%d %s lbn: %08X len: %08X\n", ctx->dptr->name, uptr-ctx->dptr->units, txt, lba, len);
+    sim_debug (reason, ctx->dptr, "%s%d %s lbn: %08X len: %08X\n", ctx->dptr->name, (int)(uptr-ctx->dptr->units), txt, lba, len);
     if (detail) {
         size_t i, same, group, sidx, oidx;
         char outbuf[80], strbuf[18];
@@ -1620,7 +1622,7 @@ OVERLAPPED pos;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 long long addr;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 addr = ((long long)lba) * ctx->sector_size;
 memset (&pos, 0, sizeof (pos));
@@ -1641,7 +1643,7 @@ OVERLAPPED pos;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 long long addr;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 addr = ((long long)lba) * ctx->sector_size;
 memset (&pos, 0, sizeof (pos));
@@ -1722,7 +1724,7 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 off_t addr;
 ssize_t bytesread;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 addr = ((off_t)lba) * ctx->sector_size;
 bytesread = pread((int)((long)uptr->fileref), buf, sects * ctx->sector_size, addr); 
@@ -1742,7 +1744,7 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 off_t addr;
 ssize_t byteswritten;
 
-sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", uptr-ctx->dptr->units, lba, sects);
+sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 addr = ((off_t)lba) * ctx->sector_size;
 byteswritten = pwrite((int)((long)uptr->fileref), buf, sects * ctx->sector_size, addr); 
@@ -1918,7 +1920,7 @@ typedef struct _VHD_Footer {
     table displays the list of features. 
     Any fields not listed are reserved. 
 
-    Feature	Value:
+    Feature Value:
        No features enabled     0x00000000
        Temporary               0x00000001
        Reserved                0x00000002
@@ -2320,7 +2322,7 @@ static
 int
 GetVHDFooter(const char *szVHDPath, 
              VHD_Footer *sFooter, 
-	     VHD_DynamicDiskHeader *sDynamic,
+             VHD_DynamicDiskHeader *sDynamic,
              uint32 **aBAT,
              uint32 *ModifiedTimeStamp,
              char *szParentVHDPath,
@@ -2412,9 +2414,8 @@ if ((sDynamic) &&
         Return = errno;
         goto Return_Cleanup;
         }
-    if (aBAT)
-        {
-        *aBAT = malloc(512*((sizeof(**aBAT)*NtoHl(sDynamic->MaxTableEntries)+511)/512));
+    if (aBAT) {
+        *aBAT = (uint32*) malloc(512*((sizeof(**aBAT)*NtoHl(sDynamic->MaxTableEntries)+511)/512));
         if (ReadFilePosition(File, 
                              *aBAT, 
                              sizeof (**aBAT)*NtoHl(sDynamic->MaxTableEntries), 
@@ -2428,27 +2429,27 @@ if ((sDynamic) &&
         VHD_Footer sParentFooter;
 
         memset (szParentVHDPath, '\0', ParentVHDPathSize);
-        if (NtoHl (sFooter->DiskType) == VHD_DT_Differencing)
-            {
+        if (NtoHl (sFooter->DiskType) == VHD_DT_Differencing) {
             size_t i, j;
 
-            for (j=0; j<8; ++j)
-            {
+            for (j=0; j<8; ++j) {
                 uint8 *Pdata;
-                char ParentName[256];
-                char CheckPath[256];
+                uint32 PdataSize;
+                char ParentName[512];
+                char CheckPath[512];
                 uint32 ParentModificationTime;
 
                 if ('\0' == sDynamic->ParentLocatorEntries[j].PlatformCode[0])
                     continue;
                 memset (ParentName, '\0', sizeof(ParentName));
                 memset (CheckPath, '\0', sizeof(CheckPath));
-                Pdata = calloc (1, NtoHl(sDynamic->ParentLocatorEntries[j].PlatformDataSpace)+1);
+                PdataSize = NtoHl(sDynamic->ParentLocatorEntries[j].PlatformDataSpace);
+                Pdata = (uint8*) calloc (1, PdataSize+2);
                 if (!Pdata)
                     continue;
                 if (ReadFilePosition(File, 
                                      Pdata, 
-                                     NtoHl (sDynamic->ParentLocatorEntries[j].PlatformDataSpace), 
+                                     PdataSize, 
                                      NULL, 
                                      NtoHll (sDynamic->ParentLocatorEntries[j].PlatformDataOffset))) {
                     free (Pdata);
@@ -2464,14 +2465,15 @@ if ((sDynamic) &&
                 free (Pdata);
                 if (0 == memcmp (sDynamic->ParentLocatorEntries[j].PlatformCode, "W2ku", 4))
                     strncpy (CheckPath, ParentName, sizeof (CheckPath)-1);
-            else
-                if (0 == memcmp (sDynamic->ParentLocatorEntries[j].PlatformCode, "W2ru", 4)) {
-	            char *c;
+                else
+                    if (0 == memcmp (sDynamic->ParentLocatorEntries[j].PlatformCode, "W2ru", 4)) {
+                        const char *c;
 
-	            if ((c = strrchr (szVHDPath, '/')) || (c = strrchr (szVHDPath, '\\')))
-	                memcpy (CheckPath, szVHDPath, c-szVHDPath+1);
-                    strncpy (CheckPath+strlen(CheckPath), ParentName, sizeof (CheckPath)-(strlen (CheckPath)+1));
-	            }
+                        if ((c = strrchr (szVHDPath, '\\')))
+                             memcpy (CheckPath, szVHDPath, c-szVHDPath+1);
+                             strncpy (CheckPath+strlen(CheckPath), ParentName, sizeof (CheckPath)-(strlen (CheckPath)+1));
+                        }
+                VhdPathToHostPath (CheckPath, CheckPath, sizeof (CheckPath));
                 if ((0 == GetVHDFooter(CheckPath, 
                                        &sParentFooter, 
                                        NULL,
@@ -2480,12 +2482,11 @@ if ((sDynamic) &&
                                        NULL, 
                                        0)) &&
                     (0 == memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID))) &&
-                    (sDynamic->ParentTimeStamp == ParentModificationTime))
-                    {
+                    (sDynamic->ParentTimeStamp == ParentModificationTime)) {
                     strncpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
                     break;
                     }
-            }
+                }
             if (!szParentVHDPath)
                 Return = EINVAL;                        /* File Corrupt */
             }
@@ -2576,23 +2577,41 @@ return (char *)(&hVHD->Footer.DriveType[0]);
 
 static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess)
     {
-    VHDHANDLE hVHD = calloc (1, sizeof(*hVHD));
+    VHDHANDLE hVHD = (VHDHANDLE) calloc (1, sizeof(*hVHD));
     int Status;
 
     if (!hVHD)
         return (FILE *)hVHD;
-    if (0 != (Status = GetVHDFooter (szVHDPath, 
-                                     &hVHD->Footer, 
-                                     &hVHD->Dynamic, 
-                                     &hVHD->BAT,
-                                     NULL,
-                                     hVHD->ParentVHDPath,
-                                     sizeof (hVHD->ParentVHDPath))))
+    Status = GetVHDFooter (szVHDPath, 
+                           &hVHD->Footer, 
+                           &hVHD->Dynamic, 
+                           &hVHD->BAT,
+                           NULL,
+                           hVHD->ParentVHDPath,
+                           sizeof (hVHD->ParentVHDPath));
+    if (Status)
         goto Cleanup_Return;
     if (NtoHl (hVHD->Footer.DiskType) == VHD_DT_Differencing) {
+        uint32 ParentModifiedTimeStamp;
+        VHD_Footer ParentFooter;
+        VHD_DynamicDiskHeader ParentDynamic;
+
         hVHD->Parent = (VHDHANDLE)sim_vhd_disk_open (hVHD->ParentVHDPath, "rb");
         if (!hVHD->Parent) {
             Status = errno;
+            goto Cleanup_Return;
+            }
+        Status = GetVHDFooter (hVHD->ParentVHDPath, 
+                               &ParentFooter, 
+                               &ParentDynamic, 
+                               NULL,
+                               &ParentModifiedTimeStamp,
+                               NULL,
+                               0);
+        if (Status)
+            goto Cleanup_Return;
+        if (ParentModifiedTimeStamp != hVHD->Dynamic.ParentTimeStamp) {
+            Status = EBADF;
             goto Cleanup_Return;
             }
         }
@@ -2607,8 +2626,7 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
         }
 Cleanup_Return:
     if (Status) {
-        free (hVHD->BAT);
-        free (hVHD);
+        sim_vhd_disk_close ((FILE *)hVHD);
         hVHD = NULL;
         }
     errno = Status;
@@ -2625,12 +2643,13 @@ WriteVirtualDiskSectors(VHDHANDLE hVHD,
 
 static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
     {
-    VHDHANDLE hVHD = calloc (1, sizeof(*hVHD));
+    VHDHANDLE hVHD = (VHDHANDLE) calloc (1, sizeof(*hVHD));
     VHDHANDLE Parent = NULL;
     int Status;
     uint32 SectorSize, SectorsPerBlock, BlockSize, BlockNumber, BitMapBytes, BitMapSectors, BlocksToMerge, NeededBlock;
     uint64 BlockOffset;
-    size_t BytesRead, SectorsWritten;
+    size_t BytesRead;
+    t_seccnt SectorsWritten;
     void *BlockData = NULL;
 
     if (!hVHD)
@@ -2694,7 +2713,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
                              BlockOffset))
             break;
         if (WriteVirtualDiskSectors (Parent, 
-                                     BlockData, 
+                                     (uint8*)BlockData, 
                                      BlockSectors, 
                                      &SectorsWritten, 
                                      SectorSize, 
@@ -2714,7 +2733,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
         fclose (hVHD->File);
         hVHD->File = NULL;
         remove (szVHDPath);
-        *ParentVHD = malloc (strlen (hVHD->ParentVHDPath)+1);
+        *ParentVHD = (char*) malloc (strlen (hVHD->ParentVHDPath)+1);
         strcpy (*ParentVHD, hVHD->ParentVHDPath);
         }
 Cleanup_Return:
@@ -2794,7 +2813,7 @@ RPC_STATUS
 (RPC_ENTRY *UuidCreate_c) (void *);
 
 if (!UuidCreate_c) {
-    HMODULE hDll;
+    HINSTANCE hDll;
     hDll = LoadLibraryA("rpcrt4.dll");
     UuidCreate_c = (RPC_STATUS (RPC_ENTRY *) (void *))GetProcAddress(hDll, "UuidCreate");
     }
@@ -2816,7 +2835,7 @@ void *handle;
 #define __STR(tok) __STR_QUOTE(tok)
     handle = dlopen("libuuid." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (handle)
-        uuid_generate_c = dlsym(handle, "uuid_generate");
+        uuid_generate_c = (void (*)(void *)) dlsym(handle, "uuid_generate");
 if (uuid_generate_c)
     uuid_generate_c(uuidaddr);
 else
@@ -2847,6 +2866,7 @@ FILE *File = NULL;
 uint32 Status = 0;
 uint32 BytesPerSector = 512;
 uint64 SizeInBytes = ((uint64)SizeInSectors)*BytesPerSector;
+uint64 TableOffset;
 uint32 MaxTableEntries;
 VHDHANDLE hVHD = NULL;
 
@@ -2854,7 +2874,8 @@ if (SizeInBytes > ((uint64)(1024*1024*1024))*2040) {
     Status = EFBIG;
     goto Cleanup_Return;
     }
-if (NULL != (File = sim_fopen (szVHDPath, "rb"))) {
+File = sim_fopen (szVHDPath, "rb");
+if (File) {
     fclose (File);
     File = NULL;
     Status = EEXIST;
@@ -2908,7 +2929,7 @@ if (1) { /* CHS Calculation */
             {
             sectorsPerTrack = 31;
             heads = 16;
-            cylinderTimesHeads = totalSectors / sectorsPerTrack;	
+            cylinderTimesHeads = totalSectors / sectorsPerTrack;
             }
         if (cylinderTimesHeads >= (heads * 1024))
             {
@@ -2936,7 +2957,10 @@ if (bFixedVHD) {
 memset (&Dynamic, 0, sizeof(Dynamic));
 memcpy (Dynamic.Cookie, "cxsparse", 8);
 Dynamic.DataOffset = NtoHll (0xFFFFFFFFFFFFFFFFLL);
-Dynamic.TableOffset = NtoHll ((uint64)(BytesPerSector*((sizeof(Dynamic)+sizeof(Footer)+BytesPerSector-1)/BytesPerSector)));
+TableOffset = (uint64)(BytesPerSector*((sizeof(Dynamic)+sizeof(Footer)+BytesPerSector-1)/BytesPerSector));
+TableOffset += VHD_DATA_BLOCK_ALIGNMENT-1;
+TableOffset &= ~(VHD_DATA_BLOCK_ALIGNMENT-1);
+Dynamic.TableOffset = NtoHll (TableOffset);
 Dynamic.HeaderVersion = NtoHl (0x00010000);
 if (0 == BlockSize)
     BlockSize = 2*1024*1024;
@@ -2944,7 +2968,7 @@ Dynamic.BlockSize = NtoHl (BlockSize);
 MaxTableEntries = (uint32)((SizeInBytes+BlockSize-1)/BlockSize);
 Dynamic.MaxTableEntries = NtoHl (MaxTableEntries);
 Dynamic.Checksum = NtoHl (CalculateVhdFooterChecksum(&Dynamic, sizeof(Dynamic)));
-BAT = malloc (BytesPerSector*((MaxTableEntries*sizeof(*BAT)+BytesPerSector-1)/BytesPerSector));
+BAT = (uint32*) malloc (BytesPerSector*((MaxTableEntries*sizeof(*BAT)+BytesPerSector-1)/BytesPerSector));
 memset (BAT, 0, BytesPerSector*((MaxTableEntries*sizeof(*BAT)+BytesPerSector-1)/BytesPerSector));
 for (i=0; i<MaxTableEntries; ++i)
     BAT[i] = VHD_BAT_FREE_ENTRY;
@@ -3004,11 +3028,92 @@ ExpandToFullPath (const char *szFileSpec,
                   char *szFullFileSpecBuffer,
                   size_t BufferSize)
 {
+char *c;
 #ifdef _WIN32
+for (c = strchr (szFullFileSpecBuffer, '/'); c; c = strchr (szFullFileSpecBuffer, '/'))
+    *c = '\\';
 GetFullPathNameA (szFileSpec, (DWORD)BufferSize, szFullFileSpecBuffer, NULL);
+for (c = strchr (szFullFileSpecBuffer, '\\'); c; c = strchr (szFullFileSpecBuffer, '\\'))
+    *c = '/';
 #else
-strncpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
+char buffer[PATH_MAX];
+char *wd = getcwd(buffer, PATH_MAX);
+
+if ((szFileSpec[0] != '/') || (strchr (szFileSpec, ':')))
+    snprintf (szFullFileSpecBuffer, BufferSize, "%s/%s", wd, szFileSpec);
+else
+    strncpy (szFullFileSpecBuffer, szFileSpec, BufferSize);
+if ((c = strstr (szFullFileSpecBuffer, "]/")))
+    strcpy (c+1, c+2);
+memset (szFullFileSpecBuffer + strlen (szFullFileSpecBuffer), 0, BufferSize - strlen (szFullFileSpecBuffer));
 #endif
+}
+
+static char *
+HostPathToVhdPath (const char *szHostPath,
+                   char *szVhdPath,
+                   size_t VhdPathSize)
+{
+char *c, *d;
+
+strncpy (szVhdPath, szHostPath, VhdPathSize-1);
+szVhdPath[VhdPathSize-1] = '\0';
+if ((c = strrchr (szVhdPath, ']'))) {
+    *c = '\0';
+    if (!(d = strchr (szVhdPath, '[')))
+        return d;
+    *d = '/';
+    while ((d = strchr (d, '.')))
+        *d = '/';
+    *c = '/';
+    }
+while ((c = strchr (szVhdPath, '/')))
+    *c = '\\';
+for (c = strstr (szVhdPath, "\\.\\"); c; c = strstr (szVhdPath, "\\.\\"))
+    strcpy (c, c+2);
+for (c = strstr (szVhdPath, "\\\\"); c; c = strstr (szVhdPath, "\\\\"))
+    strcpy (c, c+1);
+while ((c = strstr (szVhdPath, "\\..\\"))) {
+    *c = '\0';
+    d = strrchr (szVhdPath, '\\');
+    if (d)
+        strcpy (d, c+3);
+    else
+        return d;
+    }
+memset (szVhdPath + strlen (szVhdPath), 0, VhdPathSize - strlen (szVhdPath));
+return szVhdPath;
+}
+
+static char *
+VhdPathToHostPath (const char *szVhdPath,
+                   char *szHostPath,
+                   size_t HostPathSize)
+{
+char *c;
+char *d = szHostPath;
+
+strncpy (szHostPath, szVhdPath, HostPathSize-1);
+szHostPath[HostPathSize-1] = '\0';
+#if defined(VMS)
+c = strchr (szVhdPath, ':');
+if (*(c+1) != '\\')
+    return NULL;
+*(c+1) = '[';
+d = strrchr (c+2, '\\');
+if (d) {
+    *d = ']';
+    while ((d = strrchr (c+2, '\\')))
+        *d = '.';
+    }
+else
+    return NULL;
+#else
+while ((c = strchr (szHostPath, '\\')))
+    *c = '/';
+#endif
+memset (szHostPath + strlen (szHostPath), 0, HostPathSize - strlen (szHostPath));
+return szHostPath;
 }
 
 static VHDHANDLE
@@ -3023,19 +3128,19 @@ uint32 ParentTimeStamp;
 uint32 Status = 0;
 char *RelativeParentVHDPath = NULL;
 char *FullParentVHDPath = NULL;
-char *RelativeParentVHDPathBuffer = NULL;
-char *FullParentVHDPathBuffer = NULL;
+char *RelativeParentVHDPathUnicode = NULL;
+char *FullParentVHDPathUnicode = NULL;
 char *FullVHDPath = NULL;
 size_t i, RelativeMatch, UpDirectories, LocatorsWritten = 0;
 int64 LocatorPosition;
 
-if (0 != (Status = GetVHDFooter (szParentVHDPath, 
-                                 &ParentFooter, 
-                                 &ParentDynamic, 
-                                 NULL, 
-                                 &ParentTimeStamp,
-                                 NULL, 
-                                 0)))
+if ((Status = GetVHDFooter (szParentVHDPath, 
+                            &ParentFooter, 
+                            &ParentDynamic, 
+                            NULL, 
+                            &ParentTimeStamp,
+                            NULL, 
+                            0)))
     goto Cleanup_Return;
 hVHD = CreateVirtualDisk (szVHDPath,
                           (uint32)(NtoHll(ParentFooter.CurrentSize)/BytesPerSector),
@@ -3045,27 +3150,29 @@ if (!hVHD) {
     Status = errno;
     goto Cleanup_Return;
     }
-LocatorPosition = NtoHll (hVHD->Dynamic.TableOffset)+BytesPerSector*((NtoHl (hVHD->Dynamic.MaxTableEntries)*sizeof(*hVHD->BAT)+BytesPerSector-1)/BytesPerSector);
+LocatorPosition = ((sizeof (hVHD->Footer) + BytesPerSector - 1)/BytesPerSector + (sizeof (hVHD->Dynamic) + BytesPerSector - 1)/BytesPerSector)*BytesPerSector;
 hVHD->Dynamic.Checksum = 0;
-RelativeParentVHDPath = calloc (1, BytesPerSector+2);
-FullParentVHDPath = calloc (1, BytesPerSector+2);
-RelativeParentVHDPathBuffer = calloc (1, BytesPerSector+2);
-FullParentVHDPathBuffer = calloc (1, BytesPerSector+2);
-FullVHDPath = calloc (1, BytesPerSector+2);
+RelativeParentVHDPath = (char*) calloc (1, BytesPerSector+2);
+FullParentVHDPath = (char*) calloc (1, BytesPerSector+2);
+RelativeParentVHDPathUnicode = (char*) calloc (1, BytesPerSector+2);
+FullParentVHDPathUnicode = (char*) calloc (1, BytesPerSector+2);
+FullVHDPath = (char*) calloc (1, BytesPerSector+2);
 ExpandToFullPath (szParentVHDPath, FullParentVHDPath, BytesPerSector);
+HostPathToVhdPath (FullParentVHDPath, FullParentVHDPath, BytesPerSector);
 for (i=0; i < strlen (FullParentVHDPath); i++)
-    hVHD->Dynamic.ParentUnicodeName[i*2+1] = FullParentVHDPath[i];
+    hVHD->Dynamic.ParentUnicodeName[i*2+1] = FullParentVHDPath[i];  /* Big Endian Unicode */
 for (i=0; i < strlen (FullParentVHDPath); i++)
-    FullParentVHDPathBuffer[i*2] = FullParentVHDPath[i];
+    FullParentVHDPathUnicode[i*2] = FullParentVHDPath[i];           /* Little Endian Unicode */
 ExpandToFullPath (szVHDPath, FullVHDPath, BytesPerSector);
+HostPathToVhdPath (FullVHDPath, FullVHDPath, BytesPerSector);
 for (i=0, RelativeMatch=UpDirectories=0; i<strlen(FullVHDPath); i++)
-    if ((FullVHDPath[i] == '\\') || (FullVHDPath[i] == '/'))
+    if (FullVHDPath[i] == '\\')
         if (memcmp (FullVHDPath, FullParentVHDPath, i+1))
             ++UpDirectories;
         else
             RelativeMatch = i;
 if (RelativeMatch) {
-    char UpDir[4] = "../";
+    char UpDir[4] = "..\\";
 
     UpDir[2] = FullParentVHDPath[RelativeMatch];
     if (UpDirectories)
@@ -3076,16 +3183,21 @@ if (RelativeMatch) {
     strcpy (RelativeParentVHDPath+strlen (RelativeParentVHDPath), &FullParentVHDPath[RelativeMatch+1]);
     }
 for (i=0; i < strlen(RelativeParentVHDPath); i++)
-    RelativeParentVHDPathBuffer[i*2] = RelativeParentVHDPath[i];
+    RelativeParentVHDPathUnicode[i*2] = RelativeParentVHDPath[i];
 hVHD->Dynamic.ParentTimeStamp = ParentTimeStamp;
 memcpy (hVHD->Dynamic.ParentUniqueID, ParentFooter.UniqueID, sizeof (hVHD->Dynamic.ParentUniqueID));
 hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataSpace = NtoHl (BytesPerSector);
+hVHD->Dynamic.ParentLocatorEntries[7].Reserved = 0;
 hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
 ++LocatorsWritten;
+memcpy (hVHD->Dynamic.ParentLocatorEntries[6].PlatformCode, "Wi2k", 4);
 hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataSpace = NtoHl (BytesPerSector);
+hVHD->Dynamic.ParentLocatorEntries[6].Reserved = 0;
 hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataOffset = NtoHll (LocatorPosition+LocatorsWritten*BytesPerSector);
 ++LocatorsWritten;
 if (RelativeMatch) {
+    memcpy (hVHD->Dynamic.ParentLocatorEntries[7].PlatformCode, "Wi2r", 4);
+    hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataLength = NtoHl ((uint32)(strlen(RelativeParentVHDPath)));
     memcpy (hVHD->Dynamic.ParentLocatorEntries[5].PlatformCode, "W2ru", 4);
     hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataSpace = NtoHl (BytesPerSector);
     hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataLength = NtoHl ((uint32)(2*strlen(RelativeParentVHDPath)));
@@ -3121,52 +3233,43 @@ if (WriteFilePosition (hVHD->File,
     Status = errno;
     goto Cleanup_Return;
     }
-LocatorsWritten = 0;
-if (RelativeMatch) {
-    if (WriteFilePosition (hVHD->File,
-                           RelativeParentVHDPath,
-                           BytesPerSector,
-                           NULL,
-                           LocatorPosition+LocatorsWritten*BytesPerSector)) {
-        Status = errno;
-        goto Cleanup_Return;
-        }
-    ++LocatorsWritten;
+if (WriteFilePosition (hVHD->File,
+                       &hVHD->Footer,
+                       sizeof (hVHD->Footer),
+                       NULL,
+                       NtoHll (hVHD->Dynamic.TableOffset)+BytesPerSector*((NtoHl (hVHD->Dynamic.MaxTableEntries)*sizeof(*hVHD->BAT)+BytesPerSector-1)/BytesPerSector))) {
+    Status = errno;
+    goto Cleanup_Return;
+    }
+if (WriteFilePosition (hVHD->File,
+                       RelativeParentVHDPath,
+                       BytesPerSector,
+                       NULL,
+                       NtoHll (hVHD->Dynamic.ParentLocatorEntries[7].PlatformDataOffset))) {
+    Status = errno;
+    goto Cleanup_Return;
     }
 if (WriteFilePosition (hVHD->File,
                        FullParentVHDPath,
                        BytesPerSector,
                        NULL,
-                       LocatorPosition+LocatorsWritten*BytesPerSector)) {
+                       NtoHll (hVHD->Dynamic.ParentLocatorEntries[6].PlatformDataOffset))) {
     Status = errno;
     goto Cleanup_Return;
     }
-++LocatorsWritten;
-if (RelativeMatch) {
-    if (WriteFilePosition (hVHD->File,
-                           RelativeParentVHDPathBuffer,
-                           BytesPerSector,
-                           NULL,
-                           LocatorPosition+LocatorsWritten*BytesPerSector)) {
-        Status = errno;
-        goto Cleanup_Return;
-        }
-    ++LocatorsWritten;
-    }
 if (WriteFilePosition (hVHD->File,
-                       FullParentVHDPathBuffer,
+                       RelativeParentVHDPathUnicode,
                        BytesPerSector,
                        NULL,
-                       LocatorPosition+LocatorsWritten*BytesPerSector)) {
+                       NtoHll (hVHD->Dynamic.ParentLocatorEntries[5].PlatformDataOffset))) {
     Status = errno;
     goto Cleanup_Return;
     }
-++LocatorsWritten;
 if (WriteFilePosition (hVHD->File,
-                       &hVHD->Footer,
-                       sizeof(hVHD->Footer),
+                       FullParentVHDPathUnicode,
+                       BytesPerSector,
                        NULL,
-                       LocatorPosition+LocatorsWritten*BytesPerSector)) {
+                       NtoHll (hVHD->Dynamic.ParentLocatorEntries[4].PlatformDataOffset))) {
     Status = errno;
     goto Cleanup_Return;
     }
@@ -3174,8 +3277,8 @@ if (WriteFilePosition (hVHD->File,
 Cleanup_Return:
 free (RelativeParentVHDPath);
 free (FullParentVHDPath);
-free (RelativeParentVHDPathBuffer);
-free (FullParentVHDPathBuffer);
+free (RelativeParentVHDPathUnicode);
+free (FullParentVHDPathUnicode);
 free (FullVHDPath);
 sim_vhd_disk_close ((FILE *)hVHD);
 hVHD = NULL;
@@ -3213,7 +3316,7 @@ ReadVirtualDiskSectors(VHDHANDLE hVHD,
 uint64 BlockOffset = ((uint64)lba)*SectorSize;
 uint32 BlocksRead = 0;
 uint32 SectorsInRead;
-size_t BytesRead;
+size_t BytesRead = 0;
 
 if (!hVHD || (hVHD->File == NULL)) {
     errno = EBADF;
@@ -3249,7 +3352,7 @@ while (sects) {
         SectorsInRead = sects;
     if (hVHD->BAT[BlockNumber] == VHD_BAT_FREE_ENTRY) {
         if (!hVHD->Parent)
-            memset (buf, 0, SectorSize*SectorSize);
+            memset (buf, 0, SectorSize*SectorsInRead);
         else {
             if (ReadVirtualDiskSectors(hVHD->Parent,
                                        buf,
@@ -3343,7 +3446,7 @@ WriteVirtualDiskSectors(VHDHANDLE hVHD,
 uint64 BlockOffset = ((uint64)lba)*SectorSize;
 uint32 BlocksWritten = 0;
 uint32 SectorsInWrite;
-size_t BytesWritten;
+size_t BytesWritten = 0;
 
 if (!hVHD || !hVHD->File) {
     errno = EBADF;
@@ -3397,7 +3500,7 @@ while (sects) {
             return SCPE_IOERR;
         if (BitMapSectors*SectorSize > BitMapBufferSize)
             BitMapBufferSize = BitMapSectors*SectorSize;
-        BitMapBuffer = calloc(1, BitMapBufferSize + SectorSize*SectorsPerBlock);
+        BitMapBuffer = (uint8 *)calloc(1, BitMapBufferSize + SectorSize*SectorsPerBlock);
         if (BitMapBufferSize > BitMapSectors*SectorSize)
             BitMap = BitMapBuffer + BitMapBufferSize-BitMapBytes;
         else
@@ -3469,14 +3572,14 @@ while (sects) {
             if (((lba/SectorsPerBlock)*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
                 BlockSectors = (uint32)(((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize - (lba/SectorsPerBlock)*SectorsPerBlock);
             if (ReadVirtualDiskSectors(hVHD->Parent,
-                                       BlockData, 
+                                       (uint8*) BlockData, 
                                        BlockSectors,
                                        NULL,
                                        SectorSize,
                                        (lba/SectorsPerBlock)*SectorsPerBlock))
                 goto Fatal_IO_Error;
             if (WriteVirtualDiskSectors(hVHD,
-                                        BlockData, 
+                                        (uint8*) BlockData, 
                                         BlockSectors,
                                         NULL,
                                         SectorSize,
