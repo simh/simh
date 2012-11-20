@@ -329,6 +329,7 @@ REG cpu_reg[] = {
     { ORDATA (MBR, MBR, 18) },
     { ORDATA (LR, LR, 18) },
     { ORDATA (TAC, TAC, 18) },
+	{ ORDATA (TBR, TBR, 18) },
     { ORDATA (PF, PF, 18) },
     { BRDATA (PCQ, pcq, 8, ASIZE, PCQ_SIZE), REG_RO+REG_CIRC },
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
