@@ -3,9 +3,13 @@ att petr bin_newMouse_3-22-66.bin
 
 ; The mouse maze game mode is manipulated under TAC control.
 ; 400014 = Erase Wall mode.
+; 400024 = Write Wall mode.
+; 400011 = Erase Cheese mode.
 ; 400021 = Write Cheese mode.
+; 400012 = Erase Mouse mode.
 ; 400022 = Write Mouse mode.
 ; 400002 = "do mouse" (start the mouse searching.)
+; 400017 = "do over"
 
 ; Start in "Erase Wall" mode
 d tac 400014
