@@ -281,16 +281,31 @@ DEVICE tto_dev = {
     petr_dt, NULL
     };
 
-/* Paper tape reader: IOT routine.  Points to note:
+/* Photoelectric Tape Reader:
 
-   - RPA (but not RPB) complements the reader clutch control.  Thus,
-     if the reader is running, RPA will stop it.
-   - The status bit indicates data in the reader buffer that has not
-     been transfered to IR.  It is cleared by any RB->IR operation,
-     including RRB and the completion pulse.
-   - A reader error on a wait mode operation could hang the simulator.
-     IOH is set; any retry (without RESET) will be NOP'd.  Accordingly,
-     the PETR service routine clears IOH on any error during a rpa/rpb i.
+The PETR is a 250 line per minute Ferranti photoelectric paper tape reader
+using standard seven-hole Flexowriter tape that was modified to solid state
+circuitry. Lines without seventh hole punched are ignored by the PETR.
+As each line of the tape is read in, the data is stored into an 18-bit BUF
+register with bits mapped as follows:
+
+Tape	BUF
+0		0
+1		3
+2		6
+3		9
+4		12
+5		15
+
+Up to three lines of tape may be read into a single the single BUF register.
+Before subsequent lines are read, the BUF register is cycled one bit right.
+
+The PETR reads data from or a disk file.  The POS register specifies the
+number of the next data item to be read. Thus, by changing POS, the user can
+backspace or advance the reader.
+
+The PETR supports the BOOT command.  BOOT PETR switches the CPU to Read-In
+mode, and starts the processor running.
 */
 
 int32 petr (int32 inst, int32 dev, int32 dat)
@@ -497,7 +512,7 @@ t_stat petr_boot (int32 unitno, DEVICE *dptr)
 
 }
 
-/* Paper tape punch: IOT routine */
+/* Paper tape punch: punches standard seven-hole Flexowriter tape. */
 
 int32 ptp (int32 inst, int32 dev, int32 dat)
 {
