@@ -3471,7 +3471,7 @@ if (sim_log)
 if (rom)
     sprintf (args, "-R %s", filename);
 else
-    sprintf (args, "-O %s %X", filename, offset);
+    sprintf (args, "-O %s %X", filename, (int)offset);
 r = load_cmd (0, args);
 if (r != SCPE_OK) {
     if (builtin_code) {
