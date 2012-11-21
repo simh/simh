@@ -1217,7 +1217,7 @@ cpu_get_switches(void)
 
 t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
     uint32 cnt = 0, word;
-    t_addr j, lo, hi;
+    t_addr j, lo, hi, sz, sz_words;
     char *result;
 
     if (flag) { /* Dump to file. */
@@ -1225,13 +1225,15 @@ t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
         if (result == NULL) return SCPE_ARG;
 
         for (j = lo; j <= hi; j++) {
-            if (putw(j, fileref)== EOF) return SCPE_IOERR;
-            if (putw(M[j], fileref) == EOF) return SCPE_IOERR;
+            if (sim_fwrite(&j, 4, 1, fileref) == 0) return SCPE_IOERR;
+            if (sim_fwrite(&M[j], 4, 1, fileref) == 0) return SCPE_IOERR;
         }
     } else {
         lo = strtotv(cptr, &result, 8) & 0xFFFF;
-        for (j = lo; !feof(fileref); j++) {
-            if ((word = getw(fileref)) == EOF) break;
+        sz = sim_fsize(fileref);
+        sz_words = sz / 4;
+        for (j = lo; j < sz_words; j++) {
+            sim_fread(&word, 4, 1, fileref);
             M[j] = word;
         }
     }
