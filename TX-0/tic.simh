@@ -1,0 +1,5 @@
+; TX-0 Initialization file for the tic-tac-toe game
+att petr bin_tic-tac-toe_new_code_12-16-61.bin
+boot petr
+g
+

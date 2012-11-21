@@ -632,6 +632,25 @@ SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
 	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
 SWTP6800_OPT = -I ${SWTP6800D}
 
+DISPLAYD = display
+ifeq ($(WIN32),)
+  ifeq (x11,$(shell if $(TEST) -e /usr/include/X11/Intrinsic.h ; then echo x11; fi))
+    DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
+    DISPLAY_OPT = -DUSE_DISPLAY -I/usr/X11/include -lXt -lX11 -lm
+  else
+    DISPLAYL = 
+    DISPLAY_OPT = 
+  endif
+else
+  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/w32.c
+  DISPLAY_OPT = -DUSE_DISPLAY
+endif  
+  
+TX0D = TX-0
+TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
+      ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
+TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
+
 
 #
 # Build everything
@@ -639,7 +658,8 @@ SWTP6800_OPT = -I ${SWTP6800D}
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
 	altair altairz80 gri i7094 ibm1130 id16 \
-	id32 sds lgp h316 swtp6800mp-a swtp6800mp-a2
+	id32 sds lgp h316 swtp6800mp-a swtp6800mp-a2 \
+	tx-0
 
 all : ${ALL}
 
@@ -839,4 +859,10 @@ swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+tx-0 : ${BIN}tx-0${EXE}
+
+${BIN}tx-0${EXE} : ${TX0} ${SIM}
+	${MKDIRBIN}
+	${CC} ${TX0} ${SIM} ${TX0_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
