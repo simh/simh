@@ -479,14 +479,98 @@ MTAB rp_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_TRC  0x0001                                 /* trace routine calls */
+#define DBG_REG  0x0002                                 /* trace read/write registers */
+#define DBG_REQ  0x0004                                 /* display transfer requests */
+#define DBG_DSK  0x0008                                 /* display sim_disk activities */
+#define DBG_DAT  0x0010                                 /* display transfer data */
+
+DEBTAB rp_debug[] = {
+  {"TRACE",  DBG_TRC},
+  {"REG",    DBG_REG},
+  {"REQ",    DBG_REQ},
+  {"DISK",   DBG_DSK},
+  {"DATA",   DBG_DAT},
+  {0}
+};
+
 DEVICE rp_dev = {
     "RP", rp_unit, rp_reg, rp_mod,
     RP_NUMDR, DEV_RDX, 30, 1, DEV_RDX, 16,
     NULL, NULL, &rp_reset,
     &rp_boot, &rp_attach, &rp_detach,
-    &rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_MBUS | DEV_DEBUG
+    &rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_MBUS | DEV_DEBUG,
+    0, rp_debug
     };
 
+char *rp_regnam[] = 
+    {
+    "RP_CS1",    /* 0 */
+    "RP_DS",     /* 1 */
+    "RP_ER1",    /* 2 */
+    "RP_MR",     /* 3 */
+    "RP_AS",     /* 4 */
+    "RP_DA",     /* 5 */
+    "RP_DT",     /* 6 */
+    "RP_LA",     /* 7 */
+    "RP_SN",     /* 8 */
+    "RP_OF",     /* 9 */
+    "RP_DC",     /* 10 */
+    "RP_CC",     /* 11 */
+    "RP_ER2",    /* 12 */
+    "RP_ER3",    /* 13 */
+    "RP_EC1",    /* 14 */
+    "RP_EC2",    /* 15 */
+    "16",        /* 16 */
+    "17",        /* 17 */
+    "18",        /* 18 */
+    "19",        /* 19 */
+    "20",        /* 20 */
+    "21",        /* 21 */
+    "22",        /* 22 */
+    "23",        /* 23 */
+    "24",        /* 24 */
+    "25",        /* 25 */
+    "26",        /* 26 */
+    "27",        /* 27 */
+    "28",        /* 28 */
+    "29",        /* 29 */
+    "30",        /* 30 */
+    "31",        /* 31 */
+    "RM_CS1",    /* 32 */
+    "RM_DS",     /* 33 */
+    "RM_ER1",    /* 34 */
+    "RM_MR",     /* 35 */
+    "RM_AS",     /* 36 */
+    "RM_DA",     /* 37 */
+    "RM_DT",     /* 38 */
+    "RM_LA",     /* 39 */
+    "RM_SN",     /* 40 */
+    "RM_OF",     /* 41 */
+    "RM_DC",     /* 42 */
+    "RM_CC",     /* 43 */
+    "RM_MR2",    /* 44 */
+    "RM_ER2",    /* 45 */
+    "RM_EC1",    /* 46 */
+    "RM_EC2",    /* 47 */
+    "48",        /* 48 */
+    "49",        /* 49 */
+    "50",        /* 50 */
+    "51",        /* 51 */
+    "52",        /* 52 */
+    "53",        /* 53 */
+    "54",        /* 54 */
+    "55",        /* 55 */
+    "56",        /* 56 */
+    "57",        /* 57 */
+    "58",        /* 58 */
+    "59",        /* 59 */
+    "60",        /* 60 */
+    "61",        /* 61 */
+    "62",        /* 62 */
+    "63",        /* 63 */
+    };
 /* Massbus register read */
 
 t_stat rp_mbrd (int32 *data, int32 ofs, int32 drv)
@@ -588,6 +672,8 @@ switch (ofs) {                                          /* decode offset */
         return MBE_NXR;
         }
 
+sim_debug(DBG_REG, &rp_dev, "rp_mbrd(drv=%d, %s=0x%08X, )\n", drv, rp_regnam[ofs], val);
+
 *data = val;
 return SCPE_OK;
 }
@@ -598,6 +684,8 @@ t_stat rp_mbwr (int32 data, int32 ofs, int32 drv)
 {
 int32 dtype;
 UNIT *uptr;
+
+sim_debug(DBG_REG, &rp_dev, "rp_mbwr(drv=%d, %s=0x%08X)\n", drv, rp_regnam[ofs], data);
 
 uptr = rp_dev.units + drv;                              /* get unit */
 if (uptr->flags & UNIT_DIS)                             /* nx disk */
@@ -673,10 +761,11 @@ t_stat rp_go (int32 drv)
 int32 dc, fnc, dtype, t;
 UNIT *uptr;
 
+sim_debug(DBG_REQ, &rp_dev, "rp_go(drv=%d)\n", drv);
+
 fnc = GET_FNC (rpcs1[drv]);                             /* get function */
-if (DEBUG_PRS (rp_dev))
-    fprintf (sim_deb, ">>RP%d STRT: fnc=%s, ds=%o, cyl=%o, da=%o, er=%o\n",
-             drv, rp_fname[fnc], rpds[drv], rpdc[drv], rpda[drv], rper1[drv]);
+sim_debug(DBG_REQ, &rp_dev, ">>RP%d STRT: fnc=%s, ds=%o, cyl=%o, da=%o, er=%o\n",
+          drv, rp_fname[fnc], rpds[drv], rpdc[drv], rpda[drv], rper1[drv]);
 uptr = rp_dev.units + drv;                              /* get unit */
 rp_clr_as (AS_U0 << drv);                               /* clear attention */
 dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
@@ -773,6 +862,7 @@ return MBE_GOE;
 
 int32 rp_abort (void)
 {
+sim_debug(DBG_TRC, &rp_dev, "rp_abort()\n");
 return rp_reset (&rp_dev);
 }
 
@@ -780,8 +870,11 @@ return rp_reset (&rp_dev);
 
 void rp_io_complete (UNIT *uptr, t_stat status)
 {
+sim_debug(DBG_TRC, &rp_dev, "rp_io_complete(status=%d)\n", status);
 uptr->io_status = status;
 uptr->io_complete = 1;
+/* Initiate Bottom End processing */
+sim_activate (uptr, 0);
 }
 
 /* Service unit timeout
@@ -800,6 +893,8 @@ dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
 da = GET_DA (rpdc[drv], rpda[drv], dtype) * RP_NUMWD;   /* get disk addr */
 fnc = GET_FNC (rpcs1[drv]);                             /* get function */
+
+sim_debug(DBG_TRC, &rp_dev, "rp_svc(rp%d, %s, dtype=%d, da=%08X, fnc=%d)\n", drv, uptr->io_complete ? "Bottom" : "Top", dtype, da, fnc);
 
 if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     rp_set_er (ER1_UNS, drv);                           /* set drive error */
@@ -859,6 +954,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
                 awc = (wc + (RP_NUMWD - 1)) & ~(RP_NUMWD - 1);
                 for (i = wc; i < awc; i++)              /* fill buf */
                     rpxb[drv][i] = 0;
+                sim_disk_data_trace (uptr, (void *)rpxb[drv], da/RP_NUMWD, awc, "sim_disk_wrsect-WR", DBG_DAT & rp_dev.dctrl, DBG_REQ);
                 sim_disk_wrsect_a (uptr, da/RP_NUMWD, (void *)rpxb[drv], NULL, awc/RP_NUMWD, rp_io_complete);
                 return SCPE_OK;
                 }                                       /* end if wr */
@@ -899,6 +995,7 @@ else { /* Bottom End (After I/O processing) */
                 }                                       /* end if wr */
             else {                                      /* read or wchk */
                 awc = uptr->sectsread * RP_NUMWD;
+                sim_disk_data_trace (uptr, (uint8*)rpxb[drv], da/RP_NUMWD, awc << 1, "sim_disk_rdsect", DBG_DAT & rp_dev.dctrl, DBG_REQ);
                 for (i = awc; i < wc; i++)              /* fill buf */
                     rpxb[drv][i] = 0;
                 if (fnc == FNC_WCHK)                    /* write check? */
@@ -930,8 +1027,7 @@ else { /* Bottom End (After I/O processing) */
     }
 rpds[drv] = (rpds[drv] & ~DS_PIP) | DS_RDY;             /* change drive status */
 
-if (DEBUG_PRS (rp_dev))
-    fprintf (sim_deb, ">>RP%d DONE: fnc=%s, ds=%o, cyl=%o, da=%o, er=%d\n",
+sim_debug (DBG_REQ, &rp_dev, ">>RP%d DONE: fnc=%s, ds=%o, cyl=%o, da=%o, er=%d\n",
              drv, rp_fname[fnc], rpds[drv], rpdc[drv], rpda[drv], rper1[drv]);
 return SCPE_OK;
 }
@@ -940,6 +1036,7 @@ return SCPE_OK;
 
 void rp_set_er (int32 flag, int32 drv)
 {
+sim_debug(DBG_TRC, &rp_dev, "rp_set_er(rp%d, flag=0x%X)\n", drv, flag);
 rper1[drv] = rper1[drv] | flag;
 rpds[drv] = rpds[drv] | DS_ATA;
 mba_upd_ata (rp_dib.ba, 1);
@@ -951,6 +1048,8 @@ return;
 void rp_clr_as (int32 mask)
 {
 uint32 i, as;
+
+sim_debug(DBG_TRC, &rp_dev, "rp_clr_as(mask=0x%X)\n", mask);
 
 for (i = as = 0; i < RP_NUMDR; i++) {
     if (mask & (AS_U0 << i))
@@ -966,6 +1065,8 @@ return;
 
 void rp_update_ds (int32 flag, int32 drv)
 {
+sim_debug(DBG_TRC, &rp_dev, "rp_update_ds(rp%d, flag=0x%X)\n", drv, flag);
+
 if (rp_unit[drv].flags & UNIT_DIS)
     rpds[drv] = rper1[drv] = 0;
 else rpds[drv] = (rpds[drv] | DS_DPR) & ~DS_PGM;
@@ -987,6 +1088,8 @@ t_stat rp_reset (DEVICE *dptr)
 {
 int32 i;
 UNIT *uptr;
+
+sim_debug(DBG_TRC, dptr, "rp_reset()\n");
 
 mba_set_enbdis (MBA_RP, rp_dev.flags & DEV_DIS);
 for (i = 0; i < RP_NUMDR; i++) {
