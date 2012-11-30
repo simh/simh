@@ -994,7 +994,7 @@ if (pulse & 001) {                                      /* KSF */
     }
 if (pulse & 002) {                                      /* KRS/KRB */
     CLR_INT (TTI);                                      /* clear flag */
-    dat = dat | tti_unit.buf & TTI_MASK;                /* return buffer */
+    dat = dat | (tti_unit.buf & TTI_MASK);              /* return buffer */
 #if defined (PDP15)
     if (pulse & 020)                                    /* KRS? */
         tti_fdpx = 1;

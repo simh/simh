@@ -1406,7 +1406,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     memset(command, 0, sizeof(command));
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
-      system(command);
+      (void)system(command);
       if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {

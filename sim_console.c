@@ -1766,7 +1766,7 @@ if (tcsetattr (0, TCSAFLUSH, &runtty) < 0)
     return SCPE_TTIERR;
 if (prior_norm) {                                       /* at normal pri? */
     errno =     0;
-    nice (10);                                          /* try to lower pri */
+    (void)nice (10);                                    /* try to lower pri */
     prior_norm = errno;                                 /* if no error, done */
     }
 return SCPE_OK;
@@ -1778,7 +1778,7 @@ if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
 if (!prior_norm) {                                      /* priority down? */
     errno =     0;
-    nice (-10);                                         /* try to raise pri */
+    (void)nice (-10);                                   /* try to raise pri */
     prior_norm = (errno == 0);                          /* if no error, done */
     }
 if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0)
@@ -1829,7 +1829,7 @@ t_stat sim_os_putchar (int32 out)
 char c;
 
 c = out;
-write (1, &c, 1);
+(void)write (1, &c, 1);
 return SCPE_OK;
 }
 

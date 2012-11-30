@@ -996,10 +996,10 @@ if (tcgetattr (port, &tio)) {                           /* get the terminal attr
 
 #if 1
 
-tio.c_iflag = tio.c_iflag & ~i_clear | i_set;           /* configure the serial line for raw mode */
-tio.c_oflag = tio.c_oflag & ~o_clear | o_set;
-tio.c_cflag = tio.c_cflag & ~c_clear | c_set;
-tio.c_lflag = tio.c_lflag & ~l_clear | l_set;
+tio.c_iflag = (tio.c_iflag & ~i_clear) | i_set;           /* configure the serial line for raw mode */
+tio.c_oflag = (tio.c_oflag & ~o_clear) | o_set;
+tio.c_cflag = (tio.c_cflag & ~c_clear) | c_set;
+tio.c_lflag = (tio.c_lflag & ~l_clear) | l_set;
 
 #elif 0
 
@@ -1079,15 +1079,15 @@ for (i = 0; i < baud_count; i++)                        /* assign baud rate */
 if (i == baud_count)                                    /* baud rate assigned? */
     return SCPE_ARG;                                    /* invalid rate specified */
 
-if (config.charsize >= 5 && config.charsize <= 8)       /* character size OK? */
-    tio.c_cflag = tio.c_cflag & ~CSIZE |                /* replace character size code */
+if ((config.charsize >= 5) && (config.charsize <= 8))   /* character size OK? */
+    tio.c_cflag = (tio.c_cflag & ~CSIZE) |              /* replace character size code */
                 charsize_map [config.charsize - 5];
 else
     return SCPE_ARG;                                    /* not a valid size */
 
 switch (config.parity) {                                /* assign parity */
     case 'E':
-        tio.c_cflag = tio.c_cflag & ~PARODD | PARENB;   /* set for even parity */
+        tio.c_cflag = (tio.c_cflag & ~PARODD) | PARENB; /* set for even parity */
         break;
 
     case 'N':

@@ -1341,7 +1341,7 @@ if (sc >= 24) {
     A = sgn;
     }
 else {
-    B = ((B >> sc) | (A << (24 - sc)) & DMASK);
+    B = ((B >> sc) | (A << (24 - sc))) & DMASK;
     A = ((A >> sc) | (sgn << (24 - sc))) & DMASK;
     }
 return;
