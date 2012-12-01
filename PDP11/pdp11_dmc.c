@@ -1,3 +1,25 @@
+/*
+Bits still to deal with:
+
+I noticed that if you attach dmc 1234 and then start the simulator.  You then detach dmc, and change some dmc parameter and then merely continue (without reattaching DMC), you get a “Sockets: accept error” message displayed incessantly.  Some state isn’t being recorded when the detach happens.
+
+I’d like to suggest that SET DMC TRANSMIT=ip:port might be more obvious if it was SET DMC PEER=ip:port.  Your call.
+What is the point of SET DMC SPEED?
+You might want to either remove the SET DMC POLL= option or make it do something useful.  Likewise cleaning up commented out code.
+
+There is a line in vax780_defs.h which defines IOBA_DMC to (IOPAGEBASE + 0760060),  Is this correct, or is it being masked by the autoconfigure fixups?
+
+I was thinking that using this DMC11 could be simplified if there was no need for a SET DMC LINEMODE.  Both sides could be listening and when not connected periodically attempt an outgoing connection to the peer.  Why is LINEMODE required?
+
+This leads me to realize that I don’t think you can have your pdp11_dmc.c have a SET TYPE which would change a DMP device to a DMR/DMC device (DMC, DMR are register identical, right?) or change a DMR/DMC to a DMP.
+
+Since, I believe you had said that the DMP isn’t really implemented yet, for now, you should probably have some code which fails an attach to a DMP device and with some sort of unimplemented message, along with anything else you deem appropriate.  You can #ifdef DMP_WORKING this fake ‘unimplemented’ code (for now) so you can work on the real implementation in the same source module which will be part of the distribution.  Once you’ve got everything working the #ifdef stuff gets cut out and will build normally.  
+
+
+*/
+
+
+
 /* pdp11_dmc.c: DMC11 Emulation
   ------------------------------------------------------------------------------
 
@@ -1667,7 +1689,12 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
         
         controller->line->last_connect_attempt = time(NULL);
         if (is_loopback)
-            sprintf(hostport, "localhost:%s", controller->line->receive_port);
+        {
+            if (strrchr(controller->line->receive_port, ':'))
+                sprintf(hostport, "%s", controller->line->receive_port);
+            else
+                sprintf(hostport, "localhost:%s", controller->line->receive_port);
+        }
         else
             sprintf(hostport, "%s", controller->line->transmit_host);
         sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to address:port %s\n", hostport);
