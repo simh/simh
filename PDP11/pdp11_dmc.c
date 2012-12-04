@@ -1,20 +1,7 @@
 /*
 Bits still to deal with:
 
-I noticed that if you attach dmc 1234 and then start the simulator.  You then detach dmc, and change some dmc parameter and then merely continue (without reattaching DMC), you get a “Sockets: accept error” message displayed incessantly.  Some state isn’t being recorded when the detach happens.
-
-I’d like to suggest that SET DMC TRANSMIT=ip:port might be more obvious if it was SET DMC PEER=ip:port.  Your call.
-What is the point of SET DMC SPEED?
-You might want to either remove the SET DMC POLL= option or make it do something useful.  Likewise cleaning up commented out code.
-
 There is a line in vax780_defs.h which defines IOBA_DMC to (IOPAGEBASE + 0760060),  Is this correct, or is it being masked by the autoconfigure fixups?
-
-I was thinking that using this DMC11 could be simplified if there was no need for a SET DMC LINEMODE.  Both sides could be listening and when not connected periodically attempt an outgoing connection to the peer.  Why is LINEMODE required?
-
-This leads me to realize that I don’t think you can have your pdp11_dmc.c have a SET TYPE which would change a DMP device to a DMR/DMC device (DMC, DMR are register identical, right?) or change a DMR/DMC to a DMP.
-
-Since, I believe you had said that the DMP isn’t really implemented yet, for now, you should probably have some code which fails an attach to a DMP device and with some sort of unimplemented message, along with anything else you deem appropriate.  You can #ifdef DMP_WORKING this fake ‘unimplemented’ code (for now) so you can work on the real implementation in the same source module which will be part of the distribution.  Once you’ve got everything working the #ifdef stuff gets cut out and will build normally.  
-
 
 */
 
@@ -86,8 +73,6 @@ You can add /PASS=n to the above commands to get the diagnostic to send and rece
 The other test was to configure DECnet on VMS 4.6 and do SET HOST.
 */
 
-// TODO: Copyright notices
-// TODO: Compile on other platforms
 // TODO: Avoid need for manifests and newest runtime, compile with 2003
 // TODO: Investigate line number and set parameters at the unit level (?)
 // TODO: Multipoint. In this case perhaps don't need transmit port, allow all lines to connect to port on control node.
@@ -140,7 +125,7 @@ typedef struct
     int receive_readable;
     char *receive_port;
     int transmit_writeable;
-    char transmit_host[80];
+    char transmit_host[CBUFSIZE];
     int transmit_is_loopback; /* if true the transmit socket is the loopback to the receive */
     int speed; /* bits per second in each direction, 0 for no limit */
     int last_second;
@@ -206,7 +191,6 @@ struct dmc_controller {
     BUFFER_QUEUE *receive_queue;
     BUFFER_QUEUE *transmit_queue;
     SOCKET master_socket;
-    int32 svc_poll_interval;
     int32 connect_poll_interval;
     DEVTYPE dev_type;
     uint32 rxi;
@@ -226,19 +210,18 @@ t_stat dmc_wr(int32  data, int32 PA, int32 access);
 t_stat dmc_svc(UNIT * uptr);
 t_stat dmc_reset (DEVICE * dptr);
 t_stat dmc_attach (UNIT * uptr, char * cptr);
+int dmc_isattached(CTLR *controller);
 t_stat dmc_detach (UNIT * uptr);
 int32 dmc_rxint (void);
 int32 dmc_txint (void);
-t_stat dmc_settransmit (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat dmc_showtransmit (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showstats (FILE* st, UNIT* uptr, int32 val, void* desc);
-t_stat dmc_setpoll (UNIT* uptr, int32 val, char* cptr, void* desc);
-t_stat dmc_showpoll (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setconnectpoll (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showconnectpoll (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc);
@@ -370,12 +353,13 @@ REG dmp_reg[] = {
     { NULL }  };
 
 MTAB dmc_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 0, "TRANSMIT", "TRANSMIT=address:port" ,&dmc_settransmit, &dmc_showtransmit, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "PEER", "PEER=address:port" ,&dmc_setpeer, &dmc_showpeer, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "SPEED", "SPEED" ,&dmc_setspeed, &dmc_showspeed, NULL },
+#ifdef DMP
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE" ,&dmc_settype, &dmc_showtype, NULL },
+#endif
     { MTAB_XTD | MTAB_VDV, 0, "LINEMODE", "LINEMODE" ,&dmc_setlinemode, &dmc_showlinemode, NULL },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATS", "STATS" ,&dmc_setstats, &dmc_showstats, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL" ,&dmc_setpoll, &dmc_showpoll, NULL },
     { MTAB_XTD | MTAB_VDV, 0, "CONNECTPOLL", "CONNECTPOLL" ,&dmc_setconnectpoll, &dmc_showconnectpoll, NULL },
     { MTAB_XTD | MTAB_VDV, 006, "ADDRESS", "ADDRESS", &set_addr, &show_addr, NULL },
     { MTAB_XTD  |MTAB_VDV, 0, "VECTOR", "VECTOR", &set_vec, &show_vec, NULL },
@@ -411,12 +395,14 @@ DEVICE dmc_dev[] =
     &dmc_dib[3], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
 };
 
+#ifdef DMP
 DEVICE dmp_dev[] =
 {
     { "DMP", &dmp_unit[0], dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
     &dmp_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
 };
+#endif
 
 LINE dmc_line[DMC_NUMDEVICE] =
 {
@@ -443,7 +429,9 @@ CTLR dmc_ctrls[] =
     { &dmc_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], INVALID_SOCKET, -1, 30, DMC },
     { &dmc_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], INVALID_SOCKET, -1, 30, DMC },
     { &dmc_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], INVALID_SOCKET, -1, 30, DMC },
+#ifdef DMP
     { &dmp_csrs[0], &dmp_dev[0], Initialised, Idle, 0, 0, &dmp_line[0], &dmp_receive_queues[0], &dmp_transmit_queues[0], INVALID_SOCKET, -1, 30, DMP }
+#endif
 };
 
 extern int32 tmxr_poll; /* calibrated delay */
@@ -554,14 +542,17 @@ CTLR *dmc_get_controller_from_device(DEVICE *device)
     return ans;
 }
 
-t_stat dmc_showtransmit (FILE* st, UNIT* uptr, int32 val, void* desc)
+t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "TRANSMIT=%s", controller->line->transmit_host);
+    if (controller->line->transmit_host[0])
+        fprintf(st, "PEER=%s", controller->line->transmit_host);
+    else
+        fprintf(st, "PEER Unspecified");
     return SCPE_OK;
 }
 
-t_stat dmc_settransmit (UNIT* uptr, int32 val, char* cptr, void* desc)
+t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
 {
     t_stat status = SCPE_OK;
     char host[CBUFSIZE], port[CBUFSIZE];
@@ -713,27 +704,6 @@ t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc)
     controller->transmit_buffer_input_transfers_completed = 0;
 
     printf("Statistics reset\n" );
-
-    return status;
-}
-
-t_stat dmc_showpoll (FILE* st, UNIT* uptr, int32 val, void* desc)
-{
-    CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "POLL=%d", controller->svc_poll_interval);
-    return SCPE_OK;
-}
-
-t_stat dmc_setpoll (UNIT* uptr, int32 val, char* cptr, void* desc)
-{
-    t_stat status = SCPE_OK;
-    CTLR *controller = dmc_get_controller_from_unit(uptr);
-
-    if (!cptr) return SCPE_IERR;
-    if (sscanf(cptr, "%d", &controller->svc_poll_interval) != 1)
-    {
-        status = SCPE_ARG;
-    }
 
     return status;
 }
@@ -1195,14 +1165,12 @@ void dmc_process_master_clear(CTLR *controller)
     }
     dmc_buffer_queue_init(controller, controller->receive_queue, "receive");
     dmc_buffer_queue_init(controller, controller->transmit_queue, "transmit");
-    //dmc_close_receive(controller, "master clear", NULL);
-    //dmc_close_transmit(controller, "master clear");
 
     controller->transfer_state = Idle;
     dmc_set_run(controller);
 
     sim_cancel (controller->device->units);                                  /* stop poll */
-    sim_activate_abs(controller->device->units, clk_cosched (controller->svc_poll_interval));
+    sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
 }
 
 void dmc_start_input_transfer(CTLR *controller)
@@ -1286,22 +1254,19 @@ t_stat dmc_svc(UNIT* uptr)
 
     controller = dmc_get_controller_from_unit(uptr);
 
-    dmc_line_update_speed_stats(controller->line);
-
-    if (dmc_buffer_fill_receive_buffers(controller))
+    if (dmc_isattached(controller))
     {
-//      poll = 200; /* if we received data then lets poll quicker as there seems to be some activity */
-    }
-    if (controller->transfer_state == Idle) dmc_start_transfer_receive_buffer(controller);
+        dmc_line_update_speed_stats(controller->line);
 
-    if (dmc_buffer_send_transmit_buffers(controller))
-    {
-//      poll = 200; /* if we transmitted data then lets poll quicker as there seems to be some activity */
+        dmc_buffer_fill_receive_buffers(controller);
+        if (controller->transfer_state == Idle) dmc_start_transfer_receive_buffer(controller);
+
+        dmc_buffer_send_transmit_buffers(controller);
+        if (controller->transfer_state == Idle) dmc_start_transfer_transmit_buffer(controller);
     }
-    if (controller->transfer_state == Idle) dmc_start_transfer_transmit_buffer(controller);
 
     /* resubmit service timer */
-    sim_activate(controller->device->units, poll/*controller->svc_poll_interval*/);
+    sim_activate(controller->device->units, poll);
 
     dmc_timer_stop(poll_timer);
     if (dmc_timer_started(between_polls_timer))
@@ -1366,14 +1331,10 @@ void dmc_buffer_trace_line(int tracelevel, CTLR *controller, uint8 *buf, int len
 {
     char hex[TRACE_BYTES_PER_LINE*3+1];
     char ascii[TRACE_BYTES_PER_LINE+1];
-    //char ts[9];
-    //time_t t;
     int i;
     hex[0] = 0;
     ascii[TRACE_BYTES_PER_LINE] = 0;
 
-    //t = time(NULL);
-    //strftime(ts, 9, "%H:%M:%S", localtime(&t));
     for (i = 0; i<TRACE_BYTES_PER_LINE; i++)
     {
         if (i>=length)
@@ -1598,7 +1559,6 @@ t_stat dmc_close_master_socket(CTLR *controller)
 // Gets the bidirectional socket and handles arbitration of determining which socket to use.
 int dmc_get_socket(CTLR *controller, int forRead)
 {
-//  static int lastans = 0;
     int ans = 0;
     if (controller->line->isPrimary)
     {
@@ -1608,13 +1568,6 @@ int dmc_get_socket(CTLR *controller, int forRead)
     {
         ans = dmc_get_receive_socket(controller, forRead); // TODO: After change to single socket, loopback may not work.
     }
-
-//  if (lastans != ans)
-//  {
-//sim_debug(DBG_SOK, controller->device, "Get Socket forread=%d, changed to %d\n", forRead, ans);
-//  }
-//  lastans = ans;
-//
     return ans;
 }
 
@@ -1683,7 +1636,8 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
 
     if (controller->line->socket == INVALID_SOCKET && ((int32)(time(NULL) - controller->line->last_connect_attempt)) > controller->connect_poll_interval)
     {
-        char hostport[CBUFSIZE];
+        char host_port_buf[CBUFSIZE];
+        char *host_port = host_port_buf;
 
         controller->line->transmit_is_loopback = is_loopback;
         
@@ -1691,18 +1645,25 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
         if (is_loopback)
         {
             if (strrchr(controller->line->receive_port, ':'))
-                sprintf(hostport, "%s", controller->line->receive_port);
+            {
+                host_port = controller->line->receive_port;
+            }
             else
-                sprintf(hostport, "localhost:%s", controller->line->receive_port);
+            {
+                sprintf(host_port_buf, "localhost:%s", controller->line->receive_port);
+            }
         }
         else
-            sprintf(hostport, "%s", controller->line->transmit_host);
-        sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to address:port %s\n", hostport);
+        {
+            host_port = controller->line->transmit_host;
+        }
+
+        sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to address:port %s\n", host_port);
         controller->line->last_connect_attempt = time(NULL);
-        controller->line->socket = sim_connect_sock(hostport, NULL, NULL);
+        controller->line->socket = sim_connect_sock(host_port, NULL, NULL);
         if (controller->line->socket != INVALID_SOCKET)
         {
-            sim_debug(DBG_SOK, controller->device, "Opened transmit socket to port %s\n", hostport);
+            sim_debug(DBG_SOK, controller->device, "Opened transmit socket to port %s\n", host_port);
             controller->line->transmit_writeable = FALSE;
         }
     }
@@ -1736,7 +1697,7 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
 
 void dmc_close_receive(CTLR *controller, char *reason, char *from)
 {
-sim_debug(DBG_SOK, controller->device, "Closing receive socket on port %s, reason: %s%s%s\n", controller->line->receive_port, reason, from ? " from " : "", from ? from : "");
+    sim_debug(DBG_SOK, controller->device, "Closing receive socket on port %s, reason: %s%s%s\n", controller->line->receive_port, reason, from ? " from " : "", from ? from : "");
     sim_close_sock(controller->line->socket, FALSE);
     controller->line->socket = INVALID_SOCKET;
 
@@ -1837,10 +1798,6 @@ int dmc_buffer_fill_receive_buffers(CTLR *controller)
                             }
                         }
                     }
-                    else
-                    {
-//printf("Socket error was when trying to read the header.\n");
-                    }
                 }
                 else
                 {
@@ -1887,10 +1844,6 @@ int dmc_buffer_fill_receive_buffers(CTLR *controller)
 
                             ans = TRUE;
                         }
-                    }
-                    else
-                    {
-printf("Socket error was when trying to fill receive buffers when trying to read the body.\n");
                     }
                 }
 
@@ -2059,18 +2012,11 @@ void dmc_process_input_transfer_completion(CTLR *controller)
             uint16 sel4 = controller->csrs->sel4;
             uint16 sel6 = controller->csrs->sel6;
             dmc_clear_rdyi(controller);
-            //dmc_clrrxint();
             if (controller->transfer_type == TYPE_BASEI)
             {
-                //int i;
                 uint32 baseaddr = ((sel6 >> 14) << 16) | sel4;
                 uint16 count = sel6 & 0x3FFF;
                 sim_debug(DBG_INF, controller->device, "Completing Base In input transfer, base address=0x%08x count=%d\n", baseaddr, count);
-                //for (i = 0; i < count; i++)
-                //{
-                //  uint8 t = ((uint8)i + 1)*2;
-                //  Map_WriteB(baseaddr + i, 1, &t);
-                //}
             }
             else if (controller->transfer_type == TYPE_BACCI)
             {
@@ -2106,7 +2052,6 @@ void dmc_process_input_transfer_completion(CTLR *controller)
         {
             uint16 sel4 = controller->csrs->sel4;
             uint16 sel6 = controller->csrs->sel6;
-            //dmc_clrrxint();
             if (controller->transfer_type == TYPE_DMP_MODE)
             {
                 uint16 mode = sel6 & DMP_TYPE_INPUT_MASK;
@@ -2258,22 +2203,11 @@ int32 dmc_txint (void)
     }
 
     return ans;
-
-    //int32 ans = 0; /* no interrupt request active */
-    //if (controller->txi != 0)
-    //{
-    //  DIB *dib = (DIB *)controller->device->ctxt;
-    //  ans = dib->vec + 4;
-    //  dmc_clrtxint();
-    //}
-
-    //return ans;
 }
 
 t_stat dmc_reset (DEVICE *dptr)
 {
     t_stat ans = SCPE_OK;
-    //int32 ndev;
     CTLR *controller = dmc_get_controller_from_device(dptr);
 
     sim_debug(DBG_TRC, dptr, "dmc_reset()\n");
@@ -2287,7 +2221,6 @@ t_stat dmc_reset (DEVICE *dptr)
     dmc_clrrxint(controller);
     dmc_clrtxint(controller);
     sim_cancel (controller->device->units); /* stop poll */
-    if (controller->svc_poll_interval == -1) controller->svc_poll_interval = POLL;
 
     if (!(dptr->flags & DEV_DIS))
     {
@@ -2314,6 +2247,11 @@ t_stat dmc_attach (UNIT *uptr, char *cptr)
     return ans;
 }
 
+int dmc_isattached(CTLR *controller)
+{
+    return controller->master_socket != INVALID_SOCKET;
+}
+
 t_stat dmc_detach (UNIT *uptr)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
@@ -2324,4 +2262,3 @@ t_stat dmc_detach (UNIT *uptr)
 
     return SCPE_OK;
 }
-

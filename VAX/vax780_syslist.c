@@ -55,7 +55,6 @@ extern DEVICE dz_dev;
 extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE dmc_dev[];
-extern DEVICE dmp_dev[];
 
 extern int32 sim_switches;
 extern UNIT cpu_unit;
@@ -97,7 +96,6 @@ DEVICE *sim_devices[] = {
 	&dmc_dev[1],
 	&dmc_dev[2],
 	&dmc_dev[3],
-	&dmp_dev[0],
     NULL
     };
 
