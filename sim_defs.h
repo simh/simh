@@ -506,6 +506,14 @@ struct sim_debtab {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
 
+struct sim_bitfield {
+    char            *name;                              /* field name */
+    uint32          offset;                             /* starting bit */
+    uint32          width;                              /* width */
+    char            **valuenames;                       /* map of values to strings */
+    char            *format;                            /* value format string */
+    };
+
 /* File Reference */
 struct sim_fileref {
     char                name[CBUFSIZE];                 /* file name */
@@ -526,6 +534,12 @@ struct sim_fileref {
 #define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#define BIT(nm)              {#nm, -1, 1}
+#define BITNC                {"",  -1, 1}
+#define BITF(nm,sz)          {#nm, -1, sz}
+#define BITNCF(sz)           {"",  -1, sz}
+#define BITFFMT(nm,sz,fmt)   {#nm, -1, sz, NULL, #fmt}
+#define BITFNAM(nm,sz,names) {#nm, -1, sz, names}
 #else
 #define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
 #define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
@@ -535,7 +549,14 @@ struct sim_fileref {
 #define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#define BIT(nm)              {"nm", -1, 1}
+#define BITNC                {"",  -1, 1}
+#define BITF(nm,sz)          {"nm", -1, sz}
+#define BITNCF(sz)           {"",  -1, sz}
+#define BITFFMT(nm,sz,fmt)   {"nm", -1, sz, NULL, "fmt"}
+#define BITFNAM(nm,sz,names) {"nm", -1, sz, names}
 #endif
+#define ENDBITS {NULL}  /* end of bitfield list */
 
 /* Typedefs for principal structures */
 
@@ -550,6 +571,7 @@ typedef struct sim_schtab SCHTAB;
 typedef struct sim_brktab BRKTAB;
 typedef struct sim_debtab DEBTAB;
 typedef struct sim_fileref FILEREF;
+typedef struct sim_bitfield BITFIELD;
 
 /* Function prototypes */
 

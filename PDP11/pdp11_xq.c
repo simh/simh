@@ -518,19 +518,22 @@ const char* const xqt_xmit_regnames[] = {
   "IBAL", "IBAH", "ICR", "", "SRQR", "", "", "ARQR"
 };
 
-const char* const xq_csr_bits[] = {
-  "RE", "SR", "NI", "BD", "XL", "RL", "IE", "XI",
-  "IL", "EL", "SE", "RR", "OK", "CA", "PE", "RI"
+BITFIELD xq_csr_bits[] = {
+  BIT(RE), BIT(SR), BIT(NI), BIT(BD), BIT(XL), BIT(RL), BIT(IE), BIT(XI),
+  BIT(IL), BIT(EL), BIT(SE), BIT(RR), BIT(OK), BIT(CA), BIT(PE), BIT(RI),
+  ENDBITS
 };
 
-const char* const xq_var_bits[] = {
-  "ID", "RR", "V0", "V1", "V2", "V3", "V4", "V5",
-  "V6", "V7", "S1", "S2", "S3", "RS", "OS", "MS"
+BITFIELD xq_var_bits[] = {
+  BIT(ID), BIT(RR), BIT(V0), BIT(V1), BIT(V2), BIT(V3), BIT(V4), BIT(V5),
+  BIT(V6), BIT(V7), BIT(S1), BIT(S2), BIT(S3), BIT(RS), BIT(OS), BIT(MS),
+  ENDBITS
 };
 
-const char* const xq_srr_bits[] = {
-  "RS0", "RS1", "",    "",    "",    "",    "",    "",
-  "",    "TBL", "IME", "PAR", "NXM", "",    "CHN", "FES"
+BITFIELD xq_srr_bits[] = {
+  BIT(RS0), BIT(RS1), BITNC,    BITNC,    BITNC,    BITNC,    BITNC,    BITNC,
+  BITNC,    BIT(TBL), BIT(IME), BIT(PAR), BIT(NXM), BITNC, BIT(CHN), BIT(FES),
+  ENDBITS
 };
 
 /* internal debugging routines */
@@ -926,16 +929,16 @@ t_stat xq_rd(int32* data, int32 PA, int32 access)
       break;
     case 6:
       if (xq->var->mode != XQ_T_DELQA_PLUS) {
-        sim_debug_u16(DBG_VAR, xq->dev, xq_var_bits, xq->var->var, xq->var->var, 0);
-        sim_debug    (DBG_VAR, xq->dev, ", vec = 0%o\n", (xq->var->var & XQ_VEC_IV));
+        sim_debug_bits(DBG_VAR, xq->dev, xq_var_bits, xq->var->var, xq->var->var, 0);
+        sim_debug     (DBG_VAR, xq->dev, ", vec = 0%o\n", (xq->var->var & XQ_VEC_IV));
         *data = xq->var->var;
       } else {
-        sim_debug_u16(DBG_VAR, xq->dev, xq_srr_bits, xq->var->srr, xq->var->srr, 0);
+        sim_debug_bits(DBG_VAR, xq->dev, xq_srr_bits, xq->var->srr, xq->var->srr, 0);
         *data = xq->var->srr;
       }
       break;
     case 7:
-      sim_debug_u16(DBG_CSR, xq->dev, xq_csr_bits, xq->var->csr, xq->var->csr, 1);
+      sim_debug_bits(DBG_CSR, xq->dev, xq_csr_bits, xq->var->csr, xq->var->csr, 1);
       *data = xq->var->csr;
       break;
   }
@@ -1991,7 +1994,7 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
   else
     xq->dib->vec = 0;
 
-  sim_debug_u16(DBG_VAR, xq->dev, xq_var_bits, save_var, xq->var->var, 1);
+  sim_debug_bits(DBG_VAR, xq->dev, xq_var_bits, save_var, xq->var->var, 1);
 
   return SCPE_OK;
 }
@@ -2839,7 +2842,7 @@ void xq_csr_set_clr (CTLR* xq, uint16 set_bits, uint16 clear_bits)
   /* set the bits in the csr */
   xq->var->csr = (xq->var->csr | set_bits) & ~clear_bits;
 
-  sim_debug_u16(DBG_CSR, xq->dev, xq_csr_bits, saved_csr, xq->var->csr, 1);
+  sim_debug_bits(DBG_CSR, xq->dev, xq_csr_bits, saved_csr, xq->var->csr, 1);
 
   /* check and correct the state of controller interrupt */
 

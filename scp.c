@@ -5860,19 +5860,49 @@ if (!debug_unterm) {
 }
 
 /* Prints state of a register: bit translation + state (0,1,_,^)
-   indicating the state and transition of the bit. States:
+   indicating the state and transition of the bit and bitfields. States:
    0=steady(0->0), 1=steady(1->1), _=falling(1->0), ^=rising(0->1) */
 
-void sim_debug_u16(uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
-    uint16 before, uint16 after, int terminate)
+void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
+    uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && (dptr->dctrl & dbits)) {
-    int32 i;
+    int32 i, fields, offset;
+    uint32 value, beforevalue, mask;
 
+    for (fields=offset=0; bitdefs[fields].name; ++fields) {
+        if (bitdefs[fields].offset == -1)               /* fixup uninitialized offsets */
+            bitdefs[fields].offset = offset;
+        offset += bitdefs[fields].width;
+        }
     sim_debug_prefix(dbits, dptr);                      /* print prefix if required */
-    for (i = 15; i >= 0; i--) {                         /* print xlation, transition */
-        int off = ((after >> i) & 1) + (((before ^ after) >> i) & 1) * 2;
-        fprintf(sim_deb, "%s%c ", bitdefs[i], debug_bstates[off]);
+    for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition */
+        if (bitdefs[i].name[0] == '\0')
+            continue;
+        if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
+            int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> i) & 1) * 2;
+            fprintf(sim_deb, "%s%c ", bitdefs[i].name, debug_bstates[off]);
+            }
+        else {
+            char *delta = "";
+
+            mask = 0xFFFFFFFF >> (32-bitdefs[i].width);
+            value = ((after >> bitdefs[i].offset) & mask) + (((before ^ after) >> bitdefs[i].offset) & mask) * 2;
+            beforevalue = ((before >> bitdefs[i].offset) & mask);
+            if (value < beforevalue)
+                delta = "_";
+            if (value > beforevalue)
+                delta = "^";
+            if (bitdefs[i].valuenames)
+                fprintf(sim_deb, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
+            else
+                if (bitdefs[i].format) {
+                    fprintf(sim_deb, "%s=%s", bitdefs[i].name, delta, value);
+                    fprintf(sim_deb, bitdefs[i].format, value);
+                    }
+                else
+                    fprintf(sim_deb, "%s=%s0x%X ", bitdefs[i].name, delta, value);
+            }
         }
     if (terminate)
         fprintf(sim_deb, "\r\n");

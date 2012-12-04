@@ -125,8 +125,8 @@ char *match_ext (char *fnam, char *ext);
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
-void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
-    uint16 before, uint16 after, int terminate);
+void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
+    uint32 before, uint32 after, int terminate);
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
 #define CANT_USE_MACRO_VA_ARGS 1
 #endif
