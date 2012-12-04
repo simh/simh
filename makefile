@@ -234,7 +234,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
             $(info *** Warning *** components for simh networking.  For best results, with)
             $(info *** Warning *** simh networking, it is recommended that you install the)
-            $(info *** Warning *** libpcap-dev package from your $(OSTYPE) distribution)
+            $(info *** Warning *** libpcap-dev package from your $(OSNAME) distribution)
             $(info *** Warning ***)
           endif
         else
@@ -244,16 +244,33 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXT = $(LIBEXTSAVE)
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-	  # Given we have libpcap components, consider other network connections as well
+      # Given we have libpcap components, consider other network connections as well
       ifneq (,$(call find_lib,vdeplug))
         # libvdeplug requires the use of the OS provided libpcap
-		ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+        ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
             NETWORK_LDFLAGS += -lvdeplug
             $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
           endif
+        endif
+      endif
+      ifeq (,$(findstring USE_VDE_NETWORK,$(NETWORK_CCDEFS)))
+        # Support is available on Linux for libvdeplug.  Advise on its usage
+        ifneq (,$(findstring Linux,$(OSTYPE)))
+          $(info *** Warning ***)
+          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built with)
+          $(info *** Warning *** minimal libpcap networking support)
+          $(info *** Warning ***)
+          $(info *** Warning *** Simulators on your $(OSNAME) platform can also be built with)
+          $(info *** Warning *** extended Ethernet networking support by using VDE Ethernet.)
+          $(info *** Warning ***)
+          $(info *** Warning *** To build simulator(s) with extended networking support you)
+          $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
+          $(info *** Warning *** regarding the needed libvdeplug components for your $(OSNAME))
+          $(info *** Warning *** platform)
+          $(info *** Warning ***)
         endif
       endif
       ifneq (,$(call find_include,linux/if_tun))
