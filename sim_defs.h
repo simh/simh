@@ -534,12 +534,12 @@ struct sim_fileref {
 #define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#define BIT(nm)              {#nm, -1, 1}
-#define BITNC                {"",  -1, 1}
-#define BITF(nm,sz)          {#nm, -1, sz}
-#define BITNCF(sz)           {"",  -1, sz}
-#define BITFFMT(nm,sz,fmt)   {#nm, -1, sz, NULL, #fmt}
-#define BITFNAM(nm,sz,names) {#nm, -1, sz, names}
+#define BIT(nm)              {#nm, -1, 1}             /* Single Bit definition */
+#define BITNC                {"",  -1, 1}             /* Don't care Bit definition */
+#define BITF(nm,sz)          {#nm, -1, sz}            /* Bit Field definition */
+#define BITNCF(sz)           {"",  -1, sz}            /* Don't care Bit Field definition */
+#define BITFFMT(nm,sz,fmt)   {#nm, -1, sz, NULL, #fmt}/* Bit Field definition with Output format */
+#define BITFNAM(nm,sz,names) {#nm, -1, sz, names}     /* Bit Field definition with value->name map */
 #else
 #define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
 #define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
@@ -549,12 +549,12 @@ struct sim_fileref {
 #define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
-#define BIT(nm)              {"nm", -1, 1}
-#define BITNC                {"",  -1, 1}
-#define BITF(nm,sz)          {"nm", -1, sz}
-#define BITNCF(sz)           {"",  -1, sz}
-#define BITFFMT(nm,sz,fmt)   {"nm", -1, sz, NULL, "fmt"}
-#define BITFNAM(nm,sz,names) {"nm", -1, sz, names}
+#define BIT(nm)              {"nm", -1, 1}              /* Single Bit definition */
+#define BITNC                {"",  -1, 1}               /* Don't care Bit definition */
+#define BITF(nm,sz)          {"nm", -1, sz}             /* Bit Field definition */
+#define BITNCF(sz)           {"",  -1, sz}              /* Don't care Bit Field definition */
+#define BITFFMT(nm,sz,fmt)   {"nm", -1, sz, NULL, "fmt"}/* Bit Field definition with Output format */
+#define BITFNAM(nm,sz,names) {"nm", -1, sz, names}      /* Bit Field definition with value->name map */
 #endif
 #define ENDBITS {NULL}  /* end of bitfield list */
 

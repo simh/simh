@@ -5897,7 +5897,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
                 fprintf(sim_deb, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
             else
                 if (bitdefs[i].format) {
-                    fprintf(sim_deb, "%s=%s", bitdefs[i].name, delta, value);
+                    fprintf(sim_deb, "%s=%s", bitdefs[i].name, delta);
                     fprintf(sim_deb, bitdefs[i].format, value);
                     }
                 else
