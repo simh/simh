@@ -5880,14 +5880,14 @@ if (sim_deb && (dptr->dctrl & dbits)) {
         if (bitdefs[i].name[0] == '\0')
             continue;
         if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
-            int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> i) & 1) * 2;
+            int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> bitdefs[i].offset) & 1) * 2;
             fprintf(sim_deb, "%s%c ", bitdefs[i].name, debug_bstates[off]);
             }
         else {
             char *delta = "";
 
             mask = 0xFFFFFFFF >> (32-bitdefs[i].width);
-            value = ((after >> bitdefs[i].offset) & mask) + (((before ^ after) >> bitdefs[i].offset) & mask) * 2;
+            value = ((after >> bitdefs[i].offset) & mask);
             beforevalue = ((before >> bitdefs[i].offset) & mask);
             if (value < beforevalue)
                 delta = "_";

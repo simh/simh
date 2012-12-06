@@ -510,8 +510,8 @@ struct sim_bitfield {
     char            *name;                              /* field name */
     uint32          offset;                             /* starting bit */
     uint32          width;                              /* width */
-    char            **valuenames;                       /* map of values to strings */
-    char            *format;                            /* value format string */
+    const char      **valuenames;                       /* map of values to strings */
+    const char      *format;                            /* value format string */
     };
 
 /* File Reference */
