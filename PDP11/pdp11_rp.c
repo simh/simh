@@ -1025,6 +1025,13 @@ switch (fnc) {                                          /* case on function */
         return SCPE_OK;
 
     case FNC_UNLOAD:                                    /* unload */
+        if (drv_tab[dtype].ctrl == RM_CTRL) {           /* RM? */
+            rp_set_er (ER1_ILF, drv);                   /* not supported */
+            break;
+            }
+        rp_detach (uptr);                               /* detach unit */
+        return SCPE_OK;
+
     case FNC_RECAL:                                     /* recalibrate */
         dc = 0;                                         /* seek to 0 */
     case FNC_SEEK:                                      /* seek */
@@ -1137,10 +1144,6 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
             rpds[drv] = rpds[drv] & ~DS_OFM;            /* clear offset, set attn */
             rp_update_ds (DS_ATA, drv);
             break;  
-
-        case FNC_UNLOAD:                                /* unload */
-            rp_detach (uptr);                           /* detach unit */
-            break;
 
         case FNC_RECAL:                                 /* recalibrate */
         case FNC_SEARCH:                                /* search */
