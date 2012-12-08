@@ -1174,8 +1174,8 @@ void dmc_process_master_clear(CTLR *controller)
     controller->transfer_state = Idle;
     dmc_set_run(controller);
 
-    //sim_cancel (controller->device->units);                                  /* stop poll */
-    //sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
+    sim_cancel (controller->device->units);                                  /* stop poll */
+    sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
 }
 
 void dmc_start_input_transfer(CTLR *controller)
@@ -2230,7 +2230,6 @@ t_stat dmc_reset (DEVICE *dptr)
     if (!(dptr->flags & DEV_DIS))
     {
         ans = auto_config (dptr->name, DMC_UNITSPERDEVICE);
-        sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
     }
     return ans;
 }
@@ -2248,6 +2247,7 @@ t_stat dmc_attach (UNIT *uptr, char *cptr)
         uptr->filename = (char *)malloc(strlen(cptr)+1);
         strcpy(uptr->filename, cptr);
         controller->line->receive_port = uptr->filename;
+        //sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
     }
 
     return ans;
@@ -2266,6 +2266,7 @@ t_stat dmc_detach (UNIT *uptr)
     uptr->flags = uptr->flags & ~UNIT_ATT; /* clear unit attached flag */
     free(uptr->filename);
     uptr->filename = NULL;
+    sim_cancel(uptr);
 
     return SCPE_OK;
 }
