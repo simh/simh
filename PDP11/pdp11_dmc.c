@@ -546,9 +546,14 @@ t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
     if (controller->line->transmit_host[0])
+    {
         fprintf(st, "PEER=%s", controller->line->transmit_host);
+    }
     else
+    {
         fprintf(st, "PEER Unspecified");
+    }
+
     return SCPE_OK;
 }
 
@@ -1169,8 +1174,8 @@ void dmc_process_master_clear(CTLR *controller)
     controller->transfer_state = Idle;
     dmc_set_run(controller);
 
-    sim_cancel (controller->device->units);                                  /* stop poll */
-    sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
+    //sim_cancel (controller->device->units);                                  /* stop poll */
+    //sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
 }
 
 void dmc_start_input_transfer(CTLR *controller)
@@ -2225,6 +2230,7 @@ t_stat dmc_reset (DEVICE *dptr)
     if (!(dptr->flags & DEV_DIS))
     {
         ans = auto_config (dptr->name, DMC_UNITSPERDEVICE);
+        sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
     }
     return ans;
 }
@@ -2255,6 +2261,7 @@ int dmc_isattached(CTLR *controller)
 t_stat dmc_detach (UNIT *uptr)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
+    dmc_error_and_close_receive(controller, "Detach");
     dmc_close_master_socket(controller);
     uptr->flags = uptr->flags & ~UNIT_ATT; /* clear unit attached flag */
     free(uptr->filename);
