@@ -1155,6 +1155,7 @@ return SCPE_OK;
 t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
+extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
@@ -1167,7 +1168,8 @@ if (sim_is_active (uptr)) {                             /* unit active? */
     if (uptr->FUNC >= FNC_WCHK)                         /* data transfer? */
         rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;             /* set done, err */
     }
-update_rpcs (CS1_SC, drv);                              /* request intr */
+if (!sim_is_running)                                    /* from console? */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
 return detach_unit (uptr);
 }
 

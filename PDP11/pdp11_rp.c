@@ -1390,11 +1390,14 @@ t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
 DEVICE *dptr = find_dev_from_unit (uptr);
+extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 drv = (int32) (uptr - dptr->units);                     /* get drv number */
 rpds[drv] = rpds[drv] & ~(DS_MOL | DS_RDY | DS_WRL | DS_VV | DS_OFM);
+if (!sim_is_running)                                    /* from console? */
+    rp_update_ds (DS_ATA, drv);                         /* request intr */
 return sim_disk_detach (uptr);
 }
 
