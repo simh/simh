@@ -411,7 +411,7 @@ t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 t_stat step_svc (UNIT *ptr);
-void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[]);
+void sub_args (char *instr, size_t instr_size, char *do_arg[]);
 t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, char *cptr);
 t_stat set_verify (int32 flag, char *cptr);
@@ -759,7 +759,7 @@ int setenv(const char *envname, const char *envval, int overwrite)
 
 int main (int argc, char *argv[])
 {
-char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr, *cptr2;
+char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *cptr2;
 char nbuf[PATH_MAX + 7];
 int32 i, sw;
 t_bool lookswitch;
@@ -785,7 +785,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         sim_switches = sim_switches | sw;
         }
     else {
-        if ((strlen (argv[i]) + strlen (cbuf) + 3) >= CBUFSIZE) {
+        if ((strlen (argv[i]) + strlen (cbuf) + 3) >= sizeof(cbuf)) {
             fprintf (stderr, "Argument string too long\n");
             return 0;
             }
@@ -868,19 +868,19 @@ else if (*argv[0]) {                                    /* sim name arg? */
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
 
 while (stat != SCPE_EXIT) {                             /* in case exit */
-    if ((cptr = sim_brk_getact (cbuf, CBUFSIZE)))       /* pending action? */
-        printf ("%s%s\n", sim_prompt, cptr);           /* echo */
+    if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
+        printf ("%s%s\n", sim_prompt, cptr);            /* echo */
     else if (sim_vm_read != NULL) {                     /* sim routine? */
-        printf ("%s", sim_prompt);                     /* prompt */
-        cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
+        printf ("%s", sim_prompt);                      /* prompt */
+        cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
         }
-    else cptr = read_line_p (sim_prompt, cbuf, CBUFSIZE, stdin);/* read with prmopt*/
+    else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
     if (cptr == NULL)                                   /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
     if (*cptr == 0)                                     /* ignore blank */
         continue;
-    sub_args (cbuf, gbuf, sizeof(gbuf), argv);
+    sub_args (cbuf, sizeof(cbuf), argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -1073,7 +1073,7 @@ return cbuf;
 
 t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
 {
-char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
+char *cptr, cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp = NULL;
 int32 echo, nargs, errabort, i;
@@ -1164,12 +1164,12 @@ if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
 do {
-    ocptr = cptr = sim_brk_getact (cbuf, CBUFSIZE);     /* get bkpt action */
+    ocptr = cptr = sim_brk_getact (cbuf, sizeof(cbuf)); /* get bkpt action */
     if (!ocptr) {                                       /* no pending action? */
-        ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin); /* get cmd line */
+        ocptr = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
         sim_goto_line[sim_do_depth] += 1;
         }
-    sub_args (cbuf, gbuf, sizeof(gbuf), do_arg);        /* substitute args */
+    sub_args (cbuf, sizeof(cbuf), do_arg);              /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
@@ -1291,8 +1291,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
 
    Calling sequence
    instr        =       input string
-   tmpbuf       =       temp buffer
-   maxstr       =       min (len (instr), len (tmpbuf))
+   instr_size   =       sizeof input string buffer
    do_arg[10]   =       arguments
 
    Token "%0" expands to the command file name. 
@@ -1326,13 +1325,16 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    untouched.
 */
 
-void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
+void sub_args (char *instr, size_t instr_size, char *do_arg[])
 {
 char gbuf[CBUFSIZE];
-char *ip = instr, *op = tmpbuf, *ap, *oend = tmpbuf + maxstr - 2, *istart;
+char *ip = instr, *op, *ap, *oend, *istart, *tmpbuf;
 char rbuf[CBUFSIZE];
 int i;
 
+tmpbuf = malloc(instr_size);
+op = tmpbuf;
+oend = tmpbuf + instr_size - 2;
 while (isspace (*ip))                                   /* skip leading spaces */
     *op++ = *ip++;
 istart = ip;
@@ -1450,6 +1452,7 @@ for (; *ip && (op < oend); ) {
     }
 *op = 0;                                                /* term buffer */
 strcpy (instr, tmpbuf);
+free (tmpbuf);
 return;
 }
 
@@ -1533,7 +1536,7 @@ rewind(sim_gotofile);                                   /* start search for labe
 sim_goto_line[sim_do_depth] = 0;                        /* reset line number */
 sim_do_echo = 0;                                        /* Don't echo while searching for label */
 while (1) {
-    cptr = read_line (cbuf, CBUFSIZE, sim_gotofile);    /* get cmd line */
+    cptr = read_line (cbuf, sizeof(cbuf), sim_gotofile);/* get cmd line */
     if (cptr == NULL) break;                            /* exit on eof */
     sim_goto_line[sim_do_depth] += 1;                   /* record line number */
     if (*cptr == 0) continue;                           /* ignore blank */
@@ -3260,7 +3263,7 @@ REG *rptr;
 struct stat rstat;
 t_bool force_restore = sim_switches & SWMASK ('F');
 
-#define READ_S(xx) if (read_line ((xx), CBUFSIZE, rfile) == NULL) \
+#define READ_S(xx) if (read_line ((xx), sizeof(xx), rfile) == NULL) \
     return SCPE_IOERR;
 #define READ_I(xx) if (sim_fread (&xx, sizeof (xx), 1, rfile) == 0) \
     return SCPE_IOERR;
@@ -4052,7 +4055,7 @@ if ((cptr == NULL) || (rptr == NULL))
 if (rptr->flags & REG_RO)
     return SCPE_RO;
 if (flag & EX_I) {
-    cptr = read_line (gbuf, CBUFSIZE, stdin);
+    cptr = read_line (gbuf, sizeof(gbuf), stdin);
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
@@ -4270,7 +4273,7 @@ char gbuf[CBUFSIZE];
 if (dptr == NULL)
     return SCPE_IERR;
 if (flag & EX_I) {
-    cptr = read_line (gbuf, CBUFSIZE, stdin);
+    cptr = read_line (gbuf, sizeof(gbuf), stdin);
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
@@ -4542,7 +4545,7 @@ t_stat get_yn (char *ques, t_stat deflt)
 char cbuf[CBUFSIZE], *cptr;
 
 printf ("%s ", ques);
-cptr = read_line (cbuf, CBUFSIZE, stdin);
+cptr = read_line (cbuf, sizeof(cbuf), stdin);
 if ((cptr == NULL) || (*cptr == 0))
     return deflt;
 if ((*cptr == 'Y') || (*cptr == 'y'))
@@ -4652,7 +4655,7 @@ t_stat r;
 
 if ((cptr == NULL) || (*cptr == 0))
     return SCPE_ARG;
-strncpy (gbuf, cptr, CBUFSIZE);
+strncpy (gbuf, cptr, sizeof(gbuf));
 addrp = gbuf;                                           /* default addr */
 if ((portp = strchr (gbuf, ':')))                       /* x:y? split */
     *portp++ = 0;
