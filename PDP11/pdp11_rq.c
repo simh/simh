@@ -27,6 +27,18 @@
    rq           RQDX3 disk controller
 
    24-Oct-12    MB      Added mapped transfers for VAX
+   29-Jan-11    HUH     Added RC25, RCF25 and RA80 disks
+                        Not all disk parameters set yet
+                        "KLESI" MSCP controller (3) / port (1) types for RC25 
+                        not yet implemented
+                        
+                        Remarks on the RC25 disk drives: 
+                        In "real" life the RC25 drives exist in pairs only,
+                        one RC25 (removable) and one RCF25 (fixed) in one housing.
+                        The removable platter has always got an even drive number 
+                        (e.g. "0"), the fixed platter has always got the next (odd) 
+                        drive number (e.g. "1"). These two rules are not enforced 
+                        by the disk drive simulation.
    07-Mar-11    MP      Added working behaviors for removable device types.
                         This allows physical CDROM's to come online and be 
                         ejected.
@@ -252,6 +264,7 @@ x  RD33 17      7       1170    ?       ?       ?       138565
 
    RA60 42(+1)  6       1600    6       1       1008    400176
 x  RA70 33(+1)  11      1507+   11      1       ?       547041
+   RA80 31      14      546      ?      ?       ?       237212
    RA81 51(+1)  14      1258    14      1       2856    891072
    RA82 57(+1)  15      1435    15      1       3420    1216665
    RA71 51(+1)  14      1921    14      1       1428    1367310         
@@ -259,6 +272,11 @@ x  RA70 33(+1)  11      1507+   11      1       ?       547041
    RA90 69(+1)  13      2656    13      1       1794    2376153
    RA92 73(+1)  13      3101    13      1       949     2940951
 x  RA73 70(+1)  21      2667+   21      1       ?       3920490
+
+   LESI attached RC25 disks (one removable, one fixed)
+   type  sec     surf    cyl     tpg     gpc     RCT     LBNs
+   RC25  31      2        821    ?       ?       ?       50902
+   RCF25 31      2        821    ?       ?       ?       50902
 
    Each drive can be a different type.  The drive field in the
    unit flags specified the drive type and thus, indirectly,
@@ -536,13 +554,61 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RD32_GPC        1
 #define RD32_XBN        54
 #define RD32_DBN        48
-#define RD32_LBN        83204
+#define RD32_LBN        83236
 #define RD32_RCTS       4
 #define RD32_RCTC       8
 #define RD32_RBN        200
 #define RD32_MOD        15
 #define RD32_MED        0x25644020
 #define RD32_FLGS       0
+
+#define RC25_DTYPE      17                              /*  */
+#define RC25_SECT       50                              /*  */
+#define RC25_SURF       8
+#define RC25_CYL        1260                            /*  */
+#define RC25_TPG        RC25_SURF
+#define RC25_GPC        1
+#define RC25_XBN        0                               /*  */
+#define RC25_DBN        0                               /*  */
+#define RC25_LBN        50902                           /* ? 50*8*1260 ? */
+#define RC25_RCTS       0                               /*  */
+#define RC25_RCTC       1
+#define RC25_RBN        0                               /*  */
+#define RC25_MOD        3
+#define RC25_MED        0x20643019
+#define RC25_FLGS       RQDF_RMV
+
+#define RCF25_DTYPE     18                              /*  */
+#define RCF25_SECT      50                              /*  */
+#define RCF25_SURF      8
+#define RCF25_CYL       1260                            /*  */
+#define RCF25_TPG       RCF25_SURF
+#define RCF25_GPC       1
+#define RCF25_XBN       0                               /*  */
+#define RCF25_DBN       0                               /*  */
+#define RCF25_LBN       50902                           /* ? 50*8*1260 ? */
+#define RCF25_RCTS      0                               /*  */
+#define RCF25_RCTC      1
+#define RCF25_RBN       0                               /*  */
+#define RCF25_MOD       3
+#define RCF25_MED       0x20643319
+#define RCF25_FLGS      0
+
+#define RA80_DTYPE      19                              /* SDI drive */
+#define RA80_SECT       31                              /* +1 spare/track */
+#define RA80_SURF       14
+#define RA80_CYL        546                            /*  */
+#define RA80_TPG        RA80_SURF
+#define RA80_GPC        1
+#define RA80_XBN        0                               /*  */
+#define RA80_DBN        0                               /*  */
+#define RA80_LBN        237212                          /* 31*7*1092 */
+#define RA80_RCTS       0                               /*  */
+#define RA80_RCTC       1
+#define RA80_RBN        0                               /*  */
+#define RA80_MOD        1
+#define RA80_MED        0x25641050
+#define RA80_FLGS       RQDF_SDI
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -570,22 +636,31 @@ struct drvtyp {
 #define RQ_SIZE(d)      (d##_LBN * RQ_NUMBY)
 
 static struct drvtyp drv_tab[] = {
-    { RQ_DRV (RX50), "RX50" }, { RQ_DRV (RX33), "RX33" },
-    { RQ_DRV (RD51), "RD51" }, { RQ_DRV (RD31), "RD31" },
-    { RQ_DRV (RD52), "RD52" }, { RQ_DRV (RD53), "RD53" },
-    { RQ_DRV (RD54), "RD54" }, { RQ_DRV (RA82), "RA82" },
-    { RQ_DRV (RRD40), "RRD40" }, { RQ_DRV (RA72), "RA72" },
-    { RQ_DRV (RA90), "RA90" }, { RQ_DRV (RA92), "RA92" },
-    { RQ_DRV (RA8U), "RAUSER" }, { RQ_DRV (RA60), "RA60" },
-    { RQ_DRV (RA81), "RA81" }, { RQ_DRV (RA71), "RA71" },
-    { RQ_DRV (RD32), "RD32" },
+    { RQ_DRV (RX50), "RX50" }, 
+    { RQ_DRV (RX33), "RX33" },
+    { RQ_DRV (RD51), "RD51" }, 
+    { RQ_DRV (RD31), "RD31" },
+    { RQ_DRV (RD52), "RD52" }, 
+    { RQ_DRV (RD53), "RD53" },
+    { RQ_DRV (RD54), "RD54" }, 
+    { RQ_DRV (RA82), "RA82" },
+    { RQ_DRV (RRD40), "RRD40" }, 
+    { RQ_DRV (RA72), "RA72" },
+    { RQ_DRV (RA90), "RA90" }, 
+    { RQ_DRV (RA92), "RA92" },
+    { RQ_DRV (RA8U), "RAUSER" }, 
+    { RQ_DRV (RA60), "RA60" },
+    { RQ_DRV (RA81), "RA81" }, 
+    { RQ_DRV (RA71), "RA71" },
+    { RQ_DRV (RD32), "RD32" }, 
+    { RQ_DRV (RC25), "RC25" },
+    { RQ_DRV (RCF25), "RCF25" },
+    { RQ_DRV (RA80), "RA80" },
     { 0 }
     };
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern UNIT cpu_unit;
-extern FILE *sim_deb;
 extern uint32 sim_taddr_64;
 extern int32 sim_switches;
 
@@ -845,6 +920,12 @@ MTAB rq_mod[] = {
     { MTAB_XTD | MTAB_VUN, RA90_DTYPE, NULL, "RA90",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA92_DTYPE, NULL, "RA92",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RC25_DTYPE, NULL, "RC25",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RCF25_DTYPE, NULL, "RCF25",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA80_DTYPE, NULL, "RA80",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA8U_DTYPE, NULL, "RAUSER",
       &rq_set_type, NULL, NULL },
