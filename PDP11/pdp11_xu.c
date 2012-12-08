@@ -674,18 +674,16 @@ t_stat xu_sw_reset (CTLR* xu)
   for (i=0; i<6; i++)
     xu->var->setup.macs[1][i] = 0xff; /* Broadcast Address */
   xu->var->setup.mac_count = 2;
-  if (xu->var->etherface)
+  if (xu->var->etherface) {
     eth_filter (xu->var->etherface, xu->var->setup.mac_count,
                 xu->var->setup.macs, xu->var->setup.multicast,
                 xu->var->setup.promiscuous);
 
-  /* activate device if not disabled */
-  if ((xu->dev->flags & DEV_DIS) == 0) {
+    /* activate device */
     sim_activate_abs(&xu->unit[0], clk_cosched (tmxr_poll));
 
     /* start service timer */
-    if (xu->var->etherface)
-      sim_activate_abs(&xu->unit[1], tmr_poll * clk_tps);
+    sim_activate_abs(&xu->unit[1], tmr_poll * clk_tps);
   }
 
   /* clear load_server address */
@@ -1622,6 +1620,8 @@ t_stat xu_detach(UNIT* uptr)
   sim_debug(DBG_TRC, xu->dev, "xu_detach()\n");
 
   if (uptr->flags & UNIT_ATT) {
+    sim_cancel (uptr);                  /* stop the receiver */
+    sim_cancel (uptr+1);                /* stop the timer services */
     eth_close (xu->var->etherface);
     free(xu->var->etherface);
     xu->var->etherface = 0;
