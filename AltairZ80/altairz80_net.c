@@ -154,7 +154,7 @@ static t_stat net_attach(UNIT *uptr, char *cptr) {
     char host[CBUFSIZE], port[CBUFSIZE];
     t_stat r;
 
-    r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000");
+    r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL);
     if (r != SCPE_OK)
         return SCPE_ARG;
     net_reset(&net_dev);

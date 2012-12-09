@@ -565,7 +565,7 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
 
     if (!cptr) return SCPE_IERR;
     if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
-    status = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL);
+    status = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
     if (status != SCPE_OK)
         return status;
     if (host[0] == '\0')
@@ -1588,8 +1588,7 @@ int dmc_get_receive_socket(CTLR *controller, int forRead)
         {
             char host[sizeof(controller->line->transmit_host)];
 
-            sim_parse_addr (controller->line->transmit_host, host, sizeof(host), NULL, NULL, 0, NULL);
-            if (strcmp(ipaddr, host))
+            if (sim_parse_addr (controller->line->transmit_host, host, sizeof(host), NULL, NULL, 0, NULL, ipaddr))
             {
                 sim_debug(DBG_WRN, controller->device, "Received connection from unexpected source IP %s. Closing the connection.\n", ipaddr);
                 dmc_close_receive(controller, "Unathorized connection", ipaddr);

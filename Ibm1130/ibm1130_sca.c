@@ -462,7 +462,7 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 		detach_unit(&sca_unit);
 
 	if (do_listen) {							/* if listen mode, string specifies port number (only; otherwise it's a dummy argument) */
-        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT);
+        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL);
         if (r != SCPE_OK)
             return r;
         if ((0 == strcmp(port, cptr)) && (0 == strcmp(port, "dummy")))
@@ -493,7 +493,7 @@ static t_stat sca_attach (UNIT *uptr, char *cptr)
 		if (! *cptr)
 			return SCPE_2FARG;
 
-        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT);
+        r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), SCA_DEFAULT_PORT, NULL);
         if (r != SCPE_OK)
             return r;
         if ((0 == strcmp(cptr, port)) && (0 == strcmp(host, ""))) {

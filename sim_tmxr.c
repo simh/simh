@@ -791,8 +791,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
         if (lp->destination) {                          /* Virtual Null Modem Cable? */
             char host[CBUFSIZE];
 
-            sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL);
-            if (strcmp(address, host)) {
+            if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
                 tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
                 sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
                 tmxr_debug_trace_line (lp, msg);
@@ -1459,7 +1458,7 @@ while (*tptr) {
                 continue;
                 }
             cptr = get_glyph (gbuf, port, ';');
-            if (SCPE_OK != sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL))
+            if (SCPE_OK != sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
                 return SCPE_ARG;
             if (cptr)
                 get_glyph (cptr, cptr, 0);                  /* upcase this string */

@@ -581,7 +581,7 @@ if (oldf & UNIT_ATT)
     ipl_detach (uptr);
 if ((sim_switches & SWMASK ('C')) ||
     ((sim_switches & SIM_SW_REST) && (oldf & UNIT_ACTV))) {
-        r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), NULL);
+        r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL);
         if ((r != SCPE_OK) || (port[0] == '\0'))
             return SCPE_ARG;
         sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host[0] ? ":" : "", port);
@@ -597,7 +597,7 @@ if ((sim_switches & SWMASK ('C')) ||
         uptr->DSOCKET = newsock;
         }
 else {
-    r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL);
+    r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
     if (r != SCPE_OK)
         return SCPE_ARG;
     sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host[0] ? ":" : "", port);

@@ -498,7 +498,7 @@ while (*cptr != 0) {                                    /* do all mods */
             return r;
         }
     else {
-        r = sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL);
+        r = sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL, NULL);
         if (r == SCPE_OK) {
             if (sim_con_tmxr.master)                        /* already open? */
                 sim_set_notelnet (0, NULL);                 /* close first */
