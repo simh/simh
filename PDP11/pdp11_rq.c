@@ -24,8 +24,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rq           RQDX3 disk controller
+   rq           MSCP disk controller
 
+   09-Dec-12    MB      Added support for changing controller type.
    24-Oct-12    MB      Added mapped transfers for VAX
    29-Jan-11    HUH     Added RC25, RCF25 and RA80 disks
                         Not all disk parameters set yet
@@ -140,8 +141,8 @@ extern uint32 cpu_opt;
 #define RQU_UQPM        6                               /* UB port model */
 #define RQQ_UQPM        19                              /* QB port model */
 #define RQ_UQPM         (UNIBUS? RQU_UQPM: RQQ_UQPM)
-#define RQU_MODEL       6                               /* UB MSCP ctrl model */
-#define RQQ_MODEL       19                              /* QB MSCP ctrl model */
+#define RQU_MODEL       6                               /* UB MSCP ctrl model (UDA50A) */
+#define RQQ_MODEL       19                              /* QB MSCP ctrl model (RQDX3) */
 #define RQ_MODEL        (UNIBUS? RQU_MODEL: RQQ_MODEL)
 #define RQ_HVER         1                               /* hardware version */
 #define RQ_SVER         3                               /* software version */
@@ -597,18 +598,38 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RA80_DTYPE      19                              /* SDI drive */
 #define RA80_SECT       31                              /* +1 spare/track */
 #define RA80_SURF       14
-#define RA80_CYL        546                            /*  */
+#define RA80_CYL        546                             /*  */
 #define RA80_TPG        RA80_SURF
 #define RA80_GPC        1
 #define RA80_XBN        0                               /*  */
 #define RA80_DBN        0                               /*  */
-#define RA80_LBN        237212                          /* 31*7*1092 */
+#define RA80_LBN        237212                          /* 31*14*546 */
 #define RA80_RCTS       0                               /*  */
 #define RA80_RCTC       1
 #define RA80_RBN        0                               /*  */
 #define RA80_MOD        1
 #define RA80_MED        0x25641050
 #define RA80_FLGS       RQDF_SDI
+
+/* Controller parameters */
+
+#define DEFAULT_CTYPE   0
+
+#define KLESI_CTYPE     1
+#define KLESI_UQPM      1
+#define KLESI_MODEL     1
+
+#define RUX50_CTYPE     2
+#define RUX50_UQPM      2
+#define RUX50_MODEL     2
+
+#define UDA50_CTYPE     3
+#define UDA50_UQPM      6
+#define UDA50_MODEL     6
+
+#define RQDX3_CTYPE     4
+#define RQDX3_UQPM      19
+#define RQDX3_MODEL     19
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -659,6 +680,24 @@ static struct drvtyp drv_tab[] = {
     { 0 }
     };
 
+struct ctlrtyp {
+    uint32      uqpm;                                   /* port model */
+    uint32      model;                                  /* controller model */
+    char        *name;                                  /* name */
+    };
+
+#define RQ_CTLR(d) \
+    d##_UQPM, d##_MODEL
+
+static struct ctlrtyp ctlr_tab[] = {
+    { 0,            0, "DEFAULT" },
+    { RQ_CTLR (KLESI), "KLESI" },
+    { RQ_CTLR (RUX50), "RUX50" },
+    { RQ_CTLR (UDA50), "UDA50" },
+    { RQ_CTLR (RQDX3), "RQDX3" },
+    { 0 }
+    };
+
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
 extern uint32 sim_taddr_64;
@@ -688,6 +727,7 @@ typedef struct {
     uint32              credits;                        /* credits */
     uint32              hat;                            /* host timer */
     uint32              htmo;                           /* host timeout */
+    uint32              ctype;                          /* controller type */
     struct uq_ring      cq;                             /* cmd ring */
     struct uq_ring      rq;                             /* rsp ring */
     struct rqpkt        pak[RQ_NPKTS];                  /* packet queue */
@@ -755,7 +795,9 @@ t_stat rq_detach (UNIT *uptr);
 t_stat rq_boot (int32 unitno, DEVICE *dptr);
 t_stat rq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rq_set_ctype (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -883,6 +925,14 @@ MTAB rq_mod[] = {
       NULL, &rq_show_ctrl, 0 },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, RQ_SH_ALL, "ALL", NULL,
       NULL, &rq_show_ctrl, 0 },
+    { MTAB_XTD | MTAB_VDV, KLESI_CTYPE, NULL, "KLESI",
+      &rq_set_ctype, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, RUX50_CTYPE, NULL, "RUX50",
+      &rq_set_ctype, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UDA50_CTYPE, NULL, "UDA50",
+      &rq_set_ctype, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, RQDX3_CTYPE, NULL, "RQDX3",
+      &rq_set_ctype, NULL, NULL },
     { MTAB_XTD | MTAB_VUN | MTAB_NMO, 0, "UNITQ", NULL,
       NULL, &rq_show_unitq, 0 },
     { MTAB_XTD | MTAB_VUN, 0, "WRITE", NULL,
@@ -946,6 +996,8 @@ MTAB rq_mod[] = {
 #endif
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
       NULL, &show_vec, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
+      NULL, &rq_show_ctype, NULL },
     { 0 }
     };
 
@@ -1291,7 +1343,8 @@ for (i = 0; i < (lnt >> 1); i++)                        /* clr buffer */
     zero[i] = 0;
 if (Map_WriteW (base, lnt, zero))                       /* zero comm area */
     return rq_fatal (cp, PE_QWE);                       /* error? */
-cp->sa = SA_S4 | (RQ_UQPM << SA_S4C_V_MOD) |            /* send step 4 */
+cp->sa = SA_S4 |                                        /* send step 4 */
+    (ctlr_tab[cp->ctype].uqpm << SA_S4C_V_MOD) |
     (RQ_SVER << SA_S4C_V_VER);
 cp->csta = CST_S4;                                      /* set step 4 */
 rq_init_int (cp);                                       /* poke host */
@@ -1724,7 +1777,7 @@ else {
     cp->pak[pkt].d[SCC_CIDB] = 0;
     cp->pak[pkt].d[SCC_CIDC] = 0;
     cp->pak[pkt].d[SCC_CIDD] = (RQ_CLASS << SCC_CIDD_V_CLS) |
-        (RQ_MODEL << SCC_CIDD_V_MOD);
+        (ctlr_tab[cp->ctype].model << SCC_CIDD_V_MOD);
     cp->pak[pkt].d[SCC_MBCL] = 0;                       /* max bc */
     cp->pak[pkt].d[SCC_MBCH] = 0;
     }
@@ -2186,7 +2239,7 @@ cp->pak[pkt].d[DTE_CIDA] = 0;                           /* ctrl ID */
 cp->pak[pkt].d[DTE_CIDB] = 0;
 cp->pak[pkt].d[DTE_CIDC] = 0;
 cp->pak[pkt].d[DTE_CIDD] = (RQ_CLASS << DTE_CIDD_V_CLS) |
-    (RQ_MODEL << DTE_CIDD_V_MOD);
+    (ctlr_tab[cp->ctype].model << DTE_CIDD_V_MOD);
 cp->pak[pkt].d[DTE_VER] = (RQ_HVER << DTE_VER_V_HVER) |
     (RQ_SVER << DTE_VER_V_SVER);
 cp->pak[pkt].d[DTE_MLUN] = lu;                          /* MLUN */
@@ -2228,7 +2281,7 @@ cp->pak[pkt].d[HBE_CIDA] = 0;                           /* ctrl ID */
 cp->pak[pkt].d[HBE_CIDB] = 0;
 cp->pak[pkt].d[HBE_CIDC] = 0;
 cp->pak[pkt].d[HBE_CIDD] = (RQ_CLASS << DTE_CIDD_V_CLS) |
-    (RQ_MODEL << DTE_CIDD_V_MOD);
+    (ctlr_tab[cp->ctype].model << DTE_CIDD_V_MOD);
 cp->pak[pkt].d[HBE_VER] = (RQ_HVER << HBE_VER_V_HVER) | /* versions */
     (RQ_SVER << HBE_VER_V_SVER);
 cp->pak[pkt].d[HBE_RSV] = 0;
@@ -2256,7 +2309,7 @@ cp->pak[pkt].d[PLF_CIDA] = 0;                           /* cntl ID */
 cp->pak[pkt].d[PLF_CIDB] = 0;
 cp->pak[pkt].d[PLF_CIDC] = 0;
 cp->pak[pkt].d[PLF_CIDD] = (RQ_CLASS << PLF_CIDD_V_CLS) |
-    (RQ_MODEL << PLF_CIDD_V_MOD);
+    (ctlr_tab[cp->ctype].model << PLF_CIDD_V_MOD);
 cp->pak[pkt].d[PLF_VER] = (RQ_SVER << PLF_VER_V_SVER) |
     (RQ_HVER << PLF_VER_V_HVER);
 cp->pak[pkt].d[PLF_ERR] = err;
@@ -2667,6 +2720,27 @@ fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
 return SCPE_OK;
 }
 
+/* Set controller type */
+
+t_stat rq_set_ctype (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+MSC *cp = rq_ctxmap[uptr->cnum];
+
+if (val < 0)
+    return SCPE_ARG;
+cp->ctype = val;
+return SCPE_OK;
+}
+
+/* Show controller type */
+
+t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+MSC *cp = rq_ctxmap[uptr->cnum];
+fprintf (st, "%s", ctlr_tab[cp->ctype].name);
+return SCPE_OK;
+}
+
 /* Device attach */
 
 t_stat rq_attach (UNIT *uptr, char *cptr)
@@ -2716,6 +2790,8 @@ if (cidx < 0)                                           /* not found??? */
     return SCPE_IERR;
 cp = rq_ctxmap[cidx];                                   /* get context */
 cp->cnum = cidx;                                        /* init index */
+if (cp->ctype == DEFAULT_CTYPE)
+    cp->ctype = (UNIBUS? UDA50_CTYPE : RQDX3_CTYPE);
 
 #if defined (VM_VAX)                                    /* VAX */
 cp->ubase = 0;                                          /* unit base = 0 */
