@@ -137,7 +137,7 @@ extern uint16 *M;
 #define GET_UAE(x)      (((x) >> CS1_V_UAE) & CS1_M_UAE)
 #define PUT_UAE(x,n)    (((x) & ~ CS1_UAE) | (((n) << CS1_V_UAE) & CS1_UAE))
 
-char *hk_funcs[] = {
+static const char *hk_funcs[] = {
     "NOP", "PACK", "DCLR", "UNLOAD", "START", "RECAL", "OFFSET", "SEEK", 
     "READ", "WRITE", "READH", "WRITEH", "WCHK"};
 
