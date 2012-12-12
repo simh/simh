@@ -90,6 +90,8 @@ t_stat sim_activate_abs (UNIT *uptr, int32 interval);
 t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
 t_stat sim_cancel (UNIT *uptr);
 int32 sim_is_active (UNIT *uptr);
+t_bool sim_is_active_bool (UNIT *uptr);
+int32 sim_activate_time (UNIT *uptr);
 double sim_gtime (void);
 uint32 sim_grtime (void);
 int32 sim_qcount (void);

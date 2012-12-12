@@ -368,6 +368,8 @@ struct sim_unit {
     void                *up8;                           /* device specific */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(struct sim_unit *);
+    t_bool              (*a_is_active)(struct sim_unit *);
+    void                (*a_cancel)(struct sim_unit *);
     struct sim_unit     *a_next;                        /* next asynch active */
     int32               a_event_time;
     t_stat              (*a_activate_call)(struct sim_unit *, int32);
@@ -609,7 +611,8 @@ extern int32 sim_asynch_inst_latency;
       pthread_mutex_destroy(&sim_asynch_lock);                    \
       pthread_cond_destroy(&sim_asynch_wake);                     \
     }
-
+#define AIO_IS_ACTIVE(uptr) (((uptr)->a_is_active ? (uptr)->a_is_active (uptr) : FALSE) || ((uptr)->a_next))
+#define AIO_CANCEL(uptr) if ((uptr)->a_cancel) (uptr)->a_cancel (uptr); else (void)0
 #if defined(__DECC_VER)
 #include <builtins>
 #if defined(__IA64)
@@ -750,6 +753,8 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_CHECK_EVENT
 #define AIO_INIT
 #define AIO_CLEANUP
+#define AIO_IS_ACTIVE(uptr) FALSE
+#define AIO_CANCEL(uptr)
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)
 #endif /* SIM_ASYNCH_IO */
 

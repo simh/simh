@@ -3144,7 +3144,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
     WRITE_I (dptr->flags);                              /* [V2.10] flags */
     for (j = 0; j < dptr->numunits; j++) {
         uptr = dptr->units + j;
-        t = sim_is_active (uptr);
+        t = sim_activate_time (uptr);
         WRITE_I (j);                                    /* unit number */
         WRITE_I (t);                                    /* activation time */
         WRITE_I (uptr->u3);                             /* unit specific */
@@ -5221,6 +5221,7 @@ return SCPE_OK;
         sim_cancel              remove entry from event queue
         sim_process_event       process entries on event queue
         sim_is_active           see if entry is on event queue
+        sim_activate_time       return time until activation
         sim_atime               return absolute time for an entry
         sim_gtime               return global time
         sim_qcount              return event queue entry count
@@ -5357,7 +5358,6 @@ uint32 rtimenow, urtime = (uint32)rtime;
 AIO_ACTIVATE (sim_activate_notbefore, uptr, rtime);
 sim_cancel (uptr);
 rtimenow = sim_grtime();
-sim_cancel (uptr);
 if (0x80000000 <= urtime-rtimenow)
     return sim_activate (uptr, 0);
 else
@@ -5378,9 +5378,13 @@ t_stat sim_cancel (UNIT *uptr)
 UNIT *cptr, *nptr;
 
 AIO_VALIDATE;
+AIO_CANCEL(uptr);
+AIO_UPDATE_QUEUE;
 if (sim_clock_queue == NULL)
     return SCPE_OK;
 UPDATE_SIM_TIME (sim_clock_queue->time);                /* update sim time */
+if (!sim_is_active_bool (uptr))
+    return SCPE_OK;
 nptr = NULL;
 if (sim_clock_queue == uptr)
     nptr = sim_clock_queue = uptr->next;
@@ -5411,6 +5415,49 @@ return SCPE_OK;
 */
 
 int32 sim_is_active (UNIT *uptr)
+{
+UNIT *cptr;
+int32 accum;
+
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
+accum = 0;
+for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
+    if (cptr == sim_clock_queue) {
+        if (sim_interval > 0)
+            accum = accum + sim_interval;
+        }
+    else accum = accum + cptr->time;
+    if (cptr == uptr)
+        return accum + 1;
+    }
+return 0;
+}
+
+/* sim_is_active_bool - test for entry in queue
+
+   Inputs:
+        uptr    =       pointer to unit
+   Outputs:
+        result =        TRUE if unit is busy, FALSE inactive
+*/
+
+t_bool sim_is_active_bool (UNIT *uptr)
+{
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
+return ((uptr->next) || AIO_IS_ACTIVE(uptr));
+}
+
+/* sim_activate_time - return activation time
+
+   Inputs:
+        uptr    =       pointer to unit
+   Outputs:
+        result =        absolute activation time + 1, 0 if inactive
+*/
+
+int32 sim_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
 int32 accum;
