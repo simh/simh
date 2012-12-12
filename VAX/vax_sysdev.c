@@ -1464,7 +1464,7 @@ return;
 
 void tmr_sched (int32 tmr)
 {
-int32 clk_time = sim_is_active (&clk_unit) - 1;
+int32 clk_time = sim_activate_time (&clk_unit) - 1;
 int32 tmr_time;
 
 tmr_sav[tmr] = sim_grtime ();                           /* save intvl base */

@@ -695,7 +695,7 @@ void dp_goc (int32 fnc, int32 drv, int32 time)
 {
 int32 t;
 
-t = sim_is_active (&dpc_unit[drv]);
+t = sim_activate_time (&dpc_unit[drv]);
 if (t) {                                                /* still seeking? */
     sim_cancel (&dpc_unit[drv]);                        /* stop seek */
     dpc_sta[drv] = dpc_sta[drv] & ~STA_BSY;             /* clear busy */

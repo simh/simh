@@ -278,7 +278,7 @@ t_mtrlnt tbc;
 t_stat r;
 
 if (cmd == MCM_INIT) {                                  /* init state */
-    if ((t = sim_is_active (uptr + MT_REW)) != 0) {     /* rewinding? */
+    if ((t = sim_activate_time (uptr + MT_REW)) != 0) { /* rewinding? */
         sim_activate (uptr, t);                         /* retry later */
         return SCPE_OK;
         }

@@ -89,7 +89,7 @@ int32 used, incr;
 
 if (clk_dev.flags & DEV_DIS)                            /* disabled? */
     return (stop_inst << IOT_V_REASON) | dat;           /* illegal inst */
-used = tmxr_poll - (sim_is_active (&clk_unit) - 1);
+used = tmxr_poll - (sim_activate_time (&clk_unit) - 1);
 incr = (used * CLK_CNTS) / tmxr_poll;
 return clk_cntr + incr;
 }
