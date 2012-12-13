@@ -348,7 +348,7 @@ return SCPE_OK;
 
 /* Bootstrap routine */
 
-const static uint8 boot_rom[] = {
+static const uint8 boot_rom[] = {
  4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,                    /* NOP */
  3, 6, 0, 0, 0, 3, 1, 0, 0, 3, 0, 0,                    /* RNPT 31 */
  2, 5, 0, 0, 0, 7, 1, 0, 0, 0, 0, 0,                    /* TD 71,loc */
@@ -363,7 +363,7 @@ const static uint8 boot_rom[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)

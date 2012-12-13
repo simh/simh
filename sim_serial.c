@@ -131,6 +131,7 @@
 
 #define SER_DEV_NAME_MAX     256                        /* maximum device name size */
 #define SER_DEV_DESC_MAX     256                        /* maximum device description size */
+#define SER_DEV_CONFIG_MAX    64                        /* maximum device config size */
 #define SER_MAX_DEVICE        64                        /* maximum serial devices */
 
 typedef struct serial_list {
@@ -155,7 +156,7 @@ static struct open_serial_device {
     SERHANDLE port;
     TMLN *line;
     char name[SER_DEV_NAME_MAX];
-    char desc[SER_DEV_DESC_MAX];
+    char config[SER_DEV_CONFIG_MAX];
     } *serial_open_devices = NULL;
 static int serial_open_device_count = 0;
 
@@ -169,15 +170,15 @@ for (i=0; i<serial_open_device_count; ++i)
 return NULL;
 }
 
-static struct open_serial_device *_serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *desc)
+static struct open_serial_device *_serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *config)
 {
 serial_open_devices = realloc(serial_open_devices, (++serial_open_device_count)*sizeof(*serial_open_devices));
 memset(&serial_open_devices[serial_open_device_count-1], 0, sizeof(serial_open_devices[serial_open_device_count-1]));
 serial_open_devices[serial_open_device_count-1].port = port;
 serial_open_devices[serial_open_device_count-1].line = line;
-strcpy(serial_open_devices[serial_open_device_count-1].name, name);
-if (desc)
-    strcpy(serial_open_devices[serial_open_device_count-1].desc, desc);
+strncpy(serial_open_devices[serial_open_device_count-1].name, name, sizeof(serial_open_devices[serial_open_device_count-1].name)-1);
+if (config)
+    strncpy(serial_open_devices[serial_open_device_count-1].config, config, sizeof(serial_open_devices[serial_open_device_count-1].config));
 return &serial_open_devices[serial_open_device_count-1];
 }
 
@@ -234,7 +235,7 @@ for (i=0; i<serial_open_device_count; ++i) {
     if (ports >= max)
         break;
     strcpy(list[ports].name, serial_open_devices[i].name);
-    strcpy(list[ports].desc, serial_open_devices[i].desc);
+    strcpy(list[ports].desc, serial_open_devices[i].config);
     ++ports;
     }
 if (ports) /* Order the list returned alphabetically by the port name */
@@ -377,9 +378,8 @@ return SCPE_OK;
 
 SERHANDLE sim_open_serial (char *name, TMLN *lp, t_stat *stat)
 {
-char temp1[1024], temp2[1024], devname [1024];
+char temp1[1024], devname [1024];
 char *savname = name;
-char *savdesc = NULL;
 SERHANDLE port = INVALID_HANDLE;
 char *config;
 t_stat status;
@@ -407,7 +407,6 @@ if ((strlen(devname) <= 5)
             *stat = SCPE_OPENERR;
         return port;
         }
-    savdesc = sim_serial_getdesc_byname (savname, temp2);
     }
 else {
     /* are they trying to use device description? */
@@ -417,11 +416,7 @@ else {
         savname = sim_serial_getname_byname(devname, temp1);
         if (savname == NULL) /* didn't translate */
             savname = devname;
-        else
-            savdesc = sim_serial_getdesc_byname(savname, temp2);
         }
-    else
-        savdesc = devname;
     }
 
 port = sim_open_os_serial (savname);
@@ -525,7 +520,7 @@ if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_
     DWORD dwDataSize = sizeof(list[ports].name);
 	
     /* Enumerate all the values underneath HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\SERIALCOMM */
-    while (RegEnumValueA(hSERIALCOMM, dwIndex, list[ports].desc, &dwValueNameSize, NULL, &dwType, list[ports].name, &dwDataSize) == ERROR_SUCCESS) {
+    while (RegEnumValueA(hSERIALCOMM, dwIndex, list[ports].desc, &dwValueNameSize, NULL, &dwType, (BYTE *)list[ports].name, &dwDataSize) == ERROR_SUCCESS) {
         /* String values with non-zero size are the interesting ones */
         if ((dwType == REG_SZ) && (dwDataSize > 0))
             if (ports < max)

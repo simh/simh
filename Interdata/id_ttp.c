@@ -130,7 +130,7 @@ DEVICE ttp_dev = {
 uint32 ttp (uint32 dev, uint32 op, uint32 dat)
 {
 int32 xmt = dev & 1;
-int32 t, old_cmd;
+int32 t;
 
 switch (op) {                                           /* case IO op */
 
@@ -160,7 +160,6 @@ switch (op) {                                           /* case IO op */
         return t;
 
     case IO_OC:                                         /* command */
-        old_cmd = ttp_cmd;                              /* old cmd */
         if (dat & CMD_TYP) {                            /* type 1? */
             ttp_cmd = (ttp_cmd & 0xFF) | (dat << 8);
             if (ttp_cmd & CMD_WRT)                      /* write? */

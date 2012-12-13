@@ -270,13 +270,12 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
 int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
     UNIT *uptr, int32 sw)
 {
-int32 cflag, c1, c2, group, len1, len2, inst, aaddr, baddr;
+int32 c1, c2, group, len1, len2, inst, aaddr, baddr;
 int32 oplen, groupno, i, j, vpos, qbyte, da, m, n;
 char bld[128], bldaddr[32], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
 c1 = val[0] & 0xff;
 if (sw & SWMASK ('A')) {
     for (i = 0; i < 16; i++) {

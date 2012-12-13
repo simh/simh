@@ -887,7 +887,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         }
     }
 else if (sim_switches & SWMASK ('M')) {                 /* merge difference disk? */
-    char gbuf[CBUFSIZE], *Parent;
+    char gbuf[CBUFSIZE], *Parent = NULL;
     FILE *vhd;
 
     sim_switches = sim_switches & ~(SWMASK ('M'));
@@ -1672,7 +1672,6 @@ return SCPE_OK;
 
 static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmode)
 {
-int fd;
 int mode = 0;
 
 if (strchr (openmode, 'r') && (strchr (openmode, '+') || strchr (openmode, 'w')))
@@ -2835,7 +2834,7 @@ void *handle;
 #define __STR(tok) __STR_QUOTE(tok)
     handle = dlopen("libuuid." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (handle)
-        uuid_generate_c = (void (*)(void *)) dlsym(handle, "uuid_generate");
+        uuid_generate_c = (void (*)(void *))((size_t)dlsym(handle, "uuid_generate"));
 if (uuid_generate_c)
     uuid_generate_c(uuidaddr);
 else
@@ -3023,6 +3022,9 @@ errno = Status;
 return hVHD;
 }
 
+#if defined(__CYGWIN__)
+#include <unistd.h>
+#endif
 static void
 ExpandToFullPath (const char *szFileSpec,
                   char *szFullFileSpecBuffer,
@@ -3109,7 +3111,7 @@ if (d) {
 else
     return NULL;
 #else
-while ((c = strchr (szHostPath, '\\')))
+while ((c = strchr (d, '\\')))
     *c = '/';
 #endif
 memset (szHostPath + strlen (szHostPath), 0, HostPathSize - strlen (szHostPath));

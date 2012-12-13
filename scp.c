@@ -718,6 +718,7 @@ static CTAB cmd_table[] = {
       "sh{ow} <unit> {arg,...}  show unit parameters\n"
       "sh{ow} ethernet          show ethernet devices\n"
       "sh{ow} serial            show serial devices\n"
+      "sh{ow} multiplexer       show open multiplexer devices\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
       "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\b"
@@ -2072,7 +2073,6 @@ static SHTAB show_glob_tab[] = {
     { "ETHERNET", &eth_show_devices, 0 },
     { "SERIAL", &sim_show_serial, 0 },
     { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
-    { "MUX", &tmxr_show_open_devices, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };
@@ -4429,8 +4429,10 @@ char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 char *tptr;
 #if defined(HAVE_DLOPEN)
 static int initialized = 0;
-static char *(*p_readline)(const char *) = NULL;
-static void (*p_add_history)(const char *) = NULL;
+typedef char *(*readline_func)(const char *);
+static readline_func p_readline = NULL;
+typedef void (*add_history_func)(const char *);
+static add_history_func p_add_history = NULL;
 
 if (!initialized) {
     initialized = 1;
@@ -4446,8 +4448,8 @@ if (!initialized) {
     if (!handle)
         handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
     if (handle) {
-        p_readline = dlsym(handle, "readline");
-        p_add_history = dlsym(handle, "add_history");
+        p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
+        p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
         }
     }
 if (prompt) {                                           /* interactive? */

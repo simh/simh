@@ -293,7 +293,7 @@ return 0;
 void
 Usage(void)
 {
-int i;
+size_t i;
 
 printf ("sim_BuildROMs Usage:\n");
 printf ("sim_BuildROMs\n");
@@ -324,7 +324,7 @@ exit(2);
 int
 main(int argc, char **argv)
 {
-int i;
+size_t i;
 int status = 0;
 
 if (argc == 1) {  /* invoked without any arguments */

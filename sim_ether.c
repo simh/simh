@@ -957,9 +957,9 @@ typedef int (*_func)();
 
 static void load_function(char* function, _func* func_ptr) {
 #ifdef _WIN32
-    *func_ptr = (_func)GetProcAddress(hLib, function);
+    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
 #else
-    *func_ptr = (_func)dlsym(hLib, function);
+    *func_ptr = (_func)((size_t)dlsym(hLib, function));
 #endif
     if (*func_ptr == 0) {
     char* msg = "Eth: Failed to find function '%s' in %s\r\n";
@@ -1416,7 +1416,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
             while (p1) {
               p2 = strchr(p1+1, ':');
               if (p2 <= p1+3) {
-                int mac_bytes[6];
+                unsigned int mac_bytes[6];
                 if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
                   dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
                   dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
@@ -1464,7 +1464,7 @@ HANDLE hWait = pcap_getevent ((pcap_t*)dev->handle);
 #else
 int sel_ret;
 int do_select = 0;
-int select_fd;
+int select_fd = 0;
 
 switch (dev->eth_api) {
   case ETH_API_PCAP:
@@ -2111,13 +2111,13 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
       break;
 #ifdef USE_TAP_NETWORK
     case ETH_API_TAP:
-      status = ((packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
+      status = (((int)packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
       break;
 #endif
 #ifdef USE_VDE_NETWORK
     case ETH_API_VDE:
       status = vde_send((VDECONN*)dev->handle, (void *)packet->msg, packet->len, 0);
-      if ((status == packet->len) || (status == 0))
+      if ((status == (int)packet->len) || (status == 0))
         status = 0;
       else
         if ((status == -1) && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))

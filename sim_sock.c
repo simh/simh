@@ -52,6 +52,10 @@ extern FILE *sim_log;
 #include <ws2tcpip.h>
 #endif
 
+#ifdef HAVE_DLOPEN
+#include <dlfcn.h>
+#endif
+
 #ifndef WSAAPI
 #define WSAAPI
 #endif
@@ -130,18 +134,17 @@ sim_close_sock (s, flg);
 return INVALID_SOCKET;
 }
 
-static void    (WSAAPI *p_freeaddrinfo) (struct addrinfo *ai);
+typedef void    (WSAAPI *freeaddrinfo_func) (struct addrinfo *ai);
+static freeaddrinfo_func p_freeaddrinfo;
 
-static int     (WSAAPI *p_getaddrinfo) (const char *hostname,
+typedef int     (WSAAPI *getaddrinfo_func) (const char *hostname,
                                  const char *service,
                                  const struct addrinfo *hints,
                                  struct addrinfo **res);
+static getaddrinfo_func p_getaddrinfo;
 
-static int     (WSAAPI *p_getnameinfo) (const struct sockaddr *sa, socklen_t salen,
-                                 char *host, size_t hostlen,
-                                 char *serv, size_t servlen,
-                                 int flags);
-
+typedef int (WSAAPI *getnameinfo_func) (const struct sockaddr *sa, socklen_t salen, char *host, size_t hostlen, char *serv, size_t servlen, int flags);
+static getnameinfo_func p_getnameinfo;
 
 static void    WSAAPI s_freeaddrinfo (struct addrinfo *ai)
 {
@@ -199,8 +202,6 @@ if (service) {
     char *c;
 
     port = strtoul(service, &c, 10);
-    if ((port == 0) && (*c != '\0') && (hints->ai_flags & AI_NUMERICSERV))
-        return EAI_NONAME;
     if ((port == 0) || (*c != '\0')) {
         switch (hints->ai_socktype)
             {
@@ -375,7 +376,11 @@ return 0;
 #if defined(_WIN32) || defined(__CYGWIN__)
 
 /* Dynamic DLL load variables */
+#ifdef _WIN32
 static HINSTANCE hLib = 0;                      /* handle to DLL */
+#else
+static void *hLib = NULL;                       /* handle to Library */
+#endif
 static int lib_loaded = 0;                      /* 0=not loaded, 1=loaded, 2=library load failed, 3=Func load failed */
 static char* lib_name = "Ws2_32.dll";
 
@@ -383,7 +388,11 @@ static char* lib_name = "Ws2_32.dll";
 typedef int (*_func)();
 
 static void load_function(char* function, _func* func_ptr) {
+#ifdef _WIN32
     *func_ptr = (_func)GetProcAddress(hLib, function);
+#else
+    *func_ptr = (_func)dlsym(hLib, function);
+#endif
     if (*func_ptr == 0) {
     char* msg = "Sockets: Failed to find function '%s' in %s\r\n";
 
@@ -424,9 +433,9 @@ int load_ws2(void) {
 
       if (lib_loaded != 1) {
         /* unsuccessful load, connect stubs */
-        p_getaddrinfo = s_getaddrinfo;
-        p_getnameinfo = s_getnameinfo;
-        p_freeaddrinfo = s_freeaddrinfo;
+        p_getaddrinfo = (getaddrinfo_func)s_getaddrinfo;
+        p_getnameinfo = (getnameinfo_func)s_getnameinfo;
+        p_freeaddrinfo = (freeaddrinfo_func)s_freeaddrinfo;
       }
       break;
     default:                /* loaded or failed */
@@ -574,9 +583,9 @@ if (err != 0)
 load_ws2 ();
 #endif                                                  /* endif AF_INET6 */
 #else                                                   /* Use native addrinfo APIs */
-    p_getaddrinfo = (void *)getaddrinfo;
-    p_getnameinfo = (void *)getnameinfo;
-    p_freeaddrinfo = (void *)freeaddrinfo;
+    p_getaddrinfo = (getaddrinfo_func)getaddrinfo;
+    p_getnameinfo = (getnameinfo_func)getnameinfo;
+    p_freeaddrinfo = (freeaddrinfo_func)freeaddrinfo;
 #endif                                                  /* endif _WIN32 */
 #if defined (SIGPIPE)
 signal (SIGPIPE, SIG_IGN);                              /* no pipe signals */
@@ -678,10 +687,12 @@ if (newsock == INVALID_SOCKET) {                        /* socket error? */
     p_freeaddrinfo(result);
     return newsock;
     }
+#ifdef IPV6_V6ONLY
 if (result->ai_family == AF_INET6) {
     int off = FALSE;
     sta = setsockopt (newsock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
     }
+#endif
 sta = bind (newsock, result->ai_addr, result->ai_addrlen);
 p_freeaddrinfo(result);
 if (sta == SOCKET_ERROR)                                /* bind error? */

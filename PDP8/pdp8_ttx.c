@@ -66,7 +66,7 @@ extern int32 tmxr_poll, sim_is_running;
 uint8 ttix_buf[TTX_LINES] = { 0 };                      /* input buffers */
 uint8 ttox_buf[TTX_LINES] = { 0 };                      /* output buffers */
 int32 ttx_tps = 100;                                    /* polls per second */
-TMLN ttx_ldsc[TTX_LINES] = { 0 };                       /* line descriptors */
+TMLN ttx_ldsc[TTX_LINES] = { {0} };                     /* line descriptors */
 TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
 
 DEVICE ttix_dev, ttox_dev;
