@@ -116,6 +116,7 @@ struct tmln {
     TMXR                *mp;                            /* back pointer to mux */
     char                *serconfig;                     /* line config */
     SERHANDLE           serport;                        /* serial port handle */
+    t_bool              ser_connect_pending;            /* serial connection notice pending */
     SOCKET              connecting;                     /* Outgoing socket while connecting */
     char                *destination;                   /* Outgoing destination address:port */
     UNIT                *uptr;                          /* input polling unit (default to mp->uptr) */

@@ -255,9 +255,17 @@
    A device emulation may choose to implement a command interface to 
    disconnect specific individual lines.  This would usually be done via
    a Unit Modifier table entry (MTAB) which dispatches the command 
-   "SET dev DISCONNECT[=line]" to tmxr_detach_line.
+   "SET dev DISCONNECT[=line]" to tmxr_dscln.  This will cause a telnet 
+   connection to be closed, but a serial port will normally have DTR 
+   dropped for 500ms and raised again (thus hanging up a modem on that 
+   serial port).
 
      sim> set MUX disconnect=2
+
+   A line which is connected to a serial port can be manually closed by
+   adding the -C switch to a disconnect command.
+
+     sim> set -C MUX disconnect=2
 
     Full Modem Control serial port support.
 
@@ -717,49 +725,51 @@ mp->last_poll_time = poll_time;
 
 /* Check for a pending Telnet connection */
 
-newsock = sim_accept_conn (mp->master, &address);       /* poll connect */
+if (mp->master) {
+    newsock = sim_accept_conn (mp->master, &address);   /* poll connect */
 
-if (newsock != INVALID_SOCKET) {                        /* got a live one? */
-    sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
-    tmxr_debug_trace (mp, msg);
-    op = mp->lnorder;                                   /* get line connection order list pointer */
-    i = mp->lines;                                      /* play it safe in case lines == 0 */
-    ++mp->sessions;                                     /* count the new session */
+    if (newsock != INVALID_SOCKET) {                    /* got a live one? */
+        sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
+        tmxr_debug_trace (mp, msg);
+        op = mp->lnorder;                               /* get line connection order list pointer */
+        i = mp->lines;                                  /* play it safe in case lines == 0 */
+        ++mp->sessions;                                 /* count the new session */
 
-    for (j = 0; j < mp->lines; j++, i++) {              /* find next avail line */
-        if (op && (*op >= 0) && (*op < mp->lines))      /* order list present and valid? */
-            i = *op++;                                  /* get next line in list to try */
-        else                                            /* no list or not used or range error */
-            i = j;                                      /* get next sequential line */
+        for (j = 0; j < mp->lines; j++, i++) {          /* find next avail line */
+            if (op && (*op >= 0) && (*op < mp->lines))  /* order list present and valid? */
+                i = *op++;                              /* get next line in list to try */
+            else                                        /* no list or not used or range error */
+                i = j;                                  /* get next sequential line */
 
-        lp = mp->ldsc + i;                              /* get pointer to line descriptor */
-        if ((lp->conn == 0) &&                          /* is the line available? */
-            (lp->destination == NULL) &&
-            (lp->master == 0))
-            break;                                      /* yes, so stop search */
-        }
-
-    if (i >= mp->lines) {                               /* all busy? */
-        tmxr_msg (newsock, "All connections busy\r\n");
-        tmxr_debug_trace (mp, "tmxr_poll_conn() - All connections busy");
-        sim_close_sock (newsock, 0);
-        free (address);
-        }
-    else {
-        lp = mp->ldsc + i;                              /* get line desc */
-        tmxr_init_line (lp);                            /* init line */
-        lp->conn = newsock;                             /* record connection */
-        lp->ipad = address;                             /* ip address */
-        lp->notelnet = mp->notelnet;                    /* apply mux default telnet setting */
-        if (!lp->notelnet) {
-            sim_write_sock (newsock, mantra, sizeof(mantra));
-            tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
+            lp = mp->ldsc + i;                          /* get pointer to line descriptor */
+            if ((lp->conn == 0) &&                      /* is the line available? */
+                (lp->destination == NULL) &&
+                (lp->master == 0))
+                break;                                  /* yes, so stop search */
             }
-        tmxr_report_connection (mp, lp);
-        lp->cnms = sim_os_msec ();                      /* time of conn */
-        return i;
-        }
-    }                                                   /* end if newsock */
+
+        if (i >= mp->lines) {                           /* all busy? */
+            tmxr_msg (newsock, "All connections busy\r\n");
+            tmxr_debug_trace (mp, "tmxr_poll_conn() - All connections busy");
+            sim_close_sock (newsock, 0);
+            free (address);
+            }
+        else {
+            lp = mp->ldsc + i;                          /* get line desc */
+            tmxr_init_line (lp);                        /* init line */
+            lp->conn = newsock;                         /* record connection */
+            lp->ipad = address;                         /* ip address */
+            lp->notelnet = mp->notelnet;                /* apply mux default telnet setting */
+            if (!lp->notelnet) {
+                sim_write_sock (newsock, mantra, sizeof(mantra));
+                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
+                }
+            tmxr_report_connection (mp, lp);
+            lp->cnms = sim_os_msec ();                  /* time of conn */
+            return i;
+            }
+        }                                               /* end if newsock */
+    }
 
 /* Look for per line listeners or outbound connecting sockets */
 for (i = 0; i < mp->lines; i++) {                       /* check each line in sequence */
@@ -781,47 +791,57 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
 
     /* Check for a pending Telnet connection */
 
-    newsock = sim_accept_conn (lp->master, &address);   /* poll connect */
+    if (lp->master) {
 
-    if (newsock != INVALID_SOCKET) {                    /* got a live one? */
-        sprintf (msg, "tmxr_poll_conn() - Line Connection from %s", address);
-        tmxr_debug_trace_line (lp, msg);
-        ++mp->sessions;                                 /* count the new session */
+        newsock = sim_accept_conn (lp->master, &address);/* poll connect */
 
-        if (lp->destination) {                          /* Virtual Null Modem Cable? */
-            char host[CBUFSIZE];
+        if (newsock != INVALID_SOCKET) {                /* got a live one? */
+            sprintf (msg, "tmxr_poll_conn() - Line Connection from %s", address);
+            tmxr_debug_trace_line (lp, msg);
+            ++mp->sessions;                             /* count the new session */
 
-            if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
-                tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
-                sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
-                tmxr_debug_trace_line (lp, msg);
+            if (lp->destination) {                      /* Virtual Null Modem Cable? */
+                char host[CBUFSIZE];
+
+                if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
+                    tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
+                    sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
+                    tmxr_debug_trace_line (lp, msg);
+                    sim_close_sock (newsock, 0);
+                    free (address);
+                    continue;                           /* Move on to next line */
+                    }
+                if (lp->connecting) {
+                    sim_close_sock (lp->connecting, 0); /* abort our as yet unconnnected socket */
+                    lp->connecting = 0;
+                    }
+                }
+            if (lp->conn == 0) {                        /* is the line available? */
+                tmxr_init_line (lp);                    /* init line */
+                lp->conn = newsock;                     /* record connection */
+                lp->ipad = address;                     /* ip address */
+                if (!lp->notelnet) {
+                    sim_write_sock (newsock, mantra, sizeof(mantra));
+                    tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
+                    }
+                tmxr_report_connection (mp, lp);
+                lp->cnms = sim_os_msec ();              /* time of conn */
+                return i;
+                }
+            else {
+                tmxr_msg (newsock, "Line connection busy\r\n");
+                tmxr_debug_trace_line (lp, "tmxr_poll_conn() - Line connection busy");
                 sim_close_sock (newsock, 0);
                 free (address);
-                continue;                               /* Move on to next line */
-                }
-            if (lp->connecting) {
-                sim_close_sock (lp->connecting, 0);     /* abort our as yet unconnnected socket */
-                lp->connecting = 0;
                 }
             }
-        if (lp->conn == 0) {                            /* is the line available? */
-            tmxr_init_line (lp);                        /* init line */
-            lp->conn = newsock;                         /* record connection */
-            lp->ipad = address;                         /* ip address */
-            if (!lp->notelnet) {
-                sim_write_sock (newsock, mantra, sizeof(mantra));
-                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
-                }
-            tmxr_report_connection (mp, lp);
-            lp->cnms = sim_os_msec ();                  /* time of conn */
-            return i;
-            }
-        else {
-            tmxr_msg (newsock, "Line connection busy\r\n");
-            tmxr_debug_trace_line (lp, "tmxr_poll_conn() - Line connection busy");
-            sim_close_sock (newsock, 0);
-            free (address);
-            }
+        }
+
+    /* Check for pending serial port connection notification */
+    
+    if (lp->ser_connect_pending) {
+        lp->ser_connect_pending = FALSE;
+        return i;
         }
     }
 
@@ -832,8 +852,9 @@ return -1;                                              /* no new connections ma
 
    The telnet/tcp or serial session associated with multiplexer descriptor "mp" and
    line descriptor "lp" is disconnected.  An associated tcp socket is
-   deallocated; a serial port is not, although for non modem control serial lines
-   DTR is dropped and raised again after 500ms to signal the attached serial device.  
+   closed; a serial port is closed if the closeserial parameter is true, otherwise
+   for non modem control serial lines DTR is dropped and raised again after 500ms 
+   to signal the attached serial device.  
 */
 
 static t_stat tmxr_reset_ln_ex (TMLN *lp, t_bool closeserial)
@@ -847,6 +868,9 @@ if (lp->serport) {
     if (closeserial) {
         sim_close_serial (lp->serport);
         lp->serport = 0;
+        lp->ser_connect_pending = FALSE;
+        free (lp->destination);
+        lp->destination = NULL;
         free (lp->serconfig);
         lp->serconfig = NULL;
         lp->cnms = 0;
@@ -879,6 +903,11 @@ else {
     tmxr_init_line (lp);                                /* initialize line state */
     lp->conn = 0;                                       /* remove socket or connection flag */
     }
+/* Revise the unit's connect string to reflect the current attachments */
+lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
+/* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
+if (lp->mp->uptr->filename == NULL)
+    tmxr_detach (lp->mp, lp->mp->uptr);
 return SCPE_OK;
 }
 
@@ -1572,6 +1601,7 @@ while (*tptr) {
             if (serport != INVALID_HANDLE) {
                 lp->mp = mp;
                 lp->serport = serport;
+                lp->ser_connect_pending = TRUE;
                 lp->notelnet = TRUE;
                 tmxr_init_line (lp);                        /* init the line state */
                 if (!lp->mp->modem_control)                 /* raise DTR and RTS for non modem control lines */
@@ -1677,6 +1707,7 @@ while (*tptr) {
             serport = sim_open_serial (lp->destination, lp, &r);
             if (serport != INVALID_HANDLE) {
                 lp->serport = serport;
+                lp->ser_connect_pending = TRUE;
                 lp->notelnet = TRUE;
                 tmxr_init_line (lp);                        /* init the line state */
                 if (!lp->mp->modem_control)                 /* raise DTR and RTS for non modem control lines */
@@ -2016,12 +2047,11 @@ return SCPE_OK;
 }
 
 
-/* Detach unit from master socket.
+/* Detach unit from master socket and close all active network connections 
+   and/or serial ports.
 
    Note that we return SCPE_OK, regardless of whether a listening socket was
-   attached.  For single-line multiplexers that may be attached either to a
-   listening socket or to a serial port, call "tmxr_detach_line" first.  If that
-   routine returns SCPE_UNATT, then call "tmxr_detach".
+   attached.  
 */
 
 t_stat tmxr_detach (TMXR *mp, UNIT *uptr)
@@ -2119,17 +2149,19 @@ static const char *enab = "on";
 static const char *dsab = "off";
 
 if (ln >= 0)
-    fprintf (st, "line %d:\b", ln);
+    fprintf (st, "line %d:\n", ln);
 if ((!lp->conn) && (!lp->connecting) && (!lp->serport))
     fprintf (st, "line disconnected\n");
-if (lp->rxcnt)
-    fprintf (st, "  input (%s) queued/total = %d/%d\n",
-        (lp->rcve? enab: dsab),
-        tmxr_rqln (lp), lp->rxcnt);
-if (lp->txcnt || lp->txbpi)
-    fprintf (st, "  output (%s) queued/total = %d/%d\n",
-        (lp->xmte? enab: dsab),
-        tmxr_tqln (lp), lp->txcnt);
+else {
+    if ((lp->rxcnt) || (!lp->rcve))
+        fprintf (st, "  input (%s) queued/total = %d/%d\n",
+            (lp->rcve? enab: dsab),
+            tmxr_rqln (lp), lp->rxcnt);
+    if (lp->txcnt || lp->txbpi || (!lp->xmte))
+        fprintf (st, "  output (%s) queued/total = %d/%d\n",
+            (lp->xmte? enab: dsab),
+            tmxr_tqln (lp), lp->txcnt);
+    }
 if (lp->txbfd)
     fprintf (st, "  output buffer size = %d\n", lp->txbsz);
 if (lp->txcnt || lp->txbpi)
@@ -2185,7 +2217,7 @@ if (lp == NULL)                                                 /* bad line numb
 if ((lp->conn) || (lp->serport)) {                              /* connection active? */
     if (!lp->notelnet)
         tmxr_linemsg (lp, "\r\nOperator disconnected line\r\n\n");/* report closure */
-    tmxr_reset_ln (lp);                                         /* drop the line */
+    tmxr_reset_ln_ex (lp, (sim_switches & SWMASK ('C')));       /* drop the line */
     }
 
 return SCPE_OK;
