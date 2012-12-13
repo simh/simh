@@ -170,7 +170,7 @@ typedef struct {
     uint32              val[DSTRLNT];
     } DSTR;
 
-static DSTR Dstr0 = { 0, 0, 0, 0, 0 };
+static DSTR Dstr0 = { 0, {0, 0, 0, 0} };
 
 extern int32 isenable, dsenable;
 extern int32 N, Z, V, C, fpd, ipl;
@@ -327,8 +327,6 @@ static int32 binover[2][16] = {
     '0', '0', '0', '0', '0', '0'
     };
 
-static unsigned char movbuf[65536];
-
 /* CIS emulator */
 
 t_stat cis11 (int32 IR)
@@ -342,7 +340,7 @@ uint32 nc, digit, result;
 t_stat st;
 static DSTR accum, src1, src2, dst;
 static DSTR mptable[10];
-static DSTR Dstr1 = { 0, 0x10, 0, 0, 0 };
+static DSTR Dstr1 = { 0, {0x10, 0, 0, 0} };
 
 old_PC = (PC - 2) & 0177777;                            /* original PC */
 op = IR & 0177;                                         /* IR <6:0> */

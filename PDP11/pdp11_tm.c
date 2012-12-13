@@ -711,7 +711,7 @@ static const uint16 boot2_rom[] = {
 
 t_stat tm_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern int32 sim_switches;
 

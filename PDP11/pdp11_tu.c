@@ -793,7 +793,7 @@ if (DEBUG_PRS (tu_dev)) {
     fprintf (sim_deb, ">>TU%d DONE: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=",
              drv, tu_fname[fnc], tufc, tufs, tuer);
     fprint_val (sim_deb, uptr->pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
+    fprintf (sim_deb, ", r=%d\n", r);
     }
 return SCPE_OK;
 }
@@ -1036,7 +1036,7 @@ static const uint16 boot_rom[] = {
 
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

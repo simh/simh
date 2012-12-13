@@ -144,7 +144,7 @@ uint32 update_rfcs (uint32 newcs, uint32 newdae);
 
 DIB rf_dib = {
     IOBA_RF, IOLN_RF, &rf_rd, &rf_wr,
-    1, IVCL (RF), VEC_RF, NULL
+    1, IVCL (RF), VEC_RF, {NULL}
     };
 
 
@@ -461,7 +461,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rf_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)

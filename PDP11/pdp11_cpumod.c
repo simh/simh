@@ -1159,7 +1159,7 @@ if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
 nM = (uint16 *) calloc (val >> 1, sizeof (uint16));
 if (nM == NULL)
     return SCPE_MEM;
-clim = (((t_addr) val) < MEMSIZE)? val: MEMSIZE;
+clim = (((t_addr) val) < MEMSIZE)? (uint32)val: MEMSIZE;
 for (i = 0; i < clim; i = i + 2)
     nM[i >> 1] = M[i >> 1];
 free (M);

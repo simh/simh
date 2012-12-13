@@ -87,7 +87,7 @@ uint32 dli_ireq[2] = { 0, 0};
 uint16 dlo_csr[DLX_LINES] = { 0 };                      /* control/status */
 uint8 dlo_buf[DLX_LINES] = { 0 };
 uint32 dlo_ireq = 0;
-TMLN dlx_ldsc[DLX_LINES] = { 0 };                       /* line descriptors */
+TMLN dlx_ldsc[DLX_LINES] = { {0} };                     /* line descriptors */
 TMXR dlx_desc = { DLX_LINES, 0, 0, dlx_ldsc };          /* mux descriptor */
 
 t_stat dlx_rd (int32 *data, int32 PA, int32 access);

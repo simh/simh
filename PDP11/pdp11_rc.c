@@ -437,7 +437,7 @@ static uint32 sectorCRC (const uint16 *data)
 
 static t_stat rc_svc (UNIT *uptr)
 {
-    uint32      ma, da, t, u_old, u_new, last_da;
+    uint32      ma, da, t, u_old, u_new, last_da = 0;
     uint16      dat;
     uint16      *fbuf = uptr->filebuf;
 
