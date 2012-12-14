@@ -205,7 +205,11 @@ for (i=0; i<serial_open_device_count; ++i)
 
 static void sim_error_serial (char *routine, int error)
 {
+extern FILE *sim_debug;
+
 fprintf (stderr, "Serial: %s fails with error %d\n", routine, error);
+if (sim_debug)
+    fprintf (sim_debug, "Serial: %s fails with error %d\n", routine, error);
 return;
 }
 
@@ -1244,8 +1248,11 @@ int written;
 
 written = write (port, (void *) buffer, (size_t) count);    /* write the buffer to the serial port */
 
-if ((written == -1) && (errno != EAGAIN))                   /* write error? */
-    sim_error_serial ("write", errno);                      /* report unexpected error */
+if (written == -1)
+    if (errno != EAGAIN)                                    /* unexpected error? */
+        sim_error_serial ("write", errno);                  /* report it */
+    else
+        written = 0;                                        /* not an error, but nothing written */
 
 return (int32) written;                                     /* return number of characters written */
 }
