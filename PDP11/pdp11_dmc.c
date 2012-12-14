@@ -1,12 +1,3 @@
-/*
-Bits still to deal with:
-
-There is a line in vax780_defs.h which defines IOBA_DMC to (IOPAGEBASE + 0760060),  Is this correct, or is it being masked by the autoconfigure fixups?
-
-*/
-
-
-
 /* pdp11_dmc.c: DMC11 Emulation
   ------------------------------------------------------------------------------
 
@@ -366,17 +357,24 @@ MTAB dmc_mod[] = {
     { 0 },
 };
 
+#define IOLN_DMC        010
+#ifndef IOBA_FLOAT
+#define IOBA_FLOAT      0
+#define VEC_FLOAT       0
+#endif
 DIB dmc_dib[] =
 {
-    { IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} },
-    { IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} },
-    { IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} },
-    { IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} }
+    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} },
+    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} },
+    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} },
+    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} }
 };
+
+#define IOLN_DMP        010
 
 DIB dmp_dib[] =
 {
-    { IOBA_DMC, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_DMCRX, {&dmc_rxint, &dmc_txint} }
+    { IOBA_FLOAT, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} }
 };
 
 DEVICE dmc_dev[] =
@@ -1776,7 +1774,7 @@ int dmc_buffer_fill_receive_buffers(CTLR *controller)
 
                 socket = controller->line->socket;
                 /* read block length and allocate buffer */
-                if (buffer->block_len_bytes_read < sizeof(buffer->actual_block_len))
+                if ((size_t)buffer->block_len_bytes_read < sizeof(buffer->actual_block_len))
                 {
                     char *start_addr = ((char *)&buffer->actual_block_len) + buffer->block_len_bytes_read;
                     bytes_read = sim_read_sock(socket, start_addr, sizeof(buffer->actual_block_len) - buffer->block_len_bytes_read);
@@ -2054,7 +2052,6 @@ void dmc_process_input_transfer_completion(CTLR *controller)
     {
         if (!dmc_is_rdyi_set(controller))
         {
-            uint16 sel4 = controller->csrs->sel4;
             uint16 sel6 = controller->csrs->sel6;
             if (controller->transfer_type == TYPE_DMP_MODE)
             {
@@ -2120,7 +2117,6 @@ void dmc_process_command(CTLR *controller)
 t_stat dmc_rd(int32 *data, int32 PA, int32 access)
 {
     CTLR *controller = dmc_get_controller_from_address(PA);
-    int reg = PA & 07;
     sim_debug(DBG_TRC, controller->device, "dmc_rd(), addr=0x%x access=%d\n", PA, access);
     *data = dmc_getreg(controller, PA, 1);
 
