@@ -84,6 +84,11 @@ extern int32 int_req[IPL_HLVL];
 #if !defined (DZ_LINES)
 #define DZ_LINES        8
 #endif
+#define MAX_DZ_MUXES    32
+
+#if DZ_MUXES > MAX_DZ_MUXES
+#error "Too many DZ multiplexers"
+#endif
 
 #define DZ_MNOMASK      (DZ_MUXES - 1)                  /* mask for mux no */
 #define DZ_LNOMASK      (DZ_LINES - 1)                  /* mask for lineno */
@@ -146,19 +151,19 @@ extern int32 sim_switches;
 extern FILE *sim_log;
 extern int32 tmxr_poll;                                 /* calibrated delay */
 
-uint16 dz_csr[DZ_MUXES] = { 0 };                        /* csr */
-uint16 dz_rbuf[DZ_MUXES] = { 0 };                       /* rcv buffer */
-uint16 dz_lpr[DZ_MUXES] = { 0 };                        /* line param */
-uint16 dz_tcr[DZ_MUXES] = { 0 };                        /* xmit control */
-uint16 dz_msr[DZ_MUXES] = { 0 };                        /* modem status */
-uint16 dz_tdr[DZ_MUXES] = { 0 };                        /* xmit data */
-uint8 dz_sae[DZ_MUXES] = { 0 };                         /* silo alarm enabled */
+uint16 dz_csr[MAX_DZ_MUXES] = { 0 };                    /* csr */
+uint16 dz_rbuf[MAX_DZ_MUXES] = { 0 };                   /* rcv buffer */
+uint16 dz_lpr[MAX_DZ_MUXES] = { 0 };                    /* line param */
+uint16 dz_tcr[MAX_DZ_MUXES] = { 0 };                    /* xmit control */
+uint16 dz_msr[MAX_DZ_MUXES] = { 0 };                    /* modem status */
+uint16 dz_tdr[MAX_DZ_MUXES] = { 0 };                    /* xmit data */
+uint8 dz_sae[MAX_DZ_MUXES] = { 0 };                     /* silo alarm enabled */
 uint32 dz_rxi = 0;                                      /* rcv interrupts */
 uint32 dz_txi = 0;                                      /* xmt interrupts */
 int32 dz_mctl = 0;                                      /* modem ctrl enabled */
 int32 dz_auto = 0;                                      /* autodiscon enabled */
-TMLN dz_ldsc[DZ_MUXES * DZ_LINES] = { {0} };            /* line descriptors */
-TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, dz_ldsc };  /* mux descriptor */
+TMLN *dz_ldsc = NULL;                                   /* line descriptors */
+TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
@@ -211,15 +216,15 @@ DIB dz_dib = {
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
 
 REG dz_reg[] = {
-    { BRDATA (CSR, dz_csr, DEV_RDX, 16, DZ_MUXES) },
-    { BRDATA (RBUF, dz_rbuf, DEV_RDX, 16, DZ_MUXES) },
-    { BRDATA (LPR, dz_lpr, DEV_RDX, 16, DZ_MUXES) },
-    { BRDATA (TCR, dz_tcr, DEV_RDX, 16, DZ_MUXES) },
-    { BRDATA (MSR, dz_msr, DEV_RDX, 16, DZ_MUXES) },
-    { BRDATA (TDR, dz_tdr, DEV_RDX, 16, DZ_MUXES) },
-    { BRDATA (SAENB, dz_sae, DEV_RDX, 1, DZ_MUXES) },
-    { GRDATA (RXINT, dz_rxi, DEV_RDX, DZ_MUXES, 0) },
-    { GRDATA (TXINT, dz_txi, DEV_RDX, DZ_MUXES, 0) },
+    { BRDATA (CSR, dz_csr, DEV_RDX, 16, MAX_DZ_MUXES) },
+    { BRDATA (RBUF, dz_rbuf, DEV_RDX, 16, MAX_DZ_MUXES) },
+    { BRDATA (LPR, dz_lpr, DEV_RDX, 16, MAX_DZ_MUXES) },
+    { BRDATA (TCR, dz_tcr, DEV_RDX, 16, MAX_DZ_MUXES) },
+    { BRDATA (MSR, dz_msr, DEV_RDX, 16, MAX_DZ_MUXES) },
+    { BRDATA (TDR, dz_tdr, DEV_RDX, 16, MAX_DZ_MUXES) },
+    { BRDATA (SAENB, dz_sae, DEV_RDX, 1, MAX_DZ_MUXES) },
+    { GRDATA (RXINT, dz_rxi, DEV_RDX, MAX_DZ_MUXES, 0) },
+    { GRDATA (TXINT, dz_txi, DEV_RDX, MAX_DZ_MUXES, 0) },
     { FLDATA (MDMCTL, dz_mctl, 0) },
     { FLDATA (AUTODS, dz_auto, 0) },
     { GRDATA (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
@@ -421,7 +426,7 @@ t_stat dz_svc (UNIT *uptr)
 {
 int32 dz, t, newln;
 
-for (dz = t = 0; dz < DZ_MUXES; dz++)                   /* check enabled */
+for (dz = t = 0; dz < dz_desc.lines/DZ_LINES; dz++)     /* check enabled */
     t = t | (dz_csr[dz] & CSR_MSE);
 if (t) {                                                /* any enabled? */
     newln = tmxr_poll_conn (&dz_desc);                  /* poll connect */
@@ -461,10 +466,10 @@ return c;
 
 void dz_update_rcvi (void)
 {
-int32 i, dz, line, scnt[DZ_MUXES];
+int32 i, dz, line, scnt[MAX_DZ_MUXES];
 TMLN *lp;
 
-for (dz = 0; dz < DZ_MUXES; dz++) {                     /* loop thru muxes */
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
     scnt[dz] = 0;                                       /* clr input count */
     for (i = 0; i < DZ_LINES; i++) {                    /* poll lines */
         line = (dz * DZ_LINES) + i;                     /* get line num */
@@ -474,7 +479,7 @@ for (dz = 0; dz < DZ_MUXES; dz++) {                     /* loop thru muxes */
             dz_msr[dz] &= ~(1 << (i + MSR_V_CD));       /* reset car det */
         }
     }
-for (dz = 0; dz < DZ_MUXES; dz++) {                     /* loop thru muxes */
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
     if (scnt[dz] && (dz_csr[dz] & CSR_MSE)) {           /* input & enabled? */
         dz_csr[dz] |= CSR_RDONE;                        /* set done */
         if (dz_sae[dz] && (scnt[dz] >= DZ_SILO_ALM)) {  /* alm enb & cnt hi? */
@@ -498,7 +503,7 @@ void dz_update_xmti (void)
 {
 int32 dz, linemask, i, j, line;
 
-for (dz = 0; dz < DZ_MUXES; dz++) {                     /* loop thru muxes */
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* loop thru muxes */
     linemask = dz_tcr[dz] & DZ_LMASK;                   /* enabled lines */
     dz_csr[dz] &= ~CSR_TRDY;                            /* assume not rdy */
     j = CSR_GETTL (dz_csr[dz]);                         /* start at current */
@@ -540,7 +545,7 @@ int32 dz_rxinta (void)
 {
 int32 dz;
 
-for (dz = 0; dz < DZ_MUXES; dz++) {                     /* find 1st mux */
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* find 1st mux */
     if (dz_rxi & (1 << dz)) {
         sim_debug(DBG_INT, &dz_dev, "dz_rzinta(dz=%d)\n", dz);
         dz_clr_rxint (dz);                              /* clear intr */
@@ -570,7 +575,7 @@ int32 dz_txinta (void)
 {
 int32 dz;
 
-for (dz = 0; dz < DZ_MUXES; dz++) {                     /* find 1st mux */
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {       /* find 1st mux */
     if (dz_txi & (1 << dz)) {
         sim_debug(DBG_INT, &dz_dev, "dz_txinta(dz=%d)\n", dz);
         dz_clr_txint (dz);                              /* clear intr */
@@ -609,7 +614,9 @@ t_stat dz_reset (DEVICE *dptr)
 {
 int32 i, ndev;
 
-for (i = 0; i < DZ_MUXES; i++)                          /* init muxes */
+if (dz_ldsc == NULL)
+    dz_desc.ldsc = dz_ldsc = calloc (dz_desc.lines, sizeof(*dz_ldsc));
+for (i = 0; i < dz_desc.lines/DZ_LINES; i++)            /* init muxes */
     dz_clear (i, TRUE);
 dz_rxi = dz_txi = 0;                                    /* clr master int */
 CLR_INT (DZRX);
@@ -661,7 +668,7 @@ t_stat r;
 
 if (cptr == NULL)
     return SCPE_ARG;
-newln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
+newln = (int32) get_uint (cptr, 10, (MAX_DZ_MUXES * DZ_LINES), &r);
 if ((r != SCPE_OK) || (newln == dz_desc.lines))
     return r;
 if ((newln == 0) || (newln % DZ_LINES))
@@ -682,8 +689,9 @@ if (newln < dz_desc.lines) {
     }
 dz_dib.lnt = (newln / DZ_LINES) * IOLN_DZ;              /* set length */
 dz_desc.lines = newln;
+dz_desc.ldsc = dz_ldsc = realloc(dz_ldsc, dz_desc.lines*sizeof(*dz_ldsc));
 ndev = ((dz_dev.flags & DEV_DIS)? 0: (dz_desc.lines / DZ_LINES));
-return auto_config (dz_dev.name, ndev);                 /* auto config */
+return dz_reset (&dz_dev);                              /* setup lines and auto config */
 }
 
 /* SET LOG processor */
@@ -700,7 +708,7 @@ tptr = strchr (cptr, '=');
 if ((tptr == NULL) || (*tptr == 0))
     return SCPE_ARG;
 *tptr++ = 0;
-ln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
+ln = (int32) get_uint (cptr, 10, dz_desc.lines, &r);
 if ((r != SCPE_OK) || (ln >= dz_desc.lines))
     return SCPE_ARG;
 return tmxr_set_log (NULL, ln, tptr, desc);
@@ -715,7 +723,7 @@ int32 ln;
 
 if (cptr == NULL)
     return SCPE_ARG;
-ln = (int32) get_uint (cptr, 10, (DZ_MUXES * DZ_LINES), &r);
+ln = (int32) get_uint (cptr, 10, dz_desc.lines, &r);
 if ((r != SCPE_OK) || (ln >= dz_desc.lines))
     return SCPE_ARG;
 return tmxr_set_nolog (NULL, ln, NULL, desc);
