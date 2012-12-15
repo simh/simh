@@ -185,8 +185,7 @@ if (sim_con_tmxr.master == 0)                           /* not Telnet? done */
 if (tmxr_poll_conn (&sim_con_tmxr) >= 0)                /* poll connect */
     sim_con_ldsc.rcve = 1;                              /* rcv enabled */
 sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
-if (sim_con_ldsc.xmte == 0)                             /* xmt disabled? */
-    tmxr_send_buffered_data (&sim_con_ldsc);            /* try to flush buffered data */
+tmxr_send_buffered_data (&sim_con_ldsc);                /* try to flush any buffered data */
 return SCPE_OK;
 }
 

@@ -1272,8 +1272,6 @@ if ((lp->conn == 0) &&                                  /* no conn & not buffere
     ++lp->txdrp;                                        /* lost */
     return SCPE_LOST;
     }
-if (lp->txlog)                                          /* log if available */
-    fputc (chr, lp->txlog);
 tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
 #define TXBUF_AVAIL(lp) (lp->txbsz - tmxr_tqln (lp))
 #define TXBUF_CHAR(lp, c) {                               \
@@ -1288,6 +1286,8 @@ if ((lp->txbfd) || (TXBUF_AVAIL(lp) > 1)) {             /* room for char (+ IAC)
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
     if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */
         lp->xmte = 0;                                   /* disable line */
+    if (lp->txlog)                                      /* log if available */
+        fputc (chr, lp->txlog);
     return SCPE_OK;                                     /* char sent */
     }
 ++lp->txdrp; lp->xmte = 0;                              /* no room, dsbl line */
