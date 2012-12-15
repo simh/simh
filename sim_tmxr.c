@@ -1133,7 +1133,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
 /* Examine new data, remove TELNET cruft before making input available */
 
-        if (!lp->notelnet)                              /* Are we looking for telnet interpretation? */
+        if (!lp->notelnet) {                            /* Are we looking for telnet interpretation? */
             for (; j < lp->rxbpi; ) {                   /* loop thru char */
                 signed char tmp = lp->rxb[j];           /* get char */
                 switch (lp->tsta) {                     /* case tlnt state */
@@ -1228,8 +1228,10 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
                     break;
                     }                                   /* end case state */
                 }                                       /* end for char */
-            if (nbytes != (lp->rxbpi-lp->rxbpr))
+            if (nbytes != (lp->rxbpi-lp->rxbpr)) {
                 tmxr_debug (TMXR_DBG_RCV, lp, "Remaining", &(lp->rxb[lp->rxbpi]), lp->rxbpi-lp->rxbpr);
+                }
+            }
         }                                               /* end else nbytes */
     }                                                   /* end for lines */
 for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
@@ -1898,9 +1900,9 @@ pthread_mutex_lock (&sim_tmxr_poll_lock);
 #endif
 for (i=0; i<tmxr_open_device_count; ++i)
     if (tmxr_open_devices[i] == mux) {
-        --tmxr_open_device_count;
         for (j=i+1; j<tmxr_open_device_count; ++j)
             tmxr_open_devices[j-1] = tmxr_open_devices[j];
+        --tmxr_open_device_count;
         break;
         }
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
@@ -2110,11 +2112,12 @@ uint32 ctime;
 if (ln >= 0)
     fprintf (st, "line %d: ", ln);
 
-if ((lp->conn) || (lp->connecting))                     /* tcp connection? */
+if ((lp->conn) || (lp->connecting)) {                   /* tcp connection? */
     if (lp->destination)                                /* remote connection? */
         fprintf (st, "Remote port %s\n", lp->destination);/* print port name */
     else                                                /* incoming connection */
         fprintf (st, "IP address %s\n", lp->ipad);
+    }
 
 if (lp->port)
     fprintf (st, "Listening on port %s\n", lp->port);   /* print port name */
@@ -2149,18 +2152,20 @@ static const char *enab = "on";
 static const char *dsab = "off";
 
 if (ln >= 0)
-    fprintf (st, "line %d:\n", ln);
+    fprintf (st, "line %d:", ln);
 if ((!lp->conn) && (!lp->connecting) && (!lp->serport))
-    fprintf (st, "line disconnected\n");
+    fprintf (st, " not connected\n");
 else {
-    if ((lp->rxcnt) || (!lp->rcve))
-        fprintf (st, "  input (%s) queued/total = %d/%d\n",
-            (lp->rcve? enab: dsab),
+    fprintf (st, "\n");
+    fprintf (st, "  input (%s)", (lp->rcve? enab: dsab));
+    if (lp->rxcnt)
+        fprintf (st, " queued/total = %d/%d",
             tmxr_rqln (lp), lp->rxcnt);
-    if (lp->txcnt || lp->txbpi || (!lp->xmte))
-        fprintf (st, "  output (%s) queued/total = %d/%d\n",
-            (lp->xmte? enab: dsab),
+    fprintf (st, "\n  output (%s)", (lp->xmte? enab: dsab));
+    if (lp->txcnt || lp->txbpi)
+        fprintf (st, " queued/total = %d/%d",
             tmxr_tqln (lp), lp->txcnt);
+    fprintf (st, "\n");
     }
 if (lp->txbfd)
     fprintf (st, "  output buffer size = %d\n", lp->txbsz);

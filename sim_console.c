@@ -665,7 +665,7 @@ while (*cptr != 0) {                                    /* do all mods */
                 return r;
                 }
             }
-        return SCPE_NOPARAM;
+        return SCPE_ARG;
         }
     }
 return SCPE_OK;
