@@ -164,14 +164,14 @@ static int     WSAAPI s_getaddrinfo (const char *hostname,
                                      struct addrinfo **res)
 {
 struct hostent *he;
-struct servent *se;
+struct servent *se = NULL;
 struct sockaddr_in *sin;
 struct addrinfo *result = NULL;
 struct addrinfo *ai, *lai;
 struct addrinfo dhints;
 struct in_addr ipaddr;
 struct in_addr *fixed[2];
-struct in_addr **ips;
+struct in_addr **ips = NULL;
 struct in_addr **ip;
 const char *cname = NULL;
 int port = 0;

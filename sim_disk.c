@@ -1286,6 +1286,7 @@ if ((dwStatus >= ERROR_INVALID_STARTING_CODESEG) && (dwStatus <= ERROR_INFLOOP_I
 errno = EINVAL;
 }
 #include <winioctl.h>
+#if !defined(__GNUC__)
 struct _device_type {
     int32 Type;
     char *desc;
@@ -1376,6 +1377,7 @@ for (i=0; DeviceTypes[i].desc; i++)
         return DeviceTypes[i].desc;
 return "Unknown";
 }
+#endif
 
 static t_stat sim_os_disk_implemented_raw (void)
 {
@@ -1526,7 +1528,7 @@ return TRUE;
 static t_stat sim_os_disk_info_raw (FILE *Disk, uint32 *sector_size, uint32 *removable)
 {
 DWORD IoctlReturnSize;
-#ifdef IOCTL_STORAGE_GET_DEVICE_NUMBER
+#if !defined(__GNUC__)
 STORAGE_DEVICE_NUMBER Device;
 
 ZeroMemory (&Device, sizeof (Device));
