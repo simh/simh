@@ -239,7 +239,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
 	  # Given we have libpcap components, consider other network connections as well
       ifneq (,$(call find_lib,vdeplug))
         # libvdeplug requires the use of the OS provided libpcap
-		ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+        ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
@@ -293,19 +293,17 @@ else
     endif
   endif
   ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
-    PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
     NETWORK_LDFLAGS =
-    NETWORK_OPT = -DUSE_SHARED
+    NETWORK_OPT = -DUSE_SHARED -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk
     NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
   else
     ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
-      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
       NETWORK_LDFLAGS =
-      NETWORK_OPT = -DUSE_SHARED
+      NETWORK_OPT = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
       NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
     endif
   endif
-  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
+  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS)
   OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
   ifneq (binexists,$(shell if exist BIN echo binexists))
@@ -454,7 +452,8 @@ PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 	${PDP11D}/pdp11_rh.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_cpumod.c \
 	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_rf.c ${PDP11D}/pdp11_dl.c \
 	${PDP11D}/pdp11_ta.c ${PDP11D}/pdp11_rc.c ${PDP11D}/pdp11_kg.c \
-	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_dmc.c \
+	${PDP11D}/pdp11_io_lib.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
