@@ -229,7 +229,7 @@
 
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        8                               /* lines per DZV mux */
-#define VH_MUXES        4                               /* max # of DHQ muxes */
+#define VH_MUXES        4                               /* max # of DHU muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
