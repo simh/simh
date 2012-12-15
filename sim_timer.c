@@ -896,7 +896,7 @@ if (sim_is_active_bool (uptr))                          /* already active? */
 inst_per_sec = sim_timer_inst_per_sec ();
 inst_delay = (int32)((inst_per_sec*usec_delay)/1000000.0);
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
-if ((sim_calb_tmr == -1) ||                             /* if No timer initialized
+if ((sim_calb_tmr == -1) ||                             /* if No timer initialized */
     (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */
     (rtc_elapsed[sim_calb_tmr] < sim_idle_stable) ||    /*    or not idle stable yet */
     (!(sim_asynch_enabled && sim_asynch_timer))) {      /*    or asynch disabled */

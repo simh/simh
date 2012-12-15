@@ -534,11 +534,12 @@ if (hostp != NULL) {
         }
     }
 if (host)                                               /* host wanted? */
-    if (hostp != NULL)
+    if (hostp != NULL) {
         if (strlen(hostp) >= host_len)
             return SCPE_ARG;                            /* no room */
         else
             strcpy (host, hostp);
+        }
 if (validate_addr) {
     struct addrinfo *ai_host, *ai_validate, *ai;
     t_stat status;
@@ -575,7 +576,6 @@ WORD wVersionRequested;
 WSADATA wsaData; 
 wVersionRequested = MAKEWORD (2, 2);
 
-
 err = WSAStartup (wVersionRequested, &wsaData);         /* start Winsock */ 
 if (err != 0)
     printf ("Winsock: startup error %d\n", err);
@@ -583,9 +583,16 @@ if (err != 0)
 load_ws2 ();
 #endif                                                  /* endif AF_INET6 */
 #else                                                   /* Use native addrinfo APIs */
+#if defined(AF_INET6)
     p_getaddrinfo = (getaddrinfo_func)getaddrinfo;
     p_getnameinfo = (getnameinfo_func)getnameinfo;
     p_freeaddrinfo = (freeaddrinfo_func)freeaddrinfo;
+#else
+    /* Native APIs not available, connect stubs */
+    p_getaddrinfo = (getaddrinfo_func)s_getaddrinfo;
+    p_getnameinfo = (getnameinfo_func)s_getnameinfo;
+    p_freeaddrinfo = (freeaddrinfo_func)s_freeaddrinfo;
+#endif                                                  /* endif AF_INET6 */
 #endif                                                  /* endif _WIN32 */
 #if defined (SIGPIPE)
 signal (SIGPIPE, SIG_IGN);                              /* no pipe signals */

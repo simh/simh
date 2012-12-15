@@ -1028,7 +1028,7 @@ if (created) {
     }
 
 capac = size_function (uptr->fileref);
-if (capac && (capac != (t_addr)-1))
+if (capac && (capac != (t_addr)-1)) {
     if (dontautosize) {
         if ((capac < (uptr->capac*ctx->capac_factor)) && (DKUF_F_STD != DK_GET_FMT (uptr))) {
             if (!sim_quiet) {
@@ -1043,6 +1043,7 @@ if (capac && (capac != (t_addr)-1))
     else
         if ((capac > (uptr->capac*ctx->capac_factor)) || (DKUF_F_STD != DK_GET_FMT (uptr)))
             uptr->capac = capac/ctx->capac_factor;
+    }
 
 #if defined (SIM_ASYNCH_IO)
 sim_disk_set_async (uptr, completion_delay);
@@ -1182,11 +1183,11 @@ if (ctx->dptr->dctrl & reason) {
             if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
                 ++same;
                 continue;
-            }
+                }
             if (same > 0) {
                 sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
                 same = 0;
-            }
+                }
             group = (((len - i) > 16) ? 16 : (len - i));
             for (sidx=oidx=0; sidx<group; ++sidx) {
                 outbuf[oidx++] = ' ';
@@ -1196,13 +1197,14 @@ if (ctx->dptr->dctrl & reason) {
                     strbuf[sidx] = data[i+sidx];
                 else
                     strbuf[sidx] = '.';
-            }
+                }
             outbuf[oidx] = '\0';
             strbuf[sidx] = '\0';
             sim_debug (reason, ctx->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
-          }
-          if (same > 0)
-              sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
+        if (same > 0) {
+            sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
         }
     }
 }
@@ -1524,7 +1526,7 @@ return TRUE;
 static t_stat sim_os_disk_info_raw (FILE *Disk, uint32 *sector_size, uint32 *removable)
 {
 DWORD IoctlReturnSize;
-#ifndef __GNUC__
+#ifdef IOCTL_STORAGE_GET_DEVICE_NUMBER
 STORAGE_DEVICE_NUMBER Device;
 
 ZeroMemory (&Device, sizeof (Device));
@@ -2192,19 +2194,9 @@ typedef struct _VHD_DynamicDiskHeader {
 #define VHD_BAT_FREE_ENTRY (0xFFFFFFFF)
 #define VHD_DATA_BLOCK_ALIGNMENT ((uint64)4096)    /* Optimum when underlying storage has 4k sectors */
 
-static char *VHD_DiskTypes[] =
-    {
-    "None",                       /* 0 */
-    "Reserved (deprecated)",      /* 1 */
-    "Fixed hard disk",            /* 2 */
-#define VHD_DT_Fixed                 2
-    "Dynamic hard disk",          /* 3 */
-#define VHD_DT_Dynamic               3
-    "Differencing hard disk",     /* 4 */
-#define VHD_DT_Differencing          4
-    "Reserved (deprecated)",      /* 5 */
-    "Reserved (deprecated)",      /* 6 */
-    };
+#define VHD_DT_Fixed                 2  /* Fixed hard disk */
+#define VHD_DT_Dynamic               3  /* Dynamic hard disk */
+#define VHD_DT_Differencing          4  /* Differencing hard disk */
 
 static uint32 NtoHl(uint32 value);
 
@@ -2345,13 +2337,14 @@ if (!File) {
     Return = errno;
     goto Return_Cleanup;
     }
-if (ModifiedTimeStamp)
+if (ModifiedTimeStamp) {
     if (stat (szVHDPath, &statb)) {
         Return = errno;
         goto Return_Cleanup;
         }
     else
         *ModifiedTimeStamp = NtoHl ((uint32)(statb.st_mtime-946684800));
+    }
 position = sim_fsize_ex (File);
 if (((int64)position) == -1) {
     Return = errno;
@@ -3168,11 +3161,12 @@ for (i=0; i < strlen (FullParentVHDPath); i++)
 ExpandToFullPath (szVHDPath, FullVHDPath, BytesPerSector);
 HostPathToVhdPath (FullVHDPath, FullVHDPath, BytesPerSector);
 for (i=0, RelativeMatch=UpDirectories=0; i<strlen(FullVHDPath); i++)
-    if (FullVHDPath[i] == '\\')
+    if (FullVHDPath[i] == '\\') {
         if (memcmp (FullVHDPath, FullParentVHDPath, i+1))
             ++UpDirectories;
         else
             RelativeMatch = i;
+        }
 if (RelativeMatch) {
     char UpDir[4] = "..\\";
 
@@ -3407,33 +3401,6 @@ char *c = (char *)Buffer;
 for (i=0; i<BufferSize; ++i)
     if (c[i])
         return FALSE;
-return TRUE;
-}
-
-static t_bool
-VhdBlockHasAllZeroSectors(void *Block, size_t BlockSize)
-{
-uint8 *BitMap = (uint8 *)Block;
-size_t SectorSize = 512;
-size_t BitMapSize = (BlockSize/SectorSize+7)/8;
-uint8 *Buffer = BitMap + BitMapSize;
-size_t Sector;
-
-for (Sector=0; Sector<BlockSize/SectorSize; ++Sector) {
-    /* We need Endian rules for BitMap interpretation
-       These are not documented in the Version 1.0 specification, AND 
-       observations of Virtual PC's and Hyper-V's use of VHD's suggests
-       that they really don't manage this detail at the sector level.
-       What they appear to do is that whenever a Block is instantiated
-       All potential bitmap bits are set to 1 which means that the 
-       current block has fully populated data for the current VHD.  
-       The same is true in the differencing disk case (i.e. a copy of
-       the whole block is made from the parent to the current 
-       differencing disk whenever any data is written to a new block). */
-    if (!BufferIsZeros(Buffer, SectorSize))
-        return FALSE;
-    Buffer += SectorSize;
-    }
 return TRUE;
 }
 

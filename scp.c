@@ -888,9 +888,10 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
         }
     else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
-    if (cptr == NULL)                                   /* EOF? */
+    if (cptr == NULL) {                                 /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
+        }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
     sub_args (cbuf, gbuf, sizeof(gbuf), argv);
@@ -1242,11 +1243,12 @@ do {
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
         (stat != SCPE_OK) &&
-        (stat != SCPE_STEP))
+        (stat != SCPE_STEP)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][stat];
         else
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][0];
+        }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     } while (staying);
@@ -2995,11 +2997,12 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
-if (!(uptr->flags & UNIT_ATT))                          /* not attached? */
+if (!(uptr->flags & UNIT_ATT)) {                        /* not attached? */
     if (sim_switches & SIM_SW_REST)                     /* restoring? */
         return SCPE_OK;                                 /* allow detach */
     else
-        return SCPE_NOATT;                               /* complain */
+        return SCPE_NOATT;                              /* complain */
+    }
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
 if (uptr->flags & UNIT_BUF) {
@@ -3672,13 +3675,14 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
         uptr = dptr->units + j;
         if ((uptr->flags & UNIT_ATT) &&                 /* attached, */
             !(uptr->flags & UNIT_BUF) &&                /* not buffered, */
-            (uptr->fileref))                            /* real file, */
+            (uptr->fileref)) {                          /* real file, */
             if (uptr->io_flush)                         /* unit specific flush routine */
                 uptr->io_flush (uptr);
             else
                 if (!(uptr->flags & UNIT_RAW) &&        /* not raw, */
                     !(uptr->flags & UNIT_RO))           /* not read only? */
                     fflush (uptr->fileref);
+            }
         }
     }
 sim_cancel (&sim_step_unit);                            /* cancel step timer */
