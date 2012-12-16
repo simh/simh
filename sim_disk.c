@@ -1540,7 +1540,7 @@ if (DeviceIoControl((HANDLE)Disk,                      /* handle to volume */
                      (DWORD) sizeof(Device),           /* size of output buffer */
                      (LPDWORD) &IoctlReturnSize,       /* number of bytes returned */
                      (LPOVERLAPPED) NULL))             /* OVERLAPPED structure */
-     printf ("Device OK - Type: %s, Number: %d\n", _device_type_name (Device.DeviceType), Device.DeviceNumber);
+     printf ("Device OK - Type: %s, Number: %d\n", _device_type_name (Device.DeviceType), (int)Device.DeviceNumber);
 #endif
 
 if (sector_size)
