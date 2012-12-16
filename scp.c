@@ -2075,6 +2075,7 @@ static SHTAB show_glob_tab[] = {
     { "ETHERNET", &eth_show_devices, 0 },
     { "SERIAL", &sim_show_serial, 0 },
     { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
+    { "MUX", &tmxr_show_open_devices, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };
@@ -2096,8 +2097,6 @@ GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
-if ((shptr = find_shtab (show_glob_tab, gbuf)))         /* global? */
-    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
 
 if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
@@ -2112,7 +2111,10 @@ else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
     shtb = show_unit_tab;                               /* global table */
     lvl = MTAB_VUN;                                     /* unit match */
     }
-else return SCPE_NXDEV;                                 /* no match */
+else if ((shptr = find_shtab (show_glob_tab, gbuf)))    /* global? */
+    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
+else
+    return SCPE_NXDEV;                                 /* no match */
 
 if (*cptr == 0) {                                       /* now eol? */
     return (lvl == MTAB_VDV)?
