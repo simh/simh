@@ -1976,14 +1976,16 @@ else {
         fprintf(st, ", sessions=%d\n", mp->sessions);
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
-            fprintf (st, "Line: %d", j);
-            if (lp->uptr && (lp->uptr != lp->mp->uptr))
-                fprintf (st, " - Unit: %s\n", sim_uname (lp->uptr));
-            else
-                fprintf (st, "\n");
+            if (mp->lines > 1) {
+                fprintf (st, "Line: %d", j);
+                if (lp->uptr && (lp->uptr != lp->mp->uptr))
+                    fprintf (st, " - Unit: %s\n", sim_uname (lp->uptr));
+                else
+                    fprintf (st, "\n");
+                }
             if ((!lp->conn) && (!lp->connecting) && (!lp->serport) && (!lp->master))
                 continue;
-            tmxr_fconns (st, lp, j);
+            tmxr_fconns (st, lp, -1);
             tmxr_fstats (st, lp, -1);
             }
         }
@@ -2114,16 +2116,16 @@ if (ln >= 0)
 
 if ((lp->conn) || (lp->connecting)) {                   /* tcp connection? */
     if (lp->destination)                                /* remote connection? */
-        fprintf (st, "Remote port %s\n", lp->destination);/* print port name */
+        fprintf (st, "Connection to remote port %s\n", lp->destination);/* print port name */
     else                                                /* incoming connection */
-        fprintf (st, "IP address %s\n", lp->ipad);
+        fprintf (st, "Connection from IP address %s\n", lp->ipad);
     }
 
 if (lp->port)
     fprintf (st, "Listening on port %s\n", lp->port);   /* print port name */
 
 if (lp->serport)                                        /* serial connection? */
-    fprintf (st, "Serial port %s\n", lp->destination);  /* print port name */
+    fprintf (st, "Connected to serial port %s\n", lp->destination);  /* print port name */
 
 if (lp->cnms) {
     ctime = (sim_os_msec () - lp->cnms) / 1000;
@@ -2152,11 +2154,12 @@ static const char *enab = "on";
 static const char *dsab = "off";
 
 if (ln >= 0)
-    fprintf (st, "line %d:", ln);
+    fprintf (st, "Line %d:", ln);
 if ((!lp->conn) && (!lp->connecting) && (!lp->serport))
     fprintf (st, " not connected\n");
 else {
-    fprintf (st, "\n");
+    if (ln >= 0)
+        fprintf (st, "\n");
     fprintf (st, "  input (%s)", (lp->rcve? enab: dsab));
     if (lp->rxcnt)
         fprintf (st, " queued/total = %d/%d",
