@@ -1946,7 +1946,8 @@ for ( ;; ) {
             temp = CC_V;
             SET_TRAP (TRAP_DIVZRO);
             }
-        else if ((op0 == LMASK) && (op1 == LSIGN)) {    /* overflow? */
+        else if ((((uint32)op0) == LMASK) && 
+                 (((uint32)op1) == LSIGN)) {            /* overflow? */
             r = op1;
             temp = CC_V;
             INTOV;
@@ -3222,7 +3223,7 @@ if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
 nM = (uint32 *) calloc (val >> 2, sizeof (uint32));
 if (nM == NULL)
     return SCPE_MEM;
-clim = (uint32) ((((uint32) val) < MEMSIZE)? val: MEMSIZE);
+clim = (((uint32) val) < MEMSIZE)? (uint32)val: MEMSIZE;
 for (i = 0; i < clim; i = i + 4)
     nM[i >> 2] = M[i >> 2];
 free (M);

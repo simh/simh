@@ -177,7 +177,10 @@ if (mapen) {                                            /* mapping on? */
         xpte = fill (va, lnt, acc, NULL);               /* fill if needed */
     pa = (xpte.pte & TLB_PFN) | off;                    /* get phys addr */
     }
-else pa = va & PAMASK;
+else {
+    pa = va & PAMASK;
+    off = 0;
+    }
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     if (lnt >= L_LONG)                                  /* long, quad? */
         return ReadL (pa);
@@ -185,7 +188,7 @@ if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
         return ReadW (pa);
     return ReadB (pa);                                  /* byte */
     }
-if (mapen && ((off + lnt) > VA_PAGSIZE)) {              /* cross page? */
+if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {      /* cross page? */
     vpn = VA_GETVPN (va + lnt);                         /* vpn 2nd page */
     tbi = VA_GETTBI (vpn);
     xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
@@ -239,7 +242,10 @@ if (mapen) {
         xpte = fill (va, lnt, acc, NULL);
     pa = (xpte.pte & TLB_PFN) | off;
     }
-else pa = va & PAMASK;
+else {
+    pa = va & PAMASK;
+    off = 0;
+    }
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     if (lnt >= L_LONG)                                  /* long, quad? */
         WriteL (pa, val);
@@ -248,7 +254,7 @@ if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     else WriteB (pa, val);                              /* byte */
     return;
     }
-if (mapen && ((off + lnt) > VA_PAGSIZE)) {
+if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
     vpn = VA_GETVPN (va + 4);
     tbi = VA_GETTBI (vpn);
     xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */

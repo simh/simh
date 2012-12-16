@@ -2217,6 +2217,7 @@ key ^= 0x3f;
 return (hash[key>>3] & (1 << (key&0x7)));
 }
 
+#if 0
 static int
 _eth_hash_validate(ETH_MAC *MultiCastList, int count, ETH_MULTIHASH hash)
 {
@@ -2268,6 +2269,7 @@ ETH_MULTIHASH thash = {0x01, 0x40, 0x00, 0x00, 0x48, 0x88, 0x40, 0x00};
 
 _eth_hash_validate(tMacs, sizeof(tMacs)/sizeof(tMacs[0]), thash);
 }
+#endif
 
 /* The IP header */
 struct IPHeader {
@@ -2935,10 +2937,12 @@ if (dev->dptr->dctrl & dev->dbit) {
     eth_mac_fmt(&dev->filter_address[i], mac);
     sim_debug(dev->dbit, dev->dptr, "  Addr[%d]: %s\n", i, mac);
     }
-  if (dev->all_multicast)
+  if (dev->all_multicast) {
     sim_debug(dev->dbit, dev->dptr, "All Multicast\n");
-  if (dev->promiscuous)
+    }
+  if (dev->promiscuous) {
     sim_debug(dev->dbit, dev->dptr, "Promiscuous\n");
+    }
   }
 
 /* setup BPF filters and other fields to minimize packet delivery */
