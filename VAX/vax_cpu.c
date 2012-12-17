@@ -468,22 +468,14 @@ REG cpu_reg[] = {
 MTAB cpu_mod[] = {
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &cpu_set_idle, &cpu_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|NETBSD|OPENBSD|ULTRIXOLD|OPENBSDOLD|QUASIJARUS|32V|ALL}", &cpu_set_idle, &cpu_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
-    { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size },
-#if !defined (VAX_780)
-    { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size },
-#endif
+    MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt },
+    CPU_MODEL_MODIFIERS /* Model specific cpu modifiers from vaxXXX_defs.h */
     { 0 }
     };
 
@@ -591,8 +583,11 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
         break;
 
     case SCB_MCHK:                                      /* machine check */
+/* The ka630 and ka620 CPU ROMs use double machine checks to size memory */
+#if !defined(VAX_620) && !defined(VAX_630)
         if (in_ie)                                      /* in exc? panic */
             ABORT (STOP_INIE);
+#endif
         cc = machine_check (p1, opc, cc, delta);        /* system specific */
         in_ie = 0;
         GET_CUR;                                        /* PSL<cur> changed */
@@ -3460,5 +3455,41 @@ t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 if (sim_idle_enab && (cpu_idle_type != 0))
     fprintf (st, "idle=%s, ", os_tab[cpu_idle_type - 1].name);
 sim_show_idle (st, uptr, val, desc);
+return SCPE_OK;
+}
+
+
+t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset)
+{
+extern FILE *sim_log;
+char args[CBUFSIZE];
+t_stat r;
+
+printf ("Loading boot code from %s\n", filename);
+if (sim_log)
+    fprintf (sim_log, "Loading boot code from %s\n", filename);
+if (rom)
+    sprintf (args, "-R %s", filename);
+else
+    sprintf (args, "-O %s %X", filename, (int)offset);
+r = load_cmd (0, args);
+if (r != SCPE_OK) {
+    if (builtin_code) {
+        FILE *f;
+
+        if ((f = sim_fopen (filename, "wb"))) {
+            printf ("Saving boot code to %s\n", filename);
+            if (sim_log)
+                fprintf (sim_log, "Saving boot code to %s\n", filename);
+            sim_fwrite ((void *)builtin_code, 1, size, f);
+            fclose (f);
+            printf ("Loading boot code from %s\n", filename);
+            if (sim_log)
+                fprintf (sim_log, "Loading boot code from %s\n", filename);
+            r = load_cmd (0, args);
+            }
+        }
+    return r;
+    }
 return SCPE_OK;
 }

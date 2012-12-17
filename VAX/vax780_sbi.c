@@ -36,9 +36,11 @@
 
 #include "vax_defs.h"
 
-#ifndef DONT_USE_INTERNAL_ROM
-#include "vax780_vmb_exe.h"
-#endif
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_FILENAME "vmb.exe"
+#else /* !DONT_USE_INTERNAL_ROM */
+#include "vax_vmb_exe.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
 
 /* 11/780 specific IPRs */
 
@@ -106,7 +108,7 @@ uint32 sbi_sc = 0;                                      /* SBI silo comparator *
 uint32 sbi_mt = 0;                                      /* SBI maintenance */
 uint32 sbi_er = 0;                                      /* SBI error status */
 uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
-char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
+static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
 
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -203,7 +205,7 @@ DEVICE sbi_dev = {
 
 CTAB vax780_cmd[] = {
     { "BOOT", &vax780_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n" },
+      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
     { "FLOAD", &vax780_fload, 0,
       "fl{oad} <file> {<start>} load file from console floppy\n" },
     { NULL }
@@ -694,30 +696,9 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-printf ("Loading boot code from vmb.exe\n");
-if (sim_log)
-    fprintf (sim_log, "Loading boot code from vmb.exe\n");
-r = load_cmd (0, "-O vmb.exe 200");
-if (r != SCPE_OK) {
-#ifndef DONT_USE_INTERNAL_ROM
-    FILE *f;
-
-    if ((f = sim_fopen ("vmb.exe", "wb"))) {
-        printf ("Saving boot code to vmb.exe\n");
-        if (sim_log)
-            fprintf (sim_log, "Saving boot code to vmb.exe\n");
-        sim_fwrite (vax780_vmb_exe, sizeof(vax780_vmb_exe[0]), sizeof(vax780_vmb_exe)/sizeof(vax780_vmb_exe[0]), f);
-        fclose (f);
-        printf ("Loading boot code from vmb.exe\n");
-        if (sim_log)
-            fprintf (sim_log, "Loading boot code from vmb.exe\n");
-        r = load_cmd (0, "-O vmb.exe 200");
-        if (r == SCPE_OK)
-            SP = PC = 512;
-        }
-#endif
+r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
+if (r != SCPE_OK)
     return r;
-    }
 SP = PC = 512;
 return SCPE_OK;
 }

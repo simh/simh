@@ -1,4 +1,4 @@
-/* vax780_mba.c: VAX 11/780 Massbus adapter
+/* vax7x0_mba.c: VAX 11/780 snf VAX 11/750 Massbus adapter
 
    Copyright (c) 2004-2008, Robert M Supnik
 
@@ -49,6 +49,8 @@
 #define MBA_EXTDRV(x)   (((x) >> MBA_V_DRV) & MBA_M_DRV)
 #define MBA_EXTOFS(x)   (((x) >> MBA_V_DEVOFS) & MBA_M_DEVOFS)
 
+char *mba_regnames[] = {"CNF", "CR", "SR", "VA", "BC", "DR", "SMR", "CMD"};
+
 /* Massbus configuration register */
 
 #define MBACNF_OF       0x0
@@ -57,6 +59,22 @@
 #define MBACNF_CODE     0x00000020
 #define MBACNF_RD       (SBI_FAULTS|MBACNF_W1C)
 #define MBACNF_W1C      0x00C00000
+
+BITFIELD mba_cnf_bits[] = {
+  BITF(CODE,8),                             /* Adapter Code */
+  BITNCF(13),                               /* 08:20 Reserved */
+  BIT(OT),                                  /* Over Temperature */
+  BIT(PU),                                  /* Power Up */
+  BIT(PD),                                  /* Power Down */
+  BITNCF(2),                                /* 24:25 Reserved */
+  BIT(XMTFLT),                              /* Transmit Fault */
+  BIT(MT),                                  /* Multiple Transmitter */
+  BITNCF(1),                                /* 28 Reserved */
+  BIT(URD),                                 /* Unexpected Read Data */
+  BIT(WS),                                  /* Write Data Sequence (Fault B) */
+  BIT(PE),                                  /* SBI Parity Error */
+  ENDBITS
+};
 
 /* Control register */
 
@@ -67,6 +85,15 @@
 #define MBACR_INIT      0x00000001
 #define MBACR_RD        0x0000000E
 #define MBACR_WR        0x0000000E
+
+BITFIELD mba_cr_bits[] = {
+  BIT(INIT),                                /* Initialization */
+  BIT(ABORT),                               /* Abort Data Transfer */
+  BIT(IE),                                  /* Interrupt Enable */
+  BIT(MM),                                  /* Maintenance Mode */
+  BITNCF(28),                               /* 04:31 Reserved */
+  ENDBITS
+};
 
 /* Status register */
 
@@ -100,11 +127,44 @@
 #define MBASR_ERRORS    0x608E49FF
 #define MBASR_INTR      0x000F7000
 
+BITFIELD mba_sr_bits[] = {
+  BIT(RDTIMEOUT),                           /* Read Data Timeout */
+  BIT(ISTIMEOUT),                           /* Interface Sequence Timeout */
+  BIT(RDS),                                 /* Read Data Substitute */
+  BIT(ERRCONF),                             /* Error Confirmation */
+  BIT(INVMAP),                              /* Invalid Map */
+  BIT(MAPPE),                               /* Page Frame Map Parity Error */
+  BIT(MDPE),                                /* Massbus Data Parity Error */
+  BIT(MBEXC),                               /* Massbus Exception */
+  BIT(MXF),                                 /* Missed Transfer Error */
+  BIT(WCLWRERR),                            /* Write Check Lower Byte Error */
+  BIT(WCUPERR),                             /* Write Check Upper Byte Error */
+  BIT(DLT),                                 /* Data Late */
+  BIT(DTABT),                               /* Data Transfer Aborted */
+  BIT(DTCOMP),                              /* Data Transfer Complete */
+  BITNCF(2),                                /* 14:15 Reserved */
+  BIT(ATTN),                                /* Attention */
+  BIT(MCPE),                                /* Massbus Control Parity Error */
+  BIT(NED),                                 /* Non Existing Drive */
+  BIT(PGE),                                 /* Programming Error */
+  BITNCF(9),                                /* 20:28 Reserved */
+  BIT(CRD),                                 /* Corrected Read Data */
+  BIT(NRCONF),                              /* No Response Confirmation */
+  BIT(DTBUSY),                              /* Data Transfer Busy */
+  ENDBITS
+};
+
 /* Virtual address register */
 
 #define MBAVA_OF        0x3
 #define MBAVA_RD        0x0001FFFF
 #define MBAVA_WR        (MBAVA_RD)
+
+BITFIELD mba_va_bits[] = {
+  BITF(PAGEBYTE,9),                         /* Page Byte Address */
+  BITF(MAPPOINTER,8),                       /* Map Pointer */
+  ENDBITS
+};
 
 /* Byte count */
 
@@ -112,20 +172,52 @@
 #define MBABC_WR        0x0000FFFF
 #define MBABC_V_MBC     16                              /* MB count */
 
+BITFIELD mba_bc_bits[] = {
+  BITF(SBIBYTECOUNT,16),                     /* SBI Byte Counter */
+  BITF(MBBYTECOUNT,16),                      /* Massbus Byte Counter */
+  ENDBITS
+};
+
 /* Diagnostic register */
 
 #define MBADR_OF        0x5
 #define MBADR_RD        0xFFFFFFFF
 #define MBADR_WR        0xFFC00000
 
+BITFIELD mba_dr_bits[] = {
+  BITF(DR,32),                               /* Diagnostic Register */
+  ENDBITS
+};
+
 /* Selected map entry - read only */
 
 #define MBASMR_OF       0x6
 #define MBASMR_RD       (MBAMAP_RD)
 
+BITFIELD mba_smr_bits[] = {
+  BITF(SMR,32),                              /* Selected Map Register */
+  ENDBITS
+};
+
 /* Command register (SBI) - read only */
 
 #define MBACMD_OF       0x7
+
+BITFIELD mba_cmd_bits[] = {
+  BITF(CAR,32),                              /* Command Address Register */
+  ENDBITS
+};
+
+BITFIELD *mba_reg_bits[] = {
+    mba_cnf_bits,
+    mba_cr_bits,
+    mba_sr_bits,
+    mba_va_bits,
+    mba_bc_bits,
+    mba_dr_bits,
+    mba_smr_bits,
+    mba_cmd_bits
+};
 
 /* External registers */
 
@@ -148,6 +240,7 @@
 #define MBA_DEB_MWR     0x08                            /* map writes */
 #define MBA_DEB_XFR     0x10                            /* transfers */
 #define MBA_DEB_ERR     0x20                            /* errors */
+#define MBA_DEB_INT     0x40                            /* interrupts */
 
 uint32 mba_cnf[MBA_NUM];                                /* config reg */
 uint32 mba_cr[MBA_NUM];                                 /* control reg */
@@ -161,7 +254,6 @@ uint32 mba_map[MBA_NUM][MBA_NMAPR];                     /* map */
 extern uint32 nexus_req[NEXUS_HLVL];
 extern UNIT cpu_unit;
 extern FILE *sim_log;
-extern FILE *sim_deb;
 extern int32 sim_switches;
 
 t_stat mba_reset (DEVICE *dptr);
@@ -239,6 +331,7 @@ DEBTAB mba_deb[] = {
     { "MAPWRITE", MBA_DEB_MWR },
     { "XFER", MBA_DEB_XFR },
     { "ERROR", MBA_DEB_ERR },
+    { "INTERRUPT", MBA_DEB_INT },
     { NULL, 0 }
     };
 
@@ -271,8 +364,10 @@ t_stat r;
 
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>MBA%d: invalid adapter read mask, pa = %X, lnt = %d\r\n", mb, pa, lnt);
+    printf (">>MBA%d: invalid adapter read mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
+#if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
+#endif
     return SCPE_OK;
     }
 if (mb >= MBA_NUM)                                      /* valid? */
@@ -321,8 +416,8 @@ switch (rtype) {                                        /* case on type */
         default:
             return SCPE_NXM;
             }
-        if (DEBUG_PRI (mba_dev[mb], MBA_DEB_RRD))
-            fprintf (sim_deb, ">>MBA%d: int reg %d read, value = %X\n", mb, ofs, *val);
+        sim_debug (MBA_DEB_RRD, &mba_dev[mb], "mba_rdreg(Reg=%s, val=0x%X)\n", mba_regnames[ofs], *val);
+        sim_debug_bits(MBA_DEB_RRD, &mba_dev[mb], mba_reg_bits[ofs], *val, *val, 1);
         break;
 
     case MBART_EXT:                                     /* external */
@@ -336,15 +431,13 @@ switch (rtype) {                                        /* case on type */
         else if (r == MBE_NXR)                          /* nx reg? */
             return SCPE_NXM;
         *val |= (mba_sr[mb] & ~WMASK);                  /* upper 16b from SR */
-        if (DEBUG_PRI (mba_dev[mb], MBA_DEB_RRD))
-            fprintf (sim_deb, ">>MBA%d: drv %d ext reg %d read, value = %X\n", mb, drv, ofs, *val);
+        sim_debug (MBA_DEB_RRD, &mba_dev[mb], "mba_rdreg(drv %d ext reg=%d, val=0x%X)\n", drv, ofs, *val);
         break; 
 
     case MBART_MAP:                                     /* map */
         ofs = MBA_INTOFS (pa);
         *val = mba_map[mb][ofs] & MBAMAP_RD;
-        if (DEBUG_PRI (mba_dev[mb], MBA_DEB_MRD))
-            fprintf (sim_deb, ">>MBA%d: map %d read, value = %X\n", mb, ofs, *val);
+        sim_debug (MBA_DEB_MRD, &mba_dev[mb], "mba_rdreg(map %d read, val=0x%X)\n", ofs, *val);
         break;
 
     default:
@@ -359,30 +452,40 @@ return SCPE_OK;
 t_stat mba_wrreg (int32 val, int32 pa, int32 lnt)
 {
 int32 mb, ofs, drv, rtype;
+uint32 old_reg, old_sr;
 t_stat r;
 t_bool cs1dt;
 
 mb = NEXUS_GETNEX (pa) - TR_MBA0;                       /* get MBA */
 if ((pa & 3) || (lnt != L_LONG)) {                      /* unaligned or not lw? */
-    printf (">>MBA%d: invalid adapter write mask, pa = %X, lnt = %d\r\n", mb, pa, lnt);
+    printf (">>MBA%d: invalid adapter write mask, pa = 0x%X, lnt = %d\r\n", mb, pa, lnt);
+#if defined(VAX_780)
     sbi_set_errcnf ();                                  /* err confirmation */
+#endif
     return SCPE_OK;
     }
 if (mb >= MBA_NUM)                                      /* valid? */
     return SCPE_NXM;
 rtype = MBA_RTYPE (pa);                                 /* get reg type */
 
+old_sr = mba_sr[mb];
+
 switch (rtype) {                                        /* case on type */
 
     case MBART_INT:                                     /* internal */
         ofs = MBA_INTOFS (pa);                          /* check range */
+        sim_debug (MBA_DEB_RWR, &mba_dev[mb], "mba_wrreg(reg=%s write, val=0x%X)\n", mba_regnames[ofs], val);
+
         switch (ofs) {
 
         case MBACNF_OF:                                 /* CNF */
+            old_reg = mba_cnf[mb];
             mba_cnf[mb] &= ~(val & MBACNF_W1C);
+            sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_reg_bits[ofs], old_reg, mba_cnf[mb], 1);
             break;
 
         case MBACR_OF:                                  /* CR */
+            old_reg = mba_cr[mb];
             if (val & MBACR_INIT)                       /* init? */
                 mba_reset (&mba_dev[mb]);               /* reset MBA */
             if ((val & MBACR_ABORT) &&
@@ -400,6 +503,7 @@ switch (rtype) {                                        /* case on type */
                 mba_clr_int (mb);
             mba_cr[mb] = (mba_cr[mb] & ~MBACR_WR) |
                 (val & MBACR_WR);
+            sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_reg_bits[ofs], old_reg, mba_cr[mb], 1);
             break;
 
         case MBASR_OF:                                  /* SR */
@@ -407,27 +511,32 @@ switch (rtype) {                                        /* case on type */
             break;
 
         case MBAVA_OF:                                  /* VA */
+            old_reg = mba_va[mb];
+            sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_reg_bits[ofs], mba_va[mb], val, 1);
             if (mba_sr[mb] & MBASR_DTBUSY)              /* err if xfr */
                 mba_upd_sr (MBASR_PGE, 0, mb);
             else mba_va[mb] = val & MBAVA_WR;
+            sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_reg_bits[ofs], old_reg, mba_va[mb], 1);
             break;
 
         case MBABC_OF:                                  /* BC */
+            old_reg = mba_bc[mb];
             if (mba_sr[mb] & MBASR_DTBUSY)              /* err if xfr */
                 mba_upd_sr (MBASR_PGE, 0, mb);
             else mba_bc[mb] = val & MBABC_WR;
+            sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_reg_bits[ofs], old_reg, mba_bc[mb], 1);
             break;
 
         case MBADR_OF:                                  /* DR */
+            old_reg = mba_dr[mb];
             mba_dr[mb] = (mba_dr[mb] & ~MBADR_WR) |
                 (val & MBADR_WR);
+            sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_reg_bits[ofs], old_reg, mba_dr[mb], 1);
             break;
 
         default:
             return SCPE_NXM;
             }
-        if (DEBUG_PRI (mba_dev[mb], MBA_DEB_RWR))
-            fprintf (sim_deb, ">>MBA%d: int reg %d write, value = %X\n", mb, ofs, val);
         break;
 
     case MBART_EXT:                                     /* external */
@@ -435,6 +544,7 @@ switch (rtype) {                                        /* case on type */
             return SCPE_NXM;
         drv = MBA_EXTDRV (pa);                          /* get dev num */
         ofs = MBA_EXTOFS (pa);                          /* get reg offs */
+        sim_debug (MBA_DEB_RWR, &mba_dev[mb], "mba_wrreg(drv=%d ext reg=%d write, val=0x%X)\n", drv, ofs, val);
         cs1dt = (ofs == MBA_CS1) && (val & CSR_GO) &&   /* starting xfr? */
            ((val & MBA_CS1_WR) >= MBA_CS1_DT);
         if (cs1dt && (mba_sr[mb] & MBASR_DTBUSY)) {     /* xfr while busy? */
@@ -448,20 +558,20 @@ switch (rtype) {                                        /* case on type */
             return SCPE_NXM;
         if (cs1dt && (r == SCPE_OK))                    /* did dt start? */     
             mba_sr[mb] = (mba_sr[mb] | MBASR_DTBUSY) & ~MBASR_W1C;
-        if (DEBUG_PRI (mba_dev[mb], MBA_DEB_RWR))
-            fprintf (sim_deb, ">>MBA%d: drv %d ext reg %d write, value = %X\n", mb, drv, ofs, val);
         break; 
 
     case MBART_MAP:                                     /* map */
         ofs = MBA_INTOFS (pa);
         mba_map[mb][ofs] = val & MBAMAP_WR;
-        if (DEBUG_PRI (mba_dev[mb], MBA_DEB_MWR))
-            fprintf (sim_deb, ">>MBA%d: map %d write, value = %X\n", mb, ofs, val);
+        sim_debug (MBA_DEB_MWR, &mba_dev[mb], "mba_wrreg(map %d write, val=0x%X)\n", ofs, val);
         break;
 
     default:
         return SCPE_NXM;
         }
+
+if (old_sr != mba_sr[mb])
+    sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_sr_bits, old_sr, mba_sr[mb], 1);
 
 return SCPE_OK;
 }
@@ -496,8 +606,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (pa);                  /* left in page */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
-    if (DEBUG_PRI (mba_dev[mb], MBA_DEB_XFR))
-        fprintf (sim_deb, ">>MBA%d: read, pa = %X, bc = %X\n", mb, pa, pbc);
+    sim_debug (MBA_DEB_XFR, &mba_dev[mb], "mba_rdbufW(pa=0x%X, bc=0x%X)\n", pa, pbc);
     if ((pa | pbc) & 1) {                               /* aligned word? */
         for (j = 0; j < pbc; pa++, j++) {               /* no, bytes */
             if ((i + j) & 1) {                          /* odd byte? */
@@ -546,8 +655,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
     pbc = VA_PAGSIZE - VA_GETOFF (pa);                  /* left in page */
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
-    if (DEBUG_PRI (mba_dev[mb], MBA_DEB_XFR))
-        fprintf (sim_deb, ">>MBA%d: write, pa = %X, bc = %X\n", mb, pa, pbc);
+    sim_debug (MBA_DEB_XFR, &mba_dev[mb], "mba_wrbufW(pa=0x%X, bc=0x%X)\n", pa, pbc);
     if ((pa | pbc) & 1) {                               /* aligned word? */
         for (j = 0; j < pbc; pa++, j++) {               /* no, bytes */
             if ((i + j) & 1) {
@@ -595,8 +703,7 @@ for (i = 0; i < bc; i = i + pbc) {                      /* loop by pages */
         break;
         }
     pbc = VA_PAGSIZE - VA_GETOFF (pa);                  /* left in page */
-    if (DEBUG_PRI (mba_dev[mb], MBA_DEB_XFR))
-        fprintf (sim_deb, ">>MBA%d: check, pa = %X, bc = %X\n", mb, pa, pbc);
+    sim_debug (MBA_DEB_XFR, &mba_dev[mb], "mba_chbufW(pa=0x%X, bc=0x%X)\n", pa, pbc);
     if (pbc > (bc - i))                                 /* limit to rem xfr */
         pbc = bc - i;
     for (j = 0; j < pbc; j++, pa++) {                   /* byte by byte */
@@ -635,23 +742,30 @@ return 0;
 
 void mba_set_don (uint32 mb)
 {
+uint32 old_sr = mba_sr[mb];
+
 mba_upd_sr (MBASR_DTCMP, 0, mb);
+if (old_sr != mba_sr[mb])
+    sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_sr_bits, old_sr, mba_sr[mb], 1);
 return;
 }
 
 void mba_upd_ata (uint32 mb, uint32 val)
 {
+uint32 old_sr = mba_sr[mb];
+
 if (val)
     mba_upd_sr (MBASR_ATA, 0, mb);
 else mba_upd_sr (0, MBASR_ATA, mb);
+if (old_sr != mba_sr[mb])
+    sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_sr_bits, old_sr, mba_sr[mb], 1);
 return;
 }
 
 void mba_set_exc (uint32 mb)
 {
+sim_debug (MBA_DEB_ERR, &mba_dev[mb], "mba_set_exc(EXC write)\n");
 mba_upd_sr (MBASR_MBEXC, 0, mb);
-if (DEBUG_PRI (mba_dev[mb], MBA_DEB_ERR))
-    fprintf (sim_deb, ">>MBA%d: EXC write\n", mb);
 return;
 }
 
@@ -669,8 +783,10 @@ DIB *dibp;
 if (mb >= MBA_NUM)
     return;
 dibp = (DIB *) mba_dev[mb].ctxt;
-if (dibp)
+if (dibp) {
     nexus_req[dibp->vloc >> 5] |= (1u << (dibp->vloc & 0x1F));
+    sim_debug (MBA_DEB_INT, &mba_dev[mb], "mba_set_int(0x%X)\n", dibp->vloc);
+    }
 return;
 }
 
@@ -681,24 +797,31 @@ DIB *dibp;
 if (mb >= MBA_NUM)
     return;
 dibp = (DIB *) mba_dev[mb].ctxt;
-if (dibp)
+if (dibp) {
     nexus_req[dibp->vloc >> 5] &= ~(1u << (dibp->vloc & 0x1F));
+    sim_debug (MBA_DEB_INT, &mba_dev[mb], "mba_clr_int(0x%X)\n", dibp->vloc);
+    }
 return;
 }
 
 void mba_upd_sr (uint32 set, uint32 clr, uint32 mb)
 {
+uint32 o_sr;
+
 if (mb >= MBA_NUM)
     return;
+o_sr = mba_sr[mb];
 if (set & MBASR_ABORTS)
     set |= (MBASR_DTCMP|MBASR_DTABT);
 if (set & (MBASR_DTCMP|MBASR_DTABT))
     mba_sr[mb] &= ~MBASR_DTBUSY;
 mba_sr[mb] = (mba_sr[mb] | set) & ~clr;
-if ((set & MBASR_INTR) && (mba_cr[mb] & MBACR_IE))
+if (mba_sr[mb] != o_sr)
+    sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_sr_bits, o_sr, mba_sr[mb], 1);
+if ((set & MBASR_INTR) && (mba_cr[mb] & MBACR_IE) && !(mba_sr[mb] & MBASR_DTBUSY))
     mba_set_int (mb);
-if ((set & MBASR_ERRORS) && (DEBUG_PRI (mba_dev[mb], MBA_DEB_ERR)))
-    fprintf (sim_deb, ">>MBA%d: CS error = %X\n", mb, mba_sr[mb]);
+if (set & MBASR_ERRORS)
+    sim_debug (MBA_DEB_ERR, &mba_dev[mb], "mba_upd_sr(CS error=0x%X)\n", mba_sr[mb]);
 return;
 }
 

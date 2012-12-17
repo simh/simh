@@ -154,7 +154,7 @@ tempbase[1] = tim_base[1];
 if (tim_mult != TIM_MULT_T20) {                         /* interpolate? */
     int32 used;
     d10 incr;
-    used = tmr_poll - (sim_is_active (&tim_unit) - 1);
+    used = tmr_poll - (sim_activate_time (&tim_unit) - 1);
     incr = (d10) (((double) used * TIM_HW_FREQ) /
         ((double) tmr_poll * (double) clk_tps));
     tim_incr_base (tempbase, incr);
@@ -219,7 +219,7 @@ int32 t;
 
 if (tim_mult == TIM_MULT_T20)
     return wait;
-t = sim_is_active (&tim_unit);
+t = sim_activate_time (&tim_unit);
 return (t? t - 1: wait);
 }
 

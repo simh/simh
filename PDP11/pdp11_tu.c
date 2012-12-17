@@ -822,7 +822,7 @@ return;
 
 void tu_update_fs (int32 flg, int32 drv)
 {
-int32 act = sim_is_active (&tu_unit[drv]);
+int32 act = sim_activate_time (&tu_unit[drv]);
 
 tufs = (tufs & ~FS_DYN) | FS_FPR | flg;
 if (tu_unit[drv].flags & UNIT_ATT) {

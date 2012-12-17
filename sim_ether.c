@@ -757,6 +757,14 @@ t_stat ethq_destroy(ETH_QUE* que)
 
 void ethq_clear(ETH_QUE* que)
 {
+  int i;
+
+  /* free up any extended packets */
+  for (i=0; i<que->max; ++i)
+    if (que->item[i].packet.oversize) {
+      free (que->item[i].packet.oversize);
+      que->item[i].packet.oversize = NULL;
+      }
   /* clear packet array */
   memset(que->item, 0, sizeof(struct eth_item) * que->max);
   /* clear rest of structure */
@@ -768,6 +776,8 @@ void ethq_remove(ETH_QUE* que)
   struct eth_item* item = &que->item[que->head];
 
   if (que->count) {
+    if (item->packet.oversize)
+      free (item->packet.oversize);
     memset(item, 0, sizeof(struct eth_item));
     if (++que->head == que->max)
       que->head = 0;
@@ -804,15 +814,23 @@ void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, int
   item->packet.len = len;
   item->packet.used = used;
   item->packet.crc_len = crc_len;
-  memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
-  if (crc_data && (crc_len > len))
-    memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
+  if (len <= sizeof (item->packet.msg)) {
+    memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
+    if (crc_data && (crc_len > len))
+      memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
+    }
+  else {
+    item->packet.oversize = realloc (item->packet.oversize, ((len > crc_len) ? len : crc_len));
+    memcpy(item->packet.oversize, data, ((len > crc_len) ? len : crc_len));
+    if (crc_data && (crc_len > len))
+      memcpy(&item->packet.oversize[len], crc_data, ETH_CRC_SIZE);
+    }
   item->packet.status = status;
 }
 
 void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
 {
-  ethq_insert_data(que, type, pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
+ethq_insert_data(que, type, pack->oversize ? pack->oversize : pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
 }
 
 /*============================================================================*/

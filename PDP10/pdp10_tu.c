@@ -1015,7 +1015,7 @@ return;
 
 void update_tucs (int32 flag, int32 drv)
 {
-int32 act = sim_is_active (&tu_unit[drv]);
+int32 act = sim_activate_time (&tu_unit[drv]);
 
 if ((flag & ~tucs1) & CS1_DONE)                         /* DONE 0 to 1? */
     tuiff = (tucs1 & CS1_IE)? 1: 0;                     /* CSTB INTR <- IE */

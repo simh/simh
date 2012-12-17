@@ -1093,7 +1093,7 @@ t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, void *desc)
         (uptr->STAT & RLDS_WGE) ? '1' : '0',
         (uptr->STAT & RLDS_SPE) ? '1' : '0');
     if (uptr->flags & UNIT_ATT) {
-        if ((cnt = sim_is_active (uptr)) != 0)
+        if ((cnt = sim_activate_time (uptr)) != 0)
             fprintf (st, "FNC: %d, %d\n", uptr->FNC, cnt);
         else
             fputs ("FNC: none\n", st);

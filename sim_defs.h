@@ -368,6 +368,8 @@ struct sim_unit {
     void                *up8;                           /* device specific */
 #ifdef SIM_ASYNCH_IO
     void                (*a_check_completion)(struct sim_unit *);
+    t_bool              (*a_is_active)(struct sim_unit *);
+    void                (*a_cancel)(struct sim_unit *);
     struct sim_unit     *a_next;                        /* next asynch active */
     int32               a_event_time;
     t_stat              (*a_activate_call)(struct sim_unit *, int32);
@@ -506,6 +508,14 @@ struct sim_debtab {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
 
+struct sim_bitfield {
+    char            *name;                              /* field name */
+    uint32          offset;                             /* starting bit */
+    uint32          width;                              /* width */
+    const char      **valuenames;                       /* map of values to strings */
+    const char      *format;                            /* value format string */
+    };
+
 /* File Reference */
 struct sim_fileref {
     char                name[CBUFSIZE];                 /* file name */
@@ -526,6 +536,12 @@ struct sim_fileref {
 #define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep)
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     #nm, &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#define BIT(nm)              {#nm, -1, 1}             /* Single Bit definition */
+#define BITNC                {"",  -1, 1}             /* Don't care Bit definition */
+#define BITF(nm,sz)          {#nm, -1, sz}            /* Bit Field definition */
+#define BITNCF(sz)           {"",  -1, sz}            /* Don't care Bit Field definition */
+#define BITFFMT(nm,sz,fmt)   {#nm, -1, sz, NULL, #fmt}/* Bit Field definition with Output format */
+#define BITFNAM(nm,sz,names) {#nm, -1, sz, names}     /* Bit Field definition with value->name map */
 #else
 #define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1
 #define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1
@@ -535,7 +551,14 @@ struct sim_fileref {
 #define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep)
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
     "nm", &(loc), (rdx), (wd), (off), (dep), ((fl) | REG_UNIT)
+#define BIT(nm)              {"nm", -1, 1}              /* Single Bit definition */
+#define BITNC                {"",  -1, 1}               /* Don't care Bit definition */
+#define BITF(nm,sz)          {"nm", -1, sz}             /* Bit Field definition */
+#define BITNCF(sz)           {"",  -1, sz}              /* Don't care Bit Field definition */
+#define BITFFMT(nm,sz,fmt)   {"nm", -1, sz, NULL, "fmt"}/* Bit Field definition with Output format */
+#define BITFNAM(nm,sz,names) {"nm", -1, sz, names}      /* Bit Field definition with value->name map */
 #endif
+#define ENDBITS {NULL}  /* end of bitfield list */
 
 /* Typedefs for principal structures */
 
@@ -550,6 +573,7 @@ typedef struct sim_schtab SCHTAB;
 typedef struct sim_brktab BRKTAB;
 typedef struct sim_debtab DEBTAB;
 typedef struct sim_fileref FILEREF;
+typedef struct sim_bitfield BITFIELD;
 
 /* Function prototypes */
 
@@ -587,7 +611,8 @@ extern int32 sim_asynch_inst_latency;
       pthread_mutex_destroy(&sim_asynch_lock);                    \
       pthread_cond_destroy(&sim_asynch_wake);                     \
     }
-
+#define AIO_IS_ACTIVE(uptr) (((uptr)->a_is_active ? (uptr)->a_is_active (uptr) : FALSE) || ((uptr)->a_next))
+#define AIO_CANCEL(uptr) if ((uptr)->a_cancel) (uptr)->a_cancel (uptr); else (void)0
 #if defined(__DECC_VER)
 #include <builtins>
 #if defined(__IA64)
@@ -728,6 +753,8 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_CHECK_EVENT
 #define AIO_INIT
 #define AIO_CLEANUP
+#define AIO_IS_ACTIVE(uptr) FALSE
+#define AIO_CANCEL(uptr)
 #define AIO_SET_INTERRUPT_LATENCY(instpersec)
 #endif /* SIM_ASYNCH_IO */
 

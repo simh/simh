@@ -95,7 +95,16 @@ extern int32    tmxr_poll, clk_tps;
 #endif
 #define VH_MNOMASK  (VH_MUXES - 1)
 
+#if defined(VM_VAX)
+#if VEC_QBUS
 #define VH_LINES    (8)
+#else
+#define VH_LINES    (16)
+#endif
+#else
+#define VH_LINES    (UNIBUS?16:8)
+#endif
+#define VH_LINES_ALLOC 16
 
 #define UNIT_V_MODEDHU  (UNIT_V_UF + 0)
 #define UNIT_V_FASTDMA  (UNIT_V_UF + 1)
@@ -286,9 +295,9 @@ typedef struct {
     uint16  txchar;     /* single character I/O */
 } TMLX;
 
-static TMLN vh_ldsc[VH_MUXES * VH_LINES] = { { 0 } };
-static TMXR vh_desc = { VH_MUXES * VH_LINES, 0, 0, vh_ldsc };
-static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
+static TMLN vh_ldsc[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
+static TMXR vh_desc = { VH_MUXES * VH_LINES_ALLOC, 0, 0, vh_ldsc };
+static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
@@ -319,6 +328,8 @@ static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_putc (int32 vh, TMLX *lp, int32 chan, int32 data);
 static void doDMA (int32 vh, int32 chan);
+static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -351,8 +362,10 @@ static const REG vh_reg[] = {
 };
 
 static const MTAB vh_mod[] = {
-    { UNIT_MODEDHU, 0, "DHV mode", "DHV", NULL },
-    { UNIT_MODEDHU, UNIT_MODEDHU, "DHU mode", "DHU", NULL },
+#if !UNIBUS
+    { UNIT_MODEDHU, 0, "DHV mode", "DHV", &vh_setmode },
+#endif
+    { UNIT_MODEDHU, UNIT_MODEDHU, "DHU mode", "DHU", &vh_setmode },
     { UNIT_FASTDMA, 0, NULL, "NORMAL", NULL },
     { UNIT_FASTDMA, UNIT_FASTDMA, "fast DMA", "FASTDMA", NULL },
     { UNIT_MODEM, 0, NULL, "NOMODEM", NULL },
@@ -361,8 +374,8 @@ static const MTAB vh_mod[] = {
     { UNIT_HANGUP, UNIT_HANGUP, "hangup", "HANGUP", NULL },
     { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, VH_LINES, "VECTOR", "VECTOR",
-        &set_vec, &show_vec_mux, (void *) &vh_desc },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+        &set_vec, &vh_show_vec, (void *) &vh_desc },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
         &set_addr_flt, NULL, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "LINES", "LINES",
@@ -713,7 +726,7 @@ static void vh_getc (   int32   vh  )
     uint32  i, c;
     TMLX    *lp;
 
-    for (i = 0; i < VH_LINES; i++) {
+    for (i = 0; i < (uint32)VH_LINES; i++) {
         lp = &vh_parm[(vh * VH_LINES) + i];
         while ((c = tmxr_getc_ln (lp->tmln)) != 0) {
             if (c & SCPE_BREAK) {
@@ -1281,14 +1294,15 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 {
     int32   i;
 
+    if (vh_desc.lines > VH_MUXES*VH_LINES)
+        vh_desc.lines = VH_MUXES*VH_LINES;
     for (i = 0; i < vh_desc.lines; i++)
         vh_parm[i].tmln = &vh_ldsc[i];
+    vh_dev.numunits = (vh_desc.lines / VH_LINES);
     for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
-#if     defined (VM_PDP11)
         /* if Unibus, force DHU mode */
         if (UNIBUS)
             vh_unit[i].flags |= UNIT_MODEDHU;
-#endif
         vh_clear (i, TRUE);
     }
     vh_rxi = vh_txi = 0;
@@ -1310,6 +1324,13 @@ static t_stat vh_attach (   UNIT    *uptr,
 static t_stat vh_detach (   UNIT    *uptr   )
 {
     return (tmxr_detach (&vh_desc, uptr));
+}
+
+t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+
+return show_vec (st, uptr, ((mp->lines * 2) / VH_LINES), desc);
 }
 
 static void vh_detail_line (    FILE    *st,
@@ -1406,6 +1427,17 @@ vh_desc.lines = newln;
 ndev = ((vh_dev.flags & DEV_DIS)? 0: (vh_desc.lines / VH_LINES));
 vh_dev.numunits = (newln / VH_LINES);
 return auto_config (vh_dev.name, ndev);                 /* auto config */
+}
+
+/* SET DHU/DHV mode processor */
+
+static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr)
+    return SCPE_ARG;
+if ((UNIBUS) && (val != UNIT_MODEDHU))
+    return SCPE_ARG;
+return SCPE_OK;
 }
 
 /* SET LOG processor */

@@ -772,7 +772,7 @@ else if (uptr) {                                        /* otherwise, we have a 
     uptr->wait = cvptr->cmd_time;                       /* most commands use the command delay */
 
     if (props->unit_access) {                           /* does the command access the unit? */
-        is_seeking = sim_is_active (uptr) != 0;         /* see if the unit is busy */
+        is_seeking = sim_activate_time (uptr) != 0;     /* see if the unit is busy */
 
         if (is_seeking)                                 /* if a seek is in progress, */
             uptr->wait = 0;                             /*   set for no unit activation */

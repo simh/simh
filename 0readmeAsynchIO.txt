@@ -155,7 +155,10 @@ The pdp11_rq.c module has been refactored to leverage the asynch I/O
 features of the sim_disk library.  The impact to this code to adopt the
 asynch I/O paradigm was quite minimal.
 The pdp11_rp.c module has also been refactored to leverage the asynch I/O
-features of the sim_disk library.
+features of the sim_disk library.  The impact to this code to adopt the
+asynch I/O paradigm was also quite minimal.  After conversion a latent
+bug in the VAX Massbus adapter implementation was illuminated due to the
+more realistic delays to perform I/O operations.
 The pdp11_tq.c module has been refactored to leverage the asynch I/O
 features of the sim_tape library.  The impact to this code to adopt the
 asynch I/O paradigm was very significant. This was due to the two facts:

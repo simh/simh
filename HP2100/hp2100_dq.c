@@ -531,7 +531,7 @@ void dq_goc (int32 fnc, int32 drv, int32 time)
 {
 int32 t;
 
-t = sim_is_active (&dqc_unit[drv]);
+t = sim_activate_time (&dqc_unit[drv]);
 
 if (t) {                                                /* still seeking? */
     sim_cancel (&dqc_unit[drv]);                        /* cancel */

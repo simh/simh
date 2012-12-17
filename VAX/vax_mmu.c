@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-12    MB      Added support for KA620 virtual addressing
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Added address masking for system page table reads
@@ -474,6 +475,7 @@ else {
             MM_ERR (PR_LNV);
         ptead = d_p0br + ptidx;
         }
+#if !defined (VAX_620)
     if ((ptead & VA_S0) == 0)
         ABORT (STOP_PPTE);                              /* ppte must be sys */
     vpn = VA_GETVPN (ptead);                            /* get vpn, tbi */
@@ -494,6 +496,7 @@ else {
             ((pte << VA_N_OFF) & TLB_PFN);              /* set stlb data */
         }
     ptead = (stlb[tbi].pte & TLB_PFN) | VA_GETOFF (ptead);
+#endif
     }
 pte = ReadL (ptead);                                    /* read pte */
 tlbpte = cvtacc[PTE_GETACC (pte)] |                     /* cvt access */

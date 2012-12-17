@@ -1021,7 +1021,7 @@ int32 sync_poll (POLLMODE poll_mode)
 int32 poll_time;
 
     if (poll_mode == INITIAL) {
-        poll_time = sim_is_active (&tty_unit[TTI]);
+        poll_time = sim_activate_time (&tty_unit[TTI]);
 
         if (poll_time)
             return poll_time;

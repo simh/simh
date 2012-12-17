@@ -125,6 +125,7 @@ struct tape_context {
     pthread_t           io_thread;          /* I/O Thread Id */
     pthread_mutex_t     io_lock;
     pthread_cond_t      io_cond;
+    pthread_cond_t      io_done;
     pthread_cond_t      startup_cond;
     int                 io_top;
     uint8               *buf;
@@ -273,6 +274,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
             }
         pthread_mutex_lock (&ctx->io_lock);
         ctx->io_top = TOP_DONE;
+        pthread_cond_signal (&ctx->io_done);
         sim_activate (uptr, ctx->asynch_io_latency);
     }
     pthread_mutex_unlock (&ctx->io_lock);
@@ -286,7 +288,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
    processing events for any unit. It is only called when an asynchronous 
    thread has called sim_activate() to activate a unit.  The job of this 
    routine is to put the unit in proper condition to digest what may have
-   occurred in the asynchrcondition thread.
+   occurred in the asynchronous thread.
    
    Since tape processing only handles a single I/O at a time to a 
    particular tape device, we have the opportunity to possibly detect 
@@ -305,6 +307,25 @@ if (ctx->callback && ctx->io_top == TOP_DONE) {
     ctx->callback = NULL;
     callback (uptr, ctx->io_status);
     }
+}
+
+static t_bool _tape_is_active (UNIT *uptr)
+{
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
+sim_debug (ctx->dbit, ctx->dptr, "_tape_is_active(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+return (ctx->io_top != TOP_DONE);
+}
+
+static void _tape_cancel (UNIT *uptr)
+{
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
+sim_debug (ctx->dbit, ctx->dptr, "_tape_cancel(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+pthread_mutex_lock (&ctx->io_lock);
+while (ctx->io_top != TOP_DONE)
+    pthread_cond_wait (&ctx->io_done, &ctx->io_lock);
+pthread_mutex_unlock (&ctx->io_lock);
 }
 #else
 #define AIO_CALLSETUP
@@ -333,6 +354,7 @@ ctx->asynch_io_latency = latency;
 if (ctx->asynch_io) {
     pthread_mutex_init (&ctx->io_lock, NULL);
     pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_cond_init (&ctx->io_done, NULL);
     pthread_cond_init (&ctx->startup_cond, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
@@ -344,6 +366,8 @@ if (ctx->asynch_io) {
     pthread_cond_destroy (&ctx->startup_cond);
     }
 uptr->a_check_completion = _tape_completion_dispatch;
+uptr->a_is_active = _tape_is_active;
+uptr->a_cancel = _tape_cancel;
 #endif
 return SCPE_OK;
 }
@@ -368,6 +392,7 @@ if (ctx->asynch_io) {
     pthread_join (ctx->io_thread, NULL);
     pthread_mutex_destroy (&ctx->io_lock);
     pthread_cond_destroy (&ctx->io_cond);
+    pthread_cond_destroy (&ctx->io_done);
     }
 return SCPE_OK;
 #endif
