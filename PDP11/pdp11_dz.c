@@ -745,8 +745,10 @@ if (newln < dz_desc.lines) {
         }
     }
 dz_dib.lnt = (newln / DZ_LINES) * IOLN_DZ;              /* set length */
+dz_desc.ldsc = dz_ldsc = realloc(dz_ldsc, newln*sizeof(*dz_ldsc));
+if (dz_desc.lines < newln)
+    memset (dz_ldsc + dz_desc.lines, 0, sizeof(*dz_ldsc)*(newln-dz_desc.lines));
 dz_desc.lines = newln;
-dz_desc.ldsc = dz_ldsc = realloc(dz_ldsc, dz_desc.lines*sizeof(*dz_ldsc));
 return dz_reset (&dz_dev);                              /* setup lines and auto config */
 }
 

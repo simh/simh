@@ -73,7 +73,7 @@
 #define TMXR_MDM_CTS        0x10    /* Clear To Send       */
 #define TMXR_MDM_DSR        0x20    /* Data Set Ready      */
 #define TMXR_MDM_INCOMING   (TMXR_MDM_DCD|TMXR_MDM_RNG|TMXR_MDM_CTS|TMXR_MDM_DSR)  /* Settable Modem Bits */
-#define TMXR_MDM_OUTGOING   (TMXR_MDM_DTR|TMXR_MDM_DTR)  /* Settable Modem Bits */
+#define TMXR_MDM_OUTGOING   (TMXR_MDM_DTR|TMXR_MDM_RTS)  /* Settable Modem Bits */
 
 /* Unit flags */
 
