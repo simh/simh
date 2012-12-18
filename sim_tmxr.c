@@ -844,6 +844,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
     
     if (lp->ser_connect_pending) {
         lp->ser_connect_pending = FALSE;
+        lp->conn = TRUE;
         return i;
         }
     }

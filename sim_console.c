@@ -774,7 +774,11 @@ t_stat sim_check_console (int32 sec)
 {
 int32 c, i;
 
-if (sim_con_tmxr.master == 0)                           /* not Telnet? done */
+if (sim_con_ldsc.serport)
+    if (tmxr_poll_conn (&sim_con_tmxr) >= 0) 
+        sim_con_ldsc.rcve = 1;                          /* rcv enabled */
+if ((sim_con_tmxr.master == 0) ||                       /* serial console or not Telnet? done */
+    (sim_con_ldsc.serport))
     return SCPE_OK;
 if (sim_con_ldsc.conn || sim_con_ldsc.txbfd) {          /* connected or buffered ? */
     tmxr_poll_rx (&sim_con_tmxr);                       /* poll (check disconn) */
