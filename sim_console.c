@@ -538,11 +538,11 @@ else {
         tmxr_fconns (st, &sim_con_ldsc, -1);
         }
     else 
-        if (sim_con_ldsc.conn == 0)
+        if (sim_con_ldsc.sock == 0)
             fprintf (st, "Listening on port %s\n", sim_con_tmxr.port);
         else {
-            fprintf (st, "Listening on port %s, connected to socket %d\n",
-                sim_con_tmxr.port, sim_con_ldsc.conn);
+            fprintf (st, "Listening on port %s, connection from %s\n",
+                sim_con_tmxr.port, sim_con_ldsc.ipad);
             tmxr_fconns (st, &sim_con_ldsc, -1);
             }
     tmxr_fstats (st, &sim_con_ldsc, -1);
@@ -830,8 +830,7 @@ if ((c == SCPE_STOP) ||                                 /* ^E or not Telnet? */
     ((sim_con_tmxr.master == 0) &&                      /*       and not serial? */
      (sim_con_ldsc.serport == 0)))
     return c;                                           /* in-window */
-if ((sim_con_ldsc.conn == 0) &&                         /* no Telnet conn */
-    (sim_con_ldsc.serport == 0)) {                      /* and no serial conn? */
+if (!sim_con_ldsc.conn) {                               /* no telnet or serial connection? */
     if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
         return SCPE_LOST;                               /* connection lost */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
@@ -857,8 +856,7 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     }
 if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
     fputc (c, sim_log);
-if ((sim_con_ldsc.serport == 0) &&                      /* no serial port */
-    (sim_con_ldsc.conn == 0)) {                         /* and no Telnet conn? */
+if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
     if (!sim_con_ldsc.txbfd)                            /* unbuffered? */
         return SCPE_LOST;                               /* connection lost */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
@@ -881,9 +879,8 @@ if ((sim_con_tmxr.master == 0) &&                       /* not Telnet? */
     }
 if (sim_log && !sim_con_ldsc.txlog)                     /* log file, but no line log? */
     fputc (c, sim_log);
-if ((sim_con_ldsc.serport == 0) &&                      /* no serial port */
-    (sim_con_ldsc.conn == 0)) {                         /* and no Telnet conn? */
-    if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet conn? */
+if (!sim_con_ldsc.conn) {                               /* no Telnet or serial connection? */
+    if (!sim_con_ldsc.txbfd)                            /* non-buffered Telnet connection? */
         return SCPE_LOST;                               /* lost */
     if (tmxr_poll_conn (&sim_con_tmxr) >= 0)            /* poll connect */
         sim_con_ldsc.rcve = 1;                          /* rcv enabled */

@@ -87,7 +87,8 @@ typedef struct tmln TMLN;
 typedef struct tmxr TMXR;
 
 struct tmln {
-    SOCKET              conn;                           /* line conn */
+    int                 conn;                           /* line connected flag */
+    SOCKET              sock;                           /* connection socket */
     char                *ipad;                          /* IP address */
     SOCKET              master;                         /* line specific master socket */
     char                *port;                          /* line specific listening port */
