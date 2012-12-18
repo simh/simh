@@ -453,7 +453,6 @@ int32 clk_task_upd (t_bool clr)
 {
 uint32 delta, val, iusec10;
 uint32 cur = sim_grtime ();
-uint32 old = clk_task_timer;
 double usec10;
 
 if (cur > clk_task_last)
@@ -861,7 +860,8 @@ static const int32 boot_rom[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i, mask, wd;
+size_t i;
+int32 mask, wd;
 extern int32 sim_switches;
 
 #if defined (PDP7)
@@ -994,7 +994,7 @@ if (pulse & 001) {                                      /* KSF */
     }
 if (pulse & 002) {                                      /* KRS/KRB */
     CLR_INT (TTI);                                      /* clear flag */
-    dat = dat | tti_unit.buf & TTI_MASK;                /* return buffer */
+    dat = dat | (tti_unit.buf & TTI_MASK);              /* return buffer */
 #if defined (PDP15)
     if (pulse & 020)                                    /* KRS? */
         tti_fdpx = 1;

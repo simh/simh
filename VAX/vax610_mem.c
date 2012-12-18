@@ -57,7 +57,7 @@ DIB mctl_dib = {
     1, 0, 0, { NULL }
     };
 
-UNIT mctl_unit[] =  { UDATA (NULL, 0, 0) };
+UNIT mctl_unit =  { UDATA (NULL, 0, 0) };
 
 REG mctl_reg[] = {
     { DRDATA (COUNT, mctl_count, 16) },
@@ -66,7 +66,7 @@ REG mctl_reg[] = {
     };
 
 DEVICE mctl_dev = {
-    "MCTL", mctl_unit, mctl_reg, NULL,
+    "MCTL", &mctl_unit, mctl_reg, NULL,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,

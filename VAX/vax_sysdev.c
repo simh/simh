@@ -1577,7 +1577,6 @@ return run_cmd (flag, "CPU");
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 extern t_stat load_cmd (int32 flag, char *cptr);
-extern FILE *sim_log;
 t_stat r;
 
 PC = ROMBASE;

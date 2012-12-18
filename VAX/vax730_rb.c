@@ -490,7 +490,7 @@ if (func == RBCS_SEEK) {                                /* seek? */
     if (uptr->SIP == 0) {
         sim_debug(DBG_CMD, &rb_dev, "Seek, CYL=%d, TRK=%d, SECT=%d\n", GET_CYL(rbda), GET_TRACK(rbda), GET_SECT(rbda));
         uptr->SIP = 1;
-        if (rbda == 0xFFFFFFFF) swait = rb_swait;
+        if ((uint32)rbda == 0xFFFFFFFF) swait = rb_swait;
         else {
             curr = GET_CYL (uptr->TRK);                     /* current cylinder */
             newc = GET_CYL (rbda);                          /* offset */

@@ -216,6 +216,8 @@
 #include "sim_defs.h"
 #include "sim_rev.h"
 #include "sim_ether.h"
+#include "sim_serial.h"
+#include "sim_sock.h"
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
@@ -334,6 +336,7 @@ t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_unit_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat ssh_break (FILE *st, char *cptr, int32 flg);
 t_stat set_default_cmd (int32 flg, char *cptr);
+t_stat pwd_cmd (int32 flg, char *cptr);
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr);
 t_stat show_config (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_queue (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -381,7 +384,7 @@ char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
 void put_rval (REG *rptr, uint32 idx, t_value val);
-t_value strtotv (char *inptr, char **endptr, uint32 radix);
+t_value strtotv (const char *inptr, char **endptr, uint32 radix);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
@@ -425,13 +428,15 @@ t_stat set_prompt (int32 flag, char *cptr);
 /* Global data */
 
 DEVICE *sim_dflt_dev = NULL;
-UNIT *sim_clock_queue = NULL;
+UNIT *sim_clock_queue = QUEUE_LIST_END;
 int32 sim_interval = 0;
 int32 sim_switches = 0;
 FILE *sim_ofile = NULL;
 SCHTAB *sim_schptr = FALSE;
 DEVICE *sim_dfdev = NULL;
 UNIT *sim_dfunit = NULL;
+DEVICE **sim_internal_devices = NULL;
+uint32 sim_internal_device_count = 0;
 int32 sim_opt_out = 0;
 int32 sim_is_running = 0;
 uint32 sim_brk_summ = 0;
@@ -621,6 +626,10 @@ static CTAB cmd_table[] = {
       "exi{t}|q{uit}|by{e}      exit from simulation\n" },
     { "QUIT", &exit_cmd, 0, NULL },
     { "BYE", &exit_cmd, 0, NULL },
+    { "CD", &set_default_cmd, 0,
+      "cd                       set the current directory\n" },
+    { "PWD", &pwd_cmd, 0, 
+      "pwd                      show current directory\n" },
     { "SET", &set_cmd, 0,
       "set console arg{,arg...} set console options\n"
       "set console WRU          specify console drop to simh char\n"
@@ -639,6 +648,10 @@ static CTAB cmd_table[] = {
       "set console TELNET=UNBUFFERED\n"
       "                         disables console telnet buffering\n"
       "set console NOTELNET     disable console telnet\n"
+      "set console SERIAL=serialport[;config]\n"
+      "                         specify console serial port and optionally\n"
+      "                         the port config (i.e. ;9600-8n1)\n"
+      "set console NOSERIAL     disable console serial session\n"
       "set console LOG=log_file enable console logging to the\n"
       "                         specified destination {STDOUT,DEBUG or filename)\n"
       "set console NOLOG        disable console logging\n"
@@ -646,7 +659,7 @@ static CTAB cmd_table[] = {
       "                         enable console debugging to the\n"
       "                         specified destination {LOG,STDOUT or filename)\n"
       "set console NODEBUG      disable console debugging\n"
-      "set default <dir>        set the default directory\n"
+      "set default <dir>        set the current directory\n"
       "set log log_file         specify the log destination\n"
       "                         (STDOUT,DEBUG or filename)\n"
       "set nolog                disables any currently active logging\n"
@@ -706,6 +719,8 @@ static CTAB cmd_table[] = {
       "sh{ow} <dev> {arg,...}   show device parameters\n"
       "sh{ow} <unit> {arg,...}  show unit parameters\n"
       "sh{ow} ethernet          show ethernet devices\n"
+      "sh{ow} serial            show serial devices\n"
+      "sh{ow} multiplexer       show open multiplexer devices\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
       "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\b"
@@ -798,6 +813,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
 
+sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
@@ -807,7 +823,7 @@ stop_cpu = 0;
 sim_interval = 0;
 sim_time = sim_rtime = 0;
 noqueue_time = 0;
-sim_clock_queue = NULL;
+sim_clock_queue = QUEUE_LIST_END;
 sim_is_running = 0;
 sim_log = NULL;
 if (sim_emax <= 0)
@@ -875,9 +891,10 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
         }
     else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
-    if (cptr == NULL)                                   /* EOF? */
+    if (cptr == NULL) {                                 /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
+        }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
     sub_args (cbuf, sizeof(cbuf), argv);
@@ -892,7 +909,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
-    if (!stat_nomessage)                                /* displaying message status? */
+    if (!stat_nomessage) {                              /* displaying message status? */
         if (cmdp && (cmdp->message))                    /* special message handler? */
             cmdp->message (NULL, stat);                 /* let it deal with display */
         else
@@ -901,6 +918,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
                 if (sim_log)
                     fprintf (sim_log, "%s\n", sim_error_text (stat));
                 }
+        }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     }                                                   /* end while */
@@ -911,6 +929,7 @@ sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
+sim_cleanup_sock ();                                    /* cleanup sockets */
 return 0;
 }
 
@@ -1241,6 +1260,7 @@ do {
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
         else
             if (stat >= SCPE_BASE) {                    /* report error if not suppressed */
+
                 printf ("%s\n", sim_error_text (stat));
                 if (sim_log)
                     fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -1249,11 +1269,12 @@ do {
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
         (stat != SCPE_OK) &&
-        (stat != SCPE_STEP))
+        (stat != SCPE_STEP)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][stat];
         else
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][0];
+        }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     } while (staying);
@@ -2082,6 +2103,9 @@ static SHTAB show_glob_tab[] = {
     { "THROTTLE", &sim_show_throt, 0 },
     { "ASYNCH", &sim_show_asynch, 0 },
     { "ETHERNET", &eth_show_devices, 0 },
+    { "SERIAL", &sim_show_serial, 0 },
+    { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
+    { "MUX", &tmxr_show_open_devices, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };
@@ -2103,8 +2127,6 @@ GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
-if ((shptr = find_shtab (show_glob_tab, gbuf)))         /* global? */
-    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
 
 if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
@@ -2119,7 +2141,10 @@ else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
     shtb = show_unit_tab;                               /* global table */
     lvl = MTAB_VUN;                                     /* unit match */
     }
-else return SCPE_NXDEV;                                 /* no match */
+else if ((shptr = find_shtab (show_glob_tab, gbuf)))    /* global? */
+    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
+else
+    return SCPE_NXDEV;                                 /* no match */
 
 if (*cptr == 0) {                                       /* now eol? */
     return (lvl == MTAB_VDV)?
@@ -2317,7 +2342,7 @@ int32 accum;
 
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
-if (sim_clock_queue == NULL) {
+if (sim_clock_queue == QUEUE_LIST_END) {
     fprintf (st, "%s event queue empty, time = %.0f\n",
         sim_name, sim_time);
     return SCPE_OK;
@@ -2325,7 +2350,7 @@ if (sim_clock_queue == NULL) {
 fprintf (st, "%s event queue status, time = %.0f\n",
      sim_name, sim_time);
 accum = 0;
-for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
+for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
     if (uptr == &sim_step_unit)
         fprintf (st, "  Step timer");
     else if ((dptr = find_dev_from_unit (uptr)) != NULL) {
@@ -2340,10 +2365,10 @@ for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next) {
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_lock (&sim_asynch_lock);
 fprintf (st, "asynchronous pending event queue\n");
-if (sim_asynch_queue == AIO_LIST_END)
+if (sim_asynch_queue == QUEUE_LIST_END)
     fprintf (st, "Empty\n");
 else {
-    for (uptr = sim_asynch_queue; uptr != AIO_LIST_END; uptr = uptr->a_next) {
+    for (uptr = sim_asynch_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
             fprintf (st, "  %s", sim_dname (dptr));
             if (dptr->numunits > 1) fprintf (st, " unit %d",
@@ -2449,6 +2474,8 @@ if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
     show_dev_modifiers (st, dptr, NULL, flag, cptr);
+for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
+    show_dev_modifiers (st, dptr, NULL, flag, cptr);
 return SCPE_OK;
 }
 
@@ -2539,6 +2566,8 @@ if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
     show_dev_show_commands (st, dptr, NULL, flag, cptr);
+for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
+    show_dev_show_commands (st, dptr, NULL, flag, cptr);
 return SCPE_OK;
 }
 
@@ -2600,6 +2629,11 @@ if (chdir(cptr) != 0) {
     return SCPE_IOERR & SCPE_NOMESSAGE;
 } 
 return SCPE_OK;
+}
+
+t_stat pwd_cmd (int32 flg, char *cptr)
+{
+return show_cmd (0, "DEFAULT");
 }
 
 /* Breakpoint commands */
@@ -2738,6 +2772,13 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) {
             return reason;
         }
     }
+for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
+    if (dptr->reset != NULL) {
+        reason = dptr->reset (dptr);
+        if (reason != SCPE_OK)
+            return reason;
+        }
+    }
 return SCPE_OK;
 }
 
@@ -2809,7 +2850,8 @@ if (dptr == NULL)                                       /* found dev? */
     return SCPE_NXDEV;
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
-if (uptr->flags & UNIT_ATT) {                           /* already attached? */
+if ((uptr->flags & UNIT_ATT) &&                         /* already attached? */
+    !(uptr->flags & UNIT_ATTMULT)) {                    /* and only single attachable */
     r = scp_detach_unit (dptr, uptr);                   /* detach it */
     if (r != SCPE_OK)                                   /* error? */
         return r;
@@ -2967,6 +3009,7 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
 return SCPE_OK;
 }
 
+
 /* Call device-specific or file-oriented detach unit routine */
 
 t_stat scp_detach_unit (DEVICE *dptr, UNIT *uptr)
@@ -2986,11 +3029,12 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
-if (!(uptr->flags & UNIT_ATT))                          /* not attached? */
+if (!(uptr->flags & UNIT_ATT)) {                        /* not attached? */
     if (sim_switches & SIM_SW_REST)                     /* restoring? */
         return SCPE_OK;                                 /* allow detach */
     else
-        return SCPE_NOATT;                               /* complain */
+        return SCPE_NOATT;                              /* complain */
+    }
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
 if (uptr->flags & UNIT_BUF) {
@@ -3090,6 +3134,19 @@ return SCPE_OK;
 char *sim_dname (DEVICE *dptr)
 {
 return (dptr->lname? dptr->lname: dptr->name);
+}
+
+/* Get unit display name */
+
+char *sim_uname (UNIT *uptr)
+{
+DEVICE *d = find_dev_from_unit(uptr);
+static AIO_TLS char uname[CBUFSIZE];
+
+if (d->numunits == 1)
+    return sim_dname (d);
+sprintf (uname, "%s%d", sim_dname (d), (int)(uptr-d->units));
+return uname;
 }
 
 /* Save command
@@ -3311,7 +3368,7 @@ if (v32) {                                              /* [V3.2+] time as strin
     }
 else READ_I (sim_time);                                 /* sim time */
 READ_I (sim_rtime);                                     /* [V2.6+] sim rel time */
-
+detach_all (0, 0);                                      /* Detach everything to start from a consistent state */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0)                                    /* last? */
@@ -3650,19 +3707,20 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
         uptr = dptr->units + j;
         if ((uptr->flags & UNIT_ATT) &&                 /* attached, */
             !(uptr->flags & UNIT_BUF) &&                /* not buffered, */
-            (uptr->fileref))                            /* real file, */
+            (uptr->fileref)) {                          /* real file, */
             if (uptr->io_flush)                         /* unit specific flush routine */
                 uptr->io_flush (uptr);
             else
                 if (!(uptr->flags & UNIT_RAW) &&        /* not raw, */
                     !(uptr->flags & UNIT_RO))           /* not read only? */
                     fflush (uptr->fileref);
+            }
         }
     }
 sim_cancel (&sim_step_unit);                            /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
 AIO_UPDATE_QUEUE;
-if (sim_clock_queue != NULL) {                          /* update sim time */
+if (sim_clock_queue != QUEUE_LIST_END) {                /* update sim time */
     UPDATE_SIM_TIME (sim_clock_queue->time);
     }
 else {
@@ -3693,10 +3751,15 @@ if (sim_log)                                        /* log if enabled */
 
 t_stat run_boot_prep (void)
 {
+UNIT *uptr;
+
 sim_interval = 0;                                       /* reset queue */
 sim_time = sim_rtime = 0;
 noqueue_time = 0;
-sim_clock_queue = NULL;
+for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = sim_clock_queue) {
+    sim_clock_queue = uptr->next;
+    uptr->next = NULL;
+    }
 return reset_all (0);
 }
 
@@ -4402,8 +4465,10 @@ char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 char *tptr;
 #if defined(HAVE_DLOPEN)
 static int initialized = 0;
-static char *(*p_readline)(const char *) = NULL;
-static void (*p_add_history)(const char *) = NULL;
+typedef char *(*readline_func)(const char *);
+static readline_func p_readline = NULL;
+typedef void (*add_history_func)(const char *);
+static add_history_func p_add_history = NULL;
 
 if (!initialized) {
     initialized = 1;
@@ -4419,8 +4484,8 @@ if (!initialized) {
     if (!handle)
         handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
     if (handle) {
-        p_readline = dlsym(handle, "readline");
-        p_add_history = dlsym(handle, "add_history");
+        p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
+        p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
         }
     }
 if (prompt) {                                           /* interactive? */
@@ -4636,69 +4701,6 @@ if (term && (*tptr++ != term))
 return tptr;
 }
 
-/* get_ipaddr           IP address:port
-
-   Inputs:
-        cptr    =       pointer to input string
-   Outputs:
-        ipa     =       pointer to IP address (may be NULL), 0 = none
-        ipp     =       pointer to IP port (may be NULL), 0 = none
-        result  =       status
-*/
-
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp)
-{
-char gbuf[CBUFSIZE];
-char *addrp, *portp, *octetp;
-uint32 i, addr, port, octet;
-t_stat r;
-
-if ((cptr == NULL) || (*cptr == 0))
-    return SCPE_ARG;
-strncpy (gbuf, cptr, sizeof(gbuf));
-addrp = gbuf;                                           /* default addr */
-if ((portp = strchr (gbuf, ':')))                       /* x:y? split */
-    *portp++ = 0;
-else if (strchr (gbuf, '.'))                            /* x.y...? */
-    portp = NULL;
-else {
-    portp = gbuf;                                       /* port only */
-    addrp = NULL;                                       /* no addr */
-    }
-if (portp) {                                            /* port string? */
-    if (ipp == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    port = (int32) get_uint (portp, 10, 65535, &r);
-    if ((r != SCPE_OK) || (port == 0))
-        return SCPE_ARG;
-    }
-else port = 0;
-if (addrp) {                                            /* addr string? */
-    if (ipa == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    for (i = addr = 0; i < 4; i++) {                    /* four octets */
-        octetp = strchr (addrp, '.');                   /* find octet end */
-        if (octetp != NULL)                             /* split string */
-            *octetp++ = 0;
-        else if (i < 3)                                 /* except last */
-            return SCPE_ARG;
-        octet = (int32) get_uint (addrp, 10, 255, &r);
-        if (r != SCPE_OK)
-            return SCPE_ARG;
-        addr = (addr << 8) | octet;
-        addrp = octetp;
-        }
-    if (((addr & 0377) == 0) || ((addr & 0377) == 255))
-        return SCPE_ARG;
-    }
-else addr = 0;
-if (ipp)                                                /* return req values */
-    *ipp = port;
-if (ipa)
-    *ipa = addr;
-return SCPE_OK;   
-}
-
 /* Find_device          find device matching input string
 
    Inputs:
@@ -4718,6 +4720,12 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         (strcmp (cptr, dptr->lname) == 0)))
         return dptr;
     }
+for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
+    if ((strcmp (cptr, dptr->name) == 0) ||
+        (dptr->lname &&
+        (strcmp (cptr, dptr->lname) == 0)))
+        return dptr;
+    }
 return NULL;
 }
 
@@ -4729,6 +4737,7 @@ return NULL;
    Outputs:
         result  =       pointer to device (null if no dev)
         *iptr   =       pointer to unit (null if nx unit)
+
 */
 
 DEVICE *find_unit (char *cptr, UNIT **uptr)
@@ -4768,6 +4777,29 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* base + unit#? */
 return NULL;
 }
 
+/* sim_register_internal_device   Add device to internal device list
+
+   Inputs:
+        dptr    =       pointer to device
+*/
+
+t_stat sim_register_internal_device (DEVICE *dptr)
+{
+uint32 i;
+
+for (i = 0; (sim_devices[i] != NULL); ++i)
+    if (sim_devices[i] == dptr)
+        return SCPE_OK;
+for (i = 0; i < sim_internal_device_count; ++i)
+    if (sim_internal_devices[i] == dptr)
+        return SCPE_OK;
+++sim_internal_device_count;
+sim_internal_devices = realloc(sim_internal_devices, (sim_internal_device_count+1)*sizeof(*sim_internal_devices));
+sim_internal_devices[sim_internal_device_count-1] = dptr;
+sim_internal_devices[sim_internal_device_count] = NULL;
+return SCPE_OK;
+}
+
 /* Find_dev_from_unit   find device for unit
 
    Inputs:
@@ -4784,6 +4816,13 @@ uint32 i, j;
 if (uptr == NULL)
     return NULL;
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    for (j = 0; j < dptr->numunits; j++) {
+        if (uptr == (dptr->units + j))
+            return dptr;
+        }
+    }
+for (i = 0; i<sim_internal_device_count; ++i) {
+    dptr = sim_internal_devices[i];
     for (j = 0; j < dptr->numunits; j++) {
         if (uptr == (dptr->units + j))
             return dptr;
@@ -5136,13 +5175,13 @@ return 0;
    On an error, the endptr will equal the inptr.
 */
 
-t_value strtotv (char *inptr, char **endptr, uint32 radix)
+t_value strtotv (const char *inptr, char **endptr, uint32 radix)
 {
 int32 nodigit;
 t_value val;
 uint32 c, digit;
 
-*endptr = inptr;                                        /* assume fails */
+*endptr = (char *)inptr;                                /* assume fails */
 if ((radix < 2) || (radix > 36))
     return 0;
 while (isspace (*inptr))                                /* bypass white space */
@@ -5164,7 +5203,7 @@ for (c = *inptr; isalnum(c); c = *++inptr) {            /* loop through char */
     }
 if (nodigit)                                            /* no digits? */
     return 0;
-*endptr = inptr;                                        /* result pointer */
+*endptr = (char *)inptr;                                /* result pointer */
 return val;
 }
 
@@ -5218,6 +5257,7 @@ return SCPE_OK;
 /* Event queue package
 
         sim_activate            add entry to event queue
+        sim_activate_after      add entry to event queue after a specified amount of wall time
         sim_cancel              remove entry from event queue
         sim_process_event       process entries on event queue
         sim_is_active           see if entry is on event queue
@@ -5254,7 +5294,7 @@ t_stat reason;
 if (stop_cpu)                                           /* stop CPU? */
     return SCPE_STOP;
 AIO_UPDATE_QUEUE;
-if (sim_clock_queue == NULL) {                          /* queue empty? */
+if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     UPDATE_SIM_TIME (noqueue_time);                     /* update sim time */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
     return SCPE_OK;
@@ -5265,7 +5305,7 @@ do {
     sim_clock_queue = uptr->next;                       /* remove first */
     uptr->next = NULL;                                  /* hygiene */
     uptr->time = 0;
-    if (sim_clock_queue != NULL)
+    if (sim_clock_queue != QUEUE_LIST_END)
         sim_interval = sim_clock_queue->time;
     else sim_interval = noqueue_time = NOQUEUE_WAIT;
     if (uptr->action != NULL)
@@ -5289,13 +5329,18 @@ return reason;
 
 t_stat sim_activate (UNIT *uptr, int32 event_time)
 {
+return _sim_activate (uptr, event_time);
+}
+
+t_stat _sim_activate (UNIT *uptr, int32 event_time)
+{
 UNIT *cptr, *prvptr;
 int32 accum;
 
-AIO_ACTIVATE (sim_activate, uptr, event_time);
+AIO_ACTIVATE (_sim_activate, uptr, event_time);
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
-if (sim_clock_queue == NULL) {
+if (sim_clock_queue == QUEUE_LIST_END) {
     UPDATE_SIM_TIME (noqueue_time);
     }
 else  {                                                 /* update sim time */
@@ -5304,7 +5349,7 @@ else  {                                                 /* update sim time */
 
 prvptr = NULL;
 accum = 0;
-for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
+for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (event_time < (accum + cptr->time))
         break;
     accum = accum + cptr->time;
@@ -5319,7 +5364,7 @@ else {
     prvptr->next = uptr;
     }
 uptr->time = event_time - accum;
-if (cptr != NULL)
+if (cptr != QUEUE_LIST_END)
     cptr->time = cptr->time - uptr->time;
 sim_interval = sim_clock_queue->time;
 return SCPE_OK;
@@ -5358,10 +5403,33 @@ uint32 rtimenow, urtime = (uint32)rtime;
 AIO_ACTIVATE (sim_activate_notbefore, uptr, rtime);
 sim_cancel (uptr);
 rtimenow = sim_grtime();
+sim_cancel (uptr);
 if (0x80000000 <= urtime-rtimenow)
     return sim_activate (uptr, 0);
 else
     return sim_activate (uptr, urtime-rtimenow);
+}
+
+/* sim_activate_after - activate (queue) event
+
+   Inputs:
+        uptr    =       pointer to unit
+        usec_delay =    relative timeout (in microseconds)
+   Outputs:
+        reason  =       result (SCPE_OK if ok)
+*/
+
+t_stat sim_activate_after (UNIT *uptr, int32 event_time)
+{
+return _sim_activate_after (uptr, event_time);
+}
+
+t_stat _sim_activate_after (UNIT *uptr, int32 usec_delay)
+{
+if (sim_is_active (uptr))                               /* already active? */
+    return SCPE_OK;
+AIO_ACTIVATE (_sim_activate_after, uptr, usec_delay);
+return sim_timer_activate_after (uptr, usec_delay);
 }
 
 /* sim_cancel - cancel (dequeue) event
@@ -5380,27 +5448,28 @@ UNIT *cptr, *nptr;
 AIO_VALIDATE;
 AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
-if (sim_clock_queue == NULL)
+if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;
 UPDATE_SIM_TIME (sim_clock_queue->time);                /* update sim time */
 if (!sim_is_active (uptr))
     return SCPE_OK;
-nptr = NULL;
+nptr = QUEUE_LIST_END;
+
 if (sim_clock_queue == uptr)
     nptr = sim_clock_queue = uptr->next;
 else {
-    for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
+    for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
         if (cptr->next == uptr) {
             nptr = cptr->next = uptr->next;
             break;                                      /* end queue scan */
             }
         }
     }
-if (nptr != NULL)
+if (nptr != QUEUE_LIST_END)
     nptr->time = nptr->time + uptr->time;
 uptr->next = NULL;                                      /* hygiene */
 uptr->time = 0;
-if (sim_clock_queue != NULL)
+if (sim_clock_queue != QUEUE_LIST_END)
     sim_interval = sim_clock_queue->time;
 else sim_interval = noqueue_time = NOQUEUE_WAIT;
 return SCPE_OK;
@@ -5414,7 +5483,7 @@ return SCPE_OK;
         result =        absolute activation time + 1, 0 if inactive
 */
 
-t_bool sim_is_active (UNIT *uptr)
+t_bool sim_is_activeXX (UNIT *uptr)
 {
 UNIT *cptr;
 int32 accum;
@@ -5422,7 +5491,7 @@ int32 accum;
 AIO_VALIDATE;
 AIO_UPDATE_QUEUE;
 accum = 0;
-for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
+for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
         if (sim_interval > 0)
             accum = accum + sim_interval;
@@ -5434,7 +5503,7 @@ for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
 return 0;
 }
 
-/* sim_is_active_bool - test for entry in queue
+/* sim_is_active - test for entry in queue
 
    Inputs:
         uptr    =       pointer to unit
@@ -5442,7 +5511,7 @@ return 0;
         result =        TRUE if unit is busy, FALSE inactive
 */
 
-t_bool sim_is_active_bool (UNIT *uptr)
+t_bool sim_is_active (UNIT *uptr)
 {
 AIO_VALIDATE;
 AIO_UPDATE_QUEUE;
@@ -5460,11 +5529,10 @@ return (((uptr->next) || AIO_IS_ACTIVE(uptr)) ? TRUE : FALSE);
 int32 sim_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
-int32 accum;
+int32 accum = 0;
 
 AIO_VALIDATE;
-accum = 0;
-for (cptr = sim_clock_queue; cptr != NULL; cptr = cptr->next) {
+for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
         if (sim_interval > 0)
             accum = accum + sim_interval;
@@ -5486,7 +5554,7 @@ return 0;
 
 double sim_gtime (void)
 {
-if (sim_clock_queue == NULL) {
+if (sim_clock_queue == QUEUE_LIST_END) {
     UPDATE_SIM_TIME (noqueue_time);
     }
 else  {
@@ -5497,7 +5565,7 @@ return sim_time;
 
 uint32 sim_grtime (void)
 {
-if (sim_clock_queue == NULL) {
+if (sim_clock_queue == QUEUE_LIST_END) {
     UPDATE_SIM_TIME (noqueue_time);
     }
 else  {
@@ -5519,7 +5587,7 @@ int32 cnt;
 UNIT *uptr;
 
 cnt = 0;
-for (uptr = sim_clock_queue; uptr != NULL; uptr = uptr->next)
+for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next)
     cnt++;
 return cnt;
 }
@@ -5921,7 +5989,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
     uint32 value, beforevalue, mask;
 
     for (fields=offset=0; bitdefs[fields].name; ++fields) {
-        if (bitdefs[fields].offset == -1)               /* fixup uninitialized offsets */
+        if (bitdefs[fields].offset == 0xffffffff)       /* fixup uninitialized offsets */
             bitdefs[fields].offset = offset;
         offset += bitdefs[fields].width;
         }

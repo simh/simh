@@ -521,11 +521,11 @@ if (ctx->dptr->dctrl & reason) {
             if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
                 ++same;
                 continue;
-            }
+                }
             if (same > 0) {
                 sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
                 same = 0;
-            }
+                }
             group = (((len - i) > 16) ? 16 : (len - i));
             for (sidx=oidx=0; sidx<group; ++sidx) {
                 outbuf[oidx++] = ' ';
@@ -535,13 +535,14 @@ if (ctx->dptr->dctrl & reason) {
                     strbuf[sidx] = data[i+sidx];
                 else
                     strbuf[sidx] = '.';
-            }
+                }
             outbuf[oidx] = '\0';
             strbuf[sidx] = '\0';
             sim_debug (reason, ctx->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
-          }
-          if (same > 0)
-              sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
+        if (same > 0) {
+            sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
         }
     }
 }
@@ -1665,8 +1666,9 @@ t_stat sim_tape_rewind (UNIT *uptr)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-if (uptr->flags & UNIT_ATT)
+if (uptr->flags & UNIT_ATT) {
     sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rewind(unit=%d)\n", uptr-ctx->dptr->units);
+    }
 uptr->pos = 0;
 MT_CLR_PNU (uptr);
 return MTSE_OK;
@@ -1893,10 +1895,14 @@ t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
 if (uptr->capac) {
     if (uptr->capac >= (t_addr) 1000000)
         fprintf (st, "capacity=%dMB", (uint32) (uptr->capac / ((t_addr) 1000000)));
-    else if (uptr->capac >= (t_addr) 1000)
-        fprintf (st, "capacity=%dKB", (uint32) (uptr->capac / ((t_addr) 1000)));
-    else fprintf (st, "capacity=%dB", (uint32) uptr->capac);
+    else {
+        if (uptr->capac >= (t_addr) 1000)
+            fprintf (st, "capacity=%dKB", (uint32) (uptr->capac / ((t_addr) 1000)));
+        else
+            fprintf (st, "capacity=%dB", (uint32) uptr->capac);
+        }
     }
-else fprintf (st, "unlimited capacity");
+else
+    fprintf (st, "unlimited capacity");
 return SCPE_OK;
 }

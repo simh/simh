@@ -156,9 +156,9 @@ Note 2: Root access will likely be needed to configure or start the vde
 Note 3: Simulators running using VDE networking can run without root 
         privilege.
 
-Linux (Ubuntu 10.04):
+Linux (Ubuntu 11.10):
     apt-get install make
-    apt-get install libvdeplug-dev
+    apt-get install libvdeplug2-dev
     apt-get install vde2
 
     vde_switch -s /tmp/switch1 -tap tap0 -m 666

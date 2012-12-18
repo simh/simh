@@ -224,7 +224,7 @@ uint32 dev_map[64][NUM_CHAN];
 
 /* dev_dsp maps device and channel numbers to dispatch routines */
 
-t_stat (*dev_dsp[64][NUM_CHAN])() = { NULL };
+t_stat (*dev_dsp[64][NUM_CHAN])() = { {NULL} };
 
 /* dev3_dsp maps system device numbers to dispatch routines */
 

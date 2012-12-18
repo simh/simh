@@ -95,7 +95,7 @@ t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
    mctl_reg    MCTL register list
 */
 
-DIB mctl_dib[] = { TR_MCTL, 0, &mctl_rdreg, &mctl_wrreg, 0 };
+DIB mctl_dib = { TR_MCTL, 0, &mctl_rdreg, &mctl_wrreg, 0 };
 
 UNIT mctl_unit = { UDATA (NULL, 0, 0) };
 

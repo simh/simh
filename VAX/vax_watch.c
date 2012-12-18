@@ -97,7 +97,7 @@ int32 wtc_rd (int32 pa)
 int32 rg = (pa >> 1) & 0xF;
 int32 val = 0;
 time_t curr;
-struct tm *ctm;
+struct tm *ctm = NULL;
 
 if (rg < 10) {                                          /* time reg? */
     curr = time (NULL);                                 /* get curr time */

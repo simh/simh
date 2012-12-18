@@ -222,7 +222,7 @@ DEVICE  qty_dev =
 #define QTY_LINE_RX_CHAR( line )    (qty_status[ (line) ] & QTY_S_DMASK)
 #define QTY_UNIT_ACTIVE( unitp )    ( (unitp)->conn )
 
-#define QTY_LINE_BITS( line, bits ) qty_status[ (line) ] & bits
+#define QTY_LINE_BITS( line, bits ) (qty_status[ (line) ] & bits)
 
 #define QTY_LINE_SET_BIT(   line, bit )  qty_status[ (line) ] |=  (bit)  ;
 #define QTY_LINE_CLEAR_BIT( line, bit )  qty_status[ (line) ] &= ~(bit)  ;

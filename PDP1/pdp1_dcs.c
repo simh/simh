@@ -48,7 +48,7 @@ uint8 dcs_buf[DCS_LINES];                               /* line bufffers */
 extern int32 iosta, stop_inst;
 extern int32 tmxr_poll;
 
-TMLN dcs_ldsc[DCS_LINES] = { 0 };                       /* line descriptors */
+TMLN dcs_ldsc[DCS_LINES] = { {0} };                     /* line descriptors */
 TMXR dcs_desc = { DCS_LINES, 0, 0, dcs_ldsc };          /* mux descriptor */
 
 t_stat dcsi_svc (UNIT *uptr);

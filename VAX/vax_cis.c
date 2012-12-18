@@ -71,8 +71,8 @@ typedef struct {
     uint32              val[DSTRLNT];
     } DSTR;
 
-static DSTR Dstr_zero = { 0, 0, 0, 0, 0 };
-static DSTR Dstr_one = { 0, 0x10, 0, 0, 0 };
+static DSTR Dstr_zero = { 0, {0, 0, 0, 0} };
+static DSTR Dstr_one = { 0, {0x10, 0, 0, 0} };
 
 extern int32 R[16];
 extern int32 PSL;

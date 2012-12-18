@@ -81,6 +81,7 @@
 #pragma GCC diagnostic ignored "-Wunknown-pragmas"
 #pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
+#pragma GCC diagnostic ignored "-Wbitwise-op-parentheses"
 #endif
 
 

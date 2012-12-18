@@ -58,25 +58,28 @@ int clock_gettime(int clock_id, struct timespec *tp);
 #endif
 
 
-#define SIM_NTIMERS     8                               /* # timers */
-#define SIM_TMAX        500                             /* max timer makeup */
+#define SIM_NTIMERS     8                           /* # timers */
+#define SIM_TMAX        500                         /* max timer makeup */
 
-#define SIM_IDLE_CAL    10                              /* ms to calibrate */
-#define SIM_IDLE_MAX    10                              /* max granularity idle */
-#define SIM_IDLE_STMIN  10                              /* min sec for stability */
-#define SIM_IDLE_STDFLT 20                              /* dft sec for stability */
-#define SIM_IDLE_STMAX  600                             /* max sec for stability */
+#define SIM_INITIAL_IPS 50000                       /* uncalibrated assumption */
+                                                    /* about instructions per second */
 
-#define SIM_THROT_WINIT 1000                            /* cycles to skip */
-#define SIM_THROT_WST   10000                           /* initial wait */
-#define SIM_THROT_WMUL  4                               /* multiplier */
-#define SIM_THROT_WMIN  100                             /* min wait */
-#define SIM_THROT_MSMIN 10                              /* min for measurement */
-#define SIM_THROT_NONE  0                               /* throttle parameters */
-#define SIM_THROT_MCYC  1                               /* MegaCycles Per Sec */
-#define SIM_THROT_KCYC  2                               /* KiloCycles Per Sec */
-#define SIM_THROT_PCT   3                               /* Max Percent of host CPU */
-#define SIM_THROT_SPC   4                               /* Specific periodic Delay */
+#define SIM_IDLE_CAL    10                          /* ms to calibrate */
+#define SIM_IDLE_MAX    10                          /* max granularity idle */
+#define SIM_IDLE_STMIN  10                          /* min sec for stability */
+#define SIM_IDLE_STDFLT 20                          /* dft sec for stability */
+#define SIM_IDLE_STMAX  600                         /* max sec for stability */
+
+#define SIM_THROT_WINIT 1000                        /* cycles to skip */
+#define SIM_THROT_WST   10000                       /* initial wait */
+#define SIM_THROT_WMUL  4                           /* multiplier */
+#define SIM_THROT_WMIN  100                         /* min wait */
+#define SIM_THROT_MSMIN 10                          /* min for measurement */
+#define SIM_THROT_NONE  0                           /* throttle parameters */
+#define SIM_THROT_MCYC  1                           /* MegaCycles Per Sec */
+#define SIM_THROT_KCYC  2                           /* KiloCycles Per Sec */
+#define SIM_THROT_PCT   3                           /* Max Percent of host CPU */
+#define SIM_THROT_SPC   4                           /* Specific periodic Delay */
 
 t_bool sim_timer_init (void);
 void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);
@@ -97,5 +100,7 @@ uint32 sim_os_msec (void);
 void sim_os_sleep (unsigned int sec);
 uint32 sim_os_ms_sleep (unsigned int msec);
 uint32 sim_os_ms_sleep_init (void);
+t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
+double sim_timer_inst_per_sec (void);
 
 #endif

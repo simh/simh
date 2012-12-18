@@ -772,11 +772,9 @@ return SCPE_OK;
 
 t_stat hk_wr (int32 data, int32 PA, int32 access)
 {
-int32 drv, i, j, old_val, new_val;
-UNIT *uptr;
+int32 drv, i, j, old_val = 0, new_val = 0;
 
 drv = GET_UNIT (hkcs2);                                 /* get current unit */
-uptr = hk_dev.units + drv;                              /* get unit */
 j = (PA >> 1) & 017;                                    /* get reg offset */
 if ((hkcs1 & CS1_GO) &&                                 /* busy? */
     !(((j == 0) && (data & CS1_CCLR)) ||                /* not cclr or sclr? */
@@ -1245,9 +1243,10 @@ if (old_hkcs1 != hkcs1)
     sim_debug_bits (HKDEB_OPS, &hk_dev, hk_cs1_bits, old_hkcs1, hkcs1, 1);
 if (old_hkcs2 != hkcs2)
     sim_debug_bits (HKDEB_OPS, &hk_dev, hk_cs2_bits, old_hkcs2, hkcs2, 1);
-if (flag & CS1_DONE)                                    /* set done */
+if (flag & CS1_DONE) {                                  /* set done */
     sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d done: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
              drv, hk_funcs[GET_FNC (hkcs1)], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
+    }
 return;
 }
 
@@ -1552,7 +1551,7 @@ static const uint16 boot_rom[] = {
 
 t_stat hk_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)

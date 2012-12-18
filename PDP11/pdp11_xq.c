@@ -1101,7 +1101,6 @@ t_stat xq_process_rbdl(CTLR* xq)
 t_stat xq_process_mop(CTLR* xq)
 {
   uint32 address;
-  uint16 size;
   int32 wstatus;
   struct xq_meb* meb = (struct xq_meb*) &xq->var->write_buffer.msg[0200];
   const struct xq_meb* limit = (struct xq_meb*) &xq->var->write_buffer.msg[0400];
@@ -1113,7 +1112,6 @@ t_stat xq_process_mop(CTLR* xq)
 
   while ((meb->type != 0) && (meb < limit)) {
     address = (meb->add_hi << 16) || (meb->add_mi << 8) || meb->add_lo;
-    size    = (meb->siz_hi << 8) || meb->siz_lo;
 
     /* MOP stuff here - NOT YET FULLY IMPLEMENTED */
     sim_debug (DBG_WRN, xq->dev, "Processing MEB type: %d\n", meb->type);
@@ -1634,8 +1632,9 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
       ethq_remove(&xq->var->ReadQ);
   } while (0 == (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN));
 
-  if (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN)
+  if (xq->var->rring[xq->var->rbindx].rmd3 & XQ_RMD3_OWN) {
       sim_debug(DBG_WRN, xq->dev, "xq_process_turbo_rbdl() - receive ring full\n");
+  }
 
   if (descriptors_consumed)
     /* Interrupt for Packet Reception Completion */
@@ -2019,7 +2018,8 @@ t_stat xq_process_bootrom (CTLR* xq)
   uint16 b_length, w_length;
   uint32 address;
   uint8*  bootrom = (uint8*) xq_bootrom;
-  int     i, checksum;
+  size_t  i;
+  int     checksum;
 
   sim_debug(DBG_TRC, xq->dev, "xq_process_bootrom()\n");
 
@@ -2645,7 +2645,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
 
   /* has sanity timer expired? if so, reboot */
   if (xq->var->sanity.enabled)
-    if (--xq->var->sanity.timer <= 0)
+    if (--xq->var->sanity.timer <= 0) {
       if (xq->var->mode != XQ_T_DELQA_PLUS)
         return xq_boot_host(xq);
       else { /* DELQA-T Host Inactivity Timer expiration means switch out of DELQA-T mode */
@@ -2654,6 +2654,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
         xq->var->iba = xq->var->srr = 0;
         xq->var->var = XQ_VEC_MS | XQ_VEC_OS;
       }
+    }
 
   /* has system id timer expired? if so, do system id */
   if (--xq->var->idtmr <= 0) {
@@ -2895,8 +2896,9 @@ void xq_debug_setup(CTLR* xq)
   if (!(sim_deb && (xq->dev->dctrl & DBG_SET)))
     return;
 
-  if (xq->var->write_buffer.msg[0])
+  if (xq->var->write_buffer.msg[0]) {
     sim_debug(DBG_SET, xq->dev, "%s: setup> MOP info present!\n", xq->dev->name);
+    }
 
   for (i = 0; i < XQ_FILTER_MAX; i++) {
     eth_mac_fmt(&xq->var->setup.macs[i], buffer);

@@ -366,7 +366,7 @@ int32 sim_instr (void)
         if ((OP & 0xCF) == 0x01) {                      /* LXI */
             DAR = M[PC] & 0x00ff;
             PC++;
-            DAR = DAR | (M[PC] <<8) & 0xFF00;;
+            DAR = DAR | ((M[PC] <<8) & 0xFF00);
             putpair((OP >> 4) & 0x03, DAR);
             PC++;
             continue;

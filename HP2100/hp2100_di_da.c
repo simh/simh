@@ -25,6 +25,7 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    07-May-12    JDB     Cancel the intersector delay if an untalk is received
    29-Mar-12    JDB     First release
    04-Nov-11    JDB     Created DA device
@@ -757,7 +758,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
             case disc_command:                              /* execute a disc command */
                 result = dl_service_drive (cvptr, uptr);    /* service the disc unit */
 
-                if (cvptr->opcode == clear)                 /* is this a Clear command? */
+                if (cvptr->opcode == Clear)                 /* is this a Clear command? */
                     if_dsj [unit] = 2;                      /* indicate that the self test is complete */
 
                 if (cvptr->state != cntlr_busy) {           /* has the controller stopped? */
@@ -857,7 +858,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
                     if (cvptr->length == 0 || cvptr->eod == SET) {  /* is the data phase complete? */
                         uptr->PHASE = end_phase;                    /* set the end phase */
 
-                        if (cvptr->opcode == request_status)    /* is it a Request Status command? */
+                        if (cvptr->opcode == Request_Status)    /* is it a Request Status command? */
                             if_dsj [unit] = 0;                  /* clear the DSJ value */
 
                         if_state [unit] = command_exec;         /* set to execute the command */
@@ -981,7 +982,7 @@ if (result == SCPE_IERR && DEBUG_PRI (da_dev, DEB_RWSC)) {  /* did an internal e
 
 if (if_state [unit] == idle) {                              /* is the command now complete? */
     if (if_command [unit] == disc_command) {                /* did a disc command complete? */
-        if (cvptr->opcode != end)                           /* yes; if the command was not End, */
+        if (cvptr->opcode != End)                           /* yes; if the command was not End, */
             di_poll_response (da, unit, SET);               /*   then enable PPR */
 
         if (DEBUG_PRI (da_dev, DEB_RWSC))
@@ -1267,7 +1268,7 @@ result = dl_load_unload (&icd_cntlr [unit], uptr, load);    /* load or unload th
 if (result == SCPE_OK && ! load) {                          /* was the unload successful? */
     icd_cntlr [unit].status = drive_attention;              /* set Drive Attention status */
 
-    if (uptr->OP == end)                                    /* is the controller in idle state 2? */
+    if (uptr->OP == End)                                    /* is the controller in idle state 2? */
         di_poll_response (da, unit, SET);                   /* enable PPR */
     }
 

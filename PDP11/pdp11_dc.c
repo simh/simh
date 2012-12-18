@@ -86,7 +86,7 @@ uint32 dci_ireq = 0;
 uint16 dco_csr[DCX_LINES] = { 0 };                      /* control/status */
 uint8 dco_buf[DCX_LINES] = { 0 };
 uint32 dco_ireq = 0;
-TMLN dcx_ldsc[DCX_LINES] = { 0 };                       /* line descriptors */
+TMLN dcx_ldsc[DCX_LINES] = { {0} };                     /* line descriptors */
 TMXR dcx_desc = { DCX_LINES, 0, 0, dcx_ldsc };          /* mux descriptor */
 
 static const uint8 odd_par[] = {

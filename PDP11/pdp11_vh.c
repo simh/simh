@@ -34,6 +34,7 @@
                         of lines available to be 8, 16, 24, or 32.
                         Fixed performance issue avoiding redundant polling
    03-Jan-10    JAD     Eliminate gcc warnings
+   24-Nov-08    JDB     Removed tmxr_send_buffered_data declaration (now in sim_tmxr.h)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -304,12 +305,16 @@ static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 #define DBG_INT  0x0002                                 /* display transfer requests */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
+#define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
 DEBTAB vh_debug[] = {
   {"REG",    DBG_REG},
   {"INT",    DBG_INT},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"TRC",    DBG_TRC},
+  {"ASY",    DBG_ASY},
   {0}
 };
 
@@ -334,8 +339,6 @@ static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-
-int32 tmxr_send_buffered_data (TMLN *lp);
 
 /* SIMH I/O Structures */
 
@@ -421,7 +424,7 @@ DEVICE vh_dev = {
     &vh_attach,     /* attach routine */
     &vh_detach,     /* detach routine */
     (void *)&vh_dib,/* context */
-    DEV_FLTA | DEV_DISABLE | DEV_DIS |DEV_NET | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
+    DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
     0, vh_debug
 };
 

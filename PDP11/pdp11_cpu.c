@@ -256,7 +256,7 @@ typedef struct {
 extern FILE *sim_log;
 
 uint16 *M = NULL;                                       /* memory */
-int32 REGFILE[6][2] = { 0 };                            /* R0-R5, two sets */
+int32 REGFILE[6][2] = { {0} };                          /* R0-R5, two sets */
 int32 STACKFILE[4] = { 0 };                             /* SP, four modes */
 int32 saved_PC = 0;                                     /* program counter */
 int32 R[8] = { 0 };                                     /* working registers */
@@ -273,7 +273,7 @@ int32 trap_req = 0;                                     /* trap requests */
 int32 int_req[IPL_HLVL] = { 0 };                        /* interrupt requests */
 int32 PIRQ = 0;                                         /* programmed int req */
 int32 STKLIM = 0;                                       /* stack limit */
-fpac_t FR[6] = { 0 };                                   /* fp accumulators */
+fpac_t FR[6] = { {0} };                                 /* fp accumulators */
 int32 FPS = 0;                                          /* fp status */
 int32 FEC = 0;                                          /* fp exception code */
 int32 FEA = 0;                                          /* fp exception addr */
@@ -1246,7 +1246,7 @@ while (reason == 0)  {
                     else dst = R[dstspec];
                     }
                 else {
-                    i = ((cm == pm) && (cm == MD_USR))? calc_ds (pm): calc_is (pm);
+                    i = ((cm == pm) && (cm == MD_USR))? (int32)calc_ds (pm): (int32)calc_is (pm);
                     dst = ReadW ((GeteaW (dstspec) & 0177777) | i);
                     }
                 N = GET_SIGN_W (dst);

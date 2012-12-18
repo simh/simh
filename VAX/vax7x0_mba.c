@@ -820,8 +820,9 @@ if (mba_sr[mb] != o_sr)
     sim_debug_bits(MBA_DEB_RWR, &mba_dev[mb], mba_sr_bits, o_sr, mba_sr[mb], 1);
 if ((set & MBASR_INTR) && (mba_cr[mb] & MBACR_IE) && !(mba_sr[mb] & MBASR_DTBUSY))
     mba_set_int (mb);
-if (set & MBASR_ERRORS)
+if (set & MBASR_ERRORS) {
     sim_debug (MBA_DEB_ERR, &mba_dev[mb], "mba_upd_sr(CS error=0x%X)\n", mba_sr[mb]);
+    }
 return;
 }
 

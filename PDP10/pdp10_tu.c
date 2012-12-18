@@ -1273,7 +1273,7 @@ static const d10 boot_rom_its[] = {
 
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern a10 saved_PC;
 
 M[FE_UNIT] = 0;

@@ -1941,7 +1941,8 @@ for ( ;; ) {
             temp = CC_V;
             SET_TRAP (TRAP_DIVZRO);
             }
-        else if ((op0 == LMASK) && (op1 == LSIGN)) {    /* overflow? */
+        else if ((((uint32)op0) == LMASK) && 
+                 (((uint32)op1) == LSIGN)) {            /* overflow? */
             r = op1;
             temp = CC_V;
             INTOV;
@@ -3205,7 +3206,7 @@ return SCPE_NXM;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-uint32 i, clim;
+uint32 i, clim, uval = (uint32)val;
 uint32 *nM = NULL;
 
 if ((val <= 0) || (val > MAXMEMSIZE_X))
@@ -3214,15 +3215,15 @@ for (i = val; i < MEMSIZE; i = i + 4)
     mc = mc | M[i >> 2];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
-nM = (uint32 *) calloc (val >> 2, sizeof (uint32));
+nM = (uint32 *) calloc (uval >> 2, sizeof (uint32));
 if (nM == NULL)
     return SCPE_MEM;
-clim = (uint32) ((((uint32) val) < MEMSIZE)? val: MEMSIZE);
+clim = (uint32)((uval < MEMSIZE)? uval: MEMSIZE);
 for (i = 0; i < clim; i = i + 4)
     nM[i >> 2] = M[i >> 2];
 free (M);
 M = nM;
-MEMSIZE = val; 
+MEMSIZE = uval; 
 return SCPE_OK;
 }
 

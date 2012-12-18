@@ -522,7 +522,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rx_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

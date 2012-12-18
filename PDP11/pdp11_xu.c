@@ -674,18 +674,16 @@ t_stat xu_sw_reset (CTLR* xu)
   for (i=0; i<6; i++)
     xu->var->setup.macs[1][i] = 0xff; /* Broadcast Address */
   xu->var->setup.mac_count = 2;
-  if (xu->var->etherface)
+  if (xu->var->etherface) {
     eth_filter (xu->var->etherface, xu->var->setup.mac_count,
                 xu->var->setup.macs, xu->var->setup.multicast,
                 xu->var->setup.promiscuous);
 
-  /* activate device if not disabled */
-  if ((xu->dev->flags & DEV_DIS) == 0) {
+    /* activate device */
     sim_activate_abs(&xu->unit[0], clk_cosched (tmxr_poll));
 
     /* start service timer */
-    if (xu->var->etherface)
-      sim_activate_abs(&xu->unit[1], tmr_poll * clk_tps);
+    sim_activate_abs(&xu->unit[1], tmr_poll * clk_tps);
   }
 
   /* clear load_server address */
@@ -1033,7 +1031,7 @@ int32 xu_command(CTLR* xu)
 void xu_process_receive(CTLR* xu)
 {
   uint32 segb, ba;
-  int slen, wlen, off;
+  int slen, wlen, off = 0;
   t_stat rstatus, wstatus;
   ETH_ITEM* item = 0;
   int state = xu->var->pcsr1 & PCSR1_STATE;
@@ -1215,6 +1213,7 @@ void xu_process_transmit(CTLR* xu)
   sim_debug(DBG_TRC, xu->dev, "xu_process_transmit()\n");
 /* xu_dump_txring(xu); *//* debug receive ring */
 
+  off = giant = runt = 0;
   for (;;) {
 
     /* get next transmit buffer */
@@ -1481,8 +1480,9 @@ t_stat xu_rd(int32 *data, int32 PA, int32 access)
       break;
   }
   sim_debug(DBG_REG, xu->dev, "xu_rd(), PCSR%d, data=%04x\n", reg, *data);
-  if (PA & 1)
+  if (PA & 1) {
     sim_debug(DBG_WRN, xu->dev, "xu_rd(), Unexpected Odd address access of PCSR%d\n", reg);
+  }
   return SCPE_OK;
 }
 
@@ -1622,6 +1622,8 @@ t_stat xu_detach(UNIT* uptr)
   sim_debug(DBG_TRC, xu->dev, "xu_detach()\n");
 
   if (uptr->flags & UNIT_ATT) {
+    sim_cancel (uptr);                  /* stop the receiver */
+    sim_cancel (uptr+1);                /* stop the timer services */
     eth_close (xu->var->etherface);
     free(xu->var->etherface);
     xu->var->etherface = 0;
@@ -1684,7 +1686,8 @@ void xu_dump_rxring (CTLR* xu)
     int own = (rxhdr[2] & RXR_OWN) >> 15;
     int len = rxhdr[0];
     uint32 addr = rxhdr[1] + ((rxhdr[2] & 3) << 16);
-    printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, rxhdr[0], rxhdr[1], rxhdr[2], rxhdr[3]);
+    if (rstatus == 0)
+      printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, rxhdr[0], rxhdr[1], rxhdr[2], rxhdr[3]);
   }
 }
 
@@ -1700,6 +1703,7 @@ void xu_dump_txring (CTLR* xu)
     int own = (txhdr[2] & RXR_OWN) >> 15;
     int len = txhdr[0];
     uint32 addr = txhdr[1] + ((txhdr[2] & 3) << 16);
-    printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
+    if (tstatus == 0)
+      printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
   }
 }

@@ -1691,7 +1691,7 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_plf (uint32 err)
 {
-int32 pkt;
+int32 pkt = 0;
 
 if (!tq_deqf (&pkt))                                    /* get log pkt */
     return ERR;
@@ -2202,7 +2202,7 @@ static const uint16 boot_rom[] = {
 
 t_stat tq_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

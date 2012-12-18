@@ -55,9 +55,12 @@ t_stat sim_set_console (int32 flag, char *cptr);
 t_stat sim_set_kmap (int32 flag, char *cptr);
 t_stat sim_set_telnet (int32 flag, char *cptr);
 t_stat sim_set_notelnet (int32 flag, char *cptr);
+t_stat sim_set_serial (int32 flag, char *cptr);
+t_stat sim_set_noserial (int32 flag, char *cptr);
 t_stat sim_set_logon (int32 flag, char *cptr);
 t_stat sim_set_logoff (int32 flag, char *cptr);
 t_stat sim_set_debon (int32 flag, char *cptr);
+t_stat sim_set_cons_debug (int32 flg, char *cptr);
 t_stat sim_set_cons_buff (int32 flg, char *cptr);
 t_stat sim_set_cons_unbuff (int32 flg, char *cptr);
 t_stat sim_set_cons_log (int32 flg, char *cptr);
@@ -72,6 +75,7 @@ t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 t_stat sim_show_pchar (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_cons_buff (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_cons_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_cons_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_check_console (int32 sec);
 t_stat sim_open_logfile (char *filename, t_bool binary, FILE **pf, FILEREF **pref);
 t_stat sim_close_logfile (FILEREF **pref);
@@ -85,7 +89,6 @@ t_stat sim_ttcmd (void);
 t_stat sim_ttclose (void);
 t_bool sim_ttisatty(void);
 t_stat sim_os_poll_kbd (void);
-t_stat sim_os_putchar (int32 out);
 int32 sim_tt_inpcvt (int32 c, uint32 mode);
 int32 sim_tt_outcvt (int32 c, uint32 mode);
 

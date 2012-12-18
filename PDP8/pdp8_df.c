@@ -334,7 +334,7 @@ static const uint16 dm4_rom[] = {
 
 t_stat df_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 sim_switches, saved_PC;
 
 if (sim_switches & SWMASK ('D')) {

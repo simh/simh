@@ -219,6 +219,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_serial.c"
+				>
+			</File>
+			<File
 				RelativePath="..\sim_sock.c"
 				>
 			</File>
@@ -265,6 +269,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_rev.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_serial.h"
 				>
 			</File>
 			<File

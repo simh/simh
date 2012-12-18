@@ -26,6 +26,7 @@
    BACI         12966A BACI card
 
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
