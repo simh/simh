@@ -1825,7 +1825,7 @@ static CTAB set_glob_tab[] = {
     { "NOTHROTTLE", &sim_set_throt, 0 },
     { "ASYNCH", &sim_set_asynch, 1 },
     { "NOASYNCH", &sim_set_asynch, 0 },
-    { "ENV", &sim_set_environment, 1 },
+    { "ENVIRONMENT", &sim_set_environment, 1 },
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
     { "VERIFY", &set_verify, 1 },
