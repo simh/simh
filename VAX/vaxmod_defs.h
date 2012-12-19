@@ -285,6 +285,8 @@ typedef struct {
 
 /* I/O page layout - RQB,RQC,RQD float based on number of DZ's */
 
+#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
+
 #define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
 #define IOLN_DZ         010
 #define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
@@ -293,8 +295,6 @@ typedef struct {
 #define IOLN_RQC        004
 #define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
-#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHQ11 */
-#define IOLN_VH         020
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
 #define IOLN_RQ         004
 #define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
@@ -426,6 +426,8 @@ typedef struct {
 #define IPL_SMAX        0xF                             /* highest swre level */
 
 /* Device vectors */
+
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        1                               /* Qbus system */
 #define VEC_Q           0x200                           /* Qbus vector offset */

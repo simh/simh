@@ -518,6 +518,8 @@ typedef struct pdp_dib DIB;
 
 /* I/O page layout - XUB, RQB,RQC,RQD float based on number of DZ's */
 
+#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
+
 #define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
 #define IOLN_DZ         010
 #define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
@@ -528,8 +530,6 @@ typedef struct pdp_dib DIB;
 #define IOLN_RQC        004
 #define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
-#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHQ11 */
-#define IOLN_VH         020
 #define IOBA_UBM        (IOPAGEBASE + 010200)           /* Unibus map */
 #define IOLN_UBM        (UBM_LNT_LW * sizeof (int32))
 #define	IOBA_KG         (IOPAGEBASE + 010700)           /* KG11-A */
@@ -780,6 +780,8 @@ typedef struct pdp_dib DIB;
 
 /* Device vectors */
 
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
+
 #define VEC_Q           0000                            /* vector base */
 #define VEC_PIRQ        0240
 #define VEC_TTI         0060
@@ -813,8 +815,6 @@ typedef struct pdp_dib DIB;
 #define VEC_DCO         0304
 #define VEC_DZRX        0300
 #define VEC_DZTX        0304
-#define VEC_VHRX        0310
-#define VEC_VHTX        0314
 
 /* Interrupt macros */
 

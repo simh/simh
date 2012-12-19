@@ -277,6 +277,8 @@ typedef struct {
 /* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's
    Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
+#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
+
 #define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
 #define IOLN_DZ         010
 #define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
@@ -287,8 +289,6 @@ typedef struct {
 #define IOLN_RQC        004
 #define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
-#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHU11 */
-#define IOLN_VH         020
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* UDA50 */
 #define IOLN_RQ         004
 #define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
@@ -319,8 +319,6 @@ typedef struct {
 #define IOLN_PTR        004
 #define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
 #define IOLN_PTP        004
-#define IOBA_DMC        (IOPAGEBASE + 0760060)          /* DMC11 */
-#define IOLN_DMC        010
 
 /* Interrupt assignments; within each level, priority is right to left */
 
@@ -381,6 +379,8 @@ typedef struct {
 
 /* Device vectors */
 
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
+
 #define VEC_QBUS        0
 #define VEC_Q           0000
 #define VEC_PTR         0070
@@ -398,10 +398,6 @@ typedef struct {
 #define VEC_RY          0264
 #define VEC_DZRX        0300
 #define VEC_DZTX        0304
-#define VEC_VHRX        0310
-#define VEC_VHTX        0314
-#define VEC_DMCRX       0310
-#define VEC_DMCTX       0314
 
 /* Interrupt macros */
 

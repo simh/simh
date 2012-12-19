@@ -341,15 +341,16 @@ static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* SIMH I/O Structures */
+#define IOLN_VH         020
 
 static DIB vh_dib = {
-    IOBA_VH,
+    IOBA_FLOAT,
     IOLN_VH * VH_MUXES,
     &vh_rd,     /* read */
     &vh_wr,     /* write */
     2,          /* # of vectors */
     IVCL (VHRX),
-    VEC_VHRX,
+    VEC_FLOAT,
     { &vh_rxinta, &vh_txinta }  /* int. ack. routines */
 };
 

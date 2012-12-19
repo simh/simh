@@ -235,6 +235,8 @@ typedef struct {
 
 /* I/O page layout - RQB,RQC,RQD float based on number of DZ's */
 
+#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
+
 #define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
 #define IOLN_DZ         010
 #define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
@@ -243,8 +245,6 @@ typedef struct {
 #define IOLN_RQC        004
 #define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
-#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHQ11 */
-#define IOLN_VH         020
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
 #define IOLN_RQ         004
 #define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
@@ -318,6 +318,8 @@ typedef struct {
 #define INT_V_QDSS      19                              /* QDSS */
 #define INT_V_CR        20
 #define INT_V_QVSS      21                              /* QVSS */
+#define INT_V_DMCRX     22
+#define INT_V_DMCTX     23
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -342,6 +344,8 @@ typedef struct {
 #define INT_QDSS        (1u << INT_V_QDSS)
 #define INT_CR          (1u << INT_V_CR)
 #define INT_QVSS        (1u << INT_V_QVSS)
+#define INT_DMCRX       (1u << INT_V_DMCRX)
+#define INT_DMCTX       (1u << INT_V_DMCTX)
 
 #define IPL_CLK         (0x16 - IPL_HMIN)                       /* relative IPL */
 #define IPL_RQ          (0x14 - IPL_HMIN)
@@ -366,6 +370,8 @@ typedef struct {
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
 #define IPL_QVSS        (0x14 - IPL_HMIN)
+#define IPL_DMCRX       (0x15 - IPL_HMIN)
+#define IPL_DMCTX       (0x15 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */
@@ -373,6 +379,8 @@ typedef struct {
 #define IPL_SMAX        0xF                             /* highest swre level */
 
 /* Device vectors */
+
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        1                               /* Qbus system */
 #define VEC_Q           0x200                           /* Qbus vector offset */

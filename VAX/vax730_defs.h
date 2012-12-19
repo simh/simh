@@ -234,6 +234,8 @@ typedef struct {
 
 /* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's */
 
+#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
+
 #define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
 #define IOLN_DZ         010
 #define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
@@ -289,11 +291,15 @@ typedef struct {
 #define INT_V_TS        7
 #define INT_V_RY        8
 #define INT_V_XU        9
+#define INT_V_DMCRX     10
+#define INT_V_DMCTX     11
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
 #define INT_V_PTP       2
 #define INT_V_CR        3
+#define INT_V_VHRX      4
+#define INT_V_VHTX      5
 
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -306,9 +312,13 @@ typedef struct {
 #define INT_XU          (1u << INT_V_XU)
 #define INT_RB          (1u << INT_V_RB)
 #define INT_LPT         (1u << INT_V_LPT)
+#define INT_VHRX        (1u << INT_V_VHRX)
+#define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_DMCRX       (1u << INT_V_DMCRX)
+#define INT_DMCTX       (1u << INT_V_DMCTX)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -324,8 +334,14 @@ typedef struct {
 #define IPL_PTR         (0x14 - IPL_HMIN)
 #define IPL_PTP         (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
+#define IPL_VHRX        (0x14 - IPL_HMIN)
+#define IPL_VHTX        (0x14 - IPL_HMIN)
+#define IPL_DMCRX       (0x15 - IPL_HMIN)
+#define IPL_DMCTX       (0x15 - IPL_HMIN)
 
 /* Device vectors */
+
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        0
 #define VEC_Q           0x200
