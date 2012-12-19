@@ -1335,6 +1335,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
           %SIM_VERIFY%        The Verify/Verbose mode of the current Do command file
           %SIM_VERBOSE%       The Verify/Verbose mode of the current Do command file
           %SIM_QUIET%         The Quiet mode of the current Do command file
+          %SIM_MESSAGE%       The message display status of the current Do command file
    Environment variable lookups are done first with the precise name between 
    the % characters and if that fails, then the name between the % characters
    is upcased and a lookup of that valus is attempted.
