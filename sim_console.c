@@ -180,8 +180,9 @@ TMXR sim_con_tmxr = { 1, 0, 0, &sim_con_ldsc, NULL, &sim_con_telnet };/* console
 
 t_stat sim_con_poll_svc (UNIT *uptr)
 {
-if (sim_con_tmxr.master == 0)                           /* not Telnet? done */
-    return SCPE_OK;
+if ((sim_con_tmxr.master == 0) &&                       /* not Telnet and not serial? */
+    (sim_con_ldsc.serport == 0))
+    return SCPE_OK;                                     /* done */
 if (tmxr_poll_conn (&sim_con_tmxr) >= 0)                /* poll connect */
     sim_con_ldsc.rcve = 1;                              /* rcv enabled */
 sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
