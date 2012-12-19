@@ -143,6 +143,13 @@ typedef int     (WSAAPI *getaddrinfo_func) (const char *hostname,
                                  struct addrinfo **res);
 static getaddrinfo_func p_getaddrinfo;
 
+#if defined(VMS)
+typedef size_t socklen_t;
+#if !defined(EAI_OVERFLOW)
+#define EAI_OVERFLOW EAI_FAIL
+#endif
+#endif
+
 typedef int (WSAAPI *getnameinfo_func) (const struct sockaddr *sa, socklen_t salen, char *host, size_t hostlen, char *serv, size_t servlen, int flags);
 static getnameinfo_func p_getnameinfo;
 

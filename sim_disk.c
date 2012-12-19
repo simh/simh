@@ -3043,7 +3043,7 @@ errno = Status;
 return hVHD;
 }
 
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(VMS)
 #include <unistd.h>
 #endif
 static void

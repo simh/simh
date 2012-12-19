@@ -1375,7 +1375,7 @@ for (ports=0; (ports < max); ++ports) {
                 device.dsc$w_length = devnamlen;
                 if ((0 == (devsts & UCB$M_TEMPLATE)) &&
                     (0 != (devsts & UCB$M_ONLINE)) &&
-                    (0 == (devdepend & DEV$M_RTM)) {
+                    (0 == (devdepend & DEV$M_RTM))) {
                     devstr[device.dsc$w_length] = '\0';
                     strcpy (list[ports].name, devstr);
                     while (list[ports].name[0] == '_')
