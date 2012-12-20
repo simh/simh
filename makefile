@@ -336,7 +336,7 @@ else
     MKDIRBIN = if not exist BIN mkdir BIN
   endif
   ifneq ($(USE_NETWORK),)
-    NETWORK_OPT = -DUSE_SHARED
+    NETWORK_OPT += -DUSE_SHARED
   endif
 endif
 ifneq ($(DEBUG),)
