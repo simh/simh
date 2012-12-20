@@ -345,8 +345,10 @@ t_stat cr_show_trans (FILE *, UNIT *, int32, void *);
    cr_dev   CR device descriptor
 */
 
-static DIB cr_dib = { IOBA_CR, IOLN_CR, &cr_rd, &cr_wr,
-        1, IVCL (CR), VEC_CR, { NULL } };
+#define IOLN_CR         010
+
+static DIB cr_dib = { IOBA_AUTO, IOLN_CR, &cr_rd, &cr_wr,
+        1, IVCL (CR), VEC_AUTO, { NULL } };
 
 static UNIT cr_unit = {
     UDATA (&cr_svc,
@@ -1085,7 +1087,7 @@ t_stat cr_reset (   DEVICE  *dptr    )
     CLR_INT (CR);
     /* TBD: flush current card */
     /* init uptr->wait ? */
-    return (SCPE_OK);
+    return auto_config (dptr->name, 1);
 }
 
 /*

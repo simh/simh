@@ -3141,8 +3141,8 @@ PSL = PSL_IS | PSL_IPL1F;
 SISR = 0;
 ASTLVL = 4;
 mapen = 0;
-FLUSH_ISTR;                                             /* init I-stream */
-if (M == NULL) {                                        /* first time init? */
+FLUSH_ISTR;                             /* init I-stream */
+if (M == NULL) {                        /* first time init? */
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
     pcq_r = find_reg ("PCQ", NULL, dptr);
     if (pcq_r == NULL)
@@ -3151,6 +3151,7 @@ if (M == NULL) {                                        /* first time init? */
     M = (uint32 *) calloc (((uint32) MEMSIZE) >> 2, sizeof (uint32));
     if (M == NULL)
         return SCPE_MEM;
+    auto_config(NULL, 0);               /* do an initial auto configure */
     }
 return build_dib_tab ();
 }

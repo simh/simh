@@ -173,9 +173,11 @@ t_stat ry_attach (UNIT *uptr, char *cptr);
    ry_mod       RY modifier list
 */
 
+#define IOLN_RY         004
+
 DIB ry_dib = {
-    IOBA_RY, IOLN_RY, &ry_rd, &ry_wr,
-    1, IVCL (RY), VEC_RY, { NULL }
+    IOBA_AUTO, IOLN_RY, &ry_rd, &ry_wr,
+    1, IVCL (RY), VEC_AUTO, { NULL }
     };
 
 UNIT ry_unit[] = {
@@ -244,7 +246,7 @@ DEVICE ry_dev = {
     RX_NUMDR, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &ry_reset,
     &ry_boot, &ry_attach, NULL,
-    &ry_dib, DEV_FLTA | DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18
+    &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -577,7 +579,7 @@ else if (ry_unit[0].flags & UNIT_BUF)  {                /* attached? */
     sim_activate (&ry_unit[0], ry_swait * abs (1 - ry_unit[0].TRACK));
     }
 else ry_done (RYES_ID, 0010);                           /* no, error */
-return auto_config (0, 0);                              /* run autoconfig */
+return auto_config (dptr->name, 1);                     /* run autoconfig */
 }
 
 /* Attach routine */

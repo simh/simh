@@ -324,7 +324,10 @@ struct xq_device    xqb = {
   };
 
 /* SIMH device structures */
-DIB xqa_dib = { IOBA_XQ, IOLN_XQ, &xq_rd, &xq_wr,
+
+#define IOLN_XQ         020
+
+DIB xqa_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
 		1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqa_unit[] = {
@@ -380,7 +383,7 @@ REG xqa_reg[] = {
   { NULL },
 };
 
-DIB xqb_dib = { IOBA_XQB, IOLN_XQB, &xq_rd, &xq_wr,
+DIB xqb_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
 		1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqb_unit[] = {
@@ -484,7 +487,7 @@ DEVICE xq_dev = {
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
-  &xqa_dib, DEV_FLTA | DEV_DISABLE | DEV_QBUS | DEV_DEBUG,
+  &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG,
   0, xq_debug
 };
 
@@ -493,7 +496,7 @@ DEVICE xqb_dev = {
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
-  &xqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG,
+  &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG,
   0, xq_debug
 };
 

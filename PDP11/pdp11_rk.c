@@ -212,9 +212,11 @@ t_stat rk_boot (int32 unitno, DEVICE *dptr);
    rk_mod       RK modifier list
 */
 
+#define IOLN_RK         020
+
 DIB rk_dib = {
-    IOBA_RK, IOLN_RK, &rk_rd, &rk_wr,
-    1, IVCL (RK), VEC_RK, { &rk_inta }
+    IOBA_AUTO, IOLN_RK, &rk_rd, &rk_wr,
+    1, IVCL (RK), VEC_AUTO, { &rk_inta }
     };
 
 UNIT rk_unit[] = {
@@ -707,7 +709,7 @@ if (rkxb == NULL)
     rkxb = (uint16 *) calloc (RK_MAXFR, sizeof (uint16));
 if (rkxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Device bootstrap */

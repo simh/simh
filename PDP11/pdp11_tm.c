@@ -188,9 +188,11 @@ t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
    tm_mod       MT modifier list
 */
 
+#define IOLN_TM         014
+
 DIB tm_dib = {
-    IOBA_TM, IOLN_TM, &tm_rd, &tm_wr,
-    1, IVCL (TM), VEC_TM, { NULL }
+    IOBA_AUTO, IOLN_TM, &tm_rd, &tm_wr,
+    1, IVCL (TM), VEC_AUTO, { NULL }
     };
 
 UNIT tm_unit[] = {
@@ -596,7 +598,7 @@ if (tmxb == NULL)
     tmxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
 if (tmxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach routine */

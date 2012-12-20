@@ -52,8 +52,10 @@ t_stat mctl_reset (DEVICE *dptr);
    mctl_mod       MCTL modifier list
 */
 
+#define IOLN_MEM        040
+
 DIB mctl_dib = {
-    IOBA_MEM, IOLN_MEM, &mctl_rd, &mctl_wr,
+    IOBA_AUTO, IOLN_MEM, &mctl_rd, &mctl_wr,
     1, 0, 0, { NULL }
     };
 

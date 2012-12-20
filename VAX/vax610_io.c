@@ -71,7 +71,7 @@ MTAB qba_mod[] = {
     };
 
 DEVICE qba_dev = {
-    "QBA", &qba_unit, qba_reg, qba_mod,
+    "QBUS", &qba_unit, qba_reg, qba_mod,
     1, 16, 4, 2, 16, 16,
     NULL, NULL, &qba_reset,
     NULL, NULL, NULL,

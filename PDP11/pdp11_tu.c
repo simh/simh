@@ -933,7 +933,7 @@ if (wbuf == NULL)
     wbuf = (uint16 *) calloc ((MT_MAXFR + 4) >> 1, sizeof (uint16));
 if (wbuf == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config(0, 0);
 }
 
 /* Attach routine */

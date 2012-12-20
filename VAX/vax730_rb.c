@@ -228,9 +228,11 @@ t_stat rb_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
    rb_mod       RB modifier list
 */
 
+#define IOLN_RB         002
+
 DIB rb_dib = {
-    IOBA_RB, IOLN_RB, &rb_rd16, &rb_wr16,
-    1, IVCL (RB), VEC_RB, { NULL } };
+    IOBA_AUTO, IOLN_RB, &rb_rd16, &rb_wr16,
+    1, IVCL (RB), VEC_AUTO, { NULL } };
 
 UNIT rb_unit[] = {
     { UDATA (&rb_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+

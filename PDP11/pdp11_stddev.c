@@ -199,9 +199,11 @@ DEVICE tto_dev = {
    clk_reg      CLK register list
 */
 
+#define IOLN_CLK        002
+
 DIB clk_dib = {
-    IOBA_CLK, IOLN_CLK, &clk_rd, &clk_wr,
-    1, IVCL (CLK), VEC_CLK, { &clk_inta }
+    IOBA_AUTO, IOLN_CLK, &clk_rd, &clk_wr,
+    1, IVCL (CLK), VEC_AUTO, { &clk_inta }
     };
 
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };

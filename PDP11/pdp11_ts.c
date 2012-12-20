@@ -306,9 +306,11 @@ int32 ts_map_status (t_stat st);
    ts_mod       TS modifier list
 */
 
+#define IOLN_TS         004
+
 DIB ts_dib = {
-    IOBA_TS, IOLN_TS, &ts_rd, &ts_wr,
-    1, IVCL (TS), VEC_TS, { NULL }
+    IOBA_AUTO, IOLN_TS, &ts_rd, &ts_wr,
+    1, IVCL (TS), VEC_AUTO, { NULL }
     };
 
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) };
@@ -1055,7 +1057,7 @@ if (tsxb == NULL)
     tsxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
 if (tsxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach */

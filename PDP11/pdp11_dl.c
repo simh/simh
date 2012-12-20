@@ -114,9 +114,11 @@ void dlx_reset_ln (int32 ln);
    dli_reg      DLI register list
 */
 
+#define IOLN_DL         010
+
 DIB dli_dib = {
-    IOBA_DL, IOLN_DL, &dlx_rd, &dlx_wr,
-    2, IVCL (DLI), VEC_DLI, { &dli_iack, &dlo_iack }
+    IOBA_AUTO, IOLN_DL * DLX_LINES, &dlx_rd, &dlx_wr,
+    2, IVCL (DLI), VEC_AUTO, { &dli_iack, &dlo_iack }
     };
 
 UNIT dli_unit = { UDATA (&dli_svc, 0, 0), KBD_POLL_WAIT };
@@ -158,7 +160,7 @@ DEVICE dli_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, &dlx_attach, &dlx_detach,
-    &dli_dib, DEV_FLTA | DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* DLO data structures

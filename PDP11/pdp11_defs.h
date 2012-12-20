@@ -488,13 +488,11 @@ typedef struct {
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
 #define DEV_V_Q18       (DEV_V_UF + 2)                  /* Qbus with <= 256KB */
-#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* flt addr */
-#define DEV_V_MBUS      (DEV_V_UF + 4)                  /* Massbus */
-#define DEV_V_FFUF      (DEV_V_UF + 5)                  /* first free flag */
+#define DEV_V_MBUS      (DEV_V_UF + 3)                  /* Massbus */
+#define DEV_V_FFUF      (DEV_V_UF + 4)                  /* first free flag */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
-#define DEV_FLTA        (1u << DEV_V_FLTA)
 #define DEV_MBUS        (1u << DEV_V_MBUS)
 
 #define DEV_RDX         8                               /* default device radix */
@@ -516,26 +514,45 @@ struct pdp_dib {
 
 typedef struct pdp_dib DIB;
 
-/* I/O page layout - XUB, RQB,RQC,RQD float based on number of DZ's */
+/* Unibus I/O page layout - see pdp11_ui_lib.c for address layout details
+   Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
+#define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
 #define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
 
-#define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
-#define IOLN_DZ         010
-#define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
-#define IOLN_XUB        010
-#define IOBA_RQB        (IOPAGEBASE + 000334 + (020 * (DZ_MUXES / 2)))
-#define IOLN_RQB        004
-#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
-#define IOLN_RQC        004
-#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
-#define IOLN_RQD        004
+/* Processor registers which have I/O page addresses
+ */
+
+#define IOBA_CTL        (IOPAGEBASE + 017520)           /* board ctrl */
+#define IOLN_CTL        010
 #define IOBA_UBM        (IOPAGEBASE + 010200)           /* Unibus map */
 #define IOLN_UBM        (UBM_LNT_LW * sizeof (int32))
-#define	IOBA_KG         (IOPAGEBASE + 010700)           /* KG11-A */
-#define	IOLN_KG         006
-#define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
-#define IOLN_RQ         004
+#define IOBA_MMR3       (IOPAGEBASE + 012516)           /* MMR3 */
+#define IOLN_MMR3       002
+#define IOBA_TTI        (IOPAGEBASE + 017560)           /* DL11 rcv */
+#define IOLN_TTI        004
+#define IOBA_TTO        (IOPAGEBASE + 017564)           /* DL11 xmt */
+#define IOLN_TTO        004
+#define IOBA_SR         (IOPAGEBASE + 017570)           /* SR */
+#define IOLN_SR         002
+#define IOBA_MMR012     (IOPAGEBASE + 017572)           /* MMR0-2 */
+#define IOLN_MMR012     006
+#define IOBA_GPR        (IOPAGEBASE + 017700)           /* GPR's */
+#define IOLN_GPR        010
+#define IOBA_UCTL       (IOPAGEBASE + 017730)           /* UBA ctrl */
+#define IOLN_UCTL       010
+#define IOBA_CPU        (IOPAGEBASE + 017740)           /* CPU reg */
+#define IOLN_CPU        036
+#define IOBA_PSW        (IOPAGEBASE + 017776)           /* PSW */
+#define IOLN_PSW        002
+#define IOBA_UIPDR      (IOPAGEBASE + 017600)           /* user APR's */
+#define IOLN_UIPDR      020
+#define IOBA_UDPDR      (IOPAGEBASE + 017620)
+#define IOLN_UDPDR      020
+#define IOBA_UIPAR      (IOPAGEBASE + 017640)
+#define IOLN_UIPAR      020
+#define IOBA_UDPAR      (IOPAGEBASE + 017660)
+#define IOLN_UDPAR      020
 #define IOBA_SUP        (IOPAGEBASE + 012200)           /* supervisor APR's */
 #define IOLN_SUP        0100
 #define IOBA_KIPDR      (IOPAGEBASE + 012300)           /* kernel APR's */
@@ -546,88 +563,6 @@ typedef struct pdp_dib DIB;
 #define IOLN_KIPAR      020
 #define IOBA_KDPAR      (IOPAGEBASE + 012360)
 #define IOLN_KDPAR      020
-#define IOBA_TU         (IOPAGEBASE + 012440)           /* TU */
-#define IOLN_TU         040
-#define IOBA_MMR3       (IOPAGEBASE + 012516)           /* MMR3 */
-#define IOLN_MMR3       002
-#define IOBA_TM         (IOPAGEBASE + 012520)           /* TM11 */
-#define IOLN_TM         014
-#define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
-#define IOLN_TS         004
-#define IOBA_PCLK       (IOPAGEBASE + 012540)           /* KW11P */
-#define IOLN_PCLK       006
-#define IOBA_DC         (IOPAGEBASE + 014000)           /* DC11 */
-#define IOLN_DC         (DCX_LINES * 010)
-#define IOBA_RL         (IOPAGEBASE + 014400)           /* RL11 */
-#define IOLN_RL         012
-#define IOBA_XQ         (IOPAGEBASE + 014440)           /* DEQNA/DELQA */
-#define IOLN_XQ         020
-#define IOBA_XQB        (IOPAGEBASE + 014460)           /* 2nd DEQNA/DELQA */
-#define IOLN_XQB        020
-#define IOBA_TQ         (IOPAGEBASE + 014500)           /* TMSCP */
-#define IOLN_TQ         004
-#define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
-#define IOLN_XU         010
-#define IOBA_DL         (IOPAGEBASE + 016500)           /* extra KL11/DL11 */
-#define IOLN_DL         (DLX_LINES * 010)
-#define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
-#define IOLN_RP         054
-#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
-#define IOLN_CR         010
-#define IOBA_RX         (IOPAGEBASE + 017170)           /* RX11 */
-#define IOLN_RX         004
-#define IOBA_RY         (IOPAGEBASE + 017170)           /* RY11 */
-#define IOLN_RY         004
-#define IOBA_KE         (IOPAGEBASE + 017300)           /* KE11-A */
-#define IOLN_KE         020
-#define IOBA_TC         (IOPAGEBASE + 017340)           /* TC11 */
-#define IOLN_TC         012
-#define IOBA_QDSS       (IOPAGEBASE + 017400)           /* QDSS */
-#define IOLN_QDSS       002
-#define IOBA_RK         (IOPAGEBASE + 017400)           /* RK11 */
-#define IOLN_RK         020
-#define IOBA_RC         (IOPAGEBASE + 017440)           /* RC11/RS64 */
-#define IOLN_RC         020
-#define IOBA_HK         (IOPAGEBASE + 017440)           /* RK611 */
-#define IOLN_HK         040
-#define IOBA_RF         (IOPAGEBASE + 017460)           /* RF11 */
-#define IOLN_RF         020
-#define IOBA_TA         (IOPAGEBASE + 017500)           /* TA11 */
-#define IOLN_TA         004
-#define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
-#define IOLN_LPT        004
-#define IOBA_CTL        (IOPAGEBASE + 017520)           /* board ctrl */
-#define IOLN_CTL        010
-#define IOBA_CLK        (IOPAGEBASE + 017546)           /* KW11L */
-#define IOLN_CLK        002
-#define IOBA_PTR        (IOPAGEBASE + 017550)           /* PC11 reader */
-#define IOLN_PTR        004
-#define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
-#define IOLN_PTP        004
-#define IOBA_TTI        (IOPAGEBASE + 017560)           /* DL11 rcv */
-#define IOLN_TTI        004
-#define IOBA_TTO        (IOPAGEBASE + 017564)           /* DL11 xmt */
-#define IOLN_TTO        004
-#define IOBA_SR         (IOPAGEBASE + 017570)           /* SR */
-#define IOLN_SR         002
-#define IOBA_MMR012     (IOPAGEBASE + 017572)           /* MMR0-2 */
-#define IOLN_MMR012     006
-#define IOBA_UIPDR      (IOPAGEBASE + 017600)           /* user APR's */
-#define IOLN_UIPDR      020
-#define IOBA_UDPDR      (IOPAGEBASE + 017620)
-#define IOLN_UDPDR      020
-#define IOBA_UIPAR      (IOPAGEBASE + 017640)
-#define IOLN_UIPAR      020
-#define IOBA_UDPAR      (IOPAGEBASE + 017660)
-#define IOLN_UDPAR      020
-#define IOBA_GPR        (IOPAGEBASE + 017700)           /* GPR's */
-#define IOLN_GPR        010
-#define IOBA_UCTL       (IOPAGEBASE + 017730)           /* UBA ctrl */
-#define IOLN_UCTL       010
-#define IOBA_CPU        (IOPAGEBASE + 017740)           /* CPU reg */
-#define IOLN_CPU        036
-#define IOBA_PSW        (IOPAGEBASE + 017776)           /* PSW */
-#define IOLN_PSW        002
 
 /* Interrupt assignments; within each level, priority is right to left
    PIRQn has the highest priority with a level and is always bit <0>
@@ -780,41 +715,15 @@ typedef struct pdp_dib DIB;
 
 /* Device vectors */
 
+#define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_Q           0000                            /* vector base */
+
+/* Processor specific internal fixed vectors */
 #define VEC_PIRQ        0240
 #define VEC_TTI         0060
 #define VEC_TTO         0064
-#define VEC_PTR         0070
-#define VEC_PTP         0074
-#define VEC_CLK         0100
-#define VEC_PCLK        0104
-#define VEC_XQ          0120
-#define VEC_XU          0120
-#define VEC_RQ          0154
-#define VEC_RL          0160
-#define VEC_LPT         0200
-#define VEC_RF          0204
-#define VEC_HK          0210
-#define VEC_RC          0210
-#define VEC_RK          0220
-#define VEC_DTA         0214
-#define VEC_TM          0224
-#define VEC_TS          0224
-#define VEC_TU          0224
-#define VEC_CR          0230
-#define VEC_RP          0254
-#define VEC_TQ          0260
-#define VEC_TA          0260
-#define VEC_RX          0264
-#define VEC_RY          0264
-#define VEC_DLI         0300
-#define VEC_DLO         0304
-#define VEC_DCI         0300
-#define VEC_DCO         0304
-#define VEC_DZRX        0300
-#define VEC_DZTX        0304
 
 /* Interrupt macros */
 

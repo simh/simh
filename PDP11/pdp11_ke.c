@@ -71,7 +71,9 @@ t_stat ke_wr (int32 data, int32 PA, int32 access);
 t_stat ke_reset (DEVICE *dptr);
 uint32 ke_set_SR (void);
 
-DIB ke_dib = { IOBA_KE, IOLN_KE, &ke_rd, &ke_wr, 0 };
+#define IOLN_KE         020
+
+DIB ke_dib = { IOBA_AUTO, IOLN_KE, &ke_rd, &ke_wr, 0 };
 
 UNIT ke_unit = {
 	UDATA (NULL, UNIT_DISABLE, 0)
@@ -344,5 +346,5 @@ ke_SR = 0;
 ke_SC = 0;
 ke_AC = 0;
 ke_MQ = 0;
-return SCPE_OK;
+return auto_config(0, 0);
 }

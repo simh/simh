@@ -414,8 +414,10 @@ UNIT *tq_getucb (uint32 lu);
    tq_mod       TQ modifier list
 */
 
+#define IOLN_TQ         004
+
 DIB tq_dib = {
-    IOBA_TQ, IOLN_TQ, &tq_rd, &tq_wr,
+    IOBA_AUTO, IOLN_TQ, &tq_rd, &tq_wr,
     1, IVCL (TQ), 0, { &tq_inta }
     };
 

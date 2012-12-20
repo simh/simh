@@ -143,7 +143,9 @@ t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
    qba_reg      QBA register list
 */
 
-DIB qba_dib = { IOBA_DBL, IOLN_DBL, &dbl_rd, &dbl_wr, 0 };
+#define IOLN_DBL        002
+
+DIB qba_dib = { IOBA_AUTO, IOLN_DBL, &dbl_rd, &dbl_wr, 0 };
 
 UNIT qba_unit = { UDATA (NULL, 0, 0) };
 

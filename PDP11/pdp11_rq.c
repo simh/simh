@@ -854,8 +854,10 @@ int32 rq_inta (void);
 
 MSC rq_ctx = { 0 };
 
+#define IOLN_RQ         004
+
 DIB rq_dib = {
-    IOBA_RQ, IOLN_RQ, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1006,7 +1008,7 @@ DEVICE rq_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rq_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
     0, rq_debug
     };
 
@@ -1021,7 +1023,7 @@ DEVICE rq_dev = {
 MSC rqb_ctx = { 1 };
 
 DIB rqb_dib = {
-    IOBA_RQB, IOLN_RQB, &rq_rd, &rq_wr,
+    IOBA_FLOAT, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1078,7 +1080,7 @@ DEVICE rqb_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
     0, rq_debug
     };
 
@@ -1093,7 +1095,7 @@ DEVICE rqb_dev = {
 MSC rqc_ctx = { 2 };
 
 DIB rqc_dib = {
-    IOBA_RQC, IOLN_RQC, &rq_rd, &rq_wr,
+    IOBA_FLOAT, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1150,7 +1152,7 @@ DEVICE rqc_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqc_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
     0, rq_debug
     };
 
@@ -1165,7 +1167,7 @@ DEVICE rqc_dev = {
 MSC rqd_ctx = { 3 };
 
 DIB rqd_dib = {
-    IOBA_RQD, IOLN_RQD, &rq_rd, &rq_wr,
+    IOBA_FLOAT, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1222,7 +1224,7 @@ DEVICE rqd_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqd_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
     0, rq_debug
     };
 

@@ -575,9 +575,11 @@ t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
    hk_mod       HK modifier list
 */
 
+#define IOLN_HK         040
+
 DIB hk_dib = {
-    IOBA_HK, IOLN_HK, &hk_rd, &hk_wr,
-    1, IVCL (HK), VEC_HK, { NULL }
+    IOBA_AUTO, IOLN_HK, &hk_rd, &hk_wr,
+    1, IVCL (HK), VEC_AUTO, { NULL }
     };
 
 UNIT hk_unit[] = {

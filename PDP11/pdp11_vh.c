@@ -341,6 +341,7 @@ static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* SIMH I/O Structures */
+
 #define IOLN_VH         020
 
 static DIB vh_dib = {
@@ -425,7 +426,7 @@ DEVICE vh_dev = {
     &vh_attach,     /* attach routine */
     &vh_detach,     /* detach routine */
     (void *)&vh_dib,/* context */
-    DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
+    DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
     0, vh_debug
 };
 

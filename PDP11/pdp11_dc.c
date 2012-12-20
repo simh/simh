@@ -148,9 +148,11 @@ void dcx_reset_ln (int32 ln);
    dci_reg      DCI register list
 */
 
+#define IOLN_DC         010
+
 DIB dci_dib = {
-    IOBA_DC, IOLN_DC, &dcx_rd, &dcx_wr,
-    2, IVCL (DCI), VEC_DCI, { &dci_iack, &dco_iack }
+    IOBA_AUTO, IOLN_DC * DCX_LINES, &dcx_rd, &dcx_wr,
+    2, IVCL (DCI), VEC_AUTO, { &dci_iack, &dco_iack }
     };
 
 UNIT dci_unit = { UDATA (&dci_svc, 0, 0), KBD_POLL_WAIT };
@@ -191,7 +193,7 @@ DEVICE dci_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
     NULL, &dcx_attach, &dcx_detach,
-    &dci_dib, DEV_FLTA | DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* DCO data structures

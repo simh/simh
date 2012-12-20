@@ -624,11 +624,9 @@ typedef struct pdp_dib DIB;
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
 #define DEV_V_Q18       (DEV_V_UF + 2)                  /* Qbus, mem <= 256KB */
-#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* float addr */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
-#define DEV_FLTA        (1u << DEV_V_FLTA)
 
 #define UNIBUS          TRUE                            /* 18b only */
 
@@ -672,6 +670,7 @@ typedef struct pdp_dib DIB;
 #define IOLN_PTR        004
 #define IOBA_PTP        (IO_UBA3 + 017554)              /* PC11 punch */
 #define IOLN_PTP        004
+#define IOBA_AUTO       0                               /* Set by Auto Configure */
 
 /* Common Unibus CSR flags */
 
@@ -747,6 +746,7 @@ typedef struct pdp_dib DIB;
 #define VEC_DZRX        0340
 #define VEC_DZTX        0344
 #define VEC_LP20        0754
+#define VEC_AUTO        0                               /* Set by Auto Configure */
 
 #define IVCL(dv)        (INT_V_##dv)
 #define IREQ(dv)        int_req

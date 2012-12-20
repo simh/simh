@@ -206,9 +206,11 @@ static int32 mba_mapofs[(MBA_OFSMASK + 1) >> 1] = {
    mbax_reg     RHx register list
 */
 
+#define IOLN_RP         054
+
 DIB mba0_dib = {
-    IOBA_RP, IOLN_RP, &mba_rd, &mba_wr,
-    1, IVCL (RP), VEC_RP, { &mba0_inta }
+    IOBA_AUTO, IOLN_RP, &mba_rd, &mba_wr,
+    1, IVCL (RP), VEC_AUTO, { &mba0_inta }
     };
 
 UNIT mba0_unit = { UDATA (NULL, 0, 0) };
@@ -239,9 +241,11 @@ MTAB mba0_mod[] = {
     { 0 }
     };
 
+#define IOLN_TU         040
+
 DIB mba1_dib = {
-    IOBA_TU, IOLN_TU, &mba_rd, &mba_wr,
-    1, IVCL (TU), VEC_TU, { &mba1_inta }
+    IOBA_AUTO, IOLN_TU, &mba_rd, &mba_wr,
+    1, IVCL (TU), VEC_AUTO, { &mba1_inta }
     };
 
 UNIT mba1_unit = { UDATA (NULL, 0, 0) };
@@ -776,7 +780,7 @@ massbus[mb].iff = 0;
 mba_clr_int (mb);
 if (mbabort[mb])
     mbabort[mb] ();
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Enable/disable Massbus adapter */

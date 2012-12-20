@@ -904,10 +904,50 @@ for (i = 0; dib_tab[i] != NULL; i++) {                  /* print table */
 return SCPE_OK;
 }
 
-/* Stub auto-configure */
+/* 
+    Autoconfiguration - Not really just configure fixed addresses on KS10
+*/
 
-t_stat auto_config (char *name, int32 num)
+typedef struct {
+    char        *dnam;
+    uint32      fixa[1];
+    uint32      fixv[1];
+    } AUTO_CON;
+
+AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
+    { { "DZ" },    {IOBA_DZ},   {VEC_DZRX} },           /* DZ11 - fx CSR, fx VEC */
+    { { "CR" },    {IOBA_CR},   {VEC_CR} },             /* CR11 - fx CSR, fx VEC */
+    { { "RY" },    {IOBA_RY},   {VEC_RY} },             /* RX211/RXV21/RX02 - fx CSR, no VEC */
+    { { "PTR" },   {IOBA_PTR},  {VEC_PTR} },            /* PC11 reader - fx CSR, no VEC */
+    { { "PTP" },   {IOBA_PTP},  {VEC_PTP} },            /* PC11 punch - fx CSR, no VEC */
+    { { "LP20" },  {IOBA_LP20}, {VEC_LP20} },           /* LP20 - fx CSR, no VEC */
+    { { "TU" },    {IOBA_TU},   {VEC_TU} },             /* RH11/tape - fx CSR, no VEC */
+    { { "RP" },    {IOBA_RP},   {VEC_RP} },             /* RH11/disk - fx CSR, no VEC */
+    { { NULL } }                                        /* end table */
+};
+
+t_stat auto_config (char *name, int32 nctrl)
 {
+AUTO_CON *autp;
+DEVICE *dptr;
+DIB *dibp;
+
+if (name == NULL)
+    return SCPE_IERR;
+if (nctrl < 0)
+    return SCPE_ARG;
+for (autp = auto_tab; autp->dnam; autp++) {
+    dptr = find_dev (autp->dnam);                   /* find ctrl */
+    if ((dptr == NULL) ||                           /* enabled? */
+        (dptr->flags & DEV_DIS) ||
+        (strcmp (name, autp->dnam)))
+        continue;
+    dibp = (DIB *) dptr->ctxt;                      /* get DIB */
+    if (dibp == NULL)                               /* not there??? */
+        return SCPE_IERR;
+    dibp->ba = autp->fixa[0];
+    dibp->vec = autp->fixv[0];
+    }
 return SCPE_OK;
 }
 

@@ -270,9 +270,11 @@ t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
    rl_mod   RL modifier list
 */
 
+#define IOLN_RL         012
+
 static DIB rl_dib = {
-    IOBA_RL, IOLN_RL, &rl_rd, &rl_wr,
-    1, IVCL (RL), VEC_RL, { NULL } };
+    IOBA_AUTO, IOLN_RL, &rl_rd, &rl_wr,
+    1, IVCL (RL), VEC_AUTO, { NULL } };
 
 static UNIT rl_unit[] = {
     { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+

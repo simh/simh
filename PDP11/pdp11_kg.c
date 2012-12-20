@@ -195,8 +195,10 @@ static t_stat set_units (UNIT *, int32, char *, void *);
    kg_dev       KG device descriptor
 */
 
+#define IOLN_KG         006
+
 static DIB kg_dib = {
-    IOBA_KG,
+    IOBA_AUTO,
     (IOLN_KG + 2) * KG_UNITS,
     &kg_rd,
     &kg_wr,
@@ -406,7 +408,7 @@ static t_stat kg_reset (DEVICE *dptr)
         kg_unit[i].BCC = 0;
         kg_unit[i].PULSCNT = 0;
     }
-    return (SCPE_OK);
+    return auto_config(0, 0);
 }
 
 static void cycleOneBit (int unit)

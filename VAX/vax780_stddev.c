@@ -390,7 +390,7 @@ MTAB fl_mod[] = {
     };
 
 DEVICE fl_dev = {
-    "RX", &fl_unit, fl_reg, fl_mod,
+    "RXC", &fl_unit, fl_reg, fl_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &fl_reset,
     NULL, NULL, NULL,

@@ -229,9 +229,11 @@ t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
    dz_reg       DZ register list
 */
 
+#define IOLN_DZ         010
+
 DIB dz_dib = {
-    IOBA_DZ, IOLN_DZ * DZ_MUXES, &dz_rd, &dz_wr,
-    2, IVCL (DZRX), VEC_DZRX, { &dz_rxinta, &dz_txinta }
+    IOBA_AUTO, IOLN_DZ * DZ_MUXES, &dz_rd, &dz_wr,
+    2, IVCL (DZRX), VEC_AUTO, { &dz_rxinta, &dz_txinta }
     };
 
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
@@ -289,7 +291,7 @@ DEVICE dz_dev = {
     1, DEV_RDX, 8, 1, DEV_RDX, 8,
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
-    &dz_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
     0, dz_debug
     };
 

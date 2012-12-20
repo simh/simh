@@ -318,9 +318,11 @@ extern int32 sim_is_running;
    dt_mod       DT modifier list
 */
 
+#define IOLN_TC         012
+
 DIB dt_dib = {
-    IOBA_TC, IOLN_TC, &dt_rd, &dt_wr,
-    1, IVCL (DTA), VEC_DTA, { NULL }
+    IOBA_AUTO, IOLN_TC, &dt_rd, &dt_wr,
+    1, IVCL (DTA), VEC_AUTO, { NULL }
     };
 
 UNIT dt_unit[] = {
@@ -1130,7 +1132,7 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all activity */
 tcst =  tcwc = tcba = tcdt = 0;                         /* clear reg */
 tccm = CSR_DONE;
 CLR_INT (DTA);                                          /* clear int req */
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Device bootstrap */

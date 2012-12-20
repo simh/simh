@@ -145,9 +145,11 @@ uint32 ta_crc (uint8 *buf, uint32 cnt);
    ta_mod       TA modifier list
 */
 
+#define IOLN_TA         004
+
 DIB ta_dib = {
-    IOBA_TA, IOLN_TA, &ta_rd, &ta_wr,
-    1, IVCL (TA), VEC_TA, { NULL }
+    IOBA_AUTO, IOLN_TA, &ta_rd, &ta_wr,
+    1, IVCL (TA), VEC_AUTO, { NULL }
     };
 
 UNIT ta_unit[] = {
@@ -580,7 +582,7 @@ if (ta_xb == NULL)
     ta_xb = (uint8 *) calloc (TA_MAXFR + 2, sizeof (uint8));
 if (ta_xb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach routine */

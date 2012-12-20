@@ -381,16 +381,16 @@ DEVICE dmc_dev[] =
 {
     { "DMC0", &dmc_unit[0], dmca_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+    &dmc_dib[0], DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
     { "DMC1", &dmc_unit[1], dmcb_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[1], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+    &dmc_dib[1], DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
     { "DMC2", &dmc_unit[2], dmcc_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[2], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+    &dmc_dib[2], DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
     { "DMC3", &dmc_unit[3], dmcd_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[3], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
+    &dmc_dib[3], DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
 };
 
 #ifdef DMP
@@ -398,7 +398,7 @@ DEVICE dmp_dev[] =
 {
     { "DMP", &dmp_unit[0], dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmp_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
+    &dmp_dib[0], DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
 };
 #endif
 

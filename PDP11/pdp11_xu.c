@@ -129,8 +129,10 @@ void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
 t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
 
-DIB xua_dib = { IOBA_XU, IOLN_XU, &xu_rd, &xu_wr,
-1, IVCL (XU), VEC_XU, {&xu_int} };
+#define IOLN_XU        010
+
+DIB xua_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
+1, IVCL (XU), VEC_AUTO, {&xu_int} };
 
 UNIT xua_unit[] = {
  { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
@@ -190,15 +192,13 @@ DEVICE xu_dev = {
 	2, XU_RDX, 8, 1, XU_RDX, 8,
 	&xu_ex, &xu_dep, &xu_reset,
 	NULL, &xu_attach, &xu_detach,
-	&xua_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
+	&xua_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
   0, xu_debug
   };
 
+#define IOLN_XU         010
 
-/* XUB does not exist in the PDP10 simulation */
-#if defined(IOBA_XUB)
-
-DIB xub_dib = { IOBA_XUB, IOLN_XUB, &xu_rd, &xu_wr,
+DIB xub_dib = { IOBA_FLOAT, IOLN_XU, &xu_rd, &xu_wr,
 		1, IVCL (XU), 0, { &xu_int } };
 
 UNIT xub_unit[] = {
@@ -220,7 +220,7 @@ DEVICE xub_dev = {
   1, XU_RDX, 8, 1, XU_RDX, 8,
   &xu_ex, &xu_dep, &xu_reset,
   NULL, &xu_attach, &xu_detach,
-  &xub_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
+  &xub_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
   0, xu_debug
 };
 
@@ -229,12 +229,6 @@ CTLR xu_ctrl[] = {
    {&xu_dev,  xua_unit, &xua_dib, &xua}       /* XUA controller */
   ,{&xub_dev, xub_unit, &xub_dib, &xub}       /* XUB controller */
 };
-#else /* IOBA_XUB */
-#define XU_MAX_CONTROLLERS 1
-CTLR xu_ctrl[] = {
-   {&xu_dev,  xua_unit, &xua_dib, &xua}       /* XUA controller */
-}; 
-#endif /* IOBA_XUB */
 
 /*============================================================================*/
 
