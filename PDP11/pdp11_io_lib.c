@@ -48,6 +48,11 @@ extern t_stat build_dib_tab (void);
 
 static DIB *iodibp[IOPAGESIZE >> 1];
 
+#define AUTO_MAXC       4
+#define AUTO_CSRBASE    0010
+#define AUTO_CSRMAX    04000
+#define AUTO_VECBASE    0300
+
 /* Enable/disable autoconfiguration */
 
 t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -119,7 +124,7 @@ if (dibp->lnt > 1) {
     fprintf (st, "-");
     fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, DEV_RDX, 32, PV_LEFT);
     }
-if (dptr->flags & DEV_FLTA)
+if (dibp->ba < IOPAGEBASE + AUTO_CSRBASE + AUTO_CSRMAX)
     fprintf (st, "*");
 return SCPE_OK;
 }
@@ -201,6 +206,8 @@ else {
         fprint_val (st, (t_value) vec + (4 * (numvec - 1)), DEV_RDX, 16, PV_LEFT);
         }
     }
+if (vec >= VEC_Q + AUTO_VECBASE)
+    fprintf (st, "*");
 return SCPE_OK;
 }
 
@@ -342,64 +349,74 @@ typedef struct {
     uint32      fixv[AUTO_MAXC];
     } AUTO_CON;
 
-AUTO_CON auto_tab[] = {
-    { { "DCI" }, DCX_LINES, 2, 0, 8, { 0 } },           /* DC11 - fx CSRs */
-    { { "DLI" }, DLX_LINES, 2, 0, 8, { 0 } },           /* KL11/DL11/DLV11 - fx CSRs */
-    { { NULL }, 1, 2, 0, 8, { 0 } },                    /* DLV11J - fx CSRs */
-    { { NULL }, 1, 2, 8, 8 },                           /* DJ11 */
-    { { NULL }, 1, 2, 16, 8 },                          /* DH11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DQ11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DU11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DUP11 */
-    { { NULL }, 10, 2, 8, 8 },                          /* LK11A */
-    { { "DMA", "DMB", "DMC", "DMD" }, 1, 2, 8, 8 },     /* DMC11 */
-    { { "DZ" }, DZ_MUXES, 2, 8, 8 },                    /* DZ11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* KMC11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* LPP11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* VMV21 */
-    { { NULL }, 1, 2, 16, 8 },                          /* VMV31 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DWR70 */
-    { { "RL", "RLB" }, 1, 1, 8, 4, {IOBA_RL}, {VEC_RL} }, /* RL11 */
-    { { "TS", "TSB", "TSC", "TSD" }, 1, 1, 0, 4,        /* TS11 */
+/* An amod value of 0 implies that all addresses are FIXED */
+/* An vmod value of 0 implies that all vectors are FIXED */
+AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
+    { { "DCI" }, DCX_LINES,  2,  0, 8, { 0 } },         /* DC11 - fx CSRs */
+    { { "DLI" }, DLX_LINES,  2,  0, 8, { 0 } },         /* KL11/DL11/DLV11 - fx CSRs */
+    { { NULL },          1,  2,  0, 8, { 0 } },         /* DLV11J - fx CSRs */
+    { { NULL },          1,  2,  8, 8 },                /* DJ11 */
+    { { NULL },          1,  2, 16, 8 },                /* DH11 */
+    { { NULL },          1,  2,  8, 8 },                /* DQ11 */
+    { { NULL },          1,  2,  8, 8 },                /* DU11 */
+    { { NULL },          1,  2,  8, 8 },                /* DUP11 */
+    { { NULL },         10,  2,  8, 8 },                /* LK11A */
+    { { "DMC0", "DMC1", "DMC2", "DMC3" }, 
+                         1,  2,  8, 8 },                /* DMC11 */
+    { { "DZ" },   DZ_MUXES,  2,  8, 8 },                /* DZ11 */
+    { { NULL },          1,  2,  8, 8 },                /* KMC11 */
+    { { NULL },          1,  2,  8, 8 },                /* LPP11 */
+    { { NULL },          1,  2,  8, 8 },                /* VMV21 */
+    { { NULL },          1,  2, 16, 8 },                /* VMV31 */
+    { { NULL },          1,  2,  8, 8 },                /* DWR70 */
+    { { "RL", "RLB" },   1,  1,  8, 4, 
+        {IOBA_RL}, {VEC_RL} },                          /* RL11 */
+    { { "TS", "TSB", "TSC", "TSD" }, 
+                         1,  1,  0, 4,                  /* TS11 */
         {IOBA_TS, IOBA_TS + 4, IOBA_TS + 8, IOBA_TS + 12},
         {VEC_TS} },
-    { { NULL }, 1, 2, 16, 8 },                          /* LPA11K */
-    { { NULL }, 1, 2, 8, 8 },                           /* KW11C */
-    { { NULL }, 1, 1, 8, 8 },                           /* reserved */
-    { { "RX", "RY" }, 1, 1, 8, 4, {IOBA_RX} , {VEC_RX} }, /* RX11/RX211 */
-    { { NULL }, 1, 1, 8, 4 },                           /* DR11W */
-    { { NULL }, 1, 1, 8, 4, { 0, 0 }, { 0 } },          /* DR11B - fx CSRs,vec */
-    { { "DMP" }, 1, 2, 8, 8 },                          /* DMP11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* DPV11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* ISB11 */
-    { { NULL }, 1, 2, 16, 8 },                          /* DMV11 */
-    { { "XU", "XUB" }, 1, 1, 8, 4, {IOBA_XU}, {VEC_XU} },   /* DEUNA */
-    { { "XQ", "XQB" }, 1, 1, 0, 4,                      /* DEQNA */
+    { { NULL },          1,  2, 16, 8 },                /* LPA11K */
+    { { NULL },          1,  2,  8, 8 },                /* KW11C */
+    { { NULL },          1,  1,  8, 8 },                /* reserved */
+    { { "RX", "RY" },    1,  1,  8, 4, 
+        {IOBA_RX} , {VEC_RX} },                         /* RX11/RX211 */
+    { { NULL },          1,  1,  8, 4 },                /* DR11W */
+    { { NULL },          1,  1,  8, 4, 
+        { 0, 0 }, { 0 } },                              /* DR11B - fx CSRs,vec */
+    { { "DMP" },         1,  2,  8, 8 },                /* DMP11 */
+    { { NULL },          1,  2,  8, 8 },                /* DPV11 */
+    { { NULL },          1,  2, 8, 8 },                 /* ISB11 */
+    { { NULL },          1,  2, 16, 8 },                /* DMV11 */
+    { { "XU", "XUB" },   1,  1,  8, 4, 
+        {IOBA_XU}, {VEC_XU} },                          /* DEUNA */
+    { { "XQ", "XQB" },   1,  1,  0, 4,                  /* DEQNA */
         {IOBA_XQ,IOBA_XQB}, {VEC_XQ} },
-    { { "RQ", "RQB", "RQC", "RQD" }, 1, -1, 4, 4,       /* RQDX3 */
+    { { "RQ", "RQB", "RQC", "RQD" }, 
+                         1, -1,  4, 4,                  /* RQDX3 */
         {IOBA_RQ}, {VEC_RQ} },
-    { { NULL }, 1, 8, 32, 4 },                          /* DMF32 */
-    { { NULL }, 1, 2, 16, 8 },                          /* KMS11 */
-    { { NULL }, 1, 1, 16, 4 },                          /* VS100 */
-    { { "TQ", "TQB" }, 1, -1, 4, 4, {IOBA_TQ}, {VEC_TQ} }, /* TQK50 */
-    { { NULL }, 1, 2, 16, 8 },                          /* KMV11 */
-    { { "VH" }, VH_MUXES, 2, 16, 8 },                   /* DHU11/DHQ11 */
-    { { NULL }, 1, 6, 32, 4 },                          /* DMZ32 */
-    { { NULL }, 1, 6, 32, 4 },                          /* CP132 */
-    { { NULL }, 1, 2, 64, 8, { 0 } },                   /* QVSS - fx CSR */
-    { { NULL }, 1, 1, 8, 4 },                           /* VS31 */
-    { { NULL }, 1, 1, 0, 4, { 0 } },                    /* LNV11 - fx CSR */
-    { { NULL }, 1, 1, 16, 4 },                          /* LNV21/QPSS */
-    { { NULL }, 1, 1, 8, 4, { 0 } },                    /* QTA - fx CSR */
-    { { NULL }, 1, 1, 8, 4 },                           /* DSV11 */
-    { { NULL }, 1, 2, 8, 8 },                           /* CSAM */
-    { { NULL }, 1, 2, 8, 8 },                           /* ADV11C */
-    { { NULL }, 1, 0, 8, 0 },                           /* AAV11C */
-    { { NULL }, 1, 2, 8, 8, { 0 }, { 0 } },             /* AXV11C - fx CSR,vec */
-    { { NULL }, 1, 2, 4, 8, { 0 } },                    /* KWV11C - fx CSR */
-    { { NULL }, 1, 2, 8, 8, { 0 } },                    /* ADV11D - fx CSR */
-    { { NULL }, 1, 2, 8, 8, { 0 } },                    /* AAV11D - fx CSR */
-    { { "QDSS" }, 1, 3, 0, 16, {IOBA_QDSS} },           /* QDSS - fx CSR */
+    { { NULL },          1,  8, 32, 4 },                /* DMF32 */
+    { { NULL },          1,  2, 16, 8 },                /* KMS11 */
+    { { NULL },          1,  1, 16, 4 },                /* VS100 */
+    { { "TQ", "TQB" },   1, -1,  4, 4, 
+        {IOBA_TQ}, {VEC_TQ} },                          /* TQK50 */
+    { { NULL },          1,  2, 16, 8 },                /* KMV11 */
+    { { "VH" },   VH_MUXES,  2, 16, 8 },                /* DHU11/DHQ11 */
+    { { NULL },          1,  6, 32, 4 },                /* DMZ32 */
+    { { NULL },          1,  6, 32, 4 },                /* CP132 */
+    { { NULL },          1,  2, 64, 8, { 0 } },         /* QVSS - fx CSR */
+    { { NULL },          1,  1,  8, 4 },                /* VS31 */
+    { { NULL },          1,  1,  0, 4, { 0 } },         /* LNV11 - fx CSR */
+    { { NULL },          1,  1, 16, 4 },                /* LNV21/QPSS */
+    { { NULL },          1,  1,  8, 4, { 0 } },         /* QTA - fx CSR */
+    { { NULL },          1,  1,  8, 4 },                /* DSV11 */
+    { { NULL },          1,  2,  8, 8 },                /* CSAM */
+    { { NULL },          1,  2,  8, 8 },                /* ADV11C */
+    { { NULL },          1,  0,  8, 0 },                /* AAV11C */
+    { { NULL },          1,  2,  8, 8, { 0 }, { 0 } },  /* AXV11C - fx CSR,vec */
+    { { NULL },          1,  2,  4, 8, { 0 } },         /* KWV11C - fx CSR */
+    { { NULL },          1,  2,  8, 8, { 0 } },         /* ADV11D - fx CSR */
+    { { NULL },          1,  2,  8, 8, { 0 } },         /* AAV11D - fx CSR */
+    { { "QDSS" },        1,  3,  0, 16, {IOBA_QDSS} },  /* QDSS - fx CSR */
     { { NULL }, -1 }                                    /* end table */
 };
 
