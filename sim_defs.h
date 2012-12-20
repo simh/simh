@@ -659,6 +659,9 @@ extern int32 sim_asynch_inst_latency;
 /* which avoids the potential ABA issues.                                   */
 #ifdef _WIN32
 #include <winsock2.h>
+#ifdef PACKED
+#undef PACKED
+#endif /* PACKED */
 #ifdef ERROR
 #undef ERROR
 #endif /* ERROR */

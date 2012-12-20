@@ -340,7 +340,7 @@ t_stat emit_conout_character (int ch)
 	return map_conout_character(ch);
 }
 
-static void Beep (void)			/* notify user keyboard was locked or key was bad */
+static void SendBeep (void)			/* notify user keyboard was locked or key was bad */
 {
 	sim_putchar(7);
 }
@@ -395,7 +395,7 @@ static t_stat tti_svc (UNIT *uptr)
 	}
 
 	if ((tti_unit.flags & KEYBOARD_LOCKED) || ! (tti_dsw & TT_DSW_KEYBOARD_BUSY)) {
-		Beep();
+		SendBeep();
 		return SCPE_OK;
 	}
 
@@ -403,7 +403,7 @@ static t_stat tti_svc (UNIT *uptr)
 		temp = ascii_to_conin[temp];
 
 	if (temp == 0)	{							/* ignore invalid characters */
-		Beep();
+		SendBeep();
 		calc_ints();
 		return SCPE_OK;
 	}
