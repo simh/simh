@@ -1502,7 +1502,7 @@ t_stat shift_args (char *do_arg[], size_t arg_count)
 {
 size_t i;
 
-for (i=1; i<arg_count; ++i)
+for (i=1; i<arg_count-1; ++i)
     do_arg[i] = do_arg[i+1];
 return SCPE_OK;
 }
