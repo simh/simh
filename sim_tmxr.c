@@ -891,6 +891,7 @@ if (lp->serport) {
 else                                                    /* Telnet connection */
     if (lp->sock) {
         sim_close_sock (lp->sock, 0);                   /* close socket */
+        lp->sock = 0;
         lp->conn = FALSE;
         lp->rcve = lp->xmte = 0;
         }
