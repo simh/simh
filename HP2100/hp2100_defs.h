@@ -23,9 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Dec-12    JDB     Added "-Wbitwise-op-parentheses" to the suppression pragmas
    12-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
-   12-Feb-12    JDB     Added MA device select code assignment
-                        Added ma_boot_ext() declaration
    10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
    28-Mar-11    JDB     Tidied up signal handling
    29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
@@ -187,7 +186,6 @@ typedef enum { INITIAL, SERVICE } POLLMODE;             /* poll synchronization 
 #define MUXC            042                             /* 12920A control */
 #define DI_DA           043                             /* 12821A Disc Interface with Amigo disc devices */
 #define DI_DC           044                             /* 12821A Disc Interface with CS/80 disc and tape devices */
-#define DI_MA           045                             /* 12821A Disc Interface with Amigo mag tape devices */
 
 #define OPTDEV          002                             /* start of optional devices */
 #define CRSDEV          006                             /* start of devices that receive CRS */
@@ -478,7 +476,6 @@ extern t_stat      hp_showdev (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 /* Device-specific functions */
 
-extern int32  sync_poll   (POLLMODE poll_mode);
-extern t_stat ma_boot_ext (uint32 SR);
+extern int32 sync_poll (POLLMODE poll_mode);
 
 #endif

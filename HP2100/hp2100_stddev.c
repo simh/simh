@@ -28,6 +28,7 @@
    TTY          12531C buffered teleprinter interface
    CLK          12539C time base generator
 
+   18-Dec-12    MP      Now calls sim_activate_time to get remaining poll time
    09-May-12    JDB     Separated assignments from conditional expressions
    12-Feb-12    JDB     Add TBG as a logical name for the CLK device
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
