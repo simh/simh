@@ -1003,9 +1003,29 @@ if (*cptr) {
     if (*cptr)
         return SCPE_2MARG;
     if ((cmdp = find_cmd (gbuf))) {
-        fputs (cmdp->help, stdout);
-        if (sim_log)
-            fputs (cmdp->help, sim_log);
+        if (cmdp->help) {
+            fputs (cmdp->help, stdout);
+            if (sim_log)
+                fputs (cmdp->help, sim_log);
+            }
+        else { /* no help so it is likely a command alias */
+            CTAB *cmdpa;
+
+            for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
+                if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
+                    fprintf (stdout, "%s is an alias for the %s command:\n%s", 
+                                cmdp->name, cmdpa->name, cmdpa->help);
+                    if (sim_log)
+                        fprintf (sim_log, "%s is an alias for the %s command.\n%s", 
+                                    cmdp->name, cmdpa->name, cmdpa->help);
+                    break;
+                    }
+            if (cmdpa->name == NULL) {              /* not found? */
+                fprintf (stdout, "No help available for the %s command\n", cmdp->name);
+                if (sim_log)
+                    fprintf (sim_log, "No help available for the %s command\n", cmdp->name);
+                }
+            }
         }
     else return SCPE_ARG;
     }
