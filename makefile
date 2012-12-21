@@ -342,10 +342,10 @@ else
     NETWORK_OPT += -DUSE_SHARED
   endif
   ifneq (,$(shell if exist .git-commit-id type .git-commit-id))
-    GIT_COMMIT_ID==$(shell if exist .git-commit-id type .git-commit-id)
+    GIT_COMMIT_ID=$(shell if exist .git-commit-id type .git-commit-id)
   endif
 endif
-CFLAGS_GIT = -DSIM_GIT_COMMIT_ID="$(GIT_COMMIT_ID)"
+CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=\"$(GIT_COMMIT_ID)\"
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0

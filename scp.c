@@ -2297,10 +2297,10 @@ if (vdelt)
     fprintf (st, " delta %d", vdelt);
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
-fprintf (st, "\n");
 #if defined(SIM_GIT_COMMIT_ID)
-fprintf (st, "git commit id: %8.8s\n", SIM_GIT_COMMIT_ID);
+fprintf (st, "     git commit id: %8.8s", SIM_GIT_COMMIT_ID);
 #endif
+fprintf (st, "\n");
 return SCPE_OK;
 }
 
