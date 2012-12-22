@@ -1760,6 +1760,7 @@ while (*tptr) {
             else {
                 sock = sim_connect_sock (destination, "localhost", NULL);
                 if (sock != INVALID_SOCKET) {
+                    _mux_detach_line (lp, FALSE, TRUE);
                     lp->destination = malloc(1+strlen(destination));
                     strcpy (lp->destination, destination);
                     lp->connecting = sock;
