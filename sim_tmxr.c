@@ -1381,6 +1381,38 @@ int32 tmxr_tqln (TMLN *lp)
 return (lp->txbpi - lp->txbpr + ((lp->txbpi < lp->txbpr)? lp->txbsz: 0));
 }
 
+static void _mux_detach_line (TMLN *lp, t_bool close_listener, t_bool close_connecting)
+{
+if (close_listener && lp->master) {
+    sim_close_sock (lp->master, 1);
+    lp->master = 0;
+    free (lp->port);
+    lp->port = NULL;
+    }
+if (lp->sock) {                             /* if existing tcp, drop it */
+    tmxr_report_disconnection (lp);         /* report disconnection */
+    tmxr_reset_ln (lp);
+    }
+if (close_connecting) {
+    free (lp->destination);
+    lp->destination = NULL;
+    if (lp->connecting) {      /* if existing outgoing tcp, drop it */
+        lp->sock = lp->connecting;
+        lp->connecting = 0;
+        tmxr_reset_ln (lp);
+        }
+    }
+if (lp->serport) {                          /* close current serial connection */
+    tmxr_reset_ln (lp);
+    sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
+    sim_close_serial (lp->serport);
+    lp->serport = 0;
+    free (lp->serconfig);
+    lp->serconfig = NULL;
+    free (lp->destination);
+    lp->destination = NULL;
+    }
+}
 
 /* Open a master listening socket (and all of the other variances of connections).
 
@@ -1431,7 +1463,7 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
                 line = (int32) get_uint (cptr, 10, mp->lines, &r);
-                if (r != SCPE_OK)
+                if ((r != SCPE_OK) || (mp->lines == 1))
                     return SCPE_ARG;
                 continue;
                 }
@@ -1596,16 +1628,31 @@ while (*tptr) {
                     tmxr_init_line (lp);                    /* initialize line state */
                     lp->sock = 0;                           /* clear the socket */
                     }
+                else {                                      /* close current serial connection */
+                    tmxr_reset_ln (lp);
+                    sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
+                    sim_close_serial (lp->serport);
+                    lp->serport = 0;
+                    free (lp->serconfig);
+                    lp->serconfig = NULL;
+                    }
                 }
             }
         if (destination[0]) {
             if (mp->lines > 1)
                 return SCPE_ARG;                            /* ambiguous */
             lp = &mp->ldsc[0];
-            lp->destination = malloc(1+strlen(destination));
-            strcpy (lp->destination, destination);
-            serport = sim_open_serial (lp->destination, lp, &r);
+            serport = sim_open_serial (destination, lp, &r);
             if (serport != INVALID_HANDLE) {
+                _mux_detach_line (lp, TRUE, TRUE);
+                if (lp->mp->master) {                       /* if existing listener, close it */
+                    sim_close_sock (lp->mp->master, 1);
+                    lp->mp->master = 0;
+                    free (lp->mp->port);
+                    lp->mp->port = NULL;
+                    }
+                lp->destination = malloc(1+strlen(destination));
+                strcpy (lp->destination, destination);
                 lp->mp = mp;
                 lp->serport = serport;
                 lp->ser_connect_pending = TRUE;
@@ -1622,6 +1669,9 @@ while (*tptr) {
             else {
                 sock = sim_connect_sock (destination, "localhost", NULL);
                 if (sock != INVALID_SOCKET) {
+                    _mux_detach_line (lp, FALSE, TRUE);
+                    lp->destination = malloc(1+strlen(destination));
+                    strcpy (lp->destination, destination);
                     lp->mp = mp;
                     lp->connecting = sock;
                     lp->ipad = malloc (1 + strlen (lp->destination));
@@ -1672,32 +1722,12 @@ while (*tptr) {
                 }
             }
         if (listen[0]) {
-            if (lp->master) {
-                sim_close_sock (lp->master, 1);
-                lp->master = 0;
-                }
-            if (lp->sock) {
-                sim_close_sock (lp->sock, 1);
-                lp->sock = 0;
-                }
-            if (lp->connecting) {
-                sim_close_sock (lp->connecting, 1);
-                lp->connecting = 0;
-                }
-            if (lp->serport) {
-                sim_close_serial (lp->serport);
-                lp->serport = 0;
-                free (lp->serconfig);
-                lp->serconfig = NULL;
-                }
-            free (lp->destination);
-            lp->conn = FALSE;
-            lp->destination = NULL;
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r != SCPE_OK)
                 return r;
             if (sock == INVALID_SOCKET)                     /* open error */
                 return SCPE_OPENERR;
+            _mux_detach_line (lp, TRUE, FALSE);
             printf ("Line %d Listening on port %s\n", line, listen);
             if (sim_log)
                 fprintf (sim_log, "Line %d Listening on port %s\n", line, listen);
@@ -1710,10 +1740,11 @@ while (*tptr) {
                 lp->notelnet = mp->notelnet;
             }
         if (destination[0]) {
-            lp->destination = malloc(1+strlen(destination));
-            strcpy (lp->destination, destination);
-            serport = sim_open_serial (lp->destination, lp, &r);
+            serport = sim_open_serial (destination, lp, &r);
             if (serport != INVALID_HANDLE) {
+                _mux_detach_line (lp, TRUE, TRUE);
+                lp->destination = malloc(1+strlen(destination));
+                strcpy (lp->destination, destination);
                 lp->serport = serport;
                 lp->ser_connect_pending = TRUE;
                 lp->notelnet = TRUE;
@@ -1729,6 +1760,8 @@ while (*tptr) {
             else {
                 sock = sim_connect_sock (destination, "localhost", NULL);
                 if (sock != INVALID_SOCKET) {
+                    lp->destination = malloc(1+strlen(destination));
+                    strcpy (lp->destination, destination);
                     lp->connecting = sock;
                     lp->ipad = malloc (1 + strlen (lp->destination));
                     strcpy (lp->ipad, lp->destination);
