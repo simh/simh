@@ -1602,17 +1602,17 @@ while (*tptr) {
                 }
             }
         if (listen[0]) {
-            if (mp->port && (0 != strcmp (listen, mp->port))) {
-                sim_close_sock (mp->master, 1);
-                mp->master = 0;
-                free (mp->port);
-                mp->port = NULL;
-                }
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r != SCPE_OK)
                 return r;
             if (sock == INVALID_SOCKET)                     /* open error */
                 return SCPE_OPENERR;
+            if (mp->port) {                                 /* close prior listener */
+                sim_close_sock (mp->master, 1);
+                mp->master = 0;
+                free (mp->port);
+                mp->port = NULL;
+                }
             printf ("Listening on port %s\n", listen);
             if (sim_log)
                 fprintf (sim_log, "Listening on port %s\n", listen);
