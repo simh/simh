@@ -26,6 +26,7 @@
 
    DQ           12565A 2883 disk system
 
+   18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
    28-Mar-11    JDB     Tidied up signal handling

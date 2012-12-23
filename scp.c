@@ -1003,9 +1003,29 @@ if (*cptr) {
     if (*cptr)
         return SCPE_2MARG;
     if ((cmdp = find_cmd (gbuf))) {
-        fputs (cmdp->help, stdout);
-        if (sim_log)
-            fputs (cmdp->help, sim_log);
+        if (cmdp->help) {
+            fputs (cmdp->help, stdout);
+            if (sim_log)
+                fputs (cmdp->help, sim_log);
+            }
+        else { /* no help so it is likely a command alias */
+            CTAB *cmdpa;
+
+            for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
+                if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
+                    fprintf (stdout, "%s is an alias for the %s command:\n%s", 
+                                cmdp->name, cmdpa->name, cmdpa->help);
+                    if (sim_log)
+                        fprintf (sim_log, "%s is an alias for the %s command.\n%s", 
+                                    cmdp->name, cmdpa->name, cmdpa->help);
+                    break;
+                    }
+            if (cmdpa->name == NULL) {              /* not found? */
+                fprintf (stdout, "No help available for the %s command\n", cmdp->name);
+                if (sim_log)
+                    fprintf (sim_log, "No help available for the %s command\n", cmdp->name);
+                }
+            }
         }
     else return SCPE_ARG;
     }
@@ -1482,7 +1502,7 @@ t_stat shift_args (char *do_arg[], size_t arg_count)
 {
 size_t i;
 
-for (i=1; i<arg_count; ++i)
+for (i=1; i<arg_count-1; ++i)
     do_arg[i] = do_arg[i+1];
 return SCPE_OK;
 }
@@ -2297,6 +2317,9 @@ if (vdelt)
     fprintf (st, " delta %d", vdelt);
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
+#if defined(SIM_GIT_COMMIT_ID)
+fprintf (st, "     git commit id: %8.8s", SIM_GIT_COMMIT_ID);
+#endif
 fprintf (st, "\n");
 return SCPE_OK;
 }

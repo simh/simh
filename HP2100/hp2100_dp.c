@@ -26,6 +26,7 @@
    DP           12557A 2871 disk subsystem
                 13210A 7900 disk subsystem
 
+   18-Dec-12    MP      Now calls sim_activate_time to get remaining seek time
    09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CNTLR_TYPE cast to dp_settype

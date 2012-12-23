@@ -24,6 +24,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the authors.
 
+   20-Dec-12    JDB     sim_is_active() now returns t_bool
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    07-May-12    JDB     Corrected end-of-track delay time logic
    02-May-12    JDB     First release
@@ -773,7 +774,7 @@ else if (uptr) {                                        /* otherwise, we have a 
     uptr->wait = cvptr->cmd_time;                       /* most commands use the command delay */
 
     if (props->unit_access) {                           /* does the command access the unit? */
-        is_seeking = sim_activate_time (uptr) != 0;     /* see if the unit is busy */
+        is_seeking = sim_is_active (uptr);              /* see if the unit is busy */
 
         if (is_seeking)                                 /* if a seek is in progress, */
             uptr->wait = 0;                             /*   set for no unit activation */

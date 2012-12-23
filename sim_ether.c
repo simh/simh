@@ -569,7 +569,8 @@ char* eth_getname(int number, char* name)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
 
-  if (count <= number) return NULL;
+  if ((number < 0) || (count <= number))
+      return NULL;
   strcpy(name, list[number].name);
   return name;
 }

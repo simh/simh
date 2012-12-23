@@ -296,6 +296,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = mkdir -p BIN
   endif
+  ifneq (,$(shell cat .git-commit-id))
+    GIT_COMMIT_ID=$(shell cat .git-commit-id)
+  endif
 else
   #Win32 Environments (via MinGW32)
   GCC = gcc
@@ -338,7 +341,11 @@ else
   ifneq ($(USE_NETWORK),)
     NETWORK_OPT += -DUSE_SHARED
   endif
+  ifneq (,$(shell if exist .git-commit-id type .git-commit-id))
+    GIT_COMMIT_ID=$(shell if exist .git-commit-id type .git-commit-id)
+  endif
 endif
+CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=\"$(GIT_COMMIT_ID)\"
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0
@@ -406,6 +413,10 @@ ifneq (clean,$(MAKECMDGOALS))
   ifneq (,$(NETWORK_FEATURES))
     $(info *** $(NETWORK_FEATURES).)
   endif
+  ifneq (,$(GIT_COMMIT_ID))
+    $(info ***)
+    $(info *** git commit id is $(GIT_COMMIT_ID).)
+  endif
   $(info ***)
 endif
 ifneq ($(DONT_USE_ROMS),)
@@ -419,7 +430,7 @@ endif
 
 CC_STD = -std=c99
 CC_OUTSPEC = -o $@
-CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) -I . $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 
 #
@@ -565,7 +576,7 @@ PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP10D}/pdp10_ksio.c ${PDP10D}/pdp10_lp20.c ${PDP10D}/pdp10_mdfp.c \
 	${PDP10D}/pdp10_pag.c ${PDP10D}/pdp10_rp.c ${PDP10D}/pdp10_sys.c \
 	${PDP10D}/pdp10_tim.c ${PDP10D}/pdp10_tu.c ${PDP10D}/pdp10_xtnd.c \
-	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c \
+	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_cr.c
 PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
 

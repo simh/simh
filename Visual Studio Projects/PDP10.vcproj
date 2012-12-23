@@ -236,6 +236,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_dmc.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dz.c"
 				>
 			</File>
@@ -290,6 +294,10 @@
 			>
 			<File
 				RelativePath="..\PDP10\pdp10_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_dmc.h"
 				>
 			</File>
 			<File

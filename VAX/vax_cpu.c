@@ -2181,6 +2181,7 @@ for ( ;; ) {
             BRANCHB (brdisp);
             if (((PSL & PSL_IS) != 0) &&                /* on IS? */
                 (PSL_GETIPL (PSL) == 0x1F) &&           /* at IPL 31 */
+                (mapen == 0) &&                         /* Running from ROM */
                 (fault_PC == 0x2004361B))               /* Boot ROM Character Prompt */
                 cpu_idle();
             }
