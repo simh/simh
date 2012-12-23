@@ -729,7 +729,7 @@ ifeq ($(WIN32),)
     DISPLAY_OPT = 
   endif
 else
-  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/w32.c
+  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
   DISPLAY_OPT = -DUSE_DISPLAY
 endif  
   

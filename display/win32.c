@@ -278,7 +278,7 @@ ws_init2(void) {
 }
 
 #ifdef THREADS
-static volatile init_done;
+static volatile int init_done;
 static DWORD msgthread_id;
 
 static DWORD WINAPI
