@@ -40,6 +40,10 @@
 #if defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
 extern int32 int_req[IPL_HLVL];
+#elif defined(VM_PDP10)
+#include "pdp10_defs.h"
+//#define IPL_HLVL        8                               /* # int levels */
+extern int32 int_req;
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];

@@ -181,6 +181,7 @@ struct dmc_controller {
     LINE *line;
     BUFFER_QUEUE *receive_queue;
     BUFFER_QUEUE *transmit_queue;
+    UNIT_STATS *stats;
     SOCKET master_socket;
     int32 connect_poll_interval;
     DEVTYPE dev_type;
@@ -238,8 +239,6 @@ int dmc_get_socket(CTLR *controller, int forRead);
 int dmc_get_receive_socket(CTLR *controller, int forRead);
 int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead);
 void dmc_line_update_speed_stats(LINE *line);
-UNIT_STATS *dmc_get_unit_stats(UNIT *uptr);
-void dmc_set_unit_stats(UNIT *uptr, UNIT_STATS *stats);
 
 DEBTAB dmc_debug[] = {
     {"TRACE",  DBG_TRC},
@@ -253,16 +252,12 @@ DEBTAB dmc_debug[] = {
     {0}
 };
 
-UNIT dmc_unit[] = {
-    { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },
-    { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },
-    { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },
-    { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }
-};
+UNIT dmc0_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
+UNIT dmc1_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
+UNIT dmc2_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
+UNIT dmc3_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
 
-UNIT dmp_unit[] = {
-    { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }
-};
+UNIT dmpa_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
 
 CSRS dmc_csrs[DMC_NUMDEVICE];
 
@@ -362,43 +357,37 @@ MTAB dmc_mod[] = {
 #define IOBA_FLOAT      0
 #define VEC_FLOAT       0
 #endif
-DIB dmc_dib[] =
-{
-    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} },
-    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} },
-    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} },
-    { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} }
-};
+DIB dmc0_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
+DIB dmc1_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
+DIB dmc2_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
+DIB dmc3_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
 
 #define IOLN_DMP        010
 
-DIB dmp_dib[] =
-{
-    { IOBA_FLOAT, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} }
-};
+DIB dmp_dib = { IOBA_FLOAT, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint }};
 
 DEVICE dmc_dev[] =
 {
-    { "DMC0", &dmc_unit[0], dmca_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+    { "DMC0", &dmc0_unit, dmca_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
-    { "DMC1", &dmc_unit[1], dmcb_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+    &dmc0_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+    { "DMC1", &dmc1_unit, dmcb_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[1], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
-    { "DMC2", &dmc_unit[2], dmcc_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+    &dmc1_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+    { "DMC2", &dmc2_unit, dmcc_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[2], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
-    { "DMC3", &dmc_unit[3], dmcd_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+    &dmc2_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug },
+    { "DMC3", &dmc3_unit, dmcd_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc_dib[3], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
+    &dmc3_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
 };
 
 #ifdef DMP
 DEVICE dmp_dev[] =
 {
-    { "DMP", &dmp_unit[0], dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
+    { "DMP", &dmp_unit, dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmp_dib[0], DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
+    &dmp_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_NET | DEV_DEBUG, 0, dmc_debug }
 };
 #endif
 
@@ -421,39 +410,21 @@ LINE dmp_line[DMP_NUMDEVICE] =
 BUFFER_QUEUE dmp_receive_queues[DMP_NUMDEVICE];
 BUFFER_QUEUE dmp_transmit_queues[DMP_NUMDEVICE];
 
+UNIT_STATS dmc_stats[DMC_NUMDEVICE];
+UNIT_STATS dmp_stats[DMP_NUMDEVICE];
+
 CTLR dmc_ctrls[] =
 {
-    { &dmc_csrs[0], &dmc_dev[0], Initialised, Idle, 0, 0, &dmc_line[0], &dmc_receive_queues[0], &dmc_transmit_queues[0], INVALID_SOCKET, -1, 30, DMC },
-    { &dmc_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], INVALID_SOCKET, -1, 30, DMC },
-    { &dmc_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], INVALID_SOCKET, -1, 30, DMC },
-    { &dmc_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], INVALID_SOCKET, -1, 30, DMC },
+    { &dmc_csrs[0], &dmc_dev[0], Initialised, Idle, 0, 0, &dmc_line[0], &dmc_receive_queues[0], &dmc_transmit_queues[0], &dmc_stats[0], INVALID_SOCKET, -1, 30, DMC },
+    { &dmc_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], &dmc_stats[1], INVALID_SOCKET, -1, 30, DMC },
+    { &dmc_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], &dmc_stats[2], INVALID_SOCKET, -1, 30, DMC },
+    { &dmc_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], &dmc_stats[3], INVALID_SOCKET, -1, 30, DMC },
 #ifdef DMP
-    { &dmp_csrs[0], &dmp_dev[0], Initialised, Idle, 0, 0, &dmp_line[0], &dmp_receive_queues[0], &dmp_transmit_queues[0], INVALID_SOCKET, -1, 30, DMP }
+    { &dmp_csrs[0], &dmp_dev[0], Initialised, Idle, 0, 0, &dmp_line[0], &dmp_receive_queues[0], &dmp_transmit_queues[0], &dmp_stats[0], INVALID_SOCKET, -1, 30, DMP }
 #endif
 };
 
 extern int32 tmxr_poll; /* calibrated delay */
-
-UNIT_STATS *dmc_get_unit_stats(UNIT *uptr)
-{
-    UNIT_STATS *ans = NULL;
-#ifdef USE_ADDR64
-    ans = (UNIT_STATS *)(((t_uint64)uptr->u3 << 32) | uptr->u4);
-#else
-    ans = (UNIT_STATS *)(uptr->u3);
-#endif
-    return ans;
-}
-
-void dmc_set_unit_stats(UNIT *uptr, UNIT_STATS *stats)
-{
-#ifdef USE_ADDR64
-    uptr->u3 = (int32)((t_uint64)stats >> 32);
-    uptr->u4 = (int32)((t_uint64)stats & 0xFFFFFFFF);
-#else
-    uptr->u3 = (int32)stats;
-#endif
-}
 
 void dmc_reset_unit_stats(UNIT_STATS *s)
 {
@@ -545,11 +516,11 @@ t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
     CTLR *controller = dmc_get_controller_from_unit(uptr);
     if (controller->line->transmit_host[0])
     {
-        fprintf(st, "PEER=%s", controller->line->transmit_host);
+        fprintf(st, "peer=%s", controller->line->transmit_host);
     }
     else
     {
-        fprintf(st, "PEER Unspecified");
+        fprintf(st, "peer Unspecified");
     }
 
     return SCPE_OK;
@@ -576,7 +547,15 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "SPEED=%d", controller->line->speed);
+    if (controller->line->speed > 0)
+    {
+        fprintf(st, "speed=%d bits/sec", controller->line->speed);
+    }
+    else
+    {
+        fprintf(st, "speed=unrestricted");
+    }
+
     return SCPE_OK;
 }
 
@@ -602,22 +581,22 @@ t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc)
     {
     case DMC:
         {
-            fprintf(st, "TYPE=DMC");
+            fprintf(st, "type=DMC");
             break;
         }
     case DMR:
         {
-            fprintf(st, "TYPE=DMR");
+            fprintf(st, "type=DMR");
             break;
         }
     case DMP:
         {
-            fprintf(st, "TYPE=DMP");
+            fprintf(st, "type=DMP");
             break;
         }
     default:
         {
-            fprintf(st, "TYPE=???");
+            fprintf(st, "type=???");
             break;
         }
     }
@@ -662,9 +641,9 @@ t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat dmc_showstats (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    TIMER *poll_timer = &dmc_get_unit_stats(uptr)->poll_timer;
-    TIMER *between_polls_timer = &dmc_get_unit_stats(uptr)->between_polls_timer;
-    uint32 poll_count = dmc_get_unit_stats(uptr)->poll_count;
+    TIMER *poll_timer = &controller->stats->poll_timer;
+    TIMER *between_polls_timer = &controller->stats->between_polls_timer;
+    uint32 poll_count = controller->stats->poll_count;
 
     if (dmc_timer_started(between_polls_timer) && poll_count > 0)
     {
@@ -699,7 +678,7 @@ t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc)
     t_stat status = SCPE_OK;
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
-    dmc_reset_unit_stats(dmc_get_unit_stats(uptr));
+    dmc_reset_unit_stats(controller->stats);
 
     controller->receive_buffer_output_transfers_completed = 0;
     controller->transmit_buffer_output_transfers_completed = 0;
@@ -714,7 +693,7 @@ t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat dmc_showconnectpoll (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "CONNECTPOLL=%d", controller->connect_poll_interval);
+    fprintf(st, "connect poll=%d", controller->connect_poll_interval);
     return SCPE_OK;
 }
 
@@ -735,7 +714,7 @@ t_stat dmc_setconnectpoll (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat dmc_showlinemode (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "LINEMODE=%s", controller->line->isPrimary? "PRIMARY" : "SECONDARY");
+    fprintf(st, "line mode=%s", controller->line->isPrimary? "PRIMARY" : "SECONDARY");
     return SCPE_OK;
 }
 
@@ -1235,9 +1214,13 @@ t_stat dmc_svc(UNIT* uptr)
 {
     CTLR *controller;
     int32 poll;
+    TIMER *poll_timer;
+    TIMER *between_polls_timer;
 
-    TIMER *poll_timer = &dmc_get_unit_stats(uptr)->poll_timer;
-    TIMER *between_polls_timer = &dmc_get_unit_stats(uptr)->between_polls_timer;
+    controller = dmc_get_controller_from_unit(uptr);
+
+    poll_timer = &controller->stats->poll_timer;
+    between_polls_timer = &controller->stats->between_polls_timer;
 
     poll = clk_cosched (tmxr_poll);
 
@@ -1254,8 +1237,6 @@ t_stat dmc_svc(UNIT* uptr)
     {
         dmc_timer_start(poll_timer);
     }
-
-    controller = dmc_get_controller_from_unit(uptr);
 
     if (dmc_isattached(controller))
     {
@@ -1280,7 +1261,7 @@ t_stat dmc_svc(UNIT* uptr)
     {
         dmc_timer_start(between_polls_timer);
     }
-    dmc_get_unit_stats(uptr)->poll_count++;
+    controller->stats->poll_count++;
 
     return SCPE_OK;
 }
@@ -2212,12 +2193,6 @@ t_stat dmc_reset (DEVICE *dptr)
 
     sim_debug(DBG_TRC, dptr, "dmc_reset()\n");
 
-    if (dmc_get_unit_stats(dptr->units) == NULL)
-    {
-        dmc_set_unit_stats(dptr->units, (UNIT_STATS *)malloc(sizeof(UNIT_STATS)));
-        dmc_reset_unit_stats(dmc_get_unit_stats(dptr->units));
-    }
-
     dmc_clrrxint(controller);
     dmc_clrtxint(controller);
     sim_cancel (controller->device->units); /* stop poll */
@@ -2242,7 +2217,7 @@ t_stat dmc_attach (UNIT *uptr, char *cptr)
         uptr->filename = (char *)malloc(strlen(cptr)+1);
         strcpy(uptr->filename, cptr);
         controller->line->receive_port = uptr->filename;
-        //sim_activate_abs(controller->device->units, clk_cosched (tmxr_poll));
+        dmc_reset_unit_stats(controller->stats);
     }
 
     return ans;
