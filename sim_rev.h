@@ -27,10 +27,22 @@
 #ifndef _SIM_REV_H_
 #define _SIM_REV_H_     0
 
+#ifndef SIM_MAJOR
 #define SIM_MAJOR       4
+#endif
+#ifndef SIM_MINOR
 #define SIM_MINOR       0
+#endif
+#ifndef SIM_PATCH
 #define SIM_PATCH       0
+#endif
+#ifndef SIM_DELTA
 #define SIM_DELTA       0
+#endif
+
+#ifndef SIM_VERSION_MODE
+#define SIM_VERSION_MODE "Beta"
+#endif
 
 /*
   The comment section below reflects the manual editing process which was in place

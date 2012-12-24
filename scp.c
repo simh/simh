@@ -2315,6 +2315,9 @@ if (cptr && (*cptr != 0))
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
 if (vdelt)
     fprintf (st, " delta %d", vdelt);
+#if defined(SIM_VERSION_MODE)
+fprintf (st, " %s", SIM_VERSION_MODE);
+#endif
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
 #if defined(SIM_GIT_COMMIT_ID)
