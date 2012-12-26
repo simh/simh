@@ -783,6 +783,8 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 lp->conn = TRUE;                    /* record connection */
                 lp->sock = lp->connecting;          /* it now looks normal */
                 lp->connecting = 0;
+                lp->ipad = realloc (lp->ipad, 1+strlen (lp->destination));
+                strcpy (lp->ipad, lp->destination);
                 lp->cnms = sim_os_msec ();
                 break;
             case -1:                                /* failed connection */
