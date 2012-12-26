@@ -340,13 +340,13 @@ REG dmp_reg[] = {
 
 MTAB dmc_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, "PEER", "PEER=address:port" ,&dmc_setpeer, &dmc_showpeer, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "SPEED", "SPEED" ,&dmc_setspeed, &dmc_showspeed, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,&dmc_setspeed, &dmc_showspeed, NULL },
 #ifdef DMP
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE" ,&dmc_settype, &dmc_showtype, NULL },
 #endif
-    { MTAB_XTD | MTAB_VDV, 0, "LINEMODE", "LINEMODE" ,&dmc_setlinemode, &dmc_showlinemode, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}" ,&dmc_setlinemode, &dmc_showlinemode, NULL },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATS", "STATS" ,&dmc_setstats, &dmc_showstats, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "CONNECTPOLL", "CONNECTPOLL" ,&dmc_setconnectpoll, &dmc_showconnectpoll, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "CONNECTPOLL", "CONNECTPOLL=seconds" ,&dmc_setconnectpoll, &dmc_showconnectpoll, NULL },
     { MTAB_XTD | MTAB_VDV, 006, "ADDRESS", "ADDRESS", &set_addr, &show_addr, NULL },
     { MTAB_XTD  |MTAB_VDV, 0, "VECTOR", "VECTOR", &set_vec, &show_vec, NULL },
     { 0 },
