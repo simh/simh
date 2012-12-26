@@ -897,6 +897,15 @@ for (i=0; (ports < max) && (i < 64); ++i) {
         close (port);
         }
     }
+for (i=0; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/ttyAMA%d", i);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
 for (i=1; (ports < max) && (i < 64); ++i) {
     sprintf (list[ports].name, "/dev/tty.serial%d", i);
     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
