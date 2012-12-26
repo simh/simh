@@ -120,6 +120,7 @@
 #define MT_SBITA        53                              /* SBI timeout addr */
 #define MT_SBIQC        54                              /* SBI timeout clear */
 #define MT_MBRK         60                              /* microbreak */
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Machine specific reserved operand tests */
 

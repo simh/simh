@@ -94,6 +94,7 @@
 #define MT_SBITA        53                              /* SBI timeout addr */
 #define MT_SBIQC        54                              /* SBI timeout clear */
 #define MT_UBINIT       55                              /* Unibus Init */
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Machine specific reserved operand tests */
 
