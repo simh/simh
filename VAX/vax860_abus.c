@@ -31,6 +31,12 @@
 
 #include "vax_defs.h"
 
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_FILENAME "vmb.exe"
+#else /* !DONT_USE_INTERNAL_ROM */
+#include "vax_vmb_exe.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
+
 /* SBIA registers */
 
 #define SBIER_TMO       0x00001000                      /* timeout */
@@ -93,6 +99,9 @@ static struct boot_dev boot_tab[] = {
     { "HK", BOOT_HK, 0 },
     { "RL", BOOT_RL, 0 },
     { "RQ", BOOT_UDA, 1 << 24 },
+    { "RQB", BOOT_UDA, 1 << 24 },
+    { "RQC", BOOT_UDA, 1 << 24 },
+    { "RQD", BOOT_UDA, 1 << 24 },
     { "TQ", BOOT_TK, 1 << 24 },
     { "CS", BOOT_CS, 0 },
     { NULL }
@@ -619,8 +628,16 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
-else if (*regptr != 0)
-    return SCPE_ARG;
+else 
+    if (*regptr == '/') {
+        r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
+        if (r != SCPE_OK)
+            return r;
+        }
+    else {
+        if (*regptr != 0)
+            return SCPE_ARG;
+        }
 for (i = 0; boot_tab[i].name != NULL; i++) {
     if (strcmp (dptr->name, boot_tab[i].name) == 0) {
         R[0] = boot_tab[i].code;
@@ -647,10 +664,7 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-printf ("Loading boot code from vmb.exe\n");
-if (sim_log) fprintf (sim_log, 
-    "Loading boot code from vmb.exe\n");
-r = load_cmd (0, "-O vmb.exe 200");
+r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
 if (r != SCPE_OK)
     return r;
 SP = PC = 512;
