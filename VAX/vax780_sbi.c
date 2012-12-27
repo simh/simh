@@ -668,8 +668,16 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
-else if (*regptr != 0)
-    return SCPE_ARG;
+else 
+    if (*regptr == '/') {
+        r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
+        if (r != SCPE_OK)
+            return r;
+        }
+    else {
+        if (*regptr != 0)
+            return SCPE_ARG;
+        }
 for (i = 0; boot_tab[i].name != NULL; i++) {
     if (strcmp (dptr->name, boot_tab[i].name) == 0) {
         R[0] = boot_tab[i].code;

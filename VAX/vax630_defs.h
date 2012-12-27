@@ -87,6 +87,7 @@
 #define MT_IORESET      55                              /* I/O Bus Reset */
 #define MT_TBDATA       59                              /* Translation Buffer Data */
 #define MT_MBRK         60                              /* microbreak */
+#define MT_MAX          63                              /* last valid IPR */
 
 /* CPU */
 

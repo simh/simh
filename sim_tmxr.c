@@ -783,6 +783,8 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 lp->conn = TRUE;                    /* record connection */
                 lp->sock = lp->connecting;          /* it now looks normal */
                 lp->connecting = 0;
+                lp->ipad = realloc (lp->ipad, 1+strlen (lp->destination));
+                strcpy (lp->ipad, lp->destination);
                 lp->cnms = sim_os_msec ();
                 break;
             case -1:                                /* failed connection */
@@ -901,14 +903,8 @@ if ((lp->destination) && (!lp->serport)) {
     if (lp->connecting)
         sim_close_sock (lp->connecting, 0);
     lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
-    lp->ipad = malloc (1 + strlen (lp->destination));
-    strcpy (lp->ipad, lp->destination);
-    lp->cnms = sim_os_msec ();
     }
-else {
-    tmxr_init_line (lp);                                /* initialize line state */
-    }
-lp->conn = FALSE;                                       /* remove connection flag */
+tmxr_init_line (lp);                                /* initialize line state */
 /* Revise the unit's connect string to reflect the current attachments */
 lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
 /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */

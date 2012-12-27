@@ -302,7 +302,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
 else
   #Win32 Environments (via MinGW32)
   GCC = gcc
-  GCC_Path := $(dir $(shell where gcc.exe))
+  ifeq (XP,$(findstring XP,$(shell ver)))
+    GCC_Path := C:\MinGW\bin\
+  else
+    GCC_Path := $(dir $(shell where gcc.exe))
+  endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
@@ -529,6 +533,7 @@ VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 VAX620_OPT = -DVM_VAX -DVAX_620 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
+
 VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
 	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
@@ -571,6 +576,20 @@ VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
+VAX860 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
+	${VAXD}/vax860_stddev.c ${VAXD}/vax860_sbia.c \
+	${VAXD}/vax860_abus.c ${VAXD}/vax780_uba.c ${VAXD}/vax7x0_mba.c \
+	${VAXD}/vax860_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
+	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_io_lib.c
+VAX860_OPT = -DVM_VAX -DVAX_860 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+
+
 PDP10D = PDP10
 PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP10D}/pdp10_ksio.c ${PDP10D}/pdp10_lp20.c ${PDP10D}/pdp10_mdfp.c \
@@ -579,7 +598,6 @@ PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_dmc.c \
 	${PDP11D}/pdp11_cr.c
 PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
-
 
 
 PDP8D = PDP8
@@ -729,7 +747,7 @@ ifeq ($(WIN32),)
     DISPLAY_OPT = 
   endif
 else
-  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/w32.c
+  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
   DISPLAY_OPT = -DUSE_DISPLAY
 endif  
   
@@ -743,7 +761,7 @@ TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax610 vax620 vax630 vax730 vax750 vax780 \
+	vax vax610 vax620 vax630 vax730 vax750 vax780 vax860 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
 	swtp6800mp-a swtp6800mp-a2 tx-0
@@ -868,6 +886,12 @@ vax780 : ${BIN}vax780${EXE}
 ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+vax860 : ${BIN}vax860${EXE}
+
+${BIN}vax860${EXE} : ${VAX860} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX860} ${SIM} ${VAX860_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 nova : ${BIN}nova${EXE}
 

@@ -340,13 +340,13 @@ REG dmp_reg[] = {
 
 MTAB dmc_mod[] = {
     { MTAB_XTD | MTAB_VDV, 0, "PEER", "PEER=address:port" ,&dmc_setpeer, &dmc_showpeer, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "SPEED", "SPEED" ,&dmc_setspeed, &dmc_showspeed, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,&dmc_setspeed, &dmc_showspeed, NULL },
 #ifdef DMP
     { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE" ,&dmc_settype, &dmc_showtype, NULL },
 #endif
-    { MTAB_XTD | MTAB_VDV, 0, "LINEMODE", "LINEMODE" ,&dmc_setlinemode, &dmc_showlinemode, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}" ,&dmc_setlinemode, &dmc_showlinemode, NULL },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATS", "STATS" ,&dmc_setstats, &dmc_showstats, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, "CONNECTPOLL", "CONNECTPOLL" ,&dmc_setconnectpoll, &dmc_showconnectpoll, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "CONNECTPOLL", "CONNECTPOLL=seconds" ,&dmc_setconnectpoll, &dmc_showconnectpoll, NULL },
     { MTAB_XTD | MTAB_VDV, 006, "ADDRESS", "ADDRESS", &set_addr, &show_addr, NULL },
     { MTAB_XTD  |MTAB_VDV, 0, "VECTOR", "VECTOR", &set_vec, &show_vec, NULL },
     { 0 },
@@ -415,10 +415,10 @@ UNIT_STATS dmp_stats[DMP_NUMDEVICE];
 
 CTLR dmc_ctrls[] =
 {
-    { &dmc_csrs[0], &dmc_dev[0], Initialised, Idle, 0, 0, &dmc_line[0], &dmc_receive_queues[0], &dmc_transmit_queues[0], &dmc_stats[0], INVALID_SOCKET, -1, 30, DMC },
-    { &dmc_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], &dmc_stats[1], INVALID_SOCKET, -1, 30, DMC },
-    { &dmc_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], &dmc_stats[2], INVALID_SOCKET, -1, 30, DMC },
-    { &dmc_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], &dmc_stats[3], INVALID_SOCKET, -1, 30, DMC },
+    { &dmc_csrs[0], &dmc_dev[0], Initialised, Idle, 0, 0, &dmc_line[0], &dmc_receive_queues[0], &dmc_transmit_queues[0], &dmc_stats[0], INVALID_SOCKET, 30, DMC },
+    { &dmc_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], &dmc_stats[1], INVALID_SOCKET, 30, DMC },
+    { &dmc_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], &dmc_stats[2], INVALID_SOCKET, 30, DMC },
+    { &dmc_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], &dmc_stats[3], INVALID_SOCKET, 30, DMC },
 #ifdef DMP
     { &dmp_csrs[0], &dmp_dev[0], Initialised, Idle, 0, 0, &dmp_line[0], &dmp_receive_queues[0], &dmp_transmit_queues[0], &dmp_stats[0], INVALID_SOCKET, -1, 30, DMP }
 #endif
@@ -518,10 +518,6 @@ t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
     {
         fprintf(st, "peer=%s", controller->line->transmit_host);
     }
-    else
-    {
-        fprintf(st, "peer Unspecified");
-    }
 
     return SCPE_OK;
 }
@@ -553,7 +549,7 @@ t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc)
     }
     else
     {
-        fprintf(st, "speed=unrestricted");
+        fprintf(st, "speed=0 (unrestricted)");
     }
 
     return SCPE_OK;
@@ -693,7 +689,7 @@ t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat dmc_showconnectpoll (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "connect poll=%d", controller->connect_poll_interval);
+    fprintf(st, "connectpoll=%d", controller->connect_poll_interval);
     return SCPE_OK;
 }
 
@@ -714,7 +710,7 @@ t_stat dmc_setconnectpoll (UNIT* uptr, int32 val, char* cptr, void* desc)
 t_stat dmc_showlinemode (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    fprintf(st, "line mode=%s", controller->line->isPrimary? "PRIMARY" : "SECONDARY");
+    fprintf(st, "linemode=%s", controller->line->isPrimary? "PRIMARY" : "SECONDARY");
     return SCPE_OK;
 }
 

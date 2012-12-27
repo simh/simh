@@ -1,6 +1,6 @@
-/* vax750_defs.h: VAX 750 model-specific definitions file
+/* vax860_defs.h: VAX 8600 model-specific definitions file
 
-   Copyright (c) 2010-2011, Matt Burke
+   Copyright (c) 2011-2012, Matt Burke
    This module incorporates code from SimH, Copyright (c) 2004-2008, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -15,7 +15,7 @@
 
    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
    THE AUTHOR(S) BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
    IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
@@ -24,45 +24,76 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author(s).
 
-   21-Oct-2012  MB      First Version
+   26-Dec-2012  MB      First Version
 
-   This file covers the VAX 11/750, the second VAX.
+   This file covers the VAX 8600, the fourth VAX.
 
    System memory map
 
-          00 0000 - 7F FFFF             main memory
-          80 0000 - EF FFFF             reserved
-          F0 0000 - F0 FFFF             writeable control store
-          F1 0000 - F1 FFFF             reserved
-          F2 0000 - F2 0010             memory controller
-          F2 0400 - F2 07FF             bootstrap ROM
-          F2 8000 - F2 88FF             Massbus adapter 0
-          F2 A000 - F2 A8FF             Massbus adapter 1
-          F2 C000 - F2 C8FF             Massbus adapter 2
-          F3 0000 - F3 09FF             Unibus adapter 0
-          F3 2000 - F3 29FF             Unibus adapter 1
+        0000 0000 - 1FFF FFFF           main memory
+
+        2000 0000 - 2001 FFFF           SBI0 adapter space
+        2002 0000 - 200F FFFF           reserved
+        2008 0000 - 2008 00BF           SBI0 registers
+        2008 00C0 - 200F FFFF           reserved
+        2010 0000 - 2013 FFFF           Unibus address space, Unibus 0
+        2014 0000 - 2017 FFFF           Unibus address space, Unibus 1
+        2018 0000 - 201B FFFF           Unibus address space, Unibus 2
+        201C 0000 - 201F FFFF           Unibus address space, Unibus 3
+        2020 0000 - 21FF FFFF           reserved
+
+        2200 0000 - 2201 FFFF           SBI1 adapter space
+        2202 0000 - 220F FFFF           reserved
+        2208 0000 - 2208 00BF           SBI1 registers
+        2208 00C0 - 220F FFFF           reserved
+        2210 0000 - 2213 FFFF           Unibus address space, Unibus 4
+        2214 0000 - 2217 FFFF           Unibus address space, Unibus 5
+        2218 0000 - 221B FFFF           Unibus address space, Unibus 6
+        221C 0000 - 221F FFFF           Unibus address space, Unibus 7
+        2220 0000 - 23FF FFFF           reserved
+
+        2400 0000 - 2401 FFFF           SBI2 adapter space
+        2402 0000 - 240F FFFF           reserved
+        2408 0000 - 2408 00BF           SBI2 registers
+        2408 00C0 - 240F FFFF           reserved
+        2410 0000 - 2413 FFFF           Unibus address space, Unibus 8
+        2414 0000 - 2417 FFFF           Unibus address space, Unibus 9
+        2418 0000 - 241B FFFF           Unibus address space, Unibus 10
+        241C 0000 - 241F FFFF           Unibus address space, Unibus 11
+        2420 0000 - 25FF FFFF           reserved
+
+        2600 0000 - 2601 FFFF           SBI3 adapter space
+        2602 0000 - 260F FFFF           reserved
+        2608 0000 - 2608 00BF           SBI3 registers
+        2608 00C0 - 260F FFFF           reserved
+        2610 0000 - 2613 FFFF           Unibus address space, Unibus 12
+        2614 0000 - 2617 FFFF           Unibus address space, Unibus 13
+        2618 0000 - 261B FFFF           Unibus address space, Unibus 14
+        261C 0000 - 261F FFFF           Unibus address space, Unibus 15
+        2620 0000 - 3FFF FFFF           reserved
 */
 
 #ifndef FULL_VAX
 #define FULL_VAX        1
 #endif
 
-#ifndef _VAX_750_DEFS_H_
-#define _VAX_750_DEFS_H_        1
+#ifndef _VAX_860_DEFS_H_
+#define _VAX_860_DEFS_H_        1
 
 /* Microcode constructs */
 
-#define VAX750_SID      (2 << 24)                       /* system ID */
-#define VAX750_MICRO    (99 << 8)                       /* ucode revision */
-#define VAX750_HWREV    (156)                           /* hw revision */
+#define VAX860_SID      (4 << 24)                       /* system ID */
+#define VAX860_TYP      (0 << 23)                       /* sys type: 8600 */
+#define VAX865_TYP      (1 << 23)                       /* sys type: 8650 */
+#define VAX860_ECO      (7 << 19)                       /* ucode revision */
+#define VAX860_PLANT    (0 << 12)                       /* plant (Salem NH) */
+#define VAX860_SN       (1234)
 #define CON_HLTPIN      0x0200                          /* external CPU halt */
 #define CON_HLTINS      0x0600                          /* HALT instruction */
-#define MCHK_CSPE       0x01                            /* control store parity error */
-#define MCHK_BPE        0x02                            /* bus error or tb/cache parity error */
-#define VER_FPLA        0x0C                            /* FPLA version */
-#define VER_WCSP        (VER_FPLA)                      /* WCS primary version */
-#define VER_WCSS        0x12                            /* WCS secondary version */
-#define VER_PCS         ((VER_WCSS >> 4) & 0x3)         /* PCS version */
+#define MCHK_RD_F       0x00                            /* read fault */
+#define MCHK_RD_A       0xF4                            /* read abort */
+#define MCHK_IBUF       0x0D                            /* read istream */
+#define VER_UCODE       0x1                             /* Microcode version */
 
 /* Interrupts */
 
@@ -71,16 +102,17 @@
 #define IPL_HLVL        (IPL_HMAX - IPL_HMIN + 1)       /* # hardware levels */
 #define IPL_SMAX        0xF                             /* highest swre level */
 
-/* Nexus constants */
+/* SBI Nexus constants */
 
 #define NEXUS_NUM       16                              /* number of nexus */
 #define MCTL_NUM        2                               /* number of mem ctrl */
 #define MBA_NUM         2                               /* number of MBA's */
-#define TR_MCTL         0                               /* nexus assignments */
-#define TR_MBA0         4
-#define TR_MBA1         5
-#define TR_UBA          8
-#define TR_CI           15
+#define TR_MCTL0        1                               /* nexus assignments */
+#define TR_MCTL1        2
+#define TR_UBA          3
+#define TR_MBA0         8
+#define TR_MBA1         9
+#define TR_CI           14
 #define NEXUS_HLVL      (IPL_HMAX - IPL_HMIN + 1)
 #define SCB_NEXUS       0x100                           /* nexus intr base */
 #define SBI_FAULTS      0xFC000000                      /* SBI fault flags */
@@ -104,18 +136,23 @@
 
 /* Machine specific IPRs */
 
-#define MT_CSRS         28                              /* Console storage */
-#define MT_CSRD         29
-#define MT_CSTS         30
-#define MT_CSTD         31
-#define MT_CMIE         23                              /* CMI error */
-#define MT_TBDR         36                              /* TB disable */
-#define MT_CADR         37                              /* Cache disable */
-#define MT_MCESR        38                              /* MCHK err sts */
-#define MT_CAER         39                              /* Cache error */
 #define MT_ACCS         40                              /* FPA control */
-#define MT_IORESET      55                              /* Unibus Init */
-#define MT_MAX          63                              /* last valid IPR */
+#define MT_PAMACC       64
+#define MT_PAMLOC       65
+#define MT_CSWP         66
+#define MT_MDECC        67
+#define MT_MENA         68
+#define MT_MDCTL        69
+#define MT_MCCTL        70
+#define MT_MERG         71
+#define MT_CRBT         72                              /* Console reboot */
+#define MT_DFI          73
+#define MT_EHSR         74
+#define MT_STXCS        76
+#define MT_STXDB        77
+#define MT_ESPA         78
+#define MT_ESPD         79
+#define MT_MAX          MT_ESPD                         /* last valid IPR */
 
 /* Machine specific reserved operand tests */
 
@@ -137,19 +174,26 @@
 #define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
 #define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
 
+/* CPU */
+
+#define CPU_MODEL_MODIFIERS \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL", \
+                          &cpu_set_model, &cpu_show_model },
 /* Memory */
 
-#define MAXMEMWIDTH     21                              /* max mem, 16k chips */
+#define MAXMEMWIDTH     25                              /* max mem, 4MB boards */
 #define MAXMEMSIZE      (1 << MAXMEMWIDTH)
-#define MAXMEMWIDTH_X   23                              /* max mem, 64k chips */
+#define MAXMEMWIDTH_X   27                              /* max mem, 16MB boards */
 #define MAXMEMSIZE_X    (1 << MAXMEMWIDTH_X)
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }
 
 /* Unibus I/O registers */
 
@@ -159,35 +203,45 @@
 #define IOPAGEAWIDTH    13                              /* IO addr width */
 #define IOPAGESIZE      (1u << IOPAGEAWIDTH)            /* IO page length */
 #define IOPAGEMASK      (IOPAGESIZE - 1)                /* IO addr mask */
-#define UBADDRBASE      0xFC0000                        /* Unibus addr base */
-#define IOPAGEBASE      0xFFE000                        /* IO page base */
+#define UBADDRBASE      0x20100000                      /* Unibus addr base */
+#define IOPAGEBASE      0x2013E000                      /* IO page base */
 #define ADDR_IS_IO(x)   ((((uint32) (x)) >= UBADDRBASE) && \
                         (((uint32) (x)) < (UBADDRBASE + UBADDRSIZE)))
 #define ADDR_IS_IOP(x)  (((uint32) (x)) >= IOPAGEBASE)
 
 /* Nexus register space */
 
-#define REGAWIDTH       19                              /* REG addr width */
+#define REGAWIDTH       17                              /* REG addr width */
 #define REG_V_NEXUS     13                              /* nexus number */
 #define REG_M_NEXUS     0xF
 #define REG_V_OFS       2                               /* register number */
 #define REG_M_OFS       0x7FF   
 #define REGSIZE         (1u << REGAWIDTH)               /* REG length */
-#define REGBASE         0xF00000                        /* REG addr base */
+#define REGBASE         0x20000000                      /* REG addr base */
 #define ADDR_IS_REG(x)  ((((uint32) (x)) >= REGBASE) && \
                         (((uint32) (x)) < (REGBASE + REGSIZE)))
-#define NEXUSBASE       (REGBASE + 0x20000)
-#define NEXUSSIZE       0x2000
 #define NEXUS_GETNEX(x) (((x) >> REG_V_NEXUS) & REG_M_NEXUS)
 #define NEXUS_GETOFS(x) (((x) >> REG_V_OFS) & REG_M_OFS)
+
+/* SBI adapter space */
+
+#define SBIAWIDTH       19
+#define SBIABASE        0x20080000
+#define SBIASIZE        (1u << SBIAWIDTH)
+#define ADDR_IS_SBIA(x) ((((uint32) (x)) >= SBIABASE) && \
+                        (((uint32) (x)) < (SBIABASE + SBIASIZE)))
 
 /* ROM address space in memory controllers */
 
 #define ROMAWIDTH       12                              /* ROM addr width */
 #define ROMSIZE         (1u << ROMAWIDTH)               /* ROM size */
-#define ROMBASE         (REGBASE + (TR_MCTL << REG_V_NEXUS) + 0x400)
-#define ADDR_IS_ROM(x)  ((((uint32) (x)) >= ROMBASE) && \
-                        (((uint32) (x)) < (ROMBASE + ROMSIZE)))
+#define ROM0BASE        (REGBASE + (TR_MCTL0 << REG_V_NEXUS) + 0x1000)
+#define ROM1BASE        (REGBASE + (TR_MCTL1 << REG_V_NEXUS) + 0x1000)
+#define ADDR_IS_ROM0(x) ((((uint32) (x)) >= ROM0BASE) && \
+                        (((uint32) (x)) < (ROM0BASE + ROMSIZE)))
+#define ADDR_IS_ROM1(x) ((((uint32) (x)) >= ROM1BASE) && \
+                        (((uint32) (x)) < (ROM1BASE + ROMSIZE)))
+#define ADDR_IS_ROM(x)  (ADDR_IS_ROM0 (x) || ADDR_IS_ROM1 (x))
 
 /* Other address spaces */
 
@@ -221,7 +275,7 @@
 
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        8                               /* lines per DZV mux */
-#define VH_MUXES        4                               /* max # of DHQ muxes */
+#define VH_MUXES        4                               /* max # of DHU muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
@@ -229,12 +283,12 @@
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_MBUS      (DEV_V_UF + 1)                  /* Massbus */
 #define DEV_V_NEXUS     (DEV_V_UF + 2)                  /* Nexus */
-#define DEV_V_CI        (DEV_V_UF + 3)                  /* CI */
+#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* flt addr */
 #define DEV_V_FFUF      (DEV_V_UF + 4)                  /* first free flag */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_MBUS        (1u << DEV_V_MBUS)
 #define DEV_NEXUS       (1u << DEV_V_NEXUS)
-#define DEV_CI          (1u << DEV_V_CI)
+#define DEV_FLTA        (1u << DEV_V_FLTA)
 #define DEV_QBUS        (0)
 #define DEV_Q18         (0)
 
@@ -266,12 +320,51 @@ typedef struct {
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
     } DIB;
 
-/* Unibus I/O page layout - see pdp11_ui_lib.c for address layout details
+/* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's
    Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
-#define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
 #define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
 
+#define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
+#define IOLN_DZ         010
+#define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
+#define IOLN_XUB        010
+#define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
+#define IOLN_RQB        004
+#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
+#define IOLN_RQC        004
+#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
+#define IOLN_RQD        004
+#define IOBA_RQ         (IOPAGEBASE + 012150)           /* UDA50 */
+#define IOLN_RQ         004
+#define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
+#define IOLN_TS         004
+#define IOBA_RL         (IOPAGEBASE + 014400)           /* RL11 */
+#define IOLN_RL         012
+#define IOBA_XQ         (IOPAGEBASE + 014440)           /* DEQNA/DELQA */
+#define IOLN_XQ         020
+#define IOBA_XQB        (IOPAGEBASE + 014460)           /* 2nd DEQNA/DELQA */
+#define IOLN_XQB        020
+#define IOBA_TQ         (IOPAGEBASE + 014500)           /* TMSCP */
+#define IOLN_TQ         004
+#define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
+#define IOLN_XU         010
+#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
+#define IOLN_CR         010
+#define IOBA_RX         (IOPAGEBASE + 017170)           /* RX11 */
+#define IOLN_RX         004
+#define IOBA_RY         (IOPAGEBASE + 017170)           /* RXV21 */
+#define IOLN_RY         004
+#define IOBA_QDSS       (IOPAGEBASE + 017400)           /* QDSS */
+#define IOLN_QDSS       002
+#define IOBA_HK         (IOPAGEBASE + 017440)           /* RK611 */
+#define IOLN_HK         040
+#define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
+#define IOLN_LPT        004
+#define IOBA_PTR        (IOPAGEBASE + 017550)           /* PC11 reader */
+#define IOLN_PTR        004
+#define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
+#define IOLN_PTP        004
 
 /* Interrupt assignments; within each level, priority is right to left */
 
@@ -286,7 +379,6 @@ typedef struct {
 #define INT_V_XU        8
 #define INT_V_DMCRX     9
 #define INT_V_DMCTX     10
-
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
 #define INT_V_PTP       2
@@ -311,7 +403,6 @@ typedef struct {
 #define INT_CR          (1u << INT_V_CR)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
-
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
 #define IPL_HK          (0x15 - IPL_HMIN)
@@ -332,11 +423,25 @@ typedef struct {
 
 /* Device vectors */
 
-#define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        0
-#define VEC_Q           0x200
+#define VEC_Q           0000
+#define VEC_PTR         0070
+#define VEC_PTP         0074
+#define VEC_XQ          0120
+#define VEC_XU          0120
+#define VEC_RQ          0154
+#define VEC_RL          0160
+#define VEC_LPT         0200
+#define VEC_HK          0210
+#define VEC_TS          0224
+#define VEC_CR          0230
+#define VEC_TQ          0260
+#define VEC_RX          0264
+#define VEC_RY          0264
+#define VEC_DZRX        0300
+#define VEC_DZTX        0304
 
 /* Interrupt macros */
 
@@ -369,8 +474,7 @@ typedef struct {
 #define BOOT_RL         2
 #define BOOT_UDA        17
 #define BOOT_TK         18
-#define BOOT_CI         32
-#define BOOT_TD         64
+#define BOOT_CS         64
 
 /* Function prototypes for virtual memory interface */
 
@@ -409,6 +513,9 @@ t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
 int32 clk_cosched (int32 wait);
+
+t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #include "pdp11_io_lib.h"
 

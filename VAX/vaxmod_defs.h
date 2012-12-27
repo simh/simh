@@ -96,6 +96,7 @@
 #define MT_CONPC        42
 #define MT_CONPSL       43
 #define MT_IORESET      55
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Memory system error register */
 

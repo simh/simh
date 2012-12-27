@@ -1445,7 +1445,7 @@ int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
-if (prn > 63)                                           /* reg# > 63? fault */
+if (prn > MT_MAX)                                       /* reg# > max? fault */
     RSVD_OPND_FAULT;
 CC_IIZZ_L (val);                                        /* set cc's */
 switch (prn) {                                          /* case on reg # */
@@ -1576,7 +1576,7 @@ int32 val;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
-if (prn > 63)                                           /* reg# > 63? fault */
+if (prn > MT_MAX)                                       /* reg# > max? fault */
     RSVD_OPND_FAULT;
 switch (prn) {                                          /* case on reg# */
 
