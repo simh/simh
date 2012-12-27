@@ -302,7 +302,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
 else
   #Win32 Environments (via MinGW32)
   GCC = gcc
-  GCC_Path := $(dir $(shell where gcc.exe))
+  ifeq (XP,$(findstring XP,$(shell ver)))
+    GCC_Path := C:\MinGW\bin\
+  else
+    GCC_Path := $(dir $(shell where gcc.exe))
+  endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
