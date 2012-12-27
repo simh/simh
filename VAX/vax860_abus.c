@@ -188,7 +188,7 @@ DEVICE abus_dev = {
 
 CTAB vax860_cmd[] = {
     { "BOOT", &vax860_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n" },
+      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
     { NULL }
     };
 
