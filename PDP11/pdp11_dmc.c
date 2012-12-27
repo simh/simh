@@ -353,10 +353,6 @@ MTAB dmc_mod[] = {
 };
 
 #define IOLN_DMC        010
-#ifndef IOBA_FLOAT
-#define IOBA_FLOAT      0
-#define VEC_FLOAT       0
-#endif
 DIB dmc0_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
 DIB dmc1_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
 DIB dmc2_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
