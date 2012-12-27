@@ -177,7 +177,7 @@
 /* CPU */
 
 #define CPU_MODEL_MODIFIERS \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL", \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={8600|8650}", \
                           &cpu_set_model, &cpu_show_model },
 /* Memory */
 
@@ -283,12 +283,10 @@
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_MBUS      (DEV_V_UF + 1)                  /* Massbus */
 #define DEV_V_NEXUS     (DEV_V_UF + 2)                  /* Nexus */
-#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* flt addr */
-#define DEV_V_FFUF      (DEV_V_UF + 4)                  /* first free flag */
+#define DEV_V_FFUF      (DEV_V_UF + 3)                  /* first free flag */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_MBUS        (1u << DEV_V_MBUS)
 #define DEV_NEXUS       (1u << DEV_V_NEXUS)
-#define DEV_FLTA        (1u << DEV_V_FLTA)
 #define DEV_QBUS        (0)
 #define DEV_Q18         (0)
 
@@ -323,48 +321,9 @@ typedef struct {
 /* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's
    Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
+#define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
 #define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
 
-#define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
-#define IOLN_DZ         010
-#define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
-#define IOLN_XUB        010
-#define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
-#define IOLN_RQB        004
-#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
-#define IOLN_RQC        004
-#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
-#define IOLN_RQD        004
-#define IOBA_RQ         (IOPAGEBASE + 012150)           /* UDA50 */
-#define IOLN_RQ         004
-#define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
-#define IOLN_TS         004
-#define IOBA_RL         (IOPAGEBASE + 014400)           /* RL11 */
-#define IOLN_RL         012
-#define IOBA_XQ         (IOPAGEBASE + 014440)           /* DEQNA/DELQA */
-#define IOLN_XQ         020
-#define IOBA_XQB        (IOPAGEBASE + 014460)           /* 2nd DEQNA/DELQA */
-#define IOLN_XQB        020
-#define IOBA_TQ         (IOPAGEBASE + 014500)           /* TMSCP */
-#define IOLN_TQ         004
-#define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
-#define IOLN_XU         010
-#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
-#define IOLN_CR         010
-#define IOBA_RX         (IOPAGEBASE + 017170)           /* RX11 */
-#define IOLN_RX         004
-#define IOBA_RY         (IOPAGEBASE + 017170)           /* RXV21 */
-#define IOLN_RY         004
-#define IOBA_QDSS       (IOPAGEBASE + 017400)           /* QDSS */
-#define IOLN_QDSS       002
-#define IOBA_HK         (IOPAGEBASE + 017440)           /* RK611 */
-#define IOLN_HK         040
-#define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
-#define IOLN_LPT        004
-#define IOBA_PTR        (IOPAGEBASE + 017550)           /* PC11 reader */
-#define IOLN_PTR        004
-#define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
-#define IOLN_PTP        004
 
 /* Interrupt assignments; within each level, priority is right to left */
 
@@ -423,25 +382,11 @@ typedef struct {
 
 /* Device vectors */
 
+#define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
 #define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
 
 #define VEC_QBUS        0
 #define VEC_Q           0000
-#define VEC_PTR         0070
-#define VEC_PTP         0074
-#define VEC_XQ          0120
-#define VEC_XU          0120
-#define VEC_RQ          0154
-#define VEC_RL          0160
-#define VEC_LPT         0200
-#define VEC_HK          0210
-#define VEC_TS          0224
-#define VEC_CR          0230
-#define VEC_TQ          0260
-#define VEC_RX          0264
-#define VEC_RY          0264
-#define VEC_DZRX        0300
-#define VEC_DZTX        0304
 
 /* Interrupt macros */
 
