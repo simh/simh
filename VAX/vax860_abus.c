@@ -473,7 +473,7 @@ return;
 
 int32 ReadReg (int32 pa, int32 lnt)
 {
-int32 nexus, val;
+int32 val;
 
 if (ADDR_IS_SBIA (pa)) return sbia_rd (pa, lnt);        /* SBI adapter space? */
 if (ADDR_IS_REG (pa)) {                                 /* reg space? */
@@ -496,8 +496,6 @@ return 0;
 
 void WriteReg (int32 pa, int32 val, int32 lnt)
 {
-int32 nexus;
-
 if (ADDR_IS_SBIA (pa)) {                                /* SBI adapter space? */
 	sbia_wr (pa, val, lnt);
     SET_IRQL;

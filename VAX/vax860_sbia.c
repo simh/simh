@@ -171,7 +171,11 @@ int32 sbia_rd (int32 pa, int32 lnt)
 
 	case 0x11:                                          /* SBIMT */
 		return sbi_mt & SBIMT_RD;
-	}
+
+    default:                                            /* Anything else is not impl */
+        return 0;
+   
+    }
 }
 
 void sbia_wr (int32 pa, int32 val, int32 lnt)

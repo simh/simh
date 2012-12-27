@@ -971,13 +971,13 @@ else switch (lc_fnc) {                                  /* idle, case */
     case LC_FNCAC:                                      /* array configuration */
         lc_buf[3] = LC_FNCAC;
         if (MEMSIZE < MAXMEMSIZE) {                     /* 4MB Boards */
-            lc_buf[2] = (MEMSIZE >> 22);                /* slots in use */
+            lc_buf[2] = (uint8)(MEMSIZE >> 22);         /* slots in use */
             for (i = 0; i < lc_buf[2]; i++) {
                 mask |= (2 << (i * 2));                 /* build array mask */
                 }
             }
         else {
-            lc_buf[2] = (MEMSIZE >> 24);                /* 16MB Boards */
+            lc_buf[2] = (uint8)(MEMSIZE >> 24);         /* 16MB Boards */
             for (i = 0; i < lc_buf[2]; i++) {
                 mask |= (1 << (i * 2));                 /* build array mask */
                 }
