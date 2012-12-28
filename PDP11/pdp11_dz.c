@@ -90,7 +90,7 @@ extern int32 int_req[IPL_HLVL];
 #error "Too many DZ multiplexers"
 #endif
 
-#define DZ_MNOMASK      (DZ_MUXES - 1)                  /* mask for mux no */
+#define DZ_MNOMASK      (dz_desc.lines/DZ_LINES - 1)    /* mask for mux no */
 #define DZ_LNOMASK      (DZ_LINES - 1)                  /* mask for lineno */
 #define DZ_LMASK        ((1 << DZ_LINES) - 1)           /* mask of lines */
 #define DZ_SILO_ALM     16                              /* silo alarm level */
@@ -696,7 +696,7 @@ if (sim_switches & SWMASK ('M')) {                      /* modem control? */
         }
     }
 
-for (dz = 0; dz < DZ_MUXES; dz++) {
+for (dz = 0; dz < dz_desc.lines/DZ_LINES; dz++) {
     if (!dz_mctl || (0 == (dz_csr[dz] & CSR_MSE)))      /* enabled? */
         continue;
     for (muxln = 0; muxln < DZ_LINES; muxln++) {
