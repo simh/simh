@@ -546,6 +546,13 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL }, -1 }                                    /* end table */
 };
 
+#if !defined(DEV_NEXUS) 
+#if defined(DEV_MBUS)
+#define DEV_NEXUS DEV_MBUS
+#else
+#define DEV_NEXUS 0
+#endif
+#endif
 t_stat auto_config (char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
@@ -577,8 +584,9 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         if (autp->dnam[j] == NULL)                      /* no device? */
             break;
         dptr = find_dev (autp->dnam[j]);                /* find ctrl */
-        if ((dptr == NULL) ||                           /* enabled, floating? */
-            (dptr->flags & DEV_DIS))
+        if ((dptr == NULL) ||                           /* enabled, not nexus? */
+            (dptr->flags & DEV_DIS) ||
+            (dptr->flags & DEV_NEXUS) )
             continue;
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
