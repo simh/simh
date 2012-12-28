@@ -345,7 +345,7 @@ static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 #define IOLN_VH         020
 
 static DIB vh_dib = {
-    IOBA_FLOAT,
+    IOBA_AUTO,
     IOLN_VH * VH_MUXES,
     &vh_rd,     /* read */
     &vh_wr,     /* write */

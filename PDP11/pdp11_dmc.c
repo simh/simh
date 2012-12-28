@@ -353,14 +353,14 @@ MTAB dmc_mod[] = {
 };
 
 #define IOLN_DMC        010
-DIB dmc0_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
-DIB dmc1_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
-DIB dmc2_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
-DIB dmc3_dib = { IOBA_FLOAT, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint} };
+DIB dmc0_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
+DIB dmc1_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
+DIB dmc2_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
+DIB dmc3_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
 
 #define IOLN_DMP        010
 
-DIB dmp_dib = { IOBA_FLOAT, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_FLOAT, {&dmc_rxint, &dmc_txint }};
+DIB dmp_dib = { IOBA_AUTO, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }};
 
 DEVICE dmc_dev[] =
 {

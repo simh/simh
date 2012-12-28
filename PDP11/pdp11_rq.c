@@ -1023,7 +1023,7 @@ DEVICE rq_dev = {
 MSC rqb_ctx = { 1 };
 
 DIB rqb_dib = {
-    IOBA_FLOAT, IOLN_RQ, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1095,7 +1095,7 @@ DEVICE rqb_dev = {
 MSC rqc_ctx = { 2 };
 
 DIB rqc_dib = {
-    IOBA_FLOAT, IOLN_RQ, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1167,7 +1167,7 @@ DEVICE rqc_dev = {
 MSC rqd_ctx = { 3 };
 
 DIB rqd_dib = {
-    IOBA_FLOAT, IOLN_RQ, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 

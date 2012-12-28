@@ -190,7 +190,6 @@ typedef struct {
 /* Qbus I/O page layout - see pdp11_ui_lib.c for address layout details */
 
 #define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
-#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
 
 
 /* The KA610 maintains 4 separate hardware IPL levels, IPL 17 to IPL 14;

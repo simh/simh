@@ -322,7 +322,6 @@ typedef struct {
    Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
 #define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
-#define IOBA_FLOAT      (0)                             /* Assigned by Auto Configure */
 
 
 /* Interrupt assignments; within each level, priority is right to left */

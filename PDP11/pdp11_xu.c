@@ -198,7 +198,7 @@ DEVICE xu_dev = {
 
 #define IOLN_XU         010
 
-DIB xub_dib = { IOBA_FLOAT, IOLN_XU, &xu_rd, &xu_wr,
+DIB xub_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
 		1, IVCL (XU), 0, { &xu_int } };
 
 UNIT xub_unit[] = {
