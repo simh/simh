@@ -56,6 +56,8 @@
 /* Microcode constructs */
 
 #define VAX780_SID      (1 << 24)                       /* system ID */
+#define VAX780_TYP      (0 << 23)                       /* sys type: 780 */
+#define VAX785_TYP      (1 << 23)                       /* sys type: 785 */
 #define VAX780_ECO      (7 << 19)                       /* ucode revision */
 #define VAX780_PLANT    (0 << 12)                       /* plant (Salem NH) */
 #define VAX780_SN       (1234)
@@ -68,6 +70,10 @@
 #define VER_WCSP        (VER_FPLA)                      /* WCS primary version */
 #define VER_WCSS        0x12                            /* WCS secondary version */
 #define VER_PCS         ((VER_WCSS >> 4) & 0x3)         /* PCS version */
+#define VER_WCSP_785    0x01                            /* 785 WCS primary version */
+#define VER_WCSS_785    0x00                            /* 785 WCS secondary version */
+#define VER_PCS_785     0x04                            /* 785 PCS version */
+#define VER_MTCH_785    0x04                            /* 785 PCS/WCS primary version */
 
 /* Interrupts */
 
@@ -142,6 +148,11 @@
 #define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
 #define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
 
+/* CPU */
+
+#define CPU_MODEL_MODIFIERS \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={785|780}", \
+                          &cpu_set_model, &cpu_show_model },
 /* Memory */
 
 #define MAXMEMWIDTH     23                              /* max mem, MS780C */
@@ -414,6 +425,9 @@ t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
 int32 clk_cosched (int32 wait);
+
+t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #include "pdp11_io_lib.h"
 
