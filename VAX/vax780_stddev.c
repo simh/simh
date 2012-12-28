@@ -110,6 +110,9 @@
 #define  COMM_WCSV      0153                            /* WCS version */
 #define  COMM_WCSS      0154                            /* WCS secondary */
 #define  COMM_FPLV      0155                            /* FPLA version */
+#define  COMM_MTCH_785  0153                            /* 785 PCS/WCS version */
+#define  COMM_WCSP_785  0154                            /* 785 WCS version */
+#define  COMM_WCSS_785  0155                            /* 785 WCS secondary */
 #define COMM_DATA       0x300                           /* comm data return */
 #define MISC_MASK        0xFF                           /* console data mask */
 #define  MISC_SWDN       0x1                            /* software done */
@@ -1054,6 +1057,7 @@ return;
 t_stat fl_reset (DEVICE *dptr)
 {
 uint32 i;
+extern int32 sys_model;
 
 fl_esr = FL_STAINC;
 fl_ecode = 0;                                           /* clear error */
@@ -1065,10 +1069,18 @@ sim_cancel (&fl_unit);                                  /* cancel drive */
 fl_unit.TRACK = 0;
 for (i = 0; i < COMM_LNT; i++)
     comm_region[i] = 0;
-comm_region[COMM_FPLV] = VER_FPLA;
-comm_region[COMM_PCSV] = VER_PCS;
-comm_region[COMM_WCSV] = VER_WCSP;
-comm_region[COMM_WCSS] = VER_WCSS;
+if (sys_model) {    /* 785 */
+    comm_region[COMM_WCSS_785] = VER_WCSS_785;
+    comm_region[COMM_WCSP_785] = VER_WCSP_785;
+    comm_region[COMM_MTCH_785] = VER_MTCH_785;
+    comm_region[COMM_PCSV] = VER_PCS_785;
+    }
+else {              /* 780 */
+    comm_region[COMM_FPLV] = VER_FPLA;
+    comm_region[COMM_PCSV] = VER_PCS;
+    comm_region[COMM_WCSV] = VER_WCSP;
+    comm_region[COMM_WCSS] = VER_WCSS;
+    }
 comm_region[COMM_GH] = 1;
 return SCPE_OK;
 }

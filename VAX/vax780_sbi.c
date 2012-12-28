@@ -108,6 +108,7 @@ uint32 sbi_sc = 0;                                      /* SBI silo comparator *
 uint32 sbi_mt = 0;                                      /* SBI maintenance */
 uint32 sbi_er = 0;                                      /* SBI error status */
 uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
+int32 sys_model = 0;                                    /* 780 or 785 */
 static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
 
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
@@ -389,7 +390,10 @@ switch (rg) {
         break;
 
     case MT_SID:                                        /* SID */
-        val = VAX780_SID | VAX780_ECO | VAX780_PLANT | VAX780_SN;
+        if (sys_model)
+            val = VAX780_SID | VAX785_TYP | VAX780_ECO | VAX780_PLANT | VAX780_SN;
+        else
+            val = VAX780_SID | VAX780_TYP | VAX780_ECO | VAX780_PLANT | VAX780_SN;
         break;
 
     default:
@@ -812,5 +816,23 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
             }                                           /* end else */
         }                                               /* end if enabled */
     }                                                   /* end for */
+return SCPE_OK;
+}
+
+t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr == NULL) return SCPE_ARG;
+if (strcmp(cptr, "780") == 0)
+   sys_model = 0;
+else if (strcmp(cptr, "785") == 0)
+   sys_model = 1;
+else
+   return SCPE_ARG;
+return SCPE_OK;
+}
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "model=%s", (sys_model ? "785" : "780"));
 return SCPE_OK;
 }
