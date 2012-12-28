@@ -349,7 +349,9 @@ else
     GIT_COMMIT_ID=$(shell if exist .git-commit-id type .git-commit-id)
   endif
 endif
-CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=\"$(GIT_COMMIT_ID)\"
+ifneq (,$(GIT_COMMIT_ID))
+  CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=\"$(GIT_COMMIT_ID)\"
+endif
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
   CFLAGS_O = -O0
