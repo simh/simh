@@ -1641,7 +1641,7 @@ while (*tptr) {
             serport = sim_open_serial (destination, lp, &r);
             if (serport != INVALID_HANDLE) {
                 _mux_detach_line (lp, TRUE, TRUE);
-                if (lp->mp->master) {                       /* if existing listener, close it */
+                if (lp->mp && lp->mp->master) {             /* if existing listener, close it */
                     sim_close_sock (lp->mp->master, 1);
                     lp->mp->master = 0;
                     free (lp->mp->port);
