@@ -111,14 +111,14 @@ typedef enum
 
 typedef struct
 {
-    int isPrimary;
+    int32 isPrimary;
     SOCKET socket; // socket used bidirectionally
     int receive_readable;
     char *receive_port;
     int transmit_writeable;
-    char transmit_host[CBUFSIZE];
+    char peer[CBUFSIZE];
     int transmit_is_loopback; /* if true the transmit socket is the loopback to the receive */
-    int speed; /* bits per second in each direction, 0 for no limit */
+    int32 speed; /* bits per second in each direction, 0 for no limit */
     int last_second;
     int bytes_sent_in_last_second;
     int bytes_received_in_last_second;
@@ -228,6 +228,7 @@ int dmc_buffer_fill_receive_buffers(CTLR *controller);
 void dmc_start_transfer_receive_buffer(CTLR *controller);
 int dmc_buffer_send_transmit_buffers(CTLR *controller);
 void dmc_buffer_queue_init(CTLR *controller, BUFFER_QUEUE *q, char *name);
+void dmc_buffer_queue_init_all(CTLR *controller);
 BUFFER *dmc_buffer_queue_head(BUFFER_QUEUE *q);
 int dmc_buffer_queue_full(BUFFER_QUEUE *q);
 void dmc_buffer_queue_get_stats(BUFFER_QUEUE *q, int *available, int *contains_data, int *transfer_in_progress);
@@ -263,6 +264,28 @@ CSRS dmc_csrs[DMC_NUMDEVICE];
 
 CSRS dmp_csrs[DMP_NUMDEVICE];
 
+LINE dmc_line[DMC_NUMDEVICE] =
+{
+    { 0, INVALID_SOCKET },
+    { 0, INVALID_SOCKET },
+    { 0, INVALID_SOCKET },
+    { 0, INVALID_SOCKET }
+};
+
+BUFFER_QUEUE dmc_receive_queues[DMC_NUMDEVICE];
+BUFFER_QUEUE dmc_transmit_queues[DMC_NUMDEVICE];
+
+LINE dmp_line[DMP_NUMDEVICE] =
+{
+    { 0, INVALID_SOCKET }
+};
+
+BUFFER_QUEUE dmp_receive_queues[DMP_NUMDEVICE];
+BUFFER_QUEUE dmp_transmit_queues[DMP_NUMDEVICE];
+
+UNIT_STATS dmc_stats[DMC_NUMDEVICE];
+UNIT_STATS dmp_stats[DMP_NUMDEVICE];
+
 REG dmca_reg[] = {
     { HRDATA (SEL0, dmc_csrs[0].sel0, 16) },
     { HRDATA (SEL2, dmc_csrs[0].sel2, 16) },
@@ -276,6 +299,9 @@ REG dmca_reg[] = {
     { GRDATA (BSEL5, dmc_csrs[0].sel4, DEV_RDX, 8, 8) },
     { GRDATA (BSEL6, dmc_csrs[0].sel6, DEV_RDX, 8, 0) },
     { GRDATA (BSEL7, dmc_csrs[0].sel6, DEV_RDX, 8, 8) },
+    { BRDATA (PEER, dmc_line[0].peer, 16, 8, sizeof(dmc_line[0].peer)), REG_HRO},
+    { HRDATA (MODE, dmc_line[0].isPrimary, 32), REG_HRO },
+    { HRDATA (SPEED, dmc_line[0].speed, 32), REG_HRO },
     { NULL }  };
 
 REG dmcb_reg[] = {
@@ -291,6 +317,9 @@ REG dmcb_reg[] = {
     { GRDATA (BSEL5, dmc_csrs[1].sel4, DEV_RDX, 8, 8) },
     { GRDATA (BSEL6, dmc_csrs[1].sel6, DEV_RDX, 8, 0) },
     { GRDATA (BSEL7, dmc_csrs[1].sel6, DEV_RDX, 8, 8) },
+    { BRDATA (PEER, dmc_line[1].peer, 16, 8, sizeof(dmc_line[1].peer)), REG_HRO},
+    { HRDATA (MODE, dmc_line[1].isPrimary, 32), REG_HRO },
+    { HRDATA (SPEED, dmc_line[1].speed, 32), REG_HRO },
     { NULL }  };
 
 REG dmcc_reg[] = {
@@ -306,6 +335,9 @@ REG dmcc_reg[] = {
     { GRDATA (BSEL5, dmc_csrs[2].sel4, DEV_RDX, 8, 8) },
     { GRDATA (BSEL6, dmc_csrs[2].sel6, DEV_RDX, 8, 0) },
     { GRDATA (BSEL7, dmc_csrs[2].sel6, DEV_RDX, 8, 8) },
+    { BRDATA (PEER, dmc_line[2].peer, 16, 8, sizeof(dmc_line[2].peer)), REG_HRO},
+    { HRDATA (MODE, dmc_line[2].isPrimary, 32), REG_HRO },
+    { HRDATA (SPEED, dmc_line[2].speed, 32), REG_HRO },
     { NULL }  };
 
 REG dmcd_reg[] = {
@@ -321,6 +353,9 @@ REG dmcd_reg[] = {
     { GRDATA (BSEL5, dmc_csrs[3].sel4, DEV_RDX, 8, 8) },
     { GRDATA (BSEL6, dmc_csrs[3].sel6, DEV_RDX, 8, 0) },
     { GRDATA (BSEL7, dmc_csrs[3].sel6, DEV_RDX, 8, 8) },
+    { BRDATA (PEER, dmc_line[3].peer, 16, 8, sizeof(dmc_line[3].peer)), REG_HRO},
+    { HRDATA (MODE, dmc_line[3].isPrimary, 32), REG_HRO },
+    { HRDATA (SPEED, dmc_line[3].speed, 32), REG_HRO },
     { NULL }  };
 
 REG dmp_reg[] = {
@@ -336,6 +371,9 @@ REG dmp_reg[] = {
     { GRDATA (BSEL5, dmc_csrs[3].sel4, DEV_RDX, 8, 8) },
     { GRDATA (BSEL6, dmc_csrs[3].sel6, DEV_RDX, 8, 0) },
     { GRDATA (BSEL7, dmc_csrs[3].sel6, DEV_RDX, 8, 8) },
+    { BRDATA (PEER, dmp_line[0].peer, 16, 8, sizeof(dmp_line[0].peer)), REG_HRO},
+    { HRDATA (MODE, dmp_line[0].isPrimary, 32), REG_HRO },
+    { HRDATA (SPEED, dmp_line[0].speed, 32), REG_HRO },
     { NULL }  };
 
 MTAB dmc_mod[] = {
@@ -386,28 +424,6 @@ DEVICE dmp_dev[] =
     &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug }
 };
 #endif
-
-LINE dmc_line[DMC_NUMDEVICE] =
-{
-    { 0, INVALID_SOCKET },
-    { 0, INVALID_SOCKET },
-    { 0, INVALID_SOCKET },
-    { 0, INVALID_SOCKET }
-};
-
-BUFFER_QUEUE dmc_receive_queues[DMC_NUMDEVICE];
-BUFFER_QUEUE dmc_transmit_queues[DMC_NUMDEVICE];
-
-LINE dmp_line[DMP_NUMDEVICE] =
-{
-    { 0, INVALID_SOCKET }
-};
-
-BUFFER_QUEUE dmp_receive_queues[DMP_NUMDEVICE];
-BUFFER_QUEUE dmp_transmit_queues[DMP_NUMDEVICE];
-
-UNIT_STATS dmc_stats[DMC_NUMDEVICE];
-UNIT_STATS dmp_stats[DMP_NUMDEVICE];
 
 CTLR dmc_ctrls[] =
 {
@@ -510,9 +526,9 @@ CTLR *dmc_get_controller_from_device(DEVICE *device)
 t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    if (controller->line->transmit_host[0])
+    if (controller->line->peer[0])
     {
-        fprintf(st, "peer=%s", controller->line->transmit_host);
+        fprintf(st, "peer=%s", controller->line->peer);
     }
 
     return SCPE_OK;
@@ -531,7 +547,7 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
         return status;
     if (host[0] == '\0')
         return SCPE_ARG;
-    strncpy(controller->line->transmit_host, cptr, sizeof(controller->line->transmit_host)-1);
+    strncpy(controller->line->peer, cptr, sizeof(controller->line->peer)-1);
 
     return status;
 }
@@ -1137,8 +1153,7 @@ void dmc_process_master_clear(CTLR *controller)
     {
         dmc_setreg(controller, 6, 0, 0);
     }
-    dmc_buffer_queue_init(controller, controller->receive_queue, "receive");
-    dmc_buffer_queue_init(controller, controller->transmit_queue, "transmit");
+    dmc_buffer_queue_init_all(controller);
 
     controller->transfer_state = Idle;
     dmc_set_run(controller);
@@ -1370,6 +1385,12 @@ void dmc_buffer_queue_init(CTLR *controller, BUFFER_QUEUE *q, char *name)
     q->controller = controller;
 }
 
+void dmc_buffer_queue_init_all(CTLR *controller)
+{
+    dmc_buffer_queue_init(controller, controller->receive_queue, "receive");
+    dmc_buffer_queue_init(controller, controller->transmit_queue, "transmit");
+}
+
 int dmc_buffer_queue_full(BUFFER_QUEUE *q)
 {
     return q->count > BUFFER_QUEUE_SIZE;
@@ -1557,9 +1578,9 @@ int dmc_get_receive_socket(CTLR *controller, int forRead)
         controller->line->socket = sim_accept_conn (controller->master_socket, &ipaddr); /* poll connect */
         if (controller->line->socket != INVALID_SOCKET)
         {
-            char host[sizeof(controller->line->transmit_host)];
+            char host[sizeof(controller->line->peer)];
 
-            if (sim_parse_addr (controller->line->transmit_host, host, sizeof(host), NULL, NULL, 0, NULL, ipaddr))
+            if (sim_parse_addr (controller->line->peer, host, sizeof(host), NULL, NULL, 0, NULL, ipaddr))
             {
                 sim_debug(DBG_WRN, controller->device, "Received connection from unexpected source IP %s. Closing the connection.\n", ipaddr);
                 dmc_close_receive(controller, "Unathorized connection", ipaddr);
@@ -1630,7 +1651,7 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
         }
         else
         {
-            host_port = controller->line->transmit_host;
+            host_port = controller->line->peer;
         }
 
         sim_debug(DBG_SOK, controller->device, "Trying to open transmit socket to address:port %s\n", host_port);
@@ -1700,7 +1721,7 @@ void dmc_error_and_close_receive(CTLR *controller, char *format)
 
 void dmc_close_transmit(CTLR *controller, char *reason)
 {
-    sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %s, socket %d, reason: %s\n", controller->line->transmit_host, controller->line->socket, reason);
+    sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %s, socket %d, reason: %s\n", controller->line->peer, controller->line->socket, reason);
     sim_close_sock(controller->line->socket, FALSE);
     controller->line->socket = INVALID_SOCKET;
 
@@ -2185,6 +2206,7 @@ t_stat dmc_reset (DEVICE *dptr)
 
     sim_debug(DBG_TRC, dptr, "dmc_reset()\n");
 
+    dmc_buffer_queue_init_all(controller);
     dmc_clrrxint(controller);
     dmc_clrtxint(controller);
     sim_cancel (controller->device->units); /* stop poll */
