@@ -1,6 +1,6 @@
                        HP 2100 SIMULATOR BUG FIX WRITEUPS
                        ==================================
-                             Last update: 2012-12-17
+                             Last update: 2012-12-28
 
 
   1. PROBLEM:  Booting from magnetic tape reports "HALT instruction, P: 77756
@@ -6348,5 +6348,46 @@
 
      RESOLUTION:  Modify "cpu_vma_mapte" (hp2100_cpu5.c) to return FALSE if
      called for a non-VMA program.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+249. PROBLEM:  RESTORing a previously SAVEd session fails if the 12792C
+     multiplexer is attached.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  If the MPX device has a listening port attached when a
+     session is saved, attempting to restore that session results in a "Unit not
+     attachable" error.
+
+     CAUSE:  The MPX attach routine only allows attachment to unit 0, i.e.,
+     ATTACH MPX <port>, but the actual attachment is made to the Telnet poll
+     unit (unit 9).  As SAVE finds the port attached to unit 9, RESTORE attempts
+     to reattach it to unit 9.
+
+     RESOLUTION:  Modify "mpx_attach" (hp2100_mpx.c) to allow attachment to unit
+     9 only during a RESTORE.
+
+     STATUS:  Fixed in version 4.0-0.
+
+
+
+250. PROBLEM:  DEASSIGNing the TBG device generates a debug warning.
+
+     VERSION:  3.9-0
+
+     OBSERVATION:  When running the simulator under a debugger, entering the
+     command DEASSIGN TBG prints "warning: Invalid Address specified to
+     RtlFreeHeap."
+
+     CAUSE:  The TBG logical name is specified statically in the DEVICE
+     structure, but "deassign_device" calls "free" on the pointer.  The
+     developer's manual does not state that the logical name must be dynamically
+     allocated, but deassigning assumes that it was.
+
+     RESOLUTION:  Modify "clk_reset" (hp2100_stddev.c) to allocate the logical
+     name during a power-on reset.
 
      STATUS:  Fixed in version 4.0-0.

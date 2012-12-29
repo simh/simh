@@ -25,6 +25,7 @@
 
    MPX          12792C 8-channel multiplexer card
 
+   28-Dec-12    JDB     Allow direct attach to the poll unit only when restoring
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
@@ -2058,6 +2059,9 @@ return SCPE_OK;
    unit is not allowed, so we first enable the unit, then attach it, then
    disable it again.  Attachment is reported by the "mpx_status" routine below.
 
+   A direct attach to the poll unit is only allowed when restoring a previously
+   saved session.
+   
    The Telnet poll service routine is synchronized with the other input polling
    devices in the simulator to facilitate idling.
 */
@@ -2066,16 +2070,17 @@ t_stat mpx_attach (UNIT *uptr, char *cptr)
 {
 t_stat status = SCPE_OK;
 
-if (uptr != mpx_unit)                                   /* not unit 0? */
-    return SCPE_NOATT;                                  /* can't attach */
+if (uptr != mpx_unit                                        /* not unit 0? */
+  && (uptr != &mpx_poll || !(sim_switches & SIM_SW_REST)))  /*   and not restoring the poll unit? */
+    return SCPE_NOATT;                                      /* can't attach */
 
-mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;            /* enable unit */
-status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);      /* attach to socket */
-mpx_poll.flags = mpx_poll.flags | UNIT_DIS;             /* disable unit */
+mpx_poll.flags = mpx_poll.flags & ~UNIT_DIS;                /* enable unit */
+status = tmxr_attach (&mpx_desc, &mpx_poll, cptr);          /* attach to socket */
+mpx_poll.flags = mpx_poll.flags | UNIT_DIS;                 /* disable unit */
 
 if (status == SCPE_OK) {
-    mpx_poll.wait = POLL_FIRST;                         /* set up poll */
-    sim_activate (&mpx_poll, mpx_poll.wait);            /* start poll immediately */
+    mpx_poll.wait = POLL_FIRST;                             /* set up poll */
+    sim_activate (&mpx_poll, mpx_poll.wait);                /* start poll immediately */
     }
 return status;
 }

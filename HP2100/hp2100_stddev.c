@@ -26,8 +26,9 @@
    PTR          12597A-002 paper tape reader interface
    PTP          12597A-005 paper tape punch interface
    TTY          12531C buffered teleprinter interface
-   CLK          12539C time base generator
+   TBG          12539C time base generator
 
+   28-Dec-12    JDB     Allocate the TBG logical name during power-on reset
    18-Dec-12    MP      Now calls sim_activate_time to get remaining poll time
    09-May-12    JDB     Separated assignments from conditional expressions
    12-Feb-12    JDB     Add TBG as a logical name for the CLK device
@@ -98,7 +99,7 @@
    idle time.  The console poll is guaranteed to run, as the TTY device cannot
    be disabled.
 
-   The clock (time base generator) autocalibrates.  If the CLK is set to a ten
+   The clock (time base generator) autocalibrates.  If the TBG is set to a ten
    millisecond period (e.g., as under RTE), it is synchronized to the console
    poll.  Otherwise (e.g., as under DOS or TSB, which use 100 millisecond
    periods), it runs asynchronously.  If the specified clock frequency is below
@@ -393,7 +394,7 @@ DEVICE clk_dev = {
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
     &clk_dib, DEV_DISABLE,
-    0, NULL, NULL, "TBG"
+    0, NULL, NULL, NULL
     };
 
 
@@ -1191,6 +1192,9 @@ if (sim_switches & SWMASK ('P')) {                      /* initialization reset?
     clk_error = 0;                                      /* clear error */
     clk_select = 0;                                     /* clear select */
     clk_ctr = 0;                                        /* clear counter */
+
+    if (clk_dev.lname == NULL)                          /* logical name unassigned? */
+        clk_dev.lname = strdup ("TBG");                 /* allocate and initialize the name */
     }
 
 IOPRESET (&clk_dib);                                    /* PRESET device (does not use PON) */
