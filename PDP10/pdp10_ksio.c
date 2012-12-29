@@ -97,7 +97,7 @@ int32 ubcs[UBANUM] = { 0 };                             /* status registers */
 int32 ubmap[UBANUM][UMAP_MEMSIZE] = { 0 };              /* Unibus maps */
 int32 int_req = 0;                                      /* interrupt requests */
 
-int32 autcon_enb;                                       /* auto configure enabled */
+int32 autcon_enb = 1;                                   /* auto configure enabled */
 
 
 /* Map IO controller numbers to Unibus adapters: -1 = non-existent */
@@ -723,12 +723,15 @@ dptr = find_dev_from_unit (uptr);
 if (dptr == NULL)
     return SCPE_IERR;
 dibp = (DIB *) dptr->ctxt;
-if ((dibp == NULL) || (dibp->ba <= IOPAGEBASE))
+if (dibp == NULL)
+    return SCPE_IERR;
+if (((dibp->ba>>IO_V_UBA) != 1) &&
+    ((dibp->ba>>IO_V_UBA) != 3))
     return SCPE_IERR;
 fprintf (st, "address=%07o", dibp->ba);
 if (dibp->lnt > 1)
     fprintf (st, "-%07o", dibp->ba + dibp->lnt - 1);
-if (dibp->ba < IOPAGEBASE + AUTO_CSRBASE + AUTO_CSRMAX)
+if ((dibp->ba & ((1 << IO_V_UBA) - 1)) < AUTO_CSRBASE + AUTO_CSRMAX)
     fprintf (st, "*");
 return SCPE_OK;
 }

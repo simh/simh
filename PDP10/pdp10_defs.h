@@ -634,7 +634,7 @@ typedef struct pdp_dib DIB;
 
 /* I/O page layout */
 
-#define IOPAGEBASE      0760000                         /* I/O page base */
+#define IOPAGEBASE      (IO_UBA3)                       /* I/O page base */
 #define IOBA_UBMAP      0763000
 
 #define IOBA_UBMAP1     (IO_UBA1 + IOBA_UBMAP)          /* Unibus 1 map */
