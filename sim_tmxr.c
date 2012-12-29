@@ -672,6 +672,9 @@ for (i=0; i<mp->lines; ++i) {
             sprintf (growstring(&tptr, 12 + strlen (lp->port)), ",%s%s", lp->port, lp->notelnet ? ";notelnet" : "");
         }
     }
+if (mp->lines == 1)
+    while ((*tptr == ',') || (*tptr == ' '))
+        strcpy(tptr, tptr+1);
 if (*tptr == '\0') {
     free (tptr);
     tptr = NULL;
