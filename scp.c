@@ -215,6 +215,8 @@
 
 #include "sim_defs.h"
 #include "sim_rev.h"
+#include "sim_disk.h"
+#include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
 #include "sim_sock.h"
@@ -746,12 +748,12 @@ static CTAB cmd_table[] = {
       "echo <string>            display <string>\n" },
     { "ASSERT", &assert_cmd, 0,
       "assert {<dev>} <cond>    test simulator state against condition\n" },
-    { "HELP", &help_cmd, 0,
-      "h{elp}                   type this message\n"
-      "h{elp} <command>         type help for command\n" },
     { "!", &spawn_cmd, 0,
       "!                        execute local command interpreter\n"
       "! <command>              execute local host command\n" },
+    { "HELP", &help_cmd, 0,
+      "h{elp}                   type this message\n"
+      "h{elp} <command>         type help for command\n" },
     { NULL, NULL, 0 }
     };
 
@@ -980,6 +982,8 @@ return SCPE_EXIT;
 void fprint_help (FILE *st)
 {
 CTAB *cmdp;
+DEVICE *dptr;
+int i;
 
 for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help)
@@ -988,6 +992,21 @@ for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
 for (cmdp = cmd_table; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help && (!sim_vm_cmd || !find_ctab (sim_vm_cmd, cmdp->name)))
         fputs (cmdp->help, st);
+    }
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if (dptr->help)
+        fprintf (st, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+    if (dptr->attach_help || 
+        (DEV_TYPE(dptr) == DEV_MUX) ||
+        (DEV_TYPE(dptr) == DEV_DISK) ||
+        (DEV_TYPE(dptr) == DEV_TAPE)) {
+        if (dptr->numunits == 1)
+            fprintf (st, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+        else {
+            fprintf (st, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+            fprintf (st, "h{elp} %sn ATTACH\t type help for unit %sn ATTACH command\n", dptr->name, dptr->name);
+            }
+        }
     }
 return;
 }
@@ -1000,13 +1019,33 @@ CTAB *cmdp;
 GET_SWITCHES (cptr);
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
-    if (*cptr)
-        return SCPE_2MARG;
     if ((cmdp = find_cmd (gbuf))) {
+        if (*cptr)
+            return SCPE_2MARG;
         if (cmdp->help) {
             fputs (cmdp->help, stdout);
             if (sim_log)
                 fputs (cmdp->help, sim_log);
+            if (strcmp (cmdp->name, "HELP") == 0) {
+                DEVICE *dptr;
+                int i;
+
+                for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+                    if (dptr->help) {
+                        fprintf (stdout, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+                        if (sim_log)
+                            fprintf (sim_log, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+                        }
+                    if (dptr->attach_help || 
+                        (DEV_TYPE(dptr) == DEV_MUX) ||
+                        (DEV_TYPE(dptr) == DEV_DISK) ||
+                        (DEV_TYPE(dptr) == DEV_TAPE)) {
+                        fprintf (stdout, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        if (sim_log)
+                            fprintf (sim_log, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        }
+                    }
+                }
             }
         else { /* no help so it is likely a command alias */
             CTAB *cmdpa;
@@ -1027,7 +1066,80 @@ if (*cptr) {
                 }
             }
         }
-    else return SCPE_ARG;
+    else { 
+        DEVICE *dptr;
+        UNIT *uptr;
+        int i, dev_type;
+        static struct dev_help {
+            int type;
+            t_stat (*attach_help)(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+        } helps[] = {
+            {DEV_DISK,      &sim_disk_attach_help},
+            {DEV_TAPE,      &sim_tape_attach_help},
+            {DEV_MUX,       &tmxr_attach_help},
+            {0,             NULL}};
+
+        dptr = find_unit (gbuf, &uptr);
+        if (dptr == NULL)
+            return SCPE_ARG;
+        dev_type = DEV_TYPE (dptr);
+        for (i=0; helps[i].type; i++)
+            if (helps[i].type == dev_type)
+                break;
+        if (*cptr) {
+            cptr = get_glyph (cptr, gbuf, 0);
+            cmdp = find_cmd (gbuf);
+            }
+        else
+            cmdp = NULL;
+        if ((dptr->help == NULL) && (cmdp == NULL)) {
+            fprintf (stdout, "No help available for the %s device\n", dptr->name);
+            if (sim_log)
+                fprintf (sim_log, "No help available for the %s device\n", dptr->name);
+            if (dptr->attach_help || 
+                (DEV_TYPE(dptr) == DEV_MUX) ||
+                (DEV_TYPE(dptr) == DEV_DISK) ||
+                (DEV_TYPE(dptr) == DEV_TAPE)) {
+                fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                if (sim_log)
+                    fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                }
+            }
+        else {
+            if (cmdp != NULL) {
+                if (cmdp->action != &attach_cmd) {
+                    fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+                    if (sim_log)
+                        fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+                    if (dptr->attach_help || 
+                        (DEV_TYPE(dptr) == DEV_MUX) ||
+                        (DEV_TYPE(dptr) == DEV_DISK) ||
+                        (DEV_TYPE(dptr) == DEV_TAPE)) {
+                        fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                        if (sim_log)
+                            fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                        }
+                    }
+                else {
+                    if (dptr->attach_help) {
+                        dptr->attach_help (stdout, dptr, uptr, 0, cptr);
+                        if (sim_log)
+                            dptr->attach_help (sim_log, dptr, uptr, 0, cptr);
+                        }
+                    else {
+                        helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
+                        if (sim_log)
+                            helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
+                        }
+                    }
+                }
+            else {
+                dptr->help (stdout, dptr, uptr, 0, cptr);
+                if (sim_log)
+                    dptr->help (sim_log, dptr, uptr, 0, cptr);
+                }
+            }
+        }
     }
 else {
     fprint_help (stdout);
@@ -2908,8 +3020,6 @@ if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
-if (dptr->flags & DEV_RAWONLY)                          /* raw mode only? */
-    return SCPE_NOFNC;
 uptr->filename = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc name buf */
 if (uptr->filename == NULL)
     return SCPE_MEM;

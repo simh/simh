@@ -78,6 +78,7 @@
    tmxr_close_master -                  close master connection
    tmxr_attach  -                       attach terminal multiplexor to listening port
    tmxr_detach  -                       detach terminal multiplexor to listening port
+   tmxr_attach_help  -                  help routine for attaching multiplexer devices
    tmxr_set_line_unit -                 set the unit which polls for input for a given line
    tmxr_ex      -                       (null) examine
    tmxr_dep     -                       (null) deposit
@@ -2068,12 +2069,8 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
             tmxr_reset_ln (lp);
             }
         if (lp->serport) {
-            tmxr_reset_ln (lp);
             sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
-            sim_close_serial (lp->serport);
-            lp->serport = 0;
-            free (lp->serconfig);
-            lp->serconfig = NULL;
+            tmxr_close_ln (lp);
             }
         free (lp->destination);
         lp->destination = NULL;
@@ -2106,6 +2103,12 @@ tmxr_close_master (mp);                                 /* close master socket *
 free (uptr->filename);                                  /* free setup string */
 uptr->filename = NULL;
 uptr->flags = uptr->flags & ~UNIT_ATT;                  /* not attached */
+return SCPE_OK;
+}
+
+t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "%s Multiplexer Attach Help\n", dptr->name);
 return SCPE_OK;
 }
 

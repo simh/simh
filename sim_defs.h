@@ -317,6 +317,10 @@ struct sim_device {
     t_stat              (*msize)(struct sim_unit *up, int32 v, char *cp, void *dp);
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
+    t_stat              (*help)(FILE *st, struct sim_device *dptr,
+                            struct sim_unit *uptr, int32 flag, char *cptr); /* help */
+    t_stat              (*attach_help)(FILE *st, struct sim_device *dptr,
+                            struct sim_unit *uptr, int32 flag, char *cptr); /* help */
     };
 
 /* Device flags */
@@ -324,10 +328,9 @@ struct sim_device {
 #define DEV_V_DIS       0                               /* dev disabled */
 #define DEV_V_DISABLE   1                               /* dev disable-able */
 #define DEV_V_DYNM      2                               /* mem size dynamic */
-#define DEV_V_NET       3                               /* network attach */
-#define DEV_V_DEBUG     4                               /* debug capability */
-#define DEV_V_RAW       5                               /* raw supported */
-#define DEV_V_RAWONLY   6                               /* only raw supported */
+#define DEV_V_DEBUG     3                               /* debug capability */
+#define DEV_V_TYPE      4                               /* Attach type */
+#define DEV_S_TYPE      3                               /* Width of Type Field */
 #define DEV_V_UF_31     12                              /* user flags, V3.1 */
 #define DEV_V_UF        16                              /* user flags */
 #define DEV_V_RSV       31                              /* reserved */
@@ -335,10 +338,17 @@ struct sim_device {
 #define DEV_DIS         (1 << DEV_V_DIS)
 #define DEV_DISABLE     (1 << DEV_V_DISABLE)
 #define DEV_DYNM        (1 << DEV_V_DYNM)
-#define DEV_NET         (1 << DEV_V_NET)
 #define DEV_DEBUG       (1 << DEV_V_DEBUG)
-#define DEV_RAW         (1 << DEV_V_RAW)
-#define DEV_RAWONLY     (1 << DEV_V_RAWONLY)
+#define DEV_NET         0                               /* Deprecated - meaningless */
+
+
+#define DEV_TYPEMASK    (((1 << DEV_S_TYPE) - 1) << DEV_V_TYPE)
+#define DEV_DISK        (1 << DEV_S_TYPE)               /* sim_disk Attach */
+#define DEV_TAPE        (2 << DEV_S_TYPE)               /* sim_tape Attach */
+#define DEV_MUX         (3 << DEV_S_TYPE)               /* sim_tmxr Attach */
+#define DEV_ETHER       (4 << DEV_S_TYPE)               /* Ethernet Device */
+#define DEV_DISPLAY     (5 << DEV_S_TYPE)               /* Display Device */
+#define DEV_TYPE(dptr)  ((dptr)->flags & DEV_TYPEMASK)
 
 #define DEV_UFMASK_31   (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))
 #define DEV_UFMASK      (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF) - 1))

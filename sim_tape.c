@@ -58,6 +58,7 @@
 
    sim_tape_attach      attach tape unit
    sim_tape_detach      detach tape unit
+   sim_tape_attach_help help routine for attaching tapes
    sim_tape_rdrecf      read tape record forward
    sim_tape_rdrecr      read tape record reverse
    sim_tape_wrrecf      write tape record forward
@@ -503,6 +504,12 @@ sim_tape_rewind (uptr);
 free (uptr->tape_ctx);
 uptr->tape_ctx = NULL;
 uptr->io_flush = NULL;
+return SCPE_OK;
+}
+
+t_stat sim_tape_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "%s Tape Attach Help\n", dptr->name);
 return SCPE_OK;
 }
 

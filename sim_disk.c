@@ -34,6 +34,7 @@ Public routines:
 
    sim_disk_attach           attach disk unit
    sim_disk_detach           detach disk unit
+   sim_disk_attach_help      help routine for attaching disks
    sim_disk_rdsect           read disk sectors
    sim_disk_rdsect_a         read disk sectors asynchronously
    sim_disk_wrsect           write disk sectors
@@ -1128,6 +1129,12 @@ if (auto_format)
     sim_disk_set_fmt (uptr, 0, "SIMH", NULL);           /* restore file format */
 if (close_function (fileref) == EOF)
     return SCPE_IOERR;
+return SCPE_OK;
+}
+
+t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "%s Disk Attach Help\n", dptr->name);
 return SCPE_OK;
 }
 
