@@ -416,7 +416,7 @@ return (tti_csr & RXCS_RD);
 void rxcs_wr (int32 data)
 {
 if ((data & CSR_IE) == 0)
-    tto_int = 0;
+    tti_int = 0;
 else if ((tti_csr & (CSR_DONE + CSR_IE)) == CSR_DONE)
     tti_int = 1;
 tti_csr = (tti_csr & ~RXCS_WR) | (data & RXCS_WR);
