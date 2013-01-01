@@ -206,7 +206,7 @@ CTAB vax860_cmd[] = {
    External device interrupts do not vector directly.
    Instead, the interrupt handler for a given UBA IPL
    reads a vector register that contains the Unibus vector
-   for that IPL.
+   for that IPL. */
 
 /* Find highest priority vectorable interrupt */
 
@@ -570,7 +570,14 @@ return cc;
 
 int32 con_halt (int32 code, int32 cc)
 {
-ABORT (STOP_HALT);
+if ((cpu_boot_cmd[0] == 0) ||                           /* saved boot cmd? */
+    (vax860_boot_parse (0, cpu_boot_cmd) != SCPE_OK) || /* reparse the boot cmd */ 
+    (reset_all (0) != SCPE_OK) ||                       /* reset the world */
+    (cpu_boot (0, NULL) != SCPE_OK))                    /* set up boot code */
+    ABORT (STOP_BOOT);                                  /* any error? */
+printf ("Rebooting...\n");
+if (sim_log)
+    fprintf (sim_log, "Rebooting...\n");
 return cc;
 }
 
@@ -606,7 +613,7 @@ uint32 ba;
 t_stat r;
 
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
-if (slptr = strchr (gbuf, '/')) {                       /* found slash? */
+if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
     regptr = strchr (ptr, '/');                         /* locate orig */
     *slptr = 0;                                         /* zero in string */
     }
@@ -695,15 +702,15 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
         if (dptr->flags & DEV_NEXUS) {                  /* Nexus? */
-            if (r = build_nexus_tab (dptr, dibp))       /* add to dispatch table */
+            if ((r = build_nexus_tab (dptr, dibp)))     /* add to dispatch table */
                 return r;
             }
         else if (dptr->flags & DEV_MBUS) {              /* Massbus? */
-            if (r = build_mbus_tab (dptr, dibp))
+            if ((r = build_mbus_tab (dptr, dibp)))
                 return r;
             }
         else {                                          /* no, Unibus device */
-            if (r = build_ubus_tab (dptr, dibp))        /* add to dispatch tab */
+            if ((r = build_ubus_tab (dptr, dibp)))      /* add to dispatch tab */
                 return r;
             }                                           /* end else */
         }                                               /* end if enabled */
