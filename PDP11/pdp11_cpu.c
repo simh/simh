@@ -606,6 +606,7 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size},
     { UNIT_MSIZE, 786432, NULL, "768K", &cpu_set_size},
     { UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size},
+    { UNIT_MSIZE, 1572864, NULL, "1536K", &cpu_set_size},
     { UNIT_MSIZE, 2097152, NULL, "2048K", &cpu_set_size},
     { UNIT_MSIZE, 3145728, NULL, "3072K", &cpu_set_size},
     { UNIT_MSIZE, 4186112, NULL, "4096K", &cpu_set_size},
