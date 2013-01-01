@@ -925,7 +925,7 @@ return SCPE_OK;
 
    The table reflects the MicroVAX 3900 microcode, with one field addition - the
    number of controllers field handles devices where multiple instances
-   are simulated through a single DEVICE structure (e.g., DZ, VH).
+   are simulated through a single DEVICE structure (e.g., DZ, VH, DL, DC).
 
    The table has been reviewed, extended and updated to reflect the contents of
    the auto configure table in VMS sysgen (V5.5-2)
@@ -936,9 +936,7 @@ return SCPE_OK;
    An amod value of 0 indicates that all addresses are FIXED
    An vmod value of 0 indicates that all vectors are FIXED */
 
-#define DCX_LINES 8
-#define DLX_LINES 8
-#define VH_MUXES 1
+
 typedef struct {
     char        *dnam[AUTO_MAXC];
     int32       numc;
@@ -960,8 +958,10 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {010700} },                                     /* KG11-A - fx CSR, no VEC */
     { { "RHA", "RHB" },  1,  1,  0, 0, 
         {016700, 012440}, {0254, 0224} },               /* RH11/RH70 - fx CSR, fx VEC */
-    { { "CLK" },         1,  0,  0, 0, 
+    { { "CLK" },         1,  1,  0, 0, 
         {017546}, {0100} },                             /* KW11L - fx CSR, fx VEC */
+    { { "PCLK" },        1,  1,  0, 0, 
+        {012540}, {0104} },                             /* KW11P - fx CSR, fx VEC */
     { { "PTR" },         1,  1,  0, 0, 
         {017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
@@ -987,7 +987,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {014400}, {0160} },                             /* RL11 - fx CSR, fx VEC */
     { { "RL" },          1,  1,  0, 0, 
         {014400}, {0160} },                             /* RL11 - fx CSR, fx VEC */
-    { { "DCI" }, DCX_LINES,  2,  0, 8, 
+    { { "DCI" },         1,  2,  0, 8, 
         {014000, 014010, 014020, 014030, 
          014040, 014050, 014060, 014070, 
          014100, 014110, 014120, 014130, 
@@ -1024,7 +1024,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
          017430, 017432, 017434, 017436} },             /* DT11 - fx CSRs */
     { { NULL },          1,  2,  0, 8,
       {016200, 016240} },                               /* DX11 */
-    { { "DLI" }, DLX_LINES,  2,  0, 8, 
+    { { "DLI" },         1,  2,  0, 8, 
         {016500, 016510, 016520, 016530,
          016540, 016550, 016560, 016570,
          016600, 016610, 016620, 016630,
@@ -1046,7 +1046,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  8, 8 },                /* LK11A */
     { { "DMC0", "DMC1", "DMC2", "DMC3" }, 
                          1,  2,  8, 8 },                /* DMC11 */
-    { { "DZ" },   DZ_MUXES,  2,  8, 8 },                /* DZ11 */
+    { { "DZ" },          1,  2,  8, 8 },                /* DZ11 */
     { { NULL },          1,  2,  8, 8 },                /* KMC11 */
     { { NULL },          1,  2,  8, 8 },                /* LPP11 */
     { { NULL },          1,  2,  8, 8 },                /* VMV21 */
@@ -1090,11 +1090,13 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {004400, 004440, 004500, 004540} },             /* KTC32 */
     { { NULL },          1,  2,  0, 8,
         {004100} },                                     /* IEQ11 */
-    { { "VH" },   VH_MUXES,  2, 16, 8 },                /* DHU11/DHQ11 */
+    { { "VH" },          1,  2, 16, 8 },                /* DHU11/DHQ11 */
     { { NULL },          1,  6, 32, 4 },                /* DMZ32 */
     { { NULL },          1,  6, 32, 4 },                /* CP132 */
-    { { NULL },          1,  1,  0, 0,
+    { { "TC" },          1,  1,  0, 0,
         {017340}, {0214} },                             /* TC11 */
+    { { "TA" },          1,  1,  0, 0,
+        {017500}, {0260} },                             /* TA11 */
     { { NULL },          1,  2, 64, 8, 
         {017200} },                                     /* QVSS - fx CSR */
     { { NULL },          1,  1,  8, 4 },                /* VS31 */
@@ -1146,6 +1148,13 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL }, -1 }                                    /* end table */
 };
 
+#if !defined(DEV_NEXUS) 
+#if defined(DEV_MBUS)
+#define DEV_NEXUS DEV_MBUS
+#else
+#define DEV_NEXUS 0
+#endif
+#endif
 t_stat auto_config (char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
@@ -1153,8 +1162,7 @@ uint32 vec = VEC_Q + AUTO_VECBASE;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
-t_bool auto_fixed = TRUE;
-uint32 j, k, vmask, amask;
+uint32 j, vmask, amask;
 
 if (autcon_enb == 0)                                    /* enabled? */
     return SCPE_OK;
@@ -1173,39 +1181,37 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         amask = autp->amod - 1;
         csr = (csr + amask) & ~amask;                   /* align csr */
         }
-    for (j = k = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
+    for (j = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
         if (autp->dnam[j] == NULL)                      /* no device? */
             break;
         dptr = find_dev (autp->dnam[j]);                /* find ctrl */
-        if ((dptr == NULL) ||                           /* enabled, floating? */
-            (dptr->flags & DEV_DIS))
+        if ((dptr == NULL) ||                           /* enabled, not nexus? */
+            (dptr->flags & DEV_DIS) ||
+            (dptr->flags & DEV_NEXUS) )
             continue;
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
             return SCPE_IERR;
-        if (auto_fixed || (autp->amod)) {               /* dyn csr needed? */
-            if (autp->fixa[k])                          /* fixed csr avail? */
-                dibp->ba = IOPAGEBASE + autp->fixa[k];  /* use it */
-            else {                                      /* no fixed left */
-                dibp->ba = csr;                         /* set CSR */
-                csr += (autp->numc * autp->amod);       /* next CSR */
-                }                                       /* end else */
-            }                                           /* end if dyn csr */
-        if (autp->numv && (autp->vmod || auto_fixed)) { /* dyn vec needed? */
-            uint32 numv = abs (autp->numv);             /* get num vec */
-            if (autp->fixv[k]) {                        /* fixed vec avail? */
+        if (autp->fixa[j])                              /* fixed csr avail? */
+            dibp->ba = IOPAGEBASE + autp->fixa[j];      /* use it */
+        else {                                          /* no fixed left */
+            dibp->ba = csr;                             /* set CSR */
+            csr += (autp->numc * autp->amod);           /* next CSR */
+            }                                           /* end else */
+        if (autp->numv) {                               /* vec needed? */
+            if (autp->fixv[j]) {                        /* fixed vec avail? */
                 if (autp->numv > 0)
-                    dibp->vec = VEC_Q + autp->fixv[k];  /* use it */
+                    dibp->vec = VEC_Q + autp->fixv[j];  /* use it */
                 }
             else {                                      /* no fixed left */
+                uint32 numv = abs (autp->numv);         /* get num vec */
                 vmask = autp->vmod - 1;
                 vec = (vec + vmask) & ~vmask;           /* align vector */
                 if (autp->numv > 0)
                     dibp->vec = vec;                    /* set vector */
                 vec += (autp->numc * numv * 4);
                 }                                       /* end else */
-            }                                           /* end if dyn vec */
-        k++;                                            /* next instance */
+            }                                           /* end vec needed */
         }                                               /* end for j */
     if (autp->amod)                                     /* flt CSR? gap */
         csr = csr + 2;
