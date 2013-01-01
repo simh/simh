@@ -222,6 +222,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_disk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\sim_ether.c"
 				>
 			</File>
@@ -268,6 +272,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_disk.h"
 				>
 			</File>
 			<File
