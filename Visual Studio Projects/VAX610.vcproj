@@ -26,8 +26,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies"
-				CommandLine="pushd ..&#x0D;&#x0A;&quot;$(TargetDir)BuildROMs&quot;&#x0D;&#x0A;popd&#x0D;&#x0A;&#x0D;&#x0A;if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;"
+				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
+				CommandLine="pushd ..&#x0D;&#x0A;&quot;$(TargetDir)BuildROMs&quot;&#x0D;&#x0A;popd&#x0D;&#x0A;&#x0D;&#x0A;if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;SET GIT_COMMIT_ID=&#x0D;&#x0A;if not exist ..\.git-commit-id goto _NoId&#x0D;&#x0A;for /F %%i in (..\.git-commit-id) do SET GIT_COMMIT_ID=%%i&#x0D;&#x0A;:_NoId&#x0D;&#x0A;SET OLD_GIT_COMMIT_ID=&#x0D;&#x0A;if not exist .git-commit-id.h echo.&gt;.git-commit-id.h&#x0D;&#x0A;for /F &quot;tokens=3&quot; %%i in (.git-commit-id.h) do SET OLD_GIT_COMMIT_ID=%%i&#x0D;&#x0A;if &quot;%GIT_COMMIT_ID%&quot; equ &quot;%OLD_GIT_COMMIT_ID%&quot; goto _IdGood&#x0D;&#x0A;echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% &gt;.git-commit-id.h&#x0D;&#x0A;:_IdGood&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID"
 				KeepComments="false"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="0"
@@ -112,8 +112,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
-				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies"
-				CommandLine="pushd ..&#x0D;&#x0A;&quot;$(TargetDir)BuildROMs&quot;&#x0D;&#x0A;popd&#x0D;&#x0A;&#x0D;&#x0A;if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;"
+				Description="Build Dependent ROM include File(s) &amp; Check for required build dependencies &amp; git commit id"
+				CommandLine="pushd ..&#x0D;&#x0A;&quot;$(TargetDir)BuildROMs&quot;&#x0D;&#x0A;popd&#x0D;&#x0A;&#x0D;&#x0A;if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;SET GIT_COMMIT_ID=&#x0D;&#x0A;if not exist ..\.git-commit-id goto _NoId&#x0D;&#x0A;for /F %%i in (..\.git-commit-id) do SET GIT_COMMIT_ID=%%i&#x0D;&#x0A;:_NoId&#x0D;&#x0A;SET OLD_GIT_COMMIT_ID=&#x0D;&#x0A;if not exist .git-commit-id.h echo.&gt;.git-commit-id.h&#x0D;&#x0A;for /F &quot;tokens=3&quot; %%i in (.git-commit-id.h) do SET OLD_GIT_COMMIT_ID=%%i&#x0D;&#x0A;if &quot;%GIT_COMMIT_ID%&quot; equ &quot;%OLD_GIT_COMMIT_ID%&quot; goto _IdGood&#x0D;&#x0A;echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% &gt;.git-commit-id.h&#x0D;&#x0A;:_IdGood&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -136,7 +136,7 @@
 				OmitFramePointers="true"
 				WholeProgramOptimization="true"
 				AdditionalIncludeDirectories="./;../;../VAX/;../pdp11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO"
+				PreprocessorDefinitions="USE_INT64;USE_ADDR64;VM_VAX;VAX_610;USE_SHARED;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;USE_READER_THREAD;SIM_ASYNCH_IO;SIM_NEED_GIT_COMMIT_ID"
 				KeepComments="false"
 				StringPooling="true"
 				RuntimeLibrary="0"

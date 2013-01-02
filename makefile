@@ -350,7 +350,7 @@ else
   endif
 endif
 ifneq (,$(GIT_COMMIT_ID))
-  CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=\"$(GIT_COMMIT_ID)\"
+  CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=$(GIT_COMMIT_ID)
 endif
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3

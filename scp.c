@@ -2433,7 +2433,9 @@ fprintf (st, " %s", SIM_VERSION_MODE);
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
 #if defined(SIM_GIT_COMMIT_ID)
-fprintf (st, "     git commit id: %8.8s", SIM_GIT_COMMIT_ID);
+#define _xstr(a) _str(a)
+#define _str(a) #a
+fprintf (st, "     git commit id: %8.8s", _xstr(SIM_GIT_COMMIT_ID));
 #endif
 fprintf (st, "\n");
 return SCPE_OK;
