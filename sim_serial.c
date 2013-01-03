@@ -861,6 +861,13 @@ return;
 
 #elif defined (__unix__) || defined(__APPLE__)
 
+#if defined(__linux__)
+#include <dirent.h>
+#include <libgen.h>
+#include <unistd.h>
+#include <sys/stat.h>
+#endif /* __linux__ */
+
 /* UNIX implementation */
 
 /* Enumerate the available serial ports.
@@ -881,10 +888,6 @@ int ports = 0;
 
 memset(list, 0, max*sizeof(*list));
 #if defined(__linux__)
-#include <dirent.h>
-#include <libgen.h>
-#include <unistd.h>
-#include <sys/stat.h>
 if (1) {
     struct dirent **namelist;
     int n;
