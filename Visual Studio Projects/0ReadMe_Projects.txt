@@ -21,7 +21,7 @@ For Example, the directory structure should look like:
 
 The contents of the windows-build directory can be downloaded from:
 
-    https://github.com/downloads/simh/simh/windows-build.zip
+    https://github.com/simh/windows-build/archive/windows-build.zip
 
 
 Network devices are capable of using pthreads to enhance their performance.  
