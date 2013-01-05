@@ -214,8 +214,8 @@ static CTAB set_con_tab[] = {
     { "NOSERIAL", &sim_set_noserial, 0 },
     { "LOG", &sim_set_logon, 0 },
     { "NOLOG", &sim_set_logoff, 0 },
-    { "DEBUG", &sim_set_cons_debug, 1 },
-    { "NODEBUG", &sim_set_cons_debug, 0 },
+    { "DEBUG", &sim_set_debon, 0 },
+    { "NODEBUG", &sim_set_deboff, 0 },
     { NULL, NULL, 0 }
     };
 
