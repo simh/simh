@@ -233,7 +233,8 @@ BUFFER *dmc_buffer_queue_head(BUFFER_QUEUE *q);
 int dmc_buffer_queue_full(BUFFER_QUEUE *q);
 void dmc_buffer_queue_get_stats(BUFFER_QUEUE *q, int *available, int *contains_data, int *transfer_in_progress);
 void dmc_start_transfer_transmit_buffer(CTLR *controller);
-void dmc_error_and_close_receive(CTLR *controller, char *format);
+void dmc_error_and_close_socket(CTLR *controller, char *format);
+void dmc_close_socket(CTLR *controller, char *reason);
 void dmc_close_receive(CTLR *controller, char *reason, char *from);
 void dmc_close_transmit(CTLR *controller, char *reason);
 int dmc_get_socket(CTLR *controller, int forRead);
@@ -1124,6 +1125,7 @@ void dmc_process_master_clear(CTLR *controller)
 {
     sim_debug(DBG_INF, controller->device, "Master clear\n");
     dmc_clear_master_clear(controller);
+    dmc_close_socket(controller, "Master clear"); /* to resynch both ends */
     controller->state = Initialised;
     dmc_setreg(controller, 0, 0, 0);
     if (controller->dev_type == DMR)
@@ -1691,45 +1693,56 @@ int dmc_get_transmit_socket(CTLR *controller, int is_loopback, int forRead)
     return ans;
 }
 
-void dmc_close_receive(CTLR *controller, char *reason, char *from)
-{
-    sim_debug(DBG_SOK, controller->device, "Closing receive socket on port %s, reason: %s%s%s\n", controller->line->receive_port, reason, from ? " from " : "", from ? from : "");
-    sim_close_sock(controller->line->socket, FALSE);
-    controller->line->socket = INVALID_SOCKET;
-
-    if (controller->line->receive_readable)
-    {
-        sim_debug(DBG_CON, controller->device, "Readable receive socket closed, reason: %s\n", reason);
-    }
-    controller->line->receive_readable = FALSE;
-}
-
-void dmc_error_and_close_receive(CTLR *controller, char *format)
+void dmc_error_and_close_socket(CTLR *controller, char *format)
 {
     int err = WSAGetLastError(); 
     char errmsg[80];
     sprintf(errmsg, format, err);
+    dmc_close_socket(controller, errmsg);
+}
+
+void dmc_close_socket(CTLR *controller, char *reason)
+{
     if (controller->line->isPrimary)
     {
-        dmc_close_transmit(controller, errmsg);
+        dmc_close_transmit(controller, reason);
     }
     else
     {
-        dmc_close_receive(controller, errmsg, NULL);
+        dmc_close_receive(controller, reason, NULL);
+    }
+}
+
+void dmc_close_receive(CTLR *controller, char *reason, char *from)
+{
+    if (controller->line->socket != INVALID_SOCKET)
+    {
+        sim_debug(DBG_SOK, controller->device, "Closing receive socket on port %s, reason: %s%s%s\n", controller->line->receive_port, reason, from ? " from " : "", from ? from : "");
+        sim_close_sock(controller->line->socket, FALSE);
+        controller->line->socket = INVALID_SOCKET;
+
+        if (controller->line->receive_readable)
+        {
+            sim_debug(DBG_CON, controller->device, "Readable receive socket closed, reason: %s\n", reason);
+        }
+        controller->line->receive_readable = FALSE;
     }
 }
 
 void dmc_close_transmit(CTLR *controller, char *reason)
 {
-    sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %s, socket %d, reason: %s\n", controller->line->peer, controller->line->socket, reason);
-    sim_close_sock(controller->line->socket, FALSE);
-    controller->line->socket = INVALID_SOCKET;
-
-    if (controller->line->transmit_writeable)
+    if (controller->line->socket != INVALID_SOCKET)
     {
-        sim_debug(DBG_CON, controller->device, "Writeable transmit socket closed, reason: %s\n", reason);
+        sim_debug(DBG_SOK, controller->device, "Closing transmit socket to port %s, socket %d, reason: %s\n", controller->line->peer, controller->line->socket, reason);
+        sim_close_sock(controller->line->socket, FALSE);
+        controller->line->socket = INVALID_SOCKET;
+
+        if (controller->line->transmit_writeable)
+        {
+            sim_debug(DBG_CON, controller->device, "Writeable transmit socket closed, reason: %s\n", reason);
+        }
+        controller->line->transmit_writeable = FALSE;
     }
-    controller->line->transmit_writeable = FALSE;
 }
 
 /* returns true if some data was received */
@@ -1748,7 +1761,7 @@ int dmc_buffer_fill_receive_buffers(CTLR *controller)
             bytes_read = sim_read_sock(socket, buffer, sizeof(buffer));
             if (bytes_read < 0)
             {
-                dmc_error_and_close_receive(controller, "read error, code=%d");
+                dmc_error_and_close_socket(controller, "read error, code=%d");
             }
             else if (bytes_read > 0)
             {
@@ -1846,7 +1859,7 @@ int dmc_buffer_fill_receive_buffers(CTLR *controller)
                 /* Only close the socket if there was an error or no more data */
                 if (bytes_read < 0)
                 {
-                    dmc_error_and_close_receive(controller, "read error, code=%d");
+                    dmc_error_and_close_socket(controller, "read error, code=%d");
                     break;
                 }
 
@@ -2245,7 +2258,7 @@ int dmc_isattached(CTLR *controller)
 t_stat dmc_detach (UNIT *uptr)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
-    dmc_error_and_close_receive(controller, "Detach");
+    dmc_error_and_close_socket(controller, "Detach");
     dmc_close_master_socket(controller);
     uptr->flags = uptr->flags & ~UNIT_ATT; /* clear unit attached flag */
     free(uptr->filename);
