@@ -37,6 +37,7 @@ set _ZipPath=..\..\%BIN_REPO%\
 vcbuild Simh.sln "Release|Win32"
 if exist "%ProgramFiles%\7-Zip\7z.exe" "%ProgramFiles%\7-Zip\7z.exe" a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
 if exist "%ProgramFiles(x86)%\7-Zip\7z.exe" "%ProgramFiles(x86)%\7-Zip\7z.exe" a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
+if exist "%PROGRAMW6432%\7-Zip\7z.exe" "%PROGRAMW6432%\7-Zip\7z.exe" a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
 
 pushd %_ZipPath%
 where git.exe >NUL
