@@ -470,7 +470,7 @@ int load_ws2(void) {
                 =       optional pointer to default host if none specified
         host_len =      length of host buffer
         default_port
-                =       optional pointer to default host if none specified
+                =       optional pointer to default port if none specified
         port_len =      length of port buffer
         validate_addr = optional name/addr which is checked to be equivalent
                         to the host result of parsing the other input.  This
@@ -498,7 +498,8 @@ if ((host != NULL) && (host_len != 0))
     memset (host, 0, host_len);
 if ((port != NULL) && (port_len != 0))
     memset (port, 0, port_len);
-strncpy (gbuf, cptr, CBUFSIZE);
+gbuf[sizeof(gbuf)-1] = '\0';
+strncpy (gbuf, cptr, sizeof(gbuf)-1);
 hostp = gbuf;                                           /* default addr */
 portp = NULL;
 if ((portp = strrchr (gbuf, ':')) &&                    /* x:y? split */
@@ -507,13 +508,10 @@ if ((portp = strrchr (gbuf, ':')) &&                    /* x:y? split */
     if (*portp == '\0')
         portp = (char *)default_port;
     }
-else
-    if (default_port)
-        portp = (char *)default_port;
-    else {
-        portp = gbuf;
-        hostp = NULL;
-        }
+else {                                                  /* No colon in input */
+    portp = gbuf;                                       /* Input is the port specifier */
+    hostp = (char *)default_host;                       /* host is defaulted if provided */
+    }
 if (portp != NULL) {
     portval = strtoul(portp, &endc, 10);
     if ((*endc == '\0') && ((portval == 0) || (portval > 65535)))
@@ -536,7 +534,9 @@ if (hostp != NULL) {
     if (']' == hostp[strlen(hostp)-1]) {
         if ('[' != hostp[0])
             return SCPE_ARG;                            /* invalid domain literal */
-        strcpy(hostp, hostp+1);                         /* remove brackets from domain literal host */
+        /* host may be the const default_host so move to temp buffer before modifying */
+        strncpy(gbuf, hostp+1, sizeof(gbuf)-1);         /* remove brackets from domain literal host */
+        hostp = gbuf;
         hostp[strlen(hostp)-1] = '\0';
         }
     }
