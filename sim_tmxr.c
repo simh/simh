@@ -1622,20 +1622,18 @@ while (*tptr) {
             mp->notelnet = listennotelnet;                  /* save desired telnet behavior flag */
             for (i = 0; i < mp->lines; i++) {               /* initialize lines */
                 lp = mp->ldsc + i;
+                lp->mp = mp;                                /* set the back pointer */
 
-                if (lp->serport == 0) {                     /* no serial port attached? */
-                    lp->mp = mp;                            /* set the back pointer */
-                    tmxr_init_line (lp);                    /* initialize line state */
-                    lp->sock = 0;                           /* clear the socket */
-                    }
-                else {                                      /* close current serial connection */
-                    tmxr_reset_ln (lp);
+                if (lp->serport) {                          /* serial port attached? */
+                    tmxr_reset_ln (lp);                     /* close current serial connection */
                     sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
                     sim_close_serial (lp->serport);
                     lp->serport = 0;
                     free (lp->serconfig);
                     lp->serconfig = NULL;
                     }
+                tmxr_init_line (lp);                        /* initialize line state */
+                lp->sock = 0;                               /* clear the socket */
                 }
             }
         if (destination[0]) {
@@ -2052,11 +2050,6 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
     if (!lp->destination && lp->sock) {                 /* not serial and is connected? */
         tmxr_report_disconnection (lp);                 /* report disconnection */
         tmxr_reset_ln (lp);                             /* disconnect line */
-        if (lp->master)
-            sim_close_sock (mp->master, 1);             /* close master socket */
-        lp->master = 0;
-        free (lp->port);
-        lp->port = NULL;
         }
     else {
         if (lp->sock) {
@@ -2075,6 +2068,12 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
         free (lp->destination);
         lp->destination = NULL;
         lp->conn = FALSE;
+        }
+    if (lp->master) {
+        sim_close_sock (lp->master, 1);                 /* close master socket */
+        lp->master = 0;
+        free (lp->port);
+        lp->port = NULL;
         }
     }
 
