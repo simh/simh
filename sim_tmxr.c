@@ -656,7 +656,7 @@ for (i=0; i<mp->lines; ++i) {
     lp = mp->ldsc + i;
     if (lp->destination || lp->port) {
         if (mp->lines > 1)
-            sprintf (growstring(&tptr, 32), "%sLine=%d", *tptr ? ",," : "", i);
+            sprintf (growstring(&tptr, 32), "%sLine=%d", *tptr ? "," : "", i);
         else
             sprintf (growstring(&tptr, 32), "%s", *tptr ? "," : "");
         if (lp->destination) {
@@ -1428,7 +1428,7 @@ if (lp->serport) {                          /* close current serial connection *
 
 t_stat tmxr_open_master (TMXR *mp, char *cptr)
 {
-int32 i, line = -1;
+int32 i, line, nextline = -1;
 char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE], 
      logfiletmpl[CBUFSIZE], buffered[CBUFSIZE], hostport[CBUFSIZE], 
      port[CBUFSIZE], option[CBUFSIZE];
@@ -1441,7 +1441,7 @@ t_stat r = SCPE_ARG;
 
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
-    line = -1;
+    line = nextline;
     memset(logfiletmpl, '\0', sizeof(logfiletmpl));
     memset(listen,      '\0', sizeof(listen));
     memset(destination, '\0', sizeof(destination));
@@ -1462,10 +1462,10 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "LINE")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
-                line = (int32) get_uint (cptr, 10, mp->lines, &r);
+                nextline = (int32) get_uint (cptr, 10, mp->lines, &r);
                 if ((r != SCPE_OK) || (mp->lines == 1))
                     return SCPE_ARG;
-                continue;
+                break;
                 }
             if (0 == MATCH_CMD (gbuf, "LOG")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
