@@ -239,19 +239,26 @@ static t_bool _disk_is_active (UNIT *uptr)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "_disk_is_active(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
-return (ctx->io_dop != DOP_DONE);
+if (ctx) {
+    sim_debug (ctx->dbit, ctx->dptr, "_disk_is_active(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
+    return (ctx->io_dop != DOP_DONE);
+    }
+return FALSE;
 }
 
 static void _disk_cancel (UNIT *uptr)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "_disk_cancel(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
-pthread_mutex_lock (&ctx->io_lock);
-while (ctx->io_dop != DOP_DONE)
-    pthread_cond_wait (&ctx->io_done, &ctx->io_lock);
-pthread_mutex_unlock (&ctx->io_lock);
+if (ctx) {
+    sim_debug (ctx->dbit, ctx->dptr, "_disk_cancel(unit=%d, dop=%d)\n", uptr-ctx->dptr->units, ctx->io_dop);
+    if (ctx->asynch_io) {
+        pthread_mutex_lock (&ctx->io_lock);
+        while (ctx->io_dop != DOP_DONE)
+            pthread_cond_wait (&ctx->io_done, &ctx->io_lock);
+        pthread_mutex_unlock (&ctx->io_lock);
+        }
+    }
 }
 #else
 #define AIO_CALLSETUP

@@ -314,19 +314,26 @@ static t_bool _tape_is_active (UNIT *uptr)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "_tape_is_active(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
-return (ctx->io_top != TOP_DONE);
+if (ctx) {
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_is_active(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+    return (ctx->io_top != TOP_DONE);
+    }
+return FALSE;
 }
 
 static void _tape_cancel (UNIT *uptr)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-sim_debug (ctx->dbit, ctx->dptr, "_tape_cancel(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
-pthread_mutex_lock (&ctx->io_lock);
-while (ctx->io_top != TOP_DONE)
-    pthread_cond_wait (&ctx->io_done, &ctx->io_lock);
-pthread_mutex_unlock (&ctx->io_lock);
+if (ctx) {
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_cancel(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+    if (ctx->asynch_io) {
+        pthread_mutex_lock (&ctx->io_lock);
+        while (ctx->io_top != TOP_DONE)
+            pthread_cond_wait (&ctx->io_done, &ctx->io_lock);
+        pthread_mutex_unlock (&ctx->io_lock);
+        }
+    }
 }
 #else
 #define AIO_CALLSETUP
