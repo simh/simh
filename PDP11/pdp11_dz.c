@@ -291,7 +291,7 @@ DEVICE dz_dev = {
     1, DEV_RDX, 8, 1, DEV_RDX, 8,
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
-    &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_MUX,
     0, dz_debug
     };
 

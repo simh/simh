@@ -415,7 +415,7 @@ DEVICE tu_dev = {
     TU_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
-    &tu_dib, DEV_UBUS | DEV_DEBUG
+    &tu_dib, DEV_UBUS | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routine, I/O addresses 17772440 - 17772472 */

@@ -246,7 +246,7 @@ DEVICE tm_dev = {
     TM_NUMDR, 10, T_ADDR_W, 1, 8, 8,
     NULL, NULL, &tm_reset,
     &tm_boot, &tm_attach, &tm_detach,
-    &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG
+    &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772532

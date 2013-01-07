@@ -169,7 +169,7 @@ DEVICE mux_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &mux_reset,
     NULL, &mux_attach, &mux_detach,
-    &mux_dib, DEV_NET | DEV_DISABLE
+    &mux_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* MUXL data structures

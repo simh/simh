@@ -234,7 +234,7 @@ DEVICE mtc_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     NULL, &mtc_attach, &mtc_detach,
-    &mtc_dib, DEV_DISABLE | DEV_DIS
+    &mtc_dib, DEV_DISABLE | DEV_DIS | DEV_TAPE
     };
 
 

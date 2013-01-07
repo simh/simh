@@ -366,7 +366,7 @@ DEVICE ts_dev = {
     1, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
-    &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG
+    &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772522

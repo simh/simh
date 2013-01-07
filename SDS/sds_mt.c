@@ -168,7 +168,7 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     &mt_boot, &mt_attach, NULL,
-    &mt_dib, DEV_DISABLE
+    &mt_dib, DEV_DISABLE | DEV_TAPE
     };
 
 /* Mag tape routine

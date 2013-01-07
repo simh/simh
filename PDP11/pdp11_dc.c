@@ -193,7 +193,7 @@ DEVICE dci_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
     NULL, &dcx_attach, &dcx_detach,
-    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
     };
 
 /* DCO data structures

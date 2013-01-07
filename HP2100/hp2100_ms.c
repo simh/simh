@@ -375,7 +375,7 @@ DEVICE msc_dev = {
     MS_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &msc_reset,
     &msc_boot, &msc_attach, &msc_detach,
-    &msc_dib, DEV_DISABLE | DEV_DEBUG,
+    &msc_dib, DEV_DISABLE | DEV_DEBUG | DEV_TAPE,
     0, msc_deb, NULL, NULL
     };
 

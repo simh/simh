@@ -323,7 +323,7 @@ DEVICE tu_dev = {
     TU_NUMDR, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
-    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03
+    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03|DEV_TAPE
     };
 
 /* Massbus register read */

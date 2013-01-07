@@ -1008,7 +1008,7 @@ DEVICE rq_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -1080,7 +1080,7 @@ DEVICE rqb_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -1152,7 +1152,7 @@ DEVICE rqc_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -1224,7 +1224,7 @@ DEVICE rqd_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 

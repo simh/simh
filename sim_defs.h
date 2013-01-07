@@ -343,11 +343,11 @@ struct sim_device {
 
 
 #define DEV_TYPEMASK    (((1 << DEV_S_TYPE) - 1) << DEV_V_TYPE)
-#define DEV_DISK        (1 << DEV_S_TYPE)               /* sim_disk Attach */
-#define DEV_TAPE        (2 << DEV_S_TYPE)               /* sim_tape Attach */
-#define DEV_MUX         (3 << DEV_S_TYPE)               /* sim_tmxr Attach */
-#define DEV_ETHER       (4 << DEV_S_TYPE)               /* Ethernet Device */
-#define DEV_DISPLAY     (5 << DEV_S_TYPE)               /* Display Device */
+#define DEV_DISK        (1 << DEV_V_TYPE)               /* sim_disk Attach */
+#define DEV_TAPE        (2 << DEV_V_TYPE)               /* sim_tape Attach */
+#define DEV_MUX         (3 << DEV_V_TYPE)               /* sim_tmxr Attach */
+#define DEV_ETHER       (4 << DEV_V_TYPE)               /* Ethernet Device */
+#define DEV_DISPLAY     (5 << DEV_V_TYPE)               /* Display Device */
 #define DEV_TYPE(dptr)  ((dptr)->flags & DEV_TYPEMASK)
 
 #define DEV_UFMASK_31   (((1u << DEV_V_RSV) - 1) & ~((1u << DEV_V_UF_31) - 1))

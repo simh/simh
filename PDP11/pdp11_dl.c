@@ -219,7 +219,7 @@ DEVICE dlo_dev = {
     DLX_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, NULL, NULL,
-    NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
     };
 
 /* Terminal input routines */

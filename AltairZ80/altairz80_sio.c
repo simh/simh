@@ -324,7 +324,7 @@ DEVICE sio_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &sio_reset,
     NULL, &sio_attach, &sio_detach,
-    NULL, DEV_DEBUG, 0,
+    NULL, DEV_DEBUG | DEV_MUX, 0,
     generic_dt, NULL, "Serial Input Output SIO"
 };
 

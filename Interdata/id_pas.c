@@ -165,7 +165,7 @@ DEVICE pas_dev = {
     1, 10, 31, 1, 16, 8,
     &tmxr_ex, &tmxr_dep, &pas_reset,
     NULL, &pas_attach, &pas_detach,
-    &pas_dib, DEV_NET | DEV_DISABLE
+    &pas_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* PASL data structures

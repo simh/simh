@@ -348,7 +348,7 @@ DEVICE com_dev = {
     3, 10, 31, 1, 16, 8,
     &tmxr_ex, &tmxr_dep, &com_reset,
     NULL, &com_attach, &com_detach,
-    &com_dib, DEV_NET | DEV_DIS
+    &com_dib, DEV_MUX | DEV_DIS
     };
 
 /* COML data structures

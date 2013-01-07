@@ -193,7 +193,7 @@ DEVICE  qty_dev =
         1, 10, 31, 1, 8, 8,
         NULL, NULL, &qty_reset,
         NULL, &qty_attach, &qty_detach,
-        &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_NET)
+        &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_MUX)
         };
 
 #define DG_RETURN( status, data )   (int32)(((status) << IOT_V_REASON) | ((data) & 0x0FFFF) )

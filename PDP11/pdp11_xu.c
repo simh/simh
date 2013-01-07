@@ -192,7 +192,7 @@ DEVICE xu_dev = {
 	2, XU_RDX, 8, 1, XU_RDX, 8,
 	&xu_ex, &xu_dep, &xu_reset,
 	NULL, &xu_attach, &xu_detach,
-	&xua_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
+	&xua_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_ETHER,
   0, xu_debug
   };
 
@@ -220,7 +220,7 @@ DEVICE xub_dev = {
   1, XU_RDX, 8, 1, XU_RDX, 8,
   &xu_ex, &xu_dep, &xu_reset,
   NULL, &xu_attach, &xu_detach,
-  &xub_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG,
+  &xub_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_ETHER,
   0, xu_debug
 };
 

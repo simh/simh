@@ -199,7 +199,7 @@ DEVICE ta_dev = {
     TA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ta_reset,
     NULL, &ta_attach, &ta_detach,
-    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
+    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17777500 - 17777503

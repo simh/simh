@@ -128,7 +128,7 @@ DEVICE tti1_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &ttx_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_NET | DEV_DISABLE
+    &ttix_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* TTOx data structures

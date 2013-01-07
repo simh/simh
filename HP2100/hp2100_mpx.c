@@ -745,7 +745,7 @@ DEVICE mpx_dev = {
     &mpx_attach,                            /* attach routine */
     &mpx_detach,                            /* detach routine */
     &mpx_dib,                               /* device information block */
-    DEV_DEBUG | DEV_DISABLE,                /* device flags */
+    DEV_DEBUG | DEV_DISABLE | DEV_MUX,      /* device flags */
     0,                                      /* debug control flags */
     mpx_deb,                                /* debug flag name table */
     NULL,                                   /* memory size change routine */

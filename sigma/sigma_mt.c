@@ -207,7 +207,7 @@ DEVICE mt_dev = {
     MT_NUMDR * 2, 10, T_ADDR_W, 1, 16, 8,
     NULL, NULL, &mt_reset,
     &io_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_DISABLE
+    &mt_dib, DEV_DISABLE | DEV_TAPE
     };
 
 /* Magtape: IO dispatch routine */

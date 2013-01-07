@@ -541,7 +541,7 @@ DEVICE tq_dev = {
     TQ_NUMDR + 2, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tq_reset,
     &tq_boot, &tq_attach, &tq_detach,
-    &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE,
     0, tq_debug
     };
 

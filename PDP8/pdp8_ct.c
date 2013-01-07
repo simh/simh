@@ -226,7 +226,7 @@ DEVICE ct_dev = {
     CT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ct_reset,
     &ct_boot, &ct_attach, &ct_detach,
-    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
+    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
     };
 
 /* IOT routines */

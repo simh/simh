@@ -487,7 +487,7 @@ DEVICE xq_dev = {
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
-  &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG,
+  &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
   0, xq_debug
 };
 
@@ -496,7 +496,7 @@ DEVICE xqb_dev = {
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
-  &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG,
+  &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
   0, xq_debug
 };
 

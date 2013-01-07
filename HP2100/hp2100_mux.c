@@ -434,7 +434,7 @@ DEVICE muxl_dev = {
     NULL,                                   /* attach routine */
     NULL,                                   /* detach routine */
     &muxl_dib,                              /* device information block */
-    DEV_DISABLE,                            /* device flags */
+    DEV_DISABLE | DEV_MUX,                  /* device flags */
     0,                                      /* debug control flags */
     NULL,                                   /* debug flag name table */
     NULL,                                   /* memory size change routine */

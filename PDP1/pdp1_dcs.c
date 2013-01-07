@@ -101,7 +101,7 @@ DEVICE dcs_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &dcs_reset,
     NULL, &dcs_attach, &dcs_detach,
-    NULL, DEV_NET | DEV_DISABLE | DEV_DIS
+    NULL, DEV_MUX | DEV_DISABLE | DEV_DIS
     };
 
 /* DCSL data structures
@@ -172,7 +172,7 @@ DEVICE dcsl_dev = {
     DCS_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dcs_reset,
     NULL, NULL, NULL,
-    NULL, DEV_DIS
+    NULL, DEV_DIS | DEV_MUX
     };
 
 /* DCS IOT routine */

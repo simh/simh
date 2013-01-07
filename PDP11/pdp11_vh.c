@@ -426,7 +426,7 @@ DEVICE vh_dev = {
     &vh_attach,     /* attach routine */
     &vh_detach,     /* detach routine */
     (void *)&vh_dib,/* context */
-    DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
+    DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG | DEV_MUX,    /* flags */
     0, vh_debug
 };
 
