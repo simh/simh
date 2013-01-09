@@ -266,6 +266,7 @@ typedef struct eth_device  ETH_DEV;
 t_stat eth_open   (ETH_DEV* dev, char* name,            /* open ethernet interface */
                    DEVICE* dptr, uint32 dbit);
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write sychronous packet; */
                    ETH_PCALLBACK routine);              /*  callback when done */
 int eth_read      (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */

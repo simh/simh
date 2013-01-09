@@ -641,7 +641,8 @@ static CTAB cmd_table[] = {
       "set console TELNET=port  specify console telnet port\n"
       "set console TELNET=LOG=log_file\n"
       "                         specify console telnet logging to the\n"
-      "                         specified destination {LOG,STDOUT,DEBUG or filename)\n"
+      "                         specified destination {LOG,STDOUT,STDERR,DEBUG\n"
+      "                         or filename)\n"
       "set console TELNET=NOLOG disables console telnet logging\n"
       "set console TELNET=BUFFERED[=bufsize]\n"
       "                         specify console telnet buffering\n"
@@ -655,14 +656,15 @@ static CTAB cmd_table[] = {
       "                         the port config (i.e. ;9600-8n1)\n"
       "set console NOSERIAL     disable console serial session\n"
       "set console LOG=log_file enable console logging to the\n"
-      "                         specified destination {STDOUT,DEBUG or filename)\n"
+      "                         specified destination {STDOUT,STDERR,DEBUG\n"
+      "                         or filename)\n"
       "set console NOLOG        disable console logging\n"
       "set default <dir>        set the current directory\n"
       "set log log_file         specify the log destination\n"
       "                         (STDOUT,DEBUG or filename)\n"
       "set nolog                disables any currently active logging\n"
       "set debug debug_file     specify the debug destination\n"
-      "                         (STDOUT,LOG or filename)\n"
+      "                         (STDOUT,STDERR,LOG or filename)\n"
       "set nodebug              disables any currently active debug output\n"
       "set break <list>         set breakpoints\n"
       "set nobreak <list>       clear breakpoints\n"
@@ -1073,11 +1075,20 @@ if (*cptr) {
             {DEV_DISK,      &sim_disk_attach_help},
             {DEV_TAPE,      &sim_tape_attach_help},
             {DEV_MUX,       &tmxr_attach_help},
+            {DEV_ETHER,     &eth_attach_help},
             {0,             NULL}};
 
         dptr = find_unit (gbuf, &uptr);
-        if (dptr == NULL)
-            return SCPE_ARG;
+        if (dptr == NULL) {
+            dptr = find_dev (gbuf);
+            if (dptr == NULL)
+                return SCPE_ARG;
+            if (dptr->flags & DEV_DISABLE) {
+                fprintf (stdout, "Device %s is currently disabled\n", dptr->name);
+                if (sim_log)
+                    fprintf (sim_log, "Device %s is currently disabled\n", dptr->name);
+                }
+            }
         dev_type = DEV_TYPE (dptr);
         for (i=0; helps[i].type; i++)
             if (helps[i].type == dev_type)
@@ -3556,14 +3567,12 @@ for ( ;; ) {                                            /* device loop */
         uptr->flags = (uptr->flags & ~UNIT_RFLAGS) |
             (flg & UNIT_RFLAGS);                        /* restore */
         READ_S (buf);                                   /* attached file */
-        if ((uptr->flags & UNIT_ATT) &&                 /* unit currently attached? */
-            !(dptr->flags & DEV_NET)) {                 /*  and not a net device? */
+        if (uptr->flags & UNIT_ATT) {                   /* unit currently attached? */
             r = scp_detach_unit (dptr, uptr);           /* detach it */
             if (r != SCPE_OK)
                 return r;
             }
         if ((buf[0] != '\0') &&                         /* unit to be reattached? */
-            !(dptr->flags & DEV_NET) &&                 /*  and not a net device? */
             ((uptr->flags & UNIT_ATTABLE) ||            /*  and unit is attachable */
              (dptr->attach != NULL))) {                 /*    or VM attach routine provided? */
             uptr->flags = uptr->flags & ~UNIT_DIS;      /* ensure device is enabled */

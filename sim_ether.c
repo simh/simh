@@ -860,6 +860,12 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
   {return SCPE_NOFNC;}
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+  {
+  fprintf (st, "%s attach help\n\n", dptr->name);
+  fprintf (st, "This simulator was not built with ethernet device support\n");
+  return SCPE_OK;
+  }
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
   {return SCPE_NOFNC;}
@@ -1962,6 +1968,20 @@ if (sim_log) fprintf (sim_log, msg, dev->name);
 free(dev->name);
 eth_zero(dev);
 _eth_remove_from_open_list (dev);
+return SCPE_OK;
+}
+
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "%s attach help\n\n", dptr->name);
+fprintf (st, "   sim> show ethernet\n");
+fprintf (st, "   libpcap version 1.0.0\n");
+fprintf (st, "   ETH devices:\n");
+fprintf (st, "    eth0   en0      (No description available)\n");
+ fprintf (st, "   eth1   tap:tapN (Integrated Tun/Tap support)\n");
+fprintf (st, "   sim> attach %a eth0\n\n", dptr->name);
+fprintf (st, "or equivalently:\n\n");
+fprintf (st, "   sim> attach %s en0\n\n", dptr->name);
 return SCPE_OK;
 }
 
