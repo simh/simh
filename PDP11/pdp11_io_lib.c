@@ -587,9 +587,10 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
         if (autp->dnam[j] == NULL)                      /* no device? */
             break;
         dptr = find_dev (autp->dnam[j]);                /* find ctrl */
-        if ((dptr == NULL) ||                           /* enabled, not nexus? */
+        if ((dptr == NULL) ||                           /* enabled, not (nexus or unibus or qbus)? */
             (dptr->flags & DEV_DIS) ||
-            (dptr->flags & DEV_NEXUS) )
+            (dptr->flags & DEV_NEXUS) ||
+            !(dptr->flags & (DEV_UBUS | DEV_QBUS | DEV_Q18)) )
             continue;
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
