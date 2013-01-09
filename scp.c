@@ -996,6 +996,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
         fprintf (st, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
     if (dptr->attach_help || 
         (DEV_TYPE(dptr) == DEV_MUX) ||
+        (DEV_TYPE(dptr) == DEV_ETHER) ||
         (DEV_TYPE(dptr) == DEV_DISK) ||
         (DEV_TYPE(dptr) == DEV_TAPE)) {
         if (dptr->numunits == 1)
@@ -1105,6 +1106,7 @@ if (*cptr) {
                 fprintf (sim_log, "No help available for the %s device\n", dptr->name);
             if (dptr->attach_help || 
                 (DEV_TYPE(dptr) == DEV_MUX) ||
+                (DEV_TYPE(dptr) == DEV_ETHER) ||
                 (DEV_TYPE(dptr) == DEV_DISK) ||
                 (DEV_TYPE(dptr) == DEV_TAPE)) {
                 fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
@@ -1120,6 +1122,7 @@ if (*cptr) {
                         fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
                     if (dptr->attach_help || 
                         (DEV_TYPE(dptr) == DEV_MUX) ||
+                        (DEV_TYPE(dptr) == DEV_ETHER) ||
                         (DEV_TYPE(dptr) == DEV_DISK) ||
                         (DEV_TYPE(dptr) == DEV_TAPE)) {
                         fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
