@@ -296,7 +296,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = mkdir -p BIN
   endif
-  ifneq (,$(shell cat .git-commit-id))
+  ifneq (,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
     GIT_COMMIT_ID=$(shell cat .git-commit-id)
   endif
 else
