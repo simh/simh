@@ -778,9 +778,10 @@ uint32 f = DK_GET_FMT (uptr);
 
 #if defined (SIM_ASYNCH_IO)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+int was_asynch = ctx ? ctx->asynch_io : 0;
 
 sim_disk_clr_async (uptr);
-if (sim_asynch_enabled)
+if (was_asynch)
     sim_disk_set_async (uptr, ctx->asynch_io_latency);
 #endif
 switch (f) {                                            /* case on format */
@@ -1118,12 +1119,10 @@ if (NULL == find_dev_from_unit (uptr))
     return SCPE_OK;
 auto_format = ctx->auto_format;
 
+sim_disk_clr_async (uptr);
+
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
-
-#if defined SIM_ASYNCH_IO
-sim_disk_clr_async (uptr);
-#endif
 
 uptr->flags = uptr->flags & ~(UNIT_ATT | UNIT_RO | UNIT_RAW);
 free (uptr->filename);
@@ -1141,7 +1140,57 @@ return SCPE_OK;
 
 t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "%s Disk Attach Help\n", dptr->name);
+size_t unit_number = (uptr-dptr->units);
+
+fprintf (st, "%s Disk Attach Help\n\n", dptr->name);
+
+fprintf (st, "Disk container files can be one of 3 different types:\n\n");
+fprintf (st, "    SIMH   A disk is an unstructured binary file of the size appropriate\n");
+fprintf (st, "           for the disk drive being simulated\n");
+fprintf (st, "    VHD    Virtual Disk format which is described in the “Microsoft\n");
+fprintf (st, "           Virtual Hard Disk (VHD) Image Format Specification”.  The\n");
+fprintf (st, "           VHD implementation includes support for 1) Fixed (Preallocated)\n");
+fprintf (st, "           disks, 2) Dynamically Expanding disks, and 3) Differencing disks.\n");
+fprintf (st, "    RAW    platform specific access to physical disk or CDROM drives\n\n");
+fprintf (st, "Virtual (VHD) Disks  supported conform to “Virtual Hard Disk Image Format\n");
+fprintf (st, "Specification”, Version 1.0 October 11, 2006.\n");
+fprintf (st, "Dynamically expanding disks never change their “Virtual Size”, but they don’t\n");
+fprintf (st, "consume disk space on the containing storage until the virtual sectors in the\n");
+fprintf (st, "disk are actually written to (i.e. a 2GB Dynamic disk container file with only\n");
+fprintf (st, "30MB of data will initially be about 30MB in size and this size will grow up to\n");
+fprintf (st, "2GB as different sectors are written to.  The VHD format contains metadata\n");
+fprintf (st, "which describes the drive size and the simh device type in use when the VHD\n");
+fprintf (st, "was created.  This metadata is therefore available whenever that VHD is\n");
+fprintf (st, "attached to an emulated disk device in the future so the device type and\n");
+fprintf (st, "size can be automatically be configured.\n\n");
+
+if (0 == (uptr-dptr->units)) {
+    if (dptr->numunits > 1) {
+        uint32 i;
+
+        for (i=0; i < dptr->numunits; ++i)
+            if (dptr->units[i].flags & UNIT_ATTABLE)
+                fprintf (st, "  sim> attach {switches} %s%d diskfile\n", dptr->name, i);
+        }
+    else
+        fprintf (st, "  sim> attach {switches} %s diskfile\n", dptr->name);
+    }
+else
+    fprintf (st, "  sim> attach {switches} %s diskfile\n\n", dptr->name);
+fprintf (st, "\n%s attach command switches\n", dptr->name);
+fprintf (st, "    -R          Attach Read Only.\n");
+fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
+fprintf (st, "                disk container will be attempted).\n");
+fprintf (st, "    -F          Open the indicated disk container in a specific format (default\n");
+fprintf (st, "                is to autodetect VHD defaulting to simh if the indicated\n");
+fprintf (st, "                container is not a VHD).\n");
+fprintf (st, "    -C          Create a VHD and copy its contents from another disk (simh, VHD,\n");
+fprintf (st, "                or RAW format).\n");
+fprintf (st, "    -X          When creating a VHD, create a fixed sized VHD (vs a Dynamically\n");
+fprintf (st, "                expanding one).\n");
+fprintf (st, "    -D          Create a Differencing VHD (relative to an already existing VHD\n");
+fprintf (st, "                disk)\n");
+fprintf (st, "    -M          Merge a Differencing VHD into its parent VHD disk\n");
 return SCPE_OK;
 }
 
@@ -1942,7 +1991,10 @@ return NULL;
 
 /*++
     This code follows the details specified in the "Virtual Hard Disk Image 
-    Format Specification", Version 1.0 October 11, 2006.
+    Format Specification", Version 1.0 October 11, 2006.  This format 
+    specification is available for anyone to implement under the 
+    "Microsoft Open Specification Promise" described at:
+        http://www.microsoft.com/interop/osp/default.mspx.
 --*/
 
 typedef t_uint64    uint64;
@@ -3057,7 +3109,7 @@ errno = Status;
 return hVHD;
 }
 
-#if defined(__CYGWIN__) || defined(VMS)
+#if defined(__CYGWIN__) || defined(VMS) || defined(__APPLE__)
 #include <unistd.h>
 #endif
 static void

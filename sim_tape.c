@@ -410,9 +410,10 @@ static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+int was_asynch = ctx ? ctx->asynch_io : 0;
 
 sim_tape_clr_async (uptr);
-if (sim_asynch_enabled)
+if (was_asynch)
     sim_tape_set_async (uptr, ctx->asynch_io_latency);
 #endif
 fflush (uptr->fileref);
@@ -487,9 +488,10 @@ t_stat sim_tape_detach (UNIT *uptr)
 uint32 f = MT_GET_FMT (uptr);
 t_stat r;
 
-#if defined (SIM_ASYNCH_IO)
 sim_tape_clr_async (uptr);
-#endif
+
+if (uptr->io_flush)
+    uptr->io_flush (uptr);                              /* flush buffered data */
 
 r = detach_unit (uptr);                                 /* detach unit */
 if (r != SCPE_OK)
@@ -516,7 +518,28 @@ return SCPE_OK;
 
 t_stat sim_tape_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "%s Tape Attach Help\n", dptr->name);
+fprintf (st, "%s Tape Attach Help\n\n", dptr->name);
+if (0 == (uptr-dptr->units)) {
+    if (dptr->numunits > 1) {
+        uint32 i;
+
+        for (i=0; i < dptr->numunits; ++i)
+            if (dptr->units[i].flags & UNIT_ATTABLE)
+                fprintf (st, "  sim> attach {switches} %s%d tapefile\n\n", dptr->name, i);
+        }
+    else
+        fprintf (st, "  sim> attach {switches} %s tapefile\n\n", dptr->name);
+    }
+else
+    fprintf (st, "  sim> attach {switches} %s tapefile\n\n", dptr->name);
+fprintf (st, "Attach command switches\n");
+fprintf (st, "    -R          Attach Read Only.\n");
+fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
+fprintf (st, "                virtual tape will be attempted).\n");
+fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
+fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
+return SCPE_OK;
+
 return SCPE_OK;
 }
 
