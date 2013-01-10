@@ -654,9 +654,12 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_IS_ACTIVE(uptr) (((uptr)->a_is_active ? (uptr)->a_is_active (uptr) : FALSE) || ((uptr)->a_next))
 #define AIO_CANCEL(uptr) if ((uptr)->a_cancel) (uptr)->a_cancel (uptr); else (void)0
 #define AIO_LOCK                                                  \
-    pthread_mutex_lock(&sim_asynch_lock)
+    int _locked = pthread_mutex_trylock(&sim_asynch_lock)
 #define AIO_UNLOCK                                                \
-    pthread_mutex_unlock(&sim_asynch_lock)
+    if (_locked == 0)                                             \
+        pthread_mutex_unlock(&sim_asynch_lock);                   \
+    else                                                          \
+        (void)0
 
 #if defined(__DECC_VER)
 #include <builtins>
@@ -666,6 +669,11 @@ extern int32 sim_asynch_inst_latency;
 #endif
 #if defined(_WIN32) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
 #define USE_AIO_INTRINSICS 1
+#endif
+/* Provide a way to test both Intrinsic and Lock based queue manipulations  */
+/* when both are available on a particular platform                         */
+#if defined(DONT_USE_AIO_INTRINSICS) && defined(USE_AIO_INTRINSICS)
+#undef USE_AIO_INTRINSICS
 #endif
 #ifdef USE_AIO_INTRINSICS
 /* This approach uses intrinsics to manage access to the link list head     */
@@ -686,6 +694,7 @@ extern int32 sim_asynch_inst_latency;
 #else
 #error "Implementation of function InterlockedCompareExchangePointer() is needed to build with USE_AIO_INTRINSICS"
 #endif
+#define AIO_QUEUE_MODE "Lock free asynchronous event Queue access"
 #define AIO_QUEUE_VAL InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL)
 #define AIO_QUEUE_SET(val, queue) InterlockedCompareExchangePointer(&sim_asynch_queue, val, queue)
 #define AIO_UPDATE_QUEUE                                                         \
@@ -695,7 +704,7 @@ extern int32 sim_asynch_inst_latency;
       do                                                                         \
         q = AIO_QUEUE_VAL;                                                       \
         while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));                           \
-      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "found asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);\
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Found Asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);\
       while (q != QUEUE_LIST_END) {   /* List !Empty */                          \
         uptr = q;                                                                \
         q = q->a_next;                                                           \
@@ -715,7 +724,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_ACTIVATE(caller, uptr, event_time)                                   \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) {           \
       UNIT *ouptr = (uptr);                                                      \
-      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "queueing asynch event for %s after %d instructions\n", sim_uname(ouptr), event_time);\
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(ouptr), event_time);\
       if (ouptr->a_next) {                                                       \
         ouptr->a_activate_call = sim_activate_abs;                               \
       } else {                                                                   \
@@ -740,13 +749,14 @@ extern int32 sim_asynch_inst_latency;
       return SCPE_OK;                                                            \
     } else (void)0
 #else /* !USE_AIO_INTRINSICS */
+#define AIO_QUEUE_MODE "Lock based asynchronous event Queue access"
 /* This approach uses a pthread mutex to manage access to the link list     */
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
 /* lock free approach when using USE_AIO_INTRINSICS                         */
 #define AIO_UPDATE_QUEUE                                                         \
     if (1) {                                                                     \
       UNIT *uptr;                                                                \
-      pthread_mutex_lock (&sim_asynch_lock);                                     \
+      AIO_LOCK;                                                                  \
       while (sim_asynch_queue != QUEUE_LIST_END) { /* List !Empty */             \
         int32 a_event_time;                                                      \
         uptr = sim_asynch_queue;                                                 \
@@ -762,12 +772,13 @@ extern int32 sim_asynch_inst_latency;
           a_event_time = uptr->a_event_time;                                     \
         uptr->a_activate_call (uptr, a_event_time);                              \
         if (uptr->a_check_completion) {                                          \
+          sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "calling completion check for asynch event on %s\n", sim_uname(uptr));\
           pthread_mutex_unlock (&sim_asynch_lock);                               \
           uptr->a_check_completion (uptr);                                       \
           pthread_mutex_lock (&sim_asynch_lock);                                 \
           }                                                                      \
       }                                                                          \
-      pthread_mutex_unlock (&sim_asynch_lock);                                   \
+      AIO_UNLOCK;                                                                \
     } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \

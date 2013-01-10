@@ -1921,7 +1921,7 @@ t_stat sim_show_asynch (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cp
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 #ifdef SIM_ASYNCH_IO
-fprintf (st, "Asynchronous I/O is %sabled\n", (sim_asynch_enabled) ? "en" : "dis");
+fprintf (st, "Asynchronous I/O is %sabled, %s\n", (sim_asynch_enabled) ? "en" : "dis", AIO_QUEUE_MODE);
 #else
 fprintf (st, "Asynchronous I/O is not available in this simulator\n");
 #endif
@@ -5438,6 +5438,7 @@ if (stop_cpu)                                           /* stop CPU? */
     return SCPE_STOP;
 AIO_UPDATE_QUEUE;
 UPDATE_SIM_TIME;                                        /* update sim time */
+
 if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Emptry New Interval = %d\n", sim_interval);

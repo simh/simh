@@ -485,7 +485,7 @@ DEBTAB cpu_deb[] = {
     { "CONTEXT",   LOG_CPU_P },
     { "EVENT",     SIM_DBG_EVENT },
     { "ACTIVATE",  SIM_DBG_ACTIVATE },
-    { "QUEUE",     SIM_DBG_AIO_QUEUE },
+    { "ASYNCH",    SIM_DBG_AIO_QUEUE },
     { NULL, 0 }
     };
 
