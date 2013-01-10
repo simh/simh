@@ -256,9 +256,24 @@
 #define SRBSIZ          1024                            /* save/restore buffer */
 #define SIM_BRK_INILNT  4096                            /* bpt tbl length */
 #define SIM_BRK_ALLTYP  0xFFFFFFFF
-#define UPDATE_SIM_TIME(x) sim_time = sim_time + (x - sim_interval); \
-    sim_rtime = sim_rtime + ((uint32) (x - sim_interval)); \
-    x = sim_interval
+#define UPDATE_SIM_TIME                                         \
+    if (1) {                                                    \
+        int32 _x;                                               \
+        AIO_LOCK;                                               \
+        if (sim_clock_queue == QUEUE_LIST_END)                  \
+            _x = noqueue_time;                                  \
+        else                                                    \
+            _x = sim_clock_queue->time;                         \
+        sim_time = sim_time + (_x - sim_interval);              \
+        sim_rtime = sim_rtime + ((uint32) (_x - sim_interval)); \
+        if (sim_clock_queue == QUEUE_LIST_END)                  \
+            noqueue_time = sim_interval;                        \
+        else                                                    \
+            sim_clock_queue->time = sim_interval;               \
+        AIO_UNLOCK;                                             \
+        }                                                       \
+    else                                                        \
+        (void)0                                                 \
 
 #define SZ_D(dp) (size_map[((dp)->dwidth + CHAR_BIT - 1) / CHAR_BIT])
 #define SZ_R(rp) \
@@ -303,20 +318,6 @@ int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
 #endif
-
-/* VM interface */
-
-extern char sim_name[];
-extern DEVICE *sim_devices[];
-extern REG *sim_PC;
-extern const char *sim_stop_messages[];
-extern t_stat sim_instr (void);
-extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int32 flag);
-extern int32 sim_emax;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
-extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
-    int32 sw);
 
 /* The per-simulator init routine is a weak global that defaults to NULL
    The other per-simulator pointers can be overrriden by the init routine */
@@ -3867,12 +3868,7 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
 sim_cancel (&sim_step_unit);                            /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
 AIO_UPDATE_QUEUE;
-if (sim_clock_queue != QUEUE_LIST_END) {                /* update sim time */
-    UPDATE_SIM_TIME (sim_clock_queue->time);
-    }
-else {
-    UPDATE_SIM_TIME (noqueue_time);
-    }
+UPDATE_SIM_TIME;                                        /* update sim time */
 return r;
 }
 
@@ -5441,12 +5437,12 @@ t_stat reason;
 if (stop_cpu)                                           /* stop CPU? */
     return SCPE_STOP;
 AIO_UPDATE_QUEUE;
+UPDATE_SIM_TIME;                                        /* update sim time */
 if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
-    UPDATE_SIM_TIME (noqueue_time);                     /* update sim time */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
+    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Emptry New Interval = %d\n", sim_interval);
     return SCPE_OK;
     }
-UPDATE_SIM_TIME (sim_clock_queue->time);                /* update sim time */
 do {
     uptr = sim_clock_queue;                             /* get first */
     sim_clock_queue = uptr->next;                       /* remove first */
@@ -5455,12 +5451,21 @@ do {
     if (sim_clock_queue != QUEUE_LIST_END)
         sim_interval = sim_clock_queue->time;
     else sim_interval = noqueue_time = NOQUEUE_WAIT;
+    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Event for %s\n", sim_uname (uptr));
     if (uptr->action != NULL)
         reason = uptr->action (uptr);
-    else reason = SCPE_OK;
-    } while ((reason == SCPE_OK) && (sim_interval == 0));
+    else
+        reason = SCPE_OK;
+    } while ((reason == SCPE_OK) && 
+             (sim_interval <= 0) && 
+             (sim_clock_queue != QUEUE_LIST_END));
 
-/* Empty queue forces sim_interval != 0 */
+if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
+    sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
+    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Queue Complete New Interval = %d\n", sim_interval);
+    }
+else
+    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Queue Complete New Interval = %d(%s)\n", sim_interval, sim_uname(sim_clock_queue));
 
 return reason;
 }
@@ -5487,12 +5492,9 @@ int32 accum;
 AIO_ACTIVATE (_sim_activate, uptr, event_time);
 if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
-if (sim_clock_queue == QUEUE_LIST_END) {
-    UPDATE_SIM_TIME (noqueue_time);
-    }
-else  {                                                 /* update sim time */
-    UPDATE_SIM_TIME (sim_clock_queue->time);
-    }
+UPDATE_SIM_TIME;                                        /* update sim time */
+
+sim_debug (SIM_DBG_ACTIVATE, sim_dflt_dev, "Activating %s delay=%d\n", sim_uname (uptr), event_time);
 
 prvptr = NULL;
 accum = 0;
@@ -5597,7 +5599,7 @@ AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;
-UPDATE_SIM_TIME (sim_clock_queue->time);                /* update sim time */
+UPDATE_SIM_TIME;                                        /* update sim time */
 if (!sim_is_active (uptr))
     return SCPE_OK;
 nptr = QUEUE_LIST_END;
@@ -5701,23 +5703,13 @@ return 0;
 
 double sim_gtime (void)
 {
-if (sim_clock_queue == QUEUE_LIST_END) {
-    UPDATE_SIM_TIME (noqueue_time);
-    }
-else  {
-    UPDATE_SIM_TIME (sim_clock_queue->time);
-    }
+UPDATE_SIM_TIME;
 return sim_time;
 }
 
 uint32 sim_grtime (void)
 {
-if (sim_clock_queue == QUEUE_LIST_END) {
-    UPDATE_SIM_TIME (noqueue_time);
-    }
-else  {
-    UPDATE_SIM_TIME (sim_clock_queue->time);
-    }
+UPDATE_SIM_TIME;
 return sim_rtime;
 }
 

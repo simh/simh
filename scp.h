@@ -142,9 +142,35 @@ void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 #else
 void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
-extern FILE *sim_deb;                                   /* debug file */
 #define sim_debug(dbits, dptr, ...) if (sim_deb && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__); else (void)0
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
+
+/* Global data */
+
+extern DEVICE *sim_dflt_dev;
+extern int32 sim_interval;
+extern int32 sim_switches;
+extern int32 sim_quiet;
+extern FILE *sim_log;                                   /* log file */
+extern FILEREF *sim_log_ref;                            /* log file file reference */
+extern FILE *sim_deb;                                   /* debug file */
+extern FILEREF *sim_deb_ref;                            /* debug file file reference */
+extern UNIT *sim_clock_queue;
+extern volatile int32 stop_cpu;
+
+/* VM interface */
+
+extern char sim_name[];
+extern DEVICE *sim_devices[];
+extern REG *sim_PC;
+extern const char *sim_stop_messages[];
+extern t_stat sim_instr (void);
+extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int32 flag);
+extern int32 sim_emax;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+    UNIT *uptr, int32 sw);
+extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
+    int32 sw);
 
 #endif

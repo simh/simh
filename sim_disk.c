@@ -84,12 +84,6 @@ Internal routines:
 #include <pthread.h>
 #endif
 
-extern FILE *sim_log;                                   /* log file */
-extern int32 sim_switches;
-extern int32 sim_quiet;
-extern uint32 sim_taddr_64;
-extern int32 sim_end;
-
 struct disk_context {
     DEVICE              *dptr;              /* Device for unit (access to debug flags) */
     uint32              dbit;               /* debugging bit */
@@ -772,16 +766,19 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     }
 }
 
+/* 
+   This routine is called when the simulator stops and any time
+   the asynch mode is changed (enabled or disabled)
+*/
 static void _sim_disk_io_flush (UNIT *uptr)
 {
 uint32 f = DK_GET_FMT (uptr);
 
 #if defined (SIM_ASYNCH_IO)
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-int was_asynch = ctx ? ctx->asynch_io : 0;
 
 sim_disk_clr_async (uptr);
-if (was_asynch)
+if (sim_asynch_enabled)
     sim_disk_set_async (uptr, ctx->asynch_io_latency);
 #endif
 switch (f) {                                            /* case on format */
@@ -1196,8 +1193,13 @@ return SCPE_OK;
 
 t_stat sim_disk_reset (UNIT *uptr)
 {
+struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
+
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
+
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_reset(unit=%d)\n", (int)(uptr-ctx->dptr->units));
+
 _sim_disk_io_flush(uptr);
 AIO_VALIDATE;
 AIO_UPDATE_QUEUE;

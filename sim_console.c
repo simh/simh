@@ -195,11 +195,6 @@ t_stat sim_con_reset (DEVICE *dptr)
 return sim_con_poll_svc (&dptr->units[0]);              /* establish polling as needed */
 }
 
-extern volatile int32 stop_cpu;
-extern int32 sim_quiet;
-extern FILE *sim_log, *sim_deb;
-extern FILEREF *sim_log_ref, *sim_deb_ref;
-extern DEVICE *sim_devices[];
 
 /* Set/show data structures */
 
@@ -1428,7 +1423,6 @@ void SIOUXUpdateScrollbar(void);
 int ps_kbhit(void);
 int ps_getch(void);
 
-extern char sim_name[];
 extern pSIOUXWin SIOUXTextWindow;
 static CursHandle iBeamCursorH = NULL;                  /* contains the iBeamCursor */
 

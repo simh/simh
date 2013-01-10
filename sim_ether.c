@@ -366,8 +366,6 @@
 #include "sim_ether.h"
 #include "sim_sock.h"
 
-extern FILE *sim_log;
-
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -1978,8 +1976,8 @@ fprintf (st, "   sim> show ethernet\n");
 fprintf (st, "   libpcap version 1.0.0\n");
 fprintf (st, "   ETH devices:\n");
 fprintf (st, "    eth0   en0      (No description available)\n");
- fprintf (st, "   eth1   tap:tapN (Integrated Tun/Tap support)\n");
-fprintf (st, "   sim> attach %a eth0\n\n", dptr->name);
+fprintf (st, "   eth1   tap:tapN (Integrated Tun/Tap support)\n");
+fprintf (st, "   sim> attach %s eth0\n\n", dptr->name);
 fprintf (st, "or equivalently:\n\n");
 fprintf (st, "   sim> attach %s en0\n\n", dptr->name);
 return SCPE_OK;

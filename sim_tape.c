@@ -109,8 +109,6 @@ static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
     { NULL,   0,       0 }
     };
 
-extern int32 sim_switches;
-
 t_stat sim_tape_ioerr (UNIT *uptr);
 t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
 uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
@@ -348,7 +346,6 @@ if (ctx) {
 t_stat sim_tape_set_async (UNIT *uptr, int latency)
 {
 #if !defined(SIM_ASYNCH_IO)
-extern FILE *sim_log;                                   /* log file */
 char *msg = "Tape: can't operate asynchronously\r\n";
 printf ("%s", msg);
 if (sim_log) fprintf (sim_log, "%s", msg);
@@ -406,14 +403,17 @@ return SCPE_OK;
 #endif
 }
 
+/* 
+   This routine is called when the simulator stops and any time
+   the asynch mode is changed (enabled or disabled)
+*/
 static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
-int was_asynch = ctx ? ctx->asynch_io : 0;
 
 sim_tape_clr_async (uptr);
-if (was_asynch)
+if (sim_asynch_enabled)
     sim_tape_set_async (uptr, ctx->asynch_io_latency);
 #endif
 fflush (uptr->fileref);
@@ -1785,9 +1785,14 @@ return r;
 
 t_stat sim_tape_reset (UNIT *uptr)
 {
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
 MT_CLR_PNU (uptr);
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
+
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_reset(unit=%d)\n", (int)(uptr-ctx->dptr->units));
+
 _sim_tape_io_flush(uptr);
 AIO_VALIDATE;
 AIO_UPDATE_QUEUE;
@@ -1910,7 +1915,6 @@ return ((p == 0)? map[p]: map[p - 1]);
 
 t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-extern uint32 sim_taddr_64;
 t_addr cap;
 t_stat r;
 

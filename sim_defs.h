@@ -530,6 +530,10 @@ struct sim_debtab {
 #define DEBUG_PRI(d,m)  (sim_deb && (d.dctrl & (m)))
 #define DEBUG_PRJ(d,m)  (sim_deb && (d->dctrl & (m)))
 
+#define SIM_DBG_EVENT       0x10000
+#define SIM_DBG_ACTIVATE    0x20000
+#define SIM_DBG_AIO_QUEUE   0x40000
+
 struct sim_bitfield {
     char            *name;                              /* field name */
     uint32          offset;                             /* starting bit */
@@ -691,6 +695,7 @@ extern int32 sim_asynch_inst_latency;
       do                                                                         \
         q = AIO_QUEUE_VAL;                                                       \
         while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));                           \
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "found asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);\
       while (q != QUEUE_LIST_END) {   /* List !Empty */                          \
         uptr = q;                                                                \
         q = q->a_next;                                                           \
@@ -709,24 +714,26 @@ extern int32 sim_asynch_inst_latency;
     } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                                   \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) {           \
-      if (uptr->a_next) {                                                        \
-        uptr->a_activate_call = sim_activate_abs;                                \
+      UNIT *ouptr = (uptr);                                                      \
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "queueing asynch event for %s after %d instructions\n", sim_uname(ouptr), event_time);\
+      if (ouptr->a_next) {                                                       \
+        ouptr->a_activate_call = sim_activate_abs;                               \
       } else {                                                                   \
         UNIT *q, *qe;                                                            \
-        uptr->a_event_time = event_time;                                         \
-        uptr->a_activate_call = sim_activate;                                    \
-        uptr->a_next = QUEUE_LIST_END;                  /* Mark as on list */    \
+        ouptr->a_event_time = event_time;                                        \
+        ouptr->a_activate_call = sim_activate;                                   \
+        ouptr->a_next = QUEUE_LIST_END;                  /* Mark as on list */   \
         do {                                                                     \
           do                                                                     \
             q = AIO_QUEUE_VAL;                                                   \
             while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));/* Grab current list */\
-          for (qe = uptr; qe->a_next != QUEUE_LIST_END; qe = qe->a_next);        \
+          for (qe = ouptr; qe->a_next != QUEUE_LIST_END; qe = qe->a_next);       \
           qe->a_next = q;                               /* append current list */\
           do                                                                     \
             q = AIO_QUEUE_VAL;                                                   \
-            while (q != AIO_QUEUE_SET(uptr, q));                                 \
-          uptr = q;                                                              \
-          } while (uptr != QUEUE_LIST_END);                                      \
+            while (q != AIO_QUEUE_SET(ouptr, q));                                \
+          ouptr = q;                                                             \
+          } while (ouptr != QUEUE_LIST_END);                                     \
       }                                                                          \
       if (sim_idle_wait)                                                         \
         pthread_cond_signal (&sim_asynch_wake);                                  \
@@ -743,6 +750,7 @@ extern int32 sim_asynch_inst_latency;
       while (sim_asynch_queue != QUEUE_LIST_END) { /* List !Empty */             \
         int32 a_event_time;                                                      \
         uptr = sim_asynch_queue;                                                 \
+        sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "found asynch event for %s after %d instructions\n", sim_uname(uptr), uptr->a_event_time);\
         sim_asynch_queue = uptr->a_next;                                         \
         uptr->a_next = NULL;                                                     \
         if (uptr->a_activate_call != &sim_activate_notbefore) {                  \
@@ -763,6 +771,7 @@ extern int32 sim_asynch_inst_latency;
     } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "queueing asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);\
       pthread_mutex_lock (&sim_asynch_lock);                           \
       if (uptr->a_next) {                                              \
         uptr->a_activate_call = sim_activate_abs;                      \

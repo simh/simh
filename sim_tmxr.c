@@ -345,14 +345,6 @@
 
 
 
-/* External variables */
-
-extern int32 sim_switches;
-extern char sim_name[];
-extern FILE *sim_log;
-
-
-
 /* Local routines */
 
 

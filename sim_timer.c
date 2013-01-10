@@ -94,9 +94,6 @@ static uint32 sim_throt_val = 0;
 static uint32 sim_throt_state = 0;
 static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
-extern int32 sim_interval, sim_switches;
-extern FILE *sim_log;
-extern UNIT *sim_clock_queue;
 
 t_stat sim_throt_svc (UNIT *uptr);
 

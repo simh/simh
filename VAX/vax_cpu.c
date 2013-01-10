@@ -480,9 +480,12 @@ MTAB cpu_mod[] = {
     };
 
 DEBTAB cpu_deb[] = {
-    { "INTEXC", LOG_CPU_I },
-    { "REI", LOG_CPU_R },
-    { "CONTEXT", LOG_CPU_P },
+    { "INTEXC",    LOG_CPU_I },
+    { "REI",       LOG_CPU_R },
+    { "CONTEXT",   LOG_CPU_P },
+    { "EVENT",     SIM_DBG_EVENT },
+    { "ACTIVATE",  SIM_DBG_ACTIVATE },
+    { "QUEUE",     SIM_DBG_AIO_QUEUE },
     { NULL, 0 }
     };
 
