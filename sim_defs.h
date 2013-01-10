@@ -805,6 +805,8 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_VALIDATE
 #define AIO_CHECK_EVENT
 #define AIO_INIT
+#define AIO_LOCK
+#define AIO_UNLOCK
 #define AIO_CLEANUP
 #define AIO_RETURN_TIME(uptr)
 #define AIO_IS_ACTIVE(uptr) FALSE

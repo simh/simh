@@ -180,7 +180,7 @@ return (SCPE_OK);
         status  =       error code
 */
 
-int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
+int32 fprint_sym (FILE *of, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw)
 {
 int32 cflag, c1, c2, inst, adr;
@@ -229,7 +229,7 @@ return -(oplen[inst] - 1);
         status  =       error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
+int32 parse_sym (char *cptr, t_addr addr, UNIT *uptr, uint32 *val, int32 sw)
 {
 int32 cflag, i = 0, j, r;
 char gbuf[CBUFSIZE];

@@ -1955,7 +1955,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
         for M6800
 */
 
-int32 fprint_sym (FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw)
+int32 fprint_sym (FILE *of, t_addr addr, uint32 *val, UNIT *uptr, int32 sw)
 {
     int32 i, inst, inst1;
 
@@ -2010,7 +2010,7 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val, UNIT *uptr, int32 sw)
         status  =   error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
+int32 parse_sym (char *cptr, t_addr addr, UNIT *uptr, uint32 *val, int32 sw)
 {
     return (-2);
 }
