@@ -92,4 +92,9 @@ t_stat sim_os_poll_kbd (void);
 int32 sim_tt_inpcvt (int32 c, uint32 mode);
 int32 sim_tt_outcvt (int32 c, uint32 mode);
 
+extern int32 sim_int_char;                                  /* interrupt character */
+extern int32 sim_brk_char;                                  /* break character */
+extern int32 sim_tt_pchar;                                  /* printable character mask */
+extern int32 sim_del_char;                                  /* delete character */
+
 #endif

@@ -253,8 +253,6 @@ uint32 mba_map[MBA_NUM][MBA_NMAPR];                     /* map */
 
 extern uint32 nexus_req[NEXUS_HLVL];
 extern UNIT cpu_unit;
-extern FILE *sim_log;
-extern int32 sim_switches;
 
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_rdreg (int32 *val, int32 pa, int32 mode);

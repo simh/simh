@@ -85,8 +85,6 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], PC, ASW;
-extern int32 sim_switches;
-extern int32 sim_is_running;
 extern UNIT cpu_unit;
 
 int32 clk_state = 0;
@@ -862,7 +860,6 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 int32 mask, wd;
-extern int32 sim_switches;
 
 #if defined (PDP7)
 if (sim_switches & SWMASK ('H'))                        /* hardware RIM load? */

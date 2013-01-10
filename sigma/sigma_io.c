@@ -93,8 +93,6 @@ extern uint32 cpu_model;
 extern uint32 cons_alarm, cons_pcf;
 extern UNIT cpu_unit;
 extern cpu_var_t cpu_tab[];
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
 
 void io_eval_ioint (void);
 t_bool io_init_inst (uint32 ad, uint32 rn, uint32 ch, uint32 dev, uint32 r0);

@@ -78,7 +78,6 @@
 #define MEM_64K_MASK     0x5555
 
 extern UNIT cpu_unit;
-extern FILE *sim_log, *sim_deb;
 
 uint32 mcsr0 = 0;
 uint32 mcsr1 = 0;

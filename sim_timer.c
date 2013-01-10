@@ -596,7 +596,7 @@ static uint32 cyc_ms = 0;
 uint32 w_ms, w_idle, act_ms;
 int32 act_cyc;
 
-if ((sim_clock_queue == NULL) ||                        /* clock queue empty? */
+if ((sim_clock_queue == QUEUE_LIST_END) ||              /* clock queue empty? */
     ((sim_clock_queue->flags & UNIT_IDLE) == 0) ||      /* event not idle-able? */
     (rtc_elapsed[tmr] < sim_idle_stable)) {             /* timer not stable? */
     if (sin_cyc)

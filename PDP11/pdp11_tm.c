@@ -154,7 +154,6 @@
 
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint8 *tmxb = NULL;                                     /* xfer buffer */
 int32 tm_sta = 0;                                       /* status register */
@@ -715,7 +714,6 @@ t_stat tm_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 extern int32 saved_PC;
-extern int32 sim_switches;
 
 sim_tape_rewind (&tm_unit[unitno]);
 if (sim_switches & SWMASK ('O')) {

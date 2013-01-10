@@ -561,14 +561,7 @@ uint16 dms_map[MAP_NUM * MAP_LNT] = { 0 };              /* dms maps */
 
 /* External data */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_brk_char;
-extern int32 sim_del_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern DEVICE *sim_devices[];
 extern char halt_msg[];
-extern t_bool sim_idle_enab;
 extern DIB clk_dib;                                     /* CLK DIB for idle check */
 
 /* CPU local routines */

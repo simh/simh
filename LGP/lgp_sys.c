@@ -40,11 +40,7 @@ extern REG cpu_reg[];
 extern uint32 M[];
 extern uint32 PC;
 extern uint32 ts_flag;
-extern int32 sim_switches;
 extern int32 flex_to_ascii[128], ascii_to_flex[128];
-
-extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
-extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
 
 /* SCP data structures and interface routines
 

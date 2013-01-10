@@ -59,8 +59,6 @@ extern int32 recqptr;                                   /* recq pointer */
 extern int32 pcq[];
 extern int32 pcq_p;
 extern int32 ibcnt, ppc;
-extern int32 sim_interval;
-extern uint32 sim_brk_summ;
 extern jmp_buf save_env;
 
 int32 GeteaB (int32 spec);

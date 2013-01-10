@@ -120,9 +120,7 @@ extern d10 pager_word;
 extern int32 flags;
 extern const int32 pi_l2bit[8];
 extern UNIT cpu_unit;
-extern FILE *sim_log;
 extern jmp_buf save_env;
-extern DEVICE *sim_devices[];
 
 extern int32 pi_eval (void);
 extern int32 rp_inta (void);

@@ -44,8 +44,6 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 clk_tps = 60;                                     /* ticks/second */
 int32 tmxr_poll = 16000;                                /* term mux poll */
 
-extern int32 sim_is_running;
-
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);

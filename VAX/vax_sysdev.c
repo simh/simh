@@ -63,8 +63,6 @@
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
-extern CTAB *sim_vm_cmd;
-
 t_stat vax_boot (int32 flag, char *ptr);
 
 /* Special boot command, overrides regular boot */
@@ -204,7 +202,6 @@ extern UNIT cpu_unit;
 extern UNIT clk_unit;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
 extern int32 MSER;
 extern int32 tmr_poll;
 

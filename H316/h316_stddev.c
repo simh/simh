@@ -88,7 +88,6 @@ extern int32 PC;
 extern int32 stop_inst;
 extern int32 C, dp, ext, extoff_pending, sc;
 extern int32 dev_int, dev_enb;
-extern int32 sim_switches;
 extern UNIT cpu_unit;
 
 uint32 ptr_motion = 0;                                  /* read motion */

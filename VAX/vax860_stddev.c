@@ -232,7 +232,6 @@ int32 rlcs_mp = 0;
 int32 rlcs_bcnt = 0;                                    /* byte count */
 uint16 *rlcs_buf = NULL;
 
-extern int32 sim_switches;
 extern jmp_buf save_env;
 extern UNIT cpu_unit;
 extern int32 brk_req;

@@ -119,9 +119,6 @@ int32 int_req = 0;                      /* Interrupt request */
 
 int32 mem_fault = 0;                    /* memory fault flag */
 
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 /* function prototypes */
 
 t_stat m6800_reset (DEVICE *dptr);
@@ -151,7 +148,6 @@ extern void CPU_BD_put_mbyte(int32 addr, int32 val);
 extern void CPU_BD_put_mword(int32 addr, int32 val);
 extern int32 CPU_BD_get_mbyte(int32 addr);
 extern int32 CPU_BD_get_mword(int32 addr);
-extern int32 sim_switches;
 
 /* CPU data structures
 
@@ -305,7 +301,6 @@ int32 oplen[256] = {
 
 int32 sim_instr (void)
 {
-    extern int32 sim_interval;
     int32 IR, OP, DAR, reason, hi, lo, op1;
 
     PC = saved_PC & ADDRMASK;           /* load local PC */

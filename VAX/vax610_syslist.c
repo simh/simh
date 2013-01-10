@@ -49,7 +49,6 @@ extern DEVICE dz_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE vh_dev;
 
-extern int32 sim_switches;
 extern void WriteB (uint32 pa, int32 val);
 extern UNIT cpu_unit;
 

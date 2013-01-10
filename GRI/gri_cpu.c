@@ -187,10 +187,6 @@ int16 scq[SCQ_SIZE] = { 0 };                            /* PC queue */
 int32 scq_p = 0;                                        /* PC queue ptr */
 REG *scq_r = NULL;                                      /* PC queue reg ptr */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);

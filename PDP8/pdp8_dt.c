@@ -265,8 +265,6 @@
 extern uint16 M[];
 extern int32 int_req;
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern FILE *sim_deb;
 
 int32 dtsa = 0;                                         /* status A */
 int32 dtsb = 0;                                         /* status B */
@@ -293,7 +291,6 @@ void dt_seterr (UNIT *uptr, int32 e);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos, int32 dir);
-extern int32 sim_is_running;
 
 /* DT data structures
 

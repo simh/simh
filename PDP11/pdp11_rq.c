@@ -700,8 +700,6 @@ static struct ctlrtyp ctlr_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern uint32 sim_taddr_64;
-extern int32 sim_switches;
 
 int32 rq_itime = 200;                                   /* init time, except */
 int32 rq_itime4 = 10;                                   /* stage 4 */

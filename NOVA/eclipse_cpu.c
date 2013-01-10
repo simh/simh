@@ -495,9 +495,6 @@ FILE *Trace;
 
 
 t_stat reason;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern DEVICE *sim_devices[];
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -515,9 +512,6 @@ int32 GetMap(int32 addr);
 int32 PutMap(int32 addr, int32 data);
 int32 Debug_Entry(int32 PC, int32 inst, int32 inst2, int32 AC0, int32 AC1, int32 AC2, int32 AC3, int32 flags);
 t_stat build_devtab (void);
-
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -699,7 +693,6 @@ DEVICE pit_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 register int32 PC, IR, i, t, MA, j, k, tac;
 register uint32 mddata, uAC0, uAC1, uAC2, uAC3;
 int16 sAC0, sAC1, sAC2;

@@ -166,12 +166,9 @@ extern void setClockFrequency(const uint32 Value);
 extern int32 chiptype;
 extern const t_bool rtc_avail;
 extern uint32 PCX;
-extern int32 sim_switches;
-extern int32 sim_quiet;
 extern int32 SR;
 extern UNIT cpu_unit;
 extern volatile int32 stop_cpu;
-extern int32 sim_interval;
 
 /* Debug Flags */
 static DEBTAB generic_dt[] = {

@@ -55,8 +55,6 @@
 #define WTC_MODE_STD    0
 #define WTC_MODE_VMS    1
 
-extern int32 sim_switches;
-
 int32 wtc_csra = 0;
 int32 wtc_csrb = 0;
 int32 wtc_csrc = 0;

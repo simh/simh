@@ -282,10 +282,6 @@ int32 fpc_OP;                                           /* shadow op for FPC acc
 
 int32 addr_mask = YMASK;
 
-extern UNIT *sim_clock_queue;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
@@ -448,7 +444,6 @@ t_stat sim_opr_orig(int32 op);
 
 t_stat sim_instr (void)
 {
-    extern int32 sim_interval;
     int32 IR, op, inst_class, y;
     int32 tempLR;   /* LR temporary storage in case both LMB and MBL are set (swap LR<->MBR) */
     t_stat reason;
@@ -1167,8 +1162,6 @@ char *cptr = (char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0) return SCPE_NOFNC;                    /* enabled? */
 if (cptr) {

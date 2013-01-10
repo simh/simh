@@ -118,10 +118,6 @@ extern int32 tmr_int, tti_int, tto_int, csi_int;
 extern uint32 sbi_er;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
-extern CTAB *sim_vm_cmd;
 extern int32 fault_PC;                                  /* fault PC */
 extern UNIT cpu_unit;
 

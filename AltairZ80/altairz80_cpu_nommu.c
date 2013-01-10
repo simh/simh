@@ -985,8 +985,6 @@ static uint16 GET_WORD(register uint32 a) {
     INOUTFLAGS((HIGH_REGISTER(BC) & 0xa8) | ((HIGH_REGISTER(BC) == 0) << 6), x)
 
 t_stat sim_instr_nommu(void) {
-    extern int32 sim_interval;
-    extern uint32 sim_brk_summ;
     int32 reason = SCPE_OK;
     register uint32 AF;
     register uint32 BC;

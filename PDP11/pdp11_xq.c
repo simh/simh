@@ -254,10 +254,6 @@
 
 extern int32 tmxr_poll;
 extern int32 tmr_poll, clk_tps;
-extern t_bool sim_idle_enab;
-extern FILE* sim_deb;
-extern int32 sim_switches;
-extern FILE *sim_log;
 extern char* read_line (char *ptr, int32 size, FILE *stream);
 
 /* forward declarations */

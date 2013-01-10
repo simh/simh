@@ -239,9 +239,6 @@ static char *tu_fname[CS1_N_FNC] = {
     "WRITE", "31", "32", "33", "READF", "35", "36" "READR"
     };
 
-extern int32 sim_switches;
-extern FILE *sim_deb;
-
 t_stat tu_mbrd (int32 *data, int32 PA, int32 fmtr);
 t_stat tu_mbwr (int32 data, int32 PA, int32 fmtr);
 t_stat tu_svc (UNIT *uptr);

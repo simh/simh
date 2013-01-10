@@ -297,8 +297,6 @@ extern int32 int_req;
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus map */
 extern int32 ubcs[UBANUM];
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern FILE *sim_deb;
 
 int32 tucs1 = 0;                                        /* control/status 1 */
 int32 tuwc = 0;                                         /* word count */

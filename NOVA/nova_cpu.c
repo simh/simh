@@ -330,14 +330,6 @@ char * devBitNames( int32 flags, char * ptr, char * sepStr ) ;
 void mask_out (int32 mask);
 
 
-extern int32    sim_interval;
-extern int32    sim_int_char;
-extern uint32   sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern DEVICE * sim_devices[];
-extern t_stat   fprint_sym(FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
-
-
-
 /* CPU data structures
 
    cpu_dev      CPU device descriptor

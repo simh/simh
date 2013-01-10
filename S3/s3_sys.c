@@ -44,9 +44,9 @@ extern REG cpu_reg[];
 extern unsigned char M[];
 extern int32 saved_PC, IAR[];
 extern unsigned char ebcdic_to_ascii[];
-char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype);
+char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype);
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
+int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw);
 
 /* SCP data structures
@@ -267,7 +267,7 @@ int32 fprint_sym (FILE *of, t_addr addr, uint32 *val,
     return (r);
 }
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
+int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw)
 {
 int32 c1, c2, group, len1, len2, inst, aaddr, baddr;
@@ -923,7 +923,7 @@ switch (opcode[j].form) {                               /* Get operands based on
 return (-(oplen-1));
 }
 
-char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype)
+char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype)
 {
 int32 nybble = 0;
 char temp[32];

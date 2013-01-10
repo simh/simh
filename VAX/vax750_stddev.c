@@ -203,7 +203,6 @@ int32 td_offset = 0;                                    /* offset into current t
 int32 td_state = TD_IDLE;
 int32 td_ecode = 0;                                     /* end packet success code */
 
-extern int32 sim_switches;
 extern jmp_buf save_env;
 
 t_stat tti_svc (UNIT *uptr);

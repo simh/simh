@@ -276,12 +276,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
-
 t_bool devtab_init (void);
 int32 dmaio (int32 inst, int32 fnc, int32 dat, int32 dev);
 int32 undio (int32 inst, int32 fnc, int32 dat, int32 dev);

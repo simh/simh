@@ -94,7 +94,6 @@
 
 extern int32 int_req[IPL_HLVL];
 extern int32 hlt_pin;
-extern int32 sim_switches, sim_is_running;
 
 int32 tti_csr = 0;                                      /* control/status */
 int32 tto_csr = 0;                                      /* control/status */

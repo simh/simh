@@ -274,8 +274,6 @@
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern FILE *sim_deb;
 
 int32 tcst = 0;                                         /* status */
 int32 tccm = 0;                                         /* command */
@@ -308,7 +306,6 @@ void dt_stopunit (UNIT *uptr);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
-extern int32 sim_is_running;
 
 /* DT data structures
 

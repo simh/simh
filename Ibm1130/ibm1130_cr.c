@@ -349,7 +349,6 @@ way to solve the problem, the other is to keep DSW up-to-date all the time).
 
 #define ENABLE_PHYSICAL_CARD_READER_SUPPORT
 
-extern int32 sim_switches;
 extern UNIT cpu_unit;
 
 static t_stat cr_svc      (UNIT *uptr);

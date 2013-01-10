@@ -197,11 +197,8 @@ int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 t_bool conv_old = 0;                                    /* old conversions */
 
-extern int32 sim_int_char;
 extern int32 sim_emax;
 extern t_value *sim_eval;
-extern FILE *sim_deb;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -229,8 +226,6 @@ extern t_stat inq_io (int32 flag, int32 mod);
 extern t_stat mt_io (int32 unit, int32 flag, int32 mod);
 extern t_stat dp_io (int32 fnc, int32 flag, int32 mod);
 extern t_stat mt_func (int32 unit, int32 flag, int32 mod);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -1904,8 +1899,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[MAX_L + 1];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

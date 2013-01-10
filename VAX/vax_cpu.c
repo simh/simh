@@ -305,12 +305,6 @@ const uint32 align[4] = {
 
 /* External and forward references */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-
 extern t_stat build_dib_tab (void);
 extern UNIT rom_unit, nvr_unit;
 extern int32 op_ashq (int32 *opnd, int32 *rh, int32 *flg);
@@ -3325,8 +3319,6 @@ t_stat r;
 InstHistory *h;
 extern const char *opcode[];
 extern t_value *sim_eval;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
@@ -3467,7 +3459,6 @@ return SCPE_OK;
 
 t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset)
 {
-extern FILE *sim_log;
 char args[CBUFSIZE];
 t_stat r;
 

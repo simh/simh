@@ -223,11 +223,6 @@ InstHistory *hst = NULL;                                /* instruction history *
 struct BlockIO blk_io;                                  /* block I/O status */
 uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-
 uint32 ReadB (uint32 loc);
 uint32 ReadH (uint32 loc);
 void WriteB (uint32 loc, uint32 val);
@@ -2011,8 +2006,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[2];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

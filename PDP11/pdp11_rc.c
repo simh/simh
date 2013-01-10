@@ -147,7 +147,6 @@
                         ((double) RC_NUMWD)))
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 extern int32 R[];
 
 static uint32   rc_la = 0;                              /* look-ahead */

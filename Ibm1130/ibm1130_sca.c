@@ -202,8 +202,6 @@ static int    sca_rcvptr = 0;								/* index of next byte to take from rcvbuf *
 #define UNIT_AUTOANSWER	  (1u << UNIT_V_AUTOANSWER)
 #define UNIT_LISTEN		  (1u << UNIT_V_LISTEN)
 
-extern int sim_switches;									/* variable that gets bits set for -x switches on command lines */
-
 t_stat sca_set_baud (UNIT *uptr, int32 value, char *cptr, void *desc);
 
 UNIT sca_unit = {														/* default settings */

@@ -99,9 +99,7 @@ extern int32 fault_PC;
 extern int32 pcq[PCQ_SIZE];
 extern int32 pcq_p;
 extern int32 in_ie;
-extern int32 sim_interval;
 extern int32 ibcnt, ppc;
-extern FILE *sim_deb;
 extern DEVICE cpu_dev;
 
 extern int32 Test (uint32 va, int32 acc, int32 *status);

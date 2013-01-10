@@ -157,7 +157,11 @@ extern FILEREF *sim_log_ref;                            /* log file file referen
 extern FILE *sim_deb;                                   /* debug file */
 extern FILEREF *sim_deb_ref;                            /* debug file file reference */
 extern UNIT *sim_clock_queue;
+extern int32 sim_is_running;
 extern volatile int32 stop_cpu;
+extern uint32 sim_brk_types;                            /* breakpoint info */
+extern uint32 sim_brk_dflt;
+extern uint32 sim_brk_summ;
 
 /* VM interface */
 
@@ -172,5 +176,16 @@ extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);
 extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
     int32 sw);
+
+/* The per-simulator init routine is a weak global that defaults to NULL
+   The other per-simulator pointers can be overrriden by the init routine */
+
+extern void (*sim_vm_init) (void);
+extern char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream);
+extern void (*sim_vm_post) (t_bool from_scp);
+extern CTAB *sim_vm_cmd;
+extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
+extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
+
 
 #endif

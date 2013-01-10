@@ -45,7 +45,7 @@
 #include <ctype.h>
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll, sim_is_running;
+extern int32 tmxr_poll;
 
 int32 tti (int32 IR, int32 AC);
 int32 tto (int32 IR, int32 AC);

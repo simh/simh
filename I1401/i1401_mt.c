@@ -113,7 +113,6 @@ extern uint8 M[];                                       /* memory */
 extern int32 ind[64];
 extern int32 BS, iochk;
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 t_stat mt_reset (DEVICE *dptr);
 t_stat mt_boot (int32 unitno, DEVICE *dptr);
@@ -469,7 +468,6 @@ return SCPE_OK;
 t_stat mt_boot (int32 unitno, DEVICE *dptr)
 {
 extern int32 saved_IS;
-extern int32 sim_switches;
 
 if ((sim_switches & SWMASK ('N')) == 0)                 /* unless -n */
     sim_tape_rewind (&mt_unit[unitno]);                 /* force rewind */

@@ -93,7 +93,6 @@ static void   update_pen(void);        				 /* will ensure pen action is correct
 static t_stat plot_validate_change (UNIT *uptr, int32 val, char * ptr, void *desc); /* when set command issued */
 static void   process_cmd(void);					/* does actual drawing for plotter */
 
-extern int32 sim_switches;							/* switches set on simh command */
 static int16 plot_dsw  = 0;							/* device status word */
 static int16 plot_cmd  = 0;							/* the command to process */
 static int32 plot_wait = 1000;						/* plotter movement wait */

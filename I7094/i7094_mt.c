@@ -72,7 +72,6 @@ static const char *tape_stat[] = {
 extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
-extern FILE *sim_deb;
 extern const char *sel_name[];
 
 t_stat mt_chsel (uint32 ch, uint32 sel, uint32 unit);

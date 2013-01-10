@@ -202,8 +202,6 @@ cccgi[] = {
 
 #include "ibm1130_prtwheel.h"
 
-extern int32 sim_switches;
-
 /* cc_format_1132 and cc_format_1403 - turn cctape bits into proper format for DSW or status read */
 
 static int cc_format_1132 (int bits)

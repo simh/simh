@@ -84,13 +84,11 @@ static int32 clk_tps_map[4] = { 60, 60, 50, 800 };
 
 extern uint16 *M;
 extern int32 R[8];
-extern DEVICE cpu_dev, *sim_devices[];
+extern DEVICE cpu_dev;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
 extern int32 STKLIM, PIRQ;
 extern uint32 cpu_model, cpu_type, cpu_opt;
 extern int32 clk_fie, clk_fnxm, clk_tps, clk_default;
-extern int32 sim_switches;
 
 t_stat CPU24_rd (int32 *data, int32 addr, int32 access);
 t_stat CPU24_wr (int32 data, int32 addr, int32 access);

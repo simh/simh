@@ -164,9 +164,6 @@ extern int32 cpu_bme;
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
 extern t_addr cpu_memsize;
-extern FILE *sim_deb;
-extern FILE *sim_log;
-extern int32 sim_switches;
 
 t_stat mba_reset (DEVICE *dptr);
 t_stat mba_rd (int32 *val, int32 pa, int32 access);

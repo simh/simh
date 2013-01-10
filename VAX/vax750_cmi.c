@@ -98,10 +98,6 @@ extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int, csi_int, cso_int;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
-extern CTAB *sim_vm_cmd;
 
 t_stat cmi_reset (DEVICE *dptr);
 void cmi_set_tmo (void);

@@ -86,8 +86,6 @@ extern int32 rtc_pie;
 extern int32 stop_invins, stop_invdev, stop_inviop;
 extern uint32 mon_usr_trap;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
 
 t_stat chan_reset (DEVICE *dptr);
 t_stat chan_read (int32 ch);

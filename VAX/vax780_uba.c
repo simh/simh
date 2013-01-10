@@ -179,11 +179,8 @@ int32 autcon_enb = 1;                                   /* autoconfig enable */
 extern int32 trpirq;
 extern int32 autcon_enb;
 extern jmp_buf save_env;
-extern DEVICE *sim_devices[];
 extern UNIT cpu_unit;
 extern uint32 nexus_req[NEXUS_HLVL];
-extern int32 sim_switches;
-extern FILE *sim_log, *sim_deb;
 
 t_stat uba_svc (UNIT *uptr);
 t_stat uba_reset (DEVICE *dptr);

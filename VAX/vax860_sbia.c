@@ -88,9 +88,6 @@ extern int32 trpirq;
 extern int32 p1;
 extern int32 mchk_ref;
 extern int32 crd_err;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
 extern int32 fault_PC;                                  /* fault PC */
 extern UNIT cpu_unit;
 

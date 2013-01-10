@@ -36,8 +36,6 @@
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
 extern int32 autcon_enb;
 extern int32 int_vec[IPL_HLVL][32];
 extern int32 (*int_ack[IPL_HLVL][32])(void);

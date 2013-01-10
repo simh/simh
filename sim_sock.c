@@ -46,8 +46,6 @@
 #include "sim_sock.h"
 #include <signal.h>
 
-extern FILE *sim_log;
-
 #if defined(AF_INET6) && defined(_WIN32)
 #include <ws2tcpip.h>
 #endif

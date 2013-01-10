@@ -103,4 +103,7 @@ uint32 sim_os_ms_sleep_init (void);
 t_stat sim_timer_activate_after (UNIT *uptr, int32 usec_delay);
 double sim_timer_inst_per_sec (void);
 
+extern t_bool sim_idle_enab;                       /* global flag */
+extern volatile t_bool sim_idle_wait;              /* global flag */
+
 #endif

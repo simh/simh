@@ -69,7 +69,6 @@
 
 extern int32 int_req[IPL_HLVL];
 extern int32 hlt_pin;
-extern int32 sim_switches;
 extern jmp_buf save_env;
 extern int32 p1;
 

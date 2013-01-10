@@ -382,8 +382,6 @@ int32 saved_PC;                                         /* Saved (old) PC) */
 int32 debug_reg = 0;                                    /* set for debug/trace */
 int32 debug_flag = 0;                                   /* 1 when trace.log open */
 FILE *trace;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
@@ -396,7 +394,6 @@ extern int32 lpt (int32 op, int32 m, int32 n, int32 data);
 extern int32 dsk1 (int32 op, int32 m, int32 n, int32 data);
 extern int32 dsk2 (int32 op, int32 m, int32 n, int32 data);
 extern int32 cpu (int32 op, int32 m, int32 n, int32 data);
-extern t_stat sim_activate (UNIT *uptr, int32 delay);
 int32 nulldev (int32 opcode, int32 m, int32 n, int32 data);
 int32 add_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
 int32 subtract_zoned (int32 addr1, int32 len1, int32 addr2, int32 len2);
@@ -505,7 +502,6 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 register int32 PC, IR;
 int32 i, j, carry, zero, op1, op2;
 int32 opcode = 0, qbyte = 0, rbyte = 0;

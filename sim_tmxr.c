@@ -298,6 +298,7 @@
 
 #include "sim_defs.h"
 #include "sim_serial.h"
+#include "sim_console.h"
 #include "sim_sock.h"
 #include "sim_timer.h"
 #include "sim_tmxr.h"

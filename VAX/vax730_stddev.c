@@ -205,7 +205,6 @@ int32 td_state = TD_IDLE;
 int32 td_unitno = 0;                                    /* active unit number */
 int32 td_ecode = 0;                                     /* end packet success code */
 
-extern int32 sim_switches;
 extern jmp_buf save_env;
 
 t_stat tti_svc (UNIT *uptr);

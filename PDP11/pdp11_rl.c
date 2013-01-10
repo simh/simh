@@ -227,7 +227,6 @@ extern UNIT cpu_unit;
 #define RLBAE_IMP       (0000077)                       /* implemented */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint16 *rlxb = NULL;                                    /* xfer buffer */
 int32 rlcs = 0;                                         /* control/status */

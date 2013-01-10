@@ -110,7 +110,6 @@
 
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint32 rf_cs = 0;                                       /* status register */
 uint32 rf_cma = 0;

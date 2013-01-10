@@ -164,8 +164,6 @@ char *dz_stopbits[] = {"1", "2", "1", "1.5"};
 #define TDR_V_TBR       8                               /* xmit break - NI */
 
 extern int32 IREQ (HLVL);
-extern int32 sim_switches;
-extern FILE *sim_log;
 extern int32 tmxr_poll;                                 /* calibrated delay */
 
 uint16 dz_csr[MAX_DZ_MUXES] = { 0 };                    /* csr */
@@ -674,7 +672,6 @@ t_stat dz_attach (UNIT *uptr, char *cptr)
 {
 int32 dz, muxln;
 t_stat r;
-extern int32 sim_switches;
 
 if (sim_switches & SWMASK ('M'))                        /* modem control? */
     tmxr_set_modem_control_passthru (&dz_desc);

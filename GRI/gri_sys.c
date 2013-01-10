@@ -37,7 +37,6 @@ extern DEVICE hsr_dev, hsp_dev;
 extern DEVICE rtc_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
-extern int32 sim_switches;
 
 void fprint_addr (FILE *of, uint32 val, uint32 mod, uint32 dst);
 

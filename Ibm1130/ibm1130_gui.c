@@ -93,7 +93,6 @@ DEVICE console_dev = {
 /* reset for the "console" display device  */
 
 extern char *read_line (char *cptr, int size, FILE *stream);
-extern FILE *sim_log;
 extern DEVICE *find_unit (char *cptr, UNIT **uptr);
 extern char *sim_prompt;
 

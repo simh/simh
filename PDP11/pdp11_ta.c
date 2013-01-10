@@ -106,7 +106,6 @@
 #define UST_GAP         01                              /* last op hit gap */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint32 ta_cs = 0;                                       /* control/status */
 uint32 ta_idb = 0;                                      /* input data buf */

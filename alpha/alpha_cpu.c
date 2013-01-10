@@ -193,11 +193,6 @@ const t_uint64 word_mask[4] = {
     0x0000FFFF00000000, 0xFFFF000000000000
     };
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern FILE *sim_deb;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 t_uint64 uemul64 (t_uint64 a, t_uint64 b, t_uint64 *hi);
 t_uint64 byte_zap (t_uint64 op, uint32 mask);
 t_stat cpu_reset (DEVICE *dptr);

@@ -1155,7 +1155,6 @@ return SCPE_OK;
 t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
-extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;

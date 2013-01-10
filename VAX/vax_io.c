@@ -117,9 +117,6 @@ extern int32 PSL, SISR, trpirq, mem_err, crd_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
 extern jmp_buf save_env;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
 t_stat dbl_wr (int32 data, int32 addr, int32 access);

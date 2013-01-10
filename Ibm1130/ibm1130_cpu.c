@@ -222,9 +222,7 @@ t_stat cpu_set_type (UNIT *uptr, int32 value, char *cptr, void *desc);
 void calc_ints (void);
 
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
-extern t_stat detach_cmd (int32 flags, char *cptr);
 extern UNIT cr_unit;
-extern int32 sim_switches;
 
 #ifdef ENABLE_BACKTRACE
 	static void   archive_backtrace(char *inst);
@@ -466,8 +464,6 @@ static char *xio_funcs[] = {
 
 t_stat sim_instr (void)
 {
-	extern int32 sim_interval;
-	extern UNIT *sim_clock_queue;
 	int32 i, eaddr, INDIR, IR, F, DSPLC, word2, oldval, newval, src, src2, dst, abit, xbit;
 	int32 iocc_addr, iocc_op, iocc_dev, iocc_func, iocc_mod;
 	char msg[50];
@@ -516,7 +512,7 @@ t_stat sim_instr (void)
 #endif /* ifdef  GUI_SUPPORT     */
 
 		if (sim_interval <= 0) {			/* any events timed out? */
-			if (sim_clock_queue != NULL) {
+			if (sim_clock_queue != QUEUE_LIST_END) {
 				if ((status = sim_process_event()) != 0)
 					reason = simh_status_to_stopcode(status);
 

@@ -220,7 +220,6 @@ int32 fl_bptr = 0;                                      /* buffer pointer */
 
 uint8 comm_region[COMM_LNT] = { 0 };                    /* comm region */
 
-extern int32 sim_switches;
 extern jmp_buf save_env;
 
 t_stat tti_svc (UNIT *uptr);

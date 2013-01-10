@@ -54,9 +54,6 @@ extern int32 mchk_va, mchk_ref;
 extern int32 int_req[IPL_HLVL];
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
-extern FILE *sim_log;
-extern CTAB *sim_vm_cmd;
 extern int32 trpirq, mem_err;
 
 int32 conisp, conpc, conpsl;                            /* console reg */

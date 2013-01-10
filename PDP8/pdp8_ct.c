@@ -138,7 +138,6 @@
 
 extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 uint32 ct_sra = 0;                                      /* status reg A */
 uint32 ct_srb = 0;                                      /* status reg B */

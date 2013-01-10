@@ -268,7 +268,6 @@ extern uint32 cpu_opt;
 
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 uint8 *tsxb = NULL;                                     /* xfer buffer */
 int32 tssr = 0;                                         /* status register */

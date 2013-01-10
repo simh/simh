@@ -65,7 +65,6 @@ extern DEVICE mt_dev, ct_dev;
 extern DEVICE ttix_dev, ttox_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
-extern int32 sim_switches;
 
 t_stat fprint_sym_fpp (FILE *of, t_value *val);
 t_stat parse_sym_fpp (char *cptr, t_value *val);

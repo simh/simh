@@ -54,8 +54,6 @@
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
-extern CTAB *sim_vm_cmd;
-
 t_stat vax630_boot (int32 flag, char *ptr);
 
 /* Special boot command, overrides regular boot */
@@ -139,7 +137,6 @@ extern UNIT cpu_unit;
 extern UNIT clk_unit;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
 extern int32 tmr_poll;
 
 uint32 *rom = NULL;                                     /* boot ROM */
@@ -192,7 +189,6 @@ extern void rxcs_wr (int32 dat);
 extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
-extern uint32 sim_os_msec();
 
 /* ROM data structures
 
@@ -830,7 +826,6 @@ return run_cmd (flag, "CPU");
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-extern t_stat load_cmd (int32 flag, char *cptr);
 t_stat r;
 
 PC = ROMBASE;

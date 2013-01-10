@@ -88,7 +88,6 @@ extern DEVICE mt_dev[NUM_CHAN];
 extern DEVICE drm_dev;
 extern DEVICE dsk_dev;
 extern DEVICE com_dev;
-extern uint32 sim_brk_summ;
 
 t_stat ch_reset (DEVICE *dptr);
 t_stat ch6_svc (UNIT *uptr);
@@ -111,7 +110,6 @@ t_stat ch9_wr_getw (uint32 ch);
 void ch9_eval_int (uint32 ch, uint32 iflags);
 DEVICE *ch_map_flags (uint32 ch, int32 fl);
 
-extern CTAB *sim_vm_cmd;
 extern t_stat ch_bkpt (uint32 ch, uint32 clc);
 
 const uint32 col_masks[12] = {                          /* row 9,8,..,0,11,12 */

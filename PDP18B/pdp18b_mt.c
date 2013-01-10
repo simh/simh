@@ -127,7 +127,6 @@
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 int32 mt_cu = 0;                                        /* command/unit */
 int32 mt_sta = 0;                                       /* status register */

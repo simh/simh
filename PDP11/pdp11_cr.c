@@ -186,8 +186,6 @@ extern int32 int_req[IPL_HLVL];
 #define DFLT_CPM        285
 #endif
 
-extern FILE *sim_deb;                                   /* sim_console.c */
-
 /* create a int32 constant from four characters */
 #define I4C(a,b,c,d)    (((a) << 24) | ((b) << 16) | ((c) << 8) | (d))
 #define I4C_CBN         I4C ('C','B','N',' ')
@@ -1102,7 +1100,6 @@ t_stat cr_attach (  UNIT    *uptr,
                     char    *cptr    )
 {
     t_stat        reason;
-    extern int32    sim_switches;
 
     if (sim_switches & ~MASK)
         return (SCPE_INVSW);

@@ -105,8 +105,6 @@
 
 
 extern int32    int_req, dev_busy, dev_done, dev_disable ;
-extern int32    sim_switches ;
-extern FILE *   sim_log ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
 t_stat  qty_setnl   ( UNIT * uptr, int32 val, char * cptr, void * desc ) ;

@@ -61,7 +61,7 @@
 #define TTX_GETLN(x)    (((x) >> 4) & TTX_MASK)
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll, sim_is_running;
+extern int32 tmxr_poll;
 
 uint8 ttix_buf[TTX_LINES] = { 0 };                      /* input buffers */
 uint8 ttox_buf[TTX_LINES] = { 0 };                      /* output buffers */

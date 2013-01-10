@@ -60,8 +60,7 @@ extern int32 trap_req, ipl;
 extern int32 cpu_log;
 extern int32 autcon_enb;
 extern int32 uba_last;
-extern FILE *sim_log;
-extern DEVICE *sim_devices[], cpu_dev;
+extern DEVICE cpu_dev;
 extern t_addr cpu_memsize;
 
 int32 calc_ints (int32 nipl, int32 trq);

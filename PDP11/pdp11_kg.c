@@ -95,7 +95,6 @@
 #endif
 #include "pdp11_defs.h"
 
-extern FILE *sim_deb;
 extern REG cpu_reg[];
 extern int32 R[];
 
