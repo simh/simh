@@ -225,7 +225,7 @@ char regname[15][8] =  {    "(P2IAR)",
    load starts at the current value of the P1IAR.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, addr = 0, cnt = 0;
 
@@ -252,7 +252,7 @@ return (SCPE_OK);
         status  =       error code
 */
 
-int32 fprint_sym (FILE *of, t_addr addr, uint32 *val,
+t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
     int32 r;
@@ -501,7 +501,7 @@ return -(oplen - 1);
         status  =       error status
 */
 
-int32 parse_sym (char *cptr, t_addr addr, UNIT *uptr, uint32 *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, i = 0, j, r, oplen, addtyp, saveaddr, vptr;
 char gbuf[CBUFSIZE];

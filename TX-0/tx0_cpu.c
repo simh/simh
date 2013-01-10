@@ -1208,7 +1208,7 @@ cpu_get_switches(void)
     return TAC;
 }
 
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
+t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
     uint32 cnt = 0, word;
     t_addr j, lo, hi, sz, sz_words;
     char *result;

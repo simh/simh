@@ -191,7 +191,6 @@ void setBankSelect(const int32 b);
 uint32 getClockFrequency(void);
 void setClockFrequency(const uint32 Value);
 uint32 getCommon(void);
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -6810,7 +6809,7 @@ void (*sim_vm_init) (void) = &altairz80_init;
 
 #define PLURAL(x) (x), (x) == 1 ? "" : "s"
 
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
+t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
     int32 i;
     uint32 addr, cnt = 0, org, pagesModified = 0, makeROM = FALSE;
     t_addr j, lo, hi;

@@ -170,7 +170,7 @@ extern DEVICE *sim_devices[];
 extern REG *sim_PC;
 extern const char *sim_stop_messages[];
 extern t_stat sim_instr (void);
-extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int32 flag);
+extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int flag);
 extern int32 sim_emax;
 extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw);

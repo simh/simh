@@ -3111,8 +3111,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[HIST_ILNT];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

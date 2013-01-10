@@ -695,7 +695,7 @@ extern int32 sim_asynch_inst_latency;
 #else
 #error "Implementation of function InterlockedCompareExchangePointer() is needed to build with USE_AIO_INTRINSICS"
 #endif
-#define AIO_QUEUE_MODE "Lock free asynchronous event Queue access"
+#define AIO_QUEUE_MODE "Lock free asynchronous event queue access"
 #define AIO_QUEUE_VAL InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL)
 #define AIO_QUEUE_SET(val, queue) InterlockedCompareExchangePointer(&sim_asynch_queue, val, queue)
 #define AIO_UPDATE_QUEUE                                                         \
@@ -750,7 +750,7 @@ extern int32 sim_asynch_inst_latency;
       return SCPE_OK;                                                            \
     } else (void)0
 #else /* !USE_AIO_INTRINSICS */
-#define AIO_QUEUE_MODE "Lock based asynchronous event Queue access"
+#define AIO_QUEUE_MODE "Lock based asynchronous event queue access"
 /* This approach uses a pthread mutex to manage access to the link list     */
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
 /* lock free approach when using USE_AIO_INTRINSICS                         */
@@ -812,6 +812,7 @@ extern int32 sim_asynch_inst_latency;
         sim_asynch_inst_latency = 1;                                                            \
     } else (void)0
 #else /* !SIM_ASYNCH_IO */
+#define AIO_QUEUE_MODE "Asynchronous I/O is not available"
 #define AIO_UPDATE_QUEUE
 #define AIO_ACTIVATE(caller, uptr, event_time)
 #define AIO_VALIDATE

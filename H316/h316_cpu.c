@@ -290,9 +290,6 @@ t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc);
 
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
-
 /* CPU data structures
 
    cpu_dev      CPU device descriptor
@@ -1586,8 +1583,6 @@ char *cptr = (char *) desc;
 t_value sim_eval;
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 static uint8 has_opnd[16] = {
     0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1
     };

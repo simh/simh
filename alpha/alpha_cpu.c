@@ -1784,8 +1784,6 @@ t_stat cpu_fprint_one_inst (FILE *st, uint32 ir, t_uint64 pc, t_uint64 ra, t_uin
 {
 uint32 op;
 t_value sim_val;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 static const h_fmt[64] = {
     0,     0,     0,     0,     0,     0,     0,     0,

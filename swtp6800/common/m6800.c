@@ -1922,7 +1922,7 @@ t_stat m6800_reset (DEVICE *dptr)
 	takes the address from the hex record or the current PC for binary.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
     int32 i, addr = 0, cnt = 0;
 
@@ -1950,7 +1950,7 @@ int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
         for M6800
 */
 
-int32 fprint_sym (FILE *of, t_addr addr, uint32 *val, UNIT *uptr, int32 sw)
+t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
     int32 i, inst, inst1;
 
@@ -2005,7 +2005,7 @@ int32 fprint_sym (FILE *of, t_addr addr, uint32 *val, UNIT *uptr, int32 sw)
         status  =   error status
 */
 
-int32 parse_sym (char *cptr, t_addr addr, UNIT *uptr, uint32 *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
     return (-2);
 }

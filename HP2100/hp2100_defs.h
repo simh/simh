@@ -467,7 +467,6 @@ extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 
 /* System functions */
 
-extern t_stat      fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 extern const char *fmt_char   (uint8 ch);
 extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);
