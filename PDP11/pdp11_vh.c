@@ -427,7 +427,11 @@ DEVICE vh_dev = {
     &vh_detach,     /* detach routine */
     (void *)&vh_dib,/* context */
     DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG | DEV_MUX,    /* flags */
-    0, vh_debug
+    0, vh_debug,    /* debug control and debug flags */
+    NULL,           /* memory size routine */
+    NULL,           /* logical name */
+    NULL, NULL,     /* help and attach_help routines */
+    (void *)&vh_desc/* help context variable */
 };
 
 /* Register names for Debug tracing */

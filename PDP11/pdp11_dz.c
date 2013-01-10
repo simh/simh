@@ -290,7 +290,9 @@ DEVICE dz_dev = {
     &tmxr_ex, &tmxr_dep, &dz_reset,
     NULL, &dz_attach, &dz_detach,
     &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_MUX,
-    0, dz_debug
+    0, dz_debug, NULL, NULL,
+    NULL, NULL,     /* help and attach_help routines */
+    (void *)&dz_desc/* help context variable */
     };
 
 /* Register names for Debug tracing */
