@@ -76,7 +76,7 @@ address is here, 'nulldev' means no device is available
 */
 
 struct idev {
-        int32 (*routine)();
+        int32 (*routine)(int32, int32);
 };
 
 struct idev dev_table[32] = {

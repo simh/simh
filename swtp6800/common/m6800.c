@@ -299,7 +299,7 @@ int32 oplen[256] = {
 3,3,3,0,3,3,3,3,3,3,3,3,0,0,3,3
 };
 
-int32 sim_instr (void)
+t_stat sim_instr (void)
 {
     int32 IR, OP, DAR, reason, hi, lo, op1;
 

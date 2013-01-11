@@ -297,7 +297,7 @@ DEVICE cpu_dev = {
     NULL, NULL, NULL
 };
 
-int32 sim_instr (void)
+t_stat sim_instr (void)
 {
     int32 PC, IR, OP, DAR, reason, hi, lo, carry, i;
 

@@ -925,7 +925,7 @@ $(SIMH_NONET_LIB) : $(SIMH_SOURCE)
         $!
         $! Building The $(SIMH_NONET_LIB) Library.
         $!
-        $ $(CC)/DEF=($(CC_DEFS) -
+        $ $(CC)/DEF=($(CC_DEFS)) -
                /OBJ=$(BLD_DIR) $(MMS$CHANGED_LIST)
         $ IF (F$SEARCH("$(MMS$TARGET)").EQS."") THEN -
              LIBRARY/CREATE $(MMS$TARGET)
@@ -1810,7 +1810,7 @@ $(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SWTP6800MP
         $!
         $! Building The $(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE Simulator.
         $!
-        $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ $(CC)$(SWTP6800MP_A_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
@@ -1822,7 +1822,7 @@ $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE : $(SIMH_MAIN) $(SIMH_NONET_LIB) $(SWTP6800M
         $!
         $! Building The $(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE Simulator.
         $!
-        $ $(CC)$(SWTP_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
+        $ $(CC)$(SWTP6800MP_A2_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)/EXE=$(BIN_DIR)SWTP6800MP-A2-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,$(SWTP6800MP_A2_LIB)/LIBRARY,$(SIMH_NONET_LIB)/LIBRARY
         $ DELETE/NOLOG/NOCONFIRM $(BLD_DIR)*.OBJ;*
