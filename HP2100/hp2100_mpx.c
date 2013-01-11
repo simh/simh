@@ -749,7 +749,10 @@ DEVICE mpx_dev = {
     0,                                      /* debug control flags */
     mpx_deb,                                /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    (void*)&mpx_desc };                     /* help context */
 
 
 /* I/O signal handler.

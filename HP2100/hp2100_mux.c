@@ -434,11 +434,14 @@ DEVICE muxl_dev = {
     NULL,                                   /* attach routine */
     NULL,                                   /* detach routine */
     &muxl_dib,                              /* device information block */
-    DEV_DISABLE | DEV_MUX,                  /* device flags */
+    DEV_DISABLE,                            /* device flags */
     0,                                      /* debug control flags */
     NULL,                                   /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    NULL };                                 /* help context */
 
 
 /* MUXU data structures
@@ -512,11 +515,14 @@ DEVICE muxu_dev = {
     &mux_attach,                            /* attach routine */
     &mux_detach,                            /* detach routine */
     &muxu_dib,                              /* device information block */
-    DEV_DISABLE | DEV_DEBUG,                /* device flags */
+    DEV_DISABLE | DEV_DEBUG  | DEV_MUX,     /* device flags */
     0,                                      /* debug control flags */
     muxu_deb,                               /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    (void*)&mux_desc };                     /* help context */
 
 
 /* MUXC data structures.
@@ -575,7 +581,10 @@ DEVICE muxc_dev = {
     0,                                      /* debug control flags */
     NULL,                                   /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    NULL };                                 /* help context */
 
 
 /* Lower data card I/O signal handler.

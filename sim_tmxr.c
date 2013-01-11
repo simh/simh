@@ -105,7 +105,7 @@
     This library supports the simulation of multiple-line terminal multiplexers.
     It may also be used to create single-line "multiplexers" to provide
     additional terminals beyond the simulation console.  It may also be used to 
-    create single-line or mutlti-line simulated synchronous (BiSync) devices.
+    create single-line or multi-line simulated synchronous (BiSync) devices.
     Multiplexer lines may be connected to terminal emulators supporting the 
     Telnet protocol via sockets, or to hardware terminals via host serial
     ports.  Concurrent Telnet and serial connections may be mixed on a given 
@@ -132,11 +132,27 @@
         sim> atta MUX 23,Log=LogFileName
         sim> atta MUX Connect=ser0,Log=LogFileName
 
-
-    A Multi-Line multiplexer 
+    Specifying a Log value for a multi-line multiplexer is specifying a 
+    template filename.  The actual file name used for each line will be
+    the indicated filename with _n appended (n being the line number).
 
     Buffered Multiplexer Line:
 
+    A Multiplexer Line Buffering has been implemented.  A Buffered Line will 
+    have a copy of the last 'buffer size' bytes of output retained in a line
+    specific buffer.  The contents of this buffer will be transmitted out any
+    new connection on that line when a new telnet session is established.
+
+    This capability is most useful for the Console Telnet session.  When a
+    Console Telnet session is Buffered, a simulator will start (via BOOT CPU 
+    or whatever is appropriate for a particular simulator) without needing to 
+    have an active telnet connection.  When a Telnet connection comes along 
+    for the telnet port, the contents of the saved buffer (which wraps on 
+    overflow) are presented on the telnet session as output before session 
+    traffic.  This allows the connecting telnet client to see what happened 
+    before he connected since the likely reason he might be connecting to the 
+    console of a background simulator is to troubleshoot unusual behavior, 
+    the details of which may have already been sent to the console.
 
     Serial Port support:
 
@@ -187,19 +203,27 @@
         sim> attach -V MUX Connect=SerN
         
 
-    Virtual Null Modem (direct wire) support:
-
-    Direct computer to computer virtual connections may be established using
-    the telnet protocol or via raw tcp sockets.
-     
-        sim> attach MUX Line=2,Connect=host:port{;notelnet}
-
-    Optional Per line tcp listening port support:
-
     Line specific tcp listening ports are supported.  These are configured 
     using commands of the form:
      
         sim> attach MUX Line=2,port{;notelnet}
+
+    Direct computer to computer connections (Virutal Null Modem cables) may 
+    be established using the telnet protocol or via raw tcp sockets.
+     
+        sim> attach MUX Line=2,Connect=host:port{;notelnet}
+
+    Computer to computer virtual connections can be one way (as illustrated 
+    above) or symmetric.  A symmetric connection is configured by combining 
+    a one way connection with a tcp listening port on the same line:
+
+        sim> attach MUX Line=2,Connect=host:port,listenport
+
+    When symmetric virtual connections are configured, incoming connections 
+    on the specified listening port are checked to assure that they actually 
+    come from the specified connection destination host system.
+
+
 
      The command syntax for a single line device (MX) is:
 
@@ -277,9 +301,10 @@
     This disables automatic DTR (&RTS) manipulation by this library.
     Responsibility for manipulating DTR falls on the simulated operating 
     system.  Calling tmxr_set_modem_control_passthru would usually be in 
-    a device reset routine.
+    a device reset routine.  It may also be called by a device attach
+    routine based on user specified options.
     Once support for full modem control has been declared by a device 
-    emulation for a particular TMXR device, the this library will make no 
+    emulation for a particular TMXR device, this library will make no 
     direct effort to manipulate modem bits while connected to serial ports.
     The "tmxr_set_get_modem_bits" API exists to allow the device emulation 
     layer to query and control modem signals.  The "tmxr_set_config_line" 
@@ -298,7 +323,6 @@
 
 #include "sim_defs.h"
 #include "sim_serial.h"
-#include "sim_console.h"
 #include "sim_sock.h"
 #include "sim_timer.h"
 #include "sim_tmxr.h"
@@ -2100,7 +2124,140 @@ return SCPE_OK;
 
 t_stat tmxr_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "%s Multiplexer Attach Help\n", dptr->name);
+TMXR *mux = (TMXR *)dptr->help_ctx;
+t_bool single_line = FALSE;               /* default to Multi-Line help */
+
+if (mux)
+   single_line = (mux->lines == 1);
+
+fprintf (st, "%s Multiplexer Attach Help\n\n", dptr->name);
+if (single_line) {          /* Single Line Multiplexer */
+    fprintf (st, "The %s multiplexer may be connected to terminal emulators supporting the\n", dptr->name);
+    fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
+    fprintf (st, "ports.\n\n");
+    fprintf (st, "A Telnet listening port can be configured with:\n\n");
+    fprintf (st, "   sim> attach %s {interface:}port\n\n", dptr->name);
+    fprintf (st, "Line buffering can be enabled for the %s device with:\n\n", dptr->name);
+    fprintf (st, "   sim> attach %s Buffer{=bufsize}\n\n", dptr->name);
+    fprintf (st, "Line buffering can be disabled for the %s device with:\n\n", dptr->name);
+    fprintf (st, "   sim> attach %s NoBuffer\n\n", dptr->name);
+    fprintf (st, "The default buffer size is 32k bytes, the max buffer size is 1024k bytes\n\n");
+    fprintf (st, "The outbound traffic the %s device can be logged to a file with:\n", dptr->name);
+    fprintf (st, "   sim> attach %s Log=LogFileName\n\n", dptr->name);
+    fprintf (st, "File logging can be disabled for the %s device with:\n\n", dptr->name);
+    fprintf (st, "   sim> attach %s NoLog\n\n", dptr->name);
+    fprintf (st, "The %s device may be connected to a serial port on the host system.\n", dptr->name);
+    }
+else {
+    fprintf (st, "%s multiplexer lines may be connected to terminal emulators supporting the\n", dptr->name);
+    fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
+    fprintf (st, "ports.  Concurrent Telnet and serial connections may be mixed on a given\n");
+    fprintf (st, "multiplexer.\n\n");
+    fprintf (st, "A Telnet listening port can be configured with:\n\n");
+    fprintf (st, "   sim> attach %s {interface:}port\n\n", dptr->name);
+    if (mux)
+        fprintf (st, "Line buffering for all %d lines on the %s device can be configured with:\n\n", mux->lines, dptr->name);
+    else
+        fprintf (st, "Line buffering for all lines on the %s device can be configured with:\n\n", dptr->name);
+    fprintf (st, "   sim> attach %s Buffer{=bufsize}\n\n", dptr->name);
+    if (mux)
+        fprintf (st, "Line buffering for all %d lines on the %s device can be disabled with:\n\n", mux->lines, dptr->name);
+    else
+        fprintf (st, "Line buffering for all lines on the %s device can be disabled with:\n\n", dptr->name);
+    fprintf (st, "   sim> attach %s NoBuffer\n\n", dptr->name);
+    fprintf (st, "The default buffer size is 32k bytes, the max buffer size is 1024k bytes\n\n");
+    fprintf (st, "The outbound traffic for the lines of the %s device can be logged to files\n", dptr->name);
+    fprintf (st, "with:\n\n");
+    fprintf (st, "   sim> attach %s Log=LogFileName\n\n", dptr->name);
+    fprintf (st, "The log file name for each line uses the above LogFileName as a template\n");
+    fprintf (st, "for the actual file name which will be LogFileName_n where n is the line\n");
+    fprintf (st, "number.\n\n");
+    fprintf (st, "Multiplexer lines may be connected to serial ports on the host system.\n");
+    }
+fprintf (st, "Serial ports may be specified as an operating system specific device names\n");
+fprintf (st, "or using simh generic serial names.  simh generic names are of the form\n");
+fprintf (st, "serN, where N is from 0 thru one less than the maximum number of serial\n");
+fprintf (st, "ports on the local system.  The mapping of simh generic port names to OS \n");
+fprintf (st, "specific names can be displayed using the following command:\n\n");
+fprintf (st, "   sim> show serial\n");
+fprintf (st, "   Serial devices:\n");
+fprintf (st, "    ser0   COM1 (\\Device\\Serial0)\n");
+fprintf (st, "    ser1   COM3 (Winachcf0)\n\n");
+if (single_line) {          /* Single Line Multiplexer */
+    fprintf (st, "   sim> attach %s Connect=ser0\n\n", dptr->name);
+    fprintf (st, "or equivalently:\n\n");
+    fprintf (st, "   sim> attach %s Connect=COM1\n\n", dptr->name);
+    }
+else {
+    fprintf (st, "   sim> attach %s Line=n,Connect=ser0\n\n", dptr->name);
+    fprintf (st, "or equivalently:\n\n");
+    fprintf (st, "   sim> attach %s Line=n,Connect=COM1\n\n", dptr->name);
+    if (mux)
+        fprintf (st, "Valid line numbers are from 0 thru %d\n\n", mux->lines-1);
+    }
+fprintf (st, "An optional serial port configuration string may be present after the port\n");
+fprintf (st, "name.  If present, it must be separated from the port name with a semicolon\n");
+fprintf (st, "and has this form:\n\n");
+fprintf (st, "   <rate>-<charsize><parity><stopbits>\n\n");
+fprintf (st, "where:\n");
+fprintf (st, "   rate     = communication rate in bits per second\n");
+fprintf (st, "   charsize = character size in bits (5-8, including optional parity)\n");
+fprintf (st, "   parity   = parity designator (N/E/O/M/S for no/even/odd/mark/space parity)\n");
+fprintf (st, "   stopbits = number of stop bits (1, 1.5, or 2)\n\n");
+fprintf (st, "As an example:\n\n");
+fprintf (st, "   9600-8n1\n\n");
+fprintf (st, "The supported rates, sizes, and parity options are host-specific.  If\n");
+fprintf (st, "a configuration string is not supplied, then the default of 9600-8N1\n");
+fprintf (st, "is used.\n\n");
+fprintf (st, "An attachment to a serial port with the '-V' switch will cause a\n");
+fprintf (st, "connection message to be output to the connected serial port.\n");
+fprintf (st, "This will help to confirm the correct port has been connected and\n");
+fprintf (st, "that the port settings are reasonable for the connected device.\n");
+fprintf (st, "This would be done as:\n\n");
+if (single_line)            /* Single Line Multiplexer */
+    fprintf (st, "   sim> attach -V %s Connect=SerN\n", dptr->name);
+else {
+    fprintf (st, "   sim> attach -V %s Line=n,Connect=SerN\n\n", dptr->name);
+    fprintf (st, "Line specific tcp listening ports are supported.  These are configured\n");
+    fprintf (st, "using commands of the form:\n\n");
+    fprintf (st, "   sim> attach %s Line=n,{interface:}port{;notelnet}\n\n", dptr->name);
+    }
+fprintf (st, "Direct computer to computer connections (Virutal Null Modem cables) may\n");
+fprintf (st, "be established using the telnet protocol or via raw tcp sockets.\n\n");
+fprintf (st, "   sim> attach %s Line=n,Connect=host:port{;notelnet}\n\n", dptr->name);
+fprintf (st, "Computer to computer virtual connections can be one way (as illustrated\n");
+fprintf (st, "above) or symmetric.  A symmetric connection is configured by combining\n"); 
+if (single_line) {          /* Single Line Multiplexer */
+    fprintf (st, "a one way connection with a tcp listening port on the same line:\n\n");
+    fprintf (st, "   sim> attach %s listenport,Connect=host:port\n\n", dptr->name);
+    }
+else {
+    fprintf (st, "a one way connection with a tcp listening port on the same line:\n\n");
+    fprintf (st, "   sim> attach %s Line=n,listenport,Connect=host:port\n\n", dptr->name);
+    }
+fprintf (st, "When symmetric virtual connections are configured, incoming connections\n");
+fprintf (st, "on the specified listening port are checked to assure that they actually\n");
+fprintf (st, "come from the specified connection destination host system.\n\n");
+if (single_line)            /* Single Line Multiplexer */
+    fprintf (st, "The connection configured for the %s device is unconfigured by:\n\n", dptr->name);
+else
+    fprintf (st, "All connections configured for the %s device are unconfigured by:\n\n", dptr->name);
+fprintf (st, "   sim> detach %s\n\n", dptr->name);
+if (dptr->modifiers) {
+    MTAB *mptr;
+
+    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++)
+        if (mptr->valid == &tmxr_dscln) {
+            fprintf (st, "A specific line on the %s device can be disconnected with:\n\n", dptr->name);
+            fprintf (st, "   sim> set %s %s=n\n\n", dptr->name, mptr->mstring);
+            fprintf (st, "This will cause a telnet connection to be closed, but a serial port will\n");
+            fprintf (st, "normally have DTR dropped for 500ms and raised again (thus hanging up a\n");
+            fprintf (st, "modem on that serial port).\n\n");
+            fprintf (st, "A line which is connected to a serial port can be manually closed by\n");
+            fprintf (st, "adding the -C switch to a %s command.\n\n", mptr->mstring);
+            fprintf (st, "   sim> set -C %s %s=n\n\n", dptr->name, mptr->mstring);
+            }
+    }
 return SCPE_OK;
 }
 
