@@ -1142,7 +1142,8 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
             TMXR_MAXBUF - lp->rxbpi);
 
     if (nbytes < 0) {                                   /* line error? */
-        lp->txbpi = lp->txbpr = 0;                      /* Drop the data we already know we can't send */
+        if (!lp->txbfd) 
+            lp->txbpi = lp->txbpr = 0;                  /* Drop the data we already know we can't send */
         tmxr_close_ln (lp);                             /* disconnect line */
         }
 
