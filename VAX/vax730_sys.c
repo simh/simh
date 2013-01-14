@@ -43,6 +43,7 @@
 #endif /* DONT_USE_INTERNAL_ROM */
 
 static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
+int32 sys_model = 0;
 
 /* VAX-11/730 boot device definitions */
 
@@ -560,6 +561,12 @@ r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALS
 if (r != SCPE_OK)
     return r;
 SP = PC = 512;
+return SCPE_OK;
+}
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "model=VAX 11/730");
 return SCPE_OK;
 }
 

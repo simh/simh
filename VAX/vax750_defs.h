@@ -150,6 +150,9 @@
                         { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }
+#define CPU_MODEL_MODIFIERS \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL, \
+                          NULL, &cpu_show_model },
 
 /* Unibus I/O registers */
 
@@ -407,7 +410,6 @@ t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
-int32 clk_cosched (int32 wait);
 
 #include "pdp11_io_lib.h"
 

@@ -64,6 +64,7 @@
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
 t_stat vax_boot (int32 flag, char *ptr);
+int32 sys_model = 0;
 
 /* Special boot command, overrides regular boot */
 
@@ -1573,7 +1574,6 @@ return run_cmd (flag, "CPU");
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-extern t_stat load_cmd (int32 flag, char *cptr);
 t_stat r;
 
 PC = ROMBASE;
@@ -1588,6 +1588,12 @@ if (*rom == 0) {                                        /* no boot? */
         return r;
     }
 sysd_powerup ();
+return SCPE_OK;
+}
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "model=VAX 3900");
 return SCPE_OK;
 }
 

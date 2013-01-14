@@ -71,6 +71,7 @@ uint32 nexus_req[NEXUS_HLVL];                           /* nexus int req */
 uint32 cmi_err = 0;
 uint32 cmi_cadr = 0;
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
+int32 sys_model = 0;
 
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -645,6 +646,12 @@ r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALS
 if (r != SCPE_OK)
     return r;
 SP = PC = 512;
+return SCPE_OK;
+}
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "model=VAX 11/750");
 return SCPE_OK;
 }
 

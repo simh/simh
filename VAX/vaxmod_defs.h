@@ -126,6 +126,9 @@
                         { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size }
+#define CPU_MODEL_MODIFIERS \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL, \
+                          NULL, &cpu_show_model },
 
 
 /* Cache diagnostic space */
@@ -426,8 +429,6 @@ int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
-
-int32 clk_cosched (int32 wait);
 
 #include "pdp11_io_lib.h"
 

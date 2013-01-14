@@ -55,6 +55,7 @@
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
 t_stat vax630_boot (int32 flag, char *ptr);
+int32 sys_model = 0;
 
 /* Special boot command, overrides regular boot */
 

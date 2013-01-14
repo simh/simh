@@ -329,9 +329,6 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
-int32 clk_cosched (int32 wait);
-
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #include "pdp11_io_lib.h"

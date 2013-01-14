@@ -751,6 +751,10 @@ void cpu_idle (void);
 #define BOOT_CODE_ARRAY NULL
 #define BOOT_CODE_SIZE 0
 #endif
+
 extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset);
+extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern int32 clk_cosched (int32 wait);
 
 #endif                                                  /* _VAX_DEFS_H */

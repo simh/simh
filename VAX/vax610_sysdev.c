@@ -57,6 +57,7 @@ extern int32 p1;
 extern int32 trpirq, mem_err;
 
 int32 conisp, conpc, conpsl;                            /* console reg */
+int32 sys_model = 0;
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
 
 static struct boot_dev boot_tab[] = {

@@ -728,6 +728,6 @@ return SCPE_OK;
 
 t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf (st, "model=%s", (sys_model ? "8650" : "8600"));
+fprintf (st, "model=VAX %s", (sys_model ? "8650" : "8600"));
 return SCPE_OK;
 }

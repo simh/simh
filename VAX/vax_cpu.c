@@ -307,6 +307,7 @@ const uint32 align[4] = {
 
 extern t_stat build_dib_tab (void);
 extern UNIT rom_unit, nvr_unit;
+extern int32 sys_model;
 extern int32 op_ashq (int32 *opnd, int32 *rh, int32 *flg);
 extern int32 op_emul (int32 mpy, int32 mpc, int32 *rh);
 extern int32 op_ediv (int32 *opnd, int32 *rh, int32 *flg);
@@ -456,6 +457,7 @@ REG cpu_reg[] = {
     { HRDATA (PCQP, pcq_p, 6), REG_HRO },
     { HRDATA (BADABO, badabo, 32), REG_HRO },
     { HRDATA (WRU, sim_int_char, 8) },
+    { HRDATA (MODEL, sys_model, 32), REG_HRO },
     { NULL }
     };
 
