@@ -380,6 +380,9 @@ return 0;
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 
+#if !defined(IPV6_V6ONLY)           /* Older XP environments may not define IPV6_V6ONLY */
+#define IPV6_V6ONLY           27    /* Treat wildcard bind as AF_INET6-only. */
+#endif
 /* Dynamic DLL load variables */
 #ifdef _WIN32
 static HINSTANCE hLib = 0;                      /* handle to DLL */
