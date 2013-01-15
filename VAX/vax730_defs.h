@@ -323,9 +323,8 @@ typedef struct {
 
 /* Boot definitions */
 
-#define BOOT_MB         0                               /* device codes */
-#define BOOT_HK         1                               /* for VMB */
-#define BOOT_RL         2
+#define BOOT_HK         1                               /* device codes */
+#define BOOT_RL         2                               /* for VMB */
 #define BOOT_RB         3
 #define BOOT_UDA        17
 #define BOOT_TK         18

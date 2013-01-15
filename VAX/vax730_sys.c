@@ -564,12 +564,6 @@ SP = PC = 512;
 return SCPE_OK;
 }
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
-{
-fprintf (st, "model=VAX 11/730");
-return SCPE_OK;
-}
-
 /* SYSB reset */
 
 t_stat sysb_reset (DEVICE *dptr)
@@ -658,5 +652,29 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
             }                                           /* end else */
         }                                               /* end if enabled */
     }                                                   /* end for */
+return SCPE_OK;
+}
+
+t_stat cpu_print_model (FILE *st)
+{
+fprintf (st, "VAX 11/730");
+return SCPE_OK;
+}
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Initial memory size is 2MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BO{OT} <device>{/R5:flags}\n\n");
+fprintf (st, "where <device> is one of:\n\n");
+fprintf (st, "   HKn        to boot from hkn\n");
+fprintf (st, "   RLn        to boot from rln\n");
+fprintf (st, "   RQn        to boot from rqn\n");
+fprintf (st, "   RQBn       to boot from rqbn\n");
+fprintf (st, "   RQCn       to boot from rqcn\n");
+fprintf (st, "   RQDn       to boot from rqdn\n");
+fprintf (st, "   TQn        to boot from tqn\n");
+fprintf (st, "   TDn        to boot from tdn (TU58)\n");
+fprintf (st, "   RBn        to boot from rbn\n\n");
 return SCPE_OK;
 }

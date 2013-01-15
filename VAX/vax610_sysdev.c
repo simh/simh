@@ -487,8 +487,22 @@ t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 return SCPE_NOFNC;
 }
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "model=MicroVAX I");
+fprintf (st, "MicroVAX I");
+return SCPE_OK;
+}
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Initial memory size is 4MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BO{OT} <device>{/R5:flags}\n\n");
+fprintf (st, "where <device> is one of:\n\n");
+fprintf (st, "   RQn        to boot from rqn\n");
+fprintf (st, "   DUn        to boot from rqn\n");
+fprintf (st, "   DUAn       to boot from rqn\n");
+fprintf (st, "   XQ         to boot from xq\n");
+fprintf (st, "   XQA        to boot from xq\n\n");
 return SCPE_OK;
 }

@@ -883,12 +883,20 @@ rom_diag_full = 0;
 return SCPE_OK;
 }
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_print_model (FILE *st)
 {
 #if defined(VAX_620)
-fprintf (st, "model=rtVAX 1000");
+fprintf (st, "rtVAX 1000");
 #else
-fprintf (st, "model=MicroVAX II");
+fprintf (st, "MicroVAX II");
 #endif
+return SCPE_OK;
+}
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Initial memory size is 16MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BOOT\n\n");
 return SCPE_OK;
 }

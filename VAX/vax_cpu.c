@@ -491,8 +491,14 @@ DEVICE cpu_dev = {
     &cpu_ex, &cpu_dep, &cpu_reset,
     &cpu_boot, NULL, NULL,
     NULL, DEV_DYNM | DEV_DEBUG, 0,
-    cpu_deb, &cpu_set_size, NULL
+    cpu_deb, &cpu_set_size, NULL, &cpu_help, NULL, NULL
     };
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "model=");
+return cpu_print_model (st);
+}
 
 t_stat sim_instr (void)
 {
@@ -3490,5 +3496,72 @@ if (r != SCPE_OK) {
         }
     return r;
     }
+return SCPE_OK;
+}
+
+t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "The ");cpu_print_model (st);fprintf (st, " CPU help\n\n");
+fprintf (st, "CPU options include the size of main memory.\n\n");
+if (dptr->modifiers) {
+    MTAB *mptr;
+    extern t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+
+    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++)
+        if (mptr->valid == &cpu_set_size)
+            fprintf (st, "   sim> SET CPU %4s                    set memory size = %sB\n", mptr->mstring, mptr->mstring);
+    fprintf (st, "\n");
+    }
+cpu_model_help (st, dptr, uptr, flag, cptr);
+fprintf (st, "CPU options include the treatment of the HALT instruction.\n\n");
+fprintf (st, "   sim> SET CPU SIMHALT                 kernel HALT returns to simulator\n");
+fprintf (st, "   sim> SET CPU CONHALT                 kernel HALT returns to boot ROM console\n\n");
+fprintf (st, "The CPU also implements a command to display a virtual to physical address\n");
+fprintf (st, "translation:\n\n");
+fprintf (st, "   sim> SHOW {-kesu} CPU VIRTUAL=n      show translation for address n\n");
+fprintf (st, "                                        in kernel/exec/supervisor/user mode\n\n");
+fprintf (st, "Memory can be loaded with a binary byte stream using the LOAD command.  The\n");
+fprintf (st, "LOAD command recognizes three switches:\n\n");
+fprintf (st, "      -o      origin argument follows file name\n");
+fprintf (st, "      -r      load the boot ROM\n");
+fprintf (st, "      -n      load the non-volatile RAM\n\n");
+fprintf (st, "The CPU supports the BOOT command and is the only VAX device to do so.  Note\n");
+fprintf (st, "that the behavior of the bootstrap depends on the capabilities of the console\n");
+fprintf (st, "terminal emulator.  If the terminal window supports full VT100 emulation\n");
+fprintf (st, "(including Multilanguage Character Set support), the bootstrap will ask the\n");
+fprintf (st, "user to specify the language; otherwise, it will default to English.\n\n");
+fprintf (st, "These switches are recognized when examining or depositing in CPU memory:\n\n");
+fprintf (st, "      -b      examine/deposit bytes\n");
+fprintf (st, "      -w      examine/deposit words\n");
+fprintf (st, "      -l      examine/deposit longwords\n");
+fprintf (st, "      -d      data radix is decimal\n");
+fprintf (st, "      -o      data radix is octal\n");
+fprintf (st, "      -h      data radix is hexadecimal\n");
+fprintf (st, "      -m      examine (only) VAX instructions\n");
+fprintf (st, "      -p      examine/deposit PDP-11 (compatibility mode) instructions\n");
+fprintf (st, "      -r      examine (only) RADIX50 encoded data\n");
+fprintf (st, "      -v      interpret address as virtual, current mode\n");
+fprintf (st, "      -k      interpret address as virtual, kernel mode\n");
+fprintf (st, "      -e      interpret address as virtual, executive mode\n");
+fprintf (st, "      -s      interpret address as virtual, supervisor mode\n");
+fprintf (st, "      -u      interpret address as virtual, user mode\n\n");
+fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
+fprintf (st, "simulator does not use any resources on the host system.  Idle detection is\n");
+fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
+fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|NETBSD|FREEBSD|32V|ALL}\n");
+fprintf (st, "                                        enable idle detection\n");
+fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
+fprintf (st, "Idle detection is disabled by default.  Unless ALL is specified, idle\n");
+fprintf (st, "detection is operating system specific.  If idle detection is enabled with\n");
+fprintf (st, "an incorrect operating system setting, simulator performance could be\n");
+fprintf (st, "impacted.  The default operating system setting is VMS.\n\n");
+fprintf (st, "The CPU can maintain a history of the most recently executed instructions.\n");
+fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
+fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
+fprintf (st, "   sim> SET CPU HISTORY=0               disable history\n");
+fprintf (st, "   sim> SET CPU HISTORY=n               enable history, length = n\n");
+fprintf (st, "   sim> SHOW CPU HISTORY                print CPU history\n");
+fprintf (st, "   sim> SHOW CPU HISTORY=n              print first n entries of CPU history\n\n");
+fprintf (st, "The maximum length for the history is 65536 entries.\n\n");
 return SCPE_OK;
 }

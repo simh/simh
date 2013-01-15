@@ -726,8 +726,26 @@ else
 return SCPE_OK;
 }
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "model=VAX %s", (sys_model ? "8650" : "8600"));
+fprintf (st, "VAX %s", (sys_model ? "8650" : "8600"));
+return SCPE_OK;
+}
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Initial memory size is 32MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BO{OT} <device>{/R5:flags}\n\n");
+fprintf (st, "where <device> is one of:\n\n");
+fprintf (st, "   RPn        to boot from rpn\n");
+fprintf (st, "   HKn        to boot from hkn\n");
+fprintf (st, "   RLn        to boot from rln\n");
+fprintf (st, "   RQn        to boot from rqn\n");
+fprintf (st, "   RQBn       to boot from rqbn\n");
+fprintf (st, "   RQCn       to boot from rqcn\n");
+fprintf (st, "   RQDn       to boot from rqdn\n");
+fprintf (st, "   TQn        to boot from tqn\n");
+fprintf (st, "   CS         to boot from console RL\n\n");
 return SCPE_OK;
 }

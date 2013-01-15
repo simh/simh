@@ -1591,9 +1591,9 @@ sysd_powerup ();
 return SCPE_OK;
 }
 
-t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "model=VAX 3900");
+fprintf (st, "VAX 3900");
 return SCPE_OK;
 }
 
@@ -1638,5 +1638,35 @@ ssc_base = SSCBASE;
 ssc_cnf = ssc_cnf & SSCCNF_BLO;
 ssc_bto = 0;
 ssc_otp = 0;
+return SCPE_OK;
+}
+
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Notes on memory size:\n\n");
+fprintf (st, "- The real KA655 CPU only supported 16MB to 64MB of memory.  The simulator\n");
+fprintf (st, "  implements a KA655\"X\", which increases supported memory to 512MB.\n");
+fprintf (st, "- The firmware (ka655x.bin) contains code to determine the size of extended\n");
+fprintf (st, "  memory and set up the PFN bit map accordingly.  Other than setting up the\n");
+fprintf (st, "  PFN bit map, the firmware does not recognize extended memory and will\n");
+fprintf (st, "  behave as though memory size was 64MB.\n");
+fprintf (st, "- If memory size is being reduced, and the memory being truncated contains\n");
+fprintf (st, "  non-zero data, the simulator asks for confirmation.  Data in the truncated\n");
+fprintf (st, "  portion of memory is lost.\n");
+fprintf (st, "- If the simulator is running VMS, the operating system may have a SYSGEN\n");
+fprintf (st, "  parameter set called PHYSICAL PAGES (viewable with\n");
+fprintf (st, "  \"MCR SYSGEN SHOW PHYSICALPAGES\").  PHYSICALPAGES limits the maximum\n");
+fprintf (st, "  number of physical pages of memory the OS will recognize.  If it is set\n");
+fprintf (st, "  to a lower value than the new memory size of the machine, then only the\n");
+fprintf (st, "  first PHYSICALPAGES of memory will be recognized, otherwise the actual size\n");
+fprintf (st, "  of the extended memory will be realized by VMS upon each boot.  Some users\n");
+fprintf (st, "  and/or sites may specify the PHYSICALPAGES parameter in the input file to\n");
+fprintf (st, "  AUTOGEN (SYS$SYSTEM:MODPARAMS.DAT).  If PHYSICALPAGES is specified there,\n");
+fprintf (st, "  it will have to be adjusted before running AUTOGEN to recognize more memory.\n");
+fprintf (st, "  The default value for PHYSICALPAGES is 1048576, which describes 512MB of RAM.\n\n");
+fprintf (st, "Initial memory size is 16MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BOOT\n\n");
 return SCPE_OK;
 }
