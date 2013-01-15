@@ -525,13 +525,13 @@ if (0 == (uptr-dptr->units)) {
 
         for (i=0; i < dptr->numunits; ++i)
             if (dptr->units[i].flags & UNIT_ATTABLE)
-                fprintf (st, "  sim> attach {switches} %s%d tapefile\n\n", dptr->name, i);
+                fprintf (st, "  sim> ATTACH {switches} %s%d tapefile\n\n", dptr->name, i);
         }
     else
-        fprintf (st, "  sim> attach {switches} %s tapefile\n\n", dptr->name);
+        fprintf (st, "  sim> ATTACH {switches} %s tapefile\n\n", dptr->name);
     }
 else
-    fprintf (st, "  sim> attach {switches} %s tapefile\n\n", dptr->name);
+    fprintf (st, "  sim> ATTACH {switches} %s tapefile\n\n", dptr->name);
 fprintf (st, "Attach command switches\n");
 fprintf (st, "    -R          Attach Read Only.\n");
 fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
