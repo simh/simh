@@ -833,7 +833,7 @@ fprintf (st, "displays logging information for all %s lines.\n\n", dptr->name);
 fprintf (st, "Once the %s is attached and the simulator is running, the %s will listen for\n", devtype, devtype);
 fprintf (st, "connections on the specified port.  It assumes that the incoming connections\n");
 fprintf (st, "are Telnet connections.  The connection remains open until disconnected by the\n");
-fprintf (st, "simulated program, the Telnet client, a SET %s DISCONNECT command, or a\n", uptr->next);
+fprintf (st, "simulated program, the Telnet client, a SET %s DISCONNECT command, or a\n", dptr->name);
 fprintf (st, "DETACH %s command.\n\n", dptr->name);
 fprintf (st, "Other special %s commands:\n\n", dptr->name);
 fprintf (st, "   sim> SHOW %s CONNECTIONS 		show current connections\n", dptr->name);

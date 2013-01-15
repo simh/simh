@@ -1508,7 +1508,7 @@ char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 fprintf (st, "%s Terminal Multiplexer (%s)\n\n", devtype, dptr->name);
 fprintf (st, "The %s is an %d-line terminal multiplexer for %s systems.  Up to %d %s's\n", devtype, VH_LINES, (UNIBUS) ? "Unibus" : "Qbus", VH_MUXES, devtype);
 fprintf (st, "are supported.\n\n");
-fprintf (st, "The %s is a programmable asynchronous terminal multiplexer.  It has two\n");
+fprintf (st, "The %s is a programmable asynchronous terminal multiplexer.  It has two\n", devtype);
 fprintf (st, "programming modes: DHV11 and DHU11.  The register sets are compatible with\n");
 fprintf (st, "these devices.  For transmission, the %s can be used in either DMA or\n", devtype);
 fprintf (st, "programmed I/O mode.  For reception, there is a 256-entry FIFO for received\n");
@@ -1531,7 +1531,7 @@ fprintf (st, "operating systems and diagnostics.  You can change the behavior of
 fprintf (st, "controller as follows:\n\n");
 fprintf (st, "   sim> SET %sn NORMAL			use normal DMA procedures\n", dptr->name);
 fprintf (st, "   sim> SET %sn FASTDMA			set DMA to initiate immediately\n\n", dptr->name);
-fprintf (st, "The number of lines (and therefore the number of %s devices\n");
+fprintf (st, "The number of lines (and therefore the number of %s devices\n", devtype);
 fprintf (st, "simulated) can be changed with the command:\n\n");
 fprintf (st, "   sim> SET %s LINES=n			set line count to n\n\n", dptr->name);
 fprintf (st, "The line count must be a multiple of %d, with a maximum of %d.\n\n", VH_LINES, VH_LINES*VH_MUXES);
