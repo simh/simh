@@ -219,6 +219,8 @@ t_stat dz_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 /* DZ data structures
 
@@ -237,17 +239,17 @@ DIB dz_dib = {
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
 
 REG dz_reg[] = {
-    { BRDATA (CSR, dz_csr, DEV_RDX, 16, MAX_DZ_MUXES) },
-    { BRDATA (RBUF, dz_rbuf, DEV_RDX, 16, MAX_DZ_MUXES) },
-    { BRDATA (LPR, dz_lpr, DEV_RDX, 16, MAX_DZ_MUXES) },
-    { BRDATA (TCR, dz_tcr, DEV_RDX, 16, MAX_DZ_MUXES) },
-    { BRDATA (MSR, dz_msr, DEV_RDX, 16, MAX_DZ_MUXES) },
-    { BRDATA (TDR, dz_tdr, DEV_RDX, 16, MAX_DZ_MUXES) },
-    { BRDATA (SAENB, dz_sae, DEV_RDX, 1, MAX_DZ_MUXES) },
-    { GRDATA (RXINT, dz_rxi, DEV_RDX, MAX_DZ_MUXES, 0) },
-    { GRDATA (TXINT, dz_txi, DEV_RDX, MAX_DZ_MUXES, 0) },
-    { FLDATA (MDMCTL, dz_mctl, 0) },
-    { FLDATA (AUTODS, dz_auto, 0) },
+    { BRDATAD (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register") },
+    { BRDATAD (RBUF,  dz_rbuf,  DEV_RDX, 16, MAX_DZ_MUXES, "receive buffer") },
+    { BRDATAD (LPR,   dz_lpr,   DEV_RDX, 16, MAX_DZ_MUXES, "line parameter register") },
+    { BRDATAD (TCR,   dz_tcr,   DEV_RDX, 16, MAX_DZ_MUXES, "transmission control register") },
+    { BRDATAD (MSR,   dz_msr,   DEV_RDX, 16, MAX_DZ_MUXES, "modem status register") },
+    { BRDATAD (TDR,   dz_tdr,   DEV_RDX, 16, MAX_DZ_MUXES, "transmit data register") },
+    { BRDATAD (SAENB, dz_sae,   DEV_RDX,  1, MAX_DZ_MUXES, "silo alarm enabled") },
+    { GRDATAD (RXINT, dz_rxi,   DEV_RDX, MAX_DZ_MUXES,  0, "receive interrupts") },
+    { GRDATAD (TXINT, dz_txi,   DEV_RDX, MAX_DZ_MUXES,  0, "transmit interrupts") },
+    { FLDATAD (MDMCTL, dz_mctl, 0,                         "modem control enabled") },
+    { FLDATAD (AUTODS, dz_auto, 0,                         "autodisconnect enabled") },
     { GRDATA (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
     { GRDATA (DEVVEC, dz_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
@@ -291,8 +293,8 @@ DEVICE dz_dev = {
     NULL, &dz_attach, &dz_detach,
     &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_MUX,
     0, dz_debug, NULL, NULL,
-    NULL, NULL,     /* help and attach_help routines */
-    (void *)&dz_desc/* help context variable */
+    &dz_help, &dz_help_attach,          /* help and attach_help routines */
+    (void *)&dz_desc                    /* help context variable */
     };
 
 /* Register names for Debug tracing */
@@ -802,5 +804,61 @@ for (i = 0; i < dz_desc.lines; i++) {
 return SCPE_OK;
 }
 
+t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = (UNIBUS) ? "DZ11" : "DZV11";
 
+fprintf (st, "%s Terminal Multiplexer (DZ)\n\n", devtype);
+fprintf (st, "The %s is a %d line terminal multiplexor.  Up to %d %s's (%d lines) are\n", devtype, DZ_LINES, MAX_DZ_MUXES, devtype, DZ_LINES*MAX_DZ_MUXES);
+fprintf (st, "supported.  The default number of lines is %d.  The number of lines can\n", DZ_LINES*DZ_MUXES);
+fprintf (st, "be changed with the command\n\n");
+fprintf (st, "   sim> SET %s LINES=n			set line count to n\n\n", dptr->name);
+fprintf (st, "The line count must be a multiple of %d, with a maximum of %d.\n\n", DZ_LINES, DZ_LINES*MAX_DZ_MUXES);
+fprintf (st, "The %s supports three character processing modes, 7P, 7B, and 8B:\n\n", devtype);
+fprintf (st, "	mode	input characters	output characters\n");
+fprintf (st, "	=============================================\n");
+fprintf (st, "	7P	high-order bit cleared	high-order bit cleared,\n");
+fprintf (st, "					non-printing characters suppressed\n");
+fprintf (st, "	7B	high-order bit cleared	high-order bit cleared\n");
+fprintf (st, "	8B	no changes		no changes\n\n");
+fprintf (st, "The default is 8B.\n\n");
+fprintf (st, "The %s supports logging on a per-line basis.  The command\n\n", devtype);
+fprintf (st, "   sim> SET %s LOG=n=filename\n\n", dptr->name);
+fprintf (st, "enables logging for the specified line(n) to the indicated file.  The command\n\n");
+fprintf (st, "   sim> SET %s NOLOG=line\n\n", dptr->name);
+fprintf (st, "disables logging for the specified line and closes any open log file.  Finally,\n");
+fprintf (st, "the command:\n\n");
+fprintf (st, "   sim> SHOW %s LOG\n\n", dptr->name);
+fprintf (st, "displays logging information for all %s lines.\n\n", dptr->name);
+fprintf (st, "Once the %s is attached and the simulator is running, the %s will listen for\n", devtype, devtype);
+fprintf (st, "connections on the specified port.  It assumes that the incoming connections\n");
+fprintf (st, "are Telnet connections.  The connection remains open until disconnected by the\n");
+fprintf (st, "simulated program, the Telnet client, a SET %s DISCONNECT command, or a\n", uptr->next);
+fprintf (st, "DETACH %s command.\n\n", dptr->name);
+fprintf (st, "Other special %s commands:\n\n", dptr->name);
+fprintf (st, "   sim> SHOW %s CONNECTIONS 		show current connections\n", dptr->name);
+fprintf (st, "   sim> SHOW %s STATISTICS 		show statistics for active connections\n", dptr->name);
+fprintf (st, "   sim> SET %s DISCONNECT=linenumber	disconnects the specified line.\n\n\n", dptr->name);
+fprintf (st, "All open connections are lost when the simulator shuts down or the %s is\n", dptr->name);
+fprintf (st, "detached.\n");
+return SCPE_OK;
+}
+
+t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = (UNIBUS) ? "DZ11" : "DZV11";
+
+tmxr_attach_help (st, dptr, uptr, flag, cptr);
+fprintf (st, "The terminal lines perform input and output through Telnet sessions connected\n");
+fprintf (st, "to a user-specified port.  The ATTACH command specifies the port to be used:\n\n");
+fprintf (st, "   sim> ATTACH {-am} %s {interface:}port		set up listening port\n\n", dptr->name);
+fprintf (st, "where port is a decimal number between 1 and 65535 that is not being used for\n");
+fprintf (st, "other TCP/IP activities.  The optional switch -m turns on the %s's modem\n", devtype);
+fprintf (st, "controls; the optional switch -a turns on active disconnects (disconnect\n");
+fprintf (st, "session if computer clears Data Terminal Ready).  Without modem control, the\n");
+fprintf (st, "%s behaves as though terminals were directly connected; disconnecting the\n", devtype);
+fprintf (st, "Telnet session does not cause any operating system-visible change in line\n");
+fprintf (st, "status.\n\n");
+return SCPE_OK;
+}
 

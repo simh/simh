@@ -339,6 +339,8 @@ static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 /* SIMH I/O Structures */
 
@@ -430,7 +432,8 @@ DEVICE vh_dev = {
     0, vh_debug,    /* debug control and debug flags */
     NULL,           /* memory size routine */
     NULL,           /* logical name */
-    NULL, NULL,     /* help and attach_help routines */
+    &vh_help,       /* help routine */
+    &vh_help_attach,/* attach_help routines */
     (void *)&vh_desc/* help context variable */
 };
 
@@ -1496,4 +1499,65 @@ for (i = 0; i < vh_desc.lines; i++) {
     fprintf (st, "\n");
     }
 return SCPE_OK;
+}
+
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+
+fprintf (st, "%s Terminal Multiplexer (%s)\n\n", devtype, dptr->name);
+fprintf (st, "The %s is an %d-line terminal multiplexer for %s systems.  Up to %d %s's\n", devtype, VH_LINES, (UNIBUS) ? "Unibus" : "Qbus", VH_MUXES, devtype);
+fprintf (st, "are supported.\n\n");
+fprintf (st, "The %s is a programmable asynchronous terminal multiplexer.  It has two\n");
+fprintf (st, "programming modes: DHV11 and DHU11.  The register sets are compatible with\n");
+fprintf (st, "these devices.  For transmission, the %s can be used in either DMA or\n", devtype);
+fprintf (st, "programmed I/O mode.  For reception, there is a 256-entry FIFO for received\n");
+fprintf (st, "characters, dataset status changes, and diagnostic information, and a\n");
+fprintf (st, "programmable input interrupt timer (in DHU mode).  The device supports\n");
+fprintf (st, "16-, 18-, and 22-bit addressing.  The %s can be programmed to filter\n", devtype);
+fprintf (st, "and/or handle XON/XOFF characters independently of the processor.\n");
+fprintf (st, "The %s supports programmable bit width (between 5 and 8) for the input\n", devtype);
+fprintf (st, "and output of characters.\n\n");
+fprintf (st, "By default, the DHV11 mode is selected, though DHU11 mode is recommended\n");
+fprintf (st, "for applications that can support it.  The %s controller may be adjusted\n", dptr->name);
+fprintf (st, "on a per controller basis as follows:\n\n");
+fprintf (st, "   sim> SET %sn DHU			use the DHU programming mode\n", dptr->name);
+fprintf (st, "   sim> SET %sn DHV			use the DHV programming mode\n\n", dptr->name);
+fprintf (st, "DMA output is supported.  In a real %s, DMA is not initiated immediately\n", devtype);
+fprintf (st, "upon receipt of TX.DMA.START but is dependent upon some internal processes.\n");
+fprintf (st, "The %s controller mimics this behavior by default.  It may be desirable to\n", dptr->name);
+fprintf (st, "alter this and start immediately, though this may not be compatible with all\n");
+fprintf (st, "operating systems and diagnostics.  You can change the behavior of the %s\n", dptr->name);
+fprintf (st, "controller as follows:\n\n");
+fprintf (st, "   sim> SET %sn NORMAL			use normal DMA procedures\n", dptr->name);
+fprintf (st, "   sim> SET %sn FASTDMA			set DMA to initiate immediately\n\n", dptr->name);
+fprintf (st, "The number of lines (and therefore the number of %s devices\n");
+fprintf (st, "simulated) can be changed with the command:\n\n");
+fprintf (st, "   sim> SET %s LINES=n			set line count to n\n\n", dptr->name);
+fprintf (st, "The line count must be a multiple of %d, with a maximum of %d.\n\n", VH_LINES, VH_LINES*VH_MUXES);
+fprintf (st, "Modem and auto-disconnect support may be set on an individual controller\n");
+fprintf (st, "basis.  The SET MODEM command directs the controller to report modem status\n");
+fprintf (st, "changes to the computer.  The SET HANGUP command turns on active disconnects\n");
+fprintf (st, "(disconnect session if computer clears Data Terminal Ready).\n\n");
+fprintf (st, "   sim> SET %sn [NO]MODEM		disable/enable modem control\n", dptr->name);
+fprintf (st, "   sim> SET %sn [NO]HANGUP		disable/enable disconnect on DTR drop\n\n", dptr->name);
+fprintf (st, "Once the %s devuce is attached and the simulator is running, the %s will\n", dptr->name, dptr->name);
+fprintf (st, "listen for connections on the specified port.  It assumes that the incoming\n");
+fprintf (st, "connections are Telnet connections.  The connection remains open until\n");
+fprintf (st, "disconnected by the simulated program, the Telnet client, a SET %s DISCONNECT\n", dptr->name);
+fprintf (st, "command, or a DETACH %s command.\n\n", dptr->name);
+fprintf (st, "Other special %s commands:\n\n", dptr->name);
+fprintf (st, "   sim> SHOW %s CONNECTIONS 		show current connections\n", dptr->name);
+fprintf (st, "   sim> SHOW %s STATISTICS 		show statistics for active connections\n", dptr->name);
+fprintf (st, "   sim> SET %s DISCONNECT=linenumber	disconnects the specified line.\n\n", dptr->name);
+fprintf (st, "The %s does not support save and restore.  All open connections are lost\n", devtype);
+fprintf (st, "when the simulator shuts down or the %s is detached.\n", dptr->name);
+return SCPE_OK;
+}
+
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+
+return tmxr_attach_help (st, dptr, uptr, flag, cptr);
 }
