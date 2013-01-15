@@ -1007,8 +1007,35 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             fprintf (st, "h{elp} %sn ATTACH\t type help for unit %sn ATTACH command\n", dptr->name, dptr->name);
             }
         }
+    if (dptr->registers) {
+        REG *rptr;
+
+        for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+            if (rptr->desc) {
+                fprintf (st, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                break;
+                }
+            }
+        }
     }
 return;
+}
+
+void fprint_reg_help (FILE *st, DEVICE *dptr)
+{
+REG *rptr;
+t_bool found = FALSE;
+
+for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+    if (rptr->desc) {
+        if (!found)
+            fprintf (st, "%s device registers:\n", dptr->name);
+        found = TRUE;
+        fprintf (st, "  %-9s  %s\n", rptr->name, rptr->desc);
+        }
+    }
+if (!found)
+    fprintf (st, "No register help is available for the %s device\n", dptr->name);
 }
 
 t_stat help_cmd (int32 flag, char *cptr)
@@ -1043,6 +1070,18 @@ if (*cptr) {
                         fprintf (stdout, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
                         if (sim_log)
                             fprintf (sim_log, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        }
+                    if (dptr->registers) {
+                        REG *rptr;
+
+                        for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+                            if (rptr->desc) {
+                                fprintf (stdout, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                                if (sim_log)
+                                    fprintf (sim_log, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                                break;
+                                }
+                            }
                         }
                     }
                 }
@@ -1101,53 +1140,60 @@ if (*cptr) {
             }
         else
             cmdp = NULL;
-        if ((dptr->help == NULL) && (cmdp == NULL)) {
-            fprintf (stdout, "No help available for the %s device\n", dptr->name);
+        if (0 == MATCH_CMD (gbuf, "REGISTERS")) {
+            fprint_reg_help (stdout, dptr);
             if (sim_log)
-                fprintf (sim_log, "No help available for the %s device\n", dptr->name);
-            if (dptr->attach_help || 
-                (DEV_TYPE(dptr) == DEV_MUX) ||
-                (DEV_TYPE(dptr) == DEV_ETHER) ||
-                (DEV_TYPE(dptr) == DEV_DISK) ||
-                (DEV_TYPE(dptr) == DEV_TAPE)) {
-                fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                if (sim_log)
-                    fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                }
+                fprint_reg_help (sim_log, dptr);
             }
         else {
-            if (cmdp != NULL) {
-                if (cmdp->action != &attach_cmd) {
-                    fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+            if ((dptr->help == NULL) && (cmdp == NULL)) {
+                fprintf (stdout, "No help available for the %s device\n", dptr->name);
+                if (sim_log)
+                    fprintf (sim_log, "No help available for the %s device\n", dptr->name);
+                if (dptr->attach_help || 
+                    (DEV_TYPE(dptr) == DEV_MUX) ||
+                    (DEV_TYPE(dptr) == DEV_ETHER) ||
+                    (DEV_TYPE(dptr) == DEV_DISK) ||
+                    (DEV_TYPE(dptr) == DEV_TAPE)) {
+                    fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
                     if (sim_log)
-                        fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
-                    if (dptr->attach_help || 
-                        (DEV_TYPE(dptr) == DEV_MUX) ||
-                        (DEV_TYPE(dptr) == DEV_ETHER) ||
-                        (DEV_TYPE(dptr) == DEV_DISK) ||
-                        (DEV_TYPE(dptr) == DEV_TAPE)) {
-                        fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                        if (sim_log)
-                            fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                        }
-                    }
-                else {
-                    if (dptr->attach_help) {
-                        dptr->attach_help (stdout, dptr, uptr, 0, cptr);
-                        if (sim_log)
-                            dptr->attach_help (sim_log, dptr, uptr, 0, cptr);
-                        }
-                    else {
-                        helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
-                        if (sim_log)
-                            helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
-                        }
+                        fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
                     }
                 }
             else {
-                dptr->help (stdout, dptr, uptr, 0, cptr);
-                if (sim_log)
-                    dptr->help (sim_log, dptr, uptr, 0, cptr);
+                if (cmdp != NULL) {
+                    if (cmdp->action != &attach_cmd) {
+                        fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+                        if (sim_log)
+                            fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+                        if (dptr->attach_help || 
+                            (DEV_TYPE(dptr) == DEV_MUX) ||
+                            (DEV_TYPE(dptr) == DEV_ETHER) ||
+                            (DEV_TYPE(dptr) == DEV_DISK) ||
+                            (DEV_TYPE(dptr) == DEV_TAPE)) {
+                            fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                            if (sim_log)
+                                fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                            }
+                        }
+                    else {
+                        if (dptr->attach_help) {
+                            dptr->attach_help (stdout, dptr, uptr, 0, cptr);
+                            if (sim_log)
+                                dptr->attach_help (sim_log, dptr, uptr, 0, cptr);
+                            }
+                        else {
+                            helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
+                            if (sim_log)
+                                helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
+                            }
+                        }
+                    }
+                else {
+                    dptr->help (stdout, dptr, uptr, 0, cptr);
+                    if (sim_log)
+                        dptr->help (sim_log, dptr, uptr, 0, cptr);
+                    }
                 }
             }
         }
