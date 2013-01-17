@@ -376,7 +376,7 @@ REG fl_reg[] = {
     { HRDATAD (ECODE,      fl_ecode,  8, "error code") },
     { HRDATAD (TA,         fl_track,  8, "track address") },
     { HRDATAD (SA,        fl_sector,  8, "sector address") },
-    { DRDATAD (STATE,      fl_state,  4, "protocol state"), REG_RO },
+    { DRDATAD (PSTATE,     fl_state,  4, "protocol state"), REG_RO },
     { DRDATAD (BPTR,        fl_bptr,  7, "data buffer pointer")  },
     { DRDATAD (CTIME,      fl_cwait, 24, "command initiation delay"), PV_LEFT },
     { DRDATAD (STIME,      fl_swait, 24, "seek time delay, per track"), PV_LEFT },

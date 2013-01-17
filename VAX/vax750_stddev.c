@@ -354,13 +354,13 @@ UNIT td_unit = { UDATA (&td_svc,
       UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF, TD_SIZE) };
 
 REG td_reg[] = {
-    { HRDATAD (ECODE, td_ecode,  8, "end packet success code") },
-    { HRDATAD (BLK,   td_block,  8, "current block number") },
-    { DRDATAD (STATE, td_state,  4, "state"), REG_RO },
-    { DRDATAD (BPTR,  td_obptr,  7, "output buffer pointer")  },
-    { DRDATAD (CTIME, td_cwait, 24, "command time"), PV_LEFT },
-    { DRDATAD (STIME, td_swait, 24, "seek, per block"), PV_LEFT },
-    { DRDATAD (XTIME, td_xwait, 24, "tr set time"), PV_LEFT },
+    { HRDATAD (ECODE,  td_ecode,  8, "end packet success code") },
+    { HRDATAD (BLK,    td_block,  8, "current block number") },
+    { DRDATAD (PSTATE, td_state,  4, "state"), REG_RO },
+    { DRDATAD (BPTR,   td_obptr,  7, "output buffer pointer")  },
+    { DRDATAD (CTIME,  td_cwait, 24, "command time"), PV_LEFT },
+    { DRDATAD (STIME,  td_swait, 24, "seek, per block"), PV_LEFT },
+    { DRDATAD (XTIME,  td_xwait, 24, "tr set time"), PV_LEFT },
     { NULL }
     };
 
