@@ -399,7 +399,7 @@ if (tim > SIM_IDLE_MAX)
     tim = 0;
 return tim;
 }
-#if !defined(_POSIX_SOURCE) && defined(SIM_ASYNCH_IO)
+#if !defined(_POSIX_SOURCE)
 #ifdef NEED_CLOCK_GETTIME
 typedef int clockid_t;
 int clock_gettime(clockid_t clk_id, struct timespec *tp)
