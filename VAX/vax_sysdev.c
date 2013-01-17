@@ -355,13 +355,14 @@ DIB csi_dib = { 0, 0, NULL, NULL, 1, IVCL (CSI), SCB_CSI, { NULL } };
 UNIT csi_unit = { UDATA (NULL, 0, 0), KBD_POLL_WAIT };
 
 REG csi_reg[] = {
-    { ORDATA (BUF, csi_unit.buf, 8) },
-    { ORDATA (CSR, csi_csr, 16) },
-    { FLDATA (INT, int_req[IPL_CSI], INT_V_CSI) },
-    { FLDATA (DONE, csi_csr, CSR_V_DONE) },
-    { FLDATA (IE, csi_csr, CSR_V_IE) },
-    { DRDATA (POS, csi_unit.pos, 32), PV_LEFT },
-    { DRDATA (TIME, csi_unit.wait, 24), REG_NZ + PV_LEFT },
+    { ORDATAD (BUF,  csi_unit.buf,             8, "last data item processed") },
+    { ORDATAD (CSR,  csi_csr,                 16, "control/status register") },
+    { FLDATAD (INT,  int_req[IPL_CSI], INT_V_CSI, "interrupt pending flag") },
+    { FLDATAD (DONE, csi_csr,         CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (ERR,  csi_csr,          CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (IE,   csi_csr,           CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,  csi_unit.pos,            32, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, csi_unit.wait,           24, "input polling interval"), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -390,13 +391,14 @@ DIB cso_dib = { 0, 0, NULL, NULL, 1, IVCL (CSO), SCB_CSO, { NULL } };
 UNIT cso_unit = { UDATA (&cso_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG cso_reg[] = {
-    { ORDATA (BUF, cso_unit.buf, 8) },
-    { ORDATA (CSR, cso_csr, 16) },
-    { FLDATA (INT, int_req[IPL_CSO], INT_V_CSO) },
-    { FLDATA (DONE, cso_csr, CSR_V_DONE) },
-    { FLDATA (IE, cso_csr, CSR_V_IE) },
-    { DRDATA (POS, cso_unit.pos, 32), PV_LEFT },
-    { DRDATA (TIME, cso_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF,     cso_unit.buf,          8, "last data item processed") },
+    { ORDATAD (CSR,          cso_csr,         16, "control/status register") },
+    { FLDATAD (INT, int_req[IPL_CSO],  INT_V_CSO, "interrupt pending flag") },
+    { FLDATAD (ERR,          cso_csr,  CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (DONE,         cso_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE,           cso_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,     cso_unit.pos,         32, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME,   cso_unit.wait,         24, "time from I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
@@ -431,34 +433,34 @@ UNIT sysd_unit[] = {
     };
 
 REG sysd_reg[] = {
-    { HRDATA (CADR, CADR, 8) },
-    { HRDATA (MSER, MSER, 8) },
-    { HRDATA (CONPC, conpc, 32) },
-    { HRDATA (CONPSL, conpsl, 32) },
-    { BRDATA (CMCSR, cmctl_reg, 16, 32, CMCTLSIZE >> 2) },
-    { HRDATA (CACR, ka_cacr, 8) },
-    { HRDATA (BDR, ka_bdr, 8) },
-    { HRDATA (BASE, ssc_base, 29) },
-    { HRDATA (CNF, ssc_cnf, 32) },
-    { HRDATA (BTO, ssc_bto, 32) },
-    { HRDATA (OTP, ssc_otp, 4) },
-    { HRDATA (TCSR0, tmr_csr[0], 32) },
-    { HRDATA (TIR0, tmr_tir[0], 32) },
-    { HRDATA (TNIR0, tmr_tnir[0], 32) },
-    { HRDATA (TIVEC0, tmr_tivr[0], 9) },
-    { HRDATA (TINC0, tmr_inc[0], 32) },
-    { HRDATA (TSAV0, tmr_sav[0], 32) },
-    { HRDATA (TCSR1, tmr_csr[1], 32) },
-    { HRDATA (TIR1, tmr_tir[1], 32) },
-    { HRDATA (TNIR1, tmr_tnir[1], 32) },
-    { HRDATA (TIVEC1, tmr_tivr[1], 9) },
-    { HRDATA (TINC1, tmr_inc[1], 32) },
-    { HRDATA (TSAV1, tmr_sav[1], 32) },
-    { HRDATA (ADSM0, ssc_adsm[0], 32) },
-    { HRDATA (ADSK0, ssc_adsk[0], 32) },
-    { HRDATA (ADSM1, ssc_adsm[1], 32) },
-    { HRDATA (ADSK1, ssc_adsk[1], 32) },
-    { BRDATA (CDGDAT, cdg_dat, 16, 32, CDASIZE >> 2) },
+    { HRDATAD (CADR,   CADR,         8, "cache disable register") },
+    { HRDATAD (MSER,   MSER,         8, "memory system error register") },
+    { HRDATAD (CONPC,  conpc,       32, "PC at console halt") },
+    { HRDATAD (CONPSL, conpsl,      32, "PSL at console halt") },
+    { BRDATAD (CMCSR,  cmctl_reg, 16, 32, CMCTLSIZE >> 2, "CMCTL control and status registers") },
+    { HRDATAD (CACR,   ka_cacr,      8, "second-level cache control register") },
+    { HRDATAD (BDR,    ka_bdr,       8, "front panel jumper register") },
+    { HRDATAD (BASE,   ssc_base,    29, "SSC base address register") },
+    { HRDATAD (CNF,    ssc_cnf,     32, "SSC configuration register") },
+    { HRDATAD (BTO,    ssc_bto,     32, "SSC bus timeout register") },
+    { HRDATAD (OTP,    ssc_otp,      4, "SSC output port") },
+    { HRDATAD (TCSR0,  tmr_csr[0],  32, "SSC timer 0 control/status register") },
+    { HRDATAD (TIR0,   tmr_tir[0],  32, "SSC timer 0 interval register") },
+    { HRDATAD (TNIR0,  tmr_tnir[0], 32, "SSC timer 0 next interval register") },
+    { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
+    { HRDATAD (TINC0,  tmr_inc[0],  32, "SSC timer 0 tir increment") },
+    { HRDATAD (TSAV0,  tmr_sav[0],  32, "SSC timer 0 saved inst cnt") },
+    { HRDATAD (TCSR1,  tmr_csr[1],  32, "SSC timer 1 control/status register") },
+    { HRDATAD (TIR1,   tmr_tir[1],  32, "SSC timer 1 interval register") },
+    { HRDATAD (TNIR1,  tmr_tnir[1], 32, "SSC timer 1 next interval register") },
+    { HRDATAD (TIVEC1, tmr_tivr[1],  9, "SSC timer 1 interrupt vector register") },
+    { HRDATAD (TINC1,  tmr_inc[1],  32, "SSC timer 1 tir increment") },
+    { HRDATAD (TSAV1,  tmr_sav[1],  32, "SSC timer 1  saved inst cnt") },
+    { HRDATAD (ADSM0,  ssc_adsm[0], 32, "SSC address match 0 address") },
+    { HRDATAD (ADSK0,  ssc_adsk[0], 32, "SSC address match 0 mask") },
+    { HRDATAD (ADSM1,  ssc_adsm[1], 32, "SSC address match 1 address") },
+    { HRDATAD (ADSK1,  ssc_adsk[1], 32, "SSC address match 1 mask") },
+    { BRDATAD (CDGDAT, cdg_dat, 16, 32, CDASIZE >> 2, "cache diagnostic data store") },
     { NULL }
     };
 

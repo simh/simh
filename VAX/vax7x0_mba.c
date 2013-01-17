@@ -281,15 +281,15 @@ DIB mba0_dib = { TR_MBA0, 0, &mba_rdreg, &mba_wrreg, 0, NVCL (MBA0) };
 UNIT mba0_unit = { UDATA (NULL, 0, 0) };
 
 REG mba0_reg[] = {
-    { HRDATA (CNFR, mba_cnf[0], 32) },
-    { HRDATA (CR, mba_cr[0], 4) },
-    { HRDATA (SR, mba_sr[0], 32) },
-    { HRDATA (VA, mba_va[0], 17) },
-    { HRDATA (BC, mba_bc[0], 16) },
-    { HRDATA (DR, mba_dr[0], 32) },
-    { HRDATA (SMR, mba_dr[0], 32) },
-    { BRDATA (MAP, mba_map[0], 16, 32, MBA_NMAPR) },
-    { FLDATA (NEXINT, nexus_req[IPL_MBA0], TR_MBA0) },
+    { HRDATAD (CNFR,            mba_cnf[0],      32, "config register") },
+    { HRDATAD (CR,               mba_cr[0],       4, "control register") },
+    { HRDATAD (SR,               mba_sr[0],      32, "status register") },
+    { HRDATAD (VA,               mba_va[0],      17, "virtual address register") },
+    { HRDATAD (BC,               mba_bc[0],      16, "byte count register") },
+    { HRDATAD (DR,               mba_dr[0],      32, "diag register") },
+    { HRDATAD (SMR,              mba_dr[0],      32, "sel map register") },
+    { BRDATAD (MAP,             mba_map[0], 16, 32, MBA_NMAPR, "map registers") },
+    { FLDATAD (NEXINT, nexus_req[IPL_MBA0], TR_MBA0, "nexus interrupt request") },
     { NULL }
     };
 
@@ -310,15 +310,15 @@ MTAB mba1_mod[] = {
     };
 
 REG mba1_reg[] = {
-    { HRDATA (CNFR, mba_cnf[1], 32) },
-    { HRDATA (CR, mba_cr[1], 4) },
-    { HRDATA (SR, mba_sr[1], 32) },
-    { HRDATA (VA, mba_va[1], 17) },
-    { HRDATA (BC, mba_bc[1], 16) },
-    { HRDATA (DR, mba_dr[1], 32) },
-    { HRDATA (SMR, mba_dr[1], 32) },
-    { BRDATA (MAP, mba_map[1], 16, 32, MBA_NMAPR) },
-    { FLDATA (NEXINT, nexus_req[IPL_MBA1], TR_MBA1) },
+    { HRDATAD (CNFR,            mba_cnf[1],      32, "config register") },
+    { HRDATAD (CR,               mba_cr[1],       4, "control register") },
+    { HRDATAD (SR,               mba_sr[1],      32, "status register") },
+    { HRDATAD (VA,               mba_va[1],      17, "virtual address register") },
+    { HRDATAD (BC,               mba_bc[1],      16, "byte count register") },
+    { HRDATAD (DR,               mba_dr[1],      32, "diag register") },
+    { HRDATAD (SMR,              mba_dr[1],      32, "sel map register") },
+    { BRDATAD (MAP,             mba_map[1], 16, 32, MBA_NMAPR, "map registers") },
+    { FLDATAD (NEXINT, nexus_req[IPL_MBA1], TR_MBA1, "nexus interrupt request") },
     { NULL }
     };
 

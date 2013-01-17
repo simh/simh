@@ -140,13 +140,13 @@ DIB uba_dib = { TR_UBA, 0, &uba_rdreg, &uba_wrreg, 0, 0 };
 UNIT uba_unit = { UDATA (0, 0, 0) };
 
 REG uba_reg[] = {
-    { HRDATA (IPL14, int_req[0], 32), REG_RO },
-    { HRDATA (IPL15, int_req[1], 32), REG_RO },
-    { HRDATA (IPL16, int_req[2], 32), REG_RO },
-    { HRDATA (IPL17, int_req[3], 32), REG_RO },
-    { HRDATA (CSR, uba_csr, 32) },
-    { BRDATA (MAP, uba_map, 16, 32, 496) },
-    { FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
+    { HRDATAD (IPL17,   int_req[3], 32, "IPL 17 interrupt flags"), REG_RO },
+    { HRDATAD (IPL16,   int_req[2], 32, "IPL 16 interrupt flags"), REG_RO },
+    { HRDATAD (IPL15,   int_req[1], 32, "IPL 15 interrupt flags"), REG_RO },
+    { HRDATAD (IPL14,   int_req[0], 32, "IPL 14 interrupt flags"), REG_RO },
+    { HRDATAD (CSR,        uba_csr, 32, "control/status register") },
+    { BRDATAD (MAP,        uba_map, 16, 32, 496, "Unibus map registers") },
+    { FLDATA  (AUTOCON, autcon_enb, 0), REG_HRO },
     { NULL }
     };
 

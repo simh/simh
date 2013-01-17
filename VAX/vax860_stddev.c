@@ -274,13 +274,13 @@ UNIT tti_unit[] = {
     };
 
 REG tti_reg[] = {
-    { HRDATA (RXDB, tti_buf, 32) },
-    { HRDATA (RXCS, tti_csr, 32) },
-    { FLDATA (INT, tti_int, 0) },
-    { FLDATA (DONE, tti_csr, CSR_V_DONE) },
-    { FLDATA (IE, tti_csr, CSR_V_IE) },
-    { URDATA (POS, tti_unit[0].pos, 10, T_ADDR_W, 0, 4, PV_LEFT) },
-    { URDATA (TIME, tti_unit[0].wait, 10, 24, 0, 4, PV_LEFT) },
+    { HRDATAD (RXDB,          tti_buf,         16, "last data item processed") },
+    { HRDATAD (RXCS,          tti_csr,         16, "control/status register") },
+    { FLDATAD (INT,           tti_int,          0, "interrupt pending flag") },
+    { FLDATAD (DONE,          tti_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE,            tti_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { URDATAD (POS,   tti_unit[0].pos, 10, T_ADDR_W, 0, 4, PV_LEFT, "number of characters input") },
+    { URDATAD (TIME, tti_unit[0].wait, 10, 24, 0, 4, PV_LEFT, "input polling interval") },
     { NULL }
     };
 
@@ -313,13 +313,13 @@ UNIT tto_unit[] = {
     };
 
 REG tto_reg[] = {
-    { URDATA (TXDB, tto_unit[0].buf, 16, 32, 0, 4, 0) },
-    { HRDATA (TXCS, tto_csr, 32) },
-    { FLDATA (INT, tto_int, 0) },
-    { FLDATA (DONE, tto_csr, CSR_V_DONE) },
-    { FLDATA (IE, tto_csr, CSR_V_IE) },
-    { URDATA (POS, tto_unit[0].pos, 10, T_ADDR_W, 0, 4, PV_LEFT) },
-    { URDATA (TIME, tto_unit[0].wait, 10, 24, 0, 4, PV_LEFT + REG_NZ) },
+    { URDATAD (TXDB, tto_unit[0].buf, 16, 32, 0, 4, 0, "last data item processed") },
+    { HRDATAD (TXCS,          tto_csr,         16, "control/status register") },
+    { FLDATAD (INT,           tto_int,          0, "interrupt pending flag") },
+    { FLDATAD (DONE,          tto_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE,            tto_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { URDATAD (POS,   tto_unit[0].pos, 10, T_ADDR_W, 0, 4, PV_LEFT, "number of characters output") },
+    { URDATAD (TIME, tto_unit[0].wait, 10, 24, 0, 4, PV_LEFT + REG_NZ, "time from I/O initiation to interrupt") },
     { NULL }
     };
 
@@ -343,12 +343,14 @@ DEVICE tto_dev = {
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE+UNIT_FIX, sizeof(TOY)), CLK_DELAY };/* 100Hz */
 
 REG clk_reg[] = {
-    { DRDATA (TODR, todr_reg, 32), PV_LEFT },
-    { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (TPS, clk_tps, 8), REG_HIDDEN + REG_NZ + PV_LEFT },
+    { DRDATAD (TODR,                        todr_reg,  32, "time-of-day register"), PV_LEFT },
+    { DRDATAD (TIME,                   clk_unit.wait,  24, "initial poll interval"), REG_NZ + PV_LEFT },
+    { DRDATAD (POLL,                        tmr_poll,  24, "calibrated poll interval"), REG_NZ + PV_LEFT + REG_HRO },
+    { DRDATAD (TPS,                          clk_tps,   8, "ticks per second (100)"), REG_NZ + PV_LEFT },
 #if defined (SIM_ASYNCH_IO)
-    { DRDATA (LATENCY, sim_asynch_latency, 32), PV_LEFT },
-    { DRDATA (INST_LATENCY, sim_asynch_inst_latency, 32), PV_LEFT },
+    { DRDATAD (ASYNCH,            sim_asynch_enabled,   1, "asynch I/O enabled flag"), PV_LEFT },
+    { DRDATAD (LATENCY,           sim_asynch_latency,  32, "desired asynch interrupt latency"), PV_LEFT },
+    { DRDATAD (INST_LATENCY, sim_asynch_inst_latency,  32, "calibrated instruction latency"), PV_LEFT },
 #endif
     { NULL }
     };
@@ -364,13 +366,13 @@ DEVICE clk_dev = {
 UNIT tmr_unit = { UDATA (&tmr_svc, 0, 0) };             /* timer */
 
 REG tmr_reg[] = {
-    { HRDATA (ICCS, tmr_iccs, 32) },
-    { HRDATA (ICR, tmr_icr, 32) },
-    { HRDATA (NICR, tmr_nicr, 32) },
-    { HRDATA (INCR, tmr_inc, 32), REG_HIDDEN },
-    { HRDATA (SAVE, tmr_sav, 32), REG_HIDDEN },
-    { FLDATA (USE100HZ, tmr_use_100hz, 0), REG_HIDDEN },
-    { FLDATA (INT, tmr_int, 0) },
+    { HRDATAD (ICCS,          tmr_iccs, 32, "interval timer control and status") },
+    { HRDATAD (ICR,            tmr_icr, 32, "interval count register") },
+    { HRDATAD (NICR,          tmr_nicr, 32, "next interval count register") },
+    { FLDATAD (INT,            tmr_int,  0, "interrupt request") },
+    { HRDATA  (INCR,           tmr_inc, 32), REG_HIDDEN },
+    { HRDATA  (SAVE,           tmr_sav, 32), REG_HIDDEN },
+    { FLDATA  (USE100HZ, tmr_use_100hz,  0), REG_HIDDEN },
     { NULL }
     };
 
@@ -393,10 +395,10 @@ DEVICE tmr_dev = {
 UNIT rlcs_unit = { UDATA (&rlcs_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_ROABLE, RL02_SIZE) };
 
 REG rlcs_reg[] = {
-    { HRDATA (CSR, rlcs_csr, 16) },
-    { HRDATA (MP, rlcs_mp, 16) },
-    { DRDATA (BCNT, rlcs_bcnt, 7)  },
-    { DRDATA (STIME, rlcs_swait, 24), PV_LEFT },
+    { HRDATAD (CSR,     rlcs_csr, 16, "control/status register") },
+    { HRDATAD (MP,       rlcs_mp, 16, "") },
+    { DRDATAD (BCNT,   rlcs_bcnt,  7, "byte count register")  },
+    { DRDATAD (STIME, rlcs_swait, 24, "command time"), PV_LEFT },
     { NULL }
     };
 

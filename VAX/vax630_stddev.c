@@ -78,13 +78,14 @@ DIB tti_dib = { 0, 0, NULL, NULL, 1, IVCL (TTI), SCB_TTI, { NULL } };
 UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), 0 };
 
 REG tti_reg[] = {
-    { HRDATA (BUF, tti_unit.buf, 16) },
-    { HRDATA (CSR, tti_csr, 16) },
-    { FLDATA (INT, int_req[IPL_TTI], INT_V_TTI) },
-    { FLDATA (DONE, tti_csr, CSR_V_DONE) },
-    { FLDATA (IE, tti_csr, CSR_V_IE) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { HRDATAD (BUF,     tti_unit.buf,         16, "last data item processed") },
+    { HRDATAD (CSR,          tti_csr,         16, "control/status register") },
+    { FLDATAD (INT, int_req[IPL_TTI],  INT_V_TTI, "interrupt pending flag") },
+    { FLDATAD (ERR,          tti_csr,  CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (DONE,         tti_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE,           tti_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,     tti_unit.pos,   T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME,   tti_unit.wait,         24, "input polling interval"), PV_LEFT },
     { NULL }
     };
 
@@ -116,13 +117,14 @@ DIB tto_dib = { 0, 0, NULL, NULL, 1, IVCL (TTO), SCB_TTO, { NULL } };
 UNIT tto_unit = { UDATA (&tto_svc, TT_MODE_8B, 0), SERIAL_OUT_WAIT };
 
 REG tto_reg[] = {
-    { HRDATA (BUF, tto_unit.buf, 8) },
-    { HRDATA (CSR, tto_csr, 16) },
-    { FLDATA (INT, int_req[IPL_TTO], INT_V_TTO) },
-    { FLDATA (DONE, tto_csr, CSR_V_DONE) },
-    { FLDATA (IE, tto_csr, CSR_V_IE) },
-    { DRDATA (POS, tto_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tto_unit.wait, 24), PV_LEFT },
+    { HRDATAD (BUF,     tto_unit.buf,          8, "last data item processed") },
+    { HRDATAD (CSR,          tto_csr,         16, "control/status register") },
+    { FLDATAD (INT, int_req[IPL_TTO],  INT_V_TTO, "interrupt pending flag") },
+    { FLDATAD (ERR,          tto_csr,  CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (DONE,         tto_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE,           tto_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,     tto_unit.pos,   T_ADDR_W, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME,   tto_unit.wait,         24, "time from I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
@@ -154,11 +156,17 @@ DIB clk_dib = { 0, 0, NULL, NULL, 1, IVCL (CLK), SCB_INTTIM, { NULL } };
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };
 
 REG clk_reg[] = {
-    { HRDATA (CSR, clk_csr, 16) },
-    { FLDATA (INT, int_req[IPL_CLK], INT_V_CLK) },
-    { FLDATA (IE, clk_csr, CSR_V_IE) },
-    { DRDATA (TIME, clk_unit.wait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (TPS, clk_tps, 8), REG_NZ + PV_LEFT },
+    { HRDATAD (CSR,          clk_csr,        16, "control/status register") },
+    { FLDATAD (INT, int_req[IPL_CLK], INT_V_CLK, "interrupt pending flag") },
+    { FLDATAD (IE,           clk_csr,  CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (TIME,   clk_unit.wait,        24, "initial poll interval"), REG_NZ + PV_LEFT },
+    { DRDATAD (POLL,        tmr_poll,        24, "calibrated poll interval"), REG_NZ + PV_LEFT + REG_HRO },
+    { DRDATAD (TPS,          clk_tps,         8, "ticks per second (100)"), REG_NZ + PV_LEFT },
+#if defined (SIM_ASYNCH_IO)
+    { DRDATAD (ASYNCH,            sim_asynch_enabled,         1, "asynch I/O enabled flag"), PV_LEFT },
+    { DRDATAD (LATENCY,           sim_asynch_latency,        32, "desired asynch interrupt latency"), PV_LEFT },
+    { DRDATAD (INST_LATENCY, sim_asynch_inst_latency,        32, "calibrated instruction latency"), PV_LEFT },
+#endif
     { NULL }
     };
 

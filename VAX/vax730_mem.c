@@ -87,9 +87,9 @@ DIB mctl_dib = { TR_MCTL, 0, &mctl_rdreg, &mctl_wrreg, 0 };
 UNIT mctl_unit = { UDATA (NULL, 0, 0) };
 
 REG mctl_reg[] = {
-    { HRDATA (CSR0, mcsr0, 32) },
-    { HRDATA (CSR1, mcsr1, 32) },
-    { HRDATA (CSR2, mcsr2, 32) },
+    { HRDATAD (CSR0, mcsr0, 32, "ECC syndrome bits") },
+    { HRDATAD (CSR1, mcsr1, 32, "CPU error control/check bits") },
+    { HRDATAD (CSR2, mcsr2, 32, "Unibus error control/check bits") },
     { NULL }
     };
 

@@ -93,12 +93,12 @@ DIB qba_dib = { IOBA_AUTO, IOLN_DBL, &dbl_rd, &dbl_wr, 0 };
 UNIT qba_unit = { UDATA (NULL, 0, 0) };
 
 REG qba_reg[] = {
-    { HRDATA (IPC, qb_ipc, 16) },
-    { HRDATA (IPL17, int_req[3], 32), REG_RO },
-    { HRDATA (IPL16, int_req[2], 32), REG_RO },
-    { HRDATA (IPL15, int_req[1], 32), REG_RO },
-    { HRDATA (IPL14, int_req[0], 32), REG_RO },
-    { BRDATA (MAP, qb_map, 16, 32, QBNMAPR) },
+    { HRDATAD (IPC,       qb_ipc, 16, "interprocessor communications register") },
+    { HRDATAD (IPL17, int_req[3], 32, "IPL 17 interrupt flags"), REG_RO },
+    { HRDATAD (IPL16, int_req[2], 32, "IPL 16 interrupt flags"), REG_RO },
+    { HRDATAD (IPL15, int_req[1], 32, "IPL 15 interrupt flags"), REG_RO },
+    { HRDATAD (IPL14, int_req[0], 32, "IPL 14 interrupt flags"), REG_RO },
+    { BRDATAD (MAP,       qb_map, 16, 32, QBNMAPR, "map registers") },
     { FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
     { NULL }
     };

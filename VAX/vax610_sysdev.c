@@ -96,9 +96,9 @@ extern int32 eval_int (void);
 UNIT sysd_unit = { UDATA (NULL, 0, 0) };
 
 REG sysd_reg[] = {
-    { HRDATA (CONISP, conisp, 32) },
-    { HRDATA (CONPC, conpc, 32) },
-    { HRDATA (CONPSL, conpsl, 32) },
+    { HRDATAD (CONISP, conisp, 32, "console ISP") },
+    { HRDATAD (CONPC,   conpc, 32, "console PD") },
+    { HRDATAD (CONPSL, conpsl, 32, "console PSL") },
     { BRDATA (BOOTCMD, cpu_boot_cmd, 16, 8, CBUFSIZE), REG_HRO },
     { NULL }
     };

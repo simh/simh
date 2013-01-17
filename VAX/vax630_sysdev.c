@@ -251,13 +251,13 @@ DEVICE nvr_dev = {
 UNIT sysd_unit = { UDATA (NULL, 0, 0) };
 
 REG sysd_reg[] = {
-    { HRDATA (CONISP, conisp, 32) },
-    { HRDATA (CONPC, conpc, 32) },
-    { HRDATA (CONPSL, conpsl, 32) },
-    { HRDATA (BDR, ka_bdr, 16) },
-    { HRDATA (MSER, ka_mser, 8) },
-    { HRDATA (CEAR, ka_cear, 8) },
-    { HRDATA (DEAR, ka_dear, 8) },
+    { HRDATAD (CONISP, conisp, 32, "console ISP") },
+    { HRDATAD (CONPC,   conpc, 32, "console PD") },
+    { HRDATAD (CONPSL, conpsl, 32, "console PSL") },
+    { HRDATAD (BDR,    ka_bdr, 16, "KA630 boot diag") },
+    { HRDATAD (MSER,  ka_mser,  8, "KA630 mem sys err") },
+    { HRDATAD (CEAR,  ka_cear,  8, "KA630 cpu err") },
+    { HRDATAD (DEAR,  ka_dear,  8, "KA630 dma err") },
     { NULL }
     };
 

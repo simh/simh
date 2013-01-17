@@ -62,8 +62,8 @@ DIB mctl_dib = {
 UNIT mctl_unit =  { UDATA (NULL, 0, 0) };
 
 REG mctl_reg[] = {
-    { DRDATA (COUNT, mctl_count, 16) },
-    { BRDATA (CSR, mctl_csr, DEV_RDX, 16, MAX_MCTL_COUNT) },
+    { DRDATAD (COUNT, mctl_count, 16, "Memory Module Count") },
+    { BRDATAD (CSR,     mctl_csr, DEV_RDX, 16, MAX_MCTL_COUNT, "control/status registers") },
     { NULL }
     };
 
