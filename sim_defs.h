@@ -652,6 +652,28 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_TLS
 #endif
 
+#define AIO_IS_ACTIVE(uptr) (((uptr)->a_is_active ? (uptr)->a_is_active (uptr) : FALSE) || ((uptr)->a_next))
+#define AIO_CANCEL(uptr) if ((uptr)->a_cancel) (uptr)->a_cancel (uptr); else (void)0
+#define AIO_LOCK                                                  \
+    pthread_mutex_lock(&sim_asynch_lock)
+#define AIO_UNLOCK                                                \
+    pthread_mutex_unlock(&sim_asynch_lock)
+
+#if defined(__DECC_VER)
+#include <builtins>
+#if defined(__IA64)
+#define USE_AIO_INTRINSICS 1
+#endif
+#endif
+#if defined(_WIN32) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
+#define USE_AIO_INTRINSICS 1
+#endif
+/* Provide a way to test both Intrinsic and Lock based queue manipulations  */
+/* when both are available on a particular platform                         */
+#if defined(DONT_USE_AIO_INTRINSICS) && defined(USE_AIO_INTRINSICS)
+#undef USE_AIO_INTRINSICS
+#endif
+#ifdef USE_AIO_INTRINSICS
 #define AIO_INIT                                                  \
     if (1) {                                                      \
       sim_asynch_main_threadid = pthread_self();                  \
@@ -669,31 +691,6 @@ extern int32 sim_asynch_inst_latency;
       }                                                           \
     else                                                          \
       (void)0
-#define AIO_IS_ACTIVE(uptr) (((uptr)->a_is_active ? (uptr)->a_is_active (uptr) : FALSE) || ((uptr)->a_next))
-#define AIO_CANCEL(uptr) if ((uptr)->a_cancel) (uptr)->a_cancel (uptr); else (void)0
-#define AIO_LOCK                                                  \
-    int _locked = pthread_mutex_trylock(&sim_asynch_lock)
-#define AIO_UNLOCK                                                \
-    if (_locked == 0)                                             \
-        pthread_mutex_unlock(&sim_asynch_lock);                   \
-    else                                                          \
-        (void)0
-
-#if defined(__DECC_VER)
-#include <builtins>
-#if defined(__IA64)
-#define USE_AIO_INTRINSICS 1
-#endif
-#endif
-#if defined(_WIN32) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
-#define USE_AIO_INTRINSICS 1
-#endif
-/* Provide a way to test both Intrinsic and Lock based queue manipulations  */
-/* when both are available on a particular platform                         */
-#if defined(DONT_USE_AIO_INTRINSICS) && defined(USE_AIO_INTRINSICS)
-#undef USE_AIO_INTRINSICS
-#endif
-#ifdef USE_AIO_INTRINSICS
 /* This approach uses intrinsics to manage access to the link list head     */
 /* sim_asynch_queue.  This implementation is a completely lock free design  */
 /* which avoids the potential ABA issues.                                   */
@@ -767,6 +764,29 @@ extern int32 sim_asynch_inst_latency;
       return SCPE_OK;                                                            \
     } else (void)0
 #else /* !USE_AIO_INTRINSICS */
+#define AIO_INIT                                                  \
+    if (1) {                                                      \
+      pthread_mutexattr_t attr;                                   \
+                                                                  \
+      pthread_mutexattr_init (&attr);                             \
+      pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);  \
+      pthread_mutex_init (&sim_asynch_lock, &attr);               \
+      pthread_mutexattr_destroy (&attr);                          \
+      sim_asynch_main_threadid = pthread_self();                  \
+      /* Empty list/list end uses the point value (void *)1.      \
+         This allows NULL in an entry's a_next pointer to         \
+         indicate that the entry is not currently in any list */  \
+      sim_asynch_queue = QUEUE_LIST_END;                          \
+      }                                                           \
+    else                                                          \
+      (void)0
+#define AIO_CLEANUP                                               \
+    if (1) {                                                      \
+      pthread_mutex_destroy(&sim_asynch_lock);                    \
+      pthread_cond_destroy(&sim_asynch_wake);                     \
+      }                                                           \
+    else                                                          \
+      (void)0
 #define AIO_QUEUE_MODE "Lock based asynchronous event queue access"
 /* This approach uses a pthread mutex to manage access to the link list     */
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
