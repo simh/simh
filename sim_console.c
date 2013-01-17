@@ -936,6 +936,92 @@ return c;
 }
 
 
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+extern pthread_mutex_t     sim_tmxr_poll_lock;
+extern pthread_cond_t      sim_tmxr_poll_cond;
+extern int32               sim_tmxr_poll_count;
+extern t_bool              sim_tmxr_poll_running;
+extern int32 sim_is_running;
+
+pthread_t           sim_console_poll_thread;       /* Keyboard Polling Thread Id */
+t_bool              sim_console_poll_running = FALSE;
+pthread_cond_t      sim_console_startup_cond;
+
+static void *
+_console_poll(void *arg)
+{
+int sched_policy;
+struct sched_param sched_priority;
+int poll_timeout_count = 0;
+int wait_count = 0;
+DEVICE *d;
+
+/* Boost Priority for this I/O thread vs the CPU instruction execution 
+   thread which, in general, won't be readily yielding the processor when 
+   this thread needs to run */
+pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
+++sched_priority.sched_priority;
+pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
+
+sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - starting\n");
+
+pthread_mutex_lock (&sim_tmxr_poll_lock);
+pthread_cond_signal (&sim_console_startup_cond);   /* Signal we're ready to go */
+while (sim_asynch_enabled) {
+
+    if (!sim_is_running) {
+        if (wait_count) {
+            sim_debug (DBG_ASY, d, "_console_poll() - Removing interest in %s. Other interest: %d\n", d->name, sim_con_ldsc.uptr->a_poll_waiter_count);
+            --sim_con_ldsc.uptr->a_poll_waiter_count;
+            --sim_tmxr_poll_count;
+            }
+        break;
+        }
+
+    /* If we started something, let it finish before polling again */
+    if (wait_count) {
+        sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - waiting for %d units\n", wait_count);
+        pthread_cond_wait (&sim_tmxr_poll_cond, &sim_tmxr_poll_lock);
+        sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - continuing with after wait\n");
+        }
+
+    pthread_mutex_unlock (&sim_tmxr_poll_lock);
+    wait_count = 0;
+    if (sim_os_poll_kbd_ready (1000)) {
+        sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - Keyboard Data available\n");
+        pthread_mutex_lock (&sim_tmxr_poll_lock);
+        ++wait_count;
+        if (!sim_con_ldsc.uptr->a_polling_now) {
+            sim_con_ldsc.uptr->a_polling_now = TRUE;
+            sim_con_ldsc.uptr->a_poll_waiter_count = 1;
+            d = find_dev_from_unit(sim_con_ldsc.uptr);
+            sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - Activating %s\n", d->name);
+            pthread_mutex_unlock (&sim_tmxr_poll_lock);
+            _sim_activate (sim_con_ldsc.uptr, 0);
+            pthread_mutex_lock (&sim_tmxr_poll_lock);
+            }
+        else {
+            d = find_dev_from_unit(sim_con_ldsc.uptr);
+            sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - Already Activated %s %d times\n", d->name, sim_con_ldsc.uptr->a_poll_waiter_count);
+            ++sim_con_ldsc.uptr->a_poll_waiter_count;
+            }
+        }
+    else
+        pthread_mutex_lock (&sim_tmxr_poll_lock);
+
+    sim_tmxr_poll_count += wait_count;
+    }
+pthread_mutex_unlock (&sim_tmxr_poll_lock);
+
+sim_debug (DBG_ASY, &sim_con_telnet, "_console_poll() - exiting\n");
+
+return NULL;
+}
+
+
+#endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX) */
+
+
 t_stat sim_ttinit (void)
 {
 sim_register_internal_device (&sim_con_telnet);
@@ -945,8 +1031,18 @@ return sim_os_ttinit ();
 
 t_stat sim_ttrun (void)
 {
-if (!sim_con_tmxr.ldsc->uptr)                           /* If simulator didn't declare its input polling unit */
+if (!sim_con_tmxr.ldsc->uptr) {                         /* If simulator didn't declare its input polling unit */
     sim_con_unit.flags &= ~UNIT_TM_POLL;                /* we can't poll asynchronously */
+    sim_con_unit.flags |= TMUF_NOASYNCH;                /* disable asynchronous behavior */
+    }
+else {
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
+    if (sim_asynch_enabled) {
+        sim_con_tmxr.ldsc->uptr->flags |= UNIT_TM_POLL;/* flag console input device as a polling unit */
+        sim_con_unit.flags |= UNIT_TM_POLL;            /* flag as polling unit */
+        }
+#endif
+    }
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 pthread_mutex_lock (&sim_tmxr_poll_lock);
 if (sim_asynch_enabled) {

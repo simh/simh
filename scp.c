@@ -213,6 +213,8 @@
 
 /* Macros and data structures */
 
+#define NOT_MUX_USING_CODE /* sim_tmxr library provider or agnostic */
+
 #include "sim_defs.h"
 #include "sim_rev.h"
 #include "sim_disk.h"
@@ -311,8 +313,17 @@
 #if defined (SIM_ASYNCH_IO)
 pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
+pthread_cond_t sim_idle_wake       = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t sim_timer_lock     = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sim_timer_wake      = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t sim_tmxr_poll_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sim_tmxr_poll_cond  = PTHREAD_COND_INITIALIZER;
+int32 sim_tmxr_poll_count;
 pthread_t sim_asynch_main_threadid;
-struct sim_unit *sim_asynch_queue = NULL;
+UNIT * volatile sim_asynch_queue;
+UNIT * volatile sim_wallclock_queue;
+UNIT * volatile sim_wallclock_entry;
+UNIT * volatile sim_clock_cosched_queue;
 t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
@@ -722,6 +733,7 @@ static CTAB cmd_table[] = {
       "sh{ow} ethernet          show ethernet devices\n"
       "sh{ow} serial            show serial devices\n"
       "sh{ow} multiplexer       show open multiplexer devices\n"
+      "sh{ow} clocks            show calibrated timers\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
       "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\b"
@@ -1948,6 +1960,7 @@ if (cptr && (*cptr != 0))                               /* now eol? */
 if (flag == sim_asynch_enabled)                         /* already set correctly? */
     return SCPE_OK;
 sim_asynch_enabled = flag;
+tmxr_change_async ();
 if (1) {
     uint32 i, j;
     DEVICE *dptr;
@@ -2315,6 +2328,7 @@ static SHTAB show_glob_tab[] = {
     { "SERIAL", &sim_show_serial, 0 },
     { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
     { "MUX", &tmxr_show_open_devices, 0 },
+    { "CLOCKS", &sim_show_timers, 0 },
     { "ON", &show_on, 0 },
     { NULL, NULL, 0 }
     };
@@ -2597,8 +2611,41 @@ else {
     }
 fprintf (st, "asynch latency: %d nanoseconds\n", sim_asynch_latency);
 fprintf (st, "asynch instruction latency: %d instructions\n", sim_asynch_inst_latency);
+#if defined (SIM_ASYNCH_CLOCKS)
+pthread_mutex_lock (&sim_timer_lock);
+if (sim_wallclock_queue == QUEUE_LIST_END)
+    fprintf (st, "%s wall clock event queue empty, time = %.0f\n",
+             sim_name, sim_time);
+else {
+    fprintf (st, "%s wall clock event queue status, time = %.0f\n",
+             sim_name, sim_time);
+    for (uptr = sim_wallclock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
+        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+            fprintf (st, "  %s", sim_dname (dptr));
+            if (dptr->numunits > 1)
+                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+            }
+        else fprintf (st, "  Unknown");
+        fprintf (st, " after %d usec\n", uptr->a_usec_delay);
+        }
+    }
+if (sim_clock_cosched_queue != QUEUE_LIST_END) {
+    fprintf (st, "%s clock co-schedule event queue status, time = %.0f\n",
+             sim_name, sim_time);
+    for (uptr = sim_clock_cosched_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
+        if ((dptr = find_dev_from_unit (uptr)) != NULL) {
+            fprintf (st, "  %s", sim_dname (dptr));
+            if (dptr->numunits > 1)
+                fprintf (st, " unit %d", (int32) (uptr - dptr->units));
+            }
+        else fprintf (st, "  Unknown");
+        fprintf (st, "\n");
+        }
+    }
+pthread_mutex_unlock (&sim_timer_lock);
+#endif /* SIM_ASYNCH_CLOCKS */
 pthread_mutex_unlock (&sim_asynch_lock);
-#endif
+#endif /* SIM_ASYNCH_IO */
 return SCPE_OK;
 }
 
@@ -3874,23 +3921,32 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* reposition all */
         }
     }
 stop_cpu = 0;
+sim_is_running = 1;                                     /* flag running */
 if (sim_ttrun () != SCPE_OK) {                          /* set console mode */
+    sim_is_running = 0;                                 /* flag idle */
     sim_ttcmd ();
     return SCPE_TTYERR;
     }
 if ((r = sim_check_console (30)) != SCPE_OK) {          /* check console, error? */
+    sim_is_running = 0;                                 /* flag idle */
     sim_ttcmd ();
     return r;
     }
 if (signal (SIGINT, int_handler) == SIG_ERR) {          /* set WRU */
+    sim_is_running = 0;                                 /* flag idle */
+    sim_ttcmd ();
     return SCPE_SIGERR;
     }
 #ifdef SIGHUP
 if (signal (SIGHUP, int_handler) == SIG_ERR) {          /* set WRU */
+    sim_is_running = 0;                                 /* flag idle */
+    sim_ttcmd ();
     return SCPE_SIGERR;
     }
 #endif
 if (signal (SIGTERM, int_handler) == SIG_ERR) {         /* set WRU */
+    sim_is_running = 0;                                 /* flag idle */
+    sim_ttcmd ();
     return SCPE_SIGERR;
     }
 if (sim_step)                                           /* set step timer */
@@ -3899,12 +3955,13 @@ fflush(stdout);                                         /* flush stdout */
 if (sim_log)                                            /* flush log if enabled */
     fflush (sim_log);
 sim_throt_sched ();                                     /* set throttle */
-sim_is_running = 1;                                     /* flag running */
 sim_brk_clract ();                                      /* defang actions */
 sim_rtcn_init_all ();                                   /* re-init clocks */
+sim_start_timer_services ();                            /* enable wall clock timing */
 r = sim_instr();
 
 sim_is_running = 0;                                     /* flag idle */
+sim_stop_timer_services ();                             /* disable wall clock timing */
 sim_ttcmd ();                                           /* restore console */
 signal (SIGINT, SIG_DFL);                               /* cancel WRU */
 #ifdef SIGHUP
@@ -4995,10 +5052,10 @@ t_stat sim_register_internal_device (DEVICE *dptr)
 {
 uint32 i;
 
-for (i = 0; (sim_devices[i] != NULL); ++i)
+for (i = 0; (sim_devices[i] != NULL); i++)
     if (sim_devices[i] == dptr)
         return SCPE_OK;
-for (i = 0; i < sim_internal_device_count; ++i)
+for (i = 0; i < sim_internal_device_count; i++)
     if (sim_internal_devices[i] == dptr)
         return SCPE_OK;
 ++sim_internal_device_count;
@@ -5029,7 +5086,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             return dptr;
         }
     }
-for (i = 0; i<sim_internal_device_count; ++i) {
+for (i = 0; i<sim_internal_device_count; i++) {
     dptr = sim_internal_devices[i];
     for (j = 0; j < dptr->numunits; j++) {
         if (uptr == (dptr->units + j))
@@ -5465,6 +5522,9 @@ return SCPE_OK;
 /* Event queue package
 
         sim_activate            add entry to event queue
+        sim_activate_abs        add entry to event queue even if event already scheduled
+        sim_activate_notbefure  add entry to event queue even if event already scheduled
+                                but not before the specified time
         sim_activate_after      add entry to event queue after a specified amount of wall time
         sim_cancel              remove entry from event queue
         sim_process_event       process entries on event queue
@@ -5518,10 +5578,12 @@ do {
         sim_interval = sim_clock_queue->time;
     else sim_interval = noqueue_time = NOQUEUE_WAIT;
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Event for %s\n", sim_uname (uptr));
+    AIO_EVENT_BEGIN(uptr);
     if (uptr->action != NULL)
         reason = uptr->action (uptr);
     else
         reason = SCPE_OK;
+    AIO_EVENT_COMPLETE(uptr, reason);
     } while ((reason == SCPE_OK) && 
              (sim_interval <= 0) && 
              (sim_clock_queue != QUEUE_LIST_END));
@@ -5747,6 +5809,7 @@ UNIT *cptr;
 int32 accum = 0;
 
 AIO_VALIDATE;
+AIO_RETURN_TIME(uptr);
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
         if (sim_interval > 0)
