@@ -1023,19 +1023,38 @@ return;
 
 void fprint_reg_help (FILE *st, DEVICE *dptr)
 {
-REG *rptr;
+REG *rptr, *trptr;
 t_bool found = FALSE;
+t_bool all_unique = TRUE;
+DEVICE *tdptr;
+char *tptr;
 
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
     if (rptr->desc) {
-        if (!found)
-            fprintf (st, "%s device registers:\n", dptr->name);
         found = TRUE;
-        fprintf (st, "  %-9s  %s\n", rptr->name, rptr->desc);
+        trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
+        if ((trptr == NULL) || (tdptr != dptr))
+            all_unique = FALSE;
         }
     }
 if (!found)
     fprintf (st, "No register help is available for the %s device\n", dptr->name);
+else {
+    fprintf (st, "%s device registers:\n", dptr->name);
+    for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+        if (rptr->desc) {
+            if (all_unique) {
+                fprintf (st, "  %-9s  %s\n", rptr->name, rptr->desc);
+                continue;
+                }
+            trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
+            if ((trptr == NULL) || (tdptr != dptr))
+                fprintf (st, "  %s %-9s  %s\n", dptr->name, rptr->name, rptr->desc);
+            else
+                fprintf (st, "  %*s %-9s  %s\n", (int)strlen(dptr->name), "", rptr->name, rptr->desc);
+            }
+        }
+    }
 }
 
 t_stat help_cmd (int32 flag, char *cptr)
