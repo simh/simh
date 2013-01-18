@@ -3115,7 +3115,7 @@ if (dptr == NULL)                                       /* found dev? */
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
 if ((uptr->flags & UNIT_ATT) &&                         /* already attached? */
-    !(uptr->flags & UNIT_ATTMULT)) {                    /* and only single attachable */
+    !(uptr->dynflags & UNIT_ATTMULT)) {                 /* and only single attachable */
     r = scp_detach_unit (dptr, uptr);                   /* detach it */
     if (r != SCPE_OK)                                   /* error? */
         return r;
@@ -3471,6 +3471,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
         WRITE_I (uptr->u5);                             /* [V3.0] more unit */
         WRITE_I (uptr->u6);
         WRITE_I (uptr->flags);                          /* [V2.10] flags */
+        WRITE_I (uptr->dynflags);
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         if (uptr->flags & UNIT_ATT) {
             fputs (uptr->filename, sfile);
@@ -3673,6 +3674,7 @@ for ( ;; ) {                                            /* device loop */
         READ_I (uptr->u5);                              /* [V3.0+] more dev spec */
         READ_I (uptr->u6);
         READ_I (flg);                                   /* [V2.10+] unit flags */
+        READ_I (uptr->dynflags);
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
             READ_I (uptr->capac);

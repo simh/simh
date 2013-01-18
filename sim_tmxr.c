@@ -744,15 +744,15 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
     if (!uptr)                                          /* Attached ? */
         return -1;                                      /* No connections are possinle! */
 
-    if (!(uptr->flags & TMUF_NOASYNCH)) {               /* if asynch not disabled */
-        uptr->flags |= UNIT_TM_POLL;                    /* tag as polling unit */
+    if (!(uptr->dynflags & TMUF_NOASYNCH)) {            /* if asynch not disabled */
+        uptr->dynflags |= UNIT_TM_POLL;                 /* tag as polling unit */
         sim_cancel (uptr);
         }
     for (i=0; i < mp->lines; i++) {
         uptr = mp->ldsc[i].uptr ? mp->ldsc[i].uptr : mp->uptr;
 
-        if (!(mp->uptr->flags & TMUF_NOASYNCH)) {           /* if asynch not disabled */
-            uptr->flags |= UNIT_TM_POLL;                    /* tag as polling unit */
+        if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {        /* if asynch not disabled */
+            uptr->dynflags |= UNIT_TM_POLL;                 /* tag as polling unit */
             sim_cancel (uptr);
             }
         }
@@ -1360,7 +1360,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     if (nbytes == 0) {                                  /* buf empty? enab line */
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
         UNIT *ruptr = lp->uptr ? lp->uptr : lp->mp->uptr;
-        if ((ruptr->flags & UNIT_TM_POLL) &&
+        if ((ruptr->dynflags & UNIT_TM_POLL) &&
             sim_asynch_enabled &&
             tmxr_rqln (lp))
             _sim_activate (ruptr, 0);
@@ -1858,8 +1858,8 @@ t_stat tmxr_set_console_input_unit (UNIT *uptr)
 extern TMLN sim_con_ldsc;
 
 sim_con_ldsc.uptr = uptr;
-if (!(uptr->flags & UNIT_TM_POLL)) {
-    uptr->flags |= UNIT_TM_POLL;                    /* tag as polling unit */
+if (!(uptr->dynflags & UNIT_TM_POLL)) {
+    uptr->dynflags |= UNIT_TM_POLL;                 /* tag as polling unit */
     }
 else
     sim_cancel (uptr);
@@ -1991,7 +1991,7 @@ while (sim_asynch_enabled) {
     FD_ZERO (&errorfds);
     for (i=max_socket_fd=socket_count=0; i<tmxr_open_device_count; ++i) {
         mp = tmxr_open_devices[i];
-        if ((mp->master) && (mp->uptr->flags&UNIT_TM_POLL)) {
+        if ((mp->master) && (mp->uptr->dynflags&UNIT_TM_POLL)) {
             units[socket_count] = mp->uptr;
             sockets[socket_count] = mp->master;
             FD_SET (mp->master, &readfds);
@@ -2574,13 +2574,13 @@ if ((mp->lines > 1) ||
     ((mp->master == 0) &&
      (mp->ldsc[0].connecting == 0) &&
      (mp->ldsc[0].serport == 0)))
-    uptr->flags = uptr->flags | UNIT_ATTMULT;           /* allow multiple attach commands */
+    uptr->flags = uptr->dynflags | UNIT_ATTMULT;        /* allow multiple attach commands */
 
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
-if (!async)                                             /* if asynch disabled */
-    uptr->flags |= TMUF_NOASYNCH;                       /* tag as no asynch */
+if (!async || (uptr->flags & TMUF_NOASYNCH))            /* if asynch disabled */
+    uptr->dynflags |= TMUF_NOASYNCH;                    /* tag as no asynch */
 #else
-uptr->flags |= TMUF_NOASYNCH;                           /* tag as no asynch */
+uptr->dynflags |= TMUF_NOASYNCH;                        /* tag as no asynch */
 #endif
 
 if (mp->dptr == NULL)                                   /* has device been set? */
@@ -2718,10 +2718,11 @@ for (i=0; i < mp->lines; i++) {
     UNIT *uptr = mp->ldsc[i].uptr ? mp->ldsc[i].uptr : mp->uptr;
     UNIT *o_uptr = mp->ldsc[i].o_uptr ? mp->ldsc[i].o_uptr : mp->uptr;
 
-    uptr->flags &= ~UNIT_TM_POLL;                       /* no polling */
-    o_uptr->flags &= ~UNIT_TM_POLL;                     /* no polling */
+    uptr->dynflags &= ~UNIT_TM_POLL;                    /* no polling */
+    o_uptr->dynflags &= ~UNIT_TM_POLL;                  /* no polling */
     }
-uptr->flags &= ~(UNIT_ATT|UNIT_TM_POLL|TMUF_NOASYNCH);  /* not attached, no polling, not asynch disabled */
+uptr->flags &= ~(UNIT_ATT);                             /* not attached */
+uptr->dynflags &= ~(UNIT_TM_POLL|TMUF_NOASYNCH);        /* no polling, not asynch disabled  */
 return SCPE_OK;
 }
 
@@ -2729,7 +2730,7 @@ return SCPE_OK;
 t_stat tmxr_activate (UNIT *uptr, int32 interval)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
-if ((!(uptr->flags & UNIT_TM_POLL)) || 
+if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return _sim_activate (uptr, interval);
     }
@@ -2742,7 +2743,7 @@ return _sim_activate (uptr, interval);
 t_stat tmxr_activate_after (UNIT *uptr, int32 usecs_walltime)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
-if ((!(uptr->flags & UNIT_TM_POLL)) || 
+if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return _sim_activate_after (uptr, usecs_walltime);
     }
@@ -2755,7 +2756,7 @@ return _sim_activate_after (uptr, usecs_walltime);
 t_stat tmxr_clock_coschedule (UNIT *uptr, int32 interval)
 {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
-if ((!(uptr->flags & UNIT_TM_POLL)) || 
+if ((!(uptr->dynflags & UNIT_TM_POLL)) || 
     (!sim_asynch_enabled)) {
     return sim_clock_coschedule (uptr, interval);
     }

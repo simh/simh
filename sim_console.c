@@ -1032,14 +1032,14 @@ return sim_os_ttinit ();
 t_stat sim_ttrun (void)
 {
 if (!sim_con_tmxr.ldsc->uptr) {                         /* If simulator didn't declare its input polling unit */
-    sim_con_unit.flags &= ~UNIT_TM_POLL;                /* we can't poll asynchronously */
-    sim_con_unit.flags |= TMUF_NOASYNCH;                /* disable asynchronous behavior */
+    sim_con_unit.dynflags &= ~UNIT_TM_POLL;             /* we can't poll asynchronously */
+    sim_con_unit.dynflags |= TMUF_NOASYNCH;             /* disable asynchronous behavior */
     }
 else {
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
     if (sim_asynch_enabled) {
-        sim_con_tmxr.ldsc->uptr->flags |= UNIT_TM_POLL;/* flag console input device as a polling unit */
-        sim_con_unit.flags |= UNIT_TM_POLL;            /* flag as polling unit */
+        sim_con_tmxr.ldsc->uptr->dynflags |= UNIT_TM_POLL;/* flag console input device as a polling unit */
+        sim_con_unit.dynflags |= UNIT_TM_POLL;         /* flag as polling unit */
         }
 #endif
     }

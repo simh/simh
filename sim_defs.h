@@ -373,6 +373,7 @@ struct sim_unit {
     uint32              hwmark;                         /* high water mark */
     int32               time;                           /* time out */
     uint32              flags;                          /* flags */
+    uint32              dynflags;                       /* dynamic flags */
     t_addr              capac;                          /* capacity */
     t_addr              pos;                            /* file position */
     void                (*io_flush)(struct sim_unit *up);/* io flush routine */
@@ -426,14 +427,17 @@ struct sim_unit {
 #define UNIT_RAW        0010000         /* raw mode */
 #define UNIT_TEXT       0020000         /* text mode */
 #define UNIT_IDLE       0040000         /* idle eligible */
-#define UNIT_ATTMULT    0100000         /* Allow multiple attach commands */
-#define UNIT_TM_POLL    0400000         /* TMXR Polling unit */
-                                        /* This flag is ONLY set dynamically */
-                                        /* it should NOT be set via initialization */
 
 #define UNIT_UFMASK_31  (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
 #define UNIT_RFLAGS     (UNIT_UFMASK|UNIT_DIS)          /* restored flags */
+
+/* Unit dynamic flags (dynflags) */
+
+/* These flags are only set dynamically */
+
+#define UNIT_ATTMULT    0000001         /* Allow multiple attach commands */
+#define UNIT_TM_POLL    0000002         /* TMXR Polling unit */
 
 /* Register data structure */
 
@@ -563,7 +567,7 @@ struct sim_fileref {
 
 /* The following macros define structure contents */
 
-#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),(cap),0,NULL,0,0
+#define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0
 
 #if defined (__STDC__) || defined (_WIN32)
 #define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1, NULL
@@ -689,7 +693,7 @@ extern int32 sim_asynch_inst_latency;
     if ((uptr)->a_cancel)                                         \
         (uptr)->a_cancel (uptr);                                  \
     else {                                                        \
-        if (((uptr)->flags & UNIT_TM_POLL) &&                     \
+        if (((uptr)->dynflags & UNIT_TM_POLL) &&                  \
             !((uptr)->next) && !((uptr)->a_next)) {               \
             (uptr)->a_polling_now = FALSE;                        \
             sim_tmxr_poll_count -= (uptr)->a_poll_waiter_count;   \
@@ -702,7 +706,7 @@ extern int32 sim_asynch_inst_latency;
     if ((uptr)->a_cancel)                                         \
         (uptr)->a_cancel (uptr);                                  \
     else {                                                        \
-        if (((uptr)->flags & UNIT_TM_POLL) &&                     \
+        if (((uptr)->dynflags & UNIT_TM_POLL) &&                  \
             !((uptr)->next) && !((uptr)->a_next)) {               \
             (uptr)->a_polling_now = FALSE;                        \
             sim_tmxr_poll_count -= (uptr)->a_poll_waiter_count;   \
@@ -780,7 +784,7 @@ extern int32 sim_asynch_inst_latency;
 #endif
 #define AIO_EVENT_BEGIN(uptr)                                     \
     do {                                                          \
-        int __was_poll = uptr->flags & UNIT_TM_POLL
+        int __was_poll = uptr->dynflags & UNIT_TM_POLL
 #define AIO_EVENT_COMPLETE(uptr, reason)                          \
         if (__was_poll) {                                         \
             pthread_mutex_lock (&sim_tmxr_poll_lock);             \
