@@ -273,6 +273,7 @@ static void sim_vhd_disk_flush (FILE *f);
 static t_addr sim_vhd_disk_size (FILE *f);
 static t_stat sim_vhd_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects);
 static t_stat sim_vhd_disk_wrsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectswritten, t_seccnt sects);
+static t_stat sim_vhd_disk_clearerr (UNIT *uptr);
 static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype);
 static const char *sim_vhd_disk_get_dtype (FILE *f);
 static t_stat sim_os_disk_implemented_raw (void);
@@ -1121,7 +1122,8 @@ sim_disk_clr_async (uptr);
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
 
-uptr->flags = uptr->flags & ~(UNIT_ATT | UNIT_RO | UNIT_RAW);
+uptr->flags &= ~(UNIT_ATT | UNIT_RO);
+uptr->dynflags &= ~UNIT_NO_FIO;
 free (uptr->filename);
 uptr->filename = NULL;
 uptr->fileref = NULL;
@@ -1205,6 +1207,39 @@ AIO_VALIDATE;
 AIO_UPDATE_QUEUE;
 return SCPE_OK;
 }
+
+t_stat sim_disk_perror (UNIT *uptr, const char *msg)
+{
+if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
+    return SCPE_NOATT;
+switch (DK_GET_FMT (uptr)) {                            /* case on format */
+    case DKUF_F_STD:                                    /* SIMH format */
+    case DKUF_F_VHD:                                    /* VHD format */
+    case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
+        perror (msg);
+    default:
+        ;
+    }
+return SCPE_OK;
+}
+
+t_stat sim_disk_clearerr (UNIT *uptr)
+{
+if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
+    return SCPE_NOATT;
+switch (DK_GET_FMT (uptr)) {                            /* case on format */
+    case DKUF_F_STD:                                    /* SIMH format */
+        clearerr (uptr->fileref);
+        break;
+    case DKUF_F_VHD:                                    /* VHD format */
+        sim_vhd_disk_clearerr (uptr);
+        break;
+    default:
+        ;
+    }
+return SCPE_OK;
+}
+
 
 /* Factory bad block table creation routine
 
@@ -1970,6 +2005,11 @@ return (t_addr)-1;
 }
 
 static t_stat sim_vhd_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, t_seccnt sects)
+{
+return SCPE_IOERR;
+}
+
+static t_stat sim_vhd_disk_clearerr (UNIT *uptr)
 {
 return SCPE_IOERR;
 }
@@ -3486,6 +3526,14 @@ VHDHANDLE hVHD = (VHDHANDLE)uptr->fileref;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 return ReadVirtualDiskSectors(hVHD, buf, sects, sectsread, ctx->sector_size, lba);
+}
+
+static t_stat sim_vhd_disk_clearerr (UNIT *uptr)
+{
+VHDHANDLE hVHD = (VHDHANDLE)uptr->fileref;
+
+clearerr (hVHD->File);
+return SCPE_OK;
 }
 
 static t_bool

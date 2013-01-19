@@ -80,6 +80,8 @@ t_stat sim_disk_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat sim_disk_set_asynch (UNIT *uptr, int latency);
 t_stat sim_disk_clr_asynch (UNIT *uptr);
 t_stat sim_disk_reset (UNIT *uptr);
+t_stat sim_disk_perror (UNIT *uptr, const char *msg);
+t_stat sim_disk_clearerr (UNIT *uptr);
 t_bool sim_disk_isavailable (UNIT *uptr);
 t_bool sim_disk_isavailable_a (UNIT *uptr, DISK_PCALLBACK callback);
 t_bool sim_disk_wrp (UNIT *uptr);

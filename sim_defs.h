@@ -424,9 +424,10 @@ struct sim_unit {
 #define UNIT_ROABLE     0001000         /* read only ok */
 #define UNIT_DISABLE    0002000         /* disable-able */
 #define UNIT_DIS        0004000         /* disabled */
-#define UNIT_RAW        0010000         /* raw mode */
-#define UNIT_TEXT       0020000         /* text mode */
 #define UNIT_IDLE       0040000         /* idle eligible */
+
+/* Unused/meaningless flags */
+#define UNIT_TEXT       0000000         /* text mode - no effect */
 
 #define UNIT_UFMASK_31  (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF_31) - 1))
 #define UNIT_UFMASK     (((1u << UNIT_V_RSV) - 1) & ~((1u << UNIT_V_UF) - 1))
@@ -438,6 +439,7 @@ struct sim_unit {
 
 #define UNIT_ATTMULT    0000001         /* Allow multiple attach commands */
 #define UNIT_TM_POLL    0000002         /* TMXR Polling unit */
+#define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
 
 /* Register data structure */
 

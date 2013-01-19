@@ -3983,7 +3983,7 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
             if (uptr->io_flush)                         /* unit specific flush routine */
                 uptr->io_flush (uptr);
             else
-                if (!(uptr->flags & UNIT_RAW) &&        /* not raw, */
+                if (!(uptr->dynflags & UNIT_NO_FIO) &&  /* is FILE *, */
                     !(uptr->flags & UNIT_RO))           /* not read only? */
                     fflush (uptr->fileref);
             }
@@ -4543,7 +4543,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW)
+        if (uptr->dynflags & UNIT_NO_FIO)
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
             reason = SCPE_NXM;
@@ -4634,7 +4634,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW) 
+        if (uptr->dynflags & UNIT_NO_FIO)
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
             return SCPE_NXM;
