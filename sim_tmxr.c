@@ -1853,19 +1853,6 @@ mp->ldsc[line].uptr = uptr_poll;
 return SCPE_OK;
 }
 
-t_stat tmxr_set_console_input_unit (UNIT *uptr)
-{
-extern TMLN sim_con_ldsc;
-
-sim_con_ldsc.uptr = uptr;
-if (!(uptr->dynflags & UNIT_TM_POLL)) {
-    uptr->dynflags |= UNIT_TM_POLL;                 /* tag as polling unit */
-    }
-else
-    sim_cancel (uptr);
-return SCPE_OK;
-}
-
 /* Declare which unit polls for output 
 
    Inputs:

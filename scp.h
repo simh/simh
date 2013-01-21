@@ -162,6 +162,7 @@ extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;
 extern uint32 sim_brk_summ;
+extern t_bool sim_asynch_enabled;
 
 /* VM interface */
 

@@ -113,6 +113,12 @@
 #include <errno.h>
 #include <limits.h>
 
+#ifdef _WIN32
+#include <winsock2.h>
+#undef PACKED                       /* avoid macro name collision */
+#undef ERROR                        /* avoid macro name collision */
+#endif
+
 #ifndef TRUE
 #define TRUE            1
 #define FALSE           0
@@ -662,7 +668,6 @@ extern UNIT * volatile sim_wallclock_queue;
 extern UNIT * volatile sim_wallclock_entry;
 extern UNIT * volatile sim_clock_cosched_queue;
 extern volatile t_bool sim_idle_wait;
-extern t_bool sim_asynch_enabled;
 extern int32 sim_asynch_check;
 extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
@@ -846,13 +851,6 @@ extern int32 sim_asynch_inst_latency;
     else                                                          \
       (void)0
 #ifdef _WIN32
-#include <winsock2.h>
-#ifdef PACKED
-#undef PACKED
-#endif /* PACKED */
-#ifdef ERROR
-#undef ERROR
-#endif /* ERROR */
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_8)
 #define InterlockedCompareExchangePointer(Destination, Exchange, Comparand) __sync_val_compare_and_swap(Destination, Comparand, Exchange)
 #elif defined(__DECC_VER)

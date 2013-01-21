@@ -328,6 +328,8 @@ t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
+#else
+t_bool sim_asynch_enabled = FALSE;
 #endif
 
 /* The per-simulator init routine is a weak global that defaults to NULL

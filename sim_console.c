@@ -119,6 +119,7 @@
 
 #include "sim_defs.h"
 #include "sim_tmxr.h"
+#include "sim_serial.h"
 #include "sim_timer.h"
 #include <ctype.h>
 

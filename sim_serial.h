@@ -30,9 +30,7 @@
 #ifndef _SIM_SERIAL_H_
 #define _SIM_SERIAL_H_    0
 
-#if defined (_WIN32)
-
-/* Windows definitions */
+#if defined (_WIN32)                        /* Windows definitions */
 
 /* We need the basic Win32 definitions, but including "windows.h" also includes
    "winsock.h" as well.  However, "sim_sock.h" explicitly includes "winsock2.h,"
@@ -43,50 +41,49 @@
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
-
 #include <windows.h>
-
-typedef HANDLE SERHANDLE;
-
+#if !defined(INVALID_HANDLE)
 #define INVALID_HANDLE  INVALID_HANDLE_VALUE
+#endif /* !defined(INVALID_HANDLE) */
 
-
-#elif defined (__unix__) || defined(__APPLE__)
-
-/* UNIX definitions */
+#elif defined (__unix__) || defined(__APPLE__)  /* UNIX definitions */
 
 #include <fcntl.h>
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-typedef int SERHANDLE;
-
+#if !defined(INVALID_HANDLE)
 #define INVALID_HANDLE  -1
+#endif /* !defined(INVALID_HANDLE) */
 
-
-#elif defined (VMS)
-
-/* VMS definitions */
-
-typedef int SERHANDLE;
-
+#elif defined (VMS)                             /* VMS definitions */
+#if !defined(INVALID_HANDLE)
 #define INVALID_HANDLE  (uint32)(-1)
+#endif /* !defined(INVALID_HANDLE) */
 
-#else
+#else                                           /* Non-implemented definitions */
 
-/* Non-implemented definitions */
-
-typedef int SERHANDLE;
-
+#if !defined(INVALID_HANDLE)
 #define INVALID_HANDLE  -1
+#endif /* !defined(INVALID_HANDLE) */
 
+#endif  /* OS variants */
+
+#ifndef _SERHANDLE_DEFINED
+#define _SERHANDLE_DEFINED 0
+#if defined (_WIN32)                            /* Windows definitions */
+typedef void *SERHANDLE;
+#else                                           /* all other platforms */
+typedef int SERHANDLE;
 #endif
+#endif /* _SERHANDLE_DEFINED */
+
 
 /* Common definitions */
 
 /* Global routines */
-#include "sim_tmxr.h"                                   /* need TMLN definition and modem definitions */
+#include "sim_tmxr.h"                           /* need TMLN definition and modem definitions */
 
 extern SERHANDLE sim_open_serial    (char *name, TMLN *lp, t_stat *status);
 extern t_stat    sim_config_serial  (SERHANDLE port, const char *config);

@@ -47,7 +47,6 @@
 #define _SIM_SOCK_H_    0
 
 #if defined (_WIN32)                                    /* Windows */
-#undef INT_PTR                                          /* hack, hack */
 #include <winsock2.h>
 
 #elif !defined (__OS2__) || defined (__EMX__)           /* VMS, Mac, Unix, OS/2 EMX */

@@ -44,12 +44,19 @@
                         added tmxr_rqln, tmxr_tqln
 */
 
-#include "sim_serial.h"                                 /* We need serial I/O (SERHANDLE) */
-
 #ifndef _SIM_TMXR_H_
 #define _SIM_TMXR_H_    0
 
-#include "sim_sock.h"                                   /* We need sockets */
+#ifndef _SERHANDLE_DEFINED
+#define _SERHANDLE_DEFINED 0
+#if defined (_WIN32)                            /* Windows definitions */
+typedef void *SERHANDLE;
+#else                                           /* all other platforms */
+typedef int SERHANDLE;
+#endif
+#endif
+
+#include "sim_sock.h"
 
 #define TMXR_V_VALID    15
 #define TMXR_VALID      (1 << TMXR_V_VALID)
@@ -159,7 +166,7 @@ t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear
 t_stat tmxr_set_config_line (TMLN *lp, char *config);
 t_stat tmxr_set_line_unit (TMXR *mp, int line, UNIT *uptr_poll);
 t_stat tmxr_set_line_output_unit (TMXR *mp, int line, UNIT *uptr_poll);
-t_stat tmxr_set_console_input_unit (UNIT *uptr);
+t_stat tmxr_set_console_units (UNIT *rxuptr, UNIT *txuptr);
 t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);
