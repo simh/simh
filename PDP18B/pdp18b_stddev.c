@@ -74,6 +74,7 @@
 */
 
 #include "pdp18b_defs.h"
+#include "sim_tmxr.h"
 #include <ctype.h>
 
 #define UNIT_V_RASCII   (UNIT_V_UF + 0)                 /* reader ASCII */
@@ -1079,6 +1080,7 @@ return (TST_INT (TTI)? IOS_TTI: 0);
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 CLR_INT (TTI);                                          /* clear flag */
 if (!sim_is_running) {                                  /* RESET (not CAF)? */
     tti_unit.buf = 0;                                   /* clear buffer */

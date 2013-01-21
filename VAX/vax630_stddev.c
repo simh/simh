@@ -32,6 +32,7 @@
 */
 
 #include "vax_defs.h"
+#include "sim_tmxr.h"
 #include <time.h>
 
 #define TTICSR_IMP      (CSR_DONE + CSR_IE)             /* terminal input */
@@ -278,6 +279,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);

@@ -35,6 +35,7 @@
 */
 
 #include "nova_defs.h"
+#include "sim_tmxr.h"
 
 #define UNIT_V_DASHER   (UNIT_V_UF + 0)                 /* Dasher mode */
 #define UNIT_DASHER (1 << UNIT_V_DASHER)
@@ -192,6 +193,7 @@ void translate_in()
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;
 dev_busy = dev_busy & ~INT_TTI;                         /* clear busy */
 dev_done = dev_done & ~INT_TTI;                         /* clear done, int */

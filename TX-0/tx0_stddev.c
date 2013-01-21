@@ -48,6 +48,7 @@
 */
 
 #include "tx0_defs.h"
+#include "sim_tmxr.h"
 
 #define FLEXO_STOP     061                             /* stop code */
 #define FLEXO_UC       071
@@ -628,6 +629,7 @@ t_stat tto_svc (UNIT *uptr)
 
 t_stat tty_reset (DEVICE *dptr)
 {
+    tmxr_set_console_units (&tti_unit, &tto_unit);
     tty_buf = 0;                                            /* clear buffer */
     tty_uc = 0;                                             /* clear case */
     tti_hold = 0;                                           /* clear hold buf */

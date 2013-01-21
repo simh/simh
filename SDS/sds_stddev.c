@@ -33,6 +33,7 @@
 */
 
 #include "sds_defs.h"
+#include "sim_tmxr.h"
 
 #define TT_CR           052                             /* typewriter */
 #define TT_TB           072
@@ -518,6 +519,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 chan_disc (tti_dib.chan);                               /* disconnect */
 tti_unit.buf = 0;                                       /* clear state */
 xfr_req = xfr_req & ~XFR_TTI;                           /* clr xfr flag */

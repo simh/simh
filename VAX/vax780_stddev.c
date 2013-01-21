@@ -81,7 +81,7 @@
 */
 
 #include "vax_defs.h"
-
+#include "sim_tmxr.h"
 
 /* Terminal definitions */
 
@@ -484,6 +484,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_buf = 0;
 tti_csr = 0;
 tti_int = 0;

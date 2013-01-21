@@ -68,6 +68,7 @@
 */
 
 #include "h316_defs.h"
+#include "sim_tmxr.h"
 #include <ctype.h>
 
 #define UNIT_V_ASC      (TTUF_V_UF + 0)                 /* ASCII */
@@ -533,6 +534,7 @@ return SCPE_OK;
 
 t_stat ptp_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tty_unit[TTR], &tty_unit[TTO]);
 CLR_INT (INT_PTP);                                      /* clear ready, enb */
 CLR_ENB (INT_PTP);
 ptp_power = 0;                                          /* power off */

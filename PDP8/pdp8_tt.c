@@ -42,6 +42,7 @@
 */
 
 #include "pdp8_defs.h"
+#include "sim_tmxr.h"
 #include <ctype.h>
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
@@ -193,6 +194,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;
 dev_done = dev_done & ~INT_TTI;                         /* clear done, int */
 int_req = int_req & ~INT_TTI;
