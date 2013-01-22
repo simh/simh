@@ -61,12 +61,12 @@
 #define TTX_GETLN(x)    (((x) >> 4) & TTX_MASK)
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll, sim_is_running;
+extern int32 tmxr_poll;
 
 uint8 ttix_buf[TTX_LINES] = { 0 };                      /* input buffers */
 uint8 ttox_buf[TTX_LINES] = { 0 };                      /* output buffers */
 int32 ttx_tps = 100;                                    /* polls per second */
-TMLN ttx_ldsc[TTX_LINES] = { 0 };                       /* line descriptors */
+TMLN ttx_ldsc[TTX_LINES] = { {0} };                     /* line descriptors */
 TMXR ttx_desc = { TTX_LINES, 0, 0, ttx_ldsc };          /* mux descriptor */
 
 DEVICE ttix_dev, ttox_dev;
@@ -123,7 +123,7 @@ DEVICE ttix_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &ttix_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_NET | DEV_DISABLE
+    &ttix_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* TTOx data structures
@@ -226,7 +226,7 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
 if (ln >= 0)                                            /* got one? rcv enb*/
     ttx_ldsc[ln].rcve = 1;

@@ -207,7 +207,7 @@ DEVICE mt_dev = {
     MT_NUMDR * 2, 10, T_ADDR_W, 1, 16, 8,
     NULL, NULL, &mt_reset,
     &io_boot, &mt_attach, &mt_detach,
-    &mt_dib, DEV_DISABLE
+    &mt_dib, DEV_DISABLE | DEV_TAPE
     };
 
 /* Magtape: IO dispatch routine */
@@ -278,7 +278,7 @@ t_mtrlnt tbc;
 t_stat r;
 
 if (cmd == MCM_INIT) {                                  /* init state */
-    if ((t = sim_is_active (uptr + MT_REW)) != 0) {     /* rewinding? */
+    if ((t = sim_activate_time (uptr + MT_REW)) != 0) { /* rewinding? */
         sim_activate (uptr, t);                         /* retry later */
         return SCPE_OK;
         }

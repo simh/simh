@@ -173,6 +173,7 @@
 
 struct eth_packet {
   uint8   msg[ETH_FRAME_SIZE];                          /* ethernet frame (message) */
+  uint8   *oversize;                                    /* oversized frame (message) */
   uint32  len;                                          /* packet length without CRC */
   uint32  used;                                         /* bytes processed (used in packet chaining) */
   int     status;                                       /* transmit/receive status */
@@ -265,6 +266,7 @@ typedef struct eth_device  ETH_DEV;
 t_stat eth_open   (ETH_DEV* dev, char* name,            /* open ethernet interface */
                    DEVICE* dptr, uint32 dbit);
 t_stat eth_close  (ETH_DEV* dev);                       /* close ethernet interface */
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat eth_write  (ETH_DEV* dev, ETH_PACK* packet,      /* write sychronous packet; */
                    ETH_PCALLBACK routine);              /*  callback when done */
 int eth_read      (ETH_DEV* dev, ETH_PACK* packet,      /* read single packet; */
@@ -303,8 +305,8 @@ void ethq_remove (ETH_QUE* que);                        /* remove item from FIFO
 void ethq_insert (ETH_QUE* que, int32 type,             /* insert item into FIFO queue */
                   ETH_PACK* packet, int32 status);
 void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO queue */
-                  const uint8 *data, int used, int len, 
-                  int crc_len, const uint8 *crc_data, int32 status);
+                  const uint8 *data, int used, size_t len, 
+                  size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 
 

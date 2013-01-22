@@ -155,7 +155,10 @@ The pdp11_rq.c module has been refactored to leverage the asynch I/O
 features of the sim_disk library.  The impact to this code to adopt the
 asynch I/O paradigm was quite minimal.
 The pdp11_rp.c module has also been refactored to leverage the asynch I/O
-features of the sim_disk library.
+features of the sim_disk library.  The impact to this code to adopt the
+asynch I/O paradigm was also quite minimal.  After conversion a latent
+bug in the VAX Massbus adapter implementation was illuminated due to the
+more realistic delays to perform I/O operations.
 The pdp11_tq.c module has been refactored to leverage the asynch I/O
 features of the sim_tape library.  The impact to this code to adopt the
 asynch I/O paradigm was very significant. This was due to the two facts:
@@ -195,15 +198,8 @@ particular device emulation which isn't capable of asynch operation, or
 it can be defined globally on the compile command line for the simulator.
 Alternatively, if a specific Multiplexer device doesn't function correctly 
 under the multiplexer asynchronous environment and it will never be 
-revised to operate correctly, it may set the TMUF_NOASYNCH bit in its 
-unit flags field.
-
-Console I/O can operate asynchronously if the simulator notifies the 
-tmxr/console subsystem which device unit is used by the simulator to poll 
-for console input.  This is done by including sim_tmxr.h in the source 
-module which contains the console input device definition and calling 
-tmxr_set_console_input_unit().  tmxr_set_console_input_unit would usually 
-be called in a device reset routine.
+revised to operate correctly, it may statically set the TMUF_NOASYNCH bit 
+in its unit flags field.
 
 Some devices will need a small amount of extra coding to leverage the 
 Multiplexer Asynch I/O capabilties.  Devices which require extra coding
@@ -215,7 +211,17 @@ have one or more of the following characteristics:
 
 The extra coding required for proper operation is to call 
 tmxr_set_line_unit() to associate the appropriate input polling unit to 
-the respective multiplexer line.
+the respective multiplexer line (ONLY if input polling is done by a unit
+different than the unit specified when the MUX was attached). If output 
+polling is done on a different unit, then tmxr_set_line_output_unit()
+should be called to describe that fact.
+
+Console I/O can operate asynchronously if the simulator notifies the 
+tmxr/console subsystem which device unit is used by the simulator to poll 
+for console input and output units.  This is done by including sim_tmxr.h 
+in the source module which contains the console input device definition 
+and calling tmxr_set_console_units().  tmxr_set_console_units would usually 
+be called in a device reset routine.
 
 sim_tmxr consumers:
   - Altair Z80 SIO   devices = 1, units = 1,      lines = 4,  flagbits = 8, Untested Asynch
@@ -288,7 +294,8 @@ happen under a combination of conditions:
   2) the multiplexor device is NOT attached, and thus is not being managed by
      the asynchronous multiplexer support
   3) the multiplexer device schedules polling (co-scheduled) when not 
-     attached (such polling will never produce anything input).
+     attached (such polling will never produce any input, so this is probably
+     a bug).
 In prior simh versions support for clock co-scheduling was implmented 
 separately by each simulator, and usually was expressed by code of the form:
     sim_activate (uptr, clk_cosched (tmxr_poll));

@@ -56,6 +56,8 @@
 /* Microcode constructs */
 
 #define VAX780_SID      (1 << 24)                       /* system ID */
+#define VAX780_TYP      (0 << 23)                       /* sys type: 780 */
+#define VAX785_TYP      (1 << 23)                       /* sys type: 785 */
 #define VAX780_ECO      (7 << 19)                       /* ucode revision */
 #define VAX780_PLANT    (0 << 12)                       /* plant (Salem NH) */
 #define VAX780_SN       (1234)
@@ -68,6 +70,10 @@
 #define VER_WCSP        (VER_FPLA)                      /* WCS primary version */
 #define VER_WCSS        0x12                            /* WCS secondary version */
 #define VER_PCS         ((VER_WCSS >> 4) & 0x3)         /* PCS version */
+#define VER_WCSP_785    0x01                            /* 785 WCS primary version */
+#define VER_WCSS_785    0x00                            /* 785 WCS secondary version */
+#define VER_PCS_785     0x04                            /* 785 PCS version */
+#define VER_MTCH_785    0x04                            /* 785 PCS/WCS primary version */
 
 /* Interrupts */
 
@@ -120,6 +126,7 @@
 #define MT_SBITA        53                              /* SBI timeout addr */
 #define MT_SBIQC        54                              /* SBI timeout clear */
 #define MT_MBRK         60                              /* microbreak */
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Machine specific reserved operand tests */
 
@@ -141,6 +148,11 @@
 #define LP_MBZ84_TEST(r) if ((((uint32)(r)) & 0xF8C00000) != 0) RSVD_OPND_FAULT
 #define LP_MBZ92_TEST(r) if ((((uint32)(r)) & 0x7FC00000) != 0) RSVD_OPND_FAULT
 
+/* CPU */
+
+#define CPU_MODEL_MODIFIERS \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={785|780}", \
+                          &cpu_set_model, &cpu_show_model },
 /* Memory */
 
 #define MAXMEMWIDTH     23                              /* max mem, MS780C */
@@ -150,6 +162,12 @@
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }
 
 /* Unibus I/O registers */
 
@@ -223,7 +241,7 @@
 
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        8                               /* lines per DZV mux */
-#define VH_MUXES        4                               /* max # of DHQ muxes */
+#define VH_MUXES        4                               /* max # of DHU muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
@@ -231,12 +249,10 @@
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_MBUS      (DEV_V_UF + 1)                  /* Massbus */
 #define DEV_V_NEXUS     (DEV_V_UF + 2)                  /* Nexus */
-#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* flt addr */
-#define DEV_V_FFUF      (DEV_V_UF + 4)                  /* first free flag */
+#define DEV_V_FFUF      (DEV_V_UF + 3)                  /* first free flag */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_MBUS        (1u << DEV_V_MBUS)
 #define DEV_NEXUS       (1u << DEV_V_NEXUS)
-#define DEV_FLTA        (1u << DEV_V_FLTA)
 #define DEV_QBUS        (0)
 #define DEV_Q18         (0)
 
@@ -268,51 +284,11 @@ typedef struct {
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
     } DIB;
 
-/* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's
+/* Unibus I/O page layout - see pdp11_ui_lib.c for address layout details
    Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
-#define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
-#define IOLN_DZ         010
-#define IOBA_XUB        (IOPAGEBASE + 000330 + (020 * (DZ_MUXES / 2)))
-#define IOLN_XUB        010
-#define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
-#define IOLN_RQB        004
-#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
-#define IOLN_RQC        004
-#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
-#define IOLN_RQD        004
-#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHU11 */
-#define IOLN_VH         020
-#define IOBA_RQ         (IOPAGEBASE + 012150)           /* UDA50 */
-#define IOLN_RQ         004
-#define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
-#define IOLN_TS         004
-#define IOBA_RL         (IOPAGEBASE + 014400)           /* RL11 */
-#define IOLN_RL         012
-#define IOBA_XQ         (IOPAGEBASE + 014440)           /* DEQNA/DELQA */
-#define IOLN_XQ         020
-#define IOBA_XQB        (IOPAGEBASE + 014460)           /* 2nd DEQNA/DELQA */
-#define IOLN_XQB        020
-#define IOBA_TQ         (IOPAGEBASE + 014500)           /* TMSCP */
-#define IOLN_TQ         004
-#define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
-#define IOLN_XU         010
-#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
-#define IOLN_CR         010
-#define IOBA_RX         (IOPAGEBASE + 017170)           /* RX11 */
-#define IOLN_RX         004
-#define IOBA_RY         (IOPAGEBASE + 017170)           /* RXV21 */
-#define IOLN_RY         004
-#define IOBA_QDSS       (IOPAGEBASE + 017400)           /* QDSS */
-#define IOLN_QDSS       002
-#define IOBA_HK         (IOPAGEBASE + 017440)           /* RK611 */
-#define IOLN_HK         040
-#define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
-#define IOLN_LPT        004
-#define IOBA_PTR        (IOPAGEBASE + 017550)           /* PC11 reader */
-#define IOLN_PTR        004
-#define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
-#define IOLN_PTP        004
+#define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
+
 
 /* Interrupt assignments; within each level, priority is right to left */
 
@@ -325,6 +301,8 @@ typedef struct {
 #define INT_V_TS        6
 #define INT_V_RY        7
 #define INT_V_XU        8
+#define INT_V_DMCRX     9
+#define INT_V_DMCTX     10
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -348,6 +326,8 @@ typedef struct {
 #define INT_PTR         (1u << INT_V_PTR)
 #define INT_PTP         (1u << INT_V_PTP)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_DMCRX       (1u << INT_V_DMCRX)
+#define INT_DMCTX       (1u << INT_V_DMCTX)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -364,28 +344,16 @@ typedef struct {
 #define IPL_CR          (0x14 - IPL_HMIN)
 #define IPL_VHRX        (0x14 - IPL_HMIN)
 #define IPL_VHTX        (0x14 - IPL_HMIN)
+#define IPL_DMCRX       (0x15 - IPL_HMIN)
+#define IPL_DMCTX       (0x15 - IPL_HMIN)
 
 /* Device vectors */
 
+#define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
+
 #define VEC_QBUS        0
 #define VEC_Q           0000
-#define VEC_PTR         0070
-#define VEC_PTP         0074
-#define VEC_XQ          0120
-#define VEC_XU          0120
-#define VEC_RQ          0154
-#define VEC_RL          0160
-#define VEC_LPT         0200
-#define VEC_HK          0210
-#define VEC_TS          0224
-#define VEC_CR          0230
-#define VEC_TQ          0260
-#define VEC_RX          0264
-#define VEC_RY          0264
-#define VEC_DZRX        0300
-#define VEC_DZTX        0304
-#define VEC_VHRX        0310
-#define VEC_VHTX        0314
 
 /* Interrupt macros */
 
@@ -455,7 +423,6 @@ t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
-int32 clk_cosched (int32 wait);
 
 #include "pdp11_io_lib.h"
 

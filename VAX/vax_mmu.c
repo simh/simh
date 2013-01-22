@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   24-Oct-12    MB      Added support for KA620 virtual addressing
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Inlined physical memory routines
    29-Apr-07    RMS     Added address masking for system page table reads
@@ -177,7 +178,10 @@ if (mapen) {                                            /* mapping on? */
         xpte = fill (va, lnt, acc, NULL);               /* fill if needed */
     pa = (xpte.pte & TLB_PFN) | off;                    /* get phys addr */
     }
-else pa = va & PAMASK;
+else {
+    pa = va & PAMASK;
+    off = 0;
+    }
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     if (lnt >= L_LONG)                                  /* long, quad? */
         return ReadL (pa);
@@ -185,7 +189,7 @@ if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
         return ReadW (pa);
     return ReadB (pa);                                  /* byte */
     }
-if (mapen && ((off + lnt) > VA_PAGSIZE)) {              /* cross page? */
+if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {      /* cross page? */
     vpn = VA_GETVPN (va + lnt);                         /* vpn 2nd page */
     tbi = VA_GETTBI (vpn);
     xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
@@ -239,7 +243,10 @@ if (mapen) {
         xpte = fill (va, lnt, acc, NULL);
     pa = (xpte.pte & TLB_PFN) | off;
     }
-else pa = va & PAMASK;
+else {
+    pa = va & PAMASK;
+    off = 0;
+    }
 if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     if (lnt >= L_LONG)                                  /* long, quad? */
         WriteL (pa, val);
@@ -248,7 +255,7 @@ if ((pa & (lnt - 1)) == 0) {                            /* aligned? */
     else WriteB (pa, val);                              /* byte */
     return;
     }
-if (mapen && ((off + lnt) > VA_PAGSIZE)) {
+if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
     vpn = VA_GETVPN (va + 4);
     tbi = VA_GETTBI (vpn);
     xpte = (va & VA_S0)? stlb[tbi]: ptlb[tbi];          /* access tlb */
@@ -474,6 +481,7 @@ else {
             MM_ERR (PR_LNV);
         ptead = d_p0br + ptidx;
         }
+#if !defined (VAX_620)
     if ((ptead & VA_S0) == 0)
         ABORT (STOP_PPTE);                              /* ppte must be sys */
     vpn = VA_GETVPN (ptead);                            /* get vpn, tbi */
@@ -494,6 +502,7 @@ else {
             ((pte << VA_N_OFF) & TLB_PFN);              /* set stlb data */
         }
     ptead = (stlb[tbi].pte & TLB_PFN) | VA_GETOFF (ptead);
+#endif
     }
 pte = ReadL (ptead);                                    /* read pte */
 tlbpte = cvtacc[PTE_GETACC (pte)] |                     /* cvt access */

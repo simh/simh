@@ -23,26 +23,33 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   -
+*/
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+/*
 
    This program builds C include files which can be used to contain the contents
    of ROM or other boot code needed by simulators.
 
    Current Internal ROM files being built:
 
-      ROM/Boot File:     Include File:
-      =======================================
-      VAX/ka655x.bin     VAX/vax_ka655x_bin.h
-      VAX/vmb.exe        VAX/vax780_vmb_exe.h
-
-
+      ROM/Boot File:     Include File:            Size:                 Checksum:
+      =======================================================================================
 */
+struct ROM_File_Descriptor {
+    char *BinaryName;    char *IncludeFileName;   size_t expected_size; unsigned int checksum;  char *ArrayName;} ROMs[] = {
+   {"VAX/ka655x.bin",    "VAX/vax_ka655x_bin.h",                131072,            0xFF7673B6, "vax_ka655x_bin"},
+   {"VAX/ka620.bin",     "VAX/vax_ka620_bin.h",                  65536,            0xFF7F930F, "vax_ka620_bin"},
+   {"VAX/ka630.bin",     "VAX/vax_ka630_bin.h",                  65536,            0xFF7F73EF, "vax_ka630_bin"},
+   {"VAX/ka610.bin",     "VAX/vax_ka610_bin.h",                  16384,            0xFFEF3312, "vax_ka610_bin"},
+   {"VAX/vmb.exe",       "VAX/vax_vmb_exe.h",                    44544,            0xFFC014CC, "vax_vmb_exe"},
+   };
 
-#include <time.h>
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
+
+#include <ctype.h>
 #include <string.h>
+#include <time.h>
 #include <sys/stat.h>
 
 #if defined(_WIN32)
@@ -52,6 +59,133 @@
 #else
 #include <utime.h>
 #endif
+
+int sim_read_ROM_include(const char *include_filename, 
+                         int *psize,
+                         unsigned char **pROMData,
+                         unsigned int *pchecksum,
+                         char **prom_array_name,
+                         int *defines_found)
+{
+FILE *iFile;
+char line[256];
+size_t i;
+size_t bytes_written = 0;
+size_t allocated_size = 0;
+int define_size_found = 0;
+int define_filename_found = 0;
+int define_array_found = 0;
+
+*psize = 0;
+*pchecksum = 0;
+*pROMData = NULL;
+*prom_array_name = NULL;
+if (NULL == (iFile = fopen (include_filename, "r")))
+    return -1;
+
+memset (line, 0, sizeof (line));
+
+while (fgets (line, sizeof(line)-1, iFile)) {
+    unsigned int byte;
+    char *c;
+
+    switch (line[0]) {
+        case '#':
+            if (0 == strncmp ("#define BOOT_CODE_SIZE ", line, 23))
+                define_size_found = 1;
+            if (0 == strncmp ("#define BOOT_CODE_FILENAME ", line, 27))
+                define_filename_found = 1;
+            if (0 == strncmp ("#define BOOT_CODE_ARRAY ", line, 24))
+                define_array_found = 1;
+            break;
+        case ' ':
+        case '/':
+        case '*':
+        case '\n':
+            break;
+        case 'u': /* unsigned char {array_name}[] */
+            *prom_array_name = calloc(512, sizeof(char));
+            if (1 == sscanf (line, "unsigned char %s[]", *prom_array_name)) {
+                c = strchr (*prom_array_name, '[');
+                if (c)
+                    *c = '\0';
+                }
+            break;
+        case '0': /* line containing byte data */
+            c = line;
+            while (1 == sscanf (c, "0x%2Xd,", &byte)) {
+                if (bytes_written >= allocated_size) {
+                    allocated_size += 2048;
+                    *pROMData = realloc(*pROMData, allocated_size);
+                    }
+                *(*pROMData + bytes_written++) = byte;
+                c += 5;
+                }
+            break;
+        }
+    if (strchr (line, '}'))
+        break;
+    }
+fclose (iFile);
+for (i=0; i<bytes_written; ++i)
+    *pchecksum += *(*pROMData + i);
+*pchecksum = ~*pchecksum;
+*psize = bytes_written;
+*defines_found = (3 == (define_size_found + define_filename_found + define_array_found));
+return 0;
+}
+
+int sim_make_ROMs_entry(const char *rom_filename)
+{
+FILE *rFile;
+struct stat statb;
+unsigned char *ROMData = NULL;
+unsigned int checksum = 0;
+char *c;
+int i;
+char include_filename[512];
+char array_name[512];
+
+if (NULL == (rFile = fopen (rom_filename, "rb"))) {
+    printf ("Error Opening ROM binary file '%s' for input: %s\n", rom_filename, strerror(errno));
+    return -1;
+    }
+if (stat (rom_filename, &statb)) {
+    printf ("Error stating '%s': %s\n", rom_filename, strerror(errno));
+    fclose (rFile);
+    return -1;
+    }
+ROMData = malloc (statb.st_size);
+if ((size_t)(statb.st_size) != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
+    printf ("Error reading '%s': %s\n", rom_filename, strerror(errno));
+    fclose (rFile);
+    free (ROMData);
+    return -1;
+    }
+fclose (rFile);
+for (i=0; i<statb.st_size; ++i)
+    checksum += ROMData[i];
+checksum = ~checksum;
+while ((c = strchr (rom_filename, '\\')))
+    *c = '/';
+strcpy (array_name, rom_filename);
+for (c=array_name; *c; ++c)
+    if (isupper(*c))
+        *c = tolower(*c);
+if ((c = strchr (array_name, '.')))
+    *c = '_';
+if ((c = strchr (array_name, '/')))
+    *c = '_';
+sprintf (include_filename, "%s.h", rom_filename);
+if ((c = strrchr (include_filename, '/')))
+    sprintf (c+1, "%s.h", array_name);
+else
+    sprintf (include_filename, "%s.h", array_name);
+printf ("The ROMs array entry for this new ROM image file should look something like:\n");
+printf ("{\"%s\",    \"%s\",     %d,  0x%08X, \"%s\"}\n",
+        rom_filename, include_filename, (int)(statb.st_size), checksum, array_name);
+return 1;
+}
 
 int sim_make_ROM_include(const char *rom_filename,
                          int expected_size,
@@ -63,14 +197,37 @@ FILE *rFile;
 FILE *iFile;
 time_t now;
 int bytes_written = 0;
+int include_bytes;
 int c;
 struct stat statb;
+const char *load_filename;
 unsigned char *ROMData = NULL;
+unsigned char *include_ROMData = NULL;
+char *include_array_name = NULL;
 unsigned int checksum = 0;
+unsigned int include_checksum;
+int defines_found;
 
 if (NULL == (rFile = fopen (rom_filename, "rb"))) {
-    printf ("Error Opening '%s' for input: %s\n", rom_filename, strerror(errno));
-    return -1;
+    printf ("Error Opening ROM binary file '%s' for input: %s\n", rom_filename, strerror(errno));
+    if (0 != sim_read_ROM_include(include_filename, 
+                                  &include_bytes,
+                                  &include_ROMData,
+                                  &include_checksum,
+                                  &include_array_name,
+                                  &defines_found))
+        return -1;
+    c = ((include_checksum == expected_checksum) && 
+         (include_bytes == expected_size) &&
+         (0 == strcmp(include_array_name, rom_array_name)) &&
+         defines_found);
+    free(include_ROMData);
+    free(include_array_name);
+    if (!c)
+        printf ("Existing ROM include file: %s has unexpected content\n", include_filename);
+    else
+        printf ("Existing ROM include file: %s looks good\n", include_filename);
+    return (c ? 0 : -1);
     }
 if (stat (rom_filename, &statb)) {
     printf ("Error stating '%s': %s\n", rom_filename, strerror(errno));
@@ -108,35 +265,20 @@ if ((expected_checksum != 0) && (checksum != expected_checksum)) {
  * If the target include file already exists, determine if it contains the exact
  * data in the base ROM image.  If so, then we are already done
  */
-if (NULL != (iFile = fopen (include_filename, "r"))) {
-    unsigned char *IncludeData = NULL;
-    char line[256];
-    int Difference = 0;
-
-    IncludeData = malloc (statb.st_size);
-
-    while (fgets (line, sizeof(line), iFile)) {
-        unsigned int byte;
-        char *c;
-
-        if (memcmp ("0x",line,2))
-            continue;
-        c = line;
-        while (1 == sscanf (c, "0x%2Xd,", &byte)) {
-            if (bytes_written >= statb.st_size)
-                Difference = 1;
-            else
-                IncludeData[bytes_written++] = byte;
-            c += 5;
-            }
-        if ((strchr (line,'}')) || Difference)
-            break;
-        }
-    fclose (iFile);
-    if (!Difference)
-        Difference = memcmp (IncludeData, ROMData, statb.st_size);
-    free (IncludeData);
-    if (!Difference) {
+if (0 == sim_read_ROM_include(include_filename, 
+                              &include_bytes,
+                              &include_ROMData,
+                              &include_checksum,
+                              &include_array_name,
+                              &defines_found)) {
+    c = ((include_checksum == expected_checksum) && 
+         (include_bytes == expected_size) &&
+         (0 == strcmp (include_array_name, rom_array_name)) &&
+         (0 == memcmp (include_ROMData, ROMData, include_bytes)) &&
+         defines_found);
+    free(include_ROMData);
+    free(include_array_name);
+    if (c) {
         free (ROMData);
         return 0;
         }
@@ -146,6 +288,11 @@ if (NULL == (iFile = fopen (include_filename, "w"))) {
     printf ("Error Opening '%s' for output: %s\n", include_filename, strerror(errno));
     return -1;
     }
+load_filename = strrchr (rom_filename, '/');
+if (load_filename)
+    ++load_filename;
+else
+    load_filename = rom_filename;
 time (&now);
 fprintf (iFile, "#ifndef ROM_%s_H\n", rom_array_name);
 fprintf (iFile, "#define ROM_%s_H 0\n", rom_array_name);
@@ -153,7 +300,11 @@ fprintf (iFile, "/*\n");
 fprintf (iFile, "   %s         produced at %s", include_filename, ctime(&now));
 fprintf (iFile, "   from %s which was last modified at %s", rom_filename, ctime(&statb.st_mtime));
 fprintf (iFile, "   file size: %d (0x%X) - checksum: 0x%08X\n", (int)statb.st_size, (int)statb.st_size, checksum);
+fprintf (iFile, "   This file is a generated file and should NOT be edited or changed by hand.\n");
 fprintf (iFile, "*/\n");
+fprintf (iFile, "#define BOOT_CODE_SIZE 0x%X\n", (int)statb.st_size);
+fprintf (iFile, "#define BOOT_CODE_FILENAME \"%s\"\n", load_filename);
+fprintf (iFile, "#define BOOT_CODE_ARRAY %s\n", rom_array_name);
 fprintf (iFile, "unsigned char %s[] = {", rom_array_name);
 for (bytes_written=0;bytes_written<statb.st_size; ++bytes_written) {
     c = ROMData[bytes_written];
@@ -175,11 +326,63 @@ if (1) { /* Set Modification Time on the include file to be the modification tim
 return 0;
 }
 
+void
+Usage(void)
+{
+size_t i;
+
+printf ("sim_BuildROMs Usage:\n");
+printf ("sim_BuildROMs\n");
+printf ("                  invoked with no arguments will verify and/or produce all\n");
+printf ("                  known ROM include files\n");
+printf ("sim_BuildROMs -checksum ROM-File-name\n");
+printf ("                  computes the checksum on a ROM image file and provides a\n");
+printf ("                  template which can be added to the ROMs array in the\n");
+printf ("                  source file sim_BuildROMs.c\n");
+printf ("sim_BuildROMs ROM-File-name\n");
+printf ("                  if the 'ROM-File-name' specified is a file name already\n");
+printf ("                  contained in the ROMs array, only that ROM image file's\n");
+printf ("                  include file will be verified and/or created\n");
+printf ("                  if the 'ROM-File-name' specified is not a file name already\n");
+printf ("                  contained in the ROMs array, that ROM's checksum is computed\n");
+printf ("                  and a template which can be added to the ROMs array in the\n");
+printf ("                  source file sim_BuildROMs.c is displayed.\n");
+printf ("\n");
+printf ("Current ROM files:\n");
+printf ("\n");
+printf ("BinaryName:      IncludeFileName:          Size:   Checksum:  ROM Array Name:\n");
+printf ("=============================================================================\n");
+for (i=0; i<sizeof(ROMs)/sizeof(ROMs[0]); ++i)
+    printf("%-17s%-23s%8d  0x%08X  %s\n", ROMs[i].BinaryName, ROMs[i].IncludeFileName, (int)ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].ArrayName);
+exit(2);
+}
+
 int
 main(int argc, char **argv)
 {
+size_t i;
 int status = 0;
-status += sim_make_ROM_include ("VAX/ka655x.bin",  131072, 0xFF7673B6, "VAX/vax_ka655x_bin.h", "vax_ka655x_bin");
-status += sim_make_ROM_include ("VAX/vmb.exe",      44544, 0xFFC014CC, "VAX/vax780_vmb_exe.h", "vax780_vmb_exe");
+
+if (argc == 1) {  /* invoked without any arguments */
+    for (i=0; i<sizeof(ROMs)/sizeof(ROMs[0]); ++i)
+        status += sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName);
+    exit((status == 0) ? 0 : 2);
+    }
+if ((0 == strcmp(argv[1], "/?")) ||
+    (0 == strcmp(argv[1], "-?")) ||
+    (0 == strcmp(argv[1], "/help")) ||
+    (0 == strcmp(argv[1], "-help")))
+    Usage();
+if ((0 == strcmp(argv[1], "-checksum")) && (argc > 2))
+    status = sim_make_ROMs_entry (argv[2]);
+else {
+    for (i=0; i<sizeof(ROMs)/sizeof(ROMs[0]); ++i)
+        if (0 == strcmp(argv[1], ROMs[i].BinaryName))
+            break;
+    if (i == sizeof(ROMs)/sizeof(ROMs[0]))
+        status = sim_make_ROMs_entry (argv[1]);
+    else
+        status = sim_make_ROM_include (ROMs[i].BinaryName, ROMs[i].expected_size, ROMs[i].checksum, ROMs[i].IncludeFileName, ROMs[i].ArrayName);
+    }
 exit((status == 0) ? 0 : 2);
 }

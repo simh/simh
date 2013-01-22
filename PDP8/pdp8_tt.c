@@ -42,10 +42,11 @@
 */
 
 #include "pdp8_defs.h"
+#include "sim_tmxr.h"
 #include <ctype.h>
 
 extern int32 int_req, int_enable, dev_done, stop_inst;
-extern int32 tmxr_poll, sim_is_running;
+extern int32 tmxr_poll;
 
 int32 tti (int32 IR, int32 AC);
 int32 tto (int32 IR, int32 AC);
@@ -176,8 +177,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -193,6 +193,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;
 dev_done = dev_done & ~INT_TTI;                         /* clear done, int */
 int_req = int_req & ~INT_TTI;

@@ -26,6 +26,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Check for required build dependencies &amp; git commit id"
+				CommandLine="if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;SET GIT_COMMIT_ID=&#x0D;&#x0A;if not exist ..\.git-commit-id goto _NoId&#x0D;&#x0A;for /F %%i in (..\.git-commit-id) do SET GIT_COMMIT_ID=%%i&#x0D;&#x0A;:_NoId&#x0D;&#x0A;SET OLD_GIT_COMMIT_ID=&#x0D;&#x0A;if not exist .git-commit-id.h echo.&gt;.git-commit-id.h&#x0D;&#x0A;for /F &quot;tokens=3&quot; %%i in (.git-commit-id.h) do SET OLD_GIT_COMMIT_ID=%%i&#x0D;&#x0A;if &quot;%GIT_COMMIT_ID%&quot; equ &quot;%OLD_GIT_COMMIT_ID%&quot; goto _IdGood&#x0D;&#x0A;echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% &gt;.git-commit-id.h&#x0D;&#x0A;:_IdGood&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -43,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -105,6 +107,8 @@
 			>
 			<Tool
 				Name="VCPreBuildEventTool"
+				Description="Check for required build dependencies &amp; git commit id"
+				CommandLine="if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice&#x0D;&#x0A;if not exist ../../windows-build/pthreads/pthread.h goto _notice&#x0D;&#x0A;goto _good&#x0D;&#x0A;&#x0D;&#x0A;:_notice&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo **  The required build support is not available.  **&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;echo ****************************************************&#x0D;&#x0A;type 0ReadMe_Projects.txt&#x0D;&#x0A;exit 1&#x0D;&#x0A;&#x0D;&#x0A;:_good&#x0D;&#x0A;SET GIT_COMMIT_ID=&#x0D;&#x0A;if not exist ..\.git-commit-id goto _NoId&#x0D;&#x0A;for /F %%i in (..\.git-commit-id) do SET GIT_COMMIT_ID=%%i&#x0D;&#x0A;:_NoId&#x0D;&#x0A;SET OLD_GIT_COMMIT_ID=&#x0D;&#x0A;if not exist .git-commit-id.h echo.&gt;.git-commit-id.h&#x0D;&#x0A;for /F &quot;tokens=3&quot; %%i in (.git-commit-id.h) do SET OLD_GIT_COMMIT_ID=%%i&#x0D;&#x0A;if &quot;%GIT_COMMIT_ID%&quot; equ &quot;%OLD_GIT_COMMIT_ID%&quot; goto _IdGood&#x0D;&#x0A;echo #define SIM_GIT_COMMIT_ID %GIT_COMMIT_ID% &gt;.git-commit-id.h&#x0D;&#x0A;:_IdGood&#x0D;&#x0A;"
 			/>
 			<Tool
 				Name="VCCustomBuildTool"
@@ -124,7 +128,7 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -211,11 +215,19 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_disk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\sim_ether.c"
 				>
 			</File>
 			<File
 				RelativePath="..\sim_fio.c"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_serial.c"
 				>
 			</File>
 			<File
@@ -256,6 +268,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_disk.h"
+				>
+			</File>
+			<File
 				RelativePath="..\sim_ether.h"
 				>
 			</File>
@@ -265,6 +281,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_rev.h"
+				>
+			</File>
+			<File
+				RelativePath="..\sim_serial.h"
 				>
 			</File>
 			<File

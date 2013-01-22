@@ -39,6 +39,7 @@
 */
 
 #include "gri_defs.h"
+#include "sim_tmxr.h"
 #include <ctype.h>
 
 uint32 hsr_stopioe = 1, hsp_stopioe = 1;
@@ -277,6 +278,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;                                       /* clear buffer */
 dev_done = dev_done & ~INT_TTI;                         /* clear ready */
 sim_activate (&tti_unit, tti_unit.wait);                /* activate unit */

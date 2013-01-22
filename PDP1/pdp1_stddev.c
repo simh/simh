@@ -51,6 +51,7 @@
 */
 
 #include "pdp1_defs.h"
+#include "sim_tmxr.h"
 
 #define FIODEC_STOP     013                             /* stop code */
 #define FIODEC_UC       074
@@ -624,6 +625,7 @@ return SCPE_OK;
 
 t_stat tty_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tty_buf = 0;                                            /* clear buffer */
 tty_uc = 0;                                             /* clear case */
 tti_hold = 0;                                           /* clear hold buf */

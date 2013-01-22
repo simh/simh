@@ -36,9 +36,11 @@
 
 #include "vax_defs.h"
 
-#ifndef DONT_USE_INTERNAL_ROM
-#include "vax780_vmb_exe.h"
-#endif
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_FILENAME "vmb.exe"
+#else /* !DONT_USE_INTERNAL_ROM */
+#include "vax_vmb_exe.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
 
 /* 11/780 specific IPRs */
 
@@ -106,7 +108,8 @@ uint32 sbi_sc = 0;                                      /* SBI silo comparator *
 uint32 sbi_mt = 0;                                      /* SBI maintenance */
 uint32 sbi_er = 0;                                      /* SBI error status */
 uint32 sbi_tmo = 0;                                     /* SBI timeout addr */
-char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
+int32 sys_model = 0;                                    /* 780 or 785 */
+static char cpu_boot_cmd[CBUFSIZE]  = { 0 };            /* boot command */
 
 static t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 static t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -133,10 +136,6 @@ extern int32 crd_err, mem_err, hlt_pin;
 extern int32 tmr_int, tti_int, tto_int;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
-extern CTAB *sim_vm_cmd;
 
 t_stat sbi_reset (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
@@ -203,7 +202,7 @@ DEVICE sbi_dev = {
 
 CTAB vax780_cmd[] = {
     { "BOOT", &vax780_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n" },
+      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
     { "FLOAD", &vax780_fload, 0,
       "fl{oad} <file> {<start>} load file from console floppy\n" },
     { NULL }
@@ -387,7 +386,10 @@ switch (rg) {
         break;
 
     case MT_SID:                                        /* SID */
-        val = VAX780_SID | VAX780_ECO | VAX780_PLANT | VAX780_SN;
+        if (sys_model)
+            val = VAX780_SID | VAX785_TYP | VAX780_ECO | VAX780_PLANT | VAX780_SN;
+        else
+            val = VAX780_SID | VAX780_TYP | VAX780_ECO | VAX780_PLANT | VAX780_SN;
         break;
 
     default:
@@ -666,8 +668,16 @@ if ((strncmp (regptr, "/R5:", 4) == 0) ||
     if (r != SCPE_OK)
         return r;
     }
-else if (*regptr != 0)
-    return SCPE_ARG;
+else 
+    if (*regptr == '/') {
+        r5v = (int32) get_uint (regptr + 1, 16, LMASK, &r);
+        if (r != SCPE_OK)
+            return r;
+        }
+    else {
+        if (*regptr != 0)
+            return SCPE_ARG;
+        }
 for (i = 0; boot_tab[i].name != NULL; i++) {
     if (strcmp (dptr->name, boot_tab[i].name) == 0) {
         R[0] = boot_tab[i].code;
@@ -694,30 +704,9 @@ t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
 t_stat r;
 
-printf ("Loading boot code from vmb.exe\n");
-if (sim_log)
-    fprintf (sim_log, "Loading boot code from vmb.exe\n");
-r = load_cmd (0, "-O vmb.exe 200");
-if (r != SCPE_OK) {
-#ifndef DONT_USE_INTERNAL_ROM
-    FILE *f;
-
-    if ((f = sim_fopen ("vmb.exe", "wb"))) {
-        printf ("Saving boot code to vmb.exe\n");
-        if (sim_log)
-            fprintf (sim_log, "Saving boot code to vmb.exe\n");
-        sim_fwrite (vax780_vmb_exe, sizeof(vax780_vmb_exe[0]), sizeof(vax780_vmb_exe)/sizeof(vax780_vmb_exe[0]), f);
-        fclose (f);
-        printf ("Loading boot code from vmb.exe\n");
-        if (sim_log)
-            fprintf (sim_log, "Loading boot code from vmb.exe\n");
-        r = load_cmd (0, "-O vmb.exe 200");
-        if (r == SCPE_OK)
-            SP = PC = 512;
-        }
-#endif
+r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, FALSE, 0x200);
+if (r != SCPE_OK)
     return r;
-    }
 SP = PC = 512;
 return SCPE_OK;
 }
@@ -823,5 +812,40 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru dev */
             }                                           /* end else */
         }                                               /* end if enabled */
     }                                                   /* end for */
+return SCPE_OK;
+}
+
+t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr == NULL) return SCPE_ARG;
+if (strcmp(cptr, "780") == 0)
+   sys_model = 0;
+else if (strcmp(cptr, "785") == 0)
+   sys_model = 1;
+else
+   return SCPE_ARG;
+return SCPE_OK;
+}
+
+t_stat cpu_print_model (FILE *st)
+{
+fprintf (st, "VAX 11/%s", (sys_model ? "785" : "780"));
+return SCPE_OK;
+}
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Initial memory size is 8MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BO{OT} <device>{/R5:flags}\n\n");
+fprintf (st, "where <device> is one of:\n\n");
+fprintf (st, "   RPn        to boot from rpn\n");
+fprintf (st, "   HKn        to boot from hkn\n");
+fprintf (st, "   RLn        to boot from rln\n");
+fprintf (st, "   RQn        to boot from rqn\n");
+fprintf (st, "   RQBn       to boot from rqbn\n");
+fprintf (st, "   RQCn       to boot from rqcn\n");
+fprintf (st, "   RQDn       to boot from rqdn\n");
+fprintf (st, "   TQn        to boot from tqn\n\n");
 return SCPE_OK;
 }

@@ -276,12 +276,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
 
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
-
 t_bool devtab_init (void);
 int32 dmaio (int32 inst, int32 fnc, int32 dat, int32 dev);
 int32 undio (int32 inst, int32 fnc, int32 dat, int32 dev);
@@ -295,9 +289,6 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_dma (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_nchan (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_nchan (FILE *st, UNIT *uptr, int32 val, void *desc);
-
-extern t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 /* CPU data structures
 
@@ -1592,8 +1583,6 @@ char *cptr = (char *) desc;
 t_value sim_eval;
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 static uint8 has_opnd[16] = {
     0, 0, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1
     };

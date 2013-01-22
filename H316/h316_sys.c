@@ -43,7 +43,6 @@ extern DEVICE fhd_dev;
 extern DEVICE mt_dev;
 extern REG cpu_reg[];
 extern uint16 M[];
-extern int32 sim_switches;
 
 /* SCP data structures and interface routines
 

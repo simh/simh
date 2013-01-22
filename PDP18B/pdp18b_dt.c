@@ -327,9 +327,6 @@
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern int32 sim_is_running;
-extern FILE *sim_deb;
 
 int32 dtsa = 0;                                         /* status A */
 int32 dtsb = 0;                                         /* status B */

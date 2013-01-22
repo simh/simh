@@ -274,8 +274,6 @@
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern FILE *sim_deb;
 
 int32 tcst = 0;                                         /* status */
 int32 tccm = 0;                                         /* command */
@@ -308,7 +306,6 @@ void dt_stopunit (UNIT *uptr);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
-extern int32 sim_is_running;
 
 /* DT data structures
 
@@ -318,9 +315,11 @@ extern int32 sim_is_running;
    dt_mod       DT modifier list
 */
 
+#define IOLN_TC         012
+
 DIB dt_dib = {
-    IOBA_TC, IOLN_TC, &dt_rd, &dt_wr,
-    1, IVCL (DTA), VEC_DTA, { NULL }
+    IOBA_AUTO, IOLN_TC, &dt_rd, &dt_wr,
+    1, IVCL (DTA), VEC_AUTO, { NULL }
     };
 
 UNIT dt_unit[] = {
@@ -749,7 +748,7 @@ t_bool dt_setpos (UNIT *uptr)
 {
 uint32 new_time, ut, ulin, udelt;
 int32 mot = DTS_GETMOT (uptr->STATE);
-int32 unum, delta;
+int32 unum, delta = 0;
 
 new_time = sim_grtime ();                               /* current time */
 ut = new_time - uptr->LASTT;                            /* elapsed time */
@@ -1130,7 +1129,7 @@ for (i = 0; i < DT_NUMDR; i++) {                        /* stop all activity */
 tcst =  tcwc = tcba = tcdt = 0;                         /* clear reg */
 tccm = CSR_DONE;
 CLR_INT (DTA);                                          /* clear int req */
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Device bootstrap */
@@ -1183,7 +1182,7 @@ static const uint16 boot_rom[] = {
 
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 
 dt_unit[unitno].pos = DT_EZLIN;

@@ -108,7 +108,7 @@ DEVICE tti1_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &tti1_reset,
     NULL, &tti1_attach, &tti1_detach,
-    &tti1_dib, DEV_NET | DEV_DISABLE
+    &tti1_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* TTO1 data structures
@@ -148,7 +148,7 @@ DEVICE tto1_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &tto1_reset,
     NULL, NULL, NULL,
-    &tto1_dib, DEV_DISABLE
+    &tto1_dib, DEV_DISABLE | DEV_MUX
     };
 
 /* Terminal input: IOT routine */

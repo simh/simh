@@ -31,8 +31,6 @@
 
 t_uint64 *rom = NULL;                                   /* boot ROM */
 
-extern DEVICE *sim_devices[];
-
 t_bool rom_rd (t_uint64 pa, t_uint64 *val, uint32 lnt);
 t_bool rom_wr (t_uint64 pa, t_uint64 val, uint32 lnt);
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);

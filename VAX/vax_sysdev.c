@@ -54,12 +54,25 @@
 
 #include "vax_defs.h"
 
-#ifndef DONT_USE_INTERNAL_ROM
-#include "vax_ka655x_bin.h"
-#endif
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_FILENAME "ka655x.bin"
+#else /* !DONT_USE_INTERNAL_ROM */
+#include "vax_ka655x_bin.h" /* Defines BOOT_CODE_FILENAME and BOOT_CODE_ARRAY, etc */
+#endif /* DONT_USE_INTERNAL_ROM */
 
 #define UNIT_V_NODELAY  (UNIT_V_UF + 0)                 /* ROM access equal to RAM access */
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
+
+t_stat vax_boot (int32 flag, char *ptr);
+int32 sys_model = 0;
+
+/* Special boot command, overrides regular boot */
+
+CTAB vax_cmd[] = {
+    { "BOOT", &vax_boot, RU_BOOT,
+      "bo{ot}                   boot simulator\n", &run_cmd_message },
+    { NULL }
+    };
 
 /* Console storage control/status */
 
@@ -190,7 +203,6 @@ extern UNIT cpu_unit;
 extern UNIT clk_unit;
 extern jmp_buf save_env;
 extern int32 p1;
-extern int32 sim_switches;
 extern int32 MSER;
 extern int32 tmr_poll;
 
@@ -343,13 +355,14 @@ DIB csi_dib = { 0, 0, NULL, NULL, 1, IVCL (CSI), SCB_CSI, { NULL } };
 UNIT csi_unit = { UDATA (NULL, 0, 0), KBD_POLL_WAIT };
 
 REG csi_reg[] = {
-    { ORDATA (BUF, csi_unit.buf, 8) },
-    { ORDATA (CSR, csi_csr, 16) },
-    { FLDATA (INT, int_req[IPL_CSI], INT_V_CSI) },
-    { FLDATA (DONE, csi_csr, CSR_V_DONE) },
-    { FLDATA (IE, csi_csr, CSR_V_IE) },
-    { DRDATA (POS, csi_unit.pos, 32), PV_LEFT },
-    { DRDATA (TIME, csi_unit.wait, 24), REG_NZ + PV_LEFT },
+    { ORDATAD (BUF,  csi_unit.buf,             8, "last data item processed") },
+    { ORDATAD (CSR,  csi_csr,                 16, "control/status register") },
+    { FLDATAD (INT,  int_req[IPL_CSI], INT_V_CSI, "interrupt pending flag") },
+    { FLDATAD (DONE, csi_csr,         CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (ERR,  csi_csr,          CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (IE,   csi_csr,           CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,  csi_unit.pos,            32, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME, csi_unit.wait,           24, "input polling interval"), REG_NZ + PV_LEFT },
     { NULL }
     };
 
@@ -378,13 +391,14 @@ DIB cso_dib = { 0, 0, NULL, NULL, 1, IVCL (CSO), SCB_CSO, { NULL } };
 UNIT cso_unit = { UDATA (&cso_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT };
 
 REG cso_reg[] = {
-    { ORDATA (BUF, cso_unit.buf, 8) },
-    { ORDATA (CSR, cso_csr, 16) },
-    { FLDATA (INT, int_req[IPL_CSO], INT_V_CSO) },
-    { FLDATA (DONE, cso_csr, CSR_V_DONE) },
-    { FLDATA (IE, cso_csr, CSR_V_IE) },
-    { DRDATA (POS, cso_unit.pos, 32), PV_LEFT },
-    { DRDATA (TIME, cso_unit.wait, 24), PV_LEFT },
+    { ORDATAD (BUF,     cso_unit.buf,          8, "last data item processed") },
+    { ORDATAD (CSR,          cso_csr,         16, "control/status register") },
+    { FLDATAD (INT, int_req[IPL_CSO],  INT_V_CSO, "interrupt pending flag") },
+    { FLDATAD (ERR,          cso_csr,  CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (DONE,         cso_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE,           cso_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,     cso_unit.pos,         32, "number of characters output"), PV_LEFT },
+    { DRDATAD (TIME,   cso_unit.wait,         24, "time from I/O initiation to interrupt"), PV_LEFT },
     { NULL }
     };
 
@@ -419,34 +433,34 @@ UNIT sysd_unit[] = {
     };
 
 REG sysd_reg[] = {
-    { HRDATA (CADR, CADR, 8) },
-    { HRDATA (MSER, MSER, 8) },
-    { HRDATA (CONPC, conpc, 32) },
-    { HRDATA (CONPSL, conpsl, 32) },
-    { BRDATA (CMCSR, cmctl_reg, 16, 32, CMCTLSIZE >> 2) },
-    { HRDATA (CACR, ka_cacr, 8) },
-    { HRDATA (BDR, ka_bdr, 8) },
-    { HRDATA (BASE, ssc_base, 29) },
-    { HRDATA (CNF, ssc_cnf, 32) },
-    { HRDATA (BTO, ssc_bto, 32) },
-    { HRDATA (OTP, ssc_otp, 4) },
-    { HRDATA (TCSR0, tmr_csr[0], 32) },
-    { HRDATA (TIR0, tmr_tir[0], 32) },
-    { HRDATA (TNIR0, tmr_tnir[0], 32) },
-    { HRDATA (TIVEC0, tmr_tivr[0], 9) },
-    { HRDATA (TINC0, tmr_inc[0], 32) },
-    { HRDATA (TSAV0, tmr_sav[0], 32) },
-    { HRDATA (TCSR1, tmr_csr[1], 32) },
-    { HRDATA (TIR1, tmr_tir[1], 32) },
-    { HRDATA (TNIR1, tmr_tnir[1], 32) },
-    { HRDATA (TIVEC1, tmr_tivr[1], 9) },
-    { HRDATA (TINC1, tmr_inc[1], 32) },
-    { HRDATA (TSAV1, tmr_sav[1], 32) },
-    { HRDATA (ADSM0, ssc_adsm[0], 32) },
-    { HRDATA (ADSK0, ssc_adsk[0], 32) },
-    { HRDATA (ADSM1, ssc_adsm[1], 32) },
-    { HRDATA (ADSK1, ssc_adsk[1], 32) },
-    { BRDATA (CDGDAT, cdg_dat, 16, 32, CDASIZE >> 2) },
+    { HRDATAD (CADR,   CADR,         8, "cache disable register") },
+    { HRDATAD (MSER,   MSER,         8, "memory system error register") },
+    { HRDATAD (CONPC,  conpc,       32, "PC at console halt") },
+    { HRDATAD (CONPSL, conpsl,      32, "PSL at console halt") },
+    { BRDATAD (CMCSR,  cmctl_reg, 16, 32, CMCTLSIZE >> 2, "CMCTL control and status registers") },
+    { HRDATAD (CACR,   ka_cacr,      8, "second-level cache control register") },
+    { HRDATAD (BDR,    ka_bdr,       8, "front panel jumper register") },
+    { HRDATAD (BASE,   ssc_base,    29, "SSC base address register") },
+    { HRDATAD (CNF,    ssc_cnf,     32, "SSC configuration register") },
+    { HRDATAD (BTO,    ssc_bto,     32, "SSC bus timeout register") },
+    { HRDATAD (OTP,    ssc_otp,      4, "SSC output port") },
+    { HRDATAD (TCSR0,  tmr_csr[0],  32, "SSC timer 0 control/status register") },
+    { HRDATAD (TIR0,   tmr_tir[0],  32, "SSC timer 0 interval register") },
+    { HRDATAD (TNIR0,  tmr_tnir[0], 32, "SSC timer 0 next interval register") },
+    { HRDATAD (TIVEC0, tmr_tivr[0],  9, "SSC timer 0 interrupt vector register") },
+    { HRDATAD (TINC0,  tmr_inc[0],  32, "SSC timer 0 tir increment") },
+    { HRDATAD (TSAV0,  tmr_sav[0],  32, "SSC timer 0 saved inst cnt") },
+    { HRDATAD (TCSR1,  tmr_csr[1],  32, "SSC timer 1 control/status register") },
+    { HRDATAD (TIR1,   tmr_tir[1],  32, "SSC timer 1 interval register") },
+    { HRDATAD (TNIR1,  tmr_tnir[1], 32, "SSC timer 1 next interval register") },
+    { HRDATAD (TIVEC1, tmr_tivr[1],  9, "SSC timer 1 interrupt vector register") },
+    { HRDATAD (TINC1,  tmr_inc[1],  32, "SSC timer 1 tir increment") },
+    { HRDATAD (TSAV1,  tmr_sav[1],  32, "SSC timer 1  saved inst cnt") },
+    { HRDATAD (ADSM0,  ssc_adsm[0], 32, "SSC address match 0 address") },
+    { HRDATAD (ADSK0,  ssc_adsk[0], 32, "SSC address match 0 mask") },
+    { HRDATAD (ADSM1,  ssc_adsm[1], 32, "SSC address match 1 address") },
+    { HRDATAD (ADSK1,  ssc_adsk[1], 32, "SSC address match 1 mask") },
+    { BRDATAD (CDGDAT, cdg_dat, 16, 32, CDASIZE >> 2, "cache diagnostic data store") },
     { NULL }
     };
 
@@ -1450,7 +1464,7 @@ return;
 
 void tmr_sched (int32 tmr)
 {
-int32 clk_time = sim_is_active (&clk_unit) - 1;
+int32 clk_time = sim_activate_time (&clk_unit) - 1;
 int32 tmr_time;
 
 tmr_sav[tmr] = sim_grtime ();                           /* save intvl base */
@@ -1541,12 +1555,27 @@ JUMP (ROMBASE);                                         /* PC = 20040000 */
 return 0;                                               /* new cc = 0 */
 }
 
+/* Special boot command - linked into SCP by initial reset
+
+   Syntax: BOOT {CPU}
+
+*/
+
+t_stat vax_boot (int32 flag, char *ptr)
+{
+char gbuf[CBUFSIZE];
+
+get_glyph (ptr, gbuf, 0);                           /* get glyph */
+if (gbuf[0] && strcmp (gbuf, "CPU"))
+    return SCPE_ARG;                                /* Only can specify CPU device */
+return run_cmd (flag, "CPU");
+}
+
+
 /* Bootstrap */
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-extern t_stat load_cmd (int32 flag, char *cptr);
-extern FILE *sim_log;
 t_stat r;
 
 PC = ROMBASE;
@@ -1556,30 +1585,17 @@ conpsl = PSL_IS | PSL_IPL1F | CON_PWRUP;
 if (rom == NULL)
     return SCPE_IERR;
 if (*rom == 0) {                                        /* no boot? */
-    printf ("Loading boot code from ka655x.bin\n");
-    if (sim_log)
-        fprintf (sim_log, "Loading boot code from ka655x.bin\n");
-    r = load_cmd (0, "-R ka655x.bin");
-    if (r != SCPE_OK) {
-#ifndef DONT_USE_INTERNAL_ROM
-        FILE *f;
-
-        if ((f = sim_fopen ("ka655x.bin", "wb"))) {
-            printf ("Saving boot code to ka655x.bin\n");
-            if (sim_log)
-                fprintf (sim_log, "Saving boot code to ka655x.bin\n");
-            sim_fwrite (vax_ka655x_bin, sizeof(vax_ka655x_bin[0]), sizeof(vax_ka655x_bin)/sizeof(vax_ka655x_bin[0]), f);
-            fclose (f);
-            printf ("Loading boot code from ka655x.bin\n");
-            if (sim_log)
-                fprintf (sim_log, "Loading boot code from ka655x.bin\n");
-            r = load_cmd (0, "-R ka655x.bin");
-            }
-#endif
+    r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
+    if (r != SCPE_OK)
         return r;
-        }
     }
 sysd_powerup ();
+return SCPE_OK;
+}
+
+t_stat cpu_print_model (FILE *st)
+{
+fprintf (st, "VAX 3900");
 return SCPE_OK;
 }
 
@@ -1603,6 +1619,7 @@ cso_csr = CSR_DONE;
 cso_unit.buf = 0;
 sim_cancel (&cso_unit);
 CLR_INT (CSO);
+sim_vm_cmd = vax_cmd;
 return SCPE_OK;
 }
 
@@ -1623,5 +1640,35 @@ ssc_base = SSCBASE;
 ssc_cnf = ssc_cnf & SSCCNF_BLO;
 ssc_bto = 0;
 ssc_otp = 0;
+return SCPE_OK;
+}
+
+
+t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Notes on memory size:\n\n");
+fprintf (st, "- The real KA655 CPU only supported 16MB to 64MB of memory.  The simulator\n");
+fprintf (st, "  implements a KA655\"X\", which increases supported memory to 512MB.\n");
+fprintf (st, "- The firmware (ka655x.bin) contains code to determine the size of extended\n");
+fprintf (st, "  memory and set up the PFN bit map accordingly.  Other than setting up the\n");
+fprintf (st, "  PFN bit map, the firmware does not recognize extended memory and will\n");
+fprintf (st, "  behave as though memory size was 64MB.\n");
+fprintf (st, "- If memory size is being reduced, and the memory being truncated contains\n");
+fprintf (st, "  non-zero data, the simulator asks for confirmation.  Data in the truncated\n");
+fprintf (st, "  portion of memory is lost.\n");
+fprintf (st, "- If the simulator is running VMS, the operating system may have a SYSGEN\n");
+fprintf (st, "  parameter set called PHYSICAL PAGES (viewable with\n");
+fprintf (st, "  \"MCR SYSGEN SHOW PHYSICALPAGES\").  PHYSICALPAGES limits the maximum\n");
+fprintf (st, "  number of physical pages of memory the OS will recognize.  If it is set\n");
+fprintf (st, "  to a lower value than the new memory size of the machine, then only the\n");
+fprintf (st, "  first PHYSICALPAGES of memory will be recognized, otherwise the actual size\n");
+fprintf (st, "  of the extended memory will be realized by VMS upon each boot.  Some users\n");
+fprintf (st, "  and/or sites may specify the PHYSICALPAGES parameter in the input file to\n");
+fprintf (st, "  AUTOGEN (SYS$SYSTEM:MODPARAMS.DAT).  If PHYSICALPAGES is specified there,\n");
+fprintf (st, "  it will have to be adjusted before running AUTOGEN to recognize more memory.\n");
+fprintf (st, "  The default value for PHYSICALPAGES is 1048576, which describes 512MB of RAM.\n\n");
+fprintf (st, "Initial memory size is 16MB.\n\n");
+fprintf (st, "The simulator is booted with the BOOT command:\n\n");
+fprintf (st, "   sim> BOOT\n\n");
 return SCPE_OK;
 }

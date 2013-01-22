@@ -140,9 +140,11 @@ void rx_done (int32 esr_flags, int32 new_ecode);
    rx_mod       RX modifier list
 */
 
+#define IOLN_RX         004
+
 DIB rx_dib = {
-    IOBA_RX, IOLN_RX, &rx_rd, &rx_wr,
-    1, IVCL (RX), VEC_RX, { NULL }
+    IOBA_AUTO, IOLN_RX, &rx_rd, &rx_wr,
+    1, IVCL (RX), VEC_AUTO, { NULL }
     };
 
 UNIT rx_unit[] = {
@@ -200,7 +202,7 @@ DEVICE rx_dev = {
     RX_NUMDR, 8, 20, 1, 8, 8,
     NULL, NULL, &rx_reset,
     &rx_boot, NULL, NULL,
-    &rx_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &rx_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -522,7 +524,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rx_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

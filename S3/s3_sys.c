@@ -44,9 +44,9 @@ extern REG cpu_reg[];
 extern unsigned char M[];
 extern int32 saved_PC, IAR[];
 extern unsigned char ebcdic_to_ascii[];
-char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype);
+char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype);
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
+int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw);
 
 /* SCP data structures
@@ -225,7 +225,7 @@ char regname[15][8] =  {    "(P2IAR)",
    load starts at the current value of the P1IAR.
 */
 
-int32 sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
+t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, addr = 0, cnt = 0;
 
@@ -252,7 +252,7 @@ return (SCPE_OK);
         status  =       error code
 */
 
-int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
+t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
     int32 r;
@@ -267,16 +267,15 @@ int32 fprint_sym (FILE *of, int32 addr, uint32 *val,
     return (r);
 }
 
-int32 printf_sym (FILE *of, char *strg, int32 addr, uint32 *val,
+int32 printf_sym (FILE *of, char *strg, t_addr addr, uint32 *val,
     UNIT *uptr, int32 sw)
 {
-int32 cflag, c1, c2, group, len1, len2, inst, aaddr, baddr;
+int32 c1, c2, group, len1, len2, inst, aaddr, baddr;
 int32 oplen, groupno, i, j, vpos, qbyte, da, m, n;
 char bld[128], bldaddr[32], boperand[32], aoperand[32];
 int32 blk[16], blt[16];
 int32 blkadd;
 
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
 c1 = val[0] & 0xff;
 if (sw & SWMASK ('A')) {
     for (i = 0; i < 16; i++) {
@@ -502,7 +501,7 @@ return -(oplen - 1);
         status  =       error status
 */
 
-int32 parse_sym (char *cptr, int32 addr, UNIT *uptr, uint32 *val, int32 sw)
+t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val, int32 sw)
 {
 int32 cflag, i = 0, j, r, oplen, addtyp, saveaddr, vptr;
 char gbuf[CBUFSIZE];
@@ -924,7 +923,7 @@ switch (opcode[j].form) {                               /* Get operands based on
 return (-(oplen-1));
 }
 
-char *parse_addr(char *cptr,  char *gbuf, int32 *addr, int32 *addrtype)
+char *parse_addr(char *cptr,  char *gbuf, t_addr *addr, int32 *addrtype)
 {
 int32 nybble = 0;
 char temp[32];

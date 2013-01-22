@@ -86,7 +86,7 @@ int clock_gettime(int clock_id, struct timespec *tp);
 
 t_bool sim_timer_init (void);
 void sim_timespec_diff (struct timespec *diff, struct timespec *min, struct timespec *sub);
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_CLOCKS)
 double sim_timenow_double (void);
 #endif
 int32 sim_rtcn_init (int32 time, int32 tmr);
@@ -95,7 +95,7 @@ int32 sim_rtcn_calb (int32 ticksper, int32 tmr);
 int32 sim_rtc_init (int32 time);
 int32 sim_rtc_calb (int32 ticksper);
 t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* desc);
-t_bool sim_idle (int32 tmr, t_bool sin_cyc);
+t_bool sim_idle (uint32 tmr, t_bool sin_cyc);
 t_stat sim_set_throt (int32 arg, char *cptr);
 t_stat sim_show_throt (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char *cptr);
 t_stat sim_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);

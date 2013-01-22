@@ -112,7 +112,6 @@ typedef struct tag_os_map {					/* os_map = overstrike mapping */
 	unsigned char inlist[MAX_OS_CHARS];		/* inlist = overstruck ASCII characters, sorted. NOT NULL TERMINATED */
 } OS_MAP;
 
-extern UNIT *sim_clock_queue;
 extern int cgi;
 
 static int32 tti_dsw = 0;					/* device status words */
@@ -151,10 +150,6 @@ static char * handle_map_ansi_definition(char **pc);	/* input line parsers for m
 static char * handle_map_input_definition(char **pc);
 static char * handle_map_output_definition(char **pc);
 static char * handle_map_overstrike_definition(char **pc);
-
-extern t_stat sim_poll_kbd(void);
-extern t_stat sim_wait_kbd(void);
-extern t_stat sim_putchar(int32 out);
 
 #define UNIT_V_CSET		(UNIT_V_UF + 0)		/* user flag: character set */
 #define UNIT_V_LOCKED	(UNIT_V_UF + 2)		/* user flag: keyboard locked */
@@ -340,7 +335,7 @@ t_stat emit_conout_character (int ch)
 	return map_conout_character(ch);
 }
 
-static void Beep (void)			/* notify user keyboard was locked or key was bad */
+static void SendBeep (void)			/* notify user keyboard was locked or key was bad */
 {
 	sim_putchar(7);
 }
@@ -356,7 +351,7 @@ static t_stat tti_svc (UNIT *uptr)
 													/* otherwise, so ^E can interrupt the simulator, */
 	sim_activate(&tti_unit, tti_unit.wait);			/* always continue polling keyboard */
 
-	assert(sim_clock_queue != NULL);
+	assert(sim_clock_queue != QUEUE_LIST_END);
 
 	temp = sim_poll_kbd();
 
@@ -395,7 +390,7 @@ static t_stat tti_svc (UNIT *uptr)
 	}
 
 	if ((tti_unit.flags & KEYBOARD_LOCKED) || ! (tti_dsw & TT_DSW_KEYBOARD_BUSY)) {
-		Beep();
+		SendBeep();
 		return SCPE_OK;
 	}
 
@@ -403,7 +398,7 @@ static t_stat tti_svc (UNIT *uptr)
 		temp = ascii_to_conin[temp];
 
 	if (temp == 0)	{							/* ignore invalid characters */
-		Beep();
+		SendBeep();
 		calc_ints();
 		return SCPE_OK;
 	}

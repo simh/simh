@@ -358,7 +358,7 @@ int32 lfc_cosched (int32 wait)
 {
 int32 t;
 
-t = sim_is_active (&lfc_unit);
+t = sim_activate_time (&lfc_unit);
 return (t? t - 1: wait);
 }
 

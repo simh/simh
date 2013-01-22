@@ -210,6 +210,4 @@ typedef struct {
 t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);
 
-int32 clk_cosched (int32 wait);
-
 #endif

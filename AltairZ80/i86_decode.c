@@ -41,9 +41,7 @@ extern int32 SPX_S;     /* SP register (8086)                           */
 extern int32 IP_S;      /* IP register (8086)                           */
 extern int32 FLAGS_S;   /* flags register (8086)                        */
 extern int32 PCX_S;     /* PC register (8086), 20 bit                   */
-extern int32 sim_interval;
 extern uint32 PCX;      /* external view of PC                          */
-extern uint32 sim_brk_summ;
 extern UNIT cpu_unit;
 
 void i86_intr_raise(PC_ENV *m,uint8 intrnum);

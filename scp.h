@@ -1,6 +1,6 @@
 /* scp.h: simulator control program headers
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2009, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -59,6 +59,7 @@ t_stat exdep_cmd (int32 flag, char *ptr);
 t_stat eval_cmd (int32 flag, char *ptr);
 t_stat load_cmd (int32 flag, char *ptr);
 t_stat run_cmd (int32 flag, char *ptr);
+void run_cmd_message (const char *unechod_cmdline, t_stat r);
 t_stat attach_cmd (int32 flag, char *ptr);
 t_stat detach_cmd (int32 flag, char *ptr);
 t_stat assign_cmd (int32 flag, char *ptr);
@@ -91,8 +92,8 @@ t_stat sim_activate_notbefore (UNIT *uptr, int32 rtime);
 t_stat sim_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat _sim_activate_after (UNIT *uptr, int32 usecs_walltime);
 t_stat sim_cancel (UNIT *uptr);
-t_bool sim_is_active_bool (UNIT *uptr);
-int32 sim_is_active (UNIT *uptr);
+t_bool sim_is_active (UNIT *uptr);
+int32 sim_activate_time (UNIT *uptr);
 double sim_gtime (void);
 uint32 sim_grtime (void);
 int32 sim_qcount (void);
@@ -111,8 +112,7 @@ char *get_glyph_nc (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp);
-t_value strtotv (char *cptr, char **endptr, uint32 radix);
+t_value strtotv (const char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
 CTAB *find_cmd (char *gbuf);
 DEVICE *find_dev (char *ptr);
@@ -127,11 +127,13 @@ BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc);
 char *match_ext (char *fnam, char *ext);
+t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 const char *sim_error_text (t_stat stat);
 t_stat sim_string_to_stat (char *cptr, t_stat *cond);
 t_stat sim_cancel_step (void);
-void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
-    uint16 before, uint16 after, int terminate);
+void sim_debug_bits (uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
+    uint32 before, uint32 after, int terminate);
 #if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__DECC_VER < 60590001))
 #define CANT_USE_MACRO_VA_ARGS 1
 #endif
@@ -140,9 +142,51 @@ void sim_debug_u16 (uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
 void sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 #else
 void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
-extern FILE *sim_deb;                                   /* debug file */
 #define sim_debug(dbits, dptr, ...) if (sim_deb && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__); else (void)0
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
+
+/* Global data */
+
+extern DEVICE *sim_dflt_dev;
+extern int32 sim_interval;
+extern int32 sim_switches;
+extern int32 sim_quiet;
+extern FILE *sim_log;                                   /* log file */
+extern FILEREF *sim_log_ref;                            /* log file file reference */
+extern FILE *sim_deb;                                   /* debug file */
+extern FILEREF *sim_deb_ref;                            /* debug file file reference */
+extern UNIT *sim_clock_queue;
+extern int32 sim_is_running;
+extern volatile int32 stop_cpu;
+extern uint32 sim_brk_types;                            /* breakpoint info */
+extern uint32 sim_brk_dflt;
+extern uint32 sim_brk_summ;
+extern t_bool sim_asynch_enabled;
+
+/* VM interface */
+
+extern char sim_name[];
+extern DEVICE *sim_devices[];
+extern REG *sim_PC;
+extern const char *sim_stop_messages[];
+extern t_stat sim_instr (void);
+extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int flag);
+extern int32 sim_emax;
+extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
+    UNIT *uptr, int32 sw);
+extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
+    int32 sw);
+
+/* The per-simulator init routine is a weak global that defaults to NULL
+   The other per-simulator pointers can be overrriden by the init routine */
+
+extern void (*sim_vm_init) (void);
+extern char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream);
+extern void (*sim_vm_post) (t_bool from_scp);
+extern CTAB *sim_vm_cmd;
+extern void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr);
+extern t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr);
+
 
 #endif

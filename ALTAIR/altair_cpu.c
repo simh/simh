@@ -107,9 +107,6 @@ int32 chip = 0;                                         /* 0 = 8080 chip, 1 = z8
 
 int32 PCX;                                              /* External view of PC */
 
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ;/* breakpoint info */
-
 /* function prototypes */
 
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
@@ -300,9 +297,8 @@ DEVICE cpu_dev = {
     NULL, NULL, NULL
 };
 
-int32 sim_instr (void)
+t_stat sim_instr (void)
 {
-    extern int32 sim_interval;
     int32 PC, IR, OP, DAR, reason, hi, lo, carry, i;
 
     PC = saved_PC & ADDRMASK;                           /* load local PC */
@@ -366,7 +362,7 @@ int32 sim_instr (void)
         if ((OP & 0xCF) == 0x01) {                      /* LXI */
             DAR = M[PC] & 0x00ff;
             PC++;
-            DAR = DAR | (M[PC] <<8) & 0xFF00;;
+            DAR = DAR | ((M[PC] <<8) & 0xFF00);
             putpair((OP >> 4) & 0x03, DAR);
             PC++;
             continue;

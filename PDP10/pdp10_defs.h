@@ -624,11 +624,9 @@ typedef struct pdp_dib DIB;
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
 #define DEV_V_Q18       (DEV_V_UF + 2)                  /* Qbus, mem <= 256KB */
-#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* float addr */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
-#define DEV_FLTA        (1u << DEV_V_FLTA)
 
 #define UNIBUS          TRUE                            /* 18b only */
 
@@ -636,7 +634,7 @@ typedef struct pdp_dib DIB;
 
 /* I/O page layout */
 
-#define IOPAGEBASE      0760000                         /* I/O page base */
+#define IOPAGEBASE      (IO_UBA3 + 0760000)             /* I/O page base */
 #define IOBA_UBMAP      0763000
 
 #define IOBA_UBMAP1     (IO_UBA1 + IOBA_UBMAP)          /* Unibus 1 map */
@@ -672,6 +670,7 @@ typedef struct pdp_dib DIB;
 #define IOLN_PTR        004
 #define IOBA_PTP        (IO_UBA3 + 017554)              /* PC11 punch */
 #define IOLN_PTP        004
+#define IOBA_AUTO       0                               /* Set by Auto Configure */
 
 /* Common Unibus CSR flags */
 
@@ -697,6 +696,8 @@ typedef struct pdp_dib DIB;
 
 #define INT_V_RP        6                               /* RH11/RP,RM drives */
 #define INT_V_TU        7                               /* RH11/TM03/TU45 */
+#define INT_V_DMCRX     13
+#define INT_V_DMCTX     14
 #define INT_V_XU        15                              /* DEUNA/DELUA */
 #define INT_V_DZRX      16                              /* DZ11 */
 #define INT_V_DZTX      17
@@ -708,6 +709,8 @@ typedef struct pdp_dib DIB;
 
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TU          (1u << INT_V_TU)
+#define INT_DMCRX       (1u << INT_V_DMCRX)
+#define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_XU          (1u << INT_V_XU)
 #define INT_DZRX        (1u << INT_V_DZRX)
 #define INT_DZTX        (1u << INT_V_DZTX)
@@ -719,6 +722,8 @@ typedef struct pdp_dib DIB;
 
 #define IPL_RP          6                               /* int levels */
 #define IPL_TU          6
+#define IPL_DMCRX       5
+#define IPL_DMCTX       5
 #define IPL_XU          5
 #define IPL_DZRX        5
 #define IPL_DZTX        5
@@ -747,6 +752,7 @@ typedef struct pdp_dib DIB;
 #define VEC_DZRX        0340
 #define VEC_DZTX        0344
 #define VEC_LP20        0754
+#define VEC_AUTO        0                               /* Set by Auto Configure */
 
 #define IVCL(dv)        (INT_V_##dv)
 #define IREQ(dv)        int_req
@@ -767,8 +773,6 @@ t_stat set_vec (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_vec_mux (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat auto_config (char *name, int32 num);
-
-int32 clk_cosched (int32 wait);
 
 /* Global data */
 

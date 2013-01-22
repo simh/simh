@@ -244,7 +244,7 @@ static const int32 boot_rom[] = {
 
 t_stat drm_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 PC;
 
 if (drm_dib.dev != DEV_DRM)                             /* non-std addr? */

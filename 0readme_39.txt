@@ -34,25 +34,25 @@ components and build network capable simulators if they are available.
 
 1.1.4 PDP11 and VAX (Mark Pizzolato)
 
-        - Added DELQA-Plus device.
+        - added DELQA-Plus device
 
 1.1.5 IA64 VMS Ethernet Support
 
-        - Identified compiler version issues and added IA64 support (Matt Burke)
+        - identified compiler version issues and added IA64 support (Matt Burke)
         
-1.1.6 Visual Studio Projects (Mark Pizzolato)
 
 2. Bugs Fixed
 
 Please see the revision history on http://simh.trailing-edge.com or
 in the source module sim_rev.h.
 
+
 3. Status Report
 
-This is the last release of SimH for which I will be sole editor. After this
+This is the last release of SimH for which I will be lead editor. After this
 release, the source is moving to a public repository:
 
-
+https://github.com/markpizz/simh
 
 under the general editorship of Dave Hittner and Mark Pizzolato. The status
 of the individual simulators is as follows:
@@ -113,7 +113,7 @@ Stable and working; runs available software.
 
 3.13 IBM 1620
 
-Hand debug only.  No software for it has been found or tested.
+Hand debug only. No software for it has been found or tested.
 
 3.14 IBM 7094
 
@@ -126,7 +126,7 @@ Stable and working, but not really supported. Runs available software.
 
 3.16 IBM 1130
 
-Stable and working; runs available software.  Supported and edited by
+Stable and working; runs available software. Supported and edited by
 Brian Knittel.
 
 3.17 HP 2100/1000
@@ -140,7 +140,7 @@ Stable and working; runs available software.
 
 3.19 GRI-909/99
 
-Hand debug only.  No software for it has been found or tested.
+Hand debug only. No software for it has been found or tested.
 
 3.20 SDS-940
 
@@ -168,10 +168,23 @@ Bill Beech
 3.25 Sigma 32b
 
 Incomplete; more work is needed on the peripherals for accuracy.
+Included in the beta simulators package.
 
 3.26 Alpha
 
-Incomplete; essentially just an EV-5 (21164) chip emulator.
+Incomplete; essentially just an EV-5 (21164) chip emulator. Included
+in the beta simulators package.
+
+3.27 SAGE
+
+Incomplete. Included in the beta simulators package.
+
+3.28 SC1
+
+Internal simulator for SiCortex supercomputer; intended as an example
+of implementing an SMP system in the current SimH structure. Included
+in the beta simulators package.
+
 
 4. Suggestions for Future Work
 
@@ -198,4 +211,3 @@ Incomplete; essentially just an EV-5 (21164) chip emulator.
 	- Data General MV8000 (if a hobbyist license can be obtained for AOS)
 	- Alpha simulator
 	- HP 3000 (16b) simulator with MPE
-

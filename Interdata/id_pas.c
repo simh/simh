@@ -103,7 +103,7 @@ uint8 pas_xarm[PAS_LINES];                              /* xmt int armed */
 uint8 pas_rchp[PAS_LINES];                              /* rcvr chr pend */
 uint8 pas_tplte[PAS_LINES * 2 + 1];                     /* template */
 
-TMLN pas_ldsc[PAS_LINES] = { 0 };                       /* line descriptors */
+TMLN pas_ldsc[PAS_LINES] = { {0} };                     /* line descriptors */
 TMXR pas_desc = { 8, 0, 0, pas_ldsc };                  /* mux descriptor */
 #define PAS_ENAB        pas_desc.lines
 
@@ -165,7 +165,7 @@ DEVICE pas_dev = {
     1, 10, 31, 1, 16, 8,
     &tmxr_ex, &tmxr_dep, &pas_reset,
     NULL, &pas_attach, &pas_detach,
-    &pas_dib, DEV_NET | DEV_DISABLE
+    &pas_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* PASL data structures

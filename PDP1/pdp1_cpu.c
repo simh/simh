@@ -335,10 +335,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* inst history */
 
-extern UNIT *sim_clock_queue;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 t_stat cpu_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
@@ -503,7 +499,6 @@ DEVICE cpu_dev = {
 
 t_stat sim_instr (void)
 {
-extern int32 sim_interval;
 int32 IR, op, i, t, xct_count;
 int32 sign, signd, v, sbs_lvl, byno;
 int32 dev, pulse, io_data, sc, skip;
@@ -1656,8 +1651,6 @@ char *cptr = (char *) desc;
 t_stat r;
 t_value sim_eval;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

@@ -71,8 +71,8 @@ typedef struct {
     uint32              val[DSTRLNT];
     } DSTR;
 
-static DSTR Dstr_zero = { 0, 0, 0, 0, 0 };
-static DSTR Dstr_one = { 0, 0x10, 0, 0, 0 };
+static DSTR Dstr_zero = { 0, {0, 0, 0, 0} };
+static DSTR Dstr_one = { 0, {0x10, 0, 0, 0} };
 
 extern int32 R[16];
 extern int32 PSL;
@@ -80,7 +80,6 @@ extern int32 trpirq;
 extern int32 p1;
 extern int32 fault_PC;
 extern int32 ibcnt, ppc;
-extern int32 sim_interval;
 extern jmp_buf save_env;
 
 int32 ReadDstr (int32 lnt, int32 addr, DSTR *dec, int32 acc);

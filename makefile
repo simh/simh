@@ -98,6 +98,14 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
+      ifeq (incopt,$(shell if $(TEST) -d /opt/local/include; then echo incopt; fi))
+        INCPATH += /opt/local/include
+        OS_CCDEFS += -I/opt/local/include
+      endif
+      ifeq (libopt,$(shell if $(TEST) -d /opt/local/lib; then echo libopt; fi))
+        LIBPATH += /opt/local/lib
+        OS_LDFLAGS += -L/opt/local/lib
+      endif
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
       ifneq (,$(GCC_VERSION))
         ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
@@ -226,7 +234,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
             $(info *** Warning *** components for simh networking.  For best results, with)
             $(info *** Warning *** simh networking, it is recommended that you install the)
-            $(info *** Warning *** libpcap-dev package from your $(OSTYPE) distribution)
+            $(info *** Warning *** libpcap-dev package from your $(OSNAME) distribution)
             $(info *** Warning ***)
           endif
         else
@@ -236,16 +244,33 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       LIBEXT = $(LIBEXTSAVE)
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-	  # Given we have libpcap components, consider other network connections as well
+      # Given we have libpcap components, consider other network connections as well
       ifneq (,$(call find_lib,vdeplug))
         # libvdeplug requires the use of the OS provided libpcap
-		ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+        ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
             NETWORK_LDFLAGS += -lvdeplug
             $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
           endif
+        endif
+      endif
+      ifeq (,$(findstring USE_VDE_NETWORK,$(NETWORK_CCDEFS)))
+        # Support is available on Linux for libvdeplug.  Advise on its usage
+        ifneq (,$(findstring Linux,$(OSTYPE)))
+          $(info *** Warning ***)
+          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built with)
+          $(info *** Warning *** minimal libpcap networking support)
+          $(info *** Warning ***)
+          $(info *** Warning *** Simulators on your $(OSNAME) platform can also be built with)
+          $(info *** Warning *** extended Ethernet networking support by using VDE Ethernet.)
+          $(info *** Warning ***)
+          $(info *** Warning *** To build simulator(s) with extended networking support you)
+          $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
+          $(info *** Warning *** regarding the needed libvdeplug components for your $(OSNAME))
+          $(info *** Warning *** platform)
+          $(info *** Warning ***)
         endif
       endif
       ifneq (,$(call find_include,linux/if_tun))
@@ -269,13 +294,21 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     NETWORK_OPT = $(NETWORK_CCDEFS)
   endif
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
-    MKDIRBIN = if $(TEST) ! -e BIN; then mkdir BIN; fi
+    MKDIRBIN = mkdir -p BIN
+  endif
+  ifneq (,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
+    GIT_COMMIT_ID=$(shell cat .git-commit-id)
   endif
 else
   #Win32 Environments (via MinGW32)
   GCC = gcc
-  GCC_Path := $(dir $(shell where gcc.exe))
+  ifeq (XP,$(findstring XP,$(shell ver)))
+    GCC_Path := C:\MinGW\bin\
+  else
+    GCC_Path := $(dir $(shell where gcc.exe))
+  endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
+  COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
   ifeq (pthreads,$(shell if exist ..\windows-build\pthreads\Pre-built.2\include\pthread.h echo pthreads))
     PTHREADS_CCDEFS = -DUSE_READER_THREAD -DPTW32_STATIC_LIB -I../windows-build/pthreads/Pre-built.2/include
@@ -293,27 +326,31 @@ else
     endif
   endif
   ifeq (pcap,$(shell if exist ..\windows-build\winpcap\Wpdpack\include\pcap.h echo pcap))
-    PCAP_CCDEFS = -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk -DUSE_SHARED
     NETWORK_LDFLAGS =
-    NETWORK_OPT = -DUSE_SHARED
+    NETWORK_OPT = -DUSE_SHARED -I../windows-build/winpcap/Wpdpack/include -I$(GCC_Path)..\include\ddk
     NETWORK_FEATURES = - dynamic networking support using windows-build provided libpcap components
   else
     ifeq (pcap,$(shell if exist $(dir $(GCC_Path))..\include\pcap.h echo pcap))
-      PCAP_CCDEFS = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
       NETWORK_LDFLAGS =
-      NETWORK_OPT = -DUSE_SHARED
+      NETWORK_OPT = -DUSE_SHARED -I$(GCC_Path)..\include\ddk
       NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
     endif
   endif
-  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS) $(PCAP_CCDEFS)
+  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS)
   OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
   ifneq (binexists,$(shell if exist BIN echo binexists))
     MKDIRBIN = if not exist BIN mkdir BIN
   endif
   ifneq ($(USE_NETWORK),)
-    NETWORK_OPT = -DUSE_SHARED
+    NETWORK_OPT += -DUSE_SHARED
   endif
+  ifneq (,$(shell if exist .git-commit-id type .git-commit-id))
+    GIT_COMMIT_ID=$(shell if exist .git-commit-id type .git-commit-id)
+  endif
+endif
+ifneq (,$(GIT_COMMIT_ID))
+  CFLAGS_GIT = -DSIM_GIT_COMMIT_ID=$(GIT_COMMIT_ID)
 endif
 ifneq ($(DEBUG),)
   CFLAGS_G = -g -ggdb -g3
@@ -382,6 +419,10 @@ ifneq (clean,$(MAKECMDGOALS))
   ifneq (,$(NETWORK_FEATURES))
     $(info *** $(NETWORK_FEATURES).)
   endif
+  ifneq (,$(GIT_COMMIT_ID))
+    $(info ***)
+    $(info *** git commit id is $(GIT_COMMIT_ID).)
+  endif
   $(info ***)
 endif
 ifneq ($(DONT_USE_ROMS),)
@@ -395,7 +436,7 @@ endif
 
 CC_STD = -std=c99
 CC_OUTSPEC = -o $@
-CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) -I . $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 
 #
@@ -403,7 +444,7 @@ LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 #
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
-	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c
+	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c
 
 
 #
@@ -454,7 +495,8 @@ PDP11 = ${PDP11D}/pdp11_fp.c ${PDP11D}/pdp11_cpu.c ${PDP11D}/pdp11_dz.c \
 	${PDP11D}/pdp11_rh.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_cpumod.c \
 	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_rf.c ${PDP11D}/pdp11_dl.c \
 	${PDP11D}/pdp11_ta.c ${PDP11D}/pdp11_rc.c ${PDP11D}/pdp11_kg.c \
-	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_ke.c ${PDP11D}/pdp11_dc.c ${PDP11D}/pdp11_dmc.c \
+	${PDP11D}/pdp11_io_lib.c
 PDP11_OPT = -DVM_PDP11 -I ${PDP11D} ${NETWORK_OPT}
 
 
@@ -466,22 +508,88 @@ VAX = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c ${VAXD}/vax_io.c \
 	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_vh.c \
-	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_io_lib.c
 VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+
+
+VAX610 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c ${VAXD}/vax_syscm.c \
+	${VAXD}/vax610_stddev.c ${VAXD}/vax610_sysdev.c \
+	${VAXD}/vax610_io.c ${VAXD}/vax610_syslist.c ${VAXD}/vax610_mem.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_vh.c \
+	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_io_lib.c
+VAX610_OPT = -DVM_VAX -DVAX_610 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+
+VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c ${VAXD}/vax_syscm.c \
+	${VAXD}/vax_watch.c ${VAXD}/vax630_stddev.c ${VAXD}/vax630_sysdev.c \
+	${VAXD}/vax630_io.c ${VAXD}/vax630_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_vh.c \
+	${PDP11D}/pdp11_cr.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_io_lib.c
+VAX620_OPT = -DVM_VAX -DVAX_620 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+
+
+VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
+	${VAXD}/vax730_stddev.c ${VAXD}/vax730_sys.c \
+	${VAXD}/vax730_mem.c ${VAXD}/vax730_uba.c ${VAXD}/vax730_rb.c \
+	${VAXD}/vax730_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
+	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c \
+	${PDP11D}/pdp11_io_lib.c
+VAX730_OPT = -DVM_VAX -DVAX_730 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+
+
+VAX750 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
+	${VAXD}/vax750_stddev.c ${VAXD}/vax750_cmi.c \
+	${VAXD}/vax750_mem.c ${VAXD}/vax750_uba.c ${VAXD}/vax7x0_mba.c \
+	${VAXD}/vax750_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
+	${PDP11D}/pdp11_hk.c ${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c \
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_io_lib.c
+VAX750_OPT = -DVM_VAX -DVAX_750 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX780 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
 	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
 	${VAXD}/vax780_stddev.c ${VAXD}/vax780_sbi.c \
-	${VAXD}/vax780_mem.c ${VAXD}/vax780_uba.c ${VAXD}/vax780_mba.c \
+	${VAXD}/vax780_mem.c ${VAXD}/vax780_uba.c ${VAXD}/vax7x0_mba.c \
 	${VAXD}/vax780_fload.c ${VAXD}/vax780_syslist.c \
 	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
-	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_io_lib.c
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_io_lib.c
 VAX780_OPT = -DVM_VAX -DVAX_780 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
+
+
+VAX860 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
+	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c  ${VAXD}/vax_cmode.c \
+	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c  ${VAXD}/vax_syscm.c \
+	${VAXD}/vax860_stddev.c ${VAXD}/vax860_sbia.c \
+	${VAXD}/vax860_abus.c ${VAXD}/vax780_uba.c ${VAXD}/vax7x0_mba.c \
+	${VAXD}/vax860_syslist.c \
+	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
+	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
+	${PDP11D}/pdp11_xu.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c \
+	${PDP11D}/pdp11_rp.c ${PDP11D}/pdp11_tu.c ${PDP11D}/pdp11_hk.c \
+	${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_dmc.c ${PDP11D}/pdp11_io_lib.c
+VAX860_OPT = -DVM_VAX -DVAX_860 -DUSE_INT64 -DUSE_ADDR64 -I VAX -I ${PDP11D} ${NETWORK_OPT}
 
 
 PDP10D = PDP10
@@ -489,10 +597,8 @@ PDP10 = ${PDP10D}/pdp10_fe.c ${PDP11D}/pdp11_dz.c ${PDP10D}/pdp10_cpu.c \
 	${PDP10D}/pdp10_ksio.c ${PDP10D}/pdp10_lp20.c ${PDP10D}/pdp10_mdfp.c \
 	${PDP10D}/pdp10_pag.c ${PDP10D}/pdp10_rp.c ${PDP10D}/pdp10_sys.c \
 	${PDP10D}/pdp10_tim.c ${PDP10D}/pdp10_tu.c ${PDP10D}/pdp10_xtnd.c \
-	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c \
-	${PDP11D}/pdp11_cr.c
+	${PDP11D}/pdp11_pt.c ${PDP11D}/pdp11_ry.c ${PDP11D}/pdp11_cr.c
 PDP10_OPT = -DVM_PDP10 -DUSE_INT64 -I ${PDP10D} -I ${PDP11D}
-
 
 
 PDP8D = PDP8
@@ -632,14 +738,34 @@ SWTP6800MP-A2 = ${SWTP6800C}/mp-a2.c ${SWTP6800C}/m6800.c ${SWTP6800C}/m6810.c \
 	${SWTP6800C}/mp-b2.c ${SWTP6800C}/mp-8m.c ${SWTP6800C}/i2716.c
 SWTP6800_OPT = -I ${SWTP6800D}
 
+DISPLAYD = display
+ifeq ($(WIN32),)
+  ifeq (x11,$(shell if $(TEST) -e /usr/include/X11/Intrinsic.h ; then echo x11; fi))
+    DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/x11.c
+    DISPLAY_OPT = -DUSE_DISPLAY -I/usr/X11/include -lXt -lX11 -lm
+  else
+    DISPLAYL = 
+    DISPLAY_OPT = 
+  endif
+else
+  DISPLAYL = ${DISPLAYD}/display.c $(DISPLAYD)/win32.c
+  DISPLAY_OPT = -DUSE_DISPLAY
+endif  
+  
+TX0D = TX-0
+TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
+      ${TX0D}/tx0_sys.c ${TX0D}/tx0_sys_orig.c ${DISPLAYL}
+TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
+
 
 #
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax780 nova eclipse hp2100 i1401 i1620 s3 \
-	altair altairz80 gri i7094 ibm1130 id16 \
-	id32 sds lgp h316 swtp6800mp-a swtp6800mp-a2
+	vax vax610 vax620 vax630 vax730 vax750 vax780 vax860 \
+	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
+	i7094 ibm1130 id16 id32 sds lgp h316 \
+	swtp6800mp-a swtp6800mp-a2 tx-0
 
 all : ${ALL}
 
@@ -726,11 +852,47 @@ ${BIN}vax${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
+vax610 : ${BIN}vax610${EXE}
+
+${BIN}vax610${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
+
+vax620 : ${BIN}vax620${EXE}
+
+${BIN}vax620${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
+
+vax630 : ${BIN}vax630${EXE}
+
+${BIN}vax630${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
+
+vax730 : ${BIN}vax730${EXE}
+
+${BIN}vax730${EXE} : ${VAX730} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX730} ${SIM} ${VAX730_OPT} -o $@ ${LDFLAGS}
+
+vax750 : ${BIN}vax750${EXE}
+
+${BIN}vax750${EXE} : ${VAX750} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX750} ${SIM} ${VAX750_OPT} -o $@ ${LDFLAGS}
+
 vax780 : ${BIN}vax780${EXE}
 
 ${BIN}vax780${EXE} : ${VAX780} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX780} ${SIM} ${VAX780_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+vax860 : ${BIN}vax860${EXE}
+
+${BIN}vax860${EXE} : ${VAX860} ${SIM} ${BUILD_ROMS}
+	${MKDIRBIN}
+	${CC} ${VAX860} ${SIM} ${VAX860_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
 nova : ${BIN}nova${EXE}
 
@@ -839,3 +1001,10 @@ swtp6800mp-a2 : ${BIN}swtp6800mp-a2${EXE}
 ${BIN}swtp6800mp-a2${EXE} : ${SWTP6800MP-A2} ${SIM}
 	${MKDIRBIN}
 	${CC} ${SWTP6800MP-A2} ${SIM} ${SWTP6800_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+tx-0 : ${BIN}tx-0${EXE}
+
+${BIN}tx-0${EXE} : ${TX0} ${SIM}
+	${MKDIRBIN}
+	${CC} ${TX0} ${SIM} ${TX0_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+

@@ -27,12 +27,38 @@
 #ifndef _SIM_REV_H_
 #define _SIM_REV_H_     0
 
-#define SIM_MAJOR       3
-#define SIM_MINOR       9
+#ifndef SIM_MAJOR
+#define SIM_MAJOR       4
+#endif
+#ifndef SIM_MINOR
+#define SIM_MINOR       0
+#endif
+#ifndef SIM_PATCH
 #define SIM_PATCH       0
+#endif
+#ifndef SIM_DELTA
 #define SIM_DELTA       0
+#endif
 
-/* V3.9 revision history
+#ifndef SIM_VERSION_MODE
+#define SIM_VERSION_MODE "Beta"
+#endif
+
+#if defined(SIM_NEED_GIT_COMMIT_ID)
+#include ".git-commit-id.h"
+#endif
+
+/*
+  The comment section below reflects the manual editing process which was in place
+  prior to the use of the git source control system on at https://gihub.com/simh/simh
+
+  Details about all future fixes will be visible in the source control system's 
+  history.
+
+*/
+
+/*
+   V3.9 revision history
 
 patch   date            module(s) and fix(es)
 
@@ -191,6 +217,9 @@ patch   date            module(s) and fix(es)
                         - fixed backspace over tapemark not to set EOR (Van Snyder)
                         - added no rewind option (Van Snyder)
 
+                        i1401_sys.c:
+                        - fixed misuse of & instead of && in decode (Peter Schorn)
+
                         pdp1_cpu.c:
                         - fixed misuse of & instead of && in Ea_ch (Michael Bloom)
 
@@ -204,7 +233,8 @@ patch   date            module(s) and fix(es)
                         - fixed priority of PIRQ vs IO; added INT_INTERNALn
 
                         pdp11_io.c:
-                        - fixed Qbus interrupts to treat all IO devices as BR4
+                        - fixed Qbus interrupts to treat all IO devices (except clock) as BR4
+			- fixed order of int_internal (Jordi Guillaumes i Pons)
 
                         ppd11_rf.c
                         - fixed bug in updating mem addr extension (Peter Schorn)
@@ -319,7 +349,7 @@ patch   date            module(s) and fix(es)
                         - fixed bug in scan function decode (Peter Schorn)
 
                         vax_cpu.c:
-                        - revised idle design Mark Pizzolato)
+                        - revised idle design (Mark Pizzolato)
                         - fixed bug in SET CPU IDLE
                         - fixed failure to clear PSL<tp> in BPT, XFC
 

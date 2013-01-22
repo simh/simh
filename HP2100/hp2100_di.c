@@ -1466,10 +1466,10 @@ if (assert != deny)                                     /* was there any change 
 
 previous_state = di_card->srq;                          /* save the current SRQ state */
 
-if (((di_card->cntl_register & CNTL_LSTN) &&            /* if the card is a listener */
-     (di_card->status_register & STAT_IRL)) ||          /*   and the input register is loaded, */
-    ((di_card->cntl_register & CNTL_TALK) &&            /* or the card is a talker */
-     ! FIFO_FULL))                                      /*   and the FIFO is not full */
+if (di_card->cntl_register & CNTL_LSTN                  /* if the card is a listener */
+  && di_card->status_register & STAT_IRL                /*   and the input register is loaded, */
+  || di_card->cntl_register & CNTL_TALK                 /* or the card is a talker */
+  && ! FIFO_FULL)                                       /*   and the FIFO is not full */
     di_card->srq = SET;                                 /* then request a DCPC cycle */
 else
     di_card->srq = CLEAR;                               /* otherwise, DCPC service is not needed */
@@ -1481,21 +1481,21 @@ if (DEBUG_PRJ (dptrs [card], DEB_CMDS)
              dptrs [card]->name, di_card->srq == SET ? "set" : "cleared");
 
 
-if (((di_card->status_register & STAT_IRL) &&           /* is the input register loaded */
-     (di_card->cntl_register & CNTL_IRL)) ||            /*   and notification is wanted? */
-    ((di_card->status_register & STAT_LBO) &&           /* or is the last byte out */
-      (di_card->cntl_register & CNTL_LBO)) ||           /*   and notification is wanted? */
-    ((di_card->eor == SET) &&                           /* or was the end of record seen */
-     !(di_card->status_register & STAT_IRL)) ||         /*   and the input register was unloaded? */
-    ((di_card->bus_cntl & BUS_SRQ) &&                   /* or is SRQ asserted on the bus */
-     (di_card->cntl_register & CNTL_SRQ) &&             /*   and notification is wanted */
-     (di_card->cntl_register & CNTL_CIC)) ||            /*   and the card is not controller? */
-    (!SW8_SYSCTL &&                                     /* or is the card not the system controller */
-     (di_card->bus_cntl & BUS_REN) &&                   /*   and REN is asserted on the bus */
-     (di_card->cntl_register & CNTL_REN)) ||            /*   and notification is wanted? */
-    (!SW8_SYSCTL &&                                     /* or is the card not the system controller */
-     (di_card->status_register & STAT_IFC) &&           /*   and IFC is asserted on the bus */
-     (di_card->cntl_register & CNTL_IFC))) {            /*   and notification is wanted? */
+if (di_card->status_register & STAT_IRL                 /* is the input register loaded */
+    && di_card->cntl_register & CNTL_IRL                /*   and notification is wanted? */
+  || di_card->status_register & STAT_LBO                /* or is the last byte out */
+    && di_card->cntl_register & CNTL_LBO                /*   and notification is wanted? */
+  || di_card->eor == SET                                /* or was the end of record seen */
+    && !(di_card->status_register & STAT_IRL)           /*   and the input register was unloaded? */
+  || di_card->bus_cntl & BUS_SRQ                        /* or is SRQ asserted on the bus */
+    && di_card->cntl_register & CNTL_SRQ                /*   and notification is wanted */
+    && di_card->cntl_register & CNTL_CIC                /*   and the card is not controller? */
+  || !SW8_SYSCTL                                        /* or is the card not the system controller */
+    && di_card->bus_cntl & BUS_REN                      /*   and REN is asserted on the bus */
+    && di_card->cntl_register & CNTL_REN                /*   and notification is wanted? */
+  || !SW8_SYSCTL                                        /* or is the card not the system controller */
+    && di_card->status_register & STAT_IFC              /*   and IFC is asserted on the bus */
+    && di_card->cntl_register & CNTL_IFC) {             /*   and notification is wanted? */
 
     if (DEBUG_PRJ (dptrs [card], DEB_CMDS))
         fprintf (sim_deb, ">>%s cmds: Flag set\n",

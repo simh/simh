@@ -35,8 +35,6 @@
 extern int32 int_req, dev_busy, dev_done, dev_disable;
 t_stat pkb_svc (UNIT *uptr);
 t_stat pkb_reset (DEVICE *dptr);
-extern t_stat sim_poll_kbd (void);
-extern t_stat sim_putchar (int32 out);
 extern int32 IAR[], level;
 extern int32 debug_reg;
 

@@ -138,7 +138,6 @@
 
 extern int32 int_req, stop_inst;
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 uint32 ct_sra = 0;                                      /* status reg A */
 uint32 ct_srb = 0;                                      /* status reg B */
@@ -226,7 +225,7 @@ DEVICE ct_dev = {
     CT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ct_reset,
     &ct_boot, &ct_attach, &ct_detach,
-    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
+    &ct_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
     };
 
 /* IOT routines */

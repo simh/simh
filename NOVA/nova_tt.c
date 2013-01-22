@@ -49,6 +49,7 @@
 */
 
 #include "nova_defs.h"
+#include "sim_tmxr.h"
 
 #define UNIT_V_DASHER   (UNIT_V_UF + 0)                 /* Dasher mode */
 #define UNIT_DASHER     (1 << UNIT_V_DASHER)
@@ -186,6 +187,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;                                       /* <not DG compatible>  */
 DEV_CLR_BUSY( INT_TTI ) ;
 DEV_CLR_DONE( INT_TTI ) ;

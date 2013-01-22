@@ -730,8 +730,33 @@ void cpu_idle (void);
 
 #if defined (VAX_780)
 #include "vax780_defs.h"
-#else
+#elif defined (VAX_750)
+#include "vax750_defs.h"
+#elif defined (VAX_730)
+#include "vax730_defs.h"
+#elif defined (VAX_610)
+#include "vax610_defs.h"
+#elif defined (VAX_620) || defined (VAX_630)
+#include "vax630_defs.h"
+#elif defined (VAX_860)
+#include "vax860_defs.h"
+#else /* VAX 3900 */
 #include "vaxmod_defs.h"
 #endif
+#ifndef CPU_MODEL_MODIFIERS
+#define CPU_MODEL_MODIFIERS             /* No model specific CPU modifiers */
+#endif
+
+#ifdef DONT_USE_INTERNAL_ROM
+#define BOOT_CODE_ARRAY NULL
+#define BOOT_CODE_SIZE 0
+#endif
+
+extern t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset);
+extern t_stat cpu_print_model (FILE *st);
+extern t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+extern t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 #endif                                                  /* _VAX_DEFS_H */

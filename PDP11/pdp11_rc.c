@@ -147,7 +147,6 @@
                         ((double) RC_NUMWD)))
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 extern int32 R[];
 
 static uint32   rc_la = 0;                              /* look-ahead */
@@ -180,12 +179,14 @@ static uint32 update_rccs (uint32, uint32);
    rc_reg       RC register list
 */
 
+#define IOLN_RC         020
+
 static DIB rc_dib = {
-    IOBA_RC,
+    IOBA_AUTO,
     IOLN_RC,
     &rc_rd,
     &rc_wr,
-    1, IVCL (RC), VEC_RC, { NULL }
+    1, IVCL (RC), VEC_AUTO, { NULL }
 };
 
 static UNIT rc_unit = {
@@ -437,7 +438,7 @@ static uint32 sectorCRC (const uint16 *data)
 
 static t_stat rc_svc (UNIT *uptr)
 {
-    uint32      ma, da, t, u_old, u_new, last_da;
+    uint32      ma, da, t, u_old, u_new, last_da = 0;
     uint16      dat;
     uint16      *fbuf = uptr->filebuf;
 
@@ -549,7 +550,7 @@ static t_stat rc_reset (DEVICE *dptr)
     rc_db = 0;
     CLR_INT (RC);
     sim_cancel (&rc_unit);
-    return (SCPE_OK);
+    return auto_config(0, 0);
 }
 
 /* Attach routine */

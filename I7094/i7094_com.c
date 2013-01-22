@@ -183,10 +183,10 @@ uint32 com_chob_v = 0;                                  /* valid flag */
 t_uint64 com_buf[COM_BUFSIZ];                           /* channel buffer */
 LISTHD com_free;                                        /* free list */
 uint32 com_not_ret[COM_TLINES] = { 0 };                 /* chars not returned */
-LISTHD com_inpq[COM_TLINES] = { 0 };                    /* input queues */
-LISTHD com_outq[COM_TLINES] = { 0 };                    /* output queues */
+LISTHD com_inpq[COM_TLINES] = { {0} };                  /* input queues */
+LISTHD com_outq[COM_TLINES] = { {0} };                  /* output queues */
 LISTENT com_pkt[COM_PKTSIZ];                            /* character packets */
-TMLN com_ldsc[COM_MLINES] = { 0 };                      /* line descriptors */
+TMLN com_ldsc[COM_MLINES] = { {0} };                      /* line descriptors */
 TMXR com_desc = { COM_MLINES, 0, 0, com_ldsc };         /* mux descriptor */
 
 /* Even parity truth table */
@@ -348,7 +348,7 @@ DEVICE com_dev = {
     3, 10, 31, 1, 16, 8,
     &tmxr_ex, &tmxr_dep, &com_reset,
     NULL, &com_attach, &com_detach,
-    &com_dib, DEV_NET | DEV_DIS
+    &com_dib, DEV_MUX | DEV_DIS
     };
 
 /* COML data structures

@@ -236,7 +236,7 @@ DEVICE mta_dev = {
     MTA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mta_reset,
     &mta_boot, &mta_attach, &mta_detach,
-    &mta_dib, DEV_DISABLE
+    &mta_dib, DEV_DISABLE | DEV_TAPE
     };
 
 /* IOT routine */

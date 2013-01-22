@@ -71,9 +71,11 @@ t_stat lpt_detach (UNIT *uptr);
    lpt_reg      LPT register list
 */
 
+#define IOLN_LPT        004
+
 DIB lpt_dib = {
-    IOBA_LPT, IOLN_LPT, &lpt_rd, &lpt_wr,
-    1, IVCL (LPT), VEC_LPT, { NULL }
+    IOBA_AUTO, IOLN_LPT, &lpt_rd, &lpt_wr,
+    1, IVCL (LPT), VEC_AUTO, { NULL }
     };
 
 UNIT lpt_unit = {

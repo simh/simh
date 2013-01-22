@@ -186,8 +186,6 @@ extern int32 int_req[IPL_HLVL];
 #define DFLT_CPM        285
 #endif
 
-extern FILE *sim_deb;                                   /* sim_console.c */
-
 /* create a int32 constant from four characters */
 #define I4C(a,b,c,d)    (((a) << 24) | ((b) << 16) | ((c) << 8) | (d))
 #define I4C_CBN         I4C ('C','B','N',' ')
@@ -345,8 +343,10 @@ t_stat cr_show_trans (FILE *, UNIT *, int32, void *);
    cr_dev   CR device descriptor
 */
 
-static DIB cr_dib = { IOBA_CR, IOLN_CR, &cr_rd, &cr_wr,
-        1, IVCL (CR), VEC_CR, { NULL } };
+#define IOLN_CR         010
+
+static DIB cr_dib = { IOBA_AUTO, IOLN_CR, &cr_rd, &cr_wr,
+        1, IVCL (CR), VEC_AUTO, { NULL } };
 
 static UNIT cr_unit = {
     UDATA (&cr_svc,
@@ -1085,7 +1085,7 @@ t_stat cr_reset (   DEVICE  *dptr    )
     CLR_INT (CR);
     /* TBD: flush current card */
     /* init uptr->wait ? */
-    return (SCPE_OK);
+    return auto_config (dptr->name, 1);
 }
 
 /*
@@ -1100,7 +1100,6 @@ t_stat cr_attach (  UNIT    *uptr,
                     char    *cptr    )
 {
     t_stat        reason;
-    extern int32    sim_switches;
 
     if (sim_switches & ~MASK)
         return (SCPE_INVSW);

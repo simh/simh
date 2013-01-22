@@ -59,8 +59,6 @@ extern int32 recqptr;                                   /* recq pointer */
 extern int32 pcq[];
 extern int32 pcq_p;
 extern int32 ibcnt, ppc;
-extern int32 sim_interval;
-extern uint32 sim_brk_summ;
 extern jmp_buf save_env;
 
 int32 GeteaB (int32 spec);
@@ -597,7 +595,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 cc = CC_V | CC_C;                       /* set cc's */
                 break;                                  /* done */
                 }
-            if ((src == LSIGN) && (src2 == WMASK)) {    /* -2^31 / -1? */
+            if (((uint32)src == LSIGN) && ((uint32)src2 == WMASK)) {    /* -2^31 / -1? */
                 cc = CC_V;                              /* overflow */
                 break;                                  /* done */
                 }
@@ -669,7 +667,7 @@ switch ((IR >> 12) & 017) {                             /* decode IR<15:12> */
                 dst = ((uint32) src) << src2;
                 i = ((src >> (32 - src2)) | (-sign << src2)) & LMASK;
                 oc = (i & 1)? CC_C: 0;
-                if ((dst & LSIGN)? (i != LMASK): (i != 0))
+                if ((dst & LSIGN)? ((uint32)i != LMASK): (i != 0))
                     oc = oc | CC_V;
                 }
             else if (src2 == 32) {                      /* [32] = -32 */

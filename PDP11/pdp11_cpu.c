@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    29-Dec-08    RMS     Fixed failure to clear cpu_bme on RESET (Walter Mueller)
    22-Apr-08    RMS     Fixed MMR0 treatment in RESET (Walter Mueller)
@@ -255,7 +256,7 @@ typedef struct {
 extern FILE *sim_log;
 
 uint16 *M = NULL;                                       /* memory */
-int32 REGFILE[6][2] = { 0 };                            /* R0-R5, two sets */
+int32 REGFILE[6][2] = { {0} };                          /* R0-R5, two sets */
 int32 STACKFILE[4] = { 0 };                             /* SP, four modes */
 int32 saved_PC = 0;                                     /* program counter */
 int32 R[8] = { 0 };                                     /* working registers */
@@ -272,7 +273,7 @@ int32 trap_req = 0;                                     /* trap requests */
 int32 int_req[IPL_HLVL] = { 0 };                        /* interrupt requests */
 int32 PIRQ = 0;                                         /* programmed int req */
 int32 STKLIM = 0;                                       /* stack limit */
-fpac_t FR[6] = { 0 };                                   /* fp accumulators */
+fpac_t FR[6] = { {0} };                                 /* fp accumulators */
 int32 FPS = 0;                                          /* fp status */
 int32 FEC = 0;                                          /* fp exception code */
 int32 FEA = 0;                                          /* fp exception addr */
@@ -303,12 +304,6 @@ int32 dsmask[4] = { MMR3_KDS, MMR3_SDS, 0, MMR3_UDS };  /* dspace enables */
 t_addr cpu_memsize = INIMEMSIZE;                        /* last mem addr */
 
 extern int32 CPUERR, MAINT;
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-extern DEVICE *sim_devices[];
 extern CPUTAB cpu_tab[];
 
 /* Function declarations */
@@ -605,6 +600,7 @@ MTAB cpu_mod[] = {
     { UNIT_MSIZE, 524288, NULL, "512K", &cpu_set_size},
     { UNIT_MSIZE, 786432, NULL, "768K", &cpu_set_size},
     { UNIT_MSIZE, 1048576, NULL, "1024K", &cpu_set_size},
+    { UNIT_MSIZE, 1572864, NULL, "1536K", &cpu_set_size},
     { UNIT_MSIZE, 2097152, NULL, "2048K", &cpu_set_size},
     { UNIT_MSIZE, 3145728, NULL, "3072K", &cpu_set_size},
     { UNIT_MSIZE, 4186112, NULL, "4096K", &cpu_set_size},
@@ -1245,7 +1241,7 @@ while (reason == 0)  {
                     else dst = R[dstspec];
                     }
                 else {
-                    i = ((cm == pm) && (cm == MD_USR))? calc_ds (pm): calc_is (pm);
+                    i = ((cm == pm) && (cm == MD_USR))? (int32)calc_ds (pm): (int32)calc_is (pm);
                     dst = ReadW ((GeteaW (dstspec) & 0177777) | i);
                     }
                 N = GET_SIGN_W (dst);
@@ -3115,8 +3111,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[HIST_ILNT];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

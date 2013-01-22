@@ -288,7 +288,6 @@ t_stat id_dboot (int32 u, DEVICE *dptr)
 {
 extern DIB ttp_dib, sch_dib;
 extern uint32 PC;
-extern int32 sim_switches;
 uint32 i, typ, ctlno, off, add, cap, sch_dev;
 UNIT *uptr;
 

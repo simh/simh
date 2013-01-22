@@ -239,9 +239,6 @@ static char *tu_fname[CS1_N_FNC] = {
     "WRITE", "31", "32", "33", "READF", "35", "36" "READR"
     };
 
-extern int32 sim_switches;
-extern FILE *sim_deb;
-
 t_stat tu_mbrd (int32 *data, int32 PA, int32 fmtr);
 t_stat tu_mbwr (int32 data, int32 PA, int32 fmtr);
 t_stat tu_svc (UNIT *uptr);
@@ -323,7 +320,7 @@ DEVICE tu_dev = {
     TU_NUMDR, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
-    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03
+    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03|DEV_TAPE
     };
 
 /* Massbus register read */
@@ -793,7 +790,7 @@ if (DEBUG_PRS (tu_dev)) {
     fprintf (sim_deb, ">>TU%d DONE: fnc=%s, fc=%06o, fs=%06o, er=%06o, pos=",
              drv, tu_fname[fnc], tufc, tufs, tuer);
     fprint_val (sim_deb, uptr->pos, 10, T_ADDR_W, PV_LEFT);
-    fprintf (sim_deb, "\n");
+    fprintf (sim_deb, ", r=%d\n", r);
     }
 return SCPE_OK;
 }
@@ -822,7 +819,7 @@ return;
 
 void tu_update_fs (int32 flg, int32 drv)
 {
-int32 act = sim_is_active (&tu_unit[drv]);
+int32 act = sim_activate_time (&tu_unit[drv]);
 
 tufs = (tufs & ~FS_DYN) | FS_FPR | flg;
 if (tu_unit[drv].flags & UNIT_ATT) {
@@ -933,7 +930,7 @@ if (wbuf == NULL)
     wbuf = (uint16 *) calloc ((MT_MAXFR + 4) >> 1, sizeof (uint16));
 if (wbuf == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config(0, 0);
 }
 
 /* Attach routine */
@@ -1036,7 +1033,7 @@ static const uint16 boot_rom[] = {
 
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

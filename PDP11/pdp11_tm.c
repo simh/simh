@@ -154,7 +154,6 @@
 
 extern uint16 *M;                                       /* memory */
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint8 *tmxb = NULL;                                     /* xfer buffer */
 int32 tm_sta = 0;                                       /* status register */
@@ -188,9 +187,11 @@ t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
    tm_mod       MT modifier list
 */
 
+#define IOLN_TM         014
+
 DIB tm_dib = {
-    IOBA_TM, IOLN_TM, &tm_rd, &tm_wr,
-    1, IVCL (TM), VEC_TM, { NULL }
+    IOBA_AUTO, IOLN_TM, &tm_rd, &tm_wr,
+    1, IVCL (TM), VEC_AUTO, { NULL }
     };
 
 UNIT tm_unit[] = {
@@ -244,7 +245,7 @@ DEVICE tm_dev = {
     TM_NUMDR, 10, T_ADDR_W, 1, 8, 8,
     NULL, NULL, &tm_reset,
     &tm_boot, &tm_attach, &tm_detach,
-    &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG
+    &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772532
@@ -596,7 +597,7 @@ if (tmxb == NULL)
     tmxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
 if (tmxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach routine */
@@ -711,9 +712,8 @@ static const uint16 boot2_rom[] = {
 
 t_stat tm_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
-extern int32 sim_switches;
 
 sim_tape_rewind (&tm_unit[unitno]);
 if (sim_switches & SWMASK ('O')) {

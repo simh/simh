@@ -227,7 +227,6 @@ extern UNIT cpu_unit;
 #define RLBAE_IMP       (0000077)                       /* implemented */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint16 *rlxb = NULL;                                    /* xfer buffer */
 int32 rlcs = 0;                                         /* control/status */
@@ -270,9 +269,11 @@ t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
    rl_mod   RL modifier list
 */
 
+#define IOLN_RL         012
+
 static DIB rl_dib = {
-    IOBA_RL, IOLN_RL, &rl_rd, &rl_wr,
-    1, IVCL (RL), VEC_RL, { NULL } };
+    IOBA_AUTO, IOLN_RL, &rl_rd, &rl_wr,
+    1, IVCL (RL), VEC_AUTO, { NULL } };
 
 static UNIT rl_unit[] = {
     { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
@@ -1093,7 +1094,7 @@ t_stat rl_show_dstate (FILE *st, UNIT *uptr, int32 val, void *desc)
         (uptr->STAT & RLDS_WGE) ? '1' : '0',
         (uptr->STAT & RLDS_SPE) ? '1' : '0');
     if (uptr->flags & UNIT_ATT) {
-        if ((cnt = sim_is_active (uptr)) != 0)
+        if ((cnt = sim_activate_time (uptr)) != 0)
             fprintf (st, "FNC: %d, %d\n", uptr->FNC, cnt);
         else
             fputs ("FNC: none\n", st);
@@ -1187,7 +1188,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern uint16 *M;
 extern int32 saved_PC;
 

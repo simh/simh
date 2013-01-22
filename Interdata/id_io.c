@@ -66,8 +66,6 @@ extern uint32 int_req[INTSZ], int_enb[INTSZ];
 extern uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout);
 extern uint32 pawidth;
 extern UNIT cpu_unit;
-extern FILE *sim_log;
-extern DEVICE *sim_devices[];
 
 uint32 sch_max = 2;                                     /* sch count */
 uint32 sch_sa[SCH_NUMCH] = { 0 };                       /* start addr */

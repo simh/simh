@@ -1167,7 +1167,8 @@ if (sim_is_active (uptr)) {                             /* unit active? */
     if (uptr->FUNC >= FNC_WCHK)                         /* data transfer? */
         rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;             /* set done, err */
     }
-update_rpcs (CS1_SC, drv);                              /* request intr */
+if (!sim_is_running)                                    /* from console? */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
 return detach_unit (uptr);
 }
 
@@ -1284,7 +1285,7 @@ static const d10 boot_rom_its[] = {
 
 t_stat rp_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern a10 saved_PC;
 
 M[FE_UNIT] = unitno & CS2_M_UNIT;

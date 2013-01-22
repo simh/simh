@@ -398,7 +398,7 @@ static const unsigned char boot_rom[] = {
 
 t_stat cdr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_IS;
 
 for (i = 0; i < CDR_WIDTH; i++)                         /* clear buffer */

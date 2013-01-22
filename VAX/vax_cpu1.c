@@ -99,9 +99,7 @@ extern int32 fault_PC;
 extern int32 pcq[PCQ_SIZE];
 extern int32 pcq_p;
 extern int32 in_ie;
-extern int32 sim_interval;
 extern int32 ibcnt, ppc;
-extern FILE *sim_deb;
 extern DEVICE cpu_dev;
 
 extern int32 Test (uint32 va, int32 acc, int32 *status);
@@ -1445,7 +1443,7 @@ int32 cc;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
-if (prn > 63)                                           /* reg# > 63? fault */
+if (prn > MT_MAX)                                       /* reg# > max? fault */
     RSVD_OPND_FAULT;
 CC_IIZZ_L (val);                                        /* set cc's */
 switch (prn) {                                          /* case on reg # */
@@ -1576,7 +1574,7 @@ int32 val;
 
 if (PSL & PSL_CUR)                                      /* must be kernel */
     RSVD_INST_FAULT;
-if (prn > 63)                                           /* reg# > 63? fault */
+if (prn > MT_MAX)                                       /* reg# > max? fault */
     RSVD_OPND_FAULT;
 switch (prn) {                                          /* case on reg# */
 

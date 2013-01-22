@@ -25,6 +25,8 @@
 
    IPLI, IPLO   12875A interprocessor link
 
+   25-Oct-12    JDB     Removed DEV_NET to allow restoration of listening ports
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CARD_INDEX casts to dib.card_index
    07-Apr-11    JDB     A failed STC may now be retried
@@ -187,7 +189,7 @@ DEVICE ipli_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &ipli_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    &ipli_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
     0, ipl_deb, NULL, NULL
     };
 
@@ -216,7 +218,7 @@ DEVICE iplo_dev = {
     1, 10, 31, 1, 16, 16,
     &tmxr_ex, &tmxr_dep, &ipl_reset,
     &ipl_boot, &ipl_attach, &ipl_detach,
-    &iplo_dib, DEV_NET | DEV_DISABLE | DEV_DIS | DEV_DEBUG,
+    &iplo_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG,
     0, ipl_deb, NULL, NULL
     };
 
@@ -569,61 +571,62 @@ return SCPE_OK;
 t_stat ipl_attach (UNIT *uptr, char *cptr)
 {
 SOCKET newsock;
-uint32 i, t, ipa, ipp, oldf;
-char *tptr;
+uint32 i, t, oldf;
+char host[CBUFSIZE], port[CBUFSIZE], hostport[2*CBUFSIZE+3];
+char *tptr = NULL;
 t_stat r;
 
-r = get_ipaddr (cptr, &ipa, &ipp);
-if ((r != SCPE_OK) || (ipp == 0))
-    return SCPE_ARG;
 oldf = uptr->flags;
 if (oldf & UNIT_ATT)
     ipl_detach (uptr);
 if ((sim_switches & SWMASK ('C')) ||
     ((sim_switches & SIM_SW_REST) && (oldf & UNIT_ACTV))) {
-        if (ipa == 0)
-            ipa = 0x7F000001;
-        newsock = sim_connect_sock (ipa, ipp);
+        r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), NULL, NULL);
+        if ((r != SCPE_OK) || (port[0] == '\0'))
+            return SCPE_ARG;
+        sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host[0] ? ":" : "", port);
+        newsock = sim_connect_sock (hostport, NULL, NULL);
         if (newsock == INVALID_SOCKET)
             return SCPE_IOERR;
-        printf ("Connecting to IP address %d.%d.%d.%d, port %d\n",
-            (ipa >> 24) & 0xff, (ipa >> 16) & 0xff,
-            (ipa >> 8) & 0xff, ipa & 0xff, ipp);
+        printf ("Connecting to %s\n", hostport);
         if (sim_log)
             fprintf (sim_log,
-                "Connecting to IP address %d.%d.%d.%d, port %d\n",
-                (ipa >> 24) & 0xff, (ipa >> 16) & 0xff,
-                (ipa >> 8) & 0xff, ipa & 0xff, ipp);
+                "Connecting to %s\n", hostport);
         uptr->flags = uptr->flags | UNIT_ACTV;
         uptr->LSOCKET = 0;
         uptr->DSOCKET = newsock;
         }
 else {
-    if (ipa != 0)
+    r = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
+    if (r != SCPE_OK)
         return SCPE_ARG;
-    newsock = sim_master_sock (ipp);
+    sprintf(hostport, "%s%s%s%s%s", strchr(host, ':') ? "[" : "", host, strchr(host, ':') ? "]" : "", host[0] ? ":" : "", port);
+    newsock = sim_master_sock (hostport, &r);
+    if (r != SCPE_OK)
+        return r;
     if (newsock == INVALID_SOCKET)
         return SCPE_IOERR;
-    printf ("Listening on port %d\n", ipp);
+    printf ("Listening on port %s\n", hostport);
     if (sim_log)
-        fprintf (sim_log, "Listening on port %d\n", ipp);
+        fprintf (sim_log, "Listening on port %s\n", hostport);
     uptr->flags = uptr->flags & ~UNIT_ACTV;
     uptr->LSOCKET = newsock;
     uptr->DSOCKET = 0;
     }
 uptr->IBUF = uptr->OBUF = 0;
 uptr->flags = (uptr->flags | UNIT_ATT) & ~(UNIT_ESTB | UNIT_HOLD);
-tptr = (char *) malloc (strlen (cptr) + 1);             /* get string buf */
+tptr = (char *) malloc (strlen (hostport) + 1);         /* get string buf */
 if (tptr == NULL) {                                     /* no memory? */
     ipl_detach (uptr);                                  /* close sockets */
     return SCPE_MEM;
     }
-strcpy (tptr, cptr);                                    /* copy ipaddr:port */
+strcpy (tptr, hostport);                                /* copy ipaddr:port */
 uptr->filename = tptr;                                  /* save */
 sim_activate (uptr, POLL_FIRST);                        /* activate first poll "immediately" */
 if (sim_switches & SWMASK ('W')) {                      /* wait? */
     for (i = 0; i < 30; i++) {                          /* check for 30 sec */
-        if ((t = ipl_check_conn (uptr)))                /* established? */
+        t = ipl_check_conn (uptr);
+        if (t)                                          /* established? */
             break;
         if ((i % 10) == 0)                              /* status every 10 sec */
             printf ("Waiting for connnection\n");

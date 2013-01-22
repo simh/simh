@@ -60,7 +60,7 @@
 
    This library includes the following routines:
 
-   sim_timer_init -        initialize timing system
+   sim_timer_init -         initialize timing system
    sim_rtc_init -           initialize calibration
    sim_rtc_calb -           calibrate clock
    sim_timer_init -         initialize timing system
@@ -103,14 +103,11 @@ static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
 static UNIT *sim_clock_unit = NULL;
 static t_bool sim_asynch_timer = 
-#if defined (SIM_ASYNCH_IO)
+#if defined (SIM_ASYNCH_CLOCKS)
                                  TRUE;
 #else
                                  FALSE;
 #endif
-extern int32 sim_interval, sim_switches;
-extern FILE *sim_log;
-extern UNIT *sim_clock_queue;
 
 t_stat sim_throt_svc (UNIT *uptr);
 
@@ -430,7 +427,7 @@ if (tim > SIM_IDLE_MAX)
     tim = 0;
 return tim;
 }
-#if !defined(_POSIX_SOURCE) && defined(SIM_ASYNCH_IO)
+#if !defined(_POSIX_SOURCE)
 #ifdef NEED_CLOCK_GETTIME
 typedef int clockid_t;
 int clock_gettime(clockid_t clk_id, struct timespec *tp)
@@ -474,6 +471,7 @@ while (sub->tv_nsec > diff->tv_nsec) {
     }
 diff->tv_nsec -= sub->tv_nsec;
 diff->tv_sec -= sub->tv_sec;
+/* Normalize the result */
 while (diff->tv_nsec > 1000000000) {
     ++diff->tv_sec;
     diff->tv_nsec -= 1000000000;
@@ -518,7 +516,7 @@ if (done_time.tv_nsec > 1000000000) {
   }
 pthread_mutex_lock (&sim_asynch_lock);
 sim_idle_wait = TRUE;
-if (!pthread_cond_timedwait (&sim_idle_wake, &sim_asynch_lock, &done_time))
+if (!pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time))
   sim_asynch_check = 0;                 /* force check of asynch queue now */
 else
   timedout = TRUE;
@@ -730,21 +728,21 @@ return SCPE_OK;
 }
 
 REG sim_timer_reg[] = {
-    { DRDATA (TICKS_PER_SEC,    rtc_hz[0],              32), PV_RSPC|REG_RO},
-    { DRDATA (INSTS_PER_TICK,   rtc_currd[0],           32), PV_RSPC|REG_RO},
-    { FLDATA (IDLE_ENAB,        sim_idle_enab,          0),  REG_RO},
-    { DRDATA (IDLE_RATE_MS,     sim_idle_rate_ms,       32), PV_RSPC|REG_RO},
-    { DRDATA (OS_SLEEP_MIN_MS,  sim_os_sleep_min_ms,    32), PV_RSPC|REG_RO},
-    { DRDATA (IDLE_STABLE,      sim_idle_stable,        32), PV_RSPC},
-    { FLDATA (IDLE_IDLED,       sim_idle_idled,         0),  REG_RO},
-    { DRDATA (TMR,              sim_calb_tmr,           32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_MS_START,   sim_throt_ms_start,     32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_MS_STOP,    sim_throt_ms_stop,      32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_TYPE,       sim_throt_type,         32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_VAL,        sim_throt_val,          32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_STATE,      sim_throt_state,        32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_SLEEP_TIME, sim_throt_sleep_time,   32), PV_RSPC|REG_RO},
-    { DRDATA (THROT_WAIT,       sim_throt_wait,         32), PV_RSPC|REG_RO},
+    { DRDATAD (TICKS_PER_SEC,    rtc_hz[0],              32, "Ticks Per Second"), PV_RSPC|REG_RO},
+    { DRDATAD (INSTS_PER_TICK,   rtc_currd[0],           32, "Instructions Per Tick"), PV_RSPC|REG_RO},
+    { FLDATAD (IDLE_ENAB,        sim_idle_enab,           0, "Idle Enabled"), REG_RO},
+    { DRDATAD (IDLE_RATE_MS,     sim_idle_rate_ms,       32, "Idle Rate Milliseconds"), PV_RSPC|REG_RO},
+    { DRDATAD (OS_SLEEP_MIN_MS,  sim_os_sleep_min_ms,    32, "Minimum Sleep Resolution"), PV_RSPC|REG_RO},
+    { DRDATAD (IDLE_STABLE,      sim_idle_stable,        32, "Idle Stable"), PV_RSPC},
+    { FLDATAD (IDLE_IDLED,       sim_idle_idled,          0, ""), REG_RO},
+    { DRDATAD (TMR,              sim_calb_tmr,           32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_MS_START,   sim_throt_ms_start,     32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_MS_STOP,    sim_throt_ms_stop,      32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_TYPE,       sim_throt_type,         32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_VAL,        sim_throt_val,          32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_STATE,      sim_throt_state,        32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_SLEEP_TIME, sim_throt_sleep_time,   32, ""), PV_RSPC|REG_RO},
+    { DRDATAD (THROT_WAIT,       sim_throt_wait,         32, ""), PV_RSPC|REG_RO},
     { NULL }
     };
 
@@ -804,7 +802,7 @@ DEVICE sim_timer_dev = {
         w = ms_to_wait / ms_per_wait
 */
 
-t_bool sim_idle (int32 tmr, t_bool sin_cyc)
+t_bool sim_idle (uint32 tmr, t_bool sin_cyc)
 {
 static uint32 cyc_ms = 0;
 uint32 w_ms, w_idle, act_ms;
@@ -813,7 +811,7 @@ int32 act_cyc;
 //sim_idle_idled = TRUE;                                  /* record idle attempt */
 if ((!sim_idle_enab)                             ||     /* idling disabled */
     ((sim_clock_queue == QUEUE_LIST_END) &&             /* or clock queue empty? */
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
      (!(sim_asynch_enabled && sim_asynch_timer)))||     /*     and not asynch? */
 #else
      (TRUE))                                     ||
@@ -1103,7 +1101,7 @@ sim_activate (uptr, sim_throt_wait);                    /* reschedule */
 return SCPE_OK;
 }
 
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 
 static double _timespec_to_double (struct timespec *time)
 {
@@ -1244,11 +1242,11 @@ sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - exiting\n");
 return NULL;
 }
 
-#endif
+#endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS) */
 
 void sim_start_timer_services (void)
 {
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_asynch_enabled && sim_asynch_timer) {
     pthread_attr_t attr;
@@ -1285,7 +1283,7 @@ pthread_mutex_unlock (&sim_timer_lock);
 
 void sim_stop_timer_services (void)
 {
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 pthread_mutex_lock (&sim_timer_lock);
 if (sim_timer_thread_running) {
     sim_debug (DBG_TRC, &sim_timer_dev, "sim_stop_timer_services() - stopping\n");
@@ -1301,7 +1299,7 @@ else
 
 t_stat sim_timer_change_asynch (void)
 {
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 if (sim_asynch_enabled && sim_asynch_timer)
     sim_start_timer_services ();
 else {
@@ -1347,11 +1345,11 @@ int32 inst_delay;
 double inst_per_sec;
 
 AIO_VALIDATE;
-if (sim_is_active_bool (uptr))                          /* already active? */
+if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
 inst_per_sec = sim_timer_inst_per_sec ();
 inst_delay = (int32)((inst_per_sec*usec_delay)/1000000.0);
-#if defined(SIM_ASYNCH_IO)
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 if ((sim_calb_tmr == -1) ||                             /* if No timer initialized */
     (inst_delay < rtc_currd[sim_calb_tmr]) ||           /*    or sooner than next clock tick? */
     (rtc_elapsed[sim_calb_tmr] < sim_idle_stable) ||    /*    or not idle stable yet */
@@ -1432,8 +1430,8 @@ if (NULL == sim_clock_unit)
     return sim_activate (uptr, interval);
 else
     if (sim_asynch_enabled && sim_asynch_timer) {
-        if (!sim_is_active_bool (uptr)) {               /* already active? */
-#if defined(SIM_ASYNCH_IO)
+        if (!sim_is_active (uptr)) {               /* already active? */
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
             sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule() - queueing %s for clock co-schedule\n", sim_uname (uptr));
             pthread_mutex_lock (&sim_timer_lock);
             uptr->next = sim_clock_cosched_queue;
@@ -1446,7 +1444,7 @@ else
     else {
         int32 t;
 
-        t = sim_is_active (sim_clock_unit);
+        t = sim_activate_time (sim_clock_unit);
         return sim_activate (uptr, t? t - 1: interval);
         }
 }

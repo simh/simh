@@ -246,8 +246,6 @@ static struct drvtyp drv_tab[] = {
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern FILE *sim_deb;
-extern uint32 sim_taddr_64;
 
 uint32 tq_sa = 0;                                       /* status, addr */
 uint32 tq_saw = 0;                                      /* written data */
@@ -414,8 +412,10 @@ UNIT *tq_getucb (uint32 lu);
    tq_mod       TQ modifier list
 */
 
+#define IOLN_TQ         004
+
 DIB tq_dib = {
-    IOBA_TQ, IOLN_TQ, &tq_rd, &tq_wr,
+    IOBA_AUTO, IOLN_TQ, &tq_rd, &tq_wr,
     1, IVCL (TQ), 0, { &tq_inta }
     };
 
@@ -539,7 +539,7 @@ DEVICE tq_dev = {
     TQ_NUMDR + 2, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tq_reset,
     &tq_boot, &tq_attach, &tq_detach,
-    &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE,
     0, tq_debug
     };
 
@@ -1691,7 +1691,7 @@ return tq_putpkt (pkt, TRUE);
 
 t_bool tq_plf (uint32 err)
 {
-int32 pkt;
+int32 pkt = 0;
 
 if (!tq_deqf (&pkt))                                    /* get log pkt */
     return ERR;
@@ -2202,7 +2202,7 @@ static const uint16 boot_rom[] = {
 
 t_stat tq_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

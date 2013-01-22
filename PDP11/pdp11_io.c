@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   27-Mar-12    RMS     Fixed order of int_internal (Jordi Guillaumes i Pons)
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    12-Dec-11    RMS     Fixed Qbus interrupts to treat all IO devices as BR4
    19-Nov-08    RMS     Moved I/O support routines to I/O library
@@ -59,8 +60,7 @@ extern int32 trap_req, ipl;
 extern int32 cpu_log;
 extern int32 autcon_enb;
 extern int32 uba_last;
-extern FILE *sim_log;
-extern DEVICE *sim_devices[], cpu_dev;
+extern DEVICE cpu_dev;
 extern t_addr cpu_memsize;
 
 int32 calc_ints (int32 nipl, int32 trq);
@@ -83,8 +83,8 @@ static const int32 pirq_bit[7] = {
     };
 
 static const int32 int_internal[IPL_HLVL] = {
-    INT_INTERNAL7, INT_INTERNAL6, INT_INTERNAL5, INT_INTERNAL4,
-    INT_INTERNAL3, INT_INTERNAL2, INT_INTERNAL1, 0
+    0,             INT_INTERNAL1, INT_INTERNAL2, INT_INTERNAL3,
+    INT_INTERNAL4, INT_INTERNAL5, INT_INTERNAL6, INT_INTERNAL7
     };
 
 /* I/O page lookup and linkage routines

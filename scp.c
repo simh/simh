@@ -217,10 +217,19 @@
 
 #include "sim_defs.h"
 #include "sim_rev.h"
-#include "sim_tmxr.h"
+#include "sim_disk.h"
+#include "sim_tape.h"
+#include "sim_ether.h"
+#include "sim_serial.h"
+#include "sim_sock.h"
 #include <signal.h>
 #include <ctype.h>
 #include <time.h>
+#if defined(_WIN32)
+#include <direct.h>
+#else
+#include <unistd.h>
+#endif
 #include <sys/stat.h>
 
 #if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
@@ -302,37 +311,26 @@
 
 /* Asynch I/O support */
 #if defined (SIM_ASYNCH_IO)
-pthread_mutex_t sim_asynch_lock    = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t sim_idle_wake       = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t sim_asynch_lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t sim_asynch_wake = PTHREAD_COND_INITIALIZER;
+
 pthread_mutex_t sim_timer_lock     = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_timer_wake      = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t sim_tmxr_poll_lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t sim_tmxr_poll_cond  = PTHREAD_COND_INITIALIZER;
 int32 sim_tmxr_poll_count;
 pthread_t sim_asynch_main_threadid;
-UNIT * volatile sim_asynch_queue = QUEUE_LIST_END;
-UNIT * volatile sim_wallclock_queue = QUEUE_LIST_END;
-UNIT * volatile sim_wallclock_entry = NULL;
-UNIT * volatile sim_clock_cosched_queue = QUEUE_LIST_END;
+UNIT * volatile sim_asynch_queue;
+UNIT * volatile sim_wallclock_queue;
+UNIT * volatile sim_wallclock_entry;
+UNIT * volatile sim_clock_cosched_queue;
+t_bool sim_asynch_enabled = TRUE;
 int32 sim_asynch_check;
 int32 sim_asynch_latency = 4000;      /* 4 usec interrupt latency */
 int32 sim_asynch_inst_latency = 20;   /* assume 5 mip simulator */
-#endif
+#else
 t_bool sim_asynch_enabled = FALSE;
-
-/* VM interface */
-
-extern char sim_name[];
-extern DEVICE *sim_devices[];
-extern REG *sim_PC;
-extern const char *sim_stop_messages[];
-extern t_stat sim_instr (void);
-extern t_stat sim_load (FILE *ptr, char *cptr, char *fnam, int32 flag);
-extern int32 sim_emax;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
-extern t_stat parse_sym (char *cptr, t_addr addr, UNIT *uptr, t_value *val,
-    int32 sw);
+#endif
 
 /* The per-simulator init routine is a weak global that defaults to NULL
    The other per-simulator pointers can be overrriden by the init routine */
@@ -353,6 +351,8 @@ t_stat set_dev_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_unit_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat ssh_break (FILE *st, char *cptr, int32 flg);
+t_stat set_default_cmd (int32 flg, char *cptr);
+t_stat pwd_cmd (int32 flg, char *cptr);
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr);
 t_stat show_config (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_queue (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -366,6 +366,7 @@ t_stat show_dev_logicals (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *
 t_stat show_dev_modifiers (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_show_commands (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
@@ -399,7 +400,7 @@ char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_value get_rval (REG *rptr, uint32 idx);
 void put_rval (REG *rptr, uint32 idx, t_value val);
-t_value strtotv (char *inptr, char **endptr, uint32 radix);
+t_value strtotv (const char *inptr, char **endptr, uint32 radix);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
@@ -429,7 +430,7 @@ t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 t_stat step_svc (UNIT *ptr);
-void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[]);
+void sub_args (char *instr, size_t instr_size, char *do_arg[]);
 t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, char *cptr);
 t_stat set_verify (int32 flag, char *cptr);
@@ -438,7 +439,7 @@ t_stat set_quiet (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
 t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 void int_handler (int signal);
-void run_cmd_message (const char *unechod_cmdline, t_stat r);
+t_stat set_prompt (int32 flag, char *cptr);
 
 /* Global data */
 
@@ -475,6 +476,7 @@ FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
+char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
 static int32 sim_do_echo = 0;                           /* the echo status of the currently open do file */
@@ -640,6 +642,10 @@ static CTAB cmd_table[] = {
       "exi{t}|q{uit}|by{e}      exit from simulation\n" },
     { "QUIT", &exit_cmd, 0, NULL },
     { "BYE", &exit_cmd, 0, NULL },
+    { "CD", &set_default_cmd, 0,
+      "cd                       set the current directory\n" },
+    { "PWD", &pwd_cmd, 0, 
+      "pwd                      show current directory\n" },
     { "SET", &set_cmd, 0,
       "set console arg{,arg...} set console options\n"
       "set console WRU          specify console drop to simh char\n"
@@ -649,7 +655,8 @@ static CTAB cmd_table[] = {
       "set console TELNET=port  specify console telnet port\n"
       "set console TELNET=LOG=log_file\n"
       "                         specify console telnet logging to the\n"
-      "                         specified destination {LOG,STDOUT,DEBUG or filename)\n"
+      "                         specified destination {LOG,STDOUT,STDERR,DEBUG\n"
+      "                         or filename)\n"
       "set console TELNET=NOLOG disables console telnet logging\n"
       "set console TELNET=BUFFERED[=bufsize]\n"
       "                         specify console telnet buffering\n"
@@ -658,18 +665,20 @@ static CTAB cmd_table[] = {
       "set console TELNET=UNBUFFERED\n"
       "                         disables console telnet buffering\n"
       "set console NOTELNET     disable console telnet\n"
+      "set console SERIAL=serialport[;config]\n"
+      "                         specify console serial port and optionally\n"
+      "                         the port config (i.e. ;9600-8n1)\n"
+      "set console NOSERIAL     disable console serial session\n"
       "set console LOG=log_file enable console logging to the\n"
-      "                         specified destination {STDOUT,DEBUG or filename)\n"
+      "                         specified destination {STDOUT,STDERR,DEBUG\n"
+      "                         or filename)\n"
       "set console NOLOG        disable console logging\n"
-      "set console DEBUG=dbg_file\n"
-      "                         enable console debugging to the\n"
-      "                         specified destination {LOG, STDOUT or filename)\n"
-      "set console NODEBUG      disable console debugging\n"
+      "set default <dir>        set the current directory\n"
       "set log log_file         specify the log destination\n"
       "                         (STDOUT,DEBUG or filename)\n"
       "set nolog                disables any currently active logging\n"
       "set debug debug_file     specify the debug destination\n"
-      "                         (STDOUT,LOG or filename)\n"
+      "                         (STDOUT,STDERR,LOG or filename)\n"
       "set nodebug              disables any currently active debug output\n"
       "set break <list>         set breakpoints\n"
       "set nobreak <list>       clear breakpoints\n"
@@ -691,6 +700,7 @@ static CTAB cmd_table[] = {
       "set nomessage            disables display of command file error messages\n"
       "set quiet                disables suppression of some output and messages\n"
       "set noquiet              re-enables suppression of some output and messages\n"
+      "set prompt \"string\"      sets an alternate simulator prompt string\n"
       "set <dev> OCT|DEC|HEX    set device display radix\n"
       "set <dev> ENABLED        enable device\n"
       "set <dev> DISABLED       disable device\n"
@@ -714,6 +724,7 @@ static CTAB cmd_table[] = {
       "sh{ow} th{rottle}        show simulation rate\n" 
       "sh{ow} a{synch}          show asynchronouse I/O state\n" 
       "sh{ow} ve{rsion}         show simulator version\n" 
+      "sh{ow} def{ault}         show current directory\n" 
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
       "sh{ow} <dev> MODIFIERS   show device modifiers\n"
@@ -722,7 +733,8 @@ static CTAB cmd_table[] = {
       "sh{ow} <dev> {arg,...}   show device parameters\n"
       "sh{ow} <unit> {arg,...}  show unit parameters\n"
       "sh{ow} ethernet          show ethernet devices\n"
-      "sh{ow} multiplexer       show multiplexer devices\n"
+      "sh{ow} serial            show serial devices\n"
+      "sh{ow} multiplexer       show open multiplexer devices\n"
       "sh{ow} clocks            show calibrated timers\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
@@ -749,12 +761,12 @@ static CTAB cmd_table[] = {
       "echo <string>            display <string>\n" },
     { "ASSERT", &assert_cmd, 0,
       "assert {<dev>} <cond>    test simulator state against condition\n" },
-    { "HELP", &help_cmd, 0,
-      "h{elp}                   type this message\n"
-      "h{elp} <command>         type help for command\n" },
     { "!", &spawn_cmd, 0,
       "!                        execute local command interpreter\n"
       "! <command>              execute local host command\n" },
+    { "HELP", &help_cmd, 0,
+      "h{elp}                   type this message\n"
+      "h{elp} <command>         type help for command\n" },
     { NULL, NULL, 0 }
     };
 
@@ -777,7 +789,7 @@ int setenv(const char *envname, const char *envval, int overwrite)
 
 int main (int argc, char *argv[])
 {
-char cbuf[CBUFSIZE], gbuf[CBUFSIZE], *cptr, *cptr2;
+char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *cptr2;
 char nbuf[PATH_MAX + 7];
 int32 i, sw;
 t_bool lookswitch;
@@ -788,6 +800,7 @@ CTAB *cmdp;
 argc = ccommand (&argv);
 #endif
 
+set_prompt (0, "sim>");                                 /* start with set standard prompt */
 *cbuf = 0;                                              /* init arg buffer */
 sim_switches = 0;                                       /* init switches */
 lookswitch = TRUE;
@@ -802,7 +815,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
         sim_switches = sim_switches | sw;
         }
     else {
-        if ((strlen (argv[i]) + strlen (cbuf) + 3) >= CBUFSIZE) {
+        if ((strlen (argv[i]) + strlen (cbuf) + 3) >= sizeof(cbuf)) {
             fprintf (stderr, "Argument string too long\n");
             return 0;
             }
@@ -815,6 +828,7 @@ for (i = 1; i < argc; i++) {                            /* loop thru args */
 sim_quiet = sim_switches & SWMASK ('Q');                /* -q means quiet */
 sim_on_inherit = sim_switches & SWMASK ('O');           /* -o means inherit on state */
 
+sim_init_sock ();                                       /* init socket capabilities */
 AIO_INIT;                                               /* init Asynch I/O */
 if (sim_vm_init != NULL)                                /* call once only */
     (*sim_vm_init)();
@@ -885,21 +899,22 @@ else if (*argv[0]) {                                    /* sim name arg? */
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
 
 while (stat != SCPE_EXIT) {                             /* in case exit */
-    if ((cptr = sim_brk_getact (cbuf, CBUFSIZE)))       /* pending action? */
-        printf ("sim> %s\n", cptr);                     /* echo */
+    if ((cptr = sim_brk_getact (cbuf, sizeof(cbuf))))   /* pending action? */
+        printf ("%s%s\n", sim_prompt, cptr);            /* echo */
     else if (sim_vm_read != NULL) {                     /* sim routine? */
-        printf ("sim> ");                               /* prompt */
-        cptr = (*sim_vm_read) (cbuf, CBUFSIZE, stdin);
+        printf ("%s", sim_prompt);                      /* prompt */
+        cptr = (*sim_vm_read) (cbuf, sizeof(cbuf), stdin);
         }
-    else cptr = read_line_p ("sim> ", cbuf, CBUFSIZE, stdin);/* read with prmopt*/
-    if (cptr == NULL)                                   /* EOF? */
+    else cptr = read_line_p (sim_prompt, cbuf, sizeof(cbuf), stdin);/* read with prmopt*/
+    if (cptr == NULL) {                                 /* EOF? */
         if (sim_ttisatty()) continue;                   /* ignore tty EOF */
         else break;                                     /* otherwise exit */
+        }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
-    sub_args (cbuf, gbuf, sizeof(gbuf), argv);
+    sub_args (cbuf, sizeof(cbuf), argv);
     if (sim_log)                                        /* log cmd */
-        fprintf (sim_log, "sim> %s\n", cptr);
+        fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
     sim_switches = 0;                                   /* init switches */
     if ((cmdp = find_cmd (gbuf)))                       /* lookup command */
@@ -909,14 +924,15 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
     stat_nomessage = stat_nomessage || (!sim_show_message);/* Apply global suppression */
     stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
     sim_last_cmd_stat = stat;                           /* save command error status */
-    if ((stat >= SCPE_BASE) && (!stat_nomessage)) {     /* error? */
-        if (cmdp && cmdp->message)                      /* special message handler? */
-            cmdp->message (NULL, stat);
-        else {
-            printf ("%s\n", sim_error_text (stat));
-            if (sim_log)
-                fprintf (sim_log, "%s\n", sim_error_text (stat));
-            }
+    if (!stat_nomessage) {                              /* displaying message status? */
+        if (cmdp && (cmdp->message))                    /* special message handler? */
+            cmdp->message (NULL, stat);                 /* let it deal with display */
+        else
+            if (stat >= SCPE_BASE) {                    /* error? */
+                printf ("%s\n", sim_error_text (stat));
+                if (sim_log)
+                    fprintf (sim_log, "%s\n", sim_error_text (stat));
+                }
         }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
@@ -928,7 +944,30 @@ sim_set_logoff (0, NULL);                               /* close log */
 sim_set_notelnet (0, NULL);                             /* close Telnet */
 sim_ttclose ();                                         /* close console */
 AIO_CLEANUP;                                            /* Asynch I/O */
+sim_cleanup_sock ();                                    /* cleanup sockets */
 return 0;
+}
+
+/* Set prompt routine */
+
+t_stat set_prompt (int32 flag, char *cptr)
+{
+char gbuf[CBUFSIZE];
+
+if ((!cptr) || (*cptr == '\0'))
+    return SCPE_ARG;
+
+cptr = get_glyph_nc (cptr, gbuf, '"');                  /* get quote delimted token */
+if (gbuf[0] == '\0') {                                  /* Token started with quote */
+    gbuf[sizeof (gbuf)-1] = '\0';
+    strncpy (gbuf, cptr, sizeof (gbuf)-1);
+    cptr = strchr (gbuf, '"');
+    if (cptr)
+        *cptr = '\0';
+    }
+sim_prompt = realloc (sim_prompt, strlen (gbuf) + 2);   /* nul terminator and trailing blank */
+sprintf (sim_prompt, "%s ", gbuf);
+return SCPE_OK;
 }
 
 /* Find command routine */
@@ -956,6 +995,8 @@ return SCPE_EXIT;
 void fprint_help (FILE *st)
 {
 CTAB *cmdp;
+DEVICE *dptr;
+int i;
 
 for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help)
@@ -965,7 +1006,69 @@ for (cmdp = cmd_table; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help && (!sim_vm_cmd || !find_ctab (sim_vm_cmd, cmdp->name)))
         fputs (cmdp->help, st);
     }
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+    if (dptr->help)
+        fprintf (st, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+    if (dptr->attach_help || 
+        (DEV_TYPE(dptr) == DEV_MUX) ||
+        (DEV_TYPE(dptr) == DEV_ETHER) ||
+        (DEV_TYPE(dptr) == DEV_DISK) ||
+        (DEV_TYPE(dptr) == DEV_TAPE)) {
+        if (dptr->numunits == 1)
+            fprintf (st, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+        else {
+            fprintf (st, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+            fprintf (st, "h{elp} %sn ATTACH\t type help for unit %sn ATTACH command\n", dptr->name, dptr->name);
+            }
+        }
+    if (dptr->registers) {
+        REG *rptr;
+
+        for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+            if (rptr->desc) {
+                fprintf (st, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                break;
+                }
+            }
+        }
+    }
 return;
+}
+
+void fprint_reg_help (FILE *st, DEVICE *dptr)
+{
+REG *rptr, *trptr;
+t_bool found = FALSE;
+t_bool all_unique = TRUE;
+DEVICE *tdptr;
+char *tptr;
+
+for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+    if (rptr->desc) {
+        found = TRUE;
+        trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
+        if ((trptr == NULL) || (tdptr != dptr))
+            all_unique = FALSE;
+        }
+    }
+if (!found)
+    fprintf (st, "No register help is available for the %s device\n", dptr->name);
+else {
+    fprintf (st, "%s device registers:\n", dptr->name);
+    for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+        if (rptr->desc) {
+            if (all_unique) {
+                fprintf (st, "  %-9s  %s\n", rptr->name, rptr->desc);
+                continue;
+                }
+            trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
+            if ((trptr == NULL) || (tdptr != dptr))
+                fprintf (st, "  %s %-9s  %s\n", dptr->name, rptr->name, rptr->desc);
+            else
+                fprintf (st, "  %*s %-9s  %s\n", (int)strlen(dptr->name), "", rptr->name, rptr->desc);
+            }
+        }
+    }
 }
 
 t_stat help_cmd (int32 flag, char *cptr)
@@ -976,14 +1079,157 @@ CTAB *cmdp;
 GET_SWITCHES (cptr);
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
-    if (*cptr)
-        return SCPE_2MARG;
     if ((cmdp = find_cmd (gbuf))) {
-        fputs (cmdp->help, stdout);
-        if (sim_log)
-            fputs (cmdp->help, sim_log);
+        if (*cptr)
+            return SCPE_2MARG;
+        if (cmdp->help) {
+            fputs (cmdp->help, stdout);
+            if (sim_log)
+                fputs (cmdp->help, sim_log);
+            if (strcmp (cmdp->name, "HELP") == 0) {
+                DEVICE *dptr;
+                int i;
+
+                for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
+                    if (dptr->help) {
+                        fprintf (stdout, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+                        if (sim_log)
+                            fprintf (sim_log, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+                        }
+                    if (dptr->attach_help || 
+                        (DEV_TYPE(dptr) == DEV_MUX) ||
+                        (DEV_TYPE(dptr) == DEV_DISK) ||
+                        (DEV_TYPE(dptr) == DEV_TAPE)) {
+                        fprintf (stdout, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        if (sim_log)
+                            fprintf (sim_log, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        }
+                    if (dptr->registers) {
+                        REG *rptr;
+
+                        for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+                            if (rptr->desc) {
+                                fprintf (stdout, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                                if (sim_log)
+                                    fprintf (sim_log, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                                break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        else { /* no help so it is likely a command alias */
+            CTAB *cmdpa;
+
+            for (cmdpa=cmd_table; cmdpa->name != NULL; cmdpa++)
+                if ((cmdpa->action == cmdp->action) && (cmdpa->help)) {
+                    fprintf (stdout, "%s is an alias for the %s command:\n%s", 
+                                cmdp->name, cmdpa->name, cmdpa->help);
+                    if (sim_log)
+                        fprintf (sim_log, "%s is an alias for the %s command.\n%s", 
+                                    cmdp->name, cmdpa->name, cmdpa->help);
+                    break;
+                    }
+            if (cmdpa->name == NULL) {              /* not found? */
+                fprintf (stdout, "No help available for the %s command\n", cmdp->name);
+                if (sim_log)
+                    fprintf (sim_log, "No help available for the %s command\n", cmdp->name);
+                }
+            }
         }
-    else return SCPE_ARG;
+    else { 
+        DEVICE *dptr;
+        UNIT *uptr;
+        int i, dev_type;
+        static struct dev_help {
+            int type;
+            t_stat (*attach_help)(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+        } helps[] = {
+            {DEV_DISK,      &sim_disk_attach_help},
+            {DEV_TAPE,      &sim_tape_attach_help},
+            {DEV_MUX,       &tmxr_attach_help},
+            {DEV_ETHER,     &eth_attach_help},
+            {0,             NULL}};
+
+        dptr = find_unit (gbuf, &uptr);
+        if (dptr == NULL) {
+            dptr = find_dev (gbuf);
+            if (dptr == NULL)
+                return SCPE_ARG;
+            if (dptr->flags & DEV_DISABLE) {
+                fprintf (stdout, "Device %s is currently disabled\n", dptr->name);
+                if (sim_log)
+                    fprintf (sim_log, "Device %s is currently disabled\n", dptr->name);
+                }
+            }
+        dev_type = DEV_TYPE (dptr);
+        for (i=0; helps[i].type; i++)
+            if (helps[i].type == dev_type)
+                break;
+        if (*cptr) {
+            cptr = get_glyph (cptr, gbuf, 0);
+            cmdp = find_cmd (gbuf);
+            }
+        else
+            cmdp = NULL;
+        if (0 == MATCH_CMD (gbuf, "REGISTERS")) {
+            fprint_reg_help (stdout, dptr);
+            if (sim_log)
+                fprint_reg_help (sim_log, dptr);
+            }
+        else {
+            if ((dptr->help == NULL) && (cmdp == NULL)) {
+                fprintf (stdout, "No help available for the %s device\n", dptr->name);
+                if (sim_log)
+                    fprintf (sim_log, "No help available for the %s device\n", dptr->name);
+                if (dptr->attach_help || 
+                    (DEV_TYPE(dptr) == DEV_MUX) ||
+                    (DEV_TYPE(dptr) == DEV_ETHER) ||
+                    (DEV_TYPE(dptr) == DEV_DISK) ||
+                    (DEV_TYPE(dptr) == DEV_TAPE)) {
+                    fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                    if (sim_log)
+                        fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                    }
+                }
+            else {
+                if (cmdp != NULL) {
+                    if (cmdp->action != &attach_cmd) {
+                        fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+                        if (sim_log)
+                            fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
+                        if (dptr->attach_help || 
+                            (DEV_TYPE(dptr) == DEV_MUX) ||
+                            (DEV_TYPE(dptr) == DEV_ETHER) ||
+                            (DEV_TYPE(dptr) == DEV_DISK) ||
+                            (DEV_TYPE(dptr) == DEV_TAPE)) {
+                            fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                            if (sim_log)
+                                fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
+                            }
+                        }
+                    else {
+                        if (dptr->attach_help) {
+                            dptr->attach_help (stdout, dptr, uptr, 0, cptr);
+                            if (sim_log)
+                                dptr->attach_help (sim_log, dptr, uptr, 0, cptr);
+                            }
+                        else {
+                            helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
+                            if (sim_log)
+                                helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
+                            }
+                        }
+                    }
+                else {
+                    dptr->help (stdout, dptr, uptr, 0, cptr);
+                    if (sim_log)
+                        dptr->help (sim_log, dptr, uptr, 0, cptr);
+                    }
+                }
+            }
+        }
     }
 else {
     fprint_help (stdout);
@@ -1068,7 +1314,7 @@ return cbuf;
 
 t_stat do_cmd_label (int32 flag, char *fcptr, char *label)
 {
-char *cptr, cbuf[CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
+char *cptr, cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *c, quote, *do_arg[10];
 FILE *fpin;
 CTAB *cmdp = NULL;
 int32 echo, nargs, errabort, i;
@@ -1159,12 +1405,12 @@ if (errabort)                                           /* -e flag? */
     set_on (1, NULL);                                   /* equivalent to ON ERROR RETURN */
 
 do {
-    ocptr = cptr = sim_brk_getact (cbuf, CBUFSIZE);     /* get bkpt action */
+    ocptr = cptr = sim_brk_getact (cbuf, sizeof(cbuf)); /* get bkpt action */
     if (!ocptr) {                                       /* no pending action? */
-        ocptr = cptr = read_line (cbuf, CBUFSIZE, fpin); /* get cmd line */
+        ocptr = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
         sim_goto_line[sim_do_depth] += 1;
         }
-    sub_args (cbuf, gbuf, sizeof(gbuf), do_arg);        /* substitute args */
+    sub_args (cbuf, sizeof(cbuf), do_arg);              /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
@@ -1231,24 +1477,26 @@ do {
                 fprintf (sim_log, "%s> %s\n", do_position(), ocptr);
             }
         }
-    if ((stat >= SCPE_BASE) && !stat_nomessage) {       /* report error if not suppressed */
-        if (cmdp && cmdp->message) {                    /* special message handler */
+    if (!stat_nomessage) {                              /* report error if not suppressed */
+        if (cmdp && cmdp->message)                      /* special message handler */
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
-            }
-        else {
-            printf ("%s\n", sim_error_text (stat));
-            if (sim_log)
-                fprintf (sim_log, "%s\n", sim_error_text (stat));
-            }
+        else
+            if (stat >= SCPE_BASE) {                    /* report error if not suppressed */
+
+                printf ("%s\n", sim_error_text (stat));
+                if (sim_log)
+                    fprintf (sim_log, "%s\n", sim_error_text (stat));
+                }
         }
     if (staying &&
         (sim_on_check[sim_do_depth]) && 
         (stat != SCPE_OK) &&
-        (stat != SCPE_STEP))
+        (stat != SCPE_STEP)) {
         if ((stat <= SCPE_MAX_ERR) && sim_on_actions[sim_do_depth][stat])
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][stat];
         else
             sim_brk_act[sim_do_depth] = sim_on_actions[sim_do_depth][0];
+        }
     if (sim_vm_post != NULL)
         (*sim_vm_post) (TRUE);
     } while (staying);
@@ -1286,8 +1534,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
 
    Calling sequence
    instr        =       input string
-   tmpbuf       =       temp buffer
-   maxstr       =       min (len (instr), len (tmpbuf))
+   instr_size   =       sizeof input string buffer
    do_arg[10]   =       arguments
 
    Token "%0" expands to the command file name. 
@@ -1310,6 +1557,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
           %SIM_VERIFY%        The Verify/Verbose mode of the current Do command file
           %SIM_VERBOSE%       The Verify/Verbose mode of the current Do command file
           %SIM_QUIET%         The Quiet mode of the current Do command file
+          %SIM_MESSAGE%       The message display status of the current Do command file
    Environment variable lookups are done first with the precise name between 
    the % characters and if that fails, then the name between the % characters
    is upcased and a lookup of that valus is attempted.
@@ -1321,13 +1569,16 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    untouched.
 */
 
-void sub_args (char *instr, char *tmpbuf, int32 maxstr, char *do_arg[])
+void sub_args (char *instr, size_t instr_size, char *do_arg[])
 {
 char gbuf[CBUFSIZE];
-char *ip = instr, *op = tmpbuf, *ap, *oend = tmpbuf + maxstr - 2, *istart;
+char *ip = instr, *op, *ap, *oend, *istart, *tmpbuf;
 char rbuf[CBUFSIZE];
 int i;
 
+tmpbuf = malloc(instr_size);
+op = tmpbuf;
+oend = tmpbuf + instr_size - 2;
 while (isspace (*ip))                                   /* skip leading spaces */
     *op++ = *ip++;
 istart = ip;
@@ -1445,6 +1696,7 @@ for (; *ip && (op < oend); ) {
     }
 *op = 0;                                                /* term buffer */
 strcpy (instr, tmpbuf);
+free (tmpbuf);
 return;
 }
 
@@ -1452,7 +1704,7 @@ t_stat shift_args (char *do_arg[], size_t arg_count)
 {
 size_t i;
 
-for (i=1; i<arg_count; ++i)
+for (i=1; i<arg_count-1; ++i)
     do_arg[i] = do_arg[i+1];
 return SCPE_OK;
 }
@@ -1528,7 +1780,7 @@ rewind(sim_gotofile);                                   /* start search for labe
 sim_goto_line[sim_do_depth] = 0;                        /* reset line number */
 sim_do_echo = 0;                                        /* Don't echo while searching for label */
 while (1) {
-    cptr = read_line (cbuf, CBUFSIZE, sim_gotofile);    /* get cmd line */
+    cptr = read_line (cbuf, sizeof(cbuf), sim_gotofile);/* get cmd line */
     if (cptr == NULL) break;                            /* exit on eof */
     sim_goto_line[sim_do_depth] += 1;                   /* record line number */
     if (*cptr == 0) continue;                           /* ignore blank */
@@ -1750,7 +2002,7 @@ t_stat sim_show_asynch (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cp
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 #ifdef SIM_ASYNCH_IO
-fprintf (st, "Asynchronous I/O is %sabled\n", (sim_asynch_enabled) ? "en" : "dis");
+fprintf (st, "Asynchronous I/O is %sabled, %s\n", (sim_asynch_enabled) ? "en" : "dis", AIO_QUEUE_MODE);
 #else
 fprintf (st, "Asynchronous I/O is not available in this simulator\n");
 #endif
@@ -1786,6 +2038,7 @@ C1TAB *ctbr, *glbr;
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
     { "BREAK", &brk_cmd, SSH_ST },
+    { "DEFAULT", &set_default_cmd, 1 },
     { "NOBREAK", &brk_cmd, SSH_CL },
     { "TELNET", &sim_set_telnet, 0 },                   /* deprecated */
     { "NOTELNET", &sim_set_notelnet, 0 },               /* deprecated */
@@ -1797,7 +2050,7 @@ static CTAB set_glob_tab[] = {
     { "NOTHROTTLE", &sim_set_throt, 0 },
     { "ASYNCH", &sim_set_asynch, 1 },
     { "NOASYNCH", &sim_set_asynch, 0 },
-    { "ENV", &sim_set_environment, 1 },
+    { "ENVIRONMENT", &sim_set_environment, 1 },
     { "ON", &set_on, 1 },
     { "NOON", &set_on, 0 },
     { "VERIFY", &set_verify, 1 },
@@ -1808,6 +2061,7 @@ static CTAB set_glob_tab[] = {
     { "NOMESSAGE", &set_message, 0 },
     { "QUIET", &set_quiet, 1 },
     { "NOQUIET", &set_quiet, 0 },
+    { "PROMPT", &set_prompt, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -1962,7 +2216,7 @@ else {
         return SCPE_OK;
     for (i = 0; i < dptr->numunits; i++) {              /* check units */
         up = (dptr->units) + i;                         /* att or active? */
-        if ((up->flags & UNIT_ATT) || sim_is_active_bool (up))
+        if ((up->flags & UNIT_ATT) || sim_is_active (up))
             return SCPE_NOFNC;                          /* can't do it */
         }
     dptr->flags = dptr->flags | DEV_DIS;                /* disable */
@@ -1984,7 +2238,7 @@ if (flag)                                               /* enb? enable */
     uptr->flags = uptr->flags & ~UNIT_DIS;
 else {
     if ((uptr->flags & UNIT_ATT) ||                     /* dsb */
-        sim_is_active_bool (uptr))                      /* more tests */
+        sim_is_active (uptr))                           /* more tests */
         return SCPE_NOFNC;
     uptr->flags = uptr->flags | UNIT_DIS;               /* disable */
     }
@@ -2065,6 +2319,7 @@ static SHTAB show_glob_tab[] = {
     { "NAMES", &show_log_names, 0 },
     { "SHOW", &show_show_commands, 0 },
     { "VERSION", &show_version, 1 },
+    { "DEFAULT", &show_default, 0 },
     { "CONSOLE", &sim_show_console, 0 },
     { "BREAK", &show_break, 0 },
     { "LOG", &sim_show_log, 0 },                        /* deprecated */
@@ -2073,6 +2328,7 @@ static SHTAB show_glob_tab[] = {
     { "THROTTLE", &sim_show_throt, 0 },
     { "ASYNCH", &sim_show_asynch, 0 },
     { "ETHERNET", &eth_show_devices, 0 },
+    { "SERIAL", &sim_show_serial, 0 },
     { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
     { "MUX", &tmxr_show_open_devices, 0 },
     { "CLOCKS", &sim_show_timers, 0 },
@@ -2097,8 +2353,6 @@ GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
 cptr = get_glyph (cptr, gbuf, 0);                       /* get next glyph */
-if ((shptr = find_shtab (show_glob_tab, gbuf)))         /* global? */
-    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
 
 if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
@@ -2113,7 +2367,10 @@ else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
     shtb = show_unit_tab;                               /* global table */
     lvl = MTAB_VUN;                                     /* unit match */
     }
-else return SCPE_NXDEV;                                 /* no match */
+else if ((shptr = find_shtab (show_glob_tab, gbuf)))    /* global? */
+    return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
+else
+    return SCPE_NXDEV;                                 /* no match */
 
 if (*cptr == 0) {                                       /* now eol? */
     return (lvl == MTAB_VDV)?
@@ -2263,8 +2520,16 @@ if (cptr && (*cptr != 0))
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
 if (vdelt)
     fprintf (st, " delta %d", vdelt);
+#if defined(SIM_VERSION_MODE)
+fprintf (st, " %s", SIM_VERSION_MODE);
+#endif
 if (flag)
     fprintf (st, " [%s, %s, %s]", sim_si64, sim_sa64, sim_snet);
+#if defined(SIM_GIT_COMMIT_ID)
+#define _xstr(a) _str(a)
+#define _str(a) #a
+fprintf (st, "     git commit id: %8.8s", _xstr(SIM_GIT_COMMIT_ID));
+#endif
 fprintf (st, "\n");
 return SCPE_OK;
 }
@@ -2366,7 +2631,7 @@ pthread_mutex_unlock (&sim_timer_lock);
 pthread_mutex_lock (&sim_asynch_lock);
 fprintf (st, "asynchronous pending event queue\n");
 if (sim_asynch_queue == QUEUE_LIST_END)
-    fprintf (st, "Empty\n");
+    fprintf (st, "  Empty\n");
 else {
     for (uptr = sim_asynch_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
@@ -2381,7 +2646,7 @@ else {
 fprintf (st, "asynch latency: %d nanoseconds\n", sim_asynch_latency);
 fprintf (st, "asynch instruction latency: %d instructions\n", sim_asynch_inst_latency);
 pthread_mutex_unlock (&sim_asynch_lock);
-#endif
+#endif /* SIM_ASYNCH_IO */
 return SCPE_OK;
 }
 
@@ -2564,7 +2829,7 @@ DEVICE *dptr;
 
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-for (i = 0; (dptr = sim_devices[i]) != NULL; ++i) 
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
     show_dev_show_commands (st, dptr, NULL, flag, cptr);
 for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
     show_dev_show_commands (st, dptr, NULL, flag, cptr);
@@ -2612,6 +2877,33 @@ if (dptr->modifiers) {
         fprintf (st, "\n");
     }
 return SCPE_OK;
+}
+
+/* Show/change the current working directiory commands */
+
+t_stat show_default (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char buffer[PATH_MAX];
+char *wd = getcwd(buffer, PATH_MAX);
+fprintf (st, "%s\n", wd);
+return SCPE_OK;
+}
+
+t_stat set_default_cmd (int32 flg, char *cptr)
+{
+if ((!cptr) || (*cptr == 0))
+    return SCPE_2FARG;
+sim_trim_endspc(cptr);
+if (chdir(cptr) != 0) {
+    printf("Unable to change to: %s\n", cptr);
+    return SCPE_IOERR & SCPE_NOMESSAGE;
+} 
+return SCPE_OK;
+}
+
+t_stat pwd_cmd (int32 flg, char *cptr)
+{
+return show_cmd (0, "DEFAULT");
 }
 
 /* Breakpoint commands */
@@ -2750,6 +3042,13 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) {
             return reason;
         }
     }
+for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i) {
+    if (dptr->reset != NULL) {
+        reason = dptr->reset (dptr);
+        if (reason != SCPE_OK)
+            return reason;
+        }
+    }
 return SCPE_OK;
 }
 
@@ -2821,7 +3120,8 @@ if (dptr == NULL)                                       /* found dev? */
     return SCPE_NXDEV;
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
-if (uptr->flags & UNIT_ATT) {                           /* already attached? */
+if ((uptr->flags & UNIT_ATT) &&                         /* already attached? */
+    !(uptr->dynflags & UNIT_ATTMULT)) {                 /* and only single attachable */
     r = scp_detach_unit (dptr, uptr);                   /* detach it */
     if (r != SCPE_OK)                                   /* error? */
         return r;
@@ -2851,8 +3151,6 @@ if (!(uptr->flags & UNIT_ATTABLE))                      /* not attachable? */
     return SCPE_NOATT;
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_NOATT;
-if (dptr->flags & DEV_RAWONLY)                          /* raw mode only? */
-    return SCPE_NOFNC;
 uptr->filename = (char *) calloc (CBUFSIZE, sizeof (char)); /* alloc name buf */
 if (uptr->filename == NULL)
     return SCPE_MEM;
@@ -2979,6 +3277,7 @@ for (i = start; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
 return SCPE_OK;
 }
 
+
 /* Call device-specific or file-oriented detach unit routine */
 
 t_stat scp_detach_unit (DEVICE *dptr, UNIT *uptr)
@@ -2998,11 +3297,12 @@ if (uptr == NULL)
     return SCPE_IERR;
 if (!(uptr->flags & UNIT_ATTABLE))                      /* attachable? */
     return SCPE_NOATT;
-if (!(uptr->flags & UNIT_ATT))                          /* not attached? */
+if (!(uptr->flags & UNIT_ATT)) {                        /* not attached? */
     if (sim_switches & SIM_SW_REST)                     /* restoring? */
         return SCPE_OK;                                 /* allow detach */
     else
-        return SCPE_NOATT;                               /* complain */
+        return SCPE_NOATT;                              /* complain */
+    }
 if ((dptr = find_dev_from_unit (uptr)) == NULL)
     return SCPE_OK;
 if (uptr->flags & UNIT_BUF) {
@@ -3169,7 +3469,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
     WRITE_I (dptr->flags);                              /* [V2.10] flags */
     for (j = 0; j < dptr->numunits; j++) {
         uptr = dptr->units + j;
-        t = sim_is_active (uptr);
+        t = sim_activate_time (uptr);
         WRITE_I (j);                                    /* unit number */
         WRITE_I (t);                                    /* activation time */
         WRITE_I (uptr->u3);                             /* unit specific */
@@ -3177,6 +3477,7 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
         WRITE_I (uptr->u5);                             /* [V3.0] more unit */
         WRITE_I (uptr->u6);
         WRITE_I (uptr->flags);                          /* [V2.10] flags */
+        WRITE_I (uptr->dynflags);
         WRITE_I (uptr->capac);                          /* [V3.5] capacity */
         if (uptr->flags & UNIT_ATT) {
             fputs (uptr->filename, sfile);
@@ -3288,7 +3589,7 @@ REG *rptr;
 struct stat rstat;
 t_bool force_restore = sim_switches & SWMASK ('F');
 
-#define READ_S(xx) if (read_line ((xx), CBUFSIZE, rfile) == NULL) \
+#define READ_S(xx) if (read_line ((xx), sizeof(xx), rfile) == NULL) \
     return SCPE_IOERR;
 #define READ_I(xx) if (sim_fread (&xx, sizeof (xx), 1, rfile) == 0) \
     return SCPE_IOERR;
@@ -3336,7 +3637,7 @@ if (v32) {                                              /* [V3.2+] time as strin
     }
 else READ_I (sim_time);                                 /* sim time */
 READ_I (sim_rtime);                                     /* [V2.6+] sim rel time */
-
+detach_all (0, 0);                                      /* Detach everything to start from a consistent state */
 for ( ;; ) {                                            /* device loop */
     READ_S (buf);                                       /* read device name */
     if (buf[0] == 0)                                    /* last? */
@@ -3379,6 +3680,7 @@ for ( ;; ) {                                            /* device loop */
         READ_I (uptr->u5);                              /* [V3.0+] more dev spec */
         READ_I (uptr->u6);
         READ_I (flg);                                   /* [V2.10+] unit flags */
+        READ_I (uptr->dynflags);
         old_capac = uptr->capac;                        /* save current capacity */
         if (v35) {                                      /* [V3.5+] capacity */
             READ_I (uptr->capac);
@@ -3389,14 +3691,12 @@ for ( ;; ) {                                            /* device loop */
         uptr->flags = (uptr->flags & ~UNIT_RFLAGS) |
             (flg & UNIT_RFLAGS);                        /* restore */
         READ_S (buf);                                   /* attached file */
-        if ((uptr->flags & UNIT_ATT) &&                 /* unit currently attached? */
-            !(dptr->flags & DEV_NET)) {                 /*  and not a net device? */
+        if (uptr->flags & UNIT_ATT) {                   /* unit currently attached? */
             r = scp_detach_unit (dptr, uptr);           /* detach it */
             if (r != SCPE_OK)
                 return r;
             }
         if ((buf[0] != '\0') &&                         /* unit to be reattached? */
-            !(dptr->flags & DEV_NET) &&                 /*  and not a net device? */
             ((uptr->flags & UNIT_ATTABLE) ||            /*  and unit is attachable */
              (dptr->attach != NULL))) {                 /*    or VM attach routine provided? */
             uptr->flags = uptr->flags & ~UNIT_DIS;      /* ensure device is enabled */
@@ -3447,7 +3747,7 @@ for ( ;; ) {                                            /* device loop */
             if ((mbuf = calloc (SRBSIZ, sz)) == NULL)
                 return SCPE_MEM;
             for (k = 0; k < high; ) {                   /* loop thru mem */
-                if (sim_fread (&blkcnt, sizeof (blkcnt), 1, rfile) == 0) {
+                if (sim_fread (&blkcnt, sizeof (blkcnt), 1, rfile) == 0) {/* block count */
                     free (mbuf);
                     return SCPE_IOERR;
                     }
@@ -3685,19 +3985,20 @@ for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files 
         uptr = dptr->units + j;
         if ((uptr->flags & UNIT_ATT) &&                 /* attached, */
             !(uptr->flags & UNIT_BUF) &&                /* not buffered, */
-            (uptr->fileref))                            /* real file, */
+            (uptr->fileref)) {                          /* real file, */
             if (uptr->io_flush)                         /* unit specific flush routine */
                 uptr->io_flush (uptr);
             else
-                if (!(uptr->flags & UNIT_RAW) &&        /* not raw, */
+                if (!(uptr->dynflags & UNIT_NO_FIO) &&  /* is FILE *, */
                     !(uptr->flags & UNIT_RO))           /* not read only? */
                     fflush (uptr->fileref);
+            }
         }
     }
 sim_cancel (&sim_step_unit);                            /* cancel step timer */
 sim_throt_cancel ();                                    /* cancel throttle */
-UPDATE_SIM_TIME;                                        /* update sim time */
 AIO_UPDATE_QUEUE;
+UPDATE_SIM_TIME;                                        /* update sim time */
 return r;
 }
 
@@ -3723,13 +4024,14 @@ if (sim_log)                                        /* log if enabled */
 
 t_stat run_boot_prep (void)
 {
+UNIT *uptr;
+
 sim_interval = 0;                                       /* reset queue */
 sim_time = sim_rtime = 0;
 noqueue_time = 0;
-while (sim_clock_queue != QUEUE_LIST_END) {
-    UNIT *cptr = sim_clock_queue;
-    sim_clock_queue = cptr->next;
-    cptr->next = NULL;                                  /* hygiene */
+for (uptr = sim_clock_queue; uptr != QUEUE_LIST_END; uptr = sim_clock_queue) {
+    sim_clock_queue = uptr->next;
+    uptr->next = NULL;
     }
 return reset_all (0);
 }
@@ -4089,7 +4391,7 @@ if ((cptr == NULL) || (rptr == NULL))
 if (rptr->flags & REG_RO)
     return SCPE_RO;
 if (flag & EX_I) {
-    cptr = read_line (gbuf, CBUFSIZE, stdin);
+    cptr = read_line (gbuf, sizeof(gbuf), stdin);
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
@@ -4247,7 +4549,7 @@ for (i = 0, j = addr; i < sim_emax; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW)
+        if (uptr->dynflags & UNIT_NO_FIO)
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac)) {
             reason = SCPE_NXM;
@@ -4307,7 +4609,7 @@ char gbuf[CBUFSIZE];
 if (dptr == NULL)
     return SCPE_IERR;
 if (flag & EX_I) {
-    cptr = read_line (gbuf, CBUFSIZE, stdin);
+    cptr = read_line (gbuf, sizeof(gbuf), stdin);
     if (sim_log)
         fprintf (sim_log, "%s\n", cptr? cptr: "");
     if (cptr == NULL)                                   /* force exit */
@@ -4338,7 +4640,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
     else {
         if (!(uptr->flags & UNIT_ATT))
             return SCPE_UNATT;
-        if (uptr->flags & UNIT_RAW) 
+        if (uptr->dynflags & UNIT_NO_FIO)
             return SCPE_NOFNC;
         if ((uptr->flags & UNIT_FIX) && (j >= uptr->capac))
             return SCPE_NXM;
@@ -4436,8 +4738,10 @@ char *read_line_p (char *prompt, char *cptr, int32 size, FILE *stream)
 char *tptr;
 #if defined(HAVE_DLOPEN)
 static int initialized = 0;
-static char *(*p_readline)(const char *) = NULL;
-static void (*p_add_history)(const char *) = NULL;
+typedef char *(*readline_func)(const char *);
+static readline_func p_readline = NULL;
+typedef void (*add_history_func)(const char *);
+static add_history_func p_add_history = NULL;
 
 if (!initialized) {
     initialized = 1;
@@ -4453,8 +4757,8 @@ if (!initialized) {
     if (!handle)
         handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
     if (handle) {
-        p_readline = dlsym(handle, "readline");
-        p_add_history = dlsym(handle, "add_history");
+        p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
+        p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));
         }
     }
 if (prompt) {                                           /* interactive? */
@@ -4579,7 +4883,7 @@ t_stat get_yn (char *ques, t_stat deflt)
 char cbuf[CBUFSIZE], *cptr;
 
 printf ("%s ", ques);
-cptr = read_line (cbuf, CBUFSIZE, stdin);
+cptr = read_line (cbuf, sizeof(cbuf), stdin);
 if ((cptr == NULL) || (*cptr == 0))
     return deflt;
 if ((*cptr == 'Y') || (*cptr == 'y'))
@@ -4670,69 +4974,6 @@ if (term && (*tptr++ != term))
 return tptr;
 }
 
-/* get_ipaddr           IP address:port
-
-   Inputs:
-        cptr    =       pointer to input string
-   Outputs:
-        ipa     =       pointer to IP address (may be NULL), 0 = none
-        ipp     =       pointer to IP port (may be NULL), 0 = none
-        result  =       status
-*/
-
-t_stat get_ipaddr (char *cptr, uint32 *ipa, uint32 *ipp)
-{
-char gbuf[CBUFSIZE];
-char *addrp, *portp, *octetp;
-uint32 i, addr, port, octet;
-t_stat r;
-
-if ((cptr == NULL) || (*cptr == 0))
-    return SCPE_ARG;
-strncpy (gbuf, cptr, CBUFSIZE);
-addrp = gbuf;                                           /* default addr */
-if ((portp = strchr (gbuf, ':')))                       /* x:y? split */
-    *portp++ = 0;
-else if (strchr (gbuf, '.'))                            /* x.y...? */
-    portp = NULL;
-else {
-    portp = gbuf;                                       /* port only */
-    addrp = NULL;                                       /* no addr */
-    }
-if (portp) {                                            /* port string? */
-    if (ipp == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    port = (int32) get_uint (portp, 10, 65535, &r);
-    if ((r != SCPE_OK) || (port == 0))
-        return SCPE_ARG;
-    }
-else port = 0;
-if (addrp) {                                            /* addr string? */
-    if (ipa == NULL)                                    /* not wanted? */
-        return SCPE_ARG;
-    for (i = addr = 0; i < 4; i++) {                    /* four octets */
-        octetp = strchr (addrp, '.');                   /* find octet end */
-        if (octetp != NULL)                             /* split string */
-            *octetp++ = 0;
-        else if (i < 3)                                 /* except last */
-            return SCPE_ARG;
-        octet = (int32) get_uint (addrp, 10, 255, &r);
-        if (r != SCPE_OK)
-            return SCPE_ARG;
-        addr = (addr << 8) | octet;
-        addrp = octetp;
-        }
-    if (((addr & 0377) == 0) || ((addr & 0377) == 255))
-        return SCPE_ARG;
-    }
-else addr = 0;
-if (ipp)                                                /* return req values */
-    *ipp = port;
-if (ipa)
-    *ipa = addr;
-return SCPE_OK;   
-}
-
 /* Find_device          find device matching input string
 
    Inputs:
@@ -4746,7 +4987,7 @@ DEVICE *find_dev (char *cptr)
 int32 i;
 DEVICE *dptr;
 
-for (i = 0; (dptr = sim_devices[i]) != NULL; ++i) {
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     if ((strcmp (cptr, dptr->name) == 0) ||
         (dptr->lname &&
         (strcmp (cptr, dptr->lname) == 0)))
@@ -4769,6 +5010,7 @@ return NULL;
    Outputs:
         result  =       pointer to device (null if no dev)
         *iptr   =       pointer to unit (null if nx unit)
+
 */
 
 DEVICE *find_unit (char *cptr, UNIT **uptr)
@@ -4818,10 +5060,10 @@ t_stat sim_register_internal_device (DEVICE *dptr)
 {
 uint32 i;
 
-for (i = 0; (sim_devices[i] != NULL); ++i)
+for (i = 0; (sim_devices[i] != NULL); i++)
     if (sim_devices[i] == dptr)
         return SCPE_OK;
-for (i = 0; i < sim_internal_device_count; ++i)
+for (i = 0; i < sim_internal_device_count; i++)
     if (sim_internal_devices[i] == dptr)
         return SCPE_OK;
 ++sim_internal_device_count;
@@ -4846,13 +5088,13 @@ uint32 i, j;
 
 if (uptr == NULL)
     return NULL;
-for (i = 0; (dptr = sim_devices[i]) != NULL; ++i) {
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
     for (j = 0; j < dptr->numunits; j++) {
         if (uptr == (dptr->units + j))
             return dptr;
         }
     }
-for (i = 0; i<sim_internal_device_count; ++i) {
+for (i = 0; i<sim_internal_device_count; i++) {
     dptr = sim_internal_devices[i];
     for (j = 0; j < dptr->numunits; j++) {
         if (uptr == (dptr->units + j))
@@ -5206,13 +5448,13 @@ return 0;
    On an error, the endptr will equal the inptr.
 */
 
-t_value strtotv (char *inptr, char **endptr, uint32 radix)
+t_value strtotv (const char *inptr, char **endptr, uint32 radix)
 {
 int32 nodigit;
 t_value val;
 uint32 c, digit;
 
-*endptr = inptr;                                        /* assume fails */
+*endptr = (char *)inptr;                                /* assume fails */
 if ((radix < 2) || (radix > 36))
     return 0;
 while (isspace (*inptr))                                /* bypass white space */
@@ -5234,7 +5476,7 @@ for (c = *inptr; isalnum(c); c = *++inptr) {            /* loop through char */
     }
 if (nodigit)                                            /* no digits? */
     return 0;
-*endptr = inptr;                                        /* result pointer */
+*endptr = (char *)inptr;                                /* result pointer */
 return val;
 }
 
@@ -5294,8 +5536,8 @@ return SCPE_OK;
         sim_activate_after      add entry to event queue after a specified amount of wall time
         sim_cancel              remove entry from event queue
         sim_process_event       process entries on event queue
-        sim_is_active           see if entry is on event queue return time + 1
-        sim_is_active_bool      see if entry is on event queue
+        sim_is_active           see if entry is on event queue
+        sim_activate_time       return time until activation
         sim_atime               return absolute time for an entry
         sim_gtime               return global time
         sim_qcount              return event queue entry count
@@ -5327,7 +5569,9 @@ t_stat reason;
 
 if (stop_cpu)                                           /* stop CPU? */
     return SCPE_STOP;
+AIO_UPDATE_QUEUE;
 UPDATE_SIM_TIME;                                        /* update sim time */
+
 if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Emptry New Interval = %d\n", sim_interval);
@@ -5359,6 +5603,7 @@ if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     }
 else
     sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Processing Queue Complete New Interval = %d(%s)\n", sim_interval, sim_uname(sim_clock_queue));
+
 return reason;
 }
 
@@ -5382,7 +5627,7 @@ UNIT *cptr, *prvptr;
 int32 accum;
 
 AIO_ACTIVATE (_sim_activate, uptr, event_time);
-if (sim_is_active_bool (uptr))                          /* already active? */
+if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
 UPDATE_SIM_TIME;                                        /* update sim time */
 
@@ -5448,9 +5693,8 @@ sim_cancel (uptr);
 if (0x80000000 <= urtime-rtimenow)
     return _sim_activate (uptr, 0);
 else
-    return _sim_activate (uptr, urtime-rtimenow);
+    return sim_activate (uptr, urtime-rtimenow);
 }
-
 
 /* sim_activate_after - activate (queue) event
 
@@ -5468,7 +5712,7 @@ return _sim_activate_after (uptr, event_time);
 
 t_stat _sim_activate_after (UNIT *uptr, int32 usec_delay)
 {
-if (sim_is_active_bool (uptr))                          /* already active? */
+if (sim_is_active (uptr))                               /* already active? */
     return SCPE_OK;
 AIO_ACTIVATE (_sim_activate_after, uptr, usec_delay);
 return sim_timer_activate_after (uptr, usec_delay);
@@ -5489,12 +5733,14 @@ UNIT *cptr, *nptr;
 
 AIO_VALIDATE;
 AIO_CANCEL(uptr);
-if (!sim_is_active_bool (uptr))                         /* not active? */
-    return SCPE_OK;                                     /* nothing to cancel */
+AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;
 UPDATE_SIM_TIME;                                        /* update sim time */
+if (!sim_is_active (uptr))
+    return SCPE_OK;
 nptr = QUEUE_LIST_END;
+
 if (sim_clock_queue == uptr)
     nptr = sim_clock_queue = uptr->next;
 else {
@@ -5515,20 +5761,22 @@ else sim_interval = noqueue_time = NOQUEUE_WAIT;
 return SCPE_OK;
 }
 
-/* sim_is_active_bool - test for entry in queue, return activation time
+/* sim_is_active - test for entry in queue
 
    Inputs:
         uptr    =       pointer to unit
    Outputs:
-        result =        TRUE if active FALSE if inactive
+        result =        TRUE if unit is busy, FALSE inactive
 */
 
-t_bool sim_is_active_bool (UNIT *uptr)
+t_bool sim_is_active (UNIT *uptr)
 {
-return (uptr->next != NULL);
+AIO_VALIDATE;
+AIO_UPDATE_QUEUE;
+return (((uptr->next) || AIO_IS_ACTIVE(uptr)) ? TRUE : FALSE);
 }
 
-/* sim_is_active - test for entry in queue, return activation time
+/* sim_activate_time - return activation time
 
    Inputs:
         uptr    =       pointer to unit
@@ -5536,40 +5784,13 @@ return (uptr->next != NULL);
         result =        absolute activation time + 1, 0 if inactive
 */
 
-int32 sim_is_active (UNIT *uptr)
+int32 sim_activate_time (UNIT *uptr)
 {
 UNIT *cptr;
 int32 accum = 0;
 
 AIO_VALIDATE;
 AIO_RETURN_TIME(uptr);
-for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
-    if (cptr == sim_clock_queue) {
-        if (sim_interval > 0)
-            accum = accum + sim_interval;
-        }
-    else accum = accum + cptr->time;
-    if (cptr == uptr)
-        return accum + 1;
-    }
-return 0;
-}
-
-/* sim_activation_time - test for entry in queue, return activation time
-
-   Inputs:
-        uptr    =       pointer to unit
-   Outputs:
-        result =        absolute activation time + 1, 0 if inactive
-*/
-
-int32 sim_activation_time (UNIT *uptr)
-{
-UNIT *cptr;
-int32 accum;
-
-AIO_VALIDATE;
-accum = 0;
 for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
     if (cptr == sim_clock_queue) {
         if (sim_interval > 0)
@@ -6006,19 +6227,49 @@ if (!debug_unterm) {
 }
 
 /* Prints state of a register: bit translation + state (0,1,_,^)
-   indicating the state and transition of the bit. States:
+   indicating the state and transition of the bit and bitfields. States:
    0=steady(0->0), 1=steady(1->1), _=falling(1->0), ^=rising(0->1) */
 
-void sim_debug_u16(uint32 dbits, DEVICE* dptr, const char* const* bitdefs,
-    uint16 before, uint16 after, int terminate)
+void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
+    uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && (dptr->dctrl & dbits)) {
-    int32 i;
+    int32 i, fields, offset;
+    uint32 value, beforevalue, mask;
 
+    for (fields=offset=0; bitdefs[fields].name; ++fields) {
+        if (bitdefs[fields].offset == 0xffffffff)       /* fixup uninitialized offsets */
+            bitdefs[fields].offset = offset;
+        offset += bitdefs[fields].width;
+        }
     sim_debug_prefix(dbits, dptr);                      /* print prefix if required */
-    for (i = 15; i >= 0; i--) {                         /* print xlation, transition */
-        int off = ((after >> i) & 1) + (((before ^ after) >> i) & 1) * 2;
-        fprintf(sim_deb, "%s%c ", bitdefs[i], debug_bstates[off]);
+    for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition */
+        if (bitdefs[i].name[0] == '\0')
+            continue;
+        if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
+            int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> bitdefs[i].offset) & 1) * 2;
+            fprintf(sim_deb, "%s%c ", bitdefs[i].name, debug_bstates[off]);
+            }
+        else {
+            char *delta = "";
+
+            mask = 0xFFFFFFFF >> (32-bitdefs[i].width);
+            value = ((after >> bitdefs[i].offset) & mask);
+            beforevalue = ((before >> bitdefs[i].offset) & mask);
+            if (value < beforevalue)
+                delta = "_";
+            if (value > beforevalue)
+                delta = "^";
+            if (bitdefs[i].valuenames)
+                fprintf(sim_deb, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
+            else
+                if (bitdefs[i].format) {
+                    fprintf(sim_deb, "%s=%s", bitdefs[i].name, delta);
+                    fprintf(sim_deb, bitdefs[i].format, value);
+                    }
+                else
+                    fprintf(sim_deb, "%s=%s0x%X ", bitdefs[i].name, delta, value);
+            }
         }
     if (terminate)
         fprintf(sim_deb, "\r\n");

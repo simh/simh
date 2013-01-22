@@ -127,7 +127,6 @@
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1];
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 int32 mt_cu = 0;                                        /* command/unit */
 int32 mt_sta = 0;                                       /* status register */
@@ -199,7 +198,7 @@ DEVICE mt_dev = {
     MT_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     NULL, &mt_attach, &mt_detach,
-    &mt_dib, DEV_DISABLE | DEV_DEBUG
+    &mt_dib, DEV_DISABLE | DEV_DEBUG | DEV_TAPE
     };
 
 /* IOT routine */

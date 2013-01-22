@@ -96,6 +96,8 @@ extern int32 int_req[IPL_HLVL];
 #define XQ_HW_SANITY_SECS    240                        /* seconds before HW sanity timer expires */
 #define XQ_MAX_CONTROLLERS     2                        /* maximum controllers allowed */
 
+#define XQ_MAX_RCV_PACKET   1600                        /* Maximum receive packet data */
+
 enum xq_type {XQ_T_DEQNA, XQ_T_DELQA, XQ_T_DELQA_PLUS};
 
 struct xq_sanity {

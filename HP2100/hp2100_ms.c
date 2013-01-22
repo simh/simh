@@ -26,6 +26,7 @@
    MS           13181A 7970B 800bpi nine track magnetic tape
                 13183A 7970E 1600bpi nine track magnetic tape
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added CNTLR_TYPE cast to ms_settype
    28-Mar-11    JDB     Tidied up signal handling
@@ -374,7 +375,7 @@ DEVICE msc_dev = {
     MS_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &msc_reset,
     &msc_boot, &msc_attach, &msc_detach,
-    &msc_dib, DEV_DISABLE | DEV_DEBUG,
+    &msc_dib, DEV_DISABLE | DEV_DEBUG | DEV_TAPE,
     0, msc_deb, NULL, NULL
     };
 
@@ -737,7 +738,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 fprintf (sim_deb,
                     ">>MSC svc: Unit %d wrote initial gap\n",
                     unum);
-            if ((st = ms_write_gap (uptr))) {           /* write initial gap; error? */
+            st = ms_write_gap (uptr);                   /* write initial gap*/
+            if (st != MTSE_OK) {                        /* error? */
                 r = ms_map_err (uptr, st);              /* map error */
                 break;                                  /* terminate operation */
                 }
@@ -747,13 +749,15 @@ switch (uptr->FNC) {                                    /* case on function */
             fprintf (sim_deb,
                 ">>MSC svc: Unit %d wrote file mark\n",
                 unum);
-        if ((st = sim_tape_wrtmk (uptr)))               /* write tmk, err? */
+        st = sim_tape_wrtmk (uptr);                     /* write tmk */
+        if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
         msc_sta = STA_EOF;                              /* set EOF status */
         break;
 
     case FNC_FSR:                                       /* space forward */
-        if ((st = sim_tape_sprecf (uptr, &tbc)))        /* space rec fwd, err? */
+        st = sim_tape_sprecf (uptr, &tbc);              /* space rec fwd */
+        if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
         if (tbc & 1)
             msc_sta = msc_sta | STA_ODD;
@@ -761,7 +765,8 @@ switch (uptr->FNC) {                                    /* case on function */
         break;
 
     case FNC_BSR:                                       /* space reverse */
-        if ((st = sim_tape_sprecr (uptr, &tbc)))        /* space rec rev, err? */
+        st = sim_tape_sprecr (uptr, &tbc);              /* space rec rev*/
+        if (st != MTSE_OK)                              /* error? */
             r = ms_map_err (uptr, st);                  /* map error */
         if (tbc & 1)
             msc_sta = msc_sta | STA_ODD;
@@ -831,7 +836,8 @@ switch (uptr->FNC) {                                    /* case on function */
                     fprintf (sim_deb,
                         ">>MSC svc: Unit %d wrote initial gap\n",
                         unum);
-                if ((st = ms_write_gap (uptr))) {       /* write initial gap; error? */
+                st = ms_write_gap (uptr);               /* write initial gap */
+                if (st != MTSE_OK) {                    /* error? */
                     r = ms_map_err (uptr, st);          /* map error */
                     break;                              /* terminate operation */
                     }
@@ -855,7 +861,8 @@ switch (uptr->FNC) {                                    /* case on function */
                 fprintf (sim_deb,
                     ">>MSC svc: Unit %d wrote %d word record\n",
                     unum, ms_ptr / 2);
-            if ((st = sim_tape_wrrecf (uptr, msxb, ms_ptr))) {  /* write, err? */
+            st = sim_tape_wrrecf (uptr, msxb, ms_ptr);  /* write */
+            if (st != MTSE_OK) {
                 r = ms_map_err (uptr, st);              /* map error */
                 break;
                 }
@@ -894,7 +901,9 @@ t_stat st;
 uint32 gap_len = ms_ctype ? GAP_13183 : GAP_13181;      /* establish gap length */
 uint32 tape_bpi = ms_ctype ? BPI_13183 : BPI_13181;     /* establish nominal bpi */
 
-if ((st = sim_tape_wrgap (uptr, gap_len, tape_bpi)))    /* write gap */
+st = sim_tape_wrgap (uptr, gap_len, tape_bpi);          /* write gap */
+
+if (st != MTSE_OK)
     return ms_map_err (uptr, st);                       /* map error if failure */
 else
     return SCPE_OK;
@@ -974,7 +983,9 @@ for (i = 0; i < MS_NUMDR; i++) {                        /* look for write in pro
             fprintf (sim_deb,
                 ">>MSC rws: Unit %d wrote %d word partial record\n", i, ms_ptr / 2);
 
-        if ((st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF)))
+        st = sim_tape_wrrecf (uptr, msxb, ms_ptr | MTR_ERF);
+
+        if (st != MTSE_OK)
             ms_map_err (uptr, st);                      /* discard any error */
 
         ms_ptr = 0;                                     /* clear partial */

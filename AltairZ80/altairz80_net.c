@@ -150,36 +150,33 @@ static t_stat net_reset(DEVICE *dptr) {
 }
 
 static t_stat net_attach(UNIT *uptr, char *cptr) {
-    uint32 i, ipa, ipp;
-    t_stat r = get_ipaddr(cptr, &ipa, &ipp);
+    uint32 i;
+    char host[CBUFSIZE], port[CBUFSIZE];
+    t_stat r;
+
+    r = sim_parse_addr (cptr, host, sizeof(host), "localhost", port, sizeof(port), "3000", NULL);
     if (r != SCPE_OK)
         return SCPE_ARG;
-    if (ipa == 0)
-        ipa = 0x7F000001; /* localhost = 127.0.0.1 */
-    if (ipp == 0)
-        ipp = 3000;
-    net_unit.u3 = ipp;
-    net_unit.u4 = ipa;
     net_reset(&net_dev);
     for (i = 0; i <= MAX_CONNECTIONS; i++)
         serviceDescriptor[i].ioSocket = 0;
     if (net_unit.flags & UNIT_SERVER) {
         net_unit.wait = NET_INIT_POLL_SERVER;
-        serviceDescriptor[1].masterSocket = sim_master_sock(ipp);
+        serviceDescriptor[1].masterSocket = sim_master_sock(cptr, NULL);
         if (serviceDescriptor[1].masterSocket == INVALID_SOCKET)
             return SCPE_IOERR;
     }
     else {
         net_unit.wait = NET_INIT_POLL_CLIENT;
-        serviceDescriptor[0].ioSocket = sim_connect_sock(ipa, ipp);
+        serviceDescriptor[0].ioSocket = sim_connect_sock(cptr, "localhost", "3000");
         if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
             return SCPE_IOERR;
     }
     net_unit.flags |= UNIT_ATT;
-    net_unit.filename = (char *) calloc(CBUFSIZE, sizeof (char));   /* alloc name buf */
+    net_unit.filename = (char *) calloc(1, strlen(cptr)+1);         /* alloc name buf */
     if (net_unit.filename == NULL)
         return SCPE_MEM;
-    strncpy(net_unit.filename, cptr, CBUFSIZE);                     /* save name */
+    strcpy(net_unit.filename, cptr);                                /* save name */
     return SCPE_OK;
 }
 
@@ -216,7 +213,7 @@ static t_stat net_svc(UNIT *uptr) {
                 }
         }
         else if (serviceDescriptor[0].ioSocket == 0) {
-            serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.u4, net_unit.u3);
+            serviceDescriptor[0].ioSocket = sim_connect_sock(net_unit.filename, "localhost", "3000");
             if (serviceDescriptor[0].ioSocket == INVALID_SOCKET)
                 return SCPE_IOERR;
             printf("\rWaiting for server ... Type g<return> (possibly twice) when ready" NLP);

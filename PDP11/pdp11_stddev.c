@@ -61,6 +61,7 @@
 */
 
 #include "pdp11_defs.h"
+#include "sim_tmxr.h"
 
 #define TTICSR_IMP      (CSR_DONE + CSR_IE)             /* terminal input */
 #define TTICSR_RW       (CSR_IE)
@@ -199,9 +200,11 @@ DEVICE tto_dev = {
    clk_reg      CLK register list
 */
 
+#define IOLN_CLK        002
+
 DIB clk_dib = {
-    IOBA_CLK, IOLN_CLK, &clk_rd, &clk_wr,
-    1, IVCL (CLK), VEC_CLK, { &clk_inta }
+    IOBA_AUTO, IOLN_CLK, &clk_rd, &clk_wr,
+    1, IVCL (CLK), VEC_AUTO, { &clk_inta }
     };
 
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE, 0), CLK_DELAY };
@@ -288,8 +291,7 @@ t_stat tti_svc (UNIT *uptr)
 {
 int32 c;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmr_poll)));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -306,6 +308,7 @@ return SCPE_OK;
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 tti_unit.buf = 0;
 tti_csr = 0;
 CLR_INT (TTI);
@@ -454,16 +457,6 @@ int32 clk_inta (void)
 if (CPUT (CPUT_24))
     clk_csr = clk_csr & ~CSR_DONE;
 return clk_dib.vec;
-}
-
-/* Clock coscheduling routine */
-
-int32 clk_cosched (int32 wait)
-{
-int32 t;
-
-t = sim_is_active (&clk_unit);
-return (t? t - 1: wait);
 }
 
 /* Clock reset */

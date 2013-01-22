@@ -93,8 +93,8 @@ DEVICE console_dev = {
 /* reset for the "console" display device  */
 
 extern char *read_line (char *cptr, int size, FILE *stream);
-extern FILE *sim_log;
 extern DEVICE *find_unit (char *cptr, UNIT **uptr);
+extern char *sim_prompt;
 
 extern UNIT cr_unit;									/* pointers to 1442 and 1132 (1403) printers */
 extern UNIT prt_unit;
@@ -1648,8 +1648,8 @@ void remark_cmd (char *remark)
 	if (sim_log) fprintf(sim_log, "%s\n", remark);
 
 	if (scp_reading) {
-		printf("sim> ");
-		if (sim_log) fprintf(sim_log, "sim> ");
+		printf("%s", sim_prompt);
+		if (sim_log) fprintf(sim_log, "%s", sim_prompt);
 	}
 }
 

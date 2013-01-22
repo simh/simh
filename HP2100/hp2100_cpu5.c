@@ -26,6 +26,8 @@
 
    CPU5         RTE-6/VM and RTE-IV firmware option instructions
 
+   17-Dec-12    JDB     Fixed cpu_vma_mapte to return FALSE if not a VMA program
+   09-May-12    JDB     Separated assignments from conditional expressions
    23-Mar-12    JDB     Added sign extension for dim count in "cpu_ema_resolve"
    28-Dec-11    JDB     Eliminated unused variable in "cpu_ema_vset"
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
@@ -332,8 +334,13 @@ uint32 dispatch = ReadIO(vswp,UMAP) & 01777;        /* get fresh dispatch flag *
 t_bool swapflag = TRUE;
 
 if (dispatch == 0) {                                /* not yet set */
-    idext = ReadIO(idx,UMAP);                       /* go into IDsegment extent */
-    if (idext != 0) {                               /* is ema/vma program? */
+    idext = ReadIO(idx,UMAP);                       /* go into ID segment extent */
+    if (idext == 0) {                               /* is ema/vma program? */
+        swapflag = FALSE;                           /* no, so mark PTE as invalid */
+        *ptepg = (uint32) -1;                       /*   and return an invalid page number */
+        }
+
+    else {                                          /* is an EMA/VMA program */
         dispatch = ReadWA(idext+1) & 01777;         /* get 1st ema page: new vswp */
         WriteIO(vswp,dispatch,UMAP);                /* move into $VSWP */
         idext2 = ReadWA(idext+2);                   /* get swap bit */
@@ -346,7 +353,7 @@ if (dispatch) {                                     /* some page is defined */
     *ptepg = dispatch;                              /* return PTEPG# for later */
     }
 
-return swapflag;                                    /* true for swap bit set */
+return swapflag;                                    /* true for valid PTE */
 }
 
 /*  .LBP
@@ -649,9 +656,11 @@ t_bool debug = DEBUG_PRI (cpu_dev, DEB_VMA);
 entry = IR & 017;                                   /* mask to entry point */
 pattern = op_vma[entry];                            /* get operand pattern */
 
-if (pattern != OP_N)
-    if ((reason = cpu_ops (pattern, op, intrq)))    /* get instruction operands */
-        return reason;
+if (pattern != OP_N) {
+    reason = cpu_ops (pattern, op, intrq);              /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 if (debug) {                                            /* debugging? */
     fprintf (sim_deb, ">>CPU VMA: IR = %06o (", IR);    /* print preamble and IR */
@@ -1360,9 +1369,11 @@ t_bool debug = DEBUG_PRI (cpu_dev, DEB_EMA);
 entry = IR & 017;                                       /* mask to entry point */
 pattern = op_ema[entry];                                /* get operand pattern */
 
-if (pattern != OP_N)
-    if ((reason = cpu_ops (pattern, op, intrq)))        /* get instruction operands */
-        return reason;
+if (pattern != OP_N) {
+    reason = cpu_ops (pattern, op, intrq);              /* get instruction operands */
+    if (reason != SCPE_OK)                              /* evaluation failed? */
+        return reason;                                  /* return reason for failure */
+    }
 
 if (debug) {                                            /* debugging? */
     fprintf (sim_deb, ">>CPU EMA: PC = %06o, IR = %06o (", err_PC,IR);    /* print preamble and IR */

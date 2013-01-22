@@ -79,9 +79,6 @@ extern int32 MapStat;
 
 #endif
 
-extern int32 sim_switches;
-
-
 /* SCP data structures
 
    sim_name             simulator name string

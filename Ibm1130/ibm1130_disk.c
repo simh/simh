@@ -39,8 +39,6 @@ commands may NOT be accurate. This should probably be fixed.
 #define TRACE_DMS_IO				/* define to enable debug of DMS phase IO */
 
 #ifdef TRACE_DMS_IO
-extern int32 sim_switches;
-extern int32 sim_quiet;
 static int trace_dms = 0;
 static void tracesector (int iswrite, int nwords, int addr, int sector);
 static t_stat where_cmd (int32 flag, char *ptr);

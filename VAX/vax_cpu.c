@@ -305,14 +305,9 @@ const uint32 align[4] = {
 
 /* External and forward references */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-
 extern t_stat build_dib_tab (void);
 extern UNIT rom_unit, nvr_unit;
+extern int32 sys_model;
 extern int32 op_ashq (int32 *opnd, int32 *rh, int32 *flg);
 extern int32 op_emul (int32 mpy, int32 mpc, int32 *rh);
 extern int32 op_ediv (int32 *opnd, int32 *rh, int32 *flg);
@@ -413,86 +408,80 @@ UNIT cpu_unit = {
     };
 
 REG cpu_reg[] = {
-    { HRDATA (PC, R[nPC], 32) },
-    { HRDATA (R0, R[0], 32) },
-    { HRDATA (R1, R[1], 32) },
-    { HRDATA (R2, R[2], 32) },
-    { HRDATA (R3, R[3], 32) },
-    { HRDATA (R4, R[4], 32) },
-    { HRDATA (R5, R[5], 32) },
-    { HRDATA (R6, R[6], 32) },
-    { HRDATA (R7, R[7], 32) },
-    { HRDATA (R8, R[8], 32) },
-    { HRDATA (R9, R[9], 32) },
-    { HRDATA (R10, R[10], 32) },
-    { HRDATA (R11, R[11], 32) },
-    { HRDATA (R12, R[12], 32) },
-    { HRDATA (R13, R[13], 32) },
-    { HRDATA (R14, R[14], 32) },
-    { HRDATA (AP, R[nAP], 32) },
-    { HRDATA (FP, R[nFP], 32) },
-    { HRDATA (SP, R[nSP], 32) },
-    { HRDATA (PSL, PSL, 32) },
-    { HRDATA (CC, PSL, 4) },
-    { HRDATA (KSP, KSP, 32) },
-    { HRDATA (ESP, ESP, 32) },
-    { HRDATA (SSP, SSP, 32) },
-    { HRDATA (USP, USP, 32) },
-    { HRDATA (IS, IS, 32) },
-    { HRDATA (SCBB, SCBB, 32) },
-    { HRDATA (PCBB, PCBB, 32) },
-    { HRDATA (P0BR, P0BR, 32) },
-    { HRDATA (P0LR, P0LR, 22) },
-    { HRDATA (P1BR, P1BR, 32) },
-    { HRDATA (P1LR, P1LR, 22) },
-    { HRDATA (SBR, SBR, 32) },
-    { HRDATA (SLR, SLR, 22) },
-    { HRDATA (SISR, SISR, 16) },
-    { HRDATA (ASTLVL, ASTLVL, 4) },
-    { FLDATA (MAPEN, mapen, 0) },
-    { FLDATA (PME, pme, 0) },
-    { HRDATA (TRPIRQ, trpirq, 8) },
-    { FLDATA (CRDERR, crd_err, 0) },
-    { FLDATA (MEMERR, mem_err, 0) },
-    { FLDATA (HLTPIN, hlt_pin, 0) },
+    { HRDATAD (PC,      R[nPC], 32, "program counter") },
+    { HRDATAD (R0,        R[0], 32, "General Purpose Register 0") },
+    { HRDATAD (R1,        R[1], 32, "General Purpose Register 1") },
+    { HRDATAD (R2,        R[2], 32, "General Purpose Register 2") },
+    { HRDATAD (R3,        R[3], 32, "General Purpose Register 3") },
+    { HRDATAD (R4,        R[4], 32, "General Purpose Register 4") },
+    { HRDATAD (R5,        R[5], 32, "General Purpose Register 5") },
+    { HRDATAD (R6,        R[6], 32, "General Purpose Register 6") },
+    { HRDATAD (R7,        R[7], 32, "General Purpose Register 7") },
+    { HRDATAD (R8,        R[8], 32, "General Purpose Register 8") },
+    { HRDATAD (R9,        R[9], 32, "General Purpose Register 9") },
+    { HRDATAD (R10,      R[10], 32, "General Purpose Register 10") },
+    { HRDATAD (R11,      R[11], 32, "General Purpose Register 11") },
+    { HRDATAD (R12,      R[12], 32, "General Purpose Register 12") },
+    { HRDATAD (R13,      R[13], 32, "General Purpose Register 13") },
+    { HRDATAD (R14,      R[14], 32, "General Purpose Register 14") },
+    { HRDATAD (AP,      R[nAP], 32, "Alias for R12") },
+    { HRDATAD (FP,      R[nFP], 32, "Alias for R13") },
+    { HRDATAD (SP,      R[nSP], 32, "Alias for R14") },
+    { HRDATAD (PSL,        PSL, 32, "processor status longword") },
+    { HRDATAD (CC,         PSL,  4, "condition codes, PSL<3:0>") },
+    { HRDATAD (KSP,       KSP,  32, "kernel stack pointer") },
+    { HRDATAD (ESP,       ESP,  32, "executive stack pointer") },
+    { HRDATAD (SSP,       SSP,  32, "supervisor stack pointer") },
+    { HRDATAD (USP,       USP,  32, "user stack pointer") },
+    { HRDATAD (IS,         IS,  32, "interrupt stack pointer") },
+    { HRDATAD (SCBB,      SCBB, 32, "system control block base") },
+    { HRDATAD (PCBB,      PCBB, 32, "process control block base") },
+    { HRDATAD (P0BR,      P0BR, 32, "P0 base register") },
+    { HRDATAD (P0LR,      P0LR, 22, "P0 length register") },
+    { HRDATAD (P1BR,      P1BR, 32, "P1 base register") },
+    { HRDATAD (P1LR,      P1LR, 22, "P1 length register") },
+    { HRDATAD (SBR,        SBR, 32, "system base register") },
+    { HRDATAD (SLR,        SLR, 22, "system length register") },
+    { HRDATAD (SISR,      SISR, 16, "software interrupt summary register") },
+    { HRDATAD (ASTLVL,  ASTLVL,  4, "AST level register") },
+    { FLDATAD (MAPEN,    mapen,  0, "memory management enable") },
+    { FLDATAD (PME,        pme,  0, "performance monitor enable") },
+    { HRDATAD (TRPIRQ,  trpirq,  8, "trap/interrupt pending") },
+    { FLDATAD (CRDERR, crd_err,  0, "correctible read data error flag") },
+    { FLDATAD (MEMERR, mem_err,  0, "memory error flag") },
+    { FLDATA (HLTPIN, hlt_pin,  0) },
     { HRDATA (IDLE_MASK, cpu_idle_mask, 16), REG_HIDDEN },
     { DRDATA (IDLE_INDX, cpu_idle_type, 4), REG_HRO },
     { DRDATA (IDLE_ENAB, sim_idle_enab, 4), REG_HRO },
-    { BRDATA (PCQ, pcq, 16, 32, PCQ_SIZE), REG_RO+REG_CIRC },
+    { BRDATAD (PCQ, pcq, 16, 32, PCQ_SIZE, "PC prior to last PC change or interrupt;"), REG_RO+REG_CIRC },
     { HRDATA (PCQP, pcq_p, 6), REG_HRO },
     { HRDATA (BADABO, badabo, 32), REG_HRO },
-    { HRDATA (WRU, sim_int_char, 8) },
+    { HRDATAD (WRU, sim_int_char, 8, "interrupt character") },
+    { HRDATA (MODEL, sys_model, 32), REG_HRO },
     { NULL }
     };
 
 MTAB cpu_mod[] = {
     { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
     { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE", &cpu_set_idle, &cpu_show_idle },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|NETBSD|OPENBSD|ULTRIXOLD|OPENBSDOLD|QUASIJARUS|32V|ALL}", &cpu_set_idle, &cpu_show_idle },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
-    { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size },
-#if !defined (VAX_780)
-    { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size },
-    { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size },
-#endif
+    MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
       NULL, &cpu_show_virt },
+    CPU_MODEL_MODIFIERS /* Model specific cpu modifiers from vaxXXX_defs.h */
     { 0 }
     };
 
 DEBTAB cpu_deb[] = {
-    { "INTEXC", LOG_CPU_I },
-    { "REI", LOG_CPU_R },
-    { "CONTEXT", LOG_CPU_P },
-    { "EVENT", SIM_DBG_EVENT },
-    { "ACTIVATE", SIM_DBG_ACTIVATE },
+    { "INTEXC",    LOG_CPU_I },
+    { "REI",       LOG_CPU_R },
+    { "CONTEXT",   LOG_CPU_P },
+    { "EVENT",     SIM_DBG_EVENT },
+    { "ACTIVATE",  SIM_DBG_ACTIVATE },
+    { "ASYNCH",    SIM_DBG_AIO_QUEUE },
     { NULL, 0 }
     };
 
@@ -502,8 +491,14 @@ DEVICE cpu_dev = {
     &cpu_ex, &cpu_dep, &cpu_reset,
     &cpu_boot, NULL, NULL,
     NULL, DEV_DYNM | DEV_DEBUG, 0,
-    cpu_deb, &cpu_set_size, NULL
+    cpu_deb, &cpu_set_size, NULL, &cpu_help, NULL, NULL
     };
+
+t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "model=");
+return cpu_print_model (st);
+}
 
 t_stat sim_instr (void)
 {
@@ -593,8 +588,11 @@ else if (abortval < 0) {                                /* mm or rsrv or int */
         break;
 
     case SCB_MCHK:                                      /* machine check */
+/* The ka630 and ka620 CPU ROMs use double machine checks to size memory */
+#if !defined(VAX_620) && !defined(VAX_630)
         if (in_ie)                                      /* in exc? panic */
             ABORT (STOP_INIE);
+#endif
         cc = machine_check (p1, opc, cc, delta);        /* system specific */
         in_ie = 0;
         GET_CUR;                                        /* PSL<cur> changed */
@@ -1948,7 +1946,8 @@ for ( ;; ) {
             temp = CC_V;
             SET_TRAP (TRAP_DIVZRO);
             }
-        else if ((op0 == LMASK) && (op1 == LSIGN)) {    /* overflow? */
+        else if ((((uint32)op0) == LMASK) && 
+                 (((uint32)op1) == LSIGN)) {            /* overflow? */
             r = op1;
             temp = CC_V;
             INTOV;
@@ -2187,6 +2186,7 @@ for ( ;; ) {
             BRANCHB (brdisp);
             if (((PSL & PSL_IS) != 0) &&                /* on IS? */
                 (PSL_GETIPL (PSL) == 0x1F) &&           /* at IPL 31 */
+                (mapen == 0) &&                         /* Running from ROM */
                 (fault_PC == 0x2004361B))               /* Boot ROM Character Prompt */
                 cpu_idle();
             }
@@ -3146,8 +3146,8 @@ PSL = PSL_IS | PSL_IPL1F;
 SISR = 0;
 ASTLVL = 4;
 mapen = 0;
-FLUSH_ISTR;                                             /* init I-stream */
-if (M == NULL) {                                        /* first time init? */
+FLUSH_ISTR;                             /* init I-stream */
+if (M == NULL) {                        /* first time init? */
     sim_brk_types = sim_brk_dflt = SWMASK ('E');
     pcq_r = find_reg ("PCQ", NULL, dptr);
     if (pcq_r == NULL)
@@ -3156,6 +3156,7 @@ if (M == NULL) {                                        /* first time init? */
     M = (uint32 *) calloc (((uint32) MEMSIZE) >> 2, sizeof (uint32));
     if (M == NULL)
         return SCPE_MEM;
+    auto_config(NULL, 0);               /* do an initial auto configure */
     }
 return build_dib_tab ();
 }
@@ -3211,7 +3212,7 @@ return SCPE_NXM;
 t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 int32 mc = 0;
-uint32 i, clim;
+uint32 i, clim, uval = (uint32)val;
 uint32 *nM = NULL;
 
 if ((val <= 0) || (val > MAXMEMSIZE_X))
@@ -3220,15 +3221,15 @@ for (i = val; i < MEMSIZE; i = i + 4)
     mc = mc | M[i >> 2];
 if ((mc != 0) && !get_yn ("Really truncate memory [N]?", FALSE))
     return SCPE_OK;
-nM = (uint32 *) calloc (val >> 2, sizeof (uint32));
+nM = (uint32 *) calloc (uval >> 2, sizeof (uint32));
 if (nM == NULL)
     return SCPE_MEM;
-clim = (uint32) ((((uint32) val) < MEMSIZE)? val: MEMSIZE);
+clim = (uint32)((uval < MEMSIZE)? uval: MEMSIZE);
 for (i = 0; i < clim; i = i + 4)
     nM[i >> 2] = M[i >> 2];
 free (M);
 M = nM;
-MEMSIZE = val; 
+MEMSIZE = uval; 
 return SCPE_OK;
 }
 
@@ -3325,8 +3326,6 @@ t_stat r;
 InstHistory *h;
 extern const char *opcode[];
 extern t_value *sim_eval;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;
@@ -3461,5 +3460,107 @@ t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 if (sim_idle_enab && (cpu_idle_type != 0))
     fprintf (st, "idle=%s, ", os_tab[cpu_idle_type - 1].name);
 sim_show_idle (st, uptr, val, desc);
+return SCPE_OK;
+}
+
+
+t_stat cpu_load_bootcode (const char *filename, const unsigned char *builtin_code, size_t size, t_bool rom, t_addr offset)
+{
+char args[CBUFSIZE];
+t_stat r;
+
+printf ("Loading boot code from %s\n", filename);
+if (sim_log)
+    fprintf (sim_log, "Loading boot code from %s\n", filename);
+if (rom)
+    sprintf (args, "-R %s", filename);
+else
+    sprintf (args, "-O %s %X", filename, (int)offset);
+r = load_cmd (0, args);
+if (r != SCPE_OK) {
+    if (builtin_code) {
+        FILE *f;
+
+        if ((f = sim_fopen (filename, "wb"))) {
+            printf ("Saving boot code to %s\n", filename);
+            if (sim_log)
+                fprintf (sim_log, "Saving boot code to %s\n", filename);
+            sim_fwrite ((void *)builtin_code, 1, size, f);
+            fclose (f);
+            printf ("Loading boot code from %s\n", filename);
+            if (sim_log)
+                fprintf (sim_log, "Loading boot code from %s\n", filename);
+            r = load_cmd (0, args);
+            }
+        }
+    return r;
+    }
+return SCPE_OK;
+}
+
+t_stat cpu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "The ");cpu_print_model (st);fprintf (st, " CPU help\n\n");
+fprintf (st, "CPU options include the size of main memory.\n\n");
+if (dptr->modifiers) {
+    MTAB *mptr;
+    extern t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
+
+    for (mptr = dptr->modifiers; mptr->mask != 0; mptr++)
+        if (mptr->valid == &cpu_set_size)
+            fprintf (st, "   sim> SET CPU %4s                    set memory size = %sB\n", mptr->mstring, mptr->mstring);
+    fprintf (st, "\n");
+    }
+cpu_model_help (st, dptr, uptr, flag, cptr);
+fprintf (st, "CPU options include the treatment of the HALT instruction.\n\n");
+fprintf (st, "   sim> SET CPU SIMHALT                 kernel HALT returns to simulator\n");
+fprintf (st, "   sim> SET CPU CONHALT                 kernel HALT returns to boot ROM console\n\n");
+fprintf (st, "The CPU also implements a command to display a virtual to physical address\n");
+fprintf (st, "translation:\n\n");
+fprintf (st, "   sim> SHOW {-kesu} CPU VIRTUAL=n      show translation for address n\n");
+fprintf (st, "                                        in kernel/exec/supervisor/user mode\n\n");
+fprintf (st, "Memory can be loaded with a binary byte stream using the LOAD command.  The\n");
+fprintf (st, "LOAD command recognizes three switches:\n\n");
+fprintf (st, "      -o      origin argument follows file name\n");
+fprintf (st, "      -r      load the boot ROM\n");
+fprintf (st, "      -n      load the non-volatile RAM\n\n");
+fprintf (st, "The CPU supports the BOOT command and is the only VAX device to do so.  Note\n");
+fprintf (st, "that the behavior of the bootstrap depends on the capabilities of the console\n");
+fprintf (st, "terminal emulator.  If the terminal window supports full VT100 emulation\n");
+fprintf (st, "(including Multilanguage Character Set support), the bootstrap will ask the\n");
+fprintf (st, "user to specify the language; otherwise, it will default to English.\n\n");
+fprintf (st, "These switches are recognized when examining or depositing in CPU memory:\n\n");
+fprintf (st, "      -b      examine/deposit bytes\n");
+fprintf (st, "      -w      examine/deposit words\n");
+fprintf (st, "      -l      examine/deposit longwords\n");
+fprintf (st, "      -d      data radix is decimal\n");
+fprintf (st, "      -o      data radix is octal\n");
+fprintf (st, "      -h      data radix is hexadecimal\n");
+fprintf (st, "      -m      examine (only) VAX instructions\n");
+fprintf (st, "      -p      examine/deposit PDP-11 (compatibility mode) instructions\n");
+fprintf (st, "      -r      examine (only) RADIX50 encoded data\n");
+fprintf (st, "      -v      interpret address as virtual, current mode\n");
+fprintf (st, "      -k      interpret address as virtual, kernel mode\n");
+fprintf (st, "      -e      interpret address as virtual, executive mode\n");
+fprintf (st, "      -s      interpret address as virtual, supervisor mode\n");
+fprintf (st, "      -u      interpret address as virtual, user mode\n\n");
+fprintf (st, "The CPU attempts to detect when the simulator is idle.  When idle, the\n");
+fprintf (st, "simulator does not use any resources on the host system.  Idle detection is\n");
+fprintf (st, "controlled by the SET IDLE and SET NOIDLE commands:\n\n");
+fprintf (st, "   sim> SET CPU IDLE{=VMS|ULTRIX|NETBSD|FREEBSD|32V|ALL}\n");
+fprintf (st, "                                        enable idle detection\n");
+fprintf (st, "   sim> SET CPU NOIDLE                  disable idle detection\n\n");
+fprintf (st, "Idle detection is disabled by default.  Unless ALL is specified, idle\n");
+fprintf (st, "detection is operating system specific.  If idle detection is enabled with\n");
+fprintf (st, "an incorrect operating system setting, simulator performance could be\n");
+fprintf (st, "impacted.  The default operating system setting is VMS.\n\n");
+fprintf (st, "The CPU can maintain a history of the most recently executed instructions.\n");
+fprintf (st, "This is controlled by the SET CPU HISTORY and SHOW CPU HISTORY commands:\n\n");
+fprintf (st, "   sim> SET CPU HISTORY                 clear history buffer\n");
+fprintf (st, "   sim> SET CPU HISTORY=0               disable history\n");
+fprintf (st, "   sim> SET CPU HISTORY=n               enable history, length = n\n");
+fprintf (st, "   sim> SHOW CPU HISTORY                print CPU history\n");
+fprintf (st, "   sim> SHOW CPU HISTORY=n              print first n entries of CPU history\n\n");
+fprintf (st, "The maximum length for the history is 65536 entries.\n\n");
 return SCPE_OK;
 }

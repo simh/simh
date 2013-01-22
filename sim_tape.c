@@ -58,6 +58,7 @@
 
    sim_tape_attach      attach tape unit
    sim_tape_detach      detach tape unit
+   sim_tape_attach_help help routine for attaching tapes
    sim_tape_rdrecf      read tape record forward
    sim_tape_rdrecr      read tape record reverse
    sim_tape_wrrecf      write tape record forward
@@ -108,8 +109,6 @@ static struct sim_tape_fmt fmts[MTUF_N_FMT] = {
     { NULL,   0,       0 }
     };
 
-extern int32 sim_switches;
-
 t_stat sim_tape_ioerr (UNIT *uptr);
 t_stat sim_tape_wrdata (UNIT *uptr, uint32 dat);
 uint32 sim_tape_tpc_map (UNIT *uptr, t_addr *map);
@@ -125,6 +124,7 @@ struct tape_context {
     pthread_t           io_thread;          /* I/O Thread Id */
     pthread_mutex_t     io_lock;
     pthread_cond_t      io_cond;
+    pthread_cond_t      io_done;
     pthread_cond_t      startup_cond;
     int                 io_top;
     uint8               *buf;
@@ -273,6 +273,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
             }
         pthread_mutex_lock (&ctx->io_lock);
         ctx->io_top = TOP_DONE;
+        pthread_cond_signal (&ctx->io_done);
         sim_activate (uptr, ctx->asynch_io_latency);
     }
     pthread_mutex_unlock (&ctx->io_lock);
@@ -286,7 +287,7 @@ struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
    processing events for any unit. It is only called when an asynchronous 
    thread has called sim_activate() to activate a unit.  The job of this 
    routine is to put the unit in proper condition to digest what may have
-   occurred in the asynchrcondition thread.
+   occurred in the asynchronous thread.
    
    Since tape processing only handles a single I/O at a time to a 
    particular tape device, we have the opportunity to possibly detect 
@@ -306,6 +307,32 @@ if (ctx->callback && ctx->io_top == TOP_DONE) {
     callback (uptr, ctx->io_status);
     }
 }
+
+static t_bool _tape_is_active (UNIT *uptr)
+{
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
+if (ctx) {
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_is_active(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+    return (ctx->io_top != TOP_DONE);
+    }
+return FALSE;
+}
+
+static void _tape_cancel (UNIT *uptr)
+{
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
+if (ctx) {
+    sim_debug (ctx->dbit, ctx->dptr, "_tape_cancel(unit=%d, top=%d)\n", uptr-ctx->dptr->units, ctx->io_top);
+    if (ctx->asynch_io) {
+        pthread_mutex_lock (&ctx->io_lock);
+        while (ctx->io_top != TOP_DONE)
+            pthread_cond_wait (&ctx->io_done, &ctx->io_lock);
+        pthread_mutex_unlock (&ctx->io_lock);
+        }
+    }
+}
 #else
 #define AIO_CALLSETUP
 #define AIO_CALL(op, _buf, _fc, _bc, _max, _vbc, _gaplen, _bpi, _obj, _callback) \
@@ -319,7 +346,6 @@ if (ctx->callback && ctx->io_top == TOP_DONE) {
 t_stat sim_tape_set_async (UNIT *uptr, int latency)
 {
 #if !defined(SIM_ASYNCH_IO)
-extern FILE *sim_log;                                   /* log file */
 char *msg = "Tape: can't operate asynchronously\r\n";
 printf ("%s", msg);
 if (sim_log) fprintf (sim_log, "%s", msg);
@@ -333,6 +359,7 @@ ctx->asynch_io_latency = latency;
 if (ctx->asynch_io) {
     pthread_mutex_init (&ctx->io_lock, NULL);
     pthread_cond_init (&ctx->io_cond, NULL);
+    pthread_cond_init (&ctx->io_done, NULL);
     pthread_cond_init (&ctx->startup_cond, NULL);
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
@@ -344,6 +371,8 @@ if (ctx->asynch_io) {
     pthread_cond_destroy (&ctx->startup_cond);
     }
 uptr->a_check_completion = _tape_completion_dispatch;
+uptr->a_is_active = _tape_is_active;
+uptr->a_cancel = _tape_cancel;
 #endif
 return SCPE_OK;
 }
@@ -368,12 +397,16 @@ if (ctx->asynch_io) {
     pthread_join (ctx->io_thread, NULL);
     pthread_mutex_destroy (&ctx->io_lock);
     pthread_cond_destroy (&ctx->io_cond);
-    pthread_cond_destroy (&ctx->startup_cond);
+    pthread_cond_destroy (&ctx->io_done);
     }
 return SCPE_OK;
 #endif
 }
 
+/* 
+   This routine is called when the simulator stops and any time
+   the asynch mode is changed (enabled or disabled)
+*/
 static void _sim_tape_io_flush (UNIT *uptr)
 {
 #if defined (SIM_ASYNCH_IO)
@@ -455,9 +488,10 @@ t_stat sim_tape_detach (UNIT *uptr)
 uint32 f = MT_GET_FMT (uptr);
 t_stat r;
 
-#if defined (SIM_ASYNCH_IO)
 sim_tape_clr_async (uptr);
-#endif
+
+if (uptr->io_flush)
+    uptr->io_flush (uptr);                              /* flush buffered data */
 
 r = detach_unit (uptr);                                 /* detach unit */
 if (r != SCPE_OK)
@@ -482,6 +516,33 @@ uptr->io_flush = NULL;
 return SCPE_OK;
 }
 
+t_stat sim_tape_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "%s Tape Attach Help\n\n", dptr->name);
+if (0 == (uptr-dptr->units)) {
+    if (dptr->numunits > 1) {
+        uint32 i;
+
+        for (i=0; i < dptr->numunits; ++i)
+            if (dptr->units[i].flags & UNIT_ATTABLE)
+                fprintf (st, "  sim> ATTACH {switches} %s%d tapefile\n\n", dptr->name, i);
+        }
+    else
+        fprintf (st, "  sim> ATTACH {switches} %s tapefile\n\n", dptr->name);
+    }
+else
+    fprintf (st, "  sim> ATTACH {switches} %s tapefile\n\n", dptr->name);
+fprintf (st, "Attach command switches\n");
+fprintf (st, "    -R          Attach Read Only.\n");
+fprintf (st, "    -E          Must Exist (if not specified an attempt to create the indicated\n");
+fprintf (st, "                virtual tape will be attempted).\n");
+fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
+fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
+return SCPE_OK;
+
+return SCPE_OK;
+}
+
 void sim_tape_data_trace(UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
@@ -497,11 +558,11 @@ if (ctx->dptr->dctrl & reason) {
             if ((i > 0) && (0 == memcmp (&data[i], &data[i-16], 16))) {
                 ++same;
                 continue;
-            }
+                }
             if (same > 0) {
                 sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
                 same = 0;
-            }
+                }
             group = (((len - i) > 16) ? 16 : (len - i));
             for (sidx=oidx=0; sidx<group; ++sidx) {
                 outbuf[oidx++] = ' ';
@@ -511,13 +572,14 @@ if (ctx->dptr->dctrl & reason) {
                     strbuf[sidx] = data[i+sidx];
                 else
                     strbuf[sidx] = '.';
-            }
+                }
             outbuf[oidx] = '\0';
             strbuf[sidx] = '\0';
             sim_debug (reason, ctx->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
-          }
-          if (same > 0)
-              sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
+        if (same > 0) {
+            sim_debug (reason, ctx->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            }
         }
     }
 }
@@ -1641,8 +1703,9 @@ t_stat sim_tape_rewind (UNIT *uptr)
 {
 struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
 
-if (uptr->flags & UNIT_ATT)
+if (uptr->flags & UNIT_ATT) {
     sim_debug (ctx->dbit, ctx->dptr, "sim_tape_rewind(unit=%d)\n", uptr-ctx->dptr->units);
+    }
 uptr->pos = 0;
 MT_CLR_PNU (uptr);
 return MTSE_OK;
@@ -1722,9 +1785,14 @@ return r;
 
 t_stat sim_tape_reset (UNIT *uptr)
 {
+struct tape_context *ctx = (struct tape_context *)uptr->tape_ctx;
+
 MT_CLR_PNU (uptr);
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
+
+sim_debug (ctx->dbit, ctx->dptr, "sim_tape_reset(unit=%d)\n", (int)(uptr-ctx->dptr->units));
+
 _sim_tape_io_flush(uptr);
 AIO_VALIDATE;
 AIO_UPDATE_QUEUE;
@@ -1847,7 +1915,6 @@ return ((p == 0)? map[p]: map[p - 1]);
 
 t_stat sim_tape_set_capac (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-extern uint32 sim_taddr_64;
 t_addr cap;
 t_stat r;
 
@@ -1869,10 +1936,14 @@ t_stat sim_tape_show_capac (FILE *st, UNIT *uptr, int32 val, void *desc)
 if (uptr->capac) {
     if (uptr->capac >= (t_addr) 1000000)
         fprintf (st, "capacity=%dMB", (uint32) (uptr->capac / ((t_addr) 1000000)));
-    else if (uptr->capac >= (t_addr) 1000)
-        fprintf (st, "capacity=%dKB", (uint32) (uptr->capac / ((t_addr) 1000)));
-    else fprintf (st, "capacity=%dB", (uint32) uptr->capac);
+    else {
+        if (uptr->capac >= (t_addr) 1000)
+            fprintf (st, "capacity=%dKB", (uint32) (uptr->capac / ((t_addr) 1000)));
+        else
+            fprintf (st, "capacity=%dB", (uint32) uptr->capac);
+        }
     }
-else fprintf (st, "unlimited capacity");
+else
+    fprintf (st, "unlimited capacity");
 return SCPE_OK;
 }

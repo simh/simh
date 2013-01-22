@@ -88,7 +88,6 @@ t_stat cd_attach (UNIT *uptr, char *cptr);
 t_stat cd_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 char colbin_to_bcd (uint32 cb);
 
-extern int32 sim_switches;
 extern uint32 PC;
 extern uint32 ind_ioc;
 extern char bcd_to_ascii_a[64];

@@ -96,6 +96,7 @@
 #define MT_CONPC        42
 #define MT_CONPSL       43
 #define MT_IORESET      55
+#define MT_MAX          63                              /* last valid IPR */
 
 /* Memory system error register */
 
@@ -117,6 +118,18 @@
 #define INITMEMSIZE     (1 << 24)                       /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size }, \
+                        { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size }
+#define CPU_MODEL_MODIFIERS \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL, \
+                          NULL, &cpu_show_model },
+
 
 /* Cache diagnostic space */
 
@@ -249,11 +262,9 @@
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
 #define DEV_V_Q18       (DEV_V_UF + 2)                  /* Qbus, mem <= 256KB */
-#define DEV_V_FLTA      (DEV_V_UF + 3)                  /* flt addr */
 #define DEV_UBUS        (1u << DEV_V_UBUS)
 #define DEV_QBUS        (1u << DEV_V_QBUS)
 #define DEV_Q18         (1u << DEV_V_Q18)
-#define DEV_FLTA        (1u << DEV_V_FLTA)
 
 #define UNIBUS          FALSE                           /* 22b only */
 
@@ -274,50 +285,10 @@ typedef struct {
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
     } DIB;
 
-/* I/O page layout - RQB,RQC,RQD float based on number of DZ's */
+/* Qbus I/O page layout - see pdp11_ui_lib.c for address layout details */
 
-#define IOBA_DZ         (IOPAGEBASE + 000100)           /* DZ11 */
-#define IOLN_DZ         010
-#define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
-#define IOLN_RQB        004
-#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
-#define IOLN_RQC        004
-#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
-#define IOLN_RQD        004
-#define IOBA_VH         (IOPAGEBASE + 000440)           /* DHQ11 */
-#define IOLN_VH         020
-#define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
-#define IOLN_RQ         004
-#define IOBA_TS         (IOPAGEBASE + 012520)           /* TS11 */
-#define IOLN_TS         004
-#define IOBA_RL         (IOPAGEBASE + 014400)           /* RL11 */
-#define IOLN_RL         012
-#define IOBA_XQ         (IOPAGEBASE + 014440)           /* DEQNA/DELQA */
-#define IOLN_XQ         020
-#define IOBA_XQB        (IOPAGEBASE + 014460)           /* 2nd DEQNA/DELQA */
-#define IOLN_XQB        020
-#define IOBA_TQ         (IOPAGEBASE + 014500)           /* TMSCP */
-#define IOLN_TQ         004
-#define IOBA_XU         (IOPAGEBASE + 014510)           /* DEUNA/DELUA */
-#define IOLN_XU         010
-#define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
-#define IOLN_RP         054
-#define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
-#define IOLN_CR         010
-#define IOBA_RX         (IOPAGEBASE + 017170)           /* RXV11 */
-#define IOLN_RX         004
-#define IOBA_RY         (IOPAGEBASE + 017170)           /* RXV21 */
-#define IOLN_RY         004
-#define IOBA_QDSS       (IOPAGEBASE + 017400)           /* QDSS */
-#define IOLN_QDSS       002
-#define IOBA_DBL        (IOPAGEBASE + 017500)           /* doorbell */
-#define IOLN_DBL        002
-#define IOBA_LPT        (IOPAGEBASE + 017514)           /* LP11 */
-#define IOLN_LPT        004
-#define IOBA_PTR        (IOPAGEBASE + 017550)           /* PC11 reader */
-#define IOLN_PTR        004
-#define IOBA_PTP        (IOPAGEBASE + 017554)           /* PC11 punch */
-#define IOLN_PTP        004
+#define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
+
 
 /* The KA65x maintains 4 separate hardware IPL levels, IPL 17 to IPL 14;
    however, DEC Qbus controllers all interrupt on IPL 14
@@ -356,6 +327,8 @@ typedef struct {
 #define INT_V_VHTX      18 
 #define INT_V_QDSS      19                              /* QDSS */
 #define INT_V_CR        20
+#define INT_V_DMCRX     21                              /* DMC11 */
+#define INT_V_DMCTX     22
 
 #define INT_CLK         (1u << INT_V_CLK)
 #define INT_RQ          (1u << INT_V_RQ)
@@ -379,6 +352,8 @@ typedef struct {
 #define INT_VHTX        (1u << INT_V_VHTX)
 #define INT_QDSS        (1u << INT_V_QDSS)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_DMCRX       (1u << INT_V_DMCRX)
+#define INT_DMCTX       (1u << INT_V_DMCTX)
 
 #define IPL_CLK         (0x16 - IPL_HMIN)                       /* relative IPL */
 #define IPL_RQ          (0x14 - IPL_HMIN)
@@ -402,6 +377,8 @@ typedef struct {
 #define IPL_VHTX        (0x14 - IPL_HMIN)
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
+#define IPL_DMCRX       (0x14 - IPL_HMIN)
+#define IPL_DMCTX       (0x14 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */
@@ -410,24 +387,11 @@ typedef struct {
 
 /* Device vectors */
 
+#define VEC_AUTO        (0)                             /* Assigned by Auto Configure */
+#define VEC_FLOAT       (0)                             /* Assigned by Auto Configure */
+
 #define VEC_QBUS        1                               /* Qbus system */
 #define VEC_Q           0x200                           /* Qbus vector offset */
-#define VEC_PTR         (VEC_Q + 0070)
-#define VEC_PTP         (VEC_Q + 0074)
-#define VEC_XQ          (VEC_Q + 0120)
-#define VEC_XU          (VEC_Q + 0120)
-#define VEC_RQ          (VEC_Q + 0154)
-#define VEC_RL          (VEC_Q + 0160)
-#define VEC_LPT         (VEC_Q + 0200)
-#define VEC_TS          (VEC_Q + 0224)
-#define VEC_CR          (VEC_Q + 0230)
-#define VEC_TQ          (VEC_Q + 0260)
-#define VEC_RX          (VEC_Q + 0264)
-#define VEC_RY          (VEC_Q + 0264)
-#define VEC_DZRX        (VEC_Q + 0300)
-#define VEC_DZTX        (VEC_Q + 0304)
-#define VEC_VHRX        (VEC_Q + 0310)   
-#define VEC_VHTX        (VEC_Q + 0314)
 
 /* Interrupt macros */
 
@@ -465,8 +429,6 @@ int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
-
-int32 clk_cosched (int32 wait);
 
 #include "pdp11_io_lib.h"
 

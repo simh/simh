@@ -26,6 +26,7 @@
    BACI         12966A BACI card
 
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
@@ -502,11 +503,14 @@ DEVICE baci_dev = {
     &baci_attach,                           /* attach routine */
     &baci_detach,                           /* detach routine */
     &baci_dib,                              /* device information block */
-    DEV_DEBUG | DEV_DISABLE,                /* device flags */
+    DEV_DEBUG | DEV_DISABLE | DEV_MUX,      /* device flags */
     0,                                      /* debug control flags */
     baci_deb,                               /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    (void*)&baci_desc };                    /* help context */
 
 
 /* I/O signal handler.
@@ -1157,11 +1161,11 @@ if (baci_edsiw & (baci_status ^ baci_dsrw) & IN_MODEM)  /* device interrupt? */
     baci_status = baci_status | IN_DEVINT;              /* set flag */
 
 if ((baci_status & IN_STDIRQ) ||                        /* standard interrupt? */
-    (!(baci_icw & OUT_DCPC) &&                          /* or under program control */
-     (baci_status & IN_FIFOIRQ)) ||                     /*   and FIFO interrupt? */
-    ((IO_MODE == RECV) &&                               /* or receiving */
+    !(baci_icw & OUT_DCPC) &&                           /* or under program control */
+     (baci_status & IN_FIFOIRQ) ||                      /*   and FIFO interrupt? */
+     (IO_MODE == RECV) &&                               /* or receiving */
      (baci_edsiw & OUT_ENCM) &&                         /*   and char mode */
-     (baci_fget != baci_fput))) {                       /*   and FIFO not empty? */
+     (baci_fget != baci_fput)) {                        /*   and FIFO not empty? */
 
     if (baci.lockout) {                                 /* interrupt lockout? */
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
@@ -1185,8 +1189,8 @@ if ((baci_status & IN_STDIRQ) ||                        /* standard interrupt? *
     }
 
 if ((baci_icw & OUT_DCPC) &&                            /* DCPC enabled? */
-    (((IO_MODE == XMIT) && (baci_fcount < 128)) ||      /*   and xmit and room in FIFO */
-     ((IO_MODE == RECV) && (baci_fcount > 0)))) {       /*   or recv and data in FIFO? */
+    ((IO_MODE == XMIT) && (baci_fcount < 128) ||        /*   and xmit and room in FIFO */
+     (IO_MODE == RECV) && (baci_fcount > 0))) {         /*   or recv and data in FIFO? */
 
     if (baci.lockout) {                                 /* interrupt lockout? */
         if (DEBUG_PRI (baci_dev, DEB_CMDS))
@@ -1472,9 +1476,9 @@ if (baci_uart_clk > 0) {                                /* transfer in progress?
 
     if ((IO_MODE == XMIT) &&                            /* transmit mode? */
         ((baci_uart_clk == 0) ||                        /* and end of character? */
-         ((baci_uart_clk == 8) &&                       /*   or last stop bit */
-          (baci_cfcw & OUT_STBITS) &&                   /*     and extra stop bit requested */
-          ((baci_cfcw & OUT_CHARSIZE) == 0)))) {        /*     and 1.5 stop bits used? */
+         (baci_uart_clk == 8) &&                        /*   or last stop bit */
+         (baci_cfcw & OUT_STBITS) &&                    /*     and extra stop bit requested */
+         ((baci_cfcw & OUT_CHARSIZE) == 0))) {          /*     and 1.5 stop bits used? */
 
         baci_uart_clk = 0;                              /* clear clock count */
 

@@ -48,7 +48,6 @@ extern uint32 A;
 extern uint32 inp_strt, inp_done;
 extern uint32 out_strt, out_done;
 extern UNIT cpu_unit;
-extern int32 sim_switches;
 
 t_stat tti_svc (UNIT *uptr);
 t_stat ttr_svc (UNIT *uptr);

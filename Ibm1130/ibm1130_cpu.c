@@ -222,9 +222,7 @@ t_stat cpu_set_type (UNIT *uptr, int32 value, char *cptr, void *desc);
 void calc_ints (void);
 
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
-extern t_stat detach_cmd (int32 flags, char *cptr);
 extern UNIT cr_unit;
-extern int32 sim_switches;
 
 #ifdef ENABLE_BACKTRACE
 	static void   archive_backtrace(char *inst);
@@ -466,8 +464,6 @@ static char *xio_funcs[] = {
 
 t_stat sim_instr (void)
 {
-	extern int32 sim_interval;
-	extern UNIT *sim_clock_queue;
 	int32 i, eaddr, INDIR, IR, F, DSPLC, word2, oldval, newval, src, src2, dst, abit, xbit;
 	int32 iocc_addr, iocc_op, iocc_dev, iocc_func, iocc_mod;
 	char msg[50];
@@ -516,7 +512,7 @@ t_stat sim_instr (void)
 #endif /* ifdef  GUI_SUPPORT     */
 
 		if (sim_interval <= 0) {			/* any events timed out? */
-			if (sim_clock_queue != NULL) {
+			if (sim_clock_queue != QUEUE_LIST_END) {
 				if ((status = sim_process_event()) != 0)
 					reason = simh_status_to_stopcode(status);
 
@@ -768,7 +764,7 @@ t_stat sim_instr (void)
 								CCC--;
 							}
 							C = (CCC != 0);
-							WriteIndex(TAG, ReadIndex(TAG) & 0xFF00 | CCC);		/* put 6 bits back into low byte of index register */
+							WriteIndex(TAG, (ReadIndex(TAG) & 0xFF00) | CCC);   /* put 6 bits back into low byte of index register */
 							break;
 						}
 						/* if TAG == 0, fall through and treat like normal shift SLT */
@@ -814,8 +810,8 @@ t_stat sim_instr (void)
 						while (CCC > 0) {
 							xbit = (ACC & 0x0001) << 15;
 							abit = (ACC & 0x8000);
-							ACC  = (ACC >> 1) & 0x7FFF | abit;
-							EXT  = (EXT >> 1) & 0x7FFF | xbit;
+							ACC  = ((ACC >> 1) & 0x7FFF) | abit;
+							EXT  = ((EXT >> 1) & 0x7FFF) | xbit;
 							CCC--;
 						}
 						break;
@@ -824,8 +820,8 @@ t_stat sim_instr (void)
 						while (CCC > 0) {
 							abit = (EXT & 0x0001) << 15;
 							xbit = (ACC & 0x0001) << 15;
-							ACC  = (ACC >> 1) & 0x7FFF | abit;
-							EXT  = (EXT >> 1) & 0x7FFF | xbit;
+							ACC  = ((ACC >> 1) & 0x7FFF) | abit;
+							EXT  = ((EXT >> 1) & 0x7FFF) | xbit;
 							CCC--;
 						}
 						break;

@@ -23,6 +23,8 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   14-Dec-12    JDB     Added "-Wbitwise-op-parentheses" to the suppression pragmas
+   12-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
    10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
    28-Mar-11    JDB     Tidied up signal handling
    29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
@@ -70,6 +72,16 @@
 #define _HP2100_DEFS_H_ 0
 
 #include "sim_defs.h"                                   /* simulator defns */
+
+
+/* Required to quell clang precedence warnings */
+
+#if defined (__GNUC__)
+#pragma GCC diagnostic ignored "-Wunknown-pragmas"
+#pragma GCC diagnostic ignored "-Wpragmas"
+#pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
+#pragma GCC diagnostic ignored "-Wbitwise-op-parentheses"
+#endif
 
 
 /* Simulator stop and notification codes */
@@ -455,7 +467,6 @@ extern void   hp_enbdis_pair (DEVICE *ccp, DEVICE *dcp);
 
 /* System functions */
 
-extern t_stat      fprint_sym (FILE *ofile, t_addr addr, t_value *val, UNIT *uptr, int32 sw);
 extern const char *fmt_char   (uint8 ch);
 extern t_stat      hp_setsc   (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat      hp_showsc  (FILE *st, UNIT *uptr, int32 val, void *desc);

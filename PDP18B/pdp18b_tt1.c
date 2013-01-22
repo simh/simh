@@ -57,7 +57,7 @@ uint32 ttix_done = 0;                                   /* input flags */
 uint32 ttox_done = 0;                                   /* output flags */
 uint8 ttix_buf[TTX_MAXL] = { 0 };                       /* input buffers */
 uint8 ttox_buf[TTX_MAXL] = { 0 };                       /* output buffers */
-TMLN ttx_ldsc[TTX_MAXL] = { 0 };                        /* line descriptors */
+TMLN ttx_ldsc[TTX_MAXL] = { {0} };                      /* line descriptors */
 TMXR ttx_desc = { 1, 0, 0, ttx_ldsc };                  /* mux descriptor */
 #define ttx_lines ttx_desc.lines                        /* current number of lines */
 
@@ -128,7 +128,7 @@ DEVICE tti1_dev = {
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &ttx_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_NET | DEV_DISABLE
+    &ttix_dib, DEV_MUX | DEV_DISABLE
     };
 
 /* TTOx data structures
@@ -215,7 +215,7 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 ln = tmxr_poll_conn (&ttx_desc);                        /* look for connect */
 if (ln >= 0)                                            /* got one? rcv enab */
     ttx_ldsc[ln].rcve = 1;

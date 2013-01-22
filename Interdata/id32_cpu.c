@@ -222,7 +222,7 @@ uint32 GREG[16 * NRSETS] = { 0 };                       /* general registers */
 uint32 *M = NULL;                                       /* memory */
 uint32 *R = &GREG[0];                                   /* working reg set */
 uint32 F[8] = { 0 };                                    /* sp fp registers */
-dpr_t D[8] = { 0 };                                     /* dp fp registers */
+dpr_t D[8] = { {0} };                                   /* dp fp registers */
 uint32 PSW = 0;                                         /* processor status word */
 uint32 PC = 0;                                          /* program counter */
 uint32 oPC = 0;                                         /* PC at inst start */
@@ -252,12 +252,6 @@ InstHistory *hst = NULL;                                /* instruction history *
 jmp_buf save_env;                                       /* abort handler */
 struct BlockIO blk_io;                                  /* block I/O status */
 uint32 (*dev_tab[DEVNO])(uint32 dev, uint32 op, uint32 datout) = { NULL };
-
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern t_bool sim_idle_enab;
-extern FILE *sim_deb;
 
 uint32 ReadB (uint32 loc, uint32 rel);
 uint32 ReadH (uint32 loc, uint32 rel);
@@ -715,7 +709,6 @@ while (reason == 0) {                                   /* loop until halted */
 
         if (PSW & PSW_WAIT) {                           /* wait state? */
             sim_idle (TMR_LFC, TRUE);                   /* idling */
-            else sim_interval = sim_interval - 1;       /* no, count cycle */
             continue;
             }
 
@@ -2399,8 +2392,6 @@ char *cptr = (char *) desc;
 t_value sim_eval[3];
 t_stat r;
 InstHistory *h;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (hst_lnt == 0)                                       /* enabled? */
     return SCPE_NOFNC;

@@ -211,11 +211,6 @@ extern uint32 ch_sta[NUM_CHAN];
 extern uint32 ch_flags[NUM_CHAN];
 extern DEVICE mt_dev[NUM_CHAN];
 extern DEVICE ch_dev[NUM_CHAN];
-extern FILE *sim_deb;
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 
 /* Forward and external declarations */
 
@@ -2406,8 +2401,6 @@ t_stat cpu_fprint_one_inst (FILE *st, uint32 pc, uint32 rpt, uint32 ea,
 {
 int32 ch;
 t_value sim_eval;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 sim_eval = ir;
 if (pc & HIST_PC) {                                     /* instruction? */

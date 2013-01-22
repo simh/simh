@@ -106,7 +106,6 @@
 #define UST_GAP         01                              /* last op hit gap */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint32 ta_cs = 0;                                       /* control/status */
 uint32 ta_idb = 0;                                      /* input data buf */
@@ -145,9 +144,11 @@ uint32 ta_crc (uint8 *buf, uint32 cnt);
    ta_mod       TA modifier list
 */
 
+#define IOLN_TA         004
+
 DIB ta_dib = {
-    IOBA_TA, IOLN_TA, &ta_rd, &ta_wr,
-    1, IVCL (TA), VEC_TA, { NULL }
+    IOBA_AUTO, IOLN_TA, &ta_rd, &ta_wr,
+    1, IVCL (TA), VEC_AUTO, { NULL }
     };
 
 UNIT ta_unit[] = {
@@ -197,7 +198,7 @@ DEVICE ta_dev = {
     TA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ta_reset,
     NULL, &ta_attach, &ta_detach,
-    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG
+    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17777500 - 17777503
@@ -580,7 +581,7 @@ if (ta_xb == NULL)
     ta_xb = (uint8 *) calloc (TA_MAXFR + 2, sizeof (uint8));
 if (ta_xb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach routine */

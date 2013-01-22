@@ -44,8 +44,6 @@ extern int32 int_req, int_enable, dev_done, stop_inst;
 int32 clk_tps = 60;                                     /* ticks/second */
 int32 tmxr_poll = 16000;                                /* term mux poll */
 
-extern int32 sim_is_running;
-
 int32 clk (int32 IR, int32 AC);
 t_stat clk_svc (UNIT *uptr);
 t_stat clk_reset (DEVICE *dptr);
@@ -151,16 +149,6 @@ t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
 sim_activate (&clk_unit, t);                            /* reactivate unit */
 tmxr_poll = t;                                          /* set mux poll */
 return SCPE_OK;
-}
-
-/* Clock coscheduling routine */
-
-int32 clk_cosched (int32 wait)
-{
-int32 t;
-
-t = sim_is_active (&clk_unit);
-return (t? t - 1: wait);
 }
 
 /* Reset routine */

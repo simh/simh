@@ -117,9 +117,6 @@ extern int32 PSL, SISR, trpirq, mem_err, crd_err, hlt_pin;
 extern int32 p1;
 extern int32 ssc_bto;
 extern jmp_buf save_env;
-extern int32 sim_switches;
-extern DEVICE *sim_devices[];
-extern FILE *sim_log;
 
 t_stat dbl_rd (int32 *data, int32 addr, int32 access);
 t_stat dbl_wr (int32 data, int32 addr, int32 access);
@@ -143,21 +140,23 @@ t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
    qba_reg      QBA register list
 */
 
-DIB qba_dib = { IOBA_DBL, IOLN_DBL, &dbl_rd, &dbl_wr, 0 };
+#define IOLN_DBL        002
+
+DIB qba_dib = { IOBA_AUTO, IOLN_DBL, &dbl_rd, &dbl_wr, 0 };
 
 UNIT qba_unit = { UDATA (NULL, 0, 0) };
 
 REG qba_reg[] = {
-    { HRDATA (SCR, cq_scr, 16) },
-    { HRDATA (DSER, cq_dser, 8) },
-    { HRDATA (MEAR, cq_mear, 13) },
-    { HRDATA (SEAR, cq_sear, 20) },
-    { HRDATA (MBR, cq_mbr, 29) },
-    { HRDATA (IPC, cq_ipc, 16) },
-    { HRDATA (IPL17, int_req[3], 32), REG_RO },
-    { HRDATA (IPL16, int_req[2], 32), REG_RO },
-    { HRDATA (IPL15, int_req[1], 32), REG_RO },
-    { HRDATA (IPL14, int_req[0], 32), REG_RO },
+    { HRDATAD (SCR,         cq_scr, 16, "system configuration register") },
+    { HRDATAD (DSER,       cq_dser,  8, "DMA system error register") },
+    { HRDATAD (MEAR,       cq_mear, 13, "master error address register") },
+    { HRDATAD (SEAR,       cq_sear, 20, "slave error address register") },
+    { HRDATAD (MBR,         cq_mbr, 29, "Qbus map base register") },
+    { HRDATAD (IPC,         cq_ipc, 16, "interprocessor communications register") },
+    { HRDATAD (IPL17,   int_req[3], 32, "IPL 17 interrupt flags"), REG_RO },
+    { HRDATAD (IPL16,   int_req[2], 32, "IPL 16 interrupt flags"), REG_RO },
+    { HRDATAD (IPL15,   int_req[1], 32, "IPL 15 interrupt flags"), REG_RO },
+    { HRDATAD (IPL14,   int_req[0], 32, "IPL 14 interrupt flags"), REG_RO },
     { FLDATA (AUTOCON, autcon_enb, 0), REG_HRO },
     { NULL }
     };

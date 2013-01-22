@@ -151,9 +151,11 @@ void pclk_tick (void);
    pclk_reg     PCLK register list
 */
 
+#define IOLN_PCLK       006
+
 DIB pclk_dib = {
-    IOBA_PCLK, IOLN_PCLK, &pclk_rd, &pclk_wr,
-    1, IVCL (PCLK), VEC_PCLK, { NULL }
+    IOBA_AUTO, IOLN_PCLK, &pclk_rd, &pclk_wr,
+    1, IVCL (PCLK), VEC_AUTO, { NULL }
     };
 
 UNIT pclk_unit = { UDATA (&pclk_svc, UNIT_IDLE, 0) };
@@ -304,7 +306,7 @@ pclk_ctr = 0;
 CLR_INT (PCLK);                                         /* clear int */
 sim_cancel (&pclk_unit);                                /* cancel */
 pclk_unit.wait = xtim[0];                               /* reset delay */
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Set line frequency */

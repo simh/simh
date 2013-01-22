@@ -26,6 +26,7 @@
    MUX,MUXL,MUXM        12920A terminal multiplexor
 
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
+                        Removed DEV_NET to allow restoration of listening port
    28-Mar-11    JDB     Tidied up signal handling
    26-Oct-10    JDB     Changed I/O signal handler for revised signal model
    25-Nov-08    JDB     Revised for new multiplexer library SHOW routines
@@ -437,7 +438,10 @@ DEVICE muxl_dev = {
     0,                                      /* debug control flags */
     NULL,                                   /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    NULL };                                 /* help context */
 
 
 /* MUXU data structures
@@ -511,11 +515,14 @@ DEVICE muxu_dev = {
     &mux_attach,                            /* attach routine */
     &mux_detach,                            /* detach routine */
     &muxu_dib,                              /* device information block */
-    DEV_DISABLE | DEV_DEBUG,                /* device flags */
+    DEV_DISABLE | DEV_DEBUG  | DEV_MUX,     /* device flags */
     0,                                      /* debug control flags */
     muxu_deb,                               /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    (void*)&mux_desc };                     /* help context */
 
 
 /* MUXC data structures.
@@ -574,7 +581,10 @@ DEVICE muxc_dev = {
     0,                                      /* debug control flags */
     NULL,                                   /* debug flag name table */
     NULL,                                   /* memory size change routine */
-    NULL };                                 /* logical device name */
+    NULL,                                   /* logical device name */
+    NULL,                                   /* help routine */
+    NULL,                                   /* help attach routine*/
+    NULL };                                 /* help context */
 
 
 /* Lower data card I/O signal handler.

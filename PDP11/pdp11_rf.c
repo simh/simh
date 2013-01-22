@@ -110,7 +110,6 @@
 
 extern uint16 *M;
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint32 rf_cs = 0;                                       /* status register */
 uint32 rf_cma = 0;
@@ -142,9 +141,11 @@ uint32 update_rfcs (uint32 newcs, uint32 newdae);
    rf_reg       RF register list
 */
 
+#define IOLN_RF         020
+
 DIB rf_dib = {
-    IOBA_RF, IOLN_RF, &rf_rd, &rf_wr,
-    1, IVCL (RF), VEC_RF, NULL
+    IOBA_AUTO, IOLN_RF, &rf_rd, &rf_wr,
+    1, IVCL (RF), VEC_AUTO, {NULL}
     };
 
 
@@ -428,7 +429,7 @@ rf_wc = 0;
 rf_maint = 0;
 CLR_INT (RF);
 sim_cancel (&rf_unit);
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Bootstrap routine */
@@ -461,7 +462,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rf_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)

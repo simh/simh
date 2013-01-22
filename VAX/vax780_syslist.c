@@ -54,8 +54,8 @@ extern DEVICE tu_dev;
 extern DEVICE dz_dev;
 extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
+extern DEVICE dmc_dev[];
 
-extern int32 sim_switches;
 extern UNIT cpu_unit;
 extern void WriteB (uint32 pa, int32 val);
 extern void rom_wr_B (int32 pa, int32 val);
@@ -91,6 +91,10 @@ DEVICE *sim_devices[] = {
     &tq_dev,
     &xu_dev,
     &xub_dev,
+	&dmc_dev[0],
+	&dmc_dev[1],
+	&dmc_dev[2],
+	&dmc_dev[3],
     NULL
     };
 

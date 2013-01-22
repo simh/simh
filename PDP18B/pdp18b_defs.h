@@ -496,6 +496,4 @@ typedef struct {
 t_stat set_devno (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_devno (FILE *st, UNIT *uptr, int32 val, void *desc);
 
-int32 clk_cosched (int32 wait);
-
 #endif

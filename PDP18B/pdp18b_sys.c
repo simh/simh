@@ -345,8 +345,6 @@ return SCPE_OK;
 
 t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
-extern int32 sim_switches;
-
 if (flag != 0)
     return SCPE_NOFNC;
 if (sim_switches & SWMASK ('S'))                        /* RIM format? */

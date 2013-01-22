@@ -74,6 +74,7 @@
 */
 
 #include "pdp18b_defs.h"
+#include "sim_tmxr.h"
 #include <ctype.h>
 
 #define UNIT_V_RASCII   (UNIT_V_UF + 0)                 /* reader ASCII */
@@ -85,8 +86,6 @@
 
 extern int32 M[];
 extern int32 int_hwre[API_HLVL+1], PC, ASW;
-extern int32 sim_switches;
-extern int32 sim_is_running;
 extern UNIT cpu_unit;
 
 int32 clk_state = 0;
@@ -453,7 +452,6 @@ int32 clk_task_upd (t_bool clr)
 {
 uint32 delta, val, iusec10;
 uint32 cur = sim_grtime ();
-uint32 old = clk_task_timer;
 double usec10;
 
 if (cur > clk_task_last)
@@ -477,16 +475,6 @@ return ((int32) val);
 int32 clk_iors (void)
 {
 return (TST_INT (CLK)? IOS_CLK: 0);
-}
-
-/* Clock coscheduling routine */
-
-int32 clk_cosched (int32 wait)
-{
-int32 t;
-
-t = sim_is_active (&clk_unit);
-return (t? t - 1: wait);
 }
 
 /* Reset routine */
@@ -861,8 +849,8 @@ static const int32 boot_rom[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i, mask, wd;
-extern int32 sim_switches;
+size_t i;
+int32 mask, wd;
 
 #if defined (PDP7)
 if (sim_switches & SWMASK ('H'))                        /* hardware RIM load? */
@@ -994,7 +982,7 @@ if (pulse & 001) {                                      /* KSF */
     }
 if (pulse & 002) {                                      /* KRS/KRB */
     CLR_INT (TTI);                                      /* clear flag */
-    dat = dat | tti_unit.buf & TTI_MASK;                /* return buffer */
+    dat = dat | (tti_unit.buf & TTI_MASK);              /* return buffer */
 #if defined (PDP15)
     if (pulse & 020)                                    /* KRS? */
         tti_fdpx = 1;
@@ -1014,8 +1002,7 @@ t_stat tti_svc (UNIT *uptr)
 #if defined (KSR28)                                     /* Baudot... */
 int32 in, c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 if (tti_2nd) {                                          /* char waiting? */
     uptr->buf = tti_2nd;                                /* return char */
     tti_2nd = 0;                                        /* not waiting */
@@ -1050,8 +1037,7 @@ else {
 #else                                                   /* ASCII... */
 int32 c, out;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 out = c & 0177;                                         /* mask echo to 7b */
@@ -1082,6 +1068,7 @@ return (TST_INT (TTI)? IOS_TTI: 0);
 
 t_stat tti_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&tti_unit, &tto_unit);
 CLR_INT (TTI);                                          /* clear flag */
 if (!sim_is_running) {                                  /* RESET (not CAF)? */
     tti_unit.buf = 0;                                   /* clear buffer */

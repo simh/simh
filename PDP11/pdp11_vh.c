@@ -34,6 +34,7 @@
                         of lines available to be 8, 16, 24, or 32.
                         Fixed performance issue avoiding redundant polling
    03-Jan-10    JAD     Eliminate gcc warnings
+   24-Nov-08    JDB     Removed tmxr_send_buffered_data declaration (now in sim_tmxr.h)
    19-Nov-08    RMS     Revised for common TMXR show routines
    18-Jun-07    RMS     Added UNIT_IDLE flag
    29-Oct-06    RMS     Synced poll and clock
@@ -94,7 +95,16 @@ extern int32    tmxr_poll, clk_tps;
 #endif
 #define VH_MNOMASK  (VH_MUXES - 1)
 
+#if defined(VM_VAX)
+#if VEC_QBUS
 #define VH_LINES    (8)
+#else
+#define VH_LINES    (16)
+#endif
+#else
+#define VH_LINES    (UNIBUS?16:8)
+#endif
+#define VH_LINES_ALLOC 16
 
 #define UNIT_V_MODEDHU  (UNIT_V_UF + 0)
 #define UNIT_V_FASTDMA  (UNIT_V_UF + 1)
@@ -285,9 +295,9 @@ typedef struct {
     uint16  txchar;     /* single character I/O */
 } TMLX;
 
-static TMLN vh_ldsc[VH_MUXES * VH_LINES] = { { 0 } };
-static TMXR vh_desc = { VH_MUXES * VH_LINES, 0, 0, vh_ldsc };
-static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
+static TMLN vh_ldsc[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
+static TMXR vh_desc = { VH_MUXES * VH_LINES_ALLOC, 0, 0, vh_ldsc };
+static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 
 /* debugging bitmaps */
 #define DBG_REG  0x0001                                 /* trace read/write registers */
@@ -295,6 +305,8 @@ static TMLX vh_parm[VH_MUXES * VH_LINES] = { { 0 } };
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
+#define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
 DEBTAB vh_debug[] = {
   {"REG",    DBG_REG},
@@ -302,6 +314,8 @@ DEBTAB vh_debug[] = {
   {"TRC",    DBG_TRC},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"TRC",    DBG_TRC},
+  {"ASY",    DBG_ASY},
   {0}
 };
 
@@ -321,23 +335,27 @@ static t_stat vh_show_rbuf (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_show_txq (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_putc (int32 vh, TMLX *lp, int32 chan, int32 data);
 static void doDMA (int32 vh, int32 chan);
+static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
-
-int32 tmxr_send_buffered_data (TMLN *lp);
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 
 /* SIMH I/O Structures */
 
+#define IOLN_VH         020
+
 static DIB vh_dib = {
-    IOBA_VH,
+    IOBA_AUTO,
     IOLN_VH * VH_MUXES,
     &vh_rd,     /* read */
     &vh_wr,     /* write */
     2,          /* # of vectors */
     IVCL (VHRX),
-    VEC_VHRX,
+    VEC_FLOAT,
     { &vh_rxinta, &vh_txinta }  /* int. ack. routines */
 };
 
@@ -354,8 +372,10 @@ static const REG vh_reg[] = {
 };
 
 static const MTAB vh_mod[] = {
-    { UNIT_MODEDHU, 0, "DHV mode", "DHV", NULL },
-    { UNIT_MODEDHU, UNIT_MODEDHU, "DHU mode", "DHU", NULL },
+#if !UNIBUS
+    { UNIT_MODEDHU, 0, "DHV mode", "DHV", &vh_setmode },
+#endif
+    { UNIT_MODEDHU, UNIT_MODEDHU, "DHU mode", "DHU", &vh_setmode },
     { UNIT_FASTDMA, 0, NULL, "NORMAL", NULL },
     { UNIT_FASTDMA, UNIT_FASTDMA, "fast DMA", "FASTDMA", NULL },
     { UNIT_MODEM, 0, NULL, "NOMODEM", NULL },
@@ -364,8 +384,8 @@ static const MTAB vh_mod[] = {
     { UNIT_HANGUP, UNIT_HANGUP, "hangup", "HANGUP", NULL },
     { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, VH_LINES, "VECTOR", "VECTOR",
-        &set_vec, &show_vec_mux, (void *) &vh_desc },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+        &set_vec, &vh_show_vec, (void *) &vh_desc },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
         &set_addr_flt, NULL, NULL },
     { MTAB_XTD|MTAB_VDV, 0, "LINES", "LINES",
@@ -411,8 +431,13 @@ DEVICE vh_dev = {
     &vh_attach,     /* attach routine */
     &vh_detach,     /* detach routine */
     (void *)&vh_dib,/* context */
-    DEV_FLTA | DEV_DISABLE | DEV_DIS |DEV_NET | DEV_QBUS | DEV_UBUS | DEV_DEBUG,    /* flags */
-    0, vh_debug
+    DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_UBUS | DEV_DEBUG | DEV_MUX,    /* flags */
+    0, vh_debug,    /* debug control and debug flags */
+    NULL,           /* memory size routine */
+    NULL,           /* logical name */
+    &vh_help,       /* help routine */
+    &vh_help_attach,/* attach_help routines */
+    (void *)&vh_desc/* help context variable */
 };
 
 /* Register names for Debug tracing */
@@ -716,7 +741,7 @@ static void vh_getc (   int32   vh  )
     uint32  i, c;
     TMLX    *lp;
 
-    for (i = 0; i < VH_LINES; i++) {
+    for (i = 0; i < (uint32)VH_LINES; i++) {
         lp = &vh_parm[(vh * VH_LINES) + i];
         while ((c = tmxr_getc_ln (lp->tmln)) != 0) {
             if (c & SCPE_BREAK) {
@@ -1307,14 +1332,15 @@ static t_stat vh_reset (    DEVICE  *dptr   )
 {
     int32   i;
 
+    if (vh_desc.lines > VH_MUXES*VH_LINES)
+        vh_desc.lines = VH_MUXES*VH_LINES;
     for (i = 0; i < vh_desc.lines; i++)
         vh_parm[i].tmln = &vh_ldsc[i];
+    vh_dev.numunits = (vh_desc.lines / VH_LINES);
     for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
-#if     defined (VM_PDP11)
         /* if Unibus, force DHU mode */
         if (UNIBUS)
             vh_unit[i].flags |= UNIT_MODEDHU;
-#endif
         vh_clear (i, TRUE);
     }
     vh_rxi = vh_txi = 0;
@@ -1336,6 +1362,13 @@ static t_stat vh_attach (   UNIT    *uptr,
 static t_stat vh_detach (   UNIT    *uptr   )
 {
     return (tmxr_detach (&vh_desc, uptr));
+}
+
+t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+{
+TMXR *mp = (TMXR *) desc;
+
+return show_vec (st, uptr, ((mp->lines * 2) / VH_LINES), desc);
 }
 
 static void vh_detail_line (    FILE    *st,
@@ -1434,6 +1467,17 @@ vh_dev.numunits = (newln / VH_LINES);
 return auto_config (vh_dev.name, ndev);                 /* auto config */
 }
 
+/* SET DHU/DHV mode processor */
+
+static t_stat vh_setmode (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if (cptr)
+    return SCPE_ARG;
+if ((UNIBUS) && (val != UNIT_MODEDHU))
+    return SCPE_ARG;
+return SCPE_OK;
+}
+
 /* SET LOG processor */
 
 static t_stat vh_set_log (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -1481,4 +1525,65 @@ for (i = 0; i < vh_desc.lines; i++) {
     fprintf (st, "\n");
     }
 return SCPE_OK;
+}
+
+static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+
+fprintf (st, "%s Terminal Multiplexer (%s)\n\n", devtype, dptr->name);
+fprintf (st, "The %s is an %d-line terminal multiplexer for %s systems.  Up to %d %s's\n", devtype, VH_LINES, (UNIBUS) ? "Unibus" : "Qbus", VH_MUXES, devtype);
+fprintf (st, "are supported.\n\n");
+fprintf (st, "The %s is a programmable asynchronous terminal multiplexer.  It has two\n", devtype);
+fprintf (st, "programming modes: DHV11 and DHU11.  The register sets are compatible with\n");
+fprintf (st, "these devices.  For transmission, the %s can be used in either DMA or\n", devtype);
+fprintf (st, "programmed I/O mode.  For reception, there is a 256-entry FIFO for received\n");
+fprintf (st, "characters, dataset status changes, and diagnostic information, and a\n");
+fprintf (st, "programmable input interrupt timer (in DHU mode).  The device supports\n");
+fprintf (st, "16-, 18-, and 22-bit addressing.  The %s can be programmed to filter\n", devtype);
+fprintf (st, "and/or handle XON/XOFF characters independently of the processor.\n");
+fprintf (st, "The %s supports programmable bit width (between 5 and 8) for the input\n", devtype);
+fprintf (st, "and output of characters.\n\n");
+fprintf (st, "By default, the DHV11 mode is selected, though DHU11 mode is recommended\n");
+fprintf (st, "for applications that can support it.  The %s controller may be adjusted\n", dptr->name);
+fprintf (st, "on a per controller basis as follows:\n\n");
+fprintf (st, "   sim> SET %sn DHU			use the DHU programming mode\n", dptr->name);
+fprintf (st, "   sim> SET %sn DHV			use the DHV programming mode\n\n", dptr->name);
+fprintf (st, "DMA output is supported.  In a real %s, DMA is not initiated immediately\n", devtype);
+fprintf (st, "upon receipt of TX.DMA.START but is dependent upon some internal processes.\n");
+fprintf (st, "The %s controller mimics this behavior by default.  It may be desirable to\n", dptr->name);
+fprintf (st, "alter this and start immediately, though this may not be compatible with all\n");
+fprintf (st, "operating systems and diagnostics.  You can change the behavior of the %s\n", dptr->name);
+fprintf (st, "controller as follows:\n\n");
+fprintf (st, "   sim> SET %sn NORMAL			use normal DMA procedures\n", dptr->name);
+fprintf (st, "   sim> SET %sn FASTDMA			set DMA to initiate immediately\n\n", dptr->name);
+fprintf (st, "The number of lines (and therefore the number of %s devices\n", devtype);
+fprintf (st, "simulated) can be changed with the command:\n\n");
+fprintf (st, "   sim> SET %s LINES=n			set line count to n\n\n", dptr->name);
+fprintf (st, "The line count must be a multiple of %d, with a maximum of %d.\n\n", VH_LINES, VH_LINES*VH_MUXES);
+fprintf (st, "Modem and auto-disconnect support may be set on an individual controller\n");
+fprintf (st, "basis.  The SET MODEM command directs the controller to report modem status\n");
+fprintf (st, "changes to the computer.  The SET HANGUP command turns on active disconnects\n");
+fprintf (st, "(disconnect session if computer clears Data Terminal Ready).\n\n");
+fprintf (st, "   sim> SET %sn [NO]MODEM		disable/enable modem control\n", dptr->name);
+fprintf (st, "   sim> SET %sn [NO]HANGUP		disable/enable disconnect on DTR drop\n\n", dptr->name);
+fprintf (st, "Once the %s devuce is attached and the simulator is running, the %s will\n", dptr->name, dptr->name);
+fprintf (st, "listen for connections on the specified port.  It assumes that the incoming\n");
+fprintf (st, "connections are Telnet connections.  The connection remains open until\n");
+fprintf (st, "disconnected by the simulated program, the Telnet client, a SET %s DISCONNECT\n", dptr->name);
+fprintf (st, "command, or a DETACH %s command.\n\n", dptr->name);
+fprintf (st, "Other special %s commands:\n\n", dptr->name);
+fprintf (st, "   sim> SHOW %s CONNECTIONS 		show current connections\n", dptr->name);
+fprintf (st, "   sim> SHOW %s STATISTICS 		show statistics for active connections\n", dptr->name);
+fprintf (st, "   sim> SET %s DISCONNECT=linenumber	disconnects the specified line.\n\n", dptr->name);
+fprintf (st, "The %s does not support save and restore.  All open connections are lost\n", devtype);
+fprintf (st, "when the simulator shuts down or the %s is detached.\n", dptr->name);
+return SCPE_OK;
+}
+
+static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
+
+return tmxr_attach_help (st, dptr, uptr, flag, cptr);
 }

@@ -268,7 +268,6 @@ extern uint32 cpu_opt;
 
 extern int32 int_req[IPL_HLVL];
 extern UNIT cpu_unit;
-extern FILE *sim_deb;
 
 uint8 *tsxb = NULL;                                     /* xfer buffer */
 int32 tssr = 0;                                         /* status register */
@@ -306,9 +305,11 @@ int32 ts_map_status (t_stat st);
    ts_mod       TS modifier list
 */
 
+#define IOLN_TS         004
+
 DIB ts_dib = {
-    IOBA_TS, IOLN_TS, &ts_rd, &ts_wr,
-    1, IVCL (TS), VEC_TS, { NULL }
+    IOBA_AUTO, IOLN_TS, &ts_rd, &ts_wr,
+    1, IVCL (TS), VEC_AUTO, { NULL }
     };
 
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) };
@@ -364,7 +365,7 @@ DEVICE ts_dev = {
     1, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
-    &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG
+    &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772522
@@ -1055,7 +1056,7 @@ if (tsxb == NULL)
     tsxb = (uint8 *) calloc (MT_MAXFR, sizeof (uint8));
 if (tsxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach */
@@ -1150,7 +1151,7 @@ static const uint16 boot_rom[] = {
 
 t_stat ts_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 

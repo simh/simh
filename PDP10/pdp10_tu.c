@@ -297,8 +297,6 @@ extern int32 int_req;
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus map */
 extern int32 ubcs[UBANUM];
 extern UNIT cpu_unit;
-extern int32 sim_switches;
-extern FILE *sim_deb;
 
 int32 tucs1 = 0;                                        /* control/status 1 */
 int32 tuwc = 0;                                         /* word count */
@@ -415,7 +413,7 @@ DEVICE tu_dev = {
     TU_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
-    &tu_dib, DEV_UBUS | DEV_DEBUG
+    &tu_dib, DEV_UBUS | DEV_DEBUG | DEV_TAPE
     };
 
 /* I/O dispatch routine, I/O addresses 17772440 - 17772472 */
@@ -1015,7 +1013,7 @@ return;
 
 void update_tucs (int32 flag, int32 drv)
 {
-int32 act = sim_is_active (&tu_unit[drv]);
+int32 act = sim_activate_time (&tu_unit[drv]);
 
 if ((flag & ~tucs1) & CS1_DONE)                         /* DONE 0 to 1? */
     tuiff = (tucs1 & CS1_IE)? 1: 0;                     /* CSTB INTR <- IE */
@@ -1273,7 +1271,7 @@ static const d10 boot_rom_its[] = {
 
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern a10 saved_PC;
 
 M[FE_UNIT] = 0;

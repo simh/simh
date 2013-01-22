@@ -86,7 +86,7 @@ uint32 dci_ireq = 0;
 uint16 dco_csr[DCX_LINES] = { 0 };                      /* control/status */
 uint8 dco_buf[DCX_LINES] = { 0 };
 uint32 dco_ireq = 0;
-TMLN dcx_ldsc[DCX_LINES] = { 0 };                       /* line descriptors */
+TMLN dcx_ldsc[DCX_LINES] = { {0} };                     /* line descriptors */
 TMXR dcx_desc = { DCX_LINES, 0, 0, dcx_ldsc };          /* mux descriptor */
 
 static const uint8 odd_par[] = {
@@ -148,9 +148,11 @@ void dcx_reset_ln (int32 ln);
    dci_reg      DCI register list
 */
 
+#define IOLN_DC         010
+
 DIB dci_dib = {
-    IOBA_DC, IOLN_DC, &dcx_rd, &dcx_wr,
-    2, IVCL (DCI), VEC_DCI, { &dci_iack, &dco_iack }
+    IOBA_AUTO, IOLN_DC * DCX_LINES, &dcx_rd, &dcx_wr,
+    2, IVCL (DCI), VEC_AUTO, { &dci_iack, &dco_iack }
     };
 
 UNIT dci_unit = { UDATA (&dci_svc, 0, 0), KBD_POLL_WAIT };
@@ -191,7 +193,7 @@ DEVICE dci_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
     NULL, &dcx_attach, &dcx_detach,
-    &dci_dib, DEV_FLTA | DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
     };
 
 /* DCO data structures
@@ -368,7 +370,7 @@ int32 ln, c, temp;
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* attached? */
     return SCPE_OK;
-sim_activate (uptr, clk_cosched (tmxr_poll));           /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 ln = tmxr_poll_conn (&dcx_desc);                        /* look for connect */
 if (ln >= 0) {                                          /* got one? */
     dcx_ldsc[ln].rcve = 1;                              /* set rcv enb */

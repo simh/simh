@@ -366,8 +366,6 @@
 #include "sim_ether.h"
 #include "sim_sock.h"
 
-extern FILE *sim_log;
-
 
 /*============================================================================*/
 /*                  OS-independant ethernet routines                          */
@@ -528,6 +526,7 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
       int i, same, group, sidx, oidx;
       char outbuf[80], strbuf[18];
       static char hex[] = "0123456789ABCDEF";
+
       for (i=same=0; i<len; i += 16) {
         if ((i > 0) && (0 == memcmp(&msg[i], &msg[i-16], 16))) {
           ++same;
@@ -551,8 +550,9 @@ void eth_packet_trace_ex(ETH_DEV* dev, const uint8 *msg, int len, char* txt, int
         strbuf[sidx] = '\0';
         sim_debug(reason, dev->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
       }
-      if (same > 0)
+      if (same > 0) {
         sim_debug(reason, dev->dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+      }
     }
   }
 }
@@ -567,7 +567,8 @@ char* eth_getname(int number, char* name)
   ETH_LIST  list[ETH_MAX_DEVICE];
   int count = eth_devices(ETH_MAX_DEVICE, list);
 
-  if (count <= number) return NULL;
+  if ((number < 0) || (count <= number))
+      return NULL;
   strcpy(name, list[number].name);
   return name;
 }
@@ -666,6 +667,7 @@ void eth_zero(ETH_DEV* dev)
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
 
+#if defined (USE_NETWORK) || defined (USE_SHARED)
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
 eth_open_devices = realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
@@ -684,6 +686,7 @@ for (i=0; i<eth_open_device_count; ++i)
         break;
         }
 }
+#endif
 
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
@@ -702,7 +705,20 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
       for (i=0, min=0; i<number; i++)
         if ((len = strlen(list[i].name)) > min) min = len;
       for (i=0; i<number; i++)
-        fprintf(st," %2d     %-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+        fprintf(st," eth%d\t%-*s (%s)\n", i, (int)min, list[i].name, list[i].desc);
+    }
+  if (eth_open_device_count) {
+    int i;
+    char desc[ETH_DEV_DESC_MAX], *d;
+
+    fprintf(st,"Open ETH Devices:\n");
+    for (i=0; i<eth_open_device_count; i++) {
+      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
+      if (d)
+        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
+      else
+        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
+      }
     }
   if (eth_open_device_count) {
     int i;
@@ -757,6 +773,14 @@ t_stat ethq_destroy(ETH_QUE* que)
 
 void ethq_clear(ETH_QUE* que)
 {
+  int i;
+
+  /* free up any extended packets */
+  for (i=0; i<que->max; ++i)
+    if (que->item[i].packet.oversize) {
+      free (que->item[i].packet.oversize);
+      que->item[i].packet.oversize = NULL;
+      }
   /* clear packet array */
   memset(que->item, 0, sizeof(struct eth_item) * que->max);
   /* clear rest of structure */
@@ -768,6 +792,8 @@ void ethq_remove(ETH_QUE* que)
   struct eth_item* item = &que->item[que->head];
 
   if (que->count) {
+    if (item->packet.oversize)
+      free (item->packet.oversize);
     memset(item, 0, sizeof(struct eth_item));
     if (++que->head == que->max)
       que->head = 0;
@@ -775,7 +801,7 @@ void ethq_remove(ETH_QUE* que)
   }
 }
 
-void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, int len, int crc_len, const uint8 *crc_data, int32 status)
+void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, size_t len, size_t crc_len, const uint8 *crc_data, int32 status)
 {
   struct eth_item* item;
 
@@ -804,15 +830,23 @@ void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, int
   item->packet.len = len;
   item->packet.used = used;
   item->packet.crc_len = crc_len;
-  memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
-  if (crc_data && (crc_len > len))
-    memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
+  if (len <= sizeof (item->packet.msg)) {
+    memcpy(item->packet.msg, data, ((len > crc_len) ? len : crc_len));
+    if (crc_data && (crc_len > len))
+      memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
+    }
+  else {
+    item->packet.oversize = realloc (item->packet.oversize, ((len > crc_len) ? len : crc_len));
+    memcpy(item->packet.oversize, data, ((len > crc_len) ? len : crc_len));
+    if (crc_data && (crc_len > len))
+      memcpy(&item->packet.oversize[len], crc_data, ETH_CRC_SIZE);
+    }
   item->packet.status = status;
 }
 
 void ethq_insert(ETH_QUE* que, int32 type, ETH_PACK* pack, int32 status)
 {
-  ethq_insert_data(que, type, pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
+ethq_insert_data(que, type, pack->oversize ? pack->oversize : pack->msg, pack->used, pack->len, pack->crc_len, NULL, status);
 }
 
 /*============================================================================*/
@@ -824,6 +858,12 @@ t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
   {return SCPE_NOFNC;}
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+  {
+  fprintf (st, "%s attach help\n\n", dptr->name);
+  fprintf (st, "This simulator was not built with ethernet device support\n");
+  return SCPE_OK;
+  }
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
   {return SCPE_NOFNC;}
@@ -942,11 +982,11 @@ static char*   (*p_pcap_lib_version) (void);
 /* load function pointer from DLL */
 typedef int (*_func)();
 
-void load_function(char* function, _func* func_ptr) {
+static void load_function(char* function, _func* func_ptr) {
 #ifdef _WIN32
-    *func_ptr = (_func)GetProcAddress(hLib, function);
+    *func_ptr = (_func)((size_t)GetProcAddress(hLib, function));
 #else
-    *func_ptr = (_func)dlsym(hLib, function);
+    *func_ptr = (_func)((size_t)dlsym(hLib, function));
 #endif
     if (*func_ptr == 0) {
     char* msg = "Eth: Failed to find function '%s' in %s\r\n";
@@ -1393,7 +1433,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
     memset(command, 0, sizeof(command));
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
-      system(command);
+      (void)system(command);
       if (NULL != (f = fopen("NIC.hwaddr", "r"))) {
         while (0 == dev->have_host_nic_phy_addr) {
           if (fgets(command, sizeof(command)-1, f)) {
@@ -1403,7 +1443,7 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
             while (p1) {
               p2 = strchr(p1+1, ':');
               if (p2 <= p1+3) {
-                int mac_bytes[6];
+                unsigned int mac_bytes[6];
                 if (6 == sscanf(p1-2, "%02x:%02x:%02x:%02x:%02x:%02x", &mac_bytes[0], &mac_bytes[1], &mac_bytes[2], &mac_bytes[3], &mac_bytes[4], &mac_bytes[5])) {
                   dev->host_nic_phy_hw_addr[0] = mac_bytes[0];
                   dev->host_nic_phy_hw_addr[1] = mac_bytes[1];
@@ -1451,7 +1491,7 @@ HANDLE hWait = pcap_getevent ((pcap_t*)dev->handle);
 #else
 int sel_ret;
 int do_select = 0;
-int select_fd;
+int select_fd = 0;
 
 switch (dev->eth_api) {
   case ETH_API_PCAP:
@@ -1679,7 +1719,6 @@ memset(errbuf, 0, sizeof(errbuf));
 if (0 == strncmp("tap:", savname, 4)) {
   int  tun = -1;    /* TUN/TAP Socket */
   int  on = 1;
-  char dev_name[64] = "";
 
 #if defined(USE_TAP_NETWORK)
   if (!strcmp(savname, "tap:tapN")) {
@@ -1715,41 +1754,45 @@ if (0 == strncmp("tap:", savname, 4)) {
   else
     strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
 #elif defined(USE_BSDTUNTAP) && defined(USE_TAP_NETWORK)
-  snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", savname+4);
-  dev_name[sizeof(dev_name)-1] = '\0';
+  if (1) {
+    char dev_name[64] = "";
 
-  if ((tun = open(dev_name, O_RDWR)) >= 0) {
-    if (ioctl(tun, FIONBIO, &on)) {
-      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-      close(tun);
-      }
-    else {
-      dev->fd_handle = tun;
-      strcpy(savname, savname+4);
-      }
-#if defined (__APPLE__)
-    if (1) {
-      struct ifreq ifr;
-      int s;
+    snprintf(dev_name, sizeof(dev_name)-1, "/dev/%s", savname+4);
+    dev_name[sizeof(dev_name)-1] = '\0';
 
-      memset (&ifr, 0, sizeof(ifr));
-      ifr.ifr_addr.sa_family = AF_INET;
-      strncpy(ifr.ifr_name, savname, sizeof(ifr.ifr_name));
-      if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
-        if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
-          ifr.ifr_flags |= IFF_UP;
-          if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
-            strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-            close(tun);
-            }
-          }
-        close(s);
+    if ((tun = open(dev_name, O_RDWR)) >= 0) {
+      if (ioctl(tun, FIONBIO, &on)) {
+        strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+        close(tun);
         }
-      }
+      else {
+        dev->fd_handle = tun;
+        strcpy(savname, savname+4);
+        }
+#if defined (__APPLE__)
+      if (1) {
+        struct ifreq ifr;
+        int s;
+
+        memset (&ifr, 0, sizeof(ifr));
+        ifr.ifr_addr.sa_family = AF_INET;
+        strncpy(ifr.ifr_name, savname, sizeof(ifr.ifr_name));
+        if ((s = socket(AF_INET, SOCK_DGRAM, 0)) >= 0) {
+          if (ioctl(s, SIOCGIFFLAGS, (caddr_t)&ifr) >= 0) {
+            ifr.ifr_flags |= IFF_UP;
+            if (ioctl(s, SIOCSIFFLAGS, (caddr_t)&ifr)) {
+              strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+              close(tun);
+              }
+            }
+          close(s);
+          }
+        }
 #endif
-    }
-  else
-    strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+      }
+    else
+      strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
+  }
 #else
   strncpy(errbuf, "No support for tap: devices", sizeof(errbuf)-1);
 #endif /* !defined(__linux) && !defined(USE_BSDTUNTAP) */
@@ -1926,6 +1969,20 @@ _eth_remove_from_open_list (dev);
 return SCPE_OK;
 }
 
+t_stat eth_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "%s attach help\n\n", dptr->name);
+fprintf (st, "   sim> SHOW ETHERNET\n");
+fprintf (st, "   libpcap version 1.0.0\n");
+fprintf (st, "   ETH devices:\n");
+fprintf (st, "    eth0   en0      (No description available)\n");
+fprintf (st, "   eth1   tap:tapN (Integrated Tun/Tap support)\n");
+fprintf (st, "   sim> ATTACH %s eth0\n\n", dptr->name);
+fprintf (st, "or equivalently:\n\n");
+fprintf (st, "   sim> ATTACH %s en0\n\n", dptr->name);
+return SCPE_OK;
+}
+
 t_stat eth_check_address_conflict (ETH_DEV* dev, 
                                    ETH_MAC* const mac)
 {
@@ -2098,13 +2155,13 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
       break;
 #ifdef USE_TAP_NETWORK
     case ETH_API_TAP:
-      status = ((packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
+      status = (((int)packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
       break;
 #endif
 #ifdef USE_VDE_NETWORK
     case ETH_API_VDE:
       status = vde_send((VDECONN*)dev->handle, (void *)packet->msg, packet->len, 0);
-      if ((status == packet->len) || (status == 0))
+      if ((status == (int)packet->len) || (status == 0))
         status = 0;
       else
         if ((status == -1) && ((errno == EAGAIN) || (errno == EWOULDBLOCK)))
@@ -2200,6 +2257,7 @@ key ^= 0x3f;
 return (hash[key>>3] & (1 << (key&0x7)));
 }
 
+#if 0
 static int
 _eth_hash_validate(ETH_MAC *MultiCastList, int count, ETH_MULTIHASH hash)
 {
@@ -2251,6 +2309,7 @@ ETH_MULTIHASH thash = {0x01, 0x40, 0x00, 0x00, 0x48, 0x88, 0x40, 0x00};
 
 _eth_hash_validate(tMacs, sizeof(tMacs)/sizeof(tMacs[0]), thash);
 }
+#endif
 
 /* The IP header */
 struct IPHeader {
@@ -2918,10 +2977,12 @@ if (dev->dptr->dctrl & dev->dbit) {
     eth_mac_fmt(&dev->filter_address[i], mac);
     sim_debug(dev->dbit, dev->dptr, "  Addr[%d]: %s\n", i, mac);
     }
-  if (dev->all_multicast)
+  if (dev->all_multicast) {
     sim_debug(dev->dbit, dev->dptr, "All Multicast\n");
-  if (dev->promiscuous)
+    }
+  if (dev->promiscuous) {
     sim_debug(dev->dbit, dev->dptr, "Promiscuous\n");
+    }
   }
 
 /* setup BPF filters and other fields to minimize packet delivery */
@@ -3159,6 +3220,7 @@ pcap_if_t* dev;
 char errbuf[PCAP_ERRBUF_SIZE];
 
 memset(list, 0, max*sizeof(*list));
+errbuf[0] = '\0';
 /* retrieve the device list */
 if (pcap_findalldevs(&alldevs, errbuf) == -1) {
   char* msg = "Eth: error in pcap_findalldevs: %s\r\n";
@@ -3183,6 +3245,13 @@ else {
 
 /* Add any host specific devices and/or validate those already found */
 i = eth_host_devices(i, max, list);
+
+/* If no devices were found and an error message was left in the buffer, display it */
+if ((i == 0) && (errbuf[0])) {
+    char* msg = "Eth: pcap_findalldevs warning: %s\r\n";
+    printf (msg, errbuf);
+    if (sim_log) fprintf (sim_log, msg, errbuf);
+    }
 
 /* return device count */
 return i;

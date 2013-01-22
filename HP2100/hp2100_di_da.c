@@ -25,6 +25,8 @@
 
    DA           12821A Disc Interface with Amigo disc drives
 
+   24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
+   07-May-12    JDB     Cancel the intersector delay if an untalk is received
    29-Mar-12    JDB     First release
    04-Nov-11    JDB     Created DA device
 
@@ -756,7 +758,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
             case disc_command:                              /* execute a disc command */
                 result = dl_service_drive (cvptr, uptr);    /* service the disc unit */
 
-                if (cvptr->opcode == clear)                 /* is this a Clear command? */
+                if (cvptr->opcode == Clear)                 /* is this a Clear command? */
                     if_dsj [unit] = 2;                      /* indicate that the self test is complete */
 
                 if (cvptr->state != cntlr_busy) {           /* has the controller stopped? */
@@ -856,7 +858,7 @@ switch (if_state [unit]) {                                  /* dispatch the inte
                     if (cvptr->length == 0 || cvptr->eod == SET) {  /* is the data phase complete? */
                         uptr->PHASE = end_phase;                    /* set the end phase */
 
-                        if (cvptr->opcode == request_status)    /* is it a Request Status command? */
+                        if (cvptr->opcode == Request_Status)    /* is it a Request Status command? */
                             if_dsj [unit] = 0;                  /* clear the DSJ value */
 
                         if_state [unit] = command_exec;         /* set to execute the command */
@@ -980,7 +982,7 @@ if (result == SCPE_IERR && DEBUG_PRI (da_dev, DEB_RWSC)) {  /* did an internal e
 
 if (if_state [unit] == idle) {                              /* is the command now complete? */
     if (if_command [unit] == disc_command) {                /* did a disc command complete? */
-        if (cvptr->opcode != end)                           /* yes; if the command was not End, */
+        if (cvptr->opcode != End)                           /* yes; if the command was not End, */
             di_poll_response (da, unit, SET);               /*   then enable PPR */
 
         if (DEBUG_PRI (da_dev, DEB_RWSC))
@@ -1266,7 +1268,7 @@ result = dl_load_unload (&icd_cntlr [unit], uptr, load);    /* load or unload th
 if (result == SCPE_OK && ! load) {                          /* was the unload successful? */
     icd_cntlr [unit].status = drive_attention;              /* set Drive Attention status */
 
-    if (uptr->OP == end)                                    /* is the controller in idle state 2? */
+    if (uptr->OP == End)                                    /* is the controller in idle state 2? */
         di_poll_response (da, unit, SET);                   /* enable PPR */
     }
 
@@ -1594,10 +1596,10 @@ if (di [da].bus_cntl & BUS_ATN) {                           /* is it a bus comma
                 da_unit [unit].wait = icd_cntlr [unit].cmd_time;    /* these are always scheduled and */
                 initiated = TRUE;                                   /*   logged as initiated */
 
-                if (((if_state [unit] == read_wait) &&              /* if we're waiting for a send data secondary */
-                     (message_address != 0x00)) ||                  /*   but it's not there */
-                    ((if_state [unit] == status_wait) &&            /* or a send status secondary, */
-                     (message_address != 0x08)))                    /*   but it's not there */
+                if (if_state [unit] == read_wait                    /* if we're waiting for a send data secondary */
+                  && message_address != 0x00                        /*   but it's not there */
+                  || if_state [unit] == status_wait                 /* or a send status secondary, */
+                  && message_address != 0x08)                       /*   but it's not there */
                     abort_command (unit, io_program_error,          /*   then abort the pending command */
                                    idle);                           /*   and process the new command */
 
@@ -1962,6 +1964,11 @@ return;
 
     2. There is no need to test if we are processing a disc command, as the
        controller would not be busy otherwise.
+
+    3. If an auto-seek will be needed to continue the read, but the seek will
+       fail, then an extra delay is inserted before the service call to start
+       the next sector.  Once an Untalk is received, this delay is no longer
+       needed, so it is cancelled before rescheduling the service routine.
 */
 
 static void complete_read (uint32 unit)
@@ -1974,7 +1981,9 @@ if ((if_state [unit] == command_exec                        /* is a command exec
 
     if_state [unit] = command_exec;                         /* set to execute */
     da_unit [unit].PHASE = end_phase;                       /*   the completion phase */
-    da_unit [unit].wait = icd_cntlr [unit].data_time;       /* ensure that the controller will finish */
+
+    sim_cancel (&da_unit [unit]);                           /* cancel the EOT delay */
+    da_unit [unit].wait = icd_cntlr [unit].data_time;       /* reschedule for completion */
     }
 
 return;

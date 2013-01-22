@@ -39,6 +39,7 @@
 */
 
 #include "pdp10_defs.h"
+#include "sim_tmxr.h"
 #define UNIT_DUMMY      (1 << UNIT_V_UF)
 
 extern d10 *M;
@@ -143,8 +144,7 @@ t_stat fei_svc (UNIT *uptr)
 {
 int32 temp;
 
-sim_activate (uptr, KBD_WAIT (uptr->wait, clk_cosched (tmxr_poll)));  
-                                                        /* continue poll */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
 if ((temp = sim_poll_kbd ()) < SCPE_KFLAG)              /* no char or error? */
     return temp;
 if (temp & SCPE_BREAK)                                  /* ignore break */
@@ -160,6 +160,7 @@ return SCPE_OK;
 
 t_stat fe_reset (DEVICE *dptr)
 {
+tmxr_set_console_units (&fe_unit[0], &fe_unit[1]);
 fei_unit.buf = feo_unit.buf = 0;
 M[FE_CTYIN] = M[FE_CTYOUT] = 0;
 apr_flg = apr_flg & ~(APRF_ITC | APRF_CON);

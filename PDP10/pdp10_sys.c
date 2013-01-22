@@ -338,7 +338,6 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 d10 data;
 int32 wc, fmt;
-extern int32 sim_switches;
 
 fmt = 0;                                                /* no fmt */
 if (sim_switches & SWMASK ('R'))                        /* -r? */

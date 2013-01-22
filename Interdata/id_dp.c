@@ -139,7 +139,6 @@ static struct drvtyp drv_tab[] = {
     };
 
 extern uint32 int_req[INTSZ], int_enb[INTSZ];
-extern FILE *sim_deb;
 
 uint8 dpxb[DP_NUMBY];                                   /* xfer buffer */
 uint32 dp_bptr = 0;                                     /* buffer ptr */

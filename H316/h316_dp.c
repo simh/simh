@@ -220,7 +220,6 @@ extern int32 dev_int, dev_enb;
 extern uint32 chan_req;
 extern int32 stop_inst;
 extern uint32 dma_ad[DMA_MAX];
-extern int32 sim_switches;
 
 uint32 dp_cw1 = 0;                                      /* cmd word 1 */
 uint32 dp_cw2 = 0;                                      /* cmd word 2 */

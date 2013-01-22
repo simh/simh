@@ -24,8 +24,22 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   rq           RQDX3 disk controller
+   rq           MSCP disk controller
 
+   09-Dec-12    MB      Added support for changing controller type.
+   24-Oct-12    MB      Added mapped transfers for VAX
+   29-Jan-11    HUH     Added RC25, RCF25 and RA80 disks
+                        Not all disk parameters set yet
+                        "KLESI" MSCP controller (3) / port (1) types for RC25 
+                        not yet implemented
+                        
+                        Remarks on the RC25 disk drives: 
+                        In "real" life the RC25 drives exist in pairs only,
+                        one RC25 (removable) and one RCF25 (fixed) in one housing.
+                        The removable platter has always got an even drive number 
+                        (e.g. "0"), the fixed platter has always got the next (odd) 
+                        drive number (e.g. "1"). These two rules are not enforced 
+                        by the disk drive simulation.
    07-Mar-11    MP      Added working behaviors for removable device types.
                         This allows physical CDROM's to come online and be 
                         ejected.
@@ -127,8 +141,8 @@ extern uint32 cpu_opt;
 #define RQU_UQPM        6                               /* UB port model */
 #define RQQ_UQPM        19                              /* QB port model */
 #define RQ_UQPM         (UNIBUS? RQU_UQPM: RQQ_UQPM)
-#define RQU_MODEL       6                               /* UB MSCP ctrl model */
-#define RQQ_MODEL       19                              /* QB MSCP ctrl model */
+#define RQU_MODEL       6                               /* UB MSCP ctrl model (UDA50A) */
+#define RQQ_MODEL       19                              /* QB MSCP ctrl model (RQDX3) */
 #define RQ_MODEL        (UNIBUS? RQU_MODEL: RQQ_MODEL)
 #define RQ_HVER         1                               /* hardware version */
 #define RQ_SVER         3                               /* software version */
@@ -137,6 +151,8 @@ extern uint32 cpu_opt;
 #define RQ_NUMDR        4                               /* # drives */
 #define RQ_NUMBY        512                             /* bytes per block */
 #define RQ_MAXFR        (1 << 16)                       /* max xfer */
+#define RQ_MAPXFER      (1 << 31)                       /* mapped xfer */
+#define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
 #define UNIT_V_ONL      (UNIT_V_UF + 0)                 /* online */
 #define UNIT_V_WLK      (UNIT_V_UF + 1)                 /* hwre write lock */
@@ -249,6 +265,7 @@ x  RD33 17      7       1170    ?       ?       ?       138565
 
    RA60 42(+1)  6       1600    6       1       1008    400176
 x  RA70 33(+1)  11      1507+   11      1       ?       547041
+   RA80 31      14      546      ?      ?       ?       237212
    RA81 51(+1)  14      1258    14      1       2856    891072
    RA82 57(+1)  15      1435    15      1       3420    1216665
    RA71 51(+1)  14      1921    14      1       1428    1367310         
@@ -256,6 +273,11 @@ x  RA70 33(+1)  11      1507+   11      1       ?       547041
    RA90 69(+1)  13      2656    13      1       1794    2376153
    RA92 73(+1)  13      3101    13      1       949     2940951
 x  RA73 70(+1)  21      2667+   21      1       ?       3920490
+
+   LESI attached RC25 disks (one removable, one fixed)
+   type  sec     surf    cyl     tpg     gpc     RCT     LBNs
+   RC25  31      2        821    ?       ?       ?       50902
+   RCF25 31      2        821    ?       ?       ?       50902
 
    Each drive can be a different type.  The drive field in the
    unit flags specified the drive type and thus, indirectly,
@@ -533,13 +555,81 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RD32_GPC        1
 #define RD32_XBN        54
 #define RD32_DBN        48
-#define RD32_LBN        83204
+#define RD32_LBN        83236
 #define RD32_RCTS       4
 #define RD32_RCTC       8
 #define RD32_RBN        200
 #define RD32_MOD        15
 #define RD32_MED        0x25644020
 #define RD32_FLGS       0
+
+#define RC25_DTYPE      17                              /*  */
+#define RC25_SECT       50                              /*  */
+#define RC25_SURF       8
+#define RC25_CYL        1260                            /*  */
+#define RC25_TPG        RC25_SURF
+#define RC25_GPC        1
+#define RC25_XBN        0                               /*  */
+#define RC25_DBN        0                               /*  */
+#define RC25_LBN        50902                           /* ? 50*8*1260 ? */
+#define RC25_RCTS       0                               /*  */
+#define RC25_RCTC       1
+#define RC25_RBN        0                               /*  */
+#define RC25_MOD        3
+#define RC25_MED        0x20643019
+#define RC25_FLGS       RQDF_RMV
+
+#define RCF25_DTYPE     18                              /*  */
+#define RCF25_SECT      50                              /*  */
+#define RCF25_SURF      8
+#define RCF25_CYL       1260                            /*  */
+#define RCF25_TPG       RCF25_SURF
+#define RCF25_GPC       1
+#define RCF25_XBN       0                               /*  */
+#define RCF25_DBN       0                               /*  */
+#define RCF25_LBN       50902                           /* ? 50*8*1260 ? */
+#define RCF25_RCTS      0                               /*  */
+#define RCF25_RCTC      1
+#define RCF25_RBN       0                               /*  */
+#define RCF25_MOD       3
+#define RCF25_MED       0x20643319
+#define RCF25_FLGS      0
+
+#define RA80_DTYPE      19                              /* SDI drive */
+#define RA80_SECT       31                              /* +1 spare/track */
+#define RA80_SURF       14
+#define RA80_CYL        546                             /*  */
+#define RA80_TPG        RA80_SURF
+#define RA80_GPC        1
+#define RA80_XBN        0                               /*  */
+#define RA80_DBN        0                               /*  */
+#define RA80_LBN        237212                          /* 31*14*546 */
+#define RA80_RCTS       0                               /*  */
+#define RA80_RCTC       1
+#define RA80_RBN        0                               /*  */
+#define RA80_MOD        1
+#define RA80_MED        0x25641050
+#define RA80_FLGS       RQDF_SDI
+
+/* Controller parameters */
+
+#define DEFAULT_CTYPE   0
+
+#define KLESI_CTYPE     1
+#define KLESI_UQPM      1
+#define KLESI_MODEL     1
+
+#define RUX50_CTYPE     2
+#define RUX50_UQPM      2
+#define RUX50_MODEL     2
+
+#define UDA50_CTYPE     3
+#define UDA50_UQPM      6
+#define UDA50_MODEL     6
+
+#define RQDX3_CTYPE     4
+#define RQDX3_UQPM      19
+#define RQDX3_MODEL     19
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -567,24 +657,49 @@ struct drvtyp {
 #define RQ_SIZE(d)      (d##_LBN * RQ_NUMBY)
 
 static struct drvtyp drv_tab[] = {
-    { RQ_DRV (RX50), "RX50" }, { RQ_DRV (RX33), "RX33" },
-    { RQ_DRV (RD51), "RD51" }, { RQ_DRV (RD31), "RD31" },
-    { RQ_DRV (RD52), "RD52" }, { RQ_DRV (RD53), "RD53" },
-    { RQ_DRV (RD54), "RD54" }, { RQ_DRV (RA82), "RA82" },
-    { RQ_DRV (RRD40), "RRD40" }, { RQ_DRV (RA72), "RA72" },
-    { RQ_DRV (RA90), "RA90" }, { RQ_DRV (RA92), "RA92" },
-    { RQ_DRV (RA8U), "RAUSER" }, { RQ_DRV (RA60), "RA60" },
-    { RQ_DRV (RA81), "RA81" }, { RQ_DRV (RA71), "RA71" },
-    { RQ_DRV (RD32), "RD32" },
+    { RQ_DRV (RX50), "RX50" }, 
+    { RQ_DRV (RX33), "RX33" },
+    { RQ_DRV (RD51), "RD51" }, 
+    { RQ_DRV (RD31), "RD31" },
+    { RQ_DRV (RD52), "RD52" }, 
+    { RQ_DRV (RD53), "RD53" },
+    { RQ_DRV (RD54), "RD54" }, 
+    { RQ_DRV (RA82), "RA82" },
+    { RQ_DRV (RRD40), "RRD40" }, 
+    { RQ_DRV (RA72), "RA72" },
+    { RQ_DRV (RA90), "RA90" }, 
+    { RQ_DRV (RA92), "RA92" },
+    { RQ_DRV (RA8U), "RAUSER" }, 
+    { RQ_DRV (RA60), "RA60" },
+    { RQ_DRV (RA81), "RA81" }, 
+    { RQ_DRV (RA71), "RA71" },
+    { RQ_DRV (RD32), "RD32" }, 
+    { RQ_DRV (RC25), "RC25" },
+    { RQ_DRV (RCF25), "RCF25" },
+    { RQ_DRV (RA80), "RA80" },
+    { 0 }
+    };
+
+struct ctlrtyp {
+    uint32      uqpm;                                   /* port model */
+    uint32      model;                                  /* controller model */
+    char        *name;                                  /* name */
+    };
+
+#define RQ_CTLR(d) \
+    d##_UQPM, d##_MODEL
+
+static struct ctlrtyp ctlr_tab[] = {
+    { 0,            0, "DEFAULT" },
+    { RQ_CTLR (KLESI), "KLESI" },
+    { RQ_CTLR (RUX50), "RUX50" },
+    { RQ_CTLR (UDA50), "UDA50" },
+    { RQ_CTLR (RQDX3), "RQDX3" },
     { 0 }
     };
 
 extern int32 int_req[IPL_HLVL];
 extern int32 tmr_poll, clk_tps;
-extern UNIT cpu_unit;
-extern FILE *sim_deb;
-extern uint32 sim_taddr_64;
-extern int32 sim_switches;
 
 int32 rq_itime = 200;                                   /* init time, except */
 int32 rq_itime4 = 10;                                   /* stage 4 */
@@ -610,6 +725,7 @@ typedef struct {
     uint32              credits;                        /* credits */
     uint32              hat;                            /* host timer */
     uint32              htmo;                           /* host timeout */
+    uint32              ctype;                          /* controller type */
     struct uq_ring      cq;                             /* cmd ring */
     struct uq_ring      rq;                             /* rsp ring */
     struct rqpkt        pak[RQ_NPKTS];                  /* packet queue */
@@ -677,7 +793,9 @@ t_stat rq_detach (UNIT *uptr);
 t_stat rq_boot (int32 unitno, DEVICE *dptr);
 t_stat rq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat rq_set_ctype (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -707,6 +825,10 @@ t_bool rq_getdesc (MSC *cp, struct uq_ring *ring, uint32 *desc);
 t_bool rq_putdesc (MSC *cp, struct uq_ring *ring, uint32 desc);
 int32 rq_rw_valid (MSC *cp, int32 pkt, UNIT *uptr, uint32 cmd);
 t_bool rq_rw_end (MSC *cp, UNIT *uptr, uint32 flg, uint32 sts);
+uint32 rq_map_ba (uint32 ba, uint32 ma);
+int32 rq_readb (uint32 ba, int32 bc, uint32 ma, uint8 *buf);
+int32 rq_readw (uint32 ba, int32 bc, uint32 ma, uint16 *buf);
+int32 rq_writew (uint32 ba, int32 bc, uint32 ma, uint16 *buf);
 void rq_putr (MSC *cp, int32 pkt, uint32 cmd, uint32 flg,
     uint32 sts, uint32 lnt, uint32 typ);
 void rq_putr_unit (MSC *cp, int32 pkt, UNIT *uptr, uint32 lu, t_bool all);
@@ -730,8 +852,10 @@ int32 rq_inta (void);
 
 MSC rq_ctx = { 0 };
 
+#define IOLN_RQ         004
+
 DIB rq_dib = {
-    IOBA_RQ, IOLN_RQ, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -801,6 +925,14 @@ MTAB rq_mod[] = {
       NULL, &rq_show_ctrl, 0 },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, RQ_SH_ALL, "ALL", NULL,
       NULL, &rq_show_ctrl, 0 },
+    { MTAB_XTD | MTAB_VDV, KLESI_CTYPE, NULL, "KLESI",
+      &rq_set_ctype, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, RUX50_CTYPE, NULL, "RUX50",
+      &rq_set_ctype, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, UDA50_CTYPE, NULL, "UDA50",
+      &rq_set_ctype, NULL, NULL },
+    { MTAB_XTD | MTAB_VDV, RQDX3_CTYPE, NULL, "RQDX3",
+      &rq_set_ctype, NULL, NULL },
     { MTAB_XTD | MTAB_VUN | MTAB_NMO, 0, "UNITQ", NULL,
       NULL, &rq_show_unitq, 0 },
     { MTAB_XTD | MTAB_VUN, 0, "WRITE", NULL,
@@ -839,6 +971,12 @@ MTAB rq_mod[] = {
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA92_DTYPE, NULL, "RA92",
       &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RC25_DTYPE, NULL, "RC25",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RCF25_DTYPE, NULL, "RCF25",
+      &rq_set_type, NULL, NULL },
+    { MTAB_XTD | MTAB_VUN, RA80_DTYPE, NULL, "RA80",
+      &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, RA8U_DTYPE, NULL, "RAUSER",
       &rq_set_type, NULL, NULL },
     { MTAB_XTD | MTAB_VUN, 0, "TYPE", NULL,
@@ -858,6 +996,8 @@ MTAB rq_mod[] = {
 #endif
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
       NULL, &show_vec, NULL },
+    { MTAB_XTD | MTAB_VDV, 0, "TYPE", NULL,
+      NULL, &rq_show_ctype, NULL },
     { 0 }
     };
 
@@ -866,7 +1006,7 @@ DEVICE rq_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rq_dib, DEV_FLTA | DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -881,7 +1021,7 @@ DEVICE rq_dev = {
 MSC rqb_ctx = { 1 };
 
 DIB rqb_dib = {
-    IOBA_RQB, IOLN_RQB, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -894,7 +1034,7 @@ UNIT rqb_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -938,7 +1078,7 @@ DEVICE rqb_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqb_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -953,7 +1093,7 @@ DEVICE rqb_dev = {
 MSC rqc_ctx = { 2 };
 
 DIB rqc_dib = {
-    IOBA_RQC, IOLN_RQC, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -966,7 +1106,7 @@ UNIT rqc_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -1010,7 +1150,7 @@ DEVICE rqc_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqc_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -1025,7 +1165,7 @@ DEVICE rqc_dev = {
 MSC rqd_ctx = { 3 };
 
 DIB rqd_dib = {
-    IOBA_RQD, IOLN_RQD, &rq_rd, &rq_wr,
+    IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
     1, IVCL (RQ), 0, { &rq_inta }
     };
 
@@ -1038,7 +1178,7 @@ UNIT rqd_unit[] = {
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
     { UDATA (&rq_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+UNIT_ROABLE+
             (RD54_DTYPE << UNIT_V_DTYPE), RQ_SIZE (RD54)) },
-    { UDATA (&rq_tmrsvc, UNIT_DIS, 0) },
+    { UDATA (&rq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
     { UDATA (&rq_quesvc, UNIT_DIS, 0) }
     };
 
@@ -1082,7 +1222,7 @@ DEVICE rqd_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqd_dib, DEV_FLTA | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG,
+    &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
     0, rq_debug
     };
 
@@ -1203,7 +1343,8 @@ for (i = 0; i < (lnt >> 1); i++)                        /* clr buffer */
     zero[i] = 0;
 if (Map_WriteW (base, lnt, zero))                       /* zero comm area */
     return rq_fatal (cp, PE_QWE);                       /* error? */
-cp->sa = SA_S4 | (RQ_UQPM << SA_S4C_V_MOD) |            /* send step 4 */
+cp->sa = SA_S4 |                                        /* send step 4 */
+    (ctlr_tab[cp->ctype].uqpm << SA_S4C_V_MOD) |
     (RQ_SVER << SA_S4C_V_VER);
 cp->csta = CST_S4;                                      /* set step 4 */
 rq_init_int (cp);                                       /* poke host */
@@ -1636,7 +1777,7 @@ else {
     cp->pak[pkt].d[SCC_CIDB] = 0;
     cp->pak[pkt].d[SCC_CIDC] = 0;
     cp->pak[pkt].d[SCC_CIDD] = (RQ_CLASS << SCC_CIDD_V_CLS) |
-        (RQ_MODEL << SCC_CIDD_V_MOD);
+        (ctlr_tab[cp->ctype].model << SCC_CIDD_V_MOD);
     cp->pak[pkt].d[SCC_MBCL] = 0;                       /* max bc */
     cp->pak[pkt].d[SCC_MBCH] = 0;
     }
@@ -1737,6 +1878,8 @@ if ((uptr = rq_getucb (cp, lu))) {                      /* unit exist? */
         cp->pak[pkt].d[RW_WBCH] = cp->pak[pkt].d[RW_BCH];
         cp->pak[pkt].d[RW_WBLL] = cp->pak[pkt].d[RW_LBNL];
         cp->pak[pkt].d[RW_WBLH] = cp->pak[pkt].d[RW_LBNH];
+        cp->pak[pkt].d[RW_WMPL] = cp->pak[pkt].d[RW_MAPL];
+        cp->pak[pkt].d[RW_WMPH] = cp->pak[pkt].d[RW_MAPH];
         uptr->iostarttime = sim_grtime();
         sim_activate (uptr, 0);                         /* activate */
         sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_rw - started\n");
@@ -1803,6 +1946,100 @@ uptr->io_complete = 1;
 sim_activate_notbefore (uptr, uptr->iostarttime+rq_xtime);
 }
 
+/* Map buffer address */
+
+uint32 rq_map_ba (uint32 ba, uint32 ma)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 idx;
+uint32 rg;
+
+idx = (VA_GETVPN(ba) << 2);                            /* map register index */
+rg = ReadL (ma + idx);                                 /* map register */
+if (rg & PTE_V)                                        /* valid? */
+    return ((rg & RQ_M_PFN) << VA_N_OFF) | (ba & VA_M_OFF);
+#endif
+return 0;
+}
+
+/* Read byte buffer from memory */
+
+int32 rq_readb (uint32 ba, int32 bc, uint32 ma, uint8 *buf)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 lbc, t, tbc = 0;
+uint32 pba;
+
+if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
+    while (tbc < bc) {
+        if (!(pba = rq_map_ba (ba, ma)))                /* get physical ba */
+            return (bc - tbc);
+        lbc = 0x200 - (ba & VA_M_OFF);                  /* bc for this tx */
+        if (lbc > (bc - tbc)) lbc = (bc - tbc);
+        t = Map_ReadB (pba, lbc, buf);
+        tbc += (lbc - t);                               /* bytes xfer'd so far */
+        if (t) return (bc - tbc);                       /* incomplete xfer? */
+        ba += lbc;
+        buf += lbc;
+        }
+    return 0;
+    }
+#endif
+return Map_ReadB (ba, bc, buf);                         /* unmapped xfer */
+}
+
+/* Read word buffer from memory */
+
+int32 rq_readw (uint32 ba, int32 bc, uint32 ma, uint16 *buf)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 lbc, t, tbc = 0;
+uint32 pba;
+
+if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
+    while (tbc < bc) {
+        if (!(pba = rq_map_ba (ba, ma)))                /* get physical ba */
+            return (bc - tbc);
+        lbc = 0x200 - (ba & VA_M_OFF);                  /* bc for this tx */
+        if (lbc > (bc - tbc)) lbc = (bc - tbc);
+        t = Map_ReadW (pba, lbc, buf);
+        tbc += (lbc - t);                               /* bytes xfer'd so far */
+        if (t) return (bc - tbc);                       /* incomplete xfer? */
+        ba += lbc;
+        buf += (lbc >> 1);
+        }
+    return 0;
+    }
+#endif
+return Map_ReadW (ba, bc, buf);                         /* unmapped xfer */
+}
+
+/* Write word buffer to memory */
+
+int32 rq_writew (uint32 ba, int32 bc, uint32 ma, uint16 *buf)
+{
+#if defined (VM_VAX)                                    /* VAX version */
+int32 lbc, t, tbc = 0;
+uint32 pba;
+
+if (ba & RQ_MAPXFER) {                                  /* mapped xfer? */
+    while (tbc < bc) {
+        if (!(pba = rq_map_ba (ba, ma)))                /* get physical ba */
+            return (bc - tbc);
+        lbc = 0x200 - (ba & VA_M_OFF);                  /* bc for this tx */
+        if (lbc > (bc - tbc)) lbc = (bc - tbc);
+        t = Map_WriteW (pba, lbc, buf);
+        tbc += (lbc - t);                               /* bytes xfer'd so far */
+        if (t) return (bc - tbc);                       /* incomplete xfer? */
+        ba += lbc;
+        buf += (lbc >> 1);
+        }
+    return 0;
+    }
+#endif
+return Map_WriteW (ba, bc, buf);                        /* unmapped xfer */
+}
+
 /* Unit service for data transfer commands */
 
 t_stat rq_svc (UNIT *uptr)
@@ -1815,6 +2052,7 @@ uint32 cmd = GETP (pkt, CMD_OPC, OPC);                  /* get cmd */
 uint32 ba = GETP32 (pkt, RW_WBAL);                      /* buf addr */
 uint32 bc = GETP32 (pkt, RW_WBCL);                      /* byte count */
 uint32 bl = GETP32 (pkt, RW_WBLL);                      /* block addr */
+uint32 ma = GETP32 (pkt, RW_WMPL);                      /* block addr */
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_svc(unit=%d, pkt=%d, cmd=%s, lbn=%0X, bc=%0x, phase=%s)\n",
            uptr-rq_devmap[cp->cnum]->units, pkt, rq_cmdname[cp->pak[pkt].d[CMD_OPC]&0x3f], bl, bc,
@@ -1853,7 +2091,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
         }
 
     else if (cmd == OP_WR) {                            /* write? */
-        t = Map_ReadW (ba, tbc, uptr->rqxb);            /* fetch buffer */
+        t = rq_readw (ba, tbc, ma, uptr->rqxb);         /* fetch buffer */
         if ((abc = tbc - t)) {                          /* any xfer? */
             wwc = ((abc + (RQ_NUMBY - 1)) & ~(RQ_NUMBY - 1)) >> 1;
             for (i = (abc >> 1); i < wwc; i++)
@@ -1875,7 +2113,7 @@ else { /* Bottom End (After I/O processing) */
         }
 
     else if (cmd == OP_WR) {                            /* write? */
-        t = Map_ReadW (ba, tbc, uptr->rqxb);            /* fetch buffer */
+        t = rq_readw (ba, tbc, ma, uptr->rqxb);         /* fetch buffer */
         abc = tbc - t;                                  /* any xfer? */
         if (t) {                                        /* nxm? */
             PUTP32 (pkt, RW_WBCL, bc - abc);            /* adj bc */
@@ -1889,7 +2127,7 @@ else { /* Bottom End (After I/O processing) */
     else {
         sim_disk_data_trace(uptr, uptr->rqxb, bl, tbc, "sim_disk_rdsect", DBG_DAT & rq_devmap[cp->cnum]->dctrl, DBG_REQ);
         if ((cmd == OP_RD) && !err) {                   /* read? */
-            if ((t = Map_WriteW (ba, tbc, uptr->rqxb))) {/* store, nxm? */
+            if ((t = rq_writew (ba, tbc, ma, uptr->rqxb))) {/* store, nxm? */
                 PUTP32 (pkt, RW_WBCL, bc - (tbc - t));  /* adj bc */
                 PUTP32 (pkt, RW_WBAL, ba + (tbc - t));  /* adj ba */
                 if (rq_hbe (cp, uptr))                  /* post err log */
@@ -1900,7 +2138,7 @@ else { /* Bottom End (After I/O processing) */
         else if ((cmd == OP_CMP) && !err) {             /* compare? */
             uint8 dby, mby;
             for (i = 0; i < tbc; i++) {                 /* loop */
-                if (Map_ReadB (ba + i, 1, &mby)) {      /* fetch, nxm? */
+                if (rq_readb (ba + i, 1, ma, &mby)) {   /* fetch, nxm? */
                     PUTP32 (pkt, RW_WBCL, bc - i);      /* adj bc */
                     PUTP32 (pkt, RW_WBAL, bc - i);      /* adj ba */
                     if (rq_hbe (cp, uptr))              /* post err log */
@@ -1920,9 +2158,8 @@ else { /* Bottom End (After I/O processing) */
 if (err != 0) {                                         /* error? */
     if (rq_dte (cp, uptr, ST_DRV))                      /* post err log */
         rq_rw_end (cp, uptr, EF_LOG, ST_DRV);           /* if ok, report err */
-    perror ("RQ I/O error");
-    if (!(uptr->flags & UNIT_RAW))
-        clearerr (uptr->fileref);
+    sim_disk_perror (uptr, "RQ I/O error");
+    sim_disk_clearerr (uptr);
     return SCPE_IOERR;
     }
 ba = ba + tbc;                                          /* incr bus addr */
@@ -1957,6 +2194,8 @@ cp->pak[pkt].d[RW_WBCL] = 0;
 cp->pak[pkt].d[RW_WBCH] = 0;
 cp->pak[pkt].d[RW_WBLL] = 0;
 cp->pak[pkt].d[RW_WBLH] = 0;
+cp->pak[pkt].d[RW_WMPL] = 0;
+cp->pak[pkt].d[RW_WMPH] = 0;
 rq_putr (cp, pkt, cmd | OP_END, flg, sts, RW_LNT_D, UQ_TYP_SEQ); /* fill pkt */
 if (!rq_putpkt (cp, pkt, TRUE))                         /* send pkt */
     return ERR;
@@ -1999,7 +2238,7 @@ cp->pak[pkt].d[DTE_CIDA] = 0;                           /* ctrl ID */
 cp->pak[pkt].d[DTE_CIDB] = 0;
 cp->pak[pkt].d[DTE_CIDC] = 0;
 cp->pak[pkt].d[DTE_CIDD] = (RQ_CLASS << DTE_CIDD_V_CLS) |
-    (RQ_MODEL << DTE_CIDD_V_MOD);
+    (ctlr_tab[cp->ctype].model << DTE_CIDD_V_MOD);
 cp->pak[pkt].d[DTE_VER] = (RQ_HVER << DTE_VER_V_HVER) |
     (RQ_SVER << DTE_VER_V_SVER);
 cp->pak[pkt].d[DTE_MLUN] = lu;                          /* MLUN */
@@ -2041,7 +2280,7 @@ cp->pak[pkt].d[HBE_CIDA] = 0;                           /* ctrl ID */
 cp->pak[pkt].d[HBE_CIDB] = 0;
 cp->pak[pkt].d[HBE_CIDC] = 0;
 cp->pak[pkt].d[HBE_CIDD] = (RQ_CLASS << DTE_CIDD_V_CLS) |
-    (RQ_MODEL << DTE_CIDD_V_MOD);
+    (ctlr_tab[cp->ctype].model << DTE_CIDD_V_MOD);
 cp->pak[pkt].d[HBE_VER] = (RQ_HVER << HBE_VER_V_HVER) | /* versions */
     (RQ_SVER << HBE_VER_V_SVER);
 cp->pak[pkt].d[HBE_RSV] = 0;
@@ -2069,7 +2308,7 @@ cp->pak[pkt].d[PLF_CIDA] = 0;                           /* cntl ID */
 cp->pak[pkt].d[PLF_CIDB] = 0;
 cp->pak[pkt].d[PLF_CIDC] = 0;
 cp->pak[pkt].d[PLF_CIDD] = (RQ_CLASS << PLF_CIDD_V_CLS) |
-    (RQ_MODEL << PLF_CIDD_V_MOD);
+    (ctlr_tab[cp->ctype].model << PLF_CIDD_V_MOD);
 cp->pak[pkt].d[PLF_VER] = (RQ_SVER << PLF_VER_V_SVER) |
     (RQ_HVER << PLF_VER_V_HVER);
 cp->pak[pkt].d[PLF_ERR] = err;
@@ -2480,6 +2719,27 @@ fprintf (st, "%s", drv_tab[GET_DTYPE (uptr->flags)].name);
 return SCPE_OK;
 }
 
+/* Set controller type */
+
+t_stat rq_set_ctype (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+MSC *cp = rq_ctxmap[uptr->cnum];
+
+if (val < 0)
+    return SCPE_ARG;
+cp->ctype = val;
+return SCPE_OK;
+}
+
+/* Show controller type */
+
+t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+MSC *cp = rq_ctxmap[uptr->cnum];
+fprintf (st, "%s", ctlr_tab[cp->ctype].name);
+return SCPE_OK;
+}
+
 /* Device attach */
 
 t_stat rq_attach (UNIT *uptr, char *cptr)
@@ -2529,6 +2789,8 @@ if (cidx < 0)                                           /* not found??? */
     return SCPE_IERR;
 cp = rq_ctxmap[cidx];                                   /* get context */
 cp->cnum = cidx;                                        /* init index */
+if (cp->ctype == DEFAULT_CTYPE)
+    cp->ctype = (UNIBUS? UDA50_CTYPE : RQDX3_CTYPE);
 
 #if defined (VM_VAX)                                    /* VAX */
 cp->ubase = 0;                                          /* unit base = 0 */
@@ -2654,7 +2916,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rq_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 extern uint16 *M;
 DIB *dibp = (DIB *) dptr->ctxt;

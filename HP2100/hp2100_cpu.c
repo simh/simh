@@ -29,6 +29,7 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   09-May-12    JDB     Separated assignments from conditional expressions
    13-Jan-12    JDB     Minor speedup in "is_mapped"
                         Added casts to cpu_mod, dmasio, dmapio, cpu_reset, dma_reset
    07-Apr-11    JDB     Fixed I/O return status bug for DMA cycles
@@ -560,14 +561,7 @@ uint16 dms_map[MAP_NUM * MAP_LNT] = { 0 };              /* dms maps */
 
 /* External data */
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern int32 sim_brk_char;
-extern int32 sim_del_char;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-extern DEVICE *sim_devices[];
 extern char halt_msg[];
-extern t_bool sim_idle_enab;
 extern DIB clk_dib;                                     /* CLK DIB for idle check */
 
 /* CPU local routines */
@@ -1054,7 +1048,8 @@ for (i = OPTDEV; i <= MAXDEV; i++)                      /* default optional devi
 
 dtab [PWR] = &pwrf_dib;                                 /* for now, powerfail is always present */
 
-for (i = 0; (dptr = sim_devices [i]); i++) {            /* loop thru dev */
+for (i = 0; sim_devices [i] != NULL; i++) {             /* loop thru dev */
+    dptr = sim_devices [i];
     dibptr = (DIB *) dptr->ctxt;                        /* get DIB */
 
     if (dibptr && !(dptr->flags & DEV_DIS)) {           /* handler exists and device is enabled? */
@@ -1464,17 +1459,17 @@ while (reason == SCPE_OK) {                             /* loop until halted */
 */
 
         if ((sim_idle_enab) && (intrq == 0))                /* idle enabled w/o pending irq? */
-            if ((((PC == err_PC) ||                         /* RTE through RTE-IVB */
-                  ((PC == (err_PC - 1)) &&                  /* RTE-6/VM */
-                   ((ReadW (PC) & I_MRG) == I_ISZ))) &&     /* RTE jump target */
-                 (mp_fence == CLEAR) && (M [xeqt] == 0) &&  /* RTE idle indications */
-                 (M [tbg] == clk_dib.select_code)) ||       /* RTE verification */
+            if (((PC == err_PC) ||                          /* RTE through RTE-IVB */
+                 ((PC == (err_PC - 1)) &&                   /* RTE-6/VM */
+                  ((ReadW (PC) & I_MRG) == I_ISZ))) &&      /* RTE jump target */
+                (mp_fence == CLEAR) && (M [xeqt] == 0) &&   /* RTE idle indications */
+                (M [tbg] == clk_dib.select_code) ||         /* RTE verification */
 
-                ((PC == (err_PC - 3)) &&                    /* DOS through DOS-III */
-                 (ReadW (PC) == I_STF) &&                   /* DOS jump target */
-                 (AR == 0177777) && (BR == 0177777) &&      /* DOS idle indication */
-                 (M [m64] == 0177700) &&                    /* DOS verification */
-                 (M [p64] == 0000100)))                     /* DOS verification */
+                (PC == (err_PC - 3)) &&                     /* DOS through DOS-III */
+                (ReadW (PC) == I_STF) &&                    /* DOS jump target */
+                (AR == 0177777) && (BR == 0177777) &&       /* DOS idle indication */
+                (M [m64] == 0177700) &&                     /* DOS verification */
+                (M [p64] == 0000100))                       /* DOS verification */
 
                 sim_idle (TMR_POLL, FALSE);                 /* idle the simulator */
         break;
@@ -3351,7 +3346,7 @@ t_stat status;
 uint32 ioresult;
 IOCYCLE signals;
 
-if ((bytes && !even) || (dma [ch].cw3 != DMASK)) {      /* normal cycle? */
+if (bytes && !even || dma [ch].cw3 != DMASK) {          /* normal cycle? */
     if (input)                                          /* input cycle? */
         signals = ioIOI | ioCLF;                        /* assert IOI and CLF */
     else                                                /* output cycle */
@@ -3609,30 +3604,32 @@ DEVICE *dptr;
 DIB *dibptr;
 uint32 i, j, k;
 t_bool is_conflict = FALSE;
-uint32 conflicts[MAXDEV + 1] = { 0 };
+uint32 conflicts [MAXDEV + 1] = { 0 };
 
-for (i = 0; (dptr = sim_devices[i]); i++) {
+for (i = 0; sim_devices [i] != NULL; i++) {
+    dptr = sim_devices [i];
     dibptr = (DIB *) dptr->ctxt;
     if (dibptr && !(dptr->flags & DEV_DIS))
-        if (++conflicts[dibptr->select_code] > 1)
+        if (++conflicts [dibptr->select_code] > 1)
             is_conflict = TRUE;
     }
 
 if (is_conflict) {
     sim_ttcmd();
     for (i = 0; i <= MAXDEV; i++) {
-        if (conflicts[i] > 1) {
-            k = conflicts[i];
+        if (conflicts [i] > 1) {
+            k = conflicts [i];
 
             printf ("Select code %o conflict:", i);
 
             if (sim_log)
                 fprintf (sim_log, "Select code %o conflict:", i);
 
-            for (j = 0; (dptr = sim_devices[j]); j++) {
+            for (j = 0; sim_devices [j] != NULL; j++) {
+                dptr = sim_devices [j];
                 dibptr = (DIB *) dptr->ctxt;
-                if (dibptr && !(dptr->flags & DEV_DIS) && (i == dibptr->select_code)) {
-                    if (k < conflicts[i]) {
+                if (dibptr && !(dptr->flags & DEV_DIS) && i == dibptr->select_code) {
+                    if (k < conflicts [i]) {
                         printf (" and");
 
                         if (sim_log)

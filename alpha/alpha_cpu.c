@@ -193,11 +193,6 @@ const t_uint64 word_mask[4] = {
     0x0000FFFF00000000, 0xFFFF000000000000
     };
 
-extern int32 sim_interval;
-extern int32 sim_int_char;
-extern FILE *sim_deb;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
-
 t_uint64 uemul64 (t_uint64 a, t_uint64 b, t_uint64 *hi);
 t_uint64 byte_zap (t_uint64 op, uint32 mask);
 t_stat cpu_reset (DEVICE *dptr);
@@ -1789,8 +1784,6 @@ t_stat cpu_fprint_one_inst (FILE *st, uint32 ir, t_uint64 pc, t_uint64 ra, t_uin
 {
 uint32 op;
 t_value sim_val;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 static const h_fmt[64] = {
     0,     0,     0,     0,     0,     0,     0,     0,

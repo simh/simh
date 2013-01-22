@@ -183,10 +183,6 @@ int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* inst history */
 
-extern int32 sim_int_char;
-extern int32 sim_interval;
-extern int32 sim_switches;
-extern uint32 sim_brk_types, sim_brk_dflt, sim_brk_summ; /* breakpoint info */
 extern uint32 int_hiact;                                /* highest act int */
 extern uint32 int_hireq;                                /* highest int req */
 
@@ -2792,8 +2788,6 @@ void cpu_fprint_one_inst (FILE *st, uint32 tcp, uint32 ir, uint32 rn, uint32 rn1
     uint32 ea, uint32 opnd, uint32 opnd1)
 {
 t_value sim_val;
-extern t_stat fprint_sym (FILE *ofile, t_addr addr, t_value *val,
-    UNIT *uptr, int32 sw);
 
 if (tcp & (H_INST|H_ITRP)) {                        /* instr or trap? */
     uint32 op = I_GETOP (ir);

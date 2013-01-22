@@ -25,6 +25,7 @@
 
    hk           RK611/RK06/RK07 disk
 
+   10-Dec-12    RMS     Fixed interrupt logic
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    29-Apr-07    RMS     NOP and DCLR (at least) do not check drive type
                         MR2 and MR3 only updated on NOP
@@ -136,11 +137,43 @@ extern uint16 *M;
 #define GET_UAE(x)      (((x) >> CS1_V_UAE) & CS1_M_UAE)
 #define PUT_UAE(x,n)    (((x) & ~ CS1_UAE) | (((n) << CS1_V_UAE) & CS1_UAE))
 
+static const char *hk_funcs[] = {
+    "NOP", "PACK", "DCLR", "UNLOAD", "START", "RECAL", "OFFSET", "SEEK", 
+    "READ", "WRITE", "READH", "WRITEH", "WCHK"};
+
+BITFIELD hk_cs1_bits[] = {
+  BIT(GO),                                  /* go */
+  BITFNAM(FNC,4,hk_funcs),                  /* function */
+  BIT(SPARE),                               /* Spare Bit */
+  BIT(IE),                                  /* Interrupt Enable */
+  BIT(RDY),                                 /* Controller Ready */
+  BIT(BA16),                                /* Unibus addr ext bit 16 */
+  BIT(BA17),                                /* Unibus addr ext bit 17 */
+  BIT(DT),                                  /* Controller Drive Type */
+  BIT(CTO),                                 /* Controller Timeout */
+  BIT(CFMT),                                /* Controller Format */
+  BIT(DTCPAR),                              /* Drive-To-Controller Parity Error */
+  BIT(DI),                                  /* Drive Interrupt */
+  BIT(ERR),                                 /* error */
+  ENDBITS
+};
+
+
 /* HKWC - 177442 - word count */
+
+BITFIELD hk_wc_bits[] = {
+  BITF(WC,16),                              /* Word Count */
+  ENDBITS
+};
 
 /* HKBA - 177444 - base address */
 
 #define BA_MBZ          0000001                         /* must be zero */
+
+BITFIELD hk_ba_bits[] = {
+  BITF(BA,16),                              /* Bus Address */
+  ENDBITS
+};
 
 /* HKDA - 177446 - sector/track */
 
@@ -151,6 +184,14 @@ extern uint16 *M;
 #define DA_MBZ          0174340
 #define GET_SC(x)       (((x) >> DA_V_SC) & DA_M_SC)
 #define GET_SF(x)       (((x) >> DA_V_SF) & DA_M_SF)
+
+BITFIELD hk_da_bits[] = {
+  BITF(SA,5),                               /* Sector */
+  BITNCF(3),                                /* 05:07 Zero */
+  BITF(TA,3),                               /* Track */
+  BITNCF(5),                                /* 11:15 Zero */
+  ENDBITS
+};
 
 /* HKCS2 - 177450 - control/status 2 */
 
@@ -176,6 +217,25 @@ extern uint16 *M;
 						 CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
 #define GET_UNIT(x)     (((x) >> CS2_V_UNIT) & CS2_M_UNIT)
 
+BITFIELD hk_cs2_bits[] = {
+  BITF(DS,3),                               /* Drive Select */
+  BIT(RLS),                                 /* Release */
+  BIT(BAI),                                 /* Bus Address Increment Inhibit */
+  BIT(SCLR),                                /* Subsystem Clear */
+  BIT(IR),                                  /* Input Ready */
+  BIT(OR),                                  /* Output Ready */
+  BIT(UFE),                                 /* Unit Field Error */
+  BIT(MDS),                                 /* Multiple Drive Select */
+  BIT(PGE),                                 /* Programming Error */
+  BIT(NEM),                                 /* Nonexistant Memory */
+  BIT(NED),                                 /* Nonexistant Drive */
+  BIT(UPE),                                 /* Unibus Parity Error */
+  BIT(WCE),                                 /* Write Check Error */
+  BIT(DLT),                                 /* Data Late Error */
+  ENDBITS
+};
+
+
 /* HKDS - 177452 - drive status ^ = calculated dynamically */
 
 #define DS_DRA          0000001                         /* ^drive avail */
@@ -191,6 +251,25 @@ extern uint16 *M;
 #define DS_ATA          0040000                         /* attention active */
 #define DS_VLD          0100000                         /* ^status valid */
 #define DS_MBZ          0013002
+
+BITFIELD hk_ds_bits[] = {
+  BIT(DRA),                                 /* Drive Available */
+  BITNCF(1),                                /* 01 Spare */
+  BIT(OFST),                                /* Offset */
+  BIT(ACLO),                                /* Drive AC Low */
+  BIT(SPLS),                                /* Speed Loss */
+  BIT(DROT),                                /* Drive Off Track */
+  BIT(VV),                                  /* Volume Valid */
+  BIT(DRDY),                                /* Drive Ready */
+  BIT(DDT),                                 /* Disk Drive Type */
+  BITNCF(2),                                /* 09:10 Spare */
+  BIT(WRL),                                 /* Write Lock */
+  BITNCF(1),                                /* 12 Spare */
+  BIT(PIP),                                 /* Positioning in Progress */
+  BIT(ATA),                                 /* Current Drive Attention */
+  BIT(SVAL),                                /* Status Valid */
+  ENDBITS
+};
 
 /* HKER - 177454 - error status */
 
@@ -211,10 +290,43 @@ extern uint16 *M;
 #define ER_UNS          0040000                         /* drive unsafe */
 #define ER_DCK          0100000                         /* data check NI */
 
+BITFIELD hk_er_bits[] = {
+  BIT(ILF),                                 /* Illegal Function */
+  BIT(SKI),                                 /* Seek Incomplete */
+  BIT(NXF),                                 /* Nonexecutable Function */
+  BIT(DROAR),                               /* Control-to-Drive Parity Error */
+  BIT(FMTE),                                /* Format Error */
+  BIT(DTYE),                                /* Drive Type Error */
+  BIT(ECH),                                 /* Error Correction Hard */
+  BIT(BSE),                                 /* Bad Sector Error */
+  BIT(HRVC),                                /* Header Virtical Redundancy */
+  BIT(COE),                                 /* Cylinder Overflow Error */
+  BIT(IDAE),                                /* Invalid Disk Address Error */
+  BIT(WLE),                                 /* Write Lock Error */
+  BIT(DTE),                                 /* Drive Timing Error */
+  BIT(OPI),                                 /* Operation Incomplete */
+  BIT(UNS),                                 /* Drive Unsafe */
+  BIT(DCK),                                 /* Data Check */
+  ENDBITS
+};
+
 /* HKAS - 177456 - attention summary/offset */
 
 #define AS_U0           0000400                         /* unit 0 flag */
 #define AS_OF           0000277                         /* offset mask */
+
+BITFIELD hk_as_bits[] = {
+  BITF(OF,8),                               /* Offset */
+  BIT(ATN0),                                /* Attention Drive 0 */
+  BIT(ATN1),                                /* Attention Drive 1 */
+  BIT(ATN2),                                /* Attention Drive 2 */
+  BIT(ATN3),                                /* Attention Drive 3 */
+  BIT(ATN4),                                /* Attention Drive 4 */
+  BIT(ATN5),                                /* Attention Drive 5 */
+  BIT(ATN6),                                /* Attention Drive 6 */
+  BIT(ATN7),                                /* Attention Drive 7 */
+  ENDBITS
+};
 
 /* HKDC - 177460 - desired cylinder */
 
@@ -225,6 +337,12 @@ extern uint16 *M;
 #define GET_DA(c,fs)    ((((GET_CY (c) * HK_NUMSF) + \
                         GET_SF (fs)) * HK_NUMSC) + GET_SC (fs))
 
+BITFIELD hk_dc_bits[] = {
+  BITF(DC,10),                              /* Desired Cylinder */
+  BITNCF(6),                                /* 10:15 Spare */
+  ENDBITS
+};
+
 /* Spare - 177462 - read/write */
 
 #define XM_KMASK        0177700                         /* Qbus XM key mask */
@@ -233,6 +351,11 @@ extern uint16 *M;
 #define SC02C           (!UNIBUS && ((hkspr & XM_KMASK) == XM_KEY))
 
 /* HKDB - 177464 - read/write */
+
+BITFIELD hk_db_bits[] = {
+  BITF(DB,16),                              /* Data Buffer Register */
+  ENDBITS
+};
 
 /* HKMR - 177466 - maintenance register 1 */
 
@@ -244,8 +367,36 @@ extern uint16 *M;
 #define MR_DMD          0000040                         /* diagnostic mode */
 #define MR_RW           0001777
 
+BITFIELD hk_mr_bits[] = {
+  BITF(MS,4),                               /* Message Select */
+  BIT(PAT),                                 /* Parity Test */
+  BIT(DMD),                                 /* Diagnostic Mode */
+  BIT(MSP),                                 /* Maintenance Selector Pulse */
+  BIT(MIND),                                /* Maintenance Index */
+  BIT(MCLK),                                /* Maintenance Clock */
+  BIT(MERD),                                /* Maintenance Encoded Read Data */
+  BIT(MEWD),                                /* Maintenance Encoded Write Data */
+  BIT(PCA),                                 /* Precompensation Advance */
+  BIT(PCD),                                 /* Precompensation Delay */
+  BIT(ECCW),                                /* ECC Word */
+  BIT(WRTGT),                               /* Write Gate */
+  BIT(RDGT),                                /* Read Gate */
+  ENDBITS
+};
+
 /* HKEC1 - 177470 - ECC status 1 - always reads as 0 */
+
+BITFIELD hk_ec1_bits[] = {
+  BITF(EC1,16),                             /* ECC status 1 */
+  ENDBITS
+};
+
 /* HKEC2 - 177472 - ECC status 2 - always reads as 0 */
+
+BITFIELD hk_ec2_bits[] = {
+  BITF(EC2,16),                             /* ECC status 2 */
+  ENDBITS
+};
 
 /* HKMR2 - 177474 - maintenance register 2 */
 
@@ -279,6 +430,11 @@ extern uint16 *M;
 #define A2_M_DIF        0777
 
 #define A3_V_SNO        3                               /* serial # */
+
+BITFIELD hk_mr2_bits[] = {
+  BITF(MR2,16),                             /* Maintenance Register 2 */
+  ENDBITS
+};
 
 /* HKMR3 - 177476 - maintenance register 3 */
 
@@ -317,14 +473,58 @@ extern uint16 *M;
 #define RDH2_V_DHA      5                               /* decoded head */
 #define RDH2_GOOD       0140000                         /* good sector flags */
 
+BITFIELD hk_mr3_bits[] = {
+  BITF(MR3,16),                             /* Maintenance Register 3 */
+  ENDBITS
+};
+
+char *hk_regnames[] = {
+    "HKCS1",
+    "HKWC",
+    "HKBA",
+    "HKDA",
+    "HKCS2",
+    "HKDS",
+    "HKER",
+    "HKAS",
+    "HKDC",
+    "spare",
+    "HKDB",
+    "HKMR",
+    "HKEC1",
+    "HKEC2",
+    "HKMR2",
+    "HKMR3"
+    };
+
+BITFIELD *hk_reg_bits[] = {
+    hk_cs1_bits,
+    hk_wc_bits,
+    hk_ba_bits,
+    hk_da_bits,
+    hk_cs2_bits,
+    hk_ds_bits,
+    hk_er_bits,
+    hk_as_bits,
+    hk_dc_bits,
+    NULL,
+    hk_db_bits,
+    hk_mr_bits,
+    hk_ec1_bits,
+    hk_ec2_bits,
+    hk_mr2_bits,
+    hk_mr3_bits,
+    };
+
 /* Debug detail levels */
 
 #define HKDEB_OPS       001                             /* transactions */
 #define HKDEB_RRD       002                             /* reg reads */
 #define HKDEB_RWR       004                             /* reg writes */
+#define HKDEB_TRC       010                             /* trace */
+#define HKDEB_INT       020                             /* interrupts */
 
 extern int32 int_req[IPL_HLVL];
-extern FILE *sim_deb;
 
 uint16 *hkxb = NULL;                                    /* xfer buffer */
 int32 hkcs1 = 0;                                        /* control/status 1 */
@@ -375,9 +575,11 @@ t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
    hk_mod       HK modifier list
 */
 
+#define IOLN_HK         040
+
 DIB hk_dib = {
-    IOBA_HK, IOLN_HK, &hk_rd, &hk_wr,
-    1, IVCL (HK), VEC_HK, { NULL }
+    IOBA_AUTO, IOLN_HK, &hk_rd, &hk_wr,
+    1, IVCL (HK), VEC_AUTO, { NULL }
     };
 
 UNIT hk_unit[] = {
@@ -464,6 +666,8 @@ DEBTAB hk_deb[] = {
     { "OPS", HKDEB_OPS },
     { "RRD", HKDEB_RRD },
     { "RWR", HKDEB_RWR },
+    { "INTERRUPT", HKDEB_INT },
+    { "TRACE", HKDEB_TRC },
     { NULL, 0 }
     };
 
@@ -563,18 +767,16 @@ switch (j) {                                            /* decode PA<4:1> */
         break;
         }
 
-if (DEBUG_PRI (hk_dev, HKDEB_RRD))
-    fprintf (sim_deb, ">>HK%d read: reg%d=%o\n", drv, j, *data);
+sim_debug (HKDEB_RRD, &hk_dev, ">>HK%d read: %s=0%o\n", drv, hk_regnames[j], *data);
+sim_debug_bits (HKDEB_RRD, &hk_dev, hk_reg_bits[j], *data, *data, 1);
 return SCPE_OK;
 }
 
 t_stat hk_wr (int32 data, int32 PA, int32 access)
 {
-int32 drv, i, j;
-UNIT *uptr;
+int32 drv, i, j, old_val = 0, new_val = 0;
 
 drv = GET_UNIT (hkcs2);                                 /* get current unit */
-uptr = hk_dev.units + drv;                              /* get unit */
 j = (PA >> 1) & 017;                                    /* get reg offset */
 if ((hkcs1 & CS1_GO) &&                                 /* busy? */
     !(((j == 0) && (data & CS1_CCLR)) ||                /* not cclr or sclr? */
@@ -584,11 +786,11 @@ if ((hkcs1 & CS1_GO) &&                                 /* busy? */
     return SCPE_OK;
     }
 
-if (DEBUG_PRI (hk_dev, HKDEB_RWR))
-    fprintf (sim_deb, ">>HK%d write: reg%d=%o\n", drv, j, data);
+sim_debug (HKDEB_RWR, &hk_dev, ">>HK%d write: %s=0%o\n", drv, hk_regnames[j], data);
 switch (j) {                                            /* decode PA<4:1> */
 
     case 000:                                           /* HKCS1 */
+        old_val = hkcs1;
         if (data & CS1_CCLR) {                          /* controller reset? */
             hkcs1 = CS1_DONE;                           /* CS1 = done */
             hkcs2 = CS2_IR;                             /* CS2 = ready */
@@ -599,68 +801,98 @@ switch (j) {                                            /* decode PA<4:1> */
             CLR_INT (HK);                               /* clr int */
             for (i = 0; i < HK_NUMDR; i++) {            /* stop data xfr */
                 if (sim_is_active (&hk_unit[i]) &&
-                    ((uptr->FNC & CS1_M_FNC) >= FNC_XFER))
+                    ((hk_unit[i].FNC & CS1_M_FNC) >= FNC_XFER))
                     sim_cancel (&hk_unit[i]);
                 }
             drv = 0;
             break;
             }
         if (data & CS1_IE) {                            /* setting IE? */
-            if (data & CS1_DONE)                        /* write to DONE+IE? */
+            if (data & CS1_DONE) {                      /* write to DONE+IE? */
+                sim_debug (HKDEB_INT, &hk_dev, "hk_wr(SET_INT)\n");
                 SET_INT (HK);
+                }
             }
-        else CLR_INT (HK);                              /* no, clr intr */
+        else {
+            sim_debug (HKDEB_INT, &hk_dev, "hk_wr(CLR_INT)\n");
+            CLR_INT (HK);                              /* no, clr intr */
+            }
         hkcs1 = (hkcs1 & ~CS1_RW) | (data & CS1_RW);    /* merge data */
         if (SC02C)
             hkspr = (hkspr & ~CS1_M_UAE) | GET_UAE (hkcs1);
         if ((data & CS1_GO) && !(hkcs1 & CS1_ERR))      /* go? */
             hk_go (drv);
+        new_val = hkcs1;
         break;  
 
     case 001:                                           /* HKWC */
-        hkwc = data;
+        old_val = hkwc;
+        new_val = hkwc = data;
         break;
 
     case 002:                                           /* HKBA */
-        hkba = data & ~BA_MBZ;
+        old_val = hkba;
+        new_val = hkba = data & ~BA_MBZ;
         break;
 
     case 003:                                           /* HKDA */
-        hkda = data & ~DA_MBZ;
+        old_val = hkda;
+        new_val = hkda = data & ~DA_MBZ;
         break;
 
     case 004:                                           /* HKCS2 */
+        old_val = hkcs2;
         if (data & CS2_CLR)                             /* init? */
             hk_reset (&hk_dev);
         else hkcs2 = (hkcs2 & ~CS2_RW) | (data & CS2_RW) | CS2_IR;
         drv = GET_UNIT (hkcs2);
+        new_val = hkcs2;
         break;
 
     case 007:                                           /* HKAS */
-        hkof = data & AS_OF;
+        old_val = hkof;
+        new_val = hkof = data & AS_OF;
         break;
 
     case 010:                                           /* HKDC */
-        hkdc = data & ~DC_MBZ;
+        old_val = hkdc;
+        new_val = hkdc = data & ~DC_MBZ;
         break;
 
     case 011:                                           /* spare */
-        hkspr = data;
+        old_val = hkspr;
+        new_val = hkspr = data;
         if (SC02C)                                      /* SC02C? upd UAE */
             hkcs1 = PUT_UAE (hkcs1, hkspr & 03);
         break;
 
     case 012:                                           /* HKDB */
-        hkdb[0] = data;
+        old_val = hkdb[0];
+        new_val = hkdb[0] = data;
         break;
 
     case 013:                                           /* HKMR */
-        hkmr = data & MR_RW;
+        old_val = hkmr;
+        new_val = hkmr = data & MR_RW;
         break;
 
-    default:                                            /* all others RO */
+    case 014:                                           /* HKEC1 */
+        new_val = old_val = hkmr;
+        break;
+
+    case 015:                                           /* HKEC2 */
+        new_val = old_val = hkmr;
+        break;
+
+    case 016:                                           /* HKMR2 */
+        new_val = old_val = hkmr2;
+        break;
+
+    case 017:                                           /* HKMR3 */
+        new_val = old_val = hkmr3;
         break;
         }                                               /* end switch */
+sim_debug_bits (HKDEB_RWR, &hk_dev, hk_reg_bits[j], old_val, new_val, 1);
 
 update_hkcs (0, drv);                                   /* update status */
 return SCPE_OK;
@@ -691,9 +923,8 @@ static uint8 fnc_cyl[16] = {
     };
 
 fnc = GET_FNC (hkcs1);
-if (DEBUG_PRI (hk_dev, HKDEB_OPS))
-    fprintf (sim_deb, ">>HK%d strt: fnc=%o, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
-             drv, fnc, hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
+sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d strt: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
+             drv, hk_funcs[fnc], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
 uptr = hk_dev.units + drv;                              /* get unit */
 if (fnc != FNC_NOP)                                     /* !nop, clr msg sel */
     hkmr = hkmr & ~MR_MS;
@@ -730,7 +961,7 @@ switch (fnc) {                                          /* case on function */
 
 /* Instantaneous functions (unit may be busy, can't schedule thread) */
 
-    case FNC_NOP:                                       /* no operation */
+    case FNC_NOP:                                       /* no operation/select drive */
         hkmr2 = hk_rdmr2 (GET_MS (hkmr));               /* get serial msgs */
         hkmr3 = hk_rdmr3 (GET_MS (hkmr));
         update_hkcs (CS1_DONE, drv);                    /* done */
@@ -804,6 +1035,7 @@ uint16 comp;
 
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */
 fnc = uptr->FNC & CS1_M_FNC;                            /* get function */
+sim_debug (HKDEB_TRC, &hk_dev, "hk_svc(HK%d, fnc=%s)\n", drv, hk_funcs[fnc]);
 switch (fnc) {                                          /* case on function */
 
 /* Fast commands - start spindle only provides one interrupt
@@ -985,27 +1217,38 @@ return SCPE_OK;
 
 void update_hkcs (int32 flag, int32 drv)
 {
-int32 i;
+int32 i, old_hkcs1 = hkcs1, old_hkcs2 = hkcs2;
 
+sim_debug (HKDEB_TRC, &hk_dev, "update_hkcs(flag=0%o, drv=%d)\n", flag, drv);
 update_hkds (drv);                                      /* upd drv status */
-if (flag & CS1_DONE)                                    /* clear go */
-    hkcs1 = hkcs1 & ~CS1_GO;
-if (hkcs1 & CS1_IE) {                                   /* intr enable? */
-    if (((flag & CS1_DONE) && ((hkcs1 & CS1_DONE) == 0)) ||
-        ((flag & CS1_DI) && (hkcs1 & CS1_DONE)))        /* done 0->1 or DI? */
-        SET_INT (HK);
-    }
-else CLR_INT (HK);
 hkcs1 = (hkcs1 & (CS1_DT|CS1_UAE|CS1_DONE|CS1_IE|CS1_SPA|CS1_FNC|CS1_GO)) | flag;
+if (hkcs1 & CS1_DONE)                                   /* done? clear GO */
+    hkcs1 = hkcs1 & ~CS1_GO;
 for (i = 0; i < HK_NUMDR; i++) {                        /* if ATA, set DI */
-    if (hkds[i] & DS_ATA) hkcs1 = hkcs1 | CS1_DI;
+    if (hkds[i] & DS_ATA)
+        hkcs1 = hkcs1 | CS1_DI;
     }
-if (hker[drv] | (hkcs1 & (CS1_PAR | CS1_CTO)) |         /* if err, set ERR */
-    (hkcs2 & CS2_ERR)) hkcs1 = hkcs1 | CS1_ERR;
-if ((flag & CS1_DONE) &&                                /* set done && debug? */
-    (DEBUG_PRI (hk_dev, HKDEB_OPS)))
-    fprintf (sim_deb, ">>HK%d done: fnc=%o, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
-             drv, GET_FNC (hkcs1), hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
+if (hker[drv] || (hkcs1 & (CS1_PAR | CS1_CTO)) || (hkcs2 & CS2_ERR))
+    hkcs1 = hkcs1 | CS1_ERR;                            /* if err, set ERR */
+if (hkcs1 & CS1_IE) {                                   /* intr enable? */
+    if (((hkcs1 & CS1_DONE) && ((old_hkcs1 & CS1_DONE) == 0)) ||
+        ((hkcs1 & CS1_DI) && (hkcs1 & CS1_DONE))) {     /* done 0->1 or DI&done? */
+        sim_debug (HKDEB_INT, &hk_dev, "update_hkcs(SET_INT)\n");
+        SET_INT (HK);
+        }
+    }
+else {
+    sim_debug (HKDEB_INT, &hk_dev, "update_hkcs(CLR_INT)\n");
+    CLR_INT (HK);
+    }
+if (old_hkcs1 != hkcs1)
+    sim_debug_bits (HKDEB_OPS, &hk_dev, hk_cs1_bits, old_hkcs1, hkcs1, 1);
+if (old_hkcs2 != hkcs2)
+    sim_debug_bits (HKDEB_OPS, &hk_dev, hk_cs2_bits, old_hkcs2, hkcs2, 1);
+if (flag & CS1_DONE) {                                  /* set done */
+    sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d done: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
+             drv, hk_funcs[GET_FNC (hkcs1)], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
+    }
 return;
 }
 
@@ -1013,10 +1256,13 @@ return;
 
 void update_hkds (int32 drv)
 {
+int old_ds = hkds[drv];
+
 if (hk_unit[drv].flags & UNIT_DIS) {                    /* disabled? */
     hkds[drv] = hker[drv] = 0;                          /* all clear */
     return;
     }
+sim_debug (HKDEB_TRC, &hk_dev, "update_hkds(drv=%d)\n", drv);
 hkds[drv] = (hkds[drv] & (DS_VV | DS_PIP | DS_ATA)) | DS_VLD | DS_DRA;
 if (hk_unit[drv].flags & UNIT_ATT) {                    /* attached? */
     if (!sim_is_active (&hk_unit[drv]))                 /* not busy? */
@@ -1034,6 +1280,8 @@ else {
     }
 if (hk_unit[drv].flags & UNIT_RK07)
     hkds[drv] = hkds[drv] | DS_DT;
+if (old_ds != hkds[drv])
+    sim_debug_bits (HKDEB_TRC, &hk_dev, hk_ds_bits, old_ds, hkds[drv], 1);
 return;
 }
 
@@ -1041,6 +1289,7 @@ return;
 
 void hk_cmderr (int32 err, int32 drv)
 {
+sim_debug (HKDEB_TRC, &hk_dev, "update_hkds(drv=%d, err=%d)\n", drv, err);
 hker[drv] = hker[drv] | err;                            /* set error */
 hkds[drv] = hkds[drv] | DS_ATA;                         /* set attn */
 update_hkcs (CS1_DONE, drv);                            /* set done */
@@ -1158,6 +1407,7 @@ t_stat hk_reset (DEVICE *dptr)
 int32 i;
 UNIT *uptr;
 
+sim_debug (HKDEB_TRC, &hk_dev, "hk_reset()\n");
 hkcs1 = CS1_DONE;                                       /* set done */
 hkcs2 = CS2_IR;                                         /* clear state */
 hkmr = hkmr2 = hkmr3 = 0;
@@ -1303,7 +1553,7 @@ static const uint16 boot_rom[] = {
 
 t_stat hk_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)

@@ -72,7 +72,6 @@ static const char *tape_stat[] = {
 extern uint32 PC;
 extern uint32 cpu_model;
 extern uint32 ind_ioc;
-extern FILE *sim_deb;
 extern const char *sel_name[];
 
 t_stat mt_chsel (uint32 ch, uint32 sel, uint32 unit);
@@ -368,7 +367,7 @@ DEVICE mt_dev[NUM_CHAN] = {
     MT_NUMDR + 1, 10, 31, 1, 8, 8,
     NULL, NULL, &mt_reset,
     &mt_boot, &mt_attach, &sim_tape_detach,
-    &mt_dib, DEV_DEBUG
+    &mt_dib, DEV_DEBUG | DEV_TAPE
     },
     {
     "MTB", mtb_unit, mtb_reg, mt_mod,

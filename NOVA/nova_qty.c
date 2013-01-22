@@ -105,8 +105,6 @@
 
 
 extern int32    int_req, dev_busy, dev_done, dev_disable ;
-extern int32    sim_switches ;
-extern FILE *   sim_log ;
 extern int32    tmxr_poll ;                             /* calibrated delay */
 
 t_stat  qty_setnl   ( UNIT * uptr, int32 val, char * cptr, void * desc ) ;
@@ -193,7 +191,7 @@ DEVICE  qty_dev =
         1, 10, 31, 1, 8, 8,
         NULL, NULL, &qty_reset,
         NULL, &qty_attach, &qty_detach,
-        &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_NET)
+        &qty_dib, (DEV_DISABLE | DEV_DIS | DEV_MUX)
         };
 
 #define DG_RETURN( status, data )   (int32)(((status) << IOT_V_REASON) | ((data) & 0x0FFFF) )
@@ -222,7 +220,7 @@ DEVICE  qty_dev =
 #define QTY_LINE_RX_CHAR( line )    (qty_status[ (line) ] & QTY_S_DMASK)
 #define QTY_UNIT_ACTIVE( unitp )    ( (unitp)->conn )
 
-#define QTY_LINE_BITS( line, bits ) qty_status[ (line) ] & bits
+#define QTY_LINE_BITS( line, bits ) (qty_status[ (line) ] & bits)
 
 #define QTY_LINE_SET_BIT(   line, bit )  qty_status[ (line) ] |=  (bit)  ;
 #define QTY_LINE_CLEAR_BIT( line, bit )  qty_status[ (line) ] &= ~(bit)  ;

@@ -79,9 +79,11 @@ t_stat ptp_detach (UNIT *uptr);
    ptr_reg      PTR register list
 */
 
+#define IOLN_PTR        004
+
 DIB ptr_dib = {
-    IOBA_PTR, IOLN_PTR, &ptr_rd, &ptr_wr,
-    1, IVCL (PTR), VEC_PTR, { NULL }
+    IOBA_AUTO, IOLN_PTR, &ptr_rd, &ptr_wr,
+    1, IVCL (PTR), VEC_AUTO, { NULL }
     };
 
 UNIT ptr_unit = {
@@ -127,9 +129,11 @@ DEVICE ptr_dev = {
    ptp_reg      PTP register list
 */
 
+#define IOLN_PTP        004
+
 DIB ptp_dib = {
-    IOBA_PTP, IOLN_PTP, &ptp_rd, &ptp_wr,
-    1, IVCL (PTP), VEC_PTP, { NULL }
+    IOBA_AUTO, IOLN_PTP, &ptp_rd, &ptp_wr,
+    1, IVCL (PTP), VEC_AUTO, { NULL }
     };
 
 UNIT ptp_unit = {
@@ -249,7 +253,7 @@ if ((ptr_unit.flags & UNIT_ATT) == 0)
     ptr_csr = ptr_csr | CSR_ERR;
 CLR_INT (PTR);
 sim_cancel (&ptr_unit);
-return SCPE_OK;
+return auto_config (dptr->name, 1);
 }
 
 t_stat ptr_attach (UNIT *uptr, char *cptr)
@@ -344,7 +348,7 @@ if ((ptp_unit.flags & UNIT_ATT) == 0)
     ptp_csr = ptp_csr | CSR_ERR;
 CLR_INT (PTP);
 sim_cancel (&ptp_unit);                                 /* deactivate unit */
-return SCPE_OK;
+return auto_config (dptr->name, 1);
 }
 
 t_stat ptp_attach (UNIT *uptr, char *cptr)

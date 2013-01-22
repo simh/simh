@@ -217,7 +217,6 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 int32 i, wd, buf[8];
 int32 ldr = 1;
-extern int32 sim_switches;
 extern uint32 P;
 
 if ((*cptr != 0) || (flag != 0))

@@ -128,7 +128,6 @@
     }                                           \
 }
 
-extern int32 sim_int_char;
 extern int32 sio0s      (const int32 port, const int32 io, const int32 data);
 extern int32 sio0d      (const int32 port, const int32 io, const int32 data);
 extern int32 sio1s      (const int32 port, const int32 io, const int32 data);
@@ -146,8 +145,6 @@ extern void install_ALTAIRbootROM(void);
 extern void do_SIMH_sleep(void);
 extern void prepareMemoryAccessMessage(const t_addr loc);
 extern void prepareInstructionMessage(const t_addr loc, const uint32 op);
-
-extern FILE *sim_deb;
 
 extern t_stat sim_instr_nommu(void);
 extern uint8 MOPT[MAXBANKSIZE];
@@ -194,7 +191,6 @@ void setBankSelect(const int32 b);
 uint32 getClockFrequency(void);
 void setClockFrequency(const uint32 Value);
 uint32 getCommon(void);
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag);
 uint32 sim_map_resource(uint32 baseaddr, uint32 size, uint32 resource_type,
         int32 (*routine)(const int32, const int32, const int32), uint8 unmap);
 
@@ -1882,15 +1878,12 @@ void setClockFrequency(const uint32 Value) {
 }
 
 static t_stat sim_instr_mmu (void) {
-    extern int32 sim_interval;
     extern t_bool sim_brk_pend[SIM_BKPT_N_SPC];
     extern int32 timerInterrupt;
     extern int32 timerInterruptHandler;
     extern int32 keyboardInterrupt;
     extern uint32 keyboardInterruptHandler;
-    extern uint32 sim_os_msec(void);
     extern const t_bool rtc_avail;
-    extern uint32 sim_brk_summ;
     int32 reason = SCPE_OK;
     register uint32 specialProcessing;
     register uint32 AF;
@@ -6287,7 +6280,6 @@ static t_stat sim_instr_mmu (void) {
 /* reset routine */
 
 static t_stat cpu_reset(DEVICE *dptr) {
-    extern uint32 sim_brk_types, sim_brk_dflt;   /* breakpoint info */
     int32 i;
     AF_S = AF1_S = 0;
     BC_S = DE_S = HL_S = 0;
@@ -6817,7 +6809,7 @@ void (*sim_vm_init) (void) = &altairz80_init;
 
 #define PLURAL(x) (x), (x) == 1 ? "" : "s"
 
-t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int32 flag) {
+t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
     int32 i;
     uint32 addr, cnt = 0, org, pagesModified = 0, makeROM = FALSE;
     t_addr j, lo, hi;
