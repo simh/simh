@@ -253,8 +253,6 @@ typedef struct {
 
 /* Global state */
 
-extern FILE *sim_log;
-
 uint16 *M = NULL;                                       /* memory */
 int32 REGFILE[6][2] = { {0} };                          /* R0-R5, two sets */
 int32 STACKFILE[4] = { 0 };                             /* SP, four modes */

@@ -335,9 +335,10 @@ int32 t;
 if (clk_csr & CSR_IE)
     SET_INT (CLK);
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
+AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
 return SCPE_OK;
 }
 

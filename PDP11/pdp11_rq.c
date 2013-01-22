@@ -699,7 +699,6 @@ static struct ctlrtyp ctlr_tab[] = {
     };
 
 extern int32 int_req[IPL_HLVL];
-extern int32 tmr_poll, clk_tps;
 
 int32 rq_itime = 200;                                   /* init time, except */
 int32 rq_itime4 = 10;                                   /* stage 4 */
@@ -1429,7 +1428,7 @@ if (cp->csta < CST_UP) {                                /* still init? */
             sim_debug (DBG_REQ, dptr, "initialization complete\n");
             cp->csta = CST_UP;                          /* we're up */
             cp->sa = 0;                                 /* clear SA */
-            sim_activate (dptr->units + RQ_TIMER, tmr_poll * clk_tps);
+            sim_activate_after (dptr->units + RQ_TIMER, 1000000);
             if ((cp->saw & SA_S4H_LF)
                 && cp->perr) rq_plf (cp, cp->perr);
             cp->perr = 0;
@@ -1495,7 +1494,7 @@ MSC *cp = rq_ctxmap[uptr->cnum];
 DEVICE *dptr = rq_devmap[uptr->cnum];
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_tmrsvc\n");
-sim_activate (uptr, tmr_poll * clk_tps);                /* reactivate */
+sim_activate_after (uptr, 1000000);                     /* reactivate */
 for (i = 0; i < RQ_NUMDR; i++) {                        /* poll */
     nuptr = dptr->units + i;
     if ((nuptr->flags & UNIT_ATP) &&                    /* ATN pending? */

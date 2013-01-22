@@ -146,8 +146,8 @@ int32 t;
 dev_done = dev_done | INT_CLK;                          /* set done */
 int_req = INT_UPDATE;                                   /* update interrupts */
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
 tmxr_poll = t;                                          /* set mux poll */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 return SCPE_OK;
 }
 

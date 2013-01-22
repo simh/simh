@@ -427,7 +427,7 @@ int32 t;
 
 t = sim_rtc_calb (clk_tps);                             /* calibrate clock */
 tmxr_poll = t;                                          /* set mux poll */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 #if defined (PDP15)
 clk_task_upd (FALSE);                                   /* update task timer */
 #endif

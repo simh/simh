@@ -207,7 +207,6 @@ int32 tmr_use_100hz = 1;                                /* use 100Hz for timer *
 int32 clk_tps = 100;                                    /* ticks/second */
 int32 tmxr_poll = CLK_DELAY * TMXR_MULT;                /* term mux poll */
 int32 tmr_poll = CLK_DELAY;                             /* pgm timer poll */
-int32 todr_reg = 0;                                     /* TODR register */
 struct todr_battery_info {
     uint32 toy_gmtbase;                                 /* GMT base of set value */
     uint32 toy_gmtbasemsec;                             /* The milliseconds of the set value */
@@ -344,7 +343,6 @@ DEVICE tto_dev = {
 UNIT clk_unit = { UDATA (&clk_svc, UNIT_IDLE+UNIT_FIX, sizeof(TOY)), CLK_DELAY };/* 100Hz */
 
 REG clk_reg[] = {
-    { DRDATAD (TODR,                        todr_reg,  32, "time-of-day register"), PV_LEFT },
     { DRDATAD (TIME,                   clk_unit.wait,  24, "initial poll interval"), REG_NZ + PV_LEFT },
     { DRDATAD (POLL,                        tmr_poll,  24, "calibrated poll interval"), REG_NZ + PV_LEFT + REG_HRO },
     { DRDATAD (TPS,                          clk_tps,   8, "ticks per second (100)"), REG_NZ + PV_LEFT },
@@ -749,9 +747,9 @@ tmr_nicr = val;
 t_stat clk_svc (UNIT *uptr)
 {
 tmr_poll = sim_rtcn_calb (clk_tps, TMR_CLK);            /* calibrate clock */
-sim_activate (&clk_unit, tmr_poll);                     /* reactivate unit */
+sim_activate_after (&clk_unit, 1000000/clk_tps);        /* reactivate unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */
-todr_reg = todr_reg + 1;                                /* incr TODR */
+AIO_SET_INTERRUPT_LATENCY(tmr_poll*clk_tps);            /* set interrrupt latency */
 if ((tmr_iccs & TMR_CSR_RUN) && tmr_use_100hz)          /* timer on, std intvl? */
     tmr_incr (TMR_INC);                                 /* do timer service */
 return SCPE_OK;

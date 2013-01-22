@@ -1437,6 +1437,11 @@ else
             uptr->next = sim_clock_cosched_queue;
             sim_clock_cosched_queue = uptr;
             pthread_mutex_unlock (&sim_timer_lock);
+#else
+            int32 t;
+
+            t = sim_activate_time (sim_clock_unit);
+            return sim_activate (uptr, t? t - 1: interval);
 #endif
             }
         return SCPE_OK;

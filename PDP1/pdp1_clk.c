@@ -101,7 +101,7 @@ t_stat clk_svc (UNIT *uptr)
 if (clk_dev.flags & DEV_DIS)                            /* disabled? */
     return SCPE_OK;
 tmxr_poll = sim_rtcn_calb (CLK_TPS, TMR_CLK);           /* calibrate clock */
-sim_activate (&clk_unit, tmxr_poll);                    /* reactivate unit */
+sim_activate_after (uptr, 1000000/CLK_TPS);             /* reactivate unit */
 clk_cntr = clk_cntr + CLK_CNTS;                         /* incr counter */
 if ((clk_cntr % CLK_C32MS) == 0)                        /* 32ms interval? */
     dev_req_int (clk32ms_sbs);                          /* req intr */

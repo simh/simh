@@ -245,7 +245,6 @@ static struct drvtyp drv_tab[] = {
 /* Data */
 
 extern int32 int_req[IPL_HLVL];
-extern int32 tmr_poll, clk_tps;
 
 uint32 tq_sa = 0;                                       /* status, addr */
 uint32 tq_saw = 0;                                      /* written data */
@@ -713,7 +712,7 @@ if (tq_csta < CST_UP) {                                 /* still init? */
             sim_debug (DBG_REQ, &tq_dev, "initialization complete\n");
             tq_csta = CST_UP;                           /* we're up */
             tq_sa = 0;                                  /* clear SA */
-            sim_activate (&tq_unit[TQ_TIMER], tmr_poll * clk_tps);
+            sim_activate_after (&tq_unit[TQ_TIMER], 1000000);
             if ((tq_saw & SA_S4H_LF) && tq_perr)
                 tq_plf (tq_perr);
             tq_perr = 0;
@@ -786,7 +785,7 @@ UNIT *nuptr;
 
 sim_debug(DBG_TRC, &tq_dev, "tq_tmrsvc\n");
 
-sim_activate (uptr, tmr_poll * clk_tps);                /* reactivate */
+sim_activate_after (uptr, 1000000);                     /* reactivate */
 for (i = 0; i < TQ_NUMDR; i++) {                        /* poll */
     nuptr = tq_dev.units + i;
     if ((nuptr->flags & UNIT_ATP) &&                    /* ATN pending? */
@@ -1193,10 +1192,9 @@ if ((uptr = tq_getucb (lu))) {                          /* unit exist? */
     sts = tq_mot_valid (uptr, OP_POS);                  /* validity checks */
     if (sts == ST_SUC) {                                /* ok? */
         uptr->cpkt = pkt;                               /* op in progress */
-        tq_rwtime = 2 * tmr_poll * clk_tps;             /* 2 second rewind time */
         if ((tq_pkt[pkt].d[CMD_MOD] & MD_RWD) &&        /* rewind? */
             (!(tq_pkt[pkt].d[CMD_MOD] & MD_IMM)))       /* !immediate? */
-            sim_activate (uptr, tq_rwtime);             /* use 2 sec rewind execute time */
+            sim_activate_after (uptr, 2000000);         /* use 2 sec rewind execute time */
         else {                                          /* otherwise */
             uptr->iostarttime = sim_grtime();
             sim_activate (uptr, 0);                     /* use normal execute time */

@@ -453,13 +453,6 @@ struct dib {                                            /* Device information bl
 extern uint32 SR;                                       /* S register (for IBL) */
 extern uint32 dev_prl [2], dev_irq [2], dev_srq [2];    /* I/O signal vectors */
 
-/* Simulator state */
-
-extern FILE *sim_deb;
-extern FILE *sim_log;
-extern int32 sim_step;
-extern int32 sim_switches;
-
 /* CPU functions */
 
 extern t_stat ibl_copy       (const BOOT_ROM rom, int32 dev);

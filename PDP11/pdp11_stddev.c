@@ -444,7 +444,7 @@ clk_csr = clk_csr | CSR_DONE;                           /* set done */
 if ((clk_csr & CSR_IE) || clk_fie)
     SET_INT (CLK);
 t = sim_rtcn_calb (clk_tps, TMR_CLK);                   /* calibrate clock */
-sim_activate (&clk_unit, t);                            /* reactivate unit */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 tmr_poll = t;                                           /* set timer poll */
 tmxr_poll = t;                                          /* set mux poll */
 return SCPE_OK;

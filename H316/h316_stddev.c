@@ -872,7 +872,8 @@ t_stat clk_svc (UNIT *uptr)
 M[M_CLK] = (M[M_CLK] + 1) & DMASK;                      /* increment mem ctr */
 if (M[M_CLK] == 0)                                      /* = 0? set flag */
     SET_INT (INT_CLK);
-sim_activate (&clk_unit, sim_rtc_calb (clk_tps));       /* reactivate */
+sim_rtc_calb (clk_tps);                                 /* recalibrate */
+sim_activate_after (uptr, 1000000/clk_tps);             /* reactivate unit */
 return SCPE_OK;
 }
 

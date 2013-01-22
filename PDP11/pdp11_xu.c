@@ -99,8 +99,7 @@
 
 #include "pdp11_xu.h"
 
-extern int32 tmxr_poll, tmr_poll, clk_tps, cpu_astop;
-extern FILE *sim_log;
+extern int32 tmxr_poll;
 
 t_stat xu_rd(int32* data, int32 PA, int32 access);
 t_stat xu_wr(int32  data, int32 PA, int32 access);
@@ -583,7 +582,6 @@ t_stat xu_tmrsvc(UNIT* uptr)
 {
   CTLR* xu = xu_unit2ctlr(uptr);
   const ETH_MAC mop_multicast = {0xAB, 0x00, 0x00, 0x02, 0x00, 0x00};
-  const int one_second = clk_tps * tmr_poll;
 
   /* send identity packet when timer expires */
   if (--xu->var->idtmr <= 0) {
@@ -596,7 +594,7 @@ t_stat xu_tmrsvc(UNIT* uptr)
   upd_stat16 (&xu->var->stats.secs, 1);
 
   /* resubmit service timer */
-  sim_activate(uptr, one_second);
+  sim_activate_after(uptr, 1000000);
 
   return SCPE_OK;
 }
@@ -677,7 +675,7 @@ t_stat xu_sw_reset (CTLR* xu)
     sim_clock_coschedule (&xu->unit[0], tmxr_poll);
 
     /* start service timer */
-    sim_activate_abs(&xu->unit[1], tmr_poll * clk_tps);
+    sim_activate_after (&xu->unit[1], 1000000);
   }
 
   /* clear load_server address */

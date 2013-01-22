@@ -2483,7 +2483,7 @@ t_stat xq_reset(DEVICE* dptr)
     xq_csr_set_clr(xq, XQ_CSR_OK, 0);
 
     /* start service timer */
-    sim_activate_abs(&xq->unit[1], (tmr_poll * clk_tps) / 4);
+    sim_activate_after(&xq->unit[1], 250000);
 
     /* stop the receiver */
     eth_clr_async(xq->var->etherface);
@@ -2672,7 +2672,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
   }
 
   /* resubmit service timer */
-  sim_activate(uptr, (tmr_poll * clk_tps) / 4);
+  sim_activate_after(uptr, 250000);
 
   return SCPE_OK;
 }
