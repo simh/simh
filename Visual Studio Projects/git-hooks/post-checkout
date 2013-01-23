@@ -1,0 +1,5 @@
+#!/bin/sh
+#
+# A hook script that is called after a successful
+# checkout to record the commit-id in the working directory.
+git log -1 --pretty="%H" >.git-commit-id
