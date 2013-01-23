@@ -502,8 +502,7 @@ int32 fdctrk(int32 io, int32 data)
         dsk_unit[cur_dsk].u4 = data & 0xFF;
         if (dsk_dev.dctrl & DEBUG_read)
             printf("\nfdctrk: Drive %d track set to %d", cur_dsk, dsk_unit[cur_dsk].u4);
-    } else
-        ;
+    }
     if (dsk_dev.dctrl & DEBUG_write)
         printf("\nfdctrk: Drive %d track read as %d", cur_dsk, dsk_unit[cur_dsk].u4);
     return dsk_unit[cur_dsk].u4;
@@ -519,8 +518,7 @@ int32 fdcsec(int32 io, int32 data)
             dsk_unit[cur_dsk].u5 = 1;
         if (dsk_dev.dctrl & DEBUG_write)
             printf("\nfdcsec: Drive %d sector set to %d", cur_dsk, dsk_unit[cur_dsk].u5);
-    } else
-            ;
+    }
     if (dsk_dev.dctrl & DEBUG_read)
         printf("\nfdcsec: Drive %d sector read as %d", cur_dsk, dsk_unit[cur_dsk].u5);
     return dsk_unit[cur_dsk].u5;
