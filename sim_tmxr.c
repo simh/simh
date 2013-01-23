@@ -2561,7 +2561,7 @@ if ((mp->lines > 1) ||
     ((mp->master == 0) &&
      (mp->ldsc[0].connecting == 0) &&
      (mp->ldsc[0].serport == 0)))
-    uptr->flags = uptr->dynflags | UNIT_ATTMULT;        /* allow multiple attach commands */
+    uptr->dynflags = uptr->dynflags | UNIT_ATTMULT;     /* allow multiple attach commands */
 
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_MUX)
 if (!async || (uptr->flags & TMUF_NOASYNCH))            /* if asynch disabled */
