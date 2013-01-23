@@ -1040,10 +1040,14 @@ void fprint_reg_help (FILE *st, DEVICE *dptr)
 REG *rptr, *trptr;
 t_bool found = FALSE;
 t_bool all_unique = TRUE;
+size_t max_namelen = 0;
 DEVICE *tdptr;
 char *tptr;
+char *namebuf;
 
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+    if (max_namelen < (strlen(rptr->name) + ((rptr->depth > 1) ? 5 : 0)))
+        max_namelen = strlen(rptr->name) + ((rptr->depth > 1) ? 5 : 0);
     if (rptr->desc) {
         found = TRUE;
         trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
@@ -1054,20 +1058,26 @@ for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
 if (!found)
     fprintf (st, "No register help is available for the %s device\n", dptr->name);
 else {
+    namebuf = calloc (max_namelen + 1, sizeof (*namebuf));
     fprintf (st, "%s device registers:\n", dptr->name);
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
         if (rptr->desc) {
+            if (rptr->depth <= 1)
+                sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
+            else
+                sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), "[ALL]");
             if (all_unique) {
-                fprintf (st, "  %-9s  %s\n", rptr->name, rptr->desc);
+                fprintf (st, "  %s  %s\n", namebuf, rptr->desc);
                 continue;
                 }
             trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
             if ((trptr == NULL) || (tdptr != dptr))
-                fprintf (st, "  %s %-9s  %s\n", dptr->name, rptr->name, rptr->desc);
+                fprintf (st, "  %s %s  %s\n", dptr->name, namebuf, rptr->desc);
             else
-                fprintf (st, "  %*s %-9s  %s\n", (int)strlen(dptr->name), "", rptr->name, rptr->desc);
+                fprintf (st, "  %*s %s  %s\n", (int)strlen(dptr->name), "", namebuf, rptr->desc);
             }
         }
+    free (namebuf);
     }
 }
 
@@ -4232,13 +4242,14 @@ for (rptr = lowr; rptr <= highr; rptr++) {
     if ((sim_switches & SIM_SW_HIDE) &&
         (rptr->flags & REG_HIDDEN))
         continue;
+    val = last_val = 0;
     for (idx = lows; idx <= highs; idx++) {
         if (idx >= rptr->depth)
             return SCPE_SUB;
         val = get_rval (rptr, idx);
         if (schptr && !test_search (val, schptr))
             continue;
-        if (flag != EX_D) {
+        if (flag == EX_E) {
             if ((idx > lows) && (val == last_val))
                 continue;
             if (idx > val_start+1) {
@@ -4264,7 +4275,7 @@ for (rptr = lowr; rptr <= highr; rptr++) {
                 return reason;
             }
         }
-    if ((flag != EX_D) && (val_start != highs)) {
+    if ((flag == EX_E) && (val_start != highs)) {
         if (highs == val_start+1) {
             reason = ex_reg (ofile, val, flag, rptr, highs);
             if (reason != SCPE_OK)
