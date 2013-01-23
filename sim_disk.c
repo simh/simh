@@ -447,6 +447,8 @@ return SCPE_NOFNC;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 pthread_attr_t attr;
 
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_set_async(unit=%d)\n", (int)(uptr-ctx->dptr->units));
+
 ctx->asynch_io = sim_asynch_enabled;
 ctx->asynch_io_latency = latency;
 if (ctx->asynch_io) {
@@ -481,6 +483,8 @@ struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
 /* make sure device exists */
 if (!ctx) return SCPE_UNATT;
+
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_clr_async(unit=%d)\n", (int)(uptr-ctx->dptr->units));
 
 if (ctx->asynch_io) {
     pthread_mutex_lock (&ctx->io_lock);
@@ -971,6 +975,7 @@ ctx->capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* save capaci
 ctx->xfer_element_size = (uint32)xfer_element_size;     /* save xfer_element_size */
 ctx->dptr = dptr;                                       /* save DEVICE pointer */
 ctx->dbit = dbit;                                       /* save debug bit */
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_attach(unit=%d,filename='%s')\n", (int)(uptr-ctx->dptr->units), uptr->filename);
 ctx->auto_format = auto_format;                         /* save that we auto selected format */
 ctx->storage_sector_size = (uint32)sector_size;         /* Default */
 if (sim_switches & SWMASK ('R')) {                      /* read only? */
@@ -1092,10 +1097,14 @@ int (*close_function)(FILE *f);
 FILE *fileref;
 t_bool auto_format;
 
-if (uptr == NULL)
+if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
     return SCPE_IERR;
+
 ctx = (struct disk_context *)uptr->disk_ctx;
 fileref = uptr->fileref;
+
+sim_debug (ctx->dbit, ctx->dptr, "sim_disk_detach(unit=%d,filename='%s')\n", (int)(uptr-ctx->dptr->units), uptr->filename);
+
 switch (DK_GET_FMT (uptr)) {                            /* case on format */
     case DKUF_F_STD:                                    /* Simh */
         close_function = fclose;
@@ -1117,10 +1126,10 @@ if (NULL == find_dev_from_unit (uptr))
     return SCPE_OK;
 auto_format = ctx->auto_format;
 
-sim_disk_clr_async (uptr);
-
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
+
+sim_disk_clr_async (uptr);
 
 uptr->flags &= ~(UNIT_ATT | UNIT_RO);
 uptr->dynflags &= ~UNIT_NO_FIO;

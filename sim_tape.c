@@ -488,10 +488,13 @@ t_stat sim_tape_detach (UNIT *uptr)
 uint32 f = MT_GET_FMT (uptr);
 t_stat r;
 
-sim_tape_clr_async (uptr);
+if ((uptr == NULL) || !(uptr->flags & UNIT_ATT))
+    return SCPE_IERR;
 
 if (uptr->io_flush)
     uptr->io_flush (uptr);                              /* flush buffered data */
+
+sim_tape_clr_async (uptr);
 
 r = detach_unit (uptr);                                 /* detach unit */
 if (r != SCPE_OK)
