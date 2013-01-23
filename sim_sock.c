@@ -679,7 +679,7 @@ int32 sta;
 char host[CBUFSIZE], port[CBUFSIZE];
 t_stat r;
 struct addrinfo hints;
-struct addrinfo *result = NULL;
+struct addrinfo *result = NULL, *preferred;
 
 r = sim_parse_addr (hostport, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
 if (parse_status)
@@ -697,13 +697,26 @@ if (p_getaddrinfo(host[0] ? host : NULL, port[0] ? port : NULL, &hints, &result)
         *parse_status = SCPE_ARG;
     return newsock;
     }
-newsock = sim_create_sock (result->ai_family);          /* create socket */
+preferred = result;
+#ifdef IPV6_V6ONLY
+/*
+    When we can create a dual stack socket, be sure to find the IPv6 addrinfo 
+    to bind to.
+*/
+for (; preferred != NULL; preferred = preferred->ai_next) {
+    if (preferred->ai_family == AF_INET6)
+        break;
+    }
+if (preferred == NULL)
+    preferred = result;
+#endif
+newsock = sim_create_sock (preferred->ai_family);       /* create socket */
 if (newsock == INVALID_SOCKET) {                        /* socket error? */
     p_freeaddrinfo(result);
     return newsock;
     }
 #ifdef IPV6_V6ONLY
-if (result->ai_family == AF_INET6) {
+if (preferred->ai_family == AF_INET6) {
     int off = FALSE;
     sta = setsockopt (newsock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
     }
