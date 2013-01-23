@@ -102,7 +102,7 @@ static uint32 sim_throt_state = 0;
 static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
 static UNIT *sim_clock_unit = NULL;
-static t_bool sim_asynch_timer = 
+t_bool sim_asynch_timer = 
 #if defined (SIM_ASYNCH_CLOCKS)
                                  TRUE;
 #else
@@ -701,6 +701,10 @@ t_stat sim_show_timers (FILE* st, DEVICE *dptr, UNIT* uptr, int32 val, char* des
 {
 int tmr;
 
+if (sim_clock_unit)
+    fprintf (st, "%s clock device is %s\n", sim_name, sim_uname(sim_clock_unit));
+else
+    fprintf (st, "%s clock device is not specified, co-scheduling is unavailable\n", sim_name);
 for (tmr=0; tmr<SIM_NTIMERS; ++tmr) {
     if (0 == rtc_initd[tmr])
         continue;
@@ -775,7 +779,7 @@ return SCPE_OK;
 }
 
 MTAB sim_timer_mod[] = {
-#if defined (SIM_ASYNCH_IO)
+#if defined (SIM_ASYNCH_IO) && defined (SIM_ASYNCH_CLOCKS)
   { MTAB_XTD|MTAB_VDV, 0, "ASYNC", "ASYNC", &sim_timer_set_async, &sim_timer_show_async },
   { MTAB_XTD|MTAB_VDV, 0, NULL, "NOASYNC", &sim_timer_clr_async, NULL },
 #endif

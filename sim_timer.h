@@ -117,6 +117,7 @@ double sim_timer_inst_per_sec (void);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */
+extern t_bool sim_asynch_timer;
 extern DEVICE sim_timer_dev;
 
 #endif
