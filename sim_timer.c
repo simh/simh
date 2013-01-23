@@ -1255,7 +1255,7 @@ pthread_mutex_lock (&sim_timer_lock);
 if (sim_asynch_enabled && sim_asynch_timer) {
     pthread_attr_t attr;
     UNIT *cptr;
-    double delta_due_time;
+    double delta_due_time = 0;
 
     /* when restarting after being manually stopped the due times for all */
     /* timer events needs to slide so they fire in the future. (clock ticks */

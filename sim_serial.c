@@ -890,19 +890,18 @@ memset(list, 0, max*sizeof(*list));
 #if defined(__linux__)
 if (1) {
     struct dirent **namelist;
-    int n;
     struct stat st;
 
-    n = scandir("/sys/class/tty/", &namelist, NULL, NULL);
+    i = scandir("/sys/class/tty/", &namelist, NULL, NULL);
 
-    while (n--) {
-        if (strcmp(namelist[n]->d_name, ".") &&
-            strcmp(namelist[n]->d_name, "..")) {
+    while (i--) {
+        if (strcmp(namelist[i]->d_name, ".") &&
+            strcmp(namelist[i]->d_name, "..")) {
             char path[1024], devicepath[1024], driverpath[1024];
 
-            sprintf (path, "/sys/class/tty/%s", namelist[n]->d_name);
-            sprintf (devicepath, "/sys/class/tty/%s/device", namelist[n]->d_name);
-            sprintf (driverpath, "/sys/class/tty/%s/device/driver", namelist[n]->d_name);
+            sprintf (path, "/sys/class/tty/%s", namelist[i]->d_name);
+            sprintf (devicepath, "/sys/class/tty/%s/device", namelist[i]->d_name);
+            sprintf (driverpath, "/sys/class/tty/%s/device/driver", namelist[i]->d_name);
             if ((lstat(devicepath, &st) == 0) && S_ISLNK(st.st_mode)) {
                 char buffer[1024];
 
@@ -918,7 +917,7 @@ if (1) {
                     }
                 }
             }
-        free (namelist[n]);
+        free (namelist[i]);
         }
     free (namelist);
     }

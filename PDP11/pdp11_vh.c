@@ -1584,5 +1584,6 @@ static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, ch
 {
 char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 
-return tmxr_attach_help (st, dptr, uptr, flag, cptr);
+fprintf (st, "%s %s Terminal Multiplexer Attach Help\n\n", devtype, dptr->name);
+return tmxr_attach_help (st, dptr, uptr, 1, cptr);
 }

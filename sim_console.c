@@ -952,7 +952,6 @@ _console_poll(void *arg)
 {
 int sched_policy;
 struct sched_param sched_priority;
-int poll_timeout_count = 0;
 int wait_count = 0;
 DEVICE *d;
 

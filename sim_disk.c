@@ -1148,8 +1148,6 @@ return SCPE_OK;
 
 t_stat sim_disk_attach_help(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-size_t unit_number = (uptr-dptr->units);
-
 fprintf (st, "%s Disk Attach Help\n\n", dptr->name);
 
 fprintf (st, "Disk container files can be one of 3 different types:\n\n");

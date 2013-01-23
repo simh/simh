@@ -2763,7 +2763,8 @@ t_bool single_line = FALSE;               /* default to Multi-Line help */
 if (mux)
    single_line = (mux->lines == 1);
 
-fprintf (st, "%s Multiplexer Attach Help\n\n", dptr->name);
+if (!flag)
+    fprintf (st, "%s Multiplexer Attach Help\n\n", dptr->name);
 if (single_line) {          /* Single Line Multiplexer */
     fprintf (st, "The %s multiplexer may be connected to terminal emulators supporting the\n", dptr->name);
     fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
