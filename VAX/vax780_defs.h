@@ -284,7 +284,7 @@ typedef struct {
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
     } DIB;
 
-/* Unibus I/O page layout - see pdp11_ui_lib.c for address layout details
+/* Unibus I/O page layout - see pdp11_io_lib.c for address layout details
    Massbus devices (RP, TU) do not appear in the Unibus IO page */
 
 #define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */

@@ -235,7 +235,7 @@ typedef struct {
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
     } DIB;
 
-/* Qbus I/O page layout - see pdp11_ui_lib.c for address layout details */
+/* Qbus I/O page layout - see pdp11_io_lib.c for address layout details */
 
 #define IOBA_AUTO       (0)                             /* Assigned by Auto Configure */
 
