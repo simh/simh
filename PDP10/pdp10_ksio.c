@@ -921,12 +921,16 @@ return SCPE_OK;
 
 /* Autoconfiguration
 
-   The table reflects the MicroVAX 3900 microcode, with one field addition - the
-   number of controllers field handles devices where multiple instances
-   are simulated through a single DEVICE structure (e.g., DZ, VH, DL, DC).
-
-   The table has been reviewed, extended and updated to reflect the contents of
-   the auto configure table in VMS sysgen (V5.5-2)
+   The below table describes the fixed addresses for the currently 
+   supported Unibus devices which are shared between the PDP11/VAX 
+   Unibus and the PDP10.  This list isn't likely to change, but if
+   need be, it can be extended to include as many devices as necessary.
+   The full 'real' auto configuration table which describes both 
+   devices with static addresses and addresses(and vectors) in floating
+   address space is #ifdef'd out below.  These addresses have been 
+   used historically in the PDP10 simulator so their fixed addresses 
+   are retained for consistency with OS configurations which probably
+   expect them to be using these fixed address and vectors.
 
    A minus number of vectors indicates a field that should be calculated
    but not placed in the DIB (RQ, TQ dynamic vectors)
@@ -946,6 +950,18 @@ typedef struct {
     } AUTO_CON;
 
 AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
+#ifdef VM_PDP10
+    { { "DZ" },          1,  2,  0, 0,
+        {0000010}, {0340} },                             /* DZ11 - Fixed addresses and vectors in simulator */
+    { { "RY" },          1,  1,  8, 4, 
+        {0017170}, {0264} },                             /* RX11/RX211 - Fixed address and vector in simulator */
+    { { "CR" },          1,  1,  0, 0, 
+        {0017160}, {0230} },                             /* CR11 - fx CSR, fx VEC */
+    { { "PTR" },         1,  1,  0, 0, 
+        {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
+    { { "PTP" },         1,  1,  0, 0, 
+        {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
+#else
     { { "QBA" },         1,  0,  0, 0, 
         {017500} },                                     /* doorbell - fx CSR, no VEC */
     { { "MCTL" },        1,  0,  0, 0, 
@@ -1143,6 +1159,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  2,  4, 8 },                /* DTC05, DECvoice */
     { { NULL },          1,  2,  8, 8 },                /* KWV32 (DSV11) */
     { { NULL },          1,  1, 64, 4 },                /* QZA */
+#endif
     { { NULL }, -1 }                                    /* end table */
 };
 
