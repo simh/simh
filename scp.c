@@ -2003,6 +2003,12 @@ if (cptr && (*cptr != 0))
     return SCPE_2MARG;
 #ifdef SIM_ASYNCH_IO
 fprintf (st, "Asynchronous I/O is %sabled, %s\n", (sim_asynch_enabled) ? "en" : "dis", AIO_QUEUE_MODE);
+#if defined(SIM_ASYNCH_MUX)
+fprintf (st, "Asynchronous Multiplexer support is available\n");
+#endif
+#if defined(SIM_ASYNCH_CLOCKS)
+fprintf (st, "Asynchronous Clock is %sabled\n", (sim_asynch_timer) ? "en" : "dis");
+#endif
 #else
 fprintf (st, "Asynchronous I/O is not available in this simulator\n");
 #endif
@@ -4214,8 +4220,8 @@ t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs)
 {
 t_stat reason;
-uint32 idx;
-t_value val;
+uint32 idx, val_start=lows;
+t_value val, last_val;
 REG *rptr;
 
 if ((lowr == NULL) || (highr == NULL))
@@ -4233,6 +4239,19 @@ for (rptr = lowr; rptr <= highr; rptr++) {
         if (schptr && !test_search (val, schptr))
             continue;
         if (flag != EX_D) {
+            if ((idx > lows) && (val == last_val))
+                continue;
+            if (idx > val_start+1) {
+                if (idx-1 == val_start+1) {
+                    reason = ex_reg (ofile, val, flag, rptr, idx-1);
+                    if (reason != SCPE_OK)
+                        return reason;
+                    }
+                else
+                    fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, idx-1);
+                }
+            last_val = val;
+            val_start = idx;
             reason = ex_reg (ofile, val, flag, rptr, idx);
             if (reason != SCPE_OK)
                 return reason;
@@ -4244,6 +4263,15 @@ for (rptr = lowr; rptr <= highr; rptr++) {
             if (reason != SCPE_OK)
                 return reason;
             }
+        }
+    if ((flag != EX_D) && (val_start != highs)) {
+        if (highs == val_start+1) {
+            reason = ex_reg (ofile, val, flag, rptr, highs);
+            if (reason != SCPE_OK)
+                return reason;
+            }
+        else
+            fprintf (ofile, "%s[%d]-%s[%d]: same as above\n", rptr->name, val_start+1, rptr->name, highs);
         }
     }
 return SCPE_OK;
