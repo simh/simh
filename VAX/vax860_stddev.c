@@ -1019,6 +1019,8 @@ switch (rlcs_state) {
                 if (sim_fseek (uptr->fileref, da, SEEK_SET))
                     return SCPE_IOERR;
                 bcnt = sim_fread (rlcs_buf, sizeof (int16), RL_NUMBY, uptr->fileref);
+                if (bcnt != (sizeof (int16) * RL_NUMBY))
+                    return SCPE_IOERR;
                 }
             if (rlcs_bcnt < RL_NUMBY) {                 /* more data in buffer? */
                 cso_buf = rlcs_buf[rlcs_bcnt++];        /* return next word */
@@ -1048,6 +1050,8 @@ switch (rlcs_state) {
             if (sim_fseek (uptr->fileref, da, SEEK_SET))
                 return SCPE_IOERR;
             bcnt = sim_fwrite (rlcs_buf, sizeof (int16), RL_NUMBY, uptr->fileref);
+            if (bcnt != (sizeof (int16) * RL_NUMBY))
+                return SCPE_IOERR;
             rlcs_state = RL_IDLE;                       /* now idle */
             rlcs_bcnt = 0;
             cso_csr = cso_csr | CSR_DONE |              /* complete */
