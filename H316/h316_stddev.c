@@ -449,7 +449,7 @@ static const int32 pboot[] = {
 
 t_stat ptr_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
+size_t i;
 
 for (i = 0; i < PBOOT_SIZE; i++)                        /* copy bootstrap */
     M[PBOOT_START + i] = pboot[i];

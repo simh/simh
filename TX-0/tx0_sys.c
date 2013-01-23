@@ -277,7 +277,7 @@ extern t_stat fprint_sym_orig (FILE *of, t_addr addr, t_value *val,
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val,
     UNIT *uptr, int32 sw)
 {
-int32 cflag, i, inst, op;
+int32 i, inst, op;
 
 if(!cpu_get_mode()) {
     return fprint_sym_orig (of, addr, val, uptr, sw);
@@ -285,7 +285,6 @@ if(!cpu_get_mode()) {
 
 
 inst = val[0];
-cflag = (uptr == NULL) || (uptr == &cpu_unit);
 if (sw & SWMASK ('A')) {                                /* ASCII? */
     if (inst > 0377) return SCPE_ARG;
     fprintf (of, FMTASC (inst & 0177));

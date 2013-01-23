@@ -451,10 +451,10 @@ t_stat sim_instr (void)
     /* Clear Instruction counters */
     inst_ctr.sto = inst_ctr.stx = inst_ctr.sxa = inst_ctr.ado = inst_ctr.slr = inst_ctr.slx = inst_ctr.stz = 0;
     inst_ctr.add = inst_ctr.adx = inst_ctr.ldx = inst_ctr.aux = inst_ctr.llr = inst_ctr.llx = inst_ctr.lda = inst_ctr.lax = 0;
-    inst_ctr.trn = inst_ctr.trn = inst_ctr.tze = inst_ctr.tsx = inst_ctr.tix = inst_ctr.tra = inst_ctr.trx = inst_ctr.tlv = 0;
+    inst_ctr.trn = inst_ctr.tze = inst_ctr.tsx = inst_ctr.tix = inst_ctr.tra = inst_ctr.trx = inst_ctr.tlv = 0;
     inst_ctr.cla = inst_ctr.amb = inst_ctr.cyr = inst_ctr.shr = inst_ctr.mbl = inst_ctr.xmb = inst_ctr.com = inst_ctr.pad = inst_ctr.cry = inst_ctr.anb = inst_ctr.orb = inst_ctr.lmb = inst_ctr.mbx = 0;
 
-    #define INCR_ADDR(x)    ((x+=1) & (MEMSIZE-1))
+    #define INCR_ADDR(x)    ((x+1) & (MEMSIZE-1))
 
     /* Main instruction fetch/decode loop: check events */
 
@@ -625,7 +625,7 @@ t_stat sim_instr (void)
                     AC = AC + MBR;
                     if (AC > DMASK) {
                         AC += 1;
-                    } else;
+                    }
                     AC &= DMASK;
                     inst_ctr.add++;
                     break;
@@ -635,7 +635,7 @@ t_stat sim_instr (void)
                     AC = AC + MBR;
                     if (AC > DMASK) {
                         AC += 1;
-                    } else;
+                    }
                     AC &= DMASK;
                     inst_ctr.adx++;
                     break;
@@ -939,7 +939,7 @@ t_stat sim_instr (void)
                     AC = AC + MBR;
                     if (AC > DMASK) {
                         AC += 1;
-                    } else;
+                    }
                     AC &= DMASK;
                     TRACE_PRINT(ORD_MSG, ("%06o\n", AC));
                 } else {
@@ -1075,7 +1075,7 @@ t_stat cpu_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
     int32 mc = 0;
     uint32 i;
 
-    if ((val <= 0) || (val > MAXMEMSIZE) || ((val & 07777) != 0))
+    if ((val <= 0) || (val > (int32)MAXMEMSIZE) || ((val & 07777) != 0))
         return SCPE_ARG;
     for (i = val; i < MEMSIZE; i++) mc = mc | M[i];
     if ((mc != 0) && (!get_yn ("Really truncate memory [N]?", FALSE)))
@@ -1209,7 +1209,7 @@ cpu_get_switches(void)
 }
 
 t_stat sim_load(FILE *fileref, char *cptr, char *fnam, int flag) {
-    uint32 cnt = 0, word;
+    uint32 word;
     t_addr j, lo, hi, sz, sz_words;
     char *result;
 
@@ -1446,7 +1446,7 @@ t_stat sim_opr_orig(int32 op)
             AC = AC + MBR;
             if (AC & 01000000) {
                 AC += 1;
-            } else;
+            }
             AC &= DMASK;
             TRACE_PRINT(ORD_MSG, ("%06o\n", AC));
             inst_ctr.cry++;
