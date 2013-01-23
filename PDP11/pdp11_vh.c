@@ -867,8 +867,7 @@ static t_stat vh_wr (   int32   data,
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
                 sim_clock_coschedule (&vh_unit[0], tmxr_poll);
-            vh_mcount[vh] = MS2SIMH (1200); /* 1.2 seconds */
-            sim_clock_coschedule (&vh_unit[1], tmxr_poll);
+            sim_activate_after (&vh_unit[1], 1200000);  /* 1.2 seconds */
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
@@ -1226,7 +1225,7 @@ static t_stat vh_svc (  UNIT    *uptr   )
             }
         }
     }
-    sim_activate (uptr, tmxr_poll); /* requeue ourselves */
+    sim_clock_coschedule (uptr, tmxr_poll); /* requeue ourselves */
     return (SCPE_OK);
 }
 
