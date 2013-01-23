@@ -6220,7 +6220,7 @@ return SCPE_OK;
 /* Debug printout routines, from Dave Hittner */
 
 const char* debug_bstates = "01_^";
-const char* debug_fmt     = "DBG(%.0f)> %s %s: ";
+const char* debug_fmt     = "DBG(%.0f)%s> %s %s: ";
 int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
@@ -6250,7 +6250,7 @@ static void sim_debug_prefix (uint32 dbits, DEVICE* dptr)
 {
 if (!debug_unterm) {
     char* debug_type = get_dbg_verb (dbits, dptr);
-    fprintf(sim_deb, debug_fmt, sim_gtime(), dptr->name, debug_type);
+    fprintf(sim_deb, debug_fmt, sim_gtime(), AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
     }
 }
 
@@ -6387,7 +6387,9 @@ if (sim_deb && (dptr->dctrl & dbits)) {
                 if (debug_unterm)
                     fprintf (sim_deb, "%.*s\r\n", i-j, &buf[j]);
                 else                                    /* print prefix when required */
-                    fprintf (sim_deb, "DBG(%.0f)> %s %s: %.*s\r\n", sim_gtime(), dptr->name, debug_type, i-j, &buf[j]);
+                    fprintf (sim_deb, "DBG(%.0f)%s> %s %s: %.*s\r\n", sim_gtime(), 
+                                                                    AIO_MAIN_THREAD ? "" : "+",
+                                                                    dptr->name, debug_type, i-j, &buf[j]);
                 debug_unterm = 0;
                 }
             j = i + 1;

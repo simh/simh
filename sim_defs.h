@@ -682,6 +682,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_TLS
 #endif
 
+#define AIO_MAIN_THREAD (pthread_equal ( pthread_self(), sim_asynch_main_threadid ))
 #define AIO_LOCK                                                  \
     pthread_mutex_lock(&sim_asynch_lock)
 #define AIO_UNLOCK                                                \
@@ -1012,6 +1013,7 @@ extern int32 sim_asynch_inst_latency;
 #define AIO_VALIDATE
 #define AIO_CHECK_EVENT
 #define AIO_INIT
+#define AIO_MAIN_THREAD TRUE
 #define AIO_LOCK
 #define AIO_UNLOCK
 #define AIO_CLEANUP
