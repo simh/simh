@@ -24,6 +24,12 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+  ------------------------------------------------------------------------------
+
+  Modification history:
+
+  15-Jan-13  RJ   Contribution from Paul Koning of support for RSTS using the ROM
+                  INPUT (ROM I) command to get the DMC11 to report DSR status.
   ------------------------------------------------------------------------------*/
 
 // Notes
@@ -90,6 +96,7 @@ extern int32 int_req[IPL_HLVL];
 #define DMC_RDYI_MASK 0x0080
 #define DMC_IEI_MASK 0x0040
 #define DMP_IEI_MASK 0x0001
+#define ROMI_MASK 0x0200
 #define LU_LOOP_MASK 0x0800
 #define MASTER_CLEAR_MASK 0x4000
 #define RUN_MASK 0x8000
@@ -107,9 +114,12 @@ extern int32 int_req[IPL_HLVL];
 #define LOST_DATA_MASK 0x0010
 #define DISCONNECT_MASK 0x0040
 
+#define DSPDSR 0x22b3       /* KMC opcode to move line unit status to SEL2 */
+
 #define SEL0_RUN_BIT 15
 #define SEL0_MCLR_BIT 14
 #define SEL0_LU_LOOP_BIT 11
+#define SEL0_ROMI_BIT 9
 #define SEL0_RDI_BIT 7
 #define SEL0_DMC_IEI_BIT 6
 #define SEL0_DMP_IEI_BIT 0
