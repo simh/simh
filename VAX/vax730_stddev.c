@@ -858,6 +858,7 @@ return;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 tmr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);      /* init 100Hz timer */
 sim_activate_abs (&clk_unit, tmr_poll);                 /* activate 100Hz unit */
 tmxr_poll = tmr_poll * TMXR_MULT;                       /* set mux poll */

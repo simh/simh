@@ -118,6 +118,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 if (clk_dev.flags & DEV_DIS) sim_cancel (&clk_unit);    /* disabled? */
 else {
+    sim_register_clock_unit (&clk_unit);                /* declare clock unit */
     tmxr_poll = sim_rtcn_init (clk_unit.wait, TMR_CLK);
     sim_activate_abs (&clk_unit, tmxr_poll);            /* activate unit */
     }

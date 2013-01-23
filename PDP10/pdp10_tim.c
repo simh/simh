@@ -224,6 +224,7 @@ return;
 
 t_stat tim_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&tim_unit);                    /* declare clock unit */
 tim_period = 0;                                         /* clear timer */
 tim_ttg = 0;
 apr_flg = apr_flg & ~APRF_TIM;                          /* clear interrupt */

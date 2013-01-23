@@ -463,6 +463,7 @@ return clk_dib.vec;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 if (CPUT (HAS_LTCR))                                    /* reg there? */
     clk_fie = clk_fnxm = 0;
 else clk_fie = clk_fnxm = 1;                            /* no, BEVENT */

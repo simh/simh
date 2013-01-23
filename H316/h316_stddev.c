@@ -881,6 +881,7 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 CLR_INT (INT_CLK);                                      /* clear ready, enb */
 CLR_ENB (INT_CLK);
 sim_cancel (&clk_unit);                                 /* deactivate unit */

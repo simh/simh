@@ -419,6 +419,7 @@ return SCPE_OK;
 
 t_stat rtc_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&rtc_unit);                    /* declare clock unit */
 dev_done = dev_done & ~INT_RTC;                         /* clear ready */
 sim_cancel (&rtc_unit);                                 /* stop clock */
 return SCPE_OK;

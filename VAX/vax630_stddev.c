@@ -348,6 +348,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 clk_csr = 0;
 CLR_INT (CLK);
 t = sim_rtcn_init (clk_unit.wait, TMR_CLK);             /* init timer */

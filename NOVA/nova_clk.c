@@ -153,6 +153,7 @@ return SCPE_OK;
 
 t_stat clk_reset (DEVICE *dptr)
 {
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 clk_sel = 0;
 DEV_CLR_BUSY( INT_CLK ) ;
 DEV_CLR_DONE( INT_CLK ) ;

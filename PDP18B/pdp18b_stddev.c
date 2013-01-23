@@ -483,6 +483,7 @@ t_stat clk_reset (DEVICE *dptr)
 {
 int32 t;
 
+sim_register_clock_unit (&clk_unit);                    /* declare clock unit */
 CLR_INT (CLK);                                          /* clear flag */
 if (!sim_is_running) {                                  /* RESET (not CAF)? */
     t = sim_rtc_init (clk_unit.wait);                   /* init calibration */
