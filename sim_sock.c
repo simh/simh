@@ -721,7 +721,7 @@ if (preferred->ai_family == AF_INET6) {
     sta = setsockopt (newsock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
     }
 #endif
-sta = bind (newsock, result->ai_addr, result->ai_addrlen);
+sta = bind (newsock, preferred->ai_addr, preferred->ai_addrlen);
 p_freeaddrinfo(result);
 if (sta == SOCKET_ERROR)                                /* bind error? */
     return sim_err_sock (newsock, "bind", 1);
