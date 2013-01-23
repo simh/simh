@@ -173,7 +173,39 @@ MTAB xu_mod[] = {
 };
 
 REG xua_reg[] = {
-	{ NULL }  };
+  { GRDATA ( SA0,     xua.mac[0],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA1,     xua.mac[1],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA2,     xua.mac[2],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA3,     xua.mac[3],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA4,     xua.mac[4],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA5,     xua.mac[5],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( TYPE,    xua.type,     XU_RDX, 32, 0), REG_FIT },
+  { FLDATA ( INT,     xua.irq, 0) },
+  { GRDATA ( IDTMR,   xua.idtmr,    XU_RDX, 32, 0), REG_HRO},
+  { BRDATA ( SETUP,   &xua.setup,   XU_RDX, 8, sizeof(xua.setup)), REG_HRO},
+  { BRDATA ( STATS,   &xua.stats,   XU_RDX, 8, sizeof(xua.stats)), REG_HRO},
+  { GRDATA ( CSR0,    xua.pcsr0,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR1,    xua.pcsr1,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR2,    xua.pcsr2,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR3,    xua.pcsr3,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( MODE,    xua.mode,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( PCBB,    xua.pcbb,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( STAT,    xua.stat,     XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( TDRB,    xua.tdrb,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( TELEN,   xua.telen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( TRLEN,   xua.trlen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( TXNEXT,  xua.txnext,   XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RDRB,    xua.rdrb,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RELEN,   xua.relen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RRLEN,   xua.rrlen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RXNEXT,  xua.rxnext,   XU_RDX, 32, 0), REG_FIT },
+  { BRDATA ( PCB,     xua.pcb,      XU_RDX, 16, 4), REG_HRO},
+  { BRDATA ( UDB,     xua.udb,      XU_RDX, 16, UDBSIZE), REG_HRO},
+  { BRDATA ( RXHDR,   xua.rxhdr,    XU_RDX, 16, 4), REG_HRO},
+  { BRDATA ( TXHDR,   xua.txhdr,    XU_RDX, 16, 4), REG_HRO},
+  { GRDATA ( BA,      xua_dib.ba,   XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( VECTOR,  xua_dib.vec,  XU_RDX, 32, 0), REG_HRO},
+  { NULL }  };
 
 DEBTAB xu_debug[] = {
   {"TRACE",  DBG_TRC},
@@ -212,7 +244,39 @@ struct xu_device    xub = {
   };
 
 REG xub_reg[] = {
-	{ NULL }  };
+  { GRDATA ( SA0,     xub.mac[0],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA1,     xub.mac[1],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA2,     xub.mac[2],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA3,     xub.mac[3],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA4,     xub.mac[4],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( SA5,     xub.mac[5],       16,  8, 0), REG_RO|REG_FIT},
+  { GRDATA ( TYPE,    xub.type,     XU_RDX, 32, 0), REG_FIT },
+  { FLDATA ( INT,     xub.irq, 0) },
+  { GRDATA ( IDTMR,   xub.idtmr,    XU_RDX, 32, 0), REG_HRO},
+  { BRDATA ( SETUP,   &xub.setup,   XU_RDX, 8, sizeof(xua.setup)), REG_HRO},
+  { BRDATA ( STATS,   &xub.stats,   XU_RDX, 8, sizeof(xua.stats)), REG_HRO},
+  { GRDATA ( CSR0,    xub.pcsr0,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR1,    xub.pcsr1,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR2,    xub.pcsr2,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( CSR3,    xub.pcsr3,    XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( MODE,    xub.mode,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( PCBB,    xub.pcbb,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( STAT,    xub.stat,     XU_RDX, 16, 0), REG_FIT },
+  { GRDATA ( TDRB,    xub.tdrb,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( TELEN,   xub.telen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( TRLEN,   xub.trlen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( TXNEXT,  xub.txnext,   XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RDRB,    xub.rdrb,     XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RELEN,   xub.relen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RRLEN,   xub.rrlen,    XU_RDX, 32, 0), REG_FIT },
+  { GRDATA ( RXNEXT,  xub.rxnext,   XU_RDX, 32, 0), REG_FIT },
+  { BRDATA ( PCB,     xub.pcb,      XU_RDX, 16, 4), REG_HRO},
+  { BRDATA ( UDB,     xub.udb,      XU_RDX, 16, UDBSIZE), REG_HRO},
+  { BRDATA ( RXHDR,   xub.rxhdr,    XU_RDX, 16, 4), REG_HRO},
+  { BRDATA ( TXHDR,   xub.txhdr,    XU_RDX, 16, 4), REG_HRO},
+  { GRDATA ( BA,      xub_dib.ba,   XU_RDX, 32, 0), REG_HRO},
+  { GRDATA ( VECTOR,  xub_dib.vec,  XU_RDX, 32, 0), REG_HRO},
+  { NULL }  };
 
 DEVICE xub_dev = {
   "XUB", xub_unit, xub_reg, xu_mod,
@@ -795,6 +859,7 @@ int32 xu_command(CTLR* xu)
       /* get multicast list from host */
       rstatus = Map_ReadB(udbb, mtlen * 6, (uint8*) &xu->var->setup.macs[2]);
       if (rstatus == 0) {
+        xu->var->setup.valid = 1;
         xu->var->setup.mac_count = mtlen + 2;
         eth_filter (xu->var->etherface, xu->var->setup.mac_count,
                     xu->var->setup.macs, xu->var->setup.multicast,
@@ -1593,15 +1658,34 @@ t_stat xu_attach(UNIT* uptr, char* cptr)
     if (sim_log) fprintf (sim_log, "%s: MAC Address Conflict on LAN for address %s\n", xu->dev->name, buf);
     eth_close(xu->var->etherface);
     free(tptr);
-    xu->var->etherface = 0;
+    free(xu->var->etherface);
+    xu->var->etherface = NULL;
     return SCPE_NOATT;
   }
   uptr->filename = tptr;
   uptr->flags |= UNIT_ATT;
   eth_setcrc(xu->var->etherface, 1); /* enable CRC */
 
-  /* reset the device with the new attach info */
-  xu_reset(xu->dev);
+  /* init read queue (first time only) */
+  status = ethq_init(&xu->var->ReadQ, XU_QUE_MAX);
+  if (status != SCPE_OK) {
+    eth_close(xu->var->etherface);
+    free(tptr);
+    free(xu->var->etherface);
+    xu->var->etherface = NULL;
+    return status;
+    }
+
+  if (xu->var->setup.valid) {
+    int i, count = 0;
+    ETH_MAC zeros = {0, 0, 0, 0, 0, 0};
+    ETH_MAC filters[XU_FILTER_MAX + 1];
+
+    for (i = 0; i < XU_FILTER_MAX; i++)
+      if (memcmp(zeros, &xu->var->setup.macs[i], sizeof(ETH_MAC)))
+        memcpy (filters[count++], xu->var->setup.macs[i], sizeof(ETH_MAC));
+    eth_filter (xu->var->etherface, count, filters, xu->var->setup.multicast, xu->var->setup.promiscuous);
+    }
 
   return SCPE_OK;
 }

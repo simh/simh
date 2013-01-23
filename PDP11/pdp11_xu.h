@@ -53,8 +53,8 @@ extern int32 int_req;
 
 #elif defined (VM_VAX)                                                  /* VAX version */
 #include "vax_defs.h"
-#define XU_RDX                     8
-#define XU_WID                    16
+#define XU_RDX                    16
+#define XU_WID                    32
 extern int32 int_req[IPL_HLVL];
 
 #else                                                                   /* PDP-11 version */
@@ -75,6 +75,7 @@ extern int32 int_req[IPL_HLVL];
 enum xu_type {XU_T_DEUNA, XU_T_DELUA};
 
 struct xu_setup {
+  int               valid;                              /* is the setup block valid? */
   int               promiscuous;                        /* promiscuous mode enabled */
   int               multicast;                          /* enable all multicast addresses */
   int               mac_count;                          /* number of multicast mac addresses */
@@ -129,7 +130,6 @@ struct xu_device {
   ETH_QUE           ReadQ;
   ETH_MAC           load_server;                        /* load server address */
   int               idtmr;                              /* countdown for ID Timer */
-  int               sectmr;                             /* countup for one second timer */
   struct xu_setup   setup;
   struct xu_stats   stats;                              /* reportable network statistics */
 
@@ -140,7 +140,7 @@ struct xu_device {
   uint16          pcsr3;
   uint32          mode;                                 /* mode register */
   uint32          pcbb;                                 /* port command block base */
-  uint32          stat;                                 /* extended port status */
+  uint16          stat;                                 /* extended port status */
 
   uint32          tdrb;                                 /* transmit desc ring base */
   uint32          telen;                                /* transmit desc ring entry len */
