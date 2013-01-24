@@ -1062,12 +1062,12 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
     (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
     return SCPE_ARG;
 if (incoming_bits) {
-    if (lp->sock)
+    if ((lp->sock) || (lp->serport))
         *incoming_bits = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
     else
-        *incoming_bits = lp->mp->master ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
+        *incoming_bits = (lp->mp && lp->mp->master) ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
     }
-if (lp->mp->modem_control) {                        /* This API ONLY works on modem_control enabled multiplexers */
+if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on modem_control enabled multiplexers */
     if (lp->serport)
         return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
     if (lp->sock) {

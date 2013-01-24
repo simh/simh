@@ -117,6 +117,7 @@
 #include <winsock2.h>
 #undef PACKED                       /* avoid macro name collision */
 #undef ERROR                        /* avoid macro name collision */
+#undef MEM_MAPPED                   /* avoid macro name collision */
 #endif
 
 #ifndef TRUE
