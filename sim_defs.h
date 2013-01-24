@@ -447,6 +447,14 @@ struct sim_unit {
 #define UNIT_TM_POLL    0000002         /* TMXR Polling unit */
 #define UNIT_NO_FIO     0000004         /* fileref is NOT a FILE * */
 
+struct sim_bitfield {
+    char            *name;                              /* field name */
+    uint32          offset;                             /* starting bit */
+    uint32          width;                              /* width */
+    const char      **valuenames;                       /* map of values to strings */
+    const char      *format;                            /* value format string */
+    };
+
 /* Register data structure */
 
 struct sim_reg {
@@ -457,6 +465,7 @@ struct sim_reg {
     uint32              offset;                         /* starting bit */
     uint32              depth;                          /* save depth */
     char                *desc;                          /* description */
+    struct sim_bitfield *fields;                        /* bit fields */
     uint32              flags;                          /* flags */
     uint32              qptr;                           /* circ q ptr */
     };
@@ -558,14 +567,6 @@ struct sim_debtab {
 #define SIM_DBG_ACTIVATE    0x20000
 #define SIM_DBG_AIO_QUEUE   0x40000
 
-struct sim_bitfield {
-    char            *name;                              /* field name */
-    uint32          offset;                             /* starting bit */
-    uint32          width;                              /* width */
-    const char      **valuenames;                       /* map of values to strings */
-    const char      *format;                            /* value format string */
-    };
-
 /* File Reference */
 struct sim_fileref {
     char                name[CBUFSIZE];                 /* file name */
@@ -578,22 +579,30 @@ struct sim_fileref {
 #define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0
 
 #if defined (__STDC__) || defined (_WIN32)
-#define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1, NULL
-#define DRDATA(nm,loc,wd) #nm, &(loc), 10, (wd), 0, 1, NULL
-#define HRDATA(nm,loc,wd) #nm, &(loc), 16, (wd), 0, 1, NULL
-#define FLDATA(nm,loc,pos) #nm, &(loc), 2, 1, (pos), 1, NULL
-#define GRDATA(nm,loc,rdx,wd,pos) #nm, &(loc), (rdx), (wd), (pos), 1, NULL
-#define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep), NULL
+#define ORDATA(nm,loc,wd) #nm, &(loc), 8, (wd), 0, 1, NULL, NULL
+#define DRDATA(nm,loc,wd) #nm, &(loc), 10, (wd), 0, 1, NULL, NULL
+#define HRDATA(nm,loc,wd) #nm, &(loc), 16, (wd), 0, 1, NULL, NULL
+#define FLDATA(nm,loc,pos) #nm, &(loc), 2, 1, (pos), 1, NULL, NULL
+#define GRDATA(nm,loc,rdx,wd,pos) #nm, &(loc), (rdx), (wd), (pos), 1, NULL, NULL
+#define BRDATA(nm,loc,rdx,wd,dep) #nm, (loc), (rdx), (wd), 0, (dep), NULL, NULL
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
-    #nm, &(loc), (rdx), (wd), (off), (dep), NULL, ((fl) | REG_UNIT)
-#define ORDATAD(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1, (desc)
-#define DRDATAD(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1, (desc)
-#define HRDATAD(nm,loc,wd,desc) #nm, &(loc), 16, (wd), 0, 1, (desc)
-#define FLDATAD(nm,loc,pos,desc) #nm, &(loc), 2, 1, (pos), 1, (desc)
-#define GRDATAD(nm,loc,rdx,wd,pos,desc) #nm, &(loc), (rdx), (wd), (pos), 1, (desc)
-#define BRDATAD(nm,loc,rdx,wd,dep,desc) #nm, (loc), (rdx), (wd), 0, (dep), (desc)
+    #nm, &(loc), (rdx), (wd), (off), (dep), NULL, NULL, ((fl) | REG_UNIT)
+#define ORDATAD(nm,loc,wd,desc) #nm, &(loc), 8, (wd), 0, 1, (desc), NULL
+#define DRDATAD(nm,loc,wd,desc) #nm, &(loc), 10, (wd), 0, 1, (desc), NULL
+#define HRDATAD(nm,loc,wd,desc) #nm, &(loc), 16, (wd), 0, 1, (desc), NULL
+#define FLDATAD(nm,loc,pos,desc) #nm, &(loc), 2, 1, (pos), 1, (desc), NULL
+#define GRDATAD(nm,loc,rdx,wd,pos,desc) #nm, &(loc), (rdx), (wd), (pos), 1, (desc), NULL
+#define BRDATAD(nm,loc,rdx,wd,dep,desc) #nm, (loc), (rdx), (wd), 0, (dep), (desc), NULL
 #define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
-    #nm, &(loc), (rdx), (wd), (off), (dep), (desc), ((fl) | REG_UNIT)
+    #nm, &(loc), (rdx), (wd), (off), (dep), (desc), NULL, ((fl) | REG_UNIT)
+#define ORDATADF(nm,loc,wd,desc,flds) #nm, &(loc), 8, (wd), 0, 1, (desc), (flds)
+#define DRDATADF(nm,loc,wd,desc,flds) #nm, &(loc), 10, (wd), 0, 1, (desc), (flds)
+#define HRDATADF(nm,loc,wd,desc,flds) #nm, &(loc), 16, (wd), 0, 1, (desc), (flds)
+#define FLDATADF(nm,loc,pos,desc,flds) #nm, &(loc), 2, 1, (pos), 1, (desc), (flds)
+#define GRDATADF(nm,loc,rdx,wd,pos,desc,flds) #nm, &(loc), (rdx), (wd), (pos), 1, (desc), (flds)
+#define BRDATADF(nm,loc,rdx,wd,dep,desc,flds) #nm, (loc), (rdx), (wd), 0, (dep), (desc), (flds)
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds) \
+    #nm, &(loc), (rdx), (wd), (off), (dep), (desc), (flds), ((fl) | REG_UNIT)
 #define BIT(nm)              {#nm, 0xffffffff, 1}             /* Single Bit definition */
 #define BITNC                {"",  0xffffffff, 1}             /* Don't care Bit definition */
 #define BITF(nm,sz)          {#nm, 0xffffffff, sz}            /* Bit Field definition */
@@ -601,22 +610,30 @@ struct sim_fileref {
 #define BITFFMT(nm,sz,fmt)   {#nm, 0xffffffff, sz, NULL, #fmt}/* Bit Field definition with Output format */
 #define BITFNAM(nm,sz,names) {#nm, 0xffffffff, sz, names}     /* Bit Field definition with value->name map */
 #else
-#define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1, NULL
-#define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1, NULL
-#define HRDATA(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1, NULL
-#define FLDATA(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1, NULL
-#define GRDATA(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1, NULL
-#define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep), NULL
+#define ORDATA(nm,loc,wd) "nm", &(loc), 8, (wd), 0, 1, NULL, NULL
+#define DRDATA(nm,loc,wd) "nm", &(loc), 10, (wd), 0, 1, NULL, NULL
+#define HRDATA(nm,loc,wd) "nm", &(loc), 16, (wd), 0, 1, NULL, NULL
+#define FLDATA(nm,loc,pos) "nm", &(loc), 2, 1, (pos), 1, NULL, NULL
+#define GRDATA(nm,loc,rdx,wd,pos) "nm", &(loc), (rdx), (wd), (pos), 1, NULL, NULL
+#define BRDATA(nm,loc,rdx,wd,dep) "nm", (loc), (rdx), (wd), 0, (dep), NULL, NULL
 #define URDATA(nm,loc,rdx,wd,off,dep,fl) \
-    "nm", &(loc), (rdx), (wd), (off), (dep), NULL, ((fl) | REG_UNIT)
-#define ORDATAD(nm,loc,wd,desc) "nm", &(loc), 8, (wd), 0, 1, (desc)
-#define DRDATAD(nm,loc,wd,desc) "nm", &(loc), 10, (wd), 0, 1, (desc)
-#define HRDATAD(nm,loc,wd,desc) "nm", &(loc), 16, (wd), 0, 1, (desc)
-#define FLDATAD(nm,loc,pos,desc) "nm", &(loc), 2, 1, (pos), 1, (desc)
-#define GRDATAD(nm,loc,rdx,wd,pos,desc) "nm", &(loc), (rdx), (wd), (pos), 1, (desc)
-#define BRDATAD(nm,loc,rdx,wd,dep,desc) "nm", (loc), (rdx), (wd), 0, (dep), (desc)
+    "nm", &(loc), (rdx), (wd), (off), (dep), NULL, NULL, ((fl) | REG_UNIT)
+#define ORDATAD(nm,loc,wd,desc) "nm", &(loc), 8, (wd), 0, 1, (desc), NULL
+#define DRDATAD(nm,loc,wd,desc) "nm", &(loc), 10, (wd), 0, 1, (desc), NULL
+#define HRDATAD(nm,loc,wd,desc) "nm", &(loc), 16, (wd), 0, 1, (desc), NULL
+#define FLDATAD(nm,loc,pos,desc) "nm", &(loc), 2, 1, (pos), 1, (desc), NULL
+#define GRDATAD(nm,loc,rdx,wd,pos,desc) "nm", &(loc), (rdx), (wd), (pos), 1, (desc), NULL
+#define BRDATAD(nm,loc,rdx,wd,dep,desc) "nm", (loc), (rdx), (wd), 0, (dep), (desc), NULL
 #define URDATAD(nm,loc,rdx,wd,off,dep,fl,desc) \
-    "nm", &(loc), (rdx), (wd), (off), (dep), (desc), ((fl) | REG_UNIT)
+    "nm", &(loc), (rdx), (wd), (off), (dep), (desc), NULL, ((fl) | REG_UNIT)
+#define ORDATADF(nm,loc,wd,desc,flds) "nm", &(loc), 8, (wd), 0, 1, (desc), (flds)
+#define DRDATADF(nm,loc,wd,desc,flds) "nm", &(loc), 10, (wd), 0, 1, (desc), (flds)
+#define HRDATADF(nm,loc,wd,desc,flds) "nm", &(loc), 16, (wd), 0, 1, (desc), (flds)
+#define FLDATADF(nm,loc,pos,desc,flds) "nm", &(loc), 2, 1, (pos), 1, (desc), (flds)
+#define GRDATADF(nm,loc,rdx,wd,pos,desc,flds) "nm", &(loc), (rdx), (wd), (pos), 1, (desc), (flds)
+#define BRDATADF(nm,loc,rdx,wd,dep,desc,flds) "nm", (loc), (rdx), (wd), 0, (dep), (desc), (flds)
+#define URDATADF(nm,loc,rdx,wd,off,dep,fl,desc,flds) \
+    "nm", &(loc), (rdx), (wd), (off), (dep), (desc), (flds), ((fl) | REG_UNIT)
 #define BIT(nm)              {"nm", 0xffffffff, 1}              /* Single Bit definition */
 #define BITNC                {"",   0xffffffff, 1}              /* Don't care Bit definition */
 #define BITF(nm,sz)          {"nm", 0xffffffff, sz}             /* Bit Field definition */

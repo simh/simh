@@ -114,6 +114,21 @@ extern int32 int_req[IPL_HLVL];
 #define CSR_GETTL(x)    (((x) >> CSR_V_TLINE) & DZ_LNOMASK)
 #define CSR_PUTTL(x,y)  x = ((x) & ~CSR_TLINE) | (((y) & DZ_LNOMASK) << CSR_V_TLINE)
 
+BITFIELD dz_csr_bits[] = {
+  BITNCF(3),                                /* not used */
+  BIT(MAINT),                               /* Maint */
+  BIT(MSE),                                 /* naster scan enable */
+  BIT(RIE),                                 /* receive interrupt enable */
+  BIT(RDONE),                               /* receive done */
+  BITF(TLINE,3),                            /* transmit line */
+  BITNCF(1),                                /* not used */
+  BIT(SAE),                                 /* silo alarm enable */
+  BIT(SA),                                  /* silo alarm */
+  BIT(TIE),                                 /* transmit interrupt enable */
+  BIT(TRDY),                                /* transmit ready */
+  ENDBITS
+};
+
 /* DZRBUF - 160102 - receive buffer, read only */
 
 #define RBUF_CHAR       0000377                         /* rcv char */
@@ -123,6 +138,17 @@ extern int32 int_req[IPL_HLVL];
 #define RBUF_OVRE       0040000                         /* overrun err - NI */
 #define RBUF_VALID      0100000                         /* rcv valid */
 #define RBUF_MBZ        0004000
+
+BITFIELD dz_rbuf_bits[] = {
+  BITFFMT(RBUF,8,"%02X"),                   /* Received Character */
+  BITF(RLINE,3),                            /* receive line */
+  BITNCF(1),                                /* not used */
+  BIT(PARE),                                /* parity error */
+  BIT(FRME),                                /* frame error */
+  BIT(OVRE),                                /* overrun error */
+  BIT(VALID),                               /* receive valid */
+  ENDBITS
+};
 
 char *dz_charsizes[] = {"5", "6", "7", "8"};
 char *dz_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200", 
@@ -148,20 +174,50 @@ char *dz_stopbits[] = {"1", "2", "1", "1.5"};
 #define LPR_RCVE        0010000                         /* receive enb */
 #define LPR_GETLN(x)    (((x) >> LPR_V_LINE) & DZ_LNOMASK)
 
+BITFIELD dz_lpr_bits[] = {
+  BITF(LINE,3),                             /* line */
+  BITFNAM(CHARSIZE,2,dz_charsizes),         /* character size */
+  BIT(STOPBITS),                            /* stop bits code */
+  BIT(PARENB),                              /* parity error */
+  BIT(PARODD),                              /* frame error */
+  BITFNAM(SPEED,4,dz_baudrates),            /* speed code */
+  BITNCF(1),                                /* not used */
+  BIT(RCVE),                                /* receive enable */
+  ENDBITS
+};
+
 /* DZTCR - 160104 - transmission control register */
 
 #define TCR_V_XMTE      0                               /* xmit enables */
 #define TCR_V_DTR       8                               /* DTRs */
+
+BITFIELD dz_tcr_bits[] = {
+  BITFFMT(XMTE,8,%02X),                     /* Transmit enable */
+  BITFFMT(DTR, 8,%02X),                     /* Data Terminal Ready */
+  ENDBITS
+};
 
 /* DZMSR - 160106 - modem status register, read only */
 
 #define MSR_V_RI        0                               /* ring indicators */
 #define MSR_V_CD        8                               /* carrier detect */
 
+BITFIELD dz_msr_bits[] = {
+  BITFFMT(RI,8,%02X),                       /* ring indicators */
+  BITFFMT(CD,8,%02X),                       /* carrier detects */
+  ENDBITS
+};
+
 /* DZTDR - 160106 - transmit data, write only */
 
 #define TDR_CHAR        0000377                         /* xmit char */
 #define TDR_V_TBR       8                               /* xmit break - NI */
+
+BITFIELD dz_tdr_bits[] = {
+  BITFFMT(CHAR,8,%02X),                     /* ring indicators */
+  BITFFMT(TBR, 8,%02X),                     /* carrier detects */
+  ENDBITS
+};
 
 extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                                 /* calibrated delay */
@@ -239,19 +295,19 @@ DIB dz_dib = {
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };
 
 REG dz_reg[] = {
-    { BRDATAD (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register") },
-    { BRDATAD (RBUF,  dz_rbuf,  DEV_RDX, 16, MAX_DZ_MUXES, "receive buffer") },
-    { BRDATAD (LPR,   dz_lpr,   DEV_RDX, 16, MAX_DZ_MUXES, "line parameter register") },
-    { BRDATAD (TCR,   dz_tcr,   DEV_RDX, 16, MAX_DZ_MUXES, "transmission control register") },
-    { BRDATAD (MSR,   dz_msr,   DEV_RDX, 16, MAX_DZ_MUXES, "modem status register") },
-    { BRDATAD (TDR,   dz_tdr,   DEV_RDX, 16, MAX_DZ_MUXES, "transmit data register") },
-    { BRDATAD (SAENB, dz_sae,   DEV_RDX,  1, MAX_DZ_MUXES, "silo alarm enabled") },
-    { GRDATAD (RXINT, dz_rxi,   DEV_RDX, MAX_DZ_MUXES,  0, "receive interrupts") },
-    { GRDATAD (TXINT, dz_txi,   DEV_RDX, MAX_DZ_MUXES,  0, "transmit interrupts") },
-    { FLDATAD (MDMCTL, dz_mctl, 0,                         "modem control enabled") },
-    { FLDATAD (AUTODS, dz_auto, 0,                         "autodisconnect enabled") },
-    { GRDATA (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, dz_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { BRDATADF (CSR,   dz_csr,   DEV_RDX, 16, MAX_DZ_MUXES, "control/status register", dz_csr_bits) },
+    { BRDATADF (RBUF,  dz_rbuf,  DEV_RDX, 16, MAX_DZ_MUXES, "receive buffer",          dz_rbuf_bits) },
+    { BRDATADF (LPR,   dz_lpr,   DEV_RDX, 16, MAX_DZ_MUXES, "line parameter register", dz_lpr_bits) },
+    { BRDATADF (TCR,   dz_tcr,   DEV_RDX, 16, MAX_DZ_MUXES, "transmission control register", dz_tcr_bits) },
+    { BRDATADF (MSR,   dz_msr,   DEV_RDX, 16, MAX_DZ_MUXES, "modem status register",    dz_msr_bits) },
+    { BRDATADF (TDR,   dz_tdr,   DEV_RDX, 16, MAX_DZ_MUXES, "transmit data register",   dz_tdr_bits) },
+    { BRDATAD  (SAENB, dz_sae,   DEV_RDX,  1, MAX_DZ_MUXES, "silo alarm enabled") },
+    { GRDATAD  (RXINT, dz_rxi,   DEV_RDX, MAX_DZ_MUXES,  0, "receive interrupts") },
+    { GRDATAD  (TXINT, dz_txi,   DEV_RDX, MAX_DZ_MUXES,  0, "transmit interrupts") },
+    { FLDATAD  (MDMCTL, dz_mctl, 0,                         "modem control enabled") },
+    { FLDATAD  (AUTODS, dz_auto, 0,                         "autodisconnect enabled") },
+    { GRDATA   (DEVADDR, dz_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA   (DEVVEC, dz_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -337,7 +393,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
 
     case 03:                                            /* MSR */
-        for (i=0; i<DZ_LINES; ++i) {                /* Gather line status bits for each line */
+        for (i=0; i<DZ_LINES; ++i) {                    /* Gather line status bits for each line */
             int line;
             int32 modem_bits;
             TMLN *lp;

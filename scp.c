@@ -429,6 +429,7 @@ t_stat exdep_addr_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
 t_stat ex_addr (FILE *ofile, int32 flag, t_addr addr, DEVICE *dptr, UNIT *uptr);
 t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
+void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs);
 t_stat step_svc (UNIT *ptr);
 void sub_args (char *instr, size_t instr_size, char *do_arg[]);
 t_stat shift_args (char *do_arg[], size_t arg_count);
@@ -4141,6 +4142,8 @@ return;
         addr[:addr|-addr]               address range
         ALL                             all addresses
         register[:register|-register]   register range
+        register[index]                 register array element
+        register[start:end]             register array range
         STATE                           all registers
 */
 
@@ -4359,8 +4362,13 @@ GET_RADIX (rdx, rptr->radix);
 if ((rptr->flags & REG_VMAD) && sim_vm_fprint_addr)
     sim_vm_fprint_addr (ofile, sim_dflt_dev, (t_addr) val);
 else if (!(rptr->flags & REG_VMIO) ||
-    (fprint_sym (ofile, rdx, &val, NULL, sim_switches | SIM_SW_REG) > 0))
+    (fprint_sym (ofile, rdx, &val, NULL, sim_switches | SIM_SW_REG) > 0)) {
         fprint_val (ofile, val, rdx, rptr->width, rptr->flags & REG_FMT);
+        if (rptr->fields) {
+            fprintf (ofile, "\t");
+            fprint_fields (ofile, val, val, rptr->fields);
+            }
+        }
 if (flag & EX_I)
     fprintf (ofile, "\t");
 else fprintf (ofile, "\n");
@@ -6272,6 +6280,47 @@ if (!debug_unterm) {
     }
 }
 
+void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs)
+{
+int32 i, fields, offset;
+uint32 value, beforevalue, mask;
+
+for (fields=offset=0; bitdefs[fields].name; ++fields) {
+    if (bitdefs[fields].offset == 0xffffffff)       /* fixup uninitialized offsets */
+        bitdefs[fields].offset = offset;
+    offset += bitdefs[fields].width;
+    }
+for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition */
+    if (bitdefs[i].name[0] == '\0')
+        continue;
+    if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
+        int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> bitdefs[i].offset) & 1) * 2;
+        fprintf(stream, "%s%c ", bitdefs[i].name, debug_bstates[off]);
+        }
+    else {
+        char *delta = "";
+
+        mask = 0xFFFFFFFF >> (32-bitdefs[i].width);
+        value = (uint32)((after >> bitdefs[i].offset) & mask);
+        beforevalue = (uint32)((before >> bitdefs[i].offset) & mask);
+        if (value < beforevalue)
+            delta = "_";
+        if (value > beforevalue)
+            delta = "^";
+        if (bitdefs[i].valuenames)
+            fprintf(stream, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
+        else
+            if (bitdefs[i].format) {
+                fprintf(stream, "%s=%s", bitdefs[i].name, delta);
+                fprintf(stream, bitdefs[i].format, value);
+                fprintf(stream, " ");
+                }
+            else
+                fprintf(stream, "%s=%s0x%X ", bitdefs[i].name, delta, value);
+        }
+    }
+}
+
 /* Prints state of a register: bit translation + state (0,1,_,^)
    indicating the state and transition of the bit and bitfields. States:
    0=steady(0->0), 1=steady(1->1), _=falling(1->0), ^=rising(0->1) */
@@ -6280,43 +6329,8 @@ void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && (dptr->dctrl & dbits)) {
-    int32 i, fields, offset;
-    uint32 value, beforevalue, mask;
-
-    for (fields=offset=0; bitdefs[fields].name; ++fields) {
-        if (bitdefs[fields].offset == 0xffffffff)       /* fixup uninitialized offsets */
-            bitdefs[fields].offset = offset;
-        offset += bitdefs[fields].width;
-        }
     sim_debug_prefix(dbits, dptr);                      /* print prefix if required */
-    for (i = fields-1; i >= 0; i--) {                   /* print xlation, transition */
-        if (bitdefs[i].name[0] == '\0')
-            continue;
-        if ((bitdefs[i].width == 1) && (bitdefs[i].valuenames == NULL)) {
-            int off = ((after >> bitdefs[i].offset) & 1) + (((before ^ after) >> bitdefs[i].offset) & 1) * 2;
-            fprintf(sim_deb, "%s%c ", bitdefs[i].name, debug_bstates[off]);
-            }
-        else {
-            char *delta = "";
-
-            mask = 0xFFFFFFFF >> (32-bitdefs[i].width);
-            value = ((after >> bitdefs[i].offset) & mask);
-            beforevalue = ((before >> bitdefs[i].offset) & mask);
-            if (value < beforevalue)
-                delta = "_";
-            if (value > beforevalue)
-                delta = "^";
-            if (bitdefs[i].valuenames)
-                fprintf(sim_deb, "%s=%s%s ", bitdefs[i].name, delta, bitdefs[i].valuenames[value]);
-            else
-                if (bitdefs[i].format) {
-                    fprintf(sim_deb, "%s=%s", bitdefs[i].name, delta);
-                    fprintf(sim_deb, bitdefs[i].format, value);
-                    }
-                else
-                    fprintf(sim_deb, "%s=%s0x%X ", bitdefs[i].name, delta, value);
-            }
-        }
+    fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs); /* print xlation, transition */
     if (terminate)
         fprintf(sim_deb, "\r\n");
     debug_unterm = terminate ? 0 : 1;                   /* set unterm for next */
