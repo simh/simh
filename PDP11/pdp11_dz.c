@@ -337,20 +337,19 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
 
     case 03:                                            /* MSR */
-        if (dz_mctl)
-            for (i=0; i<DZ_LINES; ++i) {                /* Gather line status bits for each line */
-                int line;
-                int32 modem_bits;
-                TMLN *lp;
-                
-                line = (dz * DZ_LINES) + i;
-                lp = &dz_ldsc[line];                    /* get line desc */
-                tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
+        for (i=0; i<DZ_LINES; ++i) {                /* Gather line status bits for each line */
+            int line;
+            int32 modem_bits;
+            TMLN *lp;
+            
+            line = (dz * DZ_LINES) + i;
+            lp = &dz_ldsc[line];                    /* get line desc */
+            tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
 
-                dz_msr[dz] &= ~((1 << (MSR_V_RI + i)) | (1 << (MSR_V_CD + i)));
-                dz_msr[dz] |= ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0) | 
-                              ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0);
-                }
+            dz_msr[dz] &= ~((1 << (MSR_V_RI + i)) | (1 << (MSR_V_CD + i)));
+            dz_msr[dz] |= ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0) | 
+                          ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0);
+            }
         *data = dz_msr[dz];
         break;
         }

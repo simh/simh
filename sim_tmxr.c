@@ -1053,29 +1053,30 @@ return SCPE_OK;
 */
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
-t_stat r = SCPE_OK;
-
 tmxr_debug_trace_line (lp, "tmxr_set_get_modem_bits()");
 
-if (!lp->mp->modem_control)                         /* This API ONLY works on modem_control enabled multiplexers */
-    return SCPE_IERR;
 if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits */
     (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
     (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
     return SCPE_ARG;
-if (lp->serport)
-    return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
-if (lp->sock) {
-    if (bits_to_clear&TMXR_MDM_DTR)                 /* drop DTR? */
-        tmxr_reset_ln (lp);
-    }
 if (incoming_bits) {
     if (lp->sock)
         *incoming_bits = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
     else
         *incoming_bits = lp->mp->master ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
     }
-return r;
+if (lp->mp->modem_control) {                        /* This API ONLY works on modem_control enabled multiplexers */
+    if (lp->serport)
+        return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
+    if (lp->sock) {
+        if (bits_to_clear&TMXR_MDM_DTR)             /* drop DTR? */
+            tmxr_reset_ln (lp);
+        }
+    return SCPE_OK;
+    }
+if (lp->serport)
+    sim_control_serial (lp->serport, 0, 0, incoming_bits);
+return SCPE_IERR;
 }
 
 t_stat tmxr_set_config_line (TMLN *lp, char *config)
