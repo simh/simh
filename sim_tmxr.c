@@ -908,6 +908,8 @@ return -1;                                              /* no new connections ma
 static t_stat tmxr_reset_ln_ex (TMLN *lp, t_bool closeserial)
 {
 tmxr_debug_trace_line (lp, "tmxr_reset_ln_ex)");
+
+if (lp->txlog)
     fflush (lp->txlog);                                 /* flush log */
 
 tmxr_send_buffered_data (lp);                           /* send any buffered data */
@@ -922,8 +924,7 @@ if (lp->serport) {
         free (lp->serconfig);
         lp->serconfig = NULL;
         lp->cnms = 0;
-        lp->conn = FALSE;
-        lp->rcve = lp->xmte = 0;
+        lp->xmte = 1;
         }
     else
         if (!lp->mp->modem_control) {                   /* serial connection? */
@@ -937,7 +938,8 @@ else                                                    /* Telnet connection */
         sim_close_sock (lp->sock, 0);                   /* close socket */
         lp->sock = 0;
         lp->conn = FALSE;
-        lp->rcve = lp->xmte = 0;
+        lp->cnms = 0;
+        lp->xmte = 1;
         }
 free(lp->ipad);
 lp->ipad = NULL;
