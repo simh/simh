@@ -1044,10 +1044,15 @@ size_t max_namelen = 0;
 DEVICE *tdptr;
 char *tptr;
 char *namebuf;
+char rangebuf[32];
 
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
-    if (max_namelen < (strlen(rptr->name) + ((rptr->depth > 1) ? 5 : 0)))
-        max_namelen = strlen(rptr->name) + ((rptr->depth > 1) ? 5 : 0);
+    if (rptr->depth > 1)
+        sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
+    else
+        strcpy (rangebuf, "");
+    if (max_namelen < (strlen(rptr->name) + strlen (rangebuf)))
+        max_namelen = strlen(rptr->name) + strlen (rangebuf);
     if (rptr->desc) {
         found = TRUE;
         trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
@@ -1064,17 +1069,19 @@ else {
         if (rptr->desc) {
             if (rptr->depth <= 1)
                 sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
-            else
-                sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), "[ALL]");
+            else {
+                sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
+                sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), rangebuf);
+                }
             if (all_unique) {
-                fprintf (st, "  %s  %s\n", namebuf, rptr->desc);
+                fprintf (st, "  %s %4d  %s\n", namebuf, rptr->width, rptr->desc);
                 continue;
                 }
             trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
             if ((trptr == NULL) || (tdptr != dptr))
-                fprintf (st, "  %s %s  %s\n", dptr->name, namebuf, rptr->desc);
+                fprintf (st, "  %s %s %4d  %s\n", dptr->name, namebuf, rptr->width, rptr->desc);
             else
-                fprintf (st, "  %*s %s  %s\n", (int)strlen(dptr->name), "", namebuf, rptr->desc);
+                fprintf (st, "  %*s %s %4d  %s\n", (int)strlen(dptr->name), "", namebuf, rptr->width, rptr->desc);
             }
         }
     free (namebuf);
