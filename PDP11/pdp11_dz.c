@@ -150,11 +150,11 @@ BITFIELD dz_rbuf_bits[] = {
   ENDBITS
 };
 
-char *dz_charsizes[] = {"5", "6", "7", "8"};
-char *dz_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200", 
+const char *dz_charsizes[] = {"5", "6", "7", "8"};
+const char *dz_baudrates[] = {"50", "75", "110", "134.5", "150", "300", "600", "1200", 
                         "1800", "2000", "2400", "3600", "4800", "7200", "9600", "19200"};
-char *dz_parity[] = {"N", "E", "N", "O"};
-char *dz_stopbits[] = {"1", "2", "1", "1.5"};
+const char *dz_parity[] = {"N", "E", "N", "O"};
+const char *dz_stopbits[] = {"1", "2", "1", "1.5"};
 
 /* DZLPR - 160102 - line parameter register, write only, word access only */
 
