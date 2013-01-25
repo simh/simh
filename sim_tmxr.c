@@ -1055,24 +1055,36 @@ return SCPE_OK;
 */
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
+int32 changed_modem_bits;
+
 tmxr_debug_trace_line (lp, "tmxr_set_get_modem_bits()");
 
 if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits */
     (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
     (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
     return SCPE_ARG;
+changed_modem_bits = lp->modembits;
+lp->modembits |= bits_to_set;
+lp->modembits &= bits_to_clear;
+changed_modem_bits ^= lp->modembits;
 if (incoming_bits) {
-    if ((lp->sock) || (lp->serport))
-        *incoming_bits = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
+    if ((lp->sock) || (lp->serport)) {
+        if (lp->modembits & TMXR_MDM_DTR)
+            *incoming_bits = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
+        else
+            *incoming_bits = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
+        }
     else
         *incoming_bits = (lp->mp && lp->mp->master) ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
     }
 if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on modem_control enabled multiplexers */
-    if (lp->serport)
-        return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
-    if (lp->sock) {
-        if (bits_to_clear&TMXR_MDM_DTR)             /* drop DTR? */
-            tmxr_reset_ln (lp);
+    if (bits_to_set | bits_to_clear) {              /* Anything to do? */
+        if (lp->serport)
+            return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
+        if (lp->sock) {
+            if (bits_to_clear&TMXR_MDM_DTR)             /* drop DTR? */
+                tmxr_reset_ln (lp);
+            }
         }
     return SCPE_OK;
     }
@@ -2675,6 +2687,7 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
         free (lp->port);
         lp->port = NULL;
         }
+    lp->modembits = 0;
     }
 
 if (mp->master)

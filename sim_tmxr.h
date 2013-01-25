@@ -115,6 +115,7 @@ struct tmln {
     int32               txdrp;                          /* xmt drop count */
     int32               txbsz;                          /* xmt buffer size */
     int32               txbfd;                          /* xmt buffered flag */
+    int32               modembits;                      /* modem bits which are currently set */
     FILE                *txlog;                         /* xmt log file */
     FILEREF             *txlogref;                      /* xmt log file reference */
     char                *txlogname;                     /* xmt log file name */
