@@ -798,6 +798,7 @@ t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *rq_description (DEVICE *dptr);
 
 t_bool rq_step4 (MSC *cp);
 t_bool rq_mscp (MSC *cp, int32 pkt, t_bool q);
@@ -1009,7 +1010,8 @@ DEVICE rq_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug
+    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    &rq_description
     };
 
 /* RQB data structures
@@ -1083,7 +1085,8 @@ DEVICE rqb_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug
+    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    &rq_description
     };
 
 /* RQC data structures
@@ -1157,7 +1160,8 @@ DEVICE rqc_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug
+    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    &rq_description
     };
 
 /* RQD data structures
@@ -1231,7 +1235,8 @@ DEVICE rqd_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug
+    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    &rq_description
     };
 
 static DEVICE *rq_devmap[RQ_NUMCT] = {
@@ -3073,4 +3078,12 @@ if (val & RQ_SH_UN) {
         rq_show_unitq (st, dptr->units + i, 0, desc);
     }
 return SCPE_OK;
+}
+
+char *rq_description (DEVICE *dptr)
+{
+static char buf[80];
+
+sprintf (buf, "%s MSCP disk controller", ctlr_tab[rq_ctxmap[dptr->units->cnum]->ctype].name);
+return buf;
 }

@@ -88,6 +88,7 @@ uint32 rom_lw[MCTL_NUM][ROMSIZE >> 2];
 extern UNIT cpu_unit;
 
 t_stat mctl_reset (DEVICE *dptr);
+char *mctl_description (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
 
@@ -141,14 +142,18 @@ DEVICE mctl_dev[] = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
-    &mctl0_dib, DEV_NEXUS
+    &mctl0_dib, DEV_NEXUS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    &mctl_description
     },
     {
     "MCTL1", &mctl1_unit, mctl1_reg, mctl1_mod,
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
-    &mctl1_dib, DEV_NEXUS
+    &mctl1_dib, DEV_NEXUS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    &mctl_description
     }
     };
 
@@ -275,4 +280,12 @@ for (i = 0; i < MCTL_NUM; i++) {                        /* init for MS780C */
     mcr_d[i] = 0;
     }
 return SCPE_OK;
+}
+
+char *mctl_description (DEVICE *dptr)
+{
+static char buf[64];
+
+sprintf (buf, "Memory controller %d", (int)(dptr-mctl_dev));
+return buf;
 }

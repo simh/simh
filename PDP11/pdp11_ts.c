@@ -296,6 +296,7 @@ int32 ts_updxs0 (int32 t);
 void ts_cmpendcmd (int32 s0, int32 s1);
 void ts_endcmd (int32 ssf, int32 xs0f, int32 msg);
 int32 ts_map_status (t_stat st);
+char *ts_description (DEVICE *dptr);
 
 /* TS data structures
 
@@ -365,7 +366,9 @@ DEVICE ts_dev = {
     1, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
-    &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE
+    &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    &ts_description
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772522
@@ -1171,3 +1174,9 @@ t_stat ts_boot (int32 unitno, DEVICE *dptr)
 return SCPE_NOFNC;
 }
 #endif
+
+char *ts_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "TS11 magnetic tape controller" :
+                  "TSV11/TSV05 magnetic tape controller ";
+}

@@ -40,6 +40,7 @@ extern jmp_buf save_env;
 
 int32 eval_int (void);
 t_stat qba_reset (DEVICE *dptr);
+char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -74,7 +75,8 @@ DEVICE qba_dev = {
     1, 16, 4, 2, 16, 16,
     NULL, NULL, &qba_reset,
     NULL, NULL, NULL,
-    NULL, DEV_QBUS
+    NULL, DEV_QBUS, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &qba_description
     };
 
 /* IO page dispatches */
@@ -244,6 +246,11 @@ int32 i;
 for (i = 0; i < IPL_HLVL; i++)
     int_req[i] = 0;
 return SCPE_OK;
+}
+
+char *qba_description (DEVICE *dptr)
+{
+return "Qbus adapter";
 }
 
 /* Qbus I/O buffer routines, aligned access

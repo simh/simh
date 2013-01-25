@@ -43,6 +43,7 @@ int32 mctl_count = 0;
 t_stat mctl_rd (int32 *data, int32 PA, int32 access);
 t_stat mctl_wr (int32 data, int32 PA, int32 access);
 t_stat mctl_reset (DEVICE *dptr);
+char *mctl_description (DEVICE *dptr);
 
 /* MCTL data structures
 
@@ -72,7 +73,8 @@ DEVICE mctl_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
-    &mctl_dib, DEV_Q18
+    &mctl_dib, DEV_Q18, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &mctl_description
     };
 
 /* I/O dispatch routines */
@@ -103,6 +105,11 @@ for (rg = 0; rg < MAX_MCTL_COUNT; rg++) {
     }
 mctl_count = (int32)(MEMSIZE >> 18);                    /* memory controllers enabled */
 return SCPE_OK;
+}
+
+char *mctl_description (DEVICE *dptr)
+{
+return "memory controller";
 }
 
 /* Used by CPU */

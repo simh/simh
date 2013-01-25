@@ -119,6 +119,9 @@ t_stat clk_reset (DEVICE *dptr);
 t_stat clk_attach (UNIT *uptr, char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat todr_resync (void);
+char *tti_description (DEVICE *dptr);
+char *tto_description (DEVICE *dptr);
+char *clk_description (DEVICE *dptr);
 
 extern int32 sysd_hlt_enb (void);
 extern int32 fault_PC;
@@ -159,7 +162,8 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    &tti_dib, 0
+    &tti_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tti_description
     };
 
 /* TTO data structures
@@ -198,7 +202,8 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    &tto_dib, 0
+    &tto_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tto_description
     };
 
 /* CLK data structures
@@ -239,7 +244,8 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    &clk_dib, 0
+    &clk_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &clk_description
     };
 
 /* Clock and terminal MxPR routines
@@ -350,6 +356,11 @@ sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
+char *tti_description (DEVICE *dptr)
+{
+return "console terminal input";
+}
+
 /* Terminal output routines
 
    tto_svc      process event (character typed)
@@ -382,6 +393,11 @@ tto_csr = CSR_DONE;
 CLR_INT (TTO);
 sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+char *tto_description (DEVICE *dptr)
+{
+return "console terminal output";
 }
 
 /* Clock routines
@@ -506,6 +522,11 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
     todr_resync ();
     }
 return SCPE_OK;
+}
+
+char *clk_description (DEVICE *dptr)
+{
+return "time of year clock";
 }
 
 /* CLK attach */

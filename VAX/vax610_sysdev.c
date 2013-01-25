@@ -68,6 +68,7 @@ static struct boot_dev boot_tab[] = {
     };
 
 t_stat sysd_reset (DEVICE *dptr);
+char *sysd_description (DEVICE *dptr);
 t_stat vax610_boot (int32 flag, char *ptr);
 t_stat vax610_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -108,7 +109,8 @@ DEVICE sysd_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sysd_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &sysd_description
     };
 
 /* Special boot command, overrides regular boot */
@@ -480,6 +482,11 @@ t_stat sysd_reset (DEVICE *dptr)
 {
 sim_vm_cmd = vax610_cmd;
 return SCPE_OK;
+}
+
+char *sysd_description (DEVICE *dptr)
+{
+return "system devices";
 }
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)

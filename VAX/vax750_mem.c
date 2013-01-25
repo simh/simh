@@ -84,6 +84,7 @@ uint32 mcsr1 = 0;
 uint32 mcsr2 = 0;
 
 t_stat mctl_reset (DEVICE *dptr);
+char *mctl_description (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
 
@@ -120,7 +121,8 @@ DEVICE mctl_dev = {
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
     &mctl_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mctl_deb, 0, 0
+    mctl_deb, NULL, NULL, NULL, NULL, NULL, 
+    &mctl_description
     };
 
 /* Memory controller register read */
@@ -203,4 +205,9 @@ if (MEMSIZE > MAXMEMSIZE)                               /* More than 2MB? */
 else
     mcsr2 = MCSR2_INIT | MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_16K);  /* Use 16k chips */
 return SCPE_OK;
+}
+
+char *mctl_description (DEVICE *dptr)
+{
+return "Memory controller";
 }

@@ -255,6 +255,7 @@ extern uint32 nexus_req[NEXUS_HLVL];
 extern UNIT cpu_unit;
 
 t_stat mba_reset (DEVICE *dptr);
+char *mba_description (DEVICE *dptr);
 t_stat mba_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mba_wrreg (int32 val, int32 pa, int32 lnt);
 t_bool mba_map_addr (uint32 va, uint32 *ma, uint32 mb);
@@ -340,7 +341,8 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba0_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mba_deb, 0, 0
+    mba_deb, NULL, NULL, NULL, NULL, NULL, 
+    &mba_description
     },
     {
     "MBA1", &mba1_unit, mba1_reg, mba1_mod,
@@ -348,7 +350,8 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba1_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mba_deb, 0, 0
+    mba_deb, NULL, NULL, NULL, NULL, NULL, 
+    &mba_description
     }
     };
 
@@ -851,6 +854,14 @@ if (sim_switches & SWMASK ('P')) {
 if (mbabort[mb])                                        /* reset device */
     mbabort[mb] ();
 return SCPE_OK;
+}
+
+char *mba_description (DEVICE *dptr)
+{
+static char buf[64];
+
+sprintf (buf, "Massbus adapter %d", (int)(dptr-mba_dev));
+return buf;
 }
 
 /* Show Massbus adapter number */

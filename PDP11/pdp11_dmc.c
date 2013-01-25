@@ -28,6 +28,7 @@
 
   Modification history:
 
+  23-Jan-13  RJ   Don't do anything if not attached. See https://github.com/simh/simh/issues/28
   23-Jan-13  RJ   Clock co-scheduling move to generic framework (from Mark Pizzolato)
   21-Jan-13  RJ   Added help.
   15-Jan-13  RJ   Contribution from Paul Koning:
@@ -220,7 +221,6 @@ t_stat dmc_wr(int32  data, int32 PA, int32 access);
 t_stat dmc_svc(UNIT * uptr);
 t_stat dmc_reset (DEVICE * dptr);
 t_stat dmc_attach (UNIT * uptr, char * cptr);
-int dmc_isattached(CTLR *controller);
 t_stat dmc_detach (UNIT * uptr);
 int32 dmc_rxint (void);
 int32 dmc_txint (void);
@@ -238,6 +238,9 @@ t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showlinemode (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *dmc_description (DEVICE *dptr);
+char *dmp_description (DEVICE *dptr);
+int dmc_is_attached(UNIT* uptr);
 int dmc_is_dmc(CTLR *controller);
 int dmc_is_rqi_set(CTLR *controller);
 int dmc_is_rdyi_set(CTLR *controller);
@@ -448,19 +451,19 @@ DEVICE dmc_dev[] =
     { "DMC0", &dmc0_unit, dmca_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
     &dmc0_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL },
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description },
     { "DMC1", &dmc1_unit, dmcb_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
     &dmc1_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL },
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description },
     { "DMC2", &dmc2_unit, dmcc_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
     &dmc2_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL },
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description },
     { "DMC3", &dmc3_unit, dmcd_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
     &dmc3_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL }
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description }
 };
 
 #ifdef DMP
@@ -469,7 +472,7 @@ DEVICE dmp_dev[] =
     { "DMP", &dmp_unit, dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
     NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
     &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL }
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmp_description }
 };
 #endif
 
@@ -519,6 +522,11 @@ void dmc_timer_resume(TIMER *t)
 double dmc_timer_cumulative_seconds(TIMER *t)
 {
     return (double)t->cumulative_time/CLOCKS_PER_SEC;
+}
+
+int dmc_is_attached(UNIT* uptr)
+{
+    return uptr->flags & UNIT_ATT;
 }
 
 int dmc_is_dmc(CTLR *controller)
@@ -589,7 +597,7 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc)
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
     if (!cptr) return SCPE_IERR;
-    if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+    if (dmc_is_attached(uptr)) return SCPE_ALATT;
     status = sim_parse_addr (cptr, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
     if (status != SCPE_OK)
         return status;
@@ -621,7 +629,7 @@ t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc)
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
     if (!cptr) return SCPE_IERR;
-    if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+    if (dmc_is_attached(uptr)) return SCPE_ALATT;
     if (sscanf(cptr, "%d", &controller->line->speed) != 1)
     {
         status = SCPE_ARG;
@@ -666,7 +674,7 @@ t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc)
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
     if (!cptr) return SCPE_IERR;
-    if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+    if (UNIT_ATT) return SCPE_ALATT;
     if (sscanf(cptr, "%s", buf) != 1)
     {
         status = SCPE_ARG;
@@ -780,7 +788,7 @@ t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc)
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
     if (!cptr) return SCPE_IERR;
-    if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+    if (dmc_is_attached(uptr)) return SCPE_ALATT;
 
     if (MATCH_CMD(cptr, "PRIMARY") == 0)
     {
@@ -1400,7 +1408,7 @@ t_stat dmc_svc(UNIT* uptr)
         dmc_timer_start(poll_timer);
     }
 
-    if (dmc_isattached(controller))
+    if (dmc_is_attached(controller->device->units))
     {
         dmc_line_update_speed_stats(controller->line);
 
@@ -2309,7 +2317,7 @@ t_stat dmc_wr(int32 data, int32 PA, int32 access)
         dmc_setreg(controller, PA, (oldValue & ~mask) | (data & mask), 1);
     }
 
-    if (dmc_getsel(reg) == 0 || dmc_getsel(reg) == 1)
+    if (dmc_is_attached(controller->device->units) && (dmc_getsel(reg) == 0 || dmc_getsel(reg) == 1))
     {
         dmc_process_command(controller);
     }
@@ -2393,11 +2401,6 @@ t_stat dmc_attach (UNIT *uptr, char *cptr)
     return ans;
 }
 
-int dmc_isattached(CTLR *controller)
-{
-    return controller->master_socket != INVALID_SOCKET;
-}
-
 t_stat dmc_detach (UNIT *uptr)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
@@ -2410,3 +2413,14 @@ t_stat dmc_detach (UNIT *uptr)
 
     return SCPE_OK;
 }
+
+char *dmc_description (DEVICE *dptr)
+    {
+    return "DMC11 Synchronous network controller";
+    }
+
+char *dmp_description (DEVICE *dptr)
+    {
+    return "DMP11 Synchronous network controller";
+    }
+

@@ -333,6 +333,8 @@ t_stat cr_set_reset (UNIT *, int32, char *, void *);
 t_stat cr_set_stop (UNIT *, int32, char *, void *);
 t_stat cr_set_trans (UNIT *, int32, char*, void *);
 t_stat cr_show_trans (FILE *, UNIT *, int32, void *);
+char *cr_description (DEVICE *dptr);
+
 
 /* CR data structures
 
@@ -408,7 +410,10 @@ DEVICE cr_dev = {
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &cr_reset,
     NULL, &cr_attach, &cr_detach,
-    &cr_dib, DEV_DISABLE | DFLT_DIS | DEV_UBUS | DEV_DEBUG };
+    &cr_dib, DEV_DISABLE | DFLT_DIS | DEV_UBUS | DEV_DEBUG, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &cr_description
+    };
 
 /* Utility routines */
 
@@ -1282,3 +1287,8 @@ t_stat cr_show_trans (  FILE    *st,
     fprintf (st, "translation %s", trans[table]);
     return (SCPE_OK);
 }
+
+char *cr_description (DEVICE *dptr)
+    {
+    return "CR11 card reader";
+    }

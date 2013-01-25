@@ -123,6 +123,7 @@ extern UNIT cpu_unit;
 
 void uba_eval_int (void);
 t_stat abus_reset (DEVICE *dptr);
+char *abus_description (DEVICE *dptr);
 t_stat vax860_boot (int32 flag, char *ptr);
 t_stat vax860_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -177,7 +178,8 @@ DEVICE abus_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &abus_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &abus_description
     };
 
 /* Special boot command, overrides regular boot */
@@ -681,6 +683,12 @@ t_stat abus_reset (DEVICE *dptr)
 sim_vm_cmd = vax860_cmd;
 return SCPE_OK;
 }
+
+char *abus_description (DEVICE *dptr)
+{
+return "bus controller";
+}
+
 
 /* Build dib_tab from device list */
 

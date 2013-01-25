@@ -566,6 +566,7 @@ void hk_cmderr (int32 err, int32 drv);
 void hk_go (int32 drv);
 t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+char *hk_description (DEVICE *dptr);
 
 /* HK data structures
 
@@ -677,7 +678,8 @@ DEVICE hk_dev = {
     NULL, NULL, &hk_reset,
     &hk_boot, &hk_attach, &hk_detach,
     &hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG, 0,
-    hk_deb, NULL, 0
+    hk_deb, NULL, NULL, NULL, NULL, NULL,
+    &hk_description
     };
 
 /* I/O dispatch routines, I/O addresses 17777440 - 17777476 */
@@ -1572,3 +1574,8 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+char *hk_description (DEVICE *dptr)
+{
+return "RK611/RK06(7) cartridge disk controller";
+}

@@ -260,6 +260,7 @@ t_stat rl_show_dstate (FILE *, UNIT *, int32, void *);
 t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc);
 #endif
 t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *rl_description (DEVICE *dptr);
 
 /* RL11 data structures
 
@@ -347,7 +348,9 @@ DEVICE rl_dev = {
     RL_NUMDR, DEV_RDX, 24, 1, DEV_RDX, 16,
     NULL, NULL, &rl_reset,
     &rl_boot, &rl_attach, &rl_detach,
-    &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG
+    &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &rl_description 
     };
 
 /* Drive states */
@@ -1208,3 +1211,10 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+char *rl_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "RL11/RL01(2) cartridge disk controller" :
+                  "RLV12/RL01(2) cartridge disk controller";
+}
+

@@ -138,6 +138,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 
 t_stat sbi_reset (DEVICE *dptr);
+char *sbi_description (DEVICE *dptr);
 void sbi_set_tmo (int32 pa);
 void uba_eval_int (void);
 t_stat vax780_boot (int32 flag, char *ptr);
@@ -195,7 +196,8 @@ DEVICE sbi_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sbi_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &sbi_description
     };
 
 /* Special boot command, overrides regular boot */
@@ -725,6 +727,11 @@ sbi_er = 0;
 sbi_tmo = 0;
 sim_vm_cmd = vax780_cmd;
 return SCPE_OK;
+}
+
+char *sbi_description (DEVICE *dptr)
+{
+return "Synchronous Backplane Interconnect";
 }
 
 /* Show nexus */

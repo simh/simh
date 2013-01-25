@@ -155,12 +155,15 @@ t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
 t_stat rom_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
+char *nvr_description (DEVICE *dptr);
 t_stat sysd_reset (DEVICE *dptr);
+char *sysd_description (DEVICE *dptr);
 
 int32 rom_rd (int32 pa);
 int32 nvr_rd (int32 pa);
@@ -216,7 +219,8 @@ DEVICE rom_dev = {
     1, 16, ROMAWIDTH, 4, 16, 32,
     &rom_ex, &rom_dep, &rom_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &rom_description
     };
 
 /* NVR data structures
@@ -238,7 +242,8 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &nvr_description
     };
 
 /* SYSD data structures
@@ -266,7 +271,8 @@ DEVICE sysd_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sysd_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &sysd_description
     };
 
 /* ROM: read only memory - stored in a buffered file
@@ -391,6 +397,11 @@ if (rom == NULL)
 return SCPE_OK;
 }
 
+char *rom_description (DEVICE *dptr)
+{
+return "read-only memory";
+}
+
 /* NVR: non-volatile RAM - stored in a buffered file */
 
 int32 nvr_rd (int32 pa)
@@ -486,6 +497,11 @@ if ((uptr->flags & UNIT_ATT) == 0) {
     wtc_set_invalid ();
     }
 return r;
+}
+
+char *nvr_description (DEVICE *dptr)
+{
+return "non-volatile memory";
 }
 
 /* Read KA630 specific IPR's */
@@ -873,6 +889,11 @@ ka_dear = 0;
 sim_vm_cmd = vax630_cmd;
 
 return SCPE_OK;
+}
+
+char *sysd_description (DEVICE *dptr)
+{
+return "system devices";
 }
 
 /* SYSD powerup */

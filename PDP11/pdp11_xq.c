@@ -296,6 +296,7 @@ void xq_setint (CTLR* xq);
 void xq_clrint (CTLR* xq);
 int32 xq_int (void);
 void xq_csr_set_clr(CTLR* xq, uint16 set_bits, uint16 clear_bits);
+char *xq_description (DEVICE *dptr);
 
 struct xq_device    xqa = {
   xqa_read_callback,                        /* read callback routine */
@@ -484,7 +485,8 @@ DEVICE xq_dev = {
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
-  0, xq_debug
+  0, xq_debug, NULL, NULL, NULL, NULL, NULL, 
+  &xq_description
 };
 
 DEVICE xqb_dev = {
@@ -493,7 +495,8 @@ DEVICE xqb_dev = {
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
-  0, xq_debug
+  0, xq_debug, NULL, NULL, NULL, NULL, NULL, 
+  &xq_description
 };
 
 CTLR xq_ctrl[] = {
@@ -2972,4 +2975,9 @@ void xq_debug_turbo_setup(CTLR* xq)
             xq->dev->name, xq->var->init.rdra_h, xq->var->init.rdra_l);
   sim_debug(DBG_SET, xq->dev, "%s: setup> set Transmit Ring Buffer Address: %02X%04X\n", 
             xq->dev->name, xq->var->init.tdra_h, xq->var->init.tdra_l);
+}
+
+char *xq_description (DEVICE *dptr)
+{
+return "DELQA/DEQNA Ethernet controller";
 }

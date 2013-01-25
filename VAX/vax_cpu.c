@@ -388,6 +388,7 @@ t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_show_virt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat cpu_set_idle (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *cpu_description (DEVICE *dptr);
 int32 cpu_get_vsw (int32 sw);
 SIM_INLINE int32 get_istr (int32 lnt, int32 acc);
 int32 ReadOcta (int32 va, int32 *opnd, int32 j, int32 acc);
@@ -491,13 +492,32 @@ DEVICE cpu_dev = {
     &cpu_ex, &cpu_dep, &cpu_reset,
     &cpu_boot, NULL, NULL,
     NULL, DEV_DYNM | DEV_DEBUG, 0,
-    cpu_deb, &cpu_set_size, NULL, &cpu_help, NULL, NULL
+    cpu_deb, &cpu_set_size, NULL, &cpu_help, NULL, NULL,
+    &cpu_description
     };
 
 t_stat cpu_show_model (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 fprintf (st, "model=");
 return cpu_print_model (st);
+}
+
+char *cpu_description (DEVICE *dptr)
+{
+static char buf[80];
+uint32 min_mem = 4096, max_mem = 0;
+MTAB *mptr;
+
+for (mptr = dptr->modifiers; mptr && (mptr->mask != 0); mptr++) {
+    if (mptr->valid != &cpu_set_size)
+        continue;
+    if ((mptr->match >> 20) < min_mem)
+        min_mem = (mptr->match >> 20);
+    if ((mptr->match >> 20) > max_mem)
+        max_mem = (mptr->match >> 20);
+    }
+sprintf (buf, "VAX CPU with %dMB-%dMB of memory", (int)min_mem, (int)max_mem);
+return buf;
 }
 
 t_stat sim_instr (void)

@@ -132,6 +132,7 @@ t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
+char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -178,7 +179,8 @@ DEVICE qba_dev = {
     1, 16, CQMAWIDTH, 2, 16, 16,
     &qba_ex, &qba_dep, &qba_reset,
     NULL, NULL, NULL,
-    &qba_dib, DEV_QBUS
+    &qba_dib, DEV_QBUS, 0, NULL, NULL, NULL, NULL, NULL, NULL,
+    &qba_description
     };
 
 /* IO page dispatches */
@@ -817,4 +819,9 @@ if (cptr) {
     }
 fprintf (of, "Invalid argument\n");
 return SCPE_OK;
+}
+
+char *qba_description (DEVICE *dptr)
+{
+return "Qbus adapter";
 }

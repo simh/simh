@@ -359,6 +359,7 @@ t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *tq_description (DEVICE *dptr);
 
 t_bool tq_step4 (void);
 t_bool tq_mscp (int32 pkt, t_bool q);
@@ -539,7 +540,9 @@ DEVICE tq_dev = {
     NULL, NULL, &tq_reset,
     &tq_boot, &tq_attach, &tq_detach,
     &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE,
-    0, tq_debug
+    0, tq_debug,
+    NULL, NULL, NULL, NULL, NULL, 
+    &tq_description
     };
 
 
@@ -2378,4 +2381,10 @@ t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 fprintf (st, "%s (%dMB)", drv_tab[tq_typ].name, (uint32) (drv_tab[tq_typ].cap >> 20));
 return SCPE_OK;
+}
+
+char *tq_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "TUK50 TMSCP magnetic tape controller" :
+                  "TQK50 TMSCP magnetic tape controller";
 }

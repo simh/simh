@@ -127,6 +127,7 @@ void xu_process_receive(CTLR* xu);
 void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
 t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
+char *xu_description (DEVICE *dptr);
 
 #define IOLN_XU        010
 
@@ -224,7 +225,8 @@ DEVICE xu_dev = {
 	&xu_ex, &xu_dep, &xu_reset,
 	NULL, &xu_attach, &xu_detach,
 	&xua_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_ETHER,
-  0, xu_debug
+    0, xu_debug, NULL, NULL, NULL, NULL, NULL,
+    &xu_description
   };
 
 #define IOLN_XU         010
@@ -284,7 +286,8 @@ DEVICE xub_dev = {
   &xu_ex, &xu_dep, &xu_reset,
   NULL, &xu_attach, &xu_detach,
   &xub_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_ETHER,
-  0, xu_debug
+  0, xu_debug, NULL, NULL, NULL, NULL, NULL,
+  &xu_description
 };
 
 #define XU_MAX_CONTROLLERS 2
@@ -1783,3 +1786,10 @@ void xu_dump_txring (CTLR* xu)
       printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
   }
 }
+
+char *xu_description (DEVICE *dptr)
+{
+return "DEUNA/DELUA Ethernet controller";
+}
+
+

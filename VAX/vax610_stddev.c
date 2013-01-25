@@ -87,6 +87,9 @@ t_stat clk_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+char *tti_description (DEVICE *dptr);
+char *tto_description (DEVICE *dptr);
+char *clk_description (DEVICE *dptr);
 void txdb_func (int32 data);
 
 extern int32 sysd_hlt_enb (void);
@@ -128,7 +131,8 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    &tti_dib, 0
+    &tti_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tti_description
     };
 
 /* TTO data structures
@@ -167,7 +171,8 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    &tto_dib, 0
+    &tto_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tto_description
     };
 
 /* CLK data structures
@@ -201,7 +206,8 @@ DEVICE clk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, 0
+    &clk_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &clk_description
     };
 
 /* Clock and terminal MxPR routines
@@ -352,6 +358,11 @@ sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
+char *tti_description (DEVICE *dptr)
+{
+return "console terminal input";
+}
+
 /* Terminal output routines
 
    tto_svc      process event (character typed)
@@ -384,6 +395,11 @@ tto_csr = CSR_DONE;
 CLR_INT (TTO);
 sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+char *tto_description (DEVICE *dptr)
+{
+return "console terminal output";
 }
 
 /* Clock routines
@@ -420,5 +436,10 @@ sim_activate_abs (&clk_unit, t);                        /* activate unit */
 tmr_poll = t;                                           /* set tmr poll */
 tmxr_poll = t * TMXR_MULT;                              /* set mux poll */
 return SCPE_OK;
+}
+
+char *clk_description (DEVICE *dptr)
+{
+return "100hz clock tick";
 }
 

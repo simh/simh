@@ -277,6 +277,7 @@ t_stat dz_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat dz_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dz_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat dz_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *dz_description (DEVICE *dptr);
 
 /* DZ data structures
 
@@ -350,7 +351,8 @@ DEVICE dz_dev = {
     &dz_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_MUX,
     0, dz_debug, NULL, NULL,
     &dz_help, &dz_help_attach,          /* help and attach_help routines */
-    (void *)&dz_desc                    /* help context variable */
+    (void *)&dz_desc,                   /* help context variable */
+    &dz_description                     /* description routine */
     };
 
 /* Register names for Debug tracing */
@@ -476,8 +478,9 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                     continue;                           /* line unchanged skip */
                 line = (dz * DZ_LINES) + i;             /* get line num */
                 lp = &dz_ldsc[line];                    /* get line desc */
-                if (data & (1 << (TCR_V_DTR + i)))
+                if (data & (1 << (TCR_V_DTR + i))) {
                     tmxr_set_get_modem_bits (lp, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
+                    }
                 else
                     if (dz_auto)
                         tmxr_set_get_modem_bits (lp, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);
@@ -691,6 +694,8 @@ t_stat dz_clear (int32 dz, t_bool flag)
 {
 int32 i, line;
 
+sim_debug(DBG_TRC, &dz_dev, "dz_clear(dz=%d,flag=%d)\n", dz, flag);
+
 dz_csr[dz] = 0;                                         /* clear CSR */
 dz_rbuf[dz] = 0;                                        /* silo empty */
 dz_lpr[dz] = 0;                                         /* no params */
@@ -713,6 +718,8 @@ return SCPE_OK;
 t_stat dz_reset (DEVICE *dptr)
 {
 int32 i, ndev;
+
+sim_debug(DBG_TRC, dptr, "dz_reset()\n");
 
 if (dz_ldsc == NULL)
     dz_desc.ldsc = dz_ldsc = calloc (dz_desc.lines, sizeof(*dz_ldsc));
@@ -918,3 +925,7 @@ fprintf (st, "status.\n\n");
 return SCPE_OK;
 }
 
+char *dz_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "DZ11 8-line terminal multiplexer" : "DZV11 4-line terminal multiplexer";
+}

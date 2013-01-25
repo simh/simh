@@ -63,6 +63,7 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *ptr);
 t_stat lpt_detach (UNIT *uptr);
+char *lpt_description (DEVICE *dptr);
 
 /* LPT data structures
 
@@ -110,7 +111,9 @@ DEVICE lpt_dev = {
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &lpt_reset,
     NULL, &lpt_attach, &lpt_detach,
-    &lpt_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &lpt_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL, 
+    &lpt_description
     };
 
 /* Line printer routines
@@ -198,4 +201,10 @@ t_stat lpt_detach (UNIT *uptr)
 {
 lpt_csr = lpt_csr | CSR_ERR;
 return detach_unit (uptr);
+}
+
+char *lpt_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "LP11 line printer" :
+                  "LPV11 line printer";
 }

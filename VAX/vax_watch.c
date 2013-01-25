@@ -63,6 +63,7 @@ int32 wtc_mode = WTC_MODE_VMS;
 
 t_stat wtc_set (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *wtc_description (DEVICE *dptr);
 t_stat wtc_reset (DEVICE *dptr);
 void wtc_set_valid (void);
 void wtc_set_invalid (void);
@@ -87,7 +88,8 @@ DEVICE wtc_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &wtc_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
+    &wtc_description
     };
 
 int32 wtc_rd (int32 pa)
@@ -212,4 +214,9 @@ wtc_csrd |= WTC_CSRD_VRT;
 void wtc_set_invalid (void)
 {
 wtc_csrd &= ~WTC_CSRD_VRT;
+}
+
+char *wtc_description (DEVICE *dptr)
+{
+return "watch chip";
 }

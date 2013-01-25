@@ -228,6 +228,11 @@ t_stat tmr_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+char *tti_description (DEVICE *dptr);
+char *tto_description (DEVICE *dptr);
+char *clk_description (DEVICE *dptr);
+char *tmr_description (DEVICE *dptr);
+char *fl_description (DEVICE *dptr);
 t_stat clk_attach (UNIT *uptr, char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
@@ -274,7 +279,8 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tti_description
     };
 
 /* TTO data structures
@@ -309,7 +315,8 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tto_description
     };
 
 /* TODR and TMR data structures */
@@ -333,7 +340,8 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &clk_description
     };
 
 UNIT tmr_unit = { UDATA (&tmr_svc, 0, 0) };                     /* timer */
@@ -354,7 +362,8 @@ DEVICE tmr_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &tmr_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tmr_description
     };
 
 /* RX01 data structures
@@ -396,7 +405,8 @@ DEVICE fl_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &fl_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &fl_description
     };
 
 /* Terminal MxPR routines
@@ -465,6 +475,8 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+if (tti_csr & CSR_DONE)                                 /* is last input processed yet? */
+    return SCPE_OK;                                     /* wait */
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */
@@ -487,6 +499,11 @@ tti_csr = 0;
 tti_int = 0;
 sim_activate (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
+}
+
+char *tti_description (DEVICE *dptr)
+{
+return "console terminal input";
 }
 
 /* Terminal output service (output character) */
@@ -521,6 +538,11 @@ tto_csr = CSR_DONE;
 tto_int = 0;
 sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+char *tto_description (DEVICE *dptr)
+{
+return "console terminal output";
 }
 
 /* Programmable timer
@@ -685,6 +707,11 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
 return SCPE_OK;
 }
 
+char *clk_description (DEVICE *dptr)
+{
+return "time of year clock";
+}
+
 /* CLK attach */
 
 t_stat clk_attach (UNIT *uptr, char *cptr)
@@ -726,6 +753,11 @@ tmr_use_100hz = 1;
 sim_cancel (&tmr_unit);                                 /* cancel timer */
 todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
+}
+
+char *tmr_description (DEVICE *dptr)
+{
+return "interval timer";
 }
 
 /* TODR routines */
@@ -1073,4 +1105,9 @@ else {              /* 780 */
     }
 comm_region[COMM_GH] = 1;
 return SCPE_OK;
+}
+
+char *fl_description (DEVICE *dptr)
+{
+return "console floppy";
 }

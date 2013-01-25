@@ -164,6 +164,8 @@ t_stat ry_boot (int32 unitno, DEVICE *dptr);
 void ry_done (int32 esr_flags, int32 new_ecode);
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ry_attach (UNIT *uptr, char *cptr);
+char *ry_description (DEVICE *dptr);
+
 
 /* RY11 data structures
 
@@ -246,7 +248,9 @@ DEVICE ry_dev = {
     RX_NUMDR, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &ry_reset,
     &ry_boot, &ry_attach, NULL,
-    &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18
+    &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &ry_description
     };
 
 /* I/O dispatch routine, I/O addresses 17777170 - 17777172
@@ -702,3 +706,9 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+char *ry_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "RX211 floppy disk controller" : 
+                  "RXV21 floppy disk controller";
+}

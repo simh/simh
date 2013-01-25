@@ -215,6 +215,7 @@ t_stat rb_rd32 (int32 *data, int32 PA, int32 access);
 t_stat rb_wr32 (int32 data, int32 PA, int32 access);
 t_stat rb_svc (UNIT *uptr);
 t_stat rb_reset (DEVICE *dptr);
+char *rb_description (DEVICE *dptr);
 void rb_set_done (int32 error);
 t_stat rb_attach (UNIT *uptr, char *cptr);
 t_stat rb_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -280,7 +281,8 @@ DEVICE rb_dev = {
     NULL, NULL, &rb_reset,
     NULL, &rb_attach, NULL,
     &rb_dib, DEV_DISABLE | DEV_UBUS | DEV_DEBUG, 0,
-    rb_debug, 0, 0
+    rb_debug, NULL, NULL, NULL, NULL, NULL, 
+    &rb_description
     };
 
 /* I/O dispatch routines
@@ -630,6 +632,11 @@ if (rbxb == NULL)
 if (rbxb == NULL)
     return SCPE_MEM;
 return SCPE_OK;
+}
+
+char *rb_description (DEVICE *dptr)
+{
+return "RB730 disk controller";
 }
 
 /* Attach routine */

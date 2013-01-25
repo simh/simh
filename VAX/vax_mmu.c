@@ -102,6 +102,7 @@ static const int32 cvtacc[16] = { 0, 0,
 t_stat tlb_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tlb_reset (DEVICE *dptr);
+char *tlb_description (DEVICE *dptr);
 
 TLBENT fill (uint32 va, int32 lnt, int32 acc, int32 *stat);
 extern int32 ReadIO (uint32 pa, int32 lnt);
@@ -129,7 +130,8 @@ DEVICE tlb_dev = {
     "TLB", tlb_unit, tlb_reg, NULL,
     2, 16, VA_N_TBI * 2, 1, 16, 32,
     &tlb_ex, &tlb_dep, &tlb_reset,
-    NULL, NULL, NULL
+    NULL, NULL, NULL, NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tlb_description
     };
 
 /* Read and write virtual
@@ -626,3 +628,8 @@ for (i = 0; i < VA_TBSIZE; i++)
     stlb[i].tag = ptlb[i].tag = stlb[i].pte = ptlb[i].pte = -1;
 return SCPE_OK;
 }
+
+char *tlb_description (DEVICE *dptr)
+    {
+    return "translation buffer";
+    }

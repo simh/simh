@@ -81,6 +81,7 @@ extern jmp_buf save_env;
 extern int32 p1;
 
 t_stat sysb_reset (DEVICE *dptr);
+char *sysb_description (DEVICE *dptr);
 t_stat vax730_boot (int32 flag, char *ptr);
 t_stat vax730_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
@@ -131,7 +132,8 @@ DEVICE sysb_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &sysb_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &sysb_description
     };
 
 /* Special boot command, overrides regular boot */
@@ -570,6 +572,11 @@ t_stat sysb_reset (DEVICE *dptr)
 {
 sim_vm_cmd = vax730_cmd;
 return SCPE_OK;
+}
+
+char *sysb_description (DEVICE *dptr)
+{
+return "system bus controller";
 }
 
 /* Show nexus */

@@ -74,6 +74,7 @@ uint32 mcsr2 = 0;
 t_stat mctl_reset (DEVICE *dptr);
 t_stat mctl_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mctl_wrreg (int32 val, int32 pa, int32 mode);
+char *mctl_description (DEVICE *dptr);
 
 /* MCTLx data structures
 
@@ -111,7 +112,8 @@ DEVICE mctl_dev = {
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
     &mctl_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mctl_deb, 0, 0
+    mctl_deb, NULL, NULL, NULL, NULL, NULL, 
+    &mctl_description
     };
 
 /* Memory controller register read */
@@ -192,4 +194,9 @@ if (MEMSIZE > MAXMEMSIZE)                                                 /* Mor
 else
     mcsr2 = mcsr2 | MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_16K);                /* Use 16k chips */
 return SCPE_OK;
+}
+
+char *mctl_description (DEVICE *dptr)
+{
+return "memory controller";
 }

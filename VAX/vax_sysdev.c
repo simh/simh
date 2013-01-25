@@ -234,16 +234,21 @@ static uint32 rom_delay = 0;
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
+char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
+char *nvr_description (DEVICE *dptr);
 t_stat csi_reset (DEVICE *dptr);
+char *csi_description (DEVICE *dptr);
 t_stat cso_reset (DEVICE *dptr);
 t_stat cso_svc (UNIT *uptr);
+char *cso_description (DEVICE *dptr);
 t_stat tmr_svc (UNIT *uptr);
 t_stat sysd_reset (DEVICE *dptr);
+char *sysd_description (DEVICE *dptr);
 
 int32 rom_rd (int32 pa);
 int32 nvr_rd (int32 pa);
@@ -318,7 +323,8 @@ DEVICE rom_dev = {
     1, 16, ROMAWIDTH, 4, 16, 32,
     &rom_ex, &rom_dep, &rom_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &rom_description
     };
 
 /* NVR data structures
@@ -340,7 +346,8 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &nvr_description
     };
 
 /* CSI data structures
@@ -376,7 +383,7 @@ DEVICE csi_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &csi_reset,
     NULL, NULL, NULL,
-    &csi_dib, 0
+    &csi_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL
     };
 
 /* CSO data structures
@@ -412,7 +419,7 @@ DEVICE cso_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &cso_reset,
     NULL, NULL, NULL,
-    &cso_dib, 0
+    &cso_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL
     };
 
 /* SYSD data structures
@@ -469,7 +476,8 @@ DEVICE sysd_dev = {
     2, 16, 16, 1, 16, 8,
     NULL, NULL, &sysd_reset,
     NULL, NULL, NULL,
-    &sysd_dib, 0
+    &sysd_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &sysd_description
     };
 
 /* ROM: read only memory - stored in a buffered file
@@ -595,6 +603,11 @@ if (rom == NULL)
 return SCPE_OK;
 }
 
+char *rom_description (DEVICE *dptr)
+{
+return "read-only memory";
+}
+
 /* NVR: non-volatile RAM - stored in a buffered file */
 
 int32 nvr_rd (int32 pa)
@@ -688,6 +701,11 @@ if ((uptr->flags & UNIT_ATT) == 0)
 return r;
 }
 
+char *nvr_description (DEVICE *dptr)
+{
+return "non-volatile memory";
+}
+
 /* CSI: console storage input */
 
 int32 csrs_rd (void)
@@ -718,6 +736,11 @@ csi_unit.buf = 0;
 csi_csr = 0;
 CLR_INT (CSI);
 return SCPE_OK;
+}
+
+char *csi_description (DEVICE *dptr)
+{
+return "console storage input";
 }
 
 /* CSO: console storage output */
@@ -769,6 +792,11 @@ cso_csr = CSR_DONE;
 CLR_INT (CSO);
 sim_cancel (&cso_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+char *cso_description (DEVICE *dptr)
+{
+return "console storage output";
 }
 
 /* SYSD: SSC access mechanisms and devices
@@ -1503,6 +1531,11 @@ int32 tmr1_inta (void)
 return tmr_tivr[1];
 }
 
+char *tmr_description (DEVICE *dptr)
+{
+return "non-volatile memory";
+}
+
 /* Machine check */
 
 int32 machine_check (int32 p1, int32 opc, int32 cc, int32 delta)
@@ -1643,6 +1676,10 @@ ssc_otp = 0;
 return SCPE_OK;
 }
 
+char *sysd_description (DEVICE *dptr)
+{
+return "system devices";
+}
 
 t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {

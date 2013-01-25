@@ -343,6 +343,7 @@ static t_stat vh_set_nolog (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat vh_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat vh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 static t_stat vh_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+static char *vh_description (DEVICE *dptr);
 
 /* SIMH I/O Structures */
 
@@ -437,7 +438,8 @@ DEVICE vh_dev = {
     NULL,           /* logical name */
     &vh_help,       /* help routine */
     &vh_help_attach,/* attach_help routines */
-    (void *)&vh_desc/* help context variable */
+    (void *)&vh_desc,/* help context variable */
+    &vh_description /* description */
 };
 
 /* Register names for Debug tracing */
@@ -1586,4 +1588,9 @@ char *devtype = (UNIBUS) ? "DH11" : "DHQ11";
 
 fprintf (st, "%s %s Terminal Multiplexer Attach Help\n\n", devtype, dptr->name);
 return tmxr_attach_help (st, dptr, uptr, 1, cptr);
+}
+
+static char *vh_description (DEVICE *dptr)
+{
+return (UNIBUS) ? "DH11 16-line Terminal Multiplexer" : "DHQ11 8-line Terminal Multiplexer";
 }

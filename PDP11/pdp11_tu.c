@@ -248,6 +248,7 @@ t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
 t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc);
+char *tu_description (DEVICE *dptr);
 t_stat tu_go (int32 drv);
 int32 tu_abort (void);
 void tu_set_er (int32 flg);
@@ -320,7 +321,9 @@ DEVICE tu_dev = {
     TU_NUMDR, 10, T_ADDR_W, 1, DEV_RDX, 8,
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
-    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03|DEV_TAPE
+    &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03|DEV_TAPE,
+    0, NULL, NULL, NULL, NULL, NULL, NULL,
+    &tu_description
     };
 
 /* Massbus register read */
@@ -1053,3 +1056,8 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+char *tu_description (DEVICE *dptr)
+{
+return "TM03 tape formatter";
+}

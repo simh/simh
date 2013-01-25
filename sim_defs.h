@@ -325,10 +325,14 @@ struct sim_device {
                                                         /* mem size routine */
     char                *lname;                         /* logical name */
     t_stat              (*help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr); /* help */
+                            struct sim_unit *uptr, int32 flag, char *cptr); 
+                                                        /* help */
     t_stat              (*attach_help)(FILE *st, struct sim_device *dptr,
-                            struct sim_unit *uptr, int32 flag, char *cptr); /* attach help */
+                            struct sim_unit *uptr, int32 flag, char *cptr);
+                                                        /* attach help */
     void *help_ctx;                                     /* Context available to help routines */
+    char                *(*description)(struct sim_device *dptr);
+                                                        /* Device Description */
     };
 
 /* Device flags */

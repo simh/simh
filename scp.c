@@ -371,7 +371,7 @@ t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag);
-t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg);
+int show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg);
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr, char *cptr, int32 flag);
 t_stat sim_check_console (int32 sec);
 t_stat sim_save (FILE *sfile);
@@ -716,7 +716,8 @@ static CTAB cmd_table[] = {
       "sh{ow} br{eak} <list>    show breakpoints\n"
       "sh{ow} con{figuration}   show configuration\n"
       "sh{ow} cons{ole} {arg}   show console options\n"
-      "sh{ow} dev{ices}         show devices\n"  
+      "sh{ow} dev{ices}         show devices\n"
+      "sh{ow} sys{tem}          show system devices with descriptions\n"
       "sh{ow} m{odifiers}       show modifiers for all devices\n" 
       "sh{ow} s{how}            show SHOW commands for all devices\n" 
       "sh{ow} n{ames}           show logical names\n" 
@@ -739,7 +740,7 @@ static CTAB cmd_table[] = {
       "sh{ow} clocks            show calibrated timers\n"
       "sh{ow} on                show on condition actions\n"  },
     { "DO", &do_cmd, 1,
-      "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\b"
+      "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\n"
       "                         process command file\n" },
     { "GOTO", &goto_cmd, 1,
       "goto <label>             goto label in command file\n" },
@@ -2337,6 +2338,7 @@ SHTAB *shtb, *shptr;
 static SHTAB show_glob_tab[] = {
     { "CONFIGURATION", &show_config, 0 },
     { "DEVICES", &show_config, 1 },
+    { "SYSTEM", &show_config, 2 },
     { "QUEUE", &show_queue, 0 },
     { "TIME", &show_time, 0 },
     { "MODIFIERS", &show_mod_names, 0 },
@@ -2448,10 +2450,14 @@ t_stat show_device (FILE *st, DEVICE *dptr, int32 flag)
 {
 uint32 j, udbl, ucnt;
 UNIT *uptr;
+int mods;
 
 fprintf (st, "%s", sim_dname (dptr));                   /* print dev name */
+if ((flag == 2) && dptr->description) {
+    fprintf (st, "\t%s\n", dptr->description(dptr));
+    }
 if (qdisable (dptr)) {                                  /* disabled? */
-    fprintf (st, ", disabled\n");
+    fprintf (st, "\tdisabled\n");
     return SCPE_OK;
     }
 for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
@@ -2461,15 +2467,17 @@ for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
     else if (uptr->flags & UNIT_DISABLE)
         udbl++;                                         /* count user-disabled */
     }
-show_all_mods (st, dptr, dptr->units, MTAB_VDV);        /* show dev mods */
-if (dptr->numunits == 0)
-    fprintf (st, "\n");
+mods = show_all_mods (st, dptr, dptr->units, MTAB_VDV); /* show dev mods */
+if (dptr->numunits == 0) {
+    if (mods)
+        fprintf (st, "\n");
+    }
 else {
     if (ucnt == 0)
-        fprintf (st, ", all units disabled\n");
+        fprintf (st, "%sall units disabled\n", mods ? ", " : "\t");
     else if ((ucnt > 1) || (udbl > 0))
-        fprintf (st, ", %d units\n", ucnt + udbl);
-    else if (flag)
+        fprintf (st, "%s%d units\n", mods ? ", " : "\t", ucnt + udbl);
+    else if (mods || (flag == 1) || ((flag == 2) && !dptr->description))
         fprintf (st, "\n");
     }
 if (flag)                                               /* dev only? */
@@ -2807,9 +2815,11 @@ if ((dptr->flags & DEV_DEBUG) && dptr->debflags) {
 return SCPE_OK;
 }
 
-t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
+int show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
 {
 MTAB *mptr;
+t_bool first_mod = TRUE;
+int mods_shown = 0;
 
 if (dptr->modifiers == NULL)
     return SCPE_OK;
@@ -2817,11 +2827,13 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
     if (mptr->pstring && ((mptr->mask & MTAB_XTD)?
         ((mptr->mask & flag) && !(mptr->mask & MTAB_NMO)): 
         ((MTAB_VUN & flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
-        fputs (", ", st);
+        fputs (first_mod ? "\t" : ", ", st);
+        first_mod = FALSE;
         show_one_mod (st, dptr, uptr, mptr, NULL, 0);
+        ++mods_shown;
         }
     }
-return SCPE_OK;
+return mods_shown;
 }
 
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr,

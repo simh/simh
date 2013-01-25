@@ -581,6 +581,8 @@ t_stat rp_go (int32 drv);
 t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 rp_abort (void);
+char *rp_description (DEVICE *dptr);
+
 
 /* RP data structures
 
@@ -702,7 +704,8 @@ DEVICE rp_dev = {
     NULL, NULL, &rp_reset,
     &rp_boot, &rp_attach, &rp_detach,
     &rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_MBUS | DEV_DEBUG | DEV_DISK,
-    0, rp_debug
+    0, rp_debug, NULL, NULL, NULL, NULL, NULL, 
+    &rp_description
     };
 
 char *rp_regnam[] = 
@@ -1482,3 +1485,8 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+char *rp_description (DEVICE *dptr)
+{
+return "RP04/05/06/07 RM02/03/05/80 Massbus disk controller";
+}

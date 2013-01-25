@@ -212,11 +212,16 @@ t_stat tmr_svc (UNIT *uptr);
 t_stat tti_reset (DEVICE *dptr);
 t_stat tto_reset (DEVICE *dptr);
 t_stat clk_reset (DEVICE *dptr);
+char *tti_description (DEVICE *dptr);
+char *tto_description (DEVICE *dptr);
+char *clk_description (DEVICE *dptr);
 t_stat clk_attach (UNIT *uptr, char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
+char *tmr_description (DEVICE *dptr);
 t_stat td_svc (UNIT *uptr);
 t_stat td_reset (DEVICE *dptr);
+char *td_description (DEVICE *dptr);
 int32 icr_rd (t_bool interp);
 void tmr_incr (uint32 inc);
 void tmr_sched (void);
@@ -258,7 +263,8 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tti_description
     };
 
 /* TTO data structures
@@ -293,7 +299,8 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tto_description
     };
 
 /* TODR and TMR data structures */
@@ -317,7 +324,8 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &clk_description
     };
 
 UNIT tmr_unit = { UDATA (&tmr_svc, 0, 0) };                     /* timer */
@@ -338,7 +346,8 @@ DEVICE tmr_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &tmr_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tmr_description
     };
 
 /* TU58 data structures
@@ -374,7 +383,8 @@ DEVICE td_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &td_reset,
     NULL, NULL, NULL,
-    NULL, 0
+    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &td_description
     };
 
 /* Console storage MxPR routines
@@ -671,6 +681,11 @@ csi_int = 0;
 return SCPE_OK;
 }
 
+char *tti_description (DEVICE *dptr)
+{
+return "console terminal input";
+}
+
 /* Terminal output service (output character) */
 
 t_stat tto_svc (UNIT *uptr)
@@ -703,6 +718,11 @@ tto_csr = CSR_DONE;
 tto_int = 0;
 sim_cancel (&tto_unit);                                 /* deactivate unit */
 return SCPE_OK;
+}
+
+char *tto_description (DEVICE *dptr)
+{
+return "console terminal output";
 }
 
 /* Programmable timer
@@ -867,6 +887,11 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
 return SCPE_OK;
 }
 
+char *clk_description (DEVICE *dptr)
+{
+return "time of year clock";
+}
+
 /* CLK attach */
 
 t_stat clk_attach (UNIT *uptr, char *cptr)
@@ -908,6 +933,11 @@ tmr_use_100hz = 1;
 sim_cancel (&tmr_unit);                                 /* cancel timer */
 todr_resync ();                                         /* resync TODR */
 return SCPE_OK;
+}
+
+char *tmr_description (DEVICE *dptr)
+{
+return "interval timer";
 }
 
 /* TODR routines */
@@ -1184,4 +1214,9 @@ td_offset = 0;
 td_txsize = 0;
 sim_cancel (&td_unit);
 return SCPE_OK;
+}
+
+char *td_description (DEVICE *dptr)
+{
+return "Console TU58 cartridge";
 }
