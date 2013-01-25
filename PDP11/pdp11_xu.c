@@ -62,6 +62,7 @@
 
   Modification history:
 
+  25-Jan-13  RJ   SELFTEST needs to report the READY state otherwise VMS 3.7 gets fatal controller error
   12-Jan-11  DTH  Added SHOW XU FILTERS modifier
   11-Jan-11  DTH  Corrected SELFTEST command, enabling use by VMS 3.7, VMS 4.7, and Ultrix 1.1
   09-Dec-10  MP   Added address conflict check during attach.
@@ -1456,6 +1457,9 @@ void xu_port_command (CTLR* xu)
 		controller's progress through the diagnostic testing.
 	  */
       xu->var->pcsr0 |= PCSR0_DNI;
+      xu->var->pcsr0 &= ~PCSR0_USCI;
+      xu->var->pcsr0 &= ~PCSR0_FATL;
+      xu->var->pcsr1 = STATE_READY;
       break;
 
     case CMD_START:			/* START */

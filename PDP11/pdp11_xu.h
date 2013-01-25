@@ -28,6 +28,7 @@
 
   Modification history:
 
+  25-Jan-13  RJ   SELFTEST needs to report the READY state otherwise VMS 3.7 gets fatal controller error
   23-Jan-08  MP   Added debugging support to display packet headers and packet data
   08-Dec-05  DTH  Added load_server, increased UDBSIZE for system ID parameters
   07-Jul-05  RMS  Removed extraneous externs
@@ -173,6 +174,7 @@ typedef struct xu_controller CTLR;
 #define PCSR0_TXI   0010000                             /* <12> Transmit Interrupt */
 #define PCSR0_DNI   0004000                             /* <11> Done Interrupt */
 #define PCSR0_RCBI  0002000                             /* <10> Recv Buffer Unavail Intr */
+#define PCSR0_FATL  0001000                             /* <09> Fatal Internal Error */
 #define PCSR0_USCI  0000400                             /* <08> Unsolicited State Chg Inter */
 #define PCSR0_INTR  0000200                             /* <07> Interrupt Summary */
 #define PCSR0_INTE  0000100                             /* <06> Interrupt Enable */
