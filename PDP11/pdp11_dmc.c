@@ -28,6 +28,8 @@
 
   Modification history:
 
+  25-Jan-13  RJ   Error checking for already attached in dmc_settype() fixed.
+  25-Jan-13  RJ   If attach when already attached then detach first.
   23-Jan-13  RJ   Don't do anything if not attached. See https://github.com/simh/simh/issues/28
   23-Jan-13  RJ   Clock co-scheduling move to generic framework (from Mark Pizzolato)
   21-Jan-13  RJ   Added help.
@@ -674,7 +676,7 @@ t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc)
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
     if (!cptr) return SCPE_IERR;
-    if (UNIT_ATT) return SCPE_ALATT;
+    if (dmc_is_attached(uptr)) return SCPE_ALATT;
     if (sscanf(cptr, "%s", buf) != 1)
     {
         status = SCPE_ARG;
@@ -2386,6 +2388,11 @@ t_stat dmc_attach (UNIT *uptr, char *cptr)
 {
     CTLR *controller = dmc_get_controller_from_unit(uptr);
     t_stat ans = SCPE_OK;
+
+    if (dmc_is_attached(uptr))
+    {
+        dmc_detach(uptr);
+    }
 
     ans = dmc_open_master_socket(controller, cptr);
     if (ans == SCPE_OK)
