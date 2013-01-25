@@ -106,6 +106,10 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         LIBPATH += /opt/local/lib
         OS_LDFLAGS += -L/opt/local/lib
       endif
+      ifeq (libXt,$(shell if $(TEST) -d /usr/X11/lib; then echo libXt; fi))
+        LIBPATH += /usr/X11/lib
+        OS_LDFLAGS += -L/usr/X11/lib
+      endif
       # OSX's XCode gcc doesn't support LTO, but gcc built to explicitly enable it will work
       ifneq (,$(GCC_VERSION))
         ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep '\-\-enable-lto'))
