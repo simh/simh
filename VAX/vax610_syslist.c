@@ -29,7 +29,7 @@
 
 #include "vax_defs.h"
 
-char sim_name[] = "VAX610";
+char sim_name[] = "MicroVAX I (KA610)";
 
 extern DEVICE cpu_dev;
 extern DEVICE mctl_dev;

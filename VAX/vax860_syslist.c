@@ -29,7 +29,7 @@
 
 #include "vax_defs.h"
 
-char sim_name[] = "VAX860";
+char sim_name[] = "VAX 8600";
 
 extern DEVICE cpu_dev;
 extern DEVICE tlb_dev;

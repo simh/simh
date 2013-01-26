@@ -30,9 +30,9 @@
 #include "vax_defs.h"
 
 #if defined(VAX_620)
-char sim_name[] = "VAX620";
+char sim_name[] = "rtVAX1000 (KA620)";
 #else
-char sim_name[] = "VAX630";
+char sim_name[] = "MicroVAX II (KA630)";
 #endif
 
 extern DEVICE cpu_dev;
