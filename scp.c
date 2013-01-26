@@ -371,7 +371,7 @@ t_stat show_break (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_device (FILE *st, DEVICE *dptr, int32 flag);
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag);
-int show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg);
+t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flg, int32 *toks);
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr, char *cptr, int32 flag);
 t_stat sim_check_console (int32 sec);
 t_stat sim_save (FILE *sfile);
@@ -404,6 +404,7 @@ t_value strtotv (const char *inptr, char **endptr, uint32 radix);
 void fprint_help (FILE *st);
 void fprint_stopped (FILE *st, t_stat r);
 void fprint_capac (FILE *st, DEVICE *dptr, UNIT *uptr);
+void fprint_sep (FILE *st, int32 *tokens);
 char *read_line (char *ptr, int32 size, FILE *stream);
 char *read_line_p (char *prompt, char *ptr, int32 size, FILE *stream);
 REG *find_reg_glob (char *ptr, char **optr, DEVICE **gdptr);
@@ -2338,7 +2339,7 @@ SHTAB *shtb, *shptr;
 static SHTAB show_glob_tab[] = {
     { "CONFIGURATION", &show_config, 0 },
     { "DEVICES", &show_config, 1 },
-    { "SYSTEM", &show_config, 2 },
+    { "FEATURES", &show_config, 2 },
     { "QUEUE", &show_queue, 0 },
     { "TIME", &show_time, 0 },
     { "MODIFIERS", &show_mod_names, 0 },
@@ -2450,7 +2451,7 @@ t_stat show_device (FILE *st, DEVICE *dptr, int32 flag)
 {
 uint32 j, udbl, ucnt;
 UNIT *uptr;
-int mods;
+int32 toks = 0;
 
 fprintf (st, "%s", sim_dname (dptr));                   /* print dev name */
 if ((flag == 2) && dptr->description) {
@@ -2467,18 +2468,24 @@ for (j = ucnt = udbl = 0; j < dptr->numunits; j++) {    /* count units */
     else if (uptr->flags & UNIT_DISABLE)
         udbl++;                                         /* count user-disabled */
     }
-mods = show_all_mods (st, dptr, dptr->units, MTAB_VDV); /* show dev mods */
+show_all_mods (st, dptr, dptr->units, MTAB_VDV, &toks); /* show dev mods */
 if (dptr->numunits == 0) {
-    if (mods)
+    if (toks)
         fprintf (st, "\n");
     }
 else {
-    if (ucnt == 0)
-        fprintf (st, "%sall units disabled\n", mods ? ", " : "\t");
-    else if ((ucnt > 1) || (udbl > 0))
-        fprintf (st, "%s%d units\n", mods ? ", " : "\t", ucnt + udbl);
-    else if (mods || (flag == 1) || ((flag == 2) && !dptr->description))
-        fprintf (st, "\n");
+    if (ucnt == 0) {
+        fprint_sep (st, &toks);
+        fprintf (st, "all units disabled\n");
+        }
+    else if ((ucnt > 1) || (udbl > 0)) {
+        fprint_sep (st, &toks);
+        fprintf (st, "%d units\n", ucnt + udbl);
+        }
+    else
+        if ((flag != 2) || !dptr->description || toks) 
+            fprintf (st, "\n");
+    toks = 0;
     }
 if (flag)                                               /* dev only? */
     return SCPE_OK;
@@ -2490,27 +2497,40 @@ for (j = 0; j < dptr->numunits; j++) {                  /* loop thru units */
 return SCPE_OK;
 }
 
+void fprint_sep (FILE *st, int32 *tokens)
+{
+fprintf (st, (*tokens > 0) ? ", " : "\t");
+*tokens += 1;
+}
+
 t_stat show_unit (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
 {
 int32 u = (int32)(uptr - dptr->units);
+int32 toks = 0;
 
 if (flag > 1)
     fprintf (st, "  %s%d", sim_dname (dptr), u);
 else if (flag < 0)
     fprintf (st, "%s%d", sim_dname (dptr), u);
 if (uptr->flags & UNIT_FIX) {
-    fprintf (st, ", ");
+    fprint_sep (st, &toks);
     fprint_capac (st, dptr, uptr);
     }
 if (uptr->flags & UNIT_ATT) {
-    fprintf (st, ", attached to %s", uptr->filename);
+    fprint_sep (st, &toks);
+    fprintf (st, "attached to %s", uptr->filename);
     if (uptr->flags & UNIT_RO)
         fprintf (st, ", read only");
     }
-else if (uptr->flags & UNIT_ATTABLE)
-    fprintf (st, ", not attached");
-show_all_mods (st, dptr, uptr, MTAB_VUN);               /* show unit mods */ 
-fprintf (st, "\n");
+else {
+    if (uptr->flags & UNIT_ATTABLE) {
+        fprint_sep (st, &toks);
+        fprintf (st, "not attached");
+        }
+    }
+show_all_mods (st, dptr, uptr, MTAB_VUN, &toks);        /* show unit mods */ 
+if (toks || (flag < 0) || (flag > 1))
+    fprintf (st, "\n");
 return SCPE_OK;
 }
 
@@ -2815,11 +2835,9 @@ if ((dptr->flags & DEV_DEBUG) && dptr->debflags) {
 return SCPE_OK;
 }
 
-int show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag)
+t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, int32 *toks)
 {
 MTAB *mptr;
-t_bool first_mod = TRUE;
-int mods_shown = 0;
 
 if (dptr->modifiers == NULL)
     return SCPE_OK;
@@ -2827,13 +2845,15 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
     if (mptr->pstring && ((mptr->mask & MTAB_XTD)?
         ((mptr->mask & flag) && !(mptr->mask & MTAB_NMO)): 
         ((MTAB_VUN & flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
-        fputs (first_mod ? "\t" : ", ", st);
-        first_mod = FALSE;
+        if (*toks > 2) {
+            fprintf (st, "\n");
+            *toks = 0;
+            }
+        fprint_sep (st, toks);
         show_one_mod (st, dptr, uptr, mptr, NULL, 0);
-        ++mods_shown;
         }
     }
-return mods_shown;
+return SCPE_OK;
 }
 
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr,

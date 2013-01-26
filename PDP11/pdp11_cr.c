@@ -1284,7 +1284,7 @@ t_stat cr_show_trans (  FILE    *st,
                         int32   val,
                         void    *desc    )
 {
-    fprintf (st, "translation %s", trans[table]);
+    fprintf (st, "translation=%s", trans[table]);
     return (SCPE_OK);
 }
 

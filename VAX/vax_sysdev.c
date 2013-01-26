@@ -1628,7 +1628,7 @@ return SCPE_OK;
 
 t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "VAX 3900");
+fprintf (st, "MicroVAX 3900");
 return SCPE_OK;
 }
 

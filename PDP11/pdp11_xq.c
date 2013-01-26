@@ -731,7 +731,7 @@ t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc)
     case  XQ_T_DELQA_PLUS:  fprintf(st, "DELQA-T");    break;
   }
   if (xq->var->type != xq->var->mode) {
-    fprintf(st, ",mode=");
+    fprintf(st, ", mode=");
     switch (xq->var->mode) {
       case  XQ_T_DEQNA:       fprintf(st, "DEQNA");      break;
       case  XQ_T_DELQA:       fprintf(st, "DELQA");      break;
