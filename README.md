@@ -1,4 +1,4 @@
-# SIMH v4.0
+# SIMH v4.0 - Beta
 
 ## WHAT'S NEW
 
@@ -44,8 +44,8 @@
     Outgoing connections per line (virtual Null Modem cable).
 
 #### Asynchronous I/O
-    Disk and Tape I/O can be asynchronous.  Asynchronous support exists for pdp11_rq, pdp11_rp and pdp11_tq devices (used by VAX and PDP11 simulators).
-    Multiplexer I/O (Telnet and/or Serial) can be asynchronous.  Asynchronous support exists for console I/O and most multiplexer devices.
+    * Disk and Tape I/O can be asynchronous.  Asynchronous support exists for pdp11_rq, pdp11_rp and pdp11_tq devices (used by VAX and PDP11 simulators).
+    * Multiplexer I/O (Telnet and/or Serial) can be asynchronous.  Asynchronous support exists for console I/O and most multiplexer devices.
 
 #### Disk Extensions
     RAW Disk Access (including CDROM)
@@ -152,6 +152,7 @@ Command Aliases
    A Tokens preceeded and followed by % characters are expanded as environment
    variables, and if one isn't found then can be one of several special 
    variables: 
+   
           %DATE%              yyyy/mm/dd
           %TIME%              hh:mm:ss
           %CTIME%             Www Mmm dd hh:mm:ss yyyy
@@ -161,6 +162,7 @@ Command Aliases
           %SIM_VERBOSE%       The Verify/Verbose mode of the current Do command file
           %SIM_QUIET%         The Quiet mode of the current Do command file
           %SIM_MESSAGE%       The message display status of the current Do command file
+          
    Environment variable lookups are done first with the precise name between 
    the % characters and if that fails, then the name between the % characters
    is upcased and a lookup of that valus is attempted.
@@ -171,15 +173,16 @@ Command Aliases
    it is not found, then the original beginning token on the line is left 
    untouched.
 
-##### command aliases
+##### Command aliases
    commands can be aliases with environment variables.  For example:
+   
       sim> set env say=echo
       sim> say Hello there
       Hello there
 
 ##### Do command argument manipulation
 
-    The SHIFT command will shift the %1 thru %9 arguments to the left one position.
+The SHIFT command will shift the %1 thru %9 arguments to the left one position.
 
 
 ### Use Prebuilt Windows Simulators
