@@ -453,10 +453,6 @@
 				RelativePath="..\VAX\vax_defs.h"
 				>
 			</File>
-			<File
-				RelativePath="..\VAX\vaxmod_defs.h"
-				>
-			</File>
 		</Filter>
 		<Filter
 			Name="Resource Files"

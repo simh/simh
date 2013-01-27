@@ -126,9 +126,13 @@
                         { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size }
-#define CPU_MODEL_MODIFIERS \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL, \
-                          NULL, &cpu_show_model },
+#define CPU_MODEL_MODIFIERS                                                         \
+                        { MTAB_XTD|MTAB_VDV, 0,          "MODEL",      NULL,        \
+                          NULL, &cpu_show_model },                                  \
+                        { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",  \
+                          &sysd_set_halt, &sysd_show_halt },                        \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",\
+                          &sysd_set_halt, &sysd_show_halt },
 
 
 /* Cache diagnostic space */
@@ -431,5 +435,8 @@ int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
 #include "pdp11_io_lib.h"
+
+extern t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc);
+extern t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif

@@ -148,7 +148,8 @@ int32 ka_mser = 0;                                      /* KA630 mem sys err */
 int32 ka_cear = 0;                                      /* KA630 cpu err */
 int32 ka_dear = 0;                                      /* KA630 dma err */
 static uint32 rom_delay = 0;
-t_bool rom_diag_full = 0;
+t_bool ka_diag_full = FALSE;
+t_bool ka_hltenab = TRUE;                               /* Halt Enable / Autoboot flag */
 
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
@@ -210,7 +211,6 @@ REG rom_reg[] = {
 MTAB rom_mod[] = {
     { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL },
     { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "DIAG", "DIAG={FULL|MIN}", &rom_set_diag, &rom_show_diag },
     { 0 }
     };
 
@@ -256,13 +256,16 @@ DEVICE nvr_dev = {
 UNIT sysd_unit = { UDATA (NULL, 0, 0) };
 
 REG sysd_reg[] = {
-    { HRDATAD (CONISP, conisp, 32, "console ISP") },
-    { HRDATAD (CONPC,   conpc, 32, "console PD") },
-    { HRDATAD (CONPSL, conpsl, 32, "console PSL") },
-    { HRDATAD (BDR,    ka_bdr, 16, "KA630 boot diag") },
-    { HRDATAD (MSER,  ka_mser,  8, "KA630 mem sys err") },
-    { HRDATAD (CEAR,  ka_cear,  8, "KA630 cpu err") },
-    { HRDATAD (DEAR,  ka_dear,  8, "KA630 dma err") },
+    { HRDATAD (CONISP,         conisp, 32, "console ISP") },
+    { HRDATAD (CONPC,           conpc, 32, "console PD") },
+    { HRDATAD (CONPSL,         conpsl, 32, "console PSL") },
+    { HRDATAD (BDR,            ka_bdr, 16, "KA630 boot diag") },
+    { HRDATAD (MSER,          ka_mser,  8, "KA630 mem sys err") },
+    { HRDATAD (CEAR,          ka_cear,  8, "KA630 cpu err") },
+    { HRDATAD (DEAR,          ka_dear,  8, "KA630 dma err") },
+    { HRDATAD (DEAR,          ka_dear,  8, "KA630 dma err") },
+    { FLDATAD (DIAG,     ka_diag_full,  0, "KA630 Full Boot diagnostics") },
+    { FLDATAD (HLTENAB,    ka_hltenab,  0, "KA630 Autoboot/Halt Enable") },
     { NULL }
     };
 
@@ -860,15 +863,27 @@ if (*rom == 0) {                                        /* no boot? */
 return SCPE_OK;
 }
 
-t_stat rom_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc)
+t_stat sysd_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-if (cptr != NULL) rom_diag_full = strcmp(cptr, "MIN");
+if (cptr != NULL) ka_diag_full = strcmp(cptr, "MIN");
 return SCPE_OK;
 }
 
-t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc)
+t_stat sysd_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-fprintf(st, "diag=%s", (rom_diag_full ? "full" :"min"));
+fprintf(st, "DIAG=%s", (ka_diag_full ? "full" :"min"));
+return SCPE_OK;
+}
+
+t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+ka_hltenab = val;
+return SCPE_OK;
+}
+
+t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf(st, "%s", ka_hltenab ? "NOAUTOBOOT" : "AUTOBOOT");
 return SCPE_OK;
 }
 
@@ -878,9 +893,9 @@ t_stat sysd_reset (DEVICE *dptr)
 {
 if (sim_switches & SWMASK ('P')) sysd_powerup ();       /* powerup? */
 ka_bdr = (BDR_POK | \
-    ((rom_diag_full ? BDC_NORM : BDC_SKPM) << BDR_V_BDC) | \
+    ((ka_diag_full ? BDC_NORM : BDC_SKPM) << BDR_V_BDC) | \
     (CPUC_ARB << BDR_V_CPUC) | \
-    BDR_BRKENB | \
+    (ka_hltenab ? BDR_BRKENB : 0) | \
     0xF);
 ka_mser = 0;
 ka_cear = 0;
@@ -900,7 +915,7 @@ return "system devices";
 
 t_stat sysd_powerup (void)
 {
-rom_diag_full = 0;
+ka_diag_full = 0;
 return SCPE_OK;
 }
 

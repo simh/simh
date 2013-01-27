@@ -216,6 +216,7 @@ int32 cso_csr = 0;                                      /* control/status */
 int32 cmctl_reg[CMCTLSIZE >> 2] = { 0 };                /* CMCTL reg */
 int32 ka_cacr = 0;                                      /* KA655 cache ctl */
 int32 ka_bdr = BDR_BRKENB;                              /* KA655 boot diag */
+t_bool ka_hltenab = 1;                                  /* Halt Enable / Autoboot flag */
 int32 ssc_base = SSCBASE;                               /* SSC base */
 int32 ssc_cnf = 0;                                      /* SSC conf */
 int32 ssc_bto = 0;                                      /* SSC timeout */
@@ -468,6 +469,7 @@ REG sysd_reg[] = {
     { HRDATAD (ADSM1,  ssc_adsm[1], 32, "SSC address match 1 address") },
     { HRDATAD (ADSK1,  ssc_adsk[1], 32, "SSC address match 1 mask") },
     { BRDATAD (CDGDAT, cdg_dat, 16, 32, CDASIZE >> 2, "cache diagnostic data store") },
+    { FLDATAD (HLTENAB, ka_hltenab,  0, "KA655 Autoboot/Halt Enable") },
     { NULL }
     };
 
@@ -1629,6 +1631,22 @@ return SCPE_OK;
 t_stat cpu_print_model (FILE *st)
 {
 fprintf (st, "MicroVAX 3900 (KA655)");
+return SCPE_OK;
+}
+
+t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+ka_hltenab = val;
+if (ka_hltenab)
+    ka_bdr |= BDR_BRKENB;
+else
+    ka_bdr &= ~BDR_BRKENB;
+return SCPE_OK;
+}
+
+t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf(st, "%s", ka_hltenab ? "NOAUTOBOOT" : "AUTOBOOT");
 return SCPE_OK;
 }
 
