@@ -307,3 +307,16 @@ UNZIP can be found on the VMS freeware CDs, or from www.info-zip.org
 MMS (Module Management System) can be licensed from HP/Compaq/Digital as part of the VMS Hobbyist program (it is a component of the DECSET product).
 MMK can be found on the VMS freeware CDs, or from http://www.kednos.com/kednos/Open_Source/MMK
 DEC C can be licensed from HP/Compaq/Digital as part of the VMS Hobbyist program.
+
+## Problem Reports
+
+If you find problems or have suggestions relating to any simulator or the simh package as a whole, please report these using the github "Issue" interface at https://github.com/simh/simh/issues.
+
+Problem reports should contain;
+ - a description of the problem
+ - the simulator you experience the problem with
+ - your host platform (and OS version)
+ - how you built the simulator or that you're using prebuilt binaries
+ - the simulator build description should include the output produced by while building the simulator
+ - the simulator configuration file (or commands) which were used when the problem occurred.
+ 
