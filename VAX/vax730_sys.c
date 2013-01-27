@@ -140,7 +140,8 @@ DEVICE sysb_dev = {
 
 CTAB vax730_cmd[] = {
     { "BOOT", &vax730_boot, RU_BOOT,
-      "bo{ot} <device>{/R5:flg} boot device\n", &run_cmd_message },
+      "bo{ot} <device>{/R5:flg} boot device\n"
+      "                         type HELP CPU to see bootable devices\n", &run_cmd_message },
     { NULL }
     };
 
@@ -482,8 +483,15 @@ t_stat vax730_boot (int32 flag, char *ptr)
 t_stat r;
 
 r = vax730_boot_parse (flag, ptr);                      /* parse the boot cmd */
-if (r != SCPE_OK)                                       /* error? */
+if (r != SCPE_OK) {                                     /* error? */
+    if (r >= SCPE_BASE) {                               /* message available? */
+        printf ("%s\n", sim_error_text (r));
+        if (sim_log)
+            fprintf (sim_log, "%s\n", sim_error_text (r));
+        r |= SCPE_NOMESSAGE;
+        }
     return r;
+    }
 strncpy (cpu_boot_cmd, ptr, CBUFSIZE);                  /* save for reboot */
 return run_cmd (flag, "CPU");
 }
@@ -501,6 +509,8 @@ DIB *dibp;
 uint32 ba;
 t_stat r;
 
+if (!ptr || !*ptr)
+    return SCPE_2FARG;
 regptr = get_glyph (ptr, gbuf, 0);                      /* get glyph */
 if ((slptr = strchr (gbuf, '/'))) {                     /* found slash? */
     regptr = strchr (ptr, '/');                         /* locate orig */

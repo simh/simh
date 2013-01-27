@@ -1236,9 +1236,16 @@ if (*cptr) {
                                 dptr->attach_help (sim_log, dptr, uptr, 0, cptr);
                             }
                         else {
-                            helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
-                            if (sim_log)
-                                helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
+                            if (helps[i].attach_help) {
+                                helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
+                                if (sim_log)
+                                    helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
+                                }
+                            else {
+                                fprintf (stdout, "No help available for the %s device ATTACH command\n", dptr->name, cmdp->name);
+                                if (sim_log)
+                                    fprintf (sim_log, "No help available for the %s device ATTACH command\n", dptr->name, cmdp->name);
+                                }
                             }
                         }
                     }
