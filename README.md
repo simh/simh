@@ -60,7 +60,7 @@
     booting have those files imbedded into the simulator executable.  The 
     imbedded files are used if the normal boot file isn't found when the 
     simulator boots.  Specific examples are:  VAX (MicroVAX 3900 - ka655x.bin), 
-    VAX860 (VAX 8600 - vmb.exe), VAX780 (VAX 11/780 - vmb.exe), 
+    VAX8600 (VAX 8600 - vmb.exe), VAX780 (VAX 11/780 - vmb.exe), 
     VAX750 (VAX 11/750 - vmb.exe), VAX730 (VAX 11/730 - vmb.exe), 
     VAX610 (MicroVAX I - ka610.bin), VAX620 (rtVAX 1000 - ka620.bin), 
     VAX630 (MicroVAX II - ka630.bin)
@@ -217,6 +217,7 @@ Command Aliases
 
 The SHIFT command will shift the %1 thru %9 arguments to the left one position.
 
+## Building and running a simulator
 
 ### Use Prebuilt Windows Simulators
 
@@ -263,9 +264,9 @@ Download the latest source code as a zip file from: https://github.com/simh/simh
 Unzip it in the directory that you want SIMH to reside in.  Unpack it and 
 set the file attributes as follows:
 
-$ unzip simh-master.zip
-$ set default [.simh-master]
-$ set file/attri=RFM:STM makefile,*.mms,[...]*.c,[...]*.h,[...]*.txt
+    $ unzip simh-master.zip
+    $ set default [.simh-master]
+    $ set file/attri=RFM:STM makefile,*.mms,[...]*.c,[...]*.h,[...]*.txt
 
 Simulators with ethernet network devices (All the VAX simulators and the 
 PDP11) can have functioning networking when running on Alpha or IA64 OpenVMS.
@@ -275,8 +276,8 @@ package must be available while building your simulator.  The simh-vms-pcap.zip
 file can be downloaded from https://github.com/simh/simh/archive/vms-pcap.zip   
 This link will return a file called simh-vms-pcap.zip which should be unpacked as follows:
 
-$ unzip -aa simh-vms-pcap.zip
-$ rename [.simh-vms-pcap]pcap-vms.dir []
+    $ unzip -aa simh-vms-pcap.zip
+    $ rename [.simh-vms-pcap]pcap-vms.dir []
 
 The PCAP-VMS components are presumed (by the descript.mms file) to be 
 located in a directory at the same level as the directory containing the 
@@ -296,12 +297,12 @@ To build simulators:
 
 On a VAX use:
 
-$ MMx
+    $ MMx
 
 On a Alpha & IA64 hosts use:
 
-$ MMx                        ! With Ethernet support
-$ MMx/MACRO=(“NONETWORK=1)   ! Without Ethernet support
+    $ MMx                        ! With Ethernet support
+    $ MMx/MACRO=(“NONETWORK=1)   ! Without Ethernet support
 
 UNZIP can be found on the VMS freeware CDs, or from www.info-zip.org
 MMS (Module Management System) can be licensed from HP/Compaq/Digital as part of the VMS Hobbyist program (it is a component of the DECSET product).
