@@ -44,8 +44,12 @@
     Outgoing connections per line (virtual Null Modem cable).
 
 #### Asynchronous I/O
-    * Disk and Tape I/O can be asynchronous.  Asynchronous support exists for pdp11_rq, pdp11_rp and pdp11_tq devices (used by VAX and PDP11 simulators).
-    * Multiplexer I/O (Telnet and/or Serial) can be asynchronous.  Asynchronous support exists for console I/O and most multiplexer devices.
+    * Disk and Tape I/O can be asynchronous.  Asynchronous support exists 
+      for pdp11_rq, pdp11_rp and pdp11_tq devices (used by VAX and PDP11 
+      simulators).
+    * Multiplexer I/O (Telnet and/or Serial) can be asynchronous.  
+      Asynchronous support exists for console I/O and most multiplexer 
+      devices.  (Still experimental - not currently by default)
 
 #### Disk Extensions
     RAW Disk Access (including CDROM)
@@ -65,17 +69,46 @@
 
 The following extensions to the SCP command language without affecting prior behavior:
 
-         GOTO <Label>                 Command is now available.  Labels are lines in which the first non whitespace character is a “:”.  The target of a goto is the first matching label in the current do command file which is encountered.  Since labels don’t do anything else besides being the targets of goto’s, they could be used to provide comments in do command files, for example (“:: This is a comment”)
-         SET ON                       Enables error trapping for currently defined traps (by ON commands)
-         SET NOON                     Disables error trapping for currently defined traps (by ON commands)
-         RETURN                       Return from the current do command file execution with the status from the last executed command
-         RETURN <statusvalue>         Return from the current do command file execution with the indicated status.  Status can be a number or a SCPE_<conditionname> name string.
-         ON <statusvalue> commandtoprocess{; additionalcommandtoprocess}
-                                      Sets the action(s) to take when the specific error status is returned by a command in the currently running do command file.  Multiple actions can be specified with each delimited by a semicolon character (just like breakpoint action commands).
-         ON ERROR commandtoprocess{; additionalcommandtoprocess}
-                                      Sets the default action(s) to take when any otherwise unspecified error status is returned by a command in the currently running do command file.  Multiple actions can be specified with each delimited by a semicolon character (just like breakpoint action commands).
-         ON <statusvalue>                   
-         ON ERROR                     Clears the default actions to take when any otherwise unspecified error status is returned by a command in the currently running do command file.
+    GOTO <Label>                 Command is now available.  Labels are lines 
+                                 in which the first non whitespace character 
+                                 is a “:”.  The target of a goto is the first 
+                                 matching label in the current do command 
+                                 file which is encountered.  Since labels 
+                                 don’t do anything else besides being the 
+                                 targets of goto’s, they could be used to 
+                                 provide comments in do command files, for 
+                                 example (“:: This is a comment”)
+    SET ON                       Enables error trapping for currently defined 
+                                 traps (by ON commands)
+    SET NOON                     Disables error trapping for currently 
+                                 defined traps (by ON commands)
+    RETURN                       Return from the current do command file 
+                                 execution with the status from the last 
+                                 executed command
+    RETURN <statusvalue>         Return from the current do command file 
+                                 execution with the indicated status.  Status 
+                                 can be a number or a SCPE_<conditionname> 
+                                 name string.
+    ON <statusvalue> commandtoprocess{; additionalcommandtoprocess}
+                                 Sets the action(s) to take when the specific 
+                                 error status is returned by a command in the 
+                                 currently running do command file.  Multiple 
+                                 actions can be specified with each delimited 
+                                 by a semicolon character (just like 
+                                 breakpoint action commands).
+    ON ERROR commandtoprocess{; additionalcommandtoprocess}
+                                 Sets the default action(s) to take when any 
+                                 otherwise unspecified error status is returned 
+                                 by a command in the currently running do 
+                                 command file.  Multiple actions can be 
+                                 specified with each delimited by a semicolon 
+                                 character (just like breakpoint action 
+                                 commands).
+    ON <statusvalue>                   
+    ON ERROR                     Clears the default actions to take when any 
+                                 otherwise unspecified error status is 
+                                 returned by a command in the currently 
+                                 running do command file.
 
 
 Error traps can be taken for any command which returns a status other than SCPE_STEP, SCPE_OK, and SCPE_EXIT.   
