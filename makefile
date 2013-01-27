@@ -766,7 +766,7 @@ TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax610 vax620 vax630 vax730 vax750 vax780 vax860 \
+	vax vax610 vax620 vax630 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
 	swtp6800mp-a swtp6800mp-a2 tx-0
