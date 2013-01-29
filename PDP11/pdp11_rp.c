@@ -563,6 +563,7 @@ uint16 rper2[RP_NUMDR] = { 0 };                         /* error status 2 */
 uint16 rper3[RP_NUMDR] = { 0 };                         /* error status 3 */
 uint16 rpec1[RP_NUMDR] = { 0 };                         /* ECC correction 1 */
 uint16 rpec2[RP_NUMDR] = { 0 };                         /* ECC correction 2 */
+uint16 rpxbc[RP_NUMDR] = { 0 };                         /* Byte Count Copy */
 int32 rp_stopioe = 1;                                   /* stop on error */
 int32 rp_swait = 26;                                    /* seek time */
 int32 rp_rwait = 10;                                    /* rotate time */
@@ -1135,7 +1136,6 @@ if ((uptr->flags & UNIT_ATT) == 0) {                    /* not attached? */
     rp_update_ds (DS_ATA, drv);                         /* set attn */
     return (rp_stopioe? SCPE_UNATT: SCPE_OK);
     }
-
 if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
     switch (fnc) {                                      /* case on function */
 
@@ -1164,7 +1164,7 @@ if (!uptr->io_complete) { /* Top End (I/O Initiation) Processing */
         case FNC_WCHK:                                  /* write check */
         case FNC_READ:                                  /* read */
         case FNC_READH:                                 /* read headers */
-            mbc = mba_get_bc (dibp->ba);                /* get byte count */
+            mbc = rpxbc[drv] = mba_get_bc (dibp->ba);   /* get byte count */
             wc = (mbc + 1) >> 1;                        /* convert to words */
             if ((da + wc) > drv_tab[dtype].size) {      /* disk overrun? */
                 rp_set_er (ER1_AOE, drv);               /* set err */
@@ -1203,7 +1203,7 @@ else { /* Bottom End (After I/O processing) */
     err = uptr->io_status;
 
     switch (fnc) {                                      /* case on function */
-
+        /* Functions having no Bottom since they are complete in the Top half */
         case FNC_OFFSET:                                /* offset */
         case FNC_RETURN:                                /* return to centerline */
         case FNC_UNLOAD:                                /* unload */
@@ -1211,13 +1211,14 @@ else { /* Bottom End (After I/O processing) */
         case FNC_SEARCH:                                /* search */
         case FNC_SEEK:                                  /* seek */
         case FNC_WRITEH:                                /* write headers stub */
+            abort ();                                   /* should NEVER happen */
             break;
 
         case FNC_WRITE:                                 /* write */
         case FNC_WCHK:                                  /* write check */
         case FNC_READ:                                  /* read */
         case FNC_READH:                                 /* read headers */
-            mbc = mba_get_bc (dibp->ba);                /* get byte count */
+            mbc = rpxbc[drv];                           /* get byte count */
             wc = (mbc + 1) >> 1;                        /* convert to words */
             if (fnc == FNC_WRITE) {                     /* write? */
                 }                                       /* end if wr */
