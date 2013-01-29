@@ -1623,14 +1623,9 @@ if (*rom == 0) {                                        /* no boot? */
     r = cpu_load_bootcode (BOOT_CODE_FILENAME, BOOT_CODE_ARRAY, BOOT_CODE_SIZE, TRUE, 0);
     if (r != SCPE_OK)
         return r;
+    rom_wr_B (ROMBASE+4, sys_model ? 1 : 2);            /* Set Magic Byte to determine system type */
     }
 sysd_powerup ();
-return SCPE_OK;
-}
-
-t_stat cpu_print_model (FILE *st)
-{
-fprintf (st, "MicroVAX 3900 (KA655)");
 return SCPE_OK;
 }
 
@@ -1697,6 +1692,24 @@ return SCPE_OK;
 char *sysd_description (DEVICE *dptr)
 {
 return "system devices";
+}
+t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+if ((cptr == NULL) || (!*cptr))
+    return SCPE_ARG;
+if (MATCH_CMD(cptr, "VAXSERVER") == 0)
+    sys_model = 0;
+else if (MATCH_CMD(cptr, "MICROVAX") == 0)
+    sys_model = 1;
+else
+    return SCPE_ARG;
+return SCPE_OK;
+}
+
+t_stat cpu_print_model (FILE *st)
+{
+fprintf (st, "%s 3900 (KA655)", (sys_model ? "MicroVAX" : "VAXServer"));
+return SCPE_OK;
 }
 
 t_stat cpu_model_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)

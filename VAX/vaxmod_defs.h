@@ -126,12 +126,12 @@
                         { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size }, \
                         { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size }
-#define CPU_MODEL_MODIFIERS                                                         \
-                        { MTAB_XTD|MTAB_VDV, 0,          "MODEL",      NULL,        \
-                          NULL, &cpu_show_model },                                  \
-                        { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",  \
-                          &sysd_set_halt, &sysd_show_halt },                        \
-                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",\
+#define CPU_MODEL_MODIFIERS                                                             \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={VAXServer|MicroVAX}",  \
+                          &cpu_set_model, &cpu_show_model },                            \
+                        { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",      \
+                          &sysd_set_halt, &sysd_show_halt },                            \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",    \
                           &sysd_set_halt, &sysd_show_halt },
 
 

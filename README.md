@@ -27,6 +27,7 @@
         when connected to serial ports).
     DHU11 (device VH) on Unibus systems now has 16 ports per multiplexer.
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
+    MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer) command to change between system types
 
 #### Terminal Multiplexer additions
     Added support for TCP connections using IPv4 and/or IPv6.
