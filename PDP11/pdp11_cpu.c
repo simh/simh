@@ -717,6 +717,7 @@ while (reason == 0)  {
         break;
 		}
 
+    AIO_CHECK_EVENT;
     if (sim_interval <= 0) {                            /* intv cnt expired? */
         reason = sim_process_event ();                  /* process events */
         trap_req = calc_ints (ipl, trap_req);           /* recalc int req */
