@@ -63,6 +63,7 @@ int32 wtc_mode = WTC_MODE_VMS;
 
 t_stat wtc_set (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat wtc_show (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *wtc_description (DEVICE *dptr);
 t_stat wtc_reset (DEVICE *dptr);
 void wtc_set_valid (void);
@@ -75,6 +76,7 @@ REG wtc_reg[] = {
     { HRDATA (CSRB, wtc_csrb, 8) },
     { HRDATA (CSRC, wtc_csrc, 8) },
     { HRDATA (CSRD, wtc_csrd, 8) },
+    { HRDATA (MODE, wtc_mode, 8) },
     { NULL }
     };
 
@@ -88,7 +90,7 @@ DEVICE wtc_dev = {
     1, 16, 16, 1, 16, 8,
     NULL, NULL, &wtc_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, 0, 0, NULL, NULL, NULL, &wtc_help, NULL, NULL,
     &wtc_description
     };
 
@@ -214,6 +216,19 @@ wtc_csrd |= WTC_CSRD_VRT;
 void wtc_set_invalid (void)
 {
 wtc_csrd &= ~WTC_CSRD_VRT;
+}
+
+t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Watch Chip (WTC)\n\n");
+fprintf (st, "The WTC simulates the MC146818 watch chip.  It recognizes the following options:\n\n");
+fprintf (st, "  SET WTC TIME=STD			standard time mode\n");
+fprintf (st, "  SET WTC TIME=VMS			VMS time mode\n\n");
+fprintf (st, "When running in standard mode the current year reported by the watch chip is\n");
+fprintf (st, "determined by the date/time of the host system.  When running in VMS mode the\n");
+fprintf (st, "year is fixed at 1982, which is one of the conditions VMS expects in order to\n");
+fprintf (st, "verify that the time reported is valid.  The default mode is VMS.\n\n");
+return SCPE_OK;
 }
 
 char *wtc_description (DEVICE *dptr)
