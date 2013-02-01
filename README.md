@@ -131,6 +131,8 @@ Other related changes/extensions:
 
     HELP dev
     HELP dev ATTACH
+    HELP dev SET
+    HELP dev SHOW
     HELP dev REGISTERS
 
 #### Generic scp support Clock Coscheduling as opposed to per simulator implementations.

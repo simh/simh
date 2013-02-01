@@ -528,15 +528,20 @@ struct sim_mtab {
     void                *desc;                          /* value descriptor */
                                                         /* REG * if MTAB_VAL */
                                                         /* int * if not */
+    char                *help;                          /* help string */
     };
 
+
+/* mtab mask flag bits */
+/* NOTE: MTAB_VALR and MTAB_VALO are only used to display help */
 #define MTAB_XTD        (1u << UNIT_V_RSV)              /* ext entry flag */
-#define MTAB_VDV        001                             /* valid for dev */
-#define MTAB_VUN        002                             /* valid for unit */
-#define MTAB_VAL        004                             /* takes a value */
-#define MTAB_NMO        010                             /* only if named */
-#define MTAB_NC         020                             /* no UC conversion */
-#define MTAB_SHP        040                             /* show takes parameter */
+#define MTAB_VDV        0001                            /* valid for dev */
+#define MTAB_VUN        0002                            /* valid for unit */
+#define MTAB_VALR       0004                            /* takes a value (required) */
+#define MTAB_VALO       0010                            /* takes a value (optional) */
+#define MTAB_NMO        0020                            /* only if named */
+#define MTAB_NC         0040                            /* no UC conversion */
+#define MTAB_SHP        0100                            /* show takes parameter */
 
 /* Search table */
 
