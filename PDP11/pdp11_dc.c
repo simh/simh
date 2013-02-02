@@ -177,7 +177,7 @@ MTAB dci_mod[] = {
       NULL, &tmxr_show_cstat, (void *) &dcx_desc },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
       NULL, &tmxr_show_cstat, (void *) &dcx_desc },
-    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
+    { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", NULL,
       &set_addr, &show_addr, NULL },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
       &set_addr_flt, NULL, NULL },
