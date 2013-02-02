@@ -1157,7 +1157,7 @@ if (dptr->modifiers) {
             continue;
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
-        sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, (mptr->mask & MTAB_SHP) ? " arg" : "");
+        sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, (mptr->mask & MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
@@ -1171,7 +1171,7 @@ if (dptr->modifiers) {
             continue;
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
-        sprintf (buf, "show %s%s %s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, (mptr->mask & MTAB_SHP) ? " arg" : "");
+        sprintf (buf, "show %s%s %s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, (mptr->mask & MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
