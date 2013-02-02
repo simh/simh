@@ -1101,10 +1101,10 @@ char buf[CBUFSIZE];
 
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!(mptr->mask & MTAB_VDV) && (mptr->mask & MTAB_VUN))
-            continue;
+        if (!MMASK(mptr,MTAB_VDV) && MMASK(mptr,MTAB_VUN))
+            continue;                                       /* skip unit only modifiers */
         if (mptr->mstring) {
-            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : ((mptr->mask & MTAB_VALR) ? "=val" : ((mptr->mask & MTAB_VALO) ? "{=val}": "")));
+            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MMASK(mptr,MTAB_VALR) ? "=val" : (MMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
@@ -1126,20 +1126,22 @@ if (dptr->flags & DEV_DEBUG) {
         for (dep = dptr->debflags; dep->name != NULL; dep++)
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
-        fprintf (st,  "%-30s\tEnables detailed debugging for device %s\n", buf, sim_dname (dptr));
+        fprintf (st,  "%-30s\tEnables specific debugging for device %s\n", buf, sim_dname (dptr));
         fprintf (st, "set %s NODEBUG=", sim_dname (dptr));
         for (dep = dptr->debflags; dep->name != NULL; dep++)
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
-        fprintf (st,  "%-30s\tDisables detailed debugging for device %s\n", buf, sim_dname (dptr));
+        fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
         }
     }
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if ((!(mptr->mask & MTAB_VUN)) && (mptr->mask & MTAB_XTD))
+        if ((!MMASK(mptr,MTAB_VUN)) && MMASK(mptr,MTAB_XTD))
+            continue;                                           /* skip device only modifiers */
+        if ((dptr == sim_dflt_dev) && (dptr->numunits == 1) && !(mptr->mask & MTAB_XTD))
             continue;
         if (mptr->mstring) {
-            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : ((mptr->mask & MTAB_VALR) ? "=val" : ((mptr->mask & MTAB_VALO) ? "{=val}": "")));
+            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MMASK(mptr,MTAB_VALR) ? "=val" : (MMASK(mptr,MTAB_VALO) ? "{=val}": "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
@@ -1153,11 +1155,11 @@ char buf[CBUFSIZE];
 
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!(mptr->mask & MTAB_VDV) && (mptr->mask & MTAB_VUN))
+        if (!MMASK(mptr,MTAB_VDV) && MMASK(mptr,MTAB_VUN))
+            continue;                                       /* skip unit only modifiers */
+        if ((!mptr->disp) || (!mptr->pstring) || !(*mptr->pstring))
             continue;
-        if ((!mptr->disp) || (!mptr->pstring))
-            continue;
-        sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, (mptr->mask & MTAB_SHP) ? "=arg" : "");
+        sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, MMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
@@ -1167,11 +1169,13 @@ if (dptr->flags & DEV_DEBUG) {
     }
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if ((!(mptr->mask & MTAB_VUN)) && (mptr->mask & MTAB_XTD))
-            continue;
+        if ((!MMASK(mptr,MTAB_VUN)) && MMASK(mptr,MTAB_XTD))
+            continue;                                           /* skip device only modifiers */
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
-        sprintf (buf, "show %s%s %s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, (mptr->mask & MTAB_SHP) ? "=arg" : "");
+        if ((dptr == sim_dflt_dev) && (dptr->numunits == 1) && !(mptr->mask & MTAB_XTD))
+            continue;
+        sprintf (buf, "show %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, MMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
@@ -1360,9 +1364,9 @@ if (*cptr) {
                                             helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
                                         }
                                     else {
-                                        fprintf (stdout, "No help available for the %s device ATTACH command\n", dptr->name, cmdp->name);
+                                        fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
                                         if (sim_log)
-                                            fprintf (sim_log, "No help available for the %s device ATTACH command\n", dptr->name, cmdp->name);
+                                            fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
                                         }
                                     }
                                 }
@@ -2278,12 +2282,12 @@ while (*cptr != 0) {                                    /* do all mods */
         if ((mptr->mstring) &&                          /* match string */
             (MATCH_CMD (gbuf, mptr->mstring) == 0)) {   /* matches option? */
             if (mptr->mask & MTAB_XTD) {                /* extended? */
-                if ((lvl & mptr->mask) == 0)
+                if (((lvl & mptr->mask) & ~MTAB_XTD) == 0)
                     return SCPE_ARG;
-                if ((lvl & MTAB_VUN) && (uptr->flags & UNIT_DIS))
+                if ((lvl == MTAB_VUN) && (uptr->flags & UNIT_DIS))
                     return SCPE_UDIS;                   /* unit disabled? */
                 if (mptr->valid) {                      /* validation rtn? */
-                    if (cvptr && (mptr->mask & MTAB_NC)) {
+                    if (cvptr && MMASK(mptr,MTAB_NC)) {
                         get_glyph_nc (svptr, gbuf, ',');
                         if ((cvptr = strchr (gbuf, '=')))
                             *cvptr++ = 0;
