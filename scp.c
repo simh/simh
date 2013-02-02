@@ -2965,9 +2965,10 @@ MTAB *mptr;
 if (dptr->modifiers == NULL)
     return SCPE_OK;
 for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-    if (mptr->pstring && ((mptr->mask & MTAB_XTD)?
-        ((mptr->mask & flag) && !(mptr->mask & MTAB_NMO)): 
-        ((MTAB_VUN & flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
+    if (mptr->pstring && 
+        ((mptr->mask & MTAB_XTD)?
+            (MMASK(mptr,flag) && !MMASK(mptr,MTAB_NMO)): 
+            ((MTAB_VUN == flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
         if (*toks > 2) {
             fprintf (st, "\n");
             *toks = 0;
@@ -2994,7 +2995,7 @@ if (mptr->disp)
 //        rptr->flags & REG_FMT);
 //    }
 else fputs (mptr->pstring, st);
-if (flag && !((mptr->mask & MTAB_XTD) && (mptr->mask & MTAB_NMO)))
+if (flag && !((mptr->mask & MTAB_XTD) && MMASK(mptr,MTAB_NMO)))
     fputc ('\n', st);
 return SCPE_OK;
 }
