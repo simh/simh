@@ -1104,8 +1104,8 @@ if (dptr->modifiers) {
         if (!(mptr->mask & MTAB_VDV) && (mptr->mask & MTAB_VUN))
             continue;
         if (mptr->mstring) {
-            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (mptr->mask & MTAB_VALR) ? "=val" : ((mptr->mask & MTAB_VALO) ? "{=val}": ""));
-            fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
+            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : ((mptr->mask & MTAB_VALR) ? "=val" : ((mptr->mask & MTAB_VALO) ? "{=val}": "")));
+            fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
     }
@@ -1121,24 +1121,26 @@ if (dptr->flags & DEV_DEBUG) {
     sprintf (buf, "set %s NODEBUG", sim_dname (dptr));
     fprintf (st,  "%-30s\tDisables debugging for device %s\n", buf, sim_dname (dptr));
     if (dptr->debflags) {
-        fprintf (st, "To enable or disable detailed debugging on the %s device:\n", sim_dname (dptr));
+        strcpy (buf, "");
         fprintf (st, "set %s DEBUG=", sim_dname (dptr));
         for (dep = dptr->debflags; dep->name != NULL; dep++)
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
+        fprintf (st,  "%-30s\tEnables detailed debugging for device %s\n", buf, sim_dname (dptr));
         fprintf (st, "set %s NODEBUG=", sim_dname (dptr));
         for (dep = dptr->debflags; dep->name != NULL; dep++)
             fprintf (st, "%s%s", ((dep == dptr->debflags) ? "" : ";"), dep->name);
         fprintf (st, "\n");
+        fprintf (st,  "%-30s\tDisables detailed debugging for device %s\n", buf, sim_dname (dptr));
         }
     }
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!(mptr->mask & MTAB_VUN))
+        if ((!(mptr->mask & MTAB_VUN)) && (mptr->mask & MTAB_XTD))
             continue;
         if (mptr->mstring) {
-            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (mptr->mask & MTAB_VALR) ? "=val" : ((mptr->mask & MTAB_VALO) ? "{=val}": ""));
-            fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
+            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : ((mptr->mask & MTAB_VALR) ? "=val" : ((mptr->mask & MTAB_VALO) ? "{=val}": "")));
+            fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
     }
@@ -1165,7 +1167,7 @@ if (dptr->flags & DEV_DEBUG) {
     }
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!(mptr->mask & MTAB_VUN))
+        if ((!(mptr->mask & MTAB_VUN)) && (mptr->mask & MTAB_XTD))
             continue;
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
