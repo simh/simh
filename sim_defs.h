@@ -542,7 +542,7 @@ struct sim_mtab {
 #define MTAB_NMO        (0020 | MTAB_XTD)               /* only if named */
 #define MTAB_NC         (0040 | MTAB_XTD)               /* no UC conversion */
 #define MTAB_SHP        (0100 | MTAB_XTD)               /* show takes parameter */
-#define MMASK(mptr,flag) (((mptr)->mask & flag) == flag)/* flag mask test */
+#define MODMASK(mptr,flag) (((mptr)->mask & flag) == flag)/* flag mask test */
 
 /* Search table */
 

@@ -1101,10 +1101,10 @@ char buf[CBUFSIZE];
 
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!MMASK(mptr,MTAB_VDV) && MMASK(mptr,MTAB_VUN))
+        if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN))
             continue;                                       /* skip unit only modifiers */
         if (mptr->mstring) {
-            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MMASK(mptr,MTAB_VALR) ? "=val" : (MMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
+            sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
@@ -1136,12 +1136,12 @@ if (dptr->flags & DEV_DEBUG) {
     }
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if ((!MMASK(mptr,MTAB_VUN)) && MMASK(mptr,MTAB_XTD))
+        if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
         if ((dptr == sim_dflt_dev) && (dptr->numunits == 1) && !(mptr->mask & MTAB_XTD))
             continue;
         if (mptr->mstring) {
-            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MMASK(mptr,MTAB_VALR) ? "=val" : (MMASK(mptr,MTAB_VALO) ? "{=val}": "")));
+            sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
@@ -1155,11 +1155,11 @@ char buf[CBUFSIZE];
 
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!MMASK(mptr,MTAB_VDV) && MMASK(mptr,MTAB_VUN))
+        if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN))
             continue;                                       /* skip unit only modifiers */
         if ((!mptr->disp) || (!mptr->pstring) || !(*mptr->pstring))
             continue;
-        sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, MMASK(mptr,MTAB_SHP) ? "=arg" : "");
+        sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
@@ -1169,13 +1169,13 @@ if (dptr->flags & DEV_DEBUG) {
     }
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if ((!MMASK(mptr,MTAB_VUN)) && MMASK(mptr,MTAB_XTD))
+        if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
         if ((dptr == sim_dflt_dev) && (dptr->numunits == 1) && !(mptr->mask & MTAB_XTD))
             continue;
-        sprintf (buf, "show %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, MMASK(mptr,MTAB_SHP) ? "=arg" : "");
+        sprintf (buf, "show %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
@@ -2287,7 +2287,7 @@ while (*cptr != 0) {                                    /* do all mods */
                 if ((lvl == MTAB_VUN) && (uptr->flags & UNIT_DIS))
                     return SCPE_UDIS;                   /* unit disabled? */
                 if (mptr->valid) {                      /* validation rtn? */
-                    if (cvptr && MMASK(mptr,MTAB_NC)) {
+                    if (cvptr && MODMASK(mptr,MTAB_NC)) {
                         get_glyph_nc (svptr, gbuf, ',');
                         if ((cvptr = strchr (gbuf, '=')))
                             *cvptr++ = 0;
@@ -2967,7 +2967,7 @@ if (dptr->modifiers == NULL)
 for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
     if (mptr->pstring && 
         ((mptr->mask & MTAB_XTD)?
-            (MMASK(mptr,flag) && !MMASK(mptr,MTAB_NMO)): 
+            (MODMASK(mptr,flag) && !MODMASK(mptr,MTAB_NMO)): 
             ((MTAB_VUN == flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
         if (*toks > 2) {
             fprintf (st, "\n");
@@ -2995,7 +2995,7 @@ if (mptr->disp)
 //        rptr->flags & REG_FMT);
 //    }
 else fputs (mptr->pstring, st);
-if (flag && !((mptr->mask & MTAB_XTD) && MMASK(mptr,MTAB_NMO)))
+if (flag && !((mptr->mask & MTAB_XTD) && MODMASK(mptr,MTAB_NMO)))
     fputc ('\n', st);
 return SCPE_OK;
 }
