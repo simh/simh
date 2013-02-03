@@ -763,7 +763,7 @@ TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 # Build everything
 #
 ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
-	vax vax610 vax620 vax630 vax730 vax750 vax780 vax8600 \
+	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
 	swtp6800mp-a swtp6800mp-a2 tx-0
@@ -847,27 +847,34 @@ ${BIN}pdp11${EXE} : ${PDP11} ${SIM}
 	${MKDIRBIN}
 	${CC} ${PDP11} ${SIM} ${PDP11_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 
-vax : ${BIN}vax${EXE}
+vax : microvax3900
 
-${BIN}vax${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
+microvax3900 : ${BIN}microvax3900${EXE}
+
+${BIN}microvax3900${EXE} : ${VAX} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX} ${SIM} ${VAX_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+ifeq ($(WIN32),)
+	cp ${BIN}microvax3900${EXE} ${BIN}vax${EXE}
+else
+	copy $(@D)\microvax3900${EXE} $(@D)\vax${EXE}
+endif
 
-vax610 : ${BIN}vax610${EXE}
+microvax1 : ${BIN}microvax1${EXE}
 
-${BIN}vax610${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
+${BIN}microvax1${EXE} : ${VAX610} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX610} ${SIM} ${VAX610_OPT} -o $@ ${LDFLAGS}
 
-vax620 : ${BIN}vax620${EXE}
+rtvax1000 : ${BIN}rtvax1000${EXE}
 
-${BIN}vax620${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
+${BIN}rtvax1000${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX620_OPT} -o $@ ${LDFLAGS}
 
-vax630 : ${BIN}vax630${EXE}
+microvax2 : ${BIN}microvax2${EXE}
 
-${BIN}vax630${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
+${BIN}microvax2${EXE} : ${VAX630} ${SIM} ${BUILD_ROMS}
 	${MKDIRBIN}
 	${CC} ${VAX630} ${SIM} ${VAX630_OPT} -o $@ ${LDFLAGS}
 
