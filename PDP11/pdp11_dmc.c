@@ -426,21 +426,21 @@ REG dmp_reg[] = {
 
 MTAB dmc_mod[] = {
     { MTAB_XTD|MTAB_VDV,          0, "PEER", "PEER=address:port",
-        &dmc_setpeer, &dmc_showpeer, NULL, "Set/Display destination" },
+        &dmc_setpeer, &dmc_showpeer, NULL, "Display destination/source depends on LINEMODE" },
     { MTAB_XTD|MTAB_VDV,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
         &dmc_setspeed, &dmc_showspeed, NULL, "Display rate limit" },
 #ifdef DMP
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,0, "TYPE", "TYPE" ,&dmc_settype, &dmc_showtype, NULL, "Set/Display device type"  },
 #endif
     { MTAB_XTD|MTAB_VDV,          0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}",
-        &dmc_setlinemode, &dmc_showlinemode, NULL },
+        &dmc_setlinemode, &dmc_showlinemode, NULL, "Display the connection orientation" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATS", "STATS",
         &dmc_setstats, &dmc_showstats, NULL, "Display statistics" },
     { MTAB_XTD|MTAB_VDV,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
         &dmc_setconnectpoll, &dmc_showconnectpoll, NULL, "Display connection poll interval" },
-    { MTAB_XTD|MTAB_VDV,        006, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,        006, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV,          0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,          0, "VECTOR", "VECTOR",
         &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 },
 };

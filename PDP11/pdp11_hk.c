@@ -660,9 +660,9 @@ MTAB hk_mod[] = {
         &hk_set_size, NULL, NULL, "Set type to RK06" }, 
     { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK07, NULL, "RK07", 
         &hk_set_size, NULL, NULL, "Set type to RK07" }, 
-    { MTAB_XTD|MTAB_VDV, 0040, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0040, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV,    0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
       &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };

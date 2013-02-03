@@ -186,9 +186,9 @@ MTAB ta_mod[] = {
 //      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", NULL,
       NULL, &sim_tape_show_capac, NULL },
-    { MTAB_XTD|MTAB_VDV, IOLN_TA, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, IOLN_TA, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL },
     { 0 }
     };

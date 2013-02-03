@@ -355,9 +355,9 @@ static const MTAB rl_mod[] = {
         &rl_set_size, NULL, NULL, "Set drive type RL01" },
     { (UNIT_AUTO+UNIT_RL02), UNIT_RL02, NULL, "RL02", 
         &rl_set_size, NULL, NULL, "Set drive type RL02"  },
-    { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
         &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };

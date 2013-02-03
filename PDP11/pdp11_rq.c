@@ -991,7 +991,7 @@ MTAB rq_mod[] = {
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
       &sim_disk_set_fmt, &sim_disk_show_fmt, NULL, "Set/Display disk format (SIMH, VHD, RAW)" },
 #if defined (VM_PDP11)
-    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
       &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
       &set_addr_flt, NULL, NULL, "Enable autoconfiguration of address & vector" },
