@@ -624,7 +624,8 @@ static CTAB cmd_table[] = {
     { "NOBREAK", &brk_cmd, SSH_CL,
       "nobr{eak} <list>         clear breakpoints\n" },
     { "ATTACH", &attach_cmd, 0,
-      "at{tach} <unit> <file>   attach file to simulated unit\n" },
+      "at{tach} <unit> <file>   attach file to simulated unit\n"
+      "h{elp} <dev> attach      displays any device specific attach help\n" },
     { "DETACH", &detach_cmd, 0,
       "det{ach} <unit>          detach file from simulated unit\n" },
     { "ASSIGN", &assign_cmd, 0,
@@ -712,7 +713,7 @@ static CTAB cmd_table[] = {
       "set <unit> ENABLED       enable unit\n"
       "set <unit> DISABLED      disable unit\n"
       "set <unit> arg{,arg...}  set unit parameters (see show modifiers)\n"
-      },
+      "help <dev> set           displays the device specific set commands available\n" },
     { "SHOW", &show_cmd, 0,
       "sh{ow} br{eak} <list>    show breakpoints\n"
       "sh{ow} con{figuration}   show configuration\n"
@@ -739,7 +740,8 @@ static CTAB cmd_table[] = {
       "sh{ow} serial            show serial devices\n"
       "sh{ow} multiplexer       show open multiplexer devices\n"
       "sh{ow} clocks            show calibrated timers\n"
-      "sh{ow} on                show on condition actions\n"  },
+      "sh{ow} on                show on condition actions\n"
+      "h{elp} <dev> show        displays the device specific show commands available\n" },
     { "DO", &do_cmd, 1,
       "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\n"
       "                         process command file\n" },
