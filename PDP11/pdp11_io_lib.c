@@ -575,6 +575,11 @@ if (name) {                                             /* updating? */
                 autp->numc = nctrl;
             }
         }
+    dptr = find_dev (name);                             /* find ctrl */
+    if (dptr && !UNIBUS && !(dptr->flags & DEV_DIS) && !(dptr->flags & DEV_QBUS)) {
+        dptr->flags |= DEV_DIS;
+        return SCPE_ARG;
+        }
     }
 for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
     if (autp->amod) {                                   /* floating csr? */

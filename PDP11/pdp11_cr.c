@@ -181,7 +181,7 @@ extern int32 int_req[IPL_HLVL];
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
-#define DFLT_DIS        (0)
+#define DFLT_DIS        (DEV_DIS)
 #define DFLT_CR11       (UNIT_CR11)
 #define DFLT_CPM        285
 #endif
