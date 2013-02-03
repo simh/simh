@@ -154,12 +154,14 @@ t_bool ka_hltenab = TRUE;                               /* Halt Enable / Autoboo
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat rom_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
 char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
 char *nvr_description (DEVICE *dptr);
@@ -209,8 +211,8 @@ REG rom_reg[] = {
     };
 
 MTAB rom_mod[] = {
-    { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL },
-    { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY", NULL },
+    { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL, NULL, NULL, "Disable calibrated ROM access speed" },
+    { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY",  NULL, NULL, NULL, "Enable calibrated ROM access speed" },
     { 0 }
     };
 
@@ -219,7 +221,7 @@ DEVICE rom_dev = {
     1, 16, ROMAWIDTH, 4, 16, 32,
     &rom_ex, &rom_dep, &rom_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &rom_help, NULL, NULL, 
     &rom_description
     };
 
@@ -242,7 +244,7 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &nvr_help, NULL, NULL, 
     &nvr_description
     };
 
@@ -400,6 +402,27 @@ if (rom == NULL)
 return SCPE_OK;
 }
 
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Read-only memory (ROM)\n\n");
+fprintf (st, "The boot ROM consists of a single unit, simulating the 64KB boot ROM.  It has\n");
+fprintf (st, "no registers.  The boot ROM is loaded with a binary byte stream using the \n");
+fprintf (st, "LOAD -r command:\n\n");
+fprintf (st, "   LOAD -r KA630.BIN		load ROM image KA630.BIN\n\n");
+fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to about\n");
+fprintf (st, "500K instructions per second.  This delay is required to make the power-up\n");
+fprintf (st, "self-test routines run correctly on very fast hosts.  The delay is controlled\n");
+fprintf (st, "with the commands:\n\n");
+fprintf (st, "  SET ROM NODELAY			ROM runs like RAM\n");
+fprintf (st, "  SET ROM DELAY			ROM runs slowly\n\n");
+fprintf (st, "By default the memory power-up self-tests are skipped as they take a long time\n");
+fprintf (st, "to complete.  The self-test sequence can be controlled with the following\n");
+fprintf (st, "commands:\n\n");
+fprintf (st, "  SET CPU DIAG=MIN        Run minimal diagnostics (skip memory test)\n");
+fprintf (st, "  SET CPU DIAG=FULL       Run full diagnostics\n\n");
+return SCPE_OK;
+}
+
 char *rom_description (DEVICE *dptr)
 {
 return "read-only memory";
@@ -468,6 +491,17 @@ if (nvr == NULL) {
     }
 if (nvr == NULL)
     return SCPE_MEM;
+return SCPE_OK;
+}
+
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Non-volatile Memory (NVR)\n\n");
+fprintf (st, "The NVR simulates 50 bytes of battery-backed up memory.\n");
+fprintf (st, "When the simulator starts, NVR is cleared to 0, and the battery-low indicator\n");
+fprintf (st, "is set.  Alternately, NVR can be attached to a file.  This allows the NVR\n");
+fprintf (st, "state to be preserved across simulator runs.  Successfully attaching an NVR\n");
+fprintf (st, "image clears the battery-low indicator.\n\n");
 return SCPE_OK;
 }
 

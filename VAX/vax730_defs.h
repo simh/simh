@@ -125,14 +125,14 @@
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (2u << 20), NULL, "2M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (3u << 20), NULL, "2M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (4u << 20), NULL, "4M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (5u << 20), NULL, "5M", &cpu_set_size }
-#define CPU_MODEL_MODIFIERS \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL, \
-                          NULL, &cpu_show_model },
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" }, \
+                        { UNIT_MSIZE, (2u << 20), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" }, \
+                        { UNIT_MSIZE, (3u << 20), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 3M bytes" }, \
+                        { UNIT_MSIZE, (4u << 20), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" }, \
+                        { UNIT_MSIZE, (5u << 20), NULL, "5M", &cpu_set_size, NULL, NULL, "Set Memory to 5M bytes" }
+#define CPU_MODEL_MODIFIERS                                                                     \
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
+                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
 
 /* Unibus I/O registers */
 

@@ -149,27 +149,27 @@ struct xu_device    xua = {
 
 MTAB xu_mod[] = {
 #if defined (VM_PDP11)
-  { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
     &set_addr, &show_addr, NULL },
-  { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
+  { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
     &set_addr_flt, NULL, NULL },
-  { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", NULL,
     &set_vec, &show_vec, NULL },
 #else
-  { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
+  { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
     NULL, &show_addr, NULL, "Unibus address" },
   { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
     NULL, &show_vec, NULL, "Interrupt vector" },
 #endif
-  { MTAB_XTD | MTAB_VDV, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "MAC", "MAC=xx:xx:xx:xx:xx:xx",
     &xu_setmac, &xu_showmac, NULL, "MAC address" },
-  { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "ETH", NULL,
+  { MTAB_XTD |MTAB_VDV|MTAB_NMO, 0, "ETH", NULL,
     NULL, &eth_show, NULL, "Display attachable devices" },
-  { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATS", "STATS",
+  { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATS", "STATS",
     &xu_set_stats, &xu_show_stats, NULL, "Display or reset statistics" },
-  { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "FILTERS", NULL,
+  { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "FILTERS", NULL,
     NULL, &xu_show_filters, NULL, "Display address filters" },
-  { MTAB_XTD | MTAB_VDV, 0, "TYPE", "TYPE={DEUNA|DELUA}",
+  { MTAB_XTD|MTAB_VDV, 0, "TYPE", "TYPE={DEUNA|DELUA}",
     &xu_set_type, &xu_show_type, NULL },
   { 0 },
 };

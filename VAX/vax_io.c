@@ -164,13 +164,13 @@ REG qba_reg[] = {
 
 MTAB qba_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
-      NULL, &show_iospace },
+      NULL, &show_iospace, NULL, "Display I/O space address map" },
     { MTAB_XTD|MTAB_VDV, 1, "AUTOCONFIG", "AUTOCONFIG",
-      &set_autocon, &show_autocon },
+      &set_autocon, &show_autocon, NULL, "Enable/Display autoconfiguration" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
-      &set_autocon, NULL },
+      &set_autocon, NULL, NULL, "Disable autoconfiguration" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
-      NULL, &qba_show_virt },
+      NULL, &qba_show_virt, NULL, "Display translation for Unibus address arg" },
     { 0 }
     };
 

@@ -81,7 +81,7 @@ REG wtc_reg[] = {
     };
 
 MTAB wtc_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "TIME", "TIME={VMS|STD}", &wtc_set, &wtc_show },
+    { MTAB_XTD|MTAB_VDV, 0, "TIME", "TIME={VMS|STD}", &wtc_set, &wtc_show, NULL, "Display watch time mode" },
     { 0 }
     };
 

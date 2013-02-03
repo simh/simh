@@ -151,10 +151,9 @@ REG tti_reg[] = {
     };
 
 MTAB tti_mod[] = {
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
-      NULL, &show_vec, NULL },
+    { TT_MODE,  TT_MODE_7B, "7b", "7B",     NULL, NULL,      NULL, "Set 7 bit mode" },
+    { TT_MODE,  TT_MODE_8B, "8b", "8B",     NULL, NULL,      NULL, "Set 8 bit mode" },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL, NULL, &show_vec, NULL, "Display interrupt vector" },
     { 0 }
     };
 
@@ -191,10 +190,10 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
-    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec },
+    { TT_MODE,  TT_MODE_7B, "7b", "7B",     NULL, NULL,      NULL, "Set 7 bit mode" },
+    { TT_MODE,  TT_MODE_8B, "8b", "8B",     NULL, NULL,      NULL, "Set 8 bit mode" },
+    { TT_MODE,  TT_MODE_7P, "7p", "7P",     NULL, NULL,      NULL, "Set 7 bit mode (suppress non printing)" },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL, NULL, &show_vec, NULL, "Display interrupt vector" },
     { 0 }
     };
 
@@ -236,7 +235,7 @@ REG clk_reg[] = {
     };
 
 MTAB clk_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec, NULL, "Display interrupt vector" },
     { 0 }
     };
 

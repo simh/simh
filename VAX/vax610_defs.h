@@ -94,14 +94,14 @@
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
 #undef  PAMASK
 #define PAMASK          0x203FFFFF                      /* KA610 needs a special mask */
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 19), NULL, "512k", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }
-#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,    \
-                              NULL, &cpu_show_leds },                \
-                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,   \
-                              NULL, &cpu_show_model },
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 19), NULL, "512k", &cpu_set_size, NULL, NULL, "Set Memory to 512K bytes" },\
+                        { UNIT_MSIZE, (1u << 20), NULL, "1M",   &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },  \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M",   &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },  \
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M",   &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" }
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
+                              NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
+                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                              \
+                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
 
 /* Qbus I/O page */
 

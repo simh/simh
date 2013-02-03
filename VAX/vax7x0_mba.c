@@ -296,7 +296,7 @@ REG mba0_reg[] = {
 
 MTAB mba0_mod[] = {
     { MTAB_XTD|MTAB_VDV, TR_MBA0, "NEXUS", NULL,
-      NULL, &show_nexus },
+      NULL, &show_nexus, NULL, "Display nexus" },
     { 0 }
     };
 
@@ -306,7 +306,7 @@ UNIT mba1_unit = { UDATA (NULL, 0, 0) };
 
 MTAB mba1_mod[] = {
     { MTAB_XTD|MTAB_VDV, TR_MBA1, "NEXUS", NULL,
-      NULL, &show_nexus },
+      NULL, &show_nexus, NULL, "Display nexus" },
     { 0 }
     };
 

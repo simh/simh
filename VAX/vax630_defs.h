@@ -89,17 +89,6 @@
 #define MT_MBRK         60                              /* microbreak */
 #define MT_MAX          63                              /* last valid IPR */
 
-/* CPU */
-
-#define CPU_MODEL_MODIFIERS                                                         \
-                        { MTAB_XTD|MTAB_VDV, 0,          "MODEL",      NULL,        \
-                          NULL, &cpu_show_model },                                  \
-                        { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}", \
-                          &sysd_set_diag, &sysd_show_diag },                        \
-                        { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",  \
-                          &sysd_set_halt, &sysd_show_halt },                        \
-                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",\
-                          &sysd_set_halt, &sysd_show_halt },
 /* Memory */
 
 #define MAXMEMWIDTH     24                              /* max mem, std KA655 */
@@ -109,12 +98,20 @@
 #define INITMEMSIZE     (1 << 24)                       /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 23) + (1u << 22), NULL, "12M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },                \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },                \
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },                \
+                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },                \
+                        { UNIT_MSIZE, (1u << 23) + (1u << 22), NULL, "12M", &cpu_set_size, NULL, NULL, "Set Memory to 12M bytes" }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" }
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL",      NULL,                            \
+                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" },             \
+                            { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}",                     \
+                              &sysd_set_diag, &sysd_show_diag, NULL, "Set/Show boot rom diagnostic mode" }, \
+                            { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",                      \
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Enable autoboot (Disable Halt)" },    \
+                            { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",                    \
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" }
 
 /* Qbus I/O page */
 

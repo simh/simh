@@ -289,8 +289,8 @@ REG tti_reg[] = {
     };
 
 MTAB tti_mod[] = {
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL, NULL, NULL, "Set 7 bit mode" },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL, NULL, NULL, "Set 8 bit mode" },
     { 0 }
     };
 
@@ -329,9 +329,9 @@ REG tto_reg[] = {
     };
 
 MTAB tto_mod[] = {
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
-    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL, NULL, NULL, "Set 7 bit mode" },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL, NULL, NULL, "Set 8 bit mode" },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL, NULL, NULL, "Set 7 bit mode (suppress non printing)" },
     { 0 }
     };
 
@@ -410,8 +410,8 @@ REG rlcs_reg[] = {
     };
 
 MTAB rlcs_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
+    { UNIT_WLK,         0, "write enabled",  "WRITEENABLED", NULL, NULL, NULL, "Write enable console RL02 drive" },
+    { UNIT_WLK,  UNIT_WLK, "write locked",   "LOCKED", NULL, NULL, NULL, "Write lock console RL02 drive"  },
     { 0 }
     };
 

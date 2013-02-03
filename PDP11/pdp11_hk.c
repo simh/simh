@@ -639,9 +639,12 @@ REG hk_reg[] = {
     };
 
 MTAB hk_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
-    { UNIT_DUMMY, 0, NULL, "BADBLOCK", &hk_set_bad },
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable disk drive" },
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+        NULL, NULL, NULL, "Write lock disk drive"  },
+    { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
+        &hk_set_bad, NULL, NULL, "write bad block table on last track" },
     { (UNIT_DTYPE+UNIT_ATT), UNIT_RK06 + UNIT_ATT,
       "RK06", NULL, NULL },
     { (UNIT_DTYPE+UNIT_ATT), UNIT_RK07 + UNIT_ATT,
@@ -650,16 +653,17 @@ MTAB hk_mod[] = {
       "RK06", NULL, NULL },
     { (UNIT_AUTO+UNIT_DTYPE+UNIT_ATT), UNIT_RK07,
       "RK07", NULL, NULL },
-    { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL, NULL },
-    { UNIT_AUTO, UNIT_AUTO, NULL, "AUTOSIZE", NULL },
-    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK06,
-      NULL, "RK06", &hk_set_size },
-    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK07,
-      NULL, "RK07", &hk_set_size }, 
+    { (UNIT_AUTO+UNIT_ATT), UNIT_AUTO, "autosize", NULL},
+    { UNIT_AUTO,            UNIT_AUTO, NULL,       "AUTOSIZE",
+        NULL, NULL, NULL, "set type based on file size at ATTACH" },
+    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK06, NULL, "RK06", 
+        &hk_set_size, NULL, NULL, "Set type to RK06" }, 
+    { (UNIT_AUTO+UNIT_DTYPE), UNIT_RK07, NULL, "RK07", 
+        &hk_set_size, NULL, NULL, "Set type to RK07" }, 
     { MTAB_XTD|MTAB_VDV, 0040, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV,    0, "VECTOR", "VECTOR",
+      &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };
 

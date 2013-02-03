@@ -259,19 +259,24 @@ DEBTAB rb_debug[] = {
 };
 
 MTAB rb_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL },
-    { UNIT_DUMMY, 0, NULL, "BADBLOCK", &rb_set_bad },
-    { (UNIT_RB80+UNIT_ATT), UNIT_ATT, "RB02", NULL, NULL },
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable disk drive" },
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+        NULL, NULL, NULL, "Write lock disk drive"  },
+    { UNIT_DUMMY,      0, NULL,            "BADBLOCK", 
+        &rb_set_bad, NULL, NULL, "write bad block table on last track" },
+    { (UNIT_RB80+UNIT_ATT),             UNIT_ATT, "RB02", NULL, NULL },
     { (UNIT_RB80+UNIT_ATT), (UNIT_RB80+UNIT_ATT), "RB80", NULL, NULL },
-    { (UNIT_RB80+UNIT_ATT), 0, "RB02", NULL, NULL },
-    { (UNIT_RB80+UNIT_ATT), UNIT_RB80, "RB80", NULL, NULL },
-    { (UNIT_RB80), 0, NULL, "RB02", &rb_set_size },
-    { (UNIT_RB80), UNIT_RB80, NULL, "RB80", &rb_set_size },
-    { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { (UNIT_RB80+UNIT_ATT),                    0, "RB02", NULL, NULL },
+    { (UNIT_RB80+UNIT_ATT),            UNIT_RB80, "RB80", NULL, NULL },
+    { (UNIT_RB80),                             0, NULL, "RB02", 
+        &rb_set_size, NULL, NULL, "Set type to RB02" },
+    { (UNIT_RB80),                     UNIT_RB80, NULL, "RB80", 
+        &rb_set_size, NULL, NULL, "Set type to RB80" },
+    { MTAB_XTD|MTAB_VDV, 0010, "ADDRESS", "ADDRESS",
+      &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV,    0, "VECTOR", "VECTOR",
+      &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };
 

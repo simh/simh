@@ -96,7 +96,7 @@ REG mctl_reg[] = {
 
 MTAB mctl_mod[] = {
     { MTAB_XTD|MTAB_VDV, TR_MCTL, "NEXUS", NULL,
-      NULL, &show_nexus },
+      NULL, &show_nexus, NULL, "Display nexus" },
     { 0 }
     };
 

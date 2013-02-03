@@ -114,7 +114,7 @@ REG mctl0_reg[] = {
 
 MTAB mctl0_mod[] = {
     { MTAB_XTD|MTAB_VDV, TR_MCTL0, "NEXUS", NULL,
-      NULL, &show_nexus },
+      NULL, &show_nexus, NULL, "Display nexus" },
     { 0 }
     };
 
@@ -124,7 +124,7 @@ UNIT mctl1_unit = { UDATA (NULL, 0, 0) };
 
 MTAB mctl1_mod[] = {
     { MTAB_XTD|MTAB_VDV, TR_MCTL1, "NEXUS", NULL,
-      NULL, &show_nexus },
+      NULL, &show_nexus, NULL, "Display nexus" },
     { 0 }  };
 
 REG mctl1_reg[] = {

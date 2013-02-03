@@ -348,16 +348,18 @@ REG ts_reg[] = {
     };
 
 MTAB ts_mod[] = {
-    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
-      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
-      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
-    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { MTUF_WLK,         0, "write enabled",  "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable tape drive" },
+    { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED", 
+        NULL, NULL, NULL, "Write lock tape drive"  },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "FORMAT", "FORMAT",
+        &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Set/Display tape format (SIMH, E11, TPC, P7B)" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "CAPACITY", "CAPACITY",
+        &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Set/Display capacity" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004,     "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV, 0,                 "VECTOR", NULL,
+        NULL, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

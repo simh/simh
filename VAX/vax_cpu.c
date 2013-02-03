@@ -463,16 +463,16 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
-    { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL },
-    { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|NETBSD|OPENBSD|ULTRIXOLD|OPENBSDOLD|QUASIJARUS|32V|ALL}", &cpu_set_idle, &cpu_show_idle },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL },
+    { UNIT_CONH, 0, "HALT to SIMH", "SIMHALT", NULL, NULL, NULL, "Set HALT to trap to simulator" },
+    { UNIT_CONH, UNIT_CONH, "HALT to console", "CONHALT", NULL, NULL, NULL, "Set HALT to trap to console ROM" },
+    { MTAB_XTD|MTAB_VDV, 0, "IDLE", "IDLE={VMS|ULTRIX|NETBSD|OPENBSD|ULTRIXOLD|OPENBSDOLD|QUASIJARUS|32V|ALL}", &cpu_set_idle, &cpu_show_idle, NULL, "Display idle detection mode" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOIDLE", &sim_clr_idle, NULL, NULL,  "Disables idle detection" },
     MEM_MODIFIERS,   /* Model specific memory modifiers from vaxXXX_defs.h */
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
-      &cpu_set_hist, &cpu_show_hist },
+      &cpu_set_hist, &cpu_show_hist, NULL, "Displays instruction history" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
-      NULL, &cpu_show_virt },
-    CPU_MODEL_MODIFIERS /* Model specific cpu modifiers from vaxXXX_defs.h */
+      NULL, &cpu_show_virt, NULL, "show translation for address arg in KESU mode" },
+    CPU_MODEL_MODIFIERS, /* Model specific cpu modifiers from vaxXXX_defs.h */
     { 0 }
     };
 

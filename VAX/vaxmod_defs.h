@@ -118,21 +118,20 @@
 #define INITMEMSIZE     (1 << 24)                       /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size }, \
-                        { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size }
-#define CPU_MODEL_MODIFIERS                                                             \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={VAXServer|MicroVAX}",  \
-                          &cpu_set_model, &cpu_show_model },                            \
-                        { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",      \
-                          &sysd_set_halt, &sysd_show_halt },                            \
-                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",    \
-                          &sysd_set_halt, &sysd_show_halt },
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },                \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" },              \
+                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size, NULL, NULL, "Set Memory to 32M bytes" },              \
+                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size, NULL, NULL, "Set Memory to 48M bytes" }, \
+                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size, NULL, NULL, "Set Memory to 64M bytes" },              \
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },            \
+                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },            \
+                        { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size, NULL, NULL, "Set Memory to 512M bytes" }
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={VAXServer|MicroVAX}",                  \
+                              &cpu_set_model, &cpu_show_model, NULL, "Set/Display processor model" },       \
+                            { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",                      \
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Enable autoboot (Disable Halt)" },    \
+                            { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",                    \
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" }
 
 
 /* Cache diagnostic space */

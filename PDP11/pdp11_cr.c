@@ -378,31 +378,35 @@ static const REG cr_reg[] = {
 
 static const MTAB cr_mod[] = {
 #if defined (VM_PDP11)
-    { UNIT_CR11, UNIT_CR11, "CR11", "CR11", &cr_set_type },
-    { UNIT_CR11,         0, "CD11", "CD11", &cr_set_type },
+    { UNIT_CR11, UNIT_CR11, "CR11", "CR11", 
+        &cr_set_type, NULL, NULL, "Set device type to CR11" },
+    { UNIT_CR11,         0, "CD11", "CD11", 
+        &cr_set_type, NULL, NULL, "Set device type to CD11" },
 #else
     { UNIT_CR11, UNIT_CR11, "CR11", NULL },
     { UNIT_CR11,         0, "CD11", NULL },
 #endif
-    { UNIT_AUTOEOF, UNIT_AUTOEOF, "auto EOF", "AUTOEOF", NULL },
-    { UNIT_AUTOEOF,            0, "no auto EOF", "NOAUTOEOF", NULL },
+    { UNIT_AUTOEOF, UNIT_AUTOEOF, "auto EOF", "AUTOEOF", 
+        NULL, NULL, NULL, "Enable auto EOF mode" },
+    { UNIT_AUTOEOF,            0, "no auto EOF", "NOAUTOEOF", 
+        NULL, NULL, NULL, "Disable auto EOF mode" },
     /* card reader RESET switch */
     { MTAB_XTD|MTAB_VDV, 0, NULL, "RESET",
-        &cr_set_reset, NULL, NULL },
+        &cr_set_reset, NULL, NULL, "Pulse reader reset switch" },
     /* card reader STOP switch */
     { MTAB_XTD|MTAB_VDV, 0, NULL, "STOP",
-        &cr_set_stop, NULL, NULL },
+        &cr_set_stop, NULL, NULL, "Pulse reader Stop button" },
     { MTAB_XTD|MTAB_VUN, 0, "FORMAT", NULL,
-        NULL, &cr_show_format, NULL },
+        NULL, &cr_show_format, NULL, "Set reader input format" },
     { MTAB_XTD|MTAB_VDV, 006, "ADDRESS", "ADDRESS",
-        &set_addr, &show_addr, NULL },
+        &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-        &set_vec, &show_vec, NULL },
+        &set_vec, &show_vec, NULL, "Interrupt vector" },
     { MTAB_XTD|MTAB_VDV, 0, "RATE", "RATE={DEFAULT|200..1200}",
-        &cr_set_rate, &cr_show_rate, NULL },
+        &cr_set_rate, &cr_show_rate, NULL, "Display input rate" },
     { MTAB_XTD|MTAB_VDV, 0, "TRANSLATION",
         "TRANSLATION={DEFAULT|026|026FTN|029|EBCDIC}",
-        &cr_set_trans, &cr_show_trans, NULL },
+        &cr_set_trans, &cr_show_trans, NULL, "Display translation mode" },
     { 0 }  };
 
 DEVICE cr_dev = {

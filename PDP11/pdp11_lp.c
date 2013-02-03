@@ -100,9 +100,9 @@ REG lpt_reg[] = {
 
 MTAB lpt_mod[] = {
     { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
+      &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 

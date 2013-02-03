@@ -314,8 +314,8 @@ REG rom_reg[] = {
     };
 
 MTAB rom_mod[] = {
-    { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL },
-    { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY", NULL },
+    { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL, NULL, NULL, "Disable calibrated ROM access speed" },
+    { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY",  NULL, NULL, NULL, "Enable calibrated ROM access speed" },
     { 0 }
     };
 
@@ -375,7 +375,7 @@ REG csi_reg[] = {
     };
 
 MTAB csi_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec, NULL, "Display interrupt vector" },
     { 0 }
     };
 
@@ -411,7 +411,7 @@ REG cso_reg[] = {
     };
 
 MTAB cso_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,     NULL, &show_vec, NULL, "Display interrupt vector" },
     { 0 }
     };
 
