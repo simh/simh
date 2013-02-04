@@ -164,6 +164,7 @@ t_stat ry_boot (int32 unitno, DEVICE *dptr);
 void ry_done (int32 esr_flags, int32 new_ecode);
 t_stat ry_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat ry_attach (UNIT *uptr, char *cptr);
+t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *ry_description (DEVICE *dptr);
 
 
@@ -190,29 +191,29 @@ UNIT ry_unit[] = {
     };
 
 REG ry_reg[] = {
-    { GRDATA (RYCS, ry_csr, DEV_RDX, 16, 0) },
-    { GRDATA (RYBA, ry_ba, DEV_RDX, 16, 0) },
-    { GRDATA (RYWC, ry_wc, DEV_RDX, 8, 0) },
-    { GRDATA (RYDB, ry_dbr, DEV_RDX, 16, 0) },
-    { GRDATA (RYES, ry_esr, DEV_RDX, 12, 0) },
-    { GRDATA (RYERR, ry_ecode, DEV_RDX, 8, 0) },
-    { GRDATA (RYTA, ry_track, DEV_RDX, 8, 0) },
-    { GRDATA (RYSA, ry_sector, DEV_RDX, 8, 0) },
-    { DRDATA (STAPTR, ry_state, 4), REG_RO },
-    { FLDATA (INT, IREQ (RY), INT_V_RY) },
-    { FLDATA (ERR, ry_csr, RYCS_V_ERR) },
-    { FLDATA (TR, ry_csr, RYCS_V_TR) },
-    { FLDATA (IE, ry_csr, RYCS_V_IE) },
-    { FLDATA (DONE, ry_csr, RYCS_V_DONE) },
-    { DRDATA (CTIME, ry_cwait, 24), PV_LEFT },
-    { DRDATA (STIME, ry_swait, 24), PV_LEFT },
-    { DRDATA (XTIME, ry_xwait, 24), PV_LEFT },
-    { BRDATA (SBUF, rx2xb, 8, 8, RY_NUMBY) },
-    { FLDATA (STOP_IOE, ry_stopioe, 0) },
-    { URDATA (CAPAC, ry_unit[0].capac, 10, T_ADDR_W, 0,
+    { GRDATAD (RYCS,            ry_csr, DEV_RDX, 16, 0, "status") },
+    { GRDATAD (RYBA,             ry_ba, DEV_RDX, 16, 0, "buffer address") },
+    { GRDATAD (RYWC,             ry_wc, DEV_RDX,  8, 0, "word count") },
+    { GRDATAD (RYDB,            ry_dbr, DEV_RDX, 16, 0, "data buffer") },
+    { GRDATAD (RYES,            ry_esr, DEV_RDX, 12, 0, "error status") },
+    { GRDATAD (RYERR,         ry_ecode, DEV_RDX,  8, 0, "error code") },
+    { GRDATAD (RYTA,          ry_track, DEV_RDX,  8, 0, "current track") },
+    { GRDATAD (RYSA,         ry_sector, DEV_RDX,  8, 0, "current sector") },
+    { DRDATAD (STAPTR,        ry_state,       4,        "controller state"), REG_RO },
+    { FLDATAD (INT,          IREQ (RY), INT_V_RY,       "interrupt pending flag") },
+    { FLDATAD (ERR,             ry_csr, RYCS_V_ERR,     "error flag") },
+    { FLDATAD (TR,              ry_csr, RYCS_V_TR,      "transfer ready flag ") },
+    { FLDATAD (IE,              ry_csr, RYCS_V_IE,      "interrupt enable flag ") },
+    { FLDATAD (DONE,            ry_csr, RYCS_V_DONE,    "device done flag") },
+    { DRDATAD (CTIME,         ry_cwait, 24,             "command completion time"), PV_LEFT },
+    { DRDATAD (STIME,         ry_swait, 24,             "seek time, per track"), PV_LEFT },
+    { DRDATAD (XTIME,         ry_xwait, 24,             "transfer ready delay"), PV_LEFT },
+    { BRDATAD (SBUF,             rx2xb, 8, 8, RY_NUMBY, "sector buffer array") },
+    { FLDATAD (STOP_IOE,    ry_stopioe, 0,              "stop on I/O error") },
+    { URDATA  (CAPAC, ry_unit[0].capac, 10, T_ADDR_W, 0,
               RX_NUMDR, REG_HRO | PV_LEFT) },
-    { GRDATA (DEVADDR, ry_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, ry_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATA  (DEVADDR,     ry_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC, ry_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -254,7 +255,7 @@ DEVICE ry_dev = {
     NULL, NULL, &ry_reset,
     &ry_boot, &ry_attach, NULL,
     &ry_dib, DEV_DISABLE | DEV_DISI | DEV_UBUS | DEV_Q18, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, &ry_help, NULL, NULL,
     &ry_description
     };
 
@@ -711,6 +712,29 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+t_stat ry_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "RX211/RX02 Floppy Disk\n\n");
+fprintf (st, "RX211 options include the ability to set units write enabled or write locked,\n");
+fprintf (st, "single or double density, or autosized:\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\n");
+#if defined (VM_PDP11)
+fprintf (st, "The RX211 supports the BOOT command.\n\n");
+#endif
+fprintf (st, "The RX211 is disabled in a Qbus system with more than 256KB of memory.\n\n");
+fprintf (st, "The RX211 implements these registers:\n\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "RX02 data files are buffered in memory; therefore, end of file and OS I/O\n");
+fprintf (st, "errors cannot occur.\n");
+return SCPE_OK;
+}
 
 char *ry_description (DEVICE *dptr)
 {

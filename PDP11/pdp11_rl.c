@@ -260,6 +260,7 @@ t_stat rl_show_dstate (FILE *, UNIT *, int32, void *);
 t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc);
 #endif
 t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rl_description (DEVICE *dptr);
 
 /* RL11 data structures
@@ -288,24 +289,24 @@ static UNIT rl_unit[] = {
     };
 
 static const REG rl_reg[] = {
-    { GRDATA (RLCS, rlcs, DEV_RDX, 16, 0) },
-    { GRDATA (RLDA, rlda, DEV_RDX, 16, 0) },
-    { GRDATA (RLBA, rlba, DEV_RDX, 16, 0) },
-    { GRDATA (RLBAE, rlbae, DEV_RDX, 6, 0) },
-    { GRDATA (RLMP, rlmp, DEV_RDX, 16, 0) },
-    { GRDATA (RLMP1, rlmp1, DEV_RDX, 16, 0) },
-    { GRDATA (RLMP2, rlmp2, DEV_RDX, 16, 0) },
-    { FLDATA (INT, IREQ (RL), INT_V_RL) },
-    { FLDATA (ERR, rlcs, CSR_V_ERR) },
-    { FLDATA (DONE, rlcs, CSR_V_DONE) },
-    { FLDATA (IE, rlcs, CSR_V_IE) },
-    { DRDATA (STIME, rl_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rl_rwait, 24), PV_LEFT },
-    { URDATA (CAPAC, rl_unit[0].capac, 10, T_ADDR_W, 0,
+    { GRDATAD (RLCS,              rlcs, DEV_RDX, 16, 0, "control/status") },
+    { GRDATAD (RLDA,              rlda, DEV_RDX, 16, 0, "disk address") },
+    { GRDATAD (RLBA,              rlba, DEV_RDX, 16, 0, "memory address") },
+    { GRDATAD (RLBAE,            rlbae, DEV_RDX,  6, 0, "memory address extension (RLV12)") },
+    { GRDATAD (RLMP,              rlmp, DEV_RDX, 16, 0, "multipurpose register queue") },
+    { GRDATAD (RLMP1,            rlmp1, DEV_RDX, 16, 0, "multipurpose register queue") },
+    { GRDATAD (RLMP2,            rlmp2, DEV_RDX, 16, 0, "multipurpose register queue") },
+    { FLDATAD (INT,          IREQ (RL), INT_V_RL,       "interrupt pending flag") },
+    { FLDATAD (ERR,               rlcs, CSR_V_ERR,      "error flag (CSR<15>)") },
+    { FLDATAD (DONE,              rlcs, CSR_V_DONE,     "device done flag (CSR<7>)") },
+    { FLDATAD (IE,                rlcs, CSR_V_IE,       "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (STIME,         rl_swait, 24,             "seek time, per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME,         rl_rwait, 24,             "rotational delay"), PV_LEFT },
+    { URDATA  (CAPAC, rl_unit[0].capac, 10, T_ADDR_W, 0,
               RL_NUMDR, PV_LEFT + REG_HRO) },
-    { FLDATA (STOP_IOE, rl_stopioe, 0) },
-    { GRDATA (DEVADDR, rl_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, rl_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { FLDATAD (STOP_IOE,    rl_stopioe, 0,              "stop on I/O error flag") },
+    { GRDATA  (DEVADDR, rl_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC, rl_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -368,7 +369,7 @@ DEVICE rl_dev = {
     NULL, NULL, &rl_reset,
     &rl_boot, &rl_attach, &rl_detach,
     &rl_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, NULL, &rl_help, NULL, NULL,
     &rl_description 
     };
 
@@ -1231,9 +1232,32 @@ return SCPE_NOFNC;
 
 #endif
 
+t_stat rl_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "RL11/RL01/RL02 Cartridge Disk\n\n");
+fprintf (st, "RL11 options include the ability to set units write enabled or write locked,\n");
+fprintf (st, "to set the drive type to RL01, RL02, or autosize, and to write a DEC standard\n");
+fprintf (st, "044 compliant bad block table on the last track:\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.  The\n");
+fprintf (st, "bad block option can be used only when a unit is attached to a file.\n");
+#if defined (VM_PDP11)
+fprintf (st, "The RL device supports the BOOT command.\n");
+#endif
+fprintf (st, "\nThe RX211 implements these registers:\n\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "    end of file   x          assume rest of disk is zero\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
+}
+
 char *rl_description (DEVICE *dptr)
 {
 return (UNIBUS) ? "RL11/RL01(2) cartridge disk controller" :
                   "RLV12/RL01(2) cartridge disk controller";
 }
-

@@ -296,6 +296,7 @@ void xq_setint (CTLR* xq);
 void xq_clrint (CTLR* xq);
 int32 xq_int (void);
 void xq_csr_set_clr(CTLR* xq, uint16 set_bits, uint16 clear_bits);
+t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *xq_description (DEVICE *dptr);
 
 struct xq_device    xqa = {
@@ -455,7 +456,7 @@ MTAB xq_mod[] = {
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500|DELAY=nnn}",
     &xq_set_poll, &xq_show_poll, NULL, "Display the current polling mode" },
 #else
-  { MTAB_XTD | MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
+  { MTAB_XTD|MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
     &xq_set_poll, &xq_show_poll, NULL, "Display the current polling mode" },
 #endif
   { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALR, 0, "SANITY", "SANITY={ON|OFF}",
@@ -485,7 +486,7 @@ DEVICE xq_dev = {
   &xq_ex, &xq_dep, &xq_reset,
   NULL, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
-  0, xq_debug, NULL, NULL, NULL, NULL, NULL, 
+  0, xq_debug, NULL, NULL, &xq_help, NULL, NULL, 
   &xq_description
 };
 
@@ -2977,7 +2978,56 @@ void xq_debug_turbo_setup(CTLR* xq)
             xq->dev->name, xq->var->init.tdra_h, xq->var->init.tdra_l);
 }
 
+t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "DELQA-T/DELQA/DEQNA Qbus Ethernet Controllers\n\n");
+fprintf (st, "The simulator implements two DELQA-T/DELQA/DEQNA Qbus Ethernet controllers\n");
+fprintf (st, "(XQ, XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow\n");
+fprintf (st, "control of the MAC address, the controller type, and the sanity timer.\n\n");
+fprint_set_help (st, dptr);
+fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
+fprint_show_help (st, dptr);
+fprintf (st, "\nMAC address octets must be delimited by dashes, colons or periods.\n");
+fprintf (st, "The controller defaults to 08-00-2B-AA-BB-CC, which should be sufficient if\n");
+fprintf (st, "there is only one SIMH DELQA-T/DELQA/DEQNA controller on your LAN.  Two cards\n");
+fprintf (st, "with the same MAC address will see each other's packets, resulting in a serious\n");
+fprintf (st, "mess.\n\n");
+fprintf (st, "The DELQA-T type/mode is better and faster but may not be usable by older or\n");
+fprintf (st, "non-DEC OS's.  Also, be aware that DEQNA mode is not supported on many most\n");
+fprintf (st, "recent OS's. The DEQNA-LOCK mode of the DELQA card is emulated by setting the\n");
+fprintf (st, "controller to DEQNA -- there is no need for a separate mode.  DEQNA-LOCK mode\n");
+fprintf (st, "behaves exactly like a DEQNA, except for the operation of the VAR and MOP\n");
+fprintf (st, "processing.\n\n");
+fprintf (st, "The SANITY command change or display the INITIALIZATION sanity timer (DEQNA\n");
+fprintf (st, "jumper W3/DELQA switch S4).  The INITIALIZATION sanity timer has a default\n");
+fprintf (st, "timeout of 4 minutes, and cannot be turned off, just reset.  The normal sanity\n");
+fprintf (st, "timer can be set by operating system software regardless of the state of this\n");
+fprintf (st, "switch.  Note that only the DEQNA (or the DELQA in DEQNA-LOCK mode (=DEQNA))\n");
+fprintf (st, "supports the sanity timer -- it is ignored by a DELQA in Normal mode, which\n");
+fprintf (st, "uses switch S4 for a different purpose.\n\n");
+#if defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO)
+fprintf (st, "The POLL command change or display the service polling timer.  Scheduled\n");
+fprintf (st, "service polling is unnecessary and inefficient when asynchronous I/O is\n");
+fprintf (st, "available, therefore the default setting is disabled.\n");
+#else /* !(defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO)) */
+fprintf (st, "The POLL command change or display the service polling timer.  The polling\n");
+fprintf (st, "timer is calibrated to run the service thread on each simulated system clock\n");
+fprintf (st, "tick.  This should be sufficient for most situations, however if desired more\n");
+fprintf (st, "frequent polling can be specified.  Polling too frequent can seriously impact\n");
+fprintf (st, "the simulator's ability to execute instructions efficiently.\n");
+#endif /* defined(USE_READER_THREAD) && defined(SIM_ASYNCH_IO) */
+fprintf (st, "\nTo access the network, the simulated Ethernet controller must be attached to a\n");
+fprintf (st, "real Ethernet interface.\n\n");
+eth_attach_help(st, dptr, uptr, flag, cptr);
+fprintf (st, "One final note: because of its asynchronous nature, the XQ controller is not\n");
+fprintf (st, "limited to the network speed of the real DELQA-T/DELQA/DEQNA controllers, nor\n");
+fprintf (st, "the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet (100\n");
+fprintf (st, "Mbit/sec) card, and \"Feel the Power!\" :-)\n");
+return SCPE_OK;
+}
+
 char *xq_description (DEVICE *dptr)
 {
-return "DELQA/DEQNA Ethernet controller";
+return (dptr == &xq_dev) ? "DELQA/DEQNA Ethernet controller"
+                         : "Second DELQA/DEQNA Ethernet controller";
 }

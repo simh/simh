@@ -248,6 +248,7 @@ t_stat tu_detach (UNIT *uptr);
 t_stat tu_boot (int32 unitno, DEVICE *dptr);
 t_stat tu_set_fmtr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tu_show_fmtr (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *tu_description (DEVICE *dptr);
 t_stat tu_go (int32 drv);
 int32 tu_abort (void);
@@ -278,32 +279,32 @@ UNIT tu_unit[] = {
     };
 
 REG tu_reg[] = {
-    { GRDATA (CS1, tucs1, DEV_RDX, 6, 0) },
-    { GRDATA (FC, tufc, DEV_RDX, 16, 0) },
-    { GRDATA (FS, tufs, DEV_RDX, 16, 0) },
-    { GRDATA (ER, tuer, DEV_RDX, 16, 0) },
-    { GRDATA (CC, tucc, DEV_RDX, 16, 0) },
-    { GRDATA (MR, tumr, DEV_RDX, 16, 0) },
-    { GRDATA (TC, tutc, DEV_RDX, 16, 0) },
-    { FLDATA (STOP_IOE, tu_stopioe, 0) },
-    { DRDATA (TIME, tu_time, 24), PV_LEFT },
-    { URDATA (UST, tu_unit[0].USTAT, DEV_RDX, 17, 0, TU_NUMDR, 0) },
-    { URDATA (POS, tu_unit[0].pos, 10, T_ADDR_W, 0,
-              TU_NUMDR, PV_LEFT | REG_RO) },
+    { GRDATAD (CS1,            tucs1, DEV_RDX,  6, 0, "current operation") },
+    { GRDATAD (FC,              tufc, DEV_RDX, 16, 0, "frame count") },
+    { GRDATAD (FS,              tufs, DEV_RDX, 16, 0, "formatter status") },
+    { GRDATAD (ER,              tuer, DEV_RDX, 16, 0, "formatter errors") },
+    { GRDATAD (CC,              tucc, DEV_RDX, 16, 0, "check character") },
+    { GRDATAD (MR,              tumr, DEV_RDX, 16, 0, "maintenance register") },
+    { GRDATAD (TC,              tutc, DEV_RDX, 16, 0, "tape control register") },
+    { FLDATAD (STOP_IOE,  tu_stopioe,  0,             "stop on I/O error flag") },
+    { DRDATAD (TIME,         tu_time, 24,             "operation execution time"), PV_LEFT },
+    { URDATAD (UST, tu_unit[0].USTAT, DEV_RDX, 17, 0, TU_NUMDR, 0, "unit status") },
+    { URDATAD (POS,   tu_unit[0].pos, 10, T_ADDR_W, 0,
+              TU_NUMDR, PV_LEFT | REG_RO, "position") },
     { NULL }
     };
 
 MTAB tu_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", "MASSBUS", NULL, &mba_show_num },
+    { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", NULL, 
+        NULL, &mba_show_num, NULL, "Display Massbus number" },
 #if defined (VM_PDP11)
     { MTAB_XTD|MTAB_VDV, 0, "FORMATTER", "TM02",
-      &tu_set_fmtr, &tu_show_fmtr, NULL, "Set controller type to TM02" },
+      &tu_set_fmtr, NULL         , NULL, "Set formatter/controller type to TM02" },
     { MTAB_XTD|MTAB_VDV, 1, NULL,        "TM03",
-      &tu_set_fmtr, NULL,          NULL, "Set controller type to TM03" },
-#else
-    { MTAB_XTD|MTAB_VDV, 0, "FORMATTER", NULL,
-      NULL, &tu_show_fmtr, NULL, "Display controller type" },
+      &tu_set_fmtr, NULL,          NULL, "Set formatter/controller type to TM03" },
 #endif
+    { MTAB_XTD|MTAB_VDV, 0, "FORMATTER", NULL,
+      NULL, &tu_show_fmtr, NULL, "Display formatter/controller type" },
     { MTUF_WLK,         0, "write enabled",  "WRITEENABLED", 
         NULL, NULL, NULL, "Write enable tape drive" },
     { MTUF_WLK,  MTUF_WLK, "write locked",   "LOCKED", 
@@ -317,7 +318,9 @@ MTAB tu_mod[] = {
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "FORMAT", "FORMAT",
         &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Set/Display tape format (SIMH, E11, TPC, P7B)" },
     { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "CAPACITY", "CAPACITY",
-        &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Set/Display capacity" },
+        &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Set unit n capacity to arg MB (0 = unlimited)" },
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0,        "CAPACITY", NULL,
+        NULL,                &sim_tape_show_capac, NULL, "Set/Display capacity" },
     { 0 }
     };
 
@@ -327,7 +330,7 @@ DEVICE tu_dev = {
     NULL, NULL, &tu_reset,
     &tu_boot, &tu_attach, &tu_detach,
     &tu_dib, DEV_MBUS|DEV_UBUS|DEV_QBUS|DEV_DEBUG|DEV_DISABLE|DEV_DIS_INIT|DEV_TM03|DEV_TAPE,
-    0, NULL, NULL, NULL, NULL, NULL, NULL,
+    0, NULL, NULL, NULL, &tu_help, NULL, NULL,
     &tu_description
     };
 
@@ -1061,6 +1064,29 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+t_stat tu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "TM02/TM03/TE16/TU45/TU77 Magnetic Tapes\n\n");
+fprintf (st, "The TU controller implements the Massbus family of 800/1600bpi magnetic tape\n");
+fprintf (st, "drives.  TU options include the ability to select the formatter type (TM02\n");
+fprintf (st, "or TM03), to set the drive type to one of three drives (TE16, TU45, or TU77),\n");
+fprintf (st, "and to set the drives write enabled or write locked.\n\n");
+fprint_set_help (st, dptr);
+fprintf (st, "\nMagnetic tape units can be set to a specific reel capacity in MB, or to\n");
+fprintf (st, "unlimited capacity:\n\n");
+#if defined (VM_PDP11)
+fprintf (st, "The TU controller supports the BOOT command.\n");
+#endif
+fprintf (st, "\nThe TU controller implements the following registers:\n\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error           processed as\n");
+fprintf (st, "    not attached    tape not ready; if STOP_IOE, stop\n");
+fprintf (st, "    end of file     bad tape\n");
+fprintf (st, "    OS I/O error    parity error; if STOP_IOE, stop\n");
+return SCPE_OK;
+}
 
 char *tu_description (DEVICE *dptr)
 {

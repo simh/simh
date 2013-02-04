@@ -140,6 +140,8 @@ void dco_clr_int (int32 ln);
 void dco_set_int (int32 ln);
 int32 dco_iack (void);
 void dcx_reset_ln (int32 ln);
+t_stat dcx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *dcx_description (DEVICE *dptr);
 
 /* DCI data structures
 
@@ -158,33 +160,31 @@ DIB dci_dib = {
 UNIT dci_unit = { UDATA (&dci_svc, 0, 0), KBD_POLL_WAIT };
 
 REG dci_reg[] = {
-    { BRDATA (BUF, dci_buf, DEV_RDX, 8, DCX_LINES) },
-    { BRDATA (CSR, dci_csr, DEV_RDX, 16, DCX_LINES) },
-    { GRDATA (IREQ, dci_ireq, DEV_RDX, DCX_LINES, 0) },
-    { DRDATA (LINES, dcx_desc.lines, 6), REG_HRO },
-    { GRDATA (DEVADDR, dci_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVIOLN, dci_dib.lnt, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, dci_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { BRDATAD (BUF,          dci_buf, DEV_RDX, 8, DCX_LINES,  "input control/stats register") },
+    { BRDATAD (CSR,          dci_csr, DEV_RDX, 16, DCX_LINES, "input buffer") },
+    { GRDATAD (IREQ,        dci_ireq, DEV_RDX, DCX_LINES, 0,  "interrupt requests") },
+    { DRDATA  (LINES, dcx_desc.lines, 6), REG_HRO },
+    { GRDATA  (DEVADDR,   dci_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVIOLN,  dci_dib.lnt, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,   dci_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
 MTAB dci_mod[] = {
-    { MTAB_XTD | MTAB_VDV, 1, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &dcx_desc },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, NULL, "DISCONNECT",
+        &tmxr_dscln, NULL, &dcx_desc, "Disconnect a specific line" },
     { UNIT_ATT, UNIT_ATT, "summary", NULL,
-      NULL, &tmxr_show_summ, (void *) &dcx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 1, "CONNECTIONS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &dcx_desc },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0, "STATISTICS", NULL,
-      NULL, &tmxr_show_cstat, (void *) &dcx_desc },
-    { MTAB_XTD|MTAB_VDV, 010, "ADDRESS", NULL,
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD | MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
-      &set_addr_flt, NULL, NULL },
-    { MTAB_XTD|MTAB_VDV, 1, "VECTOR", NULL,
-      &set_vec, &show_vec_mux, (void *) &dcx_desc },
-    { MTAB_XTD | MTAB_VDV, 0, "LINES", "LINES",
-      &dcx_set_lines, &tmxr_show_lines, (void *) &dcx_desc },
+        NULL, &tmxr_show_summ, (void *) &dcx_desc, "Display a summary of line states" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "CONNECTIONS", NULL,
+        NULL, &tmxr_show_cstat, (void *) &dcx_desc, "Display current connections" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATISTICS", NULL,
+        NULL, &tmxr_show_cstat, (void *) &dcx_desc, "Display multiplexer statistics" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
+        &set_vec, &show_vec_mux, (void *) &dcx_desc, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
+        &dcx_set_lines, &tmxr_show_lines, (void *) &dcx_desc, "Display number of lines" },
     { 0 }
     };
 
@@ -193,7 +193,11 @@ DEVICE dci_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
     NULL, &dcx_attach, &dcx_detach,
-    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
+    &dci_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX,
+    0, NULL, NULL, NULL,
+    &dcx_help, NULL,                    /* help and attach_help routines */
+    (void *)&dcx_desc,                  /* help context variable */
+    &dcx_description                    /* description routine */
     };
 
 /* DCO data structures
@@ -223,30 +227,30 @@ UNIT dco_unit[] = {
     };
 
 REG dco_reg[] = {
-    { BRDATA (BUF, dco_buf, DEV_RDX, 8, DCX_LINES) },
-    { BRDATA (CSR, dco_csr, DEV_RDX, 16, DCX_LINES) },
-    { GRDATA (IREQ, dco_ireq, DEV_RDX, DCX_LINES, 0) },
-    { URDATA (TIME, dco_unit[0].wait, 10, 31, 0,
-              DCX_LINES, PV_LEFT) },
+    { BRDATAD (BUF,           dco_buf, DEV_RDX,         8, DCX_LINES, "control/stats register") },
+    { BRDATAD (CSR,           dco_csr, DEV_RDX,        16, DCX_LINES, "buffer") },
+    { GRDATAD (IREQ,         dco_ireq, DEV_RDX, DCX_LINES,         0, "interrupt requests") },
+    { URDATAD (TIME, dco_unit[0].wait,      10,        31, 0,
+              DCX_LINES, PV_LEFT, "time from I/O initiation to interrupt") },
     { NULL }
     };
 
 MTAB dco_mod[] = {
-    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL },
-    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL },
-    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL },
-    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL },
+    { TT_MODE, TT_MODE_UC, "UC", "UC", NULL, NULL, NULL, "lower case converted to upper, high bit cleared" },
+    { TT_MODE, TT_MODE_7B, "7b", "7B", NULL, NULL, NULL, "7 bit mode" },
+    { TT_MODE, TT_MODE_8B, "8b", "8B", NULL, NULL, NULL, "8 bit mode" },
+    { TT_MODE, TT_MODE_7P, "7p", "7P", NULL, NULL, NULL, "7 bit mode - non printing suppressed" },
     { DCX_OPAR+DCX_EPAR, 0,        "no parity",   "NOPARITY",   NULL },
     { DCX_OPAR+DCX_EPAR, DCX_OPAR, "odd parity",  "ODDPARITY",  NULL },
     { DCX_OPAR+DCX_EPAR, DCX_EPAR, "even parity", "EVENPARITY", NULL },
     { DCX_MDM, 0,       "no dataset", "NODATASET", NULL },
     { DCX_MDM, DCX_MDM, "dataset",    "DATASET",   NULL },
-    { MTAB_XTD|MTAB_VUN, 0, NULL, "DISCONNECT",
-      &tmxr_dscln, NULL, &dcx_desc },
-    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, "LOG", "LOG",
-      &tmxr_set_log, &tmxr_show_log, &dcx_desc },
-    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "NOLOG",
-      &tmxr_set_nolog, NULL, &dcx_desc },
+    { MTAB_XTD|MTAB_VUN, 1, NULL, "DISCONNECT",
+        &tmxr_dscln, NULL, &dcx_desc, "Disconnect a specific line" },
+    { MTAB_XTD|MTAB_VUN|MTAB_NC, 0, NULL, "LOG=file",
+        &tmxr_set_log, tmxr_show_log, &dcx_desc, "Display logging for designated line" },
+    { MTAB_XTD|MTAB_VUN, 0, NULL, "NOLOG",
+        &tmxr_set_nolog, NULL, &dcx_desc, "Disable logging on designated line" },
     { 0 }
     };
 
@@ -255,7 +259,11 @@ DEVICE dco_dev = {
     DCX_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dcx_reset,
     NULL, NULL, NULL,
-    NULL, DEV_UBUS | DEV_DISABLE | DEV_DIS
+    NULL, DEV_UBUS | DEV_DISABLE | DEV_DIS,
+    0, NULL, NULL, NULL,
+    &dcx_help, NULL,                    /* help and attach_help routines */
+    (void *)&dcx_desc,                  /* help context variable */
+    &dcx_description                    /* description routine */
     };
 
 /* Terminal input routines */
@@ -613,4 +621,57 @@ else {
 dcx_desc.lines = newln;
 dci_dib.lnt = newln * 010;                             /* upd IO page lnt */
 return auto_config (dci_dev.name, newln);              /* auto config */
+}
+
+t_stat dcx_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "DC11 Additional Terminal Interfaces (DCI/DCO)\n\n");
+fprintf (st, "For very early system programs, the PDP-11 simulator supports up to sixteen\n");
+fprintf (st, "additional DC11 terminal interfaces.  The additional terminals consist of two\n");
+fprintf (st, "independent devices, DCI and DCO.  The entire set is modeled as a terminal\n");
+fprintf (st, "multiplexer, with DCI as the master controller.  The additional terminals\n");
+fprintf (st, "perform input and output through Telnet sessions connected to a user-specified\n");
+fprintf (st, "port.  The number of lines is specified with a SET command:\n\n");
+fprintf (st, "   sim> SET DCI LINES=n        set number of additional lines to n [1-16]\n\n");
+fprintf (st, "The ATTACH command specifies the port to be used:\n\n");
+tmxr_attach_help (st, dptr, uptr, flag, cptr);
+fprintf (st, "The additional terminals can be set to one of four modes: UC, 7P, 7B, or 8B.\n\n");
+fprintf (st, "  mode  input characters        output characters\n\n");
+fprintf (st, "  UC    lower case converted    lower case converted to upper case,\n");
+fprintf (st, "        to upper case,          high-order bit cleared,\n");
+fprintf (st, "        high-order bit cleared  non-printing characters suppressed\n");
+fprintf (st, "  7P    high-order bit cleared  high-order bit cleared,\n");
+fprintf (st, "                                non-printing characters suppressed\n");
+fprintf (st, "  7B    high-order bit cleared  high-order bit cleared\n");
+fprintf (st, "  8B    no changes              no changes\n\n");
+fprintf (st, "The default mode is 7P.  In addition, each line can be configured to\n");
+fprintf (st, "behave as though it was attached to a dataset, or hardwired to a terminal:\n\n");
+fprintf (st, "   sim> SET DCOn DATASET        simulate attachment to a dataset (modem)\n");
+fprintf (st, "   sim> SET DCOn NODATASET      simulate direct attachment to a terminal\n\n");
+fprintf (st, "Finally, each line supports output logging.  The SET DCOn LOG command enables\n");
+fprintf (st, "logging on a line:\n\n");
+fprintf (st, "   sim> SET DCOn LOG=filename   log output of line n to filename\n\n");
+fprintf (st, "The SET DCOn NOLOG command disables logging and closes the open log file,\n");
+fprintf (st, "if any.\n\n");
+fprintf (st, "Once DCI is attached and the simulator is running, the terminals listen for\n");
+fprintf (st, "connections on the specified port.  They assume that the incoming connections\n");
+fprintf (st, "are Telnet connections.  The connections remain open until disconnected either\n");
+fprintf (st, "by the Telnet client, a SET DCI DISCONNECT command, or a DETACH DCI command.\n\n");
+fprintf (st, "Other special commands:\n\n");
+fprintf (st, "   sim> SHOW DCI CONNECTIONS    show current connections\n");
+fprintf (st, "   sim> SHOW DCI STATISTICS     show statistics for active connections\n");
+fprintf (st, "   sim> SET DCOn DISCONNECT     disconnects the specified line.\n\n");
+fprintf (st, "The input device  (DCI) implements these registers:\n\n");
+fprint_reg_help (st, &dci_dev);
+fprintf (st, "\nThe output device (DCO) implements these registers:\n\n");
+fprint_reg_help (st, &dco_dev);
+fprintf (st, "\nThe additional terminals do not support save and restore.  All open connections\n");
+fprintf (st, "are lost when the simulator shuts down or DCI is detached.\n");
+return SCPE_OK;
+}
+
+char *dcx_description (DEVICE *dptr)
+{
+return (dptr == &dci_dev) ? "DC11 asynchronous line interface - receiver" 
+                          : "DC11 asynchronous line interface - transmitter";
 }

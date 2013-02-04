@@ -128,6 +128,7 @@ void xu_process_receive(CTLR* xu);
 void xu_dump_rxring(CTLR* xu);
 void xu_dump_txring(CTLR* xu);
 t_stat xu_show_filters (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *xu_description (DEVICE *dptr);
 
 #define IOLN_XU        010
@@ -168,9 +169,9 @@ MTAB xu_mod[] = {
   { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATS", "STATS",
     &xu_set_stats, &xu_show_stats, NULL, "Display or reset statistics" },
   { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "FILTERS", NULL,
-    NULL, &xu_show_filters, NULL, "Display address filters" },
+    NULL, &xu_show_filters, NULL, "Display MAC addresses which will be received" },
   { MTAB_XTD|MTAB_VDV, 0, "TYPE", "TYPE={DEUNA|DELUA}",
-    &xu_set_type, &xu_show_type, NULL },
+    &xu_set_type, &xu_show_type, NULL, "Display the controller type" },
   { 0 },
 };
 
@@ -226,7 +227,7 @@ DEVICE xu_dev = {
 	&xu_ex, &xu_dep, &xu_reset,
 	NULL, &xu_attach, &xu_detach,
 	&xua_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG | DEV_ETHER,
-    0, xu_debug, NULL, NULL, NULL, NULL, NULL,
+    0, xu_debug, NULL, NULL, &xu_help, NULL, NULL,
     &xu_description
   };
 
@@ -1789,6 +1790,29 @@ void xu_dump_txring (CTLR* xu)
     if (tstatus == 0)
       printf ("  header[%d]: own:%d, len:%d, address:%08x data:{%04x,%04x,%04x,%04x}\n", i, own, len, addr, txhdr[0], txhdr[1], txhdr[2], txhdr[3]);
   }
+}
+
+t_stat xu_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "DELUA/DEUNA Unibus Ethernet Controllers (XU, XUB)\n\n");
+fprintf (st, "The simulator implements two DELUA/DEUNA Unibus Ethernet controllers (XU, XUB).\n");
+fprintf (st, "Initially, both XU and XQB are disabled.  Options allow control of the MAC\n");
+fprintf (st, "address and the controller type.\n\n");
+fprint_set_help (st, dptr);
+fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
+fprint_show_help (st, dptr);
+fprintf (st, "\nMAC address octets must be delimited by dashes, colons or periods.\n");
+fprintf (st, "The controller defaults to 08-00-2B-CC-DD-EE, which should be sufficient if\n");
+fprintf (st, "there is only one SIMH DEUNA/DELUA controller on your LAN.  Two cards with the\n");
+fprintf (st, "same MAC address will see each other's packets, resulting in a serious mess.\n\n");
+fprintf (st, "To access the network, the simulated Ethernet controller must be attached to a\n");
+fprintf (st, "real Ethernet interface.\n\n");
+eth_attach_help(st, dptr, uptr, flag, cptr);
+fprintf (st, "One final note: because of its asynchronous nature, the XU controller is not\n");
+fprintf (st, "limited to the ~1.5Mbit/sec of the real DEUNA/DELUA controllers, nor the\n");
+fprintf (st, "10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet (100 Mbit/sec)\n");
+fprintf (st, "card, and \"Feel the Power!\" :-)\n");
+return SCPE_OK;
 }
 
 char *xu_description (DEVICE *dptr)

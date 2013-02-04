@@ -171,6 +171,7 @@ static t_stat rc_reset (DEVICE *);
 static t_stat rc_attach (UNIT *, char *);
 static t_stat rc_set_size (UNIT *, int32, char *, void *);
 static uint32 update_rccs (uint32, uint32);
+static char *rc_description (DEVICE *dptr);
 
 /* RC11 data structures
 
@@ -216,15 +217,20 @@ static const REG rc_reg[] = {
 };
 
 static const MTAB rc_mod[] = {
-    { UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", &rc_set_size },
-    { UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P", &rc_set_size },
-    { UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P", &rc_set_size },
-    { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P", &rc_set_size },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
-    { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", 
+        &rc_set_size, NULL, NULL, "Set to 1 platter device" },
+    { UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P",
+        &rc_set_size, NULL, NULL, "Set to 2 platter device" },
+    { UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P",
+        &rc_set_size, NULL, NULL, "Set to 3 platter device" },
+    { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P",
+        &rc_set_size, NULL, NULL, "Set to 4 platter device" },
+    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", 
+        NULL, NULL, NULL, "set platters based on file size at ATTACH" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0020, "ADDRESS", "ADDRESS",
+      &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,    0, "VECTOR", "VECTOR",
+      &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
 };
 
@@ -238,7 +244,9 @@ DEVICE rc_dev = {
     &rc_attach,                                         /* attach */
     NULL,                                               /* detach */
     &rc_dib,
-    DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG
+    DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
+    NULL, NULL, NULL, NULL, NULL, NULL,
+    &rc_description
 };
 
 /* I/O dispatch routine, I/O addresses 17777440 - 17777456 */
@@ -581,4 +589,9 @@ static t_stat rc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
     uptr->capac = UNIT_GETP (val) * RC_DKSIZE;
     uptr->flags = uptr->flags & ~UNIT_AUTO;
     return (SCPE_OK);
+}
+
+char *rc_description (DEVICE *dptr)
+{
+    return "RC11/RS64 fixed head disk controller";
 }
