@@ -1105,6 +1105,8 @@ if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN))
             continue;                                       /* skip unit only modifiers */
+        if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
+            continue;
         if (mptr->mstring) {
             sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
@@ -1160,6 +1162,8 @@ if (dptr->modifiers) {
         if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN))
             continue;                                       /* skip unit only modifiers */
         if ((!mptr->disp) || (!mptr->pstring) || !(*mptr->pstring))
+            continue;
+        if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
             continue;
         sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");

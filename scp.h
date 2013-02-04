@@ -114,6 +114,9 @@ char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
 t_value strtotv (const char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
+void fprint_reg_help (FILE *st, DEVICE *dptr);
+void fprint_set_help (FILE *st, DEVICE *dptr);
+void fprint_show_help (FILE *st, DEVICE *dptr);
 CTAB *find_cmd (char *gbuf);
 DEVICE *find_dev (char *ptr);
 DEVICE *find_unit (char *ptr, UNIT **uptr);
