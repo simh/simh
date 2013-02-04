@@ -571,9 +571,13 @@ if (name) {                                             /* updating? */
         return SCPE_ARG;
     for (autp = auto_tab; autp->numc >= 0; autp++) {
         for (j = 0; (j < AUTO_MAXC) && autp->dnam[j]; j++) {
-            if (strcmp (name, autp->dnam[j]) == 0)
+            if (strcmp (name, autp->dnam[j]) == 0) {
                 autp->numc = nctrl;
+                break;
+                }
             }
+        if ((j < AUTO_MAXC) && autp->dnam[j] && (strcmp (name, autp->dnam[j]) == 0))
+            break;
         }
     }
 for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
