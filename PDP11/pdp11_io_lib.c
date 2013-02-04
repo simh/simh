@@ -575,11 +575,6 @@ if (name) {                                             /* updating? */
                 autp->numc = nctrl;
             }
         }
-    dptr = find_dev (name);                             /* find ctrl */
-    if (dptr && !UNIBUS && !(dptr->flags & DEV_DIS) && !(dptr->flags & DEV_QBUS)) {
-        dptr->flags |= DEV_DIS;
-        return SCPE_ARG;
-        }
     }
 for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
     if (autp->amod) {                                   /* floating csr? */
@@ -595,6 +590,17 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
             (dptr->flags & DEV_NEXUS) ||
             !(dptr->flags & (DEV_UBUS | DEV_QBUS | DEV_Q18)) )
             continue;
+        /* Sanity check that enabled devices can work on the current bus */
+        if ((!UNIBUS && !(dptr->flags & DEV_QBUS)) ||
+            (UNIBUS && !(dptr->flags & (DEV_UBUS | DEV_Q18)))) {
+            dptr->flags |= DEV_DIS;
+            if (sim_switches & SWMASK ('P'))
+                continue;
+            printf ("%s device not compatible with system bus\n", sim_dname(dptr));
+            if (sim_log)
+                fprintf (sim_log, "%s device not compatible with system bus\n", sim_dname(dptr));
+            return SCPE_NOFNC;
+            }
         dibp = (DIB *) dptr->ctxt;                      /* get DIB */
         if (dibp == NULL)                               /* not there??? */
             return SCPE_IERR;

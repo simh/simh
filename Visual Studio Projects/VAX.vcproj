@@ -208,6 +208,10 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
+				RelativePath="..\PDP11\pdp11_cr.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dz.c"
 				>
 			</File>
@@ -361,6 +365,10 @@
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
+			<File
+				RelativePath="..\PDP11\pdp11_cr_dat.h"
+				>
+			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_io_lib.h"
 				>

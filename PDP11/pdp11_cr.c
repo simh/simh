@@ -174,15 +174,15 @@ extern int32 int_req;
 #elif defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"
 extern int32 int_req[IPL_HLVL];
-#define DFLT_DIS        (0)
-#define DFLT_CR11       (UNIT_CR11)
+#define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
+#define DFLT_CR11       (UNIT_CR11)                     /* CR11 only */
 #define DFLT_CPM        285
 
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
-#define DFLT_DIS        (DEV_DIS)
-#define DFLT_CR11       (UNIT_CR11)
+#define DFLT_DIS        (DEV_QBUS)                      /* CR11 is programmed I/O only, Qbus OK */
+#define DFLT_CR11       (UNIT_CR11)                     /* Default, but changable */
 #define DFLT_CPM        285
 #endif
 
@@ -1148,9 +1148,18 @@ t_stat cr_set_type (    UNIT    *uptr,
                         char    *cptr,
                         void    *desc    )
 {
+    DEVICE *dptr = find_dev_from_unit (uptr);
+
     /* disallow type change if currently attached */
     if (uptr->flags & UNIT_ATT)
         return (SCPE_NOFNC);
+    if (val == UNIT_CR11) {
+        dptr->flags |= DEV_QBUS;                    /* Can be a Qbus device - programmed I/O only */
+    } else {                                        /* CD11 is 18bit DMA device */
+        if (!UNIBUS)
+            return SCPE_NOFNC;
+        dptr->flags &= ~DEV_QBUS;                   /* Not on a Qbus (22bit) */
+    }
     cpm = (val & UNIT_CR11) ? 285 : 1000;
     uptr->wait = (60 * 1000) / cpm;
     return (SCPE_OK);

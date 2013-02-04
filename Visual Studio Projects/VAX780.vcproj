@@ -396,6 +396,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
 			<File
+				RelativePath="..\PDP11\pdp11_cr_dat.h"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dmc.h"
 				>
 			</File>
