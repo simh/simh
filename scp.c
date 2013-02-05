@@ -773,7 +773,11 @@ static CTAB cmd_table[] = {
       "h{elp}                   type this message\n"
       "h{elp} <command>         type help for command\n" 
       "h{elp} <dev>             type help for device\n"
-      "h{elp} <dev> <command>   type help for device command (ATTACH, SET, SHOW)\n" },
+      "h{elp} <dev> registers   type help for device register variables\n"
+      "h{elp} <dev> attach      type help for device specific ATTACH command\n"
+      "h{elp} <dev> set         type help for device specific SET commands\n"
+      "h{elp} <dev> show        type help for device specific SHOW commands\n"
+      "h{elp} <dev> <command>   type help for device specific <command> command\n" },
     { NULL, NULL, 0 }
     };
 
@@ -1002,8 +1006,6 @@ return SCPE_EXIT;
 void fprint_help (FILE *st)
 {
 CTAB *cmdp;
-DEVICE *dptr;
-int i;
 
 for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help)
@@ -1012,26 +1014,6 @@ for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
 for (cmdp = cmd_table; cmdp && (cmdp->name != NULL); cmdp++) {
     if (cmdp->help && (!sim_vm_cmd || !find_ctab (sim_vm_cmd, cmdp->name)))
         fputs (cmdp->help, st);
-    }
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
-    if (dptr->help)
-        fprintf (st, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
-    if (dptr->attach_help || 
-        (DEV_TYPE(dptr) == DEV_MUX) ||
-        (DEV_TYPE(dptr) == DEV_ETHER) ||
-        (DEV_TYPE(dptr) == DEV_DISK) ||
-        (DEV_TYPE(dptr) == DEV_TAPE)) {
-        if (dptr->numunits == 1)
-            fprintf (st, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
-        else {
-            fprintf (st, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
-            fprintf (st, "h{elp} %sn ATTACH\t type help for unit %sn ATTACH command\n", dptr->name, dptr->name);
-            }
-        }
-    if (dptr->registers) {
-        if (dptr->registers->name != NULL)
-            fprintf (st, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
-        }
     }
 return;
 }
