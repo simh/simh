@@ -566,6 +566,7 @@ void hk_cmderr (int32 err, int32 drv);
 void hk_go (int32 drv);
 t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *hk_description (DEVICE *dptr);
 
 /* HK data structures
@@ -603,38 +604,38 @@ UNIT hk_unit[] = {
     };
 
 REG hk_reg[] = {
-    { GRDATA (HKCS1, hkcs1, DEV_RDX, 16, 0) },
-    { GRDATA (HKWC, hkwc, DEV_RDX, 16, 0) },
-    { GRDATA (HKBA, hkba, DEV_RDX, 16, 0) },
-    { GRDATA (HKDA, hkda, DEV_RDX, 16, 0) },
-    { GRDATA (HKCS2, hkcs2, DEV_RDX, 16, 0) },
-    { BRDATA (HKDS, hkds, DEV_RDX, 16, HK_NUMDR) },
-    { BRDATA (HKER, hker, DEV_RDX, 16, HK_NUMDR) },
-    { BRDATA (HKDB, hkdb, DEV_RDX, 16, 3) },
-    { GRDATA (HKDC, hkdc, DEV_RDX, 16, 0) },
-    { GRDATA (HKOF, hkof, DEV_RDX, 8, 0) },
-    { GRDATA (HKMR, hkmr, DEV_RDX, 16, 0) },
-    { GRDATA (HKMR2, hkmr2, DEV_RDX, 16, 0), REG_RO },
-    { GRDATA (HKMR3, hkmr3, DEV_RDX, 16, 0), REG_RO },
-    { GRDATA (HKSPR, hkspr, DEV_RDX, 16, 0) },
-    { FLDATA (INT, IREQ (HK), INT_V_HK) },
-    { FLDATA (ERR, hkcs1, CSR_V_ERR) },
-    { FLDATA (DONE, hkcs1, CSR_V_DONE) },
-    { FLDATA (IE, hkcs1, CSR_V_IE) },
-    { DRDATA (CTIME, hk_cwait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (STIME, hk_swait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (RTIME, hk_rwait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (MIN2TIME, hk_min2wait, 24), REG_NZ + PV_LEFT + REG_HRO },
-    { URDATA (FNC, hk_unit[0].FNC, DEV_RDX, 5, 0,
+    { GRDATAD (HKCS1,          hkcs1, DEV_RDX, 16, 0, "control/status 1") },
+    { GRDATAD (HKWC,            hkwc, DEV_RDX, 16, 0, "word count") },
+    { GRDATAD (HKBA,            hkba, DEV_RDX, 16, 0, "bus address") },
+    { GRDATAD (HKDA,            hkda, DEV_RDX, 16, 0, "desired surface, sector") },
+    { GRDATAD (HKCS2,          hkcs2, DEV_RDX, 16, 0, "control/status 2") },
+    { BRDATAD (HKDS,            hkds, DEV_RDX, 16, HK_NUMDR, "drive status, drives 0 to 7") },
+    { BRDATAD (HKER,            hker, DEV_RDX, 16, HK_NUMDR, "drive errors, drives 0 to 7") },
+    { BRDATAD (HKDB,            hkdb, DEV_RDX, 16, 3, "data buffer silo") },
+    { GRDATAD (HKDC,            hkdc, DEV_RDX, 16, 0, "desired cylinder") },
+    { GRDATAD (HKOF,            hkof, DEV_RDX,  8, 0, "offset") },
+    { GRDATAD (HKMR,            hkmr, DEV_RDX, 16, 0, "maintenance register") },
+    { GRDATAD (HKMR2,          hkmr2, DEV_RDX, 16, 0, "maintenance register 2"), REG_RO },
+    { GRDATAD (HKMR3,          hkmr3, DEV_RDX, 16, 0, "maintenance register 3"), REG_RO },
+    { GRDATAD (HKSPR,          hkspr, DEV_RDX, 16, 0, "spare register") },
+    { FLDATAD (INT,        IREQ (HK), INT_V_HK,       "interrupt pending flag") },
+    { FLDATAD (ERR,            hkcs1, CSR_V_ERR,      "error flag (CSR<15>)") },
+    { FLDATAD (DONE,           hkcs1, CSR_V_DONE,     "device done flag (CSR1<7>)") },
+    { FLDATAD (IE,             hkcs1, CSR_V_IE,       "interrupt enable flag (CSR1<6>)") },
+    { DRDATAD (CTIME,       hk_cwait, 24,             "command time"), REG_NZ + PV_LEFT },
+    { DRDATAD (STIME,       hk_swait, 24,             "seek time, per cylinder"), REG_NZ + PV_LEFT },
+    { DRDATAD (RTIME,       hk_rwait, 24,             "rotational delay"), REG_NZ + PV_LEFT },
+    { DRDATA  (MIN2TIME, hk_min2wait, 24), REG_NZ + PV_LEFT + REG_HRO },
+    { URDATA  (FNC,   hk_unit[0].FNC, DEV_RDX, 5, 0,
               HK_NUMDR, REG_HRO) },
-    { URDATA (CYL, hk_unit[0].CYL, DEV_RDX, 10, 0,
+    { URDATA  (CYL, hk_unit[0].CYL, DEV_RDX, 10, 0,
               HK_NUMDR, REG_HRO) },
-    { BRDATA (OFFSET, hk_off, DEV_RDX, 16, HK_NUMDR), REG_HRO },
-    { BRDATA (CYLDIF, hk_dif, DEV_RDX, 16, HK_NUMDR), REG_HRO },
-    { URDATA (CAPAC, hk_unit[0].capac, 10, T_ADDR_W, 0,
+    { BRDATA  (OFFSET,        hk_off, DEV_RDX, 16, HK_NUMDR), REG_HRO },
+    { BRDATA  (CYLDIF,        hk_dif, DEV_RDX, 16, HK_NUMDR), REG_HRO },
+    { URDATA  (CAPAC, hk_unit[0].capac, 10, T_ADDR_W, 0,
               HK_NUMDR, PV_LEFT | REG_HRO) },
-    { GRDATA (DEVADDR, hk_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, hk_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATA  (DEVADDR, hk_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC, hk_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -682,7 +683,7 @@ DEVICE hk_dev = {
     NULL, NULL, &hk_reset,
     &hk_boot, &hk_attach, &hk_detach,
     &hk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG, 0,
-    hk_deb, NULL, NULL, NULL, NULL, NULL,
+    hk_deb, NULL, NULL, &hk_help, NULL, NULL,
     &hk_description
     };
 
@@ -1578,6 +1579,30 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+t_stat hk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "RK611/RK06,RK07 Cartridge Disk (HK)\n\n");
+fprintf (st, "RK611  options include the ability to set units write enabled or write locked,\n");
+fprintf (st, "to set the drive type to RK06, RK07, or autosize, and to write a DEC standard\n");
+fprintf (st, "044 compliant bad block table on the last track:\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");
+fprintf (st, "The bad block option can be used only when a unit is attached to a file.\n");
+#if defined (VM_PDP11)
+fprintf (st, "The HK device supports the BOOT command.\n");
+fprintf (st, "The RK611 is disabled in a Qbus system with more than 256KB of memory.\n");
+#endif
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "    end of file   x          assume rest of disk is zero\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
+}
 
 char *hk_description (DEVICE *dptr)
 {
