@@ -235,12 +235,14 @@ static uint32 rom_delay = 0;
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_reset (DEVICE *dptr);
 t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *nvr_description (DEVICE *dptr);
 t_stat csi_reset (DEVICE *dptr);
 char *csi_description (DEVICE *dptr);
@@ -249,6 +251,7 @@ t_stat cso_svc (UNIT *uptr);
 char *cso_description (DEVICE *dptr);
 t_stat tmr_svc (UNIT *uptr);
 t_stat sysd_reset (DEVICE *dptr);
+t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *sysd_description (DEVICE *dptr);
 
 int32 rom_rd (int32 pa);
@@ -314,8 +317,8 @@ REG rom_reg[] = {
     };
 
 MTAB rom_mod[] = {
-    { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL, NULL, NULL, "Disable calibrated ROM access speed" },
-    { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY",  NULL, NULL, NULL, "Enable calibrated ROM access speed" },
+    { UNIT_NODELAY, UNIT_NODELAY, "fast access", "NODELAY", NULL, NULL, NULL, "Disable calibrated delay - ROM runs like RAM" },
+    { UNIT_NODELAY, 0, "1usec calibrated access", "DELAY",  NULL, NULL, NULL, "Enable calibrated ROM delay - ROM runs slowly" },
     { 0 }
     };
 
@@ -324,7 +327,7 @@ DEVICE rom_dev = {
     1, 16, ROMAWIDTH, 4, 16, 32,
     &rom_ex, &rom_dep, &rom_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &rom_help, NULL, NULL, 
     &rom_description
     };
 
@@ -347,7 +350,7 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &nvr_help, NULL, NULL, 
     &nvr_description
     };
 
@@ -478,7 +481,7 @@ DEVICE sysd_dev = {
     2, 16, 16, 1, 16, 8,
     NULL, NULL, &sysd_reset,
     NULL, NULL, NULL,
-    &sysd_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &sysd_dib, 0, 0, NULL, NULL, NULL, &sysd_help, NULL, NULL, 
     &sysd_description
     };
 
@@ -605,6 +608,25 @@ if (rom == NULL)
 return SCPE_OK;
 }
 
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Read-only memory (ROM)\n\n");
+fprintf (st, "The boot ROM consists of a single unit, simulating the 128KB boot ROM.  It\n");
+fprintf (st, "has no registers.  The boot ROM can be loaded with a binary byte stream\n");
+fprintf (st, "using the LOAD -r command:\n\n");
+fprintf (st, "    LOAD -r KA655X.BIN        load ROM image KA655X.BIN\n\n");
+fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
+fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
+fprintf (st, "ROM image from the file ka655x.bin in the current working directory.\n");
+fprintf (st, "If that load attempt fails, then a copy of the missing ROM file is\n");
+fprintf (st, "written to the current directory and the load attempt is retried.\n\n");
+fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to\n");
+fprintf (st, "about 500K instructions per second.  This delay is required to make the\n");
+fprintf (st, "power-up self-test routines run correctly on very fast hosts.\n");
+fprint_set_help (st, dptr);
+return SCPE_OK;
+}
+
 char *rom_description (DEVICE *dptr)
 {
 return "read-only memory";
@@ -701,6 +723,19 @@ r = detach_unit (uptr);
 if ((uptr->flags & UNIT_ATT) == 0)
     uptr->flags = uptr->flags & ~(UNIT_ATTABLE | UNIT_BUFABLE);
 return r;
+}
+
+t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Non-volatile Memory (NVR)\n\n");
+fprintf (st, "The NVR consists of a single unit, simulating 1KB of battery-backed up memory\n");
+fprintf (st, "in the SSC chip.  When the simulator starts, NVR is cleared to 0, and the SSC\n");
+fprintf (st, "battery-low indicator is set.  Normally, NVR is saved and restored like other\n");
+fprintf (st, "memory in the system.  Alternately, NVR can be attached to a file.  This\n");
+fprintf (st, "allows its contents to be saved and restored independently of other memories,\n");
+fprintf (st, "so that NVR state can be preserved across simulator runs.\n\n");
+fprintf (st, "Successfully loading an NVR image clears the SSC battery-low indicator.\n\n");
+return SCPE_OK;
 }
 
 char *nvr_description (DEVICE *dptr)
@@ -1689,10 +1724,31 @@ ssc_otp = 0;
 return SCPE_OK;
 }
 
+t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "System Devices (SYSD)\n\n");
+fprintf (st, "The system devices are the system-specific facilities implemented in the CVAX\n");
+fprintf (st, "chip, the KA655 CPU board, the CMCTL memory controller, and the SSC\n");
+fprintf (st, "system support chip.  Note that the simulation of these devices is incomplete\n");
+fprintf (st, "and is intended strictly to allow the patched bootstrap and console code to\n");
+fprintf (st, "run.\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\nBDR<7> is the halt-enabled switch.  It controls how the console firmware\n");
+fprintf (st, "responds to a BOOT command, a kernel halt (if option CONHALT is set), or a\n");
+fprintf (st, "console halt (BREAK typed on the console terminal).  If BDR<7> is set, the\n");
+fprintf (st, "onsole firmware responds to all these conditions by entering its interactive\n");
+fprintf (st, "command mode.  If BDR<7> is clear, the console firmware boots the operating\n");
+fprintf (st, "system in response to these conditions.  This bit can be set and cleared by\n");
+fprintf (st, "the command “SET CPU AUTOBOOT” (clearing the flag) and “SET CPU NOAUTOBOOT”\n");
+fprintf (st, "setting the flag.  The default value is set.\n");
+return SCPE_OK;
+}
+
 char *sysd_description (DEVICE *dptr)
 {
 return "system devices";
 }
+
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 if ((cptr == NULL) || (!*cptr))

@@ -78,6 +78,8 @@ t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat qba_show_virt (FILE *of, UNIT *uptr, int32 val, void *desc);
+t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *qba_description (DEVICE *dptr);
 
 /* Qbus adapter data structures
 
@@ -120,7 +122,8 @@ DEVICE qba_dev = {
     1, 16, QBMAWIDTH, 2, 16, 16,
     &qba_ex, &qba_dep, &qba_reset,
     NULL, NULL, NULL,
-    &qba_dib, DEV_QBUS
+    &qba_dib, DEV_QBUS, 0, NULL, NULL, NULL, &qba_help, NULL, NULL,
+    &qba_description
     };
 
 /* IO page dispatches */
@@ -619,4 +622,23 @@ if (cptr) {
     }
 fprintf (of, "Invalid argument\n");
 return SCPE_OK;
+}
+
+t_stat qba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Qbus Adapter (QBA)\n\n");
+fprintf (st, "The Qbus adapter (QBA) simulates the CQBIC Qbus adapter chip.\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe QBA implements main memory examination and modification via the Qbus\n");
+fprintf (st, "map.  The data width is always 16b:\n\n");
+fprintf (st, "EXAMINE QBA 0/10                examine main memory words corresponding\n");
+fprintf (st, "                                to Qbus addresses 0-10\n");
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
+char *qba_description (DEVICE *dptr)
+{
+return "Qbus adapter";
 }

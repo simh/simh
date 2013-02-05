@@ -154,9 +154,9 @@ t_bool ka_hltenab = TRUE;                               /* Halt Enable / Autoboo
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_reset (DEVICE *dptr);
-t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat rom_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rom_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rom_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rom_description (DEVICE *dptr);
 t_stat nvr_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat nvr_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
@@ -166,6 +166,7 @@ t_stat nvr_attach (UNIT *uptr, char *cptr);
 t_stat nvr_detach (UNIT *uptr);
 char *nvr_description (DEVICE *dptr);
 t_stat sysd_reset (DEVICE *dptr);
+t_stat sysd_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *sysd_description (DEVICE *dptr);
 
 int32 rom_rd (int32 pa);
@@ -409,17 +410,20 @@ fprintf (st, "The boot ROM consists of a single unit, simulating the 64KB boot R
 fprintf (st, "no registers.  The boot ROM is loaded with a binary byte stream using the \n");
 fprintf (st, "LOAD -r command:\n\n");
 fprintf (st, "   LOAD -r KA630.BIN		load ROM image KA630.BIN\n\n");
-fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to about\n");
-fprintf (st, "500K instructions per second.  This delay is required to make the power-up\n");
-fprintf (st, "self-test routines run correctly on very fast hosts.  The delay is controlled\n");
-fprintf (st, "with the commands:\n\n");
-fprintf (st, "  SET ROM NODELAY			ROM runs like RAM\n");
-fprintf (st, "  SET ROM DELAY			ROM runs slowly\n\n");
-fprintf (st, "By default the memory power-up self-tests are skipped as they take a long time\n");
-fprintf (st, "to complete.  The self-test sequence can be controlled with the following\n");
-fprintf (st, "commands:\n\n");
-fprintf (st, "  SET CPU DIAG=MIN        Run minimal diagnostics (skip memory test)\n");
-fprintf (st, "  SET CPU DIAG=FULL       Run full diagnostics\n\n");
+fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
+fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
+fprintf (st, "ROM image from the file ka655x.bin in the current working directory.\n");
+fprintf (st, "If that load attempt fails, then a copy of the missing ROM file is\n");
+fprintf (st, "written to the current directory and the load attempt is retried.\n\n");
+fprintf (st, "ROM accesses a use a calibrated delay that slows ROM-based execution to\n");
+fprintf (st, "about 500K instructions per second.  This delay is required to make the\n");
+fprintf (st, "power-up self-test routines run correctly on very fast hosts.\n");
+fprint_set_help (st, dptr);
+fprintf (st, "By default the memory power-up self-tests are skipped as they take a long\n");
+fprintf (st, "time to complete.  The self-test sequence can be controlled with the\n");
+fprintf (st, "following commands:\n\n");
+fprintf (st, "    SET CPU DIAG=MIN        Run minimal diagnostics (skip memory test)\n");
+fprintf (st, "    SET CPU DIAG=FULL       Run full diagnostics\n\n");
 return SCPE_OK;
 }
 
@@ -497,7 +501,7 @@ return SCPE_OK;
 t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 fprintf (st, "Non-volatile Memory (NVR)\n\n");
-fprintf (st, "The NVR simulates 50 bytes of battery-backed up memory.\n");
+fprintf (st, "The NVR simulates 128 bytes of battery-backed up memory.\n");
 fprintf (st, "When the simulator starts, NVR is cleared to 0, and the battery-low indicator\n");
 fprintf (st, "is set.  Alternately, NVR can be attached to a file.  This allows the NVR\n");
 fprintf (st, "state to be preserved across simulator runs.  Successfully attaching an NVR\n");

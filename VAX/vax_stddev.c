@@ -122,6 +122,7 @@ t_stat clk_detach (UNIT *uptr);
 t_stat todr_resync (void);
 char *tti_description (DEVICE *dptr);
 char *tto_description (DEVICE *dptr);
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *clk_description (DEVICE *dptr);
 
 extern int32 sysd_hlt_enb (void);
@@ -244,7 +245,7 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    &clk_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &clk_dib, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
     &clk_description
     };
 
@@ -525,6 +526,33 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
         return SCPE_MEM;
     todr_resync ();
     }
+return SCPE_OK;
+}
+
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Real-Time Clock (CLK)\n\n");
+fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
+fprintf (st, "so that the clock tracks actual elapsed time.\n\n");
+fprintf (st, "There are two modes of TODR operation:\n\n");
+fprintf (st, "   Default VMS mode.  Without initializing the TODR it returns the current\n");
+fprintf (st, "                      time of year offset which VMS would set the clock to\n");
+fprintf (st, "                      if VMS knew the correct time (i.e. by manual input).\n");
+fprintf (st, "                      This is correct almost all the time unless a VMS disk\n");
+fprintf (st, "                      hadn’t been booted from in the current year.  This mode\n");
+fprintf (st, "                      produces strange time results for non VMS OSes on each\n");
+fprintf (st, "                      system boot.\n");
+fprintf (st, "   OS Agnostic mode.  This mode behaves precisely like the VAX780 TODR and\n");
+fprintf (st, "                      works correctly for all OSes.  This mode is enabled by\n");
+fprintf (st, "                      attaching the CLK to a battery backup state file for the\n");
+fprintf (st, "                      TOY clock (i.e. sim> attach CLK TOY_CLOCK).  When\n");
+fprintf (st, "                      operating in OS Agnostic mode, the TODR will initially\n");
+fprintf (st, "                      start counting from 0 and be adjusted differently when\n");
+fprintf (st, "                      an OS specifically writes to the TODR.  VMS will prompt\n");
+fprintf (st, "                      to set the time on each boot (if the TODR value is less\n");
+fprintf (st, "                      than about 1 month) unless the SYSGEN parameter\n");
+fprintf (st, "                      TIMEPROMPTWAIT is set to 0.\n");
+fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
