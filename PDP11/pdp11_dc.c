@@ -660,10 +660,8 @@ fprintf (st, "by the Telnet client, a SET DCI DISCONNECT command, or a DETACH DC
 fprintf (st, "Other special commands:\n\n");
 fprintf (st, "   sim> SHOW DCI CONNECTIONS    show current connections\n");
 fprintf (st, "   sim> SHOW DCI STATISTICS     show statistics for active connections\n");
-fprintf (st, "   sim> SET DCOn DISCONNECT     disconnects the specified line.\n\n");
-fprintf (st, "The input device  (DCI) implements these registers:\n\n");
+fprintf (st, "   sim> SET DCOn DISCONNECT     disconnects the specified line.\n");
 fprint_reg_help (st, &dci_dev);
-fprintf (st, "\nThe output device (DCO) implements these registers:\n\n");
 fprint_reg_help (st, &dco_dev);
 fprintf (st, "\nThe additional terminals do not support save and restore.  All open connections\n");
 fprintf (st, "are lost when the simulator shuts down or DCI is detached.\n");

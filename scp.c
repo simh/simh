@@ -1059,7 +1059,6 @@ DEVICE *tdptr;
 char *tptr;
 char *namebuf;
 char rangebuf[32];
-char header[CBUFSIZE];
 
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
     if (rptr->depth > 1)
@@ -1080,9 +1079,8 @@ if (!found) {
         fprintf (st, "No register help is available for the %s device\n", dptr->name);
     }
 else {
-    sprintf (header, "\nThe %s device implements these registers:\n\n", dptr->name);
     namebuf = calloc (max_namelen + 1, sizeof (*namebuf));
-    fprintf (st, "%s device registers:\n", dptr->name);
+    fprintf (st, "\nThe %s device implements these registers:\n\n", dptr->name);
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
         if (rptr->desc) {
             if (rptr->depth <= 1)

@@ -1245,7 +1245,6 @@ fprintf (st, "bad block option can be used only when a unit is attached to a fil
 #if defined (VM_PDP11)
 fprintf (st, "The RL device supports the BOOT command.\n");
 #endif
-fprintf (st, "\nThe RX211 implements these registers:\n\n");
 fprint_reg_help (st, dptr);
 fprintf (st, "\nError handling is as follows:\n\n");
 fprintf (st, "    error         STOP_IOE   processed as\n");

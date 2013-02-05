@@ -255,6 +255,7 @@ extern uint32 nexus_req[NEXUS_HLVL];
 extern UNIT cpu_unit;
 
 t_stat mba_reset (DEVICE *dptr);
+t_stat mba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *mba_description (DEVICE *dptr);
 t_stat mba_rdreg (int32 *val, int32 pa, int32 mode);
 t_stat mba_wrreg (int32 val, int32 pa, int32 lnt);
@@ -341,7 +342,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba0_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mba_deb, NULL, NULL, NULL, NULL, NULL, 
+    mba_deb, NULL, NULL, &mba_help, NULL, NULL, 
     &mba_description
     },
     {
@@ -350,7 +351,7 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba1_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    mba_deb, NULL, NULL, NULL, NULL, NULL, 
+    mba_deb, NULL, NULL, &mba_help, NULL, NULL, 
     &mba_description
     }
     };
@@ -853,6 +854,17 @@ if (sim_switches & SWMASK ('P')) {
     }
 if (mbabort[mb])                                        /* reset device */
     mbabort[mb] ();
+return SCPE_OK;
+}
+
+t_stat mba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Massbus Adapters (MBA0, MBA1)\n\n");
+fprintf (st, "The Massbus adapters (MBA0, MBA1) simulate RH780's.  MBA0 is assigned to the\n");
+fprintf (st, "RP disk drives, MBA1 to the TU tape drives.\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 

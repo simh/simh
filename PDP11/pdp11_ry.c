@@ -725,7 +725,6 @@ fprintf (st, "\n");
 fprintf (st, "The RX211 supports the BOOT command.\n\n");
 #endif
 fprintf (st, "The RX211 is disabled in a Qbus system with more than 256KB of memory.\n\n");
-fprintf (st, "The RX211 implements these registers:\n\n");
 fprint_reg_help (st, dptr);
 fprintf (st, "\nError handling is as follows:\n\n");
 fprintf (st, "    error         STOP_IOE   processed as\n");

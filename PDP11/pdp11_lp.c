@@ -63,6 +63,7 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *ptr);
 t_stat lpt_detach (UNIT *uptr);
+t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *lpt_description (DEVICE *dptr);
 
 /* LPT data structures
@@ -112,7 +113,7 @@ DEVICE lpt_dev = {
     NULL, NULL, &lpt_reset,
     NULL, &lpt_attach, &lpt_detach,
     &lpt_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, NULL, &lpt_help, NULL, NULL, 
     &lpt_description
     };
 
@@ -201,6 +202,23 @@ t_stat lpt_detach (UNIT *uptr)
 {
 lpt_csr = lpt_csr | CSR_ERR;
 return detach_unit (uptr);
+}
+
+t_stat lpt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Line Printer (LPT)\n\n");
+fprintf (st, "The line printer (LPT) writes data to a disk file.  The POS register specifies\n");
+fprintf (st, "the number of the next data item to be written.  Thus, by changing POS, the\n");
+fprintf (st, "user can backspace or advance the printer.\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          out of paper\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
 }
 
 char *lpt_description (DEVICE *dptr)

@@ -184,6 +184,7 @@ extern uint32 nexus_req[NEXUS_HLVL];
 
 t_stat uba_svc (UNIT *uptr);
 t_stat uba_reset (DEVICE *dptr);
+t_stat uba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *uba_description (DEVICE *dptr);
 t_stat uba_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat uba_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
@@ -265,13 +266,14 @@ MTAB uba_mod[] = {
     { MTAB_XTD|MTAB_VDV, TR_UBA, "NEXUS", NULL,
       NULL, &show_nexus, NULL, "Display nexus" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "IOSPACE", NULL,
-      NULL, &show_iospace, NULL, "Display I/O space address map" },
+      NULL, &show_iospace, NULL, "Display IO address space assignments" },
     { MTAB_XTD|MTAB_VDV, 1, "AUTOCONFIG", "AUTOCONFIG",
       &set_autocon, &show_autocon, NULL, "Enable/Display autoconfiguration" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "NOAUTOCONFIG",
       &set_autocon, NULL, NULL, "Disable autoconfiguration" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "VIRTUAL", NULL,
-      NULL, &uba_show_virt, NULL, "Display translation for Unibus address arg" },
+      NULL, &uba_show_virt, NULL, "Show physical address translation for Unibus\n"
+  "                                address arg" },
     { 0 }
     };
 
@@ -291,7 +293,7 @@ DEVICE uba_dev = {
     &uba_ex, &uba_dep, &uba_reset,
     NULL, NULL, NULL,
     &uba_dib, DEV_NEXUS | DEV_DEBUG, 0,
-    uba_deb, NULL, NULL, NULL, NULL, NULL, 
+    uba_deb, NULL, NULL, &uba_help, NULL, NULL, 
     &uba_description
     };
 
@@ -930,6 +932,20 @@ uba_sr = 0;
 uba_cr = 0;
 uba_dr = 0;
 uba_cnf = UBACNF_UBIC;
+return SCPE_OK;
+}
+
+t_stat uba_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Unibus Adapter (UBA)\n\n");
+fprintf (st, "The Unibus adapter (UBA) simulates the DW780.\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe UBA implements main memory examination and modification via the Unibus\n");
+fprintf (st, "map.  The data width is always 16b:\n\n");
+fprintf (st, "EXAMINE UBA 0/10                examine main memory words corresponding\n");
+fprintf (st, "                                to Unibus addresses 0-10\n");
+fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
