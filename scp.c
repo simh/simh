@@ -1074,17 +1074,17 @@ if (!found) {
         fprintf (st, "No register help is available for the %s device\n", dptr->name);
     }
 else {
-    namebuf = calloc (max_namelen + 2, sizeof (*namebuf));
+    namebuf = calloc (max_namelen + 1, sizeof (*namebuf));
     fprintf (st, "\nThe %s device implements these registers:\n\n", dptr->name);
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+        if (rptr->flags & REG_HIDDEN)
+            continue;
         if (rptr->depth <= 1)
             sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
         else {
             sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
             sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), rangebuf);
             }
-        if (rptr->flags & REG_HIDDEN)
-            continue;
         if (all_unique) {
             fprintf (st, "  %s %4d  %s\n", namebuf, rptr->width, rptr->desc ? rptr->desc : "");
             continue;

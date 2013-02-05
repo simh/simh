@@ -582,6 +582,7 @@ t_stat rp_go (int32 drv);
 t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat rp_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 rp_abort (void);
+t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rp_description (DEVICE *dptr);
 
 
@@ -615,25 +616,25 @@ UNIT rp_unit[] = {
     };
 
 REG rp_reg[] = {
-    { BRDATA (CS1, rpcs1, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (DA, rpda, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (DS, rpds, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (ER1, rper1, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (HR, rmhr, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (OF, rpof, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (DC, rpdc, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (ER2, rper2, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (ER3, rper3, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (EC1, rpec1, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (EC2, rpec2, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (MR, rpmr, DEV_RDX, 16, RP_NUMDR) },
-    { BRDATA (MR2, rmmr2, DEV_RDX, 16, RP_NUMDR) },
-    { DRDATA (STIME, rp_swait, 24), REG_NZ + PV_LEFT },
-    { DRDATA (RTIME, rp_rwait, 24), REG_NZ + PV_LEFT },
-    { URDATA (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
+    { BRDATAD (CS1,              rpcs1, DEV_RDX, 16, RP_NUMDR, "current operation") },
+    { BRDATAD (DA,                rpda, DEV_RDX, 16, RP_NUMDR, "desired surface, sector") },
+    { BRDATAD (DS,                rpds, DEV_RDX, 16, RP_NUMDR, "drive status") },
+    { BRDATAD (ER1,              rper1, DEV_RDX, 16, RP_NUMDR, "drive errors") },
+    { BRDATAD (HR,                rmhr, DEV_RDX, 16, RP_NUMDR, "holding register") },
+    { BRDATAD (OF,                rpof, DEV_RDX, 16, RP_NUMDR, "offset") },
+    { BRDATAD (DC,                rpdc, DEV_RDX, 16, RP_NUMDR, "desired cylinder") },
+    { BRDATAD (ER2,              rper2, DEV_RDX, 16, RP_NUMDR, "error status 2") },
+    { BRDATAD (ER3,              rper3, DEV_RDX, 16, RP_NUMDR, "error status 3") },
+    { BRDATAD (EC1,              rpec1, DEV_RDX, 16, RP_NUMDR, "ECC syndrome 1") },
+    { BRDATAD (EC2,              rpec2, DEV_RDX, 16, RP_NUMDR, "ECC syndrome 2") },
+    { BRDATAD (MR,                rpmr, DEV_RDX, 16, RP_NUMDR, "maintenance register") },
+    { BRDATAD (MR2,              rmmr2, DEV_RDX, 16, RP_NUMDR, "maintenance register 2 (RM only)") },
+    { DRDATAD (STIME,         rp_swait, 24,                    "seek time, per cylinder"), REG_NZ + PV_LEFT },
+    { DRDATAD (RTIME,         rp_rwait, 24,                    "rotational delay"), REG_NZ + PV_LEFT },
+    { URDATA  (CAPAC, rp_unit[0].capac, 10, T_ADDR_W, 0,
               RP_NUMDR, PV_LEFT | REG_HRO) },
-    { FLDATA (STOP_IOE, rp_stopioe, 0) },
-    { GRDATA (CTRLTYPE, rp_dib.lnt, DEV_RDX, 16, 0), REG_HRO },
+    { FLDATAD (STOP_IOE,    rp_stopioe, 0,                     "stop on I/O error") },
+    { GRDATA  (CTRLTYPE,    rp_dib.lnt, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -708,7 +709,7 @@ DEVICE rp_dev = {
     NULL, NULL, &rp_reset,
     &rp_boot, &rp_attach, &rp_detach,
     &rp_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_MBUS | DEV_DEBUG | DEV_DISK,
-    0, rp_debug, NULL, NULL, NULL, NULL, NULL, 
+    0, rp_debug, NULL, NULL, &rp_help, NULL, NULL, 
     &rp_description
     };
 
@@ -1489,6 +1490,31 @@ return SCPE_NOFNC;
 }
 
 #endif
+
+t_stat rp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "RP04/05/06/07, RM02/03/05/80 Disk Pack Drives (RP)\n\n");
+fprintf (st, "The RP controller implements the Massbus family of large disk drives.  RP\n");
+fprintf (st, "options include the ability to set units write enabled or write locked, to\n");
+fprintf (st, "set the drive type to one of six disk types or autosize, and to write a DEC\n");
+fprintf (st, "standard 044 compliant bad block table on the last track.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.\n");
+fprintf (st, "The bad block option can be used only when a unit is attached to a file.\n");
+fprintf (st, "The RP device supports the BOOT command.\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "    end of file   x          assume rest of disk is zero\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+fprintf (st, "\nDisk drives on the %s device can be attacbed to simulated storage in the\n", dptr->name);
+fprintf (st, "following ways:\n\n");
+sim_disk_attach_help (st, dptr, uptr, flag, cptr);
+return SCPE_OK;
+}
 
 char *rp_description (DEVICE *dptr)
 {
