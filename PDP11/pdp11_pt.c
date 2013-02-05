@@ -63,12 +63,16 @@ t_stat ptr_rd (int32 *data, int32 PA, int32 access);
 t_stat ptr_wr (int32 data, int32 PA, int32 access);
 t_stat ptr_svc (UNIT *uptr);
 t_stat ptr_reset (DEVICE *dptr);
+t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *ptr_description (DEVICE *dptr);
 t_stat ptr_attach (UNIT *uptr, char *ptr);
 t_stat ptr_detach (UNIT *uptr);
 t_stat ptp_rd (int32 *data, int32 PA, int32 access);
 t_stat ptp_wr (int32 data, int32 PA, int32 access);
 t_stat ptp_svc (UNIT *uptr);
 t_stat ptp_reset (DEVICE *dptr);
+t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *ptp_description (DEVICE *dptr);
 t_stat ptp_attach (UNIT *uptr, char *ptr);
 t_stat ptp_detach (UNIT *uptr);
 
@@ -92,17 +96,19 @@ UNIT ptr_unit = {
     };
 
 REG ptr_reg[] = {
-    { GRDATA (BUF, ptr_unit.buf, DEV_RDX, 8, 0) },
-    { GRDATA (CSR, ptr_csr, DEV_RDX, 16, 0) },
-    { FLDATA (INT, int_req, INT_V_PTR) },
-    { FLDATA (ERR, ptr_csr, CSR_V_ERR) },
-    { FLDATA (BUSY, ptr_csr, CSR_V_BUSY) },
-    { FLDATA (DONE, ptr_csr, CSR_V_DONE) },
-    { FLDATA (IE, ptr_csr, CSR_V_IE) },
-    { DRDATA (POS, ptr_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptr_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptr_stopioe, 0) },
-    { FLDATA (DEVDIS, ptr_dev.flags, DEV_V_DIS), REG_HRO },
+    { GRDATAD (BUF,     ptr_unit.buf, DEV_RDX,  8, 0, "last data item processed") },
+    { GRDATAD (CSR,          ptr_csr, DEV_RDX, 16, 0, "control/status register") },
+    { FLDATAD (INT,          int_req, INT_V_PTR,      "interrupt pending flag") },
+    { FLDATAD (ERR,          ptr_csr, CSR_V_ERR,      "error flag (CSR<15>)") },
+    { FLDATAD (BUSY,         ptr_csr, CSR_V_BUSY,     "busy flag (CSR<11>)") },
+    { FLDATAD (DONE,         ptr_csr, CSR_V_DONE,     "device done flag (CSR<7>)") },
+    { FLDATAD (IE,           ptr_csr, CSR_V_IE,       "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,     ptr_unit.pos, T_ADDR_W,       "position in the input file"), PV_LEFT },
+    { DRDATAD (TIME,   ptr_unit.wait, 24,             "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptr_stopioe, 0,              "stop on I/O error") },
+    { FLDATA  (DEVDIS, ptr_dev.flags, DEV_V_DIS), REG_HRO },
+    { GRDATA  (DEVADDR,   ptr_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,   ptr_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -119,7 +125,9 @@ DEVICE ptr_dev = {
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &ptr_reset,
     NULL, &ptr_attach, &ptr_detach,
-    &ptr_dib, DEV_DISABLE | PT_DIS | DEV_UBUS | DEV_QBUS
+    &ptr_dib, DEV_DISABLE | PT_DIS | DEV_UBUS | DEV_QBUS, 0,
+    NULL, NULL, NULL, &ptr_help, NULL, NULL,
+    &ptr_description
     };
 
 /* PTP data structures
@@ -141,15 +149,17 @@ UNIT ptp_unit = {
     };
 
 REG ptp_reg[] = {
-    { GRDATA (BUF, ptp_unit.buf, DEV_RDX, 8, 0) },
-    { GRDATA (CSR, ptp_csr, DEV_RDX, 16, 0) },
-    { FLDATA (INT, int_req, INT_V_PTP) },
-    { FLDATA (ERR, ptp_csr, CSR_V_ERR) },
-    { FLDATA (DONE, ptp_csr, CSR_V_DONE) },
-    { FLDATA (IE, ptp_csr, CSR_V_IE) },
-    { DRDATA (POS, ptp_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, ptp_unit.wait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, ptp_stopioe, 0) },
+    { GRDATAD (BUF,     ptp_unit.buf, DEV_RDX,  8, 0, "last data item processed") },
+    { GRDATAD (CSR,          ptp_csr, DEV_RDX, 16, 0, "control/status register") },
+    { FLDATAD (INT,          int_req, INT_V_PTP,      "interrupt pending flag") },
+    { FLDATAD (ERR,          ptp_csr, CSR_V_ERR,      "error flag (CSR<15>)") },
+    { FLDATAD (DONE,         ptp_csr, CSR_V_DONE,     "device done flag (CSR<7>)") },
+    { FLDATAD (IE,           ptp_csr, CSR_V_IE,       "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,     ptp_unit.pos, T_ADDR_W,       "position in the output file"), PV_LEFT },
+    { DRDATAD (TIME,   ptp_unit.wait, 24,             "time from I/O initiation to interrupt"), PV_LEFT },
+    { FLDATAD (STOP_IOE, ptp_stopioe, 0,              "stop on I/O error") },
+    { GRDATA  (DEVADDR,   ptp_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,   ptp_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -166,7 +176,9 @@ DEVICE ptp_dev = {
     1, 10, 31, 1, DEV_RDX, 8,
     NULL, NULL, &ptp_reset,
     NULL, &ptp_attach, &ptp_detach,
-    &ptp_dib, DEV_DISABLE | PT_DIS | DEV_UBUS | DEV_QBUS
+    &ptp_dib, DEV_DISABLE | PT_DIS | DEV_UBUS | DEV_QBUS, 0,
+    NULL, NULL, NULL, &ptp_help, NULL, NULL,
+    &ptp_description
     };
 
 /* Paper tape reader I/O address routines */
@@ -366,4 +378,50 @@ t_stat ptp_detach (UNIT *uptr)
 {
 ptp_csr = ptp_csr | CSR_ERR;
 return detach_unit (uptr);
+}
+
+t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "PC11 Paper Tape Reader (PTP)\n\n");
+fprintf (st, "The paper tape punch (PTP) writes data to a disk file.  The POS register\n");
+fprintf (st, "specifies the number of the next data item to be written.  Thus, by changing\n");
+fprintf (st, "POS, the user can backspace or advance the punch.\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          out of tape\n\n");
+fprintf (st, "    end of file   1          report error and stop\n");
+fprintf (st, "                  0          out of tape\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
+}
+
+char *ptr_description (DEVICE *dptr)
+{
+return "PC11 paper tape reader";
+}
+
+t_stat ptp_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "PC11 Paper Tape Punch (PTP)\n\n");
+fprintf (st, "The paper tape punch (PTP) writes data to a disk file.  The POS register\n");
+fprintf (st, "specifies the number of the next data item to be written.  Thus, by changing\n");
+fprintf (st, "POS, the user can backspace or advance the punch.\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          out of tape\n\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
+}
+
+char *ptp_description (DEVICE *dptr)
+{
+return "PC11 paper tape punch";
 }
