@@ -595,6 +595,10 @@ t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
     {
         fprintf(st, "peer=%s", controller->line->peer);
     }
+    else
+    {
+        fprintf(st, "peer=unspecified");
+    }
 
     return SCPE_OK;
 }
