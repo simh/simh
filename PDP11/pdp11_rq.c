@@ -798,6 +798,7 @@ t_stat rq_show_ctype (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_wlk (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat rq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat rq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rq_description (DEVICE *dptr);
 
 t_bool rq_step4 (MSC *cp);
@@ -873,45 +874,44 @@ UNIT rq_unit[] = {
     };
 
 REG rq_reg[] = {
-    { GRDATA (UBASE,   rq_ctx.ubase,   DEV_RDX,  8, 0), REG_RO },
-    { GRDATA (SA,      rq_ctx.sa,      DEV_RDX, 16, 0) },
-    { GRDATA (SAW,     rq_ctx.saw,     DEV_RDX, 16, 0) },
-    { GRDATA (S1DAT,   rq_ctx.s1dat,   DEV_RDX, 16, 0) },
-    { GRDATA (COMM,    rq_ctx.comm,    DEV_RDX, 22, 0) },
-    { GRDATA (CQIOFF,  rq_ctx.cq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (CQBA,    rq_ctx.cq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (CQLNT,   rq_ctx.cq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (CQIDX,   rq_ctx.cq.idx,  DEV_RDX,  8, 2) },
-    { GRDATA (RQIOFF,  rq_ctx.rq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (RQBA,    rq_ctx.rq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (RQLNT,   rq_ctx.rq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (RQIDX,   rq_ctx.rq.idx,  DEV_RDX,  8, 2) },
-    { DRDATA (FREE,    rq_ctx.freq,                 5) },
-    { DRDATA (RESP,    rq_ctx.rspq,                 5) },
-    { DRDATA (PBSY,    rq_ctx.pbsy,                 5) },
-    { GRDATA (CFLGS,   rq_ctx.cflgs,   DEV_RDX, 16, 0) },
-    { GRDATA (CSTA,    rq_ctx.csta,    DEV_RDX,  4, 0) },
-    { GRDATA (PERR,    rq_ctx.perr,    DEV_RDX,  9, 0) },
-    { DRDATA (CRED,    rq_ctx.credits,              5) },
-    { DRDATA (HAT,     rq_ctx.hat,                 17) },
-    { DRDATA (HTMO,    rq_ctx.htmo,                17) },
-    { FLDATA (PRGI,    rq_ctx.prgi,                 0), REG_HIDDEN },
-    { FLDATA (PIP,     rq_ctx.pip,                  0), REG_HIDDEN },
-    { FLDATA (CTYPE,   rq_ctx.ctype,               32), REG_HIDDEN  },
-    { DRDATA (ITIME,   rq_itime,                   24), PV_LEFT + REG_NZ },
-    { DRDATA (ITIME,   rq_itime,                   24), PV_LEFT + REG_NZ },
-    { DRDATA (I4TIME,  rq_itime4,                  24), PV_LEFT + REG_NZ },
-    { DRDATA (QTIME,   rq_qtime,                   24), PV_LEFT + REG_NZ },
-    { DRDATA (XTIME,   rq_xtime,                   24), PV_LEFT + REG_NZ },
-    { BRDATA (PKTS,    rq_ctx.pak,     DEV_RDX,    16, sizeof(rq_ctx.pak)/2) },
-    { URDATA (CPKT,    rq_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UCNUM,   rq_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (PKTQ,    rq_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UFLG,    rq_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0) },
-    { URDATA (CAPAC,   rq_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { GRDATA (DEVADDR, rq_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC,  rq_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
-    { DRDATA (DEVLBN,  drv_tab[RA8U_DTYPE].lbn, 22), REG_HRO },
+    { GRDATAD (UBASE,   rq_ctx.ubase,   DEV_RDX,  8, 0, "unit base"), REG_RO },
+    { GRDATAD (SA,      rq_ctx.sa,      DEV_RDX, 16, 0, "status/address register") },
+    { GRDATAD (SAW,     rq_ctx.saw,     DEV_RDX, 16, 0, "written data") },
+    { GRDATAD (S1DAT,   rq_ctx.s1dat,   DEV_RDX, 16, 0, "step 1 init host data") },
+    { GRDATAD (COMM,    rq_ctx.comm,    DEV_RDX, 22, 0, "comm region") },
+    { GRDATAD (CQIOFF,  rq_ctx.cq.ioff, DEV_RDX, 32, 0, "command queue intr offset") },
+    { GRDATAD (CQBA,    rq_ctx.cq.ba,   DEV_RDX, 22, 0, "command queue base address") },
+    { GRDATAD (CQLNT,   rq_ctx.cq.lnt,  DEV_RDX, 32, 2, "command queue length"), REG_NZ },
+    { GRDATAD (CQIDX,   rq_ctx.cq.idx,  DEV_RDX,  8, 2, "command queue index") },
+    { GRDATAD (RQIOFF,  rq_ctx.rq.ioff, DEV_RDX, 32, 0, "request queue intr offset") },
+    { GRDATAD (RQBA,    rq_ctx.rq.ba,   DEV_RDX, 22, 0, "request queue base address") },
+    { GRDATAD (RQLNT,   rq_ctx.rq.lnt,  DEV_RDX, 32, 2, "request queue length"), REG_NZ },
+    { GRDATAD (RQIDX,   rq_ctx.rq.idx,  DEV_RDX,  8, 2, "request queue index") },
+    { DRDATAD (FREE,    rq_ctx.freq,                 5, "head of free packet list") },
+    { DRDATAD (RESP,    rq_ctx.rspq,                 5, "head of response packet list") },
+    { DRDATAD (PBSY,    rq_ctx.pbsy,                 5, "number of busy packets") },
+    { GRDATAD (CFLGS,   rq_ctx.cflgs,   DEV_RDX, 16, 0, "controller flags") },
+    { GRDATAD (CSTA,    rq_ctx.csta,    DEV_RDX,  4, 0, "controller state") },
+    { GRDATAD (PERR,    rq_ctx.perr,    DEV_RDX,  9, 0, "port error number") },
+    { DRDATAD (CRED,    rq_ctx.credits,              5, "host credits") },
+    { DRDATAD (HAT,     rq_ctx.hat,                 17, "host available timer") },
+    { DRDATAD (HTMO,    rq_ctx.htmo,                17, "host timeout value") },
+    { FLDATA  (PRGI,    rq_ctx.prgi,                 0), REG_HIDDEN },
+    { FLDATA  (PIP,     rq_ctx.pip,                  0), REG_HIDDEN },
+    { FLDATA  (CTYPE,   rq_ctx.ctype,               32), REG_HIDDEN  },
+    { DRDATAD (ITIME,   rq_itime,                   24, "init time delay, except stage 4"), PV_LEFT + REG_NZ },
+    { DRDATAD (I4TIME,  rq_itime4,                  24, "init stage 4 delay"), PV_LEFT + REG_NZ },
+    { DRDATAD (QTIME,   rq_qtime,                   24, "response time for 'immediate' packets"), PV_LEFT + REG_NZ },
+    { DRDATAD (XTIME,   rq_xtime,                   24, "response time for data transfers"), PV_LEFT + REG_NZ },
+    { BRDATAD (PKTS,    rq_ctx.pak,     DEV_RDX,    16, sizeof(rq_ctx.pak)/2, "packet buffers, 33W each, 32 entries") },
+    { URDATAD (CPKT,    rq_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0, "current packet, units 0 to 3") },
+    { URDATAD (UCNUM,   rq_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0, "ctrl number, units 0 to 3") },
+    { URDATAD (PKTQ,    rq_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
+    { URDATAD (UFLG,    rq_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
+    { URDATA  (CAPAC,   rq_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+    { GRDATA  (DEVADDR, rq_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,  rq_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
+    { DRDATA  (DEVLBN,  drv_tab[RA8U_DTYPE].lbn, 22), REG_HRO },
     { NULL }
     };
 
@@ -932,14 +932,14 @@ MTAB rq_mod[] = {
       NULL, &rq_show_ctrl, NULL, "Display all unit queues" },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RQ_SH_ALL, "ALL", NULL,
       NULL, &rq_show_ctrl, NULL, "Display complete controller state" },
+    { MTAB_XTD|MTAB_VDV, RQDX3_CTYPE, NULL, "RQDX3",
+      &rq_set_ctype, NULL, NULL, "Set RQDX3 Controller Type" },
+    { MTAB_XTD|MTAB_VDV, UDA50_CTYPE, NULL, "UDA50",
+      &rq_set_ctype, NULL, NULL, "Set UDA50 Controller Type" },
     { MTAB_XTD|MTAB_VDV, KLESI_CTYPE, NULL, "KLESI",
       &rq_set_ctype, NULL, NULL, "Set KLESI Controller Type"  },
     { MTAB_XTD|MTAB_VDV, RUX50_CTYPE, NULL, "RUX50",
       &rq_set_ctype, NULL, NULL, "Set RUX50 Controller Type" },
-    { MTAB_XTD|MTAB_VDV, UDA50_CTYPE, NULL, "UDA50",
-      &rq_set_ctype, NULL, NULL, "Set UDA50 Controller Type" },
-    { MTAB_XTD|MTAB_VDV, RQDX3_CTYPE, NULL, "RQDX3",
-      &rq_set_ctype, NULL, NULL, "Set RQDX3 Controller Type" },
     { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, "UNITQ", NULL,
       NULL, &rq_show_unitq, NULL, "Display unit queue" },
     { MTAB_XTD|MTAB_VUN, RX50_DTYPE, NULL, "RX50",
@@ -1012,7 +1012,7 @@ DEVICE rq_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
 
@@ -1045,39 +1045,39 @@ UNIT rqb_unit[] = {
     };
 
 REG rqb_reg[] = {
-    { GRDATA (UBASE,   rqb_ctx.ubase,   DEV_RDX,  8, 0), REG_RO },
-    { GRDATA (SA,      rqb_ctx.sa,      DEV_RDX, 16, 0) },
-    { GRDATA (SAW,     rqb_ctx.saw,     DEV_RDX, 16, 0) },
-    { GRDATA (S1DAT,   rqb_ctx.s1dat,   DEV_RDX, 16, 0) },
-    { GRDATA (COMM,    rqb_ctx.comm,    DEV_RDX, 22, 0) },
-    { GRDATA (CQIOFF,  rqb_ctx.cq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (CQBA,    rqb_ctx.cq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (CQLNT,   rqb_ctx.cq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (CQIDX,   rqb_ctx.cq.idx,  DEV_RDX,  8, 2) },
-    { GRDATA (RQIOFF,  rqb_ctx.rq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (RQBA,    rqb_ctx.rq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (RQLNT,   rqb_ctx.rq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (RQIDX,   rqb_ctx.rq.idx,  DEV_RDX,  8, 2) },
-    { DRDATA (FREE,    rqb_ctx.freq,                 5) },
-    { DRDATA (RESP,    rqb_ctx.rspq,                 5) },
-    { DRDATA (PBSY,    rqb_ctx.pbsy,                 5) },
-    { GRDATA (CFLGS,   rqb_ctx.cflgs,   DEV_RDX, 16, 0) },
-    { GRDATA (CSTA,    rqb_ctx.csta,    DEV_RDX,  4, 0) },
-    { GRDATA (PERR,    rqb_ctx.perr,    DEV_RDX,  9, 0) },
-    { DRDATA (CRED,    rqb_ctx.credits,              5) },
-    { DRDATA (HAT,     rqb_ctx.hat,                 17) },
-    { DRDATA (HTMO,    rqb_ctx.htmo,                17) },
-    { FLDATA (PRGI,    rqb_ctx.prgi,                 0), REG_HIDDEN },
-    { FLDATA (PIP,     rqb_ctx.pip,                  0), REG_HIDDEN },
-    { FLDATA (CTYPE,   rqb_ctx.ctype,               32), REG_HIDDEN  },
-    { BRDATA (PKTS,    rqb_ctx.pak,     DEV_RDX,    16, sizeof(rqb_ctx.pak)/2) },
-    { URDATA (CPKT,    rqb_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UCNUM,   rqb_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (PKTQ,    rqb_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UFLG,    rqb_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0) },
-    { URDATA (CAPAC,   rqb_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { GRDATA (DEVADDR, rqb_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC,  rqb_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
+    { GRDATAD (UBASE,   rqb_ctx.ubase,   DEV_RDX,  8, 0, "unit base"), REG_RO },
+    { GRDATAD (SA,      rqb_ctx.sa,      DEV_RDX, 16, 0, "status/address register") },
+    { GRDATAD (SAW,     rqb_ctx.saw,     DEV_RDX, 16, 0, "written data") },
+    { GRDATAD (S1DAT,   rqb_ctx.s1dat,   DEV_RDX, 16, 0, "step 1 init host data") },
+    { GRDATAD (COMM,    rqb_ctx.comm,    DEV_RDX, 22, 0, "comm region") },
+    { GRDATAD (CQIOFF,  rqb_ctx.cq.ioff, DEV_RDX, 32, 0, "command queue intr offset") },
+    { GRDATAD (CQBA,    rqb_ctx.cq.ba,   DEV_RDX, 22, 0, "command queue base address") },
+    { GRDATAD (CQLNT,   rqb_ctx.cq.lnt,  DEV_RDX, 32, 2, "command queue length"), REG_NZ },
+    { GRDATAD (CQIDX,   rqb_ctx.cq.idx,  DEV_RDX,  8, 2, "command queue index") },
+    { GRDATAD (RQIOFF,  rqb_ctx.rq.ioff, DEV_RDX, 32, 0, "request queue intr offset") },
+    { GRDATAD (RQBA,    rqb_ctx.rq.ba,   DEV_RDX, 22, 0, "request queue base address") },
+    { GRDATAD (RQLNT,   rqb_ctx.rq.lnt,  DEV_RDX, 32, 2, "request queue length"), REG_NZ },
+    { GRDATAD (RQIDX,   rqb_ctx.rq.idx,  DEV_RDX,  8, 2, "request queue index") },
+    { DRDATAD (FREE,    rqb_ctx.freq,                 5, "head of free packet list") },
+    { DRDATAD (RESP,    rqb_ctx.rspq,                 5, "head of response packet list") },
+    { DRDATAD (PBSY,    rqb_ctx.pbsy,                 5, "number of busy packets") },
+    { GRDATAD (CFLGS,   rqb_ctx.cflgs,   DEV_RDX, 16, 0, "controller flags") },
+    { GRDATAD (CSTA,    rqb_ctx.csta,    DEV_RDX,  4, 0, "controller state") },
+    { GRDATAD (PERR,    rqb_ctx.perr,    DEV_RDX,  9, 0, "port error number") },
+    { DRDATAD (CRED,    rqb_ctx.credits,              5, "host credits") },
+    { DRDATAD (HAT,     rqb_ctx.hat,                 17, "host available timer") },
+    { DRDATAD (HTMO,    rqb_ctx.htmo,                17, "host timeout value") },
+    { FLDATA  (PRGI,    rqb_ctx.prgi,                 0), REG_HIDDEN },
+    { FLDATA  (PIP,     rqb_ctx.pip,                  0), REG_HIDDEN },
+    { FLDATA  (CTYPE,   rqb_ctx.ctype,               32), REG_HIDDEN  },
+    { BRDATAD (PKTS,    rqb_ctx.pak,     DEV_RDX,    16, sizeof(rq_ctx.pak)/2, "packet buffers, 33W each, 32 entries") },
+    { URDATAD (CPKT,    rqb_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0, "current packet, units 0 to 3") },
+    { URDATAD (UCNUM,   rqb_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0, "ctrl number, units 0 to 3") },
+    { URDATAD (PKTQ,    rqb_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
+    { URDATAD (UFLG,    rqb_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
+    { URDATA  (CAPAC,   rqb_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+    { GRDATA  (DEVADDR, rqb_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,  rqb_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -1087,7 +1087,7 @@ DEVICE rqb_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
 
@@ -1120,39 +1120,39 @@ UNIT rqc_unit[] = {
     };
 
 REG rqc_reg[] = {
-    { GRDATA (UBASE,   rqc_ctx.ubase,   DEV_RDX,  8, 0), REG_RO },
-    { GRDATA (SA,      rqc_ctx.sa,      DEV_RDX, 16, 0) },
-    { GRDATA (SAW,     rqc_ctx.saw,     DEV_RDX, 16, 0) },
-    { GRDATA (S1DAT,   rqc_ctx.s1dat,   DEV_RDX, 16, 0) },
-    { GRDATA (COMM,    rqc_ctx.comm,    DEV_RDX, 22, 0) },
-    { GRDATA (CQIOFF,  rqc_ctx.cq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (CQBA,    rqc_ctx.cq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (CQLNT,   rqc_ctx.cq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (CQIDX,   rqc_ctx.cq.idx,  DEV_RDX,  8, 2) },
-    { GRDATA (RQIOFF,  rqc_ctx.rq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (RQBA,    rqc_ctx.rq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (RQLNT,   rqc_ctx.rq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (RQIDX,   rqc_ctx.rq.idx,  DEV_RDX,  8, 2) },
-    { DRDATA (FREE,    rqc_ctx.freq,                 5) },
-    { DRDATA (RESP,    rqc_ctx.rspq,                 5) },
-    { DRDATA (PBSY,    rqc_ctx.pbsy,                 5) },
-    { GRDATA (CFLGS,   rqc_ctx.cflgs,   DEV_RDX, 16, 0) },
-    { GRDATA (CSTA,    rqc_ctx.csta,    DEV_RDX,  4, 0) },
-    { GRDATA (PERR,    rqc_ctx.perr,    DEV_RDX,  9, 0) },
-    { DRDATA (CRED,    rqc_ctx.credits,              5) },
-    { DRDATA (HAT,     rqc_ctx.hat,                 17) },
-    { DRDATA (HTMO,    rqc_ctx.htmo,                17) },
-    { FLDATA (PRGI,    rqc_ctx.prgi,                 0), REG_HIDDEN },
-    { FLDATA (PIP,     rqc_ctx.pip,                  0), REG_HIDDEN },
-    { FLDATA (CTYPE,   rqc_ctx.ctype,               32), REG_HIDDEN  },
-    { BRDATA (PKTS,    rqc_ctx.pak,     DEV_RDX,    16, sizeof(rqc_ctx.pak)/2) },
-    { URDATA (CPKT,    rqc_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UCNUM,   rqc_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (PKTQ,    rqc_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UFLG,    rqc_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0) },
-    { URDATA (CAPAC,   rqc_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { GRDATA (DEVADDR, rqc_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC,  rqc_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
+    { GRDATAD (UBASE,   rqc_ctx.ubase,   DEV_RDX,  8, 0, "unit base"), REG_RO },
+    { GRDATAD (SA,      rqc_ctx.sa,      DEV_RDX, 16, 0, "status/address register") },
+    { GRDATAD (SAW,     rqc_ctx.saw,     DEV_RDX, 16, 0, "written data") },
+    { GRDATAD (S1DAT,   rqc_ctx.s1dat,   DEV_RDX, 16, 0, "step 1 init host data") },
+    { GRDATAD (COMM,    rqc_ctx.comm,    DEV_RDX, 22, 0, "comm region") },
+    { GRDATAD (CQIOFF,  rqc_ctx.cq.ioff, DEV_RDX, 32, 0, "command queue intr offset") },
+    { GRDATAD (CQBA,    rqc_ctx.cq.ba,   DEV_RDX, 22, 0, "command queue base address") },
+    { GRDATAD (CQLNT,   rqc_ctx.cq.lnt,  DEV_RDX, 32, 2, "command queue length"), REG_NZ },
+    { GRDATAD (CQIDX,   rqc_ctx.cq.idx,  DEV_RDX,  8, 2, "command queue index") },
+    { GRDATAD (RQIOFF,  rqc_ctx.rq.ioff, DEV_RDX, 32, 0, "request queue intr offset") },
+    { GRDATAD (RQBA,    rqc_ctx.rq.ba,   DEV_RDX, 22, 0, "request queue base address") },
+    { GRDATAD (RQLNT,   rqc_ctx.rq.lnt,  DEV_RDX, 32, 2, "request queue length"), REG_NZ },
+    { GRDATAD (RQIDX,   rqc_ctx.rq.idx,  DEV_RDX,  8, 2, "request queue index") },
+    { DRDATAD (FREE,    rqc_ctx.freq,                 5, "head of free packet list") },
+    { DRDATAD (RESP,    rqc_ctx.rspq,                 5, "head of response packet list") },
+    { DRDATAD (PBSY,    rqc_ctx.pbsy,                 5, "number of busy packets") },
+    { GRDATAD (CFLGS,   rqc_ctx.cflgs,   DEV_RDX, 16, 0, "controller flags") },
+    { GRDATAD (CSTA,    rqc_ctx.csta,    DEV_RDX,  4, 0, "controller state") },
+    { GRDATAD (PERR,    rqc_ctx.perr,    DEV_RDX,  9, 0, "port error number") },
+    { DRDATAD (CRED,    rqc_ctx.credits,              5, "host credits") },
+    { DRDATAD (HAT,     rqc_ctx.hat,                 17, "host available timer") },
+    { DRDATAD (HTMO,    rqc_ctx.htmo,                17, "host timeout value") },
+    { FLDATA  (PRGI,    rqc_ctx.prgi,                 0), REG_HIDDEN },
+    { FLDATA  (PIP,     rqc_ctx.pip,                  0), REG_HIDDEN },
+    { FLDATA  (CTYPE,   rqc_ctx.ctype,               32), REG_HIDDEN  },
+    { BRDATAD (PKTS,    rqc_ctx.pak,     DEV_RDX,    16, sizeof(rq_ctx.pak)/2, "packet buffers, 33W each, 32 entries") },
+    { URDATAD (CPKT,    rqc_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0, "current packet, units 0 to 3") },
+    { URDATAD (UCNUM,   rqc_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0, "ctrl number, units 0 to 3") },
+    { URDATAD (PKTQ,    rqc_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
+    { URDATAD (UFLG,    rqc_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
+    { URDATA  (CAPAC,   rqc_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+    { GRDATA  (DEVADDR, rqc_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,  rqc_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -1162,7 +1162,7 @@ DEVICE rqc_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
 
@@ -1195,39 +1195,39 @@ UNIT rqd_unit[] = {
     };
 
 REG rqd_reg[] = {
-    { GRDATA (UBASE,   rqd_ctx.ubase,   DEV_RDX,  8, 0), REG_RO },
-    { GRDATA (SA,      rqd_ctx.sa,      DEV_RDX, 16, 0) },
-    { GRDATA (SAW,     rqd_ctx.saw,     DEV_RDX, 16, 0) },
-    { GRDATA (S1DAT,   rqd_ctx.s1dat,   DEV_RDX, 16, 0) },
-    { GRDATA (COMM,    rqd_ctx.comm,    DEV_RDX, 22, 0) },
-    { GRDATA (CQIOFF,  rqd_ctx.cq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (CQBA,    rqd_ctx.cq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (CQLNT,   rqd_ctx.cq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (CQIDX,   rqd_ctx.cq.idx,  DEV_RDX,  8, 2) },
-    { GRDATA (RQIOFF,  rqd_ctx.rq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (RQBA,    rqd_ctx.rq.ba,   DEV_RDX, 22, 0) },
-    { GRDATA (RQLNT,   rqd_ctx.rq.lnt,  DEV_RDX, 32, 2), REG_NZ },
-    { GRDATA (RQIDX,   rqd_ctx.rq.idx,  DEV_RDX,  8, 2) },
-    { DRDATA (FREE,    rqd_ctx.freq,                 5) },
-    { DRDATA (RESP,    rqd_ctx.rspq,                 5) },
-    { DRDATA (PBSY,    rqd_ctx.pbsy,                 5) },
-    { GRDATA (CFLGS,   rqd_ctx.cflgs,   DEV_RDX, 16, 0) },
-    { GRDATA (CSTA,    rqd_ctx.csta,    DEV_RDX,  4, 0) },
-    { GRDATA (PERR,    rqd_ctx.perr,    DEV_RDX,  9, 0) },
-    { DRDATA (CRED,    rqd_ctx.credits,              5) },
-    { DRDATA (HAT,     rqd_ctx.hat,                 17) },
-    { DRDATA (HTMO,    rqd_ctx.htmo,                17) },
-    { FLDATA (PRGI,    rqd_ctx.prgi,                 0), REG_HIDDEN },
-    { FLDATA (PIP,     rqd_ctx.pip,                  0), REG_HIDDEN },
-    { FLDATA (CTYPE,   rqd_ctx.ctype,               32), REG_HIDDEN  },
-    { BRDATA (PKTS,    rqd_ctx.pak,     DEV_RDX,    16, sizeof(rqd_ctx.pak)/2) },
-    { URDATA (CPKT,    rqd_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UCNUM,   rqd_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (PKTQ,    rqd_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0) },
-    { URDATA (UFLG,    rqd_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0) },
-    { URDATA (CAPAC,   rqd_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
-    { GRDATA (DEVADDR, rqd_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC,  rqd_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
+    { GRDATAD (UBASE,   rqd_ctx.ubase,   DEV_RDX,  8, 0, "unit base"), REG_RO },
+    { GRDATAD (SA,      rqd_ctx.sa,      DEV_RDX, 16, 0, "status/address register") },
+    { GRDATAD (SAW,     rqd_ctx.saw,     DEV_RDX, 16, 0, "written data") },
+    { GRDATAD (S1DAT,   rqd_ctx.s1dat,   DEV_RDX, 16, 0, "step 1 init host data") },
+    { GRDATAD (COMM,    rqd_ctx.comm,    DEV_RDX, 22, 0, "comm region") },
+    { GRDATAD (CQIOFF,  rqd_ctx.cq.ioff, DEV_RDX, 32, 0, "command queue intr offset") },
+    { GRDATAD (CQBA,    rqd_ctx.cq.ba,   DEV_RDX, 22, 0, "command queue base address") },
+    { GRDATAD (CQLNT,   rqd_ctx.cq.lnt,  DEV_RDX, 32, 2, "command queue length"), REG_NZ },
+    { GRDATAD (CQIDX,   rqd_ctx.cq.idx,  DEV_RDX,  8, 2, "command queue index") },
+    { GRDATAD (RQIOFF,  rqd_ctx.rq.ioff, DEV_RDX, 32, 0, "request queue intr offset") },
+    { GRDATAD (RQBA,    rqd_ctx.rq.ba,   DEV_RDX, 22, 0, "request queue base address") },
+    { GRDATAD (RQLNT,   rqd_ctx.rq.lnt,  DEV_RDX, 32, 2, "request queue length"), REG_NZ },
+    { GRDATAD (RQIDX,   rqd_ctx.rq.idx,  DEV_RDX,  8, 2, "request queue index") },
+    { DRDATAD (FREE,    rqd_ctx.freq,                 5, "head of free packet list") },
+    { DRDATAD (RESP,    rqd_ctx.rspq,                 5, "head of response packet list") },
+    { DRDATAD (PBSY,    rqd_ctx.pbsy,                 5, "number of busy packets") },
+    { GRDATAD (CFLGS,   rqd_ctx.cflgs,   DEV_RDX, 16, 0, "controller flags") },
+    { GRDATAD (CSTA,    rqd_ctx.csta,    DEV_RDX,  4, 0, "controller state") },
+    { GRDATAD (PERR,    rqd_ctx.perr,    DEV_RDX,  9, 0, "port error number") },
+    { DRDATAD (CRED,    rqd_ctx.credits,              5, "host credits") },
+    { DRDATAD (HAT,     rqd_ctx.hat,                 17, "host available timer") },
+    { DRDATAD (HTMO,    rqd_ctx.htmo,                17, "host timeout value") },
+    { FLDATA  (PRGI,    rqd_ctx.prgi,                 0), REG_HIDDEN },
+    { FLDATA  (PIP,     rqd_ctx.pip,                  0), REG_HIDDEN },
+    { FLDATA  (CTYPE,   rqd_ctx.ctype,               32), REG_HIDDEN  },
+    { BRDATAD (PKTS,    rqd_ctx.pak,     DEV_RDX,    16, sizeof(rq_ctx.pak)/2, "packet buffers, 33W each, 32 entries") },
+    { URDATAD (CPKT,    rqd_unit[0].cpkt, 10, 5, 0, RQ_NUMDR, 0, "current packet, units 0 to 3") },
+    { URDATAD (UCNUM,   rqd_unit[0].cnum, 10, 5, 0, RQ_NUMDR, 0, "ctrl number, units 0 to 3") },
+    { URDATAD (PKTQ,    rqd_unit[0].pktq, 10, 5, 0, RQ_NUMDR, 0, "packet queue, units 0 to 3") },
+    { URDATAD (UFLG,    rqd_unit[0].uf,  DEV_RDX, 16, 0, RQ_NUMDR, 0, "unit flags, units 0 to 3") },
+    { URDATA  (CAPAC,   rqd_unit[0].capac, 10, T_ADDR_W, 0, RQ_NUMDR, PV_LEFT | REG_HRO) },
+    { GRDATA  (DEVADDR, rqd_dib.ba,      DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,  rqd_dib.vec,     DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -1237,7 +1237,7 @@ DEVICE rqd_dev = {
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
     &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
-    0, rq_debug, NULL, NULL, NULL, NULL, NULL,
+    0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
 
@@ -3079,6 +3079,40 @@ if (val & RQ_SH_UN) {
     for (i = 0; i < RQ_NUMDR; i++)
         rq_show_unitq (st, dptr->units + i, 0, desc);
     }
+return SCPE_OK;
+}
+
+t_stat rq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "UDA50 MSCP Disk Controller (%s)\n\n", dptr->name);
+fprintf (st, "The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.\n");
+fprintf (st, "Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates\n");
+fprintf (st, "an MSCP disk controller with four drives.  The MSCP controller type can be\n");
+fprintf (st, "specified as one of RQDX3, UDA50, KLESI or RUX50.  RQ options include the\n");
+fprintf (st, "ability to set units write enabled or write locked, and to set the drive\n");
+fprintf (st, "type to one of many disk types:\n");
+fprint_set_help (st, dptr);
+fprintf (st, "set RQn RAUSER{=n}        Set disk type to RA82 with n MB's\n");
+fprintf (st, "set -L RQn RAUSER{=n}		Set disk type to RA82 with n LBN's\n\n");
+fprintf (st, "The type options can be used only when a unit is not attached to a file.\n");
+fprintf (st, "RAUSER is a \"user specified\" disk; the user can specify the size of the\n");
+fprintf (st, "disk in either MB (1000000 bytes) or logical block numbers (LBN's, 512 bytes\n");
+fprintf (st, "each).  The minimum size is 5MB; the maximum size is 2GB without extended\n");
+fprintf (st, "file support, 1TB with extended file support.\n\n");
+fprintf (st, "The %s controllers support the BOOT command.\n\n", dptr->name);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nWhile VMS is not timing sensitive, most of the BSD-derived operating systems\n");
+fprintf (st, "(NetBSD, OpenBSD, etc) are.  The QTIME and XTIME parameters are set to values\n");
+fprintf (st, "that allow these operating systems to run correctly.\n\n");
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         processed as\n");
+fprintf (st, "    not attached  disk not ready\n");
+fprintf (st, "    end of file   assume rest of disk is zero\n");
+fprintf (st, "    OS I/O error  report error and stop\n");
+fprintf (st, "\nDisk drives on the %s device can be attacbed to simulated storage in the\n");
+fprintf (st, "following ways:\n\n", dptr->name);
+sim_disk_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 

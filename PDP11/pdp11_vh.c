@@ -1586,7 +1586,8 @@ fprintf (st, "   sim> SHOW %s CONNECTIONS 		show current connections\n", dptr->n
 fprintf (st, "   sim> SHOW %s STATISTICS 		show statistics for active connections\n", dptr->name);
 fprintf (st, "   sim> SET %s DISCONNECT=linenumber	disconnects the specified line.\n\n", dptr->name);
 fprintf (st, "The %s does not support save and restore.  All open connections are lost\n", devtype);
-fprintf (st, "when the simulator shuts down or the %s is detached.\n", dptr->name);
+fprintf (st, "when the simulator shuts down or the %s is detached.\n\n", dptr->name);
+vh_help_attach (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 

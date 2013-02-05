@@ -296,6 +296,7 @@ int32 ts_updxs0 (int32 t);
 void ts_cmpendcmd (int32 s0, int32 s1);
 void ts_endcmd (int32 ssf, int32 xs0f, int32 msg);
 int32 ts_map_status (t_stat st);
+t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *ts_description (DEVICE *dptr);
 
 /* TS data structures
@@ -316,34 +317,34 @@ DIB ts_dib = {
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) };
 
 REG ts_reg[] = {
-    { GRDATA (TSSR, tssr, DEV_RDX, 16, 0) },
-    { GRDATA (TSBA, tsba, DEV_RDX, 22, 0) },
-    { GRDATA (TSDBX, tsdbx, DEV_RDX, 8, 0) },
-    { GRDATA (CHDR, cmdhdr, DEV_RDX, 16, 0) },
-    { GRDATA (CADL, cmdadl, DEV_RDX, 16, 0) },
-    { GRDATA (CADH, cmdadh, DEV_RDX, 16, 0) },
-    { GRDATA (CLNT, cmdlnt, DEV_RDX, 16, 0) },
-    { GRDATA (MHDR, msghdr, DEV_RDX, 16, 0) },
-    { GRDATA (MRFC, msgrfc, DEV_RDX, 16, 0) },
-    { GRDATA (MXS0, msgxs0, DEV_RDX, 16, 0) },
-    { GRDATA (MXS1, msgxs1, DEV_RDX, 16, 0) },
-    { GRDATA (MXS2, msgxs2, DEV_RDX, 16, 0) },
-    { GRDATA (MXS3, msgxs3, DEV_RDX, 16, 0) },
-    { GRDATA (MSX4, msgxs4, DEV_RDX, 16, 0) },
-    { GRDATA (WADL, wchadl, DEV_RDX, 16, 0) },
-    { GRDATA (WADH, wchadh, DEV_RDX, 16, 0) },
-    { GRDATA (WLNT, wchlnt, DEV_RDX, 16, 0) },
-    { GRDATA (WOPT, wchopt, DEV_RDX, 16, 0) },
-    { GRDATA (WXOPT, wchxopt, DEV_RDX, 16, 0) },
-    { FLDATA (INT, IREQ (TS), INT_V_TS) },
-    { FLDATA (ATTN, ts_qatn, 0) },
-    { FLDATA (BOOT, ts_bcmd, 0) },
-    { FLDATA (OWNC, ts_ownc, 0) },
-    { FLDATA (OWNM, ts_ownm, 0) },
-    { DRDATA (TIME, ts_time, 24), PV_LEFT + REG_NZ },
-    { DRDATA (POS, ts_unit.pos, T_ADDR_W), PV_LEFT + REG_RO },
-    { GRDATA (DEVADDR, ts_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, ts_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATAD (TSSR,         tssr, DEV_RDX, 16, 0, "status register") },
+    { GRDATAD (TSBA,         tsba, DEV_RDX, 22, 0, "bus address register") },
+    { GRDATAD (TSDBX,       tsdbx, DEV_RDX,  8, 0, "data buffer extension register") },
+    { GRDATAD (CHDR,       cmdhdr, DEV_RDX, 16, 0, "command packet header") },
+    { GRDATAD (CADL,       cmdadl, DEV_RDX, 16, 0, "command packet low address or count") },
+    { GRDATAD (CADH,       cmdadh, DEV_RDX, 16, 0, "command packet high address") },
+    { GRDATAD (CLNT,       cmdlnt, DEV_RDX, 16, 0, "command packet length") },
+    { GRDATAD (MHDR,       msghdr, DEV_RDX, 16, 0, "message packet header") },
+    { GRDATAD (MRFC,       msgrfc, DEV_RDX, 16, 0, "message packet residual frame count") },
+    { GRDATAD (MXS0,       msgxs0, DEV_RDX, 16, 0, "message packet extended status 0") },
+    { GRDATAD (MXS1,       msgxs1, DEV_RDX, 16, 0, "message packet extended status 1") },
+    { GRDATAD (MXS2,       msgxs2, DEV_RDX, 16, 0, "message packet extended status 2") },
+    { GRDATAD (MXS3,       msgxs3, DEV_RDX, 16, 0, "message packet extended status 3") },
+    { GRDATAD (MSX4,       msgxs4, DEV_RDX, 16, 0, "message packet extended status 4") },
+    { GRDATAD (WADL,       wchadl, DEV_RDX, 16, 0, "write char packet low address") },
+    { GRDATAD (WADH,       wchadh, DEV_RDX, 16, 0, "write char packet high address") },
+    { GRDATAD (WLNT,       wchlnt, DEV_RDX, 16, 0, "write char packet length") },
+    { GRDATAD (WOPT,       wchopt, DEV_RDX, 16, 0, "write char packet options") },
+    { GRDATAD (WXOPT,     wchxopt, DEV_RDX, 16, 0, "write char packet extended options") },
+    { FLDATAD (INT, IREQ (TS), INT_V_TS,           "interrupt pending") },
+    { FLDATAD (ATTN,      ts_qatn, 0,              "attention message pending") },
+    { FLDATAD (BOOT,      ts_bcmd, 0,              "boot request pending") },
+    { FLDATAD (OWNC,      ts_ownc, 0,              "if set, tape owns command buffer") },
+    { FLDATAD (OWNM,      ts_ownm, 0,              "if set, tape owns message buffer") },
+    { DRDATAD (TIME,      ts_time, 24,             "delay"), PV_LEFT + REG_NZ },
+    { DRDATAD (POS,   ts_unit.pos, T_ADDR_W,       "position"), PV_LEFT + REG_RO },
+    { GRDATA  (DEVADDR, ts_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC, ts_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -369,7 +370,7 @@ DEVICE ts_dev = {
     NULL, NULL, &ts_reset,
     &ts_boot, &ts_attach, &ts_detach,
     &ts_dib, DEV_DISABLE | TS_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE, 0,
-    NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, NULL, &ts_help, NULL, NULL, 
     &ts_description
     };
 
@@ -1176,6 +1177,27 @@ t_stat ts_boot (int32 unitno, DEVICE *dptr)
 return SCPE_NOFNC;
 }
 #endif
+
+t_stat ts_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "TS11 Magnetic Tape (TS)\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe type options can be used only when a unit is not attached to a file.  The\n");
+fprintf (st, "bad block option can be used only when a unit is attached to a file.\n");
+fprintf (st, "The TS11 does not support the BOOT command.\n");
+#if defined (VM_PDP11)
+fprintf (st, "The TS11 device supports the BOOT command.\n");
+#endif
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         processed as\n");
+fprintf (st, "    not attached  tape not ready\n\n");
+fprintf (st, "    end of file   bad tape\n");
+fprintf (st, "    OS I/O error  fatal tape error\n\n");
+sim_tape_attach_help (st, dptr, uptr, flag, cptr);
+return SCPE_OK;
+}
 
 char *ts_description (DEVICE *dptr)
 {

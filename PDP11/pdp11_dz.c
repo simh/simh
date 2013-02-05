@@ -903,7 +903,8 @@ fprintf (st, "   sim> SHOW %s CONNECTIONS 		show current connections\n", dptr->n
 fprintf (st, "   sim> SHOW %s STATISTICS 		show statistics for active connections\n", dptr->name);
 fprintf (st, "   sim> SET %s DISCONNECT=linenumber	disconnects the specified line.\n\n\n", dptr->name);
 fprintf (st, "All open connections are lost when the simulator shuts down or the %s is\n", dptr->name);
-fprintf (st, "detached.\n");
+fprintf (st, "detached.\n\n");
+dz_help_attach (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 

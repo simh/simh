@@ -359,6 +359,7 @@ t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
+static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *tq_description (DEVICE *dptr);
 
 t_bool tq_step4 (void);
@@ -432,44 +433,44 @@ UNIT tq_unit[] = {
 #define TQ_QUEUE        (TQ_TIMER + 1)
 
 REG tq_reg[] = {
-    { GRDATA (SA, tq_sa, DEV_RDX, 16, 0) },
-    { GRDATA (SAW, tq_saw, DEV_RDX, 16, 0) },
-    { GRDATA (S1DAT, tq_s1dat, DEV_RDX, 16, 0) },
-    { GRDATA (CQIOFF, tq_cq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (CQBA, tq_cq.ba, DEV_RDX, 22, 0) },
-    { GRDATA (CQLNT, tq_cq.lnt, DEV_RDX, 8, 2), REG_NZ },
-    { GRDATA (CQIDX, tq_cq.idx, DEV_RDX, 8, 2) },
-    { GRDATA (TQIOFF, tq_rq.ioff, DEV_RDX, 32, 0) },
-    { GRDATA (TQBA, tq_rq.ba, DEV_RDX, 22, 0) },
-    { GRDATA (TQLNT, tq_rq.lnt, DEV_RDX, 8, 2), REG_NZ },
-    { GRDATA (TQIDX, tq_rq.idx, DEV_RDX, 8, 2) },
-    { DRDATA (FREE, tq_freq, 5) },
-    { DRDATA (RESP, tq_rspq, 5) },
-    { DRDATA (PBSY, tq_pbsy, 5) },
-    { GRDATA (CFLGS, tq_cflgs, DEV_RDX, 16, 0) },
-    { GRDATA (CSTA, tq_csta, DEV_RDX, 4, 0) },
-    { GRDATA (PERR, tq_perr, DEV_RDX, 9, 0) },
-    { DRDATA (CRED, tq_credits, 5) },
-    { DRDATA (HAT, tq_hat, 17) },
-    { DRDATA (HTMO, tq_htmo, 17) },
-    { URDATA (CPKT, tq_unit[0].cpkt, 10, 5, 0, TQ_NUMDR, 0) },
-    { URDATA (PKTQ, tq_unit[0].pktq, 10, 5, 0, TQ_NUMDR, 0) },
-    { URDATA (UFLG, tq_unit[0].uf, DEV_RDX, 16, 0, TQ_NUMDR, 0) },
-    { URDATA (POS, tq_unit[0].pos, 10, T_ADDR_W, 0, TQ_NUMDR, 0) },
-    { URDATA (OBJP, tq_unit[0].objp, 10, 32, 0, TQ_NUMDR, 0) },
-    { FLDATA (PRGI, tq_prgi, 0), REG_HIDDEN },
-    { FLDATA (PIP, tq_pip, 0), REG_HIDDEN },
-    { FLDATA (INT, IREQ (TQ), INT_V_TQ) },
-    { DRDATA (ITIME, tq_itime, 24), PV_LEFT + REG_NZ },
-    { DRDATA (I4TIME, tq_itime4, 24), PV_LEFT + REG_NZ },
-    { DRDATA (QTIME, tq_qtime, 24), PV_LEFT + REG_NZ },
-    { DRDATA (XTIME, tq_xtime, 24), PV_LEFT + REG_NZ },
-    { DRDATA (RWTIME, tq_rwtime, 32), PV_LEFT + REG_NZ },
-    { BRDATA (PKTS, tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1)) },
-    { DRDATA (DEVTYPE, tq_typ, 2), REG_HRO },
-    { DRDATA (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
-    { GRDATA (DEVADDR, tq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
-    { GRDATA (DEVVEC, tq_dib.vec, DEV_RDX, 16, 0), REG_HRO },
+    { GRDATAD (SA,                     tq_sa, DEV_RDX, 16, 0, "status/address register") },
+    { GRDATAD (SAW,                   tq_saw, DEV_RDX, 16, 0, "written data") },
+    { GRDATAD (S1DAT,               tq_s1dat, DEV_RDX, 16, 0, "step 1 init host data") },
+    { GRDATAD (CQIOFF,            tq_cq.ioff, DEV_RDX, 32, 0, "command queue intr offset") },
+    { GRDATAD (CQBA,                tq_cq.ba, DEV_RDX, 22, 0, "command queue base address") },
+    { GRDATAD (CQLNT,              tq_cq.lnt, DEV_RDX,  8, 2, "command queue length"), REG_NZ },
+    { GRDATAD (CQIDX,              tq_cq.idx, DEV_RDX,  8, 2, "command queue index") },
+    { GRDATAD (TQIOFF,            tq_rq.ioff, DEV_RDX, 32, 0, "request queue intr offset") },
+    { GRDATAD (TQBA,                tq_rq.ba, DEV_RDX, 22, 0, "request queue base address") },
+    { GRDATAD (TQLNT,              tq_rq.lnt, DEV_RDX,  8, 2, "request queue length"), REG_NZ },
+    { GRDATAD (TQIDX,              tq_rq.idx, DEV_RDX,  8, 2, "request queue index") },
+    { DRDATAD (FREE,                 tq_freq, 5,              "head of free packet list") },
+    { DRDATAD (RESP,                 tq_rspq, 5,              "head of response packet list") },
+    { DRDATAD (PBSY,                 tq_pbsy, 5,              "number of busy packets") },
+    { GRDATAD (CFLGS,               tq_cflgs, DEV_RDX, 16, 0, "controller flags") },
+    { GRDATAD (CSTA,                 tq_csta, DEV_RDX,  4, 0, "controller state") },
+    { GRDATAD (PERR,                 tq_perr, DEV_RDX,  9, 0, "port error number") },
+    { DRDATAD (CRED,              tq_credits, 5,              "host credits") },
+    { DRDATAD (HAT,                   tq_hat, 17,             "host available timer") },
+    { DRDATAD (HTMO,                 tq_htmo, 17,             "host timeout value") },
+    { URDATAD (CPKT,         tq_unit[0].cpkt, 10, 5, 0, TQ_NUMDR, 0, "current packet, units 0 to 3") },
+    { URDATAD (PKTQ,         tq_unit[0].pktq, 10, 5, 0, TQ_NUMDR, 0, "packet queue, units 0 to 3") },
+    { URDATAD (UFLG,           tq_unit[0].uf, DEV_RDX, 16, 0, TQ_NUMDR, 0, "unit flags, units 0 to 3") },
+    { URDATAD (POS,           tq_unit[0].pos, 10, T_ADDR_W, 0, TQ_NUMDR, 0, "position, units 0 to 3") },
+    { URDATAD (OBJP,         tq_unit[0].objp, 10, 32, 0, TQ_NUMDR, 0, "object position, units 0 to 3") },
+    { FLDATA  (PRGI,                 tq_prgi, 0), REG_HIDDEN },
+    { FLDATA  (PIP,                   tq_pip, 0), REG_HIDDEN },
+    { FLDATAD (INT,                IREQ (TQ), INT_V_TQ,       "interrupt pending flag") },
+    { DRDATAD (ITIME,               tq_itime, 24,             "init time delay, except stage 4"), PV_LEFT + REG_NZ },
+    { DRDATAD (I4TIME,             tq_itime4, 24,             "init stage 4 delay"), PV_LEFT + REG_NZ },
+    { DRDATAD (QTIME,               tq_qtime, 24,             "response time for 'immediate' packets"), PV_LEFT + REG_NZ },
+    { DRDATAD (XTIME,               tq_xtime, 24,             "response time for data transfers"), PV_LEFT + REG_NZ },
+    { DRDATAD (RWTIME,             tq_rwtime, 32,             "rewind time 2 sec (adjusted later)"), PV_LEFT + REG_NZ },
+    { BRDATAD (PKTS,                  tq_pkt, DEV_RDX, 16, TQ_NPKTS * (TQ_PKT_SIZE_W + 1), "packet buffers, 33W each, 32 entries") },
+    { DRDATA  (DEVTYPE,               tq_typ, 2), REG_HRO },
+    { DRDATA  (DEVCAP, drv_tab[TQU_TYPE].cap, T_ADDR_W), PV_LEFT | REG_HRO },
+    { GRDATA  (DEVADDR,            tq_dib.ba, DEV_RDX, 32, 0), REG_HRO },
+    { GRDATA  (DEVVEC,            tq_dib.vec, DEV_RDX, 16, 0), REG_HRO },
     { NULL }
     };
 
@@ -543,7 +544,7 @@ DEVICE tq_dev = {
     &tq_boot, &tq_attach, &tq_detach,
     &tq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_TAPE,
     0, tq_debug,
-    NULL, NULL, NULL, NULL, NULL, 
+    NULL, NULL, &tq_help, NULL, NULL, 
     &tq_description
     };
 
@@ -2382,6 +2383,27 @@ return SCPE_OK;
 t_stat tq_show_type (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
 fprintf (st, "%s (%dMB)", drv_tab[tq_typ].name, (uint32) (drv_tab[tq_typ].cap >> 20));
+return SCPE_OK;
+}
+
+t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+char *devtype = UNIBUS ? "TUK50" : "TQK50";
+
+fprintf (st, "%s (TQ)\n\n", tq_description (dptr));
+fprintf (st, "The TQ controller simulates the %s TMSCP disk controller.  TQ options\n", devtype);
+fprintf (st, "include the ability to set units write enabled or write locked, and to\n");
+fprintf (st, "specify the controller type and tape length:\n");
+fprint_set_help (st, dptr);
+fprintf (st, "\nThe %s device supports the BOOT command.\n", devtype);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         processed as\n");
+fprintf (st, "    not attached  tape not ready\n\n");
+fprintf (st, "    end of file   end of medium\n");
+fprintf (st, "    OS I/O error  fatal tape error\n\n");
+sim_tape_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
 
