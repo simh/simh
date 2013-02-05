@@ -1029,14 +1029,8 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
             }
         }
     if (dptr->registers) {
-        REG *rptr;
-
-        for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
-            if (rptr->desc) {
-                fprintf (st, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
-                break;
-                }
-            }
+        if (dptr->registers->name != NULL)
+            fprintf (st, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
         }
     }
 return;
@@ -1060,45 +1054,46 @@ char *tptr;
 char *namebuf;
 char rangebuf[32];
 
-for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
-    if (rptr->depth > 1)
-        sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
-    else
-        strcpy (rangebuf, "");
-    if (max_namelen < (strlen(rptr->name) + strlen (rangebuf)))
-        max_namelen = strlen(rptr->name) + strlen (rangebuf);
-    if (rptr->desc) {
+if (dptr->registers)
+    for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
+        if (rptr->flags & REG_HIDDEN)
+            continue;
+        if (rptr->depth > 1)
+            sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
+        else
+            strcpy (rangebuf, "");
+        if (max_namelen < (strlen(rptr->name) + strlen (rangebuf)))
+            max_namelen = strlen(rptr->name) + strlen (rangebuf);
         found = TRUE;
         trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
         if ((trptr == NULL) || (tdptr != dptr))
             all_unique = FALSE;
         }
-    }
 if (!found) {
     if (!silent)
         fprintf (st, "No register help is available for the %s device\n", dptr->name);
     }
 else {
-    namebuf = calloc (max_namelen + 1, sizeof (*namebuf));
+    namebuf = calloc (max_namelen + 2, sizeof (*namebuf));
     fprintf (st, "\nThe %s device implements these registers:\n\n", dptr->name);
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
-        if (rptr->desc) {
-            if (rptr->depth <= 1)
-                sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
-            else {
-                sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
-                sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), rangebuf);
-                }
-            if (all_unique) {
-                fprintf (st, "  %s %4d  %s\n", namebuf, rptr->width, rptr->desc);
-                continue;
-                }
-            trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
-            if ((trptr == NULL) || (tdptr != dptr))
-                fprintf (st, "  %s %s %4d  %s\n", dptr->name, namebuf, rptr->width, rptr->desc);
-            else
-                fprintf (st, "  %*s %s %4d  %s\n", (int)strlen(dptr->name), "", namebuf, rptr->width, rptr->desc);
+        if (rptr->depth <= 1)
+            sprintf (namebuf, "%*s", -((int)max_namelen), rptr->name);
+        else {
+            sprintf (rangebuf, "[%d:%d]", 0, rptr->depth-1);
+            sprintf (namebuf, "%s%*s", rptr->name, (int)(strlen(rptr->name))-((int)max_namelen), rangebuf);
             }
+        if (rptr->flags & REG_HIDDEN)
+            continue;
+        if (all_unique) {
+            fprintf (st, "  %s %4d  %s\n", namebuf, rptr->width, rptr->desc ? rptr->desc : "");
+            continue;
+            }
+        trptr = find_reg_glob (rptr->name, &tptr, &tdptr);
+        if ((trptr == NULL) || (tdptr != dptr))
+            fprintf (st, "  %s %s %4d  %s\n", dptr->name, namebuf, rptr->width, rptr->desc ? rptr->desc : "");
+        else
+            fprintf (st, "  %*s %s %4d  %s\n", (int)strlen(dptr->name), "", namebuf, rptr->width, rptr->desc ? rptr->desc : "");
         }
     free (namebuf);
     }
@@ -1346,15 +1341,10 @@ if (*cptr) {
                             fprintf (sim_log, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
                         }
                     if (dptr->registers) {
-                        REG *rptr;
-
-                        for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
-                            if (rptr->desc) {
-                                fprintf (stdout, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
-                                if (sim_log)
-                                    fprintf (sim_log, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
-                                break;
-                                }
+                        if (dptr->registers->name != NULL) {
+                            fprintf (stdout, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                            if (sim_log)
+                                fprintf (sim_log, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
                             }
                         }
                     if (dptr->modifiers) {
