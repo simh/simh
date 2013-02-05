@@ -1042,7 +1042,14 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
 return;
 }
 
-void fprint_reg_help (FILE *st, DEVICE *dptr)
+static void fprint_header (FILE *st, t_bool *pdone, char *context)
+{
+if (!*pdone)
+    fprintf (st, "%s", context);
+*pdone = TRUE;
+}
+
+void fprint_reg_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 {
 REG *rptr, *trptr;
 t_bool found = FALSE;
@@ -1052,6 +1059,7 @@ DEVICE *tdptr;
 char *tptr;
 char *namebuf;
 char rangebuf[32];
+char header[CBUFSIZE];
 
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
     if (rptr->depth > 1)
@@ -1067,9 +1075,12 @@ for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
             all_unique = FALSE;
         }
     }
-if (!found)
-    fprintf (st, "No register help is available for the %s device\n", dptr->name);
+if (!found) {
+    if (!silent)
+        fprintf (st, "No register help is available for the %s device\n", dptr->name);
+    }
 else {
+    sprintf (header, "\nThe %s device implements these registers:\n\n", dptr->name);
     namebuf = calloc (max_namelen + 1, sizeof (*namebuf));
     fprintf (st, "%s device registers:\n", dptr->name);
     for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
@@ -1095,31 +1106,75 @@ else {
     }
 }
 
-void fprint_set_help (FILE *st, DEVICE *dptr)
+void fprint_reg_help (FILE *st, DEVICE *dptr)
+{
+fprint_reg_help_ex (st, dptr, TRUE);
+}
+
+void fprint_attach_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
+{
+if (dptr->attach_help) {
+    fprintf (st, "\n%s device attach commands:\n\n", dptr->name);
+    dptr->attach_help (st, dptr, NULL, 0, NULL);
+    return;
+    }
+if (DEV_TYPE(dptr) == DEV_MUX) {
+    fprintf (st, "\n%s device attach commands:\n\n", dptr->name);
+    tmxr_attach_help (st, dptr, NULL, 0, NULL);
+    return;
+    }
+if (DEV_TYPE(dptr) == DEV_DISK) {
+    fprintf (st, "\n%s device attach commands:\n\n", dptr->name);
+    sim_disk_attach_help (st, dptr, NULL, 0, NULL);
+    return;
+    }
+if (DEV_TYPE(dptr) == DEV_TAPE) {
+    fprintf (st, "\n%s device attach commands:\n\n", dptr->name);
+    sim_tape_attach_help (st, dptr, NULL, 0, NULL);
+    return;
+    }
+if (DEV_TYPE(dptr) == DEV_ETHER) {
+    fprintf (st, "\n%s device attach commands:\n\n", dptr->name);
+    eth_attach_help (st, dptr, NULL, 0, NULL);
+    return;
+    }
+if (!silent) {
+    fprintf (st, "No ATTACH help is available for the %s device\n", dptr->name);
+    if (dptr->help)
+        dptr->help (st, dptr, NULL, 0, NULL);
+    }
+}
+
+void fprint_set_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 {
 MTAB *mptr;
 DEBTAB *dep;
-char buf[CBUFSIZE];
+t_bool found = FALSE;
+char buf[CBUFSIZE], header[CBUFSIZE];
 
+sprintf (header, "\n%s device SET commands:\n\n", dptr->name);
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN))
-            continue;                                       /* skip unit only modifiers */
+        if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
+            continue;                                       /* skip unit only extended modifiers */
         if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
-            continue;
+            continue;                                       /* skip unit only simple modifiers */
         if (mptr->mstring) {
+            fprint_header (st, &found, header);
             sprintf (buf, "set %s %s%s", sim_dname (dptr), mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}" : "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
     }
 if (dptr->flags & DEV_DISABLE) {
+    fprint_header (st, &found, header);
     sprintf (buf, "set %s ENABLE", sim_dname (dptr));
     fprintf (st,  "%-30s\tEnables device %s\n", buf, sim_dname (dptr));
     sprintf (buf, "set %s DISABLE", sim_dname (dptr));
     fprintf (st,  "%-30s\tDisables device %s\n", buf, sim_dname (dptr));
     }
 if (dptr->flags & DEV_DEBUG) {
+    fprint_header (st, &found, header);
     sprintf (buf, "set %s DEBUG", sim_dname (dptr));
     fprintf (st,  "%-30s\tEnables debugging for device %s\n", buf, sim_dname (dptr));
     sprintf (buf, "set %s NODEBUG", sim_dname (dptr));
@@ -1138,53 +1193,125 @@ if (dptr->flags & DEV_DEBUG) {
         fprintf (st,  "%-30s\tDisables specific debugging for device %s\n", buf, sim_dname (dptr));
         }
     }
-if (dptr->modifiers) {
+if ((dptr->modifiers) && (dptr->numunits != 1)) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
-        if ((dptr == sim_dflt_dev) && (dptr->numunits == 1) && !(mptr->mask & MTAB_XTD))
-            continue;
         if (mptr->mstring) {
+            fprint_header (st, &found, header);
             sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
             fprintf (st, "%-30s\t%s\n", buf, (strchr(mptr->mstring, '=')) ? "" : (mptr->help ? mptr->help : ""));
             }
         }
     }
+if (!found && !silent)
+    fprintf (st, "No SET help is available for the %s device\n", dptr->name);
 }
 
-void fprint_show_help (FILE *st, DEVICE *dptr)
+void fprint_set_help (FILE *st, DEVICE *dptr)
+    {
+    fprint_set_help_ex (st, dptr, TRUE);
+    }
+
+void fprint_show_help_ex (FILE *st, DEVICE *dptr, t_bool silent)
 {
 MTAB *mptr;
-char buf[CBUFSIZE];
+t_bool found = FALSE;
+char buf[CBUFSIZE], header[CBUFSIZE];
 
+sprintf (header, "\n%s device SHOW commands:\n\n", dptr->name);
 if (dptr->modifiers) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
-        if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN))
-            continue;                                       /* skip unit only modifiers */
+        if (!MODMASK(mptr,MTAB_VDV) && MODMASK(mptr,MTAB_VUN) && (dptr->numunits != 1))
+            continue;                                       /* skip unit only extended modifiers */
+        if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
+            continue;                                       /* skip unit only simple modifiers */
         if ((!mptr->disp) || (!mptr->pstring) || !(*mptr->pstring))
             continue;
-        if ((dptr->numunits != 1) && !(mptr->mask & MTAB_XTD))
-            continue;
+        fprint_header (st, &found, header);
         sprintf (buf, "show %s %s%s", sim_dname (dptr), mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
 if (dptr->flags & DEV_DEBUG) {
+    fprint_header (st, &found, header);
     sprintf (buf, "show %s DEBUG", sim_dname (dptr));
     fprintf (st, "%-30s\tDisplays debugging status for device %s\n", buf, sim_dname (dptr));
     }
-if (dptr->modifiers) {
+if ((dptr->modifiers) && (dptr->numunits != 1)) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
         if ((!mptr->disp) || (!mptr->pstring))
             continue;
-        if ((dptr == sim_dflt_dev) && (dptr->numunits == 1) && !(mptr->mask & MTAB_XTD))
-            continue;
+        fprint_header (st, &found, header);
         sprintf (buf, "show %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->pstring, MODMASK(mptr,MTAB_SHP) ? "=arg" : "");
         fprintf (st, "%-30s\t%s\n", buf, mptr->help ? mptr->help : "");
         }
     }
+if (!found && !silent)
+    fprintf (st, "No SHOW help is available for the %s device\n", dptr->name);
+}
+
+void fprint_show_help (FILE *st, DEVICE *dptr)
+    {
+    fprint_show_help_ex (st, dptr, TRUE);
+    }
+
+t_stat help_dev_help (FILE *st, DEVICE *dptr, UNIT *uptr, char *cptr)
+{
+char gbuf[CBUFSIZE];
+CTAB *cmdp;
+
+if (*cptr) {
+    cptr = get_glyph (cptr, gbuf, 0);
+    if ((cmdp = find_cmd (gbuf))) {
+        if (cmdp->action == &exdep_cmd) {
+            if (dptr->help)
+                dptr->help (st, dptr, uptr, 0, cptr);
+            else
+                fprintf (st, "No help available for the %s %s command\n", cmdp->name, sim_dname(dptr));
+            return SCPE_OK;
+            }
+        if (cmdp->action == &set_cmd) {
+            fprint_set_help_ex (st, dptr, FALSE);
+            return SCPE_OK;
+            }
+        if (cmdp->action == &show_cmd) {
+            fprint_show_help_ex (st, dptr, FALSE);
+            return SCPE_OK;
+            }
+        if (cmdp->action == &attach_cmd) {
+            fprint_attach_help_ex (st, dptr, FALSE);
+            return SCPE_OK;
+            }
+        fprintf (st, "No %s help is available for the %s device\n", cmdp->name, dptr->name);
+        if (dptr->help)
+            dptr->help (st, dptr, uptr, 0, cptr);
+        return SCPE_OK;
+        }
+    if (MATCH_CMD (gbuf, "REGISTERS") == 0) {
+        fprint_reg_help_ex (st, dptr, FALSE);
+        return SCPE_OK;
+        }
+    fprintf (st, "No %s help is available for the %s device\n", gbuf, dptr->name);
+    if (dptr->help)
+        dptr->help (st, dptr, uptr, 0, cptr);
+    return SCPE_OK;
+    }
+if (dptr->help) {
+    dptr->help (st, dptr, uptr, 0, cptr);
+    return SCPE_OK;
+    }
+if (dptr->description)
+    fprintf (st, "%s %s help\n", dptr->description (dptr), dptr->name);
+else
+    fprintf (st, "%s help\n", dptr->name);
+fprint_set_help_ex (st, dptr, TRUE);
+fprint_show_help_ex (st, dptr, TRUE);
+fprint_attach_help_ex (st, dptr, TRUE);
+fprint_reg_help_ex (st, dptr, TRUE);
+return SCPE_OK;
 }
 
 t_stat help_cmd (int32 flag, char *cptr)
@@ -1277,16 +1404,6 @@ if (*cptr) {
     else { 
         DEVICE *dptr;
         UNIT *uptr;
-        int i, dev_type;
-        static struct dev_help {
-            int type;
-            t_stat (*attach_help)(FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
-        } helps[] = {
-            {DEV_DISK,      &sim_disk_attach_help},
-            {DEV_TAPE,      &sim_tape_attach_help},
-            {DEV_MUX,       &tmxr_attach_help},
-            {DEV_ETHER,     &eth_attach_help},
-            {0,             NULL}};
 
         dptr = find_unit (gbuf, &uptr);
         if (dptr == NULL) {
@@ -1299,93 +1416,9 @@ if (*cptr) {
                     fprintf (sim_log, "Device %s is currently disabled\n", dptr->name);
                 }
             }
-        dev_type = DEV_TYPE (dptr);
-        for (i=0; helps[i].type; i++)
-            if (helps[i].type == dev_type)
-                break;
-        if (*cptr) {
-            cptr = get_glyph (cptr, gbuf, 0);
-            cmdp = find_cmd (gbuf);
-            }
-        else
-            cmdp = NULL;
-        if (0 == MATCH_CMD (gbuf, "REGISTERS")) {
-            fprint_reg_help (stdout, dptr);
-            if (sim_log)
-                fprint_reg_help (sim_log, dptr);
-            }
-        else {
-            if (0 == MATCH_CMD (gbuf, "SET")) {
-                fprint_set_help (stdout, dptr);
-                if (sim_log)
-                    fprint_set_help (sim_log, dptr);
-                }
-            else {
-                if (0 == MATCH_CMD (gbuf, "SHOW")) {
-                    fprint_show_help (stdout, dptr);
-                    if (sim_log)
-                        fprint_show_help (sim_log, dptr);
-                    }
-                else {
-                    if ((dptr->help == NULL) && (cmdp == NULL)) {
-                        fprintf (stdout, "No help available for the %s device\n", dptr->name);
-                        if (sim_log)
-                            fprintf (sim_log, "No help available for the %s device\n", dptr->name);
-                        if (dptr->attach_help || 
-                            (DEV_TYPE(dptr) == DEV_MUX) ||
-                            (DEV_TYPE(dptr) == DEV_ETHER) ||
-                            (DEV_TYPE(dptr) == DEV_DISK) ||
-                            (DEV_TYPE(dptr) == DEV_TAPE)) {
-                            fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                            if (sim_log)
-                                fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                            }
-                        }
-                    else {
-                        if (cmdp != NULL) {
-                            if (cmdp->action != &attach_cmd) {
-                                fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
-                                if (sim_log)
-                                    fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
-                                if (dptr->attach_help || 
-                                    (DEV_TYPE(dptr) == DEV_MUX) ||
-                                    (DEV_TYPE(dptr) == DEV_ETHER) ||
-                                    (DEV_TYPE(dptr) == DEV_DISK) ||
-                                    (DEV_TYPE(dptr) == DEV_TAPE)) {
-                                    fprintf (stdout, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                                    if (sim_log)
-                                        fprintf (sim_log, "Some help is available if you type HELP %s ATTACH\n", dptr->name);
-                                    }
-                                }
-                            else {
-                                if (dptr->attach_help) {
-                                    dptr->attach_help (stdout, dptr, uptr, 0, cptr);
-                                    if (sim_log)
-                                        dptr->attach_help (sim_log, dptr, uptr, 0, cptr);
-                                    }
-                                else {
-                                    if (helps[i].attach_help) {
-                                        helps[i].attach_help (stdout, dptr, uptr, 0, cptr);
-                                        if (sim_log)
-                                            helps[i].attach_help (sim_log, dptr, uptr, 0, cptr);
-                                        }
-                                    else {
-                                        fprintf (stdout, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
-                                        if (sim_log)
-                                            fprintf (sim_log, "No help available for the %s device %s command\n", dptr->name, cmdp->name);
-                                        }
-                                    }
-                                }
-                            }
-                        else {
-                            dptr->help (stdout, dptr, uptr, 0, cptr);
-                            if (sim_log)
-                                dptr->help (sim_log, dptr, uptr, 0, cptr);
-                            }
-                        }
-                    }
-                }
-            }
+        help_dev_help (stdout, dptr, uptr, cptr);
+        if (sim_log)
+            help_dev_help (stdout, dptr, uptr, cptr);
         }
     }
 else {
