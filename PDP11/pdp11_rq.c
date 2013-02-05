@@ -3110,8 +3110,8 @@ fprintf (st, "    error         processed as\n");
 fprintf (st, "    not attached  disk not ready\n");
 fprintf (st, "    end of file   assume rest of disk is zero\n");
 fprintf (st, "    OS I/O error  report error and stop\n");
-fprintf (st, "\nDisk drives on the %s device can be attacbed to simulated storage in the\n");
-fprintf (st, "following ways:\n\n", dptr->name);
+fprintf (st, "\nDisk drives on the %s device can be attacbed to simulated storage in the\n", dptr->name);
+fprintf (st, "following ways:\n\n");
 sim_disk_attach_help (st, dptr, uptr, flag, cptr);
 return SCPE_OK;
 }
