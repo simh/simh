@@ -326,7 +326,7 @@ MTAB dz_mod[] = {
         NULL, &tmxr_show_cstat, (void *) &dz_desc, "Display multiplexer statistics" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, DZ_LINES, "VECTOR", "VECTOR",
         &set_vec, &show_vec_mux, (void *) &dz_desc, "Interrupt vector" },
 #if !defined (VM_PDP10)
     { MTAB_XTD|MTAB_VDV, 0, NULL, "AUTOCONFIGURE",
