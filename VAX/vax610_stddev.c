@@ -91,6 +91,8 @@ t_stat clk_reset (DEVICE *dptr);
 char *tti_description (DEVICE *dptr);
 char *tto_description (DEVICE *dptr);
 char *clk_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 void txdb_func (int32 data);
 
 extern int32 sysd_hlt_enb (void);
@@ -131,7 +133,7 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    &tti_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tti_dib, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL, 
     &tti_description
     };
 
@@ -171,7 +173,7 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    &tto_dib, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &tto_dib, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL, 
     &tto_description
     };
 
@@ -363,6 +365,16 @@ sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Console Terminal Input (TTI)\n\n");
+fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
 char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
@@ -399,6 +411,16 @@ tto_unit.buf = 0;
 tto_csr = CSR_DONE;
 CLR_INT (TTO);
 sim_cancel (&tto_unit);                                 /* deactivate unit */
+return SCPE_OK;
+}
+
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Console Terminal Output (TTO)\n\n");
+fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 

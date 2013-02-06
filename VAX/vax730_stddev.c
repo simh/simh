@@ -220,6 +220,9 @@ char *tto_description (DEVICE *dptr);
 char *clk_description (DEVICE *dptr);
 char *tmr_description (DEVICE *dptr);
 char *td_description (DEVICE *dptr);
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat clk_attach (UNIT *uptr, char *cptr);
 t_stat clk_detach (UNIT *uptr);
 t_stat tmr_reset (DEVICE *dptr);
@@ -264,7 +267,7 @@ DEVICE tti_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tti_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &tti_help, NULL, NULL, 
     &tti_description
     };
 
@@ -300,7 +303,7 @@ DEVICE tto_dev = {
     1, 10, 31, 1, 16, 8,
     NULL, NULL, &tto_reset,
     NULL, NULL, NULL,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &tto_help, NULL, NULL, 
     &tto_description
     };
 
@@ -325,7 +328,7 @@ DEVICE clk_dev = {
     1, 0, 8, 4, 0, 32,
     NULL, NULL, &clk_reset,
     NULL, &clk_attach, &clk_detach,
-    NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    NULL, 0, 0, NULL, NULL, NULL, &clk_help, NULL, NULL, 
     &clk_description
     };
 
@@ -691,6 +694,16 @@ sim_activate_abs (&tti_unit, KBD_WAIT (tti_unit.wait, tmr_poll));
 return SCPE_OK;
 }
 
+t_stat tti_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Console Terminal Input (TTI)\n\n");
+fprintf (st, "The terminal input (TTI) polls the console keyboard for input.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
 char *tti_description (DEVICE *dptr)
 {
 return "console terminal input";
@@ -726,6 +739,16 @@ tto_buf = 0;
 tto_csr = CSR_DONE;
 tto_int = 0;
 sim_cancel (&tto_unit);                                 /* deactivate unit */
+return SCPE_OK;
+}
+
+t_stat tto_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Console Terminal Output (TTO)\n\n");
+fprintf (st, "The terminal output (TTO) writes to the simulator console.\n\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
@@ -893,6 +916,37 @@ if (clk_unit.filebuf == NULL) {                         /* make sure the TODR is
         return SCPE_MEM;
     todr_resync ();
     }
+return SCPE_OK;
+}
+
+t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "Real-Time Clock (CLK)\n\n");
+fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
+fprintf (st, "so that the clock tracks actual elapsed time.\n\n");
+fprintf (st, "There are two modes of TODR operation:\n\n");
+fprintf (st, "   Default VMS mode.  Without initializing the TODR it returns the current\n");
+fprintf (st, "                      time of year offset which VMS would set the clock to\n");
+fprintf (st, "                      if VMS knew the correct time (i.e. by manual input).\n");
+fprintf (st, "                      This is correct almost all the time unless a VMS disk\n");
+fprintf (st, "                      hadn't been booted from in the current year.  This mode\n");
+fprintf (st, "                      produces strange time results for non VMS OSes on each\n");
+fprintf (st, "                      system boot.\n");
+fprintf (st, "   OS Agnostic mode.  This mode behaves precisely like the VAX780 TODR and\n");
+fprintf (st, "                      works correctly for all OSes.  This mode is enabled by\n");
+fprintf (st, "                      attaching the CLK to a battery backup state file for the\n");
+fprintf (st, "                      TOY clock (i.e. sim> attach CLK TOY_CLOCK).  When\n");
+fprintf (st, "                      operating in OS Agnostic mode, the TODR will initially\n");
+fprintf (st, "                      start counting from 0 and be adjusted differently when\n");
+fprintf (st, "                      an OS specifically writes to the TODR.  VMS determines\n");
+fprintf (st, "                      if the TODR currently contains a valid time if the value\n");
+fprintf (st, "                      it sees is less than about 1 month.  If the time isn't\n");
+fprintf (st, "                      valid VMS will prompt to set the time during the system\n");
+fprintf (st, "                      boot.  While prompting for the time it will wait for an\n");
+fprintf (st, "                      answer to the prompt for up to the SYSGEN parameter\n");
+fprintf (st, "                      TIMEPROMPTWAIT seconds.  A value of 0 for TIMEPROMPTWAIT\n");
+fprintf (st, "                      will disable the clock setting prompt.\n");
+fprint_reg_help (st, dptr);
 return SCPE_OK;
 }
 
