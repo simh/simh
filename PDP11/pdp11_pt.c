@@ -382,8 +382,8 @@ return detach_unit (uptr);
 
 t_stat ptr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "PC11 Paper Tape Reader (PTP)\n\n");
-fprintf (st, "The paper tape reader (PTP) reads data from a disk file.  The POS register\n");
+fprintf (st, "PC11 Paper Tape Reader (PTR)\n\n");
+fprintf (st, "The paper tape reader (PTR) reads data from a disk file.  The POS register\n");
 fprintf (st, "specifies the number of the next data item to be read.  Thus, by changing\n");
 fprintf (st, "POS, the user can backspace or advance the reader.\n");
 fprint_set_help (st, dptr);
