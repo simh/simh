@@ -911,14 +911,21 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
                 }
             }
         if (!sim_quiet)
-            printf ("\n%s%d: Copied %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_addr)lba*sector_size)/1000000));
+            if (r == SCPE_OK)
+                printf ("\n%s%d: Copied %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_addr)lba*sector_size)/1000000));
+            else
+                printf ("\n%s%d: Error copying: %s.\n", sim_dname (dptr), (int)(uptr-dptr->units), sim_error_text (r));
         free (copy_buf);
-        created = TRUE;
         sim_vhd_disk_close (vhd);
         sim_disk_detach (uptr);
-        strcpy (cptr, gbuf);
-        sim_disk_set_fmt (uptr, 0, "VHD", NULL);
-        sim_switches = saved_sim_switches;
+        if (r == SCPE_OK) {
+            created = TRUE;
+            strcpy (cptr, gbuf);
+            sim_disk_set_fmt (uptr, 0, "VHD", NULL);
+            sim_switches = saved_sim_switches;
+            }
+        else
+            return r;
         /* fall through and open/return the newly created & copied vhd */
         }
     }
@@ -1196,7 +1203,9 @@ fprintf (st, "    -X          When creating a VHD, create a fixed sized VHD (vs 
 fprintf (st, "                expanding one).\n");
 fprintf (st, "    -D          Create a Differencing VHD (relative to an already existing VHD\n");
 fprintf (st, "                disk)\n");
-fprintf (st, "    -M          Merge a Differencing VHD into its parent VHD disk\n\n");
+fprintf (st, "    -M          Merge a Differencing VHD into its parent VHD disk\n");
+fprintf (st, "    -O          Override consistency checks when attaching differencing disks\n");
+fprintf (st, "                which have unexpected parent disk GUID or timestamps\n\n");
 fprintf (st, "Examples:\n");
 fprintf (st, "  sim> show rq\n");
 fprintf (st, "    RQ, address=20001468-2000146B*, no vector, 4 units\n");
@@ -2667,13 +2676,17 @@ if ((sDynamic) &&
                                        NULL, 
                                        0)) &&
                     (0 == memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID))) &&
-                    (sDynamic->ParentTimeStamp == ParentModificationTime)) {
+                    ((sDynamic->ParentTimeStamp == ParentModificationTime) || 
+                     ((NtoHl(sDynamic->ParentTimeStamp)-NtoHl(ParentModificationTime)) == 3600) || 
+                     (sim_switches & SWMASK ('O')))) {
                     strncpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
                     break;
                     }
                 }
-            if (!szParentVHDPath)
+            if (!*szParentVHDPath) {
                 Return = EINVAL;                        /* File Corrupt */
+                fprintf (stderr, "Error Invalid Parent VHD for Differencing VHD\n");
+                }
             }
         }
     }
@@ -3080,7 +3093,7 @@ Footer.DataOffset = NtoHll (bFixedVHD ? ((long long)-1) : (long long)(sizeof(Foo
 time (&now);
 Footer.TimeStamp = NtoHl ((uint32)(now-946684800));
 memcpy (Footer.CreatorApplication, "simh", 4);
-Footer.CreatorVersion = NtoHl (0x00010000);
+Footer.CreatorVersion = NtoHl (0x00040000);
 memcpy (Footer.CreatorHostOS, "Wi2k", 4);
 Footer.OriginalSize = NtoHll (SizeInBytes);
 Footer.CurrentSize = NtoHll (SizeInBytes);
@@ -3142,9 +3155,7 @@ if (bFixedVHD) {
 memset (&Dynamic, 0, sizeof(Dynamic));
 memcpy (Dynamic.Cookie, "cxsparse", 8);
 Dynamic.DataOffset = NtoHll (0xFFFFFFFFFFFFFFFFLL);
-TableOffset = (uint64)(BytesPerSector*((sizeof(Dynamic)+sizeof(Footer)+BytesPerSector-1)/BytesPerSector));
-TableOffset += VHD_DATA_BLOCK_ALIGNMENT-1;
-TableOffset &= ~(VHD_DATA_BLOCK_ALIGNMENT-1);
+TableOffset = NtoHll(Footer.DataOffset)+sizeof(Dynamic);
 Dynamic.TableOffset = NtoHll (TableOffset);
 Dynamic.HeaderVersion = NtoHl (0x00010000);
 if (0 == BlockSize)
@@ -3721,12 +3732,19 @@ while (sects) {
                               BlockOffset))
             goto Fatal_IO_Error;
         /* Write back just the aligned sector which contains the updated BAT entry */
-        BATUpdateBufferAddress = ((uint8 *)hVHD->BAT) + 
-            (((((size_t)&hVHD->BAT[BlockNumber]) - (size_t)hVHD->BAT)/VHD_DATA_BLOCK_ALIGNMENT)*VHD_DATA_BLOCK_ALIGNMENT);
-        BATUpdateBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
+        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) + 
+            (size_t)((((size_t)&hVHD->BAT[BlockNumber+1]) - (size_t)hVHD->BAT + (size_t)NtoHll(hVHD->Dynamic.TableOffset)) & ~(VHD_DATA_BLOCK_ALIGNMENT-1));
+        if (BATUpdateBufferAddress < (uint8 *)hVHD->BAT) {
+            BATUpdateBufferAddress = (uint8 *)hVHD->BAT;
+            BATUpdateBufferSize = (((((size_t)&hVHD->BAT[BlockNumber+1]) - (size_t)hVHD->BAT) + 511)/512)*512;
+            BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset);
+            }
+        else {
+            BATUpdateBufferSize = VHD_DATA_BLOCK_ALIGNMENT;
+            BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset) + BATUpdateBufferAddress - ((uint8 *)hVHD->BAT);
+            }
         if ((size_t)(BATUpdateBufferAddress - (uint8 *)hVHD->BAT + BATUpdateBufferSize) > 512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512))
             BATUpdateBufferSize = 512*((sizeof(*hVHD->BAT)*NtoHl(hVHD->Dynamic.MaxTableEntries) + 511)/512) - (BATUpdateBufferAddress - ((uint8 *)hVHD->BAT));
-        BATUpdateStorageAddress = NtoHll(hVHD->Dynamic.TableOffset) + BATUpdateBufferAddress - ((uint8 *)hVHD->BAT);
         if (WriteFilePosition(hVHD->File,
                               BATUpdateBufferAddress,
                               BATUpdateBufferSize,
