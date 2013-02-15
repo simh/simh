@@ -894,7 +894,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
             }
         for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
             if (!sim_quiet)
-                printf ("%s%d: Copied %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_addr)lba*sector_size)/1000000), (int)((lba*100)/total_sectors));
+                printf ("%s%d: Copied %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
             sects = sectors_per_buffer;
             if (lba + sects > total_sectors)
                 sects = total_sectors - lba;
@@ -2918,7 +2918,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
                                      SectorsPerBlock*BlockNumber))
             break;
         if (!sim_quiet)
-            printf ("Merged %dMB.  %d%% complete.\r", (int)(((float)NeededBlock*SectorsPerBlock)*SectorSize/1000000), (int)((NeededBlock*100)/BlocksToMerge));
+            printf ("Merged %dMB.  %d%% complete.\r", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000), (int)((((float)NeededBlock)*100)/BlocksToMerge));
         hVHD->BAT[BlockNumber] = VHD_BAT_FREE_ENTRY;
         }
     if (BlockNumber < NtoHl (hVHD->Dynamic.MaxTableEntries)) {
@@ -2927,7 +2927,7 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
     else {
         Status = 0;
         if (!sim_quiet)
-            printf ("Merged %dMB.  100%% complete.\n", (int)(((float)NeededBlock*SectorsPerBlock)*SectorSize/1000000));
+            printf ("Merged %dMB.  100%% complete.\n", (int)((((float)NeededBlock)*SectorsPerBlock)*SectorSize/1000000));
         fclose (hVHD->File);
         hVHD->File = NULL;
         remove (szVHDPath);
@@ -3731,7 +3731,7 @@ while (sects) {
                               NULL,
                               BlockOffset))
             goto Fatal_IO_Error;
-        /* Write back just the aligned sector which contains the updated BAT entry */
+        /* Write just the aligned sector which contains the updated BAT entry */
         BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) + 
             (size_t)((((size_t)&hVHD->BAT[BlockNumber+1]) - (size_t)hVHD->BAT + (size_t)NtoHll(hVHD->Dynamic.TableOffset)) & ~(VHD_DATA_BLOCK_ALIGNMENT-1));
         if (BATUpdateBufferAddress < (uint8 *)hVHD->BAT) {
