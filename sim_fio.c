@@ -364,3 +364,10 @@ return (t_addr)(ftell (st));
 #endif
 
 uint32 sim_taddr_64 = _SIM_IO_FSEEK_EXT_;
+
+const char *sim_slarge_files =
+#if _SIM_IO_FSEEK_EXT == 1
+           "Large File (>2GB) support";
+#else
+           "No Large File support";
+#endif
