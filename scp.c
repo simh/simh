@@ -2740,8 +2740,34 @@ if (vdelt)
 #if defined(SIM_VERSION_MODE)
 fprintf (st, " %s", SIM_VERSION_MODE);
 #endif
-if (flag)
-    fprintf (st, "\n\t[%s, %s, %s, %s]", sim_si64, sim_sa64, sim_snet, sim_slarge_files);
+if (flag) {
+    fprintf (st, "\n\tSimulator Framework Capabilities:");
+    fprintf (st, "\n\t\t%s", sim_si64);
+    fprintf (st, "\n\t\t%s", sim_sa64);
+    fprintf (st, "\n\t\t%s", sim_snet);
+    fprintf (st, "\n\t\t%s", sim_taddr_64 ? "Large File (>2GB) support" : "No Large File support");
+#if defined (SIM_ASYNCH_IO)
+    fprintf (st, "\n\t\tAsynchronous I/O support");
+#endif
+#if defined(SIM_ASYNCH_MUX)
+    fprintf (st, "\n\t\tAsynchronous Multiplexer support");
+#endif
+#if defined(SIM_ASYNCH_CLOCKS)
+    fprintf (st, "\n\t\tAsynchronous Clock support");
+#endif
+    fprintf (st, "\n\tHost Platform:");
+    fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
+    fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
+#if defined(__VMS)
+    fprintf (st, "\n\t\tOS: VMS");
+#elif defined(_WIN32)
+    fprintf (st, "\n\t\tOS: Windows");
+#else
+    fprintf (st, "\n\t\tOS: ");
+    fflush (st);
+    system ("uname -a");
+#endif
+    }
 #if defined(SIM_GIT_COMMIT_ID)
 #define _xstr(a) _str(a)
 #define _str(a) #a
