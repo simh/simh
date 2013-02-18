@@ -1939,11 +1939,11 @@ VAX8600 : $(BIN_DIR)VAX8600-$(ARCH).EXE
 
 $(BIN_DIR)VAX8600-$(ARCH).EXE : $(SIMH_MAIN) $(VAX8600_SIMH_LIB) $(PCAP_LIBD) $(VAX8600_LIB1) $(VAX8600_LIB2) $(PCAP_EXECLET)
         $!
-        $! Building The $(BIN_DIR)VAX860-$(ARCH).EXE Simulator.
+        $! Building The $(BIN_DIR)VAX8600-$(ARCH).EXE Simulator.
         $!
         $ $(CC)$(VAX8600_OPTIONS)/OBJ=$(BLD_DIR) SCP.C
         $ LINK $(LINK_DEBUG)$(LINK_SECTION_BINDING)-
-               /EXE=$(BIN_DIR)VAX860-$(ARCH).EXE -
+               /EXE=$(BIN_DIR)VAX8600-$(ARCH).EXE -
                $(BLD_DIR)SCP.OBJ,-
                $(VAX8600_LIB1)/LIBRARY,$(VAX8600_LIB2)/LIBRARY,-
                $(VAX8600_SIMH_LIB)/LIBRARY$(PCAP_LIBR)
