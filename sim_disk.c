@@ -3229,7 +3229,7 @@ errno = Status;
 return hVHD;
 }
 
-#if defined(__CYGWIN__) || defined(VMS) || defined(__APPLE__)
+#if defined(__CYGWIN__) || defined(VMS) || defined(__APPLE__) || defined(__linux)
 #include <unistd.h>
 #endif
 static void
