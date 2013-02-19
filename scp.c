@@ -2746,6 +2746,10 @@ if (flag) {
     fprintf (st, "\n\t\t%s", sim_sa64);
     fprintf (st, "\n\t\t%s", sim_snet);
     fprintf (st, "\n\t\t%s", sim_taddr_64 ? "Large File (>2GB) support" : "No Large File support");
+    if (sim_disk_vhd_support())
+        fprintf (st, "\n\t\tVirtual Hard Disk (VHD) support");
+    if (sim_disk_raw_support())
+        fprintf (st, "\n\t\tRAW disk and CD/DVD ROM support");
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n\t\tAsynchronous I/O support");
 #endif

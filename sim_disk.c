@@ -1259,6 +1259,16 @@ fprintf (st, "  RQ2, 456MB, attached to RA81-Copy.vhd, write enabled, RA81, noau
 return SCPE_OK;
 }
 
+t_bool sim_disk_vhd_support (void)
+{
+return SCPE_OK == sim_vhd_disk_implemented ();
+}
+
+t_bool sim_disk_raw_support (void)
+{
+return SCPE_OK == sim_os_disk_implemented_raw ();
+}
+
 t_stat sim_disk_reset (UNIT *uptr)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
@@ -1575,7 +1585,7 @@ return "Unknown";
 
 static t_stat sim_os_disk_implemented_raw (void)
 {
-return SCPE_OK;
+return sim_taddr_64 ? SCPE_OK : SCPE_NOFNC;
 }
 
 static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmode)
@@ -1863,7 +1873,7 @@ return SCPE_IOERR;
 
 static t_stat sim_os_disk_implemented_raw (void)
 {
-return SCPE_OK;
+return sim_taddr_64 ? SCPE_OK : SCPE_NOFNC;
 }
 
 static FILE *sim_os_disk_open_raw (const char *rawdevicename, const char *openmode)
@@ -2711,7 +2721,7 @@ struct VHD_IOData {
 
 static t_stat sim_vhd_disk_implemented (void)
 {
-return SCPE_OK;
+return sim_taddr_64 ? SCPE_OK : SCPE_NOFNC;
 }
 
 static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype)
