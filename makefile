@@ -1,6 +1,6 @@
 #
 # This GNU make makefile has been tested on:
-#   Linux (x86 & Sparc)
+#   Linux (x86 & Sparc & PPC)
 #   OS X
 #   Solaris (x86 & Sparc)
 #   OpenBSD

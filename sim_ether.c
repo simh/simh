@@ -901,7 +901,7 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 #include <string.h>
 
 #ifdef USE_TAP_NETWORK
-#if defined(__linux)
+#if defined(__linux) || defined(__linux__)
 #include <sys/ioctl.h> 
 #include <net/if.h> 
 #include <linux/if_tun.h> 
@@ -1220,7 +1220,7 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
    Return value: 0=Success, -1=Failure */
 int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 {
-#if defined (__linux)
+#if defined (__linux) || defined (__linux__)
   return (send(pcap_fileno(handle), msg, len, 0) == len)? 0 : -1;
 #else
   return (write(pcap_fileno(handle), msg, len) == len)? 0 : -1;
@@ -1728,7 +1728,7 @@ if (0 == strncmp("tap:", savname, 4)) {
     return SCPE_OPENERR;
     }
 #endif
-#if defined(__linux) && defined(USE_TAP_NETWORK)
+#if (defined(__linux) || defined(__linux__)) && defined(USE_TAP_NETWORK)
   if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
     struct ifreq ifr; /* Interface Requests */
 

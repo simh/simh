@@ -1864,7 +1864,7 @@ _set_errno_from_status (GetLastError ());
 return SCPE_IOERR;
 }
 
-#elif defined (__linux) || defined (__sun__)
+#elif defined (__linux) || defined (__linux__) || defined (__sun__)
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -3229,7 +3229,7 @@ errno = Status;
 return hVHD;
 }
 
-#if defined(__CYGWIN__) || defined(VMS) || defined(__APPLE__) || defined(__linux)
+#if defined(__CYGWIN__) || defined(VMS) || defined(__APPLE__) || defined(__linux) || defined(__linux__)
 #include <unistd.h>
 #endif
 static void

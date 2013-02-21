@@ -777,7 +777,7 @@ return newsock;                                         /* got it! */
 SOCKET sim_accept_conn (SOCKET master, char **connectaddr)
 {
 int32 sta, err;
-#if defined (macintosh) || defined (__linux) || \
+#if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
     defined(__NetBSD__) || defined(__FreeBSD__)
 socklen_t size;

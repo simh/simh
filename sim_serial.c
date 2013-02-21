@@ -861,7 +861,7 @@ return;
 
 #elif defined (__unix__) || defined(__APPLE__)
 
-#if defined(__linux__)
+#if defined(__linux) || defined(__linux__)
 #include <dirent.h>
 #include <libgen.h>
 #include <unistd.h>
@@ -887,7 +887,7 @@ int port;
 int ports = 0;
 
 memset(list, 0, max*sizeof(*list));
-#if defined(__linux__)
+#if defined(__linux) || defined(__linux__)
 if (1) {
     struct dirent **namelist;
     struct stat st;
