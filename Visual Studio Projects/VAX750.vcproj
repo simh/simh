@@ -68,7 +68,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX750.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"
@@ -156,7 +156,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX750.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"

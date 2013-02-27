@@ -68,7 +68,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX8600.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
@@ -158,7 +158,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX8600.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
@@ -327,6 +327,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\VAX\vax780_uba.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax7x0_mba.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax860_abus.c"
 				>
 			</File>
@@ -340,14 +348,6 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax860_syslist.c"
-				>
-			</File>
-			<File
-				RelativePath="..\VAX\vax780_uba.c"
-				>
-			</File>
-			<File
-				RelativePath="..\VAX\vax7x0_mba.c"
 				>
 			</File>
 			<File

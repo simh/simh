@@ -69,7 +69,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\MicroVAX1.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
@@ -160,7 +160,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\MicroVAX1.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"

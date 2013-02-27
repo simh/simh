@@ -65,7 +65,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\PDP11.exe"
 				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
@@ -149,7 +149,7 @@
 			/>
 			<Tool
 				Name="VCLinkerTool"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib"
+				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\PDP11.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
