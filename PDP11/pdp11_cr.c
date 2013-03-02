@@ -80,13 +80,23 @@
     For RSX there exists a CR/CM task handler.  Is there a CD
     handler?
 
+    To-do (RSX): The CR11 unit works as a regular device (ie, 
+    you can PIP from it) but it does not work well as a job
+    input device (it works just once, somwhow the CRP processor
+    gets stuck).
+ 
     Don't have any information about Unix or Ultrix-11 yet.  Same
     for VAX Unices.
 
     TOPS: only the CD11 is supported, under the name CD20.
 
   Revision History:
-
+   23-Feb-13    JGP     Added DEC version of the 026 codepage
+                        Fixed the handling of the CR11 error bits after
+                        a control register write.
+                        Added logic reset after RESET button press
+                        Commented and reestructured code (to supress
+                        dangling elses)
    03-Jan-10    JAD     Eliminate gcc warnings
    01-Feb-07    RMS     Added PDP-10 support
    12-May-06    JAD     Modify the DEBUG code to use the SIMH DEBUG_x
@@ -406,7 +416,7 @@ static const MTAB cr_mod[] = {
     { MTAB_XTD|MTAB_VDV, 0, "RATE", "RATE={DEFAULT|200..1200}",
         &cr_set_rate, &cr_show_rate, NULL, "Display input rate" },
     { MTAB_XTD|MTAB_VDV, 0, "TRANSLATION",
-        "TRANSLATION={DEFAULT|026|026FTN|029|EBCDIC}",
+        "TRANSLATION={DEFAULT|026|026FTN|029|EBCDIC|026DEC}",
         &cr_set_trans, &cr_show_trans, NULL, "Display translation mode" },
     { 0 }  };
 
@@ -476,7 +486,7 @@ static t_bool readCardImage (   FILE    *fp,
             }
             return (TRUE);
         }
-        crs |= CSR_ERR | CRCSR_RDCHK | CRCSR_SUPPLY | CRCSR_OFFLINE;
+        crs |= CSR_ERR | CRCSR_SUPPLY | CRCSR_OFFLINE;
         crs &= ~(CRCSR_COLRDY | CRCSR_ONLINE);
         cdst |= CSR_ERR | CDCSR_RDRCHK | CDCSR_HOPPER;
         if (cr_unit.flags & UNIT_AUTOEOF)
@@ -562,10 +572,10 @@ static t_bool readColumnBinary (    FILE    *fp,
                 }
                 return (TRUE);
             }
-            crs |= CSR_ERR | CRCSR_RDCHK | CRCSR_SUPPLY |
+            crs |= CSR_ERR | CRCSR_SUPPLY |
                    CRCSR_OFFLINE;
             crs &= ~(CRCSR_COLRDY | CRCSR_ONLINE);
-            cdst |= CSR_ERR | CDCSR_RDRCHK | CDCSR_HOPPER;
+            cdst |= CSR_ERR | CDCSR_HOPPER;
             if (cr_unit.flags & UNIT_AUTOEOF)
                 cdst |= CDCSR_EOF;
             blowerState = BLOW_STOP;
@@ -632,9 +642,9 @@ static t_bool readCardASCII (   FILE    *fp,
                     c = '\n';
                     goto fill_card;
                 }
-                crs |= CSR_ERR | CRCSR_RDCHK | CRCSR_SUPPLY | CRCSR_OFFLINE;
+                crs |= CSR_ERR | CRCSR_SUPPLY | CRCSR_OFFLINE;
                 crs &= ~(CRCSR_COLRDY | CRCSR_ONLINE);
-                cdst |= CSR_ERR | CDCSR_RDRCHK | CDCSR_HOPPER;
+                cdst |= CSR_ERR | CDCSR_HOPPER;
                 if (cr_unit.flags & UNIT_AUTOEOF)
                     cdst |= CDCSR_EOF;
                 blowerState = BLOW_STOP;
@@ -667,8 +677,8 @@ static t_bool readCardASCII (   FILE    *fp,
                 cdst |= CDCSR_DATAERR;
                 if (DEBUG_PRS (cr_dev))
                     fprintf (sim_deb,
-                        "error character at column %d\n",
-                        col);
+                        "error character at column %d (%c)\n",
+			     col, c & 0177);
             }
             ccard[col] = h2c_code[hcard[col]];
             acard[col] = c;
@@ -677,7 +687,7 @@ static t_bool readCardASCII (   FILE    *fp,
         }
     }
     /* silently truncate/flush long lines, or flag over-length card? */
-    if (c != '\n') {
+    if (c != '\n' && c != '\r') {
         if (DEBUG_PRS (cr_dev))
             fprintf (sim_deb, "truncating card\n");
         do c = fgetc (fp);
@@ -719,6 +729,11 @@ static void initTranslation (void)
         break;
     case 4:
         codeTbl = EBCDIC_code;
+        for (i = 0; i < 0177; i++)
+            ascii_code[EBCDIC_code[i]] = i;
+        break;
+    case 5:
+        codeTbl = o26_dec_code;
         for (i = 0; i < 0177; i++)
             ascii_code[EBCDIC_code[i]] = i;
         break;
@@ -830,21 +845,22 @@ t_stat cr_rd (  int32   *data,
                 crs, cdst);
         break;
     case 1:
+        /* Get word of data from crb1 (Hollerith code) */
         *data = (cr_unit.flags & UNIT_CR11) ? crb1 : cdcc;
-        /* Does crb1 clear after read? Implied by VMS driver. */
-        crb1 = 0;
         crs &= ~CRCSR_COLRDY;
         if (DEBUG_PRS (cr_dev)) {
-            if (cr_unit.flags & UNIT_CR11)
-                fprintf (sim_deb, "cr_rd crb1 %06o '%c' %d\n",
-                    crb1, cr_unit.buf, cr_unit.buf);
-            else
-                fprintf (sim_deb, "cr_rd cdcc %06o\n", cdcc);
+        if (cr_unit.flags & UNIT_CR11)
+            fprintf (sim_deb, "cr_rd crb1 %06o '%c' %d\n",
+                     crb1, cr_unit.buf, cr_unit.buf);
+        else
+            fprintf (sim_deb, "cr_rd cdcc %06o\n", cdcc);
         }
+        /* Does crb1 clear after read? Implied by VMS driver. */
+        crb1 = 0;
         break;
     case 2:
+        /* Get word of data from crb2 (DEC Compressed) */
         *data = (cr_unit.flags & UNIT_CR11) ? crb2 : cdba;
-        crb2 = 0;    /* see note for crb1 */
         crs &= ~CRCSR_COLRDY;
         if (DEBUG_PRS (cr_dev)) {
             if (cr_unit.flags & UNIT_CR11)
@@ -852,7 +868,8 @@ t_stat cr_rd (  int32   *data,
             else
                 fprintf (sim_deb, "\r\ncr_rd cdba %06o\n", cdba);
         }
-        break;
+       crb2 = 0;    /* see note for crb1 */ 
+       break;
     case 3:
     default:
         if (cr_unit.flags & UNIT_CR11)
@@ -885,16 +902,18 @@ t_stat cr_wr (  int32   data,
             if (!(data & CSR_IE))
                 CLR_INT (CR);
             crs = (crs & ~CRCSR_RW) | (data & CRCSR_RW);
-            crs &= ~(CSR_ERR | CRCSR_CRDDONE | CRCSR_TIMERR);
+	    /* Clear status bits after CSR load */
+            crs &= ~(CSR_ERR | CRCSR_ONLINE | CRCSR_CRDDONE | CRCSR_TIMERR);
             if (DEBUG_PRS (cr_dev))
                 fprintf (sim_deb, "cr_wr data %06o crs %06o\n",
                     data, crs);
             if (data & CSR_GO) {
                 if (blowerState != BLOW_ON) {
-                    sim_activate (&cr_unit, spinUp);
                     blowerState = BLOW_START;
-                } else
+                    sim_activate (&cr_unit, spinUp);
+                } else {
                     sim_activate (&cr_unit, cr_unit.wait);
+		}
             }
         } else {
             if (data & CDCSR_PWRCLR) {
@@ -917,8 +936,9 @@ t_stat cr_wr (  int32   data,
                 if (blowerState != BLOW_ON) {
                     sim_activate (&cr_unit, spinUp);
                     blowerState = BLOW_START;
-                } else
+                } else {
                     sim_activate (&cr_unit, cr_unit.wait);
+		}
             }
         }
         break;
@@ -971,53 +991,69 @@ t_stat cr_wr (  int32   data,
 Enter the service routine once for each column read from the card.
 CR state bits drive this primarily (see _BUSY and _CRDDONE).  However,
 when in CD mode, also execute one column of DMA input.
-
 */
-
 t_stat cr_svc ( UNIT    *uptr    )
 {
     uint32    pa;
     uint8    c;
     uint16    w;
 
+    /* Blower stopping: set it to OFF and do nothing */
     if (blowerState == BLOW_STOP) {
         blowerState = BLOW_OFF;
         return (SCPE_OK);
     }
+    /* Blower starting: set it to ON and do regular service */
     if (blowerState == BLOW_START)
         blowerState = BLOW_ON;
+
     /* (almost) anything we do now will cause a CR interrupt */
     if (crs & CSR_IE)
-        SET_INT (CR);
+       SET_INT (CR);
+    
+    /* Unit not attached, or error status => do nothing */
     if (!(uptr->flags & UNIT_ATT) || (crs & CSR_ERR) || (cdst & CSR_ERR))
         return (SCPE_OK);
+
+    /* End of card: unit busy and column past end column */
     if ((crs & CRCSR_BUSY) && (currCol > colEnd)) {
+        /* clear busy state and set card done bit */
         crs &= ~(CRCSR_BUSY | CSR_GO | CRCSR_COLRDY);
         crs |= CRCSR_CRDDONE;
+        /* Check CD11 error status */
         if (cdst & (CDCSR_DATAERR | CDCSR_LATE | CDCSR_NXM))
             cdst |= CSR_ERR;
-        if (cdst & CSR_IE)
-            SET_INT (CR);
         if (DEBUG_PRS (cr_dev))
             fprintf (sim_deb, "cr_svc card done\n");
         return (SCPE_OK);
     }
+
+    /* Unit not busy: try to read a card */ 
     if (!(crs & CRCSR_BUSY)) {
-        /* try to read a card */
-        /* crs &= ~CRCSR_CRDDONE; */
+        crs &= ~CRCSR_CRDDONE; /* This line WAS commented out - JGP 2013.02.05 */
+        /* Call the appropriate read card routine.             */
+        /* If no card is read (FALSE return), stop the show    */
         if (!readRtn (uptr->fileref, hcard, ccard, acard)) {
+            blowerState = BLOW_STOP;
             sim_activate (uptr, spinDown);
             return (SCPE_OK);
+        } else {
+            /* Card read: reset column counter and assert BUSY */
+            currCol = colStart;
+            crs |= CRCSR_BUSY;
         }
-        currCol = colStart;
-        crs |= CRCSR_BUSY;    /* indicate reader busy */
     }
+
     /* check for overrun (timing error) */
     if ((uptr->flags & UNIT_CR11) && (crs & CRCSR_COLRDY))
         crs |= CSR_ERR | CRCSR_TIMERR;
-    crb1 = hcard[currCol] & 07777;
-    crb2 = ccard[currCol] & 0377;
-    uptr->buf = acard[currCol] & 0377;    /* helpful for debugging */
+
+    /* Update the "buffer" registers with current column */
+    crb1 = hcard[currCol] & 07777;      /* Hollerith value */
+    crb2 = ccard[currCol] & 0377;       /* DEC compressed hollerith value */
+    uptr->buf = acard[currCol] & 0377;  /* Helpful for debug: ASCII value */
+
+    /* CD11 specific code follows */
     if (!(uptr->flags & UNIT_CR11)) {
         pa = cdba | ((cdst & 060) << 12);
 /*
@@ -1051,11 +1087,17 @@ incremented properly.  If this causes problems, I'll fix it.
             CLR_INT (CR);
 #endif
     }
+    
+    /* CD11 and CR11 */
     currCol++;    /* advance the column counter */
-    if (!(crs & CRCSR_EJECT))
+    /* Handle EJECT bit: if set DO NOT assert COLRDY */
+    /* nor interrupt                                 */
+    if (!(crs & CRCSR_EJECT)) {
         crs |= CRCSR_COLRDY;
-    else
+    } else {
         CLR_INT (CR);
+    }
+    /* Schedule next service cycle */
     sim_activate (uptr, uptr->wait);
     return (SCPE_OK);
 }
@@ -1106,6 +1148,10 @@ globals correctly.
 
 #define    MASK    (SWMASK('A')|SWMASK('B')|SWMASK('I')|SWMASK('R'))
 
+/* Attach unit                                                              */
+/* This should simulate physically putting a stack of cards into the hopper */
+/* No bits should change, nor an interrupt should be asserted               */
+/* This is a change of behaviour respect to the previous code               */
 t_stat cr_attach (  UNIT    *uptr,
                     char    *cptr    )
 {
@@ -1116,6 +1162,12 @@ t_stat cr_attach (  UNIT    *uptr,
     /* file must previously exist; kludge */
     sim_switches |= SWMASK ('R');
     reason = attach_unit (uptr, cptr);
+    if(uptr->flags & UNIT_ATT) {
+        setupCardFile(uptr, sim_switches);
+    }
+    
+    /* Old code, with status bit changes */
+    /*
     if (!(uptr->flags & UNIT_ATT)) {
         crs &= ~CRCSR_ONLINE;
         crs |= CSR_ERR | CRCSR_OFFLINE | CRCSR_RDCHK | CRCSR_SUPPLY;
@@ -1127,15 +1179,17 @@ t_stat cr_attach (  UNIT    *uptr,
         cdst &= ~(CDCSR_RDRCHK | CDCSR_HOPPER);
         EOFcard = FALSE;
     }
+     */
     return (reason);
 }
 
+/* Detach unit: assert SUPPLY and OFFLINE bits (and ERR) */
 t_stat cr_detach (  UNIT    *uptr    )
 {
-    crs |= CSR_ERR | CRCSR_RDCHK | CRCSR_SUPPLY | CRCSR_OFFLINE;
+    crs |= CSR_ERR | CRCSR_SUPPLY | CRCSR_OFFLINE;
     /* interrupt? */
     crs &= ~CRCSR_ONLINE;
-    cdst |= CSR_ERR | CDCSR_RDRCHK | CDCSR_HOPPER | CDCSR_OFFLINE;
+    cdst |= CSR_ERR | CDCSR_HOPPER | CDCSR_OFFLINE;
     cardFormat = "unknown";
     if (blowerState != BLOW_OFF) {
         blowerState = BLOW_STOP;
@@ -1209,8 +1263,9 @@ t_stat cr_show_rate (   FILE    *st,
     return (SCPE_OK);
 }
 
-/* simulate pressing the card reader RESET button */
-
+/* simulate pressing the card reader RESET button  */
+/* Per CR11 docs, transition to ONLINE, reset card */
+/* reader logic.                                   */
 t_stat cr_set_reset (   UNIT    *uptr,
                         int32   val,
                         char    *cptr,
@@ -1219,26 +1274,43 @@ t_stat cr_set_reset (   UNIT    *uptr,
     if (DEBUG_PRS (cr_dev))
         fprintf (sim_deb, "cr_set_reset\n");
 /*
-Ignore the RESET switch while a read cycle is in progress or the
-unit simply is not attached.
-*/
+ Ignore the RESET switch while a read cycle is in progress or the
+ unit simply is not attached.
+ */
     if ((crs & CRCSR_BUSY) || !(uptr->flags & UNIT_ATT))
         return (SCPE_OK);
+ 
     /* if no errors, signal transition to on line */
     crs |= CRCSR_ONLINE;
+    /* Clear error bits                           */
     crs &= ~(CSR_ERR|CRCSR_CRDDONE|CRCSR_SUPPLY|CRCSR_RDCHK|CRCSR_TIMERR|
-         CRCSR_BUSY|CRCSR_COLRDY|CRCSR_EJECT|CSR_GO);
+                     CRCSR_OFFLINE|CRCSR_BUSY|CRCSR_COLRDY|CRCSR_EJECT|CSR_GO);
     cdst |= CDCSR_ONLINE;
     cdst &= ~(CSR_ERR | CDCSR_OFFLINE | CDCSR_RDRCHK | CDCSR_HOPPER |
           CDCSR_EOF);
+    /* Assert interrupt if interrupts enabled     */
     if ((crs & CSR_IE) || (cdst & CSR_IE)) {
         SET_INT (CR);
         if (DEBUG_PRS (cr_dev))
             fprintf (sim_deb, "cr_set_reset setting interrupt\n");
     }
-    /* start up the blower if the hopper is not empty */
-    if (blowerState != BLOW_ON)
+
+    /* Reset controller status */
+    cr_unit.buf = 0;
+    currCol = 1;
+    crb1 = 0;
+    crb2 = 0;
+    cdcc = 0;
+    cdba = 0;
+    cddb = 0;
+    EOFcard = FALSE;
+    
+    /* start up the blower if the hopper is not empty 
+    if (blowerState != BLOW_ON) {
         blowerState = BLOW_START;
+        sim_activate(uptr, spinUp);
+    }
+    */
     return (SCPE_OK);
 }
 
@@ -1259,14 +1331,12 @@ t_stat cr_set_stop (    UNIT    *uptr,
         SET_INT (CR);
     if (blowerState != BLOW_OFF) {
         blowerState = BLOW_STOP;
-        /* set timer to turn it off completely */
-        sim_activate (uptr, spinDown);
     }
     return (SCPE_OK);
 }
 
 static const char * const trans[] = {
-    "unknown", "026", "026FTN", "029", "EBCDIC"
+  "unknown", "026", "026FTN", "029", "EBCDIC", "026DEC"
 };
 
 t_stat cr_set_trans (   UNIT    *uptr,
@@ -1281,12 +1351,12 @@ t_stat cr_set_trans (   UNIT    *uptr,
     if (strcmp (cptr, "DEFAULT") == 0)
         i = 3;
     else {
-        for (i = 1; i < 5; i++) {
+        for (i = 1; i < 6; i++) {
             if (strcmp (cptr, trans[i]) == 0)
                 break;
         }
     }
-    if (i < 1 || i > 4)
+    if (i < 1 || i > 5)
         return (SCPE_ARG);
     table = i;
     initTranslation ();    /* reinitialize tables */
@@ -1375,7 +1445,7 @@ fprintf (st, "upon the operating system in use, how it was generated, and how th
 fprintf (st, "will be read and used, the translation must be set correctly so that the proper\n");
 fprintf (st, "character set is used by the driver.  Use the following command to explicitly\n");
 fprintf (st, "set the correct translation:\n\n");
-fprintf (st, "    SET TRANSLATION={DEFAULT|026|026FTN|029|EBCDIC}\n\n");
+fprintf (st, "    SET TRANSLATION={DEFAULT|026|026FTN|026DEC|029|EBCDIC}\n\n");
 fprintf (st, "This command should be given after a deck is attached to the simulator.  The\n");
 fprintf (st, "mappings above are completely described at\n");
 fprintf (st, "    http://www.cs.uiowa.edu/~jones/cards/codes.html.\n");
@@ -1386,7 +1456,7 @@ fprintf (st, "Below is a summary of the various operating system conventions for
 fprintf (st, "end of deck:\n\n");
 fprintf (st, "    RT-11:    12-11-0-1-6-7-8-9 punch in column 1\n");
 fprintf (st, "    RSTS/E:   12-11-0-1 or 12-11-0-1-6-7-8-9 punch in column 1\n");
-fprintf (st, "    RSX:      12-11-0-1-6-7-8-9 punch\n");
+fprintf (st, "    RSX:      12-11-0-1-6-7-8-9 punch in first 8 columns\n");
 fprintf (st, "    VMS:      12-11-0-1-6-7-8-9 punch in first 8 columns\n");
 fprintf (st, "    TOPS:     12-11-0-1 or 12-11-0-1-6-7-8-9 punch in column 1\n\n");
 fprintf (st, "Using the AUTOEOF setting, the card reader can be set to automatically generate\n");
