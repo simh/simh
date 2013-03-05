@@ -962,7 +962,7 @@ switch (fnc) {                                          /* case on function */
                 MAPM (ba10 - i, mpa10, UMAP_RRV);
                 }
             val = ((fmt == TC_10C)? (((d10) xbuf [--j]) & 017): 0);
-            for (k = 0; k < 4; i++)
+            for (k = 0; k < 4; k++)
                 v[k] = xbuf[--j];
             val = val | (v[0] << 4) | (v[1] << 12) | (v[2] << 20) | (v[3] << 28);
             if (fnc == FNC_READR)                       /* read? store */

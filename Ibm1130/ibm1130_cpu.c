@@ -1750,7 +1750,7 @@ static void trace_instruction (void)
 				fac *= (float) (1 << 30);
 				exp -= 30;
 				while (exp > 0)
-					fac *= 2;
+					fac *= 2, exp--;
 			}
 			else if (exp > 0)
 				fac *= (float) (1 << exp);
@@ -1758,7 +1758,7 @@ static void trace_instruction (void)
 				fac /= (float) (1 << 30);
 				exp += 30;
 				while (exp < 0)
-					fac /= 2;
+					fac /= 2, exp++;
 			}
 			else if (exp < 0)
 				fac /= (float) (1 << -exp);

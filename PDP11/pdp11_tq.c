@@ -933,6 +933,7 @@ if ((uptr = tq_getucb (lu))) {                          /* get unit */
                 tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
                     break;
                 }
+            prv = tpkt;
             }
         }
     if (tpkt) {                                         /* found target? */
@@ -2386,7 +2387,7 @@ fprintf (st, "%s (%dMB)", drv_tab[tq_typ].name, (uint32) (drv_tab[tq_typ].cap >>
 return SCPE_OK;
 }
 
-t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat tq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 char *devtype = UNIBUS ? "TUK50" : "TQK50";
 

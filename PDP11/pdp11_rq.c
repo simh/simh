@@ -1617,6 +1617,7 @@ if ((uptr = rq_getucb (cp, lu))) {                      /* get unit */
                 cp->pak[prv].link = cp->pak[tpkt].link;
                 break;
                 }
+            prv = tpkt;
             }
         }
     if (tpkt) {                                         /* found target? */
