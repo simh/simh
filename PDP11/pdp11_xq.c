@@ -2289,6 +2289,11 @@ t_stat xq_wr_srqr(CTLR* xq, int32 data)
       } else {
         uint32 saved_debug = xq->dev->dctrl;
 
+        /* Correct byte ordering of non word fields for Big Endian platforms */
+        sim_buf_swap_data (xq->var->init.phys,         sizeof(uint16), sizeof(xq->var->init.phys));
+        sim_buf_swap_data (xq->var->init.hash_filter,  sizeof(uint16), sizeof(xq->var->init.hash_filter));
+        sim_buf_swap_data (xq->var->init.bootpassword, sizeof(uint16), sizeof(xq->var->init.bootpassword));
+
         /* temporarily turn on Ethernet debugging if setup debugging is enabled */
         if (xq->dev->dctrl & DBG_SET)
           xq->dev->dctrl |= DBG_ETH;
