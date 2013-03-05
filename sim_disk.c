@@ -1335,7 +1335,7 @@ return SCPE_OK;
         sta     =       status code
 */
 
-t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec)
+static t_stat sim_disk_pdp11_bad_block (UNIT *uptr, int32 sec)
 {
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 int32 i;
@@ -1864,7 +1864,7 @@ _set_errno_from_status (GetLastError ());
 return SCPE_IOERR;
 }
 
-#elif defined (__linux) || defined (__linux__) || defined (__sun__)
+#elif defined (__linux) || defined (__linux__) || defined (__sun__) || defined (__hpux)
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -2721,7 +2721,7 @@ struct VHD_IOData {
 
 static t_stat sim_vhd_disk_implemented (void)
 {
-return sim_taddr_64 ? SCPE_OK : SCPE_NOFNC;
+return SCPE_OK;
 }
 
 static t_stat sim_vhd_disk_set_dtype (FILE *f, const char *dtype)
