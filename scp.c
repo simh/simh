@@ -781,7 +781,7 @@ static CTAB cmd_table[] = {
     { NULL, NULL, 0 }
     };
 
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__hpux)
 static
 int setenv(const char *envname, const char *envval, int overwrite)
     {
@@ -789,8 +789,12 @@ int setenv(const char *envname, const char *envval, int overwrite)
     int r;
 
     sprintf(envstr, "%s=%s", envname, envval);
+#if defined(_WIN32)
     r = _putenv(envstr);
     free(envstr);
+#else
+    r = putenv(envstr);
+#endif
     return r;
     }
 #endif

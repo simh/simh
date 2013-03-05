@@ -49,6 +49,9 @@
 #elif defined (__unix__) || defined(__APPLE__)  /* UNIX definitions */
 
 #include <fcntl.h>
+#ifdef __hpux
+#include <sys/modem.h>
+#endif
 #include <termios.h>
 #include <unistd.h>
 #include <sys/ioctl.h>

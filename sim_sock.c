@@ -148,6 +148,12 @@ typedef size_t socklen_t;
 #endif
 #endif
 
+#if defined(__hpux)
+#if !defined(EAI_OVERFLOW)
+#define EAI_OVERFLOW EAI_FAIL
+#endif
+#endif
+
 typedef int (WSAAPI *getnameinfo_func) (const struct sockaddr *sa, socklen_t salen, char *host, size_t hostlen, char *serv, size_t servlen, int flags);
 static getnameinfo_func p_getnameinfo;
 
@@ -779,10 +785,12 @@ SOCKET sim_accept_conn (SOCKET master, char **connectaddr)
 int32 sta, err;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
     defined (__APPLE__) || defined (__OpenBSD__) || \
-    defined(__NetBSD__) || defined(__FreeBSD__)
+    defined(__NetBSD__) || defined(__FreeBSD__) || \
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
 socklen_t size;
 #elif defined (_WIN32) || defined (__EMX__) || \
-     (defined (__ALPHA) && defined (__unix__))
+     (defined (__ALPHA) && defined (__unix__)) || \
+     defined (__hpux)
 int size;
 #else 
 size_t size; 

@@ -6,6 +6,7 @@
 #   OpenBSD
 #   NetBSD
 #   FreeBSD
+#   HP-UX
 #   Windows (MinGW & cygwin)
 #   Linux x86 targeting Android (using agcc script)
 #
@@ -153,7 +154,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
               LIBEXT = so
             else
-              LIBEXT = a
+              ifeq (HP-UX,$(OSTYPE))
+                ifeq (ia64,$(shell uname -m))
+                  LIBEXT = so
+                else
+                  LIBEXT = sl
+                endif
+                OS_CCDEFS += -D_HPUX_SOURCE -D_LARGEFILE64_SOURCE
+                NO_LTO = 1
+              else
+                LIBEXT = a
+              endif
             endif
           endif
         endif
@@ -438,7 +449,11 @@ ifneq ($(DONT_USE_READER_THREAD),)
   NETWORK_OPT += -DDONT_USE_READER_THREAD
 endif
 
-CC_STD = -std=c99
+ifeq (HP-UX,$(OSTYPE))
+  CC_STD = -std=gnu99
+else
+  CC_STD = -std=c99
+endif
 CC_OUTSPEC = -o $@
 CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)

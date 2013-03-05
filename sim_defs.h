@@ -120,6 +120,21 @@
 #undef MEM_MAPPED                   /* avoid macro name collision */
 #endif
 
+/* avoid macro names collisions */
+#ifdef MAX
+#undef MAX
+#endif
+#ifdef MIN
+#undef MIN
+#endif
+#ifdef PMASK
+#undef PMASK
+#endif
+#ifdef RS
+#undef RS
+#endif
+
+
 #ifndef TRUE
 #define TRUE            1
 #define FALSE           0
@@ -700,7 +715,7 @@ extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
 
 /* Thread local storage */
-#if defined(__GNUC__) && !defined(__APPLE__)
+#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux)
 #define AIO_TLS __thread
 #elif defined(_MSC_VER)
 #define AIO_TLS __declspec(thread)

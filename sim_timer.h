@@ -41,7 +41,8 @@
 #define HAVE_STRUCT_TIMESPEC 1   /* OSX defined the structure but doesn't tell us */
 #endif
 
-#if !defined(CLOCK_REALTIME)
+/* on HP-UX, CLOCK_REALTIME is enum, not preprocessor define */
+#if !defined(CLOCK_REALTIME) && !defined(__hpux)
 #define CLOCK_REALTIME 1
 #define NEED_CLOCK_GETTIME 1
 #if !defined(HAVE_STRUCT_TIMESPEC)

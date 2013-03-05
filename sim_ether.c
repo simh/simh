@@ -1877,6 +1877,16 @@ if (1) {
   pthread_cond_init (&dev->writer_cond, NULL);
   pthread_attr_init(&attr);
   pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+#if defined(__hpux)
+  {
+    /* libpcap needs sizeof(long) * 8192 bytes on the stack */
+    size_t stack_size;
+    const size_t min_stack_size = sizeof(long) * 8192 * 3 / 2;
+    if (!pthread_attr_getstacksize(&attr, &stack_size) && stack_size < min_stack_size) {
+      pthread_attr_setstacksize(&attr, min_stack_size);
+    }
+  }
+#endif
   pthread_create (&dev->reader_thread, &attr, _eth_reader, (void *)dev);
   pthread_create (&dev->writer_thread, &attr, _eth_writer, (void *)dev);
   pthread_attr_destroy(&attr);
