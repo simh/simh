@@ -826,7 +826,7 @@ if (interp || (tmr_iccs & TMR_CSR_RUN)) {               /* interp, running? */
 return tmr_icr;
 }
 
-int32 nicr_rd ()
+int32 nicr_rd (void)
 {
 return tmr_nicr;
 }
@@ -918,7 +918,7 @@ return SCPE_OK;
 
 t_stat clk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "Real-Time Clock (CLK)\n\n");
+fprintf (st, "Real-Time Clock (%s)\n\n", dptr->name);
 fprintf (st, "The real-time clock autocalibrates; the clock interval is adjusted up or down\n");
 fprintf (st, "so that the clock tracks actual elapsed time.\n\n");
 fprintf (st, "There are two modes of TODR operation:\n\n");
@@ -931,8 +931,8 @@ fprintf (st, "                      produces strange time results for non VMS OS
 fprintf (st, "                      system boot.\n");
 fprintf (st, "   OS Agnostic mode.  This mode behaves precisely like the VAX780 TODR and\n");
 fprintf (st, "                      works correctly for all OSes.  This mode is enabled by\n");
-fprintf (st, "                      attaching the CLK to a battery backup state file for the\n");
-fprintf (st, "                      TOY clock (i.e. sim> attach CLK TOY_CLOCK).  When\n");
+fprintf (st, "                      attaching the %s to a battery backup state file for the\n", dptr->name);
+fprintf (st, "                      TOY clock (i.e. sim> attach %s TOY_CLOCK).  When\n", dptr->name);
 fprintf (st, "                      operating in OS Agnostic mode, the TODR will initially\n");
 fprintf (st, "                      start counting from 0 and be adjusted differently when\n");
 fprintf (st, "                      an OS specifically writes to the TODR.  VMS determines\n");
