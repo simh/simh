@@ -5380,7 +5380,7 @@ if ((cptr == NULL) || (dptr == NULL) || (dptr->registers == NULL))
 tptr = cptr;
 do {
     tptr++;
-    } while (isalnum (*tptr) || (*tptr == '*') || (*tptr == '_'));
+    } while (isalnum (*tptr) || (*tptr == '*') || (*tptr == '_') || (*tptr == '.'));
 slnt = tptr - cptr;
 for (rptr = dptr->registers; rptr->name != NULL; rptr++) {
     if ((slnt == strlen (rptr->name)) &&
