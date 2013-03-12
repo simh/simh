@@ -233,7 +233,7 @@ return fopen (file, mode);
 /* 64b VMS */
 
 #if (defined (__ALPHA) || defined (__ia64)) && defined (VMS) && (__DECC_VER >= 60590001)
-#define _SIM_IO_FSEEK_EXT_      1
+#define S_SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
 {
@@ -250,7 +250,7 @@ return (t_addr)(ftello (st));
 /* Alpha UNIX - natively 64b */
 
 #if defined (__ALPHA) && defined (__unix__)             /* Alpha UNIX */
-#define _SIM_IO_FSEEK_EXT_      1
+#define S_SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
 {
@@ -267,7 +267,7 @@ return (t_addr)(ftell (st));
 /* Windows */
 
 #if defined (_WIN32)
-#define _SIM_IO_FSEEK_EXT_      1
+#define S_SIM_IO_FSEEK_EXT_      1
 #include <sys/stat.h>
 
 int sim_fseek (FILE *st, t_addr offset, int whence)
@@ -313,7 +313,7 @@ return (t_addr)fileaddr;
 /* Linux */
 
 #if defined (__linux) || defined (__linux__) || defined (__hpux)
-#define _SIM_IO_FSEEK_EXT_      1
+#define S_SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr xpos, int origin)
 {
@@ -330,7 +330,7 @@ return (t_addr)(ftello64 (st));
 /* Apple OS/X */
 
 #if defined (__APPLE__) || defined (__FreeBSD__)
-#define _SIM_IO_FSEEK_EXT_      1
+#define S_SIM_IO_FSEEK_EXT_      1
 
 int sim_fseek (FILE *st, t_addr xpos, int origin) 
 {
@@ -348,8 +348,8 @@ return (t_addr)(ftello (st));
 
 /* Default: no OS-specific routine has been defined */
 
-#if !defined (_SIM_IO_FSEEK_EXT_)
-#define _SIM_IO_FSEEK_EXT_      0
+#if !defined (S_SIM_IO_FSEEK_EXT_)
+#define S_SIM_IO_FSEEK_EXT_      0
 
 int sim_fseek (FILE *st, t_addr xpos, int origin)
 {
@@ -363,5 +363,5 @@ return (t_addr)(ftell (st));
 
 #endif
 
-uint32 sim_taddr_64 = _SIM_IO_FSEEK_EXT_;
+uint32 sim_taddr_64 = S_SIM_IO_FSEEK_EXT_;
 

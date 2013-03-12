@@ -42,8 +42,8 @@
   ------------------------------------------------------------------------------
 */
 
-#ifndef _PDP11_XU_H
-#define _PDP11_XU_H
+#ifndef PDP11_XU_H
+#define PDP11_XU_H
 
 
 #if defined (VM_PDP10)                                                  /* PDP10 version */

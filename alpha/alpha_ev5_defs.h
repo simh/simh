@@ -28,8 +28,8 @@
    Alpha Program Office.
 */
 
-#ifndef _ALPHA_EV5_DEFS_H_
-#define _ALPHA_EV5_DEFS_H_      0
+#ifndef ALPHA_EV5_DEFS_H_
+#define ALPHA_EV5_DEFS_H_      0
 
 /* Address limits */
 

@@ -31,8 +31,8 @@
    25-Apr-03    RMS     Revised for extended file support
 */
 
-#ifndef _H316_DEFS_H_
-#define _H316_DEFS_H_   0
+#ifndef H316_DEFS_H_
+#define H316_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

@@ -46,8 +46,8 @@
    the NOVA.
 */
 
-#ifndef _NOVA_DEFS_H_
-#define _NOVA_DEFS_H_   0
+#ifndef NOVA_DEFS_H_
+#define NOVA_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

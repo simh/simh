@@ -28,8 +28,8 @@
    02-Jan-04    RMS     Split out from SCP
 */
 
-#ifndef _SIM_TIMER_H_
-#define _SIM_TIMER_H_   0
+#ifndef SIM_TIMER_H_
+#define SIM_TIMER_H_   0
 
 /* Pick up a struct timespec definition if it is available */
 #include <time.h>

@@ -68,8 +68,8 @@
 */
 
 
-#ifndef _HP2100_DEFS_H_
-#define _HP2100_DEFS_H_ 0
+#ifndef HP2100_DEFS_H_
+#define HP2100_DEFS_H_ 0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

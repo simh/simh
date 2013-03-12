@@ -47,8 +47,8 @@
    5. How does the EAO handle divide overflow?  Answer: set link.
 */
 
-#ifndef _GRI_DEFS_H_
-#define _GRI_DEFS_H_    0
+#ifndef GRI_DEFS_H_
+#define GRI_DEFS_H_    0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

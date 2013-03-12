@@ -29,8 +29,8 @@
    22-May-10    RMS     Added check for 64b definitions
 */
 
-#ifndef _SIGMA_DEFS_H_
-#define _SIGMA_DEFS_H_  0
+#ifndef SIGMA_DEFS_H_
+#define SIGMA_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

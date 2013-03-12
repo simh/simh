@@ -31,8 +31,8 @@
    02-Jan-04    RMS     Removed timer routines, added Telnet console routines
 */
 
-#ifndef _SIM_CONSOLE_H_
-#define _SIM_CONSOLE_H_ 0
+#ifndef SIM_CONSOLE_H_
+#define SIM_CONSOLE_H_ 0
 
 #define TTUF_V_MODE     (UNIT_V_UF + 0)
 #define TTUF_W_MODE     2

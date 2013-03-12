@@ -102,8 +102,8 @@
         parse_sym               parse symbolic input
 */
 
-#ifndef _SIM_DEFS_H_
-#define _SIM_DEFS_H_    0
+#ifndef SIM_DEFS_H_
+#define SIM_DEFS_H_    0
 
 #include <stddef.h>
 #include <stdlib.h>

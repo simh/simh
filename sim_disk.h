@@ -27,8 +27,8 @@
    25-Jan-11    MP      Initial Implemementation
 */
 
-#ifndef _SIM_DISK_H_
-#define _SIM_DISK_H_    0
+#ifndef SIM_DISK_H_
+#define SIM_DISK_H_    0
 
 /* SIMH/Disk format */
 

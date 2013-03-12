@@ -27,8 +27,8 @@
    12-Oct-06    JDB     Altered x_trun for F-Series FFP compatibility
 */
 
-#ifndef _HP2100_FP1_H_
-#define _HP2100_FP1_H_  0
+#ifndef HP2100_FP1_H_
+#define HP2100_FP1_H_  0
 
 
 /* Special operands. */

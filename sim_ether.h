@@ -63,8 +63,8 @@
   ------------------------------------------------------------------------------
 */
 
-#ifndef _SIM_ETHER_H
-#define _SIM_ETHER_H
+#ifndef SIM_ETHER_H
+#define SIM_ETHER_H
 
 #include "sim_defs.h"
 

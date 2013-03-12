@@ -27,8 +27,8 @@
    26-Sep-06    JDB     Moved from hp2100_fp.c to simplify extensions
 */
 
-#ifndef _HP2100_FP_H_
-#define _HP2100_FP_H_
+#ifndef HP2100_FP_H_
+#define HP2100_FP_H_
 
 /* Firmware floating-point routines */
 

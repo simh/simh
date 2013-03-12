@@ -40,8 +40,8 @@
    30-Apr-02    RMS     Added CLR_TRAPS macro
 */
 
-#ifndef _VAX_DEFS_H
-#define _VAX_DEFS_H     0
+#ifndef VAX_DEFS_H
+#define VAX_DEFS_H     0
 
 #ifndef VM_VAX
 #define VM_VAX          0

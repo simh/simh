@@ -41,8 +41,8 @@
    19-May-01    RMS     Added workaround for TOPS-20 V4.1 boot bug
 */
 
-#ifndef _PDP10_DEFS_H_
-#define _PDP10_DEFS_H_  0
+#ifndef PDP10_DEFS_H_
+#define PDP10_DEFS_H_  0
 
 #ifndef VM_PDP10
 #define VM_PDP10        0

@@ -24,8 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 */
 
-#ifndef _SIGMA_IO_DEFS_H_
-#define _SIGMA_IO_DEFS_H_  0
+#ifndef SIGMA_IO_DEFS_H_
+#define SIGMA_IO_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
 #include "sigma_defs.h"

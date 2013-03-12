@@ -24,8 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 */
 
-#ifndef _PDP11_IO_LIB_H_
-#define _PDP11_IO_LIB_H_    0
+#ifndef PDP11_IO_LIB_H_
+#define PDP11_IO_LIB_H_    0
 
 t_stat set_autocon (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_autocon (FILE *st, UNIT *uptr, int32 val, void *desc);

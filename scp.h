@@ -34,8 +34,8 @@
    02-Jan-04    RMS     Split out from SCP
 */
 
-#ifndef _SIM_SCP_H_
-#define _SIM_SCP_H_     0
+#ifndef SIM_SCP_H_
+#define SIM_SCP_H_     0
 
 /* run_cmd parameters */
 

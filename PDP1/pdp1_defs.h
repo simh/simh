@@ -49,8 +49,8 @@
    Microtape (DECtape) control  Type 550
 */
 
-#ifndef _PDP1_DEFS_H_
-#define _PDP1_DEFS_H_   0
+#ifndef PDP1_DEFS_H_
+#define PDP1_DEFS_H_   0
 
 #include "sim_defs.h"
 

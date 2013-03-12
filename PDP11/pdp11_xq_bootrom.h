@@ -34,8 +34,8 @@
   ------------------------------------------------------------------------------
 */
 
-#ifndef _PDP11_XQ_BOOTROM_H
-#define _PDP11_XQ_BOOTROM_H
+#ifndef PDP11_XQ_BOOTROM_H
+#define PDP11_XQ_BOOTROM_H
 
 #ifdef VM_PDP11
   /*

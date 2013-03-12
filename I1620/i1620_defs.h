@@ -31,8 +31,8 @@
    18-Oct-02    RMS     Fixed bug in ADDR_S macro (found by Hans Pufal)
 */
 
-#ifndef _I1620_DEFS_H_
-#define _I1620_DEFS_H_  0
+#ifndef I1620_DEFS_H_
+#define I1620_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

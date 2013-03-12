@@ -44,8 +44,8 @@
    and Bill Haygood in resolving questions about the PDP-8
 */
 
-#ifndef _PDP8_DEFS_H_
-#define _PDP8_DEFS_H_   0
+#ifndef PDP8_DEFS_H_
+#define PDP8_DEFS_H_   0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

@@ -33,8 +33,8 @@
    26-Sep-06    JDB     Split from hp2100_cpu1.c
 */
 
-#ifndef _HP2100_CPU1_H_
-#define _HP2100_CPU1_H_
+#ifndef HP2100_CPU1_H_
+#define HP2100_CPU1_H_
 
 
 /* Register print encoding */

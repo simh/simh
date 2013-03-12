@@ -40,8 +40,8 @@
 // addresses of the DZ and DMC.
 
 
-#ifndef _PDP11_DMC_H
-#define _PDP11_DMC_H
+#ifndef PDP11_DMC_H
+#define PDP11_DMC_H
 
 #if defined (VM_VAX)                                  /* VAX version */
 #include "vax_defs.h"

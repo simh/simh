@@ -41,8 +41,8 @@
 #define FULL_VAX        1
 #endif
 
-#ifndef _VAX_730_DEFS_H_
-#define _VAX_730_DEFS_H_        1
+#ifndef VAX_730_DEFS_H_
+#define VAX_730_DEFS_H_        1
 
 /* Microcode constructs */
 

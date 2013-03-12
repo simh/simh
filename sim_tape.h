@@ -31,8 +31,8 @@
    02-May-05    RMS     Added support for Paul Pierce 7b format
 */
 
-#ifndef _SIM_TAPE_H_
-#define _SIM_TAPE_H_    0
+#ifndef SIM_TAPE_H_
+#define SIM_TAPE_H_    0
 
 /* SIMH/E11 tape format */
 

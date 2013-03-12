@@ -28,8 +28,8 @@
    Alpha Program Office.
 */
 
-#ifndef _ALPHA_PAL_DEFS_H_
-#define _ALPHA_PAL_DEFS_H_  0
+#ifndef ALPHA_PAL_DEFS_H_
+#define ALPHA_PAL_DEFS_H_  0
 
 /* VA - NT software format */
 

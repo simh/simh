@@ -62,8 +62,8 @@
   ------------------------------------------------------------------------------
 */
 
-#ifndef _PDP11_XQ_H
-#define _PDP11_XQ_H
+#ifndef PDP11_XQ_H
+#define PDP11_XQ_H
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
 #error "DEQNA/DELQA not supported on PDP10!"

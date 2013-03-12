@@ -34,11 +34,11 @@
  * from the authors.
  */
 
-#ifndef _SIM_DEFS_H_
+#ifndef SIM_DEFS_H_
 typedef unsigned short uint16;
 typedef long int32;
 typedef unsigned long uint32;
-#endif /* _SIM_DEFS_H_ */
+#endif /* SIM_DEFS_H_ */
 
 /*
  * VT11 jumpers control character spacing; VS60 always uses VT11 normal.

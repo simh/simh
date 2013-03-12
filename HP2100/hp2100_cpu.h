@@ -46,8 +46,8 @@
    encode the series within the type.
 */
 
-#ifndef _HP2100_CPU_H_
-#define _HP2100_CPU_H_  0
+#ifndef HP2100_CPU_H_
+#define HP2100_CPU_H_  0
 
 #include <setjmp.h>
 

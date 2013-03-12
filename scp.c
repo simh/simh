@@ -2777,9 +2777,9 @@ if (flag) {
 #endif
     }
 #if defined(SIM_GIT_COMMIT_ID)
-#define _xstr(a) _str(a)
-#define _str(a) #a
-fprintf (st, "%sgit commit id: %8.8s", flag ? "\n        " : "        ", _xstr(SIM_GIT_COMMIT_ID));
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+fprintf (st, "%sgit commit id: %8.8s", flag ? "\n        " : "        ", S_xstr(SIM_GIT_COMMIT_ID));
 #endif
 fprintf (st, "\n");
 return SCPE_OK;
@@ -4963,15 +4963,15 @@ if (!initialized) {
     initialized = 1;
     void *handle;
 
-#define __STR_QUOTE(tok) #tok
-#define __STR(tok) __STR_QUOTE(tok)
-    handle = dlopen("libncurses." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    handle = dlopen("libcurses." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
-    handle = dlopen("libreadline." __STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+#define S__STR_QUOTE(tok) #tok
+#define S__STR(tok) S__STR_QUOTE(tok)
+    handle = dlopen("libncurses." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libcurses." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
+    handle = dlopen("libreadline." S__STR(HAVE_DLOPEN), RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
-        handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
+        handle = dlopen("libreadline." S__STR(HAVE_DLOPEN) ".6", RTLD_NOW|RTLD_GLOBAL);
     if (!handle)
-        handle = dlopen("libreadline." __STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
+        handle = dlopen("libreadline." S__STR(HAVE_DLOPEN) ".5", RTLD_NOW|RTLD_GLOBAL);
     if (handle) {
         p_readline = (readline_func)((size_t)dlsym(handle, "readline"));
         p_add_history = (add_history_func)((size_t)dlsym(handle, "add_history"));

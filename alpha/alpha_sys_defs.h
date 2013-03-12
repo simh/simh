@@ -30,8 +30,8 @@
    This is a STUB!
 */
 
-#ifndef _ALPHA_SYS_DEFS_H_
-#define _ALPHA_SYS_DEFS_H_      0
+#ifndef ALPHA_SYS_DEFS_H_
+#define ALPHA_SYS_DEFS_H_      0
 
 #define PA_SIZE                 36                       /* PA size */
 #define PA_MASK                 0x0000000FFFFFFFFF

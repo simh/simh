@@ -69,8 +69,8 @@
 #undef FULL_VAX
 #endif
 
-#ifndef _VAXMOD_DEFS_H_
-#define _VAXMOD_DEFS_H_ 1
+#ifndef VAXMOD_DEFS_H_
+#define VAXMOD_DEFS_H_ 1
 
 /* Microcode constructs */
 

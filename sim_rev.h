@@ -24,8 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 */
 
-#ifndef _SIM_REV_H_
-#define _SIM_REV_H_     0
+#ifndef SIM_REV_H_
+#define SIM_REV_H_     0
 
 #ifndef SIM_MAJOR
 #define SIM_MAJOR       4

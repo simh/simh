@@ -27,8 +27,8 @@
    30-Aug-02    RMS     Added TMSCP support
 */
 
-#ifndef _PDP11_UQSSP_H_
-#define _PDP11_UQSSP_H_ 0
+#ifndef PDP11_UQSSP_H_
+#define PDP11_UQSSP_H_ 0
 
 /* IP register - initialization and polling
 

@@ -27,8 +27,8 @@
 */
 
 
-#ifndef _SIM_SERIAL_H_
-#define _SIM_SERIAL_H_    0
+#ifndef SIM_SERIAL_H_
+#define SIM_SERIAL_H_    0
 
 #if defined (_WIN32)                        /* Windows definitions */
 
@@ -73,14 +73,14 @@
 
 #endif  /* OS variants */
 
-#ifndef _SERHANDLE_DEFINED
-#define _SERHANDLE_DEFINED 0
+#ifndef SERHANDLE_DEFINED
+#define SERHANDLE_DEFINED 0
 #if defined (_WIN32)                            /* Windows definitions */
 typedef void *SERHANDLE;
 #else                                           /* all other platforms */
 typedef int SERHANDLE;
 #endif
-#endif /* _SERHANDLE_DEFINED */
+#endif /* SERHANDLE_DEFINED */
 
 
 /* Common definitions */

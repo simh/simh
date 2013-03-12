@@ -30,8 +30,8 @@
    02-Jan-04    RMS     Split out from SCP
 */
 
-#ifndef _SIM_FIO_H_
-#define _SIM_FIO_H_     0
+#ifndef SIM_FIO_H_
+#define SIM_FIO_H_     0
 
 #define FLIP_SIZE       (1 << 16)                       /* flip buf size */
 #define fxread(a,b,c,d)         sim_fread (a, b, c, d)

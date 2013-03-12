@@ -26,8 +26,8 @@
    22-May-10    RMS     Added check for 64b definitions
 */
 
-#ifndef _LGP_DEFS_H_
-#define _LGP_DEFS_H_    0
+#ifndef LGP_DEFS_H_
+#define LGP_DEFS_H_    0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

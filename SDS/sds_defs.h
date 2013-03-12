@@ -27,8 +27,8 @@
    25-Apr-03    RMS     Revised for extended file support
 */
 
-#ifndef _SDS_DEFS_H_
-#define _SDS_DEFS_H_    0
+#ifndef SDS_DEFS_H_
+#define SDS_DEFS_H_    0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

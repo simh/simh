@@ -33,8 +33,8 @@
 
 */
 
-#ifndef _I7094_DEFS_H_
-#define _I7094_DEFS_H_  0
+#ifndef I7094_DEFS_H_
+#define I7094_DEFS_H_  0
 
 #include "sim_defs.h"                                   /* simulator defns */
 

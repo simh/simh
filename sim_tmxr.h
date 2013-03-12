@@ -44,11 +44,11 @@
                         added tmxr_rqln, tmxr_tqln
 */
 
-#ifndef _SIM_TMXR_H_
-#define _SIM_TMXR_H_    0
+#ifndef SIM_TMXR_H_
+#define SIM_TMXR_H_    0
 
-#ifndef _SERHANDLE_DEFINED
-#define _SERHANDLE_DEFINED 0
+#ifndef SIMH_SERHANDLE_DEFINED
+#define SIMH_SERHANDLE_DEFINED 0
 #if defined (_WIN32)                            /* Windows definitions */
 typedef void *SERHANDLE;
 #else                                           /* all other platforms */

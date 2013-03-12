@@ -29,8 +29,8 @@
    20-Sep-02    RMS     Merged TMSCP definitions
 */
 
-#ifndef _PDP11_MSCP_H_
-#define _PDP11_MSCP_H_  0
+#ifndef PDP11_MSCP_H_
+#define PDP11_MSCP_H_  0
 
 /* Misc constants */
 
