@@ -415,6 +415,7 @@ uint32 sim_os_ms_sleep_init (void)
 {
 uint32 i, t1, t2, tot, tim;
 
+sim_os_ms_sleep (1);                    /* Start sampling on a tick boundary */
 for (i = 0, tot = 0; i < sleep1Samples; i++) {
     t1 = sim_os_msec ();
     sim_os_ms_sleep (1);
