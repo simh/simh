@@ -73,8 +73,8 @@
 
 #endif  /* OS variants */
 
-#ifndef SERHANDLE_DEFINED
-#define SERHANDLE_DEFINED 0
+#ifndef SIMH_SERHANDLE_DEFINED
+#define SIMH_SERHANDLE_DEFINED 0
 #if defined (_WIN32)                            /* Windows definitions */
 typedef void *SERHANDLE;
 #else                                           /* all other platforms */
