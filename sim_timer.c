@@ -523,8 +523,9 @@ else
   timedout = TRUE;
 sim_idle_wait = FALSE;
 pthread_mutex_unlock (&sim_asynch_lock);
-if (!timedout)
+if (!timedout) {
     AIO_UPDATE_QUEUE;
+    }
 return sim_os_msec() - start_time;
 }
 #define SIM_IDLE_MS_SLEEP sim_idle_ms_sleep
@@ -637,8 +638,9 @@ if (sim_asynch_enabled && sim_asynch_timer)
                 new_currd = rtc_currd[tmr]/10;
         rtc_currd[tmr] = new_currd;
         rtc_gtime[tmr] = new_gtime;                     /* save instruction time */
-        if (rtc_currd[tmr] == 127)
+        if (rtc_currd[tmr] == 127) {
             sim_debug (DBG_CAL, &sim_timer_dev, "asynch calibration small: %d\n", rtc_currd[tmr]);
+            }
         sim_debug (DBG_CAL, &sim_timer_dev, "asynch calibration result: %d\n", rtc_currd[tmr]);
         return rtc_currd[tmr];                          /* calibrated result */
         }

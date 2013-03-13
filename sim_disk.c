@@ -910,11 +910,12 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
                 uptr->flags = saved_unit_flags;
                 }
             }
-        if (!sim_quiet)
+        if (!sim_quiet) {
             if (r == SCPE_OK)
                 printf ("\n%s%d: Copied %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_addr)lba*sector_size)/1000000));
             else
                 printf ("\n%s%d: Error copying: %s.\n", sim_dname (dptr), (int)(uptr-dptr->units), sim_error_text (r));
+            }
         free (copy_buf);
         sim_vhd_disk_close (vhd);
         sim_disk_detach (uptr);
