@@ -71,15 +71,20 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OSTYPE = cygwin
     OSNAME = windows-build
   endif
-  ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version'))
+  ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang'))
     GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
     COMPILER_NAME = GCC Version: $(GCC_VERSION)
   else
-    COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 }')
-    CLANG_VERSION = $(word 3,$(COMPILER_NAME))
-    ifeq (,$(findstring .,$(CLANG_VERSION)))
-      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
+    ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
+      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
       CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+    else
+      COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 }')
+      CLANG_VERSION = $(word 3,$(COMPILER_NAME))
+      ifeq (,$(findstring .,$(CLANG_VERSION)))
+        COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
+        CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+      endif
     endif
   endif
   LTO_EXCLUDE_VERSIONS = 
@@ -231,34 +236,43 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
-      LIBPATH += /usr/local/lib
       INCPATH += /usr/local/include
-      LIBEXTSAVE := $(LIBEXT)
-      LIBEXT = a
-      ifneq (,$(call find_lib,$(PCAPLIB)))
-        ifneq (,$(call find_include,pcap))
-          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
-          ifeq (cygwin,$(OSTYPE))
-            NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
-            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
-            NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
-          else
-            NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
-            NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
-            $(info *** Warning ***)
-            $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
-            $(info *** Warning *** libpcap components from www.tcpdump.org.)
-            $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
-            $(info *** Warning *** components for simh networking.  For best results, with)
-            $(info *** Warning *** simh networking, it is recommended that you install the)
-            $(info *** Warning *** libpcap-dev package from your $(OSNAME) distribution)
-            $(info *** Warning ***)
-          endif
+      ifneq (,$(call find_include,pcap))
+        LIBEXTSAVE := $(LIBEXT)
+        # first check if binary - shared objects are available/installed in the linker known search paths
+        ifneq (,$(call find_lib,$(PCAPLIB)))
+          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+          NETWORK_FEATURES = - dynamic networking support using libpcap components from www.tcpdump.org and locally installed libpcap.$(LIBEXT)
+          $(info using libpcap: $(call find_include,pcap))
         else
-          $(error using libpcap: $(call find_lib,$(PCAPLIB)) missing pcap.h)
+          LIBPATH += /usr/local/lib
+          LIBEXT = a
+          ifneq (,$(call find_lib,$(PCAPLIB)))
+            $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+            ifeq (cygwin,$(OSTYPE))
+              NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+              NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+              NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
+            else
+              NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
+              NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
+              $(info *** Warning ***)
+              $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
+              $(info *** Warning *** libpcap components from www.tcpdump.org.)
+              $(info *** Warning *** Some users have had problems using the www.tcpdump.org libpcap)
+              $(info *** Warning *** components for simh networking.  For best results, with)
+              $(info *** Warning *** simh networking, it is recommended that you install the)
+              $(info *** Warning *** libpcap-dev package from your $(OSNAME) distribution)
+              $(info *** Warning ***)
+            endif
+          else
+            $(error using libpcap: $(call find_include,pcap) missing $(PCAPLIB).$(LIBEXT))
+          endif
         endif
+        LIBEXT = $(LIBEXTSAVE)
+      else
+        $(error using libpcap: missing pcap.h)
       endif
-      LIBEXT = $(LIBEXTSAVE)
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
       # Given we have libpcap components, consider other network connections as well
