@@ -2745,10 +2745,14 @@ if (vdelt)
 fprintf (st, " %s", SIM_VERSION_MODE);
 #endif
 if (flag) {
+    uint32 idle_capable, os_tick_size;
+
     fprintf (st, "\n\tSimulator Framework Capabilities:");
     fprintf (st, "\n\t\t%s", sim_si64);
     fprintf (st, "\n\t\t%s", sim_sa64);
     fprintf (st, "\n\t\t%s", sim_snet);
+    idle_capable = sim_timer_idle_capable (&os_tick_size);
+    fprintf (st, "\n\t\tIdle/Throttling support is %savailable", ((idle_capable == 0) ? "NOT " : ""));
     fprintf (st, "\n\t\t%s", sim_taddr_64 ? "Large File (>2GB) support" : "No Large File support");
     if (sim_disk_vhd_support())
         fprintf (st, "\n\t\tVirtual Hard Disk (VHD) support");
@@ -2775,6 +2779,7 @@ if (flag) {
     fflush (st);
     system ("uname -a");
 #endif
+    fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
     }
 #if defined(SIM_GIT_COMMIT_ID)
 #define S_xstr(a) S_str(a)
