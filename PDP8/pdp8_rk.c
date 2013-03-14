@@ -121,7 +121,7 @@
                             ((rk_cmd & RKC_IE) != 0)) \
                             int_req = int_req | INT_RK; \
                         else int_req = int_req & ~INT_RK
-#define RK_MIN          10
+#define RK_MIN          45
 #define MAX(x,y)        (((x) > (y))? (x): (y))
 
 extern uint16 M[];
