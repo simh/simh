@@ -134,6 +134,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             LIBPATH += /opt/sfw/lib
             OS_LDFLAGS += -L/opt/sfw/lib -R/opt/sfw/lib
           endif
+          OS_CCDEFS += -D_LARGEFILE_SOURCE
         else
           ifeq (cygwin,$(OSTYPE))
             # use 0readme_ethernet.txt documented Windows pcap build components

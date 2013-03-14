@@ -625,7 +625,7 @@ if (delta_rtime > 30000) {                              /* gap too big? */
     return rtc_initd[tmr];                              /* can't calibr */
     }
 new_gtime = sim_gtime();
-if (sim_asynch_enabled && sim_asynch_timer)
+if (sim_asynch_enabled && sim_asynch_timer) {
     if (rtc_elapsed[tmr] > sim_idle_stable) {
         /* An asynchronous clock, merely needs to divide the number of */
         /* instructions actually executed by the clock rate. */
@@ -650,6 +650,7 @@ if (sim_asynch_enabled && sim_asynch_timer)
         sim_debug (DBG_CAL, &sim_timer_dev, "asynch not stable calibration result: %d\n", rtc_initd[tmr]);
         return rtc_initd[tmr];                          /* initial result until stable */
         }
+    }
 rtc_gtime[tmr] = new_gtime;                             /* save instruction time */
 /* This self regulating algorithm depends directly on the assumption */
 /* that this routine is called back after processing the number of */
