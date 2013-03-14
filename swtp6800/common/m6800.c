@@ -88,20 +88,20 @@
 /* Macros to handle the flags in the CCR */
 #define CCR_ALWAYS_ON       (0xC0)        /* for 6800 */
 #define CCR_MSK (HF|IF|NF|ZF|VF|CF)
-#define TOGGLE_FLAG(FLAG)   (CCR ^= FLAG)
-#define SET_FLAG(FLAG)      (CCR |= FLAG)
-#define CLR_FLAG(FLAG)      (CCR &= ~FLAG)
-#define GET_FLAG(FLAG)      (CCR & FLAG)
+#define TOGGLE_FLAG(FLAG)   ((CCR) ^= FLAG)
+#define SET_FLAG(FLAG)      ((CCR) |= FLAG)
+#define CLR_FLAG(FLAG)      ((CCR) &= ~FLAG)
+#define GET_FLAG(FLAG)      ((CCR) & FLAG)
 #define COND_SET_FLAG(COND,FLAG) \
     if (COND) SET_FLAG(FLAG); else CLR_FLAG(FLAG)
 #define COND_SET_FLAG_N(VAR) \
-    if (VAR & 0x80) SET_FLAG(NF); else CLR_FLAG(NF)
+    if ((VAR) & 0x80) SET_FLAG(NF); else CLR_FLAG(NF)
 #define COND_SET_FLAG_Z(VAR) \
-    if (VAR == 0) SET_FLAG(ZF); else CLR_FLAG(ZF)
+    if ((VAR) == 0) SET_FLAG(ZF); else CLR_FLAG(ZF)
 #define COND_SET_FLAG_H(VAR) \
-    if (VAR & 0x10) SET_FLAG(HF); else CLR_FLAG(HF)
+    if ((VAR) & 0x10) SET_FLAG(HF); else CLR_FLAG(HF)
 #define COND_SET_FLAG_C(VAR) \
-    if (VAR & 0x100) SET_FLAG(CF); else CLR_FLAG(CF)
+    if ((VAR) & 0x100) SET_FLAG(CF); else CLR_FLAG(CF)
 #define COND_SET_FLAG_V(COND) \
     if (COND) SET_FLAG(VF); else CLR_FLAG(VF)
 
@@ -403,7 +403,7 @@ t_stat sim_instr (void)
                     DAR += 6;
                     A &= 0xF0;
                     A |= (DAR & 0x0F);
-                        COND_SET_FLAG(DAR & 0x10,CF);
+                    COND_SET_FLAG(DAR & 0x10,CF);
                 }
                 DAR = (A >> 4) & 0x0F;
                 if (DAR > 9 || get_flag(CF)) {
@@ -1885,18 +1885,20 @@ int32 get_flag(int32 flg)
 
 void condevalVa(int32 op1, int32 op2)
 {
-    if (get_flag(CF))
+    if (get_flag(CF)) {
         COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80)) || (
             ((op1 & 0x80) == 0) && ((op2 & 0x80) == 0)));
+    }
 }
 
 /* test and set V for subtraction */
 
 void condevalVs(int32 op1, int32 op2)
 {
-    if (get_flag(CF))
+    if (get_flag(CF)) {
         COND_SET_FLAG_V(((op1 & 0x80) && ((op2 & 0x80) == 0)) || 
             (((op1 & 0x80) == 0) && (op2 & 0x80)));
+    }
 }
 
 /* calls from the simulator */

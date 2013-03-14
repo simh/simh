@@ -1739,7 +1739,7 @@ fprintf (st, "console halt (BREAK typed on the console terminal).  If BDR<7> is 
 fprintf (st, "onsole firmware responds to all these conditions by entering its interactive\n");
 fprintf (st, "command mode.  If BDR<7> is clear, the console firmware boots the operating\n");
 fprintf (st, "system in response to these conditions.  This bit can be set and cleared by\n");
-fprintf (st, "the command “SET CPU AUTOBOOT” (clearing the flag) and “SET CPU NOAUTOBOOT”\n");
+fprintf (st, "the command \"SET CPU AUTOBOOT\" (clearing the flag) and \"SET CPU NOAUTOBOOT\"\n");
 fprintf (st, "setting the flag.  The default value is set.\n");
 return SCPE_OK;
 }

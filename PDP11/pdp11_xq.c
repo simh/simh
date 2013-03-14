@@ -2645,11 +2645,12 @@ t_stat xq_svc(UNIT* uptr)
   }
 
   /* resubmit service timer */
-  if ((xq->var->must_poll) || (xq->var->poll && (xq->var->mode != XQ_T_DELQA_PLUS)))
+  if ((xq->var->must_poll) || (xq->var->poll && (xq->var->mode != XQ_T_DELQA_PLUS))) {
     if (sim_idle_enab)
       sim_clock_coschedule(uptr, tmxr_poll);
     else
       sim_activate(uptr, (tmr_poll*clk_tps)/xq->var->poll);
+    }
 
   return SCPE_OK;
 }

@@ -477,10 +477,11 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
 
     sim_debug(OUT_MSG, &dsk_dev, "DSK%i: " ADDRESS_FORMAT " OUT 0x09: %x\n", current_disk, PCX, data);
     if (data & 0x01) {      /* step head in                             */
-        if (current_track[current_disk] == (tracks[current_disk] - 1))
+        if (current_track[current_disk] == (tracks[current_disk] - 1)) {
             sim_debug(TRACK_STUCK_MSG, &dsk_dev,
                       "DSK%i: " ADDRESS_FORMAT " Unnecessary step in.\n",
                    current_disk, PCX);
+        }
         current_track[current_disk]++;
         if (current_track[current_disk] > (tracks[current_disk] - 1))
             current_track[current_disk] = (tracks[current_disk] - 1);
@@ -491,10 +492,11 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
     }
 
     if (data & 0x02) {      /* step head out                            */
-        if (current_track[current_disk] == 0)
+        if (current_track[current_disk] == 0) {
             sim_debug(TRACK_STUCK_MSG, &dsk_dev,
                       "DSK%i: " ADDRESS_FORMAT " Unnecessary step out.\n",
                       current_disk, PCX);
+        }
         current_track[current_disk]--;
         if (current_track[current_disk] < 0) {
             current_track[current_disk] = 0;

@@ -572,14 +572,16 @@ static int32 checkParameters(void) {
         selectedTrack = 0;
     }
     selectedDMA &= ADDRMASK;
-    if (hdskLastCommand == HDSK_READ)
+    if (hdskLastCommand == HDSK_READ) {
         sim_debug(READ_MSG, &hdsk_dev, "HDSK%d " ADDRESS_FORMAT
                   " Read Track=%04d Sector=%02d Len=%04d DMA=%04x\n",
                selectedDisk, PCX, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
-    if (hdskLastCommand == HDSK_WRITE)
+    }
+    if (hdskLastCommand == HDSK_WRITE) {
         sim_debug(WRITE_MSG, &hdsk_dev, "HDSK%d " ADDRESS_FORMAT
                   " Write Track=%04d Sector=%02d Len=%04d DMA=%04x\n",
                selectedDisk, PCX, selectedTrack, selectedSector, uptr -> HDSK_SECTOR_SIZE, selectedDMA);
+    }
     return TRUE;
 }
 

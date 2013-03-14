@@ -2311,7 +2311,9 @@ t_stat dmc_wr(int32 data, int32 PA, int32 access)
     if (access == WRITE)
     {
         if (PA & 1)
+        {
             sim_debug(DBG_WRN, controller->device, "dmc_wr(), Unexpected non-16-bit write access to SEL%d\n", reg);
+        }
         dmc_setreg(controller, PA, data, 1);
     }
     else

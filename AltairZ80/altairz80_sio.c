@@ -702,12 +702,14 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
 
 int32 sio0s(const int32 port, const int32 io, const int32 data) {
     const int32 result = sio0sCore(port, io, data);
-    if (io == 0)
+    if (io == 0) {
         sim_debug(IN_MSG, &sio_dev, "\tSIO_S: " ADDRESS_FORMAT
                   " IN(0x%03x) = 0x%02x\n", PCX, port, result);
-    else if (io)
+        }
+    else if (io) {
         sim_debug(OUT_MSG, &sio_dev, "\tSIO_S: " ADDRESS_FORMAT
                   " OUT(0x%03x) = 0x%02x\n", PCX, port, data);
+        }
     return result;
 }
 
@@ -750,12 +752,14 @@ static char* printable(char* result, int32 data, const int32 isIn) {
 int32 sio0d(const int32 port, const int32 io, const int32 data) {
     char buffer[8];
     const int32 result = sio0dCore(port, io, data);
-    if (io == 0)
+    if (io == 0) {
         sim_debug(IN_MSG, &sio_dev, "\tSIO_D: " ADDRESS_FORMAT
                   " IN(0x%03x) = 0x%02x%s\n", PCX, port, result, printable(buffer, result, TRUE));
-    else if (io)
+        }
+    else if (io) {
         sim_debug(OUT_MSG, &sio_dev, "\tSIO_D: " ADDRESS_FORMAT
                   " OUT(0x%03x) = 0x%02x%s\n", PCX, port, data, printable(buffer, data, FALSE));
+        }
     return result;
 }
 
@@ -1264,10 +1268,11 @@ static void attachCPM(UNIT *uptr) {
     /* 'C' option makes sure that file is properly truncated if it had existed before   */
     sim_quiet = sim_switches & SWMASK ('Q');    /* -q means quiet                       */
     lastCPMStatus = attach_unit(uptr, cpmCommandLine);
-    if (lastCPMStatus != SCPE_OK)
+    if (lastCPMStatus != SCPE_OK) {
         sim_debug(VERBOSE_MSG, &simh_device, "SIMH: " ADDRESS_FORMAT
                   " Cannot open '%s' (%s).\n", PCX, cpmCommandLine,
                   sim_error_text(lastCPMStatus));
+    }
 }
 
 /* setClockZSDOSAdr points to 6 byte block in M: YY MM DD HH MM SS in BCD notation */
