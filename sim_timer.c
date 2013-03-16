@@ -415,10 +415,10 @@ uint32 sim_os_ms_sleep_init (void)
 {
 uint32 i, t1, t2, tot, tim;
 
-sim_os_ms_sleep (1);                    /* Start sampling on a tick boundary */
+SIM_IDLE_MS_SLEEP (1);                  /* Start sampling on a tick boundary */
 for (i = 0, tot = 0; i < sleep1Samples; i++) {
     t1 = sim_os_msec ();
-    sim_os_ms_sleep (1);
+    SIM_IDLE_MS_SLEEP (1);
     t2 = sim_os_msec ();
     tot += (t2 - t1);
     }
@@ -1103,7 +1103,7 @@ switch (sim_throt_state) {
         break;
 
     case 2:                                             /* throttling */
-        sim_os_ms_sleep (sim_throt_sleep_time);
+        SIM_IDLE_MS_SLEEP (sim_throt_sleep_time);
         delta_ms = sim_os_msec () - sim_throt_ms_start;
         if ((sim_throt_type != SIM_THROT_SPC) &&        /* when dynamic throttling */
             (delta_ms >= 10000)) {                      /* recompute every 10 sec */
