@@ -1732,8 +1732,8 @@ if (status != SS$_NORMAL) {
     }
 if (devsts & UCB$M_BSY)
     return 0;                                           /* Would block */
-status = sys$qio (0, port, IO$_WRITELBLK | IO$M_NOFORMAT,
-                  NULL, 0, 0, buffer, count, 0, 0, 0, 0);
+status = sys$qiow (0, port, IO$_WRITELBLK | IO$M_NOFORMAT,
+                   NULL, 0, 0, buffer, count, 0, 0, 0, 0);
 if (status != SS$_NORMAL) {
     sim_error_serial ("write", status);                 /* report unexpected error */
     return -1;

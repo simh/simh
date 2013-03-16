@@ -701,10 +701,10 @@ return (sim_idle_rate_ms != 0);
 
 /* sim_timer_idle_capable - tell if the host is Idle capable and what the host OS tick size is */
 
-uint32 sim_timer_idle_capable (uint32 *hoat_tick_ms)
+uint32 sim_timer_idle_capable (uint32 *host_tick_ms)
 {
-if (hoat_tick_ms)
-    *hoat_tick_ms = sim_os_sleep_min_ms;
+if (host_tick_ms)
+    *host_tick_ms = sim_os_sleep_min_ms;
 return sim_idle_rate_ms;
 }
 

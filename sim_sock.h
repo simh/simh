@@ -75,6 +75,12 @@
 #if !defined (timerclear)
 #define timerclear(tvp)         (tvp)->tv_sec = (tvp)->tv_usec = 0
 #endif
+#if !defined (AI_NUMERICHOST)
+#define AI_NUMERICHOST 0
+#endif
+#if defined (__VAX)
+#define sockaddr_storage sockaddr
+#endif
 #endif
 #if defined(__EMX__)                                    /* OS/2 unique */
 #if !defined (timerclear)

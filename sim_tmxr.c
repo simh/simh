@@ -2340,9 +2340,9 @@ while (sim_asynch_enabled) {
     lp->a_active = TRUE;
     pthread_mutex_unlock (&sim_tmxr_poll_lock);
     term[0] = term[1] = 0;
-    status = sys$qio (0, lp->serport, 
-                      IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
-                      &iosb, 0, 0, buf, 1, 1, term, 0, 0);
+    status = sys$qiow (0, lp->serport, 
+                       IO$_READLBLK | IO$M_NOECHO | IO$M_NOFILTR | IO$M_TIMED | IO$M_TRMNOECHO,
+                       &iosb, 0, 0, buf, 1, 1, term, 0, 0);
     if (status != SS$_NORMAL) {
         fprintf (stderr, "_tmxr_serial_line_poll() - QIO Failed, Status=%d\r\n", status);
         abort();
