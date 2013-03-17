@@ -127,6 +127,38 @@ DEBTAB sim_timer_debug[] = {
   {0}
 };
 
+#if defined(SIM_ASYNCH_IO)
+uint32 sim_idle_ms_sleep (unsigned int msec)
+{
+uint32 start_time = sim_os_msec();
+struct timespec done_time;
+t_bool timedout = FALSE;
+
+clock_gettime(CLOCK_REALTIME, &done_time);
+done_time.tv_sec += (msec/1000);
+done_time.tv_nsec += 1000000*(msec%1000);
+if (done_time.tv_nsec > 1000000000) {
+  done_time.tv_sec += done_time.tv_nsec/1000000000;
+  done_time.tv_nsec = done_time.tv_nsec%1000000000;
+  }
+pthread_mutex_lock (&sim_asynch_lock);
+sim_idle_wait = TRUE;
+if (!pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time))
+  sim_asynch_check = 0;                 /* force check of asynch queue now */
+else
+  timedout = TRUE;
+sim_idle_wait = FALSE;
+pthread_mutex_unlock (&sim_asynch_lock);
+if (!timedout) {
+    AIO_UPDATE_QUEUE;
+    }
+return sim_os_msec() - start_time;
+}
+#define SIM_IDLE_MS_SLEEP sim_idle_ms_sleep
+#else
+#define SIM_IDLE_MS_SLEEP sim_os_ms_sleep
+#endif
+
 /* OS-dependent timer and clock routines */
 
 /* VMS */
@@ -500,38 +532,6 @@ if (a->tv_nsec > b->tv_nsec)
 else
     return 0;
 }
-
-#if defined(SIM_ASYNCH_IO)
-uint32 sim_idle_ms_sleep (unsigned int msec)
-{
-uint32 start_time = sim_os_msec();
-struct timespec done_time;
-t_bool timedout = FALSE;
-
-clock_gettime(CLOCK_REALTIME, &done_time);
-done_time.tv_sec += (msec/1000);
-done_time.tv_nsec += 1000000*(msec%1000);
-if (done_time.tv_nsec > 1000000000) {
-  done_time.tv_sec += done_time.tv_nsec/1000000000;
-  done_time.tv_nsec = done_time.tv_nsec%1000000000;
-  }
-pthread_mutex_lock (&sim_asynch_lock);
-sim_idle_wait = TRUE;
-if (!pthread_cond_timedwait (&sim_asynch_wake, &sim_asynch_lock, &done_time))
-  sim_asynch_check = 0;                 /* force check of asynch queue now */
-else
-  timedout = TRUE;
-sim_idle_wait = FALSE;
-pthread_mutex_unlock (&sim_asynch_lock);
-if (!timedout) {
-    AIO_UPDATE_QUEUE;
-    }
-return sim_os_msec() - start_time;
-}
-#define SIM_IDLE_MS_SLEEP sim_idle_ms_sleep
-#else
-#define SIM_IDLE_MS_SLEEP sim_os_ms_sleep
-#endif
 
 /* OS independent clock calibration package */
 
