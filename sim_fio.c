@@ -329,7 +329,7 @@ return (t_offset)(ftello64 (st));
 
 #if defined (__APPLE__) || defined (__FreeBSD__)
 #define S_SIM_IO_FSEEK_EXT_ 1
-int sim_fseek (FILE *st, t_offset xpos, int origin) 
+int sim_fseeko (FILE *st, t_offset xpos, int origin) 
 {
 return fseeko (st, (off_t)xpos, origin);
 }
