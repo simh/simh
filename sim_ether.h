@@ -82,7 +82,7 @@
 #define DONT_USE_READER_THREAD
 #endif
 
-#if (((defined(__sun__) && defined(__i386__)) || defined(__linux)) && !defined(DONT_USE_READER_THREAD))
+#if ((((defined(__sun) || defined(__sun__)) && defined(__i386__)) || defined(__linux)) && !defined(DONT_USE_READER_THREAD))
 #define USE_READER_THREAD 1
 #endif
 

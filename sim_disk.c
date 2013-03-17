@@ -1871,7 +1871,7 @@ _set_errno_from_status (GetLastError ());
 return SCPE_IOERR;
 }
 
-#elif defined (__linux) || defined (__linux__) || defined (__sun__) || defined (__hpux)
+#elif defined (__linux) || defined (__linux__) || defined (__sun) || defined (__sun__) || defined (__hpux)
 
 #include <sys/types.h>
 #include <sys/stat.h>

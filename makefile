@@ -2,7 +2,7 @@
 # This GNU make makefile has been tested on:
 #   Linux (x86 & Sparc & PPC)
 #   OS X
-#   Solaris (x86 & Sparc)
+#   Solaris (x86 & Sparc) (gcc and Sun C)
 #   OpenBSD
 #   NetBSD
 #   FreeBSD
@@ -74,6 +74,14 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq (,$(shell $(GCC) -v /dev/null 2>&1 | grep 'clang'))
     GCC_VERSION = $(shell $(GCC) -v /dev/null 2>&1 | grep 'gcc version' | awk '{ print $$3 }')
     COMPILER_NAME = GCC Version: $(GCC_VERSION)
+    ifeq (,$(GCC_VERSION))
+      ifeq (SunOS,$(OSTYPE))
+        ifneq (,$(shell $(GCC) -V | grep 'Sun C'))
+          SUNC_VERSION = $(shell $(GCC) -V | grep 'Sun C' | awk '{ print $$4 }')
+          COMPILER_NAME = Sun C $(SUNC_VERSION)
+        endif
+      endif
+    endif
   else
     ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
       COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
@@ -469,7 +477,9 @@ endif
 ifeq (HP-UX,$(OSTYPE))
   CC_STD = -std=gnu99
 else
-  CC_STD = -std=c99
+  ifeq (,$(SUNC_VERSION))
+    CC_STD = -std=c99
+  endif
 endif
 CC_OUTSPEC = -o $@
 CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -I . $(OS_CCDEFS) $(ROMS_OPT)

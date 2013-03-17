@@ -40,7 +40,7 @@
 int32 sim_finit (void);
 #if defined (__linux) || defined (__linux__) || defined (__hpux) || \
     (defined (VMS) && (defined (__ALPHA) || defined (__ia64)) && (__DECC_VER >= 60590001)) || \
-    (defined(__sun__) && defined(_LARGEFILE_SOURCE)) ||                \
+    ((defined(__sun) || defined(__sun__)) && defined(_LARGEFILE_SOURCE)) ||                \
     defined (_WIN32) || defined (__APPLE__) || defined (__FreeBSD__)
 typedef t_int64        t_offset;
 #else

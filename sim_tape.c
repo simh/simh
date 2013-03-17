@@ -542,8 +542,6 @@ fprintf (st, "                virtual tape will be attempted).\n");
 fprintf (st, "    -F          Open the indicated tape container in a specific format (default\n");
 fprintf (st, "                is SIMH, alternatives are E11, TPC and P7B)\n");
 return SCPE_OK;
-
-return SCPE_OK;
 }
 
 void sim_tape_data_trace(UNIT *uptr, const uint8 *data, size_t len, const char* txt, int detail, uint32 reason)

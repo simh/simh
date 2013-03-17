@@ -3069,7 +3069,6 @@ for ( ;; ) {
         break;
         }                                               /* end case op */
     }                                                   /* end for */
-ABORT (STOP_UNKNOWN);
 }                                                       /* end sim_instr */
 
 /* Prefetch buffer routine

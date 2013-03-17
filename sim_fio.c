@@ -233,7 +233,8 @@ return fopen (file, mode);
 
 /* 64b VMS */
 
-#if ((defined (__ALPHA) || defined (__ia64)) && defined (VMS) && (__DECC_VER >= 60590001)) || (defined(__sun__) && defined(_LARGEFILE_SOURCE))
+#if ((defined (__ALPHA) || defined (__ia64)) && defined (VMS) && (__DECC_VER >= 60590001)) || \
+    ((defined(__sun) || defined(__sun__)) && defined(_LARGEFILE_SOURCE))
 #define S_SIM_IO_FSEEK_EXT_ 1
 int sim_fseeko (FILE *st, t_offset offset, int whence)
 {
