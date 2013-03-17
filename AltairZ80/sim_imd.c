@@ -543,7 +543,7 @@ t_stat sectRead(DISK_INFO *myDisk,
 
     DBG_PRINT(("Reading C:%d/H:%d/S:%d, len=%d, offset=0x%08x" NLP, Cyl, Head, Sector, buflen, sectorFileOffset));
 
-    sim_fseek(myDisk->file, sectorFileOffset-1, 0);
+    sim_fseek(myDisk->file, sectorFileOffset-1, SEEK_SET);
 
     sectRecordType = fgetc(myDisk->file);
     switch(sectRecordType) {
@@ -642,7 +642,7 @@ t_stat sectWrite(DISK_INFO *myDisk,
 
     sectorFileOffset = myDisk->track[Cyl][Head].sectorOffsetMap[Sector-start_sect];
 
-    sim_fseek(myDisk->file, sectorFileOffset-1, 0);
+    sim_fseek(myDisk->file, sectorFileOffset-1, SEEK_SET);
 
     if (*flags & IMD_DISK_IO_ERROR_GENERAL) {
         sectRecordType = SECT_RECORD_UNAVAILABLE;

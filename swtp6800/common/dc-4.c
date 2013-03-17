@@ -389,7 +389,7 @@ int32 fdcdrv(int32 io, int32 data)
         pos = 0x200;                    /* Read in SIR */
         if (dsk_dev.dctrl & DEBUG_read)
             printf("\nfdcdrv: Read pos = %ld ($%04X)", pos, (unsigned int) pos);
-        sim_fseek(dsk_unit[cur_dsk].fileref, pos, 0); /* seek to offset */
+        sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
         sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
         dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
         dsk_unit[cur_dsk].pos = 0;      /* clear counter */
@@ -435,7 +435,7 @@ int32 fdccmd(int32 io, int32 data)
                 pos += SECSIZ * (dsk_unit[cur_dsk].u5 - 1);
                 if (dsk_dev.dctrl & DEBUG_read)
                     printf("\nfdccmd: Read pos = %ld ($%08X)", pos, (unsigned int) pos);
-                sim_fseek(dsk_unit[cur_dsk].fileref, pos, 0); /* seek to offset */
+                sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
                 sim_fread(dsk_unit[cur_dsk].filebuf, SECSIZ, 1, dsk_unit[cur_dsk].fileref); /* read in buffer */
                 dsk_unit[cur_dsk].u3 |= BUSY | DRQ; /* set DRQ & BUSY */
                 dsk_unit[cur_dsk].pos = 0; /* clear counter */
@@ -451,7 +451,7 @@ int32 fdccmd(int32 io, int32 data)
                     pos += SECSIZ * (dsk_unit[cur_dsk].u5 - 1);
                     if (dsk_dev.dctrl & DEBUG_write)
                         printf("\nfdccmd: Write pos = %ld ($%08X)", pos, (unsigned int) pos);
-                    sim_fseek(dsk_unit[cur_dsk].fileref, pos, 0); /* seek to offset */
+                    sim_fseek(dsk_unit[cur_dsk].fileref, pos, SEEK_SET); /* seek to offset */
                     wrt_flag = 1;           /* set write flag */
                     dsk_unit[cur_dsk].u3 |= BUSY | DRQ;/* set DRQ & BUSY */
                     dsk_unit[cur_dsk].pos = 0; /* clear counter */

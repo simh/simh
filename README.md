@@ -20,6 +20,7 @@
     RQ has new disk types: RC25, RCF25, RA80
     RQ device has a settable controller type (RQDX3, UDA50, KLESI, RUX50)
     RQ disks default to Autosize without regard to disk type
+    RQ disks on PDP11 can have RAUSER size beyond 2GB
     DMC11 DDCMP DECnet device simulation from Rob Jarratt.  Up to 4 DMC11 devices are supported.
     DZ on Unibus systems can have up to 256 ports (default of 32), on 
         Qbus systems 128 port limit (default of 16).

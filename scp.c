@@ -2710,6 +2710,10 @@ t_addr mval = kval * kval;
 t_addr psize = uptr->capac;
 char scale, width;
 
+if (dptr->flags & DEV_SECTORS) {
+    kval = kval / 512;
+    mval = mval / 512;
+    }
 if ((dptr->dwidth / dptr->aincr) > 8)
     width = 'W';
 else width = 'B';
@@ -2753,7 +2757,6 @@ if (flag) {
     fprintf (st, "\n\t\t%s", sim_snet);
     idle_capable = sim_timer_idle_capable (&os_tick_size);
     fprintf (st, "\n\t\tIdle/Throttling support is %savailable", ((idle_capable == 0) ? "NOT " : ""));
-    fprintf (st, "\n\t\t%s", sim_taddr_64 ? "Large File (>2GB) support" : "No Large File support");
     if (sim_disk_vhd_support())
         fprintf (st, "\n\t\tVirtual Hard Disk (VHD) support");
     if (sim_disk_raw_support())
@@ -2770,6 +2773,7 @@ if (flag) {
     fprintf (st, "\n\tHost Platform:");
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
+    fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
 #if defined(__VMS)
     fprintf (st, "\n\t\tOS: VMS");
 #elif defined(_WIN32)

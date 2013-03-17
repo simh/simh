@@ -654,7 +654,7 @@ struct drvtyp {
     d##_GPC,  d##_XBN,  d##_DBN,  d##_LBN, \
     d##_RCTS, d##_RCTC, d##_RBN,  d##_MOD, \
     d##_MED, d##_FLGS
-#define RQ_SIZE(d)      (d##_LBN * RQ_NUMBY)
+#define RQ_SIZE(d)      d##_LBN
 
 static struct drvtyp drv_tab[] = {
     { RQ_DRV (RX50), "RX50" }, 
@@ -1011,7 +1011,7 @@ DEVICE rq_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
+    &rq_dib, DEV_DISABLE | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
     0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
@@ -1086,7 +1086,7 @@ DEVICE rqb_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
+    &rqb_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
     0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
@@ -1161,7 +1161,7 @@ DEVICE rqc_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
+    &rqc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
     0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
@@ -1236,7 +1236,7 @@ DEVICE rqd_dev = {
     RQ_NUMDR + 2, DEV_RDX, T_ADDR_W, 2, DEV_RDX, 16,
     NULL, NULL, &rq_reset,
     &rq_boot, &rq_attach, &rq_detach,
-    &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK,
+    &rqd_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS | DEV_DEBUG | DEV_DISK | DEV_SECTORS,
     0, rq_debug, NULL, NULL, &rq_help, NULL, NULL,
     &rq_description
     };
@@ -1915,7 +1915,7 @@ int32 rq_rw_valid (MSC *cp, int32 pkt, UNIT *uptr, uint32 cmd)
 uint32 dtyp = GET_DTYPE (uptr->flags);                  /* get drive type */
 uint32 lbn = GETP32 (pkt, RW_LBNL);                     /* get lbn */
 uint32 bc = GETP32 (pkt, RW_BCL);                       /* get byte cnt */
-uint32 maxlbn = (uint32) (uptr->capac / RQ_NUMBY);      /* get max lbn */
+uint32 maxlbn = (uint32)uptr->capac;                    /* get max lbn */
 
 if ((uptr->flags & UNIT_ATT) == 0)                      /* not attached? */
     return (ST_OFL | SB_OFL_NV);                        /* offl no vol */
@@ -2549,7 +2549,7 @@ return;
 void rq_putr_unit (MSC *cp, int32 pkt, UNIT *uptr, uint32 lu, t_bool all)
 {
 uint32 dtyp = GET_DTYPE (uptr->flags);                  /* get drive type */
-uint32 maxlbn = (uint32) (uptr->capac / RQ_NUMBY);      /* get max lbn */
+uint32 maxlbn = (uint32)uptr->capac;                    /* get max lbn */
 
 sim_debug (DBG_TRC, rq_devmap[cp->cnum], "rq_putr_unit\n");
 
@@ -2723,7 +2723,7 @@ if (cptr) {
     drv_tab[val].lbn = cap;
     }
 uptr->flags = (uptr->flags & ~UNIT_DTYPE) | (val << UNIT_V_DTYPE);
-uptr->capac = ((t_addr) drv_tab[val].lbn) * RQ_NUMBY;
+uptr->capac = (t_addr)drv_tab[val].lbn;
 return SCPE_OK;
 }
 
