@@ -323,5 +323,6 @@ Problem reports should contain;
  - your host platform (and OS version)
  - how you built the simulator or that you're using prebuilt binaries
  - the simulator build description should include the output produced by while building the simulator
+ - the output of SHOW VERSION while running the simulator which is having an issue
  - the simulator configuration file (or commands) which were used when the problem occurred.
  
