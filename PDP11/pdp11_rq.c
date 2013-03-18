@@ -151,7 +151,7 @@ extern uint32 cpu_opt;
 #define RQ_NUMDR        4                               /* # drives */
 #define RQ_NUMBY        512                             /* bytes per block */
 #define RQ_MAXFR        (1 << 16)                       /* max xfer */
-#define RQ_MAPXFER      (1 << 31)                       /* mapped xfer */
+#define RQ_MAPXFER      (1u << 31)                      /* mapped xfer */
 #define RQ_M_PFN        0x1FFFFF                        /* map entry PFN */
 
 #define UNIT_V_ONL      (UNIT_V_UF + 0)                 /* online */

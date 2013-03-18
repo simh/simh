@@ -274,6 +274,7 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
       Older versions of libpcap can be found, for various systems, at:
       Linux  : search for your variant on http://rpmfind.net
       OS/X   : Apple Developer's site?
+      HP-UX  : ftp://hpux.connect.org.uk/hpux/Networking/Admin/
 
 	    NOTE: The repositories for older versions of these platforms
 	          don't contain a version of libpcap greater than 0.8.1.
@@ -300,7 +301,9 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
     dynamically load the libpcap library.  This means that the same simulator
     binaries will run on any system whether or not libpcap is installed.  If 
     you want to force direct libpcap linking during a build you do so by 
-    typing 'make USE_NETWORK=1'
+    typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
+    is no observable benefit to statically linking against libpcap and as 
+    such support for this ia deprecated.
 
  4. Build it!
 

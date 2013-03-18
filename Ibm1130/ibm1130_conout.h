@@ -12,9 +12,9 @@
 
 #define _0_ '\0'
 
-#define CENT_		'\xA2'					/* cent and not: standard DOS mapping */
-#define NOT_		'\xAC'
-#define IGNR_		'\xFF'
+#define CENT_		0xA2					/* cent and not: standard DOS mapping */
+#define NOT_		0xAC
+#define IGNR_		0xFF
 #define CRLF_		'\r'
 
 #define COUT_IS_CTRL			0x01		/* conout characters with bit 1 set are controls: */

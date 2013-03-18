@@ -107,7 +107,7 @@
 #define STXCS_DA        (STXCS_M_DA << STXCS_V_DA)
 #define STXCS_GETDA(x)  (((x) >> STXCS_V_DA) & STXCS_M_DA)
 #define STXCS_V_STS     24
-#define STXCS_M_STS     0xFF
+#define STXCS_M_STS     0xFFu
 #define STXCS_STS       (STXCS_M_STS << STXCS_V_STS)
 #define STXCS_WR        (STXCS_FNC | CSR_DONE | CSR_IE | STXCS_DA)
 

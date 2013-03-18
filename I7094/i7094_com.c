@@ -338,7 +338,7 @@ MTAB com_mod[] = {
       NULL, &com_show_ctrl, 0 },
     { MTAB_XTD | MTAB_VDV | MTAB_NMO, COMR_OQ, "OUTQ", NULL,
       NULL, &com_show_ctrl, 0 },
-    { MTAB_XTD | MTAB_VDV | MTAB_NMO, -1, "ALL", NULL,
+    { MTAB_XTD | MTAB_VDV | MTAB_NMO, 0xFFFFFFFF, "ALL", NULL,
       NULL, &com_show_ctrl, 0 },
     { 0 }
     };

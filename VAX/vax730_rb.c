@@ -181,7 +181,7 @@
 #define RBDA_V_TRACK    8                               /* track */
 #define RBDA_M_TRACK    0xFF
 #define RBDA_V_CYL      16                              /* cylinder */
-#define RBDA_M_CYL      0xFFFF
+#define RBDA_M_CYL      0xFFFFu
 #define RBDA_TRACK      (RBDA_M_TRACK << RBDA_V_TRACK)
 #define RBDA_CYL        (RBDA_M_CYL << RBDA_V_CYL)
 #define GET_SECT(x)     (((x) >> RBDA_V_SECT) & RBDA_M_SECT)

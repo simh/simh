@@ -2774,6 +2774,7 @@ if (flag) {
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
+    fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
 #if defined(__VMS)
     fprintf (st, "\n\t\tOS: VMS");
 #elif defined(_WIN32)
@@ -2783,7 +2784,6 @@ if (flag) {
     fflush (st);
     system ("uname -a");
 #endif
-    fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
     }
 #if defined(SIM_GIT_COMMIT_ID)
 #define S_xstr(a) S_str(a)

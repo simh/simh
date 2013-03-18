@@ -16,9 +16,11 @@
 # In general, the logic below will detect and build with the available
 # features which the host build environment provides.
 #
-# Dynamic loading of libpcap is the default behavior if pcap.h is
-# available at build time.  Direct calls to libpcap can be enabled
-# if GNU make is invoked with USE_NETWORK=1 on the command line.
+# Dynamic loading of libpcap is the preferred default behavior if pcap.h 
+# is available at build time.  Support to statically linking against libpcap
+# is deprecated and may be removed in the future.  Static linking against 
+# libpcap can be enabled if GNU make is invoked with USE_NETWORK=1 on the 
+# command line.
 #
 # The default build will build compiler optimized binaries.
 # If debugging is desired, then GNU make can be invoked with
@@ -76,8 +78,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     COMPILER_NAME = GCC Version: $(GCC_VERSION)
     ifeq (,$(GCC_VERSION))
       ifeq (SunOS,$(OSTYPE))
-        ifneq (,$(shell $(GCC) -V | grep 'Sun C'))
-          SUNC_VERSION = $(shell $(GCC) -V | grep 'Sun C' | awk '{ print $$4 }')
+        ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
+          SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C' | awk '{ print $$4 }')
           COMPILER_NAME = Sun C $(SUNC_VERSION)
         endif
       endif
@@ -225,6 +227,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(call find_lib,$(PCAPLIB)))
         ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
           NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+          $(info *** Warning ***)
+          $(info *** Warning *** Statically linking against libpcap is provides no measurable)
+          $(info *** Warning *** benefits over dynamically linking libpcap.)
+          $(info *** Warning ***)
+          $(info *** Warning *** Support for linking this way is currently deprecated and may be removed)
+          $(info *** Warning *** in the future.)
+          $(info *** Warning ***)
           ifeq (cygwin,$(OSTYPE))
             # cygwin has no ldconfig so explicitly specify pcap object library
             NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
@@ -272,6 +281,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
               $(info *** Warning *** components for simh networking.  For best results, with)
               $(info *** Warning *** simh networking, it is recommended that you install the)
               $(info *** Warning *** libpcap-dev package from your $(OSNAME) distribution)
+              $(info *** Warning ***)
+              $(info *** Warning *** Building with the components manually installed from www.tcpdump.org)
+              $(info *** Warning *** is officially deprecated.  Attempting to do so is unsupported.)
               $(info *** Warning ***)
             endif
           else
