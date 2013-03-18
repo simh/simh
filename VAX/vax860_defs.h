@@ -178,7 +178,7 @@
 
 #define MAXMEMWIDTH     25                              /* max mem, 4MB boards */
 #define MAXMEMSIZE      (1 << MAXMEMWIDTH)
-#define MAXMEMWIDTH_X   27                              /* max mem, 16MB boards */
+#define MAXMEMWIDTH_X   28                              /* max mem, 64MB boards */
 #define MAXMEMSIZE_X    (1 << MAXMEMWIDTH_X)
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
@@ -188,7 +188,9 @@
                         { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size, NULL, NULL, "Set Memory to 32M bytes" },              \
                         { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size, NULL, NULL, "Set Memory to 48M bytes" }, \
                         { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size, NULL, NULL, "Set Memory to 64M bytes" },              \
-                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" }
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },            \
+                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },            \
+                        { UNIT_MSIZE, (1u << 27) + (1u << 22), NULL, "260M", &cpu_set_size, NULL, NULL, "Set Memory to 260M bytes" }
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
                               NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
