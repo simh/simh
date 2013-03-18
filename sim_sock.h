@@ -53,7 +53,11 @@
 #define WSAGetLastError()       errno                   /* Windows macros */
 #define closesocket     close 
 #define SOCKET          int32
+#if defined(__hpux)
+#define WSAEWOULDBLOCK  EAGAIN
+#else
 #define WSAEWOULDBLOCK  EWOULDBLOCK
+#endif
 #define WSAEINPROGRESS  EINPROGRESS
 #define WSAETIMEDOUT    ETIMEDOUT
 #define WSAECONNREFUSED ECONNREFUSED
