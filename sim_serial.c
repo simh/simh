@@ -859,7 +859,7 @@ return;
 
 
 
-#elif defined (__unix__) || defined(__APPLE__)
+#elif defined (__unix__) || defined(__APPLE__) || defined(__hpux)
 
 #if defined(__linux) || defined(__linux__)
 #include <dirent.h>
@@ -921,7 +921,17 @@ if (1) {
         }
     free (namelist);
     }
-#else /* Non Linux, just try some well known device names */
+#elif defined(__hpux)
+for (i=0; (ports < max) && (i < 64); ++i) {
+    sprintf (list[ports].name, "/dev/tty%dp%d", i/8, i%8);
+    port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
+    if (port != -1) {                                   /* open OK? */
+        if (isatty (port))                              /* is device a TTY? */
+            ++ports;
+        close (port);
+        }
+    }
+#else /* Non Linux/HP-UX, just try some well known device names */
 for (i=0; (ports < max) && (i < 64); ++i) {
     sprintf (list[ports].name, "/dev/ttyS%d", i);
     port = open (list[ports].name, O_RDWR | O_NOCTTY | O_NONBLOCK);     /* open the port */
