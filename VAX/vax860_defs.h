@@ -192,8 +192,8 @@
                         { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },            \
                         { UNIT_MSIZE, (1u << 28) + (1u << 22), NULL, "260M", &cpu_set_size, NULL, NULL, "Set Memory to 260M bytes" }
 #define CPU_MODEL_MODIFIERS                                                                     \
-                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
+                        { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL=8600|8650",                                  \
+                              &cpu_set_model, &cpu_show_model, NULL, "Set/Display processor model" }
 
 /* Unibus I/O registers */
 
