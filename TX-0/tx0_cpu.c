@@ -266,7 +266,7 @@ int32 TAC = 0;                                          /* Toggle Switch Accumul
 int32 iosta = 0;                                        /* status reg */
 int32 ios = 0;                                          /* I/O Stop */
 int32 ch = 0;                                           /* Chime Alarm */
-int32 LP = 0;                                           /* Light Pen / Light Gun flops */
+int32 LPEN = 0;                                         /* Light Pen / Light Gun flops */
 int32 mode_tst = 1;                                     /* Test Mode Flip-flop */
 int32 mode_rdin = 1;                                    /* Read-In Mode Flip-flop */
 
@@ -331,7 +331,7 @@ REG cpu_reg[] = {
     { ORDATA (PCQP, pcq_p, 6), REG_HRO },
     { FLDATA (IOS, ios, 0) },       /* In Out Stop */
     { FLDATA (CH, ch, 0) },         /* Chime Alarm */
-    { ORDATA (LP, LP, 2) },         /* Light Pen */
+    { ORDATA (LP, LPEN, 2) },       /* Light Pen */
     { FLDATA (R, mode_rdin, 0), REG_HRO },      /* Mode "R" (Read In) Flip-Flop */
     { FLDATA (T, mode_tst, 0), REG_HRO },       /* Mode "T" (Test) Flip-Flop */
     { NULL }
@@ -796,10 +796,10 @@ t_stat sim_instr (void)
                     MBR |= TBR;
                     break;
                 case IOS_PEN:
-                    TRACE_PRINT(IOS_MSG, ("[%06o] Light Pen %01o\n", PC-1, LP));
+                    TRACE_PRINT(IOS_MSG, ("[%06o] Light Pen %01o\n", PC-1, LPEN));
                     AC &= AMASK;
-                    AC |= (LP & 1) << 17;
-                    AC |= (LP & 2) << 16;
+                    AC |= (LPEN & 1) << 17;
+                    AC |= (LPEN & 2) << 16;
                     AC &= DMASK;
                     break;
                 case IOS_SEL:
@@ -832,7 +832,7 @@ t_stat sim_instr (void)
                     break;
                 case IOS_DIS:
 #ifdef USE_DISPLAY
-                    LP = dpy (AC);  /* Display point on the CRT */
+                    LPEN = dpy (AC);  /* Display point on the CRT */
 #endif /* USE_DISPLAY */
                     break;
                 case IOS_R3L:
@@ -1373,7 +1373,7 @@ t_stat sim_opr_orig(int32 op)
             break;
         case OOPR_DIS:
 #ifdef USE_DISPLAY
-            LP = dpy (AC);  /* Display point on the CRT */
+            LPEN = dpy (AC);  /* Display point on the CRT */
 #endif /* USE_DISPLAY */
             break;
         }
@@ -1381,10 +1381,10 @@ t_stat sim_opr_orig(int32 op)
 
 /* 1.1 TAC and PEN */
     if ((op & OOPR_PEN_MASK) == OOPR_PEN) {  /* pen  1.1 Read the light pen flip flops 1 and 2 into AC0 and AC1 */
-        TRACE_PRINT(IOS_MSG, ("[%06o] Light Pen %01o\n", PC-1, LP));
+        TRACE_PRINT(IOS_MSG, ("[%06o] Light Pen %01o\n", PC-1, LPEN));
         AC &= AMASK;
-        AC |= (LP & 1) << 17;
-        AC |= (LP & 2) << 16;
+        AC |= (LPEN & 1) << 17;
+        AC |= (LPEN & 2) << 16;
         AC &= DMASK;
     }
 
