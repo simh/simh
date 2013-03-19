@@ -496,8 +496,8 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RA8U_MED        0x25641052                      /* RA82 */
 #define RA8U_FLGS       RQDF_SDI
 #define RA8U_MINC       10000                           /* min cap LBNs */
-#define RA8U_MAXC       4000000                         /* max cap LBNs */
-#define RA8U_EMAXC      2000000000                      /* ext max cap */
+#define RA8U_MAXC       4194303                         /* max cap LBNs */
+#define RA8U_EMAXC      2147483647                      /* ext max cap */
 
 #define RA60_DTYPE      13                              /* SDI drive */
 #define RA60_SECT       42                              /* +1 spare/track */
@@ -2707,7 +2707,7 @@ return SCPE_OK;
 t_stat rq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
 uint32 cap;
-uint32 max = sim_taddr_64? RA8U_EMAXC: RA8U_MAXC;
+uint32 max = sim_toffset_64? RA8U_EMAXC: RA8U_MAXC;
 t_stat r;
 
 if ((val < 0) || ((val != RA8U_DTYPE) && cptr))
