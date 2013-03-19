@@ -539,7 +539,7 @@ t_seccnt sread;
 sim_debug (ctx->dbit, ctx->dptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 if ((sects == 1) &&                                     /* Single sector reads */
-    (lba >= (uptr->capac*ctx->capac_factor)/ctx->sector_size)) {/* beyond the end of the disk */
+    (lba >= (uptr->capac*ctx->capac_factor)/(ctx->sector_size/((ctx->dptr->flags & DEV_SECTORS) ? 512 : 1)))) {/* beyond the end of the disk */
     memset (buf, '\0', ctx->sector_size);               /* are bad block management efforts - zero buffer */
     if (sectsread)
         *sectsread = 1;
