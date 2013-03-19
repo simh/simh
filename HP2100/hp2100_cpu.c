@@ -1,6 +1,6 @@
 /* hp2100_cpu.c: HP 21xx/1000 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
    DMA1,DMA2    12607B/12578A/12895A direct memory access controller
    DCPC1,DCPC2  12897B dual channel port controller
 
+   18-Mar-13    JDB     Removed redundant extern declarations
    09-May-12    JDB     Separated assignments from conditional expressions
    13-Jan-12    JDB     Minor speedup in "is_mapped"
                         Added casts to cpu_mod, dmasio, dmapio, cpu_reset, dma_reset
@@ -444,6 +445,7 @@
 
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
+#include "hp2100_cpu1.h"
 
 
 /* Memory protect constants */
@@ -561,8 +563,9 @@ uint16 dms_map[MAP_NUM * MAP_LNT] = { 0 };              /* dms maps */
 
 /* External data */
 
-extern char halt_msg[];
+extern char halt_msg [];                                /* halt message */
 extern DIB clk_dib;                                     /* CLK DIB for idle check */
+extern const BOOT_ROM ptr_rom, dq_rom, ms_rom, ds_rom;  /* boot ROMs for cpu_boot routine */
 
 /* CPU local routines */
 
@@ -600,14 +603,6 @@ IOHANDLER protio;
 IOHANDLER dmapio;
 IOHANDLER dmasio;
 IOHANDLER nullio;
-
-/* External routines */
-
-extern t_stat cpu_eau   (uint32 IR, uint32 intrq);
-extern t_stat cpu_uig_0 (uint32 IR, uint32 intrq, uint32 iotrap);
-extern t_stat cpu_uig_1 (uint32 IR, uint32 intrq, uint32 iotrap);
-
-extern void (*sim_vm_post) (t_bool from_scp);
 
 
 /* Table of CPU features by model.
@@ -3959,7 +3954,6 @@ t_stat cpu_show_idle (FILE *st, UNIT *uptr, int32 val, void *desc)
 
 t_stat cpu_boot (int32 unitno, DEVICE *dptr)
 {
-extern const BOOT_ROM ptr_rom, dq_rom, ms_rom, ds_rom;
 int32 dev = (SR >> IBL_V_DEV) & I_DEVMASK;
 int32 sel = (SR >> IBL_V_SEL) & IBL_M_SEL;
 

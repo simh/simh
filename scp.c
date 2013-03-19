@@ -2196,7 +2196,7 @@ return SCPE_OK;
 
 t_stat set_cmd (int32 flag, char *cptr)
 {
-int32 lvl;
+uint32 lvl;
 t_stat r;
 char gbuf[CBUFSIZE], *cvptr, *svptr;
 DEVICE *dptr;
@@ -2486,7 +2486,7 @@ return r;
 
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr)
 {
-int32 lvl;
+uint32 lvl;
 char gbuf[CBUFSIZE], *cvptr;
 DEVICE *dptr;
 UNIT *uptr;
@@ -2966,6 +2966,7 @@ else return SCPE_NOFNC;
 t_stat show_on (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 int32 lvl, i;
+
 if (cptr && (*cptr != 0)) return SCPE_2MARG;            /* now eol? */
 for (lvl=sim_do_depth; lvl >= 0; --lvl) {
     if (lvl > 0)
@@ -3020,7 +3021,7 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
     if (mptr->pstring && 
         ((mptr->mask & MTAB_XTD)?
             (MODMASK(mptr,flag) && !MODMASK(mptr,MTAB_NMO)): 
-            ((MTAB_VUN == flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
+            ((MTAB_VUN == (uint32)flag) && ((uptr->flags & mptr->mask) == mptr->match)))) {
         if (*toks > 2) {
             fprintf (st, "\n");
             *toks = 0;

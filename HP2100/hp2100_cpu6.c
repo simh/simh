@@ -1,6 +1,6 @@
 /* hp2100_cpu6.c: HP 1000 RTE-6/VM OS instructions
 
-   Copyright (c) 2006-2012, J. David Bryan
+   Copyright (c) 2006-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    CPU6         RTE-6/VM OS instructions
 
+   18-Mar-13    JDB     Use MP abort handler declaration in hp2100_cpu.h
    09-May-12    JDB     Separated assignments from conditional expressions
    29-Oct-10    JDB     DMA channels renamed from 0,1 to 1,2 to match documentation
    18-Sep-08    JDB     Corrected .SIP debug formatting
@@ -51,11 +52,6 @@
 #include "hp2100_defs.h"
 #include "hp2100_cpu.h"
 #include "hp2100_cpu1.h"
-
-
-/* external variables */
-
-extern jmp_buf save_env;                                /* MP abort handler */
 
 
 /* Offsets to data and addresses within RTE. */

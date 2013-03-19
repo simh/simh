@@ -1,6 +1,6 @@
 /* hp2100_fp1.c: HP 1000 multiple-precision floating point routines
 
-   Copyright (c) 2005-2012, J. David Bryan
+   Copyright (c) 2005-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    in advertising or otherwise to promote the sale, use or other dealings in
    this Software without prior written authorization from the author.
 
+   18-Mar-13    JDB     Changed type of mantissa masks array to to unsigned
    06-Feb-12    JDB     Added missing precision on constant "one" in fp_trun
    21-Jun-11    JDB     Completed the comments for divide; no code changes
    08-Jun-08    JDB     Quieted bogus gcc warning in fp_exec
@@ -309,7 +310,7 @@ static const uint32  op_start[6]   = { IN_V_SNUM,
                                        FP_V_TMANT,
                                        FP_V_EMANT };
 
-static const t_int64 mant_mask[6]  = { IN_SSMAGN,
+static const t_uint64 mant_mask[6] = { IN_SSMAGN,
                                        IN_SDMAGN,
                                        FP_SFMANT,
                                        FP_SXMANT,
@@ -439,7 +440,7 @@ FPU unpacked;
 unpacked.precision = precision;                         /* set value's precision */
 
 unpacked.mantissa =                                     /* unpack and mask mantissa */
-    unpack_int (packed, precision) & mant_mask[precision];
+    unpack_int (packed, precision) & (t_int64) mant_mask[precision];
 
 switch (precision) {
 
@@ -596,11 +597,11 @@ sign = (unpacked->mantissa < 0);                        /* save mantissa sign */
 if (sign)                                               /* round and mask the number */
     unpacked->mantissa =
         (unpacked->mantissa + n_half_lsb[unpacked->precision]) &
-        mant_mask[unpacked->precision];
+        (t_int64) mant_mask[unpacked->precision];
 else
     unpacked->mantissa =
         (unpacked->mantissa + p_half_lsb[unpacked->precision]) &
-        mant_mask[unpacked->precision];
+        (t_int64) mant_mask[unpacked->precision];
 
 if (sign != (unpacked->mantissa < 0))                   /* mantissa overflow? */
     lsrx (unpacked, 1);                                 /* correct by shifting */

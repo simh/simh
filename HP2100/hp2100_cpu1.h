@@ -305,11 +305,17 @@ extern t_stat cpu_signal (uint32 IR, uint32 intrq);                 /* [7] SIGNA
 
 /* Microcode helper functions */
 
-OP     ReadOp  (uint32 va, OPSIZE precision);               /* generalized operand read */
-void   WriteOp (uint32 va, OP operand, OPSIZE precision);   /* generalized operand write */
-t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq);        /* operand processor */
+extern OP     ReadOp  (uint32 va, OPSIZE precision);               /* generalized operand read */
+extern void   WriteOp (uint32 va, OP operand, OPSIZE precision);   /* generalized operand write */
+extern t_stat cpu_ops (OP_PAT pattern, OPS op, uint32 irq);        /* operand processor */
 
-void fprint_ops (OP_PAT pattern, OPS op);                   /* debug print operands */
-void fprint_regs (char *caption, uint32 regs, uint32 base); /* debug print CPU registers */
+extern void fprint_ops  (OP_PAT pattern, OPS op);                  /* debug print operands */
+extern void fprint_regs (char *caption, uint32 regs, uint32 base); /* debug print CPU registers */
+
+/* implemented in hp2100_cpu5.c (RTE-IV EMA functions) */
+
+extern t_stat cpu_ema_eres (uint32 *rtn, uint32 dtbl, uint32 atbl, t_bool debug);
+extern t_stat cpu_ema_eseg (uint32 *rtn, uint32 ir, uint32 tbl, t_bool debug);
+extern t_stat cpu_ema_vset (uint32 *rtn, OPS op, t_bool debug);
 
 #endif

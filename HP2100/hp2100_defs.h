@@ -1,6 +1,6 @@
 /* hp2100_defs.h: HP 2100 simulator definitions
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-13    JDB     Added "-Wdangling-else" to the suppression pragmas
    14-Dec-12    JDB     Added "-Wbitwise-op-parentheses" to the suppression pragmas
    12-May-12    JDB     Added pragmas to suppress logical operator precedence warnings
    10-Feb-12    JDB     Added hp_setsc, hp_showsc functions to support SC modifier
@@ -81,6 +82,7 @@
 #pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wlogical-op-parentheses"
 #pragma GCC diagnostic ignored "-Wbitwise-op-parentheses"
+#pragma GCC diagnostic ignored "-Wdangling-else"
 #endif
 
 

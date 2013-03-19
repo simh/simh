@@ -511,6 +511,7 @@ while (diff->tv_nsec > 1000000000) {
     }
 }
 
+#if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
 static int sim_timespec_compare (struct timespec *a, struct timespec *b)
 {
 while (a->tv_nsec > 1000000000) {
@@ -532,6 +533,7 @@ if (a->tv_nsec > b->tv_nsec)
 else
     return 0;
 }
+#endif /* defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS) */
 
 /* OS independent clock calibration package */
 

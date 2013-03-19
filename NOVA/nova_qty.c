@@ -602,18 +602,20 @@ t_stat qty_common_svc( DIB * dibp, UNIT * unitp )
     ++qty_polls ;                                       /*  another time 'round the track  */
     newln = tmxr_poll_conn( &qty_desc ) ;               /*  anybody knocking at the door?  */
     if ( (newln >= 0) && qty_mdm )
+        {
         if ( newln >= qty_max )
-        {
-        return SCPE_IERR;                               /*  WTF - sanity check failed, over?  */
-        }
-    else
-        {
-        line = newln ;                                  /*  handle modem control  */
-        tmlnp =&qty_ldsc[ line ] ;
-        tmlnp->rcve = tmlnp->xmte = 1 ;
-        /*  do QTY_LINE_ bit fiddling and state machine
-         *  manipulation with modem control signals
-         */
+            {
+            return SCPE_IERR;                               /*  WTF - sanity check failed, over?  */
+            }
+        else
+            {
+            line = newln ;                                  /*  handle modem control  */
+            tmlnp =&qty_ldsc[ line ] ;
+            tmlnp->rcve = tmlnp->xmte = 1 ;
+            /*  do QTY_LINE_ bit fiddling and state machine
+             *  manipulation with modem control signals
+             */
+            }
         }
 
     tmxr_poll_rx( &qty_desc ) ;                         /*  poll input                          */

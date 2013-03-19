@@ -1,6 +1,6 @@
 /* hp2100_sys.c: HP 2100 simulator interface
 
-   Copyright (c) 1993-2012, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-13    JDB     Moved CPU state variable declarations to hp2100_cpu.h
    09-May-12    JDB     Quieted warnings for assignments in conditional expressions
    10-Feb-12    JDB     Deprecated DEVNO in favor of SC
                         Added hp_setsc, hp_showsc functions to support SC modifier
@@ -61,9 +62,6 @@
 #include "hp2100_cpu.h"
 #include <ctype.h>
 
-extern DEVICE cpu_dev;
-extern UNIT   cpu_unit;
-extern REG    cpu_reg[];
 
 extern DEVICE mp_dev;
 extern DEVICE dma1_dev, dma2_dev;

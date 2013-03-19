@@ -1,7 +1,7 @@
 /* hp2100_ds.c: HP 13037D/13175D disc controller/interface simulator
 
    Copyright (c) 2004-2012, Robert M. Supnik
-   Copyright (c) 2012       J. David Bryan
+   Copyright (c) 2012-2013  J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    DS           13037D/13175D disc controller/interface
 
+   18-Mar-13    JDB     Fixed poll_drives definition to match declaration
    24-Oct-12    JDB     Changed CNTLR_OPCODE to title case to avoid name clash
    29-Mar-12    JDB     Rewritten to use the MAC/ICD disc controller library
                         ioIOO now notifies controller service of parameter output
@@ -1337,7 +1338,7 @@ return;
    sets the flag to notify the CPU.
 */
 
-void poll_drives (void)
+static void poll_drives (void)
 {
 if (mac_cntlr.state == cntlr_idle && ds.control == SET)     /* is the controller idle and interrupts are allowed? */
     if (dl_poll_drives (&mac_cntlr, ds_unit, DL_MAXDRIVE))  /* poll the drives; was Attention seen? */

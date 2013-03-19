@@ -722,9 +722,10 @@ static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
     if (io == 0) { /* IN */
         if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))
             return mapCharacter(tmxr_getc_ln(&TerminalLines[spi.terminalLine]));
-        if (!sio_unit.u3)
+        if (!sio_unit.u3) {
             sim_debug(BUFFER_EMPTY_MSG, &sio_dev, "\tSIO_D: " ADDRESS_FORMAT
                       " IN(0x%03x) for empty character buffer\n", PCX, port);
+        }
         sio_unit.u3 = FALSE;                                /* no character is available any more       */
         return mapCharacter(sio_unit.buf);                  /* return previous character                */
     }                                                       /* OUT follows, no fall-through from IN     */

@@ -1,7 +1,7 @@
 /* hp2100_cpu7.c: HP 1000 VIS and SIGNAL/1000 microcode
 
    Copyright (c) 2008, Holger Veit
-   Copyright (c) 2006-2012, J. David Bryan
+   Copyright (c) 2006-2013, J. David Bryan
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 
    CPU7         Vector Instruction Set and SIGNAL firmware
 
+   18-Mar-13    JDB     Moved EMA helper declarations to hp2100_cpu1.h
    09-May-12    JDB     Separated assignments from conditional expressions
    06-Feb-12    JDB     Corrected "opsize" parameter type in vis_abs
    11-Sep-08    JDB     Moved microcode function prototypes to hp2100_cpu1.h
@@ -122,11 +123,6 @@ static const OP zero   = { { 0, 0, 0, 0, 0 } };          /* DEC 0.0D0 */
     - 12824A Vector Instruction Set User's Manual (12824-90001, Jun-1979).
     - VIS Microcode Source (12824-18059, revision 3).
 */
-
-/* implemented in hp2100_cpu5.c (RTE-IV EMA functions) */
-extern t_stat cpu_ema_eres(uint32* rtn,uint32 dtbl,uint32 atbl, t_bool debug);
-extern t_stat cpu_ema_eseg(uint32* rtn,uint32 ir,uint32 tbl, t_bool debug);
-extern t_stat cpu_ema_vset(uint32* rtn,OPS op, t_bool debug);
 
 static const OP_PAT op_vis[16] = {
   OP_N,    OP_AAKAKAKK,OP_AKAKK, OP_AAKK,                /*  .VECT  VPIV   VABS   VSUM   */

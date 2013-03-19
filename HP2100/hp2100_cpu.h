@@ -1,6 +1,6 @@
 /* hp2100_cpu.h: HP 2100 CPU definitions
 
-   Copyright (c) 2005-2010, Robert M. Supnik
+   Copyright (c) 2005-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    be used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Mar-13    JDB     Added declarations for the MP abort handler and CPU registers
    03-Jan-10    RMS     Changed declarations of mp_control, mp_mefvv, for VMS compiler
    15-Jul-08    JDB     Rearranged declarations with hp2100_cpu.c and hp2100_defs.h
    26-Jun-08    JDB     Added mp_control to CPU state externals
@@ -298,6 +299,7 @@ extern uint32    pcq_p;
 extern uint32    stop_inst;
 extern UNIT      cpu_unit;
 extern DEVICE    cpu_dev;
+extern REG       cpu_reg [];
 extern jmp_buf   save_env;
 
 
