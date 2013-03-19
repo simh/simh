@@ -992,18 +992,20 @@ int32 alm( int32 pulse, int32 code, int32 AC )
 
     case ioDIC :    /*  get modem or receiver status  */
         if ( alm_line < qty_max )
+            {
             if ( alm_section )
-            {
-            /*  get modem section status  */
-            if ( qty_ldsc[ alm_line ].xmte )
                 {
-                iodata = 0035 ;                         /*  set CD, CTS, DSR, MDM flags  */
+                /*  get modem section status  */
+                if ( qty_ldsc[ alm_line ].xmte )
+                    {
+                    iodata = 0035 ;                         /*  set CD, CTS, DSR, MDM flags  */
+                    }
                 }
-            }
-        else
-            {
-            /*  get receiver section status  */
-            iodata = 0 ;                                /*  receiver error status - no errors by default  */
+            else
+                {
+                /*  get receiver section status  */
+                iodata = 0 ;                                /*  receiver error status - no errors by default  */
+                }
             }
         break ;
 
