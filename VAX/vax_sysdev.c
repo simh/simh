@@ -1792,6 +1792,11 @@ fprintf (st, "  AUTOGEN (SYS$SYSTEM:MODPARAMS.DAT).  If PHYSICALPAGES is specifi
 fprintf (st, "  it will have to be adjusted before running AUTOGEN to recognize more memory.\n");
 fprintf (st, "  The default value for PHYSICALPAGES is 1048576, which describes 512MB of RAM.\n\n");
 fprintf (st, "Initial memory size is 16MB.\n\n");
+fprintf (st, "The CPU supports the BOOT command and is the only VAX device to do so.  Note\n");
+fprintf (st, "that the behavior of the bootstrap depends on the capabilities of the console\n");
+fprintf (st, "terminal emulator.  If the terminal window supports full VT100 emulation\n");
+fprintf (st, "(including Multilanguage Character Set support), the bootstrap will ask the\n");
+fprintf (st, "user to specify the language; otherwise, it will default to English.\n\n");
 fprintf (st, "The simulator is booted with the BOOT command:\n\n");
 fprintf (st, "   sim> BOOT\n\n");
 return SCPE_OK;
