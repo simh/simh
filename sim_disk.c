@@ -892,6 +892,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         t_seccnt sects = sectors_per_buffer;
 
         if (!copy_buf) {
+            sim_vhd_disk_close(vhd);
             remove (gbuf);
             return SCPE_MEM;
             }
