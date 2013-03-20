@@ -2778,7 +2778,10 @@ if (flag) {
 #if defined(__VMS)
     fprintf (st, "\n\t\tOS: VMS");
 #elif defined(_WIN32)
-    fprintf (st, "\n\t\tOS: Windows");
+    fprintf (st, "\n\t\tOS: Windows: ");
+    fflush (st);
+    system ("ver");
+    system ("echo \t\t%PROCESSOR_IDENTIFIER% - %PROCESSOR_ARCHITECTURE%-%PROCESSOR_ARCHITEW6432%");
 #else
     fprintf (st, "\n\t\tOS: ");
     fflush (st);
