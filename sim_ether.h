@@ -235,6 +235,8 @@ struct eth_device {
   uint32        jumbo_fragmented;                       /* Giant IPv4 Frames Fragmented */
   uint32        jumbo_dropped;                          /* Giant Frames Dropped */
   uint32        jumbo_truncated;                        /* Giant Frames too big for capture buffer - Dropped */
+  uint32        packets_sent;                           /* Total Packets Sent */
+  uint32        packets_received;                       /* Total Packets Received */
   DEVICE*       dptr;                                   /* device ethernet is attached to */
   uint32        dbit;                                   /* debugging bit */
   int           reflections;                            /* packet reflections on interface */

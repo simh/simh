@@ -718,19 +718,7 @@ t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
         fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename, d);
       else
         fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->dptr->units[0].filename);
-      }
-    }
-  if (eth_open_device_count) {
-    int i;
-    char desc[ETH_DEV_DESC_MAX], *d;
-
-    fprintf(st,"Open ETH Devices:\n");
-    for (i=0; i<eth_open_device_count; i++) {
-      d = eth_getdesc_byname(eth_open_devices[i]->name, desc);
-      if (d)
-        fprintf(st, " %-7s%s (%s)\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name, d);
-      else
-        fprintf(st, " %-7s%s\n", eth_open_devices[i]->dptr->name, eth_open_devices[i]->name);
+      eth_show_dev (st, eth_open_devices[i]);
       }
     }
   return SCPE_OK;
@@ -2181,6 +2169,7 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
       break;
 #endif
     }
+  ++dev->packets_sent;              /* basic bookkeeping */
   /* On error, correct loopback bookkeeping */
   if ((status != 0) && loopback_self_frame) {
 #ifdef USE_READER_THREAD
@@ -2804,6 +2793,7 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
 
     pthread_mutex_lock (&dev->lock);
     ethq_insert_data(&dev->read_queue, 2, data, 0, len, crc_len, crc_data, 0);
+    ++dev->packets_received;
     pthread_mutex_unlock (&dev->lock);
     free(moved_data);
     }
@@ -2829,6 +2819,8 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     dev->read_packet->crc_len = 0;
 
   eth_packet_trace (dev, dev->read_packet->msg, dev->read_packet->len, "reading");
+
+  ++dev->packets_received;
 
   /* call optional read callback function */
   if (dev->read_callback)
@@ -3274,22 +3266,26 @@ if (!dev) {
   fprintf(st, "-- Not Attached\n");
   return;
   }
-fprintf(st, "  Name:                  %s\n", dev->name);
-fprintf(st, "  Reflections:           %d\n", dev->reflections);
-fprintf(st, "  Self Loopbacks Sent:   %d\n", dev->loopback_self_sent_total);
-fprintf(st, "  Self Loopbacks Rcvd:   %d\n", dev->loopback_self_rcvd_total);
+fprintf(st, "  Name:                    %s\n", dev->name);
+fprintf(st, "  Reflections:             %d\n", dev->reflections);
+fprintf(st, "  Self Loopbacks Sent:     %d\n", dev->loopback_self_sent_total);
+fprintf(st, "  Self Loopbacks Rcvd:     %d\n", dev->loopback_self_rcvd_total);
 if (dev->have_host_nic_phy_addr) {
   char hw_mac[20];
 
   eth_mac_fmt(&dev->host_nic_phy_hw_addr, hw_mac);
-  fprintf(st, "  Host NIC Address:      %s\n", hw_mac);
+  fprintf(st, "  Host NIC Address:        %s\n", hw_mac);
   }
 if (dev->jumbo_dropped)
-  fprintf(st, "  Jumbo Dropped:         %d\n", dev->jumbo_dropped);
+  fprintf(st, "  Jumbo Dropped:           %d\n", dev->jumbo_dropped);
 if (dev->jumbo_fragmented)
-  fprintf(st, "  Jumbo Fragmented:      %d\n", dev->jumbo_fragmented);
+  fprintf(st, "  Jumbo Fragmented:        %d\n", dev->jumbo_fragmented);
 if (dev->jumbo_truncated)
-  fprintf(st, "  Jumbo Truncated:       %d\n", dev->jumbo_truncated);
+  fprintf(st, "  Jumbo Truncated:         %d\n", dev->jumbo_truncated);
+if (dev->packets_sent)
+  fprintf(st, "  Packets Sent:            %d\n", dev->packets_sent);
+if (dev->packets_received)
+  fprintf(st, "  Packets Received:        %d\n", dev->packets_received);
 #if defined(USE_READER_THREAD)
 fprintf(st, "  Asynch Interrupts:       %s\n", dev->asynch_io?"Enabled":"Disabled");
 if (dev->asynch_io)
