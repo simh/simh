@@ -1052,6 +1052,12 @@ tio.c_iflag = (tio.c_iflag & ~i_clear) | i_set;           /* configure the seria
 tio.c_oflag = (tio.c_oflag & ~o_clear) | o_set;
 tio.c_cflag = (tio.c_cflag & ~c_clear) | c_set;
 tio.c_lflag = (tio.c_lflag & ~l_clear) | l_set;
+#ifdef VMIN
+tio.c_cc[VMIN] = 1;
+#endif
+#ifdef VTIME
+tio.c_cc[VTIME] = 0;
+#endif
 
 #elif 0
 
