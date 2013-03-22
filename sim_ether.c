@@ -1202,7 +1202,7 @@ int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
     return 0;
   }
 }
-#endif
+#endif /* defined(USE_SHARED) && (defined(_WIN32) || defined(HAVE_DLOPEN)) */
 
 /* Some platforms have always had pcap_sendpacket */
 #if defined(_WIN32) || defined(__VMS)

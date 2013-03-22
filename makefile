@@ -156,6 +156,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
             ifneq (,$(LDSEARCH))
               LIBPATH := $(LDSEARCH)
+            else
+              $(info *** Warning ***)
+              $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+              $(info *** Warning *** determined.  This should be resolved before you can expect)
+              $(info *** Warning *** to have fully working simulators.)
+              $(info *** Warning ***)
             endif
             ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
               LIBPATH += /usr/pkg/lib
@@ -219,6 +225,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifeq (BSD,$(findstring BSD,$(OSTYPE)))
         OS_CCDEFS += -DHAVE_DLOPEN=so
         $(info using libdl: $(call find_include,dlfcn))
+      else
+        ifneq (,$(call find_lib,dld))
+          OS_CCDEFS += -DHAVE_DLOPEN=$(LIBEXT)
+          OS_LDFLAGS += -ldld
+          $(info using libdld: $(call find_lib,dld) $(call find_include,dlfcn))
+        endif
       endif
     endif
   endif
