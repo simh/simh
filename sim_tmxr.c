@@ -332,22 +332,22 @@
 /* Telnet protocol constants - negatives are for init'ing signed char data */
 
 /* Commands */
-#define TN_IAC          -1                              /* protocol delim */
-#define TN_DONT         -2                              /* dont */
-#define TN_DO           -3                              /* do */
-#define TN_WONT         -4                              /* wont */
-#define TN_WILL         -5                              /* will */
-#define TN_SB           -6                              /* sub-option negotiation */
-#define TN_GA           -7                              /* go ahead */
-#define TN_EL           -8                              /* erase line */
-#define TN_EC           -9                              /* erase character */
-#define TN_AYT          -10                             /* are you there */
-#define TN_AO           -11                             /* abort output */
-#define TN_IP           -12                             /* interrupt process */
-#define TN_BRK          -13                             /* break */
-#define TN_DATAMK       -14                             /* data mark */
-#define TN_NOP          -15                             /* no operation */
-#define TN_SE           -16                             /* end sub-option negot */
+#define TN_IAC          0xFF /* -1 */                              /* protocol delim */
+#define TN_DONT         0xFE /* -2 */                              /* dont */
+#define TN_DO           0xFD /* -3 */                              /* do */
+#define TN_WONT         0xFC /* -4 */                              /* wont */
+#define TN_WILL         0xFB /* -5 */                              /* will */
+#define TN_SB           0xFA /* -6 */                              /* sub-option negotiation */
+#define TN_GA           0xF9 /* -7 */                              /* go ahead */
+#define TN_EL           0xF8 /* -8 */                              /* erase line */
+#define TN_EC           0xF7 /* -9 */                              /* erase character */
+#define TN_AYT          0xF6 /* -10 */                             /* are you there */
+#define TN_AO           0xF5 /* -11 */                             /* abort output */
+#define TN_IP           0xF4 /* -12 */                             /* interrupt process */
+#define TN_BRK          0xF3 /* -13 */                             /* break */
+#define TN_DATAMK       0xF2 /* -14 */                             /* data mark */
+#define TN_NOP          0xF1 /* -15 */                             /* no operation */
+#define TN_SE           0xF0 /* -16 */                             /* end sub-option negot */
 
 /* Options */
 
@@ -730,7 +730,7 @@ int32 i, j;
 char *address;
 char msg[512];
 uint32 poll_time = sim_os_msec ();
-static char mantra[] = {
+static u_char mantra[] = {
     TN_IAC, TN_WILL, TN_LINE,
     TN_IAC, TN_WILL, TN_SGA,
     TN_IAC, TN_WILL, TN_ECHO,
@@ -1195,7 +1195,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
         if (!lp->notelnet) {                            /* Are we looking for telnet interpretation? */
             for (; j < lp->rxbpi; ) {                   /* loop thru char */
-                signed char tmp = lp->rxb[j];           /* get char */
+                u_char tmp = (u_char)lp->rxb[j];        /* get char */
                 switch (lp->tsta) {                     /* case tlnt state */
 
                 case TNS_NORM:                          /* normal */
@@ -1340,7 +1340,7 @@ tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
         lp->txbpr = (1+lp->txbpr)%lp->txbsz, ++lp->txdrp; \
     }
 if ((lp->txbfd) || (TXBUF_AVAIL(lp) > 1)) {             /* room for char (+ IAC)? */
-    if ((TN_IAC == (char) chr) && (!lp->notelnet))      /* char == IAC in telnet session? */
+    if ((TN_IAC == (u_char) chr) && (!lp->notelnet))      /* char == IAC in telnet session? */
         TXBUF_CHAR (lp, TN_IAC);                        /* stuff extra IAC char */
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
     if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */

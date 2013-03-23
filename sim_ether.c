@@ -2620,7 +2620,7 @@ switch (IP->proto) {
 }
 
 static void
-_eth_fix_ip_xsum_offload(ETH_DEV* dev, u_char* msg, int len)
+_eth_fix_ip_xsum_offload(ETH_DEV* dev, const u_char* msg, int len)
 {
 unsigned short* proto = (unsigned short*) &msg[12];
 struct IPHeader *IP;
@@ -2784,7 +2784,7 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     /* If necessary, fix IP header checksums for packets originated locally */
     /* but were presumed to be traversing a NIC which was going to handle that task */
     /* This must be done before any needed CRC calculation */
-    _eth_fix_ip_xsum_offload(dev, (u_char*)data, len);
+    _eth_fix_ip_xsum_offload(dev, (const u_char*)data, len);
     
     if (dev->need_crc)
       crc_len = eth_get_packet_crc32_data(data, len, crc_data);
