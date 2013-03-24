@@ -43,7 +43,7 @@ struct ROM_File_Descriptor {
    {"VAX/ka620.bin",     "VAX/vax_ka620_bin.h",                  65536,            0xFF7F930F, "vax_ka620_bin"},
    {"VAX/ka630.bin",     "VAX/vax_ka630_bin.h",                  65536,            0xFF7F73EF, "vax_ka630_bin"},
    {"VAX/ka610.bin",     "VAX/vax_ka610_bin.h",                  16384,            0xFFEF3312, "vax_ka610_bin"},
-   {"VAX/vmb.exe",       "VAX/vax_vmb_exe.h",                    44544,            0xFFC014CC, "vax_vmb_exe"},
+   {"VAX/vmb.exe",       "VAX/vax_vmb_exe.h",                    44544,            0xFFC014BB, "vax_vmb_exe"}
    };
 
 
