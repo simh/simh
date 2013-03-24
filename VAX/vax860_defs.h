@@ -85,8 +85,8 @@
 #define VAX860_SID      (4 << 24)                       /* system ID */
 #define VAX860_TYP      (0 << 23)                       /* sys type: 8600 */
 #define VAX865_TYP      (1 << 23)                       /* sys type: 8650 */
-#define VAX860_ECO      (7 << 19)                       /* ucode revision */
-#define VAX860_PLANT    (0 << 12)                       /* plant (Salem NH) */
+#define VAX860_ECO      (7 << 16)                       /* ucode revision */
+#define VAX860_PLANT    (0 << 12)                       /* plant (say we're simh/undefined) */
 #define VAX860_SN       (1234)
 #define CON_HLTPIN      0x0200                          /* external CPU halt */
 #define CON_HLTINS      0x0600                          /* HALT instruction */
@@ -183,14 +183,18 @@
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL,  "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },               \
-                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" },              \
-                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size, NULL, NULL, "Set Memory to 32M bytes" },              \
-                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size, NULL, NULL, "Set Memory to 48M bytes" }, \
-                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size, NULL, NULL, "Set Memory to 64M bytes" },              \
-                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },            \
-                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },            \
-                        { UNIT_MSIZE, (1u << 28) + (1u << 22), NULL, "260M", &cpu_set_size, NULL, NULL, "Set Memory to 260M bytes" }
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL,  "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },                   \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" },                  \
+                        { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size, NULL, NULL, "Set Memory to 32M bytes" },                  \
+                        { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size, NULL, NULL, "Set Memory to 48M bytes" },     \
+                        { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size, NULL, NULL, "Set Memory to 64M bytes" },                  \
+                        { UNIT_MSIZE, (1u << 26) + (1u << 22), NULL, "68M", &cpu_set_size, NULL, NULL, "Set Memory to 68M bytes" },     \
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },                \
+                        { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },                \
+                        { UNIT_MSIZE, (1u << 28) + (1u << 22), NULL, "260M", &cpu_set_size, NULL, NULL, "Set Memory to 260M bytes" },   \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
+
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL=8600|8650",                                  \
                               &cpu_set_model, &cpu_show_model, NULL, "Set/Display processor model" }

@@ -88,6 +88,7 @@ struct boot_dev {
 
 uint32 nexus_req[NEXUS_HLVL];                           /* nexus int req */
 uint32 pamloc = 0;
+uint32 pamm[1024];                                      /* Contents of physical memory space */
 uint32 cswp = 0;
 uint32 ehsr = 0;
 uint32 mdctl = 0;
@@ -127,6 +128,7 @@ char *abus_description (DEVICE *dptr);
 t_stat vax860_boot (int32 flag, char *ptr);
 t_stat vax860_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
+void init_pamm (void);
 
 extern t_stat (*nexusR[NEXUS_NUM])(int32 *dat, int32 ad, int32 md);
 extern t_stat (*nexusW[NEXUS_NUM])(int32 dat, int32 ad, int32 md);
@@ -170,6 +172,13 @@ extern t_stat sbi_wr (int32 pa, int32 val, int32 lnt);
 UNIT abus_unit = { UDATA (NULL, 0, 0) };
 
 REG abus_reg[] = {
+    { GRDATA (PAMLOC,       pamloc, 16, 32, 0) },
+    { GRDATA (CSWP,           cswp, 16, 32, 0) },
+    { GRDATA (EHSR,           ehsr, 16, 32, 0) },
+    { GRDATA (MDCTL,         mdctl, 16, 32, 0) },
+    { GRDATA (MODEL,     sys_model, 16, 32, 0) },
+    { BRDATA (NEXUS_REQ, nexus_req, 16, 32, NEXUS_HLVL) },
+    { BRDATA (PAMM,           pamm, 16, 32, 1024) },
     { NULL }
     };
 
@@ -181,6 +190,84 @@ DEVICE abus_dev = {
     NULL, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
     &abus_description
     };
+
+/* 
+The 8600/8650 systems can have a max to 260MB of memory.
+There are three different memory boards that exists: 4MB, 16MB, and 64MB. 
+In addition, you can mix different boards.
+The rule is to put large boards first, and smaller boards later.
+The 16MB and 64MB boards are stacked and thus take up two backplane slots 
+in the backplane, while the 4MB board only takes up one slot.
+There are 8 slots in the memory backplane. You start by putting boards in 
+slot 0, going to slot 7. The boards taking up two slots actually use slot n, 
+while covering slot n-1. That means that the board in slot 0 does not cover 
+up any other slot.
+If you are using 16MB boards, the max memory is 68MB.
+Slot 0,2,4 and 6 will have 16MB boards. And then you can place a 4MB board in slot 7.
+Same story with the 64MB boards.
+*/
+
+void init_pamm()
+{
+int32 addr = 0;
+int32 mem = (int32)(MEMSIZE >> 20);
+int32 slot = 0;
+int32 size = 0;
+int32 i;
+
+for (i=0; i<1024; i++)
+    pamm[i] = PAMM_NXM;
+
+for (;mem > 0; ) {
+    if (mem >= 64)
+        size = 64;
+    else {
+        if (mem >= 16)
+            size = 16;
+        else
+            size = 4;
+        }
+    if ((size > 4) && (slot > 0))
+        slot++;
+    if (slot < 8) {
+        for (i=0; i<size; i++)
+            pamm[addr++] = slot;
+        }
+    slot++;
+    mem -= size;
+    }
+
+pamm[512] = PAMM_IOA0;
+}
+
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+int32 i, size, addr;
+int32 last_slot = pamm[0];
+
+for (i=size=addr=0; i<1024; i++) {
+    if (last_slot != pamm[i]) {
+        switch (last_slot) {
+            case PAMM_NXM:
+                break;
+            case PAMM_IOA0:
+            case PAMM_IOA1:
+            case PAMM_IOA2:
+            case PAMM_IOA3:
+                fprintf (st, "I/O Adapter %d, %2dMB Board, Address: %08X\n", last_slot-PAMM_IOA0, size, addr);
+                break;
+            default:
+                fprintf (st, "Slot:%2d - %2dMB Board, Address: %08X\n", last_slot, size, addr);
+                break;
+            }
+        addr += (size << 20);
+        size = 0;
+        last_slot = pamm[i];
+        }
+    ++size;
+    }
+return SCPE_OK;
+}
 
 /* Special boot command, overrides regular boot */
 
@@ -345,21 +432,13 @@ switch (rg) {
 
     case MT_SID:                                        /* SID */
         if (sys_model)
-            val = VAX860_SID | VAX865_TYP | VAX860_PLANT | VAX860_SN;
+            val = VAX860_SID | VAX865_TYP | VAX860_ECO | VAX860_PLANT | VAX860_SN;
         else
-            val = VAX860_SID | VAX860_TYP | VAX860_PLANT | VAX860_SN;
+            val = VAX860_SID | VAX860_TYP | VAX860_ECO | VAX860_PLANT | VAX860_SN;
         break;
 
 	case MT_PAMACC:                                     /* PAMACC */
-        if (ADDR_IS_REG (pamloc))
-            val = PAMM_IOA0;                            /* SBIA */
-        else if (ADDR_IS_MEM (pamloc)) {
-            if (MEMSIZE < MAXMEMSIZE)
-                val = (pamloc >> 23);                   /* 4MB Boards */
-            else
-                val = (pamloc >> 25);                   /* 16MB Boards */
-            }
-		else val = PAMM_NXM;                            /* NXM */
+        val = pamm[pamloc >> 20];
         val = val | (pamloc & PAMACC_ADDR);
 		break;
 
@@ -691,6 +770,7 @@ return SCPE_OK;
 t_stat abus_reset (DEVICE *dptr)
 {
 sim_vm_cmd = vax860_cmd;
+init_pamm ();
 return SCPE_OK;
 }
 

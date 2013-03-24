@@ -3249,6 +3249,7 @@ for (i = 0; i < clim; i = i + 4)
 free (M);
 M = nM;
 MEMSIZE = uval; 
+reset_all (0);
 return SCPE_OK;
 }
 
