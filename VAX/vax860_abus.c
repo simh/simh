@@ -192,7 +192,7 @@ DEVICE abus_dev = {
     };
 
 /* 
-The 8600/8650 systems can have a max to 260MB of memory.
+The 8600/8650 systems can have a max of 260MB of memory.
 There are three different memory boards that exists: 4MB, 16MB, and 64MB. 
 In addition, you can mix different boards.
 The rule is to put large boards first, and smaller boards later.
@@ -237,35 +237,46 @@ for (;mem > 0; ) {
     mem -= size;
     }
 
-pamm[512] = PAMM_IOA0;
+for (i=0; i<32; i++)
+    pamm[512+i] = PAMM_IOA0;
 }
 
 t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
-int32 i, size, addr;
-int32 last_slot = pamm[0];
+int32 slot[32];
+int32 base[32];
+int32 i;
+  
+for (i=0; i<32; i++)
+    slot[i] = base[i] = 0;
 
-for (i=size=addr=0; i<1024; i++) {
-    if (last_slot != pamm[i]) {
-        switch (last_slot) {
-            case PAMM_NXM:
-                break;
-            case PAMM_IOA0:
-            case PAMM_IOA1:
-            case PAMM_IOA2:
-            case PAMM_IOA3:
-                fprintf (st, "I/O Adapter %d, %2dMB Board, Address: %08X\n", last_slot-PAMM_IOA0, size, addr);
-                break;
-            default:
-                fprintf (st, "Slot:%2d - %2dMB Board, Address: %08X\n", last_slot, size, addr);
-                break;
-            }
-        addr += (size << 20);
-        size = 0;
-        last_slot = pamm[i];
-        }
-    ++size;
-    }
+for (i=1023; i>=0; i--) {
+    slot[pamm[i]]++;
+    base[pamm[i]] = i;
+}
+
+for (i=0; i<8; i++) {
+    if (slot[i] > 0)
+        fprintf(st, "Memory slot %d (@0x%08x): %d Mbytes.\n", i, base[i] << 20, slot[i]);
+}
+
+for (i=8; i<0x18; i++) {
+    if (slot[i] > 0)
+        fprintf(st, "Unused code %d (@0x%08x): %d Mbytes.\n", i, base[i] << 20, slot[i]);
+}
+
+for (i=0x18; i<0x1c; i++) {
+    if (slot[i] > 0)
+        fprintf(st, "I/O adapter %d (@0x%08x): %d Mbytes.\n", i-0x18, base[i] << 20, slot[i]);
+}
+
+for (i=0x1c; i<0x1f; i++) {
+    if (slot[i] > 0)
+        fprintf(st, "Unused code %d (@0x%08x): %d Mbytes.\n", i, base[i] << 20, slot[i]);
+}
+
+fprintf(st, "Ununsed address space: %d Mbytes.\n", slot[0x1f]);
+
 return SCPE_OK;
 }
 
