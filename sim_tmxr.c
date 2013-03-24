@@ -804,8 +804,8 @@ if (mp->master) {
             lp->ipad = address;                         /* ip address */
             lp->notelnet = mp->notelnet;                /* apply mux default telnet setting */
             if (!lp->notelnet) {
-                sim_write_sock (newsock, mantra, sizeof(mantra));
-                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
+                sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
                 }
             tmxr_report_connection (mp, lp);
             lp->cnms = sim_os_msec ();                  /* time of connection */
@@ -868,8 +868,8 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 lp->sock = newsock;                     /* save socket */
                 lp->ipad = address;                     /* ip address */
                 if (!lp->notelnet) {
-                    sim_write_sock (newsock, mantra, sizeof(mantra));
-                    tmxr_debug (TMXR_DBG_XMT, lp, "Sending", mantra, sizeof(mantra));
+                    sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                    tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
                     }
                 tmxr_report_connection (mp, lp);
                 lp->cnms = sim_os_msec ();              /* time of connection */
