@@ -52,25 +52,11 @@
         221C 0000 - 221F FFFF           Unibus address space, Unibus 7
         2220 0000 - 23FF FFFF           reserved
 
-        2400 0000 - 2401 FFFF           SBI2 adapter space
-        2402 0000 - 240F FFFF           reserved
-        2408 0000 - 2408 00BF           SBI2 registers
-        2408 00C0 - 240F FFFF           reserved
-        2410 0000 - 2413 FFFF           Unibus address space, Unibus 8
-        2414 0000 - 2417 FFFF           Unibus address space, Unibus 9
-        2418 0000 - 241B FFFF           Unibus address space, Unibus 10
-        241C 0000 - 241F FFFF           Unibus address space, Unibus 11
-        2420 0000 - 25FF FFFF           reserved
+        2400 0000 - 25FF FFFF           SBI2 adapter space
 
-        2600 0000 - 2601 FFFF           SBI3 adapter space
-        2602 0000 - 260F FFFF           reserved
-        2608 0000 - 2608 00BF           SBI3 registers
-        2608 00C0 - 260F FFFF           reserved
-        2610 0000 - 2613 FFFF           Unibus address space, Unibus 12
-        2614 0000 - 2617 FFFF           Unibus address space, Unibus 13
-        2618 0000 - 261B FFFF           Unibus address space, Unibus 14
-        261C 0000 - 261F FFFF           Unibus address space, Unibus 15
-        2620 0000 - 3FFF FFFF           reserved
+        2600 0000 - 27FF FFFF           SBI3 adapter space
+
+        2800 0000 - 3FFF FFFF           Not assigned
 */
 
 #ifndef FULL_VAX
