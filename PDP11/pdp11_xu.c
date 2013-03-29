@@ -493,7 +493,7 @@ t_stat xu_process_loopback(CTLR* xu, ETH_PACK* pack)
 
   memcpy (&response.msg[0], &response.msg[offset+2], sizeof(ETH_MAC));
   memcpy (&response.msg[6], physical_address, sizeof(ETH_MAC));
-  offset += 8;
+  offset += 8 - 16; /* Account for the Ethernet Header and Offset value in this number  */
   response.msg[14] = offset & 0xFF;
   response.msg[15] = (offset >> 8) & 0xFF;
 
