@@ -840,6 +840,19 @@ fd_set rw_set, er_set;
 fd_set *rw_p = &rw_set;
 fd_set *er_p = &er_set;
 struct timeval tz;
+struct sockaddr_storage peername;
+#if defined (macintosh) || defined (__linux) || defined (__linux__) || \
+    defined (__APPLE__) || defined (__OpenBSD__) || \
+    defined(__NetBSD__) || defined(__FreeBSD__) || \
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+socklen_t peernamesize = (socklen_t)sizeof(peername);
+#elif defined (_WIN32) || defined (__EMX__) || \
+     (defined (__ALPHA) && defined (__unix__)) || \
+     defined (__hpux)
+int peernamesize = (int)sizeof(peername);
+#else 
+size_t peernamesize = sizeof(peername); 
+#endif
 
 timerclear (&tz);
 FD_ZERO (rw_p);
@@ -849,8 +862,12 @@ FD_SET (sock, er_p);
 if (rd)
     select ((int) sock + 1, rw_p, NULL, er_p, &tz);
 else select ((int) sock + 1, NULL, rw_p, er_p, &tz);
-if (FD_ISSET (sock, rw_p))
-    return 1;
+if (FD_ISSET (sock, rw_p)) {
+    if ((rd) || (0 == getpeername (sock, (struct sockaddr *)&peername, &peernamesize)))
+        return 1;
+    else
+        return -1;
+    }
 if (FD_ISSET (sock, er_p))
     return -1;
 return 0;
