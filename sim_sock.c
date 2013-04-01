@@ -862,14 +862,13 @@ FD_SET (sock, er_p);
 if (rd)
     select ((int) sock + 1, rw_p, NULL, er_p, &tz);
 else select ((int) sock + 1, NULL, rw_p, er_p, &tz);
-if (FD_ISSET (sock, rw_p)) {
-    if ((rd) || (0 == getpeername (sock, (struct sockaddr *)&peername, &peernamesize)))
+if (FD_ISSET (sock, er_p))
+    return -1;
+if (FD_ISSET (sock, rw_p))
+    if (0 == getpeername (sock, (struct sockaddr *)&peername, &peernamesize))
         return 1;
     else
         return -1;
-    }
-if (FD_ISSET (sock, er_p))
-    return -1;
 return 0;
 }
 
