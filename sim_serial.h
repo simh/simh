@@ -46,7 +46,7 @@
 #define INVALID_HANDLE  INVALID_HANDLE_VALUE
 #endif /* !defined(INVALID_HANDLE) */
 
-#elif defined (__unix__) || defined(__APPLE__)  /* UNIX definitions */
+#elif defined (__unix__) || defined (__APPLE__) || defined (__hpux) /* UNIX definitions */
 
 #include <fcntl.h>
 #ifdef __hpux
