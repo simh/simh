@@ -119,14 +119,14 @@ typedef struct {                                        /* unpacked fp number */
 #define FP_BIAS         0200                            /* exponent bias */
 #define FP_N_FHI        27                              /* # of hi frac bits */
 #define FP_V_FHI        0                               /* must be zero */
-#define FP_M_FHI        0000777777777
+#define FP_M_FHI        INT64_C(0000777777777)
 #define FP_N_EXP        8                               /* # of exp bits */
 #define FP_V_EXP        (FP_V_FHI + FP_N_FHI)
 #define FP_M_EXP        0377
 #define FP_V_SIGN       (FP_V_EXP + FP_N_EXP)           /* sign */
 #define FP_N_FLO        35                              /* # of lo frac bits */
 #define FP_V_FLO        0                               /* must be zero */
-#define FP_M_FLO        0377777777777
+#define FP_M_FLO        INT64_C(0377777777777)
 #define GET_FPSIGN(x)   ((int32) (((x) >> FP_V_SIGN) & 1))
 #define GET_FPEXP(x)    ((int32) (((x) >> FP_V_EXP) & FP_M_EXP))
 #define GET_FPHI(x)     ((x) & FP_M_FHI)
@@ -141,14 +141,14 @@ typedef struct {                                        /* unpacked fp number */
 #define FP_V_URNDS      (FP_V_UFHI - 1)                 /* sp round bit */
 #define FP_V_UCRY       (FP_V_UFHI + FP_N_FHI)          /* <63> */
 #define FP_V_UNORM      (FP_V_UCRY - 1)                 /* normalized bit */
-#define FP_UFHI         0x7FFFFFF000000000
-#define FP_UFLO         0x0000000FFFFFFFFE
-#define FP_UFRAC        0x7FFFFFFFFFFFFFFE
-#define FP_URNDD        0x0000000000000001
-#define FP_URNDS        0x0000000800000000
-#define FP_UNORM        0x4000000000000000
-#define FP_UCRY         0x8000000000000000
-#define FP_ONES         0xFFFFFFFFFFFFFFFF
+#define FP_UFHI         INT64_C(0x7FFFFFF000000000)
+#define FP_UFLO         INT64_C(0x0000000FFFFFFFFE)
+#define FP_UFRAC        INT64_C(0x7FFFFFFFFFFFFFFE)
+#define FP_URNDD        INT64_C(0x0000000000000001)
+#define FP_URNDS        INT64_C(0x0000000800000000)
+#define FP_UNORM        INT64_C(0x4000000000000000)
+#define FP_UCRY         INT64_C(0x8000000000000000)
+#define FP_ONES         INT64_C(0xFFFFFFFFFFFFFFFF)
 
 #define UNEG(x)         ((~x) + 1)
 #define DUNEG(x)        x.flo = UNEG (x.flo); x.fhi = ~x.fhi + (x.flo == 0)

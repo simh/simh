@@ -149,16 +149,16 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define MEM_ADDR_NXM(x) ((x) >= MEMSIZE)
 #define VASIZE          18                              /* virtual addr width */
 #define AMASK           ((1 << VASIZE) - 1)             /* virtual addr mask */
-#define LMASK           0777777000000                   /* left mask */
-#define LSIGN           0400000000000                   /* left sign */
-#define RMASK           0000000777777                   /* right mask */
-#define RSIGN           0000000400000                   /* right sign */
-#define DMASK           0777777777777                   /* data mask */
-#define SIGN            0400000000000                   /* sign */
-#define MMASK           0377777777777                   /* magnitude mask */
-#define ONES            0777777777777
-#define MAXPOS          0377777777777
-#define MAXNEG          0400000000000
+#define LMASK           INT64_C(0777777000000)          /* left mask */
+#define LSIGN           INT64_C(0400000000000)          /* left sign */
+#define RMASK           INT64_C(0000000777777)          /* right mask */
+#define RSIGN           INT64_C(0000000400000)          /* right sign */
+#define DMASK           INT64_C(0777777777777)          /* data mask */
+#define SIGN            INT64_C(0400000000000)          /* sign */
+#define MMASK           INT64_C(0377777777777)          /* magnitude mask */
+#define ONES            INT64_C(0777777777777)
+#define MAXPOS          INT64_C(0377777777777)
+#define MAXNEG          INT64_C(0400000000000)
 
 /* Instruction format */
 
@@ -185,11 +185,11 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 /* Byte pointer format */
 
 #define BP_V_P          30                              /* position */
-#define BP_M_P          077
-#define BP_P            0770000000000
+#define BP_M_P          INT64_C(077)
+#define BP_P            INT64_C(0770000000000)
 #define BP_V_S          24                              /* size */
-#define BP_M_S          077
-#define BP_S            0007700000000
+#define BP_M_S          INT64_C(077)
+#define BP_S            INT64_C(0007700000000)
 #define GET_P(x)        ((int32) (((x) >> BP_V_P) & BP_M_P))
 #define GET_S(x)        ((int32) (((x) >> BP_V_S) & BP_M_S))
 #define PUT_P(b,x)      (((b) & ~BP_P) | ((((t_int64) (x)) & BP_M_P) << BP_V_P))
@@ -290,15 +290,15 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 
 /* Page table entry, TOPS-20 paging */
 
-#define PTE_T20_V_TYP   33                              /* T20: pointer type */
-#define PTE_T20_M_TYP   07
+#define PTE_T20_V_TYP   INT64_C(33)                     /* T20: pointer type */
+#define PTE_T20_M_TYP   INT64_C(07)
 #define  T20_NOA         0                              /* no access */
 #define  T20_IMM         1                              /* immediate */
 #define  T20_SHR         2                              /* shared */
 #define  T20_IND         3                              /* indirect */
-#define PTE_T20_W       0020000000000                   /* T20: writeable */
-#define PTE_T20_C       0004000000000                   /* T20: cacheable */
-#define PTE_T20_STM     0000077000000                   /* T20: storage medium */
+#define PTE_T20_W       INT64_C(0020000000000)          /* T20: writeable */
+#define PTE_T20_C       INT64_C(0004000000000)          /* T20: cacheable */
+#define PTE_T20_STM     INT64_C(0000077000000)          /* T20: storage medium */
 #define PTE_T20_V_PMI   18                              /* page map index */
 #define PTE_T20_M_PMI   0777
 #define T20_GETTYP(x)   ((int32) (((x) >> PTE_T20_V_TYP) & PTE_T20_M_TYP))
@@ -306,27 +306,27 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 
 /* CST entry, TOPS-20 paging */
 
-#define CST_AGE         0770000000000                   /* age field */
-#define CST_M           0000000000001                   /* modified */
+#define CST_AGE         INT64_C(0770000000000)          /* age field */
+#define CST_M           INT64_C(0000000000001)          /* modified */
 
 /* Page fail word, DEC paging */
 
-#define PF_USER         0400000000000                   /* user mode */
-#define PF_HARD         0200000000000                   /* nx I/O reg */
-#define PF_NXM          0370000000000                   /* nx memory */
-#define PF_T10_A        0100000000000                   /* T10: pte A bit */
-#define PF_T10_W        0040000000000                   /* T10: pte W bit */
-#define PF_T10_S        0020000000000                   /* T10: pte S bit */
-#define PF_T20_DN       0100000000000                   /* T20: eval done */
-#define PF_T20_M        0040000000000                   /* T20: modified */
-#define PF_T20_W        0020000000000                   /* T20: writeable */
-#define PF_WRITE        0010000000000                   /* write reference */
-#define PF_PUB          0004000000000                   /* pte public bit */
-#define PF_C            0002000000000                   /* pte C bit */
-#define PF_VIRT         0001000000000                   /* pfl: virt ref */
-#define PF_NXMP         0001000000000                   /* nxm: phys ref */
-#define PF_IO           0000200000000                   /* I/O reference */
-#define PF_BYTE         0000020000000                   /* I/O byte ref */
+#define PF_USER         INT64_C(0400000000000)          /* user mode */
+#define PF_HARD         INT64_C(0200000000000)          /* nx I/O reg */
+#define PF_NXM          INT64_C(0370000000000)          /* nx memory */
+#define PF_T10_A        INT64_C(0100000000000)          /* T10: pte A bit */
+#define PF_T10_W        INT64_C(0040000000000)          /* T10: pte W bit */
+#define PF_T10_S        INT64_C(0020000000000)          /* T10: pte S bit */
+#define PF_T20_DN       INT64_C(0100000000000)          /* T20: eval done */
+#define PF_T20_M        INT64_C(0040000000000)          /* T20: modified */
+#define PF_T20_W        INT64_C(0020000000000)          /* T20: writeable */
+#define PF_WRITE        INT64_C(0010000000000)          /* write reference */
+#define PF_PUB          INT64_C(0004000000000)          /* pte public bit */
+#define PF_C            INT64_C(0002000000000)          /* pte C bit */
+#define PF_VIRT         INT64_C(0001000000000)          /* pfl: virt ref */
+#define PF_NXMP         INT64_C(0001000000000)          /* nxm: phys ref */
+#define PF_IO           INT64_C(0000200000000)          /* I/O reference */
+#define PF_BYTE         INT64_C(0000020000000)          /* I/O byte ref */
 
 /* Virtual address, ITS paging */
 
@@ -358,7 +358,7 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 
 /* Page fail word, ITS paging */
 
-#define PF_ITS_WRITE    0010000000000                   /* write reference */
+#define PF_ITS_WRITE    INT64_C(0010000000000)          /* write reference */
 #define PF_ITS_V_ACC    28                              /* access from PTE */
 
 /* Page table fill operations */
@@ -370,16 +370,16 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 
 /* User base register */
 
-#define UBR_SETACB      0400000000000                   /* set AC blocks */
-#define UBR_SETUBR      0100000000000                   /* set UBR */
+#define UBR_SETACB      INT64_C(0400000000000)          /* set AC blocks */
+#define UBR_SETUBR      INT64_C(0100000000000)          /* set UBR */
 #define UBR_V_CURAC     27                              /* current AC block */
 #define UBR_V_PRVAC     24                              /* previous AC block */
 #define UBR_M_AC        07
-#define UBR_ACBMASK     0007700000000
+#define UBR_ACBMASK     INT64_C(0007700000000)
 #define UBR_V_UBR       0                               /* user base register */
 #define UBR_N_UBR       11
 #define UBR_M_UBR       03777
-#define UBR_UBRMASK     0000000003777
+#define UBR_UBRMASK     INT64_C(0000000003777)
 #define UBR_GETCURAC(x) ((int32) (((x) >> UBR_V_CURAC) & UBR_M_AC))
 #define UBR_GETPRVAC(x) ((int32) (((x) >> UBR_V_PRVAC) & UBR_M_AC))
 #define UBR_GETUBR(x)   ((int32) (((x) >> UBR_V_UBR) & PAG_M_PPN))
@@ -467,10 +467,10 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 
 /* Microcode constants */
 
-#define UC_INHCST       0400000000000                   /* inhibit CST update */
-#define UC_UBABLT       0040000000000                   /* BLTBU and BLTUB */
-#define UC_KIPAGE       0020000000000                   /* "KI" paging */
-#define UC_KLPAGE       0010000000000                   /* "KL" paging */
+#define UC_INHCST       INT64_C(0400000000000)          /* inhibit CST update */
+#define UC_UBABLT       INT64_C(0040000000000)          /* BLTBU and BLTUB */
+#define UC_KIPAGE       INT64_C(0020000000000)          /* "KI" paging */
+#define UC_KLPAGE       INT64_C(0010000000000)          /* "KL" paging */
 #define UC_VERDEC       (0130 << 18)                    /* ucode version */
 #define UC_VERITS       (262u << 18)
 #define UC_SERDEC       4097                            /* serial number */

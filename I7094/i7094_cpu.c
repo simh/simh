@@ -975,7 +975,7 @@ while (reason == SCPE_OK) {                             /* loop until error */
                 if (!Read (ea, &SR))
                     break;
                 AC = (AC & AC_S) | ((AC >> 6) & 0017777777777) |
-                    (SR & 0770000000000);
+                    (SR & INT64_C(0770000000000));
                 sc--;
                 }
             if ((sc == 0) && (IR & INST_T_CXR1))

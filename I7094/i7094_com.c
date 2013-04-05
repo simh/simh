@@ -114,8 +114,8 @@
 
 /* Communications output */
 
-#define COMO_LIN12B     0200000000000                   /* line is 12b */
-#define COMO_LINCTL     0100000000000                   /* control msg */
+#define COMO_LIN12B     INT64_C(0200000000000)          /* line is 12b */
+#define COMO_LINCTL     INT64_C(0100000000000)          /* control msg */
 #define COMO_GETLN(x)   (((uint32) ((x) >> 24)) & 0777)
 #define COMO_CTLRST     00000                           /* control reset */
 #define COMO_BITRPT     03777                           /* bit repeat */
@@ -125,20 +125,20 @@
 
 /* Status word (60b) */
 
-#define COMS_PCHK       004000000000000000000           /* prog check */
-#define COMS_DCHK       002000000000000000000           /* data check */
-#define COMS_EXCC       001000000000000000000           /* exc cond */
-#define COMS_MLNT       000040000000000000000           /* message length check */
-#define COMS_CHNH       000020000000000000000           /* channel hold */
-#define COMS_CHNQ       000010000000000000000           /* channel queue full */
-#define COMS_ITMO       000000100000000000000           /* interface timeout */
-#define COMS_DATR       000000004000000000000           /* data message ready */
-#define COMS_INBF       000000002000000000000           /* input buffer free */
-#define COMS_SVCR       000000001000000000000           /* service message ready */
-#define COMS_PALL       000000000000000000000
-#define COMS_DALL       000000000000000000000
-#define COMS_EALL       000000000000000000000
-#define COMS_DYN        000000007000000000000
+#define COMS_PCHK       INT64_C(004000000000000000000)  /* prog check */
+#define COMS_DCHK       INT64_C(002000000000000000000)  /* data check */
+#define COMS_EXCC       INT64_C(001000000000000000000)  /* exc cond */
+#define COMS_MLNT       INT64_C(000040000000000000000)  /* message length check */
+#define COMS_CHNH       INT64_C(000020000000000000000)  /* channel hold */
+#define COMS_CHNQ       INT64_C(000010000000000000000)  /* channel queue full */
+#define COMS_ITMO       INT64_C(000000100000000000000)  /* interface timeout */
+#define COMS_DATR       INT64_C(000000004000000000000)  /* data message ready */
+#define COMS_INBF       INT64_C(000000002000000000000)  /* input buffer free */
+#define COMS_SVCR       INT64_C(000000001000000000000)  /* service message ready */
+#define COMS_PALL       INT64_C(000000000000000000000)
+#define COMS_DALL       INT64_C(000000000000000000000)
+#define COMS_EALL       INT64_C(000000000000000000000)
+#define COMS_DYN        INT64_C(000000007000000000000)
 
 /* Report variables */
 
@@ -558,7 +558,7 @@ switch (com_sta) {                                      /* case on state */
 
     case CHSL_WRS|CHSL_2ND:                             /* write first word */
         dat = com_getob (com_ch);                       /* get word? */
-        if (dat == 0777777777777) {                     /* turn on? */
+        if (dat == INT64_C(0777777777777)) {            /* turn on? */
             com_enab = 1;                               /* enable 7750 */
             com_msgn = 0;                               /* init message # */
             com_end (com_ch, 0, CHSL_WRS|CHSL_4TH);     /* end, last state */

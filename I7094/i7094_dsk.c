@@ -143,12 +143,12 @@
 /* Track/record structure */
 
 #define THA2            0                               /* home address 2 */
-#define HA2_MASK        0777700000000                   /* two chars checked */
+#define HA2_MASK        INT64_C(0777700000000)          /* two chars checked */
 #define T1STREC         1                               /* start of records */
 #define RLNT            0                               /* record length */
 #define RADDR           1                               /* record address */
 #define RDATA           2                               /* start of data */
-#define REC_MASK        0171717177777                   /* 4 digits, 2 chars */
+#define REC_MASK        INT64_C(0171717177777)          /* 4 digits, 2 chars */
 
 /* Command word (60b) - 10 BCD digits */
 
@@ -167,27 +167,27 @@
 
 /* Status word (60b) */
 
-#define DSKS_PCHK       004000000000000000000           /* prog check */
-#define DSKS_DCHK       002000000000000000000           /* data check */
-#define DSKS_EXCC       001000000000000000000           /* exc cond */
-#define DSKS_INVS       000200000000000000000           /* invalid seq */
-#define DSKS_INVC       000040000000000000000           /* invalid opcode */
-#define DSKS_FMTC       000020000000000000000           /* format check */
-#define DSKS_NRCF       000010000000000000000           /* no record found */
-#define DSKS_INVA       000002000000000000000           /* invalid address */
-#define DSKS_RSPC       000000400000000000000           /* response check */
-#define DSKS_CMPC       000000200000000000000           /* compare check */
-#define DSKS_PARC       000000100000000000000           /* parity check */
-#define DSKS_ACCI       000000020000000000000           /* access inoperative */
-#define DSKS_ACCN       000000004000000000000           /* access not ready */
-#define DSKS_DSKE       000000002000000000000           /* disk error */
-#define DSKS_FILE       000000001000000000000           /* file error */
-#define DSKS_6B         000000000040000000000           /* six bit mode */
-#define DSKS_ATN0       000000000002000000000           /* attention start */
-#define DSKS_PALL       000777000000000000000
-#define DSKS_DALL       000000740000000000000
-#define DSKS_EALL       000000037000000000000
-#define DSKS_ALLERR     007777777000000000000
+#define DSKS_PCHK       INT64_C(004000000000000000000)  /* prog check */
+#define DSKS_DCHK       INT64_C(002000000000000000000)  /* data check */
+#define DSKS_EXCC       INT64_C(001000000000000000000)  /* exc cond */
+#define DSKS_INVS       INT64_C(000200000000000000000)  /* invalid seq */
+#define DSKS_INVC       INT64_C(000040000000000000000)  /* invalid opcode */
+#define DSKS_FMTC       INT64_C(000020000000000000000)  /* format check */
+#define DSKS_NRCF       INT64_C(000010000000000000000)  /* no record found */
+#define DSKS_INVA       INT64_C(000002000000000000000)  /* invalid address */
+#define DSKS_RSPC       INT64_C(000000400000000000000)  /* response check */
+#define DSKS_CMPC       INT64_C(000000200000000000000)  /* compare check */
+#define DSKS_PARC       INT64_C(000000100000000000000)  /* parity check */
+#define DSKS_ACCI       INT64_C(000000020000000000000)  /* access inoperative */
+#define DSKS_ACCN       INT64_C(000000004000000000000)  /* access not ready */
+#define DSKS_DSKE       INT64_C(000000002000000000000)  /* disk error */
+#define DSKS_FILE       INT64_C(000000001000000000000)  /* file error */
+#define DSKS_6B         INT64_C(000000000040000000000)  /* six bit mode */
+#define DSKS_ATN0       INT64_C(000000000002000000000)  /* attention start */
+#define DSKS_PALL       INT64_C(000777000000000000000)
+#define DSKS_DALL       INT64_C(000000740000000000000)
+#define DSKS_EALL       INT64_C(000000037000000000000)
+#define DSKS_ALLERR     INT64_C(007777777000000000000)
 
 /* Commands - opcode 0 */
 
@@ -210,7 +210,7 @@
 
 /* CTSS record structure */
 
-#define CTSS_HA2        0676767676767                   /* =HXXXXXX */
+#define CTSS_HA2        INT64_C(0676767676767)          /* =HXXXXXX */
 #define CTSS_RLNT       435                             /* data record */
 #define CTSS_D1LNT      31                              /* padding */
 #define CTSS_D2LNT      14
@@ -485,7 +485,7 @@ else {
 
     case CHSL_CTL:                                      /* control */
         dsk_cmd = val << 24;
-        if (val & 0100000000000) {                      /* need 2nd word? */
+        if (val & INT64_C(0100000000000)) {             /* need 2nd word? */
             ch_req |= REQ_CH (ch);                      /* req ch for 2nd */
             dsk_sta = CHSL_CTL|CHSL_2ND;                /* next state */
             return SCPE_OK;

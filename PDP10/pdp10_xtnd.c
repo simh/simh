@@ -89,10 +89,10 @@
 
 /* Translation control */
 
-#define XT_LFLG         0400000000000                   /* L flag */
-#define XT_SFLG         0400000000000                   /* S flag */
-#define XT_NFLG         0200000000000                   /* N flag */
-#define XT_MFLG         0100000000000                   /* M flag */
+#define XT_LFLG         INT64_C(0400000000000)          /* L flag */
+#define XT_SFLG         INT64_C(0400000000000)          /* S flag */
+#define XT_NFLG         INT64_C(0200000000000)          /* N flag */
+#define XT_MFLG         INT64_C(0100000000000)          /* M flag */
 
 /* Translation table */
 
@@ -104,10 +104,10 @@
 
 /* AC masks */
 
-#define XLNTMASK        0000777777777                   /* length */
-#define XFLGMASK        0700000000000                   /* flags */
-#define XT_MBZ          0777000000000                   /* must be zero */
-#define XT_MBZE         0047777000000                   /* must be zero, edit */
+#define XLNTMASK        INT64_C(0000777777777)          /* length */
+#define XFLGMASK        INT64_C(0700000000000)          /* flags */
+#define XT_MBZ          INT64_C(0777000000000)          /* must be zero */
+#define XT_MBZE         INT64_C(0047777000000)          /* must be zero, edit */
 
 /* Register change log */
 
@@ -122,7 +122,7 @@
 
 #define ED_V_PBYN       30                              /* pattern byte # */
 #define ED_M_PBYN       03
-#define ED_PBYNO        0040000000000                   /* overflow bit */
+#define ED_PBYNO        INT64_C(0040000000000)          /* overflow bit */
 #define ED_GETPBYN(x)   ((int32) (((x) >> ED_V_PBYN) & ED_M_PBYN))
 #define ED_V_POPC       6                               /* pattern byte opcode */
 #define ED_M_PAT        0777                            /* pattern byte mask */
@@ -155,29 +155,29 @@ d10 xlate (d10 by, a10 tblad, d10 *xflgs, int32 pflgs);
 void filldst (d10 fill, int32 ac, d10 cnt, int32 pflgs);
 
 static const d10 pwrs10[23][2] = {
-           0,           0,
-           0,           1,
-           0,          10,
-           0,         100,
-           0,        1000,
-           0,       10000,
-           0,      100000,
-           0,     1000000,
-           0,    10000000,
-           0,   100000000,
-           0,  1000000000,
-           0, 10000000000,
-           2, 31280523264,
-          29,  3567587328,
-         291,  1316134912,
-        2910, 13161349120,
-       29103, 28534276096,
-      291038, 10464854016,
-     2910383,  1569325056,
-    29103830, 15693250560,
-   291038304, 19493552128,
-  2910383045, 23136829440,
- 29103830456, 25209864192
+           INT64_C(0),           INT64_C(0),
+           INT64_C(0),           INT64_C(1),
+           INT64_C(0),          INT64_C(10),
+           INT64_C(0),         INT64_C(100),
+           INT64_C(0),        INT64_C(1000),
+           INT64_C(0),       INT64_C(10000),
+           INT64_C(0),      INT64_C(100000),
+           INT64_C(0),     INT64_C(1000000),
+           INT64_C(0),    INT64_C(10000000),
+           INT64_C(0),   INT64_C(100000000),
+           INT64_C(0),  INT64_C(1000000000),
+           INT64_C(0), INT64_C(10000000000),
+           INT64_C(2), INT64_C(31280523264),
+          INT64_C(29),  INT64_C(3567587328),
+         INT64_C(291),  INT64_C(1316134912),
+        INT64_C(2910), INT64_C(13161349120),
+       INT64_C(29103), INT64_C(28534276096),
+      INT64_C(291038), INT64_C(10464854016),
+     INT64_C(2910383),  INT64_C(1569325056),
+    INT64_C(29103830), INT64_C(15693250560),
+   INT64_C(291038304), INT64_C(19493552128),
+  INT64_C(2910383045), INT64_C(23136829440),
+ INT64_C(29103830456), INT64_C(25209864192)
  };
 
 int xtend (int32 ac, int32 ea, int32 pflgs)

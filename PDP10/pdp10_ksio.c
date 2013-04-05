@@ -520,8 +520,8 @@ for ( ; ba < lim; ba++) {                               /* by bytes */
         }
     val = *buf++;                                       /* get data */
     if (ba & 2)
-        M[pa10] = (M[pa10] & 0777777600000) | val;
-    else M[pa10] = (M[pa10] & 0600000777777) | (val << 18);
+        M[pa10] = (M[pa10] & INT64_C(0777777600000)) | val;
+    else M[pa10] = (M[pa10] & INT64_C(0600000777777)) | (val << 18);
     }
 return 0;
 }

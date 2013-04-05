@@ -173,6 +173,9 @@ typedef unsigned long           t_uint64;
 #define t_int64                 signed long long
 #define t_uint64                unsigned long long
 #endif                                                  /* end 64b */
+#ifndef INT64_C
+#define INT64_C(x)		x ## LL
+#endif
 
 #if defined (USE_INT64)                                 /* 64b data */
 typedef t_int64         t_svalue;                       /* signed value */

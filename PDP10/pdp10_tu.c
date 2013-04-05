@@ -1194,79 +1194,79 @@ return sim_tape_detach (uptr);
 #define BOOT_LEN (sizeof (boot_rom_dec) / sizeof (d10))
 
 static const d10 boot_rom_dec[] = {
-    0515040000003,                          /* boot:hrlzi 1,3       ; uba # */
-    0201000040001,                          /*      movei 0,40001   ; vld,pg 1 */
-    0713001000000+(IOBA_UBMAP+1 & RMASK),   /*      wrio 0,763001(1); set ubmap */
-    0435040000000+(IOBA_TU & RMASK),        /*      iori 1,772440   ; rh addr */
-    0202040000000+FE_RHBASE,                /*      movem 1,FE_RHBASE */
-    0201000000040,                          /*      movei 0,40      ; ctrl reset */
-    0713001000010,                          /*      wrio 0,10(1)    ; ->MTFS */
-    0201100000031,                          /*      movei 2,31      ; space f */
-    0265740377014,                          /*      jsp 17,tpop     ; skip ucode */
-    0201100000071,                          /*      movei 2,71      ; read f */
-    0265740377014,                          /*      jsp 17,tpop     ; read boot */
-    0254000001000,                          /*      jrst 1000       ; start */
-    0200000000000+FE_MTFMT,                 /* tpop:move 0,FE_MTFMT ; den,fmt,slv */
-    0713001000032,                          /*      wrio 0,32(1)    ; ->MTTC */
-    0201000000011,                          /*      movei 0,11      ; clr+go */
-    0713001000000,                          /*      wrio 0,0(1)     ; ->MTCS1 */
-    0201140176000,                          /*      movei 3,176000  ; wd cnt */
-    0201200004000,                          /*      movei 4,4000    ; addr */
-    0200240000000+FE_MTFMT,                 /*      move 5,FE_MTFMT ; unit */
-    0201300000000,                          /*      movei 6,0       ; fmtr */
-    0713141000002,                          /*      wrio 3,2(1)     ; ->MTWC */
-    0713201000004,                          /*      wrio 4,4(1)     ; ->MTBA */
-    0713301000006,                          /*      wrio 6,6(1)     ; ->MTFC */
-    0713301000010,                          /*      wrio 6,10(1)    ; ->MTFS */
-    0713241000032,                          /*      wrio 5,32(1)    ; ->MTTC */
-    0713101000000,                          /*      wrio 2,0(1)     ; ->MTCS1 */
-    0712341000012,                          /*      rdio 7,12(1)    ; read FS */
-    0606340000200,                          /*      trnn 7,200      ; test rdy */
-    0254000377032,                          /*      jrst .-2        ; loop */
-    0606340040000,                          /*      trnn 7,40000    ; test err */
-    0254017000000,                          /*      jrst 0(17)      ; return */
-    0712341000014,                          /*      rdio 7,14(1)    ; read err */
-    0302340001000,                          /*      caie 7,1000     ; fce? */
-    0254200377052,                          /*      halt */
-    0254017000000,                          /*      jrst 0(17)      ; return */
+    INT64_C(0515040000003),                 /* boot:hrlzi 1,3       ; uba # */
+    INT64_C(0201000040001),                 /*      movei 0,40001   ; vld,pg 1 */
+    INT64_C(0713001000000)+(IOBA_UBMAP+1 & RMASK),   /*      wrio 0,763001(1); set ubmap */
+    INT64_C(0435040000000)+(IOBA_TU & RMASK),        /*      iori 1,772440   ; rh addr */
+    INT64_C(0202040000000)+FE_RHBASE,       /*      movem 1,FE_RHBASE */
+    INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
+    INT64_C(0713001000010),                 /*      wrio 0,10(1)    ; ->MTFS */
+    INT64_C(0201100000031),                 /*      movei 2,31      ; space f */
+    INT64_C(0265740377014),                 /*      jsp 17,tpop     ; skip ucode */
+    INT64_C(0201100000071),                 /*      movei 2,71      ; read f */
+    INT64_C(0265740377014),                 /*      jsp 17,tpop     ; read boot */
+    INT64_C(0254000001000),                 /*      jrst 1000       ; start */
+    INT64_C(0200000000000)+FE_MTFMT,        /* tpop:move 0,FE_MTFMT ; den,fmt,slv */
+    INT64_C(0713001000032),                 /*      wrio 0,32(1)    ; ->MTTC */
+    INT64_C(0201000000011),                 /*      movei 0,11      ; clr+go */
+    INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->MTCS1 */
+    INT64_C(0201140176000),                 /*      movei 3,176000  ; wd cnt */
+    INT64_C(0201200004000),                 /*      movei 4,4000    ; addr */
+    INT64_C(0200240000000)+FE_MTFMT,        /*      move 5,FE_MTFMT ; unit */
+    INT64_C(0201300000000),                 /*      movei 6,0       ; fmtr */
+    INT64_C(0713141000002),                 /*      wrio 3,2(1)     ; ->MTWC */
+    INT64_C(0713201000004),                 /*      wrio 4,4(1)     ; ->MTBA */
+    INT64_C(0713301000006),                 /*      wrio 6,6(1)     ; ->MTFC */
+    INT64_C(0713301000010),                 /*      wrio 6,10(1)    ; ->MTFS */
+    INT64_C(0713241000032),                 /*      wrio 5,32(1)    ; ->MTTC */
+    INT64_C(0713101000000),                 /*      wrio 2,0(1)     ; ->MTCS1 */
+    INT64_C(0712341000012),                 /*      rdio 7,12(1)    ; read FS */
+    INT64_C(0606340000200),                 /*      trnn 7,200      ; test rdy */
+    INT64_C(0254000377032),                 /*      jrst .-2        ; loop */
+    INT64_C(0606340040000),                 /*      trnn 7,40000    ; test err */
+    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+    INT64_C(0712341000014),                 /*      rdio 7,14(1)    ; read err */
+    INT64_C(0302340001000),                 /*      caie 7,1000     ; fce? */
+    INT64_C(0254200377052),                 /*      halt */
+    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
     };
 
 static const d10 boot_rom_its[] = {
-    0515040000003,                          /* boot:hrlzi 1,3       ; uba # - not used */
-    0201000040001,                          /*      movei 0,40001   ; vld,pg 1 */
-    0714000000000+(IOBA_UBMAP+1 & RMASK),   /*      iowri 0,763001  ; set ubmap */
-    0435040000000+(IOBA_TU & RMASK),        /*      iori 1,772440   ; rh addr */
-    0202040000000+FE_RHBASE,                /*      movem 1,FE_RHBASE */
-    0201000000040,                          /*      movei 0,40      ; ctrl reset */
-    0714001000010,                          /*      iowri 0,10(1)   ; ->MTFS */
-    0201100000031,                          /*      movei 2,31      ; space f */
-    0265740377014,                          /*      jsp 17,tpop     ; skip ucode */
-    0201100000071,                          /*      movei 2,71      ; read f */
-    0265740377014,                          /*      jsp 17,tpop     ; read boot */
-    0254000001000,                          /*      jrst 1000       ; start */
-    0200000000000+FE_MTFMT,                 /* tpop:move 0,FE_MTFMT ; den,fmt,slv */
-    0714001000032,                          /*      iowri 0,32(1)   ; ->MTTC */
-    0201000000011,                          /*      movei 0,11      ; clr+go */
-    0714001000000,                          /*      iowri 0,0(1)    ; ->MTCS1 */
-    0201140176000,                          /*      movei 3,176000  ; wd cnt */
-    0201200004000,                          /*      movei 4,4000    ; addr */
-    0200240000000+FE_MTFMT,                 /*      move 5,FE_MTFMT ; unit */
-    0201300000000,                          /*      movei 6,0       ; fmtr */
-    0714141000002,                          /*      iowri 3,2(1)    ; ->MTWC */
-    0714201000004,                          /*      iowri 4,4(1)    ; ->MTBA */
-    0714301000006,                          /*      iowri 6,6(1)    ; ->MTFC */
-    0714301000010,                          /*      iowri 6,10(1)   ; ->MTFS */
-    0714241000032,                          /*      iowri 5,32(1)   ; ->MTTC */
-    0714101000000,                          /*      iowri 2,0(1)    ; ->MTCS1 */
-    0710341000012,                          /*      iordi 7,12(1)   ; read FS */
-    0606340000200,                          /*      trnn 7,200      ; test rdy */
-    0254000377032,                          /*      jrst .-2        ; loop */
-    0606340040000,                          /*      trnn 7,40000    ; test err */
-    0254017000000,                          /*      jrst 0(17)      ; return */
-    0710341000014,                          /*      iordi 7,14(1)   ; read err */
-    0302340001000,                          /*      caie 7,1000     ; fce? */
-    0254200377052,                          /*      halt */
-    0254017000000,                          /*      jrst 0(17)      ; return */
+    INT64_C(0515040000003),                 /* boot:hrlzi 1,3       ; uba # - not used */
+    INT64_C(0201000040001),                 /*      movei 0,40001   ; vld,pg 1 */
+    INT64_C(0714000000000)+(IOBA_UBMAP+1 & RMASK),   /*      iowri 0,763001  ; set ubmap */
+    INT64_C(0435040000000)+(IOBA_TU & RMASK),        /*      iori 1,772440   ; rh addr */
+    INT64_C(0202040000000)+FE_RHBASE,       /*      movem 1,FE_RHBASE */
+    INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
+    INT64_C(0714001000010),                 /*      iowri 0,10(1)   ; ->MTFS */
+    INT64_C(0201100000031),                 /*      movei 2,31      ; space f */
+    INT64_C(0265740377014),                 /*      jsp 17,tpop     ; skip ucode */
+    INT64_C(0201100000071),                 /*      movei 2,71      ; read f */
+    INT64_C(0265740377014),                 /*      jsp 17,tpop     ; read boot */
+    INT64_C(0254000001000),                 /*      jrst 1000       ; start */
+    INT64_C(0200000000000)+FE_MTFMT,        /* tpop:move 0,FE_MTFMT ; den,fmt,slv */
+    INT64_C(0714001000032),                 /*      iowri 0,32(1)   ; ->MTTC */
+    INT64_C(0201000000011),                 /*      movei 0,11      ; clr+go */
+    INT64_C(0714001000000),                 /*      iowri 0,0(1)    ; ->MTCS1 */
+    INT64_C(0201140176000),                 /*      movei 3,176000  ; wd cnt */
+    INT64_C(0201200004000),                 /*      movei 4,4000    ; addr */
+    INT64_C(0200240000000)+FE_MTFMT,        /*      move 5,FE_MTFMT ; unit */
+    INT64_C(0201300000000),                 /*      movei 6,0       ; fmtr */
+    INT64_C(0714141000002),                 /*      iowri 3,2(1)    ; ->MTWC */
+    INT64_C(0714201000004),                 /*      iowri 4,4(1)    ; ->MTBA */
+    INT64_C(0714301000006),                 /*      iowri 6,6(1)    ; ->MTFC */
+    INT64_C(0714301000010),                 /*      iowri 6,10(1)   ; ->MTFS */
+    INT64_C(0714241000032),                 /*      iowri 5,32(1)   ; ->MTTC */
+    INT64_C(0714101000000),                 /*      iowri 2,0(1)    ; ->MTCS1 */
+    INT64_C(0710341000012),                 /*      iordi 7,12(1)   ; read FS */
+    INT64_C(0606340000200),                 /*      trnn 7,200      ; test rdy */
+    INT64_C(0254000377032),                 /*      jrst .-2        ; loop */
+    INT64_C(0606340040000),                 /*      trnn 7,40000    ; test err */
+    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+    INT64_C(0710341000014),                 /*      iordi 7,14(1)   ; read err */
+    INT64_C(0302340001000),                 /*      caie 7,1000     ; fce? */
+    INT64_C(0254200377052),                 /*      halt */
+    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
     };
 
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
