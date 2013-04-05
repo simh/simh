@@ -178,8 +178,8 @@
 
 #define MAXMEMWIDTH     25                              /* max mem, 4MB boards */
 #define MAXMEMSIZE      (1 << MAXMEMWIDTH)
-#define MAXMEMWIDTH_X   28                              /* max mem, 64MB boards */
-#define MAXMEMSIZE_X    ((1 << MAXMEMWIDTH_X) + (1 << 22)) /* 8 64MB + 1 4MB */
+#define MAXMEMWIDTH_X   29                              /* max mem space using non-existant 256MB boards */
+#define MAXMEMSIZE_X    (1 << MAXMEMWIDTH_X)
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
@@ -192,6 +192,7 @@
                         { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },                \
                         { UNIT_MSIZE, (1u << 28), NULL, "256M", &cpu_set_size, NULL, NULL, "Set Memory to 256M bytes" },                \
                         { UNIT_MSIZE, (1u << 28) + (1u << 22), NULL, "260M", &cpu_set_size, NULL, NULL, "Set Memory to 260M bytes" },   \
+                        { UNIT_MSIZE, (1u << 29), NULL, "512M", &cpu_set_size, NULL, NULL, "Set Memory to 512M bytes" },                \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 
