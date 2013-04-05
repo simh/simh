@@ -2405,7 +2405,7 @@ t_value sim_eval;
 sim_eval = ir;
 if (pc & HIST_PC) {                                     /* instruction? */
     fputs ("CPU ", st);
-    fprintf (st, "%05o ", pc & AMASK);
+    fprintf (st, "%05o ", (int)(pc & AMASK));
     if (rpt == 0)
         fprintf (st, "       ");
     else if (rpt < 1000000)
@@ -2433,9 +2433,9 @@ if (pc & HIST_PC) {                                     /* instruction? */
     }                                                   /* end if instruction */
 else if ((ch = HIST_CH (pc))) {                         /* channel? */
     fprintf (st, "CH%c ", 'A' + ch - 1);
-    fprintf (st, "%05o  ", pc & AMASK);
+    fprintf (st, "%05o  ", (int)(pc & AMASK));
     fputs ("                                              ", st);
-    fprintf (st, "%05o  ", ea & AMASK);
+    fprintf (st, "%05o  ", (int)(ea & AMASK));
     if (fprint_sym (st, pc & AMASK, &sim_eval, &cpu_unit,
         (ch_dev[ch - 1].flags & DEV_7909)? SWMASK ('N'): SWMASK ('I')) > 0) {
         fputs ("(undefined) ", st);
