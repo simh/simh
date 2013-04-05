@@ -2560,6 +2560,7 @@ else {
                  (mptr->pstring && (MATCH_CMD (gbuf, mptr->pstring) == 0))) ||
                 (!(mptr->mask & MTAB_VDV) && (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)))) {
                 dptr = sim_dflt_dev;
+                lvl = MTAB_VDV;                         /* device match */
                 cptr -= strlen (gbuf) + 1;
                 while (isspace(*cptr))
                     ++cptr;

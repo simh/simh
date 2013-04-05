@@ -73,7 +73,7 @@ DEVICE mctl_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &mctl_reset,
     NULL, NULL, NULL,
-    &mctl_dib, DEV_Q18, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
+    &mctl_dib, DEV_QBUS, 0, NULL, NULL, NULL, NULL, NULL, NULL, 
     &mctl_description
     };
 
@@ -119,3 +119,30 @@ void rom_wr_B (int32 pa, int32 val)
 return;
 }
 
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+uint32 memsize = (uint32)(MEMSIZE>>10);
+uint32 baseaddr = 0;
+uint32 csraddr = mctl_dib.ba;
+struct {
+    uint32 capacity;
+    char *option;
+    } boards[] = {
+        {  4096, "MSV11-QC"},
+        {  2048, "MSV11-QB"},
+        {  1024, "MSV11-QA"}, 
+        {   512, "MSV11-PL"}, 
+        {   256, "MSV11-PK"}, 
+        {     0, NULL}};
+int32 i;
+
+while (memsize) {
+    for (i=0; boards[i].capacity > memsize; ++i)
+        ;
+    fprintf(st, "Memory (0x%08x): %3d %sbytes (%s) - CSR: 0x%08x.\n", baseaddr, boards[i].capacity/((boards[i].capacity >= 1024) ? 1024 : 1), (boards[i].capacity >= 1024) ? "M" : "K", boards[i].option, csraddr);
+    memsize -= boards[i].capacity;
+    baseaddr += boards[i].capacity*1024;
+    csraddr += (boards[i].capacity/256)*2;
+    }
+return SCPE_OK;
+}
