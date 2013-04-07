@@ -821,7 +821,7 @@ FILE *(*open_function)(const char *filename, const char *mode) = sim_fopen;
 FILE *(*create_function)(const char *filename, t_offset desiredsize) = NULL;
 t_offset (*size_function)(FILE *file);
 t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable) = NULL;
-t_bool created = FALSE;
+t_bool created = FALSE, copied = FALSE;
 t_bool auto_format = FALSE;
 t_offset capac;
 
@@ -978,6 +978,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         sim_disk_detach (uptr);
         if (r == SCPE_OK) {
             created = TRUE;
+            copied = TRUE;
             strcpy (cptr, gbuf);
             sim_disk_set_fmt (uptr, 0, "VHD", NULL);
             sim_switches = saved_sim_switches;
@@ -1098,7 +1099,7 @@ uptr->pos = 0;
 if (storage_function)
     storage_function (uptr->fileref, &ctx->storage_sector_size, &ctx->removable);
 
-if (created) {
+if ((created) && (!copied)) {
     t_stat r = SCPE_OK;
     uint8 *secbuf = calloc (1, ctx->sector_size);       /* alloc temp sector buf */
 
