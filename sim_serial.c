@@ -170,6 +170,16 @@ for (i=0; i<serial_open_device_count; ++i)
 return NULL;
 }
 
+static struct open_serial_device *_get_open_device_byname (const char *name)
+{
+int i;
+
+for (i=0; i<serial_open_device_count; ++i)
+    if (0 == strcmp(name, serial_open_devices[i].name))
+        return &serial_open_devices[i];
+return NULL;
+}
+
 static struct open_serial_device *_serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *config)
 {
 serial_open_devices = realloc(serial_open_devices, (++serial_open_device_count)*sizeof(*serial_open_devices));
@@ -419,6 +429,12 @@ else {
         if (savname == NULL) /* didn't translate */
             savname = devname;
         }
+    }
+
+if (_get_open_device_byname (savname)) {
+    if (stat)
+        *stat = SCPE_OPENERR;
+    return INVALID_HANDLE;
     }
 
 port = sim_open_os_serial (savname);
