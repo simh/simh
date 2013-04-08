@@ -98,12 +98,15 @@
 #define INITMEMSIZE     (1 << 24)                       /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },                \
-                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },                \
-                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },                \
-                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },                \
-                        { UNIT_MSIZE, (1u << 23) + (1u << 22), NULL, "12M", &cpu_set_size, NULL, NULL, "Set Memory to 12M bytes" }, \
-                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" }
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },                             \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },                             \
+                        { UNIT_MSIZE, (1u << 21) + (1u << 20), NULL, "3M", &cpu_set_size, NULL, NULL, "Set Memory to 3M bytes" },                \
+                        { UNIT_MSIZE, (1u << 22) + (1u << 20), NULL, "5M", &cpu_set_size, NULL, NULL, "Set Memory to 5M bytes" },                \
+                        { UNIT_MSIZE, (1u << 23) + (1u << 20), NULL, "9M", &cpu_set_size, NULL, NULL, "Set Memory to 9M bytes" },                \
+                        { UNIT_MSIZE, (1u << 23) + (1u << 22) + (1u << 20), NULL, "13M", &cpu_set_size, NULL, NULL, "Set Memory to 13M bytes" }, \
+                        { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" },                           \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL",      NULL,                            \
                               NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" },             \
                             { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}",                     \

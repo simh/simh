@@ -139,7 +139,7 @@ int32 i;
 while (memsize) {
     for (i=0; boards[i].capacity > memsize; ++i)
         ;
-    fprintf(st, "Memory (0x%08x): %3d %sbytes (%s) - CSR: 0x%08x.\n", baseaddr, boards[i].capacity/((boards[i].capacity >= 1024) ? 1024 : 1), (boards[i].capacity >= 1024) ? "M" : "K", boards[i].option, csraddr);
+    fprintf(st, "Memory (@0x%08x): %3d %sbytes (%s) - CSR: 0x%08x.\n", baseaddr, boards[i].capacity/((boards[i].capacity >= 1024) ? 1024 : 1), (boards[i].capacity >= 1024) ? "M" : "K", boards[i].option, csraddr);
     memsize -= boards[i].capacity;
     baseaddr += boards[i].capacity*1024;
     csraddr += (boards[i].capacity/256)*2;

@@ -258,7 +258,7 @@ struct {
         {  4, "MS86-B"}, 
         { 16, "MS86-C"},
         { 64, "MS86-D"},
-        {256, "MS86-E"},    /* Fake 256MB board which never existed */
+        {256, "MS86-E (board never existed)"},  /* Fake 256MB board */
         {  0, NULL}};
 int32 i, j;
   

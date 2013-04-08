@@ -141,15 +141,22 @@
 
 #define MAXMEMWIDTH     21                              /* max mem, 16k chips */
 #define MAXMEMSIZE      (1 << MAXMEMWIDTH)
-#define MAXMEMWIDTH_X   23                              /* max mem, 64k chips */
-#define MAXMEMSIZE_X    (1 << MAXMEMWIDTH_X)
+#define MAXMEMWIDTH_Y   23                              /* max mem, 64k chips */
+#define MAXMEMSIZE_Y    (1 << MAXMEMWIDTH_Y)
+#define MAXMEMWIDTH_X   24                              /* max mem, 256k chips */
+#define MAXMEMSIZE_X    ((1 << MAXMEMWIDTH_X) - (1 << 20)) /* 15M Max before interfering with Register Space */
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" }, \
-                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" }, \
-                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" }, \
-                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" }
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },   \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },   \
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },   \
+                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },   \
+                        { UNIT_MSIZE, (1u << 23) + (1u << 22), NULL, "12M", &cpu_set_size, NULL, NULL, "Set Memory to 12M bytes" },   \
+                        { UNIT_MSIZE, (1u << 23) + (6u << 20), NULL, "14M", &cpu_set_size, NULL, NULL, "Set Memory to 14M bytes" }, \
+                        { UNIT_MSIZE, (1u << 23) + (7u << 20), NULL, "15M", &cpu_set_size, NULL, NULL, "Set Memory to 15M bytes" }, \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
                               NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }

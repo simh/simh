@@ -32,17 +32,20 @@
 
 /* Memory controller register A */
 
-#define MCRA_OF         0x0
-#define MCRA_SUMM       0x00100000                      /* err summ (MS780E) */
-#define MCRA_C_SIZE     0x00007E00                      /* array size - fixed */
-#define MCRA_V_SIZE     9
-#define MCRA_ILVE       0x00000100                      /* interleave wr enab */
-#define MCRA_TYPE       0x000000F8                      /* type */
-#define MCRA_C_TYPE     0x00000010                      /* 16k uninterleaved */
-#define MCRA_E_TYPE     0x0000006A                      /* 256k upper + lower */
-#define MCRA_ILV        0x00000007                      /* interleave */
-#define MCRA_RD         (0x00107FFF|SBI_FAULTS)
-#define MCRA_WR         0x00000100
+#define MCRA_OF             0x0
+#define MCRA_SUMM           0x00100000                      /* err summ (MS780E) */
+#define MCRA_M_SIZE         0x00007E00                      /* array size - field */
+#define MCRA_V_SIZE         9
+#define MCRA_ILVE           0x00000100                      /* interleave wr enab */
+#define MCRA_M_TYPE         0x000000F8                      /* type */
+#define MCRA_C_TYPE_16K     0x00000010                      /* 16k uninterleaved (256kb arrays) */
+#define MCRA_C_TYPE_4K      0x00000008                      /* 4k uninterleaved (64kb arrays) */
+#define MCRA_E_TYPE_256K    0x00000070                      /* 256k uninterleaved (4096kb arrays) */
+#define MCRA_E_TYPE_64K     0x00000068                      /* 64k uninterleaved (1024kb arrays) */
+#define MCRA_E_TYPE         0x0000006A                      /* 256k upper + lower */
+#define MCRA_ILV            0x00000007                      /* interleave */
+#define MCRA_RD             (0x00107FFF|SBI_FAULTS)
+#define MCRA_WR             0x00000100
 
 /* Memory controller register B */
 
@@ -263,19 +266,17 @@ return;
 
 t_stat mctl_reset (DEVICE *dptr)
 {
-int32 i, amb;
+int32 i, amb, akb;
 t_bool extmem = MEMSIZE > MAXMEMSIZE;
 
-amb = (int32) (MEMSIZE / 2) >> 20;                      /* array size MB */
-for (i = 0; i < MCTL_NUM; i++) {                        /* init for MS780C */
-    if (extmem) {                                       /* extended memory? */
-        mcr_a[i] = ((amb - 1) << MCRA_V_SIZE) | MCRA_E_TYPE;
-        mcr_b[i] = MCRB_INIT | ((i * amb) << (MCRB_V_SA + 4));
-        }
-    else {
-        mcr_a[i] = MCRA_C_SIZE | MCRA_C_TYPE;
-        mcr_b[i] = MCRB_INIT | (i << 21);
-        }
+amb = (int32) (MEMSIZE / MCTL_NUM) >> 20;               /* array size MB */
+akb = (int32) (MEMSIZE / MCTL_NUM) >> 10;               /* array size KB */
+for (i = 0; i < MCTL_NUM; i++) {                        
+    if (extmem)                                         /* Need MS780E? */
+        mcr_a[i] = ((amb - 1) << MCRA_V_SIZE) | ((amb <= 16) ? MCRA_E_TYPE_64K : MCRA_E_TYPE_256K);
+    else                                                /* Use MS780C */
+        mcr_a[i] = (((akb >> 6) - 1) << MCRA_V_SIZE) | ((akb <= 1024) ? MCRA_C_TYPE_4K : MCRA_C_TYPE_16K);
+    mcr_b[i] = MCRB_INIT | ((i * akb) << (MCRB_V_SA - 6));
     mcr_c[i] = 0;
     mcr_d[i] = 0;
     }
@@ -288,4 +289,44 @@ static char buf[64];
 
 sprintf (buf, "Memory controller %d", (int)(dptr-mctl_dev));
 return buf;
+}
+
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+struct {
+    uint32 capacity;
+    char *option;
+    } boards[] = {
+        { 4096, "MS780-JD M8374 array"},
+        { 1024, "MS780-FD M8373 array"},
+        {  256, "MS780-C M8210 array"}, 
+        {   64, "MS780-C M8211 array"}, 
+        {    0, NULL}};
+uint32 i, slot, bd;
+
+for (i = 0; i < MCTL_NUM; i++) {
+    uint32 baseaddr = ((mcr_b[i] & MCRB_SA) << 1);
+
+    fprintf (st, "Memory Controller %d - MS780-%s\n", i, ((mcr_a[i]&MCRA_M_TYPE) >> 5) ? "E" : "C");
+    switch (mcr_a[i]&MCRA_M_TYPE) {
+        case MCRA_C_TYPE_4K:
+            bd = 3;         /* 4kbit chips, 64Kbyte arrays */
+            break;
+        case MCRA_C_TYPE_16K:
+            bd = 2;         /* 16kbit chips, 256Kbyte arrays */
+            break;
+        case MCRA_E_TYPE_64K:
+            bd = 1;         /* 64kbit chips, 1Mbyte arrays */
+            break;
+        case MCRA_E_TYPE_256K:
+            bd = 0;         /* 256kbit chips, 4Mbyte arrays */
+            break;
+        }
+    for (slot=0; slot<=((mcr_a[i]&MCRA_M_SIZE)>>MCRA_V_SIZE); slot += ((mcr_a[i]&MCRA_C_TYPE_4K)? 1 : 4)) {
+        if (boards[bd].capacity)
+            fprintf(st, "Memory slot %d (@0x%08x): %3d %sbytes (%s)\n", slot, baseaddr, boards[bd].capacity/((boards[bd].capacity>=1024) ? 1024 : 1), (boards[bd].capacity>=1024) ? "M" : "K", boards[bd].option);
+        baseaddr += boards[bd].capacity<<10;
+        }
+    }
+return SCPE_OK;
 }
