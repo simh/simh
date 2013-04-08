@@ -1501,6 +1501,10 @@ t_bool nolog, notelnet, listennotelnet, unbuffered;
 TMLN *lp;
 t_stat r = SCPE_ARG;
 
+for (i = 0; i < mp->lines; i++) {               /* initialize lines */
+    lp = mp->ldsc + i;
+    lp->mp = mp;                                /* set the back pointer */
+    }
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
     line = nextline;
