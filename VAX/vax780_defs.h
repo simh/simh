@@ -157,12 +157,17 @@
 #define INITMEMSIZE     (1 << MAXMEMWIDTH)              /* initial memory size */
 #define MEMSIZE         (cpu_unit.capac)
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },                \
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 20), NULL, "1M", &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },                \
+                        { UNIT_MSIZE, (1u << 21), NULL, "2M", &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },                \
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M", &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },                \
+                        { UNIT_MSIZE, (1u << 23), NULL, "8M", &cpu_set_size, NULL, NULL, "Set Memory to 8M bytes" },                \
                         { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" },              \
                         { UNIT_MSIZE, (1u << 25), NULL, "32M", &cpu_set_size, NULL, NULL, "Set Memory to 32M bytes" },              \
                         { UNIT_MSIZE, (1u << 25) + (1u << 24), NULL, "48M", &cpu_set_size, NULL, NULL, "Set Memory to 48M bytes" }, \
                         { UNIT_MSIZE, (1u << 26), NULL, "64M", &cpu_set_size, NULL, NULL, "Set Memory to 64M bytes" },              \
-                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" }
+                        { UNIT_MSIZE, (1u << 27), NULL, "128M", &cpu_set_size, NULL, NULL, "Set Memory to 128M bytes" },            \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CPU_MODEL_MODIFIERS                                                                     \
                         { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                                  \
                               NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }

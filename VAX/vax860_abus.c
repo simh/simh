@@ -192,7 +192,7 @@ DEVICE abus_dev = {
     };
 
 /* 
-The 8600/8650 systems can have a max of 260MB of memory.
+The 8600/8650 systems can have a max of 260MB of physical memory.
 There are three different memory boards that exists: 4MB, 16MB, and 64MB. 
 In addition, you can mix different boards.
 The rule is to put large boards first, and smaller boards later.
@@ -205,6 +205,13 @@ up any other slot.
 If you are using 16MB boards, the max memory is 68MB.
 Slot 0,2,4 and 6 will have 16MB boards. And then you can place a 4MB board in slot 7.
 Same story with the 64MB boards.
+
+The system architecture reserves 512MB of address space for memory, so the 
+simulated memory can be expanded up to 512MB using 2 256MB memory boards which 
+never existed but are easy to simulate.  We call these fictional boards MS86-E
+
+The logic here fills as many slots as possible with memory boards to describe
+the total system memory size.
 */
 
 void init_pamm()
@@ -212,28 +219,27 @@ void init_pamm()
 int32 addr = 0;
 int32 mem = (int32)(MEMSIZE >> 20);
 int32 slot = 0;
-int32 size = 0;
+int32 slots_remaining = 8;
+int32 size = 4;
 int32 i;
 
 for (i=0; i<1024; i++)
     pamm[i] = PAMM_NXM;
 
 for (;mem > 0; ) {
-    if (mem >= 64)
-        size = 64;
-    else {
-        if (mem >= 16)
-            size = 16;
-        else
-            size = 4;
-        }
-    if ((size > 4) && (slot > 0))
+    size = 4;
+    while (mem/size > slots_remaining/((size > 4) ? 2 : 1))
+        size = size * 4;
+    if ((size > 4) && (slot > 0)) {
         slot++;
+        slots_remaining--;
+        }
     if (slot < 8) {
         for (i=0; i<size; i++)
             pamm[addr++] = slot;
         }
     slot++;
+    slots_remaining--;
     mem -= size;
     }
 
@@ -245,7 +251,16 @@ t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
 int32 slot[32];
 int32 base[32];
-int32 i;
+struct {
+    int capacity;
+    char *option;
+    } boards[] = {
+        {  4, "MS86-B"}, 
+        { 16, "MS86-C"},
+        { 64, "MS86-D"},
+        {256, "MS86-E (board never existed)"},  /* Fake 256MB board */
+        {  0, NULL}};
+int32 i, j;
   
 for (i=0; i<32; i++)
     slot[i] = base[i] = 0;
@@ -256,23 +271,26 @@ for (i=1023; i>=0; i--) {
 }
 
 for (i=0; i<8; i++) {
-    if (slot[i] > 0)
-        fprintf(st, "Memory slot %d (@0x%08x): %d Mbytes.\n", i, base[i] << 20, slot[i]);
+    if (slot[i] > 0) {
+        for (j=0; boards[j].option && boards[j].capacity != slot[i]; ++j)
+            ;
+        fprintf(st, "Memory slot %d (@0x%08x): %3d Mbytes (%s).\n", i, base[i] << 20, boards[j].capacity, boards[j].option);
+    }
 }
 
 for (i=8; i<0x18; i++) {
     if (slot[i] > 0)
-        fprintf(st, "Unused code %d (@0x%08x): %d Mbytes.\n", i, base[i] << 20, slot[i]);
+        fprintf(st, "Unused code %d (@0x%08x): %3d Mbytes.\n", i, base[i] << 20, slot[i]);
 }
 
 for (i=0x18; i<0x1c; i++) {
     if (slot[i] > 0)
-        fprintf(st, "I/O adapter %d (@0x%08x): %d Mbytes.\n", i-0x18, base[i] << 20, slot[i]);
+        fprintf(st, "I/O adapter %d (@0x%08x): %3d Mbytes.\n", i-0x18, base[i] << 20, slot[i]);
 }
 
 for (i=0x1c; i<0x1f; i++) {
     if (slot[i] > 0)
-        fprintf(st, "Unused code %d (@0x%08x): %d Mbytes.\n", i, base[i] << 20, slot[i]);
+        fprintf(st, "Unused code %d (@0x%08x): %3d Mbytes.\n", i, base[i] << 20, slot[i]);
 }
 
 fprintf(st, "Ununsed address space: %d Mbytes.\n", slot[0x1f]);

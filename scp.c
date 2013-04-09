@@ -2556,8 +2556,11 @@ else if ((shptr = find_shtab (show_glob_tab, gbuf)))    /* global? */
 else {
     if (sim_dflt_dev->modifiers)
         for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
-            if (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)) {
+            if ((((mptr->mask & MTAB_VDV) == MTAB_VDV) &&
+                 (mptr->pstring && (MATCH_CMD (gbuf, mptr->pstring) == 0))) ||
+                (!(mptr->mask & MTAB_VDV) && (mptr->mstring && (MATCH_CMD (gbuf, mptr->mstring) == 0)))) {
                 dptr = sim_dflt_dev;
+                lvl = MTAB_VDV;                         /* device match */
                 cptr -= strlen (gbuf) + 1;
                 while (isspace(*cptr))
                     ++cptr;

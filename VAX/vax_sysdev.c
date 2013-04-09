@@ -30,6 +30,7 @@
    nvr          non-volatile ROM (no registers)
    csi          console storage input
    cso          console storage output
+   cmctl        memory controller
    sysd         system devices (SSC miscellany)
 
    23-Dec-10    RMS     Added power clear call to boot routine (Mark Pizzolato)
@@ -1141,6 +1142,32 @@ switch (rg) {
         }
 
 return;
+}
+
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+uint32 memsize = (uint32)(MEMSIZE>>20);
+uint32 baseaddr = 0;
+struct {
+    uint32 capacity;
+    char *option;
+    } boards[] = {
+        { 16, "MS650-BA"},
+        {  0, NULL}};
+int32 i;
+
+while (memsize > 1) {
+    if (baseaddr >= (64<<20)) {
+        fprintf(st, "Memory (@0x%08x): %3d Mbytes (Simulated Extended Memory)\n", baseaddr, memsize);
+        break;
+        }
+    for (i=0; boards[i].capacity > memsize; ++i)
+        ;
+    fprintf(st, "Memory (@0x%08x): %3d Mbytes (%s)\n", baseaddr, boards[i].capacity, boards[i].option);
+    memsize -= boards[i].capacity;
+    baseaddr += boards[i].capacity<<20;
+    }
+return SCPE_OK;
 }
 
 /* KA655 registers */

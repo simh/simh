@@ -762,7 +762,7 @@ t_bool wrcstm (a10 ea, int32 prv)
 {
 cstm = Read (ea, prv);
 if ((cpu_unit.flags & UNIT_T20) && (ea == 040127))
-    cstm = 0770000000000;
+    cstm = INT64_C(0770000000000);
 return FALSE;
 }
 

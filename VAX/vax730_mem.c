@@ -188,15 +188,34 @@ t_stat mctl_reset (DEVICE *dptr)
 {
 mcsr0 = 0;
 mcsr1 = 0;
-mcsr2 = 0;
-if (MEMSIZE > MAXMEMSIZE)                                                 /* More than 2MB? */
-    mcsr2 = mcsr2 | MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_64K) | MCSR2_CS;     /* Use 64k chips */
-else
-    mcsr2 = mcsr2 | MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_16K);                /* Use 16k chips */
+mcsr2 = MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_64K) | MCSR2_CS;     /* Use 64k chips */
 return SCPE_OK;
 }
 
 char *mctl_description (DEVICE *dptr)
 {
 return "memory controller";
+}
+
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+uint32 memsize = (uint32)(MEMSIZE>>20);
+uint32 baseaddr = 0;
+uint32 slot = 6;
+struct {
+    uint32 capacity;
+    char *option;
+    } boards[] = {
+        {  1, "MS730-CA M8750"}, 
+        {  0, NULL}};
+int32 bd;
+
+while (memsize) {
+    bd = 0;
+    fprintf(st, "Memory slot %d (@0x%08x): %3d Mbytes (%s)\n", slot, baseaddr, boards[bd].capacity, boards[bd].option);
+    memsize -= boards[bd].capacity;
+    baseaddr += boards[bd].capacity<<20;
+    ++slot;
+    }
+return SCPE_OK;
 }

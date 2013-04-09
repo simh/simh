@@ -844,11 +844,11 @@ return sim_tape_attach (uptr, cptr);
 #define BOOT_START      01000
 
 static const t_uint64 boot_rom[5] = {
-    0076200000000 + U_MTBIN - 1,                        /* RDS MT_binary */
-    0054000000000 + BOOT_START + 4,                     /* RCHA *+3 */
-    0054400000000,                                      /* LCHA 0 */
-    0002100000001,                                      /* TTR 1 */
-    0500003000000,                                      /* IOCT 0,,3 */
+    INT64_C(0076200000000) + U_MTBIN - 1,               /* RDS MT_binary */
+    INT64_C(0054000000000) + BOOT_START + 4,            /* RCHA *+3 */
+    INT64_C(0054400000000),                             /* LCHA 0 */
+    INT64_C(0002100000001),                             /* TTR 1 */
+    INT64_C(0500003000000),                             /* IOCT 0,,3 */
     };
 
 t_stat mt_boot (int32 unitno, DEVICE *dptr)

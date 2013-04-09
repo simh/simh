@@ -63,19 +63,24 @@
 #define MCSR2_INIT      0x00010000                      /* Cold/warm restart flag */
 #define MCSR2_V_SA      17
 #define MCSR2_M_SA      0x7F                            /* Start address */
-#define MCSR2_V_CS      24
-#define MCSR2_CS        (1u << MCSR2_V_CS)              /* Chip size */
-#define MCSR2_MBZ       0xFF000000
+#define MCSR2_V_CS64    24
+#define MCSR2_CS64      (1u << MCSR2_V_CS64)            /* Chip size */
+#define MCSR2_V_CS256   25
+#define MCSR2_CS256     (1u << MCSR2_V_CS256)           /* Chip size */
+#define MCSR2_MBZ       0xFC000000
 
 /* Debug switches */
 
 #define MCTL_DEB_RRD     0x01                            /* reg reads */
 #define MCTL_DEB_RWR     0x02                            /* reg writes */
 
-#define MEM_SIZE_16K    (1u << 17)                       /* Board size (16k chips) */
-#define MEM_SIZE_64K    (1u << 19)                       /* Board size (64k chips) */
-#define MEM_BOARD_MASK(x,y)  ((1u << (uint32)(x/y)) - 1)
+#define MEM_SIZE_16K    (1u << 18)                       /* Board size (16k chips) */
+#define MEM_SIZE_64K    (1u << 20)                       /* Board size (64k chips) */
+#define MEM_SIZE_256K   (1u << 22)                       /* Board size (256k chips) */
 #define MEM_64K_MASK     0x5555
+#define MEM_BOARD_MASK_64K(x)  ((((1u << (uint32)(x/MEM_SIZE_64K)) - 1) & MEM_64K_MASK) | MCSR2_CS64)
+#define MEM_256K_MASK    0x5555
+#define MEM_BOARD_MASK_256K(x) ((((1u << (uint32)(x/MEM_SIZE_256K)) - 1) & MEM_256K_MASK) | MCSR2_CS256)
 
 extern UNIT cpu_unit;
 
@@ -100,6 +105,9 @@ DIB mctl_dib = { TR_MCTL, 0, &mctl_rdreg, &mctl_wrreg, 0 };
 UNIT mctl_unit = { UDATA (NULL, 0, 0) };
 
 REG mctl_reg[] = {
+    { HRDATAD (CSR0, mcsr0, 32, "ECC syndrome bits") },
+    { HRDATAD (CSR1, mcsr1, 32, "CPU error control/check bits") },
+    { HRDATAD (CSR2, mcsr2, 32, "Memory Configuration") },
     { NULL }
     };
 
@@ -198,16 +206,78 @@ return;
 
 t_stat mctl_reset (DEVICE *dptr)
 {
+uint32 large_slot_size = MEM_SIZE_16K, large_slots;
+uint32 small_slot_size, small_slots;
+uint32 boards, board_mask;
+
 mcsr0 = 0;
 mcsr1 = 0;
-if (MEMSIZE > MAXMEMSIZE)                               /* More than 2MB? */
-    mcsr2 = MCSR2_INIT | (MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_64K) & MEM_64K_MASK) | MCSR2_CS;  /* Use 64k chips */
-else
-    mcsr2 = MCSR2_INIT | MEM_BOARD_MASK(MEMSIZE, MEM_SIZE_16K);  /* Use 16k chips */
+if (MEMSIZE > MAXMEMSIZE_Y)                         /* More than 8MB? */
+    large_slot_size = MEM_SIZE_256K;                /* Use 256k chips */
+else {
+    if (MEMSIZE > MAXMEMSIZE)
+        large_slot_size = MEM_SIZE_64K;
+    }
+small_slot_size = large_slot_size >> 2;
+large_slots = (uint32)(MEMSIZE/large_slot_size);
+small_slots = (MEMSIZE & (large_slot_size -1))/small_slot_size;
+boards = ((1u << ((large_slots + small_slots) << 1)) - 1);
+board_mask = (((large_slot_size == MEM_SIZE_16K)? 0xFFFF : 0x5555) & (((1u << (large_slots << 1)) - 1))) | (((large_slot_size == MEM_SIZE_256K) ? 0xAAAA : 0xFFFF) << (large_slots << 1));
+mcsr2 = MCSR2_INIT | (boards & board_mask) | ((large_slot_size == MEM_SIZE_256K) ? MCSR2_CS256 : 0);  /* Use 256k chips */
 return SCPE_OK;
 }
 
 char *mctl_description (DEVICE *dptr)
 {
 return "Memory controller";
+}
+
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+uint32 memsize = (uint32)(MEMSIZE>>10);
+uint32 baseaddr = 0;
+struct {
+    uint32 capacity;
+    char *option;
+    } boards[] = {
+        { 4096, "MS750-JD M7199"},
+        { 1024, "MS750-CA M8750"},
+        {  256, "MS750-AA M8728"}, 
+        {    0, NULL}};
+int32 i, bd;
+
+for (i=0; i<8; i++) {
+    if (mcsr2&MCSR2_CS256) {
+        switch ((mcsr2&(3<<(i*2)))>>(i*2)) {
+            case 0:
+            case 3:
+                bd = 3;         /* Not Present */
+                break;
+            case 2:
+                bd = 1;         /* 64Kb chips */
+                break;
+            case 1:
+                bd = 0;         /* 256Kb chips */
+                break;
+            }
+        }
+    else {
+        switch ((mcsr2&(3<<(i*2)))>>(i*2)) {
+            case 0:
+                bd = 3;         /* Not Present */
+                break;
+            case 3:
+                bd = 2;         /* 16Kb chips */
+                break;
+            case 1:
+            case 2:
+                bd = 1;         /* 64Kb chips */
+                break;
+            }
+        }
+    if (boards[bd].capacity)
+        fprintf(st, "Memory slot %d (@0x%08x): %3d %sbytes (%s)\n", 11+i, baseaddr, boards[bd].capacity/((boards[bd].capacity>=1024) ? 1024 : 1), (boards[bd].capacity>=1024) ? "M" : "K", boards[bd].option);
+    baseaddr += boards[bd].capacity<<10;
+    }
+return SCPE_OK;
 }

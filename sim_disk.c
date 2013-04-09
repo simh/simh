@@ -821,7 +821,7 @@ FILE *(*open_function)(const char *filename, const char *mode) = sim_fopen;
 FILE *(*create_function)(const char *filename, t_offset desiredsize) = NULL;
 t_offset (*size_function)(FILE *file);
 t_stat (*storage_function)(FILE *file, uint32 *sector_size, uint32 *removable) = NULL;
-t_bool created = FALSE;
+t_bool created = FALSE, copied = FALSE;
 t_bool auto_format = FALSE;
 t_offset capac;
 
@@ -920,11 +920,65 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
             else
                 printf ("\n%s%d: Error copying: %s.\n", sim_dname (dptr), (int)(uptr-dptr->units), sim_error_text (r));
             }
+        if ((r == SCPE_OK) && (sim_switches & SWMASK ('V'))) {
+            uint8 *verify_buf = (uint8*) malloc (1024*1024);
+
+            if (!verify_buf) {
+                sim_vhd_disk_close(vhd);
+                remove (gbuf);
+                free (copy_buf);
+                return SCPE_MEM;
+                }
+            for (lba = 0; (lba < total_sectors) && (r == SCPE_OK); lba += sects) {
+                if (!sim_quiet)
+                    printf ("%s%d: Verified %dMB.  %d%% complete.\r", sim_dname (dptr), (int)(uptr-dptr->units), (int)((((float)lba)*sector_size)/1000000), (int)((((float)lba)*100)/total_sectors));
+                sects = sectors_per_buffer;
+                if (lba + sects > total_sectors)
+                    sects = total_sectors - lba;
+                r = sim_disk_rdsect (uptr, lba, copy_buf, NULL, sects);
+                if (r == SCPE_OK) {
+                    uint32 saved_unit_flags = uptr->flags;
+                    FILE *save_unit_fileref = uptr->fileref;
+
+                    sim_disk_set_fmt (uptr, 0, "VHD", NULL);
+                    uptr->fileref = vhd;
+                    r = sim_disk_rdsect (uptr, lba, verify_buf, NULL, sects);
+                    uptr->fileref = save_unit_fileref;
+                    uptr->flags = saved_unit_flags;
+                    if (r == SCPE_OK) {
+                        if (0 != memcmp (copy_buf, verify_buf, 1024*1024))
+                            r = SCPE_IOERR;
+                        }
+                    }
+                }
+            if (!sim_quiet) {
+                if (r == SCPE_OK)
+                    printf ("\n%s%d: Verified %dMB. Done.\n", sim_dname (dptr), (int)(uptr-dptr->units), (int)(((t_offset)lba*sector_size)/1000000));
+                else {
+                    t_lba i;
+                    uint32 save_dctrl = dptr->dctrl;
+                    FILE *save_sim_deb = sim_deb;
+
+                    for (i = 0; i < (1024*1024/sector_size); ++i)
+                        if (0 != memcmp (copy_buf+i*sector_size, verify_buf+i*sector_size, sector_size))
+                            break;
+                    printf ("\n%s%d: Verification Error on lbn %d.\n", sim_dname (dptr), (int)(uptr-dptr->units), lba+i);
+                    dptr->dctrl = 0xFFFFFFFF;
+                    sim_deb = stdout;
+                    sim_disk_data_trace (uptr,   copy_buf+i*sector_size, lba+i, sector_size, "Expected", TRUE, 1);
+                    sim_disk_data_trace (uptr, verify_buf+i*sector_size, lba+i, sector_size,    "Found", TRUE, 1);
+                    dptr->dctrl = save_dctrl;
+                    sim_deb = save_sim_deb;
+                    }
+                }
+            free (verify_buf);
+            }
         free (copy_buf);
         sim_vhd_disk_close (vhd);
         sim_disk_detach (uptr);
         if (r == SCPE_OK) {
             created = TRUE;
+            copied = TRUE;
             strcpy (cptr, gbuf);
             sim_disk_set_fmt (uptr, 0, "VHD", NULL);
             sim_switches = saved_sim_switches;
@@ -1045,7 +1099,7 @@ uptr->pos = 0;
 if (storage_function)
     storage_function (uptr->fileref, &ctx->storage_sector_size, &ctx->removable);
 
-if (created) {
+if ((created) && (!copied)) {
     t_stat r = SCPE_OK;
     uint8 *secbuf = calloc (1, ctx->sector_size);       /* alloc temp sector buf */
 
@@ -1203,7 +1257,9 @@ fprintf (st, "    -F          Open the indicated disk container in a specific fo
 fprintf (st, "                is to autodetect VHD defaulting to simh if the indicated\n");
 fprintf (st, "                container is not a VHD).\n");
 fprintf (st, "    -C          Create a VHD and copy its contents from another disk (simh, VHD,\n");
-fprintf (st, "                or RAW format).\n");
+fprintf (st, "                or RAW format). Add a -V switch to verify a copy operation.\n");
+fprintf (st, "    -V          Perform a verification pass to confirm successful data copy\n");
+fprintf (st, "                operation.\n");
 fprintf (st, "    -X          When creating a VHD, create a fixed sized VHD (vs a Dynamically\n");
 fprintf (st, "                expanding one).\n");
 fprintf (st, "    -D          Create a Differencing VHD (relative to an already existing VHD\n");

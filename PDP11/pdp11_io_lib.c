@@ -351,7 +351,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { "QBA" },         1,  0,  0, 0, 
         {017500} },                                     /* doorbell - fx CSR, no VEC */
     { { "MCTL" },        1,  0,  0, 0, 
-        {012100} },                                     /* MSV11-P - fx CSR, no VEC */
+        {012100} },                                     /* MSV11-P/MSV11-Q - fx CSR, no VEC */
     { { "KE" },          1,  0,  0, 0, 
         {017300} },                                     /* KE11-A - fx CSR, no VEC */
     { { "KG" },          1,  0,  0, 0, 

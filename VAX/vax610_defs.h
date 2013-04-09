@@ -94,10 +94,13 @@
 #define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
 #undef  PAMASK
 #define PAMASK          0x203FFFFF                      /* KA610 needs a special mask */
-#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 19), NULL, "512k", &cpu_set_size, NULL, NULL, "Set Memory to 512K bytes" },\
+#define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 19), NULL, "512K", &cpu_set_size, NULL, NULL, "Set Memory to 512K bytes" },\
+                        { UNIT_MSIZE, (1u << 19) + (1u << 18), NULL, "768K",   &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },  \
                         { UNIT_MSIZE, (1u << 20), NULL, "1M",   &cpu_set_size, NULL, NULL, "Set Memory to 1M bytes" },  \
                         { UNIT_MSIZE, (1u << 21), NULL, "2M",   &cpu_set_size, NULL, NULL, "Set Memory to 2M bytes" },  \
-                        { UNIT_MSIZE, (1u << 22), NULL, "4M",   &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" }
+                        { UNIT_MSIZE, (1u << 22), NULL, "4M",   &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },  \
+                        { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
+extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
                               NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
                             { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                              \

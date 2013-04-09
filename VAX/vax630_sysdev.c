@@ -979,3 +979,32 @@ fprintf (st, "The simulator is booted with the BOOT command:\n\n");
 fprintf (st, "   sim> BOOT\n\n");
 return SCPE_OK;
 }
+
+t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+uint32 memsize = (uint32)(MEMSIZE>>20);
+uint32 baseaddr = 0;
+struct {
+    uint32 capacity;
+    char *option;
+    } boards[] = {
+        { 16, "MS630-CA"},
+        {  4, "MS630-BB"},
+        {  2, "MS630-BA"}, 
+        {  1, "MS630-AA"}, 
+        {  0, NULL}};
+int32 i;
+
+while (memsize > 1) {
+    for (i=0; boards[i].capacity > memsize; ++i)
+        ;
+    if (memsize == 2)
+        i = 3;
+    fprintf(st, "Memory (@0x%08x): %3d Mbytes (%s)\n", baseaddr, boards[i].capacity, boards[i].option);
+    memsize -= boards[i].capacity;
+    baseaddr += boards[i].capacity<<20;
+    }
+if (memsize)
+    fprintf(st, "Memory (0x%08x):   1 Mbytes (On-Board)\n", baseaddr);
+return SCPE_OK;
+}
