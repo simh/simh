@@ -719,7 +719,7 @@ static CTAB cmd_table[] = {
       "sh{ow} con{figuration}   show configuration\n"
       "sh{ow} cons{ole} {arg}   show console options\n"
       "sh{ow} dev{ices}         show devices\n"
-      "sh{ow} sys{tem}          show system devices with descriptions\n"
+      "sh{ow} fea{tures}        show system devices with descriptions\n"
       "sh{ow} m{odifiers}       show modifiers for all devices\n" 
       "sh{ow} s{how}            show SHOW commands for all devices\n" 
       "sh{ow} n{ames}           show logical names\n" 
