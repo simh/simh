@@ -389,6 +389,7 @@ typedef struct {
 #define BOOT_RL         2
 #define BOOT_UDA        17
 #define BOOT_TK         18
+#define BOOT_CS         64
 
 /* Function prototypes for virtual memory interface */
 

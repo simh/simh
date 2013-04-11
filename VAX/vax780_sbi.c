@@ -123,6 +123,7 @@ static struct boot_dev boot_tab[] = {
     { "RQC", BOOT_UDA, 1 << 24 },
     { "RQD", BOOT_UDA, 1 << 24 },
     { "TQ", BOOT_TK, 1 << 24 },
+    { "CS", BOOT_CS, 0 },
     { NULL }
     };
 
@@ -652,6 +653,7 @@ t_stat vax780_boot_parse (int32 flag, char *ptr)
 char gbuf[CBUFSIZE];
 char *slptr, *regptr;
 int32 i, r5v, unitno;
+uint32 ba;
 DEVICE *dptr;
 UNIT *uptr;
 DIB *dibp;
@@ -669,7 +671,9 @@ if ((dptr == NULL) || (uptr == NULL))
     return SCPE_ARG;
 dibp = (DIB *) dptr->ctxt;                              /* get DIB */
 if (dibp == NULL)
-    return SCPE_ARG;
+    ba = 0;
+else
+    ba = dibp->ba;
 unitno = (int32) (uptr - dptr->units);
 r5v = 0;
 if ((strncmp (regptr, "/R5:", 4) == 0) ||
@@ -694,12 +698,12 @@ for (i = 0; boot_tab[i].name != NULL; i++) {
     if (strcmp (dptr->name, boot_tab[i].name) == 0) {
         R[0] = boot_tab[i].code;
         if (dptr->flags & DEV_MBUS) {
-            R[1] = dibp->ba + TR_MBA0;
+            R[1] = ba + TR_MBA0;
             R[2] = unitno;
             }
         else {
             R[1] = TR_UBA;
-            R[2] = boot_tab[i].let | (dibp->ba & UBADDRMASK);
+            R[2] = boot_tab[i].let | (ba & UBADDRMASK);
             }
         R[3] = unitno;
         R[4] = 0;

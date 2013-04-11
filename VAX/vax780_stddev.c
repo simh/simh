@@ -25,7 +25,7 @@
 
    tti          console input
    tto          console output
-   rx           console floppy
+   cs           console floppy
    todr         TODR clock
    tmr          interval timer
 
@@ -405,7 +405,7 @@ MTAB fl_mod[] = {
     };
 
 DEVICE fl_dev = {
-    "RXC", &fl_unit, fl_reg, fl_mod,
+    "CS", &fl_unit, fl_reg, fl_mod,
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &fl_reset,
     NULL, NULL, NULL,
