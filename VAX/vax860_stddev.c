@@ -1098,6 +1098,12 @@ switch (rlcs_state) {
 	case RL_READ:
         if ((cso_csr & CSR_DONE) == 0) {                /* buf ready? */
             if (rlcs_bcnt == 0) {                       /* read in whole block */
+                if ((uptr->flags & UNIT_ATT) == 0) {    /* Attached? */
+                    cso_csr = cso_csr | CSR_DONE |      /* error */
+                        (RLST_HDERR << STXCS_V_STS);
+                    rlcs_state = RL_IDLE;               /* now idle */
+                    break;
+                    }
                 da = STXCS_GETDA(cso_csr) * 512;        /* get byte offset */
                 if (sim_fseek (uptr->fileref, da, SEEK_SET))
                     return SCPE_IOERR;
@@ -1124,6 +1130,12 @@ switch (rlcs_state) {
 		break;
 
     case RL_WRITE:
+        if ((uptr->flags & UNIT_ATT) == 0) {            /* Attached? */
+            cso_csr = cso_csr | CSR_DONE |              /* error */
+                (RLST_HDERR << STXCS_V_STS);
+            rlcs_state = RL_IDLE;                       /* now idle */
+            break;
+            }
         if (rlcs_bcnt < RL_NUMBY) {                     /* more data to buffer? */
             cso_csr = cso_csr | CSR_DONE |              /* continue */
                 (RLST_CONT << STXCS_V_STS);
