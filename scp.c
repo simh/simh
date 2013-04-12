@@ -394,7 +394,7 @@ BRKTAB *sim_brk_new (t_addr loc);
 
 SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
-char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc);
+static char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc, t_bool quote);
 int32 get_switches (char *cptr);
 char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
@@ -1785,10 +1785,10 @@ for (; *ip && (op < oend); ) {
                 }
             else {                                      /* environment variable */
                 ap = NULL;
-                get_glyph_gen (ip+1, gbuf, '%', FALSE); /* first try using the literal name */
+                get_glyph_nc (ip+1, gbuf, '%');         /* first try using the literal name */
                 ap = getenv(gbuf);
                 if (!ap) {
-                    get_glyph_gen (ip+1, gbuf, '%', TRUE); /* now try using the upcased name */
+                    get_glyph (ip+1, gbuf, '%');        /* now try using the upcased name */
                     ap = getenv(gbuf);
                     }
                 ip += 1 + strlen (gbuf);
@@ -1845,7 +1845,7 @@ for (; *ip && (op < oend); ) {
             }
         else
             if (ip == istart) {                         /* at beginning of input? */
-                get_glyph_gen (instr, gbuf, 0, TRUE);   /* substitute initial token */
+                get_glyph (instr, gbuf, 0);             /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
                 if (!ap) {                              /* nope? */
                     *op++ = *ip++;                      /* press on with literal character */
@@ -2187,7 +2187,7 @@ char varname[CBUFSIZE];
 
 if ((!cptr) || (*cptr == 0))                            /* now eol? */
     return SCPE_2FARG;
-cptr = get_glyph_gen (cptr, varname, '=', TRUE);       /* get environment variable name */
+cptr = get_glyph (cptr, varname, '=');                  /* get environment variable name */
 setenv(varname, cptr, 1);
 return SCPE_OK;
 }
@@ -2300,10 +2300,17 @@ while (*cptr != 0) {                                    /* do all mods */
                 if ((lvl == MTAB_VUN) && (uptr->flags & UNIT_DIS))
                     return SCPE_UDIS;                   /* unit disabled? */
                 if (mptr->valid) {                      /* validation rtn? */
-                    if (cvptr && MODMASK(mptr,MTAB_NC)) {
-                        get_glyph_nc (svptr, gbuf, ',');
+                    if (cvptr && MODMASK(mptr,MTAB_QUOTE)) {
+                        get_glyph_quoted (svptr, gbuf, ',');
                         if ((cvptr = strchr (gbuf, '=')))
                             *cvptr++ = 0;
+                        }
+                    else {
+                        if (cvptr && MODMASK(mptr,MTAB_NC)) {
+                            get_glyph_nc (svptr, gbuf, ',');
+                            if ((cvptr = strchr (gbuf, '=')))
+                                *cvptr++ = 0;
+                            }
                         }
                     r = mptr->valid (uptr, mptr->match, cvptr, mptr->desc);
                     if (r != SCPE_OK)
@@ -5046,20 +5053,37 @@ return cptr;
 
 /* get_glyph            get next glyph (force upper case)
    get_glyph_nc         get next glyph (no conversion)
+   get_glyph_quoted     get next glyph (potentially enclosed in quotes, no conversion)
    get_glyph_gen        get next glyph (general case)
 
    Inputs:
         iptr    =       pointer to input string
         optr    =       pointer to output string
         mchar   =       optional end of glyph character
-        flag    =       TRUE for convert to upper case (_gen only)
+        uc      =       TRUE for convert to upper case (_gen only)
+        quote   =       TRUE to allow quote enclosing values (_gen only)
    Outputs
         result  =       pointer to next character in input string
 */
 
-char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc)
+static char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc, t_bool quote)
 {
-while ((isspace (*iptr) == 0) && (*iptr != 0) && (*iptr != mchar)) {
+t_bool quoting = FALSE;
+char quote_char = 0;
+
+while ((*iptr != 0) && 
+       ((quote && quoting) || ((isspace (*iptr) == 0) && (*iptr != mchar)))) {
+    if (quote)
+        if (quoting) {
+            if (*iptr == quote_char)
+                quoting = FALSE;
+            }
+        else {
+            if ((*iptr == '"') || (*iptr == '\'')) {
+                quoting = TRUE;
+                quote_char = *iptr;
+                }
+            }
     if (islower (*iptr) && uc)
         *optr = toupper (*iptr);
     else *optr = *iptr;
@@ -5075,12 +5099,17 @@ return iptr;
 
 char *get_glyph (char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, TRUE);
+return get_glyph_gen (iptr, optr, mchar, TRUE, FALSE);
 }
 
 char *get_glyph_nc (char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, FALSE);
+return get_glyph_gen (iptr, optr, mchar, FALSE, FALSE);
+}
+
+char *get_glyph_quoted (char *iptr, char *optr, char mchar)
+{
+return get_glyph_gen (iptr, optr, mchar, FALSE, TRUE);
 }
 
 /* Trim trailing spaces from a string

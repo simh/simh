@@ -109,6 +109,7 @@ t_stat get_yn (char *ques, t_stat deflt);
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
 char *get_glyph (char *iptr, char *optr, char mchar);
 char *get_glyph_nc (char *iptr, char *optr, char mchar);
+char *get_glyph_quoted (char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);

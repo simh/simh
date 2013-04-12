@@ -561,7 +561,8 @@ struct sim_mtab {
 #define MTAB_VALO       (0010 | MTAB_XTD)               /* takes a value (optional) */
 #define MTAB_NMO        (0020 | MTAB_XTD)               /* only if named */
 #define MTAB_NC         (0040 | MTAB_XTD)               /* no UC conversion */
-#define MTAB_SHP        (0100 | MTAB_XTD)               /* show takes parameter */
+#define MTAB_QUOTE      (0100 | MTAB_XTD)               /* quoted string */
+#define MTAB_SHP        (0200 | MTAB_XTD)               /* show takes parameter */
 #define MODMASK(mptr,flag) (((mptr)->mask & (uint32)(flag)) == (uint32)(flag))/* flag mask test */
 
 /* Search table */
