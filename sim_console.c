@@ -125,14 +125,14 @@
 
 /* Forward Declaraations of Platform specific routines */
 
-t_stat sim_os_poll_kbd (void);
-t_bool sim_os_poll_kbd_ready (int ms_timeout);
-t_stat sim_os_putchar (int32 out);
-t_stat sim_os_ttinit (void);
-t_stat sim_os_ttrun (void);
-t_stat sim_os_ttcmd (void);
-t_stat sim_os_ttclose (void);
-t_bool sim_os_ttisatty (void);
+static t_stat sim_os_poll_kbd (void);
+static t_bool sim_os_poll_kbd_ready (int ms_timeout);
+static t_stat sim_os_putchar (int32 out);
+static t_stat sim_os_ttinit (void);
+static t_stat sim_os_ttrun (void);
+static t_stat sim_os_ttcmd (void);
+static t_stat sim_os_ttclose (void);
+static t_bool sim_os_ttisatty (void);
 
 #define KMAP_WRU        0
 #define KMAP_BRK        1
@@ -1130,7 +1130,7 @@ typedef struct {
 SENSE_BUF cmd_mode = { 0 };
 SENSE_BUF run_mode = { 0 };
 
-t_stat sim_os_ttinit (void)
+static t_stat sim_os_ttinit (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -1149,7 +1149,7 @@ run_mode.stat2 = cmd_mode.stat2 | TT2$M_PASTHRU;
 return SCPE_OK;
 }
 
-t_stat sim_os_ttrun (void)
+static t_stat sim_os_ttrun (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -1161,7 +1161,7 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
 return SCPE_OK;
 }
 
-t_stat sim_os_ttcmd (void)
+static t_stat sim_os_ttcmd (void)
 {
 unsigned int status;
 IOSB iosb;
@@ -1173,19 +1173,19 @@ if ((status != SS$_NORMAL) || (iosb.status != SS$_NORMAL))
 return SCPE_OK;
 }
 
-t_stat sim_os_ttclose (void)
+static t_stat sim_os_ttclose (void)
 {
 sim_ttcmd ();
 sys$dassgn (tty_chan);
 return SCPE_OK;
 }
 
-t_bool sim_os_ttisatty (void)
+static t_bool sim_os_ttisatty (void)
 {
 return isatty (fileno (stdin));
 }
 
-t_stat sim_os_poll_kbd_data (void)
+static t_stat sim_os_poll_kbd_data (void)
 {
 unsigned int status, term[2];
 unsigned char buf[4];
@@ -1210,7 +1210,7 @@ if (sim_brk_char && (buf[0] == sim_brk_char))
 return (buf[0] | SCPE_KFLAG);
 }
 
-t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 t_stat response;
 
@@ -1221,7 +1221,7 @@ if (response = buffered_character) {
 return sim_os_poll_kbd_data ();
 }
 
-t_bool sim_os_poll_kbd_ready (int ms_timeout)
+static t_bool sim_os_poll_kbd_ready (int ms_timeout)
 {
 unsigned int status, term[2];
 unsigned char buf[4];
@@ -1244,7 +1244,7 @@ return TRUE;
 }
 
 
-t_stat sim_os_putchar (int32 out)
+static t_stat sim_os_putchar (int32 out)
 {
 unsigned int status;
 char c;
@@ -1300,7 +1300,7 @@ ControlHandler(DWORD dwCtrlType)
     return FALSE;
     }
 
-t_stat sim_os_ttinit (void)
+static t_stat sim_os_ttinit (void)
 {
 SetConsoleCtrlHandler( ControlHandler, TRUE );
 std_input = GetStdHandle (STD_INPUT_HANDLE);
@@ -1311,7 +1311,7 @@ if ((std_input) &&                                      /* Not Background proces
 return SCPE_OK;
 }
  
-t_stat sim_os_ttrun (void)
+static t_stat sim_os_ttrun (void)
 {
 if ((std_input) &&                                      /* If Not Background process? */
     (std_input != INVALID_HANDLE_VALUE) &&
@@ -1326,7 +1326,7 @@ SetThreadPriority (GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
 return SCPE_OK;
 }
 
-t_stat sim_os_ttcmd (void)
+static t_stat sim_os_ttcmd (void)
 {
 if (sim_log) {
     fflush (sim_log);
@@ -1340,19 +1340,19 @@ if ((std_input) &&                                      /* If Not Background pro
 return SCPE_OK;
 }
 
-t_stat sim_os_ttclose (void)
+static t_stat sim_os_ttclose (void)
 {
 return SCPE_OK;
 }
 
-t_bool sim_os_ttisatty (void)
+static t_bool sim_os_ttisatty (void)
 {
 DWORD Mode;
 
 return (std_input) && (std_input != INVALID_HANDLE_VALUE) && GetConsoleMode (std_input, &Mode);
 }
 
-t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 int c = -1;
 DWORD nkbevents, nkbevent;
@@ -1395,7 +1395,7 @@ if ((sim_brk_char && ((c & 0177) == sim_brk_char)) || (c & SCPE_BREAK))
 return c | SCPE_KFLAG;
 }
 
-t_bool sim_os_poll_kbd_ready (int ms_timeout)
+static t_bool sim_os_poll_kbd_ready (int ms_timeout)
 {
 sim_debug (DBG_TRC, &sim_con_telnet, "sim_os_poll_kbd_ready()\n");
 if ((std_input == NULL) ||                              /* No keyboard for */
@@ -1406,7 +1406,7 @@ if ((std_input == NULL) ||                              /* No keyboard for */
 return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
 }
 
-t_stat sim_os_putchar (int32 c)
+static t_stat sim_os_putchar (int32 c)
 {
 DWORD unused;
 
@@ -1421,32 +1421,32 @@ return SCPE_OK;
 
 #include <conio.h>
 
-t_stat sim_os_ttinit (void)
+static t_stat sim_os_ttinit (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_os_ttrun (void)
+static t_stat sim_os_ttrun (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_os_ttcmd (void)
+static t_stat sim_os_ttcmd (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_os_ttclose (void)
+static t_stat sim_os_ttclose (void)
 {
 return SCPE_OK;
 }
 
-t_bool sim_os_ttisatty (void)
+static t_bool sim_os_ttisatty (void)
 {
 return 1;
 }
 
-t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 int c;
 
@@ -1477,13 +1477,13 @@ if (sim_brk_char && ((c & 0177) == sim_brk_char))
 return c | SCPE_KFLAG;
 }
 
-t_bool sim_os_poll_kbd_ready (int ms_timeout)   /* Don't know how to do this on this platform */
+static t_bool sim_os_poll_kbd_ready (int ms_timeout)   /* Don't know how to do this on this platform */
 {
 sim_os_ms_sleep (MIN(20,ms_timeout));           /* Wait a little */
 return TRUE;                                    /* force a poll */
 }
 
-t_stat sim_os_putchar (int32 c)
+static t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
 #if defined (__EMX__)
@@ -1609,7 +1609,7 @@ int ps_getch(void) {
 
 /* Note that this only works if the call to sim_ttinit comes before any output to the console */
 
-t_stat sim_os_ttinit (void) {
+static t_stat sim_os_ttinit (void) {
     int i;
     /* this blank will later be replaced by the number of characters */
     char title[50] = " ";
@@ -1632,27 +1632,27 @@ t_stat sim_os_ttinit (void) {
     return SCPE_OK;
 }
 
-t_stat sim_os_ttrun (void)
+static t_stat sim_os_ttrun (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_os_ttcmd (void)
+static t_stat sim_os_ttcmd (void)
 {
 return SCPE_OK;
 }
 
-t_stat sim_os_ttclose (void)
+static t_stat sim_os_ttclose (void)
 {
 return SCPE_OK;
 }
 
-t_bool sim_os_ttisatty (void)
+static t_bool sim_os_ttisatty (void)
 {
 return 1;
 }
 
-t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 int c;
 
@@ -1667,13 +1667,13 @@ if (sim_brk_char && ((c & 0177) == sim_brk_char))
 return c | SCPE_KFLAG;
 }
 
-t_bool sim_os_poll_kbd_ready (int ms_timeout)   /* Don't know how to do this on this platform */
+static t_bool sim_os_poll_kbd_ready (int ms_timeout)   /* Don't know how to do this on this platform */
 {
 sim_os_ms_sleep (MIN(20,ms_timeout));           /* Wait a little */
 return TRUE;                                    /* force a poll */
 }
 
-t_stat sim_os_putchar (int32 c)
+static t_stat sim_os_putchar (int32 c)
 {
 if (c != 0177) {
     putchar (c);
@@ -1695,7 +1695,7 @@ struct tchars cmdtchars,runtchars;                      /* V7 editing */
 struct ltchars cmdltchars,runltchars;                   /* 4.2 BSD editing */
 int cmdfl,runfl;                                        /* TTY flags */
 
-t_stat sim_os_ttinit (void)
+static t_stat sim_os_ttinit (void)
 {
 cmdfl = fcntl (0, F_GETFL, 0);                          /* get old flags  and status */
 runfl = cmdfl | FNDELAY;
@@ -1722,7 +1722,7 @@ runltchars.t_lnextc = 0xFF;
 return SCPE_OK;                                         /* return success */
 }
 
-t_stat sim_os_ttrun (void)
+static t_stat sim_os_ttrun (void)
 {
 runtchars.t_intrc = sim_int_char;                       /* in case changed */
 fcntl (0, F_SETFL, runfl);                              /* non-block mode */
@@ -1736,7 +1736,7 @@ nice (10);                                              /* lower priority */
 return SCPE_OK;
 }
 
-t_stat sim_os_ttcmd (void)
+static t_stat sim_os_ttcmd (void)
 {
 nice (-10);                                             /* restore priority */
 fcntl (0, F_SETFL, cmdfl);                              /* block mode */
@@ -1749,17 +1749,17 @@ if (ioctl (0, TIOCSLTC, &cmdltchars) < 0)
 return SCPE_OK;
 }
 
-t_stat sim_os_ttclose (void)
+static t_stat sim_os_ttclose (void)
 {
 return sim_ttcmd ();
 }
 
-t_bool sim_os_ttisatty (void)
+static t_bool sim_os_ttisatty (void)
 {
 return isatty (0);
 }
 
-t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];
@@ -1771,7 +1771,7 @@ if (sim_brk_char && (buf[0] == sim_brk_char))
 else return (buf[0] | SCPE_KFLAG);
 }
 
-t_bool sim_os_poll_kbd_ready (int ms_timeout)
+static t_bool sim_os_poll_kbd_ready (int ms_timeout)
 {
 fd_set readfds;
 struct timeval timeout;
@@ -1787,7 +1787,7 @@ timeout.tv_usec = (ms_timeout*1000)%1000000;
 return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
-t_stat sim_os_putchar (int32 out)
+static t_stat sim_os_putchar (int32 out)
 {
 char c;
 
@@ -1806,7 +1806,7 @@ return SCPE_OK;
 struct termios cmdtty, runtty;
 static int prior_norm = 1;
 
-t_stat sim_os_ttinit (void)
+static t_stat sim_os_ttinit (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
@@ -1848,7 +1848,7 @@ runtty.c_cc[VSTATUS] = 0;
 return SCPE_OK;
 }
 
-t_stat sim_os_ttrun (void)
+static t_stat sim_os_ttrun (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
@@ -1863,7 +1863,7 @@ if (prior_norm) {                                       /* at normal pri? */
 return SCPE_OK;
 }
 
-t_stat sim_os_ttcmd (void)
+static t_stat sim_os_ttcmd (void)
 {
 if (!isatty (fileno (stdin)))                           /* skip if !tty */
     return SCPE_OK;
@@ -1877,17 +1877,17 @@ if (tcsetattr (0, TCSAFLUSH, &cmdtty) < 0)
 return SCPE_OK;
 }
 
-t_stat sim_os_ttclose (void)
+static t_stat sim_os_ttclose (void)
 {
 return sim_ttcmd ();
 }
 
-t_bool sim_os_ttisatty (void)
+static t_bool sim_os_ttisatty (void)
 {
 return isatty (fileno (stdin));
 }
 
-t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];
@@ -1899,7 +1899,7 @@ if (sim_brk_char && (buf[0] == sim_brk_char))
 else return (buf[0] | SCPE_KFLAG);
 }
 
-t_bool sim_os_poll_kbd_ready (int ms_timeout)
+static t_bool sim_os_poll_kbd_ready (int ms_timeout)
 {
 fd_set readfds;
 struct timeval timeout;
@@ -1915,7 +1915,7 @@ timeout.tv_usec = (ms_timeout*1000)%1000000;
 return (1 == select (1, &readfds, NULL, NULL, &timeout));
 }
 
-t_stat sim_os_putchar (int32 out)
+static t_stat sim_os_putchar (int32 out)
 {
 char c;
 

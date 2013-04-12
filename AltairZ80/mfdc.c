@@ -206,7 +206,7 @@ static uint8 mfdc_rom[256] = {
 };
 
 /* Reset routine */
-t_stat mfdc_reset(DEVICE *dptr)
+static t_stat mfdc_reset(DEVICE *dptr)
 {
     uint8 i;
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
@@ -228,7 +228,7 @@ t_stat mfdc_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-t_stat mfdc_attach(UNIT *uptr, char *cptr)
+static t_stat mfdc_attach(UNIT *uptr, char *cptr)
 {
     t_stat r;
     unsigned int i = 0;
@@ -283,7 +283,7 @@ t_stat mfdc_attach(UNIT *uptr, char *cptr)
 
 
 /* Detach routine */
-t_stat mfdc_detach(UNIT *uptr)
+static t_stat mfdc_detach(UNIT *uptr)
 {
     t_stat r;
     int8 i;
