@@ -136,6 +136,7 @@ static struct sock_errors {
         {WSAECONNREFUSED, "Connection refused"},
         {WSAEHOSTUNREACH, "No route to host"},
         {WSAEADDRINUSE,   "Address already in use "},
+        {WSAEACCES,       "Permission denied"},
         {0, NULL}
     };
 
