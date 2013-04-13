@@ -111,6 +111,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_CCDEFS = -D_GNU_SOURCE
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
+    LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
@@ -153,15 +154,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             PCAPLIB = wpcap
             LIBEXT = a
           else
-            LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
-            ifneq (,$(LDSEARCH))
-              LIBPATH := $(LDSEARCH)
-            else
-              $(info *** Warning ***)
-              $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
-              $(info *** Warning *** determined.  This should be resolved before you can expect)
-              $(info *** Warning *** to have fully working simulators.)
-              $(info *** Warning ***)
+            ifeq (,$(findstring NetBSD,$(OSTYPE)))
+              LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+              ifneq (,$(LDSEARCH))
+                LIBPATH := $(LDSEARCH)
+              else
+                $(info *** Warning ***)
+                $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                $(info *** Warning *** determined.  This should be resolved before you can expect)
+                $(info *** Warning *** to have fully working simulators.)
+                $(info *** Warning ***)
+              endif
             endif
             ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
               LIBPATH += /usr/pkg/lib
