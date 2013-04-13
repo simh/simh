@@ -5073,7 +5073,7 @@ char quote_char = 0;
 
 while ((*iptr != 0) && 
        ((quote && quoting) || ((isspace (*iptr) == 0) && (*iptr != mchar)))) {
-    if (quote)
+    if (quote) {
         if (quoting) {
             if (*iptr == quote_char)
                 quoting = FALSE;
@@ -5084,6 +5084,7 @@ while ((*iptr != 0) &&
                 quote_char = *iptr;
                 }
             }
+        }
     if (islower (*iptr) && uc)
         *optr = toupper (*iptr);
     else *optr = *iptr;
