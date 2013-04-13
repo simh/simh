@@ -759,7 +759,7 @@ t_stat trackWrite(DISK_INFO *myDisk,
      * sector record type as the first byte, and fill the sector
      * data with the fillbyte.
      */
-    dataLen = (128 << sectorLen)+1;
+    dataLen = sectorLen + 1;
     sectorData = malloc(dataLen);
     memset(sectorData, fillbyte, dataLen);
     sectorData[0] = SECT_RECORD_NORM;

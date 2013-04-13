@@ -1,6 +1,6 @@
 /*  altairz80_sio.c: MITS Altair serial I/O card
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2013, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -64,27 +64,27 @@
 
 uint8 *URLContents(const char *URL, uint32 *length);
 #ifndef URL_READER_SUPPORT
-#define RESULT_BUFFER_LENGTH    1024
+#define RESULT_BUFFER_LENGTH	1024
 #define RESULT_LEAD_IN          "URL is not supported on this platform. START URL \""
 #define RESULT_LEAD_OUT         "\" URL END."
 uint8 *URLContents(const char *URL, uint32 *length) {
-    char str[RESULT_BUFFER_LENGTH] = RESULT_LEAD_IN;
+	char str[RESULT_BUFFER_LENGTH] = RESULT_LEAD_IN;
     char *result;
-    strncat(str, URL, RESULT_BUFFER_LENGTH - strlen(RESULT_LEAD_IN) - strlen(RESULT_LEAD_OUT) - 1);
-    strcat(str, RESULT_LEAD_OUT);
-    result = malloc(strlen(str));
-    strcpy(result, str);
-    *length = strlen(str);
-    return (uint8*)result;
+	strncat(str, URL, RESULT_BUFFER_LENGTH - strlen(RESULT_LEAD_IN) - strlen(RESULT_LEAD_OUT) - 1);
+	strcat(str, RESULT_LEAD_OUT);
+    result = (char*)malloc(strlen(str));
+	strcpy(result, str);
+	*length = strlen(str);
+	return (uint8*)result;
 }
 #endif
 
 /* Debug flags */
-#define IN_MSG              (1 << 0)
-#define OUT_MSG             (1 << 1)
-#define CMD_MSG             (1 << 2)
-#define VERBOSE_MSG         (1 << 3)
-#define BUFFER_EMPTY_MSG    (1 << 4)
+#define IN_MSG				(1 << 0)
+#define OUT_MSG				(1 << 1)
+#define CMD_MSG				(1 << 2)
+#define VERBOSE_MSG			(1 << 3)
+#define BUFFER_EMPTY_MSG	(1 << 4)
 
 #define UNIT_V_SIO_ANSI     (UNIT_V_UF + 0)     /* ANSI mode, strip bit 8 on output             */
 #define UNIT_SIO_ANSI       (1 << UNIT_V_SIO_ANSI)
@@ -172,12 +172,12 @@ extern volatile int32 stop_cpu;
 
 /* Debug Flags */
 static DEBTAB generic_dt[] = {
-    { "IN",             IN_MSG              },
-    { "OUT",            OUT_MSG             },
-    { "CMD",            CMD_MSG             },
-    { "VERBOSE",        VERBOSE_MSG         },
-    { "BUFFEREMPTY",    BUFFER_EMPTY_MSG    },
-    { NULL,             0                   }
+    { "IN",				IN_MSG				},
+    { "OUT",			OUT_MSG				},
+    { "CMD",			CMD_MSG				},
+    { "VERBOSE",		VERBOSE_MSG			},
+    { "BUFFEREMPTY",	BUFFER_EMPTY_MSG	},
+    { NULL,				0					}
 };
 
 /* SIMH pseudo device status registers                                                                          */
@@ -225,10 +225,10 @@ static int32 lastCPMStatus          = 0;        /* result of last attachCPM comm
 static int32 lastCommand            = 0;        /* most recent command processed on port 0xfeh                  */
 static int32 getCommonPos           = 0;        /* determines state for sending the 'common' register           */
 
-/* CPU Clock Frequency related                                                                                  */
+/* CPU Clock Frequency related																					*/
 static uint32 newClockFrequency;
-static int32 setClockFrequencyPos   = 0;        /* determines state for sending the clock frequency             */
-static int32 getClockFrequencyPos   = 0;        /* determines state for receiving the clock frequency           */
+static int32 setClockFrequencyPos	= 0;		/* determines state for sending the clock frequency				*/
+static int32 getClockFrequencyPos	= 0;		/* determines state for receiving the clock frequency			*/
 
 /* support for wild card expansion                                                                              */
 #if UNIX_PLATFORM
@@ -274,7 +274,7 @@ static UNIT sio_unit = {
     100000, /* wait                                                 */
     FALSE,  /* u3 = FALSE, no character available in buffer         */
     FALSE,  /* u4 = FALSE, terminal input is not attached to a file */
-    0,      /* u5 = 0, not used                                     */
+    0,		/* u5 = 0, not used										*/
     0       /* u6 = 0, not used                                     */
 };
 
@@ -456,7 +456,7 @@ static t_stat sio_reset(DEVICE *dptr) {
     int32 i;
     sim_debug(VERBOSE_MSG, &sio_dev, "SIO: " ADDRESS_FORMAT " Reset\n", PCX);
     sio_unit.u3 = FALSE;                                    /* no character in terminal input buffer    */
-    sio_unit.buf = 0;
+	sio_unit.buf = 0;
     resetSIOWarningFlags();
     if (sio_unit.u4)                                        /* is terminal input attached to a file?    */
         rewind(sio_unit.fileref);                           /* yes, rewind input                        */
@@ -472,7 +472,7 @@ static t_stat ptr_reset(DEVICE *dptr) {
     sim_debug(VERBOSE_MSG, &ptr_dev, "PTR: " ADDRESS_FORMAT " Reset\n", PCX);
     resetSIOWarningFlags();
     ptr_unit.u3 = FALSE;                                    /* End Of File not yet reached              */
-    ptr_unit.buf = 0;
+	ptr_unit.buf = 0;
     if (ptr_unit.flags & UNIT_ATT)                          /* attached?                                */
         rewind(ptr_unit.fileref);
     sim_map_resource(0x12, 1, RESOURCE_TYPE_IO, &sio1s, dptr->flags & DEV_DIS);
@@ -650,18 +650,18 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
     pollConnection();
     if (io == 0) { /* IN */
         if (sio_unit.u4) {                                  /* attached to a file?                      */
-            if (sio_unit.u3)                                /* character available?                     */
-                return spi.sio_can_read | spi.sio_can_write;
-            ch = getc(sio_unit.fileref);
-            if (ch == EOF) {
+			if (sio_unit.u3)                                /* character available?                     */
+				return spi.sio_can_read | spi.sio_can_write;
+			ch = getc(sio_unit.fileref);
+			if (ch == EOF) {
                 sio_detach(&sio_unit);                      /* detach file and switch to keyboard input */
-                return spi.sio_cannot_read | spi.sio_can_write;
-            }
-            else {
-                sio_unit.u3 = TRUE;                         /* indicate character available             */
-                sio_unit.buf = ch;                          /* store character in buffer                */
-                return spi.sio_can_read | spi.sio_can_write;
-            }
+				return spi.sio_cannot_read | spi.sio_can_write;
+			}
+			else {
+				sio_unit.u3 = TRUE;                         /* indicate character available             */
+				sio_unit.buf = ch;                          /* store character in buffer                */
+				return spi.sio_can_read | spi.sio_can_write;
+			}
         }
         if (sio_unit.flags & UNIT_ATT) {                    /* attached to a port?                      */
             if (tmxr_rqln(&TerminalLines[spi.terminalLine]))
@@ -692,8 +692,8 @@ static int32 sio0sCore(const int32 port, const int32 io, const int32 data) {
         return spi.sio_cannot_read | spi.sio_can_write;
     }                                                       /* OUT follows, no fall-through from IN     */
     if (spi.hasReset && (data == spi.sio_reset)) {          /* reset command                            */
-        if (!sio_unit.u4)                                   /* only reset for regular console I/O       */
-            sio_unit.u3 = FALSE;                            /* indicate that no character is available  */
+		if (!sio_unit.u4)									/* only reset for regular console I/O		*/
+			sio_unit.u3 = FALSE;                            /* indicate that no character is available  */
         sim_debug(CMD_MSG, &sio_dev, "\tSIO_S: " ADDRESS_FORMAT
                   " Command OUT(0x%03x) = 0x%02x\n", PCX, port, data);
     }
@@ -723,7 +723,7 @@ static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
         if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))
             return mapCharacter(tmxr_getc_ln(&TerminalLines[spi.terminalLine]));
         if (!sio_unit.u3) {
-            sim_debug(BUFFER_EMPTY_MSG, &sio_dev, "\tSIO_D: " ADDRESS_FORMAT
+			sim_debug(BUFFER_EMPTY_MSG, &sio_dev, "\tSIO_D: " ADDRESS_FORMAT
                       " IN(0x%03x) for empty character buffer\n", PCX, port);
         }
         sio_unit.u3 = FALSE;                                /* no character is available any more       */
@@ -733,8 +733,10 @@ static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
         ch = sio_unit.flags & UNIT_SIO_ANSI ? data & 0x7f : data;   /* clear highest bit in ANSI mode   */
         if ((ch != CONTROLG_CHAR) || !(sio_unit.flags & UNIT_SIO_BELL)) {
             voidSleep();
-            if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4))  /* attached to a port and not to a file */
+            if ((sio_unit.flags & UNIT_ATT) && (!sio_unit.u4)) {	/* attached to a port and not to a file */
                 tmxr_putc_ln(&TerminalLines[spi.terminalLine], ch); /* status ignored                   */
+                tmxr_poll_tx(&altairTMXR);							/* poll xmt							*/
+            }
             else
                 sim_putchar(ch);
         }
@@ -743,15 +745,15 @@ static int32 sio0dCore(const int32 port, const int32 io, const int32 data) {
 }
 
 static char* printable(char* result, int32 data, const int32 isIn) {
-    result[0] = 0;
-    data &= 0x7f;
-    if ((0x20 <= data) && (data < 0x7f))
-        sprintf(result, isIn ? " <-\"%c\"" : " ->\"%c\"", data);
-    return result;
+	result[0] = 0;
+	data &= 0x7f;
+	if ((0x20 <= data) && (data < 0x7f))
+		sprintf(result, isIn ? " <-\"%c\"" : " ->\"%c\"", data);
+	return result;
 }
 
 int32 sio0d(const int32 port, const int32 io, const int32 data) {
-    char buffer[8];
+	char buffer[8];
     const int32 result = sio0dCore(port, io, data);
     if (io == 0) {
         sim_debug(IN_MSG, &sio_dev, "\tSIO_D: " ADDRESS_FORMAT
@@ -797,7 +799,7 @@ int32 sio1s(const int32 port, const int32 io, const int32 data) {
                   " IN(0x%02x) = 0x%02x\n", PCX, port, result);
         sim_debug(IN_MSG, &ptp_dev, "PTP_S: " ADDRESS_FORMAT
                   " IN(0x%02x) = 0x%02x\n", PCX, port, result);
-    }
+	}
     else if (io) {
         sim_debug(OUT_MSG, &ptr_dev, "PTR_S: " ADDRESS_FORMAT
                   " OUT(0x%02x) = 0x%02x\n", PCX, port, data);
@@ -1068,11 +1070,11 @@ static int32 fromBCD(const int32 x) {
         out (0feh),a
         ld  a,<p2>
         out (0feh),a
-        ...             ; send all parameters
+        ...				; send all parameters
         in  a,(0feh)    ; <A> contains first byte of result
         in  a,(0feh)    ; <A> contains second byte of result
         ...
-
+ 
 */
 
 enum simhPseudoDeviceCommands { /* do not change order or remove commands, add only at the end          */
@@ -1106,10 +1108,10 @@ enum simhPseudoDeviceCommands { /* do not change order or remove commands, add o
     SIMHSleepCmd,               /* 27 let SIMH sleep for SIMHSleep microseconds                         */
     getHostOSPathSeparatorCmd,  /* 28 obtain the file path separator of the OS under which SIMH runs    */
     getHostFilenamesCmd,        /* 29 perform wildcard expansion and obtain list of file names          */
-    readURLCmd,                 /* 30 read the contents of an URL                                       */
-    getCPUClockFrequency,       /* 31 get the clock frequency of the CPU                                */
-    setCPUClockFrequency,       /* 32 set the clock frequency of the CPU                                */
-    kSimhPseudoDeviceCommands
+	readURLCmd,                 /* 30 read the contents of an URL										*/
+	getCPUClockFrequency,		/* 31 get the clock frequency of the CPU								*/
+	setCPUClockFrequency,		/* 32 set the clock frequency of the CPU								*/
+	kSimhPseudoDeviceCommands
 };
 
 static char *cmdNames[kSimhPseudoDeviceCommands] = {
@@ -1143,9 +1145,9 @@ static char *cmdNames[kSimhPseudoDeviceCommands] = {
     "SIMHSleep",
     "getHostOSPathSeparator",
     "getHostFilenames",
-    "readURL",
-    "getCPUClockFrequency",
-    "setCPUClockFrequency",
+	"readURL",
+	"getCPUClockFrequency",
+	"setCPUClockFrequency",
 };
 
 #define CPM_COMMAND_LINE_LENGTH    128
@@ -1155,7 +1157,7 @@ static struct tm currentTime;
 static int32 currentTimeValid = FALSE;
 static char version[] = "SIMH004";
 
-#define URL_MAX_LENGTH              1024
+#define URL_MAX_LENGTH				1024
 static uint32 urlPointer;
 static char urlStore[URL_MAX_LENGTH];
 static uint8 *urlResult = NULL;
@@ -1182,13 +1184,13 @@ static t_stat simh_dev_reset(DEVICE *dptr) {
     lastCommand             = 0;
     lastCPMStatus           = SCPE_OK;
     timerInterrupt          = FALSE;
-    urlPointer              = 0;
-    getClockFrequencyPos    = 0;
-    setClockFrequencyPos    = 0;
-    if (urlResult != NULL) {
-        free(urlResult);
-        urlResult = NULL;
-    }
+	urlPointer				= 0;
+	getClockFrequencyPos	= 0;
+	setClockFrequencyPos	= 0;
+	if (urlResult != NULL) {
+		free(urlResult);
+		urlResult = NULL;
+	}
     if (simh_unit.flags & UNIT_SIMH_TIMERON)
         simh_dev_set_timeron(NULL, 0, NULL, NULL);
     return SCPE_OK;
@@ -1319,26 +1321,26 @@ static void setClockCPM3(void) {
 static int32 simh_in(const int32 port) {
     int32 result = 0;
     switch(lastCommand) {
-        case readURLCmd:
+		case readURLCmd:
             if (isInReadPhase) {
-            if (showAvailability) {
-                if (resultPointer < resultLength)
-                    result = 1;
-                else {
-                    if (urlResult != NULL)
-                        free(urlResult);
-                    urlResult = NULL;
-                    lastCommand = 0;
-                }
-            }
-            else if (resultPointer < resultLength)
-                result = urlResult[resultPointer++];
-            showAvailability = 1 - showAvailability;
+			if (showAvailability) {
+				if (resultPointer < resultLength)
+					result = 1;
+				else {
+					if (urlResult != NULL)
+						free(urlResult);
+					urlResult = NULL;
+					lastCommand = 0;
+				}
+			}
+			else if (resultPointer < resultLength)
+				result = urlResult[resultPointer++];
+			showAvailability = 1 - showAvailability;
             }
             else
                 lastCommand = 0;
-            break;
-
+			break;
+			
         case getHostFilenamesCmd:
 #if UNIX_PLATFORM
             if (globValid) {
@@ -1479,7 +1481,7 @@ static int32 simh_in(const int32 port) {
             }
             break;
 
-        case getCPUClockFrequency:
+		case getCPUClockFrequency:
             if (getClockFrequencyPos == 0) {
                 result = getClockFrequency() & 0xff;
                 getClockFrequencyPos = 1;
@@ -1489,7 +1491,7 @@ static int32 simh_in(const int32 port) {
                 getClockFrequencyPos = lastCommand = 0;
             }
             break;
-
+			
         case hasBankedMemoryCmd:
             result = cpu_unit.flags & UNIT_CPU_BANKED ? MAXBANKS : 0;
             lastCommand = 0;
@@ -1542,7 +1544,7 @@ void do_SIMH_sleep(void) {
 static int32 simh_out(const int32 port, const int32 data) {
     time_t now;
     switch(lastCommand) {
-        case readURLCmd:
+		case readURLCmd:
             if (isInReadPhase)
                 lastCommand = 0;
             else {
@@ -1559,8 +1561,8 @@ static int32 simh_out(const int32 port, const int32 data) {
                     showAvailability = 1;
                     isInReadPhase = TRUE;
                 }
-            }
-            break;
+			}
+			break;
             
         case setClockZSDOSCmd:
             if (setClockZSDOSPos == 0) {
@@ -1586,16 +1588,16 @@ static int32 simh_out(const int32 port, const int32 data) {
             }
             break;
             
-        case setCPUClockFrequency:
-            if (setClockFrequencyPos == 0) {
-                newClockFrequency = data;
-                setClockFrequencyPos = 1;
-            }
-            else {
-                setClockFrequency((data << 8) | newClockFrequency);
+		case setCPUClockFrequency:
+			if (setClockFrequencyPos == 0) {
+				newClockFrequency = data;
+				setClockFrequencyPos = 1;
+			}
+			else {
+				setClockFrequency((data << 8) | newClockFrequency);
                 setClockFrequencyPos = lastCommand = 0;
-            }
-            break;
+			}
+			break;
             
         case setBankSelectCmd:
             if (cpu_unit.flags & UNIT_CPU_BANKED)
@@ -1644,10 +1646,10 @@ static int32 simh_out(const int32 port, const int32 data) {
             
             lastCommand = data;
             switch(data) {
-                case readURLCmd:
-                    urlPointer = 0;
+				case readURLCmd:
+					urlPointer = 0;
                     isInReadPhase = FALSE;
-                    break;
+					break;
                     
                 case getHostFilenamesCmd:
 #if UNIX_PLATFORM
@@ -1758,18 +1760,18 @@ static int32 simh_out(const int32 port, const int32 data) {
                     setClockCPM3Pos = 0;
                     break;
                     
-                case getCommonCmd:
-                    getCommonPos = 0;
-                    break;
-                    
-                case getCPUClockFrequency:
-                    getClockFrequencyPos = 0;
-                    break;
-                    
-                case setCPUClockFrequency:
-                    setClockFrequencyPos = 0;
-                    break;
-                    
+				case getCommonCmd:
+					getCommonPos = 0;
+					break;
+					
+				case getCPUClockFrequency:
+					getClockFrequencyPos = 0;
+					break;
+					
+				case setCPUClockFrequency:
+					setClockFrequencyPos = 0;
+					break;
+					
                 case getBankSelectCmd:
                 case setBankSelectCmd:
                 case hasBankedMemoryCmd:
