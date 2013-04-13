@@ -78,7 +78,7 @@
 #endif
 
 /* cygwin dowsn't have the right features to use the threaded network I/O */
-#if defined(__CYGWIN__)
+#if defined(__CYGWIN__) || defined(__ZAURUS__) // psco added check for Zaurus platform
 #define DONT_USE_READER_THREAD
 #endif
 

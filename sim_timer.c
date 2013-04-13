@@ -180,7 +180,7 @@ return sim_os_msec() - start_time;
 
 const t_bool rtc_avail = TRUE;
 
-uint32 sim_os_msec ()
+uint32 sim_os_msec (void)
 {
 uint32 quo, htod, tod[2];
 int32 i;
@@ -260,7 +260,7 @@ return 0;
 
 const t_bool rtc_avail = TRUE;
 
-uint32 sim_os_msec ()
+uint32 sim_os_msec (void)
 {
 if (sim_idle_rate_ms)
     return timeGetTime ();
@@ -330,7 +330,7 @@ return 0;
 
 const t_bool rtc_avail = FALSE;
 
-uint32 sim_os_msec ()
+uint32 sim_os_msec (void)
 {
 return 0;
 }
@@ -426,7 +426,7 @@ return 0;
 
 const t_bool rtc_avail = TRUE;
 
-uint32 sim_os_msec ()
+uint32 sim_os_msec (void)
 {
 struct timeval cur;
 struct timezone foo;

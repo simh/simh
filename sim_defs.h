@@ -579,7 +579,7 @@ struct sim_schtab {
 struct sim_brktab {
     t_addr              addr;                           /* address */
     int32               typ;                            /* mask of types */
-    int32               cnt;                            /* proceed count */     
+    int32               cnt;                            /* proceed count */
     char                *act;                           /* action string */
     };
 

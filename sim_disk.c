@@ -534,7 +534,7 @@ t_stat sim_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, 
 {
 t_stat r;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-t_seccnt sread;
+t_seccnt sread = 0;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
@@ -2185,10 +2185,10 @@ typedef t_int64     int64;
 typedef struct _VHD_Footer {
     /*
     Cookies are used to uniquely identify the original creator of the hard disk 
-    image. The values are case-sensitive.  Microsoft uses the “conectix” string 
+    image. The values are case-sensitive.  Microsoft uses the "conectix" string 
     to identify this file as a hard disk image created by Microsoft Virtual 
     Server, Virtual PC, and predecessor products. The cookie is stored as an 
-    eight-character ASCII string with the “c” in the first byte, the “o” in 
+    eight-character ASCII string with the "c" in the first byte, the "o" in 
     the second byte, and so on.
     */
     char Cookie[8];
@@ -2303,7 +2303,7 @@ typedef struct _VHD_Footer {
     uint32 DiskType;
     /*
     This field holds a basic checksum of the hard disk footer. It is just a 
-    one’s complement of the sum of all the bytes in the footer without the 
+    one's complement of the sum of all the bytes in the footer without the 
     checksum field.
     If the checksum verification fails, the Virtual PC and Virtual Server 
     products will instead use the header. If the checksum in the header also 
@@ -2342,7 +2342,7 @@ typedef struct _VHD_Footer {
     } VHD_Footer;
 
 /*
-For dynamic and differencing disk images, the “Data Offset” field within 
+For dynamic and differencing disk images, the "Data Offset" field within 
 the image footer points to a secondary structure that provides additional 
 information about the disk image. The dynamic disk header should appear on 
 a sector (512-byte) boundary.
@@ -2389,7 +2389,7 @@ typedef struct _VHD_DynamicDiskHeader {
     */
     uint32 BlockSize;
     /*
-    This field holds a basic checksum of the dynamic header. It is a one’s 
+    This field holds a basic checksum of the dynamic header. It is a one's 
     complement of the sum of all the bytes in the header without the checksum 
     field.
     If the checksum verification fails the file should be assumed to be corrupt.
@@ -2398,7 +2398,7 @@ typedef struct _VHD_DynamicDiskHeader {
     /*
     This field is used for differencing hard disks. A differencing hard disk 
     stores a 128-bit UUID of the parent hard disk. For more information, see 
-    “Creating Differencing Hard Disk Images” later in this paper.
+    "Creating Differencing Hard Disk Images" later in this paper.
     */
     uint8 ParentUniqueID[16];
     /*
@@ -2424,8 +2424,8 @@ typedef struct _VHD_DynamicDiskHeader {
         /*
         The platform code describes which platform-specific format is used for the 
         file locator. For Windows, a file locator is stored as a path (for example. 
-        “c:\disksimages\ParentDisk.vhd”). On a Macintosh system, the file locator 
-        is a binary large object (blob) that contains an “alias.” The parent locator 
+        "c:\disksimages\ParentDisk.vhd"). On a Macintosh system, the file locator 
+        is a binary large object (blob) that contains an "alias." The parent locator 
         table is used to support moving hard disk images across platforms.
         Some current platform codes include the following:
            Platform Code        Description

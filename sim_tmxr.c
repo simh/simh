@@ -2561,18 +2561,11 @@ return SCPE_OK;
 
 t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async)
 {
-char* tptr = NULL;
 t_stat r;
 
-tptr = (char *) calloc (1, 1);
-
-if (tptr == NULL)                                       /* no more mem? */
-    return SCPE_MEM;
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
-if (r != SCPE_OK) {                                     /* error? */
-    free (tptr);                                        /* release buf */
+if (r != SCPE_OK)                                       /* error? */
     return r;
-    }
 mp->uptr = uptr;                                        /* save unit for polling */
 uptr->filename = _mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
