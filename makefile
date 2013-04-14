@@ -306,8 +306,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           endif
         endif
         LIBEXT = $(LIBEXTSAVE)
-      else
-        $(error using libpcap: missing pcap.h)
       endif
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
