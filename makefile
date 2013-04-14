@@ -66,10 +66,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   OSNAME = $(OSTYPE)
   ifeq (SunOS,$(OSTYPE))
     TEST = /bin/test
-    CP = /bin/cp
   else
     TEST = test
-    CP = cp
   endif
   ifeq (CYGWIN,$(findstring CYGWIN,$(OSTYPE))) # uname returns CYGWIN_NT-n.n-ver
     OSTYPE = cygwin
@@ -102,10 +100,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
     ifeq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
       $(info *** Installing git hooks in local repository ***)
-      GIT_HOOKS = $(shell $(CP) './Visual Studio Projects/git-hooks/post-commit' ./.git/hooks/)
-      GIT_HOOKS = $(shell $(CP) './Visual Studio Projects/git-hooks/post-checkout' ./.git/hooks/)
-      GIT_HOOKS = $(shell $(CP) './Visual Studio Projects/git-hooks/post-merge' ./.git/hooks/)
-      GIT_HOOKS = $(shell ./.git/hooks/post-checkout)
+      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-commit' ./.git/hooks/)
+      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-checkout' ./.git/hooks/)
+      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-merge' ./.git/hooks/)
+      GIT_HOOKS += $(shell ./.git/hooks/post-checkout)
+      ifneq (,$(GIT_HOOKS))
+        $(info *** Warning - Error installing git hooks *** $(GIT_HOOKS))
+      endif
     endif
   endif
   LTO_EXCLUDE_VERSIONS = 
