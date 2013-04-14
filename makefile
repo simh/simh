@@ -97,6 +97,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
+  ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
+    ifneq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
+      $(info *** Installing git hooks ***)
+      GIT_HOOKS = $(shell cp ./Visual\ Studio\ Projects/git-hooks/* ./.git/hooks/;./git/hooks/post-checkout)
+    endif
+  endif
   LTO_EXCLUDE_VERSIONS = 
   PCAPLIB = pcap
   ifeq (agcc,$(findstring agcc,$(GCC))) # Android target build?
