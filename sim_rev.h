@@ -48,6 +48,10 @@
 #include ".git-commit-id.h"
 #endif
 
+#if !defined(SIM_GIT_COMMIT_ID)
+#define SIM_GIT_COMMIT_ID $Format:%H$
+#endif
+
 /*
   The comment section below reflects the manual editing process which was in place
   prior to the use of the git source control system on at https://gihub.com/simh/simh
