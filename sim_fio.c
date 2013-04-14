@@ -224,13 +224,14 @@ FILE *sim_fopen (const char *file, const char *mode)
 #if defined (VMS)
 return fopen (file, mode, "ALQ=32", "DEQ=4096",
         "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
-#elif defined (__linux) || defined (__linux__) || defined (__hpux)
+#elif (defined (__linux) || defined (__linux__) || defined (__hpux)) && !defined (DONT_DO_LARGEFILE)
 return fopen64 (file, mode);
 #else
 return fopen (file, mode);
 #endif
 }
 
+#if !defined (DONT_DO_LARGEFILE)
 /* 64b VMS */
 
 #if ((defined (__ALPHA) || defined (__ia64)) && defined (VMS) && (__DECC_VER >= 60590001)) || \
@@ -341,6 +342,7 @@ return (t_offset)(ftello (st));
 }
 
 #endif  /* end Apple OS/X */
+#endif /* !DONT_DO_LARGEFILE */
 
 /* Default: no OS-specific routine has been defined */
 
