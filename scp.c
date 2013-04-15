@@ -3394,33 +3394,43 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
     if (!sim_quiet)
         printf ("%s: unit is read only\n", sim_dname (dptr));
     }
-else {                                                  /* normal */
-    uptr->fileref = sim_fopen (cptr, "rb+");            /* open r/w */
-    if (uptr->fileref == NULL) {                        /* open fail? */
+else {
+    if (sim_switches & SWMASK ('N')) {                  /* new file only? */
+        uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
+        if (uptr->fileref == NULL)                      /* open fail? */
+            return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
+        if (!sim_quiet)
+            printf ("%s: creating new file\n", sim_dname (dptr));
+        }
+    else {                                              /* normal */
+        uptr->fileref = sim_fopen (cptr, "rb+");        /* open r/w */
+        if (uptr->fileref == NULL) {                    /* open fail? */
 #if defined(EPERM)
-        if ((errno == EROFS) || (errno == EACCES) || (errno == EPERM)) {/* read only? */
+            if ((errno == EROFS) || (errno == EACCES) || (errno == EPERM)) {/* read only? */
 #else
-        if ((errno == EROFS) || (errno == EACCES)) {    /* read only? */
+            if ((errno == EROFS) || (errno == EACCES)) {/* read only? */
 #endif
-            if ((uptr->flags & UNIT_ROABLE) == 0)       /* allowed? */
-                return attach_err (uptr, SCPE_NORO);    /* no error */
-            uptr->fileref = sim_fopen (cptr, "rb");     /* open rd only */
-            if (uptr->fileref == NULL)                  /* open fail? */
-                return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-            uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
-            if (!sim_quiet)
-                printf ("%s: unit is read only\n", sim_dname (dptr));
-            }
-        else {                                          /* doesn't exist */
-            if (sim_switches & SWMASK ('E'))            /* must exist? */
-                return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-            uptr->fileref = sim_fopen (cptr, "wb+");    /* open new file */
-            if (uptr->fileref == NULL)                  /* open fail? */
-                return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-            if (!sim_quiet) printf ("%s: creating new file\n", sim_dname (dptr));
-            }
-        }                                               /* end if null */
-    }                                                   /* end else */
+                if ((uptr->flags & UNIT_ROABLE) == 0)   /* allowed? */
+                    return attach_err (uptr, SCPE_NORO);/* no error */
+                uptr->fileref = sim_fopen (cptr, "rb"); /* open rd only */
+                if (uptr->fileref == NULL)              /* open fail? */
+                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                uptr->flags = uptr->flags | UNIT_RO;    /* set rd only */
+                if (!sim_quiet)
+                    printf ("%s: unit is read only\n", sim_dname (dptr));
+                }
+            else {                                      /* doesn't exist */
+                if (sim_switches & SWMASK ('E'))        /* must exist? */
+                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                uptr->fileref = sim_fopen (cptr, "wb+");/* open new file */
+                if (uptr->fileref == NULL)              /* open fail? */
+                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                if (!sim_quiet)
+                    printf ("%s: creating new file\n", sim_dname (dptr));
+                }
+            }                                           /* end if null */
+        }                                               /* end else */
+    }
 if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     uint32 cap = ((uint32) uptr->capac) / dptr->aincr;  /* effective size */
     if (uptr->flags & UNIT_MUSTBUF)                     /* dyn alloc? */
