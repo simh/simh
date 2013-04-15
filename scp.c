@@ -2788,6 +2788,8 @@ if (flag) {
     fprintf (st, "\n\t\tCompiler: Microsoft Visual C++ %d.%02d.%05d.%02d", _MSC_FULL_VER/10000000, (_MSC_FULL_VER/100000)%100, _MSC_FULL_VER%100000, _MSC_BUILD);
 #elif defined (__DECC_VER)
     fprintf (st, "\n\t\tCompiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
+#elif defined (SIM_COMPILER)
+    fprintf (st, "\n\t\tCompiler: %s", SIM_COMPILER);
 #endif
 #if defined (__DATE__) && defined (__TIME__)
     fprintf (st, "\n\t\tSimulator Compiled: %s at %s", __DATE__, __TIME__);

@@ -373,8 +373,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = mkdir -p BIN
   endif
-  ifneq (,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
+  ifeq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
     GIT_COMMIT_ID=$(shell cat .git-commit-id)
+  else
+    ifeq (,$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
+      GIT_COMMIT_ID=$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
+    endif
   endif
 else
   #Win32 Environments (via MinGW32)
@@ -424,6 +428,10 @@ else
   endif
   ifneq (,$(shell if exist .git-commit-id type .git-commit-id))
     GIT_COMMIT_ID=$(shell if exist .git-commit-id type .git-commit-id)
+  else
+    ifeq (,$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h | findstr Format))
+      GIT_COMMIT_ID=$(shell for /F "tokens=3" %%i in ("$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h)") do echo %%i)
+    endif
   endif
 endif
 ifneq (,$(GIT_COMMIT_ID))
@@ -519,7 +527,7 @@ else
   endif
 endif
 CC_OUTSPEC = -o $@
-CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -I . $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -DSIM_COMPILER="$(COMPILER_NAME)" -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 
 #
