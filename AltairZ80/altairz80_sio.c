@@ -1267,8 +1267,8 @@ static void attachCPM(UNIT *uptr) {
     if (uptr == &ptr_unit)
         sim_switches = SWMASK('R') | SWMASK('Q');
     else if (uptr == &ptp_unit)
-        sim_switches = SWMASK('W') | SWMASK('C') | SWMASK('Q');
-    /* 'C' option makes sure that file is properly truncated if it had existed before   */
+        sim_switches = SWMASK('W') | SWMASK('N') | SWMASK('Q');
+    /* 'N' option makes sure that file is properly truncated if it had existed before   */
     sim_quiet = sim_switches & SWMASK ('Q');    /* -q means quiet                       */
     lastCPMStatus = attach_unit(uptr, cpmCommandLine);
     if (lastCPMStatus != SCPE_OK) {
