@@ -104,7 +104,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-checkout' ./.git/hooks/)
       GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-merge' ./.git/hooks/)
       GIT_HOOKS += $(shell ./.git/hooks/post-checkout)
-      ifneq (,$(GIT_HOOKS))
+      ifneq (,$(strip $(GIT_HOOKS)))
         $(info *** Warning - Error installing git hooks *** $(GIT_HOOKS))
       endif
     endif
