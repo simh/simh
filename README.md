@@ -14,6 +14,10 @@
     
 #### Howard Harte has implemented a Lincoln Labs TX-0 simulator.
 
+#### Updated AltairZ80 simulator from Peter Schorn.
+
+#### Updated HP2100 simulator from Dave Bryan.
+
 ### New Functionality
 
 #### VAX/PDP11 Enhancements
