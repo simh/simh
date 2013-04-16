@@ -744,7 +744,7 @@ t_stat dz_attach (UNIT *uptr, char *cptr)
 int32 dz, muxln;
 t_stat r;
 
-if (sim_switches & SWMASK ('M'))                        /* modem control? */
+if ((sim_switches & SWMASK ('M')) || dz_mctl)           /* modem control? */
     tmxr_set_modem_control_passthru (&dz_desc);
 r = tmxr_attach (&dz_desc, uptr, cptr);                 /* attach mux */
 if (r != SCPE_OK) {                                     /* error? */
