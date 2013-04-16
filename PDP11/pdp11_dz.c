@@ -241,6 +241,7 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 #define DBG_INT  0x0002                                 /* display transfer requests */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
@@ -249,6 +250,7 @@ DEBTAB dz_debug[] = {
   {"INT",    DBG_INT},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"MDM",    DBG_MDM},
   {"TRC",    DBG_TRC},
   {"ASY",    DBG_ASY},
   {0}
@@ -641,6 +643,7 @@ void dz_set_rxint (int32 dz)
 {
 dz_rxi = dz_rxi | (1 << dz);                            /* set mux rcv int */
 SET_INT (DZRX);                                         /* set master intr */
+sim_debug(DBG_INT, &dz_dev, "dz_set_rxint(dz=%d)\n", dz);
 return;
 }
 
@@ -671,6 +674,7 @@ void dz_set_txint (int32 dz)
 {
 dz_txi = dz_txi | (1 << dz);                            /* set mux xmt int */
 SET_INT (DZTX);                                         /* set master intr */
+sim_debug(DBG_INT, &dz_dev, "dz_set_txint(dz=%d)\n", dz);
 return;
 }
 
@@ -778,8 +782,11 @@ return SCPE_OK;
 
 t_stat dz_detach (UNIT *uptr)
 {
+t_stat r = tmxr_detach (&dz_desc, uptr);
+
 dz_mctl = dz_auto = 0;                                  /* modem ctl off */
-return tmxr_detach (&dz_desc, uptr);
+tmxr_clear_modem_control_passthru (&dz_desc);
+return r;
 }
 
 /* SET LINES processor */

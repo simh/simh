@@ -6641,7 +6641,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
 #endif                                                  /* NO_vsnprintf */
         va_end (arglist);
 
-/* If it didn't fit into the buffer, then grow it and try again */
+/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
 
         if ((len < 0) || (len >= bufsize-1)) {
             if (buf != stackbuf)

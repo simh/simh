@@ -369,7 +369,15 @@
 #define TNS_CRPAD       005                             /* CR padding */
 #define TNS_DO          006                             /* DO request pending rejection */
 
-
+static BITFIELD tmxr_modem_bits[] = {
+  BIT(DTR),                                 /* Data Terminal Ready */
+  BIT(RTS),                                 /* Request To Send     */
+  BIT(DCD),                                 /* Data Carrier Detect */
+  BIT(RNG),                                 /* Ring Indicator      */
+  BIT(CTS),                                 /* Clear To Send       */
+  BIT(DSR),                                 /* Data Set Ready      */
+  ENDBITS
+};
 
 /* Local routines */
 
@@ -1055,7 +1063,7 @@ return SCPE_OK;
 */
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
-int32 changed_modem_bits;
+int32 before_modem_bits, incoming_state;
 
 tmxr_debug_trace_line (lp, "tmxr_set_get_modem_bits()");
 
@@ -1063,20 +1071,24 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
     (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
     (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
     return SCPE_ARG;
-changed_modem_bits = lp->modembits;
+before_modem_bits = lp->modembits;
 lp->modembits |= bits_to_set;
-lp->modembits &= bits_to_clear;
-changed_modem_bits ^= lp->modembits;
-if (incoming_bits) {
-    if ((lp->sock) || (lp->serport)) {
-        if (lp->modembits & TMXR_MDM_DTR)
-            *incoming_bits = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
-        else
-            *incoming_bits = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
-        }
+lp->modembits &= ~(bits_to_clear & TMXR_MDM_INCOMING);
+if ((lp->sock) || (lp->serport)) {
+    if (lp->modembits & TMXR_MDM_DTR)
+        incoming_state = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
     else
-        *incoming_bits = (lp->mp && lp->mp->master) ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
+        incoming_state = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
     }
+else
+    incoming_state = (lp->mp && lp->mp->master) ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
+lp->modembits |= incoming_state;
+if (sim_deb && lp->mp && lp->mp->dptr) {
+    sim_debug_bits (TMXR_DBG_MDM, lp->mp->dptr, tmxr_modem_bits, before_modem_bits, lp->modembits, FALSE);
+    sim_debug (TMXR_DBG_MDM, lp->mp->dptr, " - Line %d\n", (int)(lp-lp->mp->ldsc));
+    }
+if (incoming_bits)
+    *incoming_bits = incoming_state;
 if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on modem_control enabled multiplexers */
     if (bits_to_set | bits_to_clear) {              /* Anything to do? */
         if (lp->serport)
@@ -2620,15 +2632,19 @@ else {
             fprintf(st, ", ");
             }
         tmxr_show_summ(st, NULL, 0, mp);
-        fprintf(st, ", sessions=%d\n", mp->sessions);
+        fprintf(st, ", sessions=%d", mp->sessions);
+        if (mp->modem_control)
+            fprintf(st, ", ModemControl=enabled");
+        if (mp->notelnet)
+            fprintf(st, ", Telnet=disabled");
+        fprintf(st, "\n");
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
             if (mp->lines > 1) {
                 fprintf (st, "Line: %d", j);
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
-                    fprintf (st, " - Unit: %s\n", sim_uname (lp->uptr));
-                else
-                    fprintf (st, "\n");
+                    fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
+                fprintf (st, "\n");
                 }
             if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master))
                 continue;
@@ -2976,6 +2992,15 @@ if (lp->cnms) {
     }
 else
     fprintf (st, " Line disconnected\n");
+
+if (lp->mp->modem_control) {
+    fprintf (st, " Modem Bits: %s%s%s%s%s%s\n", (lp->modembits & TMXR_MDM_DTR) ? "DTR " : "",
+                                                (lp->modembits & TMXR_MDM_RTS) ? "RTS " : "",
+                                                (lp->modembits & TMXR_MDM_DCD) ? "DCD " : "",
+                                                (lp->modembits & TMXR_MDM_RNG) ? "RNG " : "",
+                                                (lp->modembits & TMXR_MDM_CTS) ? "CTS " : "",
+                                                (lp->modembits & TMXR_MDM_DSR) ? "DSR " : "");
+    }
 
 if ((lp->serport == 0) && (lp->sock))
     fprintf (st, " %s\n", (lp->notelnet) ? "Telnet disabled (RAW data)" : "Telnet protocol");
