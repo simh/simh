@@ -1540,7 +1540,7 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "LINE")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
-                nextline = (int32) get_uint (cptr, 10, mp->lines, &r);
+                nextline = (int32) get_uint (cptr, 10, mp->lines-1, &r);
                 if ((r != SCPE_OK) || (mp->lines == 1))
                     return SCPE_ARG;
                 break;
