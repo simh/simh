@@ -256,7 +256,6 @@ DEBTAB dz_debug[] = {
   {0}
 };
 
-DEVICE dz_dev;
 t_stat dz_rd (int32 *data, int32 PA, int32 access);
 t_stat dz_wr (int32 data, int32 PA, int32 access);
 int32 dz_rxinta (void);
@@ -407,8 +406,9 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
 
             dz_msr[dz] &= ~((1 << (MSR_V_RI + i)) | (1 << (MSR_V_CD + i)));
-            dz_msr[dz] |= ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0) | 
-                          ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0);
+            dz_msr[dz] |= (dz_tcr[dz] & (1 << (i + TCR_V_DTR))) ?
+                          ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0) :
+                          ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0);
             }
         *data = dz_msr[dz];
         break;
