@@ -430,14 +430,15 @@ char lineconfig[16];
 TMLN *lp;
 
 sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
-sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)data, (uint32)data, TRUE);
+sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)((PA & 1) ? data<<8 : data), (uint32)((PA & 1) ? data<<8 : data), TRUE);
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
     case 00:                                            /* CSR */
-        if (access == WRITEB) data = (PA & 1)?          /* byte? merge */
-            (dz_csr[dz] & 0377) | (data << 8):
-            (dz_csr[dz] & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?                            /* byte? merge */
+                    (dz_csr[dz] & 0377) | (data << 8):
+                    (dz_csr[dz] & ~0377) | data;
         if (data & CSR_CLR)                             /* clr? reset */
             dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
@@ -473,10 +474,12 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
 
     case 02:                                            /* TCR */
-        if (access == WRITEB) data = (PA & 1)?          /* byte? merge */
-            (dz_tcr[dz] & 0377) | (data << 8):
-            (dz_tcr[dz] & ~0377) | data;
-        if (dz_mctl) {                                  /* modem ctl? */
+        if (access == WRITEB)
+            data = (PA & 1)?                            /* byte? merge */
+                    (dz_tcr[dz] & 0377) | (data << 8):
+                    (dz_tcr[dz] & ~0377) | data;
+        if (dz_mctl && 
+            ((access != WRITEB) || (PA & 1))) {         /* modem ctl (DTR)? */
             int32 changed = data ^ dz_tcr[dz];
 
             for (i = 0; i < DZ_LINES; i++) {
@@ -484,10 +487,10 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                     continue;                           /* line unchanged skip */
                 line = (dz * DZ_LINES) + i;             /* get line num */
                 lp = &dz_ldsc[line];                    /* get line desc */
-                if (data & (1 << (TCR_V_DTR + i))) {
+                if (data & (1 << (TCR_V_DTR + i))) {    /* just asserted, so turn on */
                     tmxr_set_get_modem_bits (lp, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
                     }
-                else
+                else                                    /* just deasserted, so turn off */
                     if (dz_auto)
                         tmxr_set_get_modem_bits (lp, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);
                 }

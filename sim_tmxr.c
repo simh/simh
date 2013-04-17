@@ -1074,7 +1074,7 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
     return SCPE_ARG;
 before_modem_bits = lp->modembits;
 lp->modembits |= bits_to_set;
-lp->modembits &= ~(bits_to_clear & TMXR_MDM_INCOMING);
+lp->modembits &= ~(bits_to_clear | TMXR_MDM_INCOMING);
 if ((lp->sock) || (lp->serport)) {
     if (lp->modembits & TMXR_MDM_DTR)
         incoming_state = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
