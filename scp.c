@@ -6672,8 +6672,14 @@ if (sim_deb && (dptr->dctrl & dbits)) {
             j = i + 1;
             }
         }
-    if (i > j)
-        fwrite (&buf[j], 1, i-j, sim_deb);
+    if (i > j) {
+        if (debug_unterm)
+            fprintf (sim_deb, "%.*s", i-j, &buf[j]);
+        else                                    /* print prefix when required */
+            fprintf (sim_deb, "DBG(%.0f)%s> %s %s: %.*s", sim_gtime(), 
+                                                            AIO_MAIN_THREAD ? "" : "+",
+                                                            dptr->name, debug_type, i-j, &buf[j]);
+        }
 
 /* Set unterminated flag for next time */
 
