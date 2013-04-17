@@ -367,6 +367,7 @@ static char *dz_wr_regs[] =
 t_stat dz_rd (int32 *data, int32 PA, int32 access)
 {
 int i;
+static BITFIELD* bitdefs[] = {dz_csr_bits, dz_rbuf_bits, dz_tcr_bits, dz_msr_bits};
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
@@ -414,7 +415,8 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
         }
 
-sim_debug(DBG_REG, &dz_dev, "dz_rd(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_rd_regs[(PA >> 1) & 03], access, *data);
+sim_debug(DBG_REG, &dz_dev, "dz_rd(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, dz_rd_regs[(PA >> 1) & 03], access, *data);
+sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)(*data), (uint32)(*data), TRUE);
 
 return SCPE_OK;
 }
@@ -422,11 +424,13 @@ return SCPE_OK;
 t_stat dz_wr (int32 data, int32 PA, int32 access)
 {
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
+static BITFIELD* bitdefs[] = {dz_csr_bits, dz_lpr_bits, dz_tcr_bits, dz_tdr_bits};
 int32 i, c, line;
 char lineconfig[16];
 TMLN *lp;
 
-sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
+sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
+sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)data, (uint32)data, TRUE);
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
@@ -811,8 +815,9 @@ if (newln < dz_desc.lines) {
     for (i = newln; i < dz_desc.lines; i++) {
         if (dz_ldsc[i].conn) {
             tmxr_linemsg (&dz_ldsc[i], "\r\nOperator disconnected line\r\n");
-            tmxr_reset_ln (&dz_ldsc[i]);                /* reset line */
+            tmxr_send_buffered_data (&dz_ldsc[i]);
             }
+        tmxr_detach_ln (&dz_ldsc[i]);                   /* completely reset line */
         if ((i % DZ_LINES) == (DZ_LINES - 1))
             dz_clear (i / DZ_LINES, TRUE);              /* reset mux */
         }
