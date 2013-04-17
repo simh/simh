@@ -152,6 +152,7 @@ struct tmxr {
 
 int32 tmxr_poll_conn (TMXR *mp);
 t_stat tmxr_reset_ln (TMLN *lp);
+t_stat tmxr_detach_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 void tmxr_poll_rx (TMXR *mp);
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr);

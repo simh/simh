@@ -65,6 +65,7 @@
 
    tmxr_poll_conn -                     poll for connection
    tmxr_reset_ln -                      reset line (drops Telnet/tcp and serial connections)
+   tmxr_detach_ln -                     reset line and close per line listener and outgoing destination
    tmxr_getc_ln -                       get character for line
    tmxr_poll_rx -                       poll receive
    tmxr_putc_ln -                       put character for line
@@ -1488,6 +1489,13 @@ if (lp->serport) {                          /* close current serial connection *
     }
 }
 
+t_stat tmxr_detach_ln (TMLN *lp)
+{
+tmxr_debug_trace_line (lp, "tmxr_detaach_ln()");
+_mux_detach_line (lp, TRUE, TRUE);
+return SCPE_OK;
+}
+
 /* Open a master listening socket (and all of the other variances of connections).
 
    A listening socket for the port number described by "cptr" is opened for the
@@ -2642,6 +2650,8 @@ else {
             lp = mp->ldsc + j;
             if (mp->lines > 1) {
                 fprintf (st, "Line: %d", j);
+                if (mp->notelnet != lp->notelnet)
+                    fprintf (st, " - %telnet", lp->notelnet ? "no" : "");
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
                     fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
                 fprintf (st, "\n");
@@ -2681,17 +2691,17 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
             tmxr_report_disconnection (lp);             /* report disconnection */
             tmxr_reset_ln (lp);
             }
-        if (lp->connecting) {
-            lp->sock = lp->connecting;
-            lp->connecting = 0;
-            tmxr_reset_ln (lp);
-            }
         if (lp->serport) {
             sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
             tmxr_close_ln (lp);
             }
         free (lp->destination);
         lp->destination = NULL;
+        if (lp->connecting) {
+            lp->sock = lp->connecting;
+            lp->connecting = 0;
+            tmxr_reset_ln (lp);
+            }
         lp->conn = FALSE;
         }
     if (lp->master) {
