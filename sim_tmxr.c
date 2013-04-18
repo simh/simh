@@ -955,7 +955,8 @@ lp->ipad = NULL;
 if ((lp->destination) && (!lp->serport)) {
     if (lp->connecting)
         sim_close_sock (lp->connecting, 0);
-    lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR))
+        lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
     }
 tmxr_init_line (lp);                                /* initialize line state */
 /* Revise the unit's connect string to reflect the current attachments */
@@ -1094,9 +1095,15 @@ if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on mo
     if (bits_to_set | bits_to_clear) {              /* Anything to do? */
         if (lp->serport)
             return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
-        if (lp->sock) {
+        if ((lp->sock) || (lp->connecting)) {
             if (bits_to_clear&TMXR_MDM_DTR)             /* drop DTR? */
                 tmxr_reset_ln (lp);
+            }
+        else {
+            if ((lp->destination) &&                    /* Virtual Null Modem Cable */
+                ((bits_to_set ^ before_modem_bits) &    /* and DTR being Raised */
+                 TMXR_MDM_DTR))
+                lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
             }
         }
     return SCPE_OK;
