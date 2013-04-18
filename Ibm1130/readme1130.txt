@@ -1,5 +1,13 @@
 Here's the 1130 simulator as it stands now.
 
+Status: 25Oct2012
+
+ * Added plotter and 2250 GDU support (though, we don't
+   have the 2250 support library)
+
+ * Numerous fixes, especially the error in compiling
+   the FORTRAN sqrt() function under extended precision.
+
 Status: 22Jul2003
 
  * Added support for APL\1130 output translations

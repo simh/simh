@@ -28,6 +28,7 @@
  * ------------------------------------------------------------------------ */
 
 #include <stdarg.h>
+#include <ctype.h>
 #include <math.h>
 
 #include "ibm1130_defs.h"
@@ -91,10 +92,6 @@ DEVICE console_dev = {
 };
 
 /* reset for the "console" display device  */
-
-extern char *read_line (char *cptr, int size, FILE *stream);
-extern DEVICE *find_unit (char *cptr, UNIT **uptr);
-extern char *sim_prompt;
 
 extern UNIT cr_unit;									/* pointers to 1442 and 1132 (1403) printers */
 extern UNIT prt_unit;

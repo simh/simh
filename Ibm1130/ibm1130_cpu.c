@@ -22,6 +22,16 @@
    					Also commented out my echo command as it's now a standard simh command
    27-Nov-05 BLK    Added Arithmetic Factor Register support per Carl Claunch  (GUI only)
    06-Dec-06 BLK	Moved CGI stuff out of ibm1130_cpu.c
+   01-May-07 BLK	Changed name of function xio_1142_card to xio_1442_card. Corrected list of
+   					devices in xio_devs[] (used in debugging only).
+   24-Mar-11 BLK	Got the real IBM 1130 diagnostics (yay!). Fixed two errors detected by the CPU diagnostics:
+					-- was not resetting overflow bit after testing with BSC short form
+					   (why did I think only the long form reset OV after testing?)
+					-- failed to detect numeric overflow in Divide instructions
+					Also fixed bug where simulator performed 2nd word fetch on Long mode instructions
+					on ops that don't have long mode, blowing out the SAR/SBR display that's important in the 
+					IBM diagnostics. The simulator was decrementing the IAR after the incorrect fetch, so the 
+					instructions worked correctly, but, the GUI display was wrong.
 
 >> To do: verify actual operands stored in ARF, need to get this from state diagrams in the schematic set
    Also: determine how many bits are actually stored in the IAR in a real 1130, by forcing wraparound
@@ -91,6 +101,7 @@
    opcode in MSBits
 
    F = format. 0 = short (1 word), 1 = long (2 word) instruction
+   (Not all operations have long versions. The bit is ignored for shifts, LDX, WAIT and invalid opcodes)
 
    T = Tag    00 = no index register (e.g. IAR relative)
               01 = use index register 1 (e.g. core address 1 = M[1])
@@ -153,9 +164,6 @@ static int simh_status_to_stopcode (int status);
 
 /* hook pointers from scp.c */
 void (*sim_vm_init) (void) = &sim_init;
-extern char* (*sim_vm_read) (char *ptr, int32 size, FILE *stream);
-extern void (*sim_vm_post) (t_bool from_scp);
-extern CTAB *sim_vm_cmd;
 
 /* space to store extra simulator-specific commands */
 #define MAX_EXTRA_COMMANDS 10
@@ -222,7 +230,7 @@ t_stat cpu_set_type (UNIT *uptr, int32 value, char *cptr, void *desc);
 void calc_ints (void);
 
 extern t_stat ts_wr (int32 data, int32 addr, int32 access);
-extern UNIT cr_unit;
+extern UNIT cr_unit, prt_unit[];
 
 #ifdef ENABLE_BACKTRACE
 	static void   archive_backtrace(char *inst);
@@ -261,9 +269,15 @@ static void   trace_instruction (void);
  * ------------------------------------------------------------------------ */
 
 #define UNIT_MSIZE	(1 << (UNIT_V_UF + 7))		/* flag for memory size setting */
-#define UNIT_1800   (1 << (UNIT_V_UF + 0))		/* flag for 1800 mode */
+#define UNIT_1800   (1 << (UNIT_V_UF + 8))		/* flag for 1800 mode */
+#define UNIT_TRACE  (3 << (UNIT_V_UF + 9))		/* debugging tracing mode bits */
 
-UNIT cpu_unit = { UDATA (&cpu_svc, UNIT_FIX | UNIT_BINK | UNIT_ATTABLE | UNIT_SEQ, INIMEMSIZE) };
+#define UNIT_TRACE_NONE	 0
+#define UNIT_TRACE_IO    (1 << (UNIT_V_UF+9))
+#define UNIT_TRACE_INSTR (2 << (UNIT_V_UF+9))
+#define UNIT_TRACE_BOTH  (3 << (UNIT_V_UF+9))
+
+UNIT cpu_unit = { UDATA (&cpu_svc, UNIT_FIX | UNIT_BINK | UNIT_ATTABLE | UNIT_SEQ | UNIT_TRACE_BOTH, INIMEMSIZE) };
 
 REG cpu_reg[] = {
 	{ HRDATA (IAR, IAR, 32) },
@@ -300,14 +314,18 @@ REG cpu_reg[] = {
 };
 
 MTAB cpu_mod[] = {
-	{ UNIT_MSIZE,     4096, NULL,   "4KW",  &cpu_set_size},
-	{ UNIT_MSIZE,     8192, NULL,   "8KW",  &cpu_set_size},
-	{ UNIT_MSIZE,    16384, NULL,   "16KW", &cpu_set_size},
-	{ UNIT_MSIZE,    32768, NULL,   "32KW", &cpu_set_size},
+	{ UNIT_MSIZE,      4096, NULL,   "4KW",  &cpu_set_size},
+	{ UNIT_MSIZE,      8192, NULL,   "8KW",  &cpu_set_size},
+	{ UNIT_MSIZE,     16384, NULL,   "16KW", &cpu_set_size},
+	{ UNIT_MSIZE,     32768, NULL,   "32KW", &cpu_set_size},
 #ifdef ENABLE_1800_SUPPORT
-	{ UNIT_1800,         0, "1130", "1130", &cpu_set_type},
-	{ UNIT_1800, UNIT_1800, "1800", "1800", &cpu_set_type},
-#endif
+	{ UNIT_1800,          0, "1130", "1130", &cpu_set_type},
+	{ UNIT_1800,  UNIT_1800, "1800", "1800", &cpu_set_type},
+#endif	
+	{ UNIT_TRACE, UNIT_TRACE_NONE,  "notrace",    "NOTRACE",    NULL},
+	{ UNIT_TRACE, UNIT_TRACE_IO,    "traceIO",    "TRACEIO",    NULL},
+	{ UNIT_TRACE, UNIT_TRACE_INSTR, "traceInstr", "TRACEINSTR", NULL},
+	{ UNIT_TRACE, UNIT_TRACE_BOTH,  "traceBoth",  "TRACEBOTH",  NULL},
 	{ 0 }  };
 
 DEVICE cpu_dev = {
@@ -433,7 +451,6 @@ void calc_ints (void)
  * ------------------------------------------------------------------------ */
 
 #define INCREMENT_IAR 	IAR = (IAR + 1) & mem_mask
-#define DECREMENT_IAR 	IAR = (IAR - 1) & mem_mask
 
 void bail (char *msg)
 {
@@ -441,35 +458,52 @@ void bail (char *msg)
 	exit(1);
 }
 
-static void weirdop (char *msg, int offset)
+static void weirdop (char *msg)
 {
-	printf("Weird opcode: %s at %04x\n", msg, IAR+offset);
+	printf("Weird opcode: %s at %04x\n", msg, IAR-1);
 }
 
 static char *xio_devs[]  = {
-	"0?", "console", "1142card", "1134papertape",
-	"dsk0", "1627plot", "1132print", "switches",
-	"1231omr", "2501card", "comm", "b?",
-	"sys7", "d?", "e?", "f?",
-	"10?", "dsk1", "dsk2", "dsk3",
-	"dsk4", "dsk5", "dsk6", "dsk7+",
-	"18?", "2250disp", "2741attachment", "1b",
-	"1c?", "1d?", "1e?", "1f?"
+	"dev-00?",	"console", 	"1442card",		"1134ptape",
+	"dsk0", 	"1627plot", "1132print",	"switches",
+	"1231omr", 	"2501card",	"sca",	 		"dev-0b?",
+	"sys7", 	"dev-0d?", 	"dev-0e?", 		"dev-0f?",
+	"dev-10?", 	"dsk1",	 	"dsk2",			"dsk3",
+	"dsk4",		"1403prt",	"dsk5", 		"2311drv2",
+	"dev-18?", 	"2250disp",	"2741term", 	"dev-1b",
+	"dev-1c?", 	"dev-1d?",	"dev-1e?", 		"dev-1f?"
 };
 
 static char *xio_funcs[] = {
-	"0?", "write", "read", "sense_irq",
+	"func0?",  "write", "read",  "sense_irq",
 	"control", "initw", "initr", "sense"
 };
 
 t_stat sim_instr (void)
 {
 	int32 i, eaddr, INDIR, IR, F, DSPLC, word2, oldval, newval, src, src2, dst, abit, xbit;
-	int32 iocc_addr, iocc_op, iocc_dev, iocc_func, iocc_mod;
+	int32 iocc_addr, iocc_op, iocc_dev, iocc_func, iocc_mod, result;
 	char msg[50];
 	int cwincount = 0, status;
 	static long ninstr = 0;
 	static char *intlabel[] = {"INT0","INT1","INT2","INT3","INT4","INT5"};
+
+	/* the F bit indicates a two-word instruction for most instructions except the ones marked FALSE below */
+	static t_bool F_bit_used[] = {									/* FALSE for those few instructions that don't have a long instr version */
+	  /*undef  XIO   SLx    SRx    LDS    STS   WAIT   undef */
+		FALSE, TRUE, FALSE, FALSE, FALSE, TRUE, FALSE, FALSE,
+	  /*BSI    BSC   undef  undef  LDX    STX   MDX    undef */
+		TRUE,  TRUE, FALSE, FALSE, TRUE,  TRUE, TRUE,  FALSE,
+	  /*A      AD    S      SD     M      D     CPU dependent */
+		TRUE,  TRUE, TRUE,  TRUE,  TRUE,  TRUE, FALSE, FALSE,
+	  /*LD     LDD   STO    STD    AND    OR    EOR    undef */
+		TRUE,  TRUE, TRUE,  TRUE,  TRUE,  TRUE, TRUE,  FALSE
+	};
+
+#ifdef ENABLE_1800_SUPPORT
+	F_bit_used[0x16] = is_1800;				/* these two are defined and do have long versions on the 1800 */
+	F_bit_used[0x17] = is_1800;				/* but are undefined on the 1130, so set these accordingly */
+#endif
 
 	if (cgi)								/* give CGI hook function a chance to do something */
 		cgi_start();
@@ -581,7 +615,7 @@ t_stat sim_instr (void)
 		}
 
 		ninstr++;
-		if (cpu_unit.flags & UNIT_ATT)
+		if ((cpu_unit.flags & (UNIT_ATT|UNIT_TRACE_INSTR)) == (UNIT_ATT|UNIT_TRACE_INSTR))
 			trace_instruction();			/* log CPU details if logging is enabled */
 
 		prev_IAR = IAR;						/* save IAR before incrementing it */
@@ -598,7 +632,7 @@ t_stat sim_instr (void)
 
 		/* here I compute the usual effective address on the assumption that the instruction will need it. Some don't. */
 
-		if (F) {							/* long instruction, ASSUME it's valid (have to decrement IAR if not) */
+		if (F && F_bit_used[OP]) {			/* long instruction, except for a few that don't have a long mode, like WAIT */
 			INDIR = IR & 0x0080;			/* indirect bit */
 			DSPLC = IR & 0x007F;			/* displacement or modifier */
 			if (DSPLC & 0x0040)
@@ -612,6 +646,8 @@ t_stat sim_instr (void)
 				eaddr += ReadIndex(TAG);	/* add index register value */
 			if (INDIR)						/* if indirect addressing */
 				eaddr = ReadW(eaddr);		/* pick up referenced address */
+			
+			/* to do: the previous steps may lead to incorrect GUI SAR/SBR display if the instruction doesn't actually fetch anything. Check this. */
 		}
 		else {								/* short instruction, use displacement */
 			INDIR = 0;						/* never indirect */
@@ -623,6 +659,8 @@ t_stat sim_instr (void)
 				eaddr = ReadIndex(TAG) + DSPLC;	/* add index register value */
 			else
 				eaddr = IAR + DSPLC;		/* otherwise relative to IAR after fetch */
+
+			/* to do: the previous steps may lead to incorrect GUI SAR/SBR display if the instruction doesn't actually fetch the index value. Check this. */
 		}
 
 		switch (OP) { 						/* decode instruction */
@@ -634,16 +672,14 @@ t_stat sim_instr (void)
 				iocc_func = (iocc_op  >>  8) & 0x0007;
 				iocc_mod  =  iocc_op         & 0x00FF;
 
-				if (cpu_unit.flags & UNIT_ATT)
-					trace_io("* XIO %s %s mod %02x addr %04x", xio_funcs[iocc_func], xio_devs[iocc_dev], iocc_mod, iocc_addr);
-
-/*				fprintf(stderr, "* XIO %s %s mod %02x addr %04x\n", xio_funcs[iocc_func], xio_devs[iocc_dev], iocc_mod, iocc_addr); */
+				if ((cpu_unit.flags & (UNIT_ATT|UNIT_TRACE_IO)) == (UNIT_ATT|UNIT_TRACE_IO))
+					trace_io("* XIO %s %s mod %02x addr %04x", xio_funcs[iocc_func], (iocc_func == XIO_SENSE_IRQ) ? "-" : xio_devs[iocc_dev], iocc_mod, iocc_addr);
 
 				ACC = 0;							/* ACC is destroyed, and default XIO_SENSE_DEV result is 0 */
 
 				switch (iocc_func) {
 					case XIO_UNUSED:
-						sprintf(msg, "Unknown op %x on device %02x", iocc_func, iocc_dev);
+						sprintf(msg, "Unknown XIO op %x on device %02x (%s)", iocc_func, iocc_dev,  xio_devs[iocc_dev]);
 						xio_error(msg);
 						break;
 					
@@ -656,8 +692,8 @@ t_stat sim_instr (void)
 							case 0x01:				/* console keyboard and printer */
 								xio_1131_console(iocc_addr, iocc_func, iocc_mod);
 								break;
-							case 0x02:				/* 1142 card reader/punch */
-								xio_1142_card(iocc_addr, iocc_func, iocc_mod);
+							case 0x02:				/* 1442 card reader/punch */
+								xio_1442_card(iocc_addr, iocc_func, iocc_mod);
 								break;
 							case 0x03:				/* 1134 paper tape reader/punch */
 								xio_1134_papertape(iocc_addr, iocc_func, iocc_mod);
@@ -724,10 +760,8 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x02:						/* --- SLA,SLT,SLC,SLCA,NOP - Shift Left family --- */
-				if (F) {
-					weirdop("Long Left Shift", -2);
-					DECREMENT_IAR;
-				}
+				if (F)
+					weirdop("Long Left Shift");
 
 				CCC = ((TAG == 0) ? DSPLC : ReadIndex(TAG)) & 0x003F;
 				ARFSET(CCC);
@@ -764,7 +798,7 @@ t_stat sim_instr (void)
 								CCC--;
 							}
 							C = (CCC != 0);
-							WriteIndex(TAG, (ReadIndex(TAG) & 0xFF00) | CCC);   /* put 6 bits back into low byte of index register */
+							WriteIndex(TAG, ReadIndex(TAG) & 0xFF00 | CCC);		/* put 6 bits back into low byte of index register */
 							break;
 						}
 						/* if TAG == 0, fall through and treat like normal shift SLT */
@@ -786,10 +820,8 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x03:						/* --- SRA, SRT, RTE - Shift Right family --- */
-				if (F) {
-					weirdop("Long Right Shift", -2);
-					DECREMENT_IAR;
-				}
+				if (F)
+					weirdop("Long Right Shift");
 
 				CCC = ((TAG == 0) ? DSPLC : ReadIndex(TAG)) & 0x3F;
 				ARFSET(CCC);
@@ -810,8 +842,8 @@ t_stat sim_instr (void)
 						while (CCC > 0) {
 							xbit = (ACC & 0x0001) << 15;
 							abit = (ACC & 0x8000);
-							ACC  = ((ACC >> 1) & 0x7FFF) | abit;
-							EXT  = ((EXT >> 1) & 0x7FFF) | xbit;
+							ACC  = (ACC >> 1) & 0x7FFF | abit;
+							EXT  = (EXT >> 1) & 0x7FFF | xbit;
 							CCC--;
 						}
 						break;
@@ -820,8 +852,8 @@ t_stat sim_instr (void)
 						while (CCC > 0) {
 							abit = (EXT & 0x0001) << 15;
 							xbit = (ACC & 0x0001) << 15;
-							ACC  = ((ACC >> 1) & 0x7FFF) | abit;
-							EXT  = ((EXT >> 1) & 0x7FFF) | xbit;
+							ACC  = (ACC >> 1) & 0x7FFF | abit;
+							EXT  = (EXT >> 1) & 0x7FFF | xbit;
 							CCC--;
 						}
 						break;
@@ -833,10 +865,8 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x04:						/* --- LDS - Load Status --- */
-				if (F) {							/* never fetches second word? */
-					weirdop("Long LDS", -2);
-					DECREMENT_IAR;
-				}
+				if (F)						/* never fetches second word? */
+					weirdop("Long LDS");
 
 				V = (DSPLC & 1);
 				C = (DSPLC & 2) >> 1;
@@ -854,11 +884,15 @@ t_stat sim_instr (void)
 				break;
 
 			case 0x06:						/* --- WAIT --- */
+/* I am no longer doing the fetch if a long wait is encountered
+ * The 1130 diagnostics use WAIT instructions with the F bit set in some display error codes.
+ * (The wait instruction's opcode is displayed in the Storage Buffer Register on the console display, 
+ * since the last thing fetched was the instruction)
+ */
 				wait_state = WAIT_OP;
-				if (F) {							/* what happens if we use long format? */
-					weirdop("Long WAIT", -2);
-					DECREMENT_IAR;					/* assume it wouldn't have fetched 2nd word? */
-				}
+
+				SAR = prev_IAR;		/* this is a hack; ensure that the SAR/SBR display shows the WAIT instruction fetch */
+				SBR = IR;
 				break;
 
 			case 0x08:						/* --- BSI - Branch and store IAR --- */
@@ -1023,10 +1057,20 @@ t_stat sim_instr (void)
 
 				ARFSET(src2);
 
-				if (src2 == 0)
+	/* 24-Mar-11 - Failed IBM diagnostics because I was not checking for overflow here. Fixed.
+	 *             Have to check for special case of -maxint / -1 because Windows (at least) generates an exception
+	 */
+				if (src2 == 0) {
 					V = 1;							/* divide by zero just sets overflow, ACC & EXT are undefined */
+				}
+				else if (src2 == -1 && src == 0x80000000) {
+					V = 1;							/* another special case: max negative int / -1 also overflows */
+				}
 				else {
-					ACC = (src / src2) & 0xFFFF;
+					result = src / src2;			/* compute dividend */
+					if ((result > 32767) || (result < -32768))
+						V = 1;						/* if result does not fit into 16 bits, we have an overflow */
+					ACC = result & 0xFFFF;
 					EXT = (src % src2) & 0xFFFF;
 				}
 				break;
@@ -1105,13 +1149,11 @@ t_stat sim_instr (void)
 /*			case 0x07: */
 /*			case 0x0a: */
 /*			case 0x0b: */
-/*			case 0x0e: */
 /*			case 0x0f: */
 /*			case 0x1f: */
 				wait_state = WAIT_INVALID_OP;
-				if (F)
-					DECREMENT_IAR;					/* assume it wouldn't have fetched 2nd word? */
-
+				SAR = prev_IAR;		/* this is a hack; ensure that the SAR/SBR display shows the WAIT instruction fetch */
+				SBR = IR;
 				break;
 		}											/* end instruction decode switch */
 
@@ -1164,6 +1206,7 @@ static int simh_status_to_stopcode (int status)
  * bsctest - perform standard set of condition tests. We return TRUE if any
  * of the condition bits specified in DSPLC test positive, FALSE if none are true.
  * If reset_V is TRUE, we reset the oVerflow flag after testing it.
+ * 24-Mar-11: no, we reset the oVerflow flag no matter what reset_V is
  * ------------------------------------------------------------------------ */
 
 static t_bool bsctest (int32 DSPLC, t_bool reset_V)
@@ -1171,7 +1214,8 @@ static t_bool bsctest (int32 DSPLC, t_bool reset_V)
 	if (DSPLC & 0x01) {						/* Overflow off (note inverted sense) */
 		if (! V)
 			return TRUE;
-		else if (reset_V)					/* reset after testing */
+// 24-Mar-11 - V is always reset when tested, in both the long and short forms of the instructions
+//		else if (reset_V)					/* reset after testing */
 			V = 0;
 	}
 
@@ -1253,7 +1297,7 @@ t_stat cpu_reset (DEVICE *dptr)
 	wait_state = 0;						/* cancel wait */
 	wait_lamp  = TRUE;					/* but keep the wait lamp lit on the GUI */
 
-	if (cpu_unit.flags & UNIT_ATT) {						/* record reset in CPU log */
+	if ((cpu_unit.flags & (UNIT_ATT|UNIT_TRACE_INSTR)) == (UNIT_ATT|UNIT_TRACE_INSTR)) {	/* record reset in CPU log */
 		fseek(cpu_unit.fileref, 0, SEEK_END);
 		fprintf(cpu_unit.fileref, "---RESET---" CRLF);
 	}
@@ -1451,7 +1495,7 @@ t_stat register_cmd (char *name, t_stat (*action)(int32 flag, char *ptr), int ar
  * echo_cmd - just echo the command line
  * ------------------------------------------------------------------------ */
 
-static t_stat echo_cmd (int flag, char *cptr)
+static t_stat echo_cmd (int32 flag, char *cptr)
 {
 	printf("%s\n", cptr);
 	return SCPE_OK;
@@ -1794,6 +1838,11 @@ static void trace_instruction (void)
 	fputs(CRLF, cpu_unit.fileref);
 }
 
+static void trace_common (FILE *fout)
+{
+	fprintf(fout, "[IAR %04x IPL %c] ", IAR, (ipl < 0) ? ' ' : ('0' + ipl));
+}
+
 void trace_io (char *fmt, ...)
 {
 	va_list args;
@@ -1801,6 +1850,7 @@ void trace_io (char *fmt, ...)
 	if ((cpu_unit.flags & UNIT_ATT) == 0)
 		return;
 
+	trace_common(cpu_unit.fileref);
 	va_start(args, fmt);							/* get pointer to argument list */
 	vfprintf(cpu_unit.fileref, fmt, args);			/* write errors to cpu log file */
 	va_end(args);
@@ -1813,12 +1863,14 @@ void trace_both (char *fmt, ...)
 	va_list args;
 
 	if (cpu_unit.flags & UNIT_ATT) {
+		trace_common(cpu_unit.fileref);
 		va_start(args, fmt);						/* get pointer to argument list */
 		vfprintf(cpu_unit.fileref, fmt, args);
 		va_end(args);
 		fputs(CRLF, cpu_unit.fileref);
 	}
 
+	trace_common(stdout);
 	va_start(args, fmt);							/* get pointer to argument list */
 	vfprintf(stdout, fmt, args);
 	va_end(args);
@@ -1830,17 +1882,32 @@ void trace_both (char *fmt, ...)
 void debug_print (char *fmt, ...)
 {
 	va_list args;
+	FILE *fout = stdout;
+	t_bool binarymode = FALSE;
+
+#define DEBUG_TO_PRINTER
+
+#ifdef DEBUG_TO_PRINTER
+	if (prt_unit[0].fileref != NULL) {		/* THIS IS TEMPORARY */
+		fout = prt_unit[0].fileref;
+		binarymode = TRUE;
+	}
+#endif
 
 	va_start(args, fmt);
-	vprintf(fmt, args);
+	vfprintf(fout, fmt, args);
 	if (cpu_unit.flags & UNIT_ATT)
 		vfprintf(cpu_unit.fileref, fmt, args);
 	va_end(args);
 
 	if (strchr(fmt, '\n') == NULL) {		/* be sure to emit a newline */
-		putchar('\n');
+		if (binarymode)
+			fputs(CRLF, fout);
+		else
+			putc('\n', fout);
+
 		if (cpu_unit.flags & UNIT_ATT)
-			putc('\n', cpu_unit.fileref);
+			fputs(CRLF, cpu_unit.fileref);
 	}
 }
 

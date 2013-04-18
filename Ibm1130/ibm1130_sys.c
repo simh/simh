@@ -35,6 +35,7 @@ extern DEVICE gdu_dev, console_dev, plot_dev;
 extern UNIT  cpu_unit;
 extern REG   cpu_reg[];
 extern int32 saved_PC;
+extern t_bool is_1800;
 
 /* SCP data structures and interface routines
 
@@ -290,12 +291,10 @@ static int ebcdic_to_ascii (int ch)
 
 t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 {
-	int32 cflag, ch, OP, F, TAG, INDIR, DSPLC, IR, eaddr;
+	int32 ch, OP, F, TAG, INDIR, DSPLC, IR, eaddr;
 	char *mnem, tst[12];
 
-	cflag = (uptr == NULL) || (uptr == &cpu_unit);
-
-/*  if (sw & SWMASK ('A')) {				// ASCII? not useful
+/*  if (sw & SWMASK ('A')) {					// ASCII? not useful
  		fprintf (of, (c1 < 040)? "<%03o>": "%c", c1);
 		return SCPE_OK;
 	}
@@ -348,6 +347,13 @@ t_stat fprint_sym (FILE *of, t_addr addr, t_value *val, UNIT *uptr, int32 sw)
 	}
 
 	mnem = opcode[OP];					/* get mnemonic */
+	if (is_1800) {						/* these two are defined on the 1800 but undefined on the 1130 */
+		if (OP == 0x16)
+			mnem = "CMP ";
+		else if (OP == 0x17)
+			mnem = "DCMP";
+	}
+
 	if (OP == 0x02) {					/* left shifts are special */
 		mnem = lsopcode[(DSPLC >> 6) & 0x0003];
 		DSPLC &= 0x003F;
@@ -459,7 +465,7 @@ int strnicmp (const char *a, const char *b, size_t n)
 {
 	int ca, cb;
 
-	if (n == 0) return 0;					/* zero length compare is equal */
+	if (n == 0) return 0;				/* zero length compare is equal */
 
 	for (;;) {
 		if ((ca = *a) == 0)				/* get character, stop on null terminator */

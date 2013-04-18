@@ -115,6 +115,7 @@ char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
 t_value strtotv (const char *cptr, char **endptr, uint32 radix);
 t_stat fprint_val (FILE *stream, t_value val, uint32 rdx, uint32 wid, uint32 fmt);
+char *read_line (char *cptr, int32 size, FILE *stream);
 void fprint_reg_help (FILE *st, DEVICE *dptr);
 void fprint_set_help (FILE *st, DEVICE *dptr);
 void fprint_show_help (FILE *st, DEVICE *dptr);
@@ -163,6 +164,7 @@ extern FILE *sim_deb;                                   /* debug file */
 extern FILEREF *sim_deb_ref;                            /* debug file file reference */
 extern UNIT *sim_clock_queue;
 extern int32 sim_is_running;
+extern char *sim_prompt;                                /* prompt string */
 extern volatile int32 stop_cpu;
 extern uint32 sim_brk_types;                            /* breakpoint info */
 extern uint32 sim_brk_dflt;

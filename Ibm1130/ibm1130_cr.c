@@ -1,5 +1,6 @@
 #include "ibm1130_defs.h"
 #include "ibm1130_fmt.h"
+#include <ctype.h>
 
 #ifdef _WIN32
 #  include <io.h>		/* Microsoft puts definition of mktemp into io.h rather than stdlib.h */
@@ -17,6 +18,16 @@
  *
  * This is not a supported product, but I welcome bug reports and fixes.
  * Mail to simh@ibm1130.org
+
+ *  Update 2012-10-12  Added ability to specify tab expansion width in deck files
+
+ *  Update 2008-11-24  Made card reader attach always use read-only mode, so if file does not exist
+                       it will not be created as an empty file. Fixed bug in BOOT CR (cold start from card)
+					   that resulted in seeing cold card data again when next card was read. (This caused
+					   the DMS load deck to fail, for instance).
+
+ *  Update 2007-05-01  Changed name of function xio_1142_card to xio_1442_card.
+					   Took six years to notice the mistake.
 
  *  Update 2006-01-23  More fixes, in call to mktemp and in 2501 support, also thanks
  					   to Carl Claunch.
@@ -60,25 +71,29 @@
 
    The ATTACH CR command accepts several command-line switches
 
-   -q quiet mode, the simulator will not print the name of each file it opens
-      while processing deck files (which are discussed below). For example,
+     -q quiet mode, the simulator will not print the name of each file it opens
+        while processing deck files (which are discussed below). For example,
 	  
-	  ATTACH -q @deckfile
+	    ATTACH CR -q @deckfile
 
-   -l makes the simulator convert lower case letters in text decks
-      to the IBM lower-case Hollerith character codes. Normally, the simulator
-	  converts lower case input to the uppercase Hollerith character codes.
-	  (Lowercase codes are used in APL\1130 save decks).
+     -l makes the simulator convert lower case letters in text decks
+        to the IBM lower-case Hollerith character codes. Normally, the simulator
+	    converts lower case input to the uppercase Hollerith character codes.
+	    (Lowercase codes are used in APL\1130 save decks).
 
-   -d prints a lot of simulator debugging information
+     -d prints a lot of simulator debugging information
 
-   -f converts tabs in an ascii file to spaces according to Fortran column conventions
-   -a converts tabs in an ascii file to spaces according to 1130 Assembler column conventions
-   -t converts tabs in an ascii file to spaces, with tab settings every 8 columns
-      (See below for a discussion of tab formatting)
+     -f converts tabs in an ascii file to spaces according to Fortran column conventions
+     -a converts tabs in an ascii file to spaces according to 1130 Assembler column conventions
+     -t converts tabs in an ascii file to spaces, with tab settings every 8 columns
+     -# converts tabs in an ascii file to spaces, with tab settings every # columns
+        (See below for a discussion of tab formatting)
 
-   -p means that filename is a COM port connected to a physical card reader using
-      the CARDREAD interface (see http://ibm1130.org/sim/downloads)
+     -p means that filename is a COM port connected to a physical card reader using
+        the CARDREAD interface (see http://ibm1130.org/sim/downloads)
+
+   NOTE: for the Card Reader (CR), the -r (readonly) switch is implied. If the file does
+   not exist, it will NOT be created.
 
    The ATTACH CP command accepts the -d switch.
 
@@ -95,7 +110,7 @@
    arguments to ibm1130, or to the "do" command if a "do" script is executing, if the
    attach command is constructed this way:
 
-	   attach @deckfile %1 %2 %3
+	   attach CR @deckfile %1 %2 %3
    	
    This will pass the ibm1130 or do script arguments to attach, which will make
    them available in the deckfile. Then, for instance the line
@@ -114,6 +129,7 @@
 			af		forces 029 ascii conversion, and interprets tabs in Fortran mode
 			aa		forces 029 ascii conversion, and interprets tabs in 1130 Assembler mode
 			at		forces 029 ascii conversion, and interprets tabs with settings every 8 spaces
+			a#		forces 029 ascii conversion, and interprets tabs with settings every # spaces
 
    If "a" or "b" mode is not specified, the device mode setting is used.  In this case,
    if the mode is "auto", the simulator will select binary or 029 by inspecting each
@@ -644,10 +660,12 @@ static CPCODE cardcode_026F[] =		/* 026 fortran */
 	0x0220,		'\'',
 	0x8420,		'.',
 	0x8220,		')',
+	0x8220,		'<',				/* if ASCII has <, treat like ) */
 	0x4420,		'$',
 	0x4220,		'*',
 	0x2420,		',',
 	0x2220,		'(',
+	0x2220,		'%',				/* if ASCII has %, treat like ) */
 };
 
 static CPCODE cardcode_026C[] =		/* 026 commercial */
@@ -695,11 +713,13 @@ static CPCODE cardcode_026C[] =		/* 026 commercial */
 	0x0420,		'=',
 	0x0220,		'\'',
 	0x8420,		'.',
-	0x8220,		')',
+	0x8220,		'<',
+	0x8220,		')',			/* if ASCII has ), treat like < */
 	0x4420,		'$',
 	0x4220,		'*',
 	0x2420,		',',
-	0x2220,		'(',
+	0x2220,		'%',
+	0x2220,		'(',			/* if ASCII has (, treat like % */
 };
 
 extern int cgi;
@@ -717,7 +737,8 @@ static int any_punched = 0;
 #define MAXARGS   10					/* max number of arguments to save */
 static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN];
 static int list_nargs = 0;
-static char* (*tab_proc)(char*) = NULL;		/* tab reformatting routine	*/
+static char* (*tab_proc)(char* str, int width) = NULL;		/* tab reformatting routine	*/
+static int tab_width = 8;
 
 static uint16 punchstation[80];
 static uint16 readstation[80];
@@ -776,10 +797,12 @@ t_stat set_active_cr_code (int match)
 	if (! lookup_codetable(match, &code, &ncode))
 		return SCPE_ARG;
 
-	memset(ascii_to_card, 0, sizeof(ascii_to_card));
+	if (code != NULL) {					/* if an ASCII mode was selected */
+		memset(ascii_to_card, 0, sizeof(ascii_to_card));
 
-	for (i = 0; i < ncode; i++)		/* set ascii to card code table */
-		ascii_to_card[code[i].ascii] = code[i].hollerith;
+		for (i = 0; i < ncode; i++)		/* set ascii to card code table */
+			ascii_to_card[code[i].ascii] = code[i].hollerith;
+	}
 
 	return SCPE_OK;
 }
@@ -938,19 +961,19 @@ t_stat load_cr_boot (int drvno, int switches)
 	}
 									/* quiet switch or CGI mode inhibit the boot remark */
 	if (((switches & SWMASK('Q')) == 0) && ! cgi) {					/* 3.0-3, parenthesized & operation, per lint check */
-		sprintf(msg, "Loaded %s cold start card\n", name);
+		sprintf(msg, "Loaded %s cold start card", name);
 
 #ifdef GUI_SUPPORT
 		remark_cmd(msg);
 #else
-		printf("%s", msg);
+		printf("%s\n", msg);
 #endif
 	}
 
 	return SCPE_OK;
 }
 
-t_stat cr_boot (int32 unitno, DEVICE *dptr)
+t_stat cr_boot (int unitno, DEVICE *dptr)
 {
 	t_stat rval;
 	int i;
@@ -962,7 +985,7 @@ t_stat cr_boot (int32 unitno, DEVICE *dptr)
 		return load_cr_boot(-1, 0);
 
 	if (GET_ACTCODE(cr_unit) != CODE_BINARY) {
-		printf("Can only boot from card reader when set to BINARY mode");
+		printf("Can only boot from card reader when set to BINARY mode\n");
 		return SCPE_IOERR;
 	}
 
@@ -970,6 +993,11 @@ t_stat cr_boot (int32 unitno, DEVICE *dptr)
 		return SCPE_IOERR;
 
 	feedcycle(TRUE, FALSE);
+
+	if (readstate != STATION_LOADED) {
+		printf("No cards in reader\n");
+		return SCPE_IOERR;
+	}
 
 /*	if (fxread(buf, sizeof(buf[0]), 80, cr_unit.fileref) != 80) */
 /*		return SCPE_IOERR; */
@@ -979,6 +1007,7 @@ t_stat cr_boot (int32 unitno, DEVICE *dptr)
 	for (i = 0; i < 80; i++)					/* shift 12 bits into 16 */
 		WriteW(i, (readstation[i] & 0xF800) | ((readstation[i] & 0x0400) ? 0x00C0 : 0x0000) | ((readstation[i] & 0x03F0) >> 4));
 
+	readstate = STATION_READ;					/* the current card has been consumed */
 	return SCPE_OK;
 }
 
@@ -1110,7 +1139,7 @@ again:		/* jump here if we've loaded a new deck after emptying the previous one 
 
 			if (tab_proc != NULL) {						/* apply tab editing, if specified */
 				buf[nread] = '\0';						/* .. be sure string is terminated	*/
-				result = (*tab_proc)(buf);				/* .. convert tabs 	spaces	 		*/
+				result = (*tab_proc)(buf, tab_width);	/* .. convert tabs 	spaces	 		*/
 				nread  = strlen(result);				/* .. set new read length			*/
 			}
 			else
@@ -1247,7 +1276,7 @@ static void checkdeck (void)
 
 static t_bool nextdeck (void)
 {
-	char buf[200], tmpbuf[200], *fname, *c, quote, *mode;
+	char buf[200], tmpbuf[200], *fname, *c, quote;
 	int code;
 	long fpos;
 
@@ -1271,6 +1300,7 @@ static t_bool nextdeck (void)
 
 	for (;;) {								/* get a filename */
 		tab_proc = NULL;					/* default: no tab editing */
+		tab_width = 8;
 
 		if (fgets(buf, sizeof(buf), deckfile) == NULL)
 			break;							/* oops, no more names */
@@ -1391,7 +1421,7 @@ static t_bool nextdeck (void)
 			continue;
 		}
 
-		mode = c = skipbl(c);						/* skip to next token, which would be mode, if present */
+		c = skipbl(c);						/* skip to next token, which would be mode, if present */
 
 		switch (*c) {
 			case 'b':
@@ -1422,6 +1452,13 @@ static t_bool nextdeck (void)
 					case 'T':
 						tab_proc = EditToWhitespace;
 						c++;
+						tab_width = 0;				/* see if there is a digit after the 4 -- if so use it as tab expansion width */
+						while (isdigit(*c))
+							tab_width = tab_width*10 + *c++ - '0';
+
+						if (tab_width == 0)
+							tab_width = 8;
+
 						break;
 				}
 		}
@@ -1430,10 +1467,10 @@ static t_bool nextdeck (void)
 			code = guess_cr_code();
 
 		if (cpu_unit.flags & UNIT_ATT)
-			trace_io("(Opened %s deck %s%s)\n", (code == CODE_BINARY) ? "binary" : "text", fname, tab_proc ? (*tab_proc)(NULL) : "");
+			trace_io("(Opened %s deck %s%s)\n", (code == CODE_BINARY) ? "binary" : "text", fname, tab_proc ? (*tab_proc)(NULL, tab_width) : "");
 
 		if (! (cr_unit.flags & UNIT_QUIET))
-			printf(  "(Opened %s deck %s%s)\n", (code == CODE_BINARY) ? "binary" : "text", fname, tab_proc ? (*tab_proc)(NULL) : "");
+			printf(  "(Opened %s deck %s%s)\n", (code == CODE_BINARY) ? "binary" : "text", fname, tab_proc ? (*tab_proc)(NULL, tab_width) : "");
 
 		break;
 	}
@@ -1510,7 +1547,7 @@ t_stat cr_rewind (void)
 static t_stat cr_attach (UNIT *uptr, char *cptr)
 {
 	t_stat rval;
-	t_bool use_decklist;
+	t_bool use_decklist, old_quiet;
 	char *c, *arg, quote;
 
 	cr_detach(uptr);								/* detach file and possibly deck file */
@@ -1518,7 +1555,10 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 	CLRBIT(uptr->flags, UNIT_SCRATCH|UNIT_QUIET|UNIT_DEBUG|UNIT_PHYSICAL|UNIT_LOWERCASE);	/* set options */
 
 	tab_proc = NULL;
+	tab_width = 8;
 	use_decklist = FALSE;
+
+	sim_switches |= SWMASK('R');	// the card reader is readonly. Don't create an empty file if file does not exist
 
 	if (sim_switches & SWMASK('D')) SETBIT(uptr->flags, UNIT_DEBUG);
 	if (sim_switches & SWMASK('Q')) SETBIT(uptr->flags, UNIT_QUIET);
@@ -1589,8 +1629,14 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 		SETBIT(uptr->flags, UNIT_ATT);
 		uptr->pos = 0;
 	}
-	else if ((rval = attach_unit(uptr, cptr)) != SCPE_OK) {
-		return rval;
+	else {
+		old_quiet = sim_quiet;						/* attach the file, but set sim_quiet so we don't get the "CR is read-only" message */
+		sim_quiet = TRUE;
+		rval = attach_unit(uptr, cptr);
+		sim_quiet = old_quiet;
+
+		if (rval != SCPE_OK)						/* file did not exist */
+			return rval;
 	}
 
 	if (use_decklist) {								/* if we skipped the '@', store the actually-specified name */
@@ -1667,10 +1713,10 @@ static t_stat cp_detach   (UNIT *uptr)
 	return detach_unit(uptr);
 }
 
-static void op_done (UNIT *u, t_bool issue_intr)
+static void op_done (UNIT *u, char *opname, t_bool issue_intr)
 {
 	if (u->flags & UNIT_DEBUG)
-		DEBUG_PRINT("!CR Op Complete, card %d", cr_count);
+		DEBUG_PRINT("!CR %s Op Complete, card %d%s", opname, cr_count, issue_intr ? ", interrupt" : "");
 
 	SET_OP(OP_IDLE);
 
@@ -1704,7 +1750,7 @@ static t_stat cr_svc (UNIT *uptr)
 			break;
 
 		case OP_FEEDING:
-			op_done(&cr_unit, FALSE);
+			op_done(&cr_unit, "feed", FALSE);
 			break;
 
 		case OP_READING:
@@ -1718,10 +1764,7 @@ static t_stat cr_svc (UNIT *uptr)
 					M[(cr_addr + i) & mem_mask] = readstation[i];
 
 				readstate = STATION_READ;
-				if (cr_unit.flags & UNIT_DEBUG)
-					DEBUG_PRINT("!CR Op Complete, card %d", cr_count);
-
-				op_done(&cr_unit, TRUE);
+				op_done(&cr_unit, "read", TRUE);
 			}
 			else if (++cr_unit.COLUMN < 80) {			/* 1442 interrupts on each column... */
 				SETBIT(cr_dsw,  CR_DSW_1442_READ_RESPONSE);
@@ -1733,7 +1776,7 @@ static t_stat cr_svc (UNIT *uptr)
 			}
 			else {										/* ... then issues op-complete */
 				readstate = STATION_READ;
-				op_done(&cr_unit, TRUE);
+				op_done(&cr_unit, "read", TRUE);
 			}
 			break;
 
@@ -1745,7 +1788,7 @@ static t_stat cr_svc (UNIT *uptr)
 
 			if (cp_unit.flags & UNIT_LASTPUNCH) {
 				punchstate = STATION_PUNCHED;
-				op_done(&cp_unit, TRUE);
+				op_done(&cp_unit, "punch", TRUE);
 			}
 			else if (++cp_unit.COLUMN < 80) {
 				SETBIT(cr_dsw,  CR_DSW_1442_PUNCH_RESPONSE);
@@ -1757,7 +1800,7 @@ static t_stat cr_svc (UNIT *uptr)
 			}
 			else {
 				punchstate = STATION_PUNCHED;
-				op_done(&cp_unit, TRUE);
+				op_done(&cp_unit, "punch", TRUE);
 			}
 			break;
 	}
@@ -1853,7 +1896,7 @@ void xio_2501_card (int32 addr, int32 func, int32 modify)
 	}
 }
 
-void xio_1142_card (int32 addr, int32 func, int32 modify)
+void xio_1442_card (int32 addr, int32 func, int32 modify)
 {
 	char msg[80];
 	int ch;
@@ -2579,8 +2622,7 @@ static t_stat pcr_svc (UNIT *uptr)
 			break;
 
 		case OP_READING:
-			if (pcr_nready >= 2) {						/* if there is a whole column buffered, simulate column interrupt*/
-											/* pcr_trigger_interrupt_0 - simulate a read response interrupt so OS will read queued column data */
+			if (pcr_nready >= 2) {							/* if there is a whole column buffered, simulate column interrupt/* pcr_trigger_interrupt_0 - simulate a read response interrupt so OS will read queued column data */
 
 				pcr_trigger_interrupt_0();
 				sim_activate(&cr_unit, cr_wait);			/* keep checking frequently */
@@ -2588,7 +2630,7 @@ static t_stat pcr_svc (UNIT *uptr)
 			else if (pcr_done) {
 				pcr_done = FALSE;
 				cr_count++;
-				op_done(&cr_unit, TRUE);
+				op_done(&cr_unit, "pcr read", TRUE);
 				pcr_set_dsw_from_status(TRUE);
 			}
 			else
@@ -2598,7 +2640,7 @@ static t_stat pcr_svc (UNIT *uptr)
 		case OP_FEEDING:
 			if (pcr_done) {
 				cr_count++;
-				op_done(&cr_unit, FALSE);
+				op_done(&cr_unit, "pcr feed", FALSE);
 				pcr_set_dsw_from_status(TRUE);
 			}
 			else

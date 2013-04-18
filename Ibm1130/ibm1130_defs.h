@@ -137,6 +137,7 @@ void  WriteW (int32 a, int32 d);
 #define STOP_BREAK			11				/* simulator break key pressed */
 #define STOP_STEP			12				/* step count expired */
 #define STOP_OTHER			13				/* other reason, probably error returned by sim_process_event() */
+#define STOP_PRINT_CHECK	14				/* stop due to printer check (used by CGI version) */
 
 #define IORETURN(f,v)	((f)? (v): SCPE_OK)	/* cond error return */
 
@@ -252,7 +253,7 @@ void  WriteW (int32 a, int32 d);
 /* prototypes: xio handlers */
 
 void xio_1131_console	(int32 addr, int32 func, int32 modify);				/* console keyboard and printer */
-void xio_1142_card		(int32 addr, int32 func, int32 modify);				/* standard card reader/punch */
+void xio_1442_card		(int32 addr, int32 func, int32 modify);				/* standard card reader/punch */
 void xio_1134_papertape	(int32 addr, int32 func, int32 modify);				/* paper tape reader/punch */
 void xio_disk			(int32 addr, int32 func, int32 modify, int drv);	/* internal CPU disk */
 void xio_1627_plotter	(int32 addr, int32 func, int32 modify);				/* XY plotter */

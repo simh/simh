@@ -754,6 +754,9 @@ IBM1130 = ${IBM1130D}/ibm1130_cpu.c ${IBM1130D}/ibm1130_cr.c \
 	${IBM1130D}/ibm1130_plot.c ${IBM1130D}/ibm1130_sca.c \
 	${IBM1130D}/ibm1130_t2741.c
 IBM1130_OPT = -I ${IBM1130D}
+ifneq ($(WIN32),)
+IBM1130_OPT += -DGUI_SUPPORT -lgdi32
+endif  
 
 
 ID16D = Interdata
@@ -1038,7 +1041,13 @@ ibm1130 : ${BIN}ibm1130${EXE}
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
 	${MKDIRBIN}
+ifneq ($(WIN32),)
+	windres ${IBM1130D}/ibm1130.rc $(BIN)ibm1130.o
+	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(BIN)ibm1130.o $(CC_OUTSPEC) ${LDFLAGS}
+	del BIN\ibm1130.o
+else
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+endif  
 
 s3 : ${BIN}s3${EXE}
 
