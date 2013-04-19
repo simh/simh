@@ -52,6 +52,7 @@
 #define TT_GET_MODE(x)  (((x) >> TTUF_V_MODE) & TTUF_M_MODE)
 
 t_stat sim_set_console (int32 flag, char *cptr);
+t_stat sim_set_remote_console (int32 flag, char *cptr);
 t_stat sim_set_kmap (int32 flag, char *cptr);
 t_stat sim_set_telnet (int32 flag, char *cptr);
 t_stat sim_set_notelnet (int32 flag, char *cptr);
@@ -68,6 +69,7 @@ t_stat sim_set_cons_nolog (int32 flg, char *cptr);
 t_stat sim_set_deboff (int32 flag, char *cptr);
 t_stat sim_set_pchar (int32 flag, char *cptr);
 t_stat sim_show_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+t_stat sim_show_remote_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_kmap (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_telnet (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat sim_show_log (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);

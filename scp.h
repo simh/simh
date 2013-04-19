@@ -69,6 +69,8 @@ t_stat restore_cmd (int32 flag, char *ptr);
 t_stat exit_cmd (int32 flag, char *ptr);
 t_stat set_cmd (int32 flag, char *ptr);
 t_stat show_cmd (int32 flag, char *ptr);
+t_stat set_default_cmd (int32 flg, char *cptr);
+t_stat pwd_cmd (int32 flg, char *cptr);
 t_stat brk_cmd (int32 flag, char *ptr);
 t_stat do_cmd (int32 flag, char *ptr);
 t_stat goto_cmd (int32 flag, char *ptr);

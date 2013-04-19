@@ -20,6 +20,9 @@
 
 ### New Functionality
 
+#### Remote Console Facility
+    A new capability has been added which allows a TELNET Connection to a user designated port so that some out of band commands can be entered to manipulate and/or adjust a running simulator.  The commands which enable and control this capability are SET REMOTE TELNET=port, SET REMOTE CONNECTIONS=n and SHOW REMOTE.
+
 #### VAX/PDP11 Enhancements
     RQ has new disk types: RC25, RCF25, RA80
     RQ device has a settable controller type (RQDX3, UDA50, KLESI, RUX50)
@@ -155,12 +158,16 @@ Other related changes/extensions:
     SET NOQUIET                     Set normal output mode for command execution
     SET PROMPT                      Change the prompt used by the simulator (defaulr sim>)
     SET THROTTLE x/t                Throttle t ms every x cycles
+    SET REMOTE TELNET=port          Specify remote console telnet port
+    SET REMOTE NOTELNET             Disables remote console
+    SET REMOTE CONNECTIONS=n        Specify the number of concurrent remote console sessions
     SHOW FEATURES                   Displays the devices descriptions and features
     SHOW ASYNCH                     Display the current Asynchronous I/O status
     SHOW SERIAL                     Display the available and/or open serial ports
     SHOW ETHERNET                   Display the available and/or open ethernet connections
     SHOW MULTIPLEXER                Display the details about open multiplexer devices
     SHOW CLOCKS                     Display the details about calibrated timers
+    SHOW REMOTE                     Display the remote console configuration
     SHOW ON                         Display ON condition dispatch actions
     SET ON                          Enable ON condition error dispatching
     SET NOON                        Disable ON condition error dispatching

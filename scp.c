@@ -351,8 +351,6 @@ t_stat set_dev_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_unit_enbdis (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat ssh_break (FILE *st, char *cptr, int32 flg);
-t_stat set_default_cmd (int32 flg, char *cptr);
-t_stat pwd_cmd (int32 flg, char *cptr);
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr);
 t_stat show_config (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_queue (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
@@ -563,6 +561,7 @@ const struct scp_error {
          {"TTMO",    "Console Telnet connection timed out"},
          {"STALL",   "Console Telnet output stall"},
          {"AFAIL",   "Assertion failed"},
+         {"INVREM",  "Invalid remote console command"},
     };
 
 const size_t size_map[] = { sizeof (int8),
@@ -675,6 +674,9 @@ static CTAB cmd_table[] = {
       "                         specified destination {STDOUT,STDERR,DEBUG\n"
       "                         or filename)\n"
       "set console NOLOG        disable console logging\n"
+      "set remote TELNET=port   specify remote console telnet port\n"
+      "set remote NOTELNET      disables remote console\n"
+      "set remote CONNECTIONS=n specify number of concurrent remote console sessions\n"
       "set default <dir>        set the current directory\n"
       "set log log_file         specify the log destination\n"
       "                         (STDOUT,DEBUG or filename)\n"
@@ -728,6 +730,7 @@ static CTAB cmd_table[] = {
       "sh{ow} a{synch}          show asynchronouse I/O state\n" 
       "sh{ow} ve{rsion}         show simulator version\n"
       "sh{ow} def{ault}         show current directory\n" 
+      "sh{ow} re{mote}          show remote console configuration\n" 
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
       "sh{ow} <dev> MODIFIERS   show device modifiers\n"
@@ -2205,6 +2208,7 @@ C1TAB *ctbr, *glbr;
 
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
+    { "REMOTE", &sim_set_remote_console, 0 },
     { "BREAK", &brk_cmd, SSH_ST },
     { "DEFAULT", &set_default_cmd, 1 },
     { "NOBREAK", &brk_cmd, SSH_CL },
@@ -2510,6 +2514,7 @@ static SHTAB show_glob_tab[] = {
     { "VERSION", &show_version, 1 },
     { "DEFAULT", &show_default, 0 },
     { "CONSOLE", &sim_show_console, 0 },
+    { "REMOTE", &sim_show_remote_console, 0 },
     { "BREAK", &show_break, 0 },
     { "LOG", &sim_show_log, 0 },                        /* deprecated */
     { "TELNET", &sim_show_telnet, 0 },                  /* deprecated */
