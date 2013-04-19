@@ -415,7 +415,7 @@ return SCPE_IERR;           /* This routine should never be called */
 
 t_stat sim_rem_con_data_svc (UNIT *uptr)
 {
-int32 i, c;
+int32 i, j, c;
 t_stat stat, stat_nomessage;
 t_bool got_command;
 TMLN *lp;
@@ -458,15 +458,25 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
     c = c & ~TMXR_VALID;
     if (c != sim_int_char)
         continue;                               /* ^E (the interrupt character) must start console interaction */
+    for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+        if (i == j)
+            continue;
+        lp = &sim_rem_con_tmxr.ldsc[j];
+        tmxr_linemsg (lp, "\r\nRemote Console(");
+        tmxr_linemsg (lp, lp->ipad);
+        tmxr_linemsg (lp, ") Entering Commands\r\n");
+        tmxr_send_buffered_data (lp);           /* flush any buffered data */
+        }
+    lp = &sim_rem_con_tmxr.ldsc[i];
     tmxr_linemsg (lp, "\r\n");
     while (1) {
         tmxr_linemsg (lp, "sim> ");
-        tmxr_send_buffered_data (lp);           /* try to flush any buffered data */
+        tmxr_send_buffered_data (lp);           /* flush any buffered data */
         got_command = FALSE;
         while (!got_command) {
             c = tmxr_getc_ln (lp);
             if (!(TMXR_VALID & c)) {
-                tmxr_send_buffered_data (lp);   /* try to flush any buffered data */
+                tmxr_send_buffered_data (lp);   /* flush any buffered data */
                 sim_os_ms_sleep (100);
                 tmxr_poll_rx (&sim_rem_con_tmxr);/* poll input */
                 continue;
@@ -510,7 +520,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                     break;
                 }
             }
-        tmxr_send_buffered_data (lp);           /* try to flush any buffered data */
+        tmxr_send_buffered_data (lp);           /* flush any buffered data */
         printf ("Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
@@ -561,8 +571,18 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
             tmxr_linemsg (lp, "\r");
             tmxr_send_buffered_data (lp);
             }
-        if (cmdp->action == &x_continue_cmd)
+        if (cmdp && (cmdp->action == &x_continue_cmd)) {
+            tmxr_linemsg (lp, "Simulator Running...");
+            tmxr_send_buffered_data (lp);
+            for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+                if (i == j)
+                    continue;
+                lp = &sim_rem_con_tmxr.ldsc[j];
+                tmxr_linemsg (lp, "Simulator Running...");
+                tmxr_send_buffered_data (lp);
+                }
             break;
+            }
         }
     }
 sim_activate_after(uptr, 100000);               /* check again in 100 milliaeconds */
