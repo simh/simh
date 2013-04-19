@@ -723,7 +723,6 @@ static CPCODE cardcode_026C[] =		/* 026 commercial */
 };
 
 extern int cgi;
-extern void sub_args (char *instr, char *tmpbuf, int32 maxstr, int32 nargs, char *arg[]);
 
 static int16 ascii_to_card[256];
 
@@ -735,7 +734,7 @@ static int any_punched = 0;
 
 #define MAXARGLEN 80					/* max length of a saved attach command argument */
 #define MAXARGS   10					/* max number of arguments to save */
-static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN];
+static char list_save[MAXARGS][MAXARGLEN], *list_arg[MAXARGLEN+1];
 static int list_nargs = 0;
 static char* (*tab_proc)(char* str, int width) = NULL;		/* tab reformatting routine	*/
 static int tab_width = 8;
@@ -1276,7 +1275,7 @@ static void checkdeck (void)
 
 static t_bool nextdeck (void)
 {
-	char buf[200], tmpbuf[200], *fname, *c, quote;
+	char buf[200], *fname, *c, quote;
 	int code;
 	long fpos;
 
@@ -1390,7 +1389,7 @@ static t_bool nextdeck (void)
 			break;
 		}
 
-		sub_args(buf, tmpbuf, sizeof(buf), list_nargs, list_arg);	/* substitute in stuff from the attach command line */
+		sim_sub_args(buf, sizeof(buf), list_arg);	/* substitute in stuff from the attach command line */
 
 		c = buf;									/* pick filename from string */
 
@@ -1602,6 +1601,8 @@ static t_stat cr_attach (UNIT *uptr, char *cptr)
 		list_arg[list_nargs] = list_save[list_nargs];	/* set pointer to permanent storage location */
 		strncpy(list_arg[list_nargs], arg, MAXARGLEN);	/* store copy */
 	}
+	list_arg[list_nargs] = NULL;					/* NULL terminate the end of the argument list */
+
 
 	if (list_nargs <= 0)							/* need at least 1 */
 		return SCPE_2FARG;

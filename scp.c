@@ -432,7 +432,6 @@ t_stat dep_addr (int32 flag, char *cptr, t_addr addr, DEVICE *dptr,
     UNIT *uptr, int32 dfltinc);
 void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs);
 t_stat step_svc (UNIT *ptr);
-void sub_args (char *instr, size_t instr_size, char *do_arg[]);
 t_stat shift_args (char *do_arg[], size_t arg_count);
 t_stat set_on (int32 flag, char *cptr);
 t_stat set_verify (int32 flag, char *cptr);
@@ -927,7 +926,7 @@ while (stat != SCPE_EXIT) {                             /* in case exit */
         }
     if (*cptr == 0)                                     /* ignore blank */
         continue;
-    sub_args (cbuf, sizeof(cbuf), argv);
+    sim_sub_args (cbuf, sizeof(cbuf), argv);
     if (sim_log)                                        /* log cmd */
         fprintf (sim_log, "%s%s\n", sim_prompt, cptr);
     cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -1574,7 +1573,7 @@ do {
         ocptr = cptr = read_line (cbuf, sizeof(cbuf), fpin);/* get cmd line */
         sim_goto_line[sim_do_depth] += 1;
         }
-    sub_args (cbuf, sizeof(cbuf), do_arg);              /* substitute args */
+    sim_sub_args (cbuf, sizeof(cbuf), do_arg);          /* substitute args */
     if (cptr == NULL) {                                 /* EOF? */
         stat = SCPE_OK;                                 /* set good return */
         break;
@@ -1732,7 +1731,7 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    untouched.
 */
 
-void sub_args (char *instr, size_t instr_size, char *do_arg[])
+void sim_sub_args (char *instr, size_t instr_size, char *do_arg[])
 {
 char gbuf[CBUFSIZE];
 char *ip = instr, *op, *ap, *oend, *istart, *tmpbuf;

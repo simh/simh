@@ -124,6 +124,7 @@ DEVICE *find_dev (char *ptr);
 DEVICE *find_unit (char *ptr, UNIT **uptr);
 DEVICE *find_dev_from_unit (UNIT *uptr);
 t_stat sim_register_internal_device (DEVICE *dptr);
+void sim_sub_args (char *in_str, size_t in_str_size, char *do_arg[]);
 REG *find_reg (char *ptr, char **optr, DEVICE *dptr);
 CTAB *find_ctab (CTAB *tab, char *gbuf);
 C1TAB *find_c1tab (C1TAB *tab, char *gbuf);
