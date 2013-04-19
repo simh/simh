@@ -72,18 +72,19 @@
 #define MIN(a,b)	((a < b) ? a : b)
 #define AMSG		" with Assembler Reformat"
 #define FMSG		" with FORTRAN Reformat"
+#define WMSG		" with tab replacement"
 #define AFORMAT		"%20.20s%-60.60s"," "
 #define ACOMMENTFMT	"%20.20s%-60.60s"," "
 #define ABLANKLINE	"%20.20s*"," "
 #define FFORMAT		"%-5.5s %-74.74s"
 #define FCONTFMT	"%-5.5s%-75.75s"
 
-char 	gszLabel[6];									/* work area for label */
-char	gszArg[MAXLINE];								/* .. argument */
-char	gszOutput[MAXLINE];								/* .. output */
-short	gaiAsmTabs[] = {7,12,15,20,25,30,35,40,45,52,0};/* tab stops for assembler */
-
-short	gaiPlainTabs[] = {9, 17, 25, 33, 41, 49, 57, 65, 73, 0};/* tab stops for just plain tabs */
+static char	 gszLabel[6];									/* work area for label */
+static char	 gszArg[MAXLINE];								/* .. argument */
+static char	 gszOutput[MAXLINE];							/* .. output */
+static short gaiAsmTabs[] = {7,12,15,20,25,30,35,40,45,52,0};/* tab stops for assembler */
+static short gaiPlainTabs[42];								/* tab stops for plain tabs. Settings will be made later. Max # positions when tabs are every 2 positions */
+static int   giPlainTabWidth = 0;
 
 /*
  * helper routines
@@ -163,7 +164,7 @@ char*	pszX;												/* work pointer */
  * EditToAsm - convert tab-formatted text line to 1130 Assembler format
  */
 
-char *EditToAsm (char* p_pszEdit)						/* convert line to 1130 assembler */
+char *EditToAsm (char* p_pszEdit, int width)				/* convert line to 1130 assembler */
 {
 char	pszLine[MAXLINE];									/* source line */
 char	pszWork[WORKSZ];									/* work buffer */
@@ -174,11 +175,11 @@ size_t	iI;													/* work integer */
 		return AMSG;										/* a. yes .. return display message */
 
 	if (*p_pszEdit == '!')									/* leave lines starting with ! alone */
-		return EditToWhitespace(p_pszEdit+1);
+		return EditToWhitespace(p_pszEdit+1, width);
 
 	if (*p_pszEdit == '*')									/* q. comment line? */
 	{														/* a. yes..  */
-		strncpy(pszWork, EditToWhitespace(p_pszEdit), MAXLINE);		/* .. convert any tabs */
+		strncpy(pszWork, EditToWhitespace(p_pszEdit, width), MAXLINE);		/* .. convert any tabs */
 		sprintf(gszOutput, ACOMMENTFMT, pszWork);			/* .. put the comment out there in the opcode column */
 		return gszOutput;									/* .. and return it */
 	}
@@ -229,7 +230,7 @@ size_t	iI;													/* work integer */
  * (a la DEC Fortran)
  */
 
-char *EditToFortran(char* p_pszEdit)					/* convert line to 1130 assembler */
+char *EditToFortran(char* p_pszEdit, int width)				/* convert line to 1130 assembler */
 {
 char	pszLine[MAXLINE];									/* source line */
 char*	pszWork;											/* work pointer */
@@ -244,7 +245,7 @@ int		bContinue;											/* true if continue */
 
 	if (*p_pszEdit == 'C' || *p_pszEdit == '*' || *p_pszEdit == '\0')	/* q. comment or directive or blank line? */
 	{														/* a. yes.. don't restructure */
-		return EditToWhitespace(p_pszEdit);
+		return EditToWhitespace(p_pszEdit, width);
 	}
 
 	strncpy(pszLine, p_pszEdit, MAXLINE-1);					/* copy the line local */
@@ -283,19 +284,33 @@ int		bContinue;											/* true if continue */
 }
 
 /*************************************************
- * EditToWhitespace - expand tabs at 8 space intervals.
+ * EditToWhitespace - expand tabs at n space intervals.
  */
 
-char*	EditToWhitespace(char *p_pszEdit)
+char*	EditToWhitespace(char *p_pszEdit, int width)
 {
 int		iI;													/* work integer	*/
+int     iPos;                                               /* work integer for settings tab stops */
 char	pszLine[MAXLINE];									/* source line */
 char	pszWork[WORKSZ];									/* work buffer */
 
 	if (p_pszEdit == NULL)									/* q. null request? */
-		return AMSG;										/* a. yes .. return display message */
+		return WMSG;										/* a. yes .. return display message */
 
 	strncpy(pszLine, p_pszEdit, MAXLINE-1);					/* copy the line local */
+
+	if (width == 0) width = 8;								/* default */
+
+	if ((width != giPlainTabWidth) && (width > 1) && (width < 30)) {
+		giPlainTabWidth = width;							/* if width is different, and valid, rebuild tabstop array */
+		iI = 0;												/* output index */
+		iPos = width + 1;									/* first tab position */
+		while (iPos < 80) {									/* fill array up to but not including position 80 */
+			gaiPlainTabs[iI++] = iPos;
+			iPos += width;
+		}
+		gaiPlainTabs[iI] = 0;								/* mark end of array */
+	}
 	
 	ExpandTabs(pszLine, pszWork, gaiPlainTabs);				/* expand the tabs */
 	strncpy(gszOutput, pszWork, MAXLINE-1);					/* copy the line back  */

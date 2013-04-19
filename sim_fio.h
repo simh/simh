@@ -38,13 +38,17 @@
 #define fxwrite(a,b,c,d)        sim_fwrite (a, b, c, d)
 
 int32 sim_finit (void);
-#if defined (__linux) || defined (__linux__) || defined (__hpux) || \
-    (defined (VMS) && (defined (__ALPHA) || defined (__ia64)) && (__DECC_VER >= 60590001)) || \
-    ((defined(__sun) || defined(__sun__)) && defined(_LARGEFILE_SOURCE)) ||                \
-    defined (_WIN32) || defined (__APPLE__) || defined (__FreeBSD__)
+#if (defined (__linux) || defined (__linux__) || defined (__hpux) ||                           \
+     (defined (VMS) && (defined (__ALPHA) || defined (__ia64)) && (__DECC_VER >= 60590001)) || \
+     ((defined(__sun) || defined(__sun__)) && defined(_LARGEFILE_SOURCE)) ||                   \
+     defined (_WIN32) || defined (__APPLE__) ||                                                \
+     defined (__FreeBSD__) || defined(__NetBSD__) || defined (__OpenBSD__)) && !defined (DONT_DO_LARGEFILE)
 typedef t_int64        t_offset;
 #else
 typedef int32        t_offset;
+#if !defined (DONT_DO_LARGEFILE)
+#define DONT_DO_LARGEFILE 1
+#endif
 #endif
 FILE *sim_fopen (const char *file, const char *mode);
 int sim_fseek (FILE *st, t_addr offset, int whence);

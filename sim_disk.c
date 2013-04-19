@@ -20,7 +20,7 @@
    CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
    Except as contained in this notice, the names of Mark Pizzolato shall not be
-   used in advertising or otherwise to promote the sale, use or other dealings 
+   used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Mark Pizzolato.
 
 
@@ -163,8 +163,8 @@ int sched_policy;
 struct sched_param sched_priority;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
 
-/* Boost Priority for this I/O thread vs the CPU instruction execution 
-   thread which in general won't be readily yielding the processor when 
+/* Boost Priority for this I/O thread vs the CPU instruction execution
+   thread which in general won't be readily yielding the processor when
    this thread needs to run */
 pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
@@ -202,16 +202,16 @@ sim_debug (ctx->dbit, ctx->dptr, "_disk_io(unit=%d) exiting\n", (int)(uptr-ctx->
 return NULL;
 }
 
-/* This routine is called in the context of the main simulator thread before 
-   processing events for any unit. It is only called when an asynchronous 
-   thread has called sim_activate() to activate a unit.  The job of this 
+/* This routine is called in the context of the main simulator thread before
+   processing events for any unit. It is only called when an asynchronous
+   thread has called sim_activate() to activate a unit.  The job of this
    routine is to put the unit in proper condition to digest what may have
    occurred in the asynchrconous thread.
-   
-   Since disk processing only handles a single I/O at a time to a 
+  
+   Since disk processing only handles a single I/O at a time to a
    particular disk device (due to using stdio for the SimH Disk format
-   and stdio doesn't have an atomic seek+(read|write) operation), 
-   we have the opportunity to possibly detect improper attempts to 
+   and stdio doesn't have an atomic seek+(read|write) operation),
+   we have the opportunity to possibly detect improper attempts to
    issue multiple concurrent I/O requests. */
 static void _disk_completion_dispatch (UNIT *uptr)
 {
@@ -534,7 +534,7 @@ t_stat sim_disk_rdsect (UNIT *uptr, t_lba lba, uint8 *buf, t_seccnt *sectsread, 
 {
 t_stat r;
 struct disk_context *ctx = (struct disk_context *)uptr->disk_ctx;
-t_seccnt sread;
+t_seccnt sread = 0;
 
 sim_debug (ctx->dbit, ctx->dptr, "sim_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
@@ -715,20 +715,20 @@ else { /* Unaligned and/or partial sector transfers */
         ((sects + lba - tlba) & (sspsts - 1)))
         switch (DK_GET_FMT (uptr)) {                            /* case on format */
             case DKUF_F_VHD:                                    /* VHD format */
-                sim_vhd_disk_rdsect (uptr, tlba + tsects - sspsts, 
-                                     tbuf + (tsects - sspsts) * ctx->sector_size, 
+                sim_vhd_disk_rdsect (uptr, tlba + tsects - sspsts,
+                                     tbuf + (tsects - sspsts) * ctx->sector_size,
                                      NULL, sspsts);
                 break;
             case DKUF_F_RAW:                                    /* Raw Physical Disk Access */
-                sim_os_disk_rdsect (uptr, tlba + tsects - sspsts, 
-                                    tbuf + (tsects - sspsts) * ctx->sector_size, 
+                sim_os_disk_rdsect (uptr, tlba + tsects - sspsts,
+                                    tbuf + (tsects - sspsts) * ctx->sector_size,
                                     NULL, sspsts);
                 break;
             default:
                 r = SCPE_NOFNC;
                 break;
             }
-    sim_buf_copy_swapped (tbuf + (lba & (sspsts - 1)) * ctx->sector_size, 
+    sim_buf_copy_swapped (tbuf + (lba & (sspsts - 1)) * ctx->sector_size,
                           buf, ctx->xfer_element_size, (sects * ctx->sector_size) / ctx->xfer_element_size);
     switch (DK_GET_FMT (uptr)) {                            /* case on format */
         case DKUF_F_VHD:                                    /* VHD format */
@@ -774,7 +774,7 @@ switch (DK_GET_FMT (uptr)) {                            /* case on format */
     }
 }
 
-/* 
+/*
    This routine is called when the simulator stops and any time
    the asynch mode is changed (enabled or disabled)
 */
@@ -812,7 +812,7 @@ return stat;
 }
 
 
-t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize, 
+t_stat sim_disk_attach (UNIT *uptr, char *cptr, size_t sector_size, size_t xfer_element_size, t_bool dontautosize,
                         uint32 dbit, const char *dtype, uint32 pdp11tracksize, int completion_delay)
 {
 struct disk_context *ctx;
@@ -875,7 +875,7 @@ if (sim_switches & SWMASK ('C')) {                      /* create vhd disk & cop
         sim_switches = saved_sim_switches;
         return r;
         }
-    if (!sim_quiet) 
+    if (!sim_quiet)
         printf ("%s%d: creating new virtual disk '%s'\n", sim_dname (dptr), (int)(uptr-dptr->units), gbuf);
     capac_factor = ((dptr->dwidth / dptr->aincr) == 16) ? 2 : 1; /* capacity units (word: 2, byte: 1) */
     vhd = sim_vhd_disk_create (gbuf, ((t_offset)uptr->capac)*capac_factor*((dptr->flags & DEV_SECTORS) ? 512 : 1));
@@ -1076,7 +1076,7 @@ else {                                                  /* normal */
                 uptr->fileref = open_function (cptr, "wb+");/* open new file */
             if (uptr->fileref == NULL)                  /* open fail? */
                 return _err_return (uptr, SCPE_OPENERR);/* yes, error */
-            if (!sim_quiet) 
+            if (!sim_quiet)
                 printf ("%s%d: creating new file\n", sim_dname (dptr), (int)(uptr-dptr->units));
             created = TRUE;
             }
@@ -1103,15 +1103,15 @@ if ((created) && (!copied)) {
     t_stat r = SCPE_OK;
     uint8 *secbuf = calloc (1, ctx->sector_size);       /* alloc temp sector buf */
 
-    /* 
-       On a newly created disk, we write a zero sector to the last and the 
-       first sectors.  This serves 3 purposes: 
-         1) it avoids strange allocation delays writing newly allocated 
+    /*
+       On a newly created disk, we write a zero sector to the last and the
+       first sectors.  This serves 3 purposes:
+         1) it avoids strange allocation delays writing newly allocated
             storage at the end of the disk during simulator operation
-         2) it allocates storage for the whole disk at creation time to 
+         2) it allocates storage for the whole disk at creation time to
             avoid strange failures which may happen during simulator execution
             if the containing disk is full
-         3) it leaves a Sinh Format disk at the intended size so it may 
+         3) it leaves a Sinh Format disk at the intended size so it may
             subsequently be autosized with the correct size.
     */
     if (secbuf == NULL)
@@ -1970,10 +1970,17 @@ fsync ((int)((long)f));
 
 static t_offset sim_os_disk_size_raw (FILE *f)
 {
+#if defined (DONT_DO_LARGEFILE)
+struct stat statb;
+
+if (fstat ((int)((long)f), &statb))
+    return (t_offset)-1;
+#else
 struct stat64 statb;
 
 if (fstat64 ((int)((long)f), &statb))
     return (t_offset)-1;
+#endif
 return (t_offset)statb.st_size;
 }
 
@@ -1996,7 +2003,7 @@ ssize_t bytesread;
 sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_rdsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 addr = ((off_t)lba) * ctx->sector_size;
-bytesread = pread((int)((long)uptr->fileref), buf, sects * ctx->sector_size, addr); 
+bytesread = pread((int)((long)uptr->fileref), buf, sects * ctx->sector_size, addr);
 if (bytesread < 0) {
     if (sectsread)
         *sectsread = 0;
@@ -2016,7 +2023,7 @@ ssize_t byteswritten;
 sim_debug (ctx->dbit, ctx->dptr, "sim_os_disk_wrsect(unit=%d, lba=0x%X, sects=%d)\n", (int)(uptr-ctx->dptr->units), lba, sects);
 
 addr = ((off_t)lba) * ctx->sector_size;
-byteswritten = pwrite((int)((long)uptr->fileref), buf, sects * ctx->sector_size, addr); 
+byteswritten = pwrite((int)((long)uptr->fileref), buf, sects * ctx->sector_size, addr);
 if (byteswritten < 0) {
     if (sectswritten)
         *sectswritten = 0;
@@ -2172,9 +2179,9 @@ return NULL;
 #else
 
 /*++
-    This code follows the details specified in the "Virtual Hard Disk Image 
-    Format Specification", Version 1.0 October 11, 2006.  This format 
-    specification is available for anyone to implement under the 
+    This code follows the details specified in the "Virtual Hard Disk Image
+    Format Specification", Version 1.0 October 11, 2006.  This format
+    specification is available for anyone to implement under the
     "Microsoft Open Specification Promise" described at:
         http://www.microsoft.com/interop/osp/default.mspx.
 --*/
@@ -2184,75 +2191,75 @@ typedef t_int64     int64;
 
 typedef struct _VHD_Footer {
     /*
-    Cookies are used to uniquely identify the original creator of the hard disk 
-    image. The values are case-sensitive.  Microsoft uses the “conectix” string 
-    to identify this file as a hard disk image created by Microsoft Virtual 
-    Server, Virtual PC, and predecessor products. The cookie is stored as an 
-    eight-character ASCII string with the “c” in the first byte, the “o” in 
+    Cookies are used to uniquely identify the original creator of the hard disk
+    image. The values are case-sensitive.  Microsoft uses the "conectix" string
+    to identify this file as a hard disk image created by Microsoft Virtual
+    Server, Virtual PC, and predecessor products. The cookie is stored as an
+    eight-character ASCII string with the "c" in the first byte, the "o" in
     the second byte, and so on.
     */
     char Cookie[8];
     /*
-    This is a bit field used to indicate specific feature support. The following 
-    table displays the list of features. 
-    Any fields not listed are reserved. 
+    This is a bit field used to indicate specific feature support. The following
+    table displays the list of features.
+    Any fields not listed are reserved.
 
     Feature Value:
        No features enabled     0x00000000
        Temporary               0x00000001
        Reserved                0x00000002
 
-       No features enabled. 
+       No features enabled.
               The hard disk image has no special features enabled in it.
        Temporary.
-              This bit is set if the current disk is a temporary disk. A 
-              temporary disk designation indicates to an application that 
-              this disk is a candidate for deletion on shutdown. 
+              This bit is set if the current disk is a temporary disk. A
+              temporary disk designation indicates to an application that
+              this disk is a candidate for deletion on shutdown.
        Reserved.
               This bit must always be set to 1.
        All other bits are also reserved and should be set to 0.
     */
     uint32 Features;
     /*
-    This field is divided into a major/minor version and matches the version of 
-    the specification used in creating the file. The most-significant two bytes 
-    are for the major version. The least-significant two bytes are the minor 
-    version.  This must match the file format specification. For the current 
+    This field is divided into a major/minor version and matches the version of
+    the specification used in creating the file. The most-significant two bytes
+    are for the major version. The least-significant two bytes are the minor
+    version.  This must match the file format specification. For the current
     specification, this field must be initialized to 0x00010000.
-    The major version will be incremented only when the file format is modified 
-    in such a way that it is no longer compatible with older versions of the 
+    The major version will be incremented only when the file format is modified
+    in such a way that it is no longer compatible with older versions of the
     file format.
     */
     uint32 FileFormatVersion;
     /*
-    This field holds the absolute byte offset, from the beginning of the file, 
-    to the next structure. This field is used for dynamic disks and differencing 
-    disks, but not fixed disks. For fixed disks, this field should be set to 
-    0xFFFFFFFF. 
+    This field holds the absolute byte offset, from the beginning of the file,
+    to the next structure. This field is used for dynamic disks and differencing
+    disks, but not fixed disks. For fixed disks, this field should be set to
+    0xFFFFFFFF.
     */
     uint64 DataOffset;
     /*
-    This field stores the creation time of a hard disk image. This is the number 
+    This field stores the creation time of a hard disk image. This is the number
     of seconds since January 1, 2000 12:00:00 AM in UTC/GMT.
     */
     uint32 TimeStamp;
     /*
-    This field is used to document which application created the hard disk. The 
-    field is a left-justified text field. It uses a single-byte character set. 
-    If the hard disk is created by Microsoft Virtual PC, "vpc " is written in 
-    this field. If the hard disk image is created by Microsoft Virtual Server, 
+    This field is used to document which application created the hard disk. The
+    field is a left-justified text field. It uses a single-byte character set.
+    If the hard disk is created by Microsoft Virtual PC, "vpc " is written in
+    this field. If the hard disk image is created by Microsoft Virtual Server,
     then "vs  " is written in this field.
-    Other applications should use their own unique identifiers. 
+    Other applications should use their own unique identifiers.
     */
     char CreatorApplication[4];
     /*
-    This field holds the major/minor version of the application that created 
+    This field holds the major/minor version of the application that created
     the hard disk image.  Virtual Server 2004 sets this value to 0x00010000 and
     Virtual PC 2004 sets this to 0x00050000.
     */
     uint32 CreatorVersion;
     /*
-    This field stores the type of host operating system this disk image is 
+    This field stores the type of host operating system this disk image is
     created on.
        Host OS type    Value
        Windows         0x5769326B (Wi2k)
@@ -2260,34 +2267,34 @@ typedef struct _VHD_Footer {
     */
     uint8 CreatorHostOS[4];
     /*
-    This field stores the size of the hard disk in bytes, from the perspective 
-    of the virtual machine, at creation time. This field is for informational 
-    purposes. 
+    This field stores the size of the hard disk in bytes, from the perspective
+    of the virtual machine, at creation time. This field is for informational
+    purposes.
     */
     uint64 OriginalSize;
     /*
-    This field stores the current size of the hard disk, in bytes, from the 
+    This field stores the current size of the hard disk, in bytes, from the
     perspective of the virtual machine.
-    This value is same as the original size when the hard disk is created. 
-    This value can change depending on whether the hard disk is expanded. 
+    This value is same as the original size when the hard disk is created.
+    This value can change depending on whether the hard disk is expanded.
     */
     uint64 CurrentSize;
     /*
-    This field stores the cylinder, heads, and sectors per track value for the 
-    hard disk. 
+    This field stores the cylinder, heads, and sectors per track value for the
+    hard disk.
        Disk Geometry field          Size (bytes)
        Cylinder                     2
        Heads                        1
        Sectors per track/cylinder   1
 
-    When a hard disk is configured as an ATA hard disk, the CHS values (that is, 
-    Cylinder, Heads, Sectors per track) are used by the ATA controller to 
-    determine the size of the disk. When the user creates a hard disk of a 
-    certain size, the size of the hard disk image in the virtual machine is 
-    smaller than that created by the user. This is because CHS value calculated 
-    from the hard disk size is rounded down. The pseudo-code for the algorithm 
-    used to determine the CHS values can be found in the appendix of this 
-    document. 
+    When a hard disk is configured as an ATA hard disk, the CHS values (that is,
+    Cylinder, Heads, Sectors per track) are used by the ATA controller to
+    determine the size of the disk. When the user creates a hard disk of a
+    certain size, the size of the hard disk image in the virtual machine is
+    smaller than that created by the user. This is because CHS value calculated
+    from the hard disk size is rounded down. The pseudo-code for the algorithm
+    used to determine the CHS values can be found in the appendix of this
+    document.
     */
     uint32 DiskGeometry;
     /*
@@ -2302,49 +2309,49 @@ typedef struct _VHD_Footer {
     */
     uint32 DiskType;
     /*
-    This field holds a basic checksum of the hard disk footer. It is just a 
-    one’s complement of the sum of all the bytes in the footer without the 
+    This field holds a basic checksum of the hard disk footer. It is just a
+    one's complement of the sum of all the bytes in the footer without the
     checksum field.
-    If the checksum verification fails, the Virtual PC and Virtual Server 
-    products will instead use the header. If the checksum in the header also 
-    fails, the file should be assumed to be corrupt. The pseudo-code for the 
-    algorithm used to determine the checksum can be found in the appendix of 
-    this document. 
+    If the checksum verification fails, the Virtual PC and Virtual Server
+    products will instead use the header. If the checksum in the header also
+    fails, the file should be assumed to be corrupt. The pseudo-code for the
+    algorithm used to determine the checksum can be found in the appendix of
+    this document.
     */
     uint32 Checksum;
     /*
-    Every hard disk has a unique ID stored in the hard disk. This is used to 
-    identify the hard disk. This is a 128-bit universally unique identifier 
-    (UUID). This field is used to associate a parent hard disk image with its 
+    Every hard disk has a unique ID stored in the hard disk. This is used to
+    identify the hard disk. This is a 128-bit universally unique identifier
+    (UUID). This field is used to associate a parent hard disk image with its
     differencing hard disk image(s).
     */
     uint8 UniqueID[16];
     /*
-    This field holds a one-byte flag that describes whether the system is in 
+    This field holds a one-byte flag that describes whether the system is in
     saved state. If the hard disk is in the saved state the value is set to 1.
-    Operations such as compaction and expansion cannot be performed on a hard 
+    Operations such as compaction and expansion cannot be performed on a hard
     disk in a saved state.
     */
     uint8 SavedState;
     /*
-    This field contains zeroes. It is 427 bytes in size. 
+    This field contains zeroes. It is 427 bytes in size.
     */
     uint8 Reserved1[11];
     /*
-    This field is an extension to the VHD spec and includes a simh drive type 
+    This field is an extension to the VHD spec and includes a simh drive type
     name as a nul terminated string.
     */
     uint8 DriveType[16];
     /*
-    This field contains zeroes. It is 400 bytes in size. 
+    This field contains zeroes. It is 400 bytes in size.
     */
     uint8 Reserved[400];
     } VHD_Footer;
 
 /*
-For dynamic and differencing disk images, the “Data Offset” field within 
-the image footer points to a secondary structure that provides additional 
-information about the disk image. The dynamic disk header should appear on 
+For dynamic and differencing disk images, the "Data Offset" field within
+the image footer points to a secondary structure that provides additional
+information about the disk image. The dynamic disk header should appear on
 a sector (512-byte) boundary.
 */
 typedef struct _VHD_DynamicDiskHeader {
@@ -2353,79 +2360,79 @@ typedef struct _VHD_DynamicDiskHeader {
     */
     char Cookie[8];
     /*
-    This field contains the absolute byte offset to the next structure in the 
-    hard disk image. It is currently unused by existing formats and should be 
+    This field contains the absolute byte offset to the next structure in the
+    hard disk image. It is currently unused by existing formats and should be
     set to 0xFFFFFFFF.
     */
     uint64 DataOffset;
     /*
-    This field stores the absolute byte offset of the Block Allocation Table 
-    (BAT) in the file. 
+    This field stores the absolute byte offset of the Block Allocation Table
+    (BAT) in the file.
     */
     uint64 TableOffset;
     /*
-    This field stores the version of the dynamic disk header. The field is 
+    This field stores the version of the dynamic disk header. The field is
     divided into Major/Minor version. The least-significant two bytes represent
-    the minor version, and the most-significant two bytes represent the major 
-    version. This must match with the file format specification. For this 
-    specification, this field must be initialized to 0x00010000. 
-    The major version will be incremented only when the header format is 
-    modified in such a way that it is no longer compatible with older versions 
+    the minor version, and the most-significant two bytes represent the major
+    version. This must match with the file format specification. For this
+    specification, this field must be initialized to 0x00010000.
+    The major version will be incremented only when the header format is
+    modified in such a way that it is no longer compatible with older versions
     of the product.
     */
     uint32 HeaderVersion;
     /*
-    This field holds the maximum entries present in the BAT. This should be 
-    equal to the number of blocks in the disk (that is, the disk size divided 
-    by the block size). 
+    This field holds the maximum entries present in the BAT. This should be
+    equal to the number of blocks in the disk (that is, the disk size divided
+    by the block size).
     */
     uint32 MaxTableEntries;
     /*
-    A block is a unit of expansion for dynamic and differencing hard disks. It 
-    is stored in bytes. This size does not include the size of the block bitmap. 
-    It is only the size of the data section of the block. The sectors per block 
-    must always be a power of two. The default value is 0x00200000 (indicating a 
+    A block is a unit of expansion for dynamic and differencing hard disks. It
+    is stored in bytes. This size does not include the size of the block bitmap.
+    It is only the size of the data section of the block. The sectors per block
+    must always be a power of two. The default value is 0x00200000 (indicating a
     block size of 2 MB).
     */
     uint32 BlockSize;
     /*
-    This field holds a basic checksum of the dynamic header. It is a one’s 
-    complement of the sum of all the bytes in the header without the checksum 
+    This field holds a basic checksum of the dynamic header. It is a one's
+    complement of the sum of all the bytes in the header without the checksum
     field.
     If the checksum verification fails the file should be assumed to be corrupt.
     */
     uint32 Checksum;
     /*
-    This field is used for differencing hard disks. A differencing hard disk 
-    stores a 128-bit UUID of the parent hard disk. For more information, see 
-    “Creating Differencing Hard Disk Images” later in this paper.
+    This field is used for differencing hard disks. A differencing hard disk
+    stores a 128-bit UUID of the parent hard disk. For more information, see
+    "Creating Differencing Hard Disk Images" later in this paper.
     */
     uint8 ParentUniqueID[16];
     /*
-    This field stores the modification time stamp of the parent hard disk. This 
+    This field stores the modification time stamp of the parent hard disk. This
     is the number of seconds since January 1, 2000 12:00:00 AM in UTC/GMT.
     */
     uint32 ParentTimeStamp;
     /*
-    This field should be set to zero. 
+    This field should be set to zero.
     */
     uint32 Reserved0;
     /*
-    This field contains a Unicode string (UTF-16) of the parent hard disk 
-    filename. 
+    This field contains a Unicode string (UTF-16) of the parent hard disk
+    filename.
     */
     char ParentUnicodeName[512];
     /*
-    These entries store an absolute byte offset in the file where the parent 
-    locator for a differencing hard disk is stored. This field is used only for 
-    differencing disks and should be set to zero for dynamic disks. 
+    These entries store an absolute byte offset in the file where the parent
+    locator for a differencing hard disk is stored. This field is used only for
+    differencing disks and should be set to zero for dynamic disks.
     */
     struct VHD_ParentLocator {
         /*
-        The platform code describes which platform-specific format is used for the 
-        file locator. For Windows, a file locator is stored as a path (for example. 
-        “c:\disksimages\ParentDisk.vhd”). On a Macintosh system, the file locator 
-        is a binary large object (blob) that contains an “alias.” The parent locator 
+        The platform code describes which platform-specific format is used for the
+        file locator. For Windows, a file locator is stored as a path (for example.
+        "c:\disksimages\ParentDisk.vhd"). On a Macintosh system, the file locator
+        is a binary large object (blob) that contains an "alias." The parent locator
         table is used to support moving hard disk images across platforms.
         Some current platform codes include the following:
            Platform Code        Description
@@ -2439,7 +2446,7 @@ typedef struct _VHD_DynamicDiskHeader {
         */
         uint8 PlatformCode[4];
         /*
-        This field stores the number of 512-byte sectors needed to store the parent 
+        This field stores the number of 512-byte sectors needed to store the parent
         hard disk locator.
         */
         uint32 PlatformDataSpace;
@@ -2452,12 +2459,12 @@ typedef struct _VHD_DynamicDiskHeader {
         */
         uint32 Reserved;
         /*
-        This field stores the absolute file offset in bytes where the platform 
+        This field stores the absolute file offset in bytes where the platform
         specific file locator data is stored.
         */
         uint64 PlatformDataOffset;
         /*
-        This field stores the absolute file offset in bytes where the platform 
+        This field stores the absolute file offset in bytes where the platform
         specific file locator data is stored.
         */
         } ParentLocatorEntries[8];
@@ -2513,7 +2520,7 @@ return (err ? SCPE_IOERR : SCPE_OK);
 }
 
 static uint32
-CalculateVhdFooterChecksum(void *data, 
+CalculateVhdFooterChecksum(void *data,
                            size_t size)
 {
 uint32 sum = 0;
@@ -2587,8 +2594,8 @@ return value;
 
 static
 int
-GetVHDFooter(const char *szVHDPath, 
-             VHD_Footer *sFooter, 
+GetVHDFooter(const char *szVHDPath,
+             VHD_Footer *sFooter,
              VHD_DynamicDiskHeader *sDynamic,
              uint32 **aBAT,
              uint32 *ModifiedTimeStamp,
@@ -2627,10 +2634,10 @@ if (((int64)position) == -1) {
     goto Return_Cleanup;
     }
 position -= sizeof(*sFooter);
-if (ReadFilePosition(File, 
-                     sFooter, 
-                     sizeof(*sFooter), 
-                     NULL, 
+if (ReadFilePosition(File,
+                     sFooter,
+                     sizeof(*sFooter),
+                     NULL,
                      position)) {
     Return = errno;
     goto Return_Cleanup;
@@ -2643,10 +2650,10 @@ if ((sum != saved_sum) || (memcmp("conectix", sFooter->Cookie, sizeof(sFooter->C
     Return = EINVAL;                                    /* File Corrupt */
     goto Return_Cleanup;
     }
-if (ReadFilePosition(File, 
-                     &sHeader, 
-                     sizeof(sHeader), 
-                     NULL, 
+if (ReadFilePosition(File,
+                     &sHeader,
+                     sizeof(sHeader),
+                     NULL,
                      (uint64)0)) {
     Return = errno;
     goto Return_Cleanup;
@@ -2666,10 +2673,10 @@ if (((NtoHl(sFooter->DiskType) == VHD_DT_Dynamic) ||
 if ((sDynamic) &&
     ((NtoHl(sFooter->DiskType) == VHD_DT_Dynamic) ||
      (NtoHl(sFooter->DiskType) == VHD_DT_Differencing))) {
-    if (ReadFilePosition(File, 
-                         sDynamic, 
-                         sizeof (*sDynamic), 
-                         NULL, 
+    if (ReadFilePosition(File,
+                         sDynamic,
+                         sizeof (*sDynamic),
+                         NULL,
                          NtoHll (sFooter->DataOffset))) {
         Return = errno;
         goto Return_Cleanup;
@@ -2684,10 +2691,10 @@ if ((sDynamic) &&
         }
     if (aBAT) {
         *aBAT = (uint32*) malloc(512*((sizeof(**aBAT)*NtoHl(sDynamic->MaxTableEntries)+511)/512));
-        if (ReadFilePosition(File, 
-                             *aBAT, 
-                             sizeof (**aBAT)*NtoHl(sDynamic->MaxTableEntries), 
-                             NULL, 
+        if (ReadFilePosition(File,
+                             *aBAT,
+                             sizeof (**aBAT)*NtoHl(sDynamic->MaxTableEntries),
+                             NULL,
                              NtoHll (sDynamic->TableOffset))) {
             Return = EINVAL;                            /* File Corrupt */
             goto Return_Cleanup;
@@ -2715,10 +2722,10 @@ if ((sDynamic) &&
                 Pdata = (uint8*) calloc (1, PdataSize+2);
                 if (!Pdata)
                     continue;
-                if (ReadFilePosition(File, 
-                                     Pdata, 
-                                     PdataSize, 
-                                     NULL, 
+                if (ReadFilePosition(File,
+                                     Pdata,
+                                     PdataSize,
+                                     NULL,
                                      NtoHll (sDynamic->ParentLocatorEntries[j].PlatformDataOffset))) {
                     free (Pdata);
                     continue;
@@ -2742,16 +2749,16 @@ if ((sDynamic) &&
                              strncpy (CheckPath+strlen(CheckPath), ParentName, sizeof (CheckPath)-(strlen (CheckPath)+1));
                         }
                 VhdPathToHostPath (CheckPath, CheckPath, sizeof (CheckPath));
-                if ((0 == GetVHDFooter(CheckPath, 
-                                       &sParentFooter, 
+                if ((0 == GetVHDFooter(CheckPath,
+                                       &sParentFooter,
                                        NULL,
                                        NULL,
                                        &ParentModificationTime,
-                                       NULL, 
+                                       NULL,
                                        0)) &&
                     (0 == memcmp (sDynamic->ParentUniqueID, sParentFooter.UniqueID, sizeof (sParentFooter.UniqueID))) &&
-                    ((sDynamic->ParentTimeStamp == ParentModificationTime) || 
-                     ((NtoHl(sDynamic->ParentTimeStamp)-NtoHl(ParentModificationTime)) == 3600) || 
+                    ((sDynamic->ParentTimeStamp == ParentModificationTime) ||
+                     ((NtoHl(sDynamic->ParentTimeStamp)-NtoHl(ParentModificationTime)) == 3600) ||
                      (sim_switches & SWMASK ('O')))) {
                     strncpy (szParentVHDPath, CheckPath, ParentVHDPathSize);
                     break;
@@ -2854,9 +2861,9 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
 
     if (!hVHD)
         return (FILE *)hVHD;
-    Status = GetVHDFooter (szVHDPath, 
-                           &hVHD->Footer, 
-                           &hVHD->Dynamic, 
+    Status = GetVHDFooter (szVHDPath,
+                           &hVHD->Footer,
+                           &hVHD->Dynamic,
                            &hVHD->BAT,
                            NULL,
                            hVHD->ParentVHDPath,
@@ -2873,9 +2880,9 @@ static FILE *sim_vhd_disk_open (const char *szVHDPath, const char *DesiredAccess
             Status = errno;
             goto Cleanup_Return;
             }
-        Status = GetVHDFooter (hVHD->ParentVHDPath, 
-                               &ParentFooter, 
-                               &ParentDynamic, 
+        Status = GetVHDFooter (hVHD->ParentVHDPath,
+                               &ParentFooter,
+                               &ParentDynamic,
                                NULL,
                                &ParentModifiedTimeStamp,
                                NULL,
@@ -2926,9 +2933,9 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
 
     if (!hVHD)
         return (FILE *)hVHD;
-    if (0 != (Status = GetVHDFooter (szVHDPath, 
-                                     &hVHD->Footer, 
-                                     &hVHD->Dynamic, 
+    if (0 != (Status = GetVHDFooter (szVHDPath,
+                                     &hVHD->Footer,
+                                     &hVHD->Dynamic,
                                      &hVHD->BAT,
                                      NULL,
                                      hVHD->ParentVHDPath,
@@ -2984,11 +2991,11 @@ static FILE *sim_vhd_disk_merge (const char *szVHDPath, char **ParentVHD)
                              &BytesRead,
                              BlockOffset))
             break;
-        if (WriteVirtualDiskSectors (Parent, 
-                                     (uint8*)BlockData, 
-                                     BlockSectors, 
-                                     &SectorsWritten, 
-                                     SectorSize, 
+        if (WriteVirtualDiskSectors (Parent,
+                                     (uint8*)BlockData,
+                                     BlockSectors,
+                                     &SectorsWritten,
+                                     SectorSize,
                                      SectorsPerBlock*BlockNumber))
             break;
         if (!sim_quiet)
@@ -3190,7 +3197,7 @@ if (1) { /* CHS Calculation */
         cylinderTimesHeads = totalSectors / sectorsPerTrack;
         }
     else {
-        sectorsPerTrack = 17; 
+        sectorsPerTrack = 17;
         cylinderTimesHeads = totalSectors / sectorsPerTrack;
 
         heads = (cylinderTimesHeads + 1023) / 1024;
@@ -3390,7 +3397,7 @@ return szHostPath;
 }
 
 static VHDHANDLE
-CreateDifferencingVirtualDisk(const char *szVHDPath, 
+CreateDifferencingVirtualDisk(const char *szVHDPath,
                               const char *szParentVHDPath)
 {
 uint32 BytesPerSector = 512;
@@ -3407,12 +3414,12 @@ char *FullVHDPath = NULL;
 size_t i, RelativeMatch, UpDirectories, LocatorsWritten = 0;
 int64 LocatorPosition;
 
-if ((Status = GetVHDFooter (szParentVHDPath, 
-                            &ParentFooter, 
-                            &ParentDynamic, 
-                            NULL, 
+if ((Status = GetVHDFooter (szParentVHDPath,
+                            &ParentFooter,
+                            &ParentDynamic,
+                            NULL,
                             &ParentTimeStamp,
-                            NULL, 
+                            NULL,
                             0)))
     goto Cleanup_Return;
 hVHD = CreateVirtualDisk (szVHDPath,
@@ -3806,7 +3813,7 @@ while (sects) {
                               BlockOffset))
             goto Fatal_IO_Error;
         /* Write just the aligned sector which contains the updated BAT entry */
-        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) + 
+        BATUpdateBufferAddress = (uint8 *)hVHD->BAT - (size_t)NtoHll(hVHD->Dynamic.TableOffset) +
             (size_t)((((size_t)&hVHD->BAT[BlockNumber+1]) - (size_t)hVHD->BAT + (size_t)NtoHll(hVHD->Dynamic.TableOffset)) & ~(VHD_DATA_BLOCK_ALIGNMENT-1));
         if (BATUpdateBufferAddress < (uint8 *)hVHD->BAT) {
             BATUpdateBufferAddress = (uint8 *)hVHD->BAT;
@@ -3834,14 +3841,14 @@ while (sects) {
             if (((lba/SectorsPerBlock)*SectorsPerBlock + BlockSectors) > ((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize)
                 BlockSectors = (uint32)(((uint64)NtoHll (hVHD->Footer.CurrentSize))/SectorSize - (lba/SectorsPerBlock)*SectorsPerBlock);
             if (ReadVirtualDiskSectors(hVHD->Parent,
-                                       (uint8*) BlockData, 
+                                       (uint8*) BlockData,
                                        BlockSectors,
                                        NULL,
                                        SectorSize,
                                        (lba/SectorsPerBlock)*SectorsPerBlock))
                 goto Fatal_IO_Error;
             if (WriteVirtualDiskSectors(hVHD,
-                                        (uint8*) BlockData, 
+                                        (uint8*) BlockData,
                                         BlockSectors,
                                         NULL,
                                         SectorSize,

@@ -2009,41 +2009,41 @@ sim_debug(dev->dbit, dev->dptr, "Determining Address Conflict for MAC address: %
    be affected by an address conflict were physically present on a single
    Ethernet cable which might have been extended by a couple of repeaters).
    Since that time, essentially no networks are single collision domains.  
-   Thick and thinwire Ethernet cables don’t exist and very few networks 
+   Thick and thinwire Ethernet cables don't exist and very few networks 
    even have hubs.  Today, essentially all LANs are deployed using one 
    or more layers of network switches.  In a switched LAN environment, the 
-   switches on the LAN ‘learn’ which ports on the LAN source traffic from 
+   switches on the LAN "learn" which ports on the LAN source traffic from 
    which MAC addresses and then forward traffic destined for particular 
    MAC address to the appropriate ports.  If a particular MAC address is
-   already in use somewhere on the LAN, then the switches ‘know’ where 
+   already in use somewhere on the LAN, then the switches "know" where 
    it is.  The host based test using the loopback protocol is poorly 
    designed to detect this condition.  This test is performed by the host
-   first changing the device’s Physical MAC address to the address which
+   first changing the device's Physical MAC address to the address which
    is to be tested, and then sending a loopback packet FROM AND TO this
    MAC address with a loopback reply to be sent by a system which may be
    currently using the MAC address.  If no reply is received, then the 
    MAC address is presumed to be unused.  The sending of this packet will
    result in its delivery to the right system since the switch port/MAC
    address tables know where to deliver packets destined to this MAC 
-   address, however the response it generates won’t be delivered to the 
-   system performing the test since the switches on the LAN won’t know 
+   address, however the response it generates won't be delivered to the 
+   system performing the test since the switches on the LAN won't know 
    about the local port being the right target for packets with this MAC 
    address.  A better test design to detect these conflicts would be for 
    the testing system to send a loopback packet FROM the current physical
    MAC address (BEFORE changing it) TO the MAC address being tested with 
    the loopback response coming to the current physical MAC address of 
    the device.  If a response is received, then the address is in use and
-   the attempt to change the device’s MAC address should fail.  Since we 
-   can’t change the software running in these simulators to implement this
-   better conflict detection approach, we can still ‘do the right thing’ 
-   in the sim_ether layer.  We’re already handling the loopback test 
+   the attempt to change the device's MAC address should fail.  Since we 
+   can't change the software running in these simulators to implement this
+   better conflict detection approach, we can still "do the right thing" 
+   in the sim_ether layer.  We're already handling the loopback test 
    packets specially since we always had to avoid receiving the packets 
    which were being sent, but needed to allow for the incoming loopback 
    packets to be properly dealt with.  We can extend this current special
-   handling to change outgoing ‘loopback to self’ packets to have source 
-   AND loopback destination addresses in the packets to be the host NIC’s
+   handling to change outgoing "loopback to self" packets to have source 
+   AND loopback destination addresses in the packets to be the host NIC's
    physical address.  The switch network will already know the correct 
-   MAC/port relationship for the host NIC’s physical address, so loopback 
+   MAC/port relationship for the host NIC's physical address, so loopback 
    response packets will be delivered as needed.
 
    Code in _eth_write and _eth_callback provide the special handling to 

@@ -268,7 +268,7 @@ DEVICE mdsad_dev = {
 };
 
 /* Reset routine */
-t_stat mdsad_reset(DEVICE *dptr)
+static t_stat mdsad_reset(DEVICE *dptr)
 {
     PNP_INFO *pnp = (PNP_INFO *)dptr->ctxt;
 
@@ -289,7 +289,7 @@ t_stat mdsad_reset(DEVICE *dptr)
 }
 
 /* Attach routine */
-t_stat mdsad_attach(UNIT *uptr, char *cptr)
+static t_stat mdsad_attach(UNIT *uptr, char *cptr)
 {
     char header[4];
     t_stat r;
@@ -341,7 +341,7 @@ t_stat mdsad_attach(UNIT *uptr, char *cptr)
 
 
 /* Detach routine */
-t_stat mdsad_detach(UNIT *uptr)
+static t_stat mdsad_detach(UNIT *uptr)
 {
     t_stat r;
     int8 i;

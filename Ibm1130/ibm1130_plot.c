@@ -7,6 +7,7 @@
 
    2004.10.22 - Written.
    2006.1.2 - Rewritten as plotter routine by Carl V Claunch
+   2012.11.23 - added -d option in detach, which we'll use in the CGI simulator. BK.
 
  * (C) Copyright 2004, Brian Knittel.
  * You may freely use this program, but: it offered strictly on an AS-IS, AT YOUR OWN
@@ -35,6 +36,7 @@
 
 #else
 
+#define NONDLL		// I am linking statically to avoid some issues.
 #include "gd.h"
 
 /***************************************************************************************
@@ -45,31 +47,78 @@
  *  - sheet moveable in .01" steps, either direction
  *  - switchable pen, in various colors and line widths
  *
- *  Simulator implementation will create a JPEG image corresponding to a 
- *  landscape mode sheet of paper, the width of the carriage at 11".
- *  A diagram of more than 8" of paper travel will span printed pages
- *  in landscape mode. 
+ *  Notice that the WIDTH is 11" and the LENGTH can be anything up to 120'. And, the WIDTH
+ *  was the plotter's Y direction, and the LENGTH was the plotter's X direction.
+ * 
+ *  The simulator creates a GIF image corresponding to a landscape mode sheet of paper. That is,
+ *  the plotter's Y direction is the image's horizontal dimension, and the plotter's X direction
+ *  is the image's vertical dimension. The WIDTH of the image is always 1100 pixels (11 inches at
+ *  100 dpi), and the LENGTH (height) of the image can be set. The default is 800 pixels (8 
+ *  inches at 100 dpi). A diagram of more than 8" in length (X direction) will span more than 
+ *  one printed page in landscape mode. 
  *
  *  When an 'att plot' command is issued a file is created based on the
- *  default or currently set values of paper length, starting
- *  position of the pen in both X and Y axes, pen color and pen width.
- *  Based on the number of logical pages of paper, the command will create
- *  the proper size canvas internally and create the output JPEG file.
+ *  default or currently set values of paper length, pen position, pen color and pen width.
  *  
- *  When a 'det plot' command is issued, the plotter image will be converted 
- *  into the file that was specified during the attach process. The
- *  image is not viewable until this point, unless an examine plot is
- *  issued which will dump the current state of the paper into the file.
+ *  When a 'det plot' command is issued, the plotter image will be
+ *  written to the GIF that was created during the attach process. The
+ *  image is not viewable until this point. (You could implement an EXAMINE PLOT command
+ *  of some sort to write out an intermediate version of the image, but this is not currently
+ *  implemented).
  *  
  *  The 'set plot' command can set pen width, paper length, pen color,
- *  current carriage X and Y coordinates. Paper length can be set
+ *  current carriage X and Y coordinates, as discussed below. Paper length can be set
  *  to alter the default of 800 (8"); changes are ignored until
  *  the next 'attach' command. The current carriage x and y positions
  *  can be set at any time and will go into effect immediately, just
  *  as the pen color and pen width can be altered on the fly.
  *
- * NOTE: requires gd library and definition of ENABLE_PLOT_SUPPORT in makefile or Visual C configuration
- * gd is not included in the main simh and ibm1130.org distributions at the present time.
+ * NOTE: requires the libgd library and definition of ENABLE_PLOT_SUPPORT in makefile or Visual C configuration
+ * gd source is not included in the main simh and ibm1130.org source distributions at the present time due to
+ * licensing issues.
+ *
+ * NOTE: On Windows, you need to either:
+ *	+	compile both LIBGD and SIMH to use the static C runtime libraries, compile
+ *		   LIBGD to a static library, and link LIBGD into ibm1130.exe (which is
+ *		   what we do at IBM1130.org, so that gd is built into the version of ibm1130.exe
+ *		   we distribute), or, 
+ *	+	Compile both LIBGD and IBM1130 to use the DLL version of the C runtime, and compile
+ *		   GD to either a static library or a DLL, but, static is easier since you don't
+ *		   need to copy LIBGD.DLL along with ibm1130.exe
+ *
+ * SIMH commands:
+ *
+ * attach [-w] plot filename.gif
+ *		Creates file filename.gif and attaches the plotter device to it.
+ *      The file is empty at this point. The pen is raised. If the -w option is specified, and the 
+ *		simulator does not draw on the plotter between attach and detach, the gif file will be deleted
+ *		on detach. (This is useful for the the cgi version of the simulator).
+ *
+ * detach plot filename.gif
+ *		Detach the plot device. The gif data is written at this point, not before.
+ *		If the -w flag was used on attach, and there was no plot activity, the gif file will be deleted.
+ *
+ * set plot black | red | blue | green | yellow | purple | lgrey | grey
+ *		Sets the pen to the named color. Default is black.
+ *
+ * set plot 1.0 | 2.0 | 3.0 | 4.0
+ *		Sets the pen thickness to the specified number of hundredths of an inch. Default is 1.0
+ *
+ * set plot penup | pendown
+ *		Moves the pen up or down (onto the paper).
+ *
+ * set plot length NNN
+ *		Sets the plot length (plotter X direction, GIF vertical dimension) to the NNN hundredths of 
+ *		an inch. Default is 800. The plot width (plotter Y direction, GIF horizontal dimension) is always 
+ *		1100 (11 inches). NOTE: Changing this setting has no affect on the current plot. It takes affect at 
+ *		the next "attach plot" command.
+ *
+ * set plot xpos NNN
+ * set plot ypos NNN
+ *		Sets the pen x or y position to NNN hundredths of an inch.
+ * 
+ * (You cannot manually create a plot by issuing set plot pendown, xpos and ypos commands. The xpos and ypos
+ *  settings only change the starting point for the simulated program).
  ***************************************************************************************/
 
 #define PLOT1627_DSW_OP_COMPLETE			0x8000
@@ -78,7 +127,7 @@
 
 #define IS_ONLINE(u) (((u)->flags & (UNIT_ATT|UNIT_DIS)) == UNIT_ATT)
 #define IS_DEBUG 	 ((plot_unit->flags & UNIT_DEBUG) == UNIT_DEBUG)
-#define IS_PENDOWN 	 ((plot_unit->flags & UNIT_PEN) == UNIT_PEN)
+#define IS_PENDOWN 	 ((plot_unit->flags & UNIT_PEN) != 0)
 
 static t_stat plot_svc    (UNIT *uptr);				/* activity routine */
 static t_stat plot_reset  (DEVICE *dptr);			/* reset of 1130 */
@@ -103,7 +152,7 @@ static int32 plot_ymax = 1099;						/* right edge of carriage */
 
 #define PEN_DOWN 0x80000000
 #define PEN_UP   0x00000000
-static int32 plot_pen = PEN_UP;						/* current pen position */
+static int32 plot_pen = PEN_UP;						/* current pen position. This duplicates the device flag PLOT_PEN. Makes the show dev plot command nicer. */
 
 static int black_pen;								/* holds color black */
 static int blue_pen;								/* holds color blue */
@@ -116,8 +165,10 @@ static int grey_pen;                                /* holds grey */
 static int white_background;						/* holds white of paper roll */
 static int plot_pwidth;							    /* set and display variable */
 static int plot_pcolor;							    /* set and display variable */
-static int need_update = 0;							/* flag to force and update_pen() */
-static gdImagePtr  image;							/* pointer to our canvas */
+static int need_update = FALSE;						/* flag to force and update_pen() */
+static int plot_used = FALSE;						/* flag set to true if anything was actually plotted between attach and detach */
+static int delete_if_unused = FALSE;				/* if TRUE and no plotter activity was seen, delete file on detach. This flag is set by -w option on attach command. */
+static gdImagePtr image = NULL;						/* pointer to our canvas */
 
 #define UNIT_V_COLOR    (UNIT_V_UF + 0)				/* color of selected pen - 3 bits */
 #define UNIT_V_WIDTH	(UNIT_V_UF + 3)				/* width of pen - two bits */
@@ -140,8 +191,8 @@ static gdImagePtr  image;							/* pointer to our canvas */
 #define PEN_LTGREY	     (6u << UNIT_V_COLOR)
 #define PEN_GREY 	     (7u << UNIT_V_COLOR)
 
-#define SET_COLOR(op) {plot_unit[0].flags &= ~UNIT_COLOR; plot_unit[0].flags |= (op);}
-#define GET_COLOR (plot_unit[0].flags & UNIT_COLOR)
+#define SET_COLOR(op)   (plot_unit[0].flags = (plot_unit[0].flags & ~UNIT_COLOR) | (op))
+#define GET_COLOR       (plot_unit[0].flags & UNIT_COLOR)
 
 #define BLACK           0,0,0
 #define BLUE            0,0,255
@@ -159,7 +210,7 @@ static gdImagePtr  image;							/* pointer to our canvas */
 #define PEN_QUAD 		(3u << UNIT_V_WIDTH)
 
 #define GET_WIDTH()		(plot_unit[0].flags & UNIT_WIDTH)
-#define SET_WIDTH(cd)	{plot_unit[0].flags &= ~UNIT_WIDTH; un.flags |= (cd);}
+#define SET_WIDTH(cd)	(plot_unit[0].flags = (plot_unit[0].flags & ~UNIT_WIDTH) | (cd))
 
 UNIT plot_unit[] = {
 	{ UDATA (&plot_svc, UNIT_ATTABLE, 0) },
@@ -167,10 +218,10 @@ UNIT plot_unit[] = {
 
 REG plot_reg[] = {
 	{ HRDATA (DSW, 	    plot_dsw,  16) },			/* device status word */
-	{ DRDATA (WTIME,    plot_wait, 24), PV_LEFT },		/* plotter movement wait */
+	{ DRDATA (WTIME,    plot_wait, 24), PV_LEFT },	/* plotter movement wait */
 	{ DRDATA (Xpos, plot_xpos,  32), PV_LEFT },		/* Current X Position*/
 	{ DRDATA (Ypos, plot_ypos,  32), PV_LEFT },		/* Current Y Position*/
-	{ FLDATA (PenDown, plot_pen, 0)},				/* Current pen position - 1 = down */
+	{ FLDATA (PenDown, plot_pen, 0)},				/* Current pen position: 1 = down */
     { DRDATA (PaperSize, plot_xmax, 32), PV_LEFT }, /* Length of paper in inches */
 	{ NULL }  };
 
@@ -211,9 +262,10 @@ DEVICE plot_dev = {
 
 /* xio_1627_plotter - XIO command interpreter for the 1627 plotter model 1 */
 
-void xio_1627_plotter (iocc_addr, iocc_func, iocc_mod)
+void xio_1627_plotter (int32 iocc_addr, int32 iocc_func, int32 iocc_mod)
 {
 	char msg[80];
+	int16 v;
 
 	if (! IS_ONLINE(plot_unit) ) {
 		SETBIT(plot_dsw, PLOT1627_DSW_NOT_READY);					/* set not ready */
@@ -246,7 +298,44 @@ void xio_1627_plotter (iocc_addr, iocc_func, iocc_mod)
 			break;
 
 		case XIO_CONTROL:											/* control XIO */
-			xio_error("Control XIO not supported by 1627 plotter");
+			// xio_error("Control XIO not supported by 1627 plotter");
+			// Well, not on a real 1130. But on our simulator, let's use XIO_CONTROL to
+			// allow programmatic control of the pen. Nifty, eh?
+			//
+			// Functions: XIO_CONTROL 0 clr		- sets pen color (0=black, 1=red, 2=blue, 3=green, 4=yellow, 5=purple, 6=ltgrey, 7=grey)
+			//			  XIO_CONTRLL 1 wid		- sets pen width (1..4)
+			//			  XIO_CONTROL 2 xpos	- sets pen xpos
+			//			  XIO_CONTROL 3 ypos	- sets pen ypos
+
+			v = (int16) iocc_addr;									/* get signed 16 bit value passed in addr arg */
+			switch (iocc_mod) {
+				case 0:												/* set pen color */
+					if (BETWEEN(v,0,7)) {
+						SET_COLOR(v << UNIT_V_COLOR);
+						update_pen();
+					}
+					break;
+
+				case 1:												/* set pen width 1..4*/
+					if (BETWEEN(v,1,4)) {
+						SET_WIDTH((v-1) << UNIT_V_WIDTH);
+						update_pen();
+					}
+					break;
+
+				case 2:												/* set xpos. (Programmatic xpos and ypos are probably not that valuable) */
+					plot_xpos = v;									/* Note that it's possible to move the pen way off the paper */
+					break;
+
+				case 3:												/* set ypos. Clip to valid range! */
+					if (v <= 0)
+						plot_ypos = 0;
+					else if (v > plot_ymax)
+						plot_ypos = plot_ymax;
+					else
+						plot_ypos = v;
+					break;
+			}
 			break;
 
 		default:
@@ -274,8 +363,14 @@ static t_stat plot_svc (UNIT *uptr)
 
 static t_stat plot_reset (DEVICE *dptr)
 {
-	char * buf;
-	int32 size;
+#ifdef NONDLL
+	static int show_notice = FALSE;
+
+	if (show_notice && ! cgi) {
+		printf("Plotter support included. Please see www.libgd.org for libgd copyright information.\n");
+		show_notice = FALSE;
+	}
+#endif
 
 	sim_cancel(plot_unit);
 
@@ -296,18 +391,13 @@ static t_stat plot_attach (UNIT *uptr, char *cptr)
 {
 	t_stat result;
 
-    CLRBIT(uptr->flags, UNIT_DEBUG);
+	SETBIT(plot_dsw, PLOT1627_DSW_NOT_READY);				/* assume failure */
+
+	CLRBIT(uptr->flags, UNIT_DEBUG);
 	if (sim_switches & SWMASK('D')) SETBIT(uptr->flags, UNIT_DEBUG);
 
-	/* get the output file by using regular attach routine */
-    result = attach_unit(uptr, cptr);
-
-    if (result != SCPE_OK) {
-       if (IS_DEBUG) printf("problem attaching file\n");
-       return result;
-    }
-
-	SETBIT(plot_dsw, PLOT1627_DSW_NOT_READY);				/* assume failure */
+	if (cptr == NULL || ! *cptr)							/* filename must be passed */
+		return SCPE_ARG;
 
 	/* set up our canvas at the desired size */
 	image = gdImageCreate(plot_ymax+1,plot_xmax+1);			/* create our canvas */
@@ -316,7 +406,21 @@ static t_stat plot_attach (UNIT *uptr, char *cptr)
        return SCPE_MEM;
     }
 
+	delete_if_unused = (sim_switches & SWMASK('W')) != 0;
+
+	remove(cptr);											/* delete file if it already exists. Otherwise, attach_unit() would open r+w */
+	/* get the output file by using regular attach routine */
+    result = attach_unit(uptr, cptr);
+
+    if (result != SCPE_OK) {
+       if (IS_DEBUG) printf("problem attaching file\n");
+	   gdImageDestroy(image);			/* free up the canvas memory */
+	   image = NULL;
+       return result;
+    }
+
 	/* set up the basic colors after image created */
+	/* (by the way, these calls don't allocate any memory in or out of the image buffer. They just populate its "colors-used" table */
 	white_background = gdImageColorAllocate(image,WHITE);	/* white is background */
 	black_pen  = gdImageColorAllocate(image,BLACK);			/* load up black color */
 	blue_pen   = gdImageColorAllocate(image,BLUE);			/* load up blue color */
@@ -336,19 +440,22 @@ static t_stat plot_attach (UNIT *uptr, char *cptr)
 
 	CLRBIT(plot_dsw, PLOT1627_DSW_NOT_READY);				/* we're in business */
 
-    update_pen();                                       	/* routine to ensure pen is okay */
+	plot_pen = PEN_UP;
+	CLRBIT(plot_unit->flags, UNIT_PEN);
 
+    update_pen();                                       	/* routine to ensure pen is okay */
+	plot_used = FALSE;										/* plotter page is blank */
 	return SCPE_OK;
 }
 
 /* pen updating routine, called at attach and whenever we reset the values */
 
-void update_pen (void)
+static void update_pen (void)
 {
 	int color;
 	int width;
 
-     if (!IS_ONLINE(plot_unit)) return;     /* only do this if attached */
+     if (! IS_ONLINE(plot_unit)) return;     /* only do this if attached */
 
      /* pick up latest color as active pen */
      color = GET_COLOR;
@@ -430,39 +537,69 @@ void update_pen (void)
 }
 
 /* plot_detach - detach file from simulated plotter */
+
 static t_stat plot_detach (UNIT *uptr)
 {
-	char * buf;
-	int32 size;
+	char * buf, * fname;
+	int32 size, result, saveit;
 	FILE * fp;
-	int32 result;
+	t_stat rval = SCPE_OK;			/* return value */
 
     SETBIT(plot_dsw, PLOT1627_DSW_NOT_READY);
 
-	/* copy images to files, close files, set device to detached, free gd memory */
+	if (! (uptr->flags & UNIT_ATT))	/* not currently attached; don't proceed */
+		return SCPE_OK;
 
-    buf = gdImageGifPtr(image,&size);
-    if (! buf) {
-       if (IS_DEBUG) printf("failure creating GIF in-memory\n");
-       return SCPE_MEM;
+									/* if -w flag was passed on attach: save file if there was plotter activity, otherwise delete it */
+									/* if -w flag was not passed on attached, always save the file */
+	saveit = (plot_used || ! delete_if_unused) && (image != NULL);
+
+	if (saveit) {					/* copy images to files, close files, set device to detached, free gd memory */
+		if ((buf = gdImageGifPtr(image,&size)) == NULL) {
+		   if (IS_DEBUG) printf("failure creating GIF in-memory\n");
+		   return SCPE_MEM;
+		}
+
+		fp = uptr->fileref;			/* get file attached to unit */
+
+		if (fseek(fp,0,SEEK_SET) == 0) {		/* first we reset to begin of file */
+			if (IS_DEBUG) printf("wrote out GIF to file\n");
+			result = fwrite(buf,1,size,fp);		/* write out our image to the file */
+		}
+		else
+			result = 0;				/* make it look like the write failed so we return error status */
+	
+		gdFree(buf);				/* free up the memory of GIF format */
+	}
+	else {							/* make a copy of the filename so we can delete it after detach */
+		if ((fname = malloc(strlen(uptr->filename)+1)) != NULL)
+			strcpy(fname, uptr->filename);
+	}
+
+	if (image != NULL) {
+		gdImageDestroy(image);		/* free up the canvas memory */
+		image = NULL;
+	}
+
+    rval = detach_unit(uptr);		/* have simh close the file */
+
+	if (saveit) {					/* if we wrote the file, check that write was OK */
+		if (result != size) {		/* report error writing file */
+			if (IS_DEBUG) printf("error in write of image file\n");
+			rval = SCPE_IOERR;
+		}
     }
+	else {							/* if we did not write the file, delete the file */
+		if (fname == NULL) {
+			rval = SCPE_MEM;		/* we previously failed to allocate a copy of the filename (this will never happen) */
+		}
+		else {
+			remove(fname);			/* remove the file and free the copy of the filename */
+			free(fname);
+		}
+	}
 
-    fp = uptr->fileref;						/* get file attached to unit */
-
-    if (! fseek(fp,0,SEEK_SET)) {			/* first we reset to begin of file */
-       if (IS_DEBUG) printf("wrote out GIF to file\n");
-       result = fwrite(buf,1,size,fp);		/* write out our image to the file */
-    }
-
-    gdFree(buf);							/* free up the memory of GIF format */
-    gdImageDestroy(image);					/* free up the canvas memory */
-
-    if (result != size) {					/* some problem writing it */
-       if (IS_DEBUG) printf("error in write of image file\n");
-       return SCPE_IOERR;
-    }
-
-    return detach_unit(uptr);				/* have simh close the file */
+	return rval;
 }
 
 /* process_cmd - implement the drawing actions of the plotter */
@@ -474,7 +611,7 @@ static void process_cmd (void)
     /* first see if we set any changes to pen or position, do an update */
     if (need_update) {
        update_pen();
-       need_update = 0;
+       need_update = FALSE;
     }
 
    	/* will move pen one step or flip pen up or down */
@@ -484,49 +621,49 @@ static void process_cmd (void)
     switch (plot_cmd) {
 	    case 1:            /* raise pen command */
 	         plot_pen = PEN_UP;
-	         plot_unit->flags = plot_unit->flags & (~UNIT_PEN);
+			 CLRBIT(plot_unit->flags, UNIT_PEN);
 	         return;
 	         break;
 
 	    case 2:            /* +Y command */
-	         plot_ypos = plot_ypos + 1;
+	         ++plot_ypos;
 	         break;
 
 	    case 4:            /* -Y command */
-	         plot_ypos = plot_ypos - 1;
+	         --plot_ypos;
 	         break;
 
 	    case 8:            /* -X command */
-	         plot_xpos = plot_xpos - 1;
+	         --plot_xpos;
 	         break;
 
 	    case 10:            /* -X +Y command */
-	         plot_xpos = plot_xpos - 1;
-	         plot_ypos = plot_ypos + 1;
+	         --plot_xpos;
+	         ++plot_ypos;
 	         break;
 
 	    case 12:            /* -X -Y command */
-	         plot_xpos = plot_xpos - 1;
-	         plot_ypos = plot_ypos - 1;
+	         --plot_xpos;
+	         --plot_ypos;
 	         break;
 
 	    case 16:            /* +X command */
-	         plot_xpos = plot_xpos + 1;
+	         ++plot_xpos;
 	         break;
 
 	    case 18:            /* +X +Y command */
-	         plot_xpos = plot_xpos + 1;
-	         plot_ypos = plot_ypos + 1;
+	         ++plot_xpos;
+	         ++plot_ypos;
 	         break;
 
 	    case 20:            /* +X -Y pen command */
-	         plot_xpos = plot_xpos + 1;
-	         plot_ypos = plot_ypos - 1;
+	         ++plot_xpos;
+	         --plot_ypos;
 	         break;
 
 	    case 32:            /* lower pen command */
 	         plot_pen = PEN_DOWN;
-	         plot_unit->flags = plot_unit->flags | UNIT_PEN;
+			 SETBIT(plot_unit->flags, UNIT_PEN);
 	         return;
 	         break;
 
@@ -536,19 +673,36 @@ static void process_cmd (void)
 	         break;
     }
 
-    /* check to see if carriage has moved off any edge */
-    if ((plot_xpos > (plot_xmax+1)) || (plot_ypos > (plot_ymax+1)) ||
-           (plot_xpos < 0) || (plot_ypos < 0)) {
+	/* On the real plotter, y motions were physically restricted at the ends of travel.
+	 * We simulate this by clipping the plot_ypos value. Three +y movements at the right
+	 * end of travel followed by three -y movements will back up 3 positions, just as it would have on
+	 * the physical plotter. Without clipping, the pen would end up where it started, which 
+	 * is incorrect. (Hopefully, good 1130 plotting software would never make this happen anyhow!)
+	 */
+
+	 if (plot_ypos < 0)
+		plot_ypos = 0;
+	 else if (plot_ypos > plot_ymax)
+		plot_ypos = plot_ymax;
+
+	/* We do allow X overtravel though, as the drum simply turned past the end of the paper. Three +x
+	 * movements past the end of the paper followed by three -x movements would put the pen back at the
+	 * edge of the paper.
+	 */
+
+	 if ((plot_xpos < 0) || (plot_xpos > plot_xmax)) {
            /* if so, ignore as 1627 has no way of signalling error */
            if (IS_DEBUG) printf(
               "attempted to move carriage off paper edge %d %d for command %d\n",
               plot_xpos,plot_ypos,plot_cmd);
-           return;
+
+		   return;		// no drawing takes place if the pen is off of the paper!
     }
 
     /* only draw a line if the pen was down during the movement command */
     if (plot_pen) {
-       gdImageLine(image, plot_ymax-plot_ypos, plot_xmax-plot_xpos, plot_ymax-oldy, plot_xmax-oldx, gdAntiAliased);
+		gdImageLine(image, plot_ymax-plot_ypos, plot_xmax-plot_xpos, plot_ymax-oldy, plot_xmax-oldx, gdAntiAliased);
+		plot_used = TRUE;										/* remember that we drew something */
        /* semantics are 0,0 point is lower right */
     }
 
@@ -563,6 +717,11 @@ static t_stat plot_set_length (UNIT *uptr, int32 set, char *ptr, void *desc)
 	int32 val;
 
 #define LONGEST_ROLL 1440000                    /* longest is 120', 14400", 1,440,000 .01"s */
+
+	if (ptr == NULL) {							/* check for missing argument */
+		printf("Command format is: set plot length=nnn\n");
+		return SCPE_ARG;
+	}
 
 	val = strtotv (ptr, &cptr, (uint32) 10);   /* sim routine to get value */
 	if ((val < 1) | (val >= LONGEST_ROLL)) {   /* check valid range */
@@ -626,8 +785,9 @@ static t_stat plot_show_nl(FILE *fp, UNIT *uptr, int32 val, void *descrip)
 
 static t_stat plot_validate_change (UNIT *uptr, int32 set, char *ptr, void *desc)
 {
-	need_update = 1;
+	need_update = TRUE;
 	return SCPE_OK;
 }
 
 #endif /* ENABLE_PLOT_SUPPORT */
+

@@ -1,4 +1,4 @@
-//Microsoft Visual C++ generated resource script.
+// Microsoft Visual C++ generated resource script.
 //
 #include "ibm1130res.h"
 
@@ -12,6 +12,14 @@
 /////////////////////////////////////////////////////////////////////////////
 #undef APSTUDIO_READONLY_SYMBOLS
 
+/////////////////////////////////////////////////////////////////////////////
+// English (U.S.) resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_ENU)
+#ifdef _WIN32
+LANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US
+#pragma code_page(1252)
+#endif //_WIN32
 
 #ifdef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////
@@ -19,24 +27,23 @@
 // TEXTINCLUDE
 //
 
-1 TEXTINCLUDE DISCARDABLE 
+1 TEXTINCLUDE 
 BEGIN
     "ibm1130res.h\0"
 END
 
-2 TEXTINCLUDE DISCARDABLE 
+2 TEXTINCLUDE 
 BEGIN
     "#include <windows.h>\r\n"
     "\0"
 END
 
-3 TEXTINCLUDE DISCARDABLE 
+3 TEXTINCLUDE 
 BEGIN
     "\r\n"
     "\0"
 END
 
-/////////////////////////////////////////////////////////////////////////////
 #endif    // APSTUDIO_INVOKED
 
 
@@ -45,20 +52,72 @@ END
 // Bitmap
 //
 
-IDB_CONSOLE             BITMAP  MOVEABLE PURE   "1130consoleblank.bmp"
-FULL_1442               BITMAP  MOVEABLE PURE   "1442full.bmp"
-EOF_1442                BITMAP  MOVEABLE PURE   "1442eof.bmp"
-EMPTY_1442              BITMAP  MOVEABLE PURE   "1442empty.bmp"
-MIDDLE_1442             BITMAP  MOVEABLE PURE   "1442middle.bmp"
-FULL_1132               BITMAP  MOVEABLE PURE   "1132full.bmp"
-EMPTY_1132              BITMAP  MOVEABLE PURE   "1132empty.bmp"
+IDB_CONSOLE             BITMAP                  "1130consoleblank.bmp"
+FULL_1442               BITMAP                  "1442full.bmp"
+EOF_1442                BITMAP                  "1442eof.bmp"
+EMPTY_1442              BITMAP                  "1442empty.bmp"
+MIDDLE_1442             BITMAP                  "1442middle.bmp"
+FULL_1132               BITMAP                  "1132full.bmp"
+EMPTY_1132              BITMAP                  "1132empty.bmp"
 
 /////////////////////////////////////////////////////////////////////////////
 //
 // Cursor
 //
 
-IDC_MYHAND              CURSOR  DISCARDABLE     "HAND.CUR"
+IDC_MYHAND              CURSOR                  "HAND.CUR"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+mainicon                ICON                    "ibm1130.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 3,8,0,0
+ PRODUCTVERSION 3,8,0,0
+ FILEFLAGSMASK 0x17L
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "Comments", "IBM 1130 simulator. For more information see http://ibm1130.org. Program based on SIMH by Bob Supnik, http:/.simh.trailing-edge.com"
+            VALUE "FileDescription", "ibm1130 Application"
+            VALUE "FileVersion", "3, 8, 0, 0"
+            VALUE "InternalName", "ibm1130"
+            VALUE "LegalCopyright", "Copyright (C) 2012, Brian Knittel. Plotter support incorporates LIBGD Copyright © 1997-2008 Thomas Boutell, Pierre A. Joye and contributors, see file COPYING at www.libgd.org"
+            VALUE "OriginalFilename", "ibm1130.exe"
+            VALUE "ProductName", "ibm1130 Application"
+            VALUE "ProductVersion", "3, 8, 0, 0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+#endif    // English (U.S.) resources
+/////////////////////////////////////////////////////////////////////////////
+
+
 
 #ifndef APSTUDIO_INVOKED
 /////////////////////////////////////////////////////////////////////////////

@@ -3,3 +3,5 @@
 *.vcproj binary
 *.exe binary
 *.bin binary
+sim_rev.h export-subst
+

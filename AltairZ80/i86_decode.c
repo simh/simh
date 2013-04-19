@@ -209,7 +209,7 @@ t_stat sim_instr_8086(void) {
     while (switch_cpu_now == TRUE) {                        /* loop until halted    */
         if (sim_interval <= 0) {                            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_os_poll_kbd()) == SCPE_STOP)  /* poll on platforms without reliable signalling */
+            if ((reason = sim_poll_kbd()) == SCPE_STOP)     /* poll on platforms without reliable signalling */
                 break;
 #endif
             if ( (reason = sim_process_event()) )

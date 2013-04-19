@@ -1,6 +1,6 @@
 /*  altairz80_net.c: networking capability
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2013, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -77,16 +77,14 @@ static struct {
 static UNIT net_unit = {
     UDATA (&net_svc, UNIT_ATTABLE, 0),
     0,  /* wait, set in attach  */
-    0,  /* u3 = Port            */
-    0,  /* u4 = IP of host      */
+    0,  /* u3, unused			*/
+    0,  /* u4, unused			*/
     0,  /* u5, unused           */
     0,  /* u6, unused           */
 };
 
 static REG net_reg[] = {
     { DRDATA (POLL,         net_unit.wait,  32)             },
-    { HRDATA (IPHOST,       net_unit.u4,    32),    REG_RO  },
-    { DRDATA (PORT,         net_unit.u3,    32),    REG_RO  },
     { NULL }
 };
 

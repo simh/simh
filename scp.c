@@ -392,7 +392,7 @@ BRKTAB *sim_brk_new (t_addr loc);
 
 SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
-char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc);
+static char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc, t_bool quote);
 int32 get_switches (char *cptr);
 char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
@@ -562,7 +562,7 @@ const struct scp_error {
          {"STALL",   "Console Telnet output stall"},
          {"AFAIL",   "Assertion failed"},
          {"INVREM",  "Invalid remote console command"},
-};
+    };
 
 const size_t size_map[] = { sizeof (int8),
     sizeof (int8), sizeof (int16), sizeof (int32), sizeof (int32)
@@ -723,14 +723,14 @@ static CTAB cmd_table[] = {
       "sh{ow} fea{tures}        show system devices with descriptions\n"
       "sh{ow} m{odifiers}       show modifiers for all devices\n" 
       "sh{ow} s{how}            show SHOW commands for all devices\n" 
-      "sh{ow} n{ames}           show logical names\n" 
-      "sh{ow} q{ueue}           show event queue\n"  
+      "sh{ow} n{ames}           show logical names\n"
+      "sh{ow} q{ueue}           show event queue\n"
       "sh{ow} ti{me}            show simulated time\n"
-      "sh{ow} th{rottle}        show simulation rate\n" 
+      "sh{ow} th{rottle}        show simulation rate\n"
       "sh{ow} a{synch}          show asynchronouse I/O state\n" 
-      "sh{ow} ve{rsion}         show simulator version\n" 
+      "sh{ow} ve{rsion}         show simulator version\n"
       "sh{ow} def{ault}         show current directory\n" 
-      "sh{ow} rem{oteconsole}   show remote console configuration\n" 
+      "sh{ow} re{mote}          show remote console configuration\n" 
       "sh{ow} <dev> RADIX       show device display radix\n"
       "sh{ow} <dev> DEBUG       show device debug flags\n"
       "sh{ow} <dev> MODIFIERS   show device modifiers\n"
@@ -786,19 +786,19 @@ static CTAB cmd_table[] = {
 #if defined(_WIN32) || defined(__hpux)
 static
 int setenv(const char *envname, const char *envval, int overwrite)
-    {
-    char *envstr = malloc(strlen(envname)+strlen(envval)+2);
-    int r;
+{
+char *envstr = malloc(strlen(envname)+strlen(envval)+2);
+int r;
 
-    sprintf(envstr, "%s=%s", envname, envval);
+sprintf(envstr, "%s=%s", envname, envval);
 #if defined(_WIN32)
-    r = _putenv(envstr);
-    free(envstr);
+r = _putenv(envstr);
+free(envstr);
 #else
-    r = putenv(envstr);
+r = putenv(envstr);
 #endif
-    return r;
-    }
+return r;
+}
 #endif
 
 
@@ -1648,7 +1648,6 @@ do {
             cmdp->message ((!echo && !sim_quiet) ? ocptr : NULL, stat);
         else
             if (stat >= SCPE_BASE) {                    /* report error if not suppressed */
-
                 printf ("%s\n", sim_error_text (stat));
                 if (sim_log)
                     fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -1787,10 +1786,10 @@ for (; *ip && (op < oend); ) {
                 }
             else {                                      /* environment variable */
                 ap = NULL;
-                get_glyph_gen (ip+1, gbuf, '%', FALSE); /* first try using the literal name */
+                get_glyph_nc (ip+1, gbuf, '%');         /* first try using the literal name */
                 ap = getenv(gbuf);
                 if (!ap) {
-                    get_glyph_gen (ip+1, gbuf, '%', TRUE); /* now try using the upcased name */
+                    get_glyph (ip+1, gbuf, '%');        /* now try using the upcased name */
                     ap = getenv(gbuf);
                     }
                 ip += 1 + strlen (gbuf);
@@ -1847,7 +1846,7 @@ for (; *ip && (op < oend); ) {
             }
         else
             if (ip == istart) {                         /* at beginning of input? */
-                get_glyph_gen (instr, gbuf, 0, TRUE);   /* substitute initial token */
+                get_glyph (instr, gbuf, 0);             /* substitute initial token */
                 ap = getenv(gbuf);                      /* if it is an environment variable name */
                 if (!ap) {                              /* nope? */
                     *op++ = *ip++;                      /* press on with literal character */
@@ -1876,7 +1875,7 @@ return SCPE_OK;
 }
 
 /* Assert command
-   
+
    Syntax: ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>
 
    If <dev> is not specified, CPU is assumed.  <value> is expressed in the radix
@@ -2189,7 +2188,7 @@ char varname[CBUFSIZE];
 
 if ((!cptr) || (*cptr == 0))                            /* now eol? */
     return SCPE_2FARG;
-cptr = get_glyph_gen (cptr, varname, '=', TRUE);       /* get environment variable name */
+cptr = get_glyph (cptr, varname, '=');                  /* get environment variable name */
 setenv(varname, cptr, 1);
 return SCPE_OK;
 }
@@ -2198,7 +2197,7 @@ return SCPE_OK;
 
 t_stat set_cmd (int32 flag, char *cptr)
 {
-uint32 lvl;
+uint32 lvl = 0;
 t_stat r;
 char gbuf[CBUFSIZE], *cvptr, *svptr;
 DEVICE *dptr;
@@ -2303,10 +2302,17 @@ while (*cptr != 0) {                                    /* do all mods */
                 if ((lvl == MTAB_VUN) && (uptr->flags & UNIT_DIS))
                     return SCPE_UDIS;                   /* unit disabled? */
                 if (mptr->valid) {                      /* validation rtn? */
-                    if (cvptr && MODMASK(mptr,MTAB_NC)) {
-                        get_glyph_nc (svptr, gbuf, ',');
+                    if (cvptr && MODMASK(mptr,MTAB_QUOTE)) {
+                        get_glyph_quoted (svptr, gbuf, ',');
                         if ((cvptr = strchr (gbuf, '=')))
                             *cvptr++ = 0;
+                        }
+                    else {
+                        if (cvptr && MODMASK(mptr,MTAB_NC)) {
+                            get_glyph_nc (svptr, gbuf, ',');
+                            if ((cvptr = strchr (gbuf, '=')))
+                                *cvptr++ = 0;
+                            }
                         }
                     r = mptr->valid (uptr, mptr->match, cvptr, mptr->desc);
                     if (r != SCPE_OK)
@@ -2589,7 +2595,7 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (((mptr->mask & MTAB_XTD)?                   /* right level? */
-            (mptr->mask & lvl): (MTAB_VUN & lvl)) && 
+            (mptr->mask & lvl): (MTAB_VUN & lvl)) &&
             ((mptr->disp && mptr->pstring &&            /* named disp? */
             (MATCH_CMD (gbuf, mptr->pstring) == 0))
  //           ||
@@ -2752,7 +2758,7 @@ if (cptr && (*cptr != 0))
 fprintf (st, "%s simulator V%d.%d-%d", sim_name, vmaj, vmin, vpat);
 if (vdelt)
     fprintf (st, " delta %d", vdelt);
-#if defined(SIM_VERSION_MODE)
+#if defined (SIM_VERSION_MODE)
 fprintf (st, " %s", SIM_VERSION_MODE);
 #endif
 if (flag) {
@@ -2771,13 +2777,31 @@ if (flag) {
 #if defined (SIM_ASYNCH_IO)
     fprintf (st, "\n\t\tAsynchronous I/O support");
 #endif
-#if defined(SIM_ASYNCH_MUX)
+#if defined (SIM_ASYNCH_MUX)
     fprintf (st, "\n\t\tAsynchronous Multiplexer support");
 #endif
-#if defined(SIM_ASYNCH_CLOCKS)
+#if defined (SIM_ASYNCH_CLOCKS)
     fprintf (st, "\n\t\tAsynchronous Clock support");
 #endif
     fprintf (st, "\n\tHost Platform:");
+#if defined (__clang_version__)
+    fprintf (st, "\n\t\tCompiler: clang %s", __clang_version__);
+#elif defined (__GNUC__) && defined (__VERSION__)
+    fprintf (st, "\n\t\tCompiler: GCC %s", __VERSION__);
+#elif defined (_MSC_FULL_VER) && defined (_MSC_BUILD)
+    fprintf (st, "\n\t\tCompiler: Microsoft Visual C++ %d.%02d.%05d.%02d", _MSC_FULL_VER/10000000, (_MSC_FULL_VER/100000)%100, _MSC_FULL_VER%100000, _MSC_BUILD);
+#elif defined (__DECC_VER)
+    fprintf (st, "\n\t\tCompiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
+#elif defined (SIM_COMPILER)
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+    fprintf (st, "\n\t\tCompiler: %s", S_xstr(SIM_COMPILER));
+#undef S_str
+#undef S_xstr
+#endif
+#if defined (__DATE__) && defined (__TIME__)
+    fprintf (st, "\n\t\tSimulator Compiled: %s at %s", __DATE__, __TIME__);
+#endif
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
@@ -2799,6 +2823,15 @@ if (flag) {
 #define S_xstr(a) S_str(a)
 #define S_str(a) #a
 fprintf (st, "%sgit commit id: %8.8s", flag ? "\n        " : "        ", S_xstr(SIM_GIT_COMMIT_ID));
+#undef S_str
+#undef S_xstr
+#endif
+#if defined(SIM_BUILD)
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+fprintf (st, "%sBuild: %s", flag ? "\n        " : "        ", S_xstr(SIM_BUILD));
+#undef S_str
+#undef S_xstr
 #endif
 fprintf (st, "\n");
 return SCPE_OK;
@@ -3008,7 +3041,7 @@ DEVICE *dptr;
 
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-for (i = 0; (dptr = sim_devices[i]) != NULL; i++) 
+for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
     show_dev_modifiers (st, dptr, NULL, flag, cptr);
 for (i = 0; sim_internal_device_count && (dptr = sim_internal_devices[i]); ++i)
     show_dev_modifiers (st, dptr, NULL, flag, cptr);
@@ -3103,7 +3136,7 @@ sim_trim_endspc(cptr);
 if (chdir(cptr) != 0) {
     printf("Unable to change to: %s\n", cptr);
     return SCPE_IOERR & SCPE_NOMESSAGE;
-} 
+    } 
 return SCPE_OK;
 }
 
@@ -3129,7 +3162,7 @@ t_stat r;
 t_addr lo, hi, max = uptr->capac - 1;
 int32 cnt;
 
-if (sim_brk_types == 0) 
+if (sim_brk_types == 0)
     return SCPE_NOFNC;
 if ((dptr == NULL) || (uptr == NULL))
     return SCPE_IERR;
@@ -3163,7 +3196,7 @@ while (*cptr) {
             sim_brk_showall (st, sim_switches);
         else return SCPE_ARG;
         }
-    else {      
+    else {
         for ( ; lo <= hi; lo = lo + 1) {
             r = ssh_break_one (st, flg, lo, cnt, aptr);
             if (r != SCPE_OK)
@@ -3371,29 +3404,43 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
     if (!sim_quiet)
         printf ("%s: unit is read only\n", sim_dname (dptr));
     }
-else {                                                  /* normal */
-    uptr->fileref = sim_fopen (cptr, "rb+");            /* open r/w */
-    if (uptr->fileref == NULL) {                        /* open fail? */
-        if ((errno == EROFS) || (errno == EACCES)) {    /* read only? */
-            if ((uptr->flags & UNIT_ROABLE) == 0)       /* allowed? */
-                return attach_err (uptr, SCPE_NORO);    /* no error */
-            uptr->fileref = sim_fopen (cptr, "rb");     /* open rd only */
-            if (uptr->fileref == NULL)                  /* open fail? */
-                return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-            uptr->flags = uptr->flags | UNIT_RO;        /* set rd only */
-            if (!sim_quiet)
-                printf ("%s: unit is read only\n", sim_dname (dptr));
-            }
-        else {                                          /* doesn't exist */
-            if (sim_switches & SWMASK ('E'))            /* must exist? */
-                return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-            uptr->fileref = sim_fopen (cptr, "wb+");    /* open new file */
-            if (uptr->fileref == NULL)                  /* open fail? */
-                return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-            if (!sim_quiet) printf ("%s: creating new file\n", sim_dname (dptr));
-            }
-        }                                               /* end if null */
-    }                                                   /* end else */
+else {
+    if (sim_switches & SWMASK ('N')) {                  /* new file only? */
+        uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
+        if (uptr->fileref == NULL)                      /* open fail? */
+            return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
+        if (!sim_quiet)
+            printf ("%s: creating new file\n", sim_dname (dptr));
+        }
+    else {                                              /* normal */
+        uptr->fileref = sim_fopen (cptr, "rb+");        /* open r/w */
+        if (uptr->fileref == NULL) {                    /* open fail? */
+#if defined(EPERM)
+            if ((errno == EROFS) || (errno == EACCES) || (errno == EPERM)) {/* read only? */
+#else
+            if ((errno == EROFS) || (errno == EACCES)) {/* read only? */
+#endif
+                if ((uptr->flags & UNIT_ROABLE) == 0)   /* allowed? */
+                    return attach_err (uptr, SCPE_NORO);/* no error */
+                uptr->fileref = sim_fopen (cptr, "rb"); /* open rd only */
+                if (uptr->fileref == NULL)              /* open fail? */
+                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                uptr->flags = uptr->flags | UNIT_RO;    /* set rd only */
+                if (!sim_quiet)
+                    printf ("%s: unit is read only\n", sim_dname (dptr));
+                }
+            else {                                      /* doesn't exist */
+                if (sim_switches & SWMASK ('E'))        /* must exist? */
+                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                uptr->fileref = sim_fopen (cptr, "wb+");/* open new file */
+                if (uptr->fileref == NULL)              /* open fail? */
+                    return attach_err (uptr, SCPE_OPENERR); /* yes, error */
+                if (!sim_quiet)
+                    printf ("%s: creating new file\n", sim_dname (dptr));
+                }
+            }                                           /* end if null */
+        }                                               /* end else */
+    }
 if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
     uint32 cap = ((uint32) uptr->capac) / dptr->aincr;  /* effective size */
     if (uptr->flags & UNIT_MUSTBUF)                     /* dyn alloc? */
@@ -3804,7 +3851,7 @@ fstat (fileno (rfile), &rstat);
 READ_S (buf);                                           /* [V2.5+] read version */
 v35 = v32 = FALSE;
 if (strcmp (buf, save_vercur) == 0)                     /* version 3.5? */
-    v35 = v32 = TRUE;  
+    v35 = v32 = TRUE;
 else if (strcmp (buf, save_ver32) == 0)                 /* version 3.2? */
     v32 = TRUE;
 else if (strcmp (buf, save_ver30) != 0) {               /* version 3.0? */
@@ -4304,6 +4351,7 @@ return sim_cancel (&sim_step_unit);
 void int_handler (int sig)
 {
 stop_cpu = 1;
+sim_interval = 0;           /* should speed up stop detection */
 return;
 }
 
@@ -4359,7 +4407,7 @@ for (gptr = gbuf, reason = SCPE_OK;
     tdptr = sim_dfdev;                                  /* working dptr */
     if (strncmp (gptr, "STATE", strlen ("STATE")) == 0) {
         tptr = gptr + strlen ("STATE");
-        if (*tptr && (*tptr++ != ',')) 
+        if (*tptr && (*tptr++ != ','))
             return SCPE_ARG;
         if ((lowr = sim_dfdev->registers) == NULL)
             return SCPE_NXREG;
@@ -4418,7 +4466,7 @@ return reason;
    exdep_addr_loop      examine/deposit range of addresses
 */
 
-t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr, 
+t_stat exdep_reg_loop (FILE *ofile, SCHTAB *schptr, int32 flag, char *cptr,
     REG *lowr, REG *highr, uint32 lows, uint32 highs)
 {
 t_stat reason;
@@ -4690,13 +4738,13 @@ if ((rptr->depth > 1) && (rptr->flags & REG_UNIT)) {
 #if defined (USE_INT64)
     if (sz <= sizeof (uint32))
         *((uint32 *) uptr) = (*((uint32 *) uptr) &
-        ~(((uint32) mask) << rptr->offset)) | 
+        ~(((uint32) mask) << rptr->offset)) |
         (((uint32) val) << rptr->offset);
     else *((t_uint64 *) uptr) = (*((t_uint64 *) uptr)
         & ~(mask << rptr->offset)) | (val << rptr->offset);
 #else
     *((uint32 *) uptr) = (*((uint32 *) uptr) &
-        ~(((uint32) mask) << rptr->offset)) | 
+        ~(((uint32) mask) << rptr->offset)) |
         (((uint32) val) << rptr->offset);
 #endif
     }
@@ -4884,7 +4932,7 @@ for (i = 0, j = addr; i < count; i++, j = j + dptr->aincr) {
         loc = j / dptr->aincr;
         if (uptr->flags & UNIT_BUF) {
             SZ_STORE (sz, sim_eval[i], uptr->filebuf, loc);
-            if (loc >= uptr->hwmark) 
+            if (loc >= uptr->hwmark)
                 uptr->hwmark = (uint32) loc + 1;
             }
         else {
@@ -5050,20 +5098,38 @@ return cptr;
 
 /* get_glyph            get next glyph (force upper case)
    get_glyph_nc         get next glyph (no conversion)
+   get_glyph_quoted     get next glyph (potentially enclosed in quotes, no conversion)
    get_glyph_gen        get next glyph (general case)
 
    Inputs:
         iptr    =       pointer to input string
         optr    =       pointer to output string
         mchar   =       optional end of glyph character
-        flag    =       TRUE for convert to upper case (_gen only)
+        uc      =       TRUE for convert to upper case (_gen only)
+        quote   =       TRUE to allow quote enclosing values (_gen only)
    Outputs
         result  =       pointer to next character in input string
 */
 
-char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc)
+static char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc, t_bool quote)
 {
-while ((isspace (*iptr) == 0) && (*iptr != 0) && (*iptr != mchar)) {
+t_bool quoting = FALSE;
+char quote_char = 0;
+
+while ((*iptr != 0) && 
+       ((quote && quoting) || ((isspace (*iptr) == 0) && (*iptr != mchar)))) {
+    if (quote) {
+        if (quoting) {
+            if (*iptr == quote_char)
+                quoting = FALSE;
+            }
+        else {
+            if ((*iptr == '"') || (*iptr == '\'')) {
+                quoting = TRUE;
+                quote_char = *iptr;
+                }
+            }
+        }
     if (islower (*iptr) && uc)
         *optr = toupper (*iptr);
     else *optr = *iptr;
@@ -5079,12 +5145,17 @@ return iptr;
 
 char *get_glyph (char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, TRUE);
+return get_glyph_gen (iptr, optr, mchar, TRUE, FALSE);
 }
 
 char *get_glyph_nc (char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, FALSE);
+return get_glyph_gen (iptr, optr, mchar, FALSE, FALSE);
+}
+
+char *get_glyph_quoted (char *iptr, char *optr, char mchar)
+{
+return get_glyph_gen (iptr, optr, mchar, FALSE, TRUE);
 }
 
 /* Trim trailing spaces from a string
@@ -5500,7 +5571,7 @@ while (*cptr) {                                         /* loop through modifier
         cptr = get_glyph_nc (cptr + 1, gbuf, 0);
         sim_ofile = sim_fopen (gbuf, "a");              /* open for append */
         if (sim_ofile == NULL) {                        /* open failed? */
-            *st = SCPE_OPENERR;                        
+            *st = SCPE_OPENERR;
             return NULL;
             }
         sim_opt_out |= CMD_OPT_OF;                      /* got output file */
@@ -6539,7 +6610,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
    Callers should be calling sim_debug() which is a macro
    defined in scp.h which evaluates the action condition before 
    incurring call overhead. */
- 
+
 void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...)
 {
 if (sim_deb && (dptr->dctrl & dbits)) {
@@ -6578,7 +6649,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
 #endif                                                  /* NO_vsnprintf */
         va_end (arglist);
 
-/* If it didn't fit into the buffer, then grow it and try again */
+/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
 
         if ((len < 0) || (len >= bufsize-1)) {
             if (buf != stackbuf)
@@ -6609,8 +6680,14 @@ if (sim_deb && (dptr->dctrl & dbits)) {
             j = i + 1;
             }
         }
-    if (i > j)
-        fwrite (&buf[j], 1, i-j, sim_deb);
+    if (i > j) {
+        if (debug_unterm)
+            fprintf (sim_deb, "%.*s", i-j, &buf[j]);
+        else                                    /* print prefix when required */
+            fprintf (sim_deb, "DBG(%.0f)%s> %s %s: %.*s", sim_gtime(), 
+                                                            AIO_MAIN_THREAD ? "" : "+",
+                                                            dptr->name, debug_type, i-j, &buf[j]);
+        }
 
 /* Set unterminated flag for next time */
 

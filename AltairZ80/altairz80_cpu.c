@@ -1,6 +1,6 @@
 /*  altairz80_cpu.c: MITS Altair CPU (8080 and Z80)
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2013, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -75,57 +75,58 @@
 /*  CHECK_CPU_8080 must be invoked whenever a Z80 only instruction is executed
     In case a Z80 instruction is executed on an 8080 the following two cases exist:
     1) Trapping is enabled: execution stops
-    2) Trapping is not enabled: decoding continues with the next byte
+    2) Trapping is not enabled: decoding continues with the next byte, i.e. interpret as NOP
+    Note: in some cases different instructions need to be chosen on 8080
 */
-#define CHECK_CPU_8080                          \
-    if (chiptype == CHIP_TYPE_8080) {           \
-        if (cpu_unit.flags & UNIT_CPU_OPSTOP) { \
-            reason = STOP_OPCODE;               \
-            goto end_decode;                    \
-        }                                       \
-        else {                                  \
-            sim_brk_pend[0] = FALSE;            \
-            continue;                           \
-        }                                       \
+#define CHECK_CPU_8080                                      \
+    if (chiptype == CHIP_TYPE_8080) {                       \
+        if (cpu_unit.flags & UNIT_CPU_OPSTOP) {             \
+            reason = STOP_OPCODE;                           \
+            goto end_decode;                                \
+        }                                                   \
+        else {                                              \
+            sim_brk_pend[0] = FALSE;                        \
+            continue;                                       \
+        }                                                   \
     }
 
 /* CHECK_CPU_Z80 must be invoked whenever a non Z80 instruction is executed */
-#define CHECK_CPU_Z80                           \
-    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {     \
-        reason = STOP_OPCODE;                   \
-        goto end_decode;                        \
+#define CHECK_CPU_Z80                                       \
+    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {                 \
+        reason = STOP_OPCODE;                               \
+        goto end_decode;                                    \
     }
 
-#define POP(x)  {                               \
-    register uint32 y = RAM_PP(SP);             \
-    x = y + (RAM_PP(SP) << 8);                  \
+#define POP(x)  {                                           \
+    register uint32 y = RAM_PP(SP);                         \
+    x = y + (RAM_PP(SP) << 8);                              \
 }
 
-#define JPC(cond) {                             \
-    tStates += 10;                              \
-    if (cond) {                                 \
-        PCQ_ENTRY(PCX);                         \
-        PC = GET_WORD(PC);                      \
-    }                                           \
-    else {                                      \
-        PC += 2;                                \
-    }                                           \
+#define JPC(cond) {                                         \
+    tStates += 10;                                          \
+    if (cond) {                                             \
+        PCQ_ENTRY(PCX);                                     \
+        PC = GET_WORD(PC);                                  \
+    }                                                       \
+    else {                                                  \
+        PC += 2;                                            \
+    }                                                       \
 }
 
-#define CALLC(cond) {                           \
-    if (cond) {                                 \
-        register uint32 adrr = GET_WORD(PC);    \
-        CHECK_BREAK_WORD(SP - 2);               \
-        PUSH(PC + 2);                           \
-        PCQ_ENTRY(PCX);                         \
-        PC = adrr;                              \
-        tStates += 17;                          \
-    }                                           \
-    else {                                      \
-        sim_brk_pend[0] = FALSE;                \
-        PC += 2;                                \
-        tStates += 10;                          \
-    }                                           \
+#define CALLC(cond) {                                       \
+    if (cond) {                                             \
+        register uint32 adrr = GET_WORD(PC);                \
+        CHECK_BREAK_WORD(SP - 2);                           \
+        PUSH(PC + 2);                                       \
+        PCQ_ENTRY(PCX);                                     \
+        PC = adrr;                                          \
+        tStates += 17;                                      \
+    }                                                       \
+    else {                                                  \
+        sim_brk_pend[0] = FALSE;                            \
+        PC += 2;                                            \
+        tStates += (chiptype == CHIP_TYPE_8080 ? 11 : 10);  \
+    }                                                       \
 }
 
 extern int32 sio0s      (const int32 port, const int32 io, const int32 data);
@@ -1930,7 +1931,7 @@ static t_stat sim_instr_mmu (void) {
     while (switch_cpu_now == TRUE) {        /* loop until halted    */
         if (sim_interval <= 0) {            /* check clock queue    */
 #if !UNIX_PLATFORM
-            if ((reason = sim_os_poll_kbd()) == SCPE_STOP)   /* poll on platforms without reliable signalling */
+            if ((reason = sim_poll_kbd()) == SCPE_STOP)   /* poll on platforms without reliable signalling */
                 break;
 #endif
             if ((reason = sim_process_event()))
@@ -2017,31 +2018,31 @@ static t_stat sim_instr_mmu (void) {
         switch(RAM_PP(PC)) {
 
             case 0x00:      /* NOP */
-                tStates += 4;
+                tStates += 4;   /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 break;
 
             case 0x01:      /* LD BC,nnnn */
-                tStates += 10;
+                tStates += 10; /* LXI B,nnnn 10 */
                 sim_brk_pend[0] = FALSE;
                 BC = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x02:      /* LD (BC),A */
-                tStates += 7;
+                tStates += 7; /* STAX B 7 */
                 CHECK_BREAK_BYTE(BC)
                 PutBYTE(BC, HIGH_REGISTER(AF));
                 break;
 
             case 0x03:      /* INC BC */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* INX B 5 */
                 sim_brk_pend[0] = FALSE;
                 ++BC;
                 break;
 
             case 0x04:      /* INC B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR B 5 */
                 sim_brk_pend[0] = FALSE;
                 BC += 0x100;
                 temp = HIGH_REGISTER(BC);
@@ -2049,7 +2050,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x05:      /* DEC B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR B 5 */
                 sim_brk_pend[0] = FALSE;
                 BC -= 0x100;
                 temp = HIGH_REGISTER(BC);
@@ -2057,20 +2058,20 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x06:      /* LD B,nn */
-                tStates += 7;
+                tStates += 7; /* MVI B,nn 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_HIGH_REGISTER(BC, RAM_PP(PC));
                 break;
 
             case 0x07:      /* RLCA */
-                tStates += 4;
+                tStates += 4; /* RLC 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = ((AF >> 7) & 0x0128) | ((AF << 1) & ~0x1ff) |
                     (AF & 0xc4) | ((AF >> 15) & 1);
                 break;
 
             case 0x08:      /* EX AF,AF' */
-                tStates += 4;
+                tStates += 4; /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 CHECK_CPU_8080;
                 temp = AF;
@@ -2079,7 +2080,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x09:      /* ADD HL,BC */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* DAD B 10 */
                 sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 BC &= ADDRMASK;
@@ -2089,19 +2090,19 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x0a:      /* LD A,(BC) */
-                tStates += 7;
+                tStates += 7; /* LDAX B 7 */
                 CHECK_BREAK_BYTE(BC)
                 SET_HIGH_REGISTER(AF, GetBYTE(BC));
                 break;
 
             case 0x0b:      /* DEC BC */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* DCX B 5 */
                 sim_brk_pend[0] = FALSE;
                 --BC;
                 break;
 
             case 0x0c:      /* INC C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR C 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC) + 1;
                 SET_LOW_REGISTER(BC, temp);
@@ -2109,7 +2110,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x0d:      /* DEC C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR C 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC) - 1;
                 SET_LOW_REGISTER(BC, temp);
@@ -2117,19 +2118,21 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x0e:      /* LD C,nn */
-                tStates += 7;
+                tStates += 7; /* MVI C,nn 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_LOW_REGISTER(BC, RAM_PP(PC));
                 break;
 
             case 0x0f:      /* RRCA */
-                tStates += 4;
+                tStates += 4; /* RRC 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xc4) | rrcaTable[HIGH_REGISTER(AF)];
                 break;
 
             case 0x10:      /* DJNZ dd */
                 sim_brk_pend[0] = FALSE;
+                if (chiptype == CHIP_TYPE_8080)
+                    tStates += 4; /* NOP 4 */
                 CHECK_CPU_8080;
                 if ((BC -= 0x100) & 0xff00) {
                     PCQ_ENTRY(PCX);
@@ -2143,26 +2146,26 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x11:      /* LD DE,nnnn */
-                tStates += 10;
+                tStates += 10; /* LXI D,nnnn 10 */
                 sim_brk_pend[0] = FALSE;
                 DE = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x12:      /* LD (DE),A */
-                tStates += 7;
+                tStates += 7; /* STAX D 7 */
                 CHECK_BREAK_BYTE(DE)
                 PutBYTE(DE, HIGH_REGISTER(AF));
                 break;
 
             case 0x13:      /* INC DE */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* INX D 5 */
                 sim_brk_pend[0] = FALSE;
                 ++DE;
                 break;
 
             case 0x14:      /* INC D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR D 5 */
                 sim_brk_pend[0] = FALSE;
                 DE += 0x100;
                 temp = HIGH_REGISTER(DE);
@@ -2170,7 +2173,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x15:      /* DEC D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR D 5 */
                 sim_brk_pend[0] = FALSE;
                 DE -= 0x100;
                 temp = HIGH_REGISTER(DE);
@@ -2178,20 +2181,20 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x16:      /* LD D,nn */
-                tStates += 7;
+                tStates += 7; /* MVI D,nn 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_HIGH_REGISTER(DE, RAM_PP(PC));
                 break;
 
             case 0x17:      /* RLA */
-                tStates += 4;
+                tStates += 4; /* RAL 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = ((AF << 8) & 0x0100) | ((AF >> 7) & 0x28) | ((AF << 1) & ~0x01ff) |
                     (AF & 0xc4) | ((AF >> 15) & 1);
                 break;
 
             case 0x18:      /* JR dd */
-                tStates += 12;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 4 : 12); /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 CHECK_CPU_8080;
                 PCQ_ENTRY(PCX);
@@ -2199,7 +2202,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x19:      /* ADD HL,DE */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* DAD D 10 */
                 sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 DE &= ADDRMASK;
@@ -2209,19 +2212,19 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x1a:      /* LD A,(DE) */
-                tStates += 7;
+                tStates += 7; /* LDAX D 7 */
                 CHECK_BREAK_BYTE(DE)
                 SET_HIGH_REGISTER(AF, GetBYTE(DE));
                 break;
 
             case 0x1b:      /* DEC DE */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* DCX D 5 */
                 sim_brk_pend[0] = FALSE;
                 --DE;
                 break;
 
             case 0x1c:      /* INC E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR E 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE) + 1;
                 SET_LOW_REGISTER(DE, temp);
@@ -2229,7 +2232,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x1d:      /* DEC E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR E 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE) - 1;
                 SET_LOW_REGISTER(DE, temp);
@@ -2237,18 +2240,20 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x1e:      /* LD E,nn */
-                tStates += 7;
+                tStates += 7; /* MVI E 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_LOW_REGISTER(DE, RAM_PP(PC));
                 break;
 
             case 0x1f:      /* RRA */
-                tStates += 4;
+                tStates += 4; /* RAR 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = ((AF & 1) << 15) | (AF & 0xc4) | rraTable[HIGH_REGISTER(AF)];
                 break;
 
             case 0x20:      /* JR NZ,dd */
+                if (chiptype == CHIP_TYPE_8080)
+                    tStates += 4; /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 CHECK_CPU_8080;
                 if (TSTFLAG(Z)) {
@@ -2263,14 +2268,14 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x21:      /* LD HL,nnnn */
-                tStates += 10;
+                tStates += 10; /* LXI H,nnnn 10 */
                 sim_brk_pend[0] = FALSE;
                 HL = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x22:      /* LD (nnnn),HL */
-                tStates += 16;
+                tStates += 16; /* SHLD 16 */
                 temp = GET_WORD(PC);
                 CHECK_BREAK_WORD(temp);
                 PutWORD(temp, HL);
@@ -2278,13 +2283,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x23:      /* INC HL */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* INX H 5 */
                 sim_brk_pend[0] = FALSE;
                 ++HL;
                 break;
 
             case 0x24:      /* INC H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR H 5 */
                 sim_brk_pend[0] = FALSE;
                 HL += 0x100;
                 temp = HIGH_REGISTER(HL);
@@ -2292,7 +2297,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x25:      /* DEC H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR H 5 */
                 sim_brk_pend[0] = FALSE;
                 HL -= 0x100;
                 temp = HIGH_REGISTER(HL);
@@ -2300,13 +2305,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x26:      /* LD H,nn */
-                tStates += 7;
+                tStates += 7; /* MVI H,nn 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_HIGH_REGISTER(HL, RAM_PP(PC));
                 break;
 
             case 0x27:      /* DAA */
-                tStates += 4;
+                tStates += 4; /* DAA 4 */
                 sim_brk_pend[0] = FALSE;
                 acu = HIGH_REGISTER(AF);
                 temp = LOW_DIGIT(acu);
@@ -2335,6 +2340,8 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x28:      /* JR Z,dd */
+                if (chiptype == CHIP_TYPE_8080)
+                    tStates += 4; /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 CHECK_CPU_8080;
                 if (TSTFLAG(Z)) {
@@ -2349,7 +2356,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x29:      /* ADD HL,HL */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* DAD H 10 */
                 sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 sum = HL + HL;
@@ -2358,7 +2365,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x2a:      /* LD HL,(nnnn) */
-                tStates += 16;
+                tStates += 16; /* LHLD nnnn 16 */
                 temp = GET_WORD(PC);
                 CHECK_BREAK_WORD(temp);
                 HL = GET_WORD(temp);
@@ -2366,13 +2373,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x2b:      /* DEC HL */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* DCX H 5 */
                 sim_brk_pend[0] = FALSE;
                 --HL;
                 break;
 
             case 0x2c:      /* INC L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR L 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL) + 1;
                 SET_LOW_REGISTER(HL, temp);
@@ -2380,7 +2387,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x2d:      /* DEC L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR L 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL) - 1;
                 SET_LOW_REGISTER(HL, temp);
@@ -2388,18 +2395,20 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x2e:      /* LD L,nn */
-                tStates += 7;
+                tStates += 7; /* MVI L,nn 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_LOW_REGISTER(HL, RAM_PP(PC));
                 break;
 
             case 0x2f:      /* CPL */
-                tStates += 4;
+                tStates += 4; /* CMA 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = (~AF & ~0xff) | (AF & 0xc5) | ((~AF >> 8) & 0x28) | 0x12;
                 break;
 
             case 0x30:      /* JR NC,dd */
+                if (chiptype == CHIP_TYPE_8080)
+                    tStates += 4; /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 CHECK_CPU_8080;
                 if (TSTFLAG(C)) {
@@ -2414,14 +2423,14 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x31:      /* LD SP,nnnn */
-                tStates += 10;
+                tStates += 10; /* LXI SP,nnnn 10 */
                 sim_brk_pend[0] = FALSE;
                 SP = GET_WORD(PC);
                 PC += 2;
                 break;
 
             case 0x32:      /* LD (nnnn),A */
-                tStates += 13;
+                tStates += 13; /* STA nnnn 13 */
                 temp = GET_WORD(PC);
                 CHECK_BREAK_BYTE(temp);
                 PutBYTE(temp, HIGH_REGISTER(AF));
@@ -2429,13 +2438,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x33:      /* INC SP */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* INX SP 5 */
                 sim_brk_pend[0] = FALSE;
                 ++SP;
                 break;
 
             case 0x34:      /* INC (HL) */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* INR M 10 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL) + 1;
                 PutBYTE(HL, temp);
@@ -2443,7 +2452,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x35:      /* DEC (HL) */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* DCR M 10 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL) - 1;
                 PutBYTE(HL, temp);
@@ -2451,18 +2460,20 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x36:      /* LD (HL),nn */
-                tStates += 10;
+                tStates += 10; /* MVI M 10 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, RAM_PP(PC));
                 break;
 
             case 0x37:      /* SCF */
-                tStates += 4;
+                tStates += 4; /* STC 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) | 1;
                 break;
 
             case 0x38:      /* JR C,dd */
+                if (chiptype == CHIP_TYPE_8080)
+                    tStates += 4; /* NOP 4 */
                 sim_brk_pend[0] = FALSE;
                 CHECK_CPU_8080;
                 if (TSTFLAG(C)) {
@@ -2477,7 +2488,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x39:      /* ADD HL,SP */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* DAD SP 10 */
                 sim_brk_pend[0] = FALSE;
                 HL &= ADDRMASK;
                 SP &= ADDRMASK;
@@ -2487,7 +2498,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x3a:      /* LD A,(nnnn) */
-                tStates += 13;
+                tStates += 13; /* LDA nnnn 13 */
                 temp = GET_WORD(PC);
                 CHECK_BREAK_BYTE(temp);
                 SET_HIGH_REGISTER(AF, GetBYTE(temp));
@@ -2495,13 +2506,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x3b:      /* DEC SP */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* DCX SP 5 */
                 sim_brk_pend[0] = FALSE;
                 --SP;
                 break;
 
             case 0x3c:      /* INC A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* INR A 5 */
                 sim_brk_pend[0] = FALSE;
                 AF += 0x100;
                 temp = HIGH_REGISTER(AF);
@@ -2509,7 +2520,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x3d:      /* DEC A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* DCR A 5 */
                 sim_brk_pend[0] = FALSE;
                 AF -= 0x100;
                 temp = HIGH_REGISTER(AF);
@@ -2517,337 +2528,337 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x3e:      /* LD A,nn */
-                tStates += 7;
+                tStates += 7; /* MVI A,nn 7 */
                 sim_brk_pend[0] = FALSE;
                 SET_HIGH_REGISTER(AF, RAM_PP(PC));
                 break;
 
             case 0x3f:      /* CCF */
-                tStates += 4;
+                tStates += 4; /* CMC 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & ~0x3b) | ((AF >> 8) & 0x28) | ((AF & 1) << 4) | (~AF & 1);
                 break;
 
             case 0x40:      /* LD B,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,B 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x41:      /* LD B,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,C 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x42:      /* LD B,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,D 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | (DE & ~0xff);
                 break;
 
             case 0x43:      /* LD B,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,E 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x44:      /* LD B,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,H 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | (HL & ~0xff);
                 break;
 
             case 0x45:      /* LD B,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,L 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | ((HL & 0xff) << 8);
                 break;
 
             case 0x46:      /* LD B,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV B,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_HIGH_REGISTER(BC, GetBYTE(HL));
                 break;
 
             case 0x47:      /* LD B,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV B,A 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & 0xff) | (AF & ~0xff);
                 break;
 
             case 0x48:      /* LD C,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,B 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((BC >> 8) & 0xff);
                 break;
 
             case 0x49:      /* LD C,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,C 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x4a:      /* LD C,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,D 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((DE >> 8) & 0xff);
                 break;
 
             case 0x4b:      /* LD C,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,E 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | (DE & 0xff);
                 break;
 
             case 0x4c:      /* LD C,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,H 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((HL >> 8) & 0xff);
                 break;
 
             case 0x4d:      /* LD C,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,L 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | (HL & 0xff);
                 break;
 
             case 0x4e:      /* LD C,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV C,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_LOW_REGISTER(BC, GetBYTE(HL));
                 break;
 
             case 0x4f:      /* LD C,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV C,A 5 */
                 sim_brk_pend[0] = FALSE;
                 BC = (BC & ~0xff) | ((AF >> 8) & 0xff);
                 break;
 
             case 0x50:      /* LD D,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,B 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | (BC & ~0xff);
                 break;
 
             case 0x51:      /* LD D,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,C 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x52:      /* LD D,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,D 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x53:      /* LD D,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,E 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x54:      /* LD D,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,H 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | (HL & ~0xff);
                 break;
 
             case 0x55:      /* LD D,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,L 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | ((HL & 0xff) << 8);
                 break;
 
             case 0x56:      /* LD D,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV D,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_HIGH_REGISTER(DE, GetBYTE(HL));
                 break;
 
             case 0x57:      /* LD D,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV D,A 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & 0xff) | (AF & ~0xff);
                 break;
 
             case 0x58:      /* LD E,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,B 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((BC >> 8) & 0xff);
                 break;
 
             case 0x59:      /* LD E,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,C 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | (BC & 0xff);
                 break;
 
             case 0x5a:      /* LD E,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,D 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((DE >> 8) & 0xff);
                 break;
 
             case 0x5b:      /* LD E,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,E 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x5c:      /* LD E,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,H 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((HL >> 8) & 0xff);
                 break;
 
             case 0x5d:      /* LD E,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,L 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | (HL & 0xff);
                 break;
 
             case 0x5e:      /* LD E,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV E,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_LOW_REGISTER(DE, GetBYTE(HL));
                 break;
 
             case 0x5f:      /* LD E,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV E,A 5 */
                 sim_brk_pend[0] = FALSE;
                 DE = (DE & ~0xff) | ((AF >> 8) & 0xff);
                 break;
 
             case 0x60:      /* LD H,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,B 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | (BC & ~0xff);
                 break;
 
             case 0x61:      /* LD H,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,C 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x62:      /* LD H,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,D 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | (DE & ~0xff);
                 break;
 
             case 0x63:      /* LD H,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,E 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x64:      /* LD H,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,H 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x65:      /* LD H,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,L 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | ((HL & 0xff) << 8);
                 break;
 
             case 0x66:      /* LD H,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV H,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_HIGH_REGISTER(HL, GetBYTE(HL));
                 break;
 
             case 0x67:      /* LD H,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV H,A 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & 0xff) | (AF & ~0xff);
                 break;
 
             case 0x68:      /* LD L,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,B 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((BC >> 8) & 0xff);
                 break;
 
             case 0x69:      /* LD L,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,C 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | (BC & 0xff);
                 break;
 
             case 0x6a:      /* LD L,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,D 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((DE >> 8) & 0xff);
                 break;
 
             case 0x6b:      /* LD L,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,E 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | (DE & 0xff);
                 break;
 
             case 0x6c:      /* LD L,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,H 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((HL >> 8) & 0xff);
                 break;
 
             case 0x6d:      /* LD L,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,L 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x6e:      /* LD L,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV L,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_LOW_REGISTER(HL, GetBYTE(HL));
                 break;
 
             case 0x6f:      /* LD L,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV L,A 5 */
                 sim_brk_pend[0] = FALSE;
                 HL = (HL & ~0xff) | ((AF >> 8) & 0xff);
                 break;
 
             case 0x70:      /* LD (HL),B */
-                tStates += 7;
+                tStates += 7; /* MOV M,B 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, HIGH_REGISTER(BC));
                 break;
 
             case 0x71:      /* LD (HL),C */
-                tStates += 7;
+                tStates += 7; /* MOV M,C 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, LOW_REGISTER(BC));
                 break;
 
             case 0x72:      /* LD (HL),D */
-                tStates += 7;
+                tStates += 7; /* MOV M,D 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, HIGH_REGISTER(DE));
                 break;
 
             case 0x73:      /* LD (HL),E */
-                tStates += 7;
+                tStates += 7; /* MOV M,E 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, LOW_REGISTER(DE));
                 break;
 
             case 0x74:      /* LD (HL),H */
-                tStates += 7;
+                tStates += 7; /* MOV M,H 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, HIGH_REGISTER(HL));
                 break;
 
             case 0x75:      /* LD (HL),L */
-                tStates += 7;
+                tStates += 7; /* MOV M,L 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, LOW_REGISTER(HL));
                 break;
 
             case HALTINSTRUCTION:   /* HALT */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 7 : 4); /* HLT 7 */
                 sim_brk_pend[0] = FALSE;
                 PC--;
                 if (cpu_unit.flags & UNIT_CPU_STOPONHALT) {
@@ -2859,60 +2870,60 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x77:      /* LD (HL),A */
-                tStates += 7;
+                tStates += 7; /* MOV M,A 7 */
                 CHECK_BREAK_BYTE(HL);
                 PutBYTE(HL, HIGH_REGISTER(AF));
                 break;
 
             case 0x78:      /* LD A,B */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,B 5 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | (BC & ~0xff);
                 break;
 
             case 0x79:      /* LD A,C */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,C 5 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | ((BC & 0xff) << 8);
                 break;
 
             case 0x7a:      /* LD A,D */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,D 5 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | (DE & ~0xff);
                 break;
 
             case 0x7b:      /* LD A,E */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,E 5 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | ((DE & 0xff) << 8);
                 break;
 
             case 0x7c:      /* LD A,H */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,H 5 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | (HL & ~0xff);
                 break;
 
             case 0x7d:      /* LD A,L */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,L 5 */
                 sim_brk_pend[0] = FALSE;
                 AF = (AF & 0xff) | ((HL & 0xff) << 8);
                 break;
 
             case 0x7e:      /* LD A,(HL) */
-                tStates += 7;
+                tStates += 7; /* MOV A,M 7 */
                 CHECK_BREAK_BYTE(HL);
                 SET_HIGH_REGISTER(AF, GetBYTE(HL));
                 break;
 
             case 0x7f:      /* LD A,A */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* MOV A,A 5 */
                 sim_brk_pend[0] = FALSE; /* nop */
                 break;
 
             case 0x80:      /* ADD A,B */
-                tStates += 4;
+                tStates += 4; /* ADD B 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -2922,7 +2933,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x81:      /* ADD A,C */
-                tStates += 4;
+                tStates += 4; /* ADD C 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -2932,7 +2943,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x82:      /* ADD A,D */
-                tStates += 4;
+                tStates += 4; /* ADD D 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -2942,7 +2953,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x83:      /* ADD A,E */
-                tStates += 4;
+                tStates += 4; /* ADD E 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -2952,7 +2963,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x84:      /* ADD A,H */
-                tStates += 4;
+                tStates += 4; /* ADD H 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -2962,7 +2973,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x85:      /* ADD A,L */
-                tStates += 4;
+                tStates += 4; /* ADD L 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -2972,7 +2983,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x86:      /* ADD A,(HL) */
-                tStates += 7;
+                tStates += 7; /* ADD M 7 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL);
                 acu = HIGH_REGISTER(AF);
@@ -2982,14 +2993,14 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x87:      /* ADD A,A */
-                tStates += 4;
+                tStates += 4; /* ADD A 4 */
                 sim_brk_pend[0] = FALSE;
                 cbits = 2 * HIGH_REGISTER(AF);
                 AF = cbitsDup8Table[cbits] | (SET_PVS(cbits));
                 break;
 
             case 0x88:      /* ADC A,B */
-                tStates += 4;
+                tStates += 4; /* ADC B 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -2999,7 +3010,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x89:      /* ADC A,C */
-                tStates += 4;
+                tStates += 4; /* ADC C 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -3009,7 +3020,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x8a:      /* ADC A,D */
-                tStates += 4;
+                tStates += 4; /* ADC D 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -3019,7 +3030,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x8b:      /* ADC A,E */
-                tStates += 4;
+                tStates += 4; /* ADC E 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -3029,7 +3040,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x8c:      /* ADC A,H */
-                tStates += 4;
+                tStates += 4; /* ADC H 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3039,7 +3050,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x8d:      /* ADC A,L */
-                tStates += 4;
+                tStates += 4; /* ADC L 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3049,7 +3060,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x8e:      /* ADC A,(HL) */
-                tStates += 7;
+                tStates += 7; /* ADC M 7 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3059,14 +3070,14 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x8f:      /* ADC A,A */
-                tStates += 4;
+                tStates += 4; /* ADC A 4 */
                 sim_brk_pend[0] = FALSE;
                 cbits = 2 * HIGH_REGISTER(AF) + TSTFLAG(C);
                 AF = cbitsDup8Table[cbits] | (SET_PVS(cbits));
                 break;
 
             case 0x90:      /* SUB B */
-                tStates += 4;
+                tStates += 4; /* SUB B 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -3076,7 +3087,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x91:      /* SUB C */
-                tStates += 4;
+                tStates += 4; /* SUB C 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -3086,7 +3097,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x92:      /* SUB D */
-                tStates += 4;
+                tStates += 4; /* SUB D 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -3096,7 +3107,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x93:      /* SUB E */
-                tStates += 4;
+                tStates += 4; /* SUB E 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -3106,7 +3117,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x94:      /* SUB H */
-                tStates += 4;
+                tStates += 4; /* SUB H 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3116,7 +3127,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x95:      /* SUB L */
-                tStates += 4;
+                tStates += 4; /* SUB L 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3126,7 +3137,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x96:      /* SUB (HL) */
-                tStates += 7;
+                tStates += 7; /* SUB M 7 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3136,13 +3147,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x97:      /* SUB A */
-                tStates += 4;
+                tStates += 4; /* SUB A 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = (chiptype == CHIP_TYPE_Z80) ? 0x42 : 0x46;
                 break;
 
             case 0x98:      /* SBC A,B */
-                tStates += 4;
+                tStates += 4; /* SBB B 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -3152,7 +3163,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x99:      /* SBC A,C */
-                tStates += 4;
+                tStates += 4; /* SBB C 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC);
                 acu = HIGH_REGISTER(AF);
@@ -3162,7 +3173,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x9a:      /* SBC A,D */
-                tStates += 4;
+                tStates += 4; /* SBB D 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -3172,7 +3183,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x9b:      /* SBC A,E */
-                tStates += 4;
+                tStates += 4; /* SBB E 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE);
                 acu = HIGH_REGISTER(AF);
@@ -3182,7 +3193,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x9c:      /* SBC A,H */
-                tStates += 4;
+                tStates += 4; /* SBB H 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3192,7 +3203,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x9d:      /* SBC A,L */
-                tStates += 4;
+                tStates += 4; /* SBB L 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3202,7 +3213,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x9e:      /* SBC A,(HL) */
-                tStates += 7;
+                tStates += 7; /* SBB M 7 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL);
                 acu = HIGH_REGISTER(AF);
@@ -3212,158 +3223,158 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0x9f:      /* SBC A,A */
-                tStates += 4;
+                tStates += 4; /* SBB A 4 */
                 sim_brk_pend[0] = FALSE;
                 cbits = -TSTFLAG(C);
                 AF = subTable[cbits & 0xff] | cbitsTable[cbits & 0x1ff] | (SET_PVS(cbits));
                 break;
 
             case 0xa0:      /* AND B */
-                tStates += 4;
+                tStates += 4; /* ANA B 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF & BC) >> 8) & 0xff];
                 break;
 
             case 0xa1:      /* AND C */
-                tStates += 4;
+                tStates += 4; /* ANA C 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & BC) & 0xff];
                 break;
 
             case 0xa2:      /* AND D */
-                tStates += 4;
+                tStates += 4; /* ANA D 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF & DE) >> 8) & 0xff];
                 break;
 
             case 0xa3:      /* AND E */
-                tStates += 4;
+                tStates += 4; /* ANA E 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & DE) & 0xff];
                 break;
 
             case 0xa4:      /* AND H */
-                tStates += 4;
+                tStates += 4; /* ANA H 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF & HL) >> 8) & 0xff];
                 break;
 
             case 0xa5:      /* AND L */
-                tStates += 4;
+                tStates += 4; /* ANA L 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & HL) & 0xff];
                 break;
 
             case 0xa6:      /* AND (HL) */
-                tStates += 7;
+                tStates += 7; /* ANA M 7 */
                 CHECK_BREAK_BYTE(HL);
                 AF = andTable[((AF >> 8) & GetBYTE(HL)) & 0xff];
                 break;
 
             case 0xa7:      /* AND A */
-                tStates += 4;
+                tStates += 4; /* ANA A 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[(AF >> 8) & 0xff];
                 break;
 
             case 0xa8:      /* XOR B */
-                tStates += 4;
+                tStates += 4; /* XRA B 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF ^ BC) >> 8) & 0xff];
                 break;
 
             case 0xa9:      /* XOR C */
-                tStates += 4;
+                tStates += 4; /* XRA C 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ BC) & 0xff];
                 break;
 
             case 0xaa:      /* XOR D */
-                tStates += 4;
+                tStates += 4; /* XRA D 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF ^ DE) >> 8) & 0xff];
                 break;
 
             case 0xab:      /* XOR E */
-                tStates += 4;
+                tStates += 4; /* XRA E 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ DE) & 0xff];
                 break;
 
             case 0xac:      /* XOR H */
-                tStates += 4;
+                tStates += 4; /* XRA H 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF ^ HL) >> 8) & 0xff];
                 break;
 
             case 0xad:      /* XOR L */
-                tStates += 4;
+                tStates += 4; /* XRA L 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ HL) & 0xff];
                 break;
 
             case 0xae:      /* XOR (HL) */
-                tStates += 7;
+                tStates += 7; /* XRA M 7 */
                 CHECK_BREAK_BYTE(HL);
                 AF = xororTable[((AF >> 8) ^ GetBYTE(HL)) & 0xff];
                 break;
 
             case 0xaf:      /* XOR A */
-                tStates += 4;
+                tStates += 4; /* XRA A 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = 0x44;
                 break;
 
             case 0xb0:      /* OR B */
-                tStates += 4;
+                tStates += 4; /* ORA B 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF | BC) >> 8) & 0xff];
                 break;
 
             case 0xb1:      /* OR C */
-                tStates += 4;
+                tStates += 4; /* ORA C 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | BC) & 0xff];
                 break;
 
             case 0xb2:      /* OR D */
-                tStates += 4;
+                tStates += 4; /* ORA D 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF | DE) >> 8) & 0xff];
                 break;
 
             case 0xb3:      /* OR E */
-                tStates += 4;
+                tStates += 4; /* ORA E 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | DE) & 0xff];
                 break;
 
             case 0xb4:      /* OR H */
-                tStates += 4;
+                tStates += 4; /* ORA H 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF | HL) >> 8) & 0xff];
                 break;
 
             case 0xb5:      /* OR L */
-                tStates += 4;
+                tStates += 4; /* ORA L 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | HL) & 0xff];
                 break;
 
             case 0xb6:      /* OR (HL) */
-                tStates += 7;
+                tStates += 7; /* ORA M 7 */
                 CHECK_BREAK_BYTE(HL);
                 AF = xororTable[((AF >> 8) | GetBYTE(HL)) & 0xff];
                 break;
 
             case 0xb7:      /* OR A */
-                tStates += 4;
+                tStates += 4; /* ORA A 4 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[(AF >> 8) & 0xff];
                 break;
 
             case 0xb8:      /* CP B */
-                tStates += 4;
+                tStates += 4; /* CMP B 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(BC);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3375,7 +3386,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xb9:      /* CP C */
-                tStates += 4;
+                tStates += 4; /* CMP C 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(BC);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3387,7 +3398,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xba:      /* CP D */
-                tStates += 4;
+                tStates += 4; /* CMP D 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(DE);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3399,7 +3410,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xbb:      /* CP E */
-                tStates += 4;
+                tStates += 4; /* CMP E 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(DE);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3411,7 +3422,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xbc:      /* CP H */
-                tStates += 4;
+                tStates += 4; /* CMP H 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = HIGH_REGISTER(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3423,7 +3434,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xbd:      /* CP L */
-                tStates += 4;
+                tStates += 4; /* CMP L 4 */
                 sim_brk_pend[0] = FALSE;
                 temp = LOW_REGISTER(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3435,7 +3446,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xbe:      /* CP (HL) */
-                tStates += 7;
+                tStates += 7; /* CMP M 7 */
                 CHECK_BREAK_BYTE(HL);
                 temp = GetBYTE(HL);
                 AF = (AF & ~0x28) | (temp & 0x28);
@@ -3447,7 +3458,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xbf:      /* CP A */
-                tStates += 4;
+                tStates += 4; /* CMP A 4 */
                 sim_brk_pend[0] = FALSE;
                 SET_LOW_REGISTER(AF, (HIGH_REGISTER(AF) & 0x28) | (chiptype == CHIP_TYPE_Z80 ? 0x42 : 0x46));
                 break;
@@ -3455,30 +3466,30 @@ static t_stat sim_instr_mmu (void) {
             case 0xc0:      /* RET NZ */
                 if (TSTFLAG(Z)) {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RNZ 5 */
                 }
                 else {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RNZ 11 */
                 }
                 break;
 
             case 0xc1:      /* POP BC */
-                tStates += 10;
+                tStates += 10; /* POP B 10 */
                 CHECK_BREAK_WORD(SP);
                 POP(BC);
                 break;
 
             case 0xc2:      /* JP NZ,nnnn */
                 sim_brk_pend[0] = FALSE;
-                JPC(!TSTFLAG(Z));       /* also updates tStates */
+                JPC(!TSTFLAG(Z));       /* also updates tStates, Z80 and 8080 are equal */
                 break;
 
             case 0xc3:      /* JP nnnn */
                 sim_brk_pend[0] = FALSE;
-                JPC(1);                 /* also updates tStates */
+                JPC(1);                 /* also updates tStates, Z80 and 8080 are equal */
                 break;
 
             case 0xc4:      /* CALL NZ,nnnn */
@@ -3486,13 +3497,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xc5:      /* PUSH BC */
-                tStates += 11;
+                tStates += 11; /* PUSH B 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(BC);
                 break;
 
             case 0xc6:      /* ADD A,nn */
-                tStates += 7;
+                tStates += 7; /* ADI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 temp = RAM_PP(PC);
                 acu = HIGH_REGISTER(AF);
@@ -3502,7 +3513,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xc7:      /* RST 0 */
-                tStates += 11;
+                tStates += 11; /* RST 0 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -3514,16 +3525,16 @@ static t_stat sim_instr_mmu (void) {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RZ 11 */
                 }
                 else {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RZ 5 */
                 }
                 break;
 
             case 0xc9:      /* RET */
-                tStates += 10;
+                tStates += 10; /* RET 10 */
                 CHECK_BREAK_WORD(SP);
                 PCQ_ENTRY(PCX);
                 POP(PC);
@@ -3535,7 +3546,17 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xcb:      /* CB prefix */
-                CHECK_CPU_8080;
+                if (chiptype == CHIP_TYPE_8080) {
+                    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {
+                        reason = STOP_OPCODE;
+                        goto end_decode;
+                    }
+                    else {
+                        sim_brk_pend[0] = FALSE;
+                        JPC(1);
+                        break;
+                    }
+                }
                 adr = HL;
                 switch ((op = GetBYTE(PC)) & 7) {
 
@@ -3711,7 +3732,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xce:      /* ADC A,nn */
-                tStates += 7;
+                tStates += 7; /* ACI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 temp = RAM_PP(PC);
                 acu = HIGH_REGISTER(AF);
@@ -3721,7 +3742,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xcf:      /* RST 8 */
-                tStates += 11;
+                tStates += 11; /* RST 1 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -3731,18 +3752,18 @@ static t_stat sim_instr_mmu (void) {
             case 0xd0:      /* RET NC */
                 if (TSTFLAG(C)) {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RNC 5 */
                 }
                 else {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RNC 11 */
                 }
                 break;
 
             case 0xd1:      /* POP DE */
-                tStates += 10;
+                tStates += 10; /* POP D 10 */
                 CHECK_BREAK_WORD(SP);
                 POP(DE);
                 break;
@@ -3753,7 +3774,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xd3:      /* OUT (nn),A */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 :11); /* OUT nn 10 */
                 sim_brk_pend[0] = FALSE;
                 out(RAM_PP(PC), HIGH_REGISTER(AF));
                 break;
@@ -3763,13 +3784,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xd5:      /* PUSH DE */
-                tStates += 11;
+                tStates += 11; /* PUSH D 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(DE);
                 break;
 
             case 0xd6:      /* SUB nn */
-                tStates += 7;
+                tStates += 7; /* SUI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 temp = RAM_PP(PC);
                 acu = HIGH_REGISTER(AF);
@@ -3779,7 +3800,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xd7:      /* RST 10H */
-                tStates += 11;
+                tStates += 11; /* RST 2 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -3791,18 +3812,30 @@ static t_stat sim_instr_mmu (void) {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RC 11 */
                 }
                 else {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RC 5 */
                 }
                 break;
 
             case 0xd9:      /* EXX */
+                if (chiptype == CHIP_TYPE_8080) {
+                    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {
+                        reason = STOP_OPCODE;
+                        goto end_decode;
+                    }
+                    else {
+                        tStates += 10; /* RET 10 */
+                        CHECK_BREAK_WORD(SP);
+                        PCQ_ENTRY(PCX);
+                        POP(PC);
+                        break;
+                    }
+                }
                 tStates += 4;
                 sim_brk_pend[0] = FALSE;
-                CHECK_CPU_8080;
                 temp = BC;
                 BC = BC1_S;
                 BC1_S = temp;
@@ -3820,7 +3853,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xdb:      /* IN A,(nn) */
-                tStates += 11;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 10 : 11); /* IN nn 10 */
                 sim_brk_pend[0] = FALSE;
                 SET_HIGH_REGISTER(AF, in(RAM_PP(PC)));
                 break;
@@ -3830,7 +3863,16 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xdd:      /* DD prefix */
-                CHECK_CPU_8080;
+                if (chiptype == CHIP_TYPE_8080) {
+                    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {
+                        reason = STOP_OPCODE;
+                        goto end_decode;
+                    }
+                    else {
+                        CALLC(1);       /* also updates tStates */
+                        break;
+                    }
+                }
                 switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IX,BC */
@@ -4605,7 +4647,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xde:      /* SBC A,nn */
-                tStates += 7;
+                tStates += 7; /* SBI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 temp = RAM_PP(PC);
                 acu = HIGH_REGISTER(AF);
@@ -4615,7 +4657,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xdf:      /* RST 18H */
-                tStates += 11;
+                tStates += 11; /* RST 3 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -4625,18 +4667,18 @@ static t_stat sim_instr_mmu (void) {
             case 0xe0:      /* RET PO */
                 if (TSTFLAG(P)) {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RPO 5 */
                 }
                 else {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RPO 11 */
                 }
                 break;
 
             case 0xe1:      /* POP HL */
-                tStates += 10;
+                tStates += 10; /* POP H 10 */
                 CHECK_BREAK_WORD(SP);
                 POP(HL);
                 break;
@@ -4647,7 +4689,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xe3:      /* EX (SP),HL */
-                tStates += 19;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 18 : 19); /* XTHL 18 */
                 CHECK_BREAK_WORD(SP);
                 temp = HL;
                 POP(HL);
@@ -4659,19 +4701,19 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xe5:      /* PUSH HL */
-                tStates += 11;
+                tStates += 11; /* PUSH H 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(HL);
                 break;
 
             case 0xe6:      /* AND nn */
-                tStates += 7;
+                tStates += 7; /* ANI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 AF = andTable[((AF >> 8) & RAM_PP(PC)) & 0xff];
                 break;
 
             case 0xe7:      /* RST 20H */
-                tStates += 11;
+                tStates += 11; /* RST 4 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -4683,16 +4725,16 @@ static t_stat sim_instr_mmu (void) {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RPE 11 */
                 }
                 else {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RPE 5 */
                 }
                 break;
 
             case 0xe9:      /* JP (HL) */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* PCHL 5 */
                 sim_brk_pend[0] = FALSE;
                 PCQ_ENTRY(PCX);
                 PC = HL;
@@ -4704,7 +4746,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xeb:      /* EX DE,HL */
-                tStates += 4;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 4); /* XCHG 5 */
                 sim_brk_pend[0] = FALSE;
                 temp = HL;
                 HL = DE;
@@ -4716,7 +4758,16 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xed:      /* ED prefix */
-                CHECK_CPU_8080;
+                if (chiptype == CHIP_TYPE_8080) {
+                    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {
+                        reason = STOP_OPCODE;
+                        goto end_decode;
+                    }
+                    else {
+                        CALLC(1);       /* also updates tStates */
+                        break;
+                    }
+                }
                 switch (RAM_PP(PC)) {
 
                     case 0x40:      /* IN B,(C) */
@@ -5357,13 +5408,13 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xee:      /* XOR nn */
-                tStates += 7;
+                tStates += 7; /* XRI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) ^ RAM_PP(PC)) & 0xff];
                 break;
 
             case 0xef:      /* RST 28H */
-                tStates += 11;
+                tStates += 11; /* RST 5 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -5373,18 +5424,18 @@ static t_stat sim_instr_mmu (void) {
             case 0xf0:      /* RET P */
                 if (TSTFLAG(S)) {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RP 5 */
                 }
                 else {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RP 11 */
                 }
                 break;
 
             case 0xf1:      /* POP AF */
-                tStates += 10;
+                tStates += 10; /* POP PSW 10 */
                 CHECK_BREAK_WORD(SP);
                 POP(AF);
                 break;
@@ -5395,7 +5446,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xf3:      /* DI */
-                tStates += 4;
+                tStates += 4; /* DI 4 */
                 sim_brk_pend[0] = FALSE;
                 IFF_S = 0;
                 break;
@@ -5405,19 +5456,19 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xf5:      /* PUSH AF */
-                tStates += 11;
+                tStates += 11; /* PUSH PSW 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(AF);
                 break;
 
             case 0xf6:      /* OR nn */
-                tStates += 7;
+                tStates += 7; /* ORI nn 7 */
                 sim_brk_pend[0] = FALSE;
                 AF = xororTable[((AF >> 8) | RAM_PP(PC)) & 0xff];
                 break;
 
             case 0xf7:      /* RST 30H */
-                tStates += 11;
+                tStates += 11; /* RST 6 11 */
                 CHECK_BREAK_WORD(SP - 2);
                 PUSH(PC);
                 PCQ_ENTRY(PCX);
@@ -5429,16 +5480,16 @@ static t_stat sim_instr_mmu (void) {
                     CHECK_BREAK_WORD(SP);
                     PCQ_ENTRY(PCX);
                     POP(PC);
-                    tStates += 11;
+                    tStates += 11; /* RM 11 */
                 }
                 else {
                     sim_brk_pend[0] = FALSE;
-                    tStates += 5;
+                    tStates += 5; /* RM 5 */
                 }
                 break;
 
             case 0xf9:      /* LD SP,HL */
-                tStates += 6;
+                tStates += (chiptype == CHIP_TYPE_8080 ? 5 : 6); /* SPHL 5 */
                 sim_brk_pend[0] = FALSE;
                 SP = HL;
                 break;
@@ -5449,7 +5500,7 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xfb:      /* EI */
-                tStates += 4;
+                tStates += 4; /* EI 4 */
                 sim_brk_pend[0] = FALSE;
                 IFF_S = 3;
                 break;
@@ -5459,7 +5510,16 @@ static t_stat sim_instr_mmu (void) {
                 break;
 
             case 0xfd:      /* FD prefix */
-                CHECK_CPU_8080;
+                if (chiptype == CHIP_TYPE_8080) {
+                    if (cpu_unit.flags & UNIT_CPU_OPSTOP) {
+                        reason = STOP_OPCODE;
+                        goto end_decode;
+                    }
+                    else {
+                        CALLC(1);       /* also updates tStates */
+                        break;
+                    }
+                }
                 switch (RAM_PP(PC)) {
 
                     case 0x09:      /* ADD IY,BC */
@@ -6234,7 +6294,7 @@ static t_stat sim_instr_mmu (void) {
             break;
 
         case 0xfe:  /* CP nn */
-            tStates += 7;
+            tStates += 7; /* CPI nn 7 */
             sim_brk_pend[0] = FALSE;
             temp = RAM_PP(PC);
             AF = (AF & ~0x28) | (temp & 0x28);
@@ -6246,7 +6306,7 @@ static t_stat sim_instr_mmu (void) {
             break;
 
         case 0xff:  /* RST 38H */
-            tStates += 11;
+            tStates += 11; /* RST 7 11 */
             CHECK_BREAK_WORD(SP - 2);
             PUSH(PC);
             PCQ_ENTRY(PCX);

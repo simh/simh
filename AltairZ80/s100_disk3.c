@@ -351,7 +351,7 @@ static t_stat disk3_attach(UNIT *uptr, char *cptr)
 
 
 /* Detach routine */
-t_stat disk3_detach(UNIT *uptr)
+static t_stat disk3_detach(UNIT *uptr)
 {
     DISK3_DRIVE_INFO *pDrive;
     t_stat r;

@@ -123,11 +123,38 @@ return;
 
 /* UNIX, Win32, Macintosh, VMS, OS2 (Berkeley socket) routines */
 
+static struct sock_errors {
+    int32 value;
+    char *text;
+    } sock_errors[] = {
+        {WSAEWOULDBLOCK,  "Operation would block"},
+        {WSAENAMETOOLONG, "File name too long"},
+        {WSAEINPROGRESS,  "Operation now in progress "},
+        {WSAETIMEDOUT,    "Connection timed out"},
+        {WSAEISCONN,      "Transport endpoint is already connected"},
+        {WSAECONNRESET,   "Connection reset by peer"},
+        {WSAECONNREFUSED, "Connection refused"},
+        {WSAEHOSTUNREACH, "No route to host"},
+        {WSAEADDRINUSE,   "Address already in use "},
+        {WSAEACCES,       "Permission denied"},
+        {0, NULL}
+    };
+
+
+
+
 SOCKET sim_err_sock (SOCKET s, char *emsg, int32 flg)
 {
 int32 err = WSAGetLastError ();
+int32 i;
 
-printf ("Sockets: %s error %d\n", emsg, err);
+for (i=0; (sock_errors[i].text) && (sock_errors[i].value != err); i++)
+    ;
+
+if (sock_errors[i].value == err)
+    printf ("Sockets: %s error %d - %s\n", emsg, err, sock_errors[i].text);
+else
+    printf ("Sockets: %s error %d\n", emsg, err);
 sim_close_sock (s, flg);
 return INVALID_SOCKET;
 }
@@ -735,6 +762,18 @@ if (preferred->ai_family == AF_INET6) {
     sta = setsockopt (newsock, IPPROTO_IPV6, IPV6_V6ONLY, (char *)&off, sizeof(off));
     }
 #endif
+if (sim_switches & SWMASK ('U')) {
+    int on = TRUE;
+
+    sta = setsockopt (newsock, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
+    }
+#if defined (SO_EXCLUSIVEADDRUSE)
+else {
+    int on = TRUE;
+
+    sta = setsockopt (newsock, SOL_SOCKET, SO_EXCLUSIVEADDRUSE, (char *)&on, sizeof(on));
+    }
+#endif
 sta = bind (newsock, preferred->ai_addr, preferred->ai_addrlen);
 p_freeaddrinfo(result);
 if (sta == SOCKET_ERROR)                                /* bind error? */
@@ -864,11 +903,12 @@ if (rd)
 else select ((int) sock + 1, NULL, rw_p, er_p, &tz);
 if (FD_ISSET (sock, er_p))
     return -1;
-if (FD_ISSET (sock, rw_p))
+if (FD_ISSET (sock, rw_p)) {
     if (0 == getpeername (sock, (struct sockaddr *)&peername, &peernamesize))
         return 1;
     else
         return -1;
+    }
 return 0;
 }
 

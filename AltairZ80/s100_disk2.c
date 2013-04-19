@@ -285,7 +285,7 @@ static t_stat disk2_attach(UNIT *uptr, char *cptr)
 
 
 /* Detach routine */
-t_stat disk2_detach(UNIT *uptr)
+static t_stat disk2_detach(UNIT *uptr)
 {
     t_stat r;
     int8 i;

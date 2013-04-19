@@ -66,10 +66,11 @@ typedef int SERHANDLE;
 #define TMXR_DTR_DROP_TIME 500                          /* milliseconds to drop DTR for 'pseudo' modem control */
 #define TMXR_CONNECT_POLL_INTERVAL 1000                 /* milliseconds between connection polls */
 
-#define TMXR_DBG_XMT    0x10000                         /* Debug Transmit Data */
-#define TMXR_DBG_RCV    0x20000                         /* Debug Received Data */
-#define TMXR_DBG_ASY    0x40000                         /* Debug Asynchronous Activities */
-#define TMXR_DBG_TRC    0x80000                         /* Debug trace routine calls */
+#define TMXR_DBG_XMT    0x010000                         /* Debug Transmit Data */
+#define TMXR_DBG_RCV    0x020000                         /* Debug Received Data */
+#define TMXR_DBG_MDM    0x040000                         /* Debug Modem Signals */
+#define TMXR_DBG_ASY    0x080000                         /* Debug Asynchronous Activities */
+#define TMXR_DBG_TRC    0x100000                         /* Debug trace routine calls */
 
 /* Modem Control Bits */
 
@@ -151,6 +152,7 @@ struct tmxr {
 
 int32 tmxr_poll_conn (TMXR *mp);
 t_stat tmxr_reset_ln (TMLN *lp);
+t_stat tmxr_detach_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
 void tmxr_poll_rx (TMXR *mp);
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr);

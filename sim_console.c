@@ -1640,7 +1640,7 @@ if ((std_input) &&                                      /* Not Background proces
     GetConsoleMode (std_input, &saved_mode);            /* Save Mode */
 return SCPE_OK;
 }
- 
+
 static t_stat sim_os_ttrun (void)
 {
 if ((std_input) &&                                      /* If Not Background process? */
@@ -2089,7 +2089,7 @@ static t_bool sim_os_ttisatty (void)
 return isatty (0);
 }
 
-static static t_stat sim_os_poll_kbd (void)
+static t_stat sim_os_poll_kbd (void)
 {
 int status;
 unsigned char buf[1];

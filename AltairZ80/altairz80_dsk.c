@@ -1,6 +1,6 @@
 /*  altairz80_dsk.c: MITS Altair 88-DISK Simulator
 
-    Copyright (c) 2002-2011, Peter Schorn
+    Copyright (c) 2002-2013, Peter Schorn
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the "Software"),
@@ -483,6 +483,7 @@ int32 dsk11(const int32 port, const int32 io, const int32 data) {
                    current_disk, PCX);
         }
         current_track[current_disk]++;
+        current_flag[current_disk] &= 0xbf;		/* mwd 1/29/13: track zero now false */
         if (current_track[current_disk] > (tracks[current_disk] - 1))
             current_track[current_disk] = (tracks[current_disk] - 1);
         if (dirty)          /* implies that current_disk < NUM_OF_DSK   */

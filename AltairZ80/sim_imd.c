@@ -437,7 +437,7 @@ t_stat diskCreate(FILE *fileref, char *ctlr_comment)
 }
 
 
-t_stat diskFormat(DISK_INFO *myDisk)
+static t_stat diskFormat(DISK_INFO *myDisk)
 {
     uint8 i;
     uint8 sector_map[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26};
@@ -759,7 +759,7 @@ t_stat trackWrite(DISK_INFO *myDisk,
      * sector record type as the first byte, and fill the sector
      * data with the fillbyte.
      */
-    dataLen = (128 << sectorLen)+1;
+    dataLen = sectorLen + 1;
     sectorData = malloc(dataLen);
     memset(sectorData, fillbyte, dataLen);
     sectorData[0] = SECT_RECORD_NORM;

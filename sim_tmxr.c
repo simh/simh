@@ -65,6 +65,7 @@
 
    tmxr_poll_conn -                     poll for connection
    tmxr_reset_ln -                      reset line (drops Telnet/tcp and serial connections)
+   tmxr_detach_ln -                     reset line and close per line listener and outgoing destination
    tmxr_getc_ln -                       get character for line
    tmxr_poll_rx -                       poll receive
    tmxr_putc_ln -                       put character for line
@@ -369,7 +370,15 @@
 #define TNS_CRPAD       005                             /* CR padding */
 #define TNS_DO          006                             /* DO request pending rejection */
 
-
+static BITFIELD tmxr_modem_bits[] = {
+  BIT(DTR),                                 /* Data Terminal Ready */
+  BIT(RTS),                                 /* Request To Send     */
+  BIT(DCD),                                 /* Data Carrier Detect */
+  BIT(RNG),                                 /* Ring Indicator      */
+  BIT(CTS),                                 /* Clear To Send       */
+  BIT(DSR),                                 /* Data Set Ready      */
+  ENDBITS
+};
 
 /* Local routines */
 
@@ -395,6 +404,8 @@ if (!lp->txbfd)                                         /* if not buffered */
     lp->txbpr = lp->txbpi = lp->txcnt = 0;              /*   init transmit indexes */
 memset (lp->rbr, 0, TMXR_MAXBUF);                       /* clear break status array */
 lp->txdrp = 0;
+if (lp->mp->modem_control)
+    lp->modembits = TMXR_MDM_CTS | TMXR_MDM_DSR;
 if (!lp->mp->buffered) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
@@ -751,15 +762,15 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
     for (i=0; i < mp->lines; i++) {
         uptr = mp->ldsc[i].uptr ? mp->ldsc[i].uptr : mp->uptr;
 
-        if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {        /* if asynch not disabled */
-            uptr->dynflags |= UNIT_TM_POLL;                 /* tag as polling unit */
+        if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {    /* if asynch not disabled */
+            uptr->dynflags |= UNIT_TM_POLL;             /* tag as polling unit */
             sim_cancel (uptr);
             }
         }
     }
 
 if ((poll_time - mp->last_poll_time) < TMXR_CONNECT_POLL_INTERVAL)
-    return -1;                          /* too soon to try */
+    return -1;                                          /* too soon to try */
 
 tmxr_debug_trace (mp, "tmxr_poll_conn()");
 
@@ -891,6 +902,13 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
         lp->conn = TRUE;
         return i;
         }
+
+    /* Check for needed outgoing connection initiation */
+
+    if (lp->destination && (!lp->sock) && (!lp->connecting) && (!lp->serport) && 
+        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR)))
+        lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+
     }
 
 return -1;                                              /* no new connections made */
@@ -946,7 +964,8 @@ lp->ipad = NULL;
 if ((lp->destination) && (!lp->serport)) {
     if (lp->connecting)
         sim_close_sock (lp->connecting, 0);
-    lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR))
+        lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
     }
 tmxr_init_line (lp);                                /* initialize line state */
 /* Revise the unit's connect string to reflect the current attachments */
@@ -1055,7 +1074,7 @@ return SCPE_OK;
 */
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
-int32 changed_modem_bits;
+int32 before_modem_bits, incoming_state;
 
 tmxr_debug_trace_line (lp, "tmxr_set_get_modem_bits()");
 
@@ -1063,27 +1082,37 @@ if ((bits_to_set & ~(TMXR_MDM_OUTGOING)) ||         /* Assure only settable bits
     (bits_to_clear & ~(TMXR_MDM_OUTGOING)) ||
     (bits_to_set & bits_to_clear))                  /* and can't set and clear the same bits */
     return SCPE_ARG;
-changed_modem_bits = lp->modembits;
+before_modem_bits = lp->modembits;
 lp->modembits |= bits_to_set;
-lp->modembits &= bits_to_clear;
-changed_modem_bits ^= lp->modembits;
-if (incoming_bits) {
-    if ((lp->sock) || (lp->serport)) {
-        if (lp->modembits & TMXR_MDM_DTR)
-            *incoming_bits = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
-        else
-            *incoming_bits = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
-        }
+lp->modembits &= ~(bits_to_clear | TMXR_MDM_INCOMING);
+if ((lp->sock) || (lp->serport)) {
+    if (lp->modembits & TMXR_MDM_DTR)
+        incoming_state = TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
     else
-        *incoming_bits = (lp->mp && lp->mp->master) ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
+        incoming_state = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_CTS | TMXR_MDM_DSR;
     }
+else
+    incoming_state = (lp->mp && lp->mp->master) ? (TMXR_MDM_CTS | TMXR_MDM_DSR) : 0;
+lp->modembits |= incoming_state;
+if (sim_deb && lp->mp && lp->mp->dptr) {
+    sim_debug_bits (TMXR_DBG_MDM, lp->mp->dptr, tmxr_modem_bits, before_modem_bits, lp->modembits, FALSE);
+    sim_debug (TMXR_DBG_MDM, lp->mp->dptr, " - Line %d\n", (int)(lp-lp->mp->ldsc));
+    }
+if (incoming_bits)
+    *incoming_bits = incoming_state;
 if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on modem_control enabled multiplexers */
     if (bits_to_set | bits_to_clear) {              /* Anything to do? */
         if (lp->serport)
             return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
-        if (lp->sock) {
+        if ((lp->sock) || (lp->connecting)) {
             if (bits_to_clear&TMXR_MDM_DTR)             /* drop DTR? */
                 tmxr_reset_ln (lp);
+            }
+        else {
+            if ((lp->destination) &&                    /* Virtual Null Modem Cable */
+                ((bits_to_set ^ before_modem_bits) &    /* and DTR being Raised */
+                 TMXR_MDM_DTR))
+                lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
             }
         }
     return SCPE_OK;
@@ -1476,6 +1505,13 @@ if (lp->serport) {                          /* close current serial connection *
     }
 }
 
+t_stat tmxr_detach_ln (TMLN *lp)
+{
+tmxr_debug_trace_line (lp, "tmxr_detaach_ln()");
+_mux_detach_line (lp, TRUE, TRUE);
+return SCPE_OK;
+}
+
 /* Open a master listening socket (and all of the other variances of connections).
 
    A listening socket for the port number described by "cptr" is opened for the
@@ -1528,7 +1564,7 @@ while (*tptr) {
             if (0 == MATCH_CMD (gbuf, "LINE")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
-                nextline = (int32) get_uint (cptr, 10, mp->lines, &r);
+                nextline = (int32) get_uint (cptr, 10, mp->lines-1, &r);
                 if ((r != SCPE_OK) || (mp->lines == 1))
                     return SCPE_ARG;
                 break;
@@ -2561,18 +2597,11 @@ return SCPE_OK;
 
 t_stat tmxr_attach_ex (TMXR *mp, UNIT *uptr, char *cptr, t_bool async)
 {
-char* tptr = NULL;
 t_stat r;
 
-tptr = (char *) calloc (1, 1);
-
-if (tptr == NULL)                                       /* no more mem? */
-    return SCPE_MEM;
 r = tmxr_open_master (mp, cptr);                        /* open master socket */
-if (r != SCPE_OK) {                                     /* error? */
-    free (tptr);                                        /* release buf */
+if (r != SCPE_OK)                                       /* error? */
     return r;
-    }
 mp->uptr = uptr;                                        /* save unit for polling */
 uptr->filename = _mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
@@ -2627,18 +2656,27 @@ else {
             fprintf(st, ", ");
             }
         tmxr_show_summ(st, NULL, 0, mp);
-        fprintf(st, ", sessions=%d\n", mp->sessions);
+        fprintf(st, ", sessions=%d", mp->sessions);
+        if (mp->modem_control)
+            fprintf(st, ", ModemControl=enabled");
+        if (mp->notelnet)
+            fprintf(st, ", Telnet=disabled");
+        fprintf(st, "\n");
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
             if (mp->lines > 1) {
                 fprintf (st, "Line: %d", j);
+                if (mp->notelnet != lp->notelnet)
+                    fprintf (st, " - %telnet", lp->notelnet ? "no" : "");
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
-                    fprintf (st, " - Unit: %s\n", sim_uname (lp->uptr));
-                else
-                    fprintf (st, "\n");
+                    fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
+                fprintf (st, "\n");
                 }
-            if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master))
+            if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master)) {
+                if (mp->modem_control)
+                    tmxr_fconns (st, lp, -1);
                 continue;
+                }
             tmxr_fconns (st, lp, -1);
             tmxr_fstats (st, lp, -1);
             }
@@ -2672,17 +2710,17 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
             tmxr_report_disconnection (lp);             /* report disconnection */
             tmxr_reset_ln (lp);
             }
-        if (lp->connecting) {
-            lp->sock = lp->connecting;
-            lp->connecting = 0;
-            tmxr_reset_ln (lp);
-            }
         if (lp->serport) {
             sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
             tmxr_close_ln (lp);
             }
         free (lp->destination);
         lp->destination = NULL;
+        if (lp->connecting) {
+            lp->sock = lp->connecting;
+            lp->connecting = 0;
+            tmxr_reset_ln (lp);
+            }
         lp->conn = FALSE;
         }
     if (lp->master) {
@@ -2983,6 +3021,15 @@ if (lp->cnms) {
     }
 else
     fprintf (st, " Line disconnected\n");
+
+if (lp->mp->modem_control) {
+    fprintf (st, " Modem Bits: %s%s%s%s%s%s\n", (lp->modembits & TMXR_MDM_DTR) ? "DTR " : "",
+                                                (lp->modembits & TMXR_MDM_RTS) ? "RTS " : "",
+                                                (lp->modembits & TMXR_MDM_DCD) ? "DCD " : "",
+                                                (lp->modembits & TMXR_MDM_RNG) ? "RNG " : "",
+                                                (lp->modembits & TMXR_MDM_CTS) ? "CTS " : "",
+                                                (lp->modembits & TMXR_MDM_DSR) ? "DSR " : "");
+    }
 
 if ((lp->serport == 0) && (lp->sock))
     fprintf (st, " %s\n", (lp->notelnet) ? "Telnet disabled (RAW data)" : "Telnet protocol");
@@ -3347,11 +3394,15 @@ int32 i, any;
 if (mp == NULL)
     return SCPE_IERR;
 for (i = any = 0; i < mp->lines; i++) {
-    if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0)) {
-        any++;
+    if ((mp->ldsc[i].sock != 0) || 
+        (mp->ldsc[i].serport != 0) || mp->modem_control) {
+        if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
+            any++;
         if (val)
             tmxr_fconns (st, &mp->ldsc[i], i);
-        else tmxr_fstats (st, &mp->ldsc[i], i);
+        else
+            if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
+                tmxr_fstats (st, &mp->ldsc[i], i);
         }
     }
 if (any == 0)
@@ -3373,7 +3424,7 @@ return SCPE_OK;
 
 
 static struct {
-    char value;
+    u_char value;
     char *name;
     } tn_chars[] =
     {

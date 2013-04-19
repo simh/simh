@@ -241,6 +241,7 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 #define DBG_INT  0x0002                                 /* display transfer requests */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
@@ -249,12 +250,12 @@ DEBTAB dz_debug[] = {
   {"INT",    DBG_INT},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"MDM",    DBG_MDM},
   {"TRC",    DBG_TRC},
   {"ASY",    DBG_ASY},
   {0}
 };
 
-DEVICE dz_dev;
 t_stat dz_rd (int32 *data, int32 PA, int32 access);
 t_stat dz_wr (int32 data, int32 PA, int32 access);
 int32 dz_rxinta (void);
@@ -366,6 +367,7 @@ static char *dz_wr_regs[] =
 t_stat dz_rd (int32 *data, int32 PA, int32 access)
 {
 int i;
+static BITFIELD* bitdefs[] = {dz_csr_bits, dz_rbuf_bits, dz_tcr_bits, dz_msr_bits};
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
@@ -405,14 +407,16 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             tmxr_set_get_modem_bits (lp, 0, 0, &modem_bits);
 
             dz_msr[dz] &= ~((1 << (MSR_V_RI + i)) | (1 << (MSR_V_CD + i)));
-            dz_msr[dz] |= ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0) | 
-                          ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0);
+            dz_msr[dz] |= (dz_tcr[dz] & (1 << (i + TCR_V_DTR))) ?
+                          ((modem_bits&TMXR_MDM_DCD) ? (1 << (MSR_V_CD + i)) : 0) :
+                          ((modem_bits&TMXR_MDM_RNG) ? (1 << (MSR_V_RI + i)) : 0);
             }
         *data = dz_msr[dz];
         break;
         }
 
-sim_debug(DBG_REG, &dz_dev, "dz_rd(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_rd_regs[(PA >> 1) & 03], access, *data);
+sim_debug(DBG_REG, &dz_dev, "dz_rd(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, dz_rd_regs[(PA >> 1) & 03], access, *data);
+sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)(*data), (uint32)(*data), TRUE);
 
 return SCPE_OK;
 }
@@ -420,18 +424,21 @@ return SCPE_OK;
 t_stat dz_wr (int32 data, int32 PA, int32 access)
 {
 int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
+static BITFIELD* bitdefs[] = {dz_csr_bits, dz_lpr_bits, dz_tcr_bits, dz_tdr_bits};
 int32 i, c, line;
 char lineconfig[16];
 TMLN *lp;
 
-sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
+sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
+sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)((PA & 1) ? data<<8 : data), (uint32)((PA & 1) ? data<<8 : data), TRUE);
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
     case 00:                                            /* CSR */
-        if (access == WRITEB) data = (PA & 1)?          /* byte? merge */
-            (dz_csr[dz] & 0377) | (data << 8):
-            (dz_csr[dz] & ~0377) | data;
+        if (access == WRITEB)
+            data = (PA & 1)?                            /* byte? merge */
+                    (dz_csr[dz] & 0377) | (data << 8):
+                    (dz_csr[dz] & ~0377) | data;
         if (data & CSR_CLR)                             /* clr? reset */
             dz_clear (dz, FALSE);
         if (data & CSR_MSE)                             /* MSE? start poll */
@@ -467,10 +474,12 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         break;
 
     case 02:                                            /* TCR */
-        if (access == WRITEB) data = (PA & 1)?          /* byte? merge */
-            (dz_tcr[dz] & 0377) | (data << 8):
-            (dz_tcr[dz] & ~0377) | data;
-        if (dz_mctl) {                                  /* modem ctl? */
+        if (access == WRITEB)
+            data = (PA & 1)?                            /* byte? merge */
+                    (dz_tcr[dz] & 0377) | (data << 8):
+                    (dz_tcr[dz] & ~0377) | data;
+        if (dz_mctl && 
+            ((access != WRITEB) || (PA & 1))) {         /* modem ctl (DTR)? */
             int32 changed = data ^ dz_tcr[dz];
 
             for (i = 0; i < DZ_LINES; i++) {
@@ -478,10 +487,10 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
                     continue;                           /* line unchanged skip */
                 line = (dz * DZ_LINES) + i;             /* get line num */
                 lp = &dz_ldsc[line];                    /* get line desc */
-                if (data & (1 << (TCR_V_DTR + i))) {
+                if (data & (1 << (TCR_V_DTR + i))) {    /* just asserted, so turn on */
                     tmxr_set_get_modem_bits (lp, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
                     }
-                else
+                else                                    /* just deasserted, so turn off */
                     if (dz_auto)
                         tmxr_set_get_modem_bits (lp, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);
                 }
@@ -641,6 +650,7 @@ void dz_set_rxint (int32 dz)
 {
 dz_rxi = dz_rxi | (1 << dz);                            /* set mux rcv int */
 SET_INT (DZRX);                                         /* set master intr */
+sim_debug(DBG_INT, &dz_dev, "dz_set_rxint(dz=%d)\n", dz);
 return;
 }
 
@@ -671,6 +681,7 @@ void dz_set_txint (int32 dz)
 {
 dz_txi = dz_txi | (1 << dz);                            /* set mux xmt int */
 SET_INT (DZTX);                                         /* set master intr */
+sim_debug(DBG_INT, &dz_dev, "dz_set_txint(dz=%d)\n", dz);
 return;
 }
 
@@ -740,7 +751,7 @@ t_stat dz_attach (UNIT *uptr, char *cptr)
 int32 dz, muxln;
 t_stat r;
 
-if (sim_switches & SWMASK ('M'))                        /* modem control? */
+if ((sim_switches & SWMASK ('M')) || dz_mctl)           /* modem control? */
     tmxr_set_modem_control_passthru (&dz_desc);
 r = tmxr_attach (&dz_desc, uptr, cptr);                 /* attach mux */
 if (r != SCPE_OK) {                                     /* error? */
@@ -778,8 +789,11 @@ return SCPE_OK;
 
 t_stat dz_detach (UNIT *uptr)
 {
+t_stat r = tmxr_detach (&dz_desc, uptr);
+
 dz_mctl = dz_auto = 0;                                  /* modem ctl off */
-return tmxr_detach (&dz_desc, uptr);
+tmxr_clear_modem_control_passthru (&dz_desc);
+return r;
 }
 
 /* SET LINES processor */
@@ -804,8 +818,9 @@ if (newln < dz_desc.lines) {
     for (i = newln; i < dz_desc.lines; i++) {
         if (dz_ldsc[i].conn) {
             tmxr_linemsg (&dz_ldsc[i], "\r\nOperator disconnected line\r\n");
-            tmxr_reset_ln (&dz_ldsc[i]);                /* reset line */
+            tmxr_send_buffered_data (&dz_ldsc[i]);
             }
+        tmxr_detach_ln (&dz_ldsc[i]);                   /* completely reset line */
         if ((i % DZ_LINES) == (DZ_LINES - 1))
             dz_clear (i / DZ_LINES, TRUE);              /* reset mux */
         }

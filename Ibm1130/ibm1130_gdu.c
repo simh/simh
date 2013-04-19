@@ -151,6 +151,8 @@ static void   EraseGDUScreen (void);
 
 void xio_2250_display (int32 addr, int32 func, int32 modify)
 {
+	if (cgi) return;								/* ignore this device in CGI mode */
+
 	switch (func) {
 		case XIO_SENSE_DEV:
 			ACC = (gdu_dsw & GDU_DSW_BUSY) ? GDU_DSW_BUSY : gdu_dsw;
@@ -203,6 +205,8 @@ void xio_2250_display (int32 addr, int32 func, int32 modify)
 
 static t_stat gdu_reset (DEVICE *dptr)
 {
+	if (cgi) return SCPE_OK;							/* ignore this device in CGI mode */
+
 	halt_regeneration();
 	clear_interrupts();
 	set_indicators(0);
@@ -250,15 +254,13 @@ static void start_regeneration (void)
 
 static void halt_regeneration (void)
 {
-			// halt_regeneration gets called at end of every refresh interation, so it should NOT black out the
-			// screen -- this is why it was flickering so badly. The lower level code (called on a timer)
-			// should check to see if GDU_DSW_BUSY is clear, and if it it still zero after several msec,
-			// only then should it black out the screen and call StopGDUUpdates.
+	// halt_regeneration gets called at end of every refresh interation, so it should NOT black out the
+	// screen -- this is why it was flickering so badly. The lower level code (called on a timer)
+	// should check to see if GDU_DSW_BUSY is clear, and if it it still zero after several msec,
+	// only then should it black out the screen and call StopGDUUpdates.
 	if (gdu_dsw & GDU_DSW_BUSY) {
-//		StopGDUUpdates();							// let lower level code discover this during next refresh
 		CLRBIT(gdu_dsw, GDU_DSW_BUSY);
 	}
-//	EraseGDUScreen();								// let cessation of regeneration erase it (eventually)
 }
 
 static void notify_window_closed (void)
@@ -677,6 +679,8 @@ static HPEN hRedPen     = NULL;
 static HBRUSH hGrayBrush, hDarkBrush;
 static HPEN hBlackPen;
 static int halted = 0;								// number of time intervals that GDU has been halted w/o a regeneration
+static UINT idTimer = 0;
+static t_bool painting = FALSE;
 static LRESULT APIENTRY GDUWndProc (HWND hWnd, UINT iMessage, WPARAM wParam, LPARAM lParam);
 static DWORD   WINAPI   GDUPump (LPVOID arg);
 
@@ -685,6 +689,8 @@ static void destroy_GDU_window (void)
 	if (hwGDU != NULL)
 		SendMessage(hwGDU, WM_CLOSE, 0, 0);			// cross thread call is OK
 
+#ifdef XXXX
+	// let window closure do this
 	if (hGDUPump != INVALID_HANDLE_VALUE) {			// this is not the most graceful way to do it
 		TerminateThread(hGDUPump, 0);
 		hGDUPump  = INVALID_HANDLE_VALUE;
@@ -711,6 +717,7 @@ static void destroy_GDU_window (void)
 		DeleteObject(hRedBrush);
 		hRedBrush = NULL;
 	}
+#endif
 
 #ifdef DEBUG_LIGHTPEN
 	if (hRedPen != NULL) {
@@ -750,6 +757,13 @@ static void gdu_WM_CLOSE (HWND hWnd)
 
 static void gdu_WM_DESTROY (HWND hWnd)
 {
+	PostMessage(hWnd, WM_QUIT, 0, 0);
+	if (idTimer != 0) {
+		KillTimer(hwGDU, 1);
+		idTimer = 0;
+		halted  = 10000;
+		painting = FALSE;
+	}
 	notify_window_closed();
 	hwGDU = NULL;
 }
@@ -868,17 +882,29 @@ static void gdu_WM_PAINT (HWND hWnd)
 {
 	PAINTSTRUCT ps;
 	HDC hDC;
+	int msec;
+
 				// code for display
 	hDC = BeginPaint(hWnd, &ps);
 	PaintImage(hDC, TRUE);
 	EndPaint(hWnd, &ps);
+
+				// set a timer so we keep doing it!
+	if (idTimer == 0) {
+		msec = (gdu_rate == 0) ? (1000 / DEFAULT_GDU_RATE) : 1000/gdu_rate;
+		idTimer = SetTimer(hwGDU, 1, msec, NULL);
+	}
 }
 
 // the window has been resized
 
 static void gdu_WM_SIZE (HWND hWnd, UINT state, int cx, int cy)
 {
+#ifdef BLIT_MODE
+	InvalidateRect(hWnd, NULL, FALSE);		// in blt mode, we'll paint a full black bitmap over the new screen size
+#else
 	InvalidateRect(hWnd, NULL, TRUE);
+#endif
 }
 
 // tweak the sizing rectangle during a resize to guarantee a square window
@@ -911,7 +937,7 @@ static void gdu_WM_TIMER (HWND hWnd, UINT id)
 {
 	HDC hDC;
 
-	if (running) {			// if CPU is running, update picture
+	if (painting)		{						// if GDU is running, update picture
 		if ((gdu_dsw & GDU_DSW_BUSY) == 0) {	// regeneration is not to occur
 			if (++halted >= 4) {				// stop the timer if four timer intervals go by with the display halted
 				EraseGDUScreen();				// screen goes black due to cessation of refreshing
@@ -981,26 +1007,15 @@ static void CheckGDUKeyboard (void)
 {
 }
 
-static UINT idTimer = 0;
-
 static void	StartGDUUpdates (void)
 {
-	int msec;
-
-	if (idTimer == 0) {
-		msec = (gdu_rate == 0) ? (1000 / DEFAULT_GDU_RATE) : 1000/gdu_rate;
-		idTimer = SetTimer(hwGDU, 1, msec, NULL);
-	}
 	halted = 0;
+	painting = TRUE;
 }
 
 static void	StopGDUUpdates (void)
 {
-	if (idTimer != 0) {
-		KillTimer(hwGDU, 1);
-		idTimer = 0;
-		halted  = 10000;
-	}
+	painting = FALSE;
 }
 
 static void GetMouseCoordinates()
@@ -1030,7 +1045,7 @@ static void GetMouseCoordinates()
 
 t_bool gdu_active (void)
 {
-	return gdu_dsw & GDU_DSW_BUSY;
+	return cgi ? 0 : (gdu_dsw & GDU_DSW_BUSY);
 }
 
 static void EraseGDUScreen (void)
@@ -1102,6 +1117,8 @@ static DWORD WINAPI GDUPump (LPVOID arg)
 		TranslateMessage(&msg);
 		DispatchMessage(&msg);
 	}
+
+	painting = FALSE;
 
 	if (hwGDU != NULL) {
 		DestroyWindow(hwGDU);						/* but if a quit message got posted, clean up */

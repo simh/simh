@@ -2718,7 +2718,7 @@ if (cptr) {
     cap = (uint32) get_uint (cptr, 10, 0xFFFFFFFF, &r);
     if ((sim_switches & SWMASK ('L')) == 0)
         cap = cap * 1954;
-    if ((r != SCPE_OK) || (cap < RA8U_MINC) || (cap >= max))
+    if ((r != SCPE_OK) || (cap < RA8U_MINC) || (cap > max))
         return SCPE_ARG;
     drv_tab[val].lbn = cap;
     }

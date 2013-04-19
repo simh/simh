@@ -363,7 +363,7 @@ static t_stat tti_svc (UNIT *uptr)
 	if ((tti_unit.flags & CSET_MASK) == CSET_ASCII)
 		temp = conin_map[temp] & 0xFF;				/* perform input translation */
 
-	if (temp == IRQ_KEY) {							/* INT REQ (interrupt request) key */
+	if (temp == IRQ_KEY) {							/* INT REQ (interrupt request) key -- process this even if no keyboard input request pending */
 		SETBIT(tti_dsw, TT_DSW_INTERRUPT_REQUEST);	/* queue interrupt */
 		SETBIT(ILSW[4], ILSW_4_CONSOLE);
 		calc_ints();
@@ -388,16 +388,17 @@ static t_stat tti_svc (UNIT *uptr)
 
 		return SCPE_OK;
 	}
-
+													// keyboard is locked or no active input request?
 	if ((tti_unit.flags & KEYBOARD_LOCKED) || ! (tti_dsw & TT_DSW_KEYBOARD_BUSY)) {
 		SendBeep();
+		calc_ints();
 		return SCPE_OK;
 	}
 
 	if ((tti_unit.flags & CSET_MASK) == CSET_ASCII) 
 		temp = ascii_to_conin[temp];
 
-	if (temp == 0)	{							/* ignore invalid characters */
+	if (temp == 0)	{							/* ignore invalid characters (no mapping to 1130 input code) */
 		SendBeep();
 		calc_ints();
 		return SCPE_OK;

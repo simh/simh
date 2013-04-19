@@ -61,8 +61,12 @@
 #define WSAENAMETOOLONG ENAMETOOLONG
 #define WSAEINPROGRESS  EINPROGRESS
 #define WSAETIMEDOUT    ETIMEDOUT
+#define WSAEISCONN      EISCONN
+#define WSAECONNRESET   ECONNRESET
 #define WSAECONNREFUSED ECONNREFUSED
 #define WSAEHOSTUNREACH EHOSTUNREACH
+#define WSAEADDRINUSE   EADDRINUSE
+#define WSAEACCES       EACCES
 #define INVALID_SOCKET  ((SOCKET)-1) 
 #define SOCKET_ERROR    -1
 #include <sys/types.h>                                  /* for fcntl, getpid */

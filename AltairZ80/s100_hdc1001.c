@@ -256,7 +256,7 @@ static t_stat hdc1001_attach(UNIT *uptr, char *cptr)
 
 
 /* Detach routine */
-t_stat hdc1001_detach(UNIT *uptr)
+static t_stat hdc1001_detach(UNIT *uptr)
 {
     HDC1001_DRIVE_INFO *pDrive;
     t_stat r;

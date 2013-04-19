@@ -562,7 +562,8 @@ struct sim_mtab {
 #define MTAB_VALO       (0010 | MTAB_XTD)               /* takes a value (optional) */
 #define MTAB_NMO        (0020 | MTAB_XTD)               /* only if named */
 #define MTAB_NC         (0040 | MTAB_XTD)               /* no UC conversion */
-#define MTAB_SHP        (0100 | MTAB_XTD)               /* show takes parameter */
+#define MTAB_QUOTE      (0100 | MTAB_XTD)               /* quoted string */
+#define MTAB_SHP        (0200 | MTAB_XTD)               /* show takes parameter */
 #define MODMASK(mptr,flag) (((mptr)->mask & (uint32)(flag)) == (uint32)(flag))/* flag mask test */
 
 /* Search table */
@@ -579,7 +580,7 @@ struct sim_schtab {
 struct sim_brktab {
     t_addr              addr;                           /* address */
     int32               typ;                            /* mask of types */
-    int32               cnt;                            /* proceed count */     
+    int32               cnt;                            /* proceed count */
     char                *act;                           /* action string */
     };
 
@@ -721,7 +722,7 @@ extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
 
 /* Thread local storage */
-#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux)
+#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__)
 #define AIO_TLS __thread
 #elif defined(_MSC_VER)
 #define AIO_TLS __declspec(thread)

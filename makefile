@@ -79,8 +79,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (,$(GCC_VERSION))
       ifeq (SunOS,$(OSTYPE))
         ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
-          SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C' | awk '{ print $$4 }')
-          COMPILER_NAME = Sun C $(SUNC_VERSION)
+          SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C')
+          COMPILER_NAME = $(wordlist 2,10,$(SUNC_VERSION))
         endif
       endif
     endif
@@ -94,6 +94,18 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifeq (,$(findstring .,$(CLANG_VERSION)))
         COMPILER_NAME = $(shell $(GCC) -v /dev/null 2>&1 | grep 'clang version' | awk '{ print $$1 " " $$2 " " $$3 " " $$4 }')
         CLANG_VERSION = $(word 4,$(COMPILER_NAME))
+      endif
+    endif
+  endif
+  ifeq (git-repo,$(shell if $(TEST) -d ./.git; then echo git-repo; fi))
+    ifeq (need-hooks,$(shell if $(TEST) ! -e ./.git/hooks/post-checkout; then echo need-hooks; fi))
+      $(info *** Installing git hooks in local repository ***)
+      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-commit' ./.git/hooks/)
+      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-checkout' ./.git/hooks/)
+      GIT_HOOKS += $(shell /bin/cp './Visual Studio Projects/git-hooks/post-merge' ./.git/hooks/)
+      GIT_HOOKS += $(shell ./.git/hooks/post-checkout)
+      ifneq (,$(strip $(GIT_HOOKS)))
+        $(info *** Warning - Error installing git hooks *** $(GIT_HOOKS))
       endif
     endif
   endif
@@ -111,6 +123,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_CCDEFS = -D_GNU_SOURCE
     GCC_OPTIMIZERS_CMD = $(GCC) -v --help 2>&1
     GCC_WARNINGS_CMD = $(GCC) -v --help 2>&1
+    LD_ELF = $(shell echo | $(GCC) -E -dM - | grep __ELF__)
     ifeq (Darwin,$(OSTYPE))
       OSNAME = OSX
       LIBEXT = dylib
@@ -153,15 +166,17 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             PCAPLIB = wpcap
             LIBEXT = a
           else
-            LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
-            ifneq (,$(LDSEARCH))
-              LIBPATH := $(LDSEARCH)
-            else
-              $(info *** Warning ***)
-              $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
-              $(info *** Warning *** determined.  This should be resolved before you can expect)
-              $(info *** Warning *** to have fully working simulators.)
-              $(info *** Warning ***)
+            ifeq (,$(findstring NetBSD,$(OSTYPE)))
+              LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+              ifneq (,$(LDSEARCH))
+                LIBPATH := $(LDSEARCH)
+              else
+                $(info *** Warning ***)
+                $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                $(info *** Warning *** determined.  This should be resolved before you can expect)
+                $(info *** Warning *** to have fully working simulators.)
+                $(info *** Warning ***)
+              endif
             endif
             ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
               LIBPATH += /usr/pkg/lib
@@ -303,8 +318,6 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           endif
         endif
         LIBEXT = $(LIBEXTSAVE)
-      else
-        $(error using libpcap: missing pcap.h)
       endif
     endif
     ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
@@ -360,8 +373,12 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   ifneq (binexists,$(shell if $(TEST) -e BIN; then echo binexists; fi))
     MKDIRBIN = mkdir -p BIN
   endif
-  ifneq (,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
+  ifeq (commit-id-exists,$(shell if $(TEST) -e .git-commit-id; then echo commit-id-exists; fi))
     GIT_COMMIT_ID=$(shell cat .git-commit-id)
+  else
+    ifeq (,$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | grep 'Format:'))
+      GIT_COMMIT_ID=$(shell grep 'define SIM_GIT_COMMIT_ID' sim_rev.h | awk '{ print $$3 }')
+    endif
   endif
 else
   #Win32 Environments (via MinGW32)
@@ -411,6 +428,10 @@ else
   endif
   ifneq (,$(shell if exist .git-commit-id type .git-commit-id))
     GIT_COMMIT_ID=$(shell if exist .git-commit-id type .git-commit-id)
+  else
+    ifeq (,$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h | findstr Format))
+      GIT_COMMIT_ID=$(shell for /F "tokens=3" %%i in ("$(shell findstr /C:"define SIM_GIT_COMMIT_ID" sim_rev.h)") do echo %%i)
+    endif
   endif
 endif
 ifneq (,$(GIT_COMMIT_ID))
@@ -506,7 +527,7 @@ else
   endif
 endif
 CC_OUTSPEC = -o $@
-CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -I . $(OS_CCDEFS) $(ROMS_OPT)
+CC = $(GCC) $(CC_STD) -U__STRICT_ANSI__ $(CFLAGS_G) $(CFLAGS_O) $(CFLAGS_GIT) -DSIM_COMPILER="$(COMPILER_NAME)" -I . $(OS_CCDEFS) $(ROMS_OPT)
 LDFLAGS = $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 
 #
@@ -733,6 +754,9 @@ IBM1130 = ${IBM1130D}/ibm1130_cpu.c ${IBM1130D}/ibm1130_cr.c \
 	${IBM1130D}/ibm1130_plot.c ${IBM1130D}/ibm1130_sca.c \
 	${IBM1130D}/ibm1130_t2741.c
 IBM1130_OPT = -I ${IBM1130D}
+ifneq ($(WIN32),)
+IBM1130_OPT += -DGUI_SUPPORT -lgdi32
+endif  
 
 
 ID16D = Interdata
@@ -1017,7 +1041,13 @@ ibm1130 : ${BIN}ibm1130${EXE}
 
 ${BIN}ibm1130${EXE} : ${IBM1130}
 	${MKDIRBIN}
+ifneq ($(WIN32),)
+	windres ${IBM1130D}/ibm1130.rc $(BIN)ibm1130.o
+	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(BIN)ibm1130.o $(CC_OUTSPEC) ${LDFLAGS}
+	del BIN\ibm1130.o
+else
 	${CC} ${IBM1130} ${SIM} ${IBM1130_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+endif  
 
 s3 : ${BIN}s3${EXE}
 

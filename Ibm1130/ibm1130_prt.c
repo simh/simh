@@ -112,6 +112,7 @@ static t_bool formfed = FALSE;								/* last line printed was a formfeed */
 #define UNIT_V_RINGCHECK	(UNIT_V_UF + 8)
 #define UNIT_V_SYNCCHECK	(UNIT_V_UF + 9)
 #define UNIT_V_PHYSICAL_PTR	(UNIT_V_UF + 10)				/* this appears in ibm1130_gui as well */
+#define UNIT_V_TRACE        (UNIT_V_UF + 11)
 
 #define UNIT_FORMCHECK	  (1u << UNIT_V_FORMCHECK)
 #define UNIT_DATACHECK	  (1u << UNIT_V_DATACHECK)
@@ -124,6 +125,7 @@ static t_bool formfed = FALSE;								/* last line printed was a formfeed */
 #define UNIT_RINGCHECK	  (1u << UNIT_V_RINGCHECK)
 #define UNIT_SYNCCHECK	  (1u << UNIT_V_SYNCCHECK)
 #define UNIT_PHYSICAL_PTR (1u << UNIT_V_PHYSICAL_PTR)
+#define UNIT_TRACE		  (1u << UNIT_V_TRACE)
 
 UNIT prt_unit[] = {
 	{ UDATA (&prt_svc, UNIT_ATTABLE, 0) },
@@ -132,6 +134,7 @@ UNIT prt_unit[] = {
 #define IS_1403(uptr)      (uptr->flags & UNIT_1403)					/* model test */
 #define IS_1132(uptr)     ((uptr->flags & UNIT_1403) == 0)				/* model test */
 #define IS_PHYSICAL(uptr)  (uptr->flags & UNIT_PHYSICAL_PTR)
+#define DO_TRACE(uptr)	   (uptr->flags & UNIT_TRACE)
 
 /* Parameter in the unit descriptor (1132 printer) */
 
@@ -149,8 +152,10 @@ REG prt_reg[] = {
 	{ NULL }  };
 
 MTAB prt_mod[] = {
-	{ UNIT_1403, 0,         "1132", "1132", NULL },		/* model option */
-	{ UNIT_1403, UNIT_1403, "1403", "1403", NULL },
+	{ UNIT_1403, 0,           "1132",    "1132", NULL },	/* model option */
+	{ UNIT_1403, UNIT_1403,   "1403",    "1403", NULL },
+	{ UNIT_TRACE, UNIT_TRACE, "TRACE",   "TRACE", NULL },
+	{ UNIT_TRACE, 0,          "NOTRACE", "NOTRACE", NULL },
 	{ 0 }  };
 
 DEVICE prt_dev = {
@@ -348,7 +353,7 @@ static void mytrace (int start, char *what)
 	char *where;
 
 	if ((where = saywhere(prev_IAR)) == NULL) where = "?";
-	trace_io("%s %s at %04x: %s\n", start ? "start" : "stop", what, prev_IAR, where);
+	trace_io("%s %s at %04x: %s", start ? "start" : "stop", what, prev_IAR, where);
 }
 
 /* xio_1132_printer - XIO command interpreter for the 1132 printer */
@@ -372,32 +377,33 @@ void xio_1132_printer (int32 iocc_addr, int32 func, int32 modify)
 				CLRBIT(PRT_DSW, PRT1132_DSW_READ_EMITTER_RESPONSE | PRT1132_DSW_SKIP_RESPONSE | PRT1132_DSW_SPACE_RESPONSE);
 				CLRBIT(ILSW[1], ILSW_1_1132_PRINTER);
 			}
+			trace_io("* Printer DSW %04x mod %x", ACC, modify);
 			break;
 
 		case XIO_CONTROL:
 			if (modify & PRT_CMD_START_PRINTER) {
 				SETBIT(uptr->flags, UNIT_PRINTING);
-/*				mytrace(1, "printing"); */
+				if (DO_TRACE(uptr)) mytrace(1, "printing");
 			}
 
 			if (modify & PRT_CMD_STOP_PRINTER) {
 				CLRBIT(uptr->flags, UNIT_PRINTING);
-/*				mytrace(0, "printing"); */
+				if (DO_TRACE(uptr)) mytrace(0, "printing");
 			}
 
 			if (modify & PRT_CMD_START_CARRIAGE) {
 				SETBIT(uptr->flags, UNIT_SKIPPING);
-/*				mytrace(1, "skipping"); */
+				if (DO_TRACE(uptr))	mytrace(1, "skipping");
 			}
 
 			if (modify & PRT_CMD_STOP_CARRIAGE) {
 				CLRBIT(uptr->flags, UNIT_SKIPPING);
-/*				mytrace(0, "skipping"); */
+				if (DO_TRACE(uptr))	mytrace(0, "skipping");
 			}
 
 			if (modify & PRT_CMD_SPACE) {
 				SETBIT(uptr->flags, UNIT_SPACING);
-/*				mytrace(1, "space"); */
+				if (DO_TRACE(uptr))	mytrace(1, "space");
 			}
 
 			sim_cancel(uptr);
@@ -437,6 +443,7 @@ static t_stat prt_svc (UNIT *uptr)
 static t_stat prt1132_svc (UNIT *uptr)
 {
 	if (PRT_DSW & PRT1132_DSW_NOT_READY) {					/* cancel operation if printer went offline */
+		if (DO_TRACE(uptr))	trace_io("1132 form check");
 		SETBIT(uptr->flags, UNIT_FORMCHECK);
 		SET_ACTION(uptr, 0);
 		forms_check(TRUE);									/* and turn on forms check lamp */
@@ -467,9 +474,15 @@ static t_stat prt1132_svc (UNIT *uptr)
 
 	if (uptr->flags & UNIT_PRINTING) {
 		if (! save_1132_prt_line(codewheel1132[prt_nchar].ascii)) {	/* save previous printed line */
+			trace_io("* Print check -- buffer not set in time");
 			SETBIT(uptr->flags, UNIT_DATACHECK);					/* buffer wasn't set in time */
 			SET_ACTION(uptr, 0);
 			print_check(TRUE);										/* and turn on forms check lamp */
+
+/*	if (running)
+		reason = STOP_IMMEDIATE;	// halt on check
+*/
+
 			return SCPE_OK;
 		}
 
@@ -583,6 +596,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 {
 	if (PRT_DSW & PRT1403_DSW_NOT_READY) {					/* cancel operation if printer went offline */
 		SET_ACTION(uptr, 0);
+		if (DO_TRACE(uptr))	trace_io("1403 form check");
 		forms_check(TRUE);									/* and turn on forms check lamp */
 	}
 	else if (uptr->flags & UNIT_TRANSFERRING) {				/* end of transfer */
@@ -635,7 +649,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 
 /* delete_cmd - SCP command to delete a file */
 
-static t_stat delete_cmd (int32 flag, char *cptr)
+static t_stat delete_cmd (int flag, char *cptr)
 {
 	char gbuf[CBUFSIZE];
 	int status;
