@@ -404,6 +404,8 @@ if (!lp->txbfd)                                         /* if not buffered */
     lp->txbpr = lp->txbpi = lp->txcnt = 0;              /*   init transmit indexes */
 memset (lp->rbr, 0, TMXR_MAXBUF);                       /* clear break status array */
 lp->txdrp = 0;
+if (lp->mp->modem_control)
+    lp->modembits = TMXR_MDM_CTS | TMXR_MDM_DSR;
 if (!lp->mp->buffered) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
@@ -760,15 +762,15 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
     for (i=0; i < mp->lines; i++) {
         uptr = mp->ldsc[i].uptr ? mp->ldsc[i].uptr : mp->uptr;
 
-        if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {        /* if asynch not disabled */
-            uptr->dynflags |= UNIT_TM_POLL;                 /* tag as polling unit */
+        if (!(mp->uptr->dynflags & TMUF_NOASYNCH)) {    /* if asynch not disabled */
+            uptr->dynflags |= UNIT_TM_POLL;             /* tag as polling unit */
             sim_cancel (uptr);
             }
         }
     }
 
 if ((poll_time - mp->last_poll_time) < TMXR_CONNECT_POLL_INTERVAL)
-    return -1;                          /* too soon to try */
+    return -1;                                          /* too soon to try */
 
 tmxr_debug_trace (mp, "tmxr_poll_conn()");
 
@@ -900,6 +902,13 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
         lp->conn = TRUE;
         return i;
         }
+
+    /* Check for needed outgoing connection initiation */
+
+    if (lp->destination && (!lp->sock) && (!lp->connecting) && (!lp->serport) && 
+        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR)))
+        lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+
     }
 
 return -1;                                              /* no new connections made */
@@ -2663,8 +2672,11 @@ else {
                     fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
                 fprintf (st, "\n");
                 }
-            if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master))
+            if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master)) {
+                if (mp->modem_control)
+                    tmxr_fconns (st, lp, -1);
                 continue;
+                }
             tmxr_fconns (st, lp, -1);
             tmxr_fstats (st, lp, -1);
             }
@@ -3382,11 +3394,15 @@ int32 i, any;
 if (mp == NULL)
     return SCPE_IERR;
 for (i = any = 0; i < mp->lines; i++) {
-    if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0)) {
-        any++;
+    if ((mp->ldsc[i].sock != 0) || 
+        (mp->ldsc[i].serport != 0) || mp->modem_control) {
+        if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
+            any++;
         if (val)
             tmxr_fconns (st, &mp->ldsc[i], i);
-        else tmxr_fstats (st, &mp->ldsc[i], i);
+        else
+            if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
+                tmxr_fstats (st, &mp->ldsc[i], i);
         }
     }
 if (any == 0)
@@ -3408,7 +3424,7 @@ return SCPE_OK;
 
 
 static struct {
-    char value;
+    u_char value;
     char *name;
     } tn_chars[] =
     {
