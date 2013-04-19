@@ -2789,7 +2789,11 @@ if (flag) {
 #elif defined (__DECC_VER)
     fprintf (st, "\n\t\tCompiler: DEC C %c%d.%d-%03d", ("T SV")[((__DECC_VER/10000)%10)-6], __DECC_VER/10000000, (__DECC_VER/100000)%100, __DECC_VER%10000);
 #elif defined (SIM_COMPILER)
-    fprintf (st, "\n\t\tCompiler: %s", SIM_COMPILER);
+#define S_xstr(a) S_str(a)
+#define S_str(a) #a
+    fprintf (st, "\n\t\tCompiler: %s", S_xstr(SIM_COMPILER));
+#undef S_str
+#undef S_xstr
 #endif
 #if defined (__DATE__) && defined (__TIME__)
     fprintf (st, "\n\t\tSimulator Compiled: %s at %s", __DATE__, __TIME__);

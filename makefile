@@ -79,8 +79,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifeq (,$(GCC_VERSION))
       ifeq (SunOS,$(OSTYPE))
         ifneq (,$(shell $(GCC) -V 2>&1 | grep 'Sun C'))
-          SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C' | awk '{ print $$4 }')
-          COMPILER_NAME = Sun C $(SUNC_VERSION)
+          SUNC_VERSION = $(shell $(GCC) -V 2>&1 | grep 'Sun C')
+          COMPILER_NAME = $(wordlist 2,10,$(SUNC_VERSION))
         endif
       endif
     endif
