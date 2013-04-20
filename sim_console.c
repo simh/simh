@@ -84,37 +84,40 @@
    25-Jan-97    RMS     Added POSIX terminal I/O support
    02-Jan-97    RMS     Fixed bug in sim_poll_kbd
 
-   This module implements the following routines to support terminal I/O:
+   This module implements the following routines to support terminal and 
+   Remote Console I/O:
 
-   sim_poll_kbd -       poll for keyboard input
-   sim_putchar  -       output character to console
-   sim_putchar_s -      output character to console, stall if congested
-   sim_set_console -    set console parameters
-   sim_show_console -   show console parameters
-   sim_set_cons_buff -  set console buffered
-   sim_set_cons_unbuff -set console unbuffered
-   sim_set_cons_log -   set console log
-   sim_set_cons_nolog - set console nolog
-   sim_show_cons_buff - show console buffered
-   sim_show_cons_log -  show console log
-   sim_tt_inpcvt -      convert input character per mode
-   sim_tt_outcvt -      convert output character per mode
+   sim_poll_kbd                 poll for keyboard input
+   sim_putchar                  output character to console
+   sim_putchar_s                output character to console, stall if congested
+   sim_set_console              set console parameters
+   sim_show_console             show console parameters
+   sim_set_remote_console       set remote console parameters
+   sim_show_remote_console      show remote console parameters
+   sim_set_cons_buff            set console buffered
+   sim_set_cons_unbuff          set console unbuffered
+   sim_set_cons_log             set console log
+   sim_set_cons_nolog           set console nolog
+   sim_show_cons_buff           show console buffered
+   sim_show_cons_log            show console log
+   sim_tt_inpcvt                convert input character per mode
+   sim_tt_outcvt                convert output character per mode
 
-   sim_ttinit   -       called once to get initial terminal state
-   sim_ttrun    -       called to put terminal into run state
-   sim_ttcmd    -       called to return terminal to command state
-   sim_ttclose  -       called once before the simulator exits
-   sim_ttisatty -       called to determine if running interactively
-   sim_os_poll_kbd -    poll for keyboard input
-   sim_os_putchar -     output character to console
+   sim_ttinit                   called once to get initial terminal state
+   sim_ttrun                    called to put terminal into run state
+   sim_ttcmd                    called to return terminal to command state
+   sim_ttclose                  called once before the simulator exits
+   sim_ttisatty                 called to determine if running interactively
+   sim_os_poll_kbd              poll for keyboard input
+   sim_os_putchar               output character to console
 
    The first group is OS-independent; the second group is OS-dependent.
 
    The following routines are exposed but deprecated:
 
-   sim_set_telnet -     set console to Telnet port
-   sim_set_notelnet -   close console Telnet port
-   sim_show_telnet -    show console status
+   sim_set_telnet               set console to Telnet port
+   sim_set_notelnet             close console Telnet port
+   sim_show_telnet              show console status
 */
 
 #include "sim_defs.h"
@@ -136,6 +139,7 @@ static t_bool sim_os_ttisatty (void);
 
 static t_stat sim_set_rem_telnet (int32 flag, char *cptr);
 static t_stat sim_set_rem_connections (int32 flag, char *cptr);
+static t_stat sim_set_rem_timeout (int32 flag, char *cptr);
 
 #define KMAP_WRU        0
 #define KMAP_BRK        1
@@ -223,6 +227,7 @@ static CTAB set_rem_con_tab[] = {
     { "CONNECTIONS", &sim_set_rem_connections, 0 },
     { "TELNET", &sim_set_rem_telnet, 1 },
     { "NOTELNET", &sim_set_rem_telnet, 0 },
+    { "TIMEOUT", &sim_set_rem_timeout, 0 },
     { NULL, NULL, 0 }
     };
 
@@ -337,10 +342,12 @@ DEVICE sim_remote_console = {
     2, 0, 0, 0, 0, 0, 
     NULL, NULL, sim_rem_con_reset, NULL, NULL, NULL, 
     NULL, DEV_DEBUG, 0, sim_rem_con_debug};
-int32 *sim_rem_buf_size = NULL;
-int32 *sim_rem_buf_ptr = NULL;
-char **sim_rem_buf = NULL;
-TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
+#define MAX_REMOTE_SESSIONS 40          /* Arbitrary Session Limit */
+static int32 *sim_rem_buf_size = NULL;
+static int32 *sim_rem_buf_ptr = NULL;
+static char **sim_rem_buf = NULL;
+static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
+static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
 
 /* SET REMOTE CONSOLE command */
 
@@ -371,15 +378,28 @@ return SCPE_OK;
 
 t_stat sim_show_remote_console (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
+int32 i, connections;
+TMLN *lp;
+
 if (*cptr != 0)
     return SCPE_NOPARAM;
-if (!sim_rem_con_tmxr.master) {
-    fprintf (st, "Remote Console Command input is disabled\n");
-    return SCPE_OK;
-    }
-fprintf (st, "Remote Console Command Input listening on TCP port: %s\n", sim_rem_con_unit[0].filename);
 if (sim_rem_con_tmxr.lines > 1)
     fprintf (st, "Remote Console Input Connections from %d sources are supported concurrently\n", sim_rem_con_tmxr.lines);
+if (sim_rem_read_timeout)
+    fprintf (st, "Remote Console Input automatically continues after %d seconds\n", sim_rem_read_timeout);
+if (!sim_rem_con_tmxr.master)
+    fprintf (st, "Remote Console Command input is disabled\n");
+else
+    fprintf (st, "Remote Console Command Input listening on TCP port: %s\n", sim_rem_con_unit[0].filename);
+for (i=connections=0; i<sim_rem_con_tmxr.lines; i++) {
+    lp = &sim_rem_con_tmxr.ldsc[i];
+    if (!lp->conn)
+        continue;
+    ++connections;
+    if (connections == 1)
+        fprintf (st, "Remote Console Connections:\n");
+    tmxr_fconns (st, lp, i);
+    }
 return SCPE_OK;
 }
 
@@ -411,6 +431,48 @@ static t_stat x_continue_cmd (int32 flag, char *cptr)
 return SCPE_IERR;           /* This routine should never be called */
 }
 
+#define EX_D            0                               /* deposit */
+#define EX_E            1                               /* examine */
+#define EX_I            2                               /* interactive */
+static CTAB allowed_remote_cmds[] = {
+    { "EXAMINE",  &exdep_cmd,      EX_E },
+    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
+    { "DEPOSIT",  &exdep_cmd,      EX_D },
+    { "EVALUATE", &eval_cmd,          0 },
+    { "ATTACH",   &attach_cmd,        0 },
+    { "DETACH",   &detach_cmd,        0 },
+    { "ASSIGN",   &assign_cmd,        0 },
+    { "DEASSIGN", &deassign_cmd,      0 },
+    { "CONTINUE", &x_continue_cmd,    0 },
+    { "PWD",      &pwd_cmd,           0 },
+    { "SAVE",     &save_cmd,          0 },
+    { "SET",      &set_cmd,           0 },
+    { "SHOW",     &show_cmd,          0 },
+    { "ECHO",     &echo_cmd,          0 },
+    { "HELP",     &help_cmd,          0 },
+    { NULL,       NULL }
+    };
+
+static t_stat sim_rem_con_help (int32 flag, char *cptr)
+{
+CTAB *cmdp, *cmdph;
+
+if (*cptr)
+    return help_cmd (flag, cptr);
+printf ("Remote Console Commands:\r\n");
+if (sim_log)
+    fprintf (sim_log, "Remote Console Commands:\r\n");
+for (cmdp=allowed_remote_cmds; cmdp->name != NULL; ++cmdp) {
+    cmdph = find_cmd (cmdp->name);
+    if (cmdph && cmdph->help) {
+        printf ("%s", cmdph->help);
+        if (sim_log)
+            fprintf (sim_log, "%s", cmdph->help);
+        }
+    }
+return SCPE_OK;
+}
+
 /* Unit service for remote console data polling */
 
 t_stat sim_rem_con_data_svc (UNIT *uptr)
@@ -421,31 +483,8 @@ t_bool got_command;
 TMLN *lp;
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *argv[1] = {NULL};
 CTAB *cmdp;
+uint32 read_start_time;
 long cmd_log_start;
-#define EX_D            0                               /* deposit */
-#define EX_E            1                               /* examine */
-#define EX_I            2                               /* interactive */
-static CTAB allowed_remote_cmds[] = {
-    { "EXAMINE",  &exdep_cmd, EX_E },
-    { "IEXAMINE", &exdep_cmd, EX_E+EX_I },
-    { "DEPOSIT",  &exdep_cmd, EX_D },
-    { "EVALUATE", &eval_cmd },
-    { "ATTACH",   &attach_cmd },
-    { "DETACH",   &detach_cmd },
-    { "ASSIGN",   &assign_cmd },
-    { "DEASSIGN", &deassign_cmd },
-    { "CONT",     &x_continue_cmd },
-    { "PROCEED",  &noop_cmd },
-    { "IGNORE",   &noop_cmd },
-    { "PWD",      &pwd_cmd },
-    { "SAVE",     &save_cmd },
-    { "SET",      &save_cmd },
-    { "SHOW",     &show_cmd },
-    { "ECHO",     &echo_cmd },
-    { "HELP",     &help_cmd },
-    { NULL,       NULL }
-    };
-
 
 tmxr_poll_rx (&sim_rem_con_tmxr);                      /* poll input */
 for (i=0; i < sim_rem_con_tmxr.lines; i++) {
@@ -459,17 +498,25 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
     if (c != sim_int_char)
         continue;                               /* ^E (the interrupt character) must start console interaction */
     for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-        if (i == j)
-            continue;
         lp = &sim_rem_con_tmxr.ldsc[j];
+        if ((i == j) || (!lp->conn))
+            continue;
         tmxr_linemsg (lp, "\r\nRemote Console(");
         tmxr_linemsg (lp, lp->ipad);
         tmxr_linemsg (lp, ") Entering Commands\r\n");
         tmxr_send_buffered_data (lp);           /* flush any buffered data */
         }
     lp = &sim_rem_con_tmxr.ldsc[i];
-    tmxr_linemsg (lp, "\r\n");
+    tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
+    if (sim_rem_read_timeout) {
+        char timeout_buf[32];
+        tmxr_linemsg (lp, "Simulation will resume automatically if input is not received in ");
+        sprintf (timeout_buf, "%d", sim_rem_read_timeout);
+        tmxr_linemsg (lp, timeout_buf);
+        tmxr_linemsg (lp, " seconds\r\n");
+        }
     while (1) {
+        read_start_time = sim_os_msec();
         tmxr_linemsg (lp, "sim> ");
         tmxr_send_buffered_data (lp);           /* flush any buffered data */
         got_command = FALSE;
@@ -477,10 +524,27 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
             c = tmxr_getc_ln (lp);
             if (!(TMXR_VALID & c)) {
                 tmxr_send_buffered_data (lp);   /* flush any buffered data */
+                if (sim_rem_read_timeout &&
+                    ((sim_os_msec() - read_start_time)/1000 >= sim_rem_read_timeout)) {
+                    while (sim_rem_buf_ptr[i] > 0) { /* Erase current input line */
+                        tmxr_linemsg (lp, "\b \b");
+                        --sim_rem_buf_ptr[i];
+                        }
+                    if (sim_rem_buf_ptr[i]+80 >= sim_rem_buf_size[i]) {
+                        sim_rem_buf_size[i] += 1024;
+                        sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                        }
+                    strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue due to timeout");
+                    tmxr_linemsg (lp, sim_rem_buf[i]);
+                    tmxr_linemsg (lp, "\r\n");
+                    got_command = TRUE;
+                    break;
+                    }
                 sim_os_ms_sleep (100);
                 tmxr_poll_rx (&sim_rem_con_tmxr);/* poll input */
                 continue;
                 }
+            read_start_time = sim_os_msec();
             c = c & ~TMXR_VALID;
             switch (c) {
                 case 0:     /* no data */
@@ -500,8 +564,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                         }
                     break;
                 case '\r':
-                    tmxr_putc_ln (lp, c);
-                    tmxr_putc_ln (lp, '\n');
+                    tmxr_linemsg (lp, "\r\n");
                     if (sim_rem_buf_ptr[i]+1 >= sim_rem_buf_size[i]) {
                         sim_rem_buf_size[i] += 1024;
                         sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
@@ -517,6 +580,8 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                         }
                     sim_rem_buf[i][sim_rem_buf_ptr[i]++] = c;
                     sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
+                    if (sim_rem_buf_ptr[i] >= sizeof(cbuf))
+                        got_command = TRUE;                 /* command too long */
                     break;
                 }
             }
@@ -525,7 +590,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
         if (strlen(sim_rem_buf[i]) >= sizeof(cbuf)) {
-            tmxr_linemsg (lp, "Line too long. Ignored.  Continuing Simulator execution\r\n");
+            tmxr_linemsg (lp, "\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
             tmxr_send_buffered_data (lp);       /* try to flush any buffered data */
             break;
             }
@@ -543,10 +608,14 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
             stat = SCPE_UNK;
         else {
             if ((cmdp = find_ctab (allowed_remote_cmds, gbuf))) {/* lookup command */
-                if (cmdp->action != &x_continue_cmd)
-                    stat = cmdp->action (cmdp->arg, cptr);  /* if found, exec */
-                else
+                if (cmdp->action == &x_continue_cmd)
                     stat = SCPE_OK;
+                else {
+                    if (cmdp->action == &help_cmd)
+                        stat = sim_rem_con_help (cmdp->arg, cptr);
+                    else
+                        stat = cmdp->action (cmdp->arg, cptr);
+                    }
                 }
             else
                 stat = SCPE_INVREM;
@@ -575,9 +644,9 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
             tmxr_linemsg (lp, "Simulator Running...");
             tmxr_send_buffered_data (lp);
             for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-                if (i == j)
-                    continue;
                 lp = &sim_rem_con_tmxr.ldsc[j];
+                if ((i == j) || (!lp->conn))
+                    continue;
                 tmxr_linemsg (lp, "Simulator Running...");
                 tmxr_send_buffered_data (lp);
                 }
@@ -628,9 +697,15 @@ return SCPE_OK;
 
 static t_stat sim_set_rem_connections (int32 flag, char *cptr)
 {
-int32 lines = atoi(cptr);
+int32 lines;
+t_stat r;
 int32 i;
 
+if (cptr == NULL)
+    return SCPE_ARG;
+lines = (int32) get_uint (cptr, 10, MAX_REMOTE_SESSIONS, &r);
+if (r != SCPE_OK)
+    return r;
 if (sim_rem_con_tmxr.master)
     return SCPE_ARG;
 for (i=0; i<sim_rem_con_tmxr.lines; i++)
@@ -647,6 +722,19 @@ memset (sim_rem_buf_ptr, 0, sizeof(*sim_rem_buf_ptr)*lines);
 return SCPE_OK;
 }
 
+static t_stat sim_set_rem_timeout (int32 flag, char *cptr)
+{
+int32 timeout;
+t_stat r;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+timeout = (int32) get_uint (cptr, 10, 3600, &r);
+if (r != SCPE_OK)
+    return r;
+sim_rem_read_timeout = timeout;
+return SCPE_OK;
+}
 
 /* Set keyboard map */
 

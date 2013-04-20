@@ -613,7 +613,7 @@ static CTAB cmd_table[] = {
       "go {new PC}              start simulation\n", &run_cmd_message }, 
     { "STEP", &run_cmd, RU_STEP,
       "s{tep} {n}               simulate n instructions\n", &run_cmd_message },
-    { "CONT", &run_cmd, RU_CONT,
+    { "CONTINUE", &run_cmd, RU_CONT,
       "c{ont}                   continue simulation\n", &run_cmd_message },
     { "BOOT", &run_cmd, RU_BOOT,
       "b{oot} <unit>            bootstrap unit\n", &run_cmd_message },
@@ -677,6 +677,8 @@ static CTAB cmd_table[] = {
       "set remote TELNET=port   specify remote console telnet port\n"
       "set remote NOTELNET      disables remote console\n"
       "set remote CONNECTIONS=n specify number of concurrent remote console sessions\n"
+      "set remote TIMEOUT=n     specify number of seconds without input before\n"
+      "                         automatic continue\n"
       "set default <dir>        set the current directory\n"
       "set log log_file         specify the log destination\n"
       "                         (STDOUT,DEBUG or filename)\n"
