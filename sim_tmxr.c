@@ -2667,7 +2667,7 @@ else {
             if (mp->lines > 1) {
                 fprintf (st, "Line: %d", j);
                 if (mp->notelnet != lp->notelnet)
-                    fprintf (st, " - %telnet", lp->notelnet ? "no" : "");
+                    fprintf (st, " - %stelnet", lp->notelnet ? "no" : "");
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
                     fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
                 fprintf (st, "\n");
