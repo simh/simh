@@ -176,7 +176,7 @@ return total;
 
 /* Forward Declaration */
 
-static t_offset _sim_ftell (FILE *st);
+t_offset sim_ftell (FILE *st);
 
 /* Get file size */
 
@@ -186,9 +186,9 @@ t_offset pos, sz;
 
 if (fp == NULL)
     return 0;
-pos = _sim_ftell (fp);
+pos = sim_ftell (fp);
 sim_fseek (fp, 0, SEEK_END);
-sz = _sim_ftell (fp);
+sz = sim_ftell (fp);
 sim_fseeko (fp, pos, SEEK_SET);
 return sz;
 }
@@ -242,7 +242,7 @@ int sim_fseeko (FILE *st, t_offset offset, int whence)
 return fseeko (st, (off_t)offset, whence);
 }
 
-static t_offset _sim_ftell (FILE *st)
+t_offset sim_ftell (FILE *st)
 {
 return (t_offset)(ftello (st));
 }
@@ -258,7 +258,7 @@ int sim_fseeko (FILE *st, t_offset offset, int whence)
 return fseek (st, offset, whence);
 }
 
-static t_offset _sim_ftell (FILE *st)
+t_offset sim_ftell (FILE *st)
 {
 return (t_offset)(ftell (st));
 }
@@ -301,7 +301,7 @@ switch (whence) {
 return fsetpos (st, &fileaddr);
 }
 
-static t_offset _sim_ftell (FILE *st)
+t_offset sim_ftell (FILE *st)
 {
 fpos_t fileaddr;
 if (fgetpos (st, &fileaddr))
@@ -320,7 +320,7 @@ int sim_fseeko (FILE *st, t_offset xpos, int origin)
 return fseeko64 (st, (off64_t)xpos, origin);
 }
 
-static t_offset _sim_ftell (FILE *st)
+t_offset sim_ftell (FILE *st)
 {
 return (t_offset)(ftello64 (st));
 }
@@ -336,7 +336,7 @@ int sim_fseeko (FILE *st, t_offset xpos, int origin)
 return fseeko (st, (off_t)xpos, origin);
 }
 
-static t_offset _sim_ftell (FILE *st)
+t_offset sim_ftell (FILE *st)
 {
 return (t_offset)(ftello (st));
 }
@@ -352,7 +352,7 @@ int sim_fseeko (FILE *st, t_offset xpos, int origin)
 return fseek (st, (long) xpos, origin);
 }
 
-static t_offset _sim_ftell (FILE *st)
+t_offset sim_ftell (FILE *st)
 {
 return (t_offset)(ftell (st));
 }

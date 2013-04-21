@@ -57,6 +57,7 @@ size_t sim_fread (void *bptr, size_t size, size_t count, FILE *fptr);
 size_t sim_fwrite (void *bptr, size_t size, size_t count, FILE *fptr);
 uint32 sim_fsize (FILE *fptr);
 uint32 sim_fsize_name (char *fname);
+t_offset sim_ftell (FILE *st);
 t_offset sim_fsize_ex (FILE *fptr);
 t_offset sim_fsize_name_ex (char *fname);
 void sim_buf_swap_data (void *bptr, size_t size, size_t count);

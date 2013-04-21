@@ -484,7 +484,7 @@ TMLN *lp;
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *argv[1] = {NULL};
 CTAB *cmdp;
 uint32 read_start_time;
-long cmd_log_start;
+t_offset cmd_log_start;
 
 tmxr_poll_rx (&sim_rem_con_tmxr);                      /* poll input */
 for (i=0; i < sim_rem_con_tmxr.lines; i++) {
@@ -603,7 +603,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
         sim_switches = 0;                                   /* init switches */
-        cmd_log_start = ftell (sim_log);
+        cmd_log_start = sim_ftell (sim_log);
         if (!find_cmd (gbuf))                               /* validate command */
             stat = SCPE_UNK;
         else {
@@ -633,7 +633,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                     }
             }
         fflush (sim_log);
-        fseek (sim_log, cmd_log_start, SEEK_SET);
+        sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
         cbuf[sizeof(cbuf)-1] = '\0';
         while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
             tmxr_linemsg (lp, cbuf);
@@ -1161,7 +1161,7 @@ else {
         return SCPE_MEM;
     get_glyph_nc (filename, gbuf, 0);                   /* reparse */
     strncpy ((*pref)->name, gbuf, sizeof((*pref)->name)-1);
-    *pf = sim_fopen (gbuf, (binary ? "a+b" : "a+"));      /* open file */
+    *pf = sim_fopen (gbuf, (binary ? "a+b" : "a+"));    /* open file */
     if (*pf == NULL) {                                  /* error? */
         free (*pref);
         *pref = NULL;
