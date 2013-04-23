@@ -647,6 +647,10 @@ static CTAB cmd_table[] = {
       "cd                       set the current directory\n" },
     { "PWD", &pwd_cmd, 0, 
       "pwd                      show current directory\n" },
+    { "DIR", &dir_cmd, 0, 
+      "dir {dir}                list directory files\n" },
+    { "LS", &dir_cmd, 0, 
+      "ls {dir}                 list directory files\n" },
     { "SET", &set_cmd, 0,
       "set console arg{,arg...} set console options\n"
       "set console WRU          specify console drop to simh char\n"
@@ -3146,6 +3150,251 @@ t_stat pwd_cmd (int32 flg, char *cptr)
 {
 return show_cmd (0, "DEFAULT");
 }
+
+#if defined (_WIN32)
+
+t_stat dir_cmd (int flg, char *cptr)
+{
+HANDLE hFind;
+WIN32_FIND_DATAA File;
+struct stat filestat;
+char WildName[PATH_MAX + 1];
+
+if (*cptr == '\0')
+    cptr = "./*";
+if ((!stat (cptr, &filestat)) && (filestat.st_mode & S_IFDIR)) {
+    sprintf (WildName, "%s%c*", cptr, strchr (cptr, '/') ? '/' : '\\');
+    cptr = WildName;
+    }
+if ((hFind =  FindFirstFileA (cptr, &File)) != INVALID_HANDLE_VALUE) {
+    t_int64 FileSize, TotalSize = 0;
+    int DirCount = 0, FileCount = 0;
+    char DirName[PATH_MAX + 1], FileName[PATH_MAX + 1];
+    char *c, pathsep = '/';
+    struct tm *local;
+
+    GetFullPathNameA(cptr, sizeof(DirName), DirName, &c);
+    c = strrchr(DirName, pathsep);
+    if (NULL == c) {
+        pathsep = '\\';
+        c = strrchr(cptr, pathsep);
+        }
+    if (c) {
+        memcpy(DirName, cptr, c - cptr);
+        DirName[c - cptr] = '\0';
+        }
+    else {
+        getcwd(DirName, PATH_MAX);
+        }
+    printf (" Directory of %s\n\n", DirName);
+    if (sim_log)
+        fprintf (sim_log, " Directory of %s\n\n", DirName);
+    do {
+        FileSize = (((t_int64)(File.nFileSizeHigh)) << 32) | File.nFileSizeLow;
+        sprintf (FileName, "%s%c%s", DirName, pathsep, File.cFileName);
+        stat (FileName, &filestat);
+        local = localtime (&filestat.st_mtime);
+        printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+        if (sim_log)
+            fprintf (sim_log, "%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+        if (filestat.st_mode & S_IFDIR) {
+            ++DirCount;
+            printf ("   <DIR>         ");
+            if (sim_log)
+                fprintf (sim_log, "   <DIR>         ");
+            }
+        else {
+            if (filestat.st_mode & S_IFREG) {
+                ++FileCount;
+                fprint_val (stdout, (t_value) FileSize, 10, 17, PV_RCOMMA);
+                if (sim_log)
+                    fprint_val (sim_log, (t_value) FileSize, 10, 17, PV_RCOMMA);
+                TotalSize += FileSize;
+                }
+            else {
+                printf ("%17s", "");
+                if (sim_log)
+                    fprintf (sim_log, "%17s", "");
+                }
+            }
+        printf (" %s\n", File.cFileName);
+        if (sim_log)
+            fprintf (sim_log, " %s\n", File.cFileName);
+        } while (FindNextFile (hFind, &File));
+    printf ("%16d File(s)", FileCount);
+    fprint_val (stdout, (t_value) TotalSize, 10, 15, PV_RCOMMA);
+    printf (" bytes\n");
+    printf ("%16d Dir(s)\n", DirCount);
+    if (sim_log) {
+        fprintf (sim_log, "%16d File(s)", FileCount);
+        fprint_val (sim_log, (t_value) TotalSize, 10, 15, PV_RCOMMA);
+        fprintf (sim_log, " bytes\n");
+        fprintf (sim_log, "%16d Dir(s)\n", DirCount);
+        }
+    FindClose (hFind);
+    }
+else {
+    printf ("Can't list files for %s\n", cptr);
+    if (sim_log)
+        fprintf (sim_log, "Can't list files for %s\n", cptr);
+    return SCPE_ARG;
+    }
+return SCPE_OK;
+}
+
+#else /* !defined (_WIN32) */
+
+#if defined (HAVE_GLOB)
+#include <glob.h>
+#else /* !defined (HAVE_GLOB) */
+#include <dirent.h>
+#if defined (HAVE_FNMATCH)
+#include <fnmatch.h>
+#endif
+#endif /* defined (HAVE_GLOB) */
+
+t_stat dir_cmd (int flg, char *cptr)
+{
+#if defined (HAVE_GLOB)
+glob_t  paths;
+#else
+DIR *dir;
+#endif
+struct stat filestat;
+char *c;
+char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
+
+if (*cptr == '\0')
+    cptr = "./*";
+strcpy (WildName, cptr);
+while (strlen(WildName) && isspace(WildName[strlen(WildName)-1]))
+    WildName[strlen(WildName)-1] = '\0';
+if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR)) {
+    strcat (WildName, "/*");
+    cptr = WildName;
+    }
+if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
+    getcwd (WholeName, PATH_MAX);
+    strcat (WholeName, "/");
+    strcat (WholeName, cptr);
+    while (strlen(WholeName) && isspace(WholeName[strlen(WholeName)-1]))
+        WholeName[strlen(WholeName)-1] = '\0';
+    }
+while ((c = strstr (WholeName, "/./")))
+    strcpy (c + 1, c + 3);
+while ((c = strstr (WholeName, "//")))
+    strcpy (c + 1, c + 2);
+while ((c = strstr (WholeName, "/../"))) {
+    char *c1;
+    c1 = c - 1;
+    while ((c1 >= WholeName) && (*c1 != '/'))
+        c1 = c1 - 1;
+    strcpy (c1, c + 3);
+    while (0 == memcmp (WholeName, "/../", 4))
+        strcpy (WholeName, WholeName+3);
+    }
+c = strrchr (WholeName, '/');
+if (c) {
+    memcpy (DirName, WholeName, c-WholeName);
+    DirName[c-WholeName] = '\0';
+    }
+else
+    getcwd(DirName, PATH_MAX);
+cptr = WholeName;
+#if defined (HAVE_GLOB)
+memset (&paths, 0, sizeof(paths));
+if (0 == glob (cptr, 0, NULL, &paths)) {
+#else
+dir = opendir(DirName[0] ? DirName : "/.");
+if (dir) {
+    struct dirent *ent;
+#endif
+    t_int64 FileSize, TotalSize = 0;
+    int DirCount = 0, FileCount = 0;
+    char FileName[PATH_MAX + 1], *MatchName;
+    char *c;
+    struct tm *local;
+    int i;
+
+    MatchName = 1 + strrchr (cptr, '/');
+    printf (" Directory of %s\n\n", DirName[0] ? DirName : "/");
+    if (sim_log)
+        fprintf (sim_log, " Directory of %s\n\n", DirName[0] ? DirName : "/");
+#if defined (HAVE_GLOB)
+    for (i=0; i<paths.gl_pathc; i++) {
+        sprintf (FileName, "%s", paths.gl_pathv[i]);
+#else
+    while ((ent = readdir (dir))) {
+#if defined (HAVE_FNMATCH)
+        if (fnmatch(MatchName, ent->d_name, 0))
+            continue;
+#endif
+        sprintf (FileName, "%s/%s", DirName, ent->d_name);
+#endif
+        stat (FileName, &filestat);
+        local = localtime (&filestat.st_mtime);
+        printf ("%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+        if (sim_log)
+            fprintf (sim_log, "%02d/%02d/%04d  %02d:%02d %s ", local->tm_mon+1, local->tm_mday, 1900+local->tm_year, local->tm_hour%12, local->tm_min, (local->tm_hour >= 12) ? "PM" : "AM");
+        if (filestat.st_mode & S_IFDIR) {
+            ++DirCount;
+            printf ("   <DIR>         ");
+            if (sim_log)
+                fprintf (sim_log, "   <DIR>         ");
+            }
+        else {
+            if (filestat.st_mode & S_IFREG) {
+                ++FileCount;
+                FileSize = filestat.st_size;
+                fprint_val (stdout, (t_value) FileSize, 10, 17, PV_RCOMMA);
+                if (sim_log)
+                    fprint_val (sim_log, (t_value) FileSize, 10, 17, PV_RCOMMA);
+                TotalSize += FileSize;
+                }
+            else {
+                printf ("%17s", "");
+                if (sim_log)
+                    fprintf (sim_log, "%17s", "");
+                }
+            }
+        c = strrchr (FileName, '/');
+        printf (" %s\n", c ? c + 1 : FileName);
+        if (sim_log)
+            fprintf (sim_log, " %s\n", c ? c + 1 : FileName);
+        }
+    if (FileCount) {
+        printf ("%16d File(s)", FileCount);
+        fprint_val (stdout, (t_value) TotalSize, 10, 15, PV_RCOMMA);
+        printf (" bytes\n");
+        printf ("%16d Dir(s)\n", DirCount);
+        if (sim_log) {
+            fprintf (sim_log, "%16d File(s)", FileCount);
+            fprint_val (sim_log, (t_value) TotalSize, 10, 15, PV_RCOMMA);
+            fprintf (sim_log, " bytes\n");
+            fprintf (sim_log, "%16d Dir(s)\n", DirCount);
+            }
+        }
+    else {
+        printf ("File Not Found\n");
+        if (sim_log)
+            fprintf (sim_log, "File Not Found\n");
+        }
+#if defined (HAVE_GLOB)
+    globfree (&paths);
+#else
+    closedir (dir);
+#endif
+    }
+else {
+    printf ("Can't list files for %s\n", cptr);
+    if (sim_log)
+        fprintf (sim_log, "Can't list files for %s\n", cptr);
+    return SCPE_ARG;
+    }
+return SCPE_OK;
+}
+
+#endif /* !defined(_WIN32) */
 
 /* Breakpoint commands */
 
@@ -5804,9 +6053,9 @@ return val;
 t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
     uint32 width, uint32 format)
 {
-#define MAX_WIDTH ((int) (CHAR_BIT * sizeof (t_value)))
+#define MAX_WIDTH ((int) ((CHAR_BIT * sizeof (t_value) * 4 + 3)/3))
 t_value owtest, wtest;
-int32 d, digit, ndigits;
+int32 d, digit, ndigits, commas = 0;
 char dbuf[MAX_WIDTH + 1];
 
 for (d = 0; d < MAX_WIDTH; d++)
@@ -5820,16 +6069,39 @@ do {
     dbuf[d] = (digit <= 9)? '0' + digit: 'A' + (digit - 10);
     } while ((d > 0) && (val != 0));
 
-if (format != PV_LEFT) {
-    wtest = owtest = radix;
-    ndigits = 1;
-    while ((wtest < width_mask[width]) && (wtest >= owtest)) {
-        owtest = wtest;
-        wtest = wtest * radix;
-        ndigits = ndigits + 1;
-        }
-    if ((MAX_WIDTH - ndigits) < d)
-        d = MAX_WIDTH - ndigits;
+switch (format) {
+    case PV_LEFT:
+        break;
+    case PV_RCOMMA:
+        for (digit = 0; digit < MAX_WIDTH; digit++)
+            if (dbuf[digit] != ' ')
+                break;
+        ndigits = MAX_WIDTH - digit;
+        commas = (ndigits - 1)/3;
+        for (digit=0; digit<ndigits-3; digit++)
+            dbuf[MAX_WIDTH - ndigits + digit - (commas - (digit+1)/3)] = dbuf[MAX_WIDTH - ndigits + digit];
+        for (digit=1; digit<=commas; digit++)
+            dbuf[MAX_WIDTH - (digit * 4)] = ',';
+        d = d - commas;
+        if (width > MAX_WIDTH) {
+            fprintf (stream, "%*s", -((int)width), dbuf);
+            return SCPE_OK;
+            }
+        else
+            d = MAX_WIDTH - width;
+        break;
+    case PV_RZRO:
+    case PV_RSPC:
+        wtest = owtest = radix;
+        ndigits = 1;
+        while ((wtest < width_mask[width]) && (wtest >= owtest)) {
+            owtest = wtest;
+            wtest = wtest * radix;
+            ndigits = ndigits + 1;
+            }
+        if ((MAX_WIDTH - (ndigits + commas)) < d)
+            d = MAX_WIDTH - (ndigits + commas);
+        break;
     }
 if (fputs (&dbuf[d], stream) == EOF)
     return SCPE_IOERR;

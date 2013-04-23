@@ -249,6 +249,13 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     endif
   endif
+  ifneq (,$(call find_include,glob))
+    OS_CCDEFS += -DHAVE_GLOB
+  else
+    ifneq (,$(call find_include,fnmatch))
+      OS_CCDEFS += -DHAVE_FNMATCH    
+    endif
+  endif
   ifneq (,$(NETWORK_USEFUL))
     ifneq (,$(call find_include,pcap))
       ifneq (,$(call find_lib,$(PCAPLIB)))

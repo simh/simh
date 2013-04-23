@@ -448,6 +448,8 @@ static CTAB allowed_remote_cmds[] = {
     { "SAVE",     &save_cmd,          0 },
     { "SET",      &set_cmd,           0 },
     { "SHOW",     &show_cmd,          0 },
+    { "DIR",      &dir_cmd,           0 },
+    { "LS",       &dir_cmd,           0 },
     { "ECHO",     &echo_cmd,          0 },
     { "HELP",     &help_cmd,          0 },
     { NULL,       NULL }
@@ -586,10 +588,11 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                 }
             }
         tmxr_send_buffered_data (lp);           /* flush any buffered data */
-        printf ("Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
+        printf ("Remote Console Command from %s> %s\r\n", lp->ipad, sim_rem_buf[i]);
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
         if (strlen(sim_rem_buf[i]) >= sizeof(cbuf)) {
+            printf ("\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
             tmxr_linemsg (lp, "\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
             tmxr_send_buffered_data (lp);       /* try to flush any buffered data */
             break;
@@ -627,7 +630,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                 cmdp->message (NULL, stat);                 /* let it deal with display */
             else
                 if (stat >= SCPE_BASE) {                    /* error? */
-                    printf ("%s\n", sim_error_text (stat));
+                    printf ("%s\r\n", sim_error_text (stat));
                     if (sim_log)
                         fprintf (sim_log, "%s\n", sim_error_text (stat));
                     }
