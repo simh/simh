@@ -753,9 +753,8 @@ for (; preferred != NULL; preferred = preferred->ai_next) {
     }
 if (preferred == NULL)
     preferred = result;
-#else
-retry:
 #endif
+retry:
 newsock = sim_create_sock (preferred->ai_family);       /* create socket */
 if (newsock == INVALID_SOCKET) {                        /* socket error? */
 #ifndef IPV6_V6ONLY
