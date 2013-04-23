@@ -135,7 +135,10 @@ static struct sock_errors {
         {WSAECONNRESET,   "Connection reset by peer"},
         {WSAECONNREFUSED, "Connection refused"},
         {WSAEHOSTUNREACH, "No route to host"},
-        {WSAEADDRINUSE,   "Address already in use "},
+        {WSAEADDRINUSE,   "Address already in use"},
+#if defined (WSAEAFNOSUPPORT)
+        {WSAEAFNOSUPPORT, "Address family not supported by protocol"},
+#endif
         {WSAEACCES,       "Permission denied"},
         {0, NULL}
     };
@@ -154,8 +157,13 @@ for (i=0; (sock_errors[i].text) && (sock_errors[i].value != err); i++)
 if (sock_errors[i].value == err)
     printf ("Sockets: %s error %d - %s\n", emsg, err, sock_errors[i].text);
 else
+#if defined(_WIN32)
     printf ("Sockets: %s error %d\n", emsg, err);
-sim_close_sock (s, flg);
+#else
+    printf ("Sockets: %s error %d - %s\n", emsg, err, strerror(err));
+#endif
+if (s != INVALID_SOCKET)
+    sim_close_sock (s, flg);
 return INVALID_SOCKET;
 }
 
@@ -692,8 +700,11 @@ int32 err;
 newsock = socket (af, SOCK_STREAM, 0);                  /* create socket */
 if (newsock == INVALID_SOCKET) {                        /* socket error? */
     err = WSAGetLastError ();
-    printf ("Sockets: socket error %d\n", err);
-    return INVALID_SOCKET;
+#if defined(WSAEAFNOSUPPORT)
+    if (err == WSAEAFNOSUPPORT)                         /* expected error, just return */
+        return newsock;
+#endif
+    return sim_err_sock (newsock, "socket", 0);         /* report error and return */
     }
 return newsock;
 }
@@ -750,6 +761,12 @@ if (newsock == INVALID_SOCKET) {                        /* socket error? */
 #ifndef IPV6_V6ONLY
     if (preferred->ai_next) {
         preferred = preferred->ai_next;
+        goto retry;
+        }
+#else
+    if ((preferred->ai_family == AF_INET6) &&
+        (preferred != result)) {
+        preferred = result;
         goto retry;
         }
 #endif
