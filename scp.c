@@ -2813,7 +2813,17 @@ if (flag) {
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
     fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
 #if defined(__VMS)
-    fprintf (st, "\n\t\tOS: VMS");
+    if (1) {
+        char *arch = 
+#if defined(__ia64)
+            "I64";
+#elif defined(__ALPHA)
+            "Alpha";
+#else
+            "VAX";
+#endif
+        fprintf (st, "\n\t\tOS: OpenVMS %s %s", arch, __VMS_VERSION);
+        }
 #elif defined(_WIN32)
     fprintf (st, "\n\t\tOS: Windows: ");
     fflush (st);
