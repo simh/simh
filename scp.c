@@ -6881,18 +6881,6 @@ if (sim_deb && (dptr->dctrl & dbits)) {
     }
 }
 
-#if defined (_WIN32)
-#define vsnprintf _vsnprintf
-#endif
-#if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__CRTL_VER <= 70311000))
-#define NO_vsnprintf
-#endif
-#if defined( NO_vsnprintf)
-#define STACKBUFSIZE 16384
-#else
-#define STACKBUFSIZE 2048
-#endif
-
 /* Inline debugging - will print debug message if debug file is
    set and the bitmask matches the current device debug options.
    Extra returns are added for un*x systems, since the output

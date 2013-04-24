@@ -193,6 +193,18 @@ typedef uint32          t_addr;
 #define T_ADDR_W        32
 #endif                                                  /* end 64b address */
 
+#if defined (_WIN32)
+#define vsnprintf _vsnprintf
+#endif
+#if defined (__DECC) && defined (__VMS) && (defined (__VAX) || (__CRTL_VER <= 70311000))
+#define NO_vsnprintf
+#endif
+#if defined( NO_vsnprintf)
+#define STACKBUFSIZE 16384
+#else
+#define STACKBUFSIZE 2048
+#endif
+
 #if defined (VMS) && (defined (__ia64) || defined (__ALPHA))
 #define HAVE_GLOB
 #endif
