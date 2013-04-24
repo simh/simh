@@ -3153,7 +3153,7 @@ return show_cmd (0, "DEFAULT");
 
 #if defined (_WIN32)
 
-t_stat dir_cmd (int flg, char *cptr)
+t_stat dir_cmd (int32 flg, char *cptr)
 {
 HANDLE hFind;
 WIN32_FIND_DATAA File;
@@ -3253,7 +3253,7 @@ return SCPE_OK;
 #endif
 #endif /* defined (HAVE_GLOB) */
 
-t_stat dir_cmd (int flg, char *cptr)
+t_stat dir_cmd (int32 flg, char *cptr)
 {
 #if defined (HAVE_GLOB)
 glob_t  paths;
@@ -3267,14 +3267,17 @@ char DirName[PATH_MAX + 1], WholeName[PATH_MAX + 1], WildName[PATH_MAX + 1];
 if (*cptr == '\0')
     cptr = "./*";
 strcpy (WildName, cptr);
+cptr = WildName;
 while (strlen(WildName) && isspace(WildName[strlen(WildName)-1]))
     WildName[strlen(WildName)-1] = '\0';
-if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR)) {
+if ((!stat (WildName, &filestat)) && (filestat.st_mode & S_IFDIR))
     strcat (WildName, "/*");
-    cptr = WildName;
-    }
 if ((*cptr != '/') || (0 == memcmp (cptr, "./", 2)) || (0 == memcmp (cptr, "../", 3))) {
+#if defined (VMS)
+    getcwd (WholeName, PATH_MAX, 0);
+#else
     getcwd (WholeName, PATH_MAX);
+#endif
     strcat (WholeName, "/");
     strcat (WholeName, cptr);
     while (strlen(WholeName) && isspace(WholeName[strlen(WholeName)-1]))
@@ -3299,7 +3302,11 @@ if (c) {
     DirName[c-WholeName] = '\0';
     }
 else
-    getcwd(DirName, PATH_MAX);
+#if defined (VMS)
+    getcwd (WholeName, PATH_MAX, 0);
+#else
+    getcwd (WholeName, PATH_MAX);
+#endif
 cptr = WholeName;
 #if defined (HAVE_GLOB)
 memset (&paths, 0, sizeof(paths));
@@ -3309,7 +3316,7 @@ dir = opendir(DirName[0] ? DirName : "/.");
 if (dir) {
     struct dirent *ent;
 #endif
-    t_int64 FileSize, TotalSize = 0;
+    t_offset FileSize, TotalSize = 0;
     int DirCount = 0, FileCount = 0;
     char FileName[PATH_MAX + 1], *MatchName;
     char *c;
@@ -3345,7 +3352,7 @@ if (dir) {
         else {
             if (filestat.st_mode & S_IFREG) {
                 ++FileCount;
-                FileSize = filestat.st_size;
+                FileSize = sim_fsize_name_ex (FileName);
                 fprint_val (stdout, (t_value) FileSize, 10, 17, PV_RCOMMA);
                 if (sim_log)
                     fprint_val (sim_log, (t_value) FileSize, 10, 17, PV_RCOMMA);

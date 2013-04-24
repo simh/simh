@@ -193,6 +193,10 @@ typedef uint32          t_addr;
 #define T_ADDR_W        32
 #endif                                                  /* end 64b address */
 
+#if defined (VMS) && (defined (__ia64) || defined (__ALPHA))
+#define HAVE_GLOB
+#endif
+
 /* Stubs for inlining */
 
 #define SIM_INLINE
