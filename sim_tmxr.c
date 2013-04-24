@@ -85,6 +85,7 @@
    tmxr_dep     -                       (null) deposit
    tmxr_msg     -                       send message to socket
    tmxr_linemsg -                       send message to line
+   tmxr_linemsgf -                      send formatted message to line
    tmxr_fconns  -                       output connection status
    tmxr_fstats  -                       output connection statistics
    tmxr_set_log -                       enable logging for line
@@ -490,9 +491,7 @@ static void tmxr_report_disconnection (TMLN *lp)
 {
 if (lp->notelnet)
     return;
-tmxr_linemsg (lp, "\r\nDisconnected from the ");        /* report disconnection */
-tmxr_linemsg (lp, sim_name);
-tmxr_linemsg (lp, " simulator\r\n\n");
+tmxr_linemsgf (lp, "\nDisconnected from the %s simulator\n\n", sim_name);/* report disconnection */
 return;
 }
 
@@ -2984,6 +2983,73 @@ int32 len;
 
 for (len = (int32)strlen (msg); len > 0; --len)
     tmxr_putc_ln (lp, *msg++);
+return;
+}
+
+
+/* Write a formatted message to a line */
+
+void tmxr_linemsgf (TMLN *lp, const char *fmt, ...)
+{
+char stackbuf[STACKBUFSIZE];
+int32 bufsize = sizeof(stackbuf);
+char *buf = stackbuf;
+va_list arglist;
+int32 i, len;
+
+buf[bufsize-1] = '\0';
+while (1) {                                         /* format passed string, args */
+    va_start (arglist, fmt);
+#if defined(NO_vsnprintf)
+#if defined(HAS_vsprintf_void)
+
+/* Note, this could blow beyond the buffer, and we couldn't tell */
+/* That is a limitation of the C runtime library available on this platform */
+
+    vsprintf (buf, fmt, arglist);
+    for (len = 0; len < bufsize-1; len++)
+        if (buf[len] == 0) break;
+#else
+    len = vsprintf (buf, fmt, arglist);
+#endif                                                  /* HAS_vsprintf_void */
+#else                                                   /* NO_vsnprintf */
+#if defined(HAS_vsnprintf_void)
+    vsnprintf (buf, bufsize-1, fmt, arglist);
+    for (len = 0; len < bufsize-1; len++)
+        if (buf[len] == 0) break;
+#else
+    len = vsnprintf (buf, bufsize-1, fmt, arglist);
+#endif                                                  /* HAS_vsnprintf_void */
+#endif                                                  /* NO_vsnprintf */
+    va_end (arglist);
+
+/* If the formatted result didn't fit into the buffer, then grow the buffer and try again */
+
+    if ((len < 0) || (len >= bufsize-1)) {
+        if (buf != stackbuf)
+            free (buf);
+        bufsize = bufsize * 2;
+        buf = (char *) malloc (bufsize);
+        if (buf == NULL)                            /* out of memory */
+            return;
+        buf[bufsize-1] = '\0';
+        continue;
+        }
+    break;
+    }
+
+/* Output the formatted data expanding newlines where they exist */
+
+for (i = 0; i < len; ++i) {
+    if ('\n' == buf[i]) {
+        tmxr_putc_ln (lp, '\r');
+        tmxr_putc_ln (lp, buf[i]);
+        }
+    else
+        tmxr_putc_ln (lp, buf[i]);
+    }
+if (buf != stackbuf)
+    free (buf);
 return;
 }
 

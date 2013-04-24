@@ -174,6 +174,7 @@ t_stat tmxr_ex (t_value *vptr, t_addr addr, UNIT *uptr, int32 sw);
 t_stat tmxr_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 void tmxr_msg (SOCKET sock, char *msg);
 void tmxr_linemsg (TMLN *lp, char *msg);
+void tmxr_linemsgf (TMLN *lp, const char *fmt, ...);
 void tmxr_fconns (FILE *st, TMLN *lp, int32 ln);
 void tmxr_fstats (FILE *st, TMLN *lp, int32 ln);
 t_stat tmxr_set_log (UNIT *uptr, int32 val, char *cptr, void *desc);
