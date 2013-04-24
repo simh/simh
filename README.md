@@ -22,7 +22,8 @@
 
 #### Remote Console Facility
 A new capability has been added which allows a TELNET Connection to a user designated port so that some out of band commands can be entered to manipulate and/or adjust a running simulator.  The commands which enable and control this capability are SET REMOTE TELNET=port, SET REMOTE CONNECTIONS=n, SET REMOTE TIMEOUT=seconds, and SHOW REMOTE.
-A subset of normal simh commands are available for use in remote console sessions.  These are: EXAMINE, IEXAMINE, DEPOSIT, EVALUATE, ATTACH, DETACH, ASSIGN, DEASSIGN, CONTINUE, PWD, SAVE, SET, SHOW, DIR, LS, ECHO, HELP
+
+A subset of normal simh commands are available for use in remote console sessions.  These are: EXAMINE, IEXAMINE, DEPOSIT, EVALUATE, ATTACH, DETACH, ASSIGN, DEASSIGN, STEP, CONTINUE, PWD, SAVE, SET, SHOW, DIR, LS, ECHO, HELP
 
 #### VAX/PDP11 Enhancements
     RQ has new disk types: RC25, RCF25, RA80

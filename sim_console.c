@@ -348,6 +348,7 @@ static int32 *sim_rem_buf_ptr = NULL;
 static char **sim_rem_buf = NULL;
 static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
+static int32 sim_rem_step_line = -1;        /* step in progress on line # */
 
 /* SET REMOTE CONSOLE command */
 
@@ -416,8 +417,7 @@ if (c >= 0) {                                           /* poll connect */
     sim_activate_after(uptr+1, 1000000);                /* start data poll after 100ms */
     lp->rcve = 1;                                       /* rcv enabled */
     sim_rem_buf_ptr[c] = 0;                             /* start with empty command buffer */
-    tmxr_linemsg (lp, sim_name);
-    tmxr_linemsg (lp, " Remote Console\r\nSimulator Running...");
+    tmxr_linemsgf (lp, "%s Remote Console\r\nSimulator Running...", sim_name);
     tmxr_send_buffered_data (lp);                       /* flush buffered data */
     }
 sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
@@ -430,6 +430,13 @@ static t_stat x_continue_cmd (int32 flag, char *cptr)
 {
 return SCPE_IERR;           /* This routine should never be called */
 }
+
+static t_stat x_step_cmd (int32 flag, char *cptr)
+{
+return SCPE_IERR;           /* This routine should never be called */
+}
+
+static t_stat x_help_cmd (int32 flag, char *cptr);
 
 #define EX_D            0                               /* deposit */
 #define EX_E            1                               /* examine */
@@ -444,18 +451,19 @@ static CTAB allowed_remote_cmds[] = {
     { "ASSIGN",   &assign_cmd,        0 },
     { "DEASSIGN", &deassign_cmd,      0 },
     { "CONTINUE", &x_continue_cmd,    0 },
+    { "STEP",     &x_step_cmd,        0 },
     { "PWD",      &pwd_cmd,           0 },
     { "SAVE",     &save_cmd,          0 },
-    { "SET",      &set_cmd,           0 },
-    { "SHOW",     &show_cmd,          0 },
     { "DIR",      &dir_cmd,           0 },
     { "LS",       &dir_cmd,           0 },
     { "ECHO",     &echo_cmd,          0 },
-    { "HELP",     &help_cmd,          0 },
+    { "SET",      &set_cmd,           0 },
+    { "SHOW",     &show_cmd,          0 },
+    { "HELP",     &x_help_cmd,        0 },
     { NULL,       NULL }
     };
 
-static t_stat sim_rem_con_help (int32 flag, char *cptr)
+static t_stat x_help_cmd (int32 flag, char *cptr)
 {
 CTAB *cmdp, *cmdph;
 
@@ -481,6 +489,9 @@ t_stat sim_rem_con_data_svc (UNIT *uptr)
 {
 int32 i, j, c;
 t_stat stat, stat_nomessage;
+t_bool stepping = FALSE;
+int32 steps = 1;
+t_bool was_stepping = (sim_rem_step_line != -1);
 t_bool got_command;
 TMLN *lp;
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *argv[1] = {NULL};
@@ -489,33 +500,56 @@ uint32 read_start_time;
 t_offset cmd_log_start;
 
 tmxr_poll_rx (&sim_rem_con_tmxr);                      /* poll input */
-for (i=0; i < sim_rem_con_tmxr.lines; i++) {
+for (i=(was_stepping ? sim_rem_step_line : 0); 
+     (i < sim_rem_con_tmxr.lines) && (!stepping); 
+     i++) {
     lp = &sim_rem_con_tmxr.ldsc[i];
     if (!lp->conn)
         continue;
-    c = tmxr_getc_ln (lp);
-    if (!(TMXR_VALID & c))
-        continue;
-    c = c & ~TMXR_VALID;
-    if (c != sim_int_char)
-        continue;                               /* ^E (the interrupt character) must start console interaction */
-    for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-        lp = &sim_rem_con_tmxr.ldsc[j];
-        if ((i == j) || (!lp->conn))
-            continue;
-        tmxr_linemsg (lp, "\r\nRemote Console(");
-        tmxr_linemsg (lp, lp->ipad);
-        tmxr_linemsg (lp, ") Entering Commands\r\n");
-        tmxr_send_buffered_data (lp);           /* flush any buffered data */
+    if (was_stepping) {
+        sim_rem_step_line = -1;                     /* Done with step */
+        stat = SCPE_STEP;
+        cmdp = find_cmd ("STEP");
+        stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
+        stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
+        if (!stat_nomessage) {                              /* displaying message status? */
+            fflush (sim_log);
+            cmd_log_start = sim_ftell (sim_log);
+            if (cmdp && (cmdp->message))                    /* special message handler? */
+                cmdp->message (NULL, stat);                 /* let it deal with display */
+            else
+                if (stat >= SCPE_BASE) {                    /* error? */
+                    printf ("%s\r\n", sim_error_text (stat));
+                    if (sim_log)
+                        fprintf (sim_log, "%s\n", sim_error_text (stat));
+                    }
+            fflush (sim_log);
+            sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
+            cbuf[sizeof(cbuf)-1] = '\0';
+            while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
+                tmxr_linemsgf (lp, "%s", cbuf);
+                tmxr_send_buffered_data (lp);
+                }
+            }
         }
-    lp = &sim_rem_con_tmxr.ldsc[i];
-    tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
-    if (sim_rem_read_timeout) {
-        char timeout_buf[32];
-        tmxr_linemsg (lp, "Simulation will resume automatically if input is not received in ");
-        sprintf (timeout_buf, "%d", sim_rem_read_timeout);
-        tmxr_linemsg (lp, timeout_buf);
-        tmxr_linemsg (lp, " seconds\r\n");
+    else {
+        c = tmxr_getc_ln (lp);
+        if (!(TMXR_VALID & c))
+            continue;
+        c = c & ~TMXR_VALID;
+        if (c != sim_int_char)
+            continue;                               /* ^E (the interrupt character) must start console interaction */
+        for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+            lp = &sim_rem_con_tmxr.ldsc[j];
+            if ((i == j) || (!lp->conn))
+                continue;
+            tmxr_linemsgf (lp, "\nRemote Console(%s) Entering Commands\n", lp->ipad);
+            tmxr_send_buffered_data (lp);           /* flush any buffered data */
+            }
+        lp = &sim_rem_con_tmxr.ldsc[i];
+        tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
+        if (sim_rem_read_timeout)
+            tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeout);
         }
     while (1) {
         read_start_time = sim_os_msec();
@@ -537,8 +571,7 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                         sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
                         }
                     strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue due to timeout");
-                    tmxr_linemsg (lp, sim_rem_buf[i]);
-                    tmxr_linemsg (lp, "\r\n");
+                    tmxr_linemsgf (lp, "%s\n", sim_rem_buf[i]);
                     got_command = TRUE;
                     break;
                     }
@@ -593,15 +626,15 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
         if (strlen(sim_rem_buf[i]) >= sizeof(cbuf)) {
             printf ("\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
-            tmxr_linemsg (lp, "\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
+            tmxr_linemsgf (lp, "\nLine too long. Ignored.  Continuing Simulator execution\n");
             tmxr_send_buffered_data (lp);       /* try to flush any buffered data */
             break;
             }
         strcpy (cbuf, sim_rem_buf[i]);
-        if (cbuf[0] == '\0')
-            continue;
         sim_rem_buf_ptr[i] = 0;
         sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
+        if (cbuf[0] == '\0')
+            continue;
         sim_sub_args (cbuf, sizeof(cbuf), argv);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
@@ -614,8 +647,24 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                 if (cmdp->action == &x_continue_cmd)
                     stat = SCPE_OK;
                 else {
-                    if (cmdp->action == &help_cmd)
-                        stat = sim_rem_con_help (cmdp->arg, cptr);
+                    if (cmdp->action == &x_step_cmd) {
+                        steps = 1;                          /* default of 1 instruction */
+                        stat = SCPE_OK;
+                        if (*cptr != 0) {                   /* argument? */
+                             cptr = get_glyph (cptr, gbuf, 0);/* get next glyph */
+                             if (*cptr != 0)                /* should be end */
+                                 stat = SCPE_2MARG;
+                             else {
+                                 steps = (int32) get_uint (gbuf, 10, INT_MAX, &stat);
+                                 if ((stat != SCPE_OK) || (steps <= 0)) /* error? */
+                                     stat = SCPE_ARG;
+                                 }
+                             }
+                        if (stat == SCPE_OK)
+                            stepping = TRUE;
+                        else
+                            cmdp = NULL;
+                        }
                     else
                         stat = cmdp->action (cmdp->arg, cptr);
                     }
@@ -639,11 +688,11 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
         sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
         cbuf[sizeof(cbuf)-1] = '\0';
         while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
-            tmxr_linemsg (lp, cbuf);
-            tmxr_linemsg (lp, "\r");
+            tmxr_linemsgf (lp, "%s", cbuf);
             tmxr_send_buffered_data (lp);
             }
         if (cmdp && (cmdp->action == &x_continue_cmd)) {
+            sim_rem_step_line = -1;                 /* Not stepping */
             tmxr_linemsg (lp, "Simulator Running...");
             tmxr_send_buffered_data (lp);
             for (j=0; j < sim_rem_con_tmxr.lines; j++) {
@@ -655,9 +704,16 @@ for (i=0; i < sim_rem_con_tmxr.lines; i++) {
                 }
             break;
             }
+        if (cmdp && (cmdp->action == &x_step_cmd)) {
+            sim_rem_step_line = i;
+            break;
+            }
         }
     }
-sim_activate_after(uptr, 100000);               /* check again in 100 milliaeconds */
+if (stepping)
+    sim_activate(uptr, steps);                  /* check again after 'steps' instructions */
+else
+    sim_activate_after(uptr, 100000);           /* check again in 100 milliaeconds */
 return SCPE_OK;
 }
 
