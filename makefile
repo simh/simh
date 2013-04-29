@@ -395,6 +395,9 @@ else
   else
     GCC_Path := $(dir $(shell where gcc.exe))
   endif
+  ifeq (rename-build-support,$(shell if exist ..\windows-build-windows-build echo rename-build-support))
+    FIXED_BUILD := $(shell move ..\windows-build-windows-build ..\windows-build >NUL)
+  endif
   GCC_VERSION = $(word 3,$(shell $(GCC) --version))
   COMPILER_NAME = GCC Version: $(GCC_VERSION)
   LTO_EXCLUDE_VERSIONS = 4.5.2
