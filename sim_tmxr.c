@@ -3550,10 +3550,25 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     for (i=0; i<bufsize; ++i) {
         for (j=0; 1; ++j) {
             if (NULL == tn_chars[j].name) {
-                tmxr_buf_debug_char (buf[i]);
+                if (isprint(buf[i]))
+                    tmxr_buf_debug_char (buf[i]);
+                else {
+                    tmxr_buf_debug_char ('_');
+                    if ((buf[i] >= 1) && (buf[i] <= 26)) {
+                        tmxr_buf_debug_char ('^');
+                        tmxr_buf_debug_char ('A' + buf[i] - 1);
+                        }
+                    else {
+                        char octal[8];
+
+                        sprintf(octal, "\\%03o", (u_char)buf[i]);
+                        tmxr_buf_debug_string (octal);
+                        }
+                    tmxr_buf_debug_char ('_');
+                    }
                 break;
                 }
-            if (buf[i] == tn_chars[j].value) {
+            if ((u_char)buf[i] == tn_chars[j].value) {
                 tmxr_buf_debug_char ('_');
                 tmxr_buf_debug_string (tn_chars[j].name);
                 tmxr_buf_debug_char ('_');

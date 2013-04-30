@@ -598,6 +598,9 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         --sim_rem_buf_ptr[i];
                         }
                     break;
+                case '\n':
+                    if (sim_rem_buf_ptr[i] == 0)
+                        break;
                 case '\r':
                     tmxr_linemsg (lp, "\r\n");
                     if (sim_rem_buf_ptr[i]+1 >= sim_rem_buf_size[i]) {
