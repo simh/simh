@@ -349,6 +349,8 @@ static char **sim_rem_buf = NULL;
 static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
 static int32 sim_rem_step_line = -1;        /* step in progress on line # */
+static t_bool sim_log_temp = FALSE;         /* temporary log file active */
+#define SIM_REMOTE_TEMP_LOG "sim_remote_console.log"
 
 /* SET REMOTE CONSOLE command */
 
@@ -628,7 +630,9 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
         if (strlen(sim_rem_buf[i]) >= sizeof(cbuf)) {
-            printf ("\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
+            printf ("\nLine too long. Ignored.  Continuing Simulator execution\n");
+            if (sim_log)
+                fprintf (sim_log, "\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
             tmxr_linemsgf (lp, "\nLine too long. Ignored.  Continuing Simulator execution\n");
             tmxr_send_buffered_data (lp);       /* try to flush any buffered data */
             break;
@@ -642,6 +646,14 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
         sim_switches = 0;                                   /* init switches */
+        if (!sim_log) {                                     /* Not currently logging? */
+            int32 save_quiet = sim_quiet;
+
+            sim_quiet = 0;
+            sim_set_logon (0, SIM_REMOTE_TEMP_LOG);
+            sim_quiet = save_quiet;
+            sim_log_temp = TRUE;
+            }
         cmd_log_start = sim_ftell (sim_log);
         if (!find_cmd (gbuf))                               /* validate command */
             stat = SCPE_UNK;
@@ -696,6 +708,15 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             }
         if (cmdp && (cmdp->action == &x_continue_cmd)) {
             sim_rem_step_line = -1;                 /* Not stepping */
+            if (sim_log_temp) {                     /* If we setup a temporary log, clean it now  */
+                int32 save_quiet = sim_quiet;
+
+                sim_quiet = 0;
+                sim_set_logoff (0, NULL);
+                sim_quiet = save_quiet;
+                remove (SIM_REMOTE_TEMP_LOG);
+                sim_log_temp = FALSE;
+                }
             tmxr_linemsg (lp, "Simulator Running...");
             tmxr_send_buffered_data (lp);
             for (j=0; j < sim_rem_con_tmxr.lines; j++) {
@@ -734,10 +755,6 @@ t_stat r;
 if (flag) {
     r = sim_parse_addr (cptr, NULL, 0, NULL, NULL, 0, NULL, NULL);
     if (r == SCPE_OK) {
-        if (!sim_log) {
-            printf ("Logging must be enabled to activate Remote Console support\n");
-            return SCPE_ARG;
-            }
         if (sim_rem_con_tmxr.master)                    /* already open? */
             sim_set_rem_telnet (0, NULL);               /* close first */
         if (sim_rem_con_tmxr.lines == 0)                /* Ir no connection limit set */
@@ -890,12 +907,6 @@ if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 if (sim_log == NULL)                                    /* no log? */
     return SCPE_OK;
-if (sim_rem_con_tmxr.master) {
-    if (!sim_quiet)
-        printf ("Can't close log, Remote Console is enabled\n");
-    fprintf (sim_log, "Can't close log, Remote Console is enabled\n");
-    return SCPE_ARG;
-    }
 if (!sim_quiet)
     printf ("Log file closed\n");
 fprintf (sim_log, "Log file closed\n");
