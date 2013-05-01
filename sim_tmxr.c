@@ -353,10 +353,44 @@
 
 /* Options */
 
-#define TN_BIN          0                               /* bin */
-#define TN_ECHO         1                               /* echo */
-#define TN_SGA          3                               /* sga */
-#define TN_LINE         34                              /* line mode */
+#define TN_BIN            0                             /* bin */
+#define TN_ECHO           1                             /* echo */
+#define TN_SGA            3                             /* sga */
+#define TN_STATUS         5                             /* option status query */
+#define TN_TIMING         6                             /* Timing Mark */
+#define TN_NAOCRD        10                             /* Output Carriage-Return Disposition */
+#define TN_NAOHTS        11                             /* Output Horizontal Tab Stops */
+#define TN_NAOHTD        12                             /* Output Horizontal Tab Stop Disposition */
+#define TN_NAOFFD        13                             /* Output Forfeed Disposition */
+#define TN_NAOVTS        14                             /* Output Vertical Tab Stop */
+#define TN_NAOVTD        15                             /* Output Vertical Tab Stop Disposition */
+#define TN_NAOLFD        16                             /* Output Linefeed Disposition */
+#define TN_EXTEND        17                             /* Extended Ascii */
+#define TN_LOGOUT        18                             /* Logout */
+#define TN_BM            19                             /* Byte Macro */
+#define TN_DET           20                             /* Data Entry Terminal */
+#define TN_SENDLO        23                             /* Send Location */
+#define TN_TERMTY        24                             /* Terminal Type */
+#define TN_ENDREC        25                             /* Terminal Type */
+#define TN_TUID          26                             /* TACACS User Identification */
+#define TN_OUTMRK        27                             /* Output Marking */
+#define TN_TTYLOC        28                             /* Terminal Location Number */
+#define TN_3270          29                             /* 3270 Regime */
+#define TN_X3PAD         30                             /* X.3 PAD */
+#define TN_NAWS          31                             /* Negotiate About Window Size */
+#define TN_TERMSP        32                             /* Terminal Speed */
+#define TN_TOGFLO        33                             /* Remote Flow Control */
+#define TN_LINE          34                             /* line mode */
+#define TN_XDISPL        35                             /* X Display Location */
+#define TN_ENVIRO        36                             /* Environment */
+#define TN_AUTH          37                             /* Authentication */
+#define TN_ENCRYP        38                             /* Data Encryption */
+#define TN_NEWENV        39                             /* New Environment */
+#define TN_TN3270        40                             /* TN3270 Enhancements */
+#define TN_CHARST        42                             /* CHARSET */
+#define TN_COMPRT        44                             /* Com Port Control */
+#define TN_KERMIT        47                             /* KERMIT */
+
 #define TN_CR           015                             /* carriage return */
 #define TN_LF           012                             /* line feed */
 #define TN_NUL          000                             /* null */
@@ -1280,9 +1314,12 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
                 case TNS_WILL: case TNS_WONT:           /* IAC+WILL/WONT prev */
                     if (tmp == TN_BIN) {                /* BIN? */
-                        if (lp->tsta == TNS_WILL)
+                        if (lp->tsta == TNS_WILL) {
                             lp->dstb = 0;
-                        else lp->dstb = 1;
+                            }
+                        else {
+                            lp->dstb = 1;
+                            }
                         }
                     tmxr_rmvrc (lp, j);                 /* remove it */
                     lp->tsta = TNS_NORM;                /* next normal */
@@ -3514,9 +3551,40 @@ static struct {
         {TN_BIN,    "TN_BIN"},                /* bin */
         {TN_ECHO,   "TN_ECHO"},               /* echo */
         {TN_SGA,    "TN_SGA"},                /* sga */
+        {TN_STATUS, "TN_STATUS"},             /* option status query */
+        {TN_TIMING, "TN_TIMING"},             /* Timing Mark */
+        {TN_NAOCRD, "TN_NAOCRD"},             /* Output Carriage-Return Disposition */
+        {TN_NAOHTS, "TN_NAOHTS"},             /* Output Horizontal Tab Stops */
+        {TN_NAOHTD, "TN_NAOHTD"},             /* Output Horizontal Tab Stop Disposition */
+        {TN_NAOFFD, "TN_NAOFFD"},             /* Output Forfeed Disposition */
+        {TN_NAOVTS, "TN_NAOVTS"},             /* Output Vertical Tab Stop */
+        {TN_NAOVTD, "TN_NAOVTD"},             /* Output Vertical Tab Stop Disposition */
+        {TN_NAOLFD, "TN_NAOLFD"},             /* Output Linefeed Disposition */
+        {TN_EXTEND, "TN_EXTEND"},             /* Extended Ascii */
+        {TN_LOGOUT, "TN_LOGOUT"},             /* Logout */
+        {TN_BM,     "TN_BM"},                 /* Byte Macro */
+        {TN_DET,    "TN_DET"},                /* Data Entry Terminal */
+        {TN_SENDLO, "TN_SENDLO"},             /* Send Location */
+        {TN_TERMTY, "TN_TERMTY"},             /* Terminal Type */
+        {TN_ENDREC, "TN_ENDREC"},             /* Terminal Type */
+        {TN_TUID,   "TN_TUID"},               /* TACACS User Identification */
+        {TN_OUTMRK, "TN_OUTMRK"},             /* Output Marking */
+        {TN_TTYLOC, "TN_TTYLOC"},             /* Terminal Location Number */
+        {TN_3270,   "TN_3270"},               /* 3270 Regime */
+        {TN_X3PAD,  "TN_X3PAD"},              /* X.3 PAD */
+        {TN_NAWS,   "TN_NAWS"},               /* Negotiate About Window Size */
+        {TN_TERMSP, "TN_TERMSP"},             /* Terminal Speed */
+        {TN_TOGFLO, "TN_TOGFLO"},             /* Remote Flow Control */
         {TN_LINE,   "TN_LINE"},               /* line mode */
-        {TN_CR,     "TN_CR"},                 /* carriage return */
-        {TN_LF,     "TN_LF"},                 /* line feed */
+        {TN_XDISPL, "TN_XDISPL"},             /* X Display Location */
+        {TN_ENVIRO, "TN_ENVIRO"},             /* Environment */
+        {TN_AUTH,   "TN_AUTH"},               /* Authentication */
+        {TN_ENCRYP, "TN_ENCRYP"},             /* Data Encryption */
+        {TN_NEWENV, "TN_NEWENV"},             /* New Environment */
+        {TN_TN3270, "TN_TN3270"},             /* TN3270 Enhancements */
+        {TN_CHARST, "TN_CHARST"},             /* CHARSET */
+        {TN_COMPRT, "TN_COMPRT"},             /* Com Port Control */
+        {TN_KERMIT, "TN_KERMIT"},             /* KERMIT */
         {0, NULL}};
 
 static char *tmxr_debug_buf = NULL;
@@ -3539,17 +3607,81 @@ while (*string)
     tmxr_buf_debug_char (*string++);
 }
 
+static void tmxr_buf_debug_telnet_option (u_char chr)
+{
+int j;
+
+for (j=0; 1; ++j) {
+    if (NULL == tn_chars[j].name) {
+        if (isprint(chr))
+            tmxr_buf_debug_char (chr);
+        else {
+            tmxr_buf_debug_char ('_');
+            if ((chr >= 1) && (chr <= 26)) {
+                tmxr_buf_debug_char ('^');
+                tmxr_buf_debug_char ('A' + chr - 1);
+                }
+            else {
+                char octal[8];
+
+                sprintf(octal, "\\%03o", (u_char)chr);
+                tmxr_buf_debug_string (octal);
+                }
+            tmxr_buf_debug_char ('_');
+            }
+        break;
+        }
+    if ((u_char)chr == tn_chars[j].value) {
+        tmxr_buf_debug_char ('_');
+        tmxr_buf_debug_string (tn_chars[j].name);
+        tmxr_buf_debug_char ('_');
+        break;
+        }
+    }
+}
+
+static int tmxr_buf_debug_telnet_options (char *buf, int bufsize)
+{
+int optsize = 2;
+
+tmxr_buf_debug_telnet_option ((u_char)buf[0]);
+tmxr_buf_debug_telnet_option ((u_char)buf[1]);
+switch ((u_char)buf[1]) {
+    case TN_IAC:
+    default:
+        return optsize;
+        break;
+    case TN_WILL:
+    case TN_WONT:
+    case TN_DO:
+    case TN_DONT:
+        ++optsize;
+        tmxr_buf_debug_telnet_option ((u_char)buf[2]);
+        break;
+    }
+return optsize;
+}
+
 void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize)
 {
 if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
-    int i, j;
+    int i;
 
     tmxr_debug_buf_used = 0;
     if (tmxr_debug_buf)
         tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
     for (i=0; i<bufsize; ++i) {
-        for (j=0; 1; ++j) {
-            if (NULL == tn_chars[j].name) {
+        switch ((u_char)buf[i]) {
+            case TN_IAC:
+                i += (tmxr_buf_debug_telnet_options (&buf[i], bufsize-i) - 1);
+                break;
+            case TN_CR:
+                tmxr_buf_debug_string ("_TN_CR_");
+                break;
+            case TN_LF:
+                tmxr_buf_debug_string ("_TN_LF_");
+                break;
+            default:
                 if (isprint(buf[i]))
                     tmxr_buf_debug_char (buf[i]);
                 else {
@@ -3567,13 +3699,6 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
                     tmxr_buf_debug_char ('_');
                     }
                 break;
-                }
-            if ((u_char)buf[i] == tn_chars[j].value) {
-                tmxr_buf_debug_char ('_');
-                tmxr_buf_debug_string (tn_chars[j].name);
-                tmxr_buf_debug_char ('_');
-                break;
-                }
             }
         }
     sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
