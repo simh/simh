@@ -350,7 +350,7 @@ static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* r
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
 static int32 sim_rem_step_line = -1;        /* step in progress on line # */
 static t_bool sim_log_temp = FALSE;         /* temporary log file active */
-#define SIM_REMOTE_TEMP_LOG "sim_remote_console.log"
+static char sim_rem_con_temp_name[PATH_MAX+1];
 
 /* SET REMOTE CONSOLE command */
 
@@ -650,7 +650,8 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             int32 save_quiet = sim_quiet;
 
             sim_quiet = 0;
-            sim_set_logon (0, SIM_REMOTE_TEMP_LOG);
+            sprintf (sim_rem_con_temp_name, "sim_remote_console_%d.temporary_log", (int)getpid());
+            sim_set_logon (0, sim_rem_con_temp_name);
             sim_quiet = save_quiet;
             sim_log_temp = TRUE;
             }
@@ -714,7 +715,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 sim_quiet = 0;
                 sim_set_logoff (0, NULL);
                 sim_quiet = save_quiet;
-                remove (SIM_REMOTE_TEMP_LOG);
+                remove (sim_rem_con_temp_name);
                 sim_log_temp = FALSE;
                 }
             tmxr_linemsg (lp, "Simulator Running...");

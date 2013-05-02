@@ -118,6 +118,7 @@
 #undef PACKED                       /* avoid macro name collision */
 #undef ERROR                        /* avoid macro name collision */
 #undef MEM_MAPPED                   /* avoid macro name collision */
+#include <process.h>
 #endif
 
 /* avoid macro names collisions */

@@ -3146,6 +3146,8 @@ return SCPE_OK;
 
 t_stat set_default_cmd (int32 flg, char *cptr)
 {
+if (sim_is_running)
+    return SCPE_INVREM;
 if ((!cptr) || (*cptr == 0))
     return SCPE_2FARG;
 sim_trim_endspc(cptr);
