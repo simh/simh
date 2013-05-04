@@ -763,6 +763,57 @@ extern int32 sim_asynch_inst_latency;
     else                                                          \
         (void)0
 #endif /* !defined(SIM_ASYNCH_MUX) && !defined(SIM_ASYNCH_CLOCKS) */
+#if !defined(SIM_ASYNCH_MUX) && defined(SIM_ASYNCH_CLOCKS)
+#define AIO_CANCEL(uptr)                                          \
+    if ((uptr)->a_cancel)                                         \
+        (uptr)->a_cancel (uptr);                                  \
+    else {                                                        \
+        if (AIO_IS_ACTIVE (uptr)) {                               \
+            UNIT *cptr, *nptr;                                    \
+            AIO_UPDATE_QUEUE;                                     \
+            pthread_mutex_lock (&sim_timer_lock);                 \
+            nptr = QUEUE_LIST_END;                                \
+            if ((uptr) == sim_wallclock_queue) {                  \
+                sim_wallclock_queue = (uptr)->next;               \
+                (uptr)->next = NULL;                              \
+                }                                                 \
+            else                                                  \
+                for (cptr = sim_wallclock_queue;                  \
+                    (cptr != QUEUE_LIST_END);                     \
+                    cptr = cptr->next)                            \
+                    if (cptr->next == (uptr)) {                   \
+                        cptr->next = (uptr)->next;                \
+                        nptr = cptr;                              \
+                        (uptr)->next = NULL;                      \
+                        break;                                    \
+                        }                                         \
+            if (nptr == QUEUE_LIST_END) {                         \
+                sim_timer_event_canceled = TRUE;                  \
+                pthread_cond_signal (&sim_timer_wake);            \
+                }                                                 \
+            if ((uptr)->next == NULL)                             \
+                (uptr)->a_due_time = (uptr)->a_usec_delay = 0;    \
+            else {                                                \
+                nptr = QUEUE_LIST_END;                            \
+                if ((uptr) == sim_clock_cosched_queue) {          \
+                    sim_clock_cosched_queue = (uptr)->next;       \
+                    (uptr)->next = NULL;                          \
+                    }                                             \
+                else                                              \
+                    for (cptr = sim_clock_cosched_queue;          \
+                        (cptr != QUEUE_LIST_END);                 \
+                        cptr = cptr->next)                        \
+                        if (cptr->next == (uptr)) {               \
+                            cptr->next = (uptr)->next;            \
+                            nptr = cptr;                          \
+                            (uptr)->next = NULL;                  \
+                            break;                                \
+                            }                                     \
+                }                                                 \
+            pthread_mutex_unlock (&sim_timer_lock);               \
+            }                                                     \
+        }
+#endif
 #if defined(SIM_ASYNCH_MUX) && !defined(SIM_ASYNCH_CLOCKS)
 #define AIO_CANCEL(uptr)                                          \
     if ((uptr)->a_cancel)                                         \
@@ -832,6 +883,8 @@ extern int32 sim_asynch_inst_latency;
             pthread_mutex_unlock (&sim_timer_lock);               \
             }                                                     \
         }
+#endif
+#if defined(SIM_ASYNCH_CLOCKS)
 #define AIO_RETURN_TIME(uptr)                                     \
     if (1) {                                                      \
         pthread_mutex_lock (&sim_timer_lock);                     \

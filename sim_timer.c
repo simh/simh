@@ -1427,8 +1427,8 @@ if (1) {
     }
 pthread_mutex_lock (&sim_timer_lock);
 sim_wallclock_entry = uptr;
-pthread_mutex_unlock (&sim_timer_lock);
 pthread_cond_signal (&sim_timer_wake);                  /* wake the timer thread to deal with it */
+pthread_mutex_unlock (&sim_timer_lock);
 return SCPE_OK;
 #else
 return _sim_activate (uptr, inst_delay);                /* queue it now */
@@ -1451,18 +1451,26 @@ else
     if (sim_asynch_enabled && sim_asynch_timer) {
         if (!sim_is_active (uptr)) {               /* already active? */
 #if defined(SIM_ASYNCH_IO) && defined(SIM_ASYNCH_CLOCKS)
-            sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule() - queueing %s for clock co-schedule\n", sim_uname (uptr));
-            pthread_mutex_lock (&sim_timer_lock);
-            uptr->next = sim_clock_cosched_queue;
-            sim_clock_cosched_queue = uptr;
-            pthread_mutex_unlock (&sim_timer_lock);
+            if ((sim_calb_tmr != -1) &&
+                (rtc_elapsed[sim_calb_tmr ] >= sim_idle_stable))  {
+                sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule() - queueing %s for clock co-schedule\n", sim_uname (uptr));
+                pthread_mutex_lock (&sim_timer_lock);
+                uptr->next = sim_clock_cosched_queue;
+                sim_clock_cosched_queue = uptr;
+                pthread_mutex_unlock (&sim_timer_lock);
+                return SCPE_OK;
+                }
+            else {
 #else
-            int32 t;
-
-            t = sim_activate_time (sim_clock_unit);
-            return sim_activate (uptr, t? t - 1: interval);
+            if (1) {
 #endif
+                int32 t;
+
+                t = sim_activate_time (sim_clock_unit);
+                return sim_activate (uptr, t? t - 1: interval);
+                }
             }
+        sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule() - %s is already active\n", sim_uname (uptr));
         return SCPE_OK;
         }
     else {
