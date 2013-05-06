@@ -816,7 +816,7 @@ if (mp->master) {
 
     if (newsock != INVALID_SOCKET) {                    /* got a live one? */
         sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
-        tmxr_debug_trace (mp, msg);
+        tmxr_debug_connect (mp, msg);
         op = mp->lnorder;                               /* get line connection order list pointer */
         i = mp->lines;                                  /* play it safe in case lines == 0 */
         ++mp->sessions;                                 /* count the new session */
@@ -836,7 +836,7 @@ if (mp->master) {
 
         if (i >= mp->lines) {                           /* all busy? */
             tmxr_msg (newsock, "All connections busy\r\n");
-            tmxr_debug_trace (mp, "tmxr_poll_conn() - All connections busy");
+            tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
             sim_close_sock (newsock, 0);
             free (address);
             }
@@ -872,8 +872,12 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 lp->ipad = realloc (lp->ipad, 1+strlen (lp->destination));
                 strcpy (lp->ipad, lp->destination);
                 lp->cnms = sim_os_msec ();
+                sprintf (msg, "tmxr_poll_conn() - Line Connection to %s established", lp->destination);
+                tmxr_debug_connect_line (lp, msg);
                 break;
             case -1:                                /* failed connection */
+                sprintf (msg, "tmxr_poll_conn() - Line Connection to %s failed", lp->destination);
+                tmxr_debug_connect_line (lp, msg);
                 tmxr_reset_ln (lp);                 /* retry */
                 break;
             }
@@ -887,7 +891,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
 
         if (newsock != INVALID_SOCKET) {                /* got a live one? */
             sprintf (msg, "tmxr_poll_conn() - Line Connection from %s", address);
-            tmxr_debug_trace_line (lp, msg);
+            tmxr_debug_connect_line (lp, msg);
             ++mp->sessions;                             /* count the new session */
 
             if (lp->destination) {                      /* Virtual Null Modem Cable? */
@@ -896,12 +900,14 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
                     tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
                     sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
-                    tmxr_debug_trace_line (lp, msg);
+                    tmxr_debug_connect_line (lp, msg);
                     sim_close_sock (newsock, 0);
                     free (address);
                     continue;                           /* Move on to next line */
                     }
                 if (lp->connecting) {
+                    sprintf (msg, "tmxr_poll_conn() - aborting outgoing line connection attempt to: %s", lp->destination);
+                    tmxr_debug_connect_line (lp, msg);
                     sim_close_sock (lp->connecting, 0); /* abort our as yet unconnnected socket */
                     lp->connecting = 0;
                     }
@@ -921,7 +927,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 }
             else {
                 tmxr_msg (newsock, "Line connection busy\r\n");
-                tmxr_debug_trace_line (lp, "tmxr_poll_conn() - Line connection busy");
+                tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection busy");
                 sim_close_sock (newsock, 0);
                 free (address);
                 }
@@ -939,8 +945,11 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
     /* Check for needed outgoing connection initiation */
 
     if (lp->destination && (!lp->sock) && (!lp->connecting) && (!lp->serport) && 
-        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR)))
+        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR))) {
+        sprintf (msg, "tmxr_poll_conn() - establishing outgoing connection to: %s", lp->destination);
+        tmxr_debug_connect_line (lp, msg);
         lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+        }
 
     }
 
@@ -958,12 +967,17 @@ return -1;                                              /* no new connections ma
 
 static t_stat tmxr_reset_ln_ex (TMLN *lp, t_bool closeserial)
 {
+char msg[512];
+
 tmxr_debug_trace_line (lp, "tmxr_reset_ln_ex)");
 
 if (lp->txlog)
     fflush (lp->txlog);                                 /* flush log */
 
 tmxr_send_buffered_data (lp);                           /* send any buffered data */
+
+sprintf (msg, "tmxr_reset_ln_ex(%s)", closeserial ? "TRUE" : "FALSE");
+tmxr_debug_connect_line (lp, msg);
 
 if (lp->serport) {
     if (closeserial) {
@@ -995,10 +1009,15 @@ else                                                    /* Telnet connection */
 free(lp->ipad);
 lp->ipad = NULL;
 if ((lp->destination) && (!lp->serport)) {
-    if (lp->connecting)
+    if (lp->connecting) {
         sim_close_sock (lp->connecting, 0);
-    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR))
+        lp->connecting = 0;
+        }
+    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
+        sprintf (msg, "tmxr_reset_ln_ex() - connecting to %s", lp->destination);
+        tmxr_debug_connect_line (lp, msg);
         lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+        }
     }
 tmxr_init_line (lp);                                /* initialize line state */
 /* Revise the unit's connect string to reflect the current attachments */
@@ -1012,6 +1031,7 @@ return SCPE_OK;
 t_stat tmxr_close_ln (TMLN *lp)
 {
 tmxr_debug_trace_line (lp, "tmxr_close_ln()");
+tmxr_debug_connect_line (lp, "tmxr_close_ln()");
 return tmxr_reset_ln_ex (lp, TRUE);
 }
 
@@ -1144,8 +1164,13 @@ if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on mo
         else {
             if ((lp->destination) &&                    /* Virtual Null Modem Cable */
                 ((bits_to_set ^ before_modem_bits) &    /* and DTR being Raised */
-                 TMXR_MDM_DTR))
+                 TMXR_MDM_DTR)) {
+                char msg[512];
+
+                sprintf (msg, "tmxr_set_get_modem_bits() - establishing outgoing connection to: %s", lp->destination);
+                tmxr_debug_connect_line (lp, msg);
                 lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+                }
             }
         }
     return SCPE_OK;

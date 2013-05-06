@@ -305,6 +305,8 @@ static TMLX vh_parm[VH_MUXES * VH_LINES_ALLOC] = { { 0 } };
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
+#define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
@@ -314,6 +316,8 @@ DEBTAB vh_debug[] = {
   {"TRC",    DBG_TRC},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"MDM",    DBG_MDM},
+  {"CON",    DBG_CON},
   {"TRC",    DBG_TRC},
   {"ASY",    DBG_ASY},
   {0}
