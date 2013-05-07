@@ -1250,16 +1250,11 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
             }
         else
             sim_activate (uptr, inst_delay);
-        continue;
         }
-    else /* Something wants to adjust the queue since the wait condition was signaled */
+    else {/* Something wants to adjust the queue since the wait condition was signaled */
         if (sim_timer_event_canceled)
             sim_timer_event_canceled = FALSE;           /* reset flag and continue */
-        else
-            if (sim_wallclock_entry == NULL) {          /* nothing to insert? */
-                sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - condition wakeup without new entry\n");
-                break;                                  /* stop processing entries */
-                }
+        }
     }
 pthread_mutex_unlock (&sim_timer_lock);
 

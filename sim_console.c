@@ -541,6 +541,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         c = c & ~TMXR_VALID;
         if (c != sim_int_char)
             continue;                               /* ^E (the interrupt character) must start console interaction */
+        sim_is_running = 0;
         sim_stop_timer_services ();
         for (j=0; j < sim_rem_con_tmxr.lines; j++) {
             lp = &sim_rem_con_tmxr.ldsc[j];
@@ -728,6 +729,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 tmxr_linemsg (lp, "Simulator Running...");
                 tmxr_send_buffered_data (lp);
                 }
+            sim_is_running = 1;
             sim_start_timer_services ();
             break;
             }
