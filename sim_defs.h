@@ -749,7 +749,24 @@ extern int32 sim_asynch_inst_latency;
 /* It is primarily used only used in debugging messages */
 #define AIO_TLS
 #endif
-
+#define AIO_QUEUE_CHECK(que, lock)                                  \
+    if (1) {                                                        \
+            UNIT *_cptr;                                            \
+            if (lock)                                               \
+                pthread_mutex_lock (lock);                          \
+            for (_cptr = que;                                       \
+                (_cptr != QUEUE_LIST_END);                          \
+                _cptr = _cptr->next)                                \
+                if (!_cptr->next) {                                 \
+                    if (sim_deb) {                                  \
+                        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Corruption detected\n");\
+                        fclose(sim_deb);                            \
+                        }                                           \
+                    abort();                                        \
+                    }                                               \
+            if (lock)                                               \
+                pthread_mutex_unlock (lock);                        \
+        } else (void)0
 #define AIO_MAIN_THREAD (pthread_equal ( pthread_self(), sim_asynch_main_threadid ))
 #define AIO_LOCK                                                  \
     pthread_mutex_lock(&sim_asynch_lock)
@@ -768,14 +785,16 @@ extern int32 sim_asynch_inst_latency;
     if ((uptr)->a_cancel)                                         \
         (uptr)->a_cancel (uptr);                                  \
     else {                                                        \
-        if (AIO_IS_ACTIVE (uptr)) {                               \
-            UNIT *cptr, *nptr;                                    \
+        if ((uptr)->next) {                                       \
+            UNIT *cptr;                                           \
             AIO_UPDATE_QUEUE;                                     \
             pthread_mutex_lock (&sim_timer_lock);                 \
-            nptr = QUEUE_LIST_END;                                \
             if ((uptr) == sim_wallclock_queue) {                  \
                 sim_wallclock_queue = (uptr)->next;               \
                 (uptr)->next = NULL;                              \
+                sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Timer Event for %s\n", sim_uname(uptr));\
+                sim_timer_event_canceled = TRUE;                  \
+                pthread_cond_signal (&sim_timer_wake);            \
                 }                                                 \
             else                                                  \
                 for (cptr = sim_wallclock_queue;                  \
@@ -783,18 +802,13 @@ extern int32 sim_asynch_inst_latency;
                     cptr = cptr->next)                            \
                     if (cptr->next == (uptr)) {                   \
                         cptr->next = (uptr)->next;                \
-                        nptr = cptr;                              \
                         (uptr)->next = NULL;                      \
+                        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Timer Event for %s\n", sim_uname(uptr));\
                         break;                                    \
                         }                                         \
-            if (nptr == QUEUE_LIST_END) {                         \
-                sim_timer_event_canceled = TRUE;                  \
-                pthread_cond_signal (&sim_timer_wake);            \
-                }                                                 \
             if ((uptr)->next == NULL)                             \
                 (uptr)->a_due_time = (uptr)->a_usec_delay = 0;    \
             else {                                                \
-                nptr = QUEUE_LIST_END;                            \
                 if ((uptr) == sim_clock_cosched_queue) {          \
                     sim_clock_cosched_queue = (uptr)->next;       \
                     (uptr)->next = NULL;                          \
@@ -805,10 +819,18 @@ extern int32 sim_asynch_inst_latency;
                         cptr = cptr->next)                        \
                         if (cptr->next == (uptr)) {               \
                             cptr->next = (uptr)->next;            \
-                            nptr = cptr;                          \
                             (uptr)->next = NULL;                  \
                             break;                                \
                             }                                     \
+                if ((uptr)->next == NULL) {                       \
+                    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Clock Coscheduling Event for %s\n", sim_uname(uptr));\
+                    }                                             \
+                }                                                 \
+            while (sim_timer_event_canceled) {                    \
+                pthread_mutex_unlock (&sim_timer_lock);           \
+                sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Waiting for Timer Event cancelation for %s\n", sim_uname(uptr));\
+                sim_os_ms_sleep (0);                              \
+                pthread_mutex_lock (&sim_timer_lock);             \
                 }                                                 \
             pthread_mutex_unlock (&sim_timer_lock);               \
             }                                                     \
@@ -838,14 +860,16 @@ extern int32 sim_asynch_inst_latency;
             sim_tmxr_poll_count -= (uptr)->a_poll_waiter_count;   \
             (uptr)->a_poll_waiter_count = 0;                      \
             }                                                     \
-        if (AIO_IS_ACTIVE (uptr)) {                               \
-            UNIT *cptr, *nptr;                                    \
+        if ((uptr)->next) {                                       \
+            UNIT *cptr;                                           \
             AIO_UPDATE_QUEUE;                                     \
             pthread_mutex_lock (&sim_timer_lock);                 \
-            nptr = QUEUE_LIST_END;                                \
             if ((uptr) == sim_wallclock_queue) {                  \
                 sim_wallclock_queue = (uptr)->next;               \
                 (uptr)->next = NULL;                              \
+                sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Timer Event for %s\n", sim_uname(uptr));\
+                sim_timer_event_canceled = TRUE;                  \
+                pthread_cond_signal (&sim_timer_wake);            \
                 }                                                 \
             else                                                  \
                 for (cptr = sim_wallclock_queue;                  \
@@ -853,18 +877,13 @@ extern int32 sim_asynch_inst_latency;
                     cptr = cptr->next)                            \
                     if (cptr->next == (uptr)) {                   \
                         cptr->next = (uptr)->next;                \
-                        nptr = cptr;                              \
                         (uptr)->next = NULL;                      \
+                        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Timer Event for %s\n", sim_uname(uptr));\
                         break;                                    \
                         }                                         \
-            if (nptr == QUEUE_LIST_END) {                         \
-                sim_timer_event_canceled = TRUE;                  \
-                pthread_cond_signal (&sim_timer_wake);            \
-                }                                                 \
             if ((uptr)->next == NULL)                             \
                 (uptr)->a_due_time = (uptr)->a_usec_delay = 0;    \
             else {                                                \
-                nptr = QUEUE_LIST_END;                            \
                 if ((uptr) == sim_clock_cosched_queue) {          \
                     sim_clock_cosched_queue = (uptr)->next;       \
                     (uptr)->next = NULL;                          \
@@ -875,10 +894,18 @@ extern int32 sim_asynch_inst_latency;
                         cptr = cptr->next)                        \
                         if (cptr->next == (uptr)) {               \
                             cptr->next = (uptr)->next;            \
-                            nptr = cptr;                          \
                             (uptr)->next = NULL;                  \
                             break;                                \
                             }                                     \
+                if ((uptr)->next == NULL) {                       \
+                    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Clock Coscheduling Event for %s\n", sim_uname(uptr));\
+                    }                                             \
+                }                                                 \
+            while (sim_timer_event_canceled) {                    \
+                pthread_mutex_unlock (&sim_timer_lock);           \
+                sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Waiting for Timer Event cancelation for %s\n", sim_uname(uptr));\
+                sim_os_ms_sleep (0);                              \
+                pthread_mutex_lock (&sim_timer_lock);             \
                 }                                                 \
             pthread_mutex_unlock (&sim_timer_lock);               \
             }                                                     \
@@ -988,8 +1015,8 @@ extern int32 sim_asynch_inst_latency;
       do                                                                         \
         q = AIO_QUEUE_VAL;                                                       \
         while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));                           \
-      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Found Asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);\
       while (q != QUEUE_LIST_END) {   /* List !Empty */                          \
+        sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Migrating Asynch event for %s after %d instructions\n", sim_uname(q), q->a_event_time);\
         uptr = q;                                                                \
         q = q->a_next;                                                           \
         uptr->a_next = NULL;        /* hygiene */                                \
@@ -1014,8 +1041,8 @@ extern int32 sim_asynch_inst_latency;
       } else {                                                                   \
         UNIT *q, *qe;                                                            \
         ouptr->a_event_time = event_time;                                        \
-        uptr->a_activate_call = caller;                                          \
-        uptr->a_next = QUEUE_LIST_END;                  /* Mark as on list */    \
+        ouptr->a_activate_call = caller;                                         \
+        ouptr->a_next = QUEUE_LIST_END;                 /* Mark as on list */    \
         do {                                                                     \
           do                                                                     \
             q = AIO_QUEUE_VAL;                                                   \
@@ -1035,6 +1062,39 @@ extern int32 sim_asynch_inst_latency;
         }                                                                        \
       return SCPE_OK;                                                            \
     } else (void)0
+#define AIO_ACTIVATE_LIST(caller, list, event_time)                              \
+    if (1) {                                                                     \
+      UNIT *ouptr, *q, *qe;                                                      \
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch events for %s after %d instructions\n", sim_uname(list), event_time);\
+      for (qe=(list); qe->next != QUEUE_LIST_END;) {                             \
+          qe->a_event_time = event_time;                                         \
+          qe->a_activate_call = caller;                                          \
+          qe->a_next = qe->next;                                                 \
+          qe->next = NULL;                                                       \
+          qe = qe->a_next;                                                       \
+          }                                                                      \
+      qe->a_event_time = event_time;                                             \
+      qe->a_activate_call = caller;                                              \
+      qe->a_next = QUEUE_LIST_END;                                               \
+      qe->next = NULL;                                                           \
+      ouptr = (list);                                                            \
+      do {                                                                       \
+        do                                                                       \
+          q = AIO_QUEUE_VAL;                                                     \
+          while (q != AIO_QUEUE_SET(QUEUE_LIST_END, q));/* Grab current list */  \
+        for (qe = ouptr; qe->a_next != QUEUE_LIST_END; qe = qe->a_next);         \
+        qe->a_next = q;                               /* append current list */  \
+        do                                                                       \
+          q = AIO_QUEUE_VAL;                                                     \
+          while (q != AIO_QUEUE_SET(ouptr, q));                                  \
+        ouptr = q;                                                               \
+        } while (ouptr != QUEUE_LIST_END);                                       \
+      sim_asynch_check = 0;                             /* try to force check */ \
+      if (sim_idle_wait) {                                                       \
+        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(ouptr), event_time);\
+        pthread_cond_signal (&sim_asynch_wake);                                  \
+        }                                                                        \
+      } else (void)0
 #else /* !USE_AIO_INTRINSICS */
 /* This approach uses a pthread mutex to manage access to the link list     */
 /* head sim_asynch_queue.  It will always work, but may be slower than the  */
@@ -1098,8 +1158,8 @@ extern int32 sim_asynch_inst_latency;
     } else (void)0
 #define AIO_ACTIVATE(caller, uptr, event_time)                         \
     if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) { \
-      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "queueing asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);\
-      AIO_UNLOCK;                                                      \
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch event for %s after %d instructions\n", sim_uname(uptr), event_time);\
+      AIO_LOCK;                                                        \
       if (uptr->a_next) {                       /* already queued? */  \
         uptr->a_activate_call = sim_activate_abs;                      \
       } else {                                                         \
@@ -1108,12 +1168,38 @@ extern int32 sim_asynch_inst_latency;
         uptr->a_activate_call = caller;                                \
         sim_asynch_queue = uptr;                                       \
       }                                                                \
-      if (sim_idle_wait)                                               \
+      if (sim_idle_wait) {                                             \
+        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(uptr), event_time);\
         pthread_cond_signal (&sim_asynch_wake);                        \
+        }                                                              \
       AIO_UNLOCK;                                                      \
       sim_asynch_check = 0;                                            \
       return SCPE_OK;                                                  \
     } else (void)0
+#define AIO_ACTIVATE_LIST(caller, list, event_time)                              \
+    if (1) {                                                                     \
+      UNIT *qe;                                                                  \
+      sim_debug (SIM_DBG_AIO_QUEUE, sim_dflt_dev, "Queueing Asynch events for %s after %d instructions\n", sim_uname(list), event_time);\
+      for (qe=list; qe->next != QUEUE_LIST_END;) {                               \
+          qe->a_event_time = event_time;                                         \
+          qe->a_activate_call = caller;                                          \
+          qe->a_next = qe->next;                                                 \
+          qe->next = NULL;                                                       \
+          qe = qe->a_next;                                                       \
+          }                                                                      \
+      qe->a_event_time = event_time;                                             \
+      qe->a_activate_call = caller;                                              \
+      qe->next = NULL;                                                           \
+      AIO_LOCK;                                                                  \
+      qe->a_next = sim_asynch_queue;                                             \
+      sim_asynch_queue = list;                                                   \
+      sim_asynch_check = 0;                             /* try to force check */ \
+      if (sim_idle_wait) {                                                       \
+        sim_debug (TIMER_DBG_IDLE, &sim_timer_dev, "waking due to event on %s after %d instructions\n", sim_uname(list), event_time);\
+        pthread_cond_signal (&sim_asynch_wake);                                  \
+        }                                                                        \
+      AIO_UNLOCK;                                                                \
+      } else (void)0
 #endif /* USE_AIO_INTRINSICS */
 #define AIO_VALIDATE if (!pthread_equal ( pthread_self(), sim_asynch_main_threadid )) abort()
 #define AIO_CHECK_EVENT                                                \

@@ -2934,8 +2934,8 @@ else {
         }
     }
 if (sim_clock_cosched_queue != QUEUE_LIST_END) {
-    fprintf (st, "%s clock co-schedule event queue status, time = %.0f\n",
-             sim_name, sim_time);
+    fprintf (st, "%s clock (%s) co-schedule event queue status, time = %.0f\n",
+             sim_name, sim_uname(sim_clock_unit), sim_time);
     for (uptr = sim_clock_cosched_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
             fprintf (st, "  %s", sim_dname (dptr));
@@ -3934,6 +3934,8 @@ char *sim_uname (UNIT *uptr)
 DEVICE *d = find_dev_from_unit(uptr);
 static AIO_TLS char uname[CBUFSIZE];
 
+if (!d)
+    return "";
 if (d->numunits == 1)
     return sim_dname (d);
 sprintf (uname, "%s%d", sim_dname (d), (int)(uptr-d->units));
@@ -6336,28 +6338,39 @@ AIO_CANCEL(uptr);
 AIO_UPDATE_QUEUE;
 if (sim_clock_queue == QUEUE_LIST_END)
     return SCPE_OK;
+sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Canceling Event for %s\n", sim_uname(uptr));
 UPDATE_SIM_TIME;                                        /* update sim time */
 if (!sim_is_active (uptr))
     return SCPE_OK;
 nptr = QUEUE_LIST_END;
 
-if (sim_clock_queue == uptr)
+if (sim_clock_queue == uptr) {
     nptr = sim_clock_queue = uptr->next;
+    uptr->next = NULL;                                  /* hygiene */
+    }
 else {
     for (cptr = sim_clock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
         if (cptr->next == uptr) {
             nptr = cptr->next = uptr->next;
+            uptr->next = NULL;                          /* hygiene */
             break;                                      /* end queue scan */
             }
         }
     }
 if (nptr != QUEUE_LIST_END)
-    nptr->time = nptr->time + uptr->time;
-uptr->next = NULL;                                      /* hygiene */
-uptr->time = 0;
+    nptr->time += (uptr->next) ? 0 : uptr->time;
+if (!uptr->next)
+    uptr->time = 0;
 if (sim_clock_queue != QUEUE_LIST_END)
     sim_interval = sim_clock_queue->time;
 else sim_interval = noqueue_time = NOQUEUE_WAIT;
+if (sim_is_active(uptr)) {
+    if (sim_deb) {
+        sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Cancel failed for %s\n", sim_uname(uptr));
+        fclose(sim_deb);
+        }
+    abort ();
+    }
 return SCPE_OK;
 }
 
@@ -6413,7 +6426,8 @@ return 0;
 
 double sim_gtime (void)
 {
-UPDATE_SIM_TIME;
+if (AIO_MAIN_THREAD)
+    UPDATE_SIM_TIME;
 return sim_time;
 }
 

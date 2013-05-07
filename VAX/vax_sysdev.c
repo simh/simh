@@ -1580,8 +1580,10 @@ if ((tmr_inc[tmr] == TMR_INC) && (tmr_time > clk_time)) {
 
     tmr_inc[tmr] = (uint32) (((double) clk_time * TMR_INC) / tmr_poll);
     tmr_time = clk_time;
+    sim_clock_coschedule (&sysd_unit[tmr], tmr_time);
     }
-sim_activate (&sysd_unit[tmr], tmr_time);
+else
+    sim_activate (&sysd_unit[tmr], tmr_time);
 return;
 }
 

@@ -101,7 +101,7 @@ static uint32 sim_throt_val = 0;
 static uint32 sim_throt_state = 0;
 static uint32 sim_throt_sleep_time = 0;
 static int32 sim_throt_wait = 0;
-static UNIT *sim_clock_unit = NULL;
+UNIT *sim_clock_unit = NULL;
 t_bool sim_asynch_timer = 
 #if defined (SIM_ASYNCH_CLOCKS)
                                  TRUE;
@@ -1216,7 +1216,7 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
     if (sim_wallclock_queue == QUEUE_LIST_END)
         sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - waiting forever\n");
     else
-        sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - waiting for %.0f usecs until %.6f\n", wait_usec, sim_wallclock_queue->a_due_time);
+        sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - waiting for %.0f usecs until %.6f for %s\n", wait_usec, sim_wallclock_queue->a_due_time, sim_uname(sim_wallclock_queue));
     if ((wait_usec <= 0.0) || 
         (0 != pthread_cond_timedwait (&sim_timer_wake, &sim_timer_lock, &due_time))) {
         if (sim_wallclock_queue == QUEUE_LIST_END)      /* queue empty? */
@@ -1238,21 +1238,28 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
             }
         sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - slept %.0fms - activating(%s,%d)\n", 
                    1000.0*(_timespec_to_double (&stop_time)-_timespec_to_double (&start_time)), sim_uname(uptr), inst_delay);
-        sim_activate (uptr, inst_delay);
-        if (sim_clock_unit == uptr)
-            while (sim_clock_cosched_queue != QUEUE_LIST_END) {
-                uptr = sim_clock_cosched_queue;
-                sim_clock_cosched_queue = uptr->next;
-                uptr->next = NULL;
-                sim_activate (uptr, inst_delay);
-                }
+        if (sim_clock_unit == uptr) {
+            /*
+             * Some devices may depend on executing during the same instruction as the
+             * clock tick event.  We link the clock coschedule queue to the clock tick
+             * and then insert that list in the asynch event queue in a single operation
+             */
+            uptr->next = sim_clock_cosched_queue;
+            sim_clock_cosched_queue = QUEUE_LIST_END;
+            AIO_ACTIVATE_LIST(sim_activate, uptr, inst_delay);
+            }
+        else
+            sim_activate (uptr, inst_delay);
+        continue;
         }
-    else /* Something wants to adjust the queue */
+    else /* Something wants to adjust the queue since the wait condition was signaled */
         if (sim_timer_event_canceled)
             sim_timer_event_canceled = FALSE;           /* reset flag and continue */
         else
-            if (sim_wallclock_entry == NULL)            /* nothing to insert? */
+            if (sim_wallclock_entry == NULL) {          /* nothing to insert? */
+                sim_debug (DBG_TIM, &sim_timer_dev, "_timer_thread() - condition wakeup without new entry\n");
                 break;                                  /* stop processing entries */
+                }
     }
 pthread_mutex_unlock (&sim_timer_lock);
 
@@ -1426,9 +1433,16 @@ if (1) {
                sim_uname(uptr), uptr->a_due_time);
     }
 pthread_mutex_lock (&sim_timer_lock);
+while (sim_wallclock_entry) {
+    sim_debug (DBG_TIM, &sim_timer_dev, "sim_timer_activate_after() - queue insert entry %s busy waiting for 1ms\n", 
+               sim_uname(sim_wallclock_entry));
+    pthread_mutex_unlock (&sim_timer_lock);
+    sim_os_ms_sleep (1);
+    pthread_mutex_lock (&sim_timer_lock);
+    }
 sim_wallclock_entry = uptr;
-pthread_cond_signal (&sim_timer_wake);                  /* wake the timer thread to deal with it */
 pthread_mutex_unlock (&sim_timer_lock);
+pthread_cond_signal (&sim_timer_wake);                  /* wake the timer thread to deal with it */
 return SCPE_OK;
 #else
 return _sim_activate (uptr, inst_delay);                /* queue it now */
