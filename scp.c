@@ -2923,7 +2923,7 @@ if (sim_wallclock_queue == QUEUE_LIST_END)
 else {
     fprintf (st, "%s wall clock event queue status, time = %.0f\n",
              sim_name, sim_time);
-    for (uptr = sim_wallclock_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
+    for (uptr = sim_wallclock_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
             fprintf (st, "  %s", sim_dname (dptr));
             if (dptr->numunits > 1)
@@ -2938,7 +2938,7 @@ else {
 if (sim_clock_cosched_queue != QUEUE_LIST_END) {
     fprintf (st, "%s clock (%s) co-schedule event queue status, time = %.0f\n",
              sim_name, sim_uname(sim_clock_unit), sim_time);
-    for (uptr = sim_clock_cosched_queue; uptr != QUEUE_LIST_END; uptr = uptr->next) {
+    for (uptr = sim_clock_cosched_queue; uptr != QUEUE_LIST_END; uptr = uptr->a_next) {
         if ((dptr = find_dev_from_unit (uptr)) != NULL) {
             fprintf (st, "  %s", sim_dname (dptr));
             if (dptr->numunits > 1)

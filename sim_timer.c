@@ -1185,18 +1185,18 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
         sim_wallclock_entry = NULL;
 
         prvptr = NULL;
-        for (cptr = sim_wallclock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
+        for (cptr = sim_wallclock_queue; cptr != QUEUE_LIST_END; cptr = cptr->a_next) {
             if (uptr->a_due_time < cptr->a_due_time)
                 break;
             prvptr = cptr;
             }
         if (prvptr == NULL) {                           /* insert at head */
-            cptr = uptr->next = sim_wallclock_queue;
+            cptr = uptr->a_next = sim_wallclock_queue;
             sim_wallclock_queue = uptr;
             }
         else {
-            cptr = uptr->next = prvptr->next;           /* insert at prvptr */
-            prvptr->next = uptr;
+            cptr = uptr->a_next = prvptr->a_next;       /* insert at prvptr */
+            prvptr->a_next = uptr;
             }
         }
 
@@ -1224,8 +1224,8 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
         inst_per_sec = sim_timer_inst_per_sec ();
 
         uptr = sim_wallclock_queue;
-        sim_wallclock_queue = uptr->next;
-        uptr->next = NULL;                              /* hygiene */
+        sim_wallclock_queue = uptr->a_next;
+        uptr->a_next = NULL;                            /* hygiene */
 
         clock_gettime(CLOCK_REALTIME, &stop_time);
         if (1 != sim_timespec_compare (&due_time, &stop_time)) {
@@ -1240,11 +1240,12 @@ while (sim_asynch_enabled && sim_asynch_timer && sim_is_running) {
                    1000.0*(_timespec_to_double (&stop_time)-_timespec_to_double (&start_time)), sim_uname(uptr), inst_delay);
         if (sim_clock_unit == uptr) {
             /*
-             * Some devices may depend on executing during the same instruction as the
-             * clock tick event.  We link the clock coschedule queue to the clock tick
-             * and then insert that list in the asynch event queue in a single operation
+             * Some devices may depend on executing during the same instruction or immediately 
+             * after the clock tick event.  To satisfy this, we link the clock unit to the head
+             * of the clock coschedule queue and then insert that list in the asynch event 
+             * queue in a single operation
              */
-            uptr->next = sim_clock_cosched_queue;
+            uptr->a_next = sim_clock_cosched_queue;
             sim_clock_cosched_queue = QUEUE_LIST_END;
             AIO_ACTIVATE_LIST(sim_activate, uptr, inst_delay);
             }
@@ -1277,7 +1278,7 @@ if (sim_asynch_enabled && sim_asynch_timer) {
     /* when restarting after being manually stopped the due times for all */
     /* timer events needs to slide so they fire in the future. (clock ticks */
     /* don't accumulate when the simulator is stopped) */
-    for (cptr = sim_wallclock_queue; cptr != QUEUE_LIST_END; cptr = cptr->next) {
+    for (cptr = sim_wallclock_queue; cptr != QUEUE_LIST_END; cptr = cptr->a_next) {
         if (cptr == sim_wallclock_queue) { /* Handle first entry */
             struct timespec now;
             double due_time;
@@ -1332,9 +1333,9 @@ else {
         uptr = sim_wallclock_queue;
         if (uptr == QUEUE_LIST_END)
             break;
-        sim_wallclock_queue = uptr->next;
+        sim_wallclock_queue = uptr->a_next;
         accum += uptr->time;
-        uptr->next = NULL;
+        uptr->a_next = NULL;
         uptr->a_due_time = 0;
         uptr->a_usec_delay = 0;
         sim_activate_after (uptr, accum);
@@ -1464,7 +1465,7 @@ else
                 (rtc_elapsed[sim_calb_tmr ] >= sim_idle_stable))  {
                 sim_debug (DBG_TIM, &sim_timer_dev, "sim_clock_coschedule() - queueing %s for clock co-schedule\n", sim_uname (uptr));
                 pthread_mutex_lock (&sim_timer_lock);
-                uptr->next = sim_clock_cosched_queue;
+                uptr->a_next = sim_clock_cosched_queue;
                 sim_clock_cosched_queue = uptr;
                 pthread_mutex_unlock (&sim_timer_lock);
                 return SCPE_OK;
