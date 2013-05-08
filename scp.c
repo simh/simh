@@ -2930,7 +2930,9 @@ else {
                 fprintf (st, " unit %d", (int32) (uptr - dptr->units));
             }
         else fprintf (st, "  Unknown");
-        fprintf (st, " after %d usec\n", uptr->a_usec_delay);
+        fprintf (st, " after ");
+        fprint_val (st, (t_value)uptr->a_usec_delay, 10, 0, PV_RCOMMA);
+        fprintf (st, " usec\n");
         }
     }
 if (sim_clock_cosched_queue != QUEUE_LIST_END) {
@@ -6100,7 +6102,7 @@ switch (format) {
         ndigits = MAX_WIDTH - digit;
         commas = (ndigits - 1)/3;
         for (digit=0; digit<ndigits-3; digit++)
-            dbuf[MAX_WIDTH - ndigits + digit - (commas - (digit+1)/3)] = dbuf[MAX_WIDTH - ndigits + digit];
+            dbuf[MAX_WIDTH + (digit - ndigits) - (ndigits - digit - 1)/3] = dbuf[MAX_WIDTH + (digit - ndigits)];
         for (digit=1; digit<=commas; digit++)
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
         d = d - commas;
@@ -6109,7 +6111,8 @@ switch (format) {
             return SCPE_OK;
             }
         else
-            d = MAX_WIDTH - width;
+            if (width > 0)
+                d = MAX_WIDTH - width;
         break;
     case PV_RZRO:
     case PV_RSPC:
