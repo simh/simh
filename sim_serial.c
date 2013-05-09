@@ -583,7 +583,7 @@ return ports;
        interest to a DCB retrieved from a call to "GetCommState".
 */
 
-SERHANDLE sim_open_os_serial (char *name)
+static SERHANDLE sim_open_os_serial (char *name)
 {
 SERHANDLE port;
 DCB dcb;
@@ -675,7 +675,7 @@ return port;                                            /* return port handle on
        1.5 stop bits.
 */
 
-t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
+static t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 static const struct {
     char parity;
@@ -868,7 +868,7 @@ else
    The serial port is closed.  Errors are ignored.
 */
 
-void sim_close_os_serial (SERHANDLE port)
+static void sim_close_os_serial (SERHANDLE port)
 {
 CloseHandle (port);                                     /* close the port */
 return;
@@ -1000,7 +1000,7 @@ return ports;
        reading.
 */
 
-SERHANDLE sim_open_os_serial (char *name)
+static SERHANDLE sim_open_os_serial (char *name)
 {
 static const tcflag_t i_clear = IGNBRK |                /* ignore BREAK */
                                 BRKINT |                /* signal on BREAK */
@@ -1118,7 +1118,7 @@ return port;                                            /* return port fd for su
 
 */
 
-t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
+static t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 struct termios tio;
 int32 i;
@@ -1339,7 +1339,7 @@ return (int32) written;                                     /* return number of 
    The serial port is closed.  Errors are ignored.
 */
 
-void sim_close_os_serial (SERHANDLE port)
+static void sim_close_os_serial (SERHANDLE port)
 {
 close (port);                                           /* close the port */
 return;
@@ -1484,7 +1484,7 @@ return ports;
 
 */
 
-SERHANDLE sim_open_os_serial (char *name)
+static SERHANDLE sim_open_os_serial (char *name)
 {
 uint32 status;
 uint32 chan = 0;
@@ -1541,7 +1541,7 @@ return chan;                                            /* return channel for su
 
 */
 
-t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
+static t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 int32 i;
 SENSE_BUF sense;
@@ -1780,7 +1780,7 @@ return (int32)iosb.count;                               /* return number of char
    The serial port is closed.  Errors are ignored.
 */
 
-void sim_close_os_serial (SERHANDLE port)
+static void sim_close_os_serial (SERHANDLE port)
 {
 sys$dassgn (port);                                      /* close the port */
 return;
@@ -1800,7 +1800,7 @@ return 0;
 
 /* Open a serial port */
 
-SERHANDLE sim_open_os_serial (char *name)
+static SERHANDLE sim_open_os_serial (char *name)
 {
 return INVALID_HANDLE;
 }
@@ -1808,7 +1808,7 @@ return INVALID_HANDLE;
 
 /* Configure a serial port */
 
-t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
+static t_stat sim_config_os_serial (SERHANDLE port, SERCONFIG config)
 {
 return SCPE_IERR;
 }
@@ -1840,7 +1840,7 @@ return -1;
 
 /* Close a serial port */
 
-void sim_close_os_serial (SERHANDLE port)
+static void sim_close_os_serial (SERHANDLE port)
 {
 return;
 }

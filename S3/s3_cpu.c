@@ -1315,7 +1315,7 @@ int32 PutMem(int32 addr, int32 data)
 
 /* Check the condition register against the qbyte and return 1 if true */
 
-int32 condition(int32 qbyte)
+static int32 condition(int32 qbyte)
 {
     int32 r = 0, t, q;
     t = (qbyte & 0xf0) >> 4;

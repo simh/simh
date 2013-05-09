@@ -591,7 +591,7 @@ static t_stat rc_set_size (UNIT *uptr, int32 val, char *cptr, void *desc)
     return (SCPE_OK);
 }
 
-char *rc_description (DEVICE *dptr)
+static char *rc_description (DEVICE *dptr)
 {
     return "RC11/RS64 fixed head disk controller";
 }

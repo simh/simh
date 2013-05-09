@@ -1386,7 +1386,7 @@ static t_stat vh_detach (   UNIT    *uptr   )
     return (tmxr_detach (&vh_desc, uptr));
 }
 
-t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
+static t_stat vh_show_vec (FILE *st, UNIT *uptr, int32 arg, void *desc)
 {
 TMXR *mp = (TMXR *) desc;
 
