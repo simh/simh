@@ -1345,7 +1345,7 @@ return (r);
    condition register initial state in parameter 3
 */   
 
-int32 compare(int32 byte1, int32 byte2, int32 cond)
+static int32 compare(int32 byte1, int32 byte2, int32 cond)
 {
     int32 r;
     
