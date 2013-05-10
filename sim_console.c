@@ -773,8 +773,17 @@ if (flag) {
     return SCPE_NOPARAM;
     }
 else {
-    if (sim_rem_con_tmxr.master)
+    if (sim_rem_con_tmxr.master) {
+        int32 i;
+
         tmxr_detach (&sim_rem_con_tmxr, &sim_rem_con_unit[0]);
+        for (i=0; i<sim_rem_con_tmxr.lines; i++) {
+            free (sim_rem_buf[i]);
+            sim_rem_buf[i] = NULL;
+            sim_rem_buf_size[i] = 0;
+            sim_rem_buf_ptr[i] = 0;
+            }
+        }
     }
 return SCPE_OK;
 }
