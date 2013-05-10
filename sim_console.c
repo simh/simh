@@ -684,7 +684,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         if (!sim_log) {                                     /* Not currently logging? */
             int32 save_quiet = sim_quiet;
 
-            sim_quiet = 0;
+            sim_quiet = 1;
             sprintf (sim_rem_con_temp_name, "sim_remote_console_%d.temporary_log", (int)getpid());
             sim_set_logon (0, sim_rem_con_temp_name);
             sim_quiet = save_quiet;
