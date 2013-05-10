@@ -83,6 +83,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           COMPILER_NAME = $(wordlist 2,10,$(SUNC_VERSION))
         endif
       endif
+      ifeq (HP-UX,$(OSTYPE))
+        ifneq (,$(shell what `which $(firstword $(GCC))` | grep -i compiler))
+          COMPILER_NAME = $(strip $(shell what `which $(firstword $(GCC))` | grep -i compiler))
+        endif
+      endif
     endif
   else
     ifeq (Apple,$(shell $(GCC) -v /dev/null 2>&1 | grep 'Apple' | awk '{ print $$1 }'))
@@ -167,15 +172,25 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             LIBEXT = a
           else
             ifeq (,$(findstring NetBSD,$(OSTYPE)))
-              LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+              ifneq (no ldconfig,$(wordlist 1,2,$(shell which ldconfig)))
+                LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+              endif
               ifneq (,$(LDSEARCH))
                 LIBPATH := $(LDSEARCH)
               else
-                $(info *** Warning ***)
-                $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
-                $(info *** Warning *** determined.  This should be resolved before you can expect)
-                $(info *** Warning *** to have fully working simulators.)
-                $(info *** Warning ***)
+                ifeq (,$(strip $(LPATH)))
+                  $(info *** Warning ***)
+                  $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                  $(info *** Warning *** determined.  This should be resolved before you can expect)
+                  $(info *** Warning *** to have fully working simulators.)
+                  $(info *** Warning ***)
+                  $(info *** Warning *** You can specify your library paths via the LPATH environment)
+                  $(info *** Warning *** variable.)
+                  $(info *** Warning ***)
+                else
+                  LIBPATH = $(subst :, ,$(LPATH))
+                  OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
+                endif
               endif
             endif
             ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
@@ -192,6 +207,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
                   LIBEXT = sl
                 endif
                 OS_CCDEFS += -D_HPUX_SOURCE -D_LARGEFILE64_SOURCE
+                OS_LDFLAGS += -Wl,+b:
                 NO_LTO = 1
               else
                 LIBEXT = a
@@ -306,7 +322,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
               NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
               NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
             else
-              NETWORK_CCDEFS := -DUSE_NETWORK -isystem $(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
+              NETWORK_CCDEFS := -DUSE_NETWORK -isystem -I$(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
               NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
               $(info *** Warning ***)
               $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
