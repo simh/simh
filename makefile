@@ -22,6 +22,13 @@
 # libpcap can be enabled if GNU make is invoked with USE_NETWORK=1 on the 
 # command line.
 #
+# Some platforms may not have vendor supplied libpcap available.  HP-UX is 
+# one such example.  The packages which are available for this platform
+# install include files and libraries in user specified directories.  In 
+# order for this makefile to locate where these components may have been 
+# installed, gmake should be invoked with LPATH=/usr/lib:/usr/local/lib 
+# defined (adjusted as needed depending on where they may be installed).
+#
 # The default build will build compiler optimized binaries.
 # If debugging is desired, then GNU make can be invoked with
 # DEBUG=1 on the command line.

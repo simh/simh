@@ -304,8 +304,15 @@ Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
     typing 'make USE_NETWORK=1'.  You must build with gcc to do this.  There 
     is no observable benefit to statically linking against libpcap and as 
     such support for this ia deprecated.
+    
+ 4. Some platforms (HP-UX in particular) may not have vendor supplied libpcap 
+    components available and installed with the operating system.  The packages
+    which are available for this platform install include and library files in 
+    user specified locations.  When building on these platforms the library 
+    path must be specified on the make command line.  This can be done with:
+    'make LPATH=/usr/lib:/usr/local/lib'
 
- 4. Build it!
+ 5. Build it!
 
 -------------------------------------------------------------------------------
 
