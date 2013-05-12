@@ -3665,7 +3665,7 @@ for (j=0; 1; ++j) {
     }
 }
 
-static int tmxr_buf_debug_telnet_options (char *buf, int bufsize)
+static int tmxr_buf_debug_telnet_options (u_char *buf, int bufsize)
 {
 int optsize = 2;
 
@@ -3698,7 +3698,7 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     for (i=0; i<bufsize; ++i) {
         switch ((u_char)buf[i]) {
             case TN_IAC:
-                i += (tmxr_buf_debug_telnet_options (&buf[i], bufsize-i) - 1);
+                i += (tmxr_buf_debug_telnet_options ((u_char *)(&buf[i]), bufsize-i) - 1);
                 break;
             case TN_CR:
                 tmxr_buf_debug_string ("_TN_CR_");
@@ -3707,7 +3707,7 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
                 tmxr_buf_debug_string ("_TN_LF_");
                 break;
             default:
-                if (isprint(buf[i]))
+                if (isprint((u_char)buf[i]))
                     tmxr_buf_debug_char (buf[i]);
                 else {
                     tmxr_buf_debug_char ('_');
