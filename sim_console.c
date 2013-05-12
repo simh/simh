@@ -659,6 +659,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         printf ("Remote Console Command from %s> %s\r\n", lp->ipad, sim_rem_buf[i]);
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
+        got_command = FALSE;
         if (strlen(sim_rem_buf[i]) >= sizeof(cbuf)) {
             printf ("\nLine too long. Ignored.  Continuing Simulator execution\n");
             if (sim_log)
