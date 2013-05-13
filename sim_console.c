@@ -416,13 +416,21 @@ int32 c;
 c = tmxr_poll_conn (&sim_rem_con_tmxr);
 if (c >= 0) {                                           /* poll connect */
     TMLN *lp = &sim_rem_con_tmxr.ldsc[c];
+    char wru_name[8];
 
     sim_activate_after(uptr+1, 1000000);                /* start data poll after 100ms */
     lp->rcve = 1;                                       /* rcv enabled */
     sim_rem_buf_ptr[c] = 0;                             /* start with empty command buffer */
+    if (isprint(sim_int_char&0xFF))
+        sprintf(wru_name, "'%c'", sim_int_char&0xFF);
+    else
+        if (sim_int_char <= 26)
+            sprintf(wru_name, "^%c", '@' + (sim_int_char&0xFF));
+        else
+            sprintf(wru_name, "'\\%03o'", sim_int_char&0xFF);
     tmxr_linemsgf (lp, "%s Remote Console\r\n"
-                       "Enter single commands or to enter multiple command mode enter the WRU character\r\n"
-                       "Simulator Running...", sim_name);
+                       "Enter single commands or to enter multiple command mode enter the %s character\r\n"
+                       "Simulator Running...", sim_name, wru_name);
     tmxr_send_buffered_data (lp);                       /* flush buffered data */
     }
 sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
@@ -572,7 +580,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 }
             else {
                 sim_rem_single_mode[i] = TRUE;
-                tmxr_linemsg (lp, "\r\nsim> ");
+                tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
                 tmxr_send_buffered_data (lp);           /* flush any buffered data */
                 }
             }
@@ -581,7 +589,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
     while (1) {
         if (!sim_rem_single_mode[i]) {
             read_start_time = sim_os_msec();
-            tmxr_linemsg (lp, "sim> ");
+            tmxr_linemsg (lp, sim_prompt);
             tmxr_send_buffered_data (lp);           /* flush any buffered data */
             }
         do {
@@ -740,8 +748,14 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
         cbuf[sizeof(cbuf)-1] = '\0';
         while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
+            int32 unwritten;
+
             tmxr_linemsgf (lp, "%s", cbuf);
-            tmxr_send_buffered_data (lp);
+            do {
+                unwritten = tmxr_send_buffered_data (lp);
+                if (unwritten == lp->txbsz)
+                    sim_os_ms_sleep (100);
+                } while (unwritten == lp->txbsz);
             }
         if ((cmdp && (cmdp->action == &x_continue_cmd)) ||
             (sim_rem_single_mode[i])) {
