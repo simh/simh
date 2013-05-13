@@ -1,4 +1,5 @@
-/* ssem_defs.h: SSEM (Small Scale Experimental Machine) simulator definitions 
+/* ssem_defs.h: Manchester University SSEM (Small Scale Experimental Machine)
+                          simulator definitions 
 
    Based on the SIMH package written by Robert M Supnik
  

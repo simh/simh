@@ -1,4 +1,5 @@
-/* ssem_sys.c: SSEM (Small Scale Experimental Machine) simulator interface
+/* ssem_sys.c: Manchester University SSEM (Small Scale Experimental Machine)
+                         simulator interface
 
    Based on the SIMH package written by Robert M Supnik
  

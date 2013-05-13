@@ -1,4 +1,5 @@
-/* ssem_cpu.c: SSEM (Small Scale Experimental Machine) CPU simulator
+/* ssem_cpu.c: Manchester University SSEM (Small Scale Experimental Machine) 
+                         CPU simulator
 
    Based on the SIMH package written by Robert M Supnik
  
@@ -257,3 +258,4 @@ void Write (uint32 ea, uint32 dat)
 S[ea] = dat & MMASK;
 return;
 }
+
