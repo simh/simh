@@ -14,6 +14,8 @@
     
 #### Howard Harte has implemented a Lincoln Labs TX-0 simulator.
 
+#### Gerardo Ospina has implemented a Manchester University SSEM (Small Scale Experimental Machine) simulator.
+
 #### Updated AltairZ80 simulator from Peter Schorn.
 
 #### Updated HP2100 simulator from Dave Bryan.

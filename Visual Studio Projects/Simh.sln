@@ -97,6 +97,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "VAX8600", "VAX8600.vcproj",
 		{D40F3AF1-EEE7-4432-9807-2AD287B490F8} = {D40F3AF1-EEE7-4432-9807-2AD287B490F8}
 	EndProjectSection
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SSEM", "SSEM.vcproj", "{48DA6BA8-23E1-4F0D-959C-48C8576494DA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -247,6 +249,10 @@ Global
 		{F5C22D72-460E-43CD-9AC6-6D6AC517BD1F}.Debug|Win32.Build.0 = Debug|Win32
 		{F5C22D72-460E-43CD-9AC6-6D6AC517BD1F}.Release|Win32.ActiveCfg = Release|Win32
 		{F5C22D72-460E-43CD-9AC6-6D6AC517BD1F}.Release|Win32.Build.0 = Release|Win32
+		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Debug|Win32.Build.0 = Debug|Win32
+		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Release|Win32.ActiveCfg = Release|Win32
+		{48DA6BA8-23E1-4F0D-959C-48C8576494DA}.Release|Win32.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

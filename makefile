@@ -885,6 +885,11 @@ TX0 = ${TX0D}/tx0_cpu.c ${TX0D}/tx0_dpy.c ${TX0D}/tx0_stddev.c \
 TX0_OPT = -I ${TX0D} $(DISPLAY_OPT)
 
 
+SSEMD = SSEM
+SSEM = ${SSEMD}/ssem_cpu.c ${SSEMD}/ssem_sys.c
+SSEM_OPT = -I ${SSEMD}
+
+
 #
 # Build everything
 #
@@ -892,7 +897,7 @@ ALL = pdp1 pdp4 pdp7 pdp8 pdp9 pdp15 pdp11 pdp10 \
 	vax microvax3900 microvax1 rtvax1000 microvax2 vax730 vax750 vax780 vax8600 \
 	nova eclipse hp2100 i1401 i1620 s3 altair altairz80 gri \
 	i7094 ibm1130 id16 id32 sds lgp h316 \
-	swtp6800mp-a swtp6800mp-a2 tx-0
+	swtp6800mp-a swtp6800mp-a2 tx-0 ssem
 
 all : ${ALL}
 
@@ -1147,4 +1152,10 @@ tx-0 : ${BIN}tx-0${EXE}
 ${BIN}tx-0${EXE} : ${TX0} ${SIM}
 	${MKDIRBIN}
 	${CC} ${TX0} ${SIM} ${TX0_OPT} $(CC_OUTSPEC) ${LDFLAGS}
+
+ssem : ${BIN}ssem${EXE}
+
+${BIN}ssem${EXE} : ${SSEM} ${SIM}
+	${MKDIRBIN}
+	${CC} ${SSEM} ${SIM} ${SSEM_OPT} $(CC_OUTSPEC) ${LDFLAGS}
 

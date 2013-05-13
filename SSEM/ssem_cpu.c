@@ -142,7 +142,8 @@ do {
             break;
         }
 #endif
-        if (reason = sim_process_event ()) break;
+        if ((reason = sim_process_event ()))
+            break;
         }
     
     if (sim_brk_summ &&                                 /* breakpoint? */
@@ -157,10 +158,10 @@ do {
     /* Get present instruction */
     C[1] = Read (*C);                                   
 
-    Staticisor = C[1] & IMASK;                            /* get instruction */
+    Staticisor = C[1] & IMASK;                          /* get instruction */
     sim_interval = sim_interval - 1;
 
-    if (reason = cpu_one_inst (*C, Staticisor)) {       /* one instr; error? */
+    if ((reason = cpu_one_inst (*C, Staticisor))) {     /* one instr; error? */
         break;
         }
 
