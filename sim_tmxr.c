@@ -3104,11 +3104,13 @@ while (1) {                                         /* format passed string, arg
 
 for (i = 0; i < len; ++i) {
     if ('\n' == buf[i]) {
-        tmxr_putc_ln (lp, '\r');
-        tmxr_putc_ln (lp, buf[i]);
+        while (SCPE_STALL == tmxr_putc_ln (lp, '\r'))
+            if (lp->txbsz == tmxr_send_buffered_data (lp))
+                sim_os_ms_sleep (10);
         }
-    else
-        tmxr_putc_ln (lp, buf[i]);
+    while (SCPE_STALL == tmxr_putc_ln (lp, buf[i]))
+        if (lp->txbsz == tmxr_send_buffered_data (lp))
+            sim_os_ms_sleep (10);
     }
 if (buf != stackbuf)
     free (buf);
