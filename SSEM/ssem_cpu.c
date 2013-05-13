@@ -48,13 +48,13 @@
 
     <13:15>               operation
 
-	000   0            C[0] <- S[n]
-	001   1            C[0] <- C[0] + S[n]
-	010   2            A[0] <- -S[n]
-	011   3            S[n] <- A[0]
-	100   4            A[0] <- A[0] - S[n]
-	110   6            C[0] <- C[0] + 1  if (A[0] < 0)
-	111   7            Stop the machine
+    000   0            C[0] <- S[n]
+    001   1            C[0] <- C[0] + S[n]
+    010   2            A[0] <- -S[n]
+    011   3            S[n] <- A[0]
+    100   4            A[0] <- A[0] - S[n]
+    110   6            C[0] <- C[0] + 1  if (A[0] < 0)
+    111   7            Stop the machine
 
     The SSEM has 32 32b words of memory.
 
@@ -80,10 +80,10 @@
 
 #include "ssem_defs.h"
 
-uint32 S[MEMSIZE] = { 0 };		/* storage (memory) */
+uint32 S[MEMSIZE] = { 0 };        /* storage (memory) */
 
-int32  A[MEMSIZE] = { 0 };		/* A[0] accumulator */
-uint32 C[MEMSIZE] = { 0, 0 };	/* C[0] current instruction */
+int32  A[MEMSIZE] = { 0 };        /* A[0] accumulator */
+uint32 C[MEMSIZE] = { 0, 0 };    /* C[0] current instruction */
                                 /* C[1] present instruction */
 uint32 Staticisor = 0;
 
@@ -115,7 +115,7 @@ REG cpu_reg[] = {
     };
 
 MTAB cpu_mod[] = {
-    { UNIT_SSEM, 0, "Manchester SSEM (Small Scale Experimental Machine)", "SSEM" },
+    { UNIT_SSEM, 0, "Manchester University SSEM (Small Scale Experimental Machine)", "SSEM" },
     { 0 }
     };
 
@@ -142,21 +142,21 @@ do {
         }
 #endif
         if (reason = sim_process_event ()) break;
-		}
-	
+        }
+    
     if (sim_brk_summ &&                                 /* breakpoint? */
         sim_brk_test (*C, SWMASK ('E'))) {
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
         }
 
-	/* Increment current instruction */
-	*C = (*C + 1) & AMASK;
+    /* Increment current instruction */
+    *C = (*C + 1) & AMASK;
 
-	/* Get present instruction */
+    /* Get present instruction */
     C[1] = Read (*C);                                   
 
-	Staticisor = C[1] & IMASK;							/* get instruction */
+    Staticisor = C[1] & IMASK;                            /* get instruction */
     sim_interval = sim_interval - 1;
 
     if (reason = cpu_one_inst (*C, Staticisor)) {       /* one instr; error? */
@@ -202,45 +202,45 @@ t_stat cpu_one_inst (uint32 opc, uint32 ir)
 uint32 ea, op;
 t_stat reason = 0;
 
-op = I_GETOP (ir);					/* opcode */
-switch (op) {						/* case on opcode */
+op = I_GETOP (ir);                    /* opcode */
+switch (op) {                        /* case on opcode */
 
-    case OP_JUMP_INDIRECT:			/* C[0] <- S[ea] */
-		ea = I_GETEA (ir);			/* address */
-		*C =  Read(ea);
+    case OP_JUMP_INDIRECT:            /* C[0] <- S[ea] */
+        ea = I_GETEA (ir);            /* address */
+        *C =  Read(ea);
         break;
 
-    case OP_JUMP_INDIRECT_RELATIVE:	/* C[0] <- C[0] + S[ea] */
-		ea = I_GETEA (ir);			/* address */
-		*C += Read(ea);
+    case OP_JUMP_INDIRECT_RELATIVE:    /* C[0] <- C[0] + S[ea] */
+        ea = I_GETEA (ir);            /* address */
+        *C += Read(ea);
         break;
 
-    case OP_LOAD_NEGATED:			/* A[0] <- -S[ea] */
-		ea = I_GETEA (ir);			/* address */
-		*A = -((int32)Read(ea));
+    case OP_LOAD_NEGATED:            /* A[0] <- -S[ea] */
+        ea = I_GETEA (ir);            /* address */
+        *A = -((int32)Read(ea));
         break;
 
-    case OP_STORE:					/* S[ea] <- A[0] */
-		ea = I_GETEA (ir);			/* address */
-		Write(ea, (uint32) *A);
+    case OP_STORE:                    /* S[ea] <- A[0] */
+        ea = I_GETEA (ir);            /* address */
+        Write(ea, (uint32) *A);
         break;
 
-    case OP_SUBSTRACT:				/* A[0] <- A[0] - S[ea] */
-	case OP_UNDOCUMENTED:
-		ea = I_GETEA (ir);			/* address */
-		*A -= ((int32) Read(ea));
+    case OP_SUBSTRACT:                /* A[0] <- A[0] - S[ea] */
+    case OP_UNDOCUMENTED:
+        ea = I_GETEA (ir);            /* address */
+        *A -= ((int32) Read(ea));
         break;
 
-    case OP_TEST:					/* C[0] <- C[0] + 1  if (A[0] < 0) */
-		if (*A < 0){
-			*C += 1;
-		}
+    case OP_TEST:                    /* C[0] <- C[0] + 1  if (A[0] < 0) */
+        if (*A < 0){
+            *C += 1;
+        }
         break;
 
-	case OP_STOP:					/* Stop  the machine */
-        reason = STOP_STOP;			/* stop simulation */
+    case OP_STOP:                    /* Stop  the machine */
+        reason = STOP_STOP;            /* stop simulation */
         break;
-	}								/* end switch */
+    }                                /* end switch */
 
 return reason;
 }
