@@ -353,10 +353,44 @@
 
 /* Options */
 
-#define TN_BIN          0                               /* bin */
-#define TN_ECHO         1                               /* echo */
-#define TN_SGA          3                               /* sga */
-#define TN_LINE         34                              /* line mode */
+#define TN_BIN            0                             /* bin */
+#define TN_ECHO           1                             /* echo */
+#define TN_SGA            3                             /* sga */
+#define TN_STATUS         5                             /* option status query */
+#define TN_TIMING         6                             /* Timing Mark */
+#define TN_NAOCRD        10                             /* Output Carriage-Return Disposition */
+#define TN_NAOHTS        11                             /* Output Horizontal Tab Stops */
+#define TN_NAOHTD        12                             /* Output Horizontal Tab Stop Disposition */
+#define TN_NAOFFD        13                             /* Output Forfeed Disposition */
+#define TN_NAOVTS        14                             /* Output Vertical Tab Stop */
+#define TN_NAOVTD        15                             /* Output Vertical Tab Stop Disposition */
+#define TN_NAOLFD        16                             /* Output Linefeed Disposition */
+#define TN_EXTEND        17                             /* Extended Ascii */
+#define TN_LOGOUT        18                             /* Logout */
+#define TN_BM            19                             /* Byte Macro */
+#define TN_DET           20                             /* Data Entry Terminal */
+#define TN_SENDLO        23                             /* Send Location */
+#define TN_TERMTY        24                             /* Terminal Type */
+#define TN_ENDREC        25                             /* Terminal Type */
+#define TN_TUID          26                             /* TACACS User Identification */
+#define TN_OUTMRK        27                             /* Output Marking */
+#define TN_TTYLOC        28                             /* Terminal Location Number */
+#define TN_3270          29                             /* 3270 Regime */
+#define TN_X3PAD         30                             /* X.3 PAD */
+#define TN_NAWS          31                             /* Negotiate About Window Size */
+#define TN_TERMSP        32                             /* Terminal Speed */
+#define TN_TOGFLO        33                             /* Remote Flow Control */
+#define TN_LINE          34                             /* line mode */
+#define TN_XDISPL        35                             /* X Display Location */
+#define TN_ENVIRO        36                             /* Environment */
+#define TN_AUTH          37                             /* Authentication */
+#define TN_ENCRYP        38                             /* Data Encryption */
+#define TN_NEWENV        39                             /* New Environment */
+#define TN_TN3270        40                             /* TN3270 Enhancements */
+#define TN_CHARST        42                             /* CHARSET */
+#define TN_COMPRT        44                             /* Com Port Control */
+#define TN_KERMIT        47                             /* KERMIT */
+
 #define TN_CR           015                             /* carriage return */
 #define TN_LF           012                             /* line feed */
 #define TN_NUL          000                             /* null */
@@ -782,7 +816,7 @@ if (mp->master) {
 
     if (newsock != INVALID_SOCKET) {                    /* got a live one? */
         sprintf (msg, "tmxr_poll_conn() - Connection from %s", address);
-        tmxr_debug_trace (mp, msg);
+        tmxr_debug_connect (mp, msg);
         op = mp->lnorder;                               /* get line connection order list pointer */
         i = mp->lines;                                  /* play it safe in case lines == 0 */
         ++mp->sessions;                                 /* count the new session */
@@ -802,7 +836,7 @@ if (mp->master) {
 
         if (i >= mp->lines) {                           /* all busy? */
             tmxr_msg (newsock, "All connections busy\r\n");
-            tmxr_debug_trace (mp, "tmxr_poll_conn() - All connections busy");
+            tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
             sim_close_sock (newsock, 0);
             free (address);
             }
@@ -838,8 +872,12 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 lp->ipad = realloc (lp->ipad, 1+strlen (lp->destination));
                 strcpy (lp->ipad, lp->destination);
                 lp->cnms = sim_os_msec ();
+                sprintf (msg, "tmxr_poll_conn() - Line Connection to %s established", lp->destination);
+                tmxr_debug_connect_line (lp, msg);
                 break;
             case -1:                                /* failed connection */
+                sprintf (msg, "tmxr_poll_conn() - Line Connection to %s failed", lp->destination);
+                tmxr_debug_connect_line (lp, msg);
                 tmxr_reset_ln (lp);                 /* retry */
                 break;
             }
@@ -853,7 +891,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
 
         if (newsock != INVALID_SOCKET) {                /* got a live one? */
             sprintf (msg, "tmxr_poll_conn() - Line Connection from %s", address);
-            tmxr_debug_trace_line (lp, msg);
+            tmxr_debug_connect_line (lp, msg);
             ++mp->sessions;                             /* count the new session */
 
             if (lp->destination) {                      /* Virtual Null Modem Cable? */
@@ -862,12 +900,14 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
                     tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
                     sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
-                    tmxr_debug_trace_line (lp, msg);
+                    tmxr_debug_connect_line (lp, msg);
                     sim_close_sock (newsock, 0);
                     free (address);
                     continue;                           /* Move on to next line */
                     }
                 if (lp->connecting) {
+                    sprintf (msg, "tmxr_poll_conn() - aborting outgoing line connection attempt to: %s", lp->destination);
+                    tmxr_debug_connect_line (lp, msg);
                     sim_close_sock (lp->connecting, 0); /* abort our as yet unconnnected socket */
                     lp->connecting = 0;
                     }
@@ -887,7 +927,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                 }
             else {
                 tmxr_msg (newsock, "Line connection busy\r\n");
-                tmxr_debug_trace_line (lp, "tmxr_poll_conn() - Line connection busy");
+                tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection busy");
                 sim_close_sock (newsock, 0);
                 free (address);
                 }
@@ -905,8 +945,11 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
     /* Check for needed outgoing connection initiation */
 
     if (lp->destination && (!lp->sock) && (!lp->connecting) && (!lp->serport) && 
-        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR)))
+        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR))) {
+        sprintf (msg, "tmxr_poll_conn() - establishing outgoing connection to: %s", lp->destination);
+        tmxr_debug_connect_line (lp, msg);
         lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+        }
 
     }
 
@@ -924,12 +967,17 @@ return -1;                                              /* no new connections ma
 
 static t_stat tmxr_reset_ln_ex (TMLN *lp, t_bool closeserial)
 {
+char msg[512];
+
 tmxr_debug_trace_line (lp, "tmxr_reset_ln_ex)");
 
 if (lp->txlog)
     fflush (lp->txlog);                                 /* flush log */
 
 tmxr_send_buffered_data (lp);                           /* send any buffered data */
+
+sprintf (msg, "tmxr_reset_ln_ex(%s)", closeserial ? "TRUE" : "FALSE");
+tmxr_debug_connect_line (lp, msg);
 
 if (lp->serport) {
     if (closeserial) {
@@ -961,10 +1009,15 @@ else                                                    /* Telnet connection */
 free(lp->ipad);
 lp->ipad = NULL;
 if ((lp->destination) && (!lp->serport)) {
-    if (lp->connecting)
+    if (lp->connecting) {
         sim_close_sock (lp->connecting, 0);
-    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR))
+        lp->connecting = 0;
+        }
+    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
+        sprintf (msg, "tmxr_reset_ln_ex() - connecting to %s", lp->destination);
+        tmxr_debug_connect_line (lp, msg);
         lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+        }
     }
 tmxr_init_line (lp);                                /* initialize line state */
 /* Revise the unit's connect string to reflect the current attachments */
@@ -978,6 +1031,7 @@ return SCPE_OK;
 t_stat tmxr_close_ln (TMLN *lp)
 {
 tmxr_debug_trace_line (lp, "tmxr_close_ln()");
+tmxr_debug_connect_line (lp, "tmxr_close_ln()");
 return tmxr_reset_ln_ex (lp, TRUE);
 }
 
@@ -1110,8 +1164,13 @@ if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on mo
         else {
             if ((lp->destination) &&                    /* Virtual Null Modem Cable */
                 ((bits_to_set ^ before_modem_bits) &    /* and DTR being Raised */
-                 TMXR_MDM_DTR))
+                 TMXR_MDM_DTR)) {
+                char msg[512];
+
+                sprintf (msg, "tmxr_set_get_modem_bits() - establishing outgoing connection to: %s", lp->destination);
+                tmxr_debug_connect_line (lp, msg);
                 lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+                }
             }
         }
     return SCPE_OK;
@@ -1280,9 +1339,12 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
 
                 case TNS_WILL: case TNS_WONT:           /* IAC+WILL/WONT prev */
                     if (tmp == TN_BIN) {                /* BIN? */
-                        if (lp->tsta == TNS_WILL)
+                        if (lp->tsta == TNS_WILL) {
                             lp->dstb = 0;
-                        else lp->dstb = 1;
+                            }
+                        else {
+                            lp->dstb = 1;
+                            }
                         }
                     tmxr_rmvrc (lp, j);                 /* remove it */
                     lp->tsta = TNS_NORM;                /* next normal */
@@ -3042,11 +3104,13 @@ while (1) {                                         /* format passed string, arg
 
 for (i = 0; i < len; ++i) {
     if ('\n' == buf[i]) {
-        tmxr_putc_ln (lp, '\r');
-        tmxr_putc_ln (lp, buf[i]);
+        while (SCPE_STALL == tmxr_putc_ln (lp, '\r'))
+            if (lp->txbsz == tmxr_send_buffered_data (lp))
+                sim_os_ms_sleep (10);
         }
-    else
-        tmxr_putc_ln (lp, buf[i]);
+    while (SCPE_STALL == tmxr_putc_ln (lp, buf[i]))
+        if (lp->txbsz == tmxr_send_buffered_data (lp))
+            sim_os_ms_sleep (10);
     }
 if (buf != stackbuf)
     free (buf);
@@ -3514,9 +3578,40 @@ static struct {
         {TN_BIN,    "TN_BIN"},                /* bin */
         {TN_ECHO,   "TN_ECHO"},               /* echo */
         {TN_SGA,    "TN_SGA"},                /* sga */
+        {TN_STATUS, "TN_STATUS"},             /* option status query */
+        {TN_TIMING, "TN_TIMING"},             /* Timing Mark */
+        {TN_NAOCRD, "TN_NAOCRD"},             /* Output Carriage-Return Disposition */
+        {TN_NAOHTS, "TN_NAOHTS"},             /* Output Horizontal Tab Stops */
+        {TN_NAOHTD, "TN_NAOHTD"},             /* Output Horizontal Tab Stop Disposition */
+        {TN_NAOFFD, "TN_NAOFFD"},             /* Output Forfeed Disposition */
+        {TN_NAOVTS, "TN_NAOVTS"},             /* Output Vertical Tab Stop */
+        {TN_NAOVTD, "TN_NAOVTD"},             /* Output Vertical Tab Stop Disposition */
+        {TN_NAOLFD, "TN_NAOLFD"},             /* Output Linefeed Disposition */
+        {TN_EXTEND, "TN_EXTEND"},             /* Extended Ascii */
+        {TN_LOGOUT, "TN_LOGOUT"},             /* Logout */
+        {TN_BM,     "TN_BM"},                 /* Byte Macro */
+        {TN_DET,    "TN_DET"},                /* Data Entry Terminal */
+        {TN_SENDLO, "TN_SENDLO"},             /* Send Location */
+        {TN_TERMTY, "TN_TERMTY"},             /* Terminal Type */
+        {TN_ENDREC, "TN_ENDREC"},             /* Terminal Type */
+        {TN_TUID,   "TN_TUID"},               /* TACACS User Identification */
+        {TN_OUTMRK, "TN_OUTMRK"},             /* Output Marking */
+        {TN_TTYLOC, "TN_TTYLOC"},             /* Terminal Location Number */
+        {TN_3270,   "TN_3270"},               /* 3270 Regime */
+        {TN_X3PAD,  "TN_X3PAD"},              /* X.3 PAD */
+        {TN_NAWS,   "TN_NAWS"},               /* Negotiate About Window Size */
+        {TN_TERMSP, "TN_TERMSP"},             /* Terminal Speed */
+        {TN_TOGFLO, "TN_TOGFLO"},             /* Remote Flow Control */
         {TN_LINE,   "TN_LINE"},               /* line mode */
-        {TN_CR,     "TN_CR"},                 /* carriage return */
-        {TN_LF,     "TN_LF"},                 /* line feed */
+        {TN_XDISPL, "TN_XDISPL"},             /* X Display Location */
+        {TN_ENVIRO, "TN_ENVIRO"},             /* Environment */
+        {TN_AUTH,   "TN_AUTH"},               /* Authentication */
+        {TN_ENCRYP, "TN_ENCRYP"},             /* Data Encryption */
+        {TN_NEWENV, "TN_NEWENV"},             /* New Environment */
+        {TN_TN3270, "TN_TN3270"},             /* TN3270 Enhancements */
+        {TN_CHARST, "TN_CHARST"},             /* CHARSET */
+        {TN_COMPRT, "TN_COMPRT"},             /* Com Port Control */
+        {TN_KERMIT, "TN_KERMIT"},             /* KERMIT */
         {0, NULL}};
 
 static char *tmxr_debug_buf = NULL;
@@ -3539,26 +3634,98 @@ while (*string)
     tmxr_buf_debug_char (*string++);
 }
 
+static void tmxr_buf_debug_telnet_option (u_char chr)
+{
+int j;
+
+for (j=0; 1; ++j) {
+    if (NULL == tn_chars[j].name) {
+        if (isprint(chr))
+            tmxr_buf_debug_char (chr);
+        else {
+            tmxr_buf_debug_char ('_');
+            if ((chr >= 1) && (chr <= 26)) {
+                tmxr_buf_debug_char ('^');
+                tmxr_buf_debug_char ('A' + chr - 1);
+                }
+            else {
+                char octal[8];
+
+                sprintf(octal, "\\%03o", (u_char)chr);
+                tmxr_buf_debug_string (octal);
+                }
+            tmxr_buf_debug_char ('_');
+            }
+        break;
+        }
+    if ((u_char)chr == tn_chars[j].value) {
+        tmxr_buf_debug_char ('_');
+        tmxr_buf_debug_string (tn_chars[j].name);
+        tmxr_buf_debug_char ('_');
+        break;
+        }
+    }
+}
+
+static int tmxr_buf_debug_telnet_options (u_char *buf, int bufsize)
+{
+int optsize = 2;
+
+tmxr_buf_debug_telnet_option ((u_char)buf[0]);
+tmxr_buf_debug_telnet_option ((u_char)buf[1]);
+switch ((u_char)buf[1]) {
+    case TN_IAC:
+    default:
+        return optsize;
+        break;
+    case TN_WILL:
+    case TN_WONT:
+    case TN_DO:
+    case TN_DONT:
+        ++optsize;
+        tmxr_buf_debug_telnet_option ((u_char)buf[2]);
+        break;
+    }
+return optsize;
+}
+
 void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize)
 {
 if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
-    int i, j;
+    int i;
 
     tmxr_debug_buf_used = 0;
     if (tmxr_debug_buf)
         tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
     for (i=0; i<bufsize; ++i) {
-        for (j=0; 1; ++j) {
-            if (NULL == tn_chars[j].name) {
-                tmxr_buf_debug_char (buf[i]);
+        switch ((u_char)buf[i]) {
+            case TN_IAC:
+                i += (tmxr_buf_debug_telnet_options ((u_char *)(&buf[i]), bufsize-i) - 1);
                 break;
-                }
-            if (buf[i] == tn_chars[j].value) {
-                tmxr_buf_debug_char ('_');
-                tmxr_buf_debug_string (tn_chars[j].name);
-                tmxr_buf_debug_char ('_');
+            case TN_CR:
+                tmxr_buf_debug_string ("_TN_CR_");
                 break;
-                }
+            case TN_LF:
+                tmxr_buf_debug_string ("_TN_LF_");
+                break;
+            default:
+                if (isprint((u_char)buf[i]))
+                    tmxr_buf_debug_char (buf[i]);
+                else {
+                    tmxr_buf_debug_char ('_');
+                    if ((buf[i] >= 1) && (buf[i] <= 26)) {
+                        tmxr_buf_debug_char ('^');
+                        tmxr_buf_debug_char ('A' + buf[i] - 1);
+                        }
+                    else {
+                        char octal[8];
+
+                        sprintf(octal, "\\%03o", (u_char)buf[i]);
+                        tmxr_buf_debug_string (octal);
+                        }
+                    tmxr_buf_debug_char ('_');
+                    }
+                break;
             }
         }
     sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);

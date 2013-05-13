@@ -242,6 +242,7 @@ TMXR dz_desc = { DZ_MUXES * DZ_LINES, 0, 0, NULL };     /* mux descriptor */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
 #define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
+#define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
 #define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
 #define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
 
@@ -251,6 +252,7 @@ DEBTAB dz_debug[] = {
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
   {"MDM",    DBG_MDM},
+  {"CON",    DBG_CON},
   {"TRC",    DBG_TRC},
   {"ASY",    DBG_ASY},
   {0}

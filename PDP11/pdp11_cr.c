@@ -1372,7 +1372,7 @@ t_stat cr_show_trans (  FILE    *st,
     return (SCPE_OK);
 }
 
-t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+static t_stat cr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 #if defined(VM_PDP11)
 char *devtype = "CR11/CD11";

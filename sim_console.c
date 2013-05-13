@@ -346,9 +346,12 @@ DEVICE sim_remote_console = {
 static int32 *sim_rem_buf_size = NULL;
 static int32 *sim_rem_buf_ptr = NULL;
 static char **sim_rem_buf = NULL;
+static t_bool *sim_rem_single_mode = NULL;  /* per line command mode (single command or must continue) */
 static TMXR sim_rem_con_tmxr = { 0, 0, 0, NULL, NULL, &sim_remote_console };/* remote console line mux */
 static uint32 sim_rem_read_timeout = 30;    /* seconds before automatic continue */
 static int32 sim_rem_step_line = -1;        /* step in progress on line # */
+static t_bool sim_log_temp = FALSE;         /* temporary log file active */
+static char sim_rem_con_temp_name[PATH_MAX+1];
 
 /* SET REMOTE CONSOLE command */
 
@@ -413,11 +416,21 @@ int32 c;
 c = tmxr_poll_conn (&sim_rem_con_tmxr);
 if (c >= 0) {                                           /* poll connect */
     TMLN *lp = &sim_rem_con_tmxr.ldsc[c];
+    char wru_name[8];
 
     sim_activate_after(uptr+1, 1000000);                /* start data poll after 100ms */
     lp->rcve = 1;                                       /* rcv enabled */
     sim_rem_buf_ptr[c] = 0;                             /* start with empty command buffer */
-    tmxr_linemsgf (lp, "%s Remote Console\r\nSimulator Running...", sim_name);
+    if (isprint(sim_int_char&0xFF))
+        sprintf(wru_name, "'%c'", sim_int_char&0xFF);
+    else
+        if (sim_int_char <= 26)
+            sprintf(wru_name, "^%c", '@' + (sim_int_char&0xFF));
+        else
+            sprintf(wru_name, "'\\%03o'", sim_int_char&0xFF);
+    tmxr_linemsgf (lp, "%s Remote Console\r\n"
+                       "Enter single commands or to enter multiple command mode enter the %s character\r\n"
+                       "Simulator Running...", sim_name, wru_name);
     tmxr_send_buffered_data (lp);                       /* flush buffered data */
     }
 sim_activate_after(uptr, 1000000);                      /* check again in 1 second */
@@ -458,6 +471,18 @@ static CTAB allowed_remote_cmds[] = {
     { "LS",       &dir_cmd,           0 },
     { "ECHO",     &echo_cmd,          0 },
     { "SET",      &set_cmd,           0 },
+    { "SHOW",     &show_cmd,          0 },
+    { "HELP",     &x_help_cmd,        0 },
+    { NULL,       NULL }
+    };
+
+static CTAB allowed_single_remote_cmds[] = {
+    { "ATTACH",   &attach_cmd,        0 },
+    { "DETACH",   &detach_cmd,        0 },
+    { "PWD",      &pwd_cmd,           0 },
+    { "DIR",      &dir_cmd,           0 },
+    { "LS",       &dir_cmd,           0 },
+    { "ECHO",     &echo_cmd,          0 },
     { "SHOW",     &show_cmd,          0 },
     { "HELP",     &x_help_cmd,        0 },
     { NULL,       NULL }
@@ -537,50 +562,63 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         if (!(TMXR_VALID & c))
             continue;
         c = c & ~TMXR_VALID;
-        if (c != sim_int_char)
-            continue;                               /* ^E (the interrupt character) must start console interaction */
-        for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-            lp = &sim_rem_con_tmxr.ldsc[j];
-            if ((i == j) || (!lp->conn))
-                continue;
-            tmxr_linemsgf (lp, "\nRemote Console(%s) Entering Commands\n", lp->ipad);
+        if (!sim_rem_single_mode[i]) {
+            if (c == sim_int_char) {                /* ^E (the interrupt character) must start continue mode console interaction */
+                sim_is_running = 0;
+                sim_stop_timer_services ();
+                for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+                    lp = &sim_rem_con_tmxr.ldsc[j];
+                    if ((i == j) || (!lp->conn))
+                        continue;
+                    tmxr_linemsgf (lp, "\nRemote Console(%s) Entering Commands\n", lp->ipad);
+                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    }
+                lp = &sim_rem_con_tmxr.ldsc[i];
+                tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
+                if (sim_rem_read_timeout)
+                    tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeout);
+                }
+            else {
+                sim_rem_single_mode[i] = TRUE;
+                tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
+                tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                }
+            }
+        }
+    got_command = FALSE;
+    while (1) {
+        if (!sim_rem_single_mode[i]) {
+            read_start_time = sim_os_msec();
+            tmxr_linemsg (lp, sim_prompt);
             tmxr_send_buffered_data (lp);           /* flush any buffered data */
             }
-        lp = &sim_rem_con_tmxr.ldsc[i];
-        tmxr_linemsg (lp, "\r\nSimulator paused.\r\n");
-        if (sim_rem_read_timeout)
-            tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeout);
-        }
-    while (1) {
-        read_start_time = sim_os_msec();
-        tmxr_linemsg (lp, "sim> ");
-        tmxr_send_buffered_data (lp);           /* flush any buffered data */
-        got_command = FALSE;
-        while (!got_command) {
-            c = tmxr_getc_ln (lp);
-            if (!(TMXR_VALID & c)) {
-                tmxr_send_buffered_data (lp);   /* flush any buffered data */
-                if (sim_rem_read_timeout &&
-                    ((sim_os_msec() - read_start_time)/1000 >= sim_rem_read_timeout)) {
-                    while (sim_rem_buf_ptr[i] > 0) { /* Erase current input line */
-                        tmxr_linemsg (lp, "\b \b");
-                        --sim_rem_buf_ptr[i];
+        do {
+            if (!sim_rem_single_mode[i]) {
+                c = tmxr_getc_ln (lp);
+                if (!(TMXR_VALID & c)) {
+                    tmxr_send_buffered_data (lp);   /* flush any buffered data */
+                    if (sim_rem_read_timeout &&
+                        ((sim_os_msec() - read_start_time)/1000 >= sim_rem_read_timeout)) {
+                        while (sim_rem_buf_ptr[i] > 0) { /* Erase current input line */
+                            tmxr_linemsg (lp, "\b \b");
+                            --sim_rem_buf_ptr[i];
+                            }
+                        if (sim_rem_buf_ptr[i]+80 >= sim_rem_buf_size[i]) {
+                            sim_rem_buf_size[i] += 1024;
+                            sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                            }
+                        strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue due to timeout");
+                        tmxr_linemsgf (lp, "%s\n", sim_rem_buf[i]);
+                        got_command = TRUE;
+                        break;
                         }
-                    if (sim_rem_buf_ptr[i]+80 >= sim_rem_buf_size[i]) {
-                        sim_rem_buf_size[i] += 1024;
-                        sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
-                        }
-                    strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue due to timeout");
-                    tmxr_linemsgf (lp, "%s\n", sim_rem_buf[i]);
-                    got_command = TRUE;
-                    break;
+                    sim_os_ms_sleep (100);
+                    tmxr_poll_rx (&sim_rem_con_tmxr);/* poll input */
+                    continue;
                     }
-                sim_os_ms_sleep (100);
-                tmxr_poll_rx (&sim_rem_con_tmxr);/* poll input */
-                continue;
+                read_start_time = sim_os_msec();
+                c = c & ~TMXR_VALID;
                 }
-            read_start_time = sim_os_msec();
-            c = c & ~TMXR_VALID;
             switch (c) {
                 case 0:     /* no data */
                     break;
@@ -598,6 +636,9 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         --sim_rem_buf_ptr[i];
                         }
                     break;
+                case '\n':
+                    if (sim_rem_buf_ptr[i] == 0)
+                        break;
                 case '\r':
                     tmxr_linemsg (lp, "\r\n");
                     if (sim_rem_buf_ptr[i]+1 >= sim_rem_buf_size[i]) {
@@ -619,13 +660,18 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                         got_command = TRUE;                 /* command too long */
                     break;
                 }
-            }
+            } while ((!got_command) && (!sim_rem_single_mode[i]));
         tmxr_send_buffered_data (lp);           /* flush any buffered data */
+        if ((sim_rem_single_mode[i]) && !got_command)
+            break;
         printf ("Remote Console Command from %s> %s\r\n", lp->ipad, sim_rem_buf[i]);
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
+        got_command = FALSE;
         if (strlen(sim_rem_buf[i]) >= sizeof(cbuf)) {
-            printf ("\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
+            printf ("\nLine too long. Ignored.  Continuing Simulator execution\n");
+            if (sim_log)
+                fprintf (sim_log, "\r\nLine too long. Ignored.  Continuing Simulator execution\r\n");
             tmxr_linemsgf (lp, "\nLine too long. Ignored.  Continuing Simulator execution\n");
             tmxr_send_buffered_data (lp);       /* try to flush any buffered data */
             break;
@@ -634,16 +680,30 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         sim_rem_buf_ptr[i] = 0;
         sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
         if (cbuf[0] == '\0')
-            continue;
+            if (sim_rem_single_mode[i]) {
+                sim_rem_single_mode[i] = FALSE;
+                break;
+                }
+            else
+                continue;
         sim_sub_args (cbuf, sizeof(cbuf), argv);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */
         sim_switches = 0;                                   /* init switches */
+        if (!sim_log) {                                     /* Not currently logging? */
+            int32 save_quiet = sim_quiet;
+
+            sim_quiet = 1;
+            sprintf (sim_rem_con_temp_name, "sim_remote_console_%d.temporary_log", (int)getpid());
+            sim_set_logon (0, sim_rem_con_temp_name);
+            sim_quiet = save_quiet;
+            sim_log_temp = TRUE;
+            }
         cmd_log_start = sim_ftell (sim_log);
         if (!find_cmd (gbuf))                               /* validate command */
             stat = SCPE_UNK;
         else {
-            if ((cmdp = find_ctab (allowed_remote_cmds, gbuf))) {/* lookup command */
+            if ((cmdp = find_ctab (sim_rem_single_mode[i] ? allowed_single_remote_cmds : allowed_remote_cmds, gbuf))) {/* lookup command */
                 if (cmdp->action == &x_continue_cmd)
                     stat = SCPE_OK;
                 else {
@@ -688,20 +748,41 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         sim_fseeko (sim_log, cmd_log_start, SEEK_SET);
         cbuf[sizeof(cbuf)-1] = '\0';
         while (fgets (cbuf, sizeof(cbuf)-1, sim_log)) {
+            int32 unwritten;
+
             tmxr_linemsgf (lp, "%s", cbuf);
-            tmxr_send_buffered_data (lp);
+            do {
+                unwritten = tmxr_send_buffered_data (lp);
+                if (unwritten == lp->txbsz)
+                    sim_os_ms_sleep (100);
+                } while (unwritten == lp->txbsz);
             }
-        if (cmdp && (cmdp->action == &x_continue_cmd)) {
+        if ((cmdp && (cmdp->action == &x_continue_cmd)) ||
+            (sim_rem_single_mode[i])) {
             sim_rem_step_line = -1;                 /* Not stepping */
-            tmxr_linemsg (lp, "Simulator Running...");
-            tmxr_send_buffered_data (lp);
-            for (j=0; j < sim_rem_con_tmxr.lines; j++) {
-                lp = &sim_rem_con_tmxr.ldsc[j];
-                if ((i == j) || (!lp->conn))
-                    continue;
+            if (sim_log_temp) {                     /* If we setup a temporary log, clean it now  */
+                int32 save_quiet = sim_quiet;
+
+                sim_quiet = 1;
+                sim_set_logoff (0, NULL);
+                sim_quiet = save_quiet;
+                remove (sim_rem_con_temp_name);
+                sim_log_temp = FALSE;
+                }
+            if (!sim_rem_single_mode[i]) {
                 tmxr_linemsg (lp, "Simulator Running...");
                 tmxr_send_buffered_data (lp);
+                for (j=0; j < sim_rem_con_tmxr.lines; j++) {
+                    lp = &sim_rem_con_tmxr.ldsc[j];
+                    if ((i == j) || (!lp->conn))
+                        continue;
+                    tmxr_linemsg (lp, "Simulator Running...");
+                    tmxr_send_buffered_data (lp);
+                    }
+                sim_is_running = 1;
+                sim_start_timer_services ();
                 }
+            sim_rem_single_mode[i] = FALSE;
             break;
             }
         if (cmdp && (cmdp->action == &x_step_cmd)) {
@@ -731,10 +812,6 @@ t_stat r;
 if (flag) {
     r = sim_parse_addr (cptr, NULL, 0, NULL, NULL, 0, NULL, NULL);
     if (r == SCPE_OK) {
-        if (!sim_log) {
-            printf ("Logging must be enabled to activate Remote Console support\n");
-            return SCPE_ARG;
-            }
         if (sim_rem_con_tmxr.master)                    /* already open? */
             sim_set_rem_telnet (0, NULL);               /* close first */
         if (sim_rem_con_tmxr.lines == 0)                /* Ir no connection limit set */
@@ -748,8 +825,18 @@ if (flag) {
     return SCPE_NOPARAM;
     }
 else {
-    if (sim_rem_con_tmxr.master)
+    if (sim_rem_con_tmxr.master) {
+        int32 i;
+
         tmxr_detach (&sim_rem_con_tmxr, &sim_rem_con_unit[0]);
+        for (i=0; i<sim_rem_con_tmxr.lines; i++) {
+            free (sim_rem_buf[i]);
+            sim_rem_buf[i] = NULL;
+            sim_rem_buf_size[i] = 0;
+            sim_rem_buf_ptr[i] = 0;
+            sim_rem_single_mode[i] = FALSE;
+            }
+        }
     }
 return SCPE_OK;
 }
@@ -778,6 +865,8 @@ sim_rem_buf_size = realloc (sim_rem_buf_size, sizeof(*sim_rem_buf_size)*lines);
 memset (sim_rem_buf_size, 0, sizeof(*sim_rem_buf_size)*lines);
 sim_rem_buf_ptr = realloc (sim_rem_buf_ptr, sizeof(*sim_rem_buf_ptr)*lines);
 memset (sim_rem_buf_ptr, 0, sizeof(*sim_rem_buf_ptr)*lines);
+sim_rem_single_mode = realloc (sim_rem_single_mode, sizeof(*sim_rem_single_mode)*lines);
+memset (sim_rem_single_mode, 0, sizeof(*sim_rem_single_mode)*lines);
 return SCPE_OK;
 }
 
@@ -887,12 +976,6 @@ if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
 if (sim_log == NULL)                                    /* no log? */
     return SCPE_OK;
-if (sim_rem_con_tmxr.master) {
-    if (!sim_quiet)
-        printf ("Can't close log, Remote Console is enabled\n");
-    fprintf (sim_log, "Can't close log, Remote Console is enabled\n");
-    return SCPE_ARG;
-    }
 if (!sim_quiet)
     printf ("Log file closed\n");
 fprintf (sim_log, "Log file closed\n");

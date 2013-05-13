@@ -119,6 +119,7 @@ uint32 sim_timer_idle_capable (uint32 *hoat_tick_ms);
 
 extern t_bool sim_idle_enab;                        /* idle enabled flag */
 extern volatile t_bool sim_idle_wait;               /* idle waiting flag */
+extern UNIT *sim_clock_unit;
 extern t_bool sim_asynch_timer;
 extern DEVICE sim_timer_dev;
 

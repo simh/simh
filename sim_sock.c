@@ -939,6 +939,10 @@ if (rbytes == SOCKET_ERROR) {
     err = WSAGetLastError ();
     if (err == WSAEWOULDBLOCK)                          /* no data */
         return 0;
+#if defined(EAGAIN)
+    if (err == EAGAIN)                                  /* no data */
+        return 0;
+#endif
     if ((err != WSAETIMEDOUT) &&                        /* expected errors after a connect failure */
         (err != WSAEHOSTUNREACH) &&
         (err != WSAECONNREFUSED))
