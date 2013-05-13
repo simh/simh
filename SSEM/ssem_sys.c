@@ -2,7 +2,7 @@
 
    Based on the SIMH package written by Robert M Supnik
  
-   Copyright (c) 2006-2008 Gerardo Ospina
+   Copyright (c) 2006-2013 Gerardo Ospina
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
    in this Software without prior written authorization from the author.
 
    This is not a supported product, but the author welcomes bug reports and fixes.
-   Mail to ngospina@panix.com
+   Mail to ngospina@gmail.com
 */
 
 #include <ctype.h>
@@ -110,7 +110,7 @@ t_stat sim_load (FILE *fi, char *cptr, char *fnam, int flag)
 size_t len;
 
 len = strlen(fnam);
-if (len <= 4 || strcmp(fnam + (len - 4), ".dmp") != 0) return SCPE_ARG;
+if (len <= 3 || strcmp(fnam + (len - 3), ".st") != 0) return SCPE_ARG;
 
 if (flag == 1) return ssem_dump(fi);
 return ssem_load_dmp(fi);

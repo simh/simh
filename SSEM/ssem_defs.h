@@ -2,7 +2,7 @@
 
    Based on the SIMH package written by Robert M Supnik
  
-   Copyright (c) 2006-2008 Gerardo Ospina
+   Copyright (c) 2006-2013 Gerardo Ospina
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
    in this Software without prior written authorization from the author.
 
    This is not a supported product, but the author welcomes bug reports and fixes.
-   Mail to ngospina@panix.com
+   Mail to ngospina@gmail.com
 */
 
 #ifndef _SSEM_DEFS_H_
