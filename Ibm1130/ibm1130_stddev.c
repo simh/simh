@@ -298,7 +298,7 @@ void xio_1131_console (int32 iocc_addr, int32 func, int32 modify)
 
 /* emit_conout_character - write character with 1130 console code 'ch' */
 
-t_stat emit_conout_character (int ch)
+static t_stat emit_conout_character (int ch)
 {
 	t_stat status;
 

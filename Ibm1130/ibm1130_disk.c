@@ -384,7 +384,7 @@ static void diskfail (UNIT *uptr, int dswflag, int unitflag, t_bool do_interrupt
 		sim_activate(uptr, 1);			/* schedule an immediate op complete interrupt */
 }
 
-t_stat dsk_svc (UNIT *uptr)
+static t_stat dsk_svc (UNIT *uptr)
 {
 	int drv = uptr - dsk_unit, i, nwords, sec;
 	int16 buf[DSK_NUMWD];
@@ -465,7 +465,7 @@ t_stat dsk_svc (UNIT *uptr)
 	return SCPE_OK;
 }
 
-t_stat dsk_reset (DEVICE *dptr)
+static t_stat dsk_reset (DEVICE *dptr)
 {
 	int drv;
 	UNIT *uptr;
