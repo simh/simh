@@ -90,13 +90,13 @@ The following extensions to the SCP command language without affecting prior beh
 
     GOTO <Label>                 Command is now available.  Labels are lines 
                                  in which the first non whitespace character 
-                                 is a �:�.  The target of a goto is the first 
+                                 is a ":".  The target of a goto is the first 
                                  matching label in the current do command 
                                  file which is encountered.  Since labels 
-                                 don�t do anything else besides being the 
-                                 targets of goto�s, they could be used to 
+                                 don't do anything else besides being the 
+                                 targets of goto's, they could be used to 
                                  provide comments in do command files, for 
-                                 example (�:: This is a comment�)
+                                 example (":: This is a comment")
     SET ON                       Enables error trapping for currently defined 
                                  traps (by ON commands)
     SET NOON                     Disables error trapping for currently 
@@ -134,15 +134,15 @@ Error traps can be taken for any command which returns a status other than SCPE_
 
 ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
 
-Interactions with ASSERT command and �DO �e�:
-DO �e		is equivalent to SET ON, which by itself it equivalent to �SET ON; ON ERROR RETURN�.
+Interactions with ASSERT command and "DO -e":
+DO -e		is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
 ASSERT		failure have several different actions:
        If error trapping is not enabled then AFAIL causes exit from the current do command file.
-       If error trapping is enabled and an explicit �ON AFAIL� action is defined, then the specified action is performed.
-       If error trapping is enabled and no �ON AFAIL� action is defined, then an AFAIL causes exit from the current do command file.
+       If error trapping is enabled and an explicit "ON AFAIL" action is defined, then the specified action is performed.
+       If error trapping is enabled and no "ON AFAIL" action is defined, then an AFAIL causes exit from the current do command file.
 
 Other related changes/extensions:
-� The �!� command (execute a command on the local OS), now returns the command�s exit status as the status from the �!� command.  This allows ON conditions to handle error status responses from OS commands and act as desired.
+The "!" command (execute a command on the local OS), now returns the command's exit status as the status from the "!" command.  This allows ON conditions to handle error status responses from OS commands and act as desired.
 
 
 #### Help
@@ -329,7 +329,7 @@ On a VAX use:
 On a Alpha & IA64 hosts use:
 
     $ MMx                        ! With Ethernet support
-    $ MMx/MACRO=(�NONETWORK=1)   ! Without Ethernet support
+    $ MMx/MACRO=(NONETWORK=1)    ! Without Ethernet support
 
 UNZIP can be found on the VMS freeware CDs, or from www.info-zip.org
 MMS (Module Management System) can be licensed from HP/Compaq/Digital as part of the VMS Hobbyist program (it is a component of the DECSET product).
