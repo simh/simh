@@ -807,6 +807,7 @@ if (mp->last_poll_time == 0) {                          /* first poll initializa
 if ((poll_time - mp->last_poll_time) < TMXR_CONNECT_POLL_INTERVAL)
     return -1;                                          /* too soon to try */
 
+srand((unsigned int)poll_time);
 tmxr_debug_trace (mp, "tmxr_poll_conn()");
 
 mp->last_poll_time = poll_time;
@@ -862,95 +863,108 @@ if (mp->master) {
 
 /* Look for per line listeners or outbound connecting sockets */
 for (i = 0; i < mp->lines; i++) {                       /* check each line in sequence */
+    int j, r = rand();
     lp = mp->ldsc + i;                                  /* get pointer to line descriptor */
 
-    if (lp->connecting) {                           /* connecting? */
-        char *sockname, *peername;
+    /* If two simulators are configured with symmetric virtual null modem 
+       cables pointing at each other, there may be a problem establishing 
+       a connection if both systems happen to be checking for the success
+       of their connections in the exact same order.  They can each observe
+       success in their respective outgoing connections, which haven't 
+       actually been 'accept'ed on the peer end of the connection.  
+       We address this issue by checking for the success of an outgoing
+       connection and the arrival of an incoming one in a random order.
+     */
+    for (j=0; j<2; j++)
+        switch ((j+r)&1) {
+            case 0:
+                if (lp->connecting) {                           /* connecting? */
+                    char *sockname, *peername;
 
-        switch (sim_check_conn(lp->connecting, FALSE))
-            {
-            case 1:                                 /* successful connection */
-                lp->conn = TRUE;                    /* record connection */
-                lp->sock = lp->connecting;          /* it now looks normal */
-                lp->connecting = 0;
-                lp->ipad = realloc (lp->ipad, 1+strlen (lp->destination));
-                strcpy (lp->ipad, lp->destination);
-                lp->cnms = sim_os_msec ();
-                sim_getnames_sock (lp->sock, &sockname, &peername);
-                sprintf (msg, "tmxr_poll_conn() - Outgoing Line Connection to %s (%s->%s) established", lp->destination, sockname, peername);
-                tmxr_debug_connect_line (lp, msg);
-                free (sockname);
-                free (peername);
-                break;
-            case -1:                                /* failed connection */
-                sprintf (msg, "tmxr_poll_conn() - Outgoing Line Connection to %s failed", lp->destination);
-                tmxr_debug_connect_line (lp, msg);
-                tmxr_reset_ln (lp);                 /* retry */
-                break;
-            }
-        }
-
-    /* Check for a pending Telnet/tcp connection */
-
-    if (lp->master) {
-
-        while (INVALID_SOCKET != (newsock = sim_accept_conn (lp->master, &address))) {/* got a live one? */
-            char *sockname, *peername;
-
-            sim_getnames_sock (newsock, &sockname, &peername);
-            sprintf (msg, "tmxr_poll_conn() - Incoming Line Connection from %s (%s->%s)", address, peername, sockname);
-            tmxr_debug_connect_line (lp, msg);
-            free (sockname);
-            free (peername);
-            ++mp->sessions;                             /* count the new session */
-
-            if (lp->destination) {                      /* Virtual Null Modem Cable? */
-                char host[CBUFSIZE];
-
-                if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
-                    tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
-                    sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
-                    tmxr_debug_connect_line (lp, msg);
-                    sim_close_sock (newsock, 0);
-                    free (address);
-                    continue;                           /* Try for another connection */
-                    }
-                if (lp->connecting) {
-                    sprintf (msg, "tmxr_poll_conn() - aborting outgoing line connection attempt to: %s", lp->destination);
-                    tmxr_debug_connect_line (lp, msg);
-                    sim_close_sock (lp->connecting, 0); /* abort our as yet unconnnected socket */
-                    lp->connecting = 0;
-                    }
-                }
-            if (lp->conn == FALSE) {                    /* is the line available? */
-                if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
-                    tmxr_init_line (lp);                /* init line */
-                    lp->conn = TRUE;                    /* record connection */
-                    lp->sock = newsock;                 /* save socket */
-                    lp->ipad = address;                 /* ip address */
-                    if (!lp->notelnet) {
-                        sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
-                        tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                    switch (sim_check_conn(lp->connecting, FALSE))
+                        {
+                        case 1:                                 /* successful connection */
+                            lp->conn = TRUE;                    /* record connection */
+                            lp->sock = lp->connecting;          /* it now looks normal */
+                            lp->connecting = 0;
+                            lp->ipad = realloc (lp->ipad, 1+strlen (lp->destination));
+                            strcpy (lp->ipad, lp->destination);
+                            lp->cnms = sim_os_msec ();
+                            sim_getnames_sock (lp->sock, &sockname, &peername);
+                            sprintf (msg, "tmxr_poll_conn() - Outgoing Line Connection to %s (%s->%s) established", lp->destination, sockname, peername);
+                            tmxr_debug_connect_line (lp, msg);
+                            free (sockname);
+                            free (peername);
+                            break;
+                        case -1:                                /* failed connection */
+                            sprintf (msg, "tmxr_poll_conn() - Outgoing Line Connection to %s failed", lp->destination);
+                            tmxr_debug_connect_line (lp, msg);
+                            tmxr_reset_ln (lp);                 /* retry */
+                            break;
                         }
-                    tmxr_report_connection (mp, lp);
-                    lp->cnms = sim_os_msec ();          /* time of connection */
-                    return i;
                     }
-                else {
-                    tmxr_msg (newsock, "Line connection not available\r\n");
-                    tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection not available");
-                    sim_close_sock (newsock, 0);
-                    free (address);
+                break;
+            case 1:
+                if (lp->master) {                                   /* Check for a pending Telnet/tcp connection */
+                    while (INVALID_SOCKET != (newsock = sim_accept_conn (lp->master, &address))) {/* got a live one? */
+                        char *sockname, *peername;
+
+                        sim_getnames_sock (newsock, &sockname, &peername);
+                        sprintf (msg, "tmxr_poll_conn() - Incoming Line Connection from %s (%s->%s)", address, peername, sockname);
+                        tmxr_debug_connect_line (lp, msg);
+                        free (sockname);
+                        free (peername);
+                        ++mp->sessions;                             /* count the new session */
+
+                        if (lp->destination) {                      /* Virtual Null Modem Cable? */
+                            char host[CBUFSIZE];
+
+                            if (sim_parse_addr (lp->destination, host, sizeof(host), NULL, NULL, 0, NULL, address)) {
+                                tmxr_msg (newsock, "Rejecting connection from unexpected source\r\n");
+                                sprintf (msg, "tmxr_poll_conn() - Rejecting line connection from: %s, Expected: %s", address, host);
+                                tmxr_debug_connect_line (lp, msg);
+                                sim_close_sock (newsock, 0);
+                                free (address);
+                                continue;                           /* Try for another connection */
+                                }
+                            if (lp->connecting) {
+                                sprintf (msg, "tmxr_poll_conn() - aborting outgoing line connection attempt to: %s", lp->destination);
+                                tmxr_debug_connect_line (lp, msg);
+                                sim_close_sock (lp->connecting, 0); /* abort our as yet unconnnected socket */
+                                lp->connecting = 0;
+                                }
+                            }
+                        if (lp->conn == FALSE) {                    /* is the line available? */
+                            if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
+                                tmxr_init_line (lp);                /* init line */
+                                lp->conn = TRUE;                    /* record connection */
+                                lp->sock = newsock;                 /* save socket */
+                                lp->ipad = address;                 /* ip address */
+                                if (!lp->notelnet) {
+                                    sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                                    tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                                    }
+                                tmxr_report_connection (mp, lp);
+                                lp->cnms = sim_os_msec ();          /* time of connection */
+                                return i;
+                                }
+                            else {
+                                tmxr_msg (newsock, "Line connection not available\r\n");
+                                tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection not available");
+                                sim_close_sock (newsock, 0);
+                                free (address);
+                                }
+                            }
+                        else {
+                            tmxr_msg (newsock, "Line connection busy\r\n");
+                            tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection busy");
+                            sim_close_sock (newsock, 0);
+                            free (address);
+                            }
+                        }
                     }
-                }
-            else {
-                tmxr_msg (newsock, "Line connection busy\r\n");
-                tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection busy");
-                sim_close_sock (newsock, 0);
-                free (address);
-                }
+                break;
             }
-        }
 
     /* Check for pending serial port connection notification */
     
