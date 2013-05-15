@@ -869,7 +869,7 @@ newsock = accept (master, (struct sockaddr *) &clientname, &size);
 if (newsock == INVALID_SOCKET) {                        /* error? */
     err = WSAGetLastError ();
     if (err != WSAEWOULDBLOCK)
-        printf ("Sockets: accept error %d\n", err);
+        sim_err_sock(newsock, "accept", 0);
     return INVALID_SOCKET;
     }
 if (connectaddr != NULL) {
@@ -945,8 +945,9 @@ if (rbytes == SOCKET_ERROR) {
 #endif
     if ((err != WSAETIMEDOUT) &&                        /* expected errors after a connect failure */
         (err != WSAEHOSTUNREACH) &&
-        (err != WSAECONNREFUSED))
-        printf ("Sockets: read error %d\n", err);
+        (err != WSAECONNREFUSED) &&
+        (err != WSAECONNRESET))
+        sim_err_sock (INVALID_SOCKET, "read", 0);
     return -1;
     }
 return rbytes;
