@@ -437,9 +437,9 @@ lp->dstb = 0;                                           /* default bin mode */
 lp->rxbpr = lp->rxbpi = lp->rxcnt = 0;                  /* init receive indexes */
 if (!lp->txbfd)                                         /* if not buffered */
     lp->txbpr = lp->txbpi = lp->txcnt = 0;              /*   init transmit indexes */
-memset (lp->rbr, 0, TMXR_MAXBUF);                       /* clear break status array */
+memset (lp->rbr, 0, sizeof(lp->rbr));                   /* clear break status array */
 lp->txdrp = 0;
-if (lp->mp->modem_control)
+if (lp->modem_control)
     lp->modembits = TMXR_MDM_CTS | TMXR_MDM_DSR;
 if (!lp->mp->buffered) {
     lp->txbfd = 0;
@@ -721,6 +721,8 @@ for (i=0; i<mp->lines; ++i) {
             sprintf (growstring(&tptr, 32), "%sLine=%d", *tptr ? "," : "", i);
         else
             sprintf (growstring(&tptr, 32), "%s", *tptr ? "," : "");
+        if (lp->modem_control != mp->modem_control)
+            sprintf (growstring(&tptr, 32), ",%s", mp->modem_control ? "Modem" : "NoModem");
         if (lp->destination) {
             if (lp->serport) {
                 char portname[CBUFSIZE];
@@ -913,17 +915,25 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
                     }
                 }
             if (lp->conn == 0) {                        /* is the line available? */
-                tmxr_init_line (lp);                    /* init line */
-                lp->conn = TRUE;                        /* record connection */
-                lp->sock = newsock;                     /* save socket */
-                lp->ipad = address;                     /* ip address */
-                if (!lp->notelnet) {
-                    sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
-                    tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
+                    tmxr_init_line (lp);                /* init line */
+                    lp->conn = TRUE;                    /* record connection */
+                    lp->sock = newsock;                 /* save socket */
+                    lp->ipad = address;                 /* ip address */
+                    if (!lp->notelnet) {
+                        sim_write_sock (newsock, (char *)mantra, sizeof(mantra));
+                        tmxr_debug (TMXR_DBG_XMT, lp, "Sending", (char *)mantra, sizeof(mantra));
+                        }
+                    tmxr_report_connection (mp, lp);
+                    lp->cnms = sim_os_msec ();          /* time of connection */
+                    return i;
                     }
-                tmxr_report_connection (mp, lp);
-                lp->cnms = sim_os_msec ();              /* time of connection */
-                return i;
+                else {
+                    tmxr_msg (newsock, "Line connection not available\r\n");
+                    tmxr_debug_connect_line (lp, "tmxr_poll_conn() - Line connection not available");
+                    sim_close_sock (newsock, 0);
+                    free (address);
+                    }
                 }
             else {
                 tmxr_msg (newsock, "Line connection busy\r\n");
@@ -945,7 +955,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
     /* Check for needed outgoing connection initiation */
 
     if (lp->destination && (!lp->sock) && (!lp->connecting) && (!lp->serport) && 
-        (!mp->modem_control || (lp->modembits & TMXR_MDM_DTR))) {
+        (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR))) {
         sprintf (msg, "tmxr_poll_conn() - establishing outgoing connection to: %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
         lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
@@ -969,7 +979,7 @@ static t_stat tmxr_reset_ln_ex (TMLN *lp, t_bool closeserial)
 {
 char msg[512];
 
-tmxr_debug_trace_line (lp, "tmxr_reset_ln_ex)");
+tmxr_debug_trace_line (lp, "tmxr_reset_ln_ex()");
 
 if (lp->txlog)
     fflush (lp->txlog);                                 /* flush log */
@@ -992,7 +1002,7 @@ if (lp->serport) {
         lp->xmte = 1;
         }
     else
-        if (!lp->mp->modem_control) {                   /* serial connection? */
+        if (!lp->modem_control) {                       /* serial connection? */
             sim_control_serial (lp->serport, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);/* drop DTR and RTS */
             sim_os_ms_sleep (TMXR_DTR_DROP_TIME);
             sim_control_serial (lp->serport, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);/* raise DTR and RTS */
@@ -1013,7 +1023,7 @@ if ((lp->destination) && (!lp->serport)) {
         sim_close_sock (lp->connecting, 0);
         lp->connecting = 0;
         }
-    if ((!lp->mp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
+    if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
         sprintf (msg, "tmxr_reset_ln_ex() - connecting to %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
         lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
@@ -1058,10 +1068,33 @@ return tmxr_reset_ln_ex (lp, FALSE);
        tmxr_set_config_line APIs.
 
 */
+static t_stat tmxr_clear_modem_control_passthru_state (TMXR *mp, t_bool state)
+{
+int i;
+
+if (mp->modem_control == state)
+    return SCPE_OK;
+if (mp->master)
+    return SCPE_ALATT;
+for (i=0; i<mp->lines; ++i) {
+    TMLN *lp;
+
+    lp = mp->ldsc + i;
+    if ((lp->master)     || 
+        (lp->sock)       || 
+        (lp->connecting) ||
+        (lp->serport))
+        return SCPE_ALATT;
+    }
+mp->modem_control = state;
+for (i=0; i<mp->lines; ++i)
+    mp->ldsc[i].modem_control = state;
+return SCPE_OK;
+}
+
 t_stat tmxr_set_modem_control_passthru (TMXR *mp)
 {
-mp->modem_control = TRUE;
-return SCPE_OK;
+return tmxr_clear_modem_control_passthru_state (mp, TRUE);
 }
 
 /* Disable modem control pass thru
@@ -1087,24 +1120,7 @@ return SCPE_OK;
 */
 t_stat tmxr_clear_modem_control_passthru (TMXR *mp)
 {
-int i;
-
-if (!mp->modem_control)
-    return SCPE_OK;
-if (mp->master)
-    return SCPE_ALATT;
-for (i=0; i<mp->lines; ++i) {
-    TMLN *lp;
-
-    lp = mp->ldsc + i;
-    if ((lp->master)     || 
-        (lp->sock)       || 
-        (lp->connecting) ||
-        (lp->serport))
-        return SCPE_ALATT;
-    }
-mp->modem_control = FALSE;
-return SCPE_OK;
+return tmxr_clear_modem_control_passthru_state (mp, FALSE);
 }
 
 /* Manipulate the modem control bits of a specific line
@@ -1153,7 +1169,7 @@ if (sim_deb && lp->mp && lp->mp->dptr) {
     }
 if (incoming_bits)
     *incoming_bits = incoming_state;
-if (lp->mp && lp->mp->modem_control) {              /* This API ONLY works on modem_control enabled multiplexers */
+if (lp->mp && lp->modem_control) {                  /* This API ONLY works on modem_control enabled multiplexer lines */
     if (bits_to_set | bits_to_clear) {              /* Anything to do? */
         if (lp->serport)
             return sim_control_serial (lp->serport, bits_to_set, bits_to_clear, incoming_bits);
@@ -1185,7 +1201,7 @@ t_stat tmxr_set_config_line (TMLN *lp, char *config)
 t_stat r;
 
 tmxr_debug_trace_line (lp, "tmxr_set_config_line()");
-if (!lp->mp->modem_control)                         /* This API ONLY works on modem_control enabled multiplexers */
+if (!lp->modem_control)                             /* This API ONLY works on modem_control enabled multiplexer lines */
     return SCPE_IERR;
 if (lp->serport)
     r = sim_config_serial (lp->serport, config);
@@ -1594,13 +1610,14 @@ char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE],
 SOCKET sock;
 SERHANDLE serport;
 char *tptr = cptr;
-t_bool nolog, notelnet, listennotelnet, unbuffered;
+t_bool nolog, notelnet, listennotelnet, unbuffered, modem_control;
 TMLN *lp;
 t_stat r = SCPE_ARG;
 
 for (i = 0; i < mp->lines; i++) {               /* initialize lines */
     lp = mp->ldsc + i;
     lp->mp = mp;                                /* set the back pointer */
+    lp->modem_control = mp->modem_control;
     }
 tmxr_debug_trace (mp, "tmxr_open_master()");
 while (*tptr) {
@@ -1612,6 +1629,7 @@ while (*tptr) {
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
     nolog = notelnet = listennotelnet = unbuffered = FALSE;
+    modem_control = mp->modem_control;
     while (*tptr) {
         tptr = get_glyph_nc (tptr, tbuf, ',');
         if (!tbuf[0])
@@ -1658,6 +1676,18 @@ while (*tptr) {
                 if ((NULL != cptr) && ('\0' != *cptr))
                     return SCPE_2MARG;
                 nolog = TRUE;
+                continue;
+                }
+            if (0 == MATCH_CMD (gbuf, "NOMODEM")) {
+                if ((NULL != cptr) && ('\0' != *cptr))
+                    return SCPE_2MARG;
+                modem_control = FALSE;
+                continue;
+                }
+            if (0 == MATCH_CMD (gbuf, "MODEM")) {
+                if ((NULL != cptr) && ('\0' != *cptr))
+                    return SCPE_2MARG;
+                modem_control = TRUE;
                 continue;
                 }
             if (0 == MATCH_CMD (gbuf, "CONNECT")) {
@@ -1710,6 +1740,8 @@ while (*tptr) {
             listennotelnet = TRUE;
         }
     if (line == -1) {
+        if (modem_control != mp->modem_control)
+            return SCPE_ARG;
         if (logfiletmpl[0]) {
             strncpy(mp->logfiletmpl, logfiletmpl, sizeof(mp->logfiletmpl)-1);
             for (i = 0; i < mp->lines; i++) {
@@ -1935,6 +1967,7 @@ while (*tptr) {
                     return SCPE_ARG;
                 }
             }
+        lp->modem_control = modem_control;
         r = SCPE_OK;
         }
     }
@@ -2731,10 +2764,12 @@ else {
                     fprintf (st, " - %stelnet", lp->notelnet ? "no" : "");
                 if (lp->uptr && (lp->uptr != lp->mp->uptr))
                     fprintf (st, " - Unit: %s", sim_uname (lp->uptr));
+                if (mp->modem_control != lp->modem_control)
+                    fprintf(st, ", ModemControl=%s", lp->modem_control ? "enabled" : "disabled");
                 fprintf (st, "\n");
                 }
             if ((!lp->sock) && (!lp->connecting) && (!lp->serport) && (!lp->master)) {
-                if (mp->modem_control)
+                if (lp->modem_control)
                     tmxr_fconns (st, lp, -1);
                 continue;
                 }
@@ -2790,6 +2825,8 @@ for (i = 0; i < mp->lines; i++) {  /* loop thru conn */
         free (lp->port);
         lp->port = NULL;
         }
+    free (lp->txb);
+    lp->txb = NULL;
     lp->modembits = 0;
     }
 
@@ -2888,6 +2925,10 @@ if (single_line) {          /* Single Line Multiplexer */
     fprintf (st, "The %s multiplexer may be connected to terminal emulators supporting the\n", dptr->name);
     fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
     fprintf (st, "ports.\n\n");
+    if (mux->modem_control) {
+        fprintf (st, "The %s device is a full modem control device and therefore is capable of\n", dptr->name);
+        fprintf (st, "passing port configuration information and modem signals.\n");
+        }
     fprintf (st, "A Telnet listening port can be configured with:\n\n");
     fprintf (st, "   sim> ATTACH %s {interface:}port\n\n", dptr->name);
     fprintf (st, "Line buffering can be enabled for the %s device with:\n\n", dptr->name);
@@ -2906,6 +2947,14 @@ else {
     fprintf (st, "Telnet protocol via sockets, or to hardware terminals via host serial\n");
     fprintf (st, "ports.  Concurrent Telnet and serial connections may be mixed on a given\n");
     fprintf (st, "multiplexer.\n\n");
+    if (mux && mux->modem_control) {
+        fprintf (st, "The %s device is a full modem control device and therefore is capable of\n", dptr->name);
+        fprintf (st, "passing port configuration information and modem signals on all lines.\n");
+        }
+    fprintf (st, "Modem Control signalling behaviors can be enabled/disabled on a specific\n");
+    fprintf (st, "multiplexer line with:\n\n");
+    fprintf (st, "   sim> ATTACH %s Line=n,Modem\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %s Line=n,NoModem\n\n", dptr->name);
     fprintf (st, "A Telnet listening port can be configured with:\n\n");
     fprintf (st, "   sim> ATTACH %s {interface:}port\n\n", dptr->name);
     if (mux)
@@ -2961,7 +3010,12 @@ fprintf (st, "As an example:\n\n");
 fprintf (st, "   9600-8n1\n\n");
 fprintf (st, "The supported rates, sizes, and parity options are host-specific.  If\n");
 fprintf (st, "a configuration string is not supplied, then the default of 9600-8N1\n");
-fprintf (st, "is used.\n\n");
+fprintf (st, "is used.\n");
+fprintf (st, "Note: The serial port configuration option is only available on multiplexer\n");
+fprintf (st, "      lines which are not operating with full modem control behaviors enabled.\n");
+fprintf (st, "      Lines with full modem control behaviors enabled have all of their\n");
+fprintf (st, "      configuration managed by the Operating System running within the\n");
+fprintf (st, "      simulator.\n\n");
 fprintf (st, "An attachment to a serial port with the '-V' switch will cause a\n");
 fprintf (st, "connection message to be output to the connected serial port.\n");
 fprintf (st, "This will help to confirm the correct port has been connected and\n");
@@ -3152,7 +3206,7 @@ if (lp->cnms) {
 else
     fprintf (st, " Line disconnected\n");
 
-if (lp->mp->modem_control) {
+if (lp->modem_control) {
     fprintf (st, " Modem Bits: %s%s%s%s%s%s\n", (lp->modembits & TMXR_MDM_DTR) ? "DTR " : "",
                                                 (lp->modembits & TMXR_MDM_RTS) ? "RTS " : "",
                                                 (lp->modembits & TMXR_MDM_DCD) ? "DCD " : "",
@@ -3525,7 +3579,7 @@ if (mp == NULL)
     return SCPE_IERR;
 for (i = any = 0; i < mp->lines; i++) {
     if ((mp->ldsc[i].sock != 0) || 
-        (mp->ldsc[i].serport != 0) || mp->modem_control) {
+        (mp->ldsc[i].serport != 0) || mp->ldsc[i].modem_control) {
         if ((mp->ldsc[i].sock != 0) || (mp->ldsc[i].serport != 0))
             any++;
         if (val)
