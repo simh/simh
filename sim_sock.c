@@ -928,6 +928,76 @@ if (FD_ISSET (sock, rw_p)) {
 return 0;
 }
 
+static int32 _sim_getaddrname (struct sockaddr *addr, size_t addrsize, char *hostnamebuf, char *portnamebuf)
+{
+#if defined (macintosh) || defined (__linux) || defined (__linux__) || \
+    defined (__APPLE__) || defined (__OpenBSD__) || \
+    defined(__NetBSD__) || defined(__FreeBSD__) || \
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+socklen_t size = (socklen_t)addrsize;
+#elif defined (_WIN32) || defined (__EMX__) || \
+     (defined (__ALPHA) && defined (__unix__)) || \
+     defined (__hpux)
+int size = (int)addrsize;
+#else 
+size_t size = addrsize; 
+#endif
+int32 ret = 0;
+
+#ifdef AF_INET6
+*hostnamebuf = '\0';
+*portnamebuf = '\0';
+ret = p_getnameinfo(addr, size, hostnamebuf, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
+if (0 == memcmp("::ffff:", hostnamebuf, 7))        /* is this a IPv4-mapped IPv6 address? */
+    strcpy(hostnamebuf, 7+hostnamebuf);           /* prefer bare IPv4 address if possible */
+if (!ret)
+    ret = p_getnameinfo(addr, size, NULL, 0, portnamebuf, NI_MAXSERV, NI_NUMERICSERV);
+#else
+strcpy(hostnamebuf, inet_ntoa(((struct sockaddr_in *)addr)->s_addr));
+sprintf(portnamebuf, "%d", (int)ntohs(((struct sockaddr_in *)addr)->s_port)));
+#endif
+return ret;
+}
+
+int32 sim_getnames_sock (SOCKET sock, char **socknamebuf, char **peernamebuf)
+{
+struct sockaddr_storage sockname, peername;
+#if defined (macintosh) || defined (__linux) || defined (__linux__) || \
+    defined (__APPLE__) || defined (__OpenBSD__) || \
+    defined(__NetBSD__) || defined(__FreeBSD__) || \
+    (defined(__hpux) && defined(_XOPEN_SOURCE_EXTENDED))
+socklen_t socknamesize = (socklen_t)sizeof(sockname);
+socklen_t peernamesize = (socklen_t)sizeof(peername);
+#elif defined (_WIN32) || defined (__EMX__) || \
+     (defined (__ALPHA) && defined (__unix__)) || \
+     defined (__hpux)
+int socknamesize = (int)sizeof(sockname);
+int peernamesize = (int)sizeof(peername);
+#else 
+size_t socknamesize = sizeof(sockname); 
+size_t peernamesize = sizeof(peername); 
+#endif
+char hostbuf[NI_MAXHOST+1];
+char portbuf[NI_MAXSERV+1];
+
+if (socknamebuf)
+    *socknamebuf = calloc(1, NI_MAXHOST+NI_MAXSERV+4);
+if (peernamebuf)
+    *peernamebuf = calloc(1, NI_MAXHOST+NI_MAXSERV+4);
+getsockname (sock, (struct sockaddr *)&sockname, &socknamesize);
+getpeername (sock, (struct sockaddr *)&peername, &peernamesize);
+if (socknamebuf != NULL) {
+    _sim_getaddrname ((struct sockaddr *)&sockname, (size_t)socknamesize, hostbuf, portbuf);
+    sprintf(*socknamebuf, "[%s]:%s", hostbuf, portbuf);
+    }
+if (peernamebuf != NULL) {
+    _sim_getaddrname ((struct sockaddr *)&peername, (size_t)peernamesize, hostbuf, portbuf);
+    sprintf(*peernamebuf, "[%s]:%s", hostbuf, portbuf);
+    }
+return 0;
+}
+
+
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes)
 {
 int32 rbytes, err;
