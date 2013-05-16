@@ -90,7 +90,7 @@ extern int32 int_req[IPL_HLVL];
 #error "Too many DZ multiplexers"
 #endif
 
-#define DZ_MNOMASK      (dz_desc.lines/DZ_LINES - 1)    /* mask for mux no */
+#define DZ_MAXMUX       (dz_desc.lines/DZ_LINES - 1)    /* maximul mux no */
 #define DZ_LNOMASK      (DZ_LINES - 1)                  /* mask for lineno */
 #define DZ_LMASK        ((1 << DZ_LINES) - 1)           /* mask of lines */
 #define DZ_SILO_ALM     16                              /* silo alarm level */
@@ -370,8 +370,10 @@ t_stat dz_rd (int32 *data, int32 PA, int32 access)
 {
 int i;
 static BITFIELD* bitdefs[] = {dz_csr_bits, dz_rbuf_bits, dz_tcr_bits, dz_msr_bits};
-int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
+int32 dz = ((PA - dz_dib.ba) >> 3);                     /* get mux num */
 
+if (dz > DZ_MAXMUX)
+    return SCPE_IERR;
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
     case 00:                                            /* CSR */
@@ -425,11 +427,14 @@ return SCPE_OK;
 
 t_stat dz_wr (int32 data, int32 PA, int32 access)
 {
-int32 dz = ((PA - dz_dib.ba) >> 3) & DZ_MNOMASK;        /* get mux num */
+int32 dz = ((PA - dz_dib.ba) >> 3);                     /* get mux num */
 static BITFIELD* bitdefs[] = {dz_csr_bits, dz_lpr_bits, dz_tcr_bits, dz_tdr_bits};
 int32 i, c, line;
 char lineconfig[16];
 TMLN *lp;
+
+if (dz > DZ_MAXMUX)
+    return SCPE_IERR;
 
 sim_debug(DBG_REG, &dz_dev, "dz_wr(PA=0x%08X [%s], access=%d, data=0x%X) ", PA, dz_wr_regs[(PA >> 1) & 03], access, data);
 sim_debug_bits(DBG_REG, &dz_dev, bitdefs[(PA >> 1) & 03], (uint32)((PA & 1) ? data<<8 : data), (uint32)((PA & 1) ? data<<8 : data), TRUE);
