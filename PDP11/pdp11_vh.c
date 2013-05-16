@@ -93,7 +93,7 @@ extern int32    tmxr_poll, clk_tps;
 #ifndef VH_MUXES
 #define VH_MUXES    (4)
 #endif
-#define VH_MNOMASK  (VH_MUXES - 1)
+#define VH_MAXMUX  (vh_desc.lines/VH_LINES - 1)
 
 #if defined(VM_VAX)
 #if VEC_QBUS
@@ -787,8 +787,11 @@ static t_stat vh_rd (   int32   *data,
             int32   PA,
             int32   access  )
 {
-    int32   vh = ((PA - vh_dib.ba) >> 4) & VH_MNOMASK, line;
+    int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
+
+    if (vh > VH_MAXMUX)                         /* validate mux number */
+        return SCPE_IERR;
 
     switch ((PA >> 1) & 7) {
     case 0:     /* CSR */
@@ -873,8 +876,11 @@ static t_stat vh_wr (   int32   data,
             int32   PA,
             int32   access  )
 {
-    int32   vh = ((PA - vh_dib.ba) >> 4) & VH_MNOMASK, line;
+    int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
+
+    if (vh > VH_MAXMUX)                         /* validate mux number */
+        return SCPE_IERR;
 
     sim_debug(DBG_REG, &vh_dev, "vh_wr(PA=0x%08X [%s], access=%d, data=0x%X)\n", PA, 
               ((vh_unit[vh].flags & UNIT_MODEDHU) ? vh_wr_dhu_regs : vh_wr_dhv_regs)[(PA >> 1) & 07], access, data);

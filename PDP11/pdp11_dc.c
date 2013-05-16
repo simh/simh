@@ -47,7 +47,7 @@
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
-#define DCX_MASK        (DCX_LINES - 1)
+#define DCX_MAXMUX      (dcx_desc.lines - 1)
 
 /* Parity and modem control */
 
@@ -270,7 +270,10 @@ DEVICE dco_dev = {
 
 t_stat dcx_rd (int32 *data, int32 PA, int32 access)
 {
-int32 ln = ((PA - dci_dib.ba) >> 3) & DCX_MASK;
+int32 ln = ((PA - dci_dib.ba) >> 3);
+
+if (ln > DCX_MAXMUX)                                    /* validate line number */
+    return SCPE_IERR;
 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
@@ -301,8 +304,11 @@ return SCPE_NXM;
 
 t_stat dcx_wr (int32 data, int32 PA, int32 access)
 {
-int32 ln = ((PA - dci_dib.ba) >> 3) & DCX_MASK;
+int32 ln = ((PA - dci_dib.ba) >> 3);
 TMLN *lp = &dcx_ldsc[ln];
+
+if (ln > DCX_MAXMUX)                                    /* validate line number */
+    return SCPE_IERR;
 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 

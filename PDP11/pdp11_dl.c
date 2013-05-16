@@ -44,7 +44,7 @@
 #include "sim_sock.h"
 #include "sim_tmxr.h"
 
-#define DLX_MASK        (DLX_LINES - 1)
+#define DLX_MAXMUX      (dlx_desc.lines - 1)
 #define DLI_RCI         0                               /* rcv ints */
 #define DLI_DSI         1                               /* dset ints */
 
@@ -226,7 +226,10 @@ DEVICE dlo_dev = {
 
 t_stat dlx_rd (int32 *data, int32 PA, int32 access)
 {
-int32 ln = ((PA - dli_dib.ba) >> 3) & DLX_MASK;
+int32 ln = ((PA - dli_dib.ba) >> 3);
+
+if (ln > DLX_MAXMUX)                                    /* validate line number */
+    return SCPE_IERR;
 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
@@ -257,8 +260,11 @@ return SCPE_NXM;
 
 t_stat dlx_wr (int32 data, int32 PA, int32 access)
 {
-int32 ln = ((PA - dli_dib.ba) >> 3) & DLX_MASK;
+int32 ln = ((PA - dli_dib.ba) >> 3);
 TMLN *lp = &dlx_ldsc[ln];
+
+if (ln > DLX_MAXMUX)                                    /* validate line number */
+    return SCPE_IERR;
 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
