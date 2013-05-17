@@ -2857,12 +2857,14 @@ t_stat show_config (FILE *st, DEVICE *dnotused, UNIT *unotused, int32 flag, char
 {
 int32 i;
 DEVICE *dptr;
+t_bool only_enabled = (sim_switches & SWMASK ('E'));
 
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
-fprintf (st, "%s simulator configuration\n\n", sim_name);
+fprintf (st, "%s simulator configuration%s\n\n", sim_name, only_enabled ? " (enabled devices)" : "");
 for (i = 0; (dptr = sim_devices[i]) != NULL; i++)
-    show_device (st, dptr, flag);
+    if (!only_enabled || !qdisable (dptr))
+        show_device (st, dptr, flag);
 return SCPE_OK;
 }
 
