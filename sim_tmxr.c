@@ -715,26 +715,13 @@ if (mp->logfiletmpl[0])                                 /* logfile info */
 while ((*tptr == ',') || (*tptr == ' '))
     strcpy(tptr, tptr+1);
 for (i=0; i<mp->lines; ++i) {
+    char *lptr;
     lp = mp->ldsc + i;
-    if (lp->destination || lp->port) {
-        if (mp->lines > 1)
-            sprintf (growstring(&tptr, 32), "%sLine=%d", *tptr ? "," : "", i);
-        else
-            sprintf (growstring(&tptr, 32), "%s", *tptr ? "," : "");
-        if (lp->modem_control != mp->modem_control)
-            sprintf (growstring(&tptr, 32), ",%s", mp->modem_control ? "Modem" : "NoModem");
-        if (lp->destination) {
-            if (lp->serport) {
-                char portname[CBUFSIZE];
 
-                get_glyph_nc (lp->destination, portname, ';');
-                sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s%s", portname, strcmp("9600-8N1", lp->serconfig) ? ";" : "", strcmp("9600-8N1", lp->serconfig) ? lp->serconfig : "");
-                }
-            else
-                sprintf (growstring(&tptr, 18 + strlen (lp->destination)), ",Connect=%s%s", lp->destination, lp->notelnet ? ";notelnet" : "");
-            }
-        if (lp->port)
-            sprintf (growstring(&tptr, 12 + strlen (lp->port)), ",%s%s", lp->port, lp->notelnet ? ";notelnet" : "");
+    lptr = tmxr_line_attach_string(lp);
+    if (lptr) {
+        sprintf (growstring(&tptr, 10+strlen(lptr)), "%s%s", *tptr ? "," : "", lptr);
+        free (lptr);
         }
     }
 if (mp->lines == 1)
@@ -751,6 +738,55 @@ return tptr;
 
 /* Global routines */
 
+
+/* Return the Line specific attach setup currently configured for a given line
+
+   Inputs:
+        *lp     =       pointer to terminal line descriptor
+   Outputs:
+        a string which can be used to reconfigure the line, 
+        NULL if the line isn't configured
+
+   Note: The returned string is dynamically allocated memory and must be freed 
+         when it is no longer needed by calling free
+
+*/
+
+char *tmxr_line_attach_string(TMLN *lp)
+{
+char* tptr = NULL;
+
+tptr = (char *) calloc (1, 1);
+
+if (tptr == NULL)                                       /* no more mem? */
+    return tptr;
+
+if (lp->destination || lp->port || lp->txlogname) {
+    if ((lp->mp->lines > 1) || (lp->port))
+        sprintf (growstring(&tptr, 32), "Line=%d", (int)(lp-lp->mp->ldsc));
+    if (lp->modem_control != lp->mp->modem_control)
+        sprintf (growstring(&tptr, 32), ",%s", lp->modem_control ? "Modem" : "NoModem");
+    if (lp->destination) {
+        if (lp->serport) {
+            char portname[CBUFSIZE];
+
+            get_glyph_nc (lp->destination, portname, ';');
+            sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s%s", portname, strcmp("9600-8N1", lp->serconfig) ? ";" : "", strcmp("9600-8N1", lp->serconfig) ? lp->serconfig : "");
+            }
+        else
+            sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s", lp->destination, (lp->mp->notelnet != lp->notelnet) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
+        }
+    if (lp->port)
+        sprintf (growstring(&tptr, 12 + strlen (lp->port)), ",%s%s", lp->port, (lp->mp->notelnet != lp->notelnet) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
+    if (lp->txlogname)
+        sprintf (growstring(&tptr, 12 + strlen (lp->txlogname)), ",Log=%s", lp->txlogname);
+    }
+if (*tptr == '\0') {
+    free (tptr);
+    tptr = NULL;
+    }
+return tptr;
+}
 
 /* Poll for new connection
 
@@ -1052,11 +1088,13 @@ if ((lp->destination) && (!lp->serport)) {
         }
     }
 tmxr_init_line (lp);                                /* initialize line state */
-/* Revise the unit's connect string to reflect the current attachments */
-lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
-/* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
-if (lp->mp->uptr->filename == NULL)
-    tmxr_detach (lp->mp, lp->mp->uptr);
+if (lp->mp->uptr) {
+    /* Revise the unit's connect string to reflect the current attachments */
+    lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
+    /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
+    if (lp->mp->uptr->filename == NULL)
+        tmxr_detach (lp->mp, lp->mp->uptr);
+    }
 return SCPE_OK;
 }
 
@@ -1651,6 +1689,8 @@ while (*tptr) {
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
     nolog = notelnet = listennotelnet = unbuffered = FALSE;
+    if (line != -1)
+        notelnet = listennotelnet = mp->notelnet;
     modem_control = mp->modem_control;
     while (*tptr) {
         tptr = get_glyph_nc (tptr, tbuf, ',');
@@ -1666,7 +1706,7 @@ while (*tptr) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
                 nextline = (int32) get_uint (cptr, 10, mp->lines-1, &r);
-                if ((r != SCPE_OK) || (mp->lines == 1))
+                if (r != SCPE_OK)
                     return SCPE_ARG;
                 break;
                 }
@@ -1731,10 +1771,16 @@ while (*tptr) {
                         sim_close_sock (sock, 0);
                     else
                         return SCPE_ARG;
-                    if (cptr)
+                    if (cptr) {
                         get_glyph (cptr, cptr, 0);          /* upcase this string */
-                    if (0 == MATCH_CMD (cptr, "NOTELNET"))
-                        notelnet = TRUE;
+                        if (0 == MATCH_CMD (cptr, "NOTELNET"))
+                            notelnet = TRUE;
+                        else
+                            if (0 == MATCH_CMD (cptr, "TELNET"))
+                                notelnet = FALSE;
+                            else
+                                return SCPE_ARG;
+                        }
                     cptr = hostport;
                     }
                 strcpy(destination, cptr);
@@ -1743,10 +1789,16 @@ while (*tptr) {
             cptr = get_glyph (gbuf, port, ';');
             if (SCPE_OK != sim_parse_addr (port, NULL, 0, NULL, NULL, 0, NULL, NULL))
                 return SCPE_ARG;
-            if (cptr)
+            if (cptr) {
                 get_glyph (cptr, cptr, 0);                  /* upcase this string */
-            if (0 == MATCH_CMD (cptr, "NOTELNET"))
-                listennotelnet = TRUE;
+                if (0 == MATCH_CMD (cptr, "NOTELNET"))
+                    listennotelnet = TRUE;
+                else
+                    if (0 == MATCH_CMD (cptr, "TELNET"))
+                        listennotelnet = FALSE;
+                    else
+                        return SCPE_ARG;
+                }
             cptr = init_cptr;
             }
         cptr = get_glyph_nc (cptr, port, ';');
@@ -1758,8 +1810,14 @@ while (*tptr) {
         sim_close_sock (sock, 1);
         strcpy(listen, port);
         cptr = get_glyph (cptr, option, ';');
-        if (0 == MATCH_CMD (option, "NOTELNET"))
-            listennotelnet = TRUE;
+        if (option[0])
+            if (0 == MATCH_CMD (option, "NOTELNET"))
+                listennotelnet = TRUE;
+            else
+                if (0 == MATCH_CMD (option, "TELNET"))
+                    listennotelnet = FALSE;
+                else
+                    return SCPE_ARG;
         }
     if (line == -1) {
         if (modem_control != mp->modem_control)
@@ -1894,6 +1952,7 @@ while (*tptr) {
                     lp->notelnet = notelnet;
                     lp->cnms = sim_os_msec ();              /* record time of connection */
                     tmxr_init_line (lp);                    /* init the line state */
+                    return SCPE_OK;
                     }
                 else
                     return SCPE_ARG;
@@ -1937,6 +1996,8 @@ while (*tptr) {
                 }
             }
         if (listen[0]) {
+            if ((mp->lines == 1) && (mp->master))           /* single line mux can have either line specific OR mux listener but NOT both */
+                return SCPE_ARG;
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r != SCPE_OK)
                 return r;
@@ -1949,7 +2010,7 @@ while (*tptr) {
             lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
             strcpy(lp->port, listen);                       /* save port */
             lp->master = sock;                              /* save master socket */
-            if (listennotelnet)
+            if (listennotelnet != mp->notelnet)
                 lp->notelnet = listennotelnet;
             else
                 lp->notelnet = mp->notelnet;
