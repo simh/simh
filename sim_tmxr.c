@@ -3842,42 +3842,89 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     tmxr_debug_buf_used = 0;
     if (tmxr_debug_buf)
         tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
-    for (i=0; i<bufsize; ++i) {
-        switch ((u_char)buf[i]) {
-            case TN_CR:
-                tmxr_buf_debug_string ("_TN_CR_");
-                break;
-            case TN_LF:
-                tmxr_buf_debug_string ("_TN_LF_");
-                break;
-            case TN_IAC:
-                if (!lp->notelnet) {
-                    i += (tmxr_buf_debug_telnet_options ((u_char *)(&buf[i]), bufsize-i) - 1);
-                    break;
-                    }
-            default:
-                if (isprint((u_char)buf[i]))
-                    tmxr_buf_debug_char (buf[i]);
-                else {
-                    tmxr_buf_debug_char ('_');
-                    if ((buf[i] >= 1) && (buf[i] <= 26)) {
-                        tmxr_buf_debug_char ('^');
-                        tmxr_buf_debug_char ('A' + buf[i] - 1);
-                        }
-                    else {
-                        char octal[8];
 
-                        sprintf(octal, "\\%03o", (u_char)buf[i]);
-                        tmxr_buf_debug_string (octal);
-                        }
-                    tmxr_buf_debug_char ('_');
-                    }
-                break;
+    if (!lp->notelnet) {
+        int same, group, sidx, oidx;
+        char outbuf[80], strbuf[18];
+        static char hex[] = "0123456789ABCDEF";
+
+        for (i=same=0; i<bufsize; i += 16) {
+            if ((i > 0) && (0 == memcmp(&buf[i], &buf[i-16], 16))) {
+                ++same;
+                continue;
+                }
+            if (same > 0) {
+                if (lp->mp->lines > 1)
+                    sim_debug (dbits, lp->mp->dptr, "Line:%d %04X thru %04X same as above\n", (int)(lp-lp->mp->ldsc), i-(16*same), i-1);
+                else
+                    sim_debug (dbits, lp->mp->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
+                same = 0;
+                }
+            group = (((bufsize - i) > 16) ? 16 : (bufsize - i));
+            for (sidx=oidx=0; sidx<group; ++sidx) {
+                outbuf[oidx++] = ' ';
+                outbuf[oidx++] = hex[(buf[i+sidx]>>4)&0xf];
+                outbuf[oidx++] = hex[buf[i+sidx]&0xf];
+                if (isprint((u_char)buf[i+sidx]))
+                    strbuf[sidx] = buf[i+sidx];
+                else
+                    strbuf[sidx] = '.';
+                }
+            outbuf[oidx] = '\0';
+            strbuf[sidx] = '\0';
+            if (lp->mp->lines > 1)
+                sim_debug (dbits, lp->mp->dptr, "Line:%d %04X%-48s %s\n", (int)(lp-lp->mp->ldsc), i, outbuf, strbuf);
+            else
+                sim_debug (dbits, lp->mp->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
+            }
+        if (same > 0) {
+            if (lp->mp->lines > 1)
+                sim_debug (dbits, lp->mp->dptr, "Line:%d %04X thru %04X same as above\n", (int)(lp-lp->mp->ldsc), i-(16*same), bufsize-1);
+            else
+                sim_debug (dbits, lp->mp->dptr, "%04X thru %04X same as above\n", i-(16*same), bufsize-1);
             }
         }
-    if (lp->mp->lines > 1)
-        sim_debug (dbits, lp->mp->dptr, "Line:%d %s %d bytes '%s'\n", (int)(lp-lp->mp->ldsc), msg, bufsize, tmxr_debug_buf);
-    else
-        sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
+    else {
+        tmxr_debug_buf_used = 0;
+        if (tmxr_debug_buf)
+            tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
+        for (i=0; i<bufsize; ++i) {
+            switch ((u_char)buf[i]) {
+                case TN_CR:
+                    tmxr_buf_debug_string ("_TN_CR_");
+                    break;
+                case TN_LF:
+                    tmxr_buf_debug_string ("_TN_LF_");
+                    break;
+                case TN_IAC:
+                    if (!lp->notelnet) {
+                        i += (tmxr_buf_debug_telnet_options ((u_char *)(&buf[i]), bufsize-i) - 1);
+                        break;
+                        }
+                default:
+                    if (isprint((u_char)buf[i]))
+                        tmxr_buf_debug_char (buf[i]);
+                    else {
+                        tmxr_buf_debug_char ('_');
+                        if ((buf[i] >= 1) && (buf[i] <= 26)) {
+                            tmxr_buf_debug_char ('^');
+                            tmxr_buf_debug_char ('A' + buf[i] - 1);
+                            }
+                        else {
+                            char octal[8];
+
+                            sprintf(octal, "\\%03o", (u_char)buf[i]);
+                            tmxr_buf_debug_string (octal);
+                            }
+                        tmxr_buf_debug_char ('_');
+                        }
+                    break;
+                }
+            }
+        if (lp->mp->lines > 1)
+            sim_debug (dbits, lp->mp->dptr, "Line:%d %s %d bytes '%s'\n", (int)(lp-lp->mp->ldsc), msg, bufsize, tmxr_debug_buf);
+        else
+            sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
+        }
     }
 }
