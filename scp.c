@@ -6369,7 +6369,7 @@ if (!uptr->next)
 if (sim_clock_queue != QUEUE_LIST_END)
     sim_interval = sim_clock_queue->time;
 else sim_interval = noqueue_time = NOQUEUE_WAIT;
-if (sim_is_active(uptr)) {
+if (uptr->next) {
     if (sim_deb) {
         sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Cancel failed for %s\n", sim_uname(uptr));
         fclose(sim_deb);
