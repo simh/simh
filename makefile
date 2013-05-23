@@ -261,14 +261,26 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     OS_LDFLAGS += -lrt
     $(info using librt: $(call find_lib,rt))
   endif
-  ifneq (,$(call find_lib,pthread))
-    ifneq (,$(call find_include,pthread))
+  ifneq (,$(call find_include,pthread))
+    ifneq (,$(call find_lib,pthread))
       OS_CCDEFS += -DUSE_READER_THREAD
       ifeq (,$(NOASYNCH))
         OS_CCDEFS += -DSIM_ASYNCH_IO 
       endif
       OS_LDFLAGS += -lpthread
       $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+    else
+      LIBEXTSAVE := $(LIBEXT)
+      LIBEXT = a
+      ifneq (,$(call find_lib,pthread))
+        OS_CCDEFS += -DUSE_READER_THREAD
+        ifeq (,$(NOASYNCH))
+          OS_CCDEFS += -DSIM_ASYNCH_IO 
+        endif
+        OS_LDFLAGS += -lpthread
+        $(info using libpthread: $(call find_lib,pthread) $(call find_include,pthread))
+      endif
+      LIBEXT = $(LIBEXTSAVE)        
     endif
   endif
   ifneq (,$(call find_include,dlfcn))
@@ -331,7 +343,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           LIBEXT = a
           ifneq (,$(call find_lib,$(PCAPLIB)))
             NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
-            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+            NETWORK_LDFLAGS := -L$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
             NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
             $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
           endif
@@ -387,7 +399,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
-            NETWORK_LDFLAGS += -lvdeplug -Wl,-R$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
+            NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
             $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
           endif
         endif
