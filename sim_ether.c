@@ -965,6 +965,7 @@ static int     (*p_pcap_fileno) (pcap_t *);
 #endif
 static int     (*p_pcap_sendpacket) (pcap_t* handle, const u_char* msg, int len);
 static int     (*p_pcap_setfilter) (pcap_t *, struct bpf_program *);
+static int     (*p_pcap_setnonblock)(pcap_t* a, int nonblock, char *errbuf);
 static char*   (*p_pcap_lib_version) (void);
 
 /* load function pointer from DLL */
@@ -1040,6 +1041,7 @@ int load_pcap(void) {
 #endif
       load_function("pcap_sendpacket",   (_func *) &p_pcap_sendpacket);
       load_function("pcap_setfilter",    (_func *) &p_pcap_setfilter);
+      load_function("pcap_setnonblock",  (_func *) &p_pcap_setnonblock);
       load_function("pcap_lib_version",  (_func *) &p_pcap_lib_version);
 
       if (lib_loaded == 1) {
@@ -1063,8 +1065,8 @@ void pcap_close(pcap_t* a) {
   }
 }
 
-/* OpenBSD and OS/X on PowerPC have an ancient declaration of pcap_compile which doesn't have a const in the bpf string argument */
-#if defined (__OpenBSD__) || (defined (__APPLE__) && defined (__POWERPC__))
+/* OpenBSD, AIX and OS/X on PowerPC have an ancient declaration of pcap_compile which doesn't have a const in the bpf string argument */
+#if defined (__OpenBSD__) || defined (_AIX) || (defined (__APPLE__) && defined (__POWERPC__))
 int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e) {
 #else
 int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_int32 e) {
@@ -1186,6 +1188,14 @@ int pcap_sendpacket(pcap_t* a, const u_char* b, int c) {
 int pcap_setfilter(pcap_t* a, struct bpf_program* b) {
   if (load_pcap() != 0) {
     return p_pcap_setfilter(a, b);
+  } else {
+    return 0;
+  }
+}
+
+int pcap_setnonblock(pcap_t* a, int nonblock, char *errbuf) {
+  if (load_pcap() != 0) {
+    return p_pcap_setnonblock(a, nonblock, errbuf);
   } else {
     return 0;
   }
