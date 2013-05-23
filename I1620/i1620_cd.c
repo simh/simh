@@ -133,7 +133,7 @@ const char cdr_to_num[128] = {
 
 /* Numeric (flag + digit) to card punch (ASCII) */
 
-const char num_to_cdp[32] = {
+const int8 num_to_cdp[32] = {
  '0', '1', '2', '3', '4', '5', '6', '7',                /* 0 */
  '8', '9', '|', ',', ' ', '"', ' ', '"',
  ']', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* F + 0 */
@@ -149,7 +149,7 @@ const char num_to_cdp[32] = {
    12-7-8 (}) reads as 5F
 */
 
-const char cdr_to_alp[128] = {
+const int8 cdr_to_alp[128] = {
  0x00,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 00 */
    -1, 0x00, 0x00,   -1,   -1, 0x00,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 10 */
@@ -186,7 +186,7 @@ const char cdr_to_alp[128] = {
    12-5-8 ([), or 12-6-8 (<)
 */
 
-const char alp_to_cdp[256] = {
+const int8 alp_to_cdp[256] = {
  ' ',  -1, '?', '.', ')',  -1,  -1, '}',                /* 00 */
   -1,  -1, '\'', -1,  -1,  -1,  -1, '"',
  '+',  -1, '!', '$', '*', ']',  -1,  -1,                /* 10 */ 

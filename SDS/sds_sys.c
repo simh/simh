@@ -101,7 +101,7 @@ const char *sim_stop_messages[] = {
 
 /* Character conversion tables */
 
-const char sds_to_ascii[64] = {
+const int8 sds_to_ascii[64] = {
     '0', '1', '2', '3', '4', '5', '6', '7',
     '8', '9', ' ', '=', '\'', ':', '>', '%',            /* 17 = check mark */
     '+', 'A', 'B', 'C', 'D', 'E', 'F', 'G',
@@ -112,7 +112,7 @@ const char sds_to_ascii[64] = {
     'Y', 'Z', '?', ',', '(', '~', '\\', '#'             /* 72 = rec mark */
      };                                                 /* 75 = squiggle, 77 = del */
 
-const char ascii_to_sds[128] = {
+const int8 ascii_to_sds[128] = {
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,             /* 0 - 37 */
     032, 072,  -1,  -1,  -1, 052,  -1,  -1,
      -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
@@ -131,7 +131,7 @@ const char ascii_to_sds[128] = {
     067, 070, 071,  -1,  -1,  -1,  -1,  -1
     };
 
-const char odd_par[64] = {
+const int8 odd_par[64] = {
     0100, 0001, 0002, 0103, 0004, 0105, 0106, 0007,
     0010, 0111, 0112, 0013, 0114, 0015, 0016, 0117,
     0020, 0121, 0122, 0023, 0124, 0025, 0026, 0127,

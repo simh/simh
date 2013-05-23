@@ -65,9 +65,9 @@ t_stat tto (uint32 fnc, uint32 inst, uint32 *dat);
 t_stat tto_svc (UNIT *uptr);
 t_stat tto_reset (DEVICE *dptr);
 
-extern const char ascii_to_sds[128];
-extern const char sds_to_ascii[64];
-extern const char odd_par[64];
+extern const int8 ascii_to_sds[128];
+extern const int8 sds_to_ascii[64];
+extern const int8 odd_par[64];
 
 /* PTR data structures
 
