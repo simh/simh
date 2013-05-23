@@ -224,7 +224,7 @@ FILE *sim_fopen (const char *file, const char *mode)
 #if defined (VMS)
 return fopen (file, mode, "ALQ=32", "DEQ=4096",
         "MBF=6", "MBC=127", "FOP=cbt,tef", "ROP=rah,wbh", "CTX=stm");
-#elif (defined (__linux) || defined (__linux__) || defined (__hpux)) && !defined (DONT_DO_LARGEFILE)
+#elif (defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX)) && !defined (DONT_DO_LARGEFILE)
 return fopen64 (file, mode);
 #else
 return fopen (file, mode);
@@ -313,7 +313,7 @@ return (t_offset)fileaddr;
 
 /* Linux */
 
-#if defined (__linux) || defined (__linux__) || defined (__hpux)
+#if defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX)
 #define S_SIM_IO_FSEEK_EXT_ 1
 int sim_fseeko (FILE *st, t_offset xpos, int origin)
 {

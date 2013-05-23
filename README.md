@@ -20,6 +20,8 @@
 
 #### Updated HP2100 simulator from Dave Bryan.
 
+### New Host Platform support - HP-UX and AIX
+
 ### New Functionality
 
 #### Remote Console Facility

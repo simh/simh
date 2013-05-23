@@ -38,7 +38,7 @@
 #define fxwrite(a,b,c,d)        sim_fwrite (a, b, c, d)
 
 int32 sim_finit (void);
-#if (defined (__linux) || defined (__linux__) || defined (__hpux) ||                           \
+#if (defined (__linux) || defined (__linux__) || defined (__hpux) || defined (_AIX) ||                           \
      (defined (VMS) && (defined (__ALPHA) || defined (__ia64)) && (__DECC_VER >= 60590001)) || \
      ((defined(__sun) || defined(__sun__)) && defined(_LARGEFILE_SOURCE)) ||                   \
      defined (_WIN32) || defined (__APPLE__) ||                                                \

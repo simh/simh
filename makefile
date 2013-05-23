@@ -7,6 +7,7 @@
 #   NetBSD
 #   FreeBSD
 #   HP-UX
+#   AIX
 #   Windows (MinGW & cygwin)
 #   Linux x86 targeting Android (using agcc script)
 #
@@ -91,8 +92,8 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
         endif
       endif
       ifeq (HP-UX,$(OSTYPE))
-        ifneq (,$(shell what `which $(firstword $(GCC))` | grep -i compiler))
-          COMPILER_NAME = $(strip $(shell what `which $(firstword $(GCC))` | grep -i compiler))
+        ifneq (,$(shell what `which $(firstword $(GCC)) 2>&1`| grep -i compiler))
+          COMPILER_NAME = $(strip $(shell what `which $(firstword $(GCC)) 2>&1` | grep -i compiler))
         endif
       endif
     endif
@@ -178,25 +179,37 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             PCAPLIB = wpcap
             LIBEXT = a
           else
-            ifeq (,$(findstring NetBSD,$(OSTYPE)))
-              ifneq (no ldconfig,$(wordlist 1,2,$(shell which ldconfig)))
-                LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+            ifneq (,$(findstring AIX,$(OSTYPE)))
+              OS_LDFLAGS += -lm -lrt
+              ifeq (incopt,$(shell if $(TEST) -d /opt/freeware/include; then echo incopt; fi))
+                INCPATH += /opt/freeware/include
+                OS_CCDEFS += -I/opt/freeware/include
               endif
-              ifneq (,$(LDSEARCH))
-                LIBPATH := $(LDSEARCH)
-              else
-                ifeq (,$(strip $(LPATH)))
-                  $(info *** Warning ***)
-                  $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
-                  $(info *** Warning *** determined.  This should be resolved before you can expect)
-                  $(info *** Warning *** to have fully working simulators.)
-                  $(info *** Warning ***)
-                  $(info *** Warning *** You can specify your library paths via the LPATH environment)
-                  $(info *** Warning *** variable.)
-                  $(info *** Warning ***)
+              ifeq (libopt,$(shell if $(TEST) -d /opt/freeware/lib; then echo libopt; fi))
+                LIBPATH += /opt/freeware/lib
+                OS_LDFLAGS += -L/opt/freeware/lib
+              endif
+            else
+              ifeq (,$(findstring NetBSD,$(OSTYPE)))
+                ifneq (no ldconfig,$(findstring no ldconfig,$(shell which ldconfig 2>&1)))
+                  LDSEARCH :=$(shell ldconfig -r | grep 'search directories' | awk '{print $$3}' | sed 's/:/ /g')
+                endif
+                ifneq (,$(LDSEARCH))
+                  LIBPATH := $(LDSEARCH)
                 else
-                  LIBPATH = $(subst :, ,$(LPATH))
-                  OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
+                  ifeq (,$(strip $(LPATH)))
+                    $(info *** Warning ***)
+                    $(info *** Warning *** The library search path on your $(OSTYPE) platform can't be)
+                    $(info *** Warning *** determined.  This should be resolved before you can expect)
+                    $(info *** Warning *** to have fully working simulators.)
+                    $(info *** Warning ***)
+                    $(info *** Warning *** You can specify your library paths via the LPATH environment)
+                    $(info *** Warning *** variable.)
+                    $(info *** Warning ***)
+                  else
+                    LIBPATH = $(subst :, ,$(LPATH))
+                    OS_LDFLAGS += $(patsubst %,-L%,$(LIBPATH))
+                  endif
                 endif
               endif
             endif
@@ -204,7 +217,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
               LIBPATH += /usr/pkg/lib
               OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
             endif
-            ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE)))
+            ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
+              INCPATH += /usr/local/include
+              OS_CCDEFS += -I/usr/local/include
+            endif
+            ifneq (,$(findstring NetBSD,$(OSTYPE))$(findstring FreeBSD,$(OSTYPE))$(findstring AIX,$(OSTYPE)))
               LIBEXT = so
             else
               ifeq (HP-UX,$(OSTYPE))
@@ -260,7 +277,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_LDFLAGS += -ldl
       $(info using libdl: $(call find_lib,dl) $(call find_include,dlfcn))
     else
-      ifeq (BSD,$(findstring BSD,$(OSTYPE)))
+      ifneq (,$(findstring BSD,$(OSTYPE))$(findstring AIX,$(OSTYPE)))
         OS_CCDEFS += -DHAVE_DLOPEN=so
         $(info using libdl: $(call find_include,dlfcn))
       else
@@ -305,9 +322,21 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
         endif
       else
-        NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
-        NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
-        $(info using libpcap: $(call find_include,pcap))
+        ifneq (,$(call find_lib,$(PCAPLIB)))
+          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
+          $(info using libpcap: $(call find_include,pcap))
+        else
+          LIBEXTSAVE := $(LIBEXT)
+          LIBEXT = a
+          ifneq (,$(call find_lib,$(PCAPLIB)))
+            NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+            NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+            NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
+            $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
+          endif
+          LIBEXT = $(LIBEXTSAVE)        
+        endif
       endif
     else
       # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
@@ -358,7 +387,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
-            NETWORK_LDFLAGS += -lvdeplug
+            NETWORK_LDFLAGS += -lvdeplug -R$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
             $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
           endif
         endif

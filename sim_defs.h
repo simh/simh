@@ -134,6 +134,9 @@
 #ifdef RS
 #undef RS
 #endif
+#ifdef PAGESIZE
+#undef PAGESIZE
+#endif
 
 
 #ifndef TRUE
@@ -302,7 +305,7 @@ typedef uint32          t_addr;
 
 #define PV_RZRO         0                               /* right, zero fill */
 #define PV_RSPC         1                               /* right, space fill */
-#define PV_RCOMMA       2                               /* right, space fill. Comma separte every 3 */
+#define PV_RCOMMA       2                               /* right, space fill. Comma separate every 3 */
 #define PV_LEFT         3                               /* left justify */
 
 /* Default timing parameters */
@@ -740,7 +743,7 @@ extern int32 sim_asynch_latency;
 extern int32 sim_asynch_inst_latency;
 
 /* Thread local storage */
-#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__)
+#if defined(__GNUC__) && !defined(__APPLE__) && !defined(__hpux) && !defined(__OpenBSD__) && !defined(_AIX)
 #define AIO_TLS __thread
 #elif defined(_MSC_VER)
 #define AIO_TLS __declspec(thread)
