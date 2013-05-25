@@ -417,6 +417,7 @@ static BITFIELD tmxr_modem_bits[] = {
 
 /* Local routines */
 
+static void tmxr_add_to_open_list (TMXR* mux);
 
 /* Initialize the line state.
 
@@ -2054,6 +2055,8 @@ while (*tptr) {
         r = SCPE_OK;
         }
     }
+if (r == SCPE_OK)
+    tmxr_add_to_open_list (mp);
 return r;
 }
 
@@ -2714,7 +2717,7 @@ else
 return SCPE_OK;
 }
 
-static void _tmxr_add_to_open_list (TMXR* mux)
+static void tmxr_add_to_open_list (TMXR* mux)
 {
 int i;
 t_bool found = FALSE;
@@ -2798,7 +2801,7 @@ uptr->dynflags |= TMUF_NOASYNCH;                        /* tag as no asynch */
 if (mp->dptr == NULL)                                   /* has device been set? */
     mp->dptr = find_dev_from_unit (uptr);               /* no, so set device now */
 
-_tmxr_add_to_open_list (mp);
+tmxr_add_to_open_list (mp);
 return SCPE_OK;
 }
 
