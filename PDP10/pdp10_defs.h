@@ -658,6 +658,12 @@ typedef struct pdp_dib DIB;
 #define IOLN_UBMNT3     001
 #define IOBA_XU         (IO_UBA3 + 0774510)             /* DEUNA/DELUA */
 #define IOLN_XU         010
+#define IOBA_DMR        (IO_UBA3 + 0764000)		/* DMR11 */
+#define IOLN_DMR        010
+#define IOBA_DUP        (IO_UBA3 + 0760300)		/* DUP11 */
+#define IOLN_DUP        010
+#define IOBA_KMC        (IO_UBA3 + 0760540)		/* KMC11 */
+#define IOLN_KMC         010
 #define IOBA_CR         (IO_UBA3 + 0777160)             /* CD/CR/CM */
 #define IOLN_CR         010
 #define IOBA_RY         (IO_UBA3 + 0777170)             /* RX211 */
@@ -696,6 +702,10 @@ typedef struct pdp_dib DIB;
 
 #define INT_V_RP        6                               /* RH11/RP,RM drives */
 #define INT_V_TU        7                               /* RH11/TM03/TU45 */
+#define INT_V_KMCA      8				/* KMC11 */
+#define INT_V_KMCB      9
+#define INT_V_DMRA      10				/* DMR11 */
+#define INT_V_DMRB      11
 #define INT_V_DMCRX     13
 #define INT_V_DMCTX     14
 #define INT_V_XU        15                              /* DEUNA/DELUA */
@@ -709,6 +719,10 @@ typedef struct pdp_dib DIB;
 
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TU          (1u << INT_V_TU)
+#define INT_KMCA        (1u << INT_V_KMCA)
+#define INT_KMCB        (1u << INT_V_KMCB)
+#define INT_DMRA        (1u << INT_V_DMRA)
+#define INT_DMRB        (1u << INT_V_DMRB)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_XU          (1u << INT_V_XU)
@@ -722,6 +736,10 @@ typedef struct pdp_dib DIB;
 
 #define IPL_RP          6                               /* int levels */
 #define IPL_TU          6
+#define IPL_KMCA        5
+#define IPL_KMCB        5
+#define IPL_DMRA        5
+#define IPL_DMRB        5
 #define IPL_DMCRX       5
 #define IPL_DMCTX       5
 #define IPL_XU          5
@@ -751,6 +769,10 @@ typedef struct pdp_dib DIB;
 #define VEC_RY          0264
 #define VEC_DZRX        0340
 #define VEC_DZTX        0344
+#define VEC_KMCA        0540
+#define VEC_KMCB        0544
+#define VEC_DMRA        0610
+#define VEC_DMRB        0614
 #define VEC_LP20        0754
 #define VEC_AUTO        0                               /* Set by Auto Configure */
 

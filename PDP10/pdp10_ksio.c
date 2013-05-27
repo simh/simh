@@ -512,7 +512,7 @@ d10 val;
 
 ba = ba & ~01;                                          /* align start */
 lim = ba + (bc & ~01);
-for ( ; ba < lim; ba++) {                               /* by bytes */
+for ( ; ba < lim; ba += 2) {                            /* by bytes */
     pa10 = Map_Addr10 (ba, 1);                          /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
@@ -520,8 +520,8 @@ for ( ; ba < lim; ba++) {                               /* by bytes */
         }
     val = *buf++;                                       /* get data */
     if (ba & 2)
-        M[pa10] = (M[pa10] & INT64_C(0777777600000)) | val;
-    else M[pa10] = (M[pa10] & INT64_C(0600000777777)) | (val << 18);
+        M[pa10] = (M[pa10] & INT64_C(0777777000000)) | val;
+    else M[pa10] = (M[pa10] & INT64_C(0000000777777)) | (val << 18);
     }
 return 0;
 }
