@@ -436,12 +436,14 @@ lp->tsta = 0;                                           /* init telnet state */
 lp->xmte = 1;                                           /* enable transmit */
 lp->dstb = 0;                                           /* default bin mode */
 lp->rxbpr = lp->rxbpi = lp->rxcnt = 0;                  /* init receive indexes */
-if (!lp->txbfd)                                         /* if not buffered */
+if (!lp->txbfd || lp->notelnet)                         /* if not buffered telnet */
     lp->txbpr = lp->txbpi = lp->txcnt = 0;              /*   init transmit indexes */
 memset (lp->rbr, 0, sizeof(lp->rbr));                   /* clear break status array */
 lp->txdrp = 0;
-if (lp->modem_control)
-    lp->modembits = TMXR_MDM_CTS | TMXR_MDM_DSR;
+if (lp->modem_control) {
+    lp->modembits &= ~TMXR_MDM_INCOMING;
+    lp->modembits |= TMXR_MDM_CTS | TMXR_MDM_DSR;
+    }
 if (!lp->mp->buffered) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
@@ -695,7 +697,7 @@ static char *growstring(char **string, size_t growth)
 return *string + strlen(*string);
 }
 
-static char *_mux_attach_string(char *old, TMXR *mp)
+static char *tmxr_mux_attach_string(char *old, TMXR *mp)
 {
 char* tptr = NULL;
 int32 i;
@@ -767,6 +769,10 @@ if (lp->destination || lp->port || lp->txlogname) {
         sprintf (growstring(&tptr, 32), "Line=%d", (int)(lp-lp->mp->ldsc));
     if (lp->modem_control != lp->mp->modem_control)
         sprintf (growstring(&tptr, 32), ",%s", lp->modem_control ? "Modem" : "NoModem");
+    if (lp->txbfd && (lp->txbsz != lp->mp->buffered))
+        sprintf (growstring(&tptr, 32), ",Buffered=%d", lp->txbsz);
+    if (!lp->txbfd && (lp->mp->buffered > 0))
+        sprintf (growstring(&tptr, 32), ",UnBuffered");
     if (lp->destination) {
         if (lp->serport) {
             char portname[CBUFSIZE];
@@ -1091,7 +1097,7 @@ if ((lp->destination) && (!lp->serport)) {
 tmxr_init_line (lp);                                /* initialize line state */
 if (lp->mp->uptr) {
     /* Revise the unit's connect string to reflect the current attachments */
-    lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
+    lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
     /* No connections or listeners exist, then we're equivalent to being fully detached.  We should reflect that */
     if (lp->mp->uptr->filename == NULL)
         tmxr_detach (lp->mp, lp->mp->uptr);
@@ -1272,7 +1278,7 @@ else {
     r = SCPE_OK;
     }
 if (r == SCPE_OK)                                   /* Record port state for proper restore */
-    lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
+    lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return r;
 }
 
@@ -1342,7 +1348,7 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
             TMXR_MAXBUF - lp->rxbpi);
 
     if (nbytes < 0) {                                   /* line error? */
-        if (!lp->txbfd) 
+        if (!lp->txbfd || lp->notelnet) 
             lp->txbpi = lp->txbpr = 0;                  /* Drop the data we already know we can't send */
         tmxr_close_ln (lp);                             /* disconnect line */
         }
@@ -1493,8 +1499,8 @@ return (lp->rxbpi - lp->rxbpr + ((lp->rxbpi < lp->rxbpr)? TMXR_MAXBUF: 0));
 
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr)
 {
-if ((lp->conn == FALSE) &&                              /* no conn & not buffered? */
-    (!lp->txbfd)) {
+if ((lp->conn == FALSE) &&                              /* no conn & not buffered telnet? */
+    (!lp->txbfd || lp->notelnet)) {
     ++lp->txdrp;                                        /* lost */
     return SCPE_LOST;
     }
@@ -1507,7 +1513,7 @@ tmxr_debug_trace_line (lp, "tmxr_putc_ln()");
         lp->txbpr = (1+lp->txbpr)%lp->txbsz, ++lp->txdrp; \
     }
 if ((lp->txbfd) || (TXBUF_AVAIL(lp) > 1)) {             /* room for char (+ IAC)? */
-    if ((TN_IAC == (u_char) chr) && (!lp->notelnet))      /* char == IAC in telnet session? */
+    if ((TN_IAC == (u_char) chr) && (!lp->notelnet))    /* char == IAC in telnet session? */
         TXBUF_CHAR (lp, TN_IAC);                        /* stuff extra IAC char */
     TXBUF_CHAR (lp, chr);                               /* buffer char & adv pointer */
     if ((!lp->txbfd) && (TXBUF_AVAIL (lp) <= TMXR_GUARD))/* near full? */
@@ -2783,7 +2789,7 @@ r = tmxr_open_master (mp, cptr);                        /* open master socket */
 if (r != SCPE_OK)                                       /* error? */
     return r;
 mp->uptr = uptr;                                        /* save unit for polling */
-uptr->filename = _mux_attach_string (uptr->filename, mp);/* save */
+uptr->filename = tmxr_mux_attach_string (uptr->filename, mp);/* save */
 uptr->flags = uptr->flags | UNIT_ATT;                   /* no more errors */
 if ((mp->lines > 1) ||
     ((mp->master == 0) &&
@@ -2828,9 +2834,12 @@ else {
     for (i=0; i<tmxr_open_device_count; ++i) {
         TMXR *mp = tmxr_open_devices[i];
         TMLN *lp;
+        char *attach;
 
-        fprintf(st, "Multiplexer device: %s", mp->dptr->name);
-        fprintf(st, ", attached to %s, ", mp->uptr->filename);
+        fprintf(st, "Multiplexer device: %s, ", mp->dptr->name);
+        attach = tmxr_mux_attach_string (NULL, mp);
+        fprintf(st, "attached to %s, ", attach);
+        free (attach);
         if (mp->lines > 1) {
             tmxr_show_lines(st, NULL, 0, mp);
             fprintf(st, ", ");
@@ -3427,7 +3436,7 @@ if (lp->txlog == NULL) {                                /* error? */
     free (lp->txlogname);                               /* free buffer */
     return SCPE_OPENERR;
     }
-lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
+lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return SCPE_OK;
 }
 
@@ -3450,7 +3459,7 @@ if (lp->txlog) {                                        /* logging? */
     lp->txlog = NULL;
     lp->txlogname = NULL;
     }
-lp->mp->uptr->filename = _mux_attach_string (lp->mp->uptr->filename, lp->mp);
+lp->mp->uptr->filename = tmxr_mux_attach_string (lp->mp->uptr->filename, lp->mp);
 return SCPE_OK;
 }
 
