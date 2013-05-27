@@ -103,6 +103,8 @@ extern DEVICE xu_dev, xub_dev;
 extern DEVICE ke_dev;
 extern DEVICE kg_dev;
 extern DEVICE dmc_dev[];
+extern DEVICE dup_dev;
+extern DEVICE dpv_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern uint16 *M;
@@ -171,6 +173,8 @@ DEVICE *sim_devices[] = {
 	&dmc_dev[1],
 	&dmc_dev[2],
 	&dmc_dev[3],
+    &dup_dev,
+    &dpv_dev,
     NULL
     };
 

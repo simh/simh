@@ -55,6 +55,7 @@ extern DEVICE dz_dev;
 extern DEVICE vh_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE dmc_dev[];
+extern DEVICE dup_dev;
 
 extern UNIT cpu_unit;
 extern void WriteB (uint32 pa, int32 val);
@@ -93,6 +94,7 @@ DEVICE *sim_devices[] = {
 	&dmc_dev[1],
 	&dmc_dev[2],
 	&dmc_dev[3],
+    &dup_dev,
     NULL
     };
 

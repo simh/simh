@@ -247,6 +247,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define VH_MUXES        4                               /* max # of DHU muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
+#define DUP_LINES       8                               /* max # of DUP11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
@@ -306,6 +307,8 @@ typedef struct {
 #define INT_V_XU        8
 #define INT_V_DMCRX     9
 #define INT_V_DMCTX     10
+#define INT_V_DUPRX     11
+#define INT_V_DUPTX     12
 
 #define INT_V_LPT       0                               /* BR4 */
 #define INT_V_PTR       1
@@ -331,6 +334,8 @@ typedef struct {
 #define INT_CR          (1u << INT_V_CR)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
+#define INT_DUPRX       (1u << INT_V_DUPRX)
+#define INT_DUPTX       (1u << INT_V_DUPTX)
 
 #define IPL_DZRX        (0x15 - IPL_HMIN)
 #define IPL_DZTX        (0x15 - IPL_HMIN)
@@ -349,6 +354,8 @@ typedef struct {
 #define IPL_VHTX        (0x14 - IPL_HMIN)
 #define IPL_DMCRX       (0x15 - IPL_HMIN)
 #define IPL_DMCTX       (0x15 - IPL_HMIN)
+#define IPL_DUPRX       (0x15 - IPL_HMIN)
+#define IPL_DUPTX       (0x15 - IPL_HMIN)
 
 /* Device vectors */
 

@@ -961,6 +961,8 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
         {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
+    { { "DUP" },         1,  2,  0, 0, 
+        {0000100}, {0300} },                             /* DUP11 sync lines - fx CSR, fx VEC */
 #else
     { { "QBA" },         1,  0,  0, 0, 
         {017500} },                                     /* doorbell - fx CSR, no VEC */
