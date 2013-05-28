@@ -49,6 +49,7 @@
 #endif
 
 #include "sim_tmxr.h"
+#include <ctype.h>
 
 #if !defined(DUP_LINES)
 #define DUP_LINES 8
@@ -88,6 +89,7 @@ t_stat dup_set_modem (int32 dup, int32 rxcsr_bits);
 t_stat dup_get_modem (int32 dup);
 t_stat dup_svc (UNIT *uptr);
 t_stat dup_poll_svc (UNIT *uptr);
+t_stat dup_rcv_byte (int32 dup);
 t_stat dup_reset (DEVICE *dptr);
 t_stat dup_attach (UNIT *uptr, char *ptr);
 t_stat dup_detach (UNIT *uptr);
@@ -508,6 +510,15 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             if (dup_rxcsr[dup] & RXCSR_M_RXIE)
                 dup_set_rxint (dup);
             }
+        if ((dup_rxcsr[dup] & RXCSR_M_RCVEN) && 
+            (!(orig_val & RXCSR_M_RCVEN))) {            /* Upward transition of receiver enable */
+            dup_rcv_byte (dup);                         /* start any pending receive */
+            }
+        if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) && 
+            (orig_val & RXCSR_M_RCVEN)) {               /* Downward transition of receiver enable */
+            dup_rxcsr[dup] &= ~RXCSR_M_RXDONE;
+            dup_rcvpkinoff[dup] = dup_rcvpkoffset[dup] = 0;
+            }
         break;
 
     case 01:                                            /* PARCSR */
@@ -585,7 +596,11 @@ return SCPE_OK;
 
 t_stat dup_rcv_byte (int32 dup)
 {
-sim_debug (DBG_TRC, DUPDPTR, "");
+sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
+           (dup_rxcsr[dup] & RXCSR_M_RCVEN) ? "enabled" : "disabled",
+           dup_rcvpkinoff[dup], dup_rcvpkoffset[dup]);
+if (!(dup_rxcsr[dup] & RXCSR_M_RCVEN) || (dup_rcvpkoffset[dup] == 0))
+    return SCPE_OK;
 dup_rxcsr[dup] |= RXCSR_M_RXACT;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
@@ -729,7 +744,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                     break;
                     }
                 else {
-                    int32 count = ((dup_rcvpacket[dup][2] & 0x3F) << 8)| dup_rcvpacket[dup][3];
+                    int32 count = ((dup_rcvpacket[dup][2] & 0x3F) << 8)| dup_rcvpacket[dup][1];
 
                     if (dup_rcvpkoffset[dup] >= 10 + count) {
                         ddcmp_packet_trace (DUPDPTR, "RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
@@ -763,8 +778,8 @@ if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
 
         switch (msg[0]) {
             case DDCMP_SOH:   /* Data Message */
-                sim_debug (DBG_PKT, dptr, "Data Message, Link: %d, Count: %d, Resp: %d, Num: %d, HDRCRC: %s, DATACRC: %s\n", msg[1], msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[3], msg[4], msg[5], 
-                                            (0 == dup_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == dup_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)| msg[3]))) ? "OK" : "BAD");
+                sim_debug (DBG_PKT, dptr, "Data Message, Link: %d, Count: %d, Resp: %d, Num: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)|msg[1], msg[3], msg[4], 
+                                            (0 == dup_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == dup_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)|msg[1]))) ? "OK" : "BAD");
                 break;
             case DDCMP_ENQ:   /* Control Message */
                 sim_debug (DBG_PKT, dptr, "Control: Type: %d ", msg[1]);
