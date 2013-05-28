@@ -336,6 +336,20 @@ UNIT dup_poll_unit_template = {
 UNIT dup_units[DUP_LINES+1];    /* One unit per line and a polling unit */
 
 REG dup_reg[] = {
+    { BRDATADF (RXCSR,          dup_rxcsr,  DEV_RDX, 16, DUP_LINES, "receive control/status register",  dup_rxcsr_bits) },
+    { BRDATADF (RXDBUF,        dup_rxdbuf,  DEV_RDX, 16, DUP_LINES, "receive data buffer",              dup_rxdbuf_bits) },
+    { BRDATADF (PARCSR,        dup_parcsr,  DEV_RDX, 16, DUP_LINES, "receive control/status register",  dup_parcsr_bits) },
+    { BRDATADF (TXCSR,          dup_txcsr,  DEV_RDX, 16, DUP_LINES, "transmit control/status register", dup_txcsr_bits) },
+    { BRDATADF (TXDBUF,        dup_txdbuf,  DEV_RDX, 16, DUP_LINES, "transmit data buffer",             dup_txdbuf_bits) },
+    { GRDATAD  (RXINT,            dup_rxi,  DEV_RDX, DUP_LINES,  0, "receive interrupts") },
+    { GRDATAD  (TXINT,            dup_txi,  DEV_RDX, DUP_LINES,  0, "transmit interrupts") },
+    { DRDATAD  (RXWAIT,       dup_rx_wait,                      24, "delay time for receive bytes") },
+    { DRDATAD  (TXWAIT,       dup_tx_wait,                      24, "delay time for transmit bytes") },
+    { BRDATAD  (RPOFFSET, dup_rcvpkoffset,  DEV_RDX, 16, DUP_LINES, "receive assembly packet offset") },
+    { BRDATAD  (TPOFFSET, dup_xmtpkoffset,  DEV_RDX, 16, DUP_LINES, "transmit assembly packet offset") },
+    { BRDATAD  (RPINOFF,   dup_rcvpkinoff,  DEV_RDX, 16, DUP_LINES, "receive digest packet offset") },
+    { BRDATAD  (TPOUTOFF, dup_xmtpkoutoff,  DEV_RDX, 16, DUP_LINES, "transmit digest packet offset") },
+    { BRDATAD  (TPREADY,     dup_xmtpkrdy,  DEV_RDX, 16, DUP_LINES, "transmit packet ready") },
     { NULL }
     };
 
@@ -606,11 +620,15 @@ dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
 dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
+if (((dup_rcvpkinoff[dup] == 8) || 
+     (dup_rcvpkinoff[dup] >= dup_rcvpkoffset[dup])) &&
+    (0 == dup_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
+    dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
+else
+    dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 if (dup_rcvpkinoff[dup] >= dup_rcvpkoffset[dup]) {
     dup_rcvpkoffset[dup] = 0;
     dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
-    if (0 == dup_crc16 (0, dup_rcvpacket[dup], dup_rcvpkoffset[dup]))
-        dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
     }
 if (dup_rxcsr[dup] & RXCSR_M_RXIE)
     dup_set_rxint (dup);
@@ -1087,58 +1105,18 @@ return (UNIBUS) ? "DUP11 bit synchronous interface" :
 }
 
 /* crc16 polynomial x^16 + x^15 + x^2 + 1 (0xA001) CCITT LSB */
-static const uint16 crc16Table[256] = {
-    0x0000, 0x8005, 0x800f, 0x000a, 0x801b, 0x001e, 0x0014, 0x8011,
-    0x8033, 0x0036, 0x003c, 0x8039, 0x0028, 0x802d, 0x8027, 0x0022,
-    0x8063, 0x0066, 0x006c, 0x8069, 0x0078, 0x807d, 0x8077, 0x0072,
-    0x0050, 0x8055, 0x805f, 0x005a, 0x804b, 0x004e, 0x0044, 0x8041,
-    0x80c3, 0x00c6, 0x00cc, 0x80c9, 0x00d8, 0x80dd, 0x80d7, 0x00d2,
-    0x00f0, 0x80f5, 0x80ff, 0x00fa, 0x80eb, 0x00ee, 0x00e4, 0x80e1,
-    0x00a0, 0x80a5, 0x80af, 0x00aa, 0x80bb, 0x00be, 0x00b4, 0x80b1,
-    0x8093, 0x0096, 0x009c, 0x8099, 0x0088, 0x808d, 0x8087, 0x0082,
-    0x8183, 0x0186, 0x018c, 0x8189, 0x0198, 0x819d, 0x8197, 0x0192,
-    0x01b0, 0x81b5, 0x81bf, 0x01ba, 0x81ab, 0x01ae, 0x01a4, 0x81a1,
-    0x01e0, 0x81e5, 0x81ef, 0x01ea, 0x81fb, 0x01fe, 0x01f4, 0x81f1,
-    0x81d3, 0x01d6, 0x01dc, 0x81d9, 0x01c8, 0x81cd, 0x81c7, 0x01c2,
-    0x0140, 0x8145, 0x814f, 0x014a, 0x815b, 0x015e, 0x0154, 0x8151,
-    0x8173, 0x0176, 0x017c, 0x8179, 0x0168, 0x816d, 0x8167, 0x0162,
-    0x8123, 0x0126, 0x012c, 0x8129, 0x0138, 0x813d, 0x8137, 0x0132,
-    0x0110, 0x8115, 0x811f, 0x011a, 0x810b, 0x010e, 0x0104, 0x8101,
-    0x8303, 0x0306, 0x030c, 0x8309, 0x0318, 0x831d, 0x8317, 0x0312,
-    0x0330, 0x8335, 0x833f, 0x033a, 0x832b, 0x032e, 0x0324, 0x8321,
-    0x0360, 0x8365, 0x836f, 0x036a, 0x837b, 0x037e, 0x0374, 0x8371,
-    0x8353, 0x0356, 0x035c, 0x8359, 0x0348, 0x834d, 0x8347, 0x0342,
-    0x03c0, 0x83c5, 0x83cf, 0x03ca, 0x83db, 0x03de, 0x03d4, 0x83d1,
-    0x83f3, 0x03f6, 0x03fc, 0x83f9, 0x03e8, 0x83ed, 0x83e7, 0x03e2,
-    0x83a3, 0x03a6, 0x03ac, 0x83a9, 0x03b8, 0x83bd, 0x83b7, 0x03b2,
-    0x0390, 0x8395, 0x839f, 0x039a, 0x838b, 0x038e, 0x0384, 0x8381,
-    0x0280, 0x8285, 0x828f, 0x028a, 0x829b, 0x029e, 0x0294, 0x8291,
-    0x82b3, 0x02b6, 0x02bc, 0x82b9, 0x02a8, 0x82ad, 0x82a7, 0x02a2,
-    0x82e3, 0x02e6, 0x02ec, 0x82e9, 0x02f8, 0x82fd, 0x82f7, 0x02f2,
-    0x02d0, 0x82d5, 0x82df, 0x02da, 0x82cb, 0x02ce, 0x02c4, 0x82c1,
-    0x8243, 0x0246, 0x024c, 0x8249, 0x0258, 0x825d, 0x8257, 0x0252,
-    0x0270, 0x8275, 0x827f, 0x027a, 0x826b, 0x026e, 0x0264, 0x8261,
-    0x0220, 0x8225, 0x822f, 0x022a, 0x823b, 0x023e, 0x0234, 0x8231,
-    0x8213, 0x0216, 0x021c, 0x8219, 0x0208, 0x820d, 0x8207, 0x0202
-};
+static uint16 crc16_nibble[16] = {
+    0x0000, 0xCC01, 0xD801, 0x1400, 0xF001, 0x3C00, 0x2800, 0xE401,
+    0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400,
+    };
 
-static uint16 dup_crc16 (uint16 crc, const void* vbuf, size_t len)
+static uint16 dup_crc16(uint16 crc, const void* vbuf, size_t len)
 {
 const unsigned char* buf = (const unsigned char*)vbuf;
 
-while (len > 8) {
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
-    len -= 8;
-    }
-while (0 != len--)
-    crc = (crc >> 8) ^ crc16Table[ (crc ^ (*buf++)) & 0xFF ];
+while(0 != len--) {
+    crc = (crc>>4) ^ crc16_nibble[(*buf ^ crc) & 0xF];
+    crc = (crc>>4) ^ crc16_nibble[((*buf++)>>4 ^ crc) & 0xF];
+    };
 return(crc);
 }
-
