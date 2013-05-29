@@ -476,8 +476,9 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define UC_SERDEC       4097                            /* serial number */
 #define UC_SERITS       1729
 #define UC_AIDDEC       (UC_INHCST | UC_UBABLT | UC_KIPAGE | UC_KLPAGE | \
-                         UC_VERDEC | UC_SERDEC)
-#define UC_AIDITS       (UC_KIPAGE | UC_VERITS | UC_SERITS)
+                         UC_VERDEC)
+#define UC_AIDITS       (UC_KIPAGE | UC_VERITS)
+
 #define UC_HSBDEC       0376000                         /* DEC initial HSB */
 #define UC_HSBITS       0000500                         /* ITS initial HSB */
 
