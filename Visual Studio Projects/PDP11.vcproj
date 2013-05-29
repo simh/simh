@@ -417,6 +417,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_ddcmp.h"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_defs.h"
 				>
 			</File>
