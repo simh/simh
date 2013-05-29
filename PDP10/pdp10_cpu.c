@@ -197,6 +197,7 @@ jmp_buf save_env;
 int32 hst_p = 0;                                        /* history pointer */
 int32 hst_lnt = 0;                                      /* history length */
 InstHistory *hst = NULL;                                /* instruction history */
+int32 apr_serial = -1;                                  /* CPU Serial number */
 
 /* Forward and external declarations */
 
@@ -205,6 +206,9 @@ t_stat cpu_dep (t_value val, t_addr addr, UNIT *uptr, int32 sw);
 t_stat cpu_reset (DEVICE *dptr);
 t_stat cpu_set_hist (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat cpu_show_hist (FILE *st, UNIT *uptr, int32 val, void *desc);
+t_stat cpu_set_serial (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat cpu_show_serial (FILE *st, UNIT *uptr, int32 val, void *desc);
+
 d10 adjsp (d10 val, a10 ea);
 void ibp (a10 ea, int32 pflgs);
 d10 ldb (a10 ea, int32 pflgs);
@@ -400,6 +404,7 @@ MTAB cpu_mod[] = {
       NULL, &show_iospace },
     { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_SHP, 0, "HISTORY", "HISTORY",
       &cpu_set_hist, &cpu_show_hist },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "SERIAL", "SERIAL", &cpu_set_serial, &cpu_show_serial },
     { 0 }
     };
 
@@ -2104,8 +2109,14 @@ return;
 
 t_bool aprid (a10 ea, int32 prv)
 {
-Write (ea, (Q_ITS)? UC_AIDITS: UC_AIDDEC, prv);
-return FALSE;
+  d10 value = (Q_ITS)? UC_AIDITS: UC_AIDDEC;
+  if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) )
+    value |= (Q_ITS)? UC_SERITS: UC_SERDEC;
+  else
+    value |= apr_serial;
+
+  Write (ea, value, prv);
+  return FALSE;
 }
 
 /* Checked against KS10 ucode */
@@ -2418,4 +2429,35 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
         }                                               /* end else instruction */
     }                                                   /* end for */
 return SCPE_OK;
+}
+
+/* Set serial */
+
+t_stat cpu_set_serial (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+  int32 lnt;
+  t_stat r;
+
+  if (cptr == NULL) {
+    apr_serial = -1;
+    return SCPE_OK;
+  }
+  lnt = (int32) get_uint (cptr, 10, 077777, &r);
+  if ((r != SCPE_OK) || (lnt <= 0) || (!Q_ITS && lnt < 4096))
+    return SCPE_ARG;
+  apr_serial = lnt & 077777;
+  return SCPE_OK;
+}
+
+/* Show serial */
+
+t_stat cpu_show_serial (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+  fprintf (st, "Serial: " );
+  if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) ) {
+    fprintf (st, "%d (default)", (Q_ITS)? UC_SERITS: UC_SERDEC);
+    return SCPE_OK;
+  }
+  fprintf (st, "%d", apr_serial);
+  return SCPE_OK;
 }

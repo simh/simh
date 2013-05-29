@@ -25,6 +25,8 @@
 
    lp20         line printer
 
+   29-May-13    TL      Force append when an existing file is attached.
+                        Previously over-wrote file from the top.
    19-Jan-07    RMS     Added UNIT_TEXT flag
    04-Sep-05    RMS     Fixed missing return (found by Peter Schorn)
    07-Jul-05    RMS     Removed extraneous externs
@@ -374,17 +376,17 @@ return SCPE_OK;
         else if (paper)
             davfu_action;
         else print_xlate;
-		}
+   }
    else if (paper) {
         if (xlate || delim || delim_hold)
             davfu_action;
         else print_input;
-		}
+   }
    else {
         if (xlate || delim || delim_hold)
             print_xlate;
         else print_input;
-		}
+  }
 */
 
 t_stat lp20_svc (UNIT *uptr)
@@ -657,6 +659,10 @@ t_stat lp20_attach (UNIT *uptr, char *cptr)
 t_stat reason;
     
 reason = attach_unit (uptr, cptr);                      /* attach file */
+if (reason == SCPE_OK) {
+  sim_fseek (uptr->fileref, 0, SEEK_END);
+  uptr->pos = ftell (uptr->fileref);
+}
 if (lpcsa & CSA_ONL)                                    /* just file chg? */
     return reason;
 if (sim_is_active (&lp20_unit))                         /* busy? no int */
