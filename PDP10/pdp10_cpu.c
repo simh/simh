@@ -2109,14 +2109,15 @@ return;
 
 t_bool aprid (a10 ea, int32 prv)
 {
-  d10 value = (Q_ITS)? UC_AIDITS: UC_AIDDEC;
-  if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) )
+d10 value = (Q_ITS)? UC_AIDITS: UC_AIDDEC;
+
+if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) )
     value |= (Q_ITS)? UC_SERITS: UC_SERDEC;
-  else
+else
     value |= apr_serial;
 
-  Write (ea, value, prv);
-  return FALSE;
+Write (ea, value, prv);
+return FALSE;
 }
 
 /* Checked against KS10 ucode */
@@ -2435,29 +2436,29 @@ return SCPE_OK;
 
 t_stat cpu_set_serial (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-  int32 lnt;
-  t_stat r;
+int32 lnt;
+t_stat r;
 
-  if (cptr == NULL) {
+if (cptr == NULL) {
     apr_serial = -1;
     return SCPE_OK;
-  }
-  lnt = (int32) get_uint (cptr, 10, 077777, &r);
-  if ((r != SCPE_OK) || (lnt <= 0) || (!Q_ITS && lnt < 4096))
+    }
+lnt = (int32) get_uint (cptr, 10, 077777, &r);
+if ((r != SCPE_OK) || (lnt <= 0) || (!Q_ITS && lnt < 4096))
     return SCPE_ARG;
-  apr_serial = lnt & 077777;
-  return SCPE_OK;
+apr_serial = lnt & 077777;
+return SCPE_OK;
 }
 
 /* Show serial */
 
 t_stat cpu_show_serial (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
-  fprintf (st, "Serial: " );
-  if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) ) {
+fprintf (st, "Serial: " );
+if( (apr_serial == -1) || (!Q_ITS && apr_serial < 4096) ) {
     fprintf (st, "%d (default)", (Q_ITS)? UC_SERITS: UC_SERDEC);
     return SCPE_OK;
-  }
-  fprintf (st, "%d", apr_serial);
-  return SCPE_OK;
+    }
+fprintf (st, "%d", apr_serial);
+return SCPE_OK;
 }

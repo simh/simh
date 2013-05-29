@@ -376,17 +376,17 @@ return SCPE_OK;
         else if (paper)
             davfu_action;
         else print_xlate;
-   }
+        }
    else if (paper) {
         if (xlate || delim || delim_hold)
             davfu_action;
         else print_input;
-   }
+        }
    else {
         if (xlate || delim || delim_hold)
             print_xlate;
         else print_input;
-  }
+        }
 */
 
 t_stat lp20_svc (UNIT *uptr)
@@ -660,9 +660,9 @@ t_stat reason;
     
 reason = attach_unit (uptr, cptr);                      /* attach file */
 if (reason == SCPE_OK) {
-  sim_fseek (uptr->fileref, 0, SEEK_END);
-  uptr->pos = ftell (uptr->fileref);
-}
+    sim_fseek (uptr->fileref, 0, SEEK_END);
+    uptr->pos = sim_ftell (uptr->fileref);
+    }
 if (lpcsa & CSA_ONL)                                    /* just file chg? */
     return reason;
 if (sim_is_active (&lp20_unit))                         /* busy? no int */
