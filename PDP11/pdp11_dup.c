@@ -49,6 +49,7 @@
 #endif
 
 #include "sim_tmxr.h"
+#include "pdp11_ddcmp.h"
 #include <ctype.h>
 
 #if !defined(DUP_LINES)
@@ -95,7 +96,8 @@ t_stat dup_reset (DEVICE *dptr);
 t_stat dup_attach (UNIT *uptr, char *ptr);
 t_stat dup_detach (UNIT *uptr);
 t_stat dup_clear (int32 dup, t_bool flag);
-void ddcmp_packet_trace (DEVICE *dptr, const char *txt, const uint8 *msg, int32 len, t_bool detail);
+void ddcmp_packet_trace (uint32 reason, DEVICE *dptr, const char *txt, const uint8 *msg, int32 len, t_bool detail);
+uint16 ddcmp_crc16(uint16 crc, const void* vbuf, size_t len);
 int32 dup_rxinta (void);
 int32 dup_txinta (void);
 void dup_update_rcvi (void);
@@ -110,13 +112,6 @@ t_stat dup_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *dup_description (DEVICE *dptr);
-static uint16 dup_crc16(uint16 crc, const void* vbuf, size_t len);
-
-/* DDCMP packet types */
-
-#define DDCMP_SOH 0201u   /* Numbered Data Message Identifier */
-#define DDCMP_ENQ 0005u   /* Control Message Identifier */
-#define DDCMP_DLE 0220u   /* Maintenance Message Identifier */
 
 /* RXCSR - 16XXX0 - receiver control/status register */
 
@@ -628,7 +623,7 @@ dup_rxdbuf[dup] |= dup_rcvpacket[dup][dup_rcvpkinoff[dup]++];
 dup_rxcsr[dup] |= RXCSR_M_RXDONE;
 if (((dup_rcvpkinoff[dup] == 8) || 
      (dup_rcvpkinoff[dup] >= dup_rcvpkoffset[dup])) &&
-    (0 == dup_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
+    (0 == ddcmp_crc16 (0, dup_rcvpacket[dup], dup_rcvpkinoff[dup])))
     dup_rxdbuf[dup] |= RXDBUF_M_RCRCER;
 else
     dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
@@ -671,7 +666,7 @@ if (!(dup_txcsr[dup] & TXCSR_M_TXDONE) && (!dup_xmtpkrdy[dup])) {
     if (dup_txcsr[dup] & TXCSR_M_TXIE)
         dup_set_txint (dup);
     if (dup_txdbuf[dup] & TXDBUF_M_TEOM) { /* Packet ready to send? */
-        uint16 crc16 = dup_crc16 (0, dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
+        uint16 crc16 = ddcmp_crc16 (0, dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
 
         if (dup_xmtpkoffset[dup] + 2 > dup_xmtpksize[dup]) {
             dup_xmtpksize[dup] += 512;
@@ -680,7 +675,7 @@ if (!(dup_txcsr[dup] & TXCSR_M_TXDONE) && (!dup_xmtpkrdy[dup])) {
         dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
         dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
         sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d) - Packet Done %d bytes\n", dup, dup_xmtpkoffset[dup]);
-        ddcmp_packet_trace (DUPDPTR, ">>> XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
+        ddcmp_packet_trace (DBG_PKT, DUPDPTR, ">>> XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
         dup_xmtpkoutoff[dup] = 0;
         dup_xmtpkrdy[dup] = TRUE;
         }
@@ -769,7 +764,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                 }
             if (dup_rcvpkoffset[dup] >= 8) {
                 if (dup_rcvpacket[dup][0] == DDCMP_ENQ) { /* Control Message? */
-                    ddcmp_packet_trace (DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
+                    ddcmp_packet_trace (DBG_PKT, DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
                     dup_rcvpkinoff[dup] = 0;
                     dup_rcv_byte (dup);
                     break;
@@ -778,7 +773,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                     int32 count = ((dup_rcvpacket[dup][2] & 0x3F) << 8)| dup_rcvpacket[dup][1];
 
                     if (dup_rcvpkoffset[dup] >= 10 + count) {
-                        ddcmp_packet_trace (DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
+                        ddcmp_packet_trace (DBG_PKT, DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
                         dup_rcvpkinoff[dup] = 0;
                         dup_rcv_byte (dup);
                         break;
@@ -808,10 +803,10 @@ return SCPE_OK;
 
 /* Debug routines */
 
-void ddcmp_packet_trace (DEVICE *dptr, const char *txt, const uint8 *msg, int32 len, t_bool detail)
+void ddcmp_packet_trace (uint32 reason, DEVICE *dptr, const char *txt, const uint8 *msg, int32 len, t_bool detail)
 {
-if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
-    sim_debug(DBG_PKT, dptr, "%s  len: %d\n", txt, len);
+if (sim_deb && dptr && (reason & dptr->dctrl)) {
+    sim_debug(reason, dptr, "%s  len: %d\n", txt, len);
     if (detail) {
         int i, same, group, sidx, oidx;
         char outbuf[80], strbuf[18];
@@ -819,39 +814,39 @@ if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
 
         switch (msg[0]) {
             case DDCMP_SOH:   /* Data Message */
-                sim_debug (DBG_PKT, dptr, "Data Message, Link: %d, Count: %d, Resp: %d, Num: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)|msg[1], msg[3], msg[4], 
-                                            (0 == dup_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == dup_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)|msg[1]))) ? "OK" : "BAD");
+                sim_debug (reason, dptr, "Data Message, Link: %d, Count: %d, Resp: %d, Num: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)|msg[1], msg[3], msg[4], 
+                                            (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)|msg[1]))) ? "OK" : "BAD");
                 break;
             case DDCMP_ENQ:   /* Control Message */
-                sim_debug (DBG_PKT, dptr, "Control: Type: %d ", msg[1]);
+                sim_debug (reason, dptr, "Control: Type: %d ", msg[1]);
                 switch (msg[1]) {
                     case 1: /* ACK */
-                        sim_debug (DBG_PKT, dptr, "(ACK) ACKSUB: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
+                        sim_debug (reason, dptr, "(ACK) ACKSUB: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
                         break;
                     case 2: /* NAK */
-                        sim_debug (DBG_PKT, dptr, "(NAK) Reason: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
+                        sim_debug (reason, dptr, "(NAK) Reason: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
                         break;
                     case 3: /* REP */
-                        sim_debug (DBG_PKT, dptr, "(REP) REPSUB: %d, Link: %d, Num: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[4]);
+                        sim_debug (reason, dptr, "(REP) REPSUB: %d, Link: %d, Num: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[4]);
                         break;
                     case 6: /* STRT */
-                        sim_debug (DBG_PKT, dptr, "(STRT) STRTSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
+                        sim_debug (reason, dptr, "(STRT) STRTSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
                         break;
                     case 7: /* STACK */
-                        sim_debug (DBG_PKT, dptr, "(STACK) STCKSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
+                        sim_debug (reason, dptr, "(STACK) STCKSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
                         break;
                     default: /* Unknown */
-                        sim_debug (DBG_PKT, dptr, "(Unknown=0%o)\n", msg[1]);
+                        sim_debug (reason, dptr, "(Unknown=0%o)\n", msg[1]);
                         break;
                     }
                 if (len != 8)
-                    sim_debug (DBG_PKT, dptr, "Unexpected Control Message Length: %d expected 8\n", len);
-                if (0 != dup_crc16 (0, msg, len))
-                    sim_debug (DBG_PKT, dptr, "Unexpected Message CRC\n");
+                    sim_debug (reason, dptr, "Unexpected Control Message Length: %d expected 8\n", len);
+                if (0 != ddcmp_crc16 (0, msg, len))
+                    sim_debug (reason, dptr, "Unexpected Message CRC\n");
                 break;
             case DDCMP_DLE:   /* Maintenance Message */
-                sim_debug (DBG_PKT, dptr, "Maintenance Message, Link: %d, Count: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[1], 
-                                            (0 == dup_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == dup_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)| msg[1]))) ? "OK" : "BAD");
+                sim_debug (reason, dptr, "Maintenance Message, Link: %d, Count: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[1], 
+                                            (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)| msg[1]))) ? "OK" : "BAD");
                 break;
             }
         for (i=same=0; i<len; i += 16) {
@@ -860,7 +855,7 @@ if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
                 continue;
                 }
             if (same > 0) {
-                sim_debug(DBG_PKT, dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
+                sim_debug(reason, dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
                 same = 0;
                 }
             group = (((len - i) > 16) ? 16 : (len - i));
@@ -875,10 +870,10 @@ if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
                 }
             outbuf[oidx] = '\0';
             strbuf[sidx] = '\0';
-            sim_debug(DBG_PKT, dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
+            sim_debug(reason, dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
             }
         if (same > 0) {
-            sim_debug(DBG_PKT, dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
+            sim_debug(reason, dptr, "%04X thru %04X same as above\n", i-(16*same), len-1);
             }
         }
     }
@@ -1170,7 +1165,7 @@ static uint16 crc16_nibble[16] = {
     0xA001, 0x6C00, 0x7800, 0xB401, 0x5000, 0x9C01, 0x8801, 0x4400,
     };
 
-static uint16 dup_crc16(uint16 crc, const void* vbuf, size_t len)
+uint16 ddcmp_crc16(uint16 crc, const void* vbuf, size_t len)
 {
 const unsigned char* buf = (const unsigned char*)vbuf;
 
