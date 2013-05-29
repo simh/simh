@@ -56,12 +56,13 @@
 #endif
 #define INITIAL_DUP_LINES 1
 
-#define DUP_RX_WAIT   100
-#define DUP_TX_WAIT   100
-#define DUP_CONNECT_POLL    2 /* Seconds */
+#define DUP_WAIT   50           /* Minimum character time */
+#define DUP_CONNECT_POLL    2   /* Seconds */
 
 extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                                 /* calibrated delay */
+extern int32 clk_tps;                                   /* clock ticks per second */
+extern int32 tmr_poll;                                  /* instructions per tick */
 
 uint16 dup_rxcsr[DUP_LINES];
 uint16 dup_rxdbuf[DUP_LINES];
@@ -70,8 +71,8 @@ uint16 dup_txcsr[DUP_LINES];
 uint16 dup_txdbuf[DUP_LINES];
 uint32 dup_rxi = 0;                                     /* rcv interrupts */
 uint32 dup_txi = 0;                                     /* xmt interrupts */
-uint32 dup_rx_wait = DUP_RX_WAIT;                       /* rcv character delay */
-uint32 dup_tx_wait = DUP_TX_WAIT;                       /* xmt character delay */
+uint32 dup_wait[DUP_LINES];                             /* rcv/xmt byte delay */
+uint32 dup_speed[DUP_LINES];                            /* line speed (bits/sec) */
 uint8 *dup_rcvpacket[DUP_LINES];                        /* rcv buffer */
 uint16 dup_rcvpksize[DUP_LINES];                        /* rcv buffer size */
 uint16 dup_rcvpkoffset[DUP_LINES];                      /* rcv buffer offset */
@@ -104,6 +105,8 @@ void dup_set_rxint (int32 dup);
 void dup_clr_txint (int32 dup);
 void dup_set_txint (int32 dup);
 t_stat dup_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dup_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dup_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *dup_description (DEVICE *dptr);
@@ -343,8 +346,7 @@ REG dup_reg[] = {
     { BRDATADF (TXDBUF,        dup_txdbuf,  DEV_RDX, 16, DUP_LINES, "transmit data buffer",             dup_txdbuf_bits) },
     { GRDATAD  (RXINT,            dup_rxi,  DEV_RDX, DUP_LINES,  0, "receive interrupts") },
     { GRDATAD  (TXINT,            dup_txi,  DEV_RDX, DUP_LINES,  0, "transmit interrupts") },
-    { DRDATAD  (RXWAIT,       dup_rx_wait,                      24, "delay time for receive bytes") },
-    { DRDATAD  (TXWAIT,       dup_tx_wait,                      24, "delay time for transmit bytes") },
+    { BRDATAD  (RXWAIT,          dup_wait,       10, 24, DUP_LINES, "delay time for transmit/receive bytes") },
     { BRDATAD  (RPOFFSET, dup_rcvpkoffset,  DEV_RDX, 16, DUP_LINES, "receive assembly packet offset") },
     { BRDATAD  (TPOFFSET, dup_xmtpkoffset,  DEV_RDX, 16, DUP_LINES, "transmit assembly packet offset") },
     { BRDATAD  (RPINOFF,   dup_rcvpkinoff,  DEV_RDX, 16, DUP_LINES, "receive digest packet offset") },
@@ -357,6 +359,8 @@ TMLN *dup_ldsc = NULL;                                  /* line descriptors */
 TMXR dup_desc = { INITIAL_DUP_LINES, 0, 0, NULL };      /* mux descriptor */
 
 MTAB dup_mod[] = {
+    { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
+        &dup_setspeed, &dup_showspeed, NULL, "Display rate limit" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
@@ -475,7 +479,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         *data = dup_rxdbuf[dup];
         dup_rxcsr[dup] &= ~RXCSR_M_RXDONE;
         if (dup_rxcsr[dup] & RXCSR_M_RXACT)
-            sim_activate (dup_units+dup, dup_rx_wait);
+            sim_activate (dup_units+dup, dup_wait[dup]);
         break;
 
     case 02:                                            /* TXCSR */
@@ -559,7 +563,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         dup_txcsr[dup] &= ~TXCSR_M_TXDONE;
         if (dup_txcsr[dup] & TXCSR_M_SEND) {
             dup_txcsr[dup] |= TXCSR_M_TXACT;
-            sim_activate (dup_units+dup, dup_tx_wait);
+            sim_activate (dup_units+dup, dup_wait[dup]);
             }
         break;
     }
@@ -786,9 +790,19 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
     }
 if (active)
     sim_clock_coschedule (uptr, tmxr_poll);     /* reactivate */
-else
+else {
+    for (dup=0; dup < dup_desc.lines; dup++) {
+        if (dup_speed[dup]/8) {
+            dup_wait[dup] = (tmr_poll*clk_tps)/(dup_speed[dup]/8);
+            if (dup_wait[dup] < DUP_WAIT)
+                dup_wait[dup] = DUP_WAIT;
+            }
+        else
+            dup_wait[dup] = DUP_WAIT; /* set minimum byte delay */
+        }
     if (attached)
         sim_activate_after (uptr, DUP_CONNECT_POLL*1000000);/* periodic check for connections */
+    }
 return SCPE_OK;
 }
 
@@ -944,6 +958,7 @@ dup_rxdbuf[dup] = 0;                                    /* silo empty */
 dup_txdbuf[dup] = 0;
 dup_parcsr[dup] = 0;                                    /* no params */
 dup_txcsr[dup] = TXCSR_M_TXDONE;                        /* clear CSR */
+dup_wait[dup] = DUP_WAIT;                               /* initial/default byte delay */
 if (flag)                                               /* INIT? clr all */
     dup_rxcsr[dup] = 0;
 else
@@ -1046,6 +1061,36 @@ dup_xmtpkoutoff[dup] = 0;
 return tmxr_detach_ln (lp);
 }
 
+/* SET/SHOW SPEED processor */
+
+t_stat dup_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+DEVICE *dptr = DUPDPTR;
+int32 dup = (int32)(uptr-dptr->units);
+
+if (dup_speed[dup])
+    fprintf(st, "speed=%d bits/sec", dup_speed[dup]);
+else
+    fprintf(st, "speed=0 (unrestricted)");
+return SCPE_OK;
+}
+
+t_stat dup_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+DEVICE *dptr = DUPDPTR;
+int32 dup = (int32)(uptr-dptr->units);
+t_stat r;
+int32 newspeed;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+newspeed = (int32) get_uint (cptr, 10, 100000000, &r);
+if (r != SCPE_OK)
+    return r;
+dup_speed[dup] = newspeed;
+return SCPE_OK;
+}
+
 /* SET LINES processor */
 
 t_stat dup_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
@@ -1085,6 +1130,13 @@ fprintf (st, "The %s connects two systems to provide a network connection.\n", d
 fprintf (st, "A maximum of %d %s devices/lines can be configured in the system.\n", DUP_LINES, dptr->name);
 fprintf (st, "The number of configured devices can be changed with:\n\n");
 fprintf (st, "   sim> SET %s LINES=n\n\n", dptr->name);
+fprintf (st, "If you want to experience the actual data rates of the physical hardware you\n");
+fprintf (st, "can set the bit rate of the simulated line can be set using the following\n");
+fprintf (st, "command:\n\n");
+fprintf (st, "   sim> SET %sn SPEED=bps\n\n", dptr->name);
+fprintf (st, "Where bps is the number of data bits per second that the simulated line runs\n");
+fprintf (st, "at.  Use a value of zero to run at full speed with no artificial\n");
+fprintf (st, "throttling.\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprint_reg_help (st, dptr);
@@ -1093,18 +1145,17 @@ return SCPE_OK;
 
 t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-    tmxr_attach_help (st, dptr, uptr, flag, cptr);
-    fprintf (st, "The communication line performs input and output through a TCP session\n");
-    fprintf (st, "connected to a user-specified port.  The ATTACH command specifies the");
-    fprintf (st, "port to be used as well as the peer address:\n\n");
-    fprintf (st, "   sim> ATTACH %sn {interface:}port,Connect=peerhost:port\n\n", dptr->name);
-    fprintf (st, "where port is a decimal number between 1 and 65535 that is not being used for\n");
-    fprintf (st, "other TCP/IP activities.\n\n");
-    fprintf (st, "Specifying symmetric attach configuration (with both a listen port and\n");
-    fprintf (st, "a connection destination) will cause the side receiving an incoming\n");
-    fprintf (st, "connection to validate that the connection actually comes from the\n");
-    fprintf (st, "connecction destination system.\n\n");
-    return SCPE_OK;
+fprintf (st, "The communication line performs input and output through a TCP session\n");
+fprintf (st, "connected to a user-specified port.  The ATTACH command specifies the\n");
+fprintf (st, "port to be used as well as the peer address:\n\n");
+fprintf (st, "   sim> ATTACH %sn {interface:}port,Connect=peerhost:port\n\n", dptr->name);
+fprintf (st, "where port is a decimal number between 1 and 65535 that is not being used for\n");
+fprintf (st, "other TCP/IP activities.\n\n");
+fprintf (st, "Specifying symmetric attach configuration (with both a listen port and\n");
+fprintf (st, "a peer address) will cause the side receiving an incoming\n");
+fprintf (st, "connection to validate that the connection actually comes from the\n");
+fprintf (st, "connecction destination system.\n\n");
+return SCPE_OK;
 }
 
 char *dup_description (DEVICE *dptr)
