@@ -531,7 +531,9 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
         if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) && 
             (orig_val & RXCSR_M_RCVEN)) {               /* Downward transition of receiver enable */
             dup_rxcsr[dup] &= ~RXCSR_M_RXDONE;
-            dup_rcvpkinoff[dup] = dup_rcvpkoffset[dup] = 0;
+            if ((dup_rcvpkinoff[dup] != 0) || 
+                (dup_rcvpkoffset[dup] != 0))
+                dup_rcvpkinoff[dup] = dup_rcvpkoffset[dup] = 0;
             }
         break;
 
@@ -627,7 +629,7 @@ if (((dup_rcvpkinoff[dup] == 8) ||
 else
     dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 if (dup_rcvpkinoff[dup] >= dup_rcvpkoffset[dup]) {
-    dup_rcvpkoffset[dup] = 0;
+    dup_rcvpkinoff[dup] = dup_rcvpkoffset[dup] = 0;
     dup_rxcsr[dup] &= ~RXCSR_M_RXACT;
     }
 if (dup_rxcsr[dup] & RXCSR_M_RXIE)
@@ -644,7 +646,7 @@ int32 dup = (int32)(uptr-dptr->units);
 TMLN *lp = &dup_desc.ldsc[dup];
 
 sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d)\n", dup);
-if (!(dup_txcsr[dup] & TXCSR_M_TXDONE)) {
+if (!(dup_txcsr[dup] & TXCSR_M_TXDONE) && (!dup_xmtpkrdy[dup])) {
     if (dup_txdbuf[dup] & TXDBUF_M_TSOM) {
         dup_xmtpkoffset[dup] = 0;
         }
@@ -674,12 +676,12 @@ if (!(dup_txcsr[dup] & TXCSR_M_TXDONE)) {
         dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
         dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
         sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d) - Packet Done %d bytes\n", dup, dup_xmtpkoffset[dup]);
-        ddcmp_packet_trace (DUPDPTR, "XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
+        ddcmp_packet_trace (DUPDPTR, ">>> XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
         dup_xmtpkoutoff[dup] = 0;
         dup_xmtpkrdy[dup] = TRUE;
         }
     }
-if (dup_xmtpkrdy[dup]) {
+if (dup_xmtpkrdy[dup] && lp->xmte) {
     t_stat st = SCPE_OK;
 
     while ((st == SCPE_OK) && (dup_xmtpkoutoff[dup] < dup_xmtpkoffset[dup])) {
@@ -693,8 +695,13 @@ if (dup_xmtpkrdy[dup]) {
         dup_xmtpkrdy[dup] = FALSE;
         }
     else
-        if (st == SCPE_OK)
+        if (st == SCPE_OK) {
+            sim_debug(DBG_PKT, DUPDPTR, "dup_svc(dup=%d) - %d byte packet transmission complete\n", dup, dup_xmtpkoutoff[dup]);
             dup_xmtpkrdy[dup] = FALSE;
+            }
+        else {
+            sim_debug(DBG_PKT, DUPDPTR, "dup_svc(dup=%d) - Packet Transmission Stalled with %d bytes remaining\n", dup, (int)(dup_xmtpkoffset[dup]-dup_xmtpkoutoff[dup]));
+            }
     if (!dup_xmtpkrdy[dup])
         dup_txcsr[dup] &= ~TXCSR_M_TXACT;
     }
@@ -726,8 +733,10 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
     if (dup_ldsc[dup].conn)
         ++active;
     dup_get_modem (dup);
-    if (lp->xmte && dup_xmtpkrdy[dup])
+    if (lp->xmte && dup_xmtpkrdy[dup]) {
+        sim_debug(DBG_PKT, DUPDPTR, "dup_poll_svc(dup=%d) - Packet Transmission of remaining %d bytes restarting...\n", dup, (int)(dup_xmtpkoffset[dup]-dup_xmtpkoutoff[dup]));
         dup_svc (&dup_units[dup]);              /* Flush pending output */
+        }
     if (!(dup_rxcsr[dup] & RXCSR_M_RXACT)) {
         while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
             if (dup_rcvpkoffset[dup] + 1 > dup_rcvpksize[dup]) {
@@ -756,7 +765,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                 }
             if (dup_rcvpkoffset[dup] >= 8) {
                 if (dup_rcvpacket[dup][0] == DDCMP_ENQ) { /* Control Message? */
-                    ddcmp_packet_trace (DUPDPTR, "RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
+                    ddcmp_packet_trace (DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
                     dup_rcvpkinoff[dup] = 0;
                     dup_rcv_byte (dup);
                     break;
@@ -765,7 +774,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                     int32 count = ((dup_rcvpacket[dup][2] & 0x3F) << 8)| dup_rcvpacket[dup][1];
 
                     if (dup_rcvpkoffset[dup] >= 10 + count) {
-                        ddcmp_packet_trace (DUPDPTR, "RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
+                        ddcmp_packet_trace (DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
                         dup_rcvpkinoff[dup] = 0;
                         dup_rcv_byte (dup);
                         break;
@@ -803,19 +812,19 @@ if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
                 sim_debug (DBG_PKT, dptr, "Control: Type: %d ", msg[1]);
                 switch (msg[1]) {
                     case 1: /* ACK */
-                        sim_debug (DBG_PKT, dptr, "(ACK) Link: %d, Resp: %d\n", msg[2]>>6, msg[3]);
+                        sim_debug (DBG_PKT, dptr, "(ACK) ACKSUB: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
                         break;
                     case 2: /* NAK */
                         sim_debug (DBG_PKT, dptr, "(NAK) Reason: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
                         break;
                     case 3: /* REP */
-                        sim_debug (DBG_PKT, dptr, "(REP) Link: %d, Num: %d\n", msg[2]>>6, msg[4]);
+                        sim_debug (DBG_PKT, dptr, "(REP) REPSUB: %d, Link: %d, Num: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[4]);
                         break;
                     case 6: /* STRT */
-                        sim_debug (DBG_PKT, dptr, "(STRT) Link: %d\n", msg[2]>>6);
+                        sim_debug (DBG_PKT, dptr, "(STRT) STRTSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
                         break;
                     case 7: /* STACK */
-                        sim_debug (DBG_PKT, dptr, "(STACK) Link: %d\n", msg[2]>>6);
+                        sim_debug (DBG_PKT, dptr, "(STACK) STCKSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
                         break;
                     default: /* Unknown */
                         sim_debug (DBG_PKT, dptr, "(Unknown=0%o)\n", msg[1]);
@@ -827,8 +836,8 @@ if (sim_deb && dptr && (DBG_PKT & dptr->dctrl)) {
                     sim_debug (DBG_PKT, dptr, "Unexpected Message CRC\n");
                 break;
             case DDCMP_DLE:   /* Maintenance Message */
-                sim_debug (DBG_PKT, dptr, "Maintenance Message, Link: %d, Count: %d, HDRCRC: %s, DATACRC: %s\n", msg[1], msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[3], 
-                                            (0 == dup_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == dup_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)| msg[3]))) ? "OK" : "BAD");
+                sim_debug (DBG_PKT, dptr, "Maintenance Message, Link: %d, Count: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[1], 
+                                            (0 == dup_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == dup_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)| msg[1]))) ? "OK" : "BAD");
                 break;
             }
         for (i=same=0; i<len; i += 16) {
