@@ -518,6 +518,7 @@ t_bool stepping = FALSE;
 int32 steps = 1;
 t_bool was_stepping = (sim_rem_step_line != -1);
 t_bool got_command;
+t_bool close_session = FALSE;
 TMLN *lp;
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *argv[1] = {NULL};
 CTAB *cmdp;
@@ -535,15 +536,15 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         sim_rem_step_line = -1;                     /* Done with step */
         stat = SCPE_STEP;
         cmdp = find_cmd ("STEP");
-        stat_nomessage = stat & SCPE_NOMESSAGE;             /* extract possible message supression flag */
-        stat = SCPE_BARE_STATUS(stat);                      /* remove possible flag */
-        if (!stat_nomessage) {                              /* displaying message status? */
+        stat_nomessage = stat & SCPE_NOMESSAGE;     /* extract possible message supression flag */
+        stat = SCPE_BARE_STATUS(stat);              /* remove possible flag */
+        if (!stat_nomessage) {                      /* displaying message status? */
             fflush (sim_log);
             cmd_log_start = sim_ftell (sim_log);
-            if (cmdp && (cmdp->message))                    /* special message handler? */
-                cmdp->message (NULL, stat);                 /* let it deal with display */
+            if (cmdp && (cmdp->message))            /* special message handler? */
+                cmdp->message (NULL, stat);         /* let it deal with display */
             else
-                if (stat >= SCPE_BASE) {                    /* error? */
+                if (stat >= SCPE_BASE) {            /* error? */
                     printf ("%s\r\n", sim_error_text (stat));
                     if (sim_log)
                         fprintf (sim_log, "%s\n", sim_error_text (stat));
@@ -579,6 +580,12 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeout);
                 }
             else {
+                if ((c == '\004') || (c == '\032')) { /* EOF character (^D or ^Z) ? */
+                    tmxr_linemsgf (lp, "\r\nGoodbye\r\n");
+                    tmxr_send_buffered_data (lp);           /* flush any buffered data */
+                    tmxr_reset_ln (lp);
+                    continue;
+                    }
                 sim_rem_single_mode[i] = TRUE;
                 tmxr_linemsgf (lp, "\r\n%s", sim_prompt);
                 tmxr_send_buffered_data (lp);           /* flush any buffered data */
@@ -648,6 +655,23 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     sim_rem_buf[i][sim_rem_buf_ptr[i]++] = '\0';
                     got_command = TRUE;
                     break;
+                case '\004': /* EOF (^D) */
+                case '\032': /* EOF (^Z) */
+                    while (sim_rem_buf_ptr[i] > 0) { /* Erase current input line */
+                        tmxr_linemsg (lp, "\b \b");
+                        --sim_rem_buf_ptr[i];
+                        }
+                    if (!sim_rem_single_mode[i]) {
+                        if (sim_rem_buf_ptr[i]+80 >= sim_rem_buf_size[i]) {
+                            sim_rem_buf_size[i] += 1024;
+                            sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                            }
+                        strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue before close");
+                        tmxr_linemsgf (lp, "%s\n", sim_rem_buf[i]);
+                        got_command = TRUE;
+                        }
+                    close_session = TRUE;
+                    break;
                 default:
                     tmxr_putc_ln (lp, c);
                     if (sim_rem_buf_ptr[i]+2 >= sim_rem_buf_size[i]) {
@@ -662,8 +686,9 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                 }
             } while ((!got_command) && (!sim_rem_single_mode[i]));
         tmxr_send_buffered_data (lp);           /* flush any buffered data */
-        if ((sim_rem_single_mode[i]) && !got_command)
+        if ((sim_rem_single_mode[i]) && !got_command) {
             break;
+            }
         printf ("Remote Console Command from %s> %s\r\n", lp->ipad, sim_rem_buf[i]);
         if (sim_log)
             fprintf (sim_log, "Remote Console Command from %s> %s\n", lp->ipad, sim_rem_buf[i]);
@@ -789,6 +814,11 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
             sim_rem_step_line = i;
             break;
             }
+        }
+    if (close_session) {
+        tmxr_linemsgf (lp, "\r\nGoodbye\r\n");
+        tmxr_send_buffered_data (lp);           /* flush any buffered data */
+        tmxr_reset_ln (lp);
         }
     }
 if (stepping)
