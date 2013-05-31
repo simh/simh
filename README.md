@@ -35,6 +35,8 @@ A subset of normal simh commands are available for use in remote console session
 The Single Command Mode commands are: ATTACH, DETACH, PWD, SHOW, DIR, LS, ECHO, HELP
 The Multiple Command Mode commands are: EXAMINE, IEXAMINE, DEPOSIT, EVALUATE, ATTACH, DETACH, ASSIGN, DEASSIGN, STEP, CONTINUE, PWD, SAVE, SET, SHOW, DIR, LS, ECHO, HELP
 
+A remote console session will close when an EOF character is entered (i.e. ^D or ^Z).
+
 #### VAX/PDP11 Enhancements
     RQ has new disk types: RC25, RCF25, RA80
     RQ device has a settable controller type (RQDX3, UDA50, KLESI, RUX50)
