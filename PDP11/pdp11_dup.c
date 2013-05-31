@@ -50,6 +50,7 @@
 
 #include "sim_tmxr.h"
 #include "pdp11_ddcmp.h"
+#include "pdp11_dup.h"
 #include <ctype.h>
 
 #if !defined(DUP_LINES)
@@ -84,6 +85,8 @@ uint16 dup_xmtpkoffset[DUP_LINES];                      /* xmt buffer offset */
 uint16 dup_xmtpkoutoff[DUP_LINES];                      /* xmt packet out offset */
 t_bool dup_xmtpkrdy[DUP_LINES];                         /* xmt packet ready */
 
+PACKET_RECEIVE_CALLBACK dup_rcv_packet_callback[DUP_LINES];
+PACKET_TRANSMIT_COMPLETE_CALLBACK dup_xmt_complete_callback[DUP_LINES];
 
 t_stat dup_rd (int32 *data, int32 PA, int32 access);
 t_stat dup_wr (int32 data, int32 PA, int32 access);
@@ -341,7 +344,8 @@ REG dup_reg[] = {
     { BRDATADF (TXDBUF,        dup_txdbuf,  DEV_RDX, 16, DUP_LINES, "transmit data buffer",             dup_txdbuf_bits) },
     { GRDATAD  (RXINT,            dup_rxi,  DEV_RDX, DUP_LINES,  0, "receive interrupts") },
     { GRDATAD  (TXINT,            dup_txi,  DEV_RDX, DUP_LINES,  0, "transmit interrupts") },
-    { BRDATAD  (RXWAIT,          dup_wait,       10, 24, DUP_LINES, "delay time for transmit/receive bytes") },
+    { BRDATAD  (WAIT,            dup_wait,       10, 32, DUP_LINES, "delay time for transmit/receive bytes"), PV_RSPC },
+    { BRDATAD  (SPEED,          dup_speed,       10, 32, DUP_LINES, "line bit rate"), PV_RCOMMA },
     { BRDATAD  (RPOFFSET, dup_rcvpkoffset,  DEV_RDX, 16, DUP_LINES, "receive assembly packet offset") },
     { BRDATAD  (TPOFFSET, dup_xmtpkoffset,  DEV_RDX, 16, DUP_LINES, "transmit assembly packet offset") },
     { BRDATAD  (RPINOFF,   dup_rcvpkinoff,  DEV_RDX, 16, DUP_LINES, "receive digest packet offset") },
@@ -503,6 +507,11 @@ if (dup >= dup_desc.lines)                              /* validate line number 
     return SCPE_IERR;
 
 orig_val = regs[(PA >> 1) & 03][dup];
+if (PA & 1)                                             /* unaligned byte access? */
+    data = ((data << 8) & (orig_val & 0xFF)) & 0xFFFF;  /* Merge with original word */
+else
+    if (access == WRITEB)                               /* byte access? */
+        data = (orig_val & 0xFF00) | (data & 0xFF);     /* Merge with original high word */
 
 switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
 
@@ -529,11 +538,16 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
             }
         if ((!(dup_rxcsr[dup] & RXCSR_M_RCVEN)) && 
             (orig_val & RXCSR_M_RCVEN)) {               /* Downward transition of receiver enable */
-            dup_rxcsr[dup] &= ~RXCSR_M_RXDONE;
+            dup_rxcsr[dup] &= ~(RXCSR_M_RXDONE|RXCSR_M_RXACT);
             if ((dup_rcvpkinoff[dup] != 0) || 
                 (dup_rcvpkoffset[dup] != 0))
                 dup_rcvpkinoff[dup] = dup_rcvpkoffset[dup] = 0;
             }
+        if ((!(dup_rxcsr[dup] & RXCSR_M_RXIE)) && 
+            (orig_val & RXCSR_M_RXIE))                  /* Downward transition of receiver interrupt enable */
+            dup_clr_rxint (dup);
+        if ((dup_rxcsr[dup] & RXCSR_M_RXIE) && (dup_rxcsr[dup] & RXCSR_M_RXDONE))
+            dup_set_rxint (dup);
         break;
 
     case 01:                                            /* PARCSR */
@@ -609,13 +623,40 @@ if ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) &&
 return SCPE_OK;
 }
 
+int32 dup_csr_to_linenum (int32 CSRPA)
+{
+DEVICE *dptr = DUPDPTR;
+DIB *dib = (DIB *)dptr->ctxt;
+
+if ((dib->ba > (uint32)CSRPA) || ((uint32)CSRPA > (dib->ba + dib->lnt)))
+    return -1;
+
+return ((uint32)CSRPA - dib->ba)/dib->lnt;
+}
+
+void dup_set_callback_mode (int32 dup, PACKET_RECEIVE_CALLBACK receive, PACKET_TRANSMIT_COMPLETE_CALLBACK transmit)
+{
+dup_rcv_packet_callback[dup] = receive;
+dup_xmt_complete_callback[dup] = transmit;
+}
+
+int32 dup_get_line_speed (int32 dup)
+{
+return dup_speed[dup];
+}
+
+
 t_stat dup_rcv_byte (int32 dup)
 {
 sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
            (dup_rxcsr[dup] & RXCSR_M_RCVEN) ? "enabled" : "disabled",
            dup_rcvpkinoff[dup], dup_rcvpkoffset[dup]);
-if (!(dup_rxcsr[dup] & RXCSR_M_RCVEN) || (dup_rcvpkoffset[dup] == 0))
+if (!(dup_rxcsr[dup] & RXCSR_M_RCVEN) || (dup_rcvpkoffset[dup] == 0) || (dup_rxcsr[dup] & RXCSR_M_RXDONE))
     return SCPE_OK;
+if (dup_rcv_packet_callback[dup]) {
+    dup_rcv_packet_callback[dup](dup, dup_rcvpacket[dup], dup_rcvpkoffset[dup]);
+    return SCPE_OK;
+    }
 dup_rxcsr[dup] |= RXCSR_M_RXACT;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RCRCER;
 dup_rxdbuf[dup] &= ~RXDBUF_M_RXDBUF;
@@ -636,6 +677,45 @@ if (dup_rxcsr[dup] & RXCSR_M_RXIE)
 return SCPE_OK;
 }
 
+t_bool dup_put_msg_bytes (int32 dup, uint8 *bytes, size_t len, t_bool start, t_bool end)
+{
+t_bool breturn = FALSE;
+
+if (!dup_xmtpkrdy[dup]) {  /* Not Busy sending? */
+    if (start)
+        dup_xmtpkoffset[dup] = 0;
+    if (dup_xmtpkoffset[dup] + 2 + len > dup_xmtpksize[dup]) {
+        dup_xmtpksize[dup] += 2 + len;
+        dup_xmtpacket[dup] = realloc (dup_xmtpacket[dup], dup_xmtpksize[dup]);
+        }
+    /* Strip sync bytes at the beginning of a message */
+    while (len && (dup_xmtpkoffset[dup] == 0) && (bytes[0] == DDCMP_SYN)) {
+        --len;
+        ++bytes;
+        }
+    /* Insert remaining bytes into transmit buffer */
+    if (len) {
+        memcpy (&dup_xmtpacket[dup][dup_xmtpkoffset[dup]], bytes, len);
+        dup_xmtpkoffset[dup] += len;
+        }
+    dup_txcsr[dup] |= TXCSR_M_TXDONE;
+    if (dup_txcsr[dup] & TXCSR_M_TXIE)
+        dup_set_txint (dup);
+    /* On End of Message, insert CRC and flag delivery start */
+    if (end) {
+        uint16 crc16 = ddcmp_crc16 (0, dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
+
+        dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
+        dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
+        dup_xmtpkoutoff[dup] = 0;
+        dup_xmtpkrdy[dup] = TRUE;
+        }
+    breturn = TRUE;
+    }
+sim_debug (DBG_TRC, DUPDPTR, "dup_put_msg_bytes(dup=%d, len=%d, start=%s, end=%s) %s\n", 
+           dup, len, start ? "TRUE" : "FALSE", end ? "TRUE" : "FALSE", breturn ? "Good" : "Busy");
+return breturn;
+}
 
 /* service routine to delay device activity */
 t_stat dup_svc (UNIT *uptr)
@@ -646,38 +726,12 @@ TMLN *lp = &dup_desc.ldsc[dup];
 
 sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d)\n", dup);
 if (!(dup_txcsr[dup] & TXCSR_M_TXDONE) && (!dup_xmtpkrdy[dup])) {
-    if (dup_txdbuf[dup] & TXDBUF_M_TSOM) {
-        dup_xmtpkoffset[dup] = 0;
-        }
-    else {
-        if ((dup_xmtpkoffset[dup] != 0) ||
-            ((dup_txdbuf[dup] & TXDBUF_M_TXDBUF) != (dup_parcsr[dup] & PARCSR_M_ADSYNC))) {
-            if (!(dup_txdbuf[dup] & TXDBUF_M_TEOM)) {
-                if (dup_xmtpkoffset[dup] + 1 > dup_xmtpksize[dup]) {
-                    dup_xmtpksize[dup] += 512;
-                    dup_xmtpacket[dup] = realloc (dup_xmtpacket[dup], dup_xmtpksize[dup]);
-                    }
-                dup_xmtpacket[dup][dup_xmtpkoffset[dup]] = dup_txdbuf[dup] & TXDBUF_M_TXDBUF;
-                dup_xmtpkoffset[dup] += 1;
-                }
-            }
-        }
-    dup_txcsr[dup] |= TXCSR_M_TXDONE;
-    if (dup_txcsr[dup] & TXCSR_M_TXIE)
-        dup_set_txint (dup);
-    if (dup_txdbuf[dup] & TXDBUF_M_TEOM) { /* Packet ready to send? */
-        uint16 crc16 = ddcmp_crc16 (0, dup_xmtpacket[dup], dup_xmtpkoffset[dup]);
+    uint8 data = dup_txdbuf[dup] & TXDBUF_M_TXDBUF;
 
-        if (dup_xmtpkoffset[dup] + 2 > dup_xmtpksize[dup]) {
-            dup_xmtpksize[dup] += 512;
-            dup_xmtpacket[dup] = realloc (dup_xmtpacket[dup], dup_xmtpksize[dup]);
-            }
-        dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 & 0xFF;
-        dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
+    dup_put_msg_bytes (dup, &data, (dup_txdbuf[dup] & TXDBUF_M_TEOM) ? 0 : 1, dup_txdbuf[dup] & TXDBUF_M_TSOM, (dup_txdbuf[dup] & TXDBUF_M_TEOM));
+    if (dup_xmtpkrdy[dup]) { /* Packet ready to send? */
         sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d) - Packet Done %d bytes\n", dup, dup_xmtpkoffset[dup]);
         ddcmp_packet_trace (DBG_PKT, DUPDPTR, ">>> XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
-        dup_xmtpkoutoff[dup] = 0;
-        dup_xmtpkrdy[dup] = TRUE;
         }
     }
 if (dup_xmtpkrdy[dup] && lp->xmte) {
@@ -692,17 +746,22 @@ if (dup_xmtpkrdy[dup] && lp->xmte) {
     if (st == SCPE_LOST) {                      /* line state transition? */
         dup_get_modem (dup);
         dup_xmtpkrdy[dup] = FALSE;
+        dup_xmtpkoffset[dup] = 0;
         }
     else
         if (st == SCPE_OK) {
             sim_debug(DBG_PKT, DUPDPTR, "dup_svc(dup=%d) - %d byte packet transmission complete\n", dup, dup_xmtpkoutoff[dup]);
             dup_xmtpkrdy[dup] = FALSE;
+            dup_xmtpkoffset[dup] = 0;
             }
         else {
             sim_debug(DBG_PKT, DUPDPTR, "dup_svc(dup=%d) - Packet Transmission Stalled with %d bytes remaining\n", dup, (int)(dup_xmtpkoffset[dup]-dup_xmtpkoutoff[dup]));
             }
-    if (!dup_xmtpkrdy[dup])
-        dup_txcsr[dup] &= ~TXCSR_M_TXACT;
+    if (!dup_xmtpkrdy[dup]) {               /* Done transmitting? */
+        dup_txcsr[dup] &= ~TXCSR_M_TXACT;   /* Set idle */
+        if (dup_xmt_complete_callback[dup])
+            dup_xmt_complete_callback[dup](dup, (dup_rxcsr[dup] & RXCSR_M_DCD) ? 0 : 1);
+        }
     }
 if (dup_rxcsr[dup] & RXCSR_M_RXACT)
     dup_rcv_byte (dup);
@@ -766,6 +825,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                 if (dup_rcvpacket[dup][0] == DDCMP_ENQ) { /* Control Message? */
                     ddcmp_packet_trace (DBG_PKT, DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
                     dup_rcvpkinoff[dup] = 0;
+                    dup_rxcsr[dup] |= RXCSR_M_RXACT;
                     dup_rcv_byte (dup);
                     break;
                     }
@@ -775,6 +835,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                     if (dup_rcvpkoffset[dup] >= 10 + count) {
                         ddcmp_packet_trace (DBG_PKT, DUPDPTR, "<<< RCV Packet", dup_rcvpacket[dup], dup_rcvpkoffset[dup], TRUE);
                         dup_rcvpkinoff[dup] = 0;
+                        dup_rxcsr[dup] |= RXCSR_M_RXACT;
                         dup_rcv_byte (dup);
                         break;
                         }
