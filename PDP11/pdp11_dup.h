@@ -1,4 +1,4 @@
-/* pdp11_ddcmp.h: Digital Data Communications Message Protocol support
+/* pdp11_dup.h: PDP-11 DUP11 bit synchronous shared device packet interface interface 
 
    Copyright (c) 2013, Mark Pizzolato
 
@@ -23,25 +23,25 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   Digital Data Communications Message Protocol - DDCMP support routines 
+   dup          DUP11 Unibus/DPV11 Qbus bit synchronous interface
 
-   29-May-13    MP      Initial implementation
+   This module describes the interfaces exposed by the dup device for use by
+   a packet delivery devices (i.e. KMC11).
+
+   31-May-13    MP      Initial implementation
 */
 
-#ifndef PDP11_DDCMP_H_
-#define PDP11_DDCMP_H_    0
+#ifndef PDP11_DUP_H_
+#define PDP11_DUP_H_    0
 
-/* DDCMP packet types */
+typedef void (*PACKET_RECEIVE_CALLBACK)(int32 dup, uint8 *buf, size_t len);
+typedef void (*PACKET_TRANSMIT_COMPLETE_CALLBACK)(int32 dup, int status);
 
-#define DDCMP_SYN  0226u    /* Sync character on synchronous links */
-#define DDCMP_DEL  0377u    /* Sync character on asynchronous links */
-#define DDCMP_SOH  0201u    /* Numbered Data Message Identifier */
-#define DDCMP_ENQ  0005u    /* Control Message Identifier */
-#define DDCMP_DLE  0220u    /* Maintenance Message Identifier */
+int32 dup_get_line_speed (int32 dup);
+int32 dup_csr_to_linenum (int32 CSRPA);
 
-/* Support routines */
+void dup_set_callback_mode (int32 dup, PACKET_RECEIVE_CALLBACK receive, PACKET_TRANSMIT_COMPLETE_CALLBACK transmit);
 
-void ddcmp_packet_trace (uint32 reason, DEVICE *dptr, const char *txt, const uint8 *msg, int32 len, t_bool detail);
-uint16 ddcmp_crc16(uint16 crc, const void* vbuf, size_t len);
+t_bool dup_put_msg_bytes (int32 dup, uint8 *bytes, size_t len, t_bool start, t_bool end);
 
-#endif /* PDP11_DDCMP_H_ */
+#endif /* PDP11_DUP_H_ */

@@ -444,7 +444,7 @@ if (lp->modem_control) {
     lp->modembits &= ~TMXR_MDM_INCOMING;
     lp->modembits |= TMXR_MDM_CTS | TMXR_MDM_DSR;
     }
-if (!lp->mp->buffered) {
+if ((!lp->mp->buffered) && (!lp->txbfd)) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
     lp->txb = (char *)realloc (lp->txb, lp->txbsz);
