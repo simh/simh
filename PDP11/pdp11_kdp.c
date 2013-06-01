@@ -29,7 +29,24 @@
 **   We don't implement buffer flushing.
 */
 
-#include "pdp11_kdp.h"
+#if defined (VM_PDP10)                                  /* PDP10 version */
+#include "pdp10_defs.h"
+
+#elif defined (VM_VAX)                                  /* VAX version */
+#include "vax_defs.h"
+
+#else                                                   /* PDP-11 version */
+#include "pdp11_defs.h"
+#endif
+
+#define KMC_RDX     8
+#define DUP_RDX     8
+
+extern int32 IREQ (HLVL);
+extern int32 tmxr_poll;                                 /* calibrated delay */
+extern int32 clk_tps;                                   /* clock ticks per second */
+extern int32 tmr_poll;                                  /* instructions per tick */
+
 #include "sim_tmxr.h"
 
 #define DF_CMD    0001	/* Print commands. */
@@ -39,8 +56,6 @@
 #define DF_QUEUE  0020	/* Print rx/tx queue changes. */
 #define DF_TRC    0040	/* Detailed trace. */
 #define DF_INF    0100  /* Info */
-
-extern int32 int_req;
 
 //t_stat sync_open(int* retval, char* cptr)
 //{
@@ -291,7 +306,9 @@ DEBTAB kmc_debug[] = {
 
 /* KMC11 data structs: */
 
-DIB kmc_dib = { IOBA_KMC, IOLN_KMC, &kmc_rd, &kmc_wr, 2, IVCL (KMCA), VEC_KMCA, {&kmc_rxint, &kmc_txint} };
+#define IOLN_KMC        010
+
+DIB kmc_dib = { IOBA_AUTO, IOLN_KMC, &kmc_rd, &kmc_wr, 2, IVCL (KMCA), VEC_AUTO, {&kmc_rxint, &kmc_txint} };
 
 UNIT kmc_unit = { UDATA (&kmc_svc, 0, 0) };
 
@@ -327,13 +344,15 @@ DEVICE kmc_dev =
 	1, KMC_RDX, 13, 1, KMC_RDX, 8,
 	NULL, NULL, &kmc_reset,
 	NULL, NULL, NULL, &kmc_dib,
-	DEV_UBUS | DEV_DEBUG, 0, kmc_debug
+	DEV_UBUS | DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, kmc_debug
 };
 
 /* DUP11 data structs: */
 
-DIB dup0_dib = { IOBA_DUP, IOLN_DUP, &dup_rd, &dup_wr, 0 };
-DIB dup1_dib = { IOBA_DUP + IOLN_DUP, IOLN_DUP, &dup_rd, &dup_wr, 0 };
+#define IOLN_DUP        010
+
+DIB dup0_dib = { IOBA_AUTO, IOLN_DUP, &dup_rd, &dup_wr, 0 };
+DIB dup1_dib = { IOBA_AUTO, IOLN_DUP, &dup_rd, &dup_wr, 0 };
 
 UNIT dup_unit[MAXDUP] = {
   { UDATA (&dup_svc, UNIT_ATTABLE, 0) },
@@ -1247,7 +1266,8 @@ t_stat dup_reset(DEVICE* dptr)
   //  }
   //  firsttime = FALSE;		/* Once-only init done now. */
   //}
-  return SCPE_OK;
+
+  return auto_config (dptr->name, (dptr->flags & DEV_DIS)? 0: 1 );    /* auto config */
 }
 
 /*
@@ -1261,7 +1281,7 @@ t_stat kmc_reset(DEVICE* dptr)
 	kmc_sel4 = 0;
 	kmc_sel6 = 0;
 
-	return SCPE_OK;
+    return auto_config (dptr->name, (dptr->flags & DEV_DIS)? 0: 1 );    /* auto config */
 }
 
 /*

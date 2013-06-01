@@ -240,6 +240,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_kdp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_ke.c"
 				>
 			</File>

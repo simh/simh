@@ -599,6 +599,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_RC        17
 #define INT_V_DMCRX     18
 #define INT_V_DMCTX     19
+#define INT_V_KMCA     20
+#define INT_V_KMCB     21
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
@@ -644,6 +646,8 @@ typedef struct pdp_dib DIB;
 #define INT_RC          (1u << INT_V_RC)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
+#define INT_KMCA        (1u << INT_V_KMCA)
+#define INT_KMCB        (1u << INT_V_KMCB)
 #define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_TTO         (1u << INT_V_TTO)
@@ -692,6 +696,8 @@ typedef struct pdp_dib DIB;
 #define IPL_RC          5
 #define IPL_DMCRX       5
 #define IPL_DMCTX       5
+#define IPL_KMCA        5
+#define IPL_KMCB        5
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_TTI         4

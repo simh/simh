@@ -660,10 +660,6 @@ typedef struct pdp_dib DIB;
 #define IOLN_XU         010
 #define IOBA_DMR        (IO_UBA3 + 0764000)		/* DMR11 */
 #define IOLN_DMR        010
-#define IOBA_DUP        (IO_UBA3 + 0760300)		/* DUP11 */
-#define IOLN_DUP        010
-#define IOBA_KMC        (IO_UBA3 + 0760540)		/* KMC11 */
-#define IOLN_KMC         010
 #define IOBA_CR         (IO_UBA3 + 0777160)             /* CD/CR/CM */
 #define IOLN_CR         010
 #define IOBA_RY         (IO_UBA3 + 0777170)             /* RX211 */
