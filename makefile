@@ -399,7 +399,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(call find_include,libvdeplug))
             # Provide support for vde networking
             NETWORK_CCDEFS += -DUSE_VDE_NETWORK
-            NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
+            ifeq (Darwin,$(OSTYPE))
+              NETWORK_LDFLAGS += -lvdeplug -L$(dir $(call find_lib,vdeplug))
+            else
+              NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
+            endif
             $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
           endif
         endif
