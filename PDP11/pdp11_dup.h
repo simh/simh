@@ -38,6 +38,9 @@ typedef void (*PACKET_RECEIVE_CALLBACK)(int32 dup, uint8 *buf, size_t len);
 typedef void (*PACKET_TRANSMIT_COMPLETE_CALLBACK)(int32 dup, int status);
 
 int32 dup_get_line_speed (int32 dup);
+int32 dup_get_DCD (int32 dup);
+t_stat dup_set_DTR (int32 dup, t_bool state);
+t_stat dup_set_DDCMP (int32 dup, t_bool state);
 int32 dup_csr_to_linenum (int32 CSRPA);
 
 void dup_set_callback_mode (int32 dup, PACKET_RECEIVE_CALLBACK receive, PACKET_TRANSMIT_COMPLETE_CALLBACK transmit);
