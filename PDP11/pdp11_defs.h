@@ -482,6 +482,7 @@ typedef struct {
 #define VH_MUXES        4                               /* max # of VH muxes */
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
+#define DUP_LINES       8                               /* max # of DUP11/DPV11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 #define AUTO_LNT        34                              /* autoconfig ranks */
 #define DIB_MAX         100                             /* max DIBs */
@@ -601,6 +602,8 @@ typedef struct pdp_dib DIB;
 #define INT_V_DMCTX     19
 #define INT_V_KMCA     20
 #define INT_V_KMCB     21
+#define INT_V_DUPRX     20
+#define INT_V_DUPTX     21
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
@@ -648,6 +651,8 @@ typedef struct pdp_dib DIB;
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_KMCA        (1u << INT_V_KMCA)
 #define INT_KMCB        (1u << INT_V_KMCB)
+#define INT_DUPRX       (1u << INT_V_DUPRX)
+#define INT_DUPTX       (1u << INT_V_DUPTX)
 #define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_TTO         (1u << INT_V_TTO)
@@ -698,6 +703,8 @@ typedef struct pdp_dib DIB;
 #define IPL_DMCTX       5
 #define IPL_KMCA        5
 #define IPL_KMCB        5
+#define IPL_DUPRX       5
+#define IPL_DUPTX       5
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_TTI         4

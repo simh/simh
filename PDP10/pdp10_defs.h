@@ -476,8 +476,9 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define UC_SERDEC       4097                            /* serial number */
 #define UC_SERITS       1729
 #define UC_AIDDEC       (UC_INHCST | UC_UBABLT | UC_KIPAGE | UC_KLPAGE | \
-                         UC_VERDEC | UC_SERDEC)
-#define UC_AIDITS       (UC_KIPAGE | UC_VERITS | UC_SERITS)
+                         UC_VERDEC)
+#define UC_AIDITS       (UC_KIPAGE | UC_VERITS)
+
 #define UC_HSBDEC       0376000                         /* DEC initial HSB */
 #define UC_HSBITS       0000500                         /* ITS initial HSB */
 
@@ -619,6 +620,7 @@ typedef struct pdp_dib DIB;
 
 #define DZ_MUXES        4                               /* max # of muxes */
 #define DZ_LINES        8                               /* lines per mux */
+#define DUP_LINES       4                               /* max # of DUP11's */
 #define DIB_MAX         100                             /* max DIBs */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
@@ -712,6 +714,9 @@ typedef struct pdp_dib DIB;
 #define INT_V_PTP       25
 #define INT_V_LP20      26                              /* LPT20 */
 #define INT_V_CR        27                              /* CD20 (CD11) */
+#define INT_V_CR        27                              /* CD20 (CD11) */
+#define INT_V_DUPRX     28                              /* DUP11 */
+#define INT_V_DUPTX     29
 
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TU          (1u << INT_V_TU)
@@ -729,6 +734,8 @@ typedef struct pdp_dib DIB;
 #define INT_PTP         (1u << INT_V_PTP)
 #define INT_LP20        (1u << INT_V_LP20)
 #define INT_CR          (1u << INT_V_CR)
+#define INT_DUPRX       (1u << INT_V_DUPRX)
+#define INT_DUPTX       (1u << INT_V_DUPTX)
 
 #define IPL_RP          6                               /* int levels */
 #define IPL_TU          6
@@ -742,6 +749,8 @@ typedef struct pdp_dib DIB;
 #define IPL_DZRX        5
 #define IPL_DZTX        5
 #define IPL_RY          5
+#define IPL_DUPRX       5
+#define IPL_DUPTX       5
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_LP20        4

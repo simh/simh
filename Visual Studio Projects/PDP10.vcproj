@@ -240,6 +240,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_dup.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_dz.c"
 				>
 			</File>
@@ -298,6 +302,10 @@
 			>
 			<File
 				RelativePath="..\PDP10\pdp10_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_ddcmp.h"
 				>
 			</File>
 			<File

@@ -35,6 +35,8 @@ A subset of normal simh commands are available for use in remote console session
 The Single Command Mode commands are: ATTACH, DETACH, PWD, SHOW, DIR, LS, ECHO, HELP
 The Multiple Command Mode commands are: EXAMINE, IEXAMINE, DEPOSIT, EVALUATE, ATTACH, DETACH, ASSIGN, DEASSIGN, STEP, CONTINUE, PWD, SAVE, SET, SHOW, DIR, LS, ECHO, HELP
 
+A remote console session will close when an EOF character is entered (i.e. ^D or ^Z).
+
 #### VAX/PDP11 Enhancements
     RQ has new disk types: RC25, RCF25, RA80
     RQ device has a settable controller type (RQDX3, UDA50, KLESI, RUX50)
@@ -276,15 +278,15 @@ See the 0readme_ethernet.txt file for details about the required network compone
 
 Compiling on windows is supported with recent versions of Microsoft Visual Studio (Standard or Express) and using GCC via the MinGW environment.  Things may also work under Cygwin, but that is not the preferred windows environment.  Not all features will be available as well as with either Visual Studio or MinGW.
 
-##### Required related files.  The file https://github.com/simh/simh/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
+##### Required related files.  The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt
 
 ##### Visual Studio (Standard or Express) 2008, 2010 or 2012
 
-The file https://github.com/simh/simh/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using Visual Studio.
+The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using Visual Studio.
 
 ##### MinGW
 
-The file https://github.com/simh/simh/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using MinGW.
+The file https://github.com/simh/simh/blob/master/Visual%20Studio%20Projects/0ReadMe_Projects.txt describes the required steps to use the setup your environment to build using MinGW.
 
 #### VMS
 
