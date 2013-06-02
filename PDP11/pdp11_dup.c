@@ -670,6 +670,9 @@ t_stat dup_set_DDCMP (int32 dup, t_bool state)
 {
 if ((dup < 0) || (dup >= dup_desc.lines))
     return SCPE_IERR;
+
+dup_rxcsr[dup] &= ~RXCSR_M_STRSYN;
+dup_rxcsr[dup] |= (state ? 0: RXCSR_M_STRSYN);
 dup_parcsr[dup] &= ~PARCSR_M_NOCRC;
 dup_parcsr[dup] |= (state ? 0: PARCSR_M_NOCRC);
 dup_parcsr[dup] &= ~PARCSR_M_DECMODE;
