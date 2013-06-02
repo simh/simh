@@ -6431,8 +6431,9 @@ return 0;
 
 double sim_gtime (void)
 {
-if (AIO_MAIN_THREAD)
+if (AIO_MAIN_THREAD) {
     UPDATE_SIM_TIME;
+    }
 return sim_time;
 }
 
