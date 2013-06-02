@@ -393,9 +393,10 @@ t_stat send_buffer(int dupindex)
 	{
 		r = send_packet(&dup_dev[dupindex], &kdp_ldsc[dupindex], d->txbuf, d->txbuflen);
 		d->txnext += d->txnow;
-		d->txnow = 0;
 		kmc_output = TRUE;
 	}
+
+	d->txnow = 0;
 
 	return r;
 }
