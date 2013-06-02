@@ -704,13 +704,14 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         strcpy (cbuf, sim_rem_buf[i]);
         sim_rem_buf_ptr[i] = 0;
         sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
-        if (cbuf[0] == '\0')
+        if (cbuf[0] == '\0') {
             if (sim_rem_single_mode[i]) {
                 sim_rem_single_mode[i] = FALSE;
                 break;
                 }
             else
                 continue;
+            }
         sim_sub_args (cbuf, sizeof(cbuf), argv);
         cptr = cbuf;
         cptr = get_glyph (cptr, gbuf, 0);                   /* get command glyph */

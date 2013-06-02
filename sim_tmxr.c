@@ -1817,7 +1817,7 @@ while (*tptr) {
         sim_close_sock (sock, 1);
         strcpy(listen, port);
         cptr = get_glyph (cptr, option, ';');
-        if (option[0])
+        if (option[0]) {
             if (0 == MATCH_CMD (option, "NOTELNET"))
                 listennotelnet = TRUE;
             else
@@ -1825,6 +1825,7 @@ while (*tptr) {
                     listennotelnet = FALSE;
                 else
                     return SCPE_ARG;
+            }
         }
     if (line == -1) {
         if (modem_control != mp->modem_control)

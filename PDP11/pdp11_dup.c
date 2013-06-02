@@ -728,7 +728,7 @@ sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d)\n", dup);
 if (!(dup_txcsr[dup] & TXCSR_M_TXDONE) && (!dup_xmtpkrdy[dup])) {
     uint8 data = dup_txdbuf[dup] & TXDBUF_M_TXDBUF;
 
-    dup_put_msg_bytes (dup, &data, (dup_txdbuf[dup] & TXDBUF_M_TEOM) ? 0 : 1, dup_txdbuf[dup] & TXDBUF_M_TSOM, (dup_txdbuf[dup] & TXDBUF_M_TEOM));
+    dup_put_msg_bytes (dup, &data, (dup_txdbuf[dup] & TXDBUF_M_TEOM) && (dptr == &dup_dev) ? 0 : 1, dup_txdbuf[dup] & TXDBUF_M_TSOM, (dup_txdbuf[dup] & TXDBUF_M_TEOM));
     if (dup_xmtpkrdy[dup]) { /* Packet ready to send? */
         sim_debug(DBG_TRC, DUPDPTR, "dup_svc(dup=%d) - Packet Done %d bytes\n", dup, dup_xmtpkoffset[dup]);
         ddcmp_packet_trace (DBG_PKT, DUPDPTR, ">>> XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
@@ -900,10 +900,12 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
                         sim_debug (reason, dptr, "(Unknown=0%o)\n", msg[1]);
                         break;
                     }
-                if (len != 8)
+                if (len != 8) {
                     sim_debug (reason, dptr, "Unexpected Control Message Length: %d expected 8\n", len);
-                if (0 != ddcmp_crc16 (0, msg, len))
+                    }
+                if (0 != ddcmp_crc16 (0, msg, len)) {
                     sim_debug (reason, dptr, "Unexpected Message CRC\n");
+                    }
                 break;
             case DDCMP_DLE:   /* Maintenance Message */
                 sim_debug (reason, dptr, "Maintenance Message, Link: %d, Count: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[1], 
