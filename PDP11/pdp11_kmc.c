@@ -716,7 +716,7 @@ void kmc_doinput(void)
     */
     sim_debug(DF_CMD, &kmc_dev, "Running DDCMP in full duplex on Line %d (dup %d):\n", line, d->dupnumber);
     dup_set_DDCMP (d->dupnumber, TRUE);
-    dup_set_DTR (d->dupnumber, TRUE);
+    dup_set_DTR (d->dupnumber, (kmc_sel6 & 0400) ? TRUE : FALSE));
     dup_set_callback_mode (d->dupnumber, dup_receive, dup_send_complete);
     break;
   case 3:			/* Base in. */
