@@ -25,7 +25,7 @@
 
    tc           TC11/TU56 DECtape
 
-   23-Jun-06	RMS     Fixed switch conflict in ATTACH
+   23-Jun-06    RMS     Fixed switch conflict in ATTACH
    10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -265,10 +265,10 @@
 #define LOG_BL          0x4
 
 #define DT_SETDONE      tccm = tccm | CSR_DONE; \
-						if (tccm & CSR_IE) \
+                        if (tccm & CSR_IE) \
                             SET_INT (DTA)
 #define DT_CLRDONE      tccm = tccm & ~CSR_DONE; \
-						CLR_INT (DTA)
+                        CLR_INT (DTA)
 #define ABS(x)          (((x) < 0)? (-(x)): (x))
 
 extern uint16 *M;                                       /* memory */
@@ -708,7 +708,7 @@ switch (fnc) {                                          /* case function */
             if (dir)
                 newpos = DT_BLK2LN (blk + 1, uptr) - DT_CSMLN - DT_WSIZE;
             else newpos = DT_BLK2LN (blk, uptr) + DT_CSMLN + (DT_WSIZE - 1);
-			}
+            }
         if (fnc == FNC_WALL) sim_activate               /* write all? */
             (&dt_dev.units[DT_TIMER], dt_ctime);        /* sched done */
         if (DEBUG_PRI (dt_dev, LOG_RW) ||
@@ -783,13 +783,13 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
-	uptr->STATE = uptr->pos = 0;
-	unum = (int32) (uptr - dt_dev.units);
-	if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
-		dt_seterr (uptr, STA_SEL);						/* error */
-	return TRUE;
-	}
+    detach_unit (uptr);                                 /* off reel? */
+    uptr->STATE = uptr->pos = 0;
+    unum = (int32) (uptr - dt_dev.units);
+    if ((unum == CSR_GETUNIT (tccm)) && (CSR_GETFNC (tccm) != FNC_STOP))
+        dt_seterr (uptr, STA_SEL);                      /* error */
+    return TRUE;
+    }
 return FALSE;
 }
 
@@ -1303,7 +1303,7 @@ if (sim_is_active (uptr)) {                             /* active? cancel op */
         tccm = tccm | CSR_ERR | CSR_DONE;
         if (tccm & CSR_IE)
             SET_INT (DTA);
-		}
+        }
     uptr->STATE = uptr->pos = 0;
     }
 fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */

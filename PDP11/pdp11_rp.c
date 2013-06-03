@@ -31,7 +31,7 @@
                         to boot.
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
-   12-Nov-05	RMS     Fixed DriveClear, does not clear disk address
+   12-Nov-05    RMS     Fixed DriveClear, does not clear disk address
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    18-Mar-05    RMS     Added attached test to detach routine
    12-Sep-04    RMS     Cloned from pdp11_rp.c

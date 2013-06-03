@@ -72,7 +72,7 @@ DEVICE *sim_devices[] = {
     &tmr_dev,
     &tti_dev,
     &tto_dev,
-	&rlcs_dev,
+    &rlcs_dev,
     &dz_dev,
     &vh_dev,
     &cr_dev,
@@ -90,10 +90,10 @@ DEVICE *sim_devices[] = {
     &tq_dev,
     &xu_dev,
     &xub_dev,
-	&dmc_dev[0],
-	&dmc_dev[1],
-	&dmc_dev[2],
-	&dmc_dev[3],
+    &dmc_dev[0],
+    &dmc_dev[1],
+    &dmc_dev[2],
+    &dmc_dev[3],
     &dup_dev,
     NULL
     };

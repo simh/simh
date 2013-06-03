@@ -278,7 +278,7 @@ if (ln > DCX_MAXMUX)                                    /* validate line number 
 switch ((PA >> 1) & 03) {                               /* decode PA<2:1> */
 
     case 00:                                            /* dci csr */
-	if (dci_csr[ln] & DCICSR_ALLERR)
+        if (dci_csr[ln] & DCICSR_ALLERR)
             dci_csr[ln] |= DCICSR_ERR;
         else dci_csr[ln] &= ~DCICSR_ERR;
         *data = dci_csr[ln] & DCICSR_RD;

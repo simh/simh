@@ -764,7 +764,7 @@ if ((sw & SWMASK ('A')) || (sw & SWMASK ('C'))) {       /* char format? */
     for (vp = lnt - 1; vp >= 0; vp--) {
         c = (int32) val[vp] & 0x7F;
         fprintf (of, (c < 0x20)? "<%02X>": "%c", c);
-		}
+        }
     return -(lnt - 1);                                  /* return # chars */
     }
 

@@ -189,7 +189,7 @@
 #define RLDS_ATT        (RLDS_HDO+RLDS_BHO+RLDS_LOCK)   /* att status */
 #define RLDS_UNATT      (RLDS_CVO+RLDS_LOAD)            /* unatt status */
 #define RLDS_ERR        (RLDS_WDE+RLDS_HCE+RLDS_STO+RLDS_SPE+RLDS_WGE+ \
-						 RLDS_VCK+RLDS_DSE)             /* errors bits */
+                         RLDS_VCK+RLDS_DSE)             /* errors bits */
 
 int32 tti_csr = 0;                                      /* control/status */
 int32 tti_buf = 0;                                      /* buffer */
@@ -526,33 +526,33 @@ cso_csr = cso_csr & ~STXCS_STS;
 
 switch (fnc) {
     case RLFC_NOP:
-	    break;
+        break;
 
     case RLFC_CONT:
         rlcs_bcnt = 0;
     case RLFC_STS:
-		rlcs_state = RL_STATUS;
+        rlcs_state = RL_STATUS;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
-		sim_activate (&rlcs_unit, rlcs_swait);
-	    break;
+        sim_activate (&rlcs_unit, rlcs_swait);
+        break;
 
     case RLFC_ABORT:
-		rlcs_state = RL_ABORT;
+        rlcs_state = RL_ABORT;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
-		sim_activate (&rlcs_unit, rlcs_swait);
-	    break;
+        sim_activate (&rlcs_unit, rlcs_swait);
+        break;
 
     case RLFC_WRITE:
         rlcs_state = RL_WRITE;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
-		sim_activate (&rlcs_unit, rlcs_swait);
-	    break;
+        sim_activate (&rlcs_unit, rlcs_swait);
+        break;
 
     case RLFC_READ:
         rlcs_state = RL_READ;
         cso_csr = cso_csr & ~CSR_DONE;                  /* clear done */
-		sim_activate (&rlcs_unit, rlcs_swait);
-	    break;
+        sim_activate (&rlcs_unit, rlcs_swait);
+        break;
 
     default:
         printf ("CS: Unknown Command: %d\n", fnc);
@@ -1095,7 +1095,7 @@ switch (rlcs_state) {
     case RL_IDLE:
         return SCPE_IERR;
 
-	case RL_READ:
+    case RL_READ:
         if ((cso_csr & CSR_DONE) == 0) {                /* buf ready? */
             if (rlcs_bcnt == 0) {                       /* read in whole block */
                 if ((uptr->flags & UNIT_ATT) == 0) {    /* Attached? */
@@ -1127,7 +1127,7 @@ switch (rlcs_state) {
             break;
             }
         sim_activate (uptr, rlcs_swait);                /* schedule next */
-		break;
+        break;
 
     case RL_WRITE:
         if ((uptr->flags & UNIT_ATT) == 0) {            /* Attached? */
@@ -1156,21 +1156,21 @@ switch (rlcs_state) {
             csi_int = 1;
         break;
 
-	case RL_ABORT:
+    case RL_ABORT:
         if ((cso_csr & CSR_DONE) == 0) {                /* buf ready? */
             cso_csr = cso_csr | CSR_DONE |              /* aborted */
                 (RLST_ABORT << STXCS_V_STS);
             cso_buf = 0;
             rlcs_bcnt = 0;
-			rlcs_state = RL_IDLE;
+            rlcs_state = RL_IDLE;
             if (cso_csr & CSR_IE)
                 csi_int = 1;
             break;
             }
         sim_activate (uptr, rlcs_swait);                /* schedule next */
-		break;
+        break;
 
-	case RL_STATUS:
+    case RL_STATUS:
         if ((cso_csr & CSR_DONE) == 0) {                /* buf ready? */
             switch (rlcs_sts_reg) {                     /* which register? */
 
@@ -1194,14 +1194,14 @@ switch (rlcs_state) {
                 }
             cso_csr = cso_csr | CSR_DONE |              /* returning status */
                 (RLST_STS << STXCS_V_STS);
-			rlcs_state = RL_IDLE;
+            rlcs_state = RL_IDLE;
             if (cso_csr & CSR_IE)
                 csi_int = 1;
             break;
             }
         sim_activate (uptr, rlcs_swait);                /* schedule next */
-		break;
-	}
+        break;
+    }
 return SCPE_OK;
 }
 

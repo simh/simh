@@ -106,8 +106,8 @@ CTAB vax630_cmd[] = {
 #define MSER_MCD1       0x00000200                      /* Mem Code 1 */
 #define MSER_MBZ        0xFFFFFC04
 #define MSER_RD         (MSER_PE | MSER_WWP | MSER_LEB | \
-	                     MSER_DQPE | MSER_CQPE | MSER_CLPE | \
-						 MSER_NXM | MSER_MCD0 | MSER_MCD1)
+                         MSER_DQPE | MSER_CQPE | MSER_CLPE | \
+                         MSER_NXM | MSER_MCD0 | MSER_MCD1)
 #define MSER_WR         (MSER_PE | MSER_WWP)
 #define MSER_RS         (MSER_LEB | MSER_DQPE | MSER_CQPE | MSER_CLPE | MSER_NXM)
 
@@ -409,7 +409,7 @@ fprintf (st, "Read-only memory (ROM)\n\n");
 fprintf (st, "The boot ROM consists of a single unit, simulating the 64KB boot ROM.  It has\n");
 fprintf (st, "no registers.  The boot ROM is loaded with a binary byte stream using the \n");
 fprintf (st, "LOAD -r command:\n\n");
-fprintf (st, "   LOAD -r KA630.BIN		load ROM image KA630.BIN\n\n");
+fprintf (st, "   LOAD -r KA630.BIN      load ROM image KA630.BIN\n\n");
 fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
 fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
 fprintf (st, "ROM image from the file ka655x.bin in the current working directory.\n");
@@ -825,8 +825,8 @@ p2 = mchk_va + 4;                                       /* save vap */
 st = 0;
 if (p1 & 0x80) {                                        /* mref? */
     cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
-	if (!(ka_mser & MSER_CQPE) && !(ka_mser & MSER_CLPE))
-		ka_mser |= MSER_NXM;
+    if (!(ka_mser & MSER_CQPE) && !(ka_mser & MSER_CLPE))
+        ka_mser |= MSER_NXM;
 }
 else cc = intexc (SCB_MCHK, cc, 0, IE_SVE);             /* take severe exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */

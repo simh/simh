@@ -366,7 +366,7 @@ do {
                 update_rfcs (0, RFDAE_NXM);
                 break;
                 }
-            fbuf[da] = dat;						       /* write word */
+            fbuf[da] = dat;                            /* write word */
             rf_dbr = dat;
             if (da >= uptr->hwmark)
                 uptr->hwmark = da + 1;

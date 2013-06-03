@@ -134,42 +134,42 @@ DEVICE sbia_dev = {
 
 int32 sbia_rd (int32 pa, int32 lnt)
 {
-	int32 rg = (pa >> 2) & 0x1F;
+    int32 rg = (pa >> 2) & 0x1F;
 
-	switch (rg) {
-	case 0:                                             /* SBICNF */
+    switch (rg) {
+    case 0:                                             /* SBICNF */
         return 0x00400010;                              /* 8MB + SBIA Abus code */
 
-	case 1:                                             /* SBICSR */
-		return sbi_csr;
+    case 1:                                             /* SBICSR */
+        return sbi_csr;
 
-	case 2:                                             /* SBIES (not impl) */
-	case 3:                                             /* SBIDCR (not impl) */
-	case 4:                                             /* DMAI CMD (not impl) */
-	case 5:                                             /* DMAI ID (not impl) */
-	case 6:                                             /* DMAA CMD (not impl) */
-	case 7:                                             /* DMAA ID (not impl) */
-	case 8:                                             /* DMAB CMD (not impl) */
-	case 9:                                             /* DMAB ID (not impl) */
-	case 0xa:                                           /* DMAC CMD (not impl) */
-	case 0xb:                                           /* DMAC ID (not impl) */
-	case 0xc:                                           /* SBIS (not impl) */
-		return 0;
+    case 2:                                             /* SBIES (not impl) */
+    case 3:                                             /* SBIDCR (not impl) */
+    case 4:                                             /* DMAI CMD (not impl) */
+    case 5:                                             /* DMAI ID (not impl) */
+    case 6:                                             /* DMAA CMD (not impl) */
+    case 7:                                             /* DMAA ID (not impl) */
+    case 8:                                             /* DMAB CMD (not impl) */
+    case 9:                                             /* DMAB ID (not impl) */
+    case 0xa:                                           /* DMAC CMD (not impl) */
+    case 0xb:                                           /* DMAC ID (not impl) */
+    case 0xc:                                           /* SBIS (not impl) */
+        return 0;
 
-	case 0xd:                                           /* SBIER */
-		return sbi_er & SBIER_RD;
+    case 0xd:                                           /* SBIER */
+        return sbi_er & SBIER_RD;
 
-	case 0xe:                                           /* SBITA */
-		return sbi_tmo;
+    case 0xe:                                           /* SBITA */
+        return sbi_tmo;
 
-	case 0xf:                                           /* SBIFS */
-		return sbi_fs & SBIFS_RD;
+    case 0xf:                                           /* SBIFS */
+        return sbi_fs & SBIFS_RD;
 
-	case 0x10:                                          /* SBISC */
-		return sbi_sc & SBISC_RD;
+    case 0x10:                                          /* SBISC */
+        return sbi_sc & SBISC_RD;
 
-	case 0x11:                                          /* SBIMT */
-		return sbi_mt & SBIMT_RD;
+    case 0x11:                                          /* SBIMT */
+        return sbi_mt & SBIMT_RD;
 
     default:                                            /* Anything else is not impl */
         return 0;
@@ -179,31 +179,31 @@ int32 sbia_rd (int32 pa, int32 lnt)
 
 void sbia_wr (int32 pa, int32 val, int32 lnt)
 {
-	int32 rg = (pa >> 2) & 0x1F;
+    int32 rg = (pa >> 2) & 0x1F;
 
-	switch (rg) {
-	case 0:                                             /* SBICNF */
+    switch (rg) {
+    case 0:                                             /* SBICNF */
         break;
 
-	case 1:                                             /* SBICSR */
+    case 1:                                             /* SBICSR */
         printf ("sbi_csr wr: %08X\n", val);
         sbi_csr = sbi_csr & SBICSR_WR;
         break;
 
-	case 2:                                             /* SBIES (not impl) */
-	case 3:                                             /* SBIDCR (not impl) */
-	case 4:                                             /* DMAI CMD (not impl) */
-	case 5:                                             /* DMAI ID (not impl) */
-	case 6:                                             /* DMAA CMD (not impl) */
-	case 7:                                             /* DMAA ID (not impl) */
-	case 8:                                             /* DMAB CMD (not impl) */
-	case 9:                                             /* DMAB ID (not impl) */
-	case 0xa:                                           /* DMAC CMD (not impl) */
-	case 0xb:                                           /* DMAC ID (not impl) */
-	case 0xc:                                           /* SBIS (not impl) */
+    case 2:                                             /* SBIES (not impl) */
+    case 3:                                             /* SBIDCR (not impl) */
+    case 4:                                             /* DMAI CMD (not impl) */
+    case 5:                                             /* DMAI ID (not impl) */
+    case 6:                                             /* DMAA CMD (not impl) */
+    case 7:                                             /* DMAA ID (not impl) */
+    case 8:                                             /* DMAB CMD (not impl) */
+    case 9:                                             /* DMAB ID (not impl) */
+    case 0xa:                                           /* DMAC CMD (not impl) */
+    case 0xb:                                           /* DMAC ID (not impl) */
+    case 0xc:                                           /* SBIS (not impl) */
         break;
 
-	case 0xd:                                           /* SBIER */
+    case 0xd:                                           /* SBIER */
         sbi_er = (sbi_er & ~SBIER_WR) | (val & SBIER_WR);
         sbi_er = sbi_er & ~(val & SBIER_W1C);
         if (val & SBIER_TMO)
@@ -215,22 +215,22 @@ void sbia_wr (int32 pa, int32 val, int32 lnt)
         else crd_err = 0;
         break;
 
-	case 0xe:                                           /* SBITA */
+    case 0xe:                                           /* SBITA */
         break;
 
-	case 0xf:                                           /* SBIFS */
+    case 0xf:                                           /* SBIFS */
         sbi_fs = (sbi_fs & ~SBIFS_WR) | (val & SBIFS_WR);
         sbi_fs = sbi_fs & ~(val & SBIFS_W1C);
         break;
 
-	case 0x10:                                          /* SBISC */
+    case 0x10:                                          /* SBISC */
         sbi_sc = (sbi_sc & ~(SBISC_LOCK|SBISC_WR)) | (val & SBISC_WR);
         break;
 
-	case 0x11:                                          /* SBIMT */
+    case 0x11:                                          /* SBIMT */
         sbi_mt = (sbi_mt & ~SBIMT_WR) | (val & SBIMT_WR);
         break;
-	}
+    }
 return;
 }
 

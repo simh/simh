@@ -222,8 +222,8 @@ for (i = 0; int_req[l] && (i < 32); i++) {
     if ((int_req[l] >> i) & 1) {
         int_req[l] = int_req[l] & ~(1u << i);
         if (int_ack[l][i])
-			return int_ack[l][i]();
-		return int_vec[l][i];
+            return int_ack[l][i]();
+        return int_vec[l][i];
         }
     }
 return 0;

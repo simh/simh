@@ -238,7 +238,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_io.c:
                         - fixed Qbus interrupts to treat all IO devices (except clock) as BR4
-			- fixed order of int_internal (Jordi Guillaumes i Pons)
+                        - fixed order of int_internal (Jordi Guillaumes i Pons)
 
                         ppd11_rf.c
                         - fixed bug in updating mem addr extension (Peter Schorn)

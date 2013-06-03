@@ -270,7 +270,7 @@ switch (ofs) {                                          /* case on offset */
     case UBADPR_OF + 2:
         break;                                          /* ignore writes */
 
-    case UBACSR_OF:			                            /* CSR */
+    case UBACSR_OF:                                     /* CSR */
         if(val & 0x10000) uba_csr = 0;
         break;
 

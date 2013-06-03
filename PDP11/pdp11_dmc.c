@@ -906,7 +906,7 @@ t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cp
     fprintf (st, "The communication line performs input and output through a TCP session\n");
     fprintf (st, "connected to a user-specified port.  The ATTACH command specifies the");
     fprintf (st, "port to be used:\n\n");
-    fprintf (st, "   sim> ATTACH %s {interface:}port		set up listening port\n\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %s {interface:}port        set up listening port\n\n", dptr->name);
     fprintf (st, "where port is a decimal number between 1 and 65535 that is not being used for\n");
     fprintf (st, "other TCP/IP activities. An ATTACH is required even if in PRIMARY mode. \n\n");
     return SCPE_OK;
