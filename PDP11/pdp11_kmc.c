@@ -22,8 +22,6 @@
 **   We don't handle NXM on the unibus.  At all.  In fact, we don't
 **   generate control-outs.
 **
-**   We don't really implement the DUP registers.
-**
 **   We don't do anything but full-duplex DDCMP.
 **
 **   We don't implement buffer flushing.
@@ -40,60 +38,42 @@
 #endif
 
 #define KMC_RDX     8
-#define DUP_RDX     8
+
+#include "pdp11_dup.h"
+
+#define DF_CMD    0001  /* Print commands. */
+#define DF_TX     0002  /* Print tx done. */
+#define DF_RX     0004  /* Print rx done. */
+#define DF_DATA   0010  /* Print data. */
+#define DF_QUEUE  0020  /* Print rx/tx queue changes. */
+#define DF_TRC    0040  /* Detailed trace. */
+#define DF_INF    0100  /* Info */
 
 extern int32 IREQ (HLVL);
 extern int32 tmxr_poll;                                 /* calibrated delay */
 extern int32 clk_tps;                                   /* clock ticks per second */
 extern int32 tmr_poll;                                  /* instructions per tick */
 
-#include "sim_tmxr.h"
-
-#define DF_CMD    0001	/* Print commands. */
-#define DF_TX     0002	/* Print tx done. */
-#define DF_RX     0004	/* Print rx done. */
-#define DF_DATA   0010	/* Print data. */
-#define DF_QUEUE  0020	/* Print rx/tx queue changes. */
-#define DF_TRC    0040	/* Detailed trace. */
-#define DF_INF    0100  /* Info */
-
-//t_stat sync_open(int* retval, char* cptr)
-//{
-//	return SCPE_OK;
-//}
-int sync_read(int line, uint8* packet, int length)
-{
-	return 0;
-}
-
-//void sync_write(int line, uint8* packet, int length)
-//{
-//}
-
-//void sync_close(int line)
-//{
-//}
-
 t_stat unibus_read(int32* data, int32 addr)
 {
-	t_stat ans;
-	uint16 d;
+    t_stat ans;
+    uint16 d;
 
-	*data = 0;
-	ans = Map_ReadW (addr, 2, &d);
-	*data = d;
-	return ans;
+    *data = 0;
+    ans = Map_ReadW (addr, 2, &d);
+    *data = d;
+    return ans;
 }
 
-extern t_stat unibus_write(int32 data, int32 addr)
+t_stat unibus_write(int32 data, int32 addr)
 {
     uint16 d;
 
     d = data & 0xFFFF;
 
-//printf("dma ub write 0x%08x=%06ho(oct)\n", addr, d);
-	return Map_WriteW (addr, 2, &d);
+    return Map_WriteW (addr, 2, &d);
 }
+
 t_stat dma_write(int32 ba, uint8* data, int length)
 {
   t_stat r;
@@ -141,7 +121,7 @@ t_stat dma_read(int32 ba, uint8* data, int length)
   t_stat r;
   uint32 wd;
 
-  if (ba & 1) {		/* Starting on an odd boundary? */
+  if (ba & 1) {         /* Starting on an odd boundary? */
     r = unibus_read((int32 *)&wd, ba-1);
     if (r != SCPE_OK) {
       return r;
@@ -167,54 +147,54 @@ t_stat dma_read(int32 ba, uint8* data, int length)
 
 /* bits, sel0: */
 
-#define KMC_RUN    0100000	/* Run bit. */
-#define KMC_MRC    0040000	/* Master clear. */
-#define KMC_CWR    0020000	/* CRAM write. */
-#define KMC_SLU    0010000	/* Step Line Unit. */
-#define KMC_LUL    0004000	/* Line Unit Loop. */
-#define KMC_RMO    0002000	/* ROM output. */
-#define KMC_RMI    0001000	/* ROM input. */
-#define KMC_SUP    0000400	/* Step microprocessor. */
-#define KMC_RQI    0000200	/* Request input. */
-#define KMC_IEO    0000020	/* Interrupt enable output. */
-#define KMC_IEI    0000001	/* Interrupt enable input. */
+#define KMC_RUN    0100000  /* Run bit. */
+#define KMC_MRC    0040000  /* Master clear. */
+#define KMC_CWR    0020000  /* CRAM write. */
+#define KMC_SLU    0010000  /* Step Line Unit. */
+#define KMC_LUL    0004000  /* Line Unit Loop. */
+#define KMC_RMO    0002000  /* ROM output. */
+#define KMC_RMI    0001000  /* ROM input. */
+#define KMC_SUP    0000400  /* Step microprocessor. */
+#define KMC_RQI    0000200  /* Request input. */
+#define KMC_IEO    0000020  /* Interrupt enable output. */
+#define KMC_IEI    0000001  /* Interrupt enable input. */
 
 /* bits, sel2: */
 
-#define KMC_OVR    0100000	/* Buffer overrun. */
-#define KMC_LINE   0177400	/* Line number. */
-#define KMC_RDO    0000200	/* Ready for output transaction. */
-#define KMC_RDI    0000020	/* Ready for input transaction. */
-#define KMC_IOT    0000004	/* I/O type, 1 = rx, 0 = tx. */
-#define KMC_CMD    0000003	/* Command code. */
-#  define CMD_BUFFIN     0	/*   Buffer in. */
-#  define CMD_CTRLIN     1	/*   Control in. */
-#  define CMD_BASEIN     3	/*   Base in. */
-#  define CMD_BUFFOUT    0	/*   Buffer out. */
-#  define CMD_CTRLOUT    1	/*   Control out. */
+#define KMC_OVR    0100000  /* Buffer overrun. */
+#define KMC_LINE   0177400  /* Line number. */
+#define KMC_RDO    0000200  /* Ready for output transaction. */
+#define KMC_RDI    0000020  /* Ready for input transaction. */
+#define KMC_IOT    0000004  /* I/O type, 1 = rx, 0 = tx. */
+#define KMC_CMD    0000003  /* Command code. */
+#  define CMD_BUFFIN     0  /*   Buffer in. */
+#  define CMD_CTRLIN     1  /*   Control in. */
+#  define CMD_BASEIN     3  /*   Base in. */
+#  define CMD_BUFFOUT    0  /*   Buffer out. */
+#  define CMD_CTRLOUT    1  /*   Control out. */
 
 /* bits, sel6: */
 
-#define BFR_EOM    0010000	/* End of message. */
-#define BFR_KIL    0010000	/* Buffer Kill. */
+#define BFR_EOM    0010000  /* End of message. */
+#define BFR_KIL    0010000  /* Buffer Kill. */
 
 /* buffer descriptor list bits: */
 
-#define BDL_LDS    0100000	/* Last descriptor in list. */
-#define BDL_RSY    0010000	/* Resync transmitter. */
-#define BDL_XAD    0006000	/* Buffer address bits 17 & 16. */
-#define BDL_EOM    0001000	/* End of message. */
-#define BDL_SOM    0000400	/* Start of message. */
+#define BDL_LDS    0100000  /* Last descriptor in list. */
+#define BDL_RSY    0010000  /* Resync transmitter. */
+#define BDL_XAD    0006000  /* Buffer address bits 17 & 16. */
+#define BDL_EOM    0001000  /* End of message. */
+#define BDL_SOM    0000400  /* Start of message. */
 
-#define KMC_CRAMSIZE 1024	/* Size of CRAM. */
+#define KMC_CRAMSIZE 1024   /* Size of CRAM. */
 
 #ifndef MAXDUP
-#  define MAXDUP 2		/* Number of DUP-11's we can handle. */
+#  define MAXDUP 2      /* Number of DUP-11's we can handle. */
 #endif
 
-#define MAXQUEUE 16		/* Number of rx bdl's we can handle. */
+#define MAXQUEUE 16     /* Number of rx bdl's we can handle. */
 
-#define MAXMSG 2000		/* Largest message we handle. */
+#define MAXMSG 2000     /* Largest message we handle. */
 
 /* local variables: */
 
@@ -228,23 +208,18 @@ int    kmc_txi;
 
 uint16 kmc_microcode[KMC_CRAMSIZE];
 
-uint32 dup_rxcsr[MAXDUP];
-uint32 dup_rxdbuf[MAXDUP];
-uint32 dup_parcsr[MAXDUP];
-uint32 dup_txcsr[MAXDUP];
-uint32 dup_txdbuf[MAXDUP];
-
 struct dupblock {
-  uint32 rxqueue[MAXQUEUE];	/* Queue of bd's to receive into. */
-  uint32 rxcount;		/* No. bd's in above. */
-  uint32 rxnext;		/* Next bd to receive into. */
-  uint32 txqueue[MAXQUEUE];	/* Queue of bd's to transmit. */
-  uint32 txcount;		/* No. bd's in above. */
-  uint32 txnext;		/* Next bd to transmit. */
-  uint32 txnow;			/* No. bd's we are transmitting now. */
-  uint8  txbuf[MAXMSG + 2]; /* contains next buffer to transmit, including two bytes for length */
-  uint8  txbuflen;      /* length of message in buffer */
-  uint8  txbufbytessent;/* number of bytes from the message actually sent so far */
+  int32  dupnumber;         /* Line Number of all DUP11's on Unibus */
+  uint32 rxqueue[MAXQUEUE]; /* Queue of bd's to receive into. */
+  uint32 rxcount;           /* No. bd's in above. */
+  uint32 rxnext;            /* Next bd to receive into. */
+  uint32 txqueue[MAXQUEUE]; /* Queue of bd's to transmit. */
+  uint32 txcount;           /* No. bd's in above. */
+  uint32 txnext;            /* Next bd to transmit. */
+  uint32 txnow;             /* No. bd's we are transmitting now. */
+  uint8  txbuf[MAXMSG];     /* contains next buffer to transmit */
+  uint8  txbuflen;          /* length of message in buffer */
+  uint8  txbufbytessent;    /* number of bytes from the message actually sent so far */
 };
 
 typedef struct dupblock dupblock;
@@ -253,17 +228,8 @@ dupblock dup[MAXDUP] = { 0 };
 
 /* state/timing/etc: */
 
-t_bool kmc_output = FALSE;	/* Flag, need at least one output. */
-int kmc_interval = 10000;	/* Polling interval. */
-
-TMLN kdp_ldsc[MAXDUP];                   /* line descriptors */
-TMXR kdp_desc[MAXDUP] = 
-{
-	{ 1, 0, 0, &kdp_ldsc[0] },
-	{ 1, 0, 0, &kdp_ldsc[1] }
-};
-
-extern int32 tmxr_poll;                                 /* calibrated delay */
+t_bool kmc_output = FALSE;  /* Flag, need at least one output. */
+int32 kmc_output_duetime;   /* time to activate after buffer transmit */
 
 /* forward decls: */
 
@@ -278,15 +244,7 @@ void kmc_clrtxint();
 t_stat kmc_svc(UNIT * uptr);
 t_stat kmc_reset(DEVICE * dptr);
 
-t_stat dup_rd(int32* data, int32 PA, int32 access);
-t_stat dup_wr(int32 data, int32 PA, int32 access);
-t_stat dup_svc(UNIT * uptr);
-t_stat dup_reset(DEVICE * dptr);
-t_stat dup_attach(UNIT * uptr, char * cptr);
-t_stat dup_detach(UNIT * uptr);
 void prbdl(uint32 dbits, DEVICE *dev, int32 ba, int prbuf);
-
-t_stat send_packet(DEVICE *device, TMLN *lp, uint8 *buf, size_t size);
 
 DEBTAB kmc_debug[] = {
     {"CMD",   DF_CMD},
@@ -295,12 +253,7 @@ DEBTAB kmc_debug[] = {
     {"DATA",  DF_DATA},
     {"QUEUE", DF_QUEUE},
     {"TRC",   DF_TRC},
-	{"INF",   DF_INF},
-	{ "TMXRXMT", TMXR_DBG_XMT },
-	{ "TMXRRCV", TMXR_DBG_RCV },
-	{ "TMXRASY", TMXR_DBG_ASY },
-	{ "TMXRTRC", TMXR_DBG_TRC },
-	{ "TMXRCON", TMXR_DBG_CON },
+    {"INF",   DF_INF},
     {0}
 };
 
@@ -317,22 +270,12 @@ REG kmc_reg[] = {
   { ORDATA ( SEL2, kmc_sel2, 16) },
   { ORDATA ( SEL4, kmc_sel4, 16) },
   { ORDATA ( SEL6, kmc_sel6, 16) },
-
-  { ORDATA ( DEBUG, kmc_debug, 32) },
-  { DRDATA ( INTERVAL, kmc_interval, 32) },
-
-  { GRDATA (DEVADDR, kmc_dib.ba, KMC_RDX, 32, 0), REG_HRO },
-/*  { FLDATA (*DEVENB, kmc_dib.enb, 0), REG_HRO }, */
   { NULL },
 };
 
 MTAB kmc_mod[] = {
   { MTAB_XTD|MTAB_VDV, 010, "address", "ADDRESS",
     &set_addr, &show_addr, NULL, "IP address" },
-/*  { MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-    &set_enbdis, NULL, &kmc_dib },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-    &set_enbdis, NULL, &kmc_dib },*/
   { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", NULL,
     &set_vec, &show_vec, NULL, "Interrupt vector" },
   { 0 },
@@ -340,153 +283,56 @@ MTAB kmc_mod[] = {
 
 DEVICE kmc_dev =
 {
-	"KMC", &kmc_unit, kmc_reg, kmc_mod,
-	1, KMC_RDX, 13, 1, KMC_RDX, 8,
-	NULL, NULL, &kmc_reset,
-	NULL, NULL, NULL, &kmc_dib,
-	DEV_UBUS | DEV_DISABLE | DEV_DIS | DEV_DEBUG, 0, kmc_debug
+    "KMC", &kmc_unit, kmc_reg, kmc_mod,
+    1, KMC_RDX, 13, 1, KMC_RDX, 8,
+    NULL, NULL, &kmc_reset,
+    NULL, NULL, NULL, &kmc_dib,
+    DEV_UBUS | DEV_DIS | DEV_DISABLE | DEV_DEBUG, 0, kmc_debug
 };
 
-/* DUP11 data structs: */
-
-#define IOLN_DUP        010
-
-DIB dup0_dib = { IOBA_AUTO, IOLN_DUP, &dup_rd, &dup_wr, 0 };
-DIB dup1_dib = { IOBA_AUTO, IOLN_DUP, &dup_rd, &dup_wr, 0 };
-
-UNIT dup_unit[MAXDUP] = {
-  { UDATA (&dup_svc, UNIT_ATTABLE, 0) },
-  { UDATA (&dup_svc, UNIT_ATTABLE, 0) }
-};
-
-REG dup0_reg[] =
+void dup_send_complete (int32 dup, int status)
 {
-  { GRDATA (DEVADDR, dup0_dib.ba, DUP_RDX, 32, 0), REG_HRO },
-/*  { FLDATA (*DEVENB, dup0_dib.enb, 0), REG_HRO },*/
-  { NULL },
-};
-
-REG dup1_reg[] =
-{
-  { GRDATA (DEVADDR, dup1_dib.ba, DUP_RDX, 32, 0), REG_HRO },
-/*  { FLDATA (*DEVENB, dup1_dib.enb, 0), REG_HRO },*/
-  { NULL },
-};
-
-MTAB dup_mod[] = {
-  { MTAB_XTD|MTAB_VDV, 010, "address", "ADDRESS",
-    &set_addr, &show_addr },
-/*  { MTAB_XTD|MTAB_VDV, 1, NULL, "ENABLED",
-    &set_enbdis, NULL, &dup_dib },
-  { MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLED",
-    &set_enbdis, NULL, &dup_dib },*/
-  { 0 },
-};
-
-DEVICE dup_dev[] =
-{
-	{
-		"DUP0", &dup_unit[0], dup0_reg, dup_mod,
-		1, DUP_RDX, 13, 1, DUP_RDX, 8,
-		NULL, NULL, &dup_reset,
-		NULL, &dup_attach, &dup_detach, &dup0_dib,
-		DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, kmc_debug
-	},
-	{
-		"DUP1", &dup_unit[1], dup1_reg, dup_mod,
-		1, DUP_RDX, 13, 1, DUP_RDX, 8,
-		NULL, NULL, &dup_reset,
-		NULL, &dup_attach, &dup_detach, &dup1_dib,
-		DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, kmc_debug
-	}
-};
+    sim_activate_notbefore (&kmc_unit, kmc_output_duetime);
+}
 
 t_stat send_buffer(int dupindex)
 {
-	t_stat r = SCPE_OK;
+    t_stat r = SCPE_OK;
     dupblock* d;
+    d = &dup[dupindex];
 
-	d = &dup[dupindex];
+    if (d->txnow > 0) {
+        if (dup_put_msg_bytes (d->dupnumber, d->txbuf, d->txbuflen, TRUE, TRUE)) {
+            int32 speed = dup_get_line_speed(d->dupnumber);
 
-	if (d->txnow > 0 && kdp_ldsc[dupindex].conn)
-	{
-		r = send_packet(&dup_dev[dupindex], &kdp_ldsc[dupindex], d->txbuf, d->txbuflen);
-		d->txnext += d->txnow;
-		kmc_output = TRUE;
-	}
+            d->txnext += d->txnow;
+            d->txnow = 0;
+            kmc_output = TRUE;
+            kmc_output_duetime = sim_grtime();
+            if (speed > 7)
+                kmc_output_duetime += (tmxr_poll * clk_tps)/(speed/8);
+            }
+        }
 
-	d->txnow = 0;
-
-	return r;
+    return r;
 }
 
 char *format_packet_data(uint8 *data, size_t size)
 {
-	static char buf[3 * 128 + 1];
-	int buflen;
-	int i;
-	int n;
+    static char buf[3 * 128 + 1];
+    int buflen;
+    int i;
+    int n;
 
-	buflen = 0;
-	n = (size > 128) ? 128 : size;
-	for (i = 0; i < n; i++)
-	{
-		sprintf(&buf[buflen], " %02X", data[i]);
-		buflen += 3;
-	}
+    buflen = 0;
+    n = (size > 128) ? 128 : size;
+    for (i = 0; i < n; i++)
+    {
+        sprintf(&buf[buflen], " %02X", data[i]);
+        buflen += 3;
+    }
 
-	return buf;
-}
-
-t_stat send_packet(DEVICE *device, TMLN *lp, uint8 *buf, size_t size)
-{
-	int bytesLeft;
-	size_t i;
-	t_stat r = SCPE_OK;
-
-	sim_debug(DF_DATA, device, "Sending packet, length %d:%s\n", size - 2, format_packet_data(buf + 2, size - 2));
-
-	for (i=0; i<size; i++) {
-		r = tmxr_putc_ln (lp, buf[i]);
-	    if (r != SCPE_OK) sim_debug(DF_DATA, device, "Failed to put a data byte\n");
-	}
-	bytesLeft = tmxr_send_buffered_data(lp);
-	if (bytesLeft != 0) sim_debug(DF_DATA, device, "Bytes left after send %d\n", bytesLeft);
-
-	return r;
-}
-
-int read_packet(DEVICE *device, TMLN *lp, uint8 *buf, size_t size)
-{
-	size_t i;
-	size_t actualLength = 0;
-	int32 firstByte;
-
-	tmxr_poll_rx(lp->mp);
-
-	firstByte = tmxr_getc_ln(lp);
-	if (firstByte & TMXR_VALID)
-	{
-		actualLength = (firstByte & 0xFF) << 8;
-		actualLength += (tmxr_getc_ln(lp) & 0xFF);
-
-		if (actualLength > size)
-		{
-			sim_debug(DF_INF, device, "Received message too long, expected %d, but was %d\n", size, actualLength);
-			actualLength = 0;
-		}
-		else
-		{
-			for (i = 0; i < actualLength; i++)
-			{
-				buf[i] = (uint8)(tmxr_getc_ln(lp) & 0xFF);
-			}
-
-			sim_debug(DF_DATA, device, "Read packet, length %d:%s\n", actualLength, format_packet_data(buf, actualLength));
-		}
-	}
-
-	return actualLength;
+    return buf;
 }
 
 /*
@@ -495,17 +341,17 @@ int read_packet(DEVICE *device, TMLN *lp, uint8 *buf, size_t size)
 
 void kmc_updints(void)
 {
-	if (kmc_sel0 & KMC_IEI) {
-		if (kmc_sel2 & KMC_RDI) {
-			kmc_setrxint();
-		} else {
-			kmc_clrrxint();
-		}
-	}
+    if (kmc_sel0 & KMC_IEI) {
+        if (kmc_sel2 & KMC_RDI) {
+            kmc_setrxint();
+        } else {
+        kmc_clrrxint();
+        }
+    }
 
-	if (kmc_sel0 & KMC_IEO) {
-		if (kmc_sel2 & KMC_RDO) {
-			kmc_settxint();
+    if (kmc_sel0 & KMC_IEO) {
+        if (kmc_sel2 & KMC_RDO) {
+        	kmc_settxint();
 		} else {
 			kmc_clrtxint();
 		}
@@ -521,7 +367,7 @@ t_bool kmc_getrdo(void)
 {
   if (kmc_sel2 & KMC_RDO)	/* Already on? */
     return FALSE;
-  if (kmc_sel2 & KMC_RDI)	/* Busy doing input? */
+  if (kmc_sel2 & KMC_RDI)   /* Busy doing input? */
     return FALSE;
   kmc_sel2 |= KMC_RDO;
   return TRUE;
@@ -533,37 +379,37 @@ t_bool kmc_getrdo(void)
 
 void kmc_tryoutput(void)
 {
-	int i, j;
-	dupblock* d;
-	uint32 ba;
+    int i, j;
+    dupblock* d;
+    uint32 ba;
 
-	if (kmc_output) {
-		kmc_output = FALSE;
-		for (i = 0; i < MAXDUP; i += 1) {
-			d = &dup[i];
-			if (d->rxnext > 0) {
-				kmc_output = TRUE;	/* At least one, need more scanning. */
-				if (kmc_getrdo()) {
-					ba = d->rxqueue[0];
-					kmc_sel2 &= ~KMC_LINE;
-					kmc_sel2 |= (i << 8);
-					kmc_sel2 &= ~KMC_CMD;
-					kmc_sel2 |= CMD_BUFFOUT;
-					kmc_sel2 |= KMC_IOT;	/* Buffer type. */
-					kmc_sel4 = ba & 0177777;
-					kmc_sel6 = (ba >> 2) & 0140000;
-					kmc_sel6 |= BFR_EOM;
+    if (kmc_output) {
+        kmc_output = FALSE;
+        for (i = 0; i < MAXDUP; i += 1) {
+            d = &dup[i];
+            if (d->rxnext > 0) {
+                kmc_output = TRUE;  /* At least one, need more scanning. */
+                if (kmc_getrdo()) {
+                    ba = d->rxqueue[0];
+                    kmc_sel2 &= ~KMC_LINE;
+                    kmc_sel2 |= (i << 8);
+                    kmc_sel2 &= ~KMC_CMD;
+                    kmc_sel2 |= CMD_BUFFOUT;
+                    kmc_sel2 |= KMC_IOT;	/* Buffer type. */
+                    kmc_sel4 = ba & 0177777;
+                    kmc_sel6 = (ba >> 2) & 0140000;
+                    kmc_sel6 |= BFR_EOM;
 
-					for (j = 1; j < (int)d->rxcount; j += 1) {
-						d->rxqueue[j-1] = d->rxqueue[j];
-					}
-					d->rxcount -= 1;
-					d->rxnext -= 1;
+                    for (j = 1; j < (int)d->rxcount; j += 1) {
+                        d->rxqueue[j-1] = d->rxqueue[j];
+                    }
+                    d->rxcount -= 1;
+                    d->rxnext -= 1;
 
-					sim_debug(DF_QUEUE, &dup_dev[i], "DUP%d: (tryout) ba = %6o, rxcount = %d, rxnext = %d\r\n", i, ba, d->rxcount, d->rxnext);
-					kmc_updints();
-				}
-				return;
+                    sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (tryout) ba = %6o, rxcount = %d, rxnext = %d\r\n", i, ba, d->rxcount, d->rxnext);
+                    kmc_updints();
+                }
+                return;
 			} 
 			if (d->txnext > 0) {
 				kmc_output = TRUE;	/* At least one, need more scanning. */
@@ -583,7 +429,7 @@ void kmc_tryoutput(void)
 					d->txcount -= 1;
 					d->txnext -= 1;
 
-					sim_debug(DF_QUEUE, &dup_dev[i], "DUP%d: (tryout) ba = %6o, txcount = %d, txnext = %d\r\n", i, ba, d->txcount, d->txnext);
+					sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (tryout) ba = %6o, txcount = %d, txnext = %d\r\n", i, ba, d->txcount, d->txnext);
 					kmc_updints();
 				}
 				return;
@@ -601,7 +447,7 @@ void dup_tryxmit(int dupindex)
 {
   dupblock* d;
 
-  int pos;			/* Offset into transmit buffer. */
+  int pos;			    /* Offset into transmit buffer. */
 
   uint32 bda;			/* Buffer Descriptor Address. */
   uint32 bd[3];			/* Buffer Descriptor. */
@@ -612,10 +458,7 @@ void dup_tryxmit(int dupindex)
   int dcount;			/* Number of descriptors to use. */
   t_bool lds;			/* Found last descriptor. */
 
-  int i;			/* Random loop var. */
-  int delay;			/* Estimated transmit time. */
-
-  extern int32 tmxr_poll;	/* calibrated delay */
+  int i;			    /* Random loop var. */
 
   d = &dup[dupindex];
 
@@ -628,7 +471,7 @@ void dup_tryxmit(int dupindex)
   */
 
   lds = FALSE;			/* No last descriptor yet. */
-  dcount = msglen = 0;		/* No data yet. */
+  dcount = msglen = 0;	/* No data yet. */
 
   /* accumulate length, scan for LDS flag */
 
@@ -651,10 +494,8 @@ void dup_tryxmit(int dupindex)
   d->txnow = dcount;		/* Got a full frame, will send or ignore it. */
 
   if (msglen <= MAXMSG) {	/* If message fits in buffer, - */
-	d->txbuf[0] = (uint8)(msglen>>8) & 0xFF;
-	d->txbuf[1] = (uint8)msglen & 0xFF;
-	d->txbuflen = msglen + 2;
-    pos = 2;
+    pos = 0;
+    d->txbuflen = msglen;
 
     for (i = d->txnext; i < (int)(d->txnext + dcount); i += 1) {
       bda = d->txqueue[i];
@@ -671,21 +512,6 @@ void dup_tryxmit(int dupindex)
 
   send_buffer(dupindex);
   }
-
-#define IPS() (tmxr_poll * 50)	/* UGH! */
-
-  /*
-  ** Delay calculation:
-  ** delay (instructions) = bytes * IPS * 8 / speed;
-  ** either do this in floating point, or be very careful about
-  ** overflows...
-  */
-
-  delay = IPS() / (19200 >> 10);
-  delay *= msglen;
-  delay >>= 7;
-
-  //sim_activate(&dup_unit[dupindex], delay);
 }
 
 /*
@@ -703,11 +529,11 @@ void dup_newrxbuf(int line, int32 ba)
     if (d->rxcount < MAXQUEUE) {
       d->rxqueue[d->rxcount] = ba;
       d->rxcount += 1;
-      sim_debug(DF_QUEUE, &dup_dev[line], "Queued rx buffer %d, descriptor address=0x%04X(%06o octal)\n", d->rxcount - 1, ba, ba);
+      sim_debug(DF_QUEUE, &kmc_dev, "Queued rx buffer %d, descriptor address=0x%04X(%06o octal)\n", d->rxcount - 1, ba, ba);
     }
 	else
 	{
-      sim_debug(DF_QUEUE, &dup_dev[line], "(newrxb) no more room for buffers\n");
+      sim_debug(DF_QUEUE, &kmc_dev, "(newrxb) no more room for buffers\n");
 	}
 
     (void) unibus_read(&w3, ba + 4);
@@ -717,7 +543,7 @@ void dup_newrxbuf(int line, int32 ba)
     ba += 6;
   }
 
-  sim_debug(DF_QUEUE, &dup_dev[line], "(newrxb) rxcount = %d, rxnext = %d\n", d->rxcount, d->rxnext);
+  sim_debug(DF_QUEUE, &kmc_dev, "(newrxb) rxcount = %d, rxnext = %d\n", d->rxcount, d->rxnext);
 
 }
 
@@ -745,7 +571,7 @@ void dup_newtxbuf(int line, int32 ba)
     ba += 6;
   }
 
-  sim_debug(DF_QUEUE, &dup_dev[line], "DUP%d: (newtxb) txcount = %d, txnext = %d\r\n", line, d->txcount, d->txnext);
+  sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (newtxb) txcount = %d, txnext = %d\r\n", line, d->txcount, d->txnext);
 
   dup_tryxmit(line);		/* Try to start output. */
 }
@@ -765,19 +591,20 @@ void dup_receive(int line, uint8* data, int count)
   d = &dup[line];
 
   if (d->rxcount > d->rxnext) {
+    count -= 2;                     /* strip incoming CSR */
     bda = d->rxqueue[d->rxnext];
     (void) unibus_read((int32 *)&bd[0], bda);
     (void) unibus_read((int32 *)&bd[1], bda + 2);
     (void) unibus_read((int32 *)&bd[2], bda + 4);
-    sim_debug(DF_QUEUE, &dup_dev[line], "dup_receive ba=0x%04x(%06o octal). Descriptor is:\n", bda, bda);
-	prbdl(DF_QUEUE, &dup_dev[line], bda, 0);
+    sim_debug(DF_QUEUE, &kmc_dev, "dup_receive ba=0x%04x(%06o octal). Descriptor is:\n", bda, bda);
+	prbdl(DF_QUEUE, &kmc_dev, bda, 0);
 
     ba = bd[0] + ((bd[2] & 06000) << 6);
     bl = bd[1];
 
     if (count > (int)bl) count = bl;	/* XXX */
 
-    sim_debug(DF_QUEUE, &dup_dev[line], "Receive buf[%d] writing to address=0x%04X(%06o octal), bytes=%d\n", d->rxnext, ba, ba, count);
+    sim_debug(DF_QUEUE, &kmc_dev, "Receive buf[%d] writing to address=0x%04X(%06o octal), bytes=%d\n", d->rxnext, ba, ba, count);
     (void) dma_write(ba, data, count);
 
     bd[2] |= (BDL_SOM | BDL_EOM);
@@ -785,25 +612,6 @@ void dup_receive(int line, uint8* data, int count)
     (void) unibus_write(bd[2], bda + 4);
 
     d->rxnext += 1;
-  }
-}
-
-/*
-** Try to receive data for a given line:
-*/
-
-void dup_tryreceive(int dupindex)
-{
-  int length;
-  uint8 buffer[MAXMSG];
-
-  if (kdp_ldsc[dupindex].conn) {	/* Got a sync line? */
-    length = read_packet(&dup_dev[dupindex], &kdp_ldsc[dupindex], buffer, MAXMSG);
-    if (length > 0) {		/* Got data? */
-      sim_debug(DF_RX, &dup_dev[dupindex], "DUP%d: receiving %d bytes\r\n", dupindex, length);
-      dup_receive(dupindex, buffer, length);
-      kmc_output = TRUE;	/* Flag this. */
-    }
   }
 }
 
@@ -879,8 +687,10 @@ void kmc_doinput(void)
 {
   int line;
   int32 ba;
+  dupblock* d;
 
   line = (kmc_sel2 & 077400) >> 8;
+  d = &dup[line];
   ba = ((kmc_sel6 & 0140000) << 2) + kmc_sel4;
 
   sim_debug(DF_CMD, &kmc_dev, "Input command: sel2=%06o sel4=%06o sel6=%06o\n", kmc_sel2, kmc_sel4, kmc_sel6);
@@ -901,15 +711,20 @@ void kmc_doinput(void)
     break;
   case 1:			/* Control in. */
     /*
-    ** The only thing this does is tell us to run DDCMP, in full duplex,
-    ** but that is the only thing we know how to do anyway...
+    ** This lets us setup the dup for DDCMP mode, and possibly turn up DTR 
+    ** since nothing else seems to do that.
     */
+    sim_debug(DF_CMD, &kmc_dev, "Running DDCMP in full duplex on Line %d (dup %d):\n", line, d->dupnumber);
+    dup_set_DDCMP (d->dupnumber, TRUE);
+    dup_set_DTR (d->dupnumber, TRUE);
+    dup_set_callback_mode (d->dupnumber, dup_receive, dup_send_complete);
     break;
   case 3:			/* Base in. */
     /*
-    ** The only thing this does is tell the KMC what unibus address
-    ** the dup is at.  But we already know...
+    ** This tell the KMC what unibus address the dup is at.
     */
+    sim_debug(DF_CMD, &kmc_dev, "Setting Line %d DUP unibus address to: 0x%x (0%o octal)\n", line, kmc_sel6+IOPAGEBASE, kmc_sel6+IOPAGEBASE);
+    d->dupnumber = dup_csr_to_linenum (kmc_sel6);
     break;
   case 4:			/* Buffer in, receive buffer for us... */
     dup_newrxbuf(line, ba);
@@ -944,38 +759,9 @@ void kmc_mclear(void)
     d->txcount = 0;
     d->txnext = 0;
     d->txnow = 0;
-    sim_cancel(&dup_unit[i]);	/* Stop xmit wait. */
-    sim_clock_coschedule(&dup_unit[i], tmxr_poll);
   }
   sim_cancel(&kmc_unit);	/* Stop the clock. */
-  sim_clock_coschedule(&kmc_unit, tmxr_poll);
-}
-
-/*
-** DUP11, read registers:
-*/
-
-t_stat dup_rd(int32* data, int32 PA, int32 access)
-{
-  int dupno;
-
-  dupno = ((PA - dup0_dib.ba) >> 3) & (MAXDUP - 1);
-
-  switch ((PA >> 1) & 03) {
-  case 00:
-    *data = dup_rxcsr[dupno];
-    break;
-  case 01:
-    *data = dup_rxdbuf[dupno];
-    break;
-  case 02:
-    *data = dup_txcsr[dupno];
-    break;
-  case 03:
-    *data = dup_txdbuf[dupno];
-    break;
-  }
-  return SCPE_OK;
+  sim_activate_after(&kmc_unit, 2000000);
 }
 
 /*
@@ -1004,33 +790,6 @@ t_stat kmc_rd(int32* data, int32 PA, int32 access)
   }
  
   sim_debug(DF_TRC, &kmc_dev, "kmc_rd(), addr=0%o access=%d, result=0x%04x\n", PA, access, *data);
-  return SCPE_OK;
-}
-
-/*
-** DUP11, write registers:
-*/
-
-t_stat dup_wr(int32 data, int32 PA, int32 access)
-{
-  int dupno;
-
-  dupno = ((PA - dup0_dib.ba) >> 3) & (MAXDUP - 1);
-
-  switch ((PA >> 1) & 03) {
-  case 00:
-    dup_rxcsr[dupno] = data;
-    break;
-  case 01:
-    dup_parcsr[dupno] = data;
-    break;
-  case 02:
-    dup_txcsr[dupno] = data;
-    break;
-  case 03:
-    dup_txdbuf[dupno] = data;
-    break;
-  }
   return SCPE_OK;
 }
 
@@ -1182,93 +941,20 @@ int32 kmc_txint (void)
 }
 
 /*
-** DUP11 service routine:
-*/
-
-t_stat dup_svc(UNIT* uptr)
-{
-  int dupindex;
-  int32 ln;
-  dupblock* d;
-
-  dupindex = uptr->u3;
-  d = &dup[dupindex];
-  //printf("dup_svc %d\n", dupindex);
-
-  ln = tmxr_poll_conn(&kdp_desc[dupindex]);
-  if (ln >= 0)
-  {
-	  kdp_ldsc[dupindex].rcve = 1;
-  }
-
-  tmxr_poll_rx(&kdp_desc[dupindex]);
-  tmxr_poll_tx(&kdp_desc[dupindex]);
-
-  //send_buffer(dupindex);
-  //if (d->txnow > 0) {
-  //  d->txnext += d->txnow;
-  //  d->txnow = 0;
-  //  kmc_output = TRUE;
-  //}
-
-  if (d->txcount > d->txnext) {
-    dup_tryxmit(dupindex);
-  }
-
-  sim_clock_coschedule (uptr, tmxr_poll);
-
-  return SCPE_OK;
-}
-
-/*
 ** KMC11 service routine:
 */
 
 t_stat kmc_svc (UNIT* uptr)
 {
-  int i;
-  int dupno;
+    int dupno;
 
-  dupno = uptr->u3;
+    dupno = uptr->u3;
 
-  for (i = 0; i < MAXDUP; i += 1) {
-    dup_tryreceive(i);
-  }
-  if (kmc_output) {
-    kmc_tryoutput();		/* Try to do an output transaction. */
-  }  
-  sim_clock_coschedule (uptr, tmxr_poll);
-  //sim_activate(&kmc_unit, kmc_interval);
-  return SCPE_OK;
-}
-
-/*
-** DUP11, reset device:
-*/
-
-t_stat dup_reset(DEVICE* dptr)
-{
-//  static t_bool firsttime = TRUE;
-  int i;
-
-  for (i = 0; i < MAXDUP; i++)
-  {
-	  dup_unit[i].u3 = i;
-	  kdp_ldsc[i].rcve = 1;
-  }
-
-  //if (firsttime) {
-  //  for (i = 1; i < MAXDUP; i += 1) {
-  //    dup_unit[i] = dup_unit[0]; /* Copy all the units. */
-  //  }
-  //  for (i = 0; i < MAXDUP; i += 1) {
-  //    //tmxr_reset_ln(&kdp_ldsc[i]);
-  //    dup_unit[i].u3 = i;	/* Link dupblock to unit. */
-  //  }
-  //  firsttime = FALSE;		/* Once-only init done now. */
-  //}
-
-  return auto_config (dptr->name, (dptr->flags & DEV_DIS)? 0: 1 );    /* auto config */
+    if (kmc_output) {
+        kmc_tryoutput();		/* Try to do an output transaction. */
+    }
+    sim_activate_after(uptr, 2000000);
+    return SCPE_OK;
 }
 
 /*
@@ -1281,55 +967,5 @@ t_stat kmc_reset(DEVICE* dptr)
 	kmc_sel2 = 0;
 	kmc_sel4 = 0;
 	kmc_sel6 = 0;
-
-    return auto_config (dptr->name, (dptr->flags & DEV_DIS)? 0: 1 );    /* auto config */
-}
-
-/*
-** DUP11, attach device:
-*/
-
-t_stat dup_attach(UNIT* uptr, char* cptr)
-{
-  int dupno;
-  t_stat r;
-  char* tptr;
-
-  dupno = uptr->u3;
-
-  tptr = (char *)malloc(strlen(cptr) + 1);
-  if (tptr == NULL) return SCPE_MEM;
-  strcpy(tptr, cptr);
-
-  r = tmxr_attach(&kdp_desc[dupno], uptr, cptr);
-  if (r != SCPE_OK) {
-    free(tptr);
-    return r;
-  }
-
-  uptr->filename = tptr;
-  uptr->flags |= UNIT_ATT;
-
-  return SCPE_OK;
-}
-
-/*
-** DUP11, detach device:
-*/
-
-t_stat dup_detach(UNIT* uptr)
-{
-  int dupno;
-
-  dupno = uptr->u3;
-
-  tmxr_detach(&kdp_desc[dupno], uptr);
-
-  if (uptr->flags & UNIT_ATT) {
-    free(uptr->filename);
-    uptr->filename = NULL;
-    uptr->flags &= ~UNIT_ATT;
-  }
-
-  return SCPE_OK;
+    return auto_config (dptr->name, ((dptr->flags & DEV_DIS)? 0: 1 ));  /* auto config */
 }

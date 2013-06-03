@@ -34,7 +34,7 @@
 #ifndef PDP11_DUP_H_
 #define PDP11_DUP_H_    0
 
-typedef void (*PACKET_RECEIVE_CALLBACK)(int32 dup, uint8 *buf, size_t len);
+typedef void (*PACKET_RECEIVE_CALLBACK)(int32 dup, uint8 *buf, int len);
 typedef void (*PACKET_TRANSMIT_COMPLETE_CALLBACK)(int32 dup, int status);
 
 int32 dup_get_line_speed (int32 dup);

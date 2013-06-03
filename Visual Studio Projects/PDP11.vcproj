@@ -244,15 +244,15 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PDP11\pdp11_kdp.c"
-				>
-			</File>
-			<File
 				RelativePath="..\PDP11\pdp11_ke.c"
 				>
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_kg.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_kmc.c"
 				>
 			</File>
 			<File
@@ -430,6 +430,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_dmc.h"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP11\pdp11_dup.h"
 				>
 			</File>
 			<File

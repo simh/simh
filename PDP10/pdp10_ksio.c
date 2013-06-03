@@ -856,7 +856,7 @@ DIB *dibp;
 for (i = 0; i < 32; i++) {                              /* clear intr tables */
     int_vec[i] = 0;
     int_ack[i] = NULL;
-	}
+    }
 for (i = j = 0; (dptr = sim_devices[i]) != NULL; i++) { /* loop thru dev */
     dibp = (DIB *) dptr->ctxt;                          /* get DIB */
     if (dibp && !(dptr->flags & DEV_DIS)) {             /* defined, enabled? */
@@ -961,12 +961,10 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
         {0017554}, {0074} },                             /* PC11 punch - fx CSR, fx VEC */
+    { { "DUP" },         1,  2,  0, 0, 
+        {0000300}, {0300} },                             /* DUP11 bit sync - fx CSR, fx VEC */
     { { "KMC" },         1,  2,  0, 0, 
-        {0000540}, {0540} },                             /* KMC11 - fx CSR, fx VEC */
-    { { "DUP0" },        1,  2,  0, 0, 
-        {0000300}, {0300} },                             /* DUP11 sync - fx CSR, fx VEC */
-    { { "DUP1" },        1,  2,  0, 0, 
-        {0000310}, {0310} },                             /* DUP11 sync - fx CSR, fx VEC */
+        {0000540}, {0540} },                             /* KMC11 comm - fx CSR, fx VEC */
 #else
     { { "QBA" },         1,  0,  0, 0, 
         {017500} },                                     /* doorbell - fx CSR, no VEC */

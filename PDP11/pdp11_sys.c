@@ -174,9 +174,9 @@ DEVICE *sim_devices[] = {
     &dmc_dev[1],
     &dmc_dev[2],
     &dmc_dev[3],
-    &kmc_dev,
     &dup_dev,
     &dpv_dev,
+    &kmc_dev,
     NULL
     };
 

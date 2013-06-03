@@ -600,10 +600,10 @@ typedef struct pdp_dib DIB;
 #define INT_V_RC        17
 #define INT_V_DMCRX     18
 #define INT_V_DMCTX     19
-#define INT_V_KMCA     20
-#define INT_V_KMCB     21
-#define INT_V_DUPRX     20
-#define INT_V_DUPTX     21
+#define INT_V_KMCA      20
+#define INT_V_KMCB      21
+#define INT_V_DUPRX     22
+#define INT_V_DUPTX     23
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
