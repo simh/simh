@@ -744,7 +744,7 @@ switch (fnc) {                                          /* case on function */
             for (i = j = 0; j < xbc; j = j + 1) {
                 xbuf[i++] = wbuf[j] & 0377;
                 xbuf[i++] = (wbuf[j] >> 8) & 0377;
-				}
+                }
             tbc = xbc;
             }
         if ((st = sim_tape_wrrecf (uptr, xbuf, tbc)))   /* write rec, err? */

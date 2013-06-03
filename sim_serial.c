@@ -536,7 +536,7 @@ if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_
     DWORD dwType;
     DWORD dwValueNameSize = sizeof(list[ports].desc);
     DWORD dwDataSize = sizeof(list[ports].name);
-	
+
     /* Enumerate all the values underneath HKEY_LOCAL_MACHINE\HARDWARE\DEVICEMAP\SERIALCOMM */
     while (RegEnumValueA(hSERIALCOMM, dwIndex, list[ports].desc, &dwValueNameSize, NULL, &dwType, (BYTE *)list[ports].name, &dwDataSize) == ERROR_SUCCESS) {
         /* String values with non-zero size are the interesting ones */

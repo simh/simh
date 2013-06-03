@@ -745,7 +745,7 @@ if (IR & 000740) {                                      /* defined? */
     if (CPUT (CPUT_03))                                 /* 11/03 reads word */
         ReadW (exta | R[reg]);
     ABORT (TRAP_ILL);
-	}
+    }
 FEC = 0;                                                /* no errors */
 FPS = FPS_IU|FPS_IV;                                    /* trap ovf,unf */
 
@@ -782,7 +782,7 @@ switch ((IR >> 3) & 3) {                                /* case IR<5:3> */
             V = N = C = 1;                              /* set cc's */
             setTRAP (TRAP_FPE);                         /* set trap */
             return SCPE_OK;
-			}
+            }
         else divfp11 (&fac, &fsrc);
         break;
         }

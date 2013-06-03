@@ -326,7 +326,7 @@ struct xq_device    xqb = {
 #define IOLN_XQ         020
 
 DIB xqa_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_int } };
+        1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqa_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
@@ -382,7 +382,7 @@ REG xqa_reg[] = {
 };
 
 DIB xqb_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
-		1, IVCL (XQ), 0, { &xq_int } };
+        1, IVCL (XQ), 0, { &xq_int } };
 
 UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */
@@ -1381,7 +1381,7 @@ t_stat xq_process_xbdl(CTLR* xq)
         else {
           if (xq->var->coalesce_latency == 0)
             xq_svc(&xq->unit[0]);        /* service any received data */
-	  }
+      }
         sim_debug(DBG_WRN, xq->dev, "XBDL completed processing write\n");
 
       } /* loopback/non-loopback */

@@ -103,7 +103,7 @@
 #define RB02DS_ATT      (RB02DS_HDO+RB02DS_BHO+RB02DS_LOCK)   /* att status */
 #define RB02DS_UNATT    (RB02DS_CVO+RB02DS_LOAD)            /* unatt status */
 #define RB02DS_ERR      (RB02DS_WDE+RB02DS_HCE+RB02DS_STO+RB02DS_SPE+RB02DS_WGE+ \
-						 RB02DS_VCK+RB02DS_DSE)             /* errors bits */
+                         RB02DS_VCK+RB02DS_DSE)             /* errors bits */
 
 #define RB80DS_SCNT     0x0000000F
 #define RB80DS_FLT      0x00000100

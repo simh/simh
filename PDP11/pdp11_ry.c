@@ -185,9 +185,9 @@ DIB ry_dib = {
 
 UNIT ry_unit[] = {
     { UDATA (&ry_svc, UNIT_DEN+UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-			 RY_SIZE) },
+             RY_SIZE) },
     { UDATA (&ry_svc, UNIT_DEN+UNIT_FIX+UNIT_ATTABLE+UNIT_BUFABLE+UNIT_MUSTBUF,
-			 RY_SIZE) }
+             RY_SIZE) }
     };
 
 REG ry_reg[] = {
@@ -485,59 +485,59 @@ switch (ry_state) {                                     /* case on state */
         sim_activate (uptr, ry_cwait * 100);            /* schedule operation */
         break;
 
-	case SDXFR:                                         /* erase disk */
-		for (i = 0; i < (int32) uptr->capac; i++)
+    case SDXFR:                                         /* erase disk */
+        for (i = 0; i < (int32) uptr->capac; i++)
             fbuf[i] = 0;
-		uptr->hwmark = (uint32) uptr->capac;
-		if (ry_csr & RYCS_DEN)
+        uptr->hwmark = (uint32) uptr->capac;
+        if (ry_csr & RYCS_DEN)
             uptr->flags = uptr->flags | UNIT_DEN;
-		else uptr->flags = uptr->flags & ~UNIT_DEN;
-		ry_done (0, 0);
-		break;
+        else uptr->flags = uptr->flags & ~UNIT_DEN;
+        ry_done (0, 0);
+        break;
 
 
-	case ESBA:
-		ry_ba = ry_dbr;                                 /* save WC */
-		ry_state = ESXFR;                               /* next state */
-		sim_activate (uptr, ry_cwait);                  /* schedule xfer */
-		return SCPE_OK;
+    case ESBA:
+        ry_ba = ry_dbr;                                 /* save WC */
+        ry_state = ESXFR;                               /* next state */
+        sim_activate (uptr, ry_cwait);                  /* schedule xfer */
+        return SCPE_OK;
 
-	case ESXFR:
-		estat[0] = ry_ecode;                            /* fill 8B status */
-		estat[1] = ry_wc;
-		estat[2] = ry_unit[0].TRACK;
-		estat[3] = ry_unit[1].TRACK;
-		estat[4] = ry_track;
-		estat[5] = ry_sector;
-		estat[6] = ((ry_csr & RYCS_DRV)? 0200: 0) |
-			       ((ry_unit[1].flags & UNIT_DEN)? 0100: 0) |
+    case ESXFR:
+        estat[0] = ry_ecode;                            /* fill 8B status */
+        estat[1] = ry_wc;
+        estat[2] = ry_unit[0].TRACK;
+        estat[3] = ry_unit[1].TRACK;
+        estat[4] = ry_track;
+        estat[5] = ry_sector;
+        estat[6] = ((ry_csr & RYCS_DRV)? 0200: 0) |
+                   ((ry_unit[1].flags & UNIT_DEN)? 0100: 0) |
                    ((uptr->flags & UNIT_ATT)? 0040: 0) |
                    ((ry_unit[0].flags & UNIT_DEN)? 0020: 0) |
                    ((ry_csr & RYCS_DEN)? 0001: 0);
-		estat[7] = uptr->TRACK;
-		t = Map_WriteB (ba, 8, estat);                  /* DMA to memory */
-		ry_done (t? RYES_NXM: 0, 0);                    /* done */
-		break;
+        estat[7] = uptr->TRACK;
+        t = Map_WriteB (ba, 8, estat);                  /* DMA to memory */
+        ry_done (t? RYES_NXM: 0, 0);                    /* done */
+        break;
 
-	case CMD_COMPLETE:                                  /* command complete */
-		ry_done (0, 0);
-		break;
+    case CMD_COMPLETE:                                  /* command complete */
+        ry_done (0, 0);
+        break;
 
-	case INIT_COMPLETE:                                 /* init complete */
-		ry_unit[0].TRACK = 1;                           /* drive 0 to trk 1 */
-		ry_unit[1].TRACK = 0;                           /* drive 1 to trk 0 */
-		if ((uptr->flags & UNIT_BUF) == 0) {            /* not buffered? */
-			ry_done (RYES_ID, 0010);                    /* init done, error */
-			break;
-			}
-		da = CALC_DA (1, 1, bps);                       /* track 1, sector 1 */
-		for (i = 0; i < bps; i++)                       /* read sector */
-			rx2xb[i] = fbuf[da + i];
-		ry_done (RYES_ID, 0);                           /* set done */
-		if ((ry_unit[1].flags & UNIT_ATT) == 0)
+    case INIT_COMPLETE:                                 /* init complete */
+        ry_unit[0].TRACK = 1;                           /* drive 0 to trk 1 */
+        ry_unit[1].TRACK = 0;                           /* drive 1 to trk 0 */
+        if ((uptr->flags & UNIT_BUF) == 0) {            /* not buffered? */
+            ry_done (RYES_ID, 0010);                    /* init done, error */
+            break;
+            }
+        da = CALC_DA (1, 1, bps);                       /* track 1, sector 1 */
+        for (i = 0; i < bps; i++)                       /* read sector */
+            rx2xb[i] = fbuf[da + i];
+        ry_done (RYES_ID, 0);                           /* set done */
+        if ((ry_unit[1].flags & UNIT_ATT) == 0)
             ry_ecode = 0020;
-		break;
-		}                                               /* end case state */
+        break;
+        }                                               /* end case state */
 
 return SCPE_OK;
 }

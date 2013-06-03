@@ -639,7 +639,7 @@ int32 u = uptr - tm_dev.units;
 
 if ((uptr->flags & UNIT_ATT) && 
     (val || sim_tape_wrp (uptr)))
-	uptr->USTAT = uptr->USTAT | STA_WLK;
+    uptr->USTAT = uptr->USTAT | STA_WLK;
 else uptr->USTAT = uptr->USTAT & ~STA_WLK;
 if (u == GET_UNIT (tm_cmd))
     tm_updcsta (uptr);

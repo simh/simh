@@ -222,8 +222,8 @@ t_stat wtc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 fprintf (st, "Watch Chip (WTC)\n\n");
 fprintf (st, "The WTC simulates the MC146818 watch chip.  It recognizes the following options:\n\n");
-fprintf (st, "  SET WTC TIME=STD			standard time mode\n");
-fprintf (st, "  SET WTC TIME=VMS			VMS time mode\n\n");
+fprintf (st, "  SET WTC TIME=STD            standard time mode\n");
+fprintf (st, "  SET WTC TIME=VMS            VMS time mode\n\n");
 fprintf (st, "When running in standard mode the current year reported by the watch chip is\n");
 fprintf (st, "determined by the date/time of the host system.  When running in VMS mode the\n");
 fprintf (st, "year is fixed at 1982, which is one of the conditions VMS expects in order to\n");

@@ -283,10 +283,10 @@ switch (whence) {
         break;
 
     case SEEK_END:
-		if (_fstati64 (_fileno (st), &statb))
-			return (-1);
-		fileaddr = statb.st_size + offset;
-		break;
+        if (_fstati64 (_fileno (st), &statb))
+            return (-1);
+        fileaddr = statb.st_size + offset;
+        break;
     case SEEK_CUR:
         if (fgetpos (st, &fileaddr))
             return (-1);

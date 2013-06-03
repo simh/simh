@@ -200,7 +200,7 @@ tim_ttg = tim_period;                                   /* reload */
 apr_flg = apr_flg | APRF_TIM;                           /* request interrupt */
 if (Q_ITS) {                                            /* ITS? */
     if (pi_act == 0)
-	    quant = (quant + TIM_ITS_QUANT) & DMASK;
+        quant = (quant + TIM_ITS_QUANT) & DMASK;
     if (TSTS (pcst)) {                                  /* PC sampling? */
         WriteP ((a10) pcst & AMASK, pager_PC);          /* store sample */
         pcst = AOB (pcst);                              /* add 1,,1 */
