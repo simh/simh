@@ -661,7 +661,7 @@ t_stat reason;
 reason = attach_unit (uptr, cptr);                      /* attach file */
 if (reason == SCPE_OK) {
     sim_fseek (uptr->fileref, 0, SEEK_END);
-    uptr->pos = sim_ftell (uptr->fileref);
+    uptr->pos = (t_addr)sim_ftell (uptr->fileref);
     }
 if (lpcsa & CSA_ONL)                                    /* just file chg? */
     return reason;
