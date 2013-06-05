@@ -40,6 +40,7 @@
 #define KMC_RDX     8
 
 #include "pdp11_dup.h"
+#include "pdp11_ddcmp.h"
 
 #define DF_CMD    0001  /* Print commands. */
 #define DF_TX     0002  /* Print tx done. */
@@ -292,29 +293,29 @@ DEVICE kmc_dev =
 
 void dup_send_complete (int32 dup, int status)
 {
-    sim_activate_notbefore (&kmc_unit, kmc_output_duetime);
+sim_activate_notbefore (&kmc_unit, kmc_output_duetime);
 }
 
 t_stat send_buffer(int dupindex)
 {
-    t_stat r = SCPE_OK;
-    dupblock* d;
-    d = &dup[dupindex];
+t_stat r = SCPE_OK;
+dupblock* d;
+d = &dup[dupindex];
 
-    if (d->txnow > 0) {
-        if (dup_put_msg_bytes (d->dupnumber, d->txbuf, d->txbuflen, TRUE, TRUE)) {
-            int32 speed = dup_get_line_speed(d->dupnumber);
+if (d->txnow > 0) {
+    if (dup_put_ddcmp_packet (d->dupnumber, d->txbuf, d->txbuflen)) {
+        int32 speed = dup_get_line_speed(d->dupnumber);
 
-            d->txnext += d->txnow;
-            d->txnow = 0;
-            kmc_output = TRUE;
-            kmc_output_duetime = sim_grtime();
-            if (speed > 7)
-                kmc_output_duetime += (tmxr_poll * clk_tps)/(speed/8);
-            }
+        d->txnext += d->txnow;
+        d->txnow = 0;
+        kmc_output = TRUE;
+        kmc_output_duetime = sim_grtime();
+        if (speed > 7)
+            kmc_output_duetime += (tmxr_poll * clk_tps)/(speed/8);
         }
+    }
 
-    return r;
+return r;
 }
 
 char *format_packet_data(uint8 *data, size_t size)
@@ -564,7 +565,7 @@ void dup_newtxbuf(int line, int32 ba)
       d->txqueue[d->txcount] = ba;
       d->txcount += 1;
     }
-    (void) unibus_read(&w3, ba + 4);
+    unibus_read(&w3, ba + 4);
     if (w3 & BDL_LDS)
       break;
 
@@ -582,37 +583,48 @@ void dup_newtxbuf(int line, int32 ba)
 
 void dup_receive(int line, uint8* data, int count)
 {
-  dupblock* d;
-  uint32 bda;
-  uint32 bd[3];
-  uint32 ba;
-  uint32 bl;
+dupblock* d;
+uint32 bda;
+uint32 bd[3];
+uint32 ba;
+uint32 bl;
 
-  d = &dup[line];
+d = &dup[line];
 
-  if (d->rxcount > d->rxnext) {
-    count -= 2;                     /* strip incoming CSR */
+if (d->rxcount > d->rxnext) {
+    if (0 != ddcmp_crc16 (0, data, count)) {
+        sim_debug(DF_QUEUE, &kmc_dev, "dup_receive CRC Error for %d byte packet received\n", count);
+        /* FIXME Should report CRC error (maybe Header CRC error and if good, then data CRC error) and NOT deliver the packet data */
+        }
+    count -= 2;                     /* strip trailing CRC */
     bda = d->rxqueue[d->rxnext];
-    (void) unibus_read((int32 *)&bd[0], bda);
-    (void) unibus_read((int32 *)&bd[1], bda + 2);
-    (void) unibus_read((int32 *)&bd[2], bda + 4);
+    unibus_read((int32 *)&bd[0], bda);
+    unibus_read((int32 *)&bd[1], bda + 2);
+    unibus_read((int32 *)&bd[2], bda + 4);
     sim_debug(DF_QUEUE, &kmc_dev, "dup_receive ba=0x%04x(%06o octal). Descriptor is:\n", bda, bda);
-	prbdl(DF_QUEUE, &kmc_dev, bda, 0);
+    prbdl(DF_QUEUE, &kmc_dev, bda, 0);
 
     ba = bd[0] + ((bd[2] & 06000) << 6);
     bl = bd[1];
 
-    if (count > (int)bl) count = bl;	/* XXX */
+    if (count > (int)bl)
+        count = bl;	/* FIXME We shouldn't silently truncate the data.  We should move to the next buffer descriptor */
 
-    sim_debug(DF_QUEUE, &kmc_dev, "Receive buf[%d] writing to address=0x%04X(%06o octal), bytes=%d\n", d->rxnext, ba, ba, count);
-    (void) dma_write(ba, data, count);
+    sim_debug(DF_QUEUE, &kmc_dev, "Receive buf[%d] writing to address=0x%04X(%06o octal), bytes=%d\n", d->rxnext, ba, ba, (count > 6) ? count - 2 : count);
+
+    if (count > 6) {
+        dma_write(ba, data, 6);             /* Header */
+        dma_write(ba, data + 8, count - 8); /* Payload (skipping header CRC) */
+        }
+    else
+        dma_write(ba, data, count);
 
     bd[2] |= (BDL_SOM | BDL_EOM);
 
-    (void) unibus_write(bd[2], bda + 4);
+    unibus_write(bd[2], bda + 4);
 
     d->rxnext += 1;
-  }
+    }
 }
 
 /*
@@ -716,7 +728,7 @@ void kmc_doinput(void)
     */
     sim_debug(DF_CMD, &kmc_dev, "Running DDCMP in full duplex on Line %d (dup %d):\n", line, d->dupnumber);
     dup_set_DDCMP (d->dupnumber, TRUE);
-    dup_set_DTR (d->dupnumber, (kmc_sel6 & 0400) ? TRUE : FALSE));
+    dup_set_DTR (d->dupnumber, (kmc_sel6 & 0400) ? TRUE : FALSE);
     dup_set_callback_mode (d->dupnumber, dup_receive, dup_send_complete);
     break;
   case 3:			/* Base in. */

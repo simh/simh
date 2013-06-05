@@ -47,4 +47,6 @@ void dup_set_callback_mode (int32 dup, PACKET_RECEIVE_CALLBACK receive, PACKET_T
 
 t_bool dup_put_msg_bytes (int32 dup, uint8 *bytes, size_t len, t_bool start, t_bool end);
 
+t_bool dup_put_ddcmp_packet (int32 dup, uint8 *bytes, size_t len);
+
 #endif /* PDP11_DUP_H_ */

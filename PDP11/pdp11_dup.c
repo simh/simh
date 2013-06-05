@@ -730,6 +730,23 @@ if (breturn && dup_xmtpkrdy[dup]) {
 return breturn;
 }
 
+t_bool dup_put_ddcmp_packet (int32 dup, uint8 *bytes, size_t len)
+{
+uint16 crc16;
+uint8 crc16bytes[2];
+
+if (len == 6)
+    return dup_put_msg_bytes (dup, bytes, len, TRUE, TRUE);
+if (!dup_put_msg_bytes (dup, bytes, 6, TRUE, FALSE))
+    return FALSE;
+crc16 = ddcmp_crc16 (0, bytes, 6);
+crc16bytes[0] = crc16 & 0xFF;
+crc16bytes[1] = crc16 >> 8;
+dup_put_msg_bytes (dup, crc16bytes, 2, FALSE, FALSE);
+return dup_put_msg_bytes (dup, bytes + 6, len - 6, FALSE, TRUE);
+}
+
+
 static t_stat dup_rcv_byte (int32 dup)
 {
 sim_debug (DBG_TRC, DUPDPTR, "dup_rcv_byte(dup=%d) - %s, byte %d of %d\n", dup, 
@@ -859,7 +876,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
                 if (dup_parcsr[dup] & PARCSR_M_DECMODE) {
                     switch (dup_rcvpacket[dup][0]) {
                         default:
-                            sim_debug (DBG_PKT, DUPDPTR, "Ignoring unexpected byte 0%o in DDCMP mode\n", dup_rcvpacket[dup][0]);
+                            sim_debug (DBG_PKT, DUPDPTR, "Ignoring unexpected byte 0%o ('%c') in DDCMP mode\n", dup_rcvpacket[dup][0], isprint(dup_rcvpacket[dup][0]) ? dup_rcvpacket[dup][0] : '.');
                             dup_rcvpkoffset[dup] = 0;
                         case DDCMP_SOH:
                         case DDCMP_ENQ:
