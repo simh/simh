@@ -1234,7 +1234,6 @@ readFault:
         /* Card read: reset column counter and assert BUSY */
         currCol = colStart;
         crs |= CRCSR_BUSY;
-        uptr->u3++;
 
         /* Update status if this read emptied hopper.
          * I believe something similar must happen with the CR11, but
