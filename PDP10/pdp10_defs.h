@@ -708,7 +708,6 @@ typedef struct pdp_dib DIB;
 #define INT_V_PTP       25
 #define INT_V_LP20      26                              /* LPT20 */
 #define INT_V_CR        27                              /* CD20 (CD11) */
-#define INT_V_CR        27                              /* CD20 (CD11) */
 #define INT_V_DUPRX     28                              /* DUP11 */
 #define INT_V_DUPTX     29
 
@@ -772,8 +771,10 @@ typedef struct pdp_dib DIB;
 
 int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_ReadW18 (uint32 ba, int32 bc, uint32 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
+int32 Map_WriteW18 (uint32 ba, int32 bc, uint32 *buf);
 
 t_stat set_addr (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat set_addr_flt (UNIT *uptr, int32 val, char *cptr, void *desc);

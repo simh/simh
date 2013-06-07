@@ -881,7 +881,8 @@ if (mp->master) {
             }
 
         if (i >= mp->lines) {                           /* all busy? */
-            tmxr_msg (newsock, "All connections busy\r\n");
+            if (!lp->notelnet)
+                   tmxr_msg (newsock, "All connections busy\r\n");
             tmxr_debug_connect (mp, "tmxr_poll_conn() - All connections busy");
             sim_close_sock (newsock, 0);
             free (address);

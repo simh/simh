@@ -437,15 +437,24 @@ UBNXM_FAIL (pa, mode);
 
 /* Mapped read and write routines - used by standard Unibus devices on Unibus 1 */
 
-a10 Map_Addr10 (a10 ba, int32 ub)
+a10 Map_Addr10 (a10 ba, int32 ub, int32 *ubmp)
 {
 a10 pa10;
 int32 vpn = PAG_GETVPN (ba >> 2);                       /* get PDP-10 page number */
+int32 ubm;
     
-if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ) ||          /* invalid map? */
-    ((ubmap[ub][vpn] & UMAP_VLD) == 0))
+if ((vpn >= UMAP_MEMSIZE) || (ba & XBA_MBZ)) {          /* Validate bus address */
+    if (ubmp)
+        *ubmp = 0;
     return -1;
-pa10 = (ubmap[ub][vpn] + PAG_GETOFF (ba >> 2)) & PAMASK;
+}
+ubm =  ubmap[ub][vpn];
+if (ubmp)
+    *ubmp = ubm;
+
+if ((ubm & UMAP_VLD) == 0)                              /* Ensure map entry is valid */
+    return -1;
+pa10 = (ubm + PAG_GETOFF (ba >> 2)) & PAMASK;
 return pa10;
 }
 
@@ -456,7 +465,7 @@ a10 pa10;
 
 lim = ba + bc;
 for ( ; ba < lim; ba++) {                               /* by bytes */
-    pa10 = Map_Addr10 (ba, 1);                          /* map addr */
+    pa10 = Map_Addr10 (ba, 1, NULL);                    /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
         return (lim - ba);                              /* return bc */
@@ -474,7 +483,7 @@ a10 pa10;
 ba = ba & ~01;                                          /* align start */
 lim = ba + (bc & ~01);
 for ( ; ba < lim; ba = ba + 2) {                        /* by words */
-    pa10 = Map_Addr10 (ba, 1);                          /* map addr */
+    pa10 = Map_Addr10 (ba, 1, NULL);                    /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
         return (lim - ba);                              /* return bc */
@@ -484,6 +493,28 @@ for ( ; ba < lim; ba = ba + 2) {                        /* by words */
 return 0;
 }
 
+/* Word reads returning 18-bit data */
+
+int32 Map_ReadW18 (uint32 ba, int32 bc, uint32 *buf)
+{
+uint32 lim;
+a10 pa10;
+
+ba = ba & ~01;                                          /* align start */
+lim = ba + (bc & ~01);
+for ( ; ba < lim; ba = ba + 2) {                        /* by words */
+    pa10 = Map_Addr10 (ba, 1, NULL);                    /* map addr */
+    if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
+        ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
+        return (lim - ba);                              /* return bc */
+        }
+    *buf++ = (uint32) ((M[pa10] >> ((ba & 2)? 0: 18)) & 0777777);
+    }
+return 0;
+}
+
+/* Byte-mode writes */
+
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 lim;
@@ -491,40 +522,91 @@ a10 pa10;
 d10 mask;
 
 lim = ba + bc;
-for ( ; ba < lim; ba++) {                               /* by bytes */
-    pa10 = Map_Addr10 (ba, 1);                          /* map addr */
-    if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
-        ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
-        return (lim - ba);                              /* return bc */
+for ( ; ba < lim; ba++) {                           /* by bytes */
+    pa10 = Map_Addr10 (ba, 1, NULL);                /* map addr */
+    if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {        /* inv map or NXM? */
+        ubcs[1] = ubcs[1] | UBCS_TMO;               /* UBA times out */
+        return (lim - ba);                          /* return bc */
         }
-    mask = 0377;
-    M[pa10] = (M[pa10] & ~(mask << ubashf[ba & 3])) |
-        (((d10) *buf++) << ubashf[ba & 3]);
+    if( (ba&3) == 0 ) { /* byte 0 writes memory;  other bytes & <0:1,18:19> of M[] are undefined. */
+        M[pa10] = ((d10) *buf++) << 18;             /* Clears undefined bits */
+    } else { /* RPW - clear byte position, and UB<17:16> of correct 1/2 word when writing high byte */
+        mask = 0377<< ubashf[ba & 3];
+        if (ba & 1)
+            mask |= INT64_C(0000000600000) << ((ba & 2)? 0 : 18);
+        M[pa10] = (M[pa10] & ~mask) | (((d10) *buf++) << ubashf[ba & 3]);
+        }
     }
 return 0;
 }
+
+/* Word mode writes; 16-bit data */
 
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 lim;
+uint32 ubm;
 a10 pa10;
 d10 val;
 
-ba = ba & ~01;                                          /* align start */
+ba = ba & ~01;                                      /* align start */
 lim = ba + (bc & ~01);
-for ( ; ba < lim; ba += 2) {                            /* by bytes */
-    pa10 = Map_Addr10 (ba, 1);                          /* map addr */
-    if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
-        ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
-        return (lim - ba);                              /* return bc */
+for ( ; ba < lim; ba+= 2) {                         /* by words */
+    pa10 = Map_Addr10 (ba, 1, &ubm);                /* map addr */
+    if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {        /* inv map or NXM? */
+        ubcs[1] = ubcs[1] | UBCS_TMO;               /* UBA times out */
+        return (lim - ba);                          /* return bc */
         }
-    val = *buf++;                                       /* get data */
-    if (ba & 2)
-        M[pa10] = (M[pa10] & INT64_C(0777777000000)) | val;
-    else M[pa10] = (M[pa10] & INT64_C(0000000777777)) | (val << 18);
+    val = *buf++;                                   /* get 16-bit data, clearing <17:16> */
+    if (ubm & UMAP_RRV ) { /* Read reverse preserves even word */
+        if (ba & 2)
+            M[pa10] = (M[pa10] & INT64_C(0777777000000)) | val;
+        else
+            M[pa10] = (M[pa10] & INT64_C(0000000777777)) | (val << 18);
+        } else {    /* Not RRV */
+        if (ba & 2) /* Write odd preserves even word */
+            M[pa10] = (M[pa10] & INT64_C(0777777000000)) | val;
+        else
+            M[pa10] = val << 18; /* Write even clears odd */
+        }
     }
 return 0;
 }
+
+
+/* Word mode writes; 18-bit data */
+
+int32 Map_WriteW18 (uint32 ba, int32 bc, uint32 *buf)
+{
+uint32 lim;
+uint32 ubm;
+a10 pa10;
+d10 val;
+
+ba = ba & ~01;                                  /* align start */
+lim = ba + (bc & ~01);
+for ( ; ba < lim; ba+= 2) {                     /* by words */
+    pa10 = Map_Addr10 (ba, 1, &ubm);            /* map addr */
+    if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {    /* inv map or NXM? */
+        ubcs[1] = ubcs[1] | UBCS_TMO;           /* UBA times out */
+        return (lim - ba);                      /* return bc */
+        }
+    val = *buf++;                               /* get 18-bit data */
+    if (ubm & UMAP_RRV ) { /* Read reverse preserves even word */
+        if (ba & 2)
+            M[pa10] = (M[pa10] & INT64_C(0777777000000)) | val;
+        else
+            M[pa10] = (M[pa10] & INT64_C(0000000777777)) | (val << 18);
+        } else { /* Write odd preserves even word */
+        if (ba & 2)
+            M[pa10] = (M[pa10] & INT64_C(0777777000000)) | val;
+        else
+            M[pa10] = val << 18; /* Write even clears odd */
+        }
+    }
+return 0;
+}
+
 
 /* Evaluate Unibus priority interrupts */
 
@@ -956,7 +1038,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { "RY" },          1,  1,  8, 4, 
         {0017170}, {0264} },                             /* RX11/RX211 - Fixed address and vector in simulator */
     { { "CR" },          1,  1,  0, 0, 
-        {0017160}, {0230} },                             /* CR11 - fx CSR, fx VEC */
+        {0017160}, {0230} },                             /* CD20 (CD11) - fx CSR, fx VEC */
     { { "PTR" },         1,  1,  0, 0, 
         {0017550}, {0070} },                             /* PC11 reader - fx CSR, fx VEC */
     { { "PTP" },         1,  1,  0, 0, 
