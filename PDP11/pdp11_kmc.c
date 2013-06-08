@@ -57,93 +57,91 @@ extern int32 tmr_poll;                                  /* instructions per tick
 
 t_stat unibus_read(int32* data, int32 addr)
 {
-    t_stat ans;
-    uint16 d;
+t_stat ans;
+uint16 d;
 
-    *data = 0;
-    ans = Map_ReadW (addr, 2, &d);
-    *data = d;
-    return ans;
+*data = 0;
+ans = Map_ReadW (addr, 2, &d);
+*data = d;
+return ans;
 }
 
 t_stat unibus_write(int32 data, int32 addr)
 {
-    uint16 d;
+uint16 d;
 
-    d = data & 0xFFFF;
+d = data & 0xFFFF;
 
-    return Map_WriteW (addr, 2, &d);
+return Map_WriteW (addr, 2, &d);
 }
 
 t_stat dma_write(int32 ba, uint8* data, int length)
 {
-  t_stat r;
-  uint32 wd;
+t_stat r;
+uint32 wd;
 
-  if (length <= 0) return SCPE_OK;
-  if (ba & 1) {
+if (length <= 0)
+    return SCPE_OK;
+if (ba & 1) {
     r = unibus_read((int32 *)&wd, ba-1);
     if (r != SCPE_OK)
-      return r;
+        return r;
     wd &= 0377;
     wd |= (*data++ << 8);
     r = unibus_write(wd, ba-1);
     if (r != SCPE_OK)
-      return r;
+        return r;
     length -= 1;
     ba += 1;
-  }
-  while (length >= 2) {
+    }
+while (length >= 2) {
     wd = *data++;
     wd |= *data++ << 8;
     r = unibus_write(wd, ba);
     if (r != SCPE_OK)
-      return r;
+        return r;
     length -= 2;
     ba += 2;
-  }
-  if (length == 1) {
+    }
+if (length == 1) {
     r = unibus_read((int32 *)&wd, ba);
     if (r != SCPE_OK)
-      return r;
+        return r;
     wd &= 0177400;
     wd |= *data++;
     r = unibus_write(wd, ba);
     if (r != SCPE_OK)
-      return r;
-  }
-  return SCPE_OK;
+        return r;
+    }
+return SCPE_OK;
 }
 
 /* dma a block from main memory */
 
 t_stat dma_read(int32 ba, uint8* data, int length)
 {
-  t_stat r;
-  uint32 wd;
+t_stat r;
+uint32 wd;
 
-  if (ba & 1) {         /* Starting on an odd boundary? */
+if (ba & 1) {         /* Starting on an odd boundary? */
     r = unibus_read((int32 *)&wd, ba-1);
-    if (r != SCPE_OK) {
-      return r;
-    }
+    if (r != SCPE_OK)
+        return r;
     *data++ = wd >> 8;
     ba += 1;
     length -= 1;
-  }
-  while (length > 0) {
+    }
+while (length > 0) {
     r = unibus_read((int32 *)&wd, ba);
-    if (r != SCPE_OK) {
-      return r;
-    }
+    if (r != SCPE_OK)
+        return r;
     *data++ = wd & 0377;
-    if (length > 1) {
-      *data++ = wd >> 8;
-    }
+    if (length > 1)
+        *data++ = wd >> 8;
     ba += 2;
     length -= 2;
-  }
-  return SCPE_OK;
+    }
+return SCPE_OK;
 }
 
 /* bits, sel0: */
@@ -210,19 +208,19 @@ int    kmc_txi;
 uint16 kmc_microcode[KMC_CRAMSIZE];
 
 struct dupblock {
-  int32  dupnumber;         /* Line Number amongst all DUP11's on Unibus (-1 == unassigned) */
-  int32  linkstate;         /* Line Link Status (i.e. 1 when DCD/DSR is on, 0 otherwise */
-  uint32 rxqueue[MAXQUEUE]; /* Queue of bd's to receive into. */
-  uint32 rxcount;           /* No. bd's in above. */
-  uint32 rxnext;            /* Next bd to receive into. */
-  uint32 txqueue[MAXQUEUE]; /* Queue of bd's to transmit. */
-  uint32 txcount;           /* No. bd's in above. */
-  uint32 txnext;            /* Next bd to transmit. */
-  uint32 txnow;             /* No. bd's we are transmitting now. */
-  uint8  txbuf[MAXMSG];     /* contains next buffer to transmit */
-  uint8  txbuflen;          /* length of message in buffer */
-  uint8  txbufbytessent;    /* number of bytes from the message actually sent so far */
-};
+    int32  dupnumber;         /* Line Number amongst all DUP11's on Unibus (-1 == unassigned) */
+    int32  linkstate;         /* Line Link Status (i.e. 1 when DCD/DSR is on, 0 otherwise */
+    uint32 rxqueue[MAXQUEUE]; /* Queue of bd's to receive into. */
+    uint32 rxcount;           /* No. bd's in above. */
+    uint32 rxnext;            /* Next bd to receive into. */
+    uint32 txqueue[MAXQUEUE]; /* Queue of bd's to transmit. */
+    uint32 txcount;           /* No. bd's in above. */
+    uint32 txnext;            /* Next bd to transmit. */
+    uint32 txnow;             /* No. bd's we are transmitting now. */
+    uint8  txbuf[MAXMSG];     /* contains next buffer to transmit */
+    uint8  txbuflen;          /* length of message in buffer */
+    uint8  txbufbytessent;    /* number of bytes from the message actually sent so far */
+    };
 
 typedef struct dupblock dupblock;
 
@@ -268,29 +266,28 @@ DIB kmc_dib = { IOBA_AUTO, IOLN_KMC, &kmc_rd, &kmc_wr, 2, IVCL (KMCA), VEC_AUTO,
 UNIT kmc_unit = { UDATA (&kmc_svc, 0, 0) };
 
 REG kmc_reg[] = {
-  { ORDATA ( SEL0, kmc_sel0, 16) },
-  { ORDATA ( SEL2, kmc_sel2, 16) },
-  { ORDATA ( SEL4, kmc_sel4, 16) },
-  { ORDATA ( SEL6, kmc_sel6, 16) },
-  { NULL },
-};
+    { ORDATA ( SEL0, kmc_sel0, 16) },
+    { ORDATA ( SEL2, kmc_sel2, 16) },
+    { ORDATA ( SEL4, kmc_sel4, 16) },
+    { ORDATA ( SEL6, kmc_sel6, 16) },
+    { NULL },
+    };
 
 MTAB kmc_mod[] = {
-  { MTAB_XTD|MTAB_VDV, 010, "address", "ADDRESS",
-    &set_addr, &show_addr, NULL, "IP address" },
-  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", NULL,
-    &set_vec, &show_vec, NULL, "Interrupt vector" },
-  { 0 },
-};
+    { MTAB_XTD|MTAB_VDV, 010, "address", "ADDRESS",
+        &set_addr, &show_addr, NULL, "IP address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", NULL,
+        &set_vec, &show_vec, NULL, "Interrupt vector" },
+    { 0 },
+    };
 
-DEVICE kmc_dev =
-{
+DEVICE kmc_dev = {
     "KMC", &kmc_unit, kmc_reg, kmc_mod,
     1, KMC_RDX, 13, 1, KMC_RDX, 8,
     NULL, NULL, &kmc_reset,
     NULL, NULL, NULL, &kmc_dib,
     DEV_UBUS | DEV_DIS | DEV_DISABLE | DEV_DEBUG, 0, kmc_debug
-};
+    };
 
 void dup_send_complete (int32 dup, int status)
 {
@@ -321,20 +318,18 @@ return r;
 
 char *format_packet_data(uint8 *data, size_t size)
 {
-    static char buf[3 * 128 + 1];
-    int buflen;
-    int i;
-    int n;
+static char buf[3 * 128 + 1];
+int buflen;
+int i;
+int n;
 
-    buflen = 0;
-    n = (size > 128) ? 128 : size;
-    for (i = 0; i < n; i++)
-    {
-        sprintf(&buf[buflen], " %02X", data[i]);
-        buflen += 3;
+buflen = 0;
+n = (size > 128) ? 128 : size;
+for (i = 0; i < n; i++) {
+    sprintf(&buf[buflen], " %02X", data[i]);
+    buflen += 3;
     }
-
-    return buf;
+return buf;
 }
 
 /*
@@ -343,21 +338,18 @@ char *format_packet_data(uint8 *data, size_t size)
 
 void kmc_updints(void)
 {
-    if (kmc_sel0 & KMC_IEI) {
-        if (kmc_sel2 & KMC_RDI) {
-            kmc_setrxint();
-        } else {
+if (kmc_sel0 & KMC_IEI) {
+    if (kmc_sel2 & KMC_RDI)
+        kmc_setrxint();
+    else
         kmc_clrrxint();
-        }
     }
-
-    if (kmc_sel0 & KMC_IEO) {
-        if (kmc_sel2 & KMC_RDO) {
-        	kmc_settxint();
-		} else {
-			kmc_clrtxint();
-		}
-	}
+if (kmc_sel0 & KMC_IEO) {
+    if (kmc_sel2 & KMC_RDO)
+    	kmc_settxint();
+	else
+		kmc_clrtxint();
+    }
 }
 
 /*
@@ -367,12 +359,12 @@ void kmc_updints(void)
 
 t_bool kmc_getrdo(void)
 {
-  if (kmc_sel2 & KMC_RDO)	/* Already on? */
+if (kmc_sel2 & KMC_RDO)	/* Already on? */
     return FALSE;
-  if (kmc_sel2 & KMC_RDI)   /* Busy doing input? */
+if (kmc_sel2 & KMC_RDI)   /* Busy doing input? */
     return FALSE;
-  kmc_sel2 |= KMC_RDO;
-  return TRUE;
+kmc_sel2 |= KMC_RDO;
+return TRUE;
 }
 
 /*
@@ -381,63 +373,62 @@ t_bool kmc_getrdo(void)
 
 void kmc_tryoutput(void)
 {
-    int i, j;
-    dupblock* d;
-    uint32 ba;
+int i, j;
+dupblock* d;
+uint32 ba;
 
-    if (kmc_output) {
-        kmc_output = FALSE;
-        for (i = 0; i < MAXDUP; i += 1) {
-            d = &dup[i];
-            if (d->rxnext > 0) {
-                kmc_output = TRUE;  /* At least one, need more scanning. */
-                if (kmc_getrdo()) {
-                    ba = d->rxqueue[0];
-                    kmc_sel2 &= ~KMC_LINE;
-                    kmc_sel2 |= (i << 8);
-                    kmc_sel2 &= ~KMC_CMD;
-                    kmc_sel2 |= CMD_BUFFOUT;
-                    kmc_sel2 |= KMC_IOT;	/* Buffer type. */
-                    kmc_sel4 = ba & 0177777;
-                    kmc_sel6 = (ba >> 2) & 0140000;
-                    kmc_sel6 |= BFR_EOM;
+if (kmc_output) {
+    kmc_output = FALSE;
+    for (i = 0; i < MAXDUP; i += 1) {
+        d = &dup[i];
+        if (d->rxnext > 0) {
+            kmc_output = TRUE;  /* At least one, need more scanning. */
+            if (kmc_getrdo()) {
+                ba = d->rxqueue[0];
+                kmc_sel2 &= ~KMC_LINE;
+                kmc_sel2 |= (i << 8);
+                kmc_sel2 &= ~KMC_CMD;
+                kmc_sel2 |= CMD_BUFFOUT;
+                kmc_sel2 |= KMC_IOT;	/* Buffer type. */
+                kmc_sel4 = ba & 0177777;
+                kmc_sel6 = (ba >> 2) & 0140000;
+                kmc_sel6 |= BFR_EOM;
 
-                    for (j = 1; j < (int)d->rxcount; j += 1) {
-                        d->rxqueue[j-1] = d->rxqueue[j];
+                for (j = 1; j < (int)d->rxcount; j += 1) {
+                    d->rxqueue[j-1] = d->rxqueue[j];
                     }
-                    d->rxcount -= 1;
-                    d->rxnext -= 1;
+                d->rxcount -= 1;
+                d->rxnext -= 1;
 
-                    sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (tryout) ba = %6o, rxcount = %d, rxnext = %d\r\n", i, ba, d->rxcount, d->rxnext);
-                    kmc_updints();
+                sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (tryout) ba = %6o, rxcount = %d, rxnext = %d\r\n", i, ba, d->rxcount, d->rxnext);
+                kmc_updints();
                 }
-                return;
-			} 
-			if (d->txnext > 0) {
-				kmc_output = TRUE;	/* At least one, need more scanning. */
-				if (kmc_getrdo()) {
-					ba = d->txqueue[0];
-					kmc_sel2 &= ~KMC_LINE;
-					kmc_sel2 |= (i << 8);
-					kmc_sel2 &= ~KMC_CMD;
-					kmc_sel2 |= CMD_BUFFOUT;
-					kmc_sel2 &= ~KMC_IOT;	/* Buffer type. */
-					kmc_sel4 = ba & 0177777;
-					kmc_sel6 = (ba >> 2) & 0140000;
+            return;
+		    }
+		if (d->txnext > 0) {
+			kmc_output = TRUE;	/* At least one, need more scanning. */
+			if (kmc_getrdo()) {
+				ba = d->txqueue[0];
+				kmc_sel2 &= ~KMC_LINE;
+				kmc_sel2 |= (i << 8);
+				kmc_sel2 &= ~KMC_CMD;
+				kmc_sel2 |= CMD_BUFFOUT;
+				kmc_sel2 &= ~KMC_IOT;	/* Buffer type. */
+				kmc_sel4 = ba & 0177777;
+				kmc_sel6 = (ba >> 2) & 0140000;
 
-					for (j = 1; j < (int)d->txcount; j += 1) {
-						d->txqueue[j-1] = d->txqueue[j];
-					}
-					d->txcount -= 1;
-					d->txnext -= 1;
+				for (j = 1; j < (int)d->txcount; j += 1)
+					d->txqueue[j-1] = d->txqueue[j];
+				d->txcount -= 1;
+				d->txnext -= 1;
 
-					sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (tryout) ba = %6o, txcount = %d, txnext = %d\r\n", i, ba, d->txcount, d->txnext);
-					kmc_updints();
-				}
-				return;
-			}
-		}
-	}
+				sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (tryout) ba = %6o, txcount = %d, txnext = %d\r\n", i, ba, d->txcount, d->txnext);
+				kmc_updints();
+			    }
+			return;
+		    }
+	    }
+    }
 }
 
 /*
@@ -447,73 +438,76 @@ void kmc_tryoutput(void)
 
 void dup_tryxmit(int dupindex)
 {
-  dupblock* d;
+dupblock* d;
 
-  int pos;			    /* Offset into transmit buffer. */
+int pos;			    /* Offset into transmit buffer. */
 
-  uint32 bda;			/* Buffer Descriptor Address. */
-  uint32 bd[3];			/* Buffer Descriptor. */
-  uint32 bufaddr;		/* Buffer Address. */
-  uint32 buflen;		/* Buffer Length. */
+uint32 bda;			/* Buffer Descriptor Address. */
+uint32 bd[3];			/* Buffer Descriptor. */
+uint32 bufaddr;		/* Buffer Address. */
+uint32 buflen;		/* Buffer Length. */
 
-  int msglen;			/* Message length. */
-  int dcount;			/* Number of descriptors to use. */
-  t_bool lds;			/* Found last descriptor. */
+int msglen;			/* Message length. */
+int dcount;			/* Number of descriptors to use. */
+t_bool lds;			/* Found last descriptor. */
 
-  int i;			    /* Random loop var. */
+int i;			    /* Random loop var. */
 
-  d = &dup[dupindex];
+d = &dup[dupindex];
 
-  if (d->txnow > 0) return;	/* If xmit in progress, quit. */
-  if (d->txcount <= d->txnext) return;
+if (d->txnow > 0)
+    return;	        /* If xmit in progress, quit. */
+if (d->txcount <= d->txnext)
+    return;
 
-  /*
-  ** check the transmit buffers we have queued up and find out if
-  ** we have a full DDCMP frame.
-  */
+/*
+** check the transmit buffers we have queued up and find out if
+** we have a full DDCMP frame.
+*/
 
-  lds = FALSE;			/* No last descriptor yet. */
-  dcount = msglen = 0;	/* No data yet. */
+lds = FALSE;			/* No last descriptor yet. */
+dcount = msglen = 0;	/* No data yet. */
 
-  /* accumulate length, scan for LDS flag */
+/* accumulate length, scan for LDS flag */
 
-  for (i = d->txnext; i < (int)d->txcount; i += 1) {
+for (i = d->txnext; i < (int)d->txcount; i += 1) {
     bda = d->txqueue[i];
-    (void) unibus_read((int32 *)&bd[0], bda);
-    (void) unibus_read((int32 *)&bd[1], bda + 2);
-    (void) unibus_read((int32 *)&bd[2], bda + 4);
+    unibus_read((int32 *)&bd[0], bda);
+    unibus_read((int32 *)&bd[1], bda + 2);
+    unibus_read((int32 *)&bd[2], bda + 4);
 
     dcount += 1;		/* Count one more descriptor. */
-    msglen += bd[1];		/* Count some more bytes. */
+    msglen += bd[1];	/* Count some more bytes. */
     if (bd[2] & BDL_LDS) {
-      lds = TRUE;
-      break;
+        lds = TRUE;
+        break;
+        }
     }
-  }
-  
-  if (!lds) return;		/* If no end of message, give up. */
 
-  d->txnow = dcount;		/* Got a full frame, will send or ignore it. */
+if (!lds)
+    return;		        /* If no end of message, give up. */
 
-  if (msglen <= MAXMSG) {	/* If message fits in buffer, - */
+d->txnow = dcount;		/* Got a full frame, will send or ignore it. */
+
+if (msglen <= MAXMSG) {	/* If message fits in buffer, - */
     pos = 0;
     d->txbuflen = msglen;
 
     for (i = d->txnext; i < (int)(d->txnext + dcount); i += 1) {
-      bda = d->txqueue[i];
-      (void) unibus_read((int32 *)&bd[0], bda);
-      (void) unibus_read((int32 *)&bd[1], bda + 2);
-      (void) unibus_read((int32 *)&bd[2], bda + 4);
+        bda = d->txqueue[i];
+        unibus_read((int32 *)&bd[0], bda);
+        unibus_read((int32 *)&bd[1], bda + 2);
+        unibus_read((int32 *)&bd[2], bda + 4);
 
-      bufaddr = bd[0] + ((bd[2] & 06000) << 6);
-      buflen = bd[1];
+        bufaddr = bd[0] + ((bd[2] & 06000) << 6);
+        buflen = bd[1];
 
-      (void) dma_read(bufaddr, &d->txbuf[pos], buflen);
-      pos += buflen;
+        dma_read(bufaddr, &d->txbuf[pos], buflen);
+        pos += buflen;
+        }
+
+    send_buffer(dupindex);
     }
-
-  send_buffer(dupindex);
-  }
 }
 
 /*
@@ -522,30 +516,29 @@ void dup_tryxmit(int dupindex)
 
 void dup_newrxbuf(int line, int32 ba)
 {
-  dupblock* d;
-  int32 w3;
+dupblock* d;
+int32 w3;
 
-  d = &dup[line];
+d = &dup[line];
 
-  for (;;) {
+for (;;) {
     if (d->rxcount < MAXQUEUE) {
-      d->rxqueue[d->rxcount] = ba;
-      d->rxcount += 1;
-      sim_debug(DF_QUEUE, &kmc_dev, "Queued rx buffer %d, descriptor address=0x%04X(%06o octal)\n", d->rxcount - 1, ba, ba);
-    }
-	else
-	{
-      sim_debug(DF_QUEUE, &kmc_dev, "(newrxb) no more room for buffers\n");
-	}
+        d->rxqueue[d->rxcount] = ba;
+        d->rxcount += 1;
+        sim_debug(DF_QUEUE, &kmc_dev, "Queued rx buffer %d, descriptor address=0x%04X(%06o octal)\n", d->rxcount - 1, ba, ba);
+        }
+    else {
+        sim_debug(DF_QUEUE, &kmc_dev, "(newrxb) no more room for buffers\n");
+        }
 
-    (void) unibus_read(&w3, ba + 4);
+    unibus_read(&w3, ba + 4);
     if (w3 & BDL_LDS)
-      break;
+        break;
 
     ba += 6;
-  }
+    }
 
-  sim_debug(DF_QUEUE, &kmc_dev, "(newrxb) rxcount = %d, rxnext = %d\n", d->rxcount, d->rxnext);
+sim_debug(DF_QUEUE, &kmc_dev, "(newrxb) rxcount = %d, rxnext = %d\n", d->rxcount, d->rxnext);
 
 }
 
@@ -556,26 +549,26 @@ void dup_newrxbuf(int line, int32 ba)
 
 void dup_newtxbuf(int line, int32 ba)
 {
-  dupblock* d;
-  int32 w3;
+dupblock* d;
+int32 w3;
 
-  d = &dup[line];
+d = &dup[line];
 
-  for (;;) {
+for (;;) {
     if (d->txcount < MAXQUEUE) {
-      d->txqueue[d->txcount] = ba;
-      d->txcount += 1;
-    }
+        d->txqueue[d->txcount] = ba;
+        d->txcount += 1;
+        }
     unibus_read(&w3, ba + 4);
     if (w3 & BDL_LDS)
-      break;
+        break;
 
     ba += 6;
-  }
+    }
 
-  sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (newtxb) txcount = %d, txnext = %d\r\n", line, d->txcount, d->txnext);
+sim_debug(DF_QUEUE, &kmc_dev, "DUP%d: (newtxb) txcount = %d, txnext = %d\r\n", line, d->txcount, d->txnext);
 
-  dup_tryxmit(line);		/* Try to start output. */
+dup_tryxmit(line);		/* Try to start output. */
 }
 
 /*
@@ -634,62 +627,64 @@ if (d->rxcount > d->rxnext) {
 
 void prbdl(uint32 dbits, DEVICE *dev, int32 ba, int prbuf)
 {
-  int32 w1, w2, w3;
-  int32 dp;
+int32 w1, w2, w3;
+int32 dp;
 
-  for (;;) {
-    (void) unibus_read(&w1, ba);
-    (void) unibus_read(&w2, ba + 2);
-    (void) unibus_read(&w3, ba + 4);
+for (;;) {
+    unibus_read(&w1, ba);
+    unibus_read(&w2, ba + 2);
+    unibus_read(&w3, ba + 4);
 
     sim_debug(dbits, dev, "  Word 1 = 0x%04X(%06o octal)\n", w1, w1);
     sim_debug(dbits, dev, "  Word 2 = 0x%04X(%06o octal)\n", w2, w2);
     sim_debug(dbits, dev, "  Word 3 = 0x%04X(%06o octal)\n", w3, w3);
 
     if (prbuf) {
-      if (w2 > 20) w2 = 20;
-      dp = w1 + ((w3 & 06000) << 6);
+        if (w2 > 20)
+            w2 = 20;
+        dp = w1 + ((w3 & 06000) << 6);
 
-      while (w2 > 0) {
-		  (void) unibus_read(&w1, dp);
-		  dp += 2;
-		  w2 -= 2;
+        while (w2 > 0) {
+            unibus_read(&w1, dp);
+            dp += 2;
+            w2 -= 2;
 
-		  sim_debug(DF_CMD, dev, " %2x %2x", w1 & 0xff, w1 >> 8);
-      }
-      sim_debug(DF_CMD, dev, "\r\n");
-    }
-    if (w3 & BDL_LDS) break;
+            sim_debug(DF_CMD, dev, " %2x %2x", w1 & 0xff, w1 >> 8);
+            }
+        sim_debug(DF_CMD, dev, "\r\n");
+        }
+    if (w3 & BDL_LDS)
+        break;
     ba += 6;
-  }
+    }
 }
 
 void kmc_setrxint()
 {
-    sim_debug(DF_TRC, &kmc_dev, "set rx interrupt\n");
-    kmc_rxi = 1;
-    SET_INT(KMCA);
+sim_debug(DF_TRC, &kmc_dev, "set rx interrupt\n");
+kmc_rxi = 1;
+SET_INT(KMCA);
 }
 
 void kmc_clrrxint()
 {
-    sim_debug(DF_TRC, &kmc_dev, "clear rx interrupt\n");
-    kmc_rxi = 0;
-    CLR_INT(KMCA);
+sim_debug(DF_TRC, &kmc_dev, "clear rx interrupt\n");
+kmc_rxi = 0;
+CLR_INT(KMCA);
 }
 
 void kmc_settxint()
 {
-    sim_debug(DF_TRC, &kmc_dev, "set tx interrupt\n");
-    kmc_txi = 1;
-    SET_INT(KMCB);
+sim_debug(DF_TRC, &kmc_dev, "set tx interrupt\n");
+kmc_txi = 1;
+SET_INT(KMCB);
 }
 
 void kmc_clrtxint()
 {
-    sim_debug(DF_TRC, &kmc_dev, "clear tx interrupt\n");
-    kmc_txi = 0;
-    CLR_INT(KMCB);
+sim_debug(DF_TRC, &kmc_dev, "clear tx interrupt\n");
+kmc_txi = 0;
+CLR_INT(KMCB);
 }
 
 /*
@@ -698,52 +693,52 @@ void kmc_clrtxint()
 
 void kmc_doinput(void)
 {
-  int line;
-  int32 ba;
-  dupblock* d;
+int line;
+int32 ba;
+dupblock* d;
 
-  line = (kmc_sel2 & 077400) >> 8;
-  d = &dup[line];
-  ba = ((kmc_sel6 & 0140000) << 2) + kmc_sel4;
+line = (kmc_sel2 & 077400) >> 8;
+d = &dup[line];
+ba = ((kmc_sel6 & 0140000) << 2) + kmc_sel4;
 
-  sim_debug(DF_CMD, &kmc_dev, "Input command: sel2=%06o sel4=%06o sel6=%06o\n", kmc_sel2, kmc_sel4, kmc_sel6);
-  sim_debug(DF_CMD, &kmc_dev, "Line %d ba=0x%04x(%06o octal)\n", line, ba, ba);
-    switch (kmc_sel2 & 7) {
+sim_debug(DF_CMD, &kmc_dev, "Input command: sel2=%06o sel4=%06o sel6=%06o\n", kmc_sel2, kmc_sel4, kmc_sel6);
+sim_debug(DF_CMD, &kmc_dev, "Line %d ba=0x%04x(%06o octal)\n", line, ba, ba);
+switch (kmc_sel2 & 7) {
     case 0:
-      sim_debug(DF_CMD, &kmc_dev, "Descriptor for tx buffer:\n");
-      prbdl(DF_CMD, &kmc_dev, ba, 1);
-      break;
+        sim_debug(DF_CMD, &kmc_dev, "Descriptor for tx buffer:\n");
+        prbdl(DF_CMD, &kmc_dev, ba, 1);
+        break;
     case 4:
-      sim_debug(DF_CMD, &kmc_dev, "Descriptor for rx buffer:\n");
-      prbdl(DF_CMD, &kmc_dev, ba, 0);
+        sim_debug(DF_CMD, &kmc_dev, "Descriptor for rx buffer:\n");
+        prbdl(DF_CMD, &kmc_dev, ba, 0);
     }
 
-  switch (kmc_sel2 & 7) {
-  case 0:			/* Buffer in, data to send: */
-    dup_newtxbuf(line, ba);
-    break;
-  case 1:			/* Control in. */
-    /*
-    ** This lets us setup the dup for DDCMP mode, and possibly turn up DTR 
-    ** since nothing else seems to do that.
-    */
-    sim_debug(DF_CMD, &kmc_dev, "Running DDCMP in full duplex on Line %d (dup %d):\n", line, d->dupnumber);
-    dup_set_DDCMP (d->dupnumber, TRUE);
-    d->linkstate = 0;                               /* Link not up yet. */
-    dup_set_DTR (d->dupnumber, (kmc_sel6 & 0400) ? TRUE : FALSE);
-    dup_set_callback_mode (d->dupnumber, dup_receive, dup_send_complete);
-    break;
-  case 3:			/* Base in. */
-    /*
-    ** This tell the KMC what unibus address the dup is at.
-    */
-    sim_debug(DF_CMD, &kmc_dev, "Setting Line %d DUP unibus address to: 0x%x (0%o octal)\n", line, kmc_sel6+IOPAGEBASE, kmc_sel6+IOPAGEBASE);
-    d->dupnumber = dup_csr_to_linenum (kmc_sel6);
-    break;
-  case 4:			/* Buffer in, receive buffer for us... */
-    dup_newrxbuf(line, ba);
-    break;
-  }
+switch (kmc_sel2 & 7) {
+    case 0:			/* Buffer in, data to send: */
+        dup_newtxbuf(line, ba);
+        break;
+    case 1:			/* Control in. */
+        /*
+        ** This lets us setup the dup for DDCMP mode, and possibly turn up DTR 
+        ** since nothing else seems to do that.
+        */
+        sim_debug(DF_CMD, &kmc_dev, "Running DDCMP in full duplex on Line %d (dup %d):\n", line, d->dupnumber);
+        dup_set_DDCMP (d->dupnumber, TRUE);
+        d->linkstate = 0;                               /* Link not up yet. */
+        dup_set_DTR (d->dupnumber, (kmc_sel6 & 0400) ? TRUE : FALSE);
+        dup_set_callback_mode (d->dupnumber, dup_receive, dup_send_complete);
+        break;
+    case 3:			/* Base in. */
+        /*
+        ** This tell the KMC what unibus address the dup is at.
+        */
+        sim_debug(DF_CMD, &kmc_dev, "Setting Line %d DUP unibus address to: 0x%x (0%o octal)\n", line, kmc_sel6+IOPAGEBASE, kmc_sel6+IOPAGEBASE);
+        d->dupnumber = dup_csr_to_linenum (kmc_sel6);
+        break;
+    case 4:			/* Buffer in, receive buffer for us... */
+        dup_newrxbuf(line, ba);
+        break;
+    }
 }
 
 /*
@@ -752,30 +747,30 @@ void kmc_doinput(void)
 
 void kmc_mclear(void)
 {
-  int i;
-  dupblock* d;
+int i;
+dupblock* d;
 
-  sim_debug(DF_INF, &kmc_dev, "Master clear\n");
-  kmc_running = 0;
-  kmc_sel0 = KMC_MRC;
-  kmc_sel2 = 0;
-  kmc_sel4 = 0;
-  kmc_sel6 = 0;
-  kmc_rxi = 0;
-  kmc_txi = 0;
+sim_debug(DF_INF, &kmc_dev, "Master clear\n");
+kmc_running = 0;
+kmc_sel0 = KMC_MRC;
+kmc_sel2 = 0;
+kmc_sel4 = 0;
+kmc_sel6 = 0;
+kmc_rxi = 0;
+kmc_txi = 0;
 
-  /* clear out the dup's as well. */
+/* clear out the dup's as well. */
 
-  for (i = 0; i < MAXDUP; i += 1) {
+for (i = 0; i < MAXDUP; i += 1) {
     d = &dup[i];
     d->rxcount = 0;
     d->rxnext = 0;
     d->txcount = 0;
     d->txnext = 0;
     d->txnow = 0;
-  }
-  sim_cancel(&kmc_unit);	/* Stop the clock. */
-  sim_activate_after(&kmc_unit, 2000000);
+    }
+sim_cancel(&kmc_unit);	/* Stop the clock. */
+sim_activate_after(&kmc_unit, 2000000);
 }
 
 /*
@@ -784,40 +779,36 @@ void kmc_mclear(void)
 
 t_stat kmc_rd(int32* data, int32 PA, int32 access)
 {
-  switch ((PA >> 1) & 03) {
-  case 00:
-    *data = kmc_sel0;
-    break;
-  case 01:
-    *data = kmc_sel2;
-    break;
-  case 02:
-    *data = kmc_sel4;
-    break;
-  case 03:
-	if (kmc_sel0 == KMC_RMO)
-	{
-		kmc_sel6 = kmc_microcode[kmc_sel4 & (KMC_CRAMSIZE - 1)];
-	}
-    *data = kmc_sel6;
-    break;
-  }
- 
-  sim_debug(DF_TRC, &kmc_dev, "kmc_rd(), addr=0%o access=%d, result=0x%04x\n", PA, access, *data);
-  return SCPE_OK;
+switch ((PA >> 1) & 03) {
+    case 00:
+        *data = kmc_sel0;
+        break;
+    case 01:
+        *data = kmc_sel2;
+        break;
+    case 02:
+        *data = kmc_sel4;
+        break;
+    case 03:
+        if (kmc_sel0 == KMC_RMO)
+            kmc_sel6 = kmc_microcode[kmc_sel4 & (KMC_CRAMSIZE - 1)];
+        *data = kmc_sel6;
+        break;
+    }
+
+sim_debug(DF_TRC, &kmc_dev, "kmc_rd(), addr=0%o access=%d, result=0x%04x\n", PA, access, *data);
+return SCPE_OK;
 }
 
 void kmc_domicroinstruction()
 {
-	static uint32 save;
-	if (kmc_sel6 == 041222) /* MOVE <MEM><BSEL2> */
-	{
-		kmc_sel2 = (kmc_sel2 & ~0xFF) |  (save & 0xFF);
-	}
-	else if (kmc_sel6 == 0122440) /* MOVE <BSEL2><MEM> */
-	{
-		save = kmc_sel2 & 0xFF;
-	}
+static uint32 save;
+
+if (kmc_sel6 == 041222) /* MOVE <MEM><BSEL2> */
+	kmc_sel2 = (kmc_sel2 & ~0xFF) |  (save & 0xFF);
+else 
+    if (kmc_sel6 == 0122440) /* MOVE <BSEL2><MEM> */
+	    save = kmc_sel2 & 0xFF;
 }
 
 /*
@@ -826,132 +817,127 @@ void kmc_domicroinstruction()
 
 t_stat kmc_wr(int32 data, int32 PA, int32 access)
 {
-  uint32 toggle;
-  int reg = PA & 07;
-  int sel = (PA >> 1) & 03;
+uint32 toggle;
+int reg = PA & 07;
+int sel = (PA >> 1) & 03;
 
-  if (access == WRITE)
-  {
-      sim_debug(DF_TRC, &kmc_dev, "kmc_wr(), addr=0%08o, SEL%d, data=0x%04x\n", PA, reg, data);
-  }
-  else
-  {
-      sim_debug(DF_TRC, &kmc_dev, "kmc_wr(), addr=0x%08o, BSEL%d, data=%04x\n", PA, reg, data);
-  }
-
-  switch (sel) {
-  case 00:
-    if (access == WRITEB) {
-      data = (PA & 1)
-	? (((data & 0377) << 8) | (kmc_sel0 & 0377))
-	: ((data & 0377) | (kmc_sel0 & 0177400));
+if (access == WRITE) {
+    sim_debug(DF_TRC, &kmc_dev, "kmc_wr(), addr=0%08o, SEL%d, data=0x%04x\n", PA, reg, data);
     }
-    toggle = kmc_sel0 ^ data;
-    kmc_sel0 = data;
-    if (kmc_sel0 & KMC_MRC) {
-      kmc_mclear();
-      break;
-    }
-    if ((toggle & KMC_CWR) && (toggle & KMC_RMO) && !(data & KMC_CWR) && !(data & KMC_RMO)) {
-      kmc_microcode[kmc_sel4 & (KMC_CRAMSIZE - 1)] = kmc_sel6;
+else {
+    sim_debug(DF_TRC, &kmc_dev, "kmc_wr(), addr=0x%08o, BSEL%d, data=%04x\n", PA, reg, data);
     }
 
-	if ((toggle & KMC_RMI) && (toggle & KMC_SUP) && !(data & KMC_RMI) && !(data & KMC_SUP))
-	{
-		kmc_domicroinstruction();
-	}
+switch (sel) {
+    case 00:
+        if (access == WRITEB) {
+            data = (PA & 1)
+            ? (((data & 0377) << 8) | (kmc_sel0 & 0377))
+            : ((data & 0377) | (kmc_sel0 & 0177400));
+            }
+        toggle = kmc_sel0 ^ data;
+        kmc_sel0 = data;
+        if (kmc_sel0 & KMC_MRC) {
+            kmc_mclear();
+            break;
+            }
+        if ((toggle & KMC_CWR) && (toggle & KMC_RMO) && !(data & KMC_CWR) && !(data & KMC_RMO)) {
+            kmc_microcode[kmc_sel4 & (KMC_CRAMSIZE - 1)] = kmc_sel6;
+            }
 
-    if (toggle & KMC_RUN) {	/* Changing the run bit? */
-      if (kmc_sel0 & KMC_RUN)
-	  {
-        sim_debug(DF_INF, &kmc_dev, "Started RUNing\n");
-		kmc_running = 1;
-      }
-	  else
-	  {
-        sim_debug(DF_INF, &kmc_dev, "Stopped RUNing\n");
-	    sim_cancel(&kmc_unit);
-		kmc_running = 0;
-      }
+        if ((toggle & KMC_RMI) && (toggle & KMC_SUP) && !(data & KMC_RMI) && !(data & KMC_SUP)) {
+            kmc_domicroinstruction();
+            }
+
+        if (toggle & KMC_RUN) {	/* Changing the run bit? */
+            if (kmc_sel0 & KMC_RUN) {
+                sim_debug(DF_INF, &kmc_dev, "Started RUNing\n");
+                kmc_running = 1;
+                }
+            else {
+                sim_debug(DF_INF, &kmc_dev, "Stopped RUNing\n");
+                sim_cancel(&kmc_unit);
+                kmc_running = 0;
+                }
+            }
+        break;
+    case 01:
+        if (access == WRITEB) {
+            data = (PA & 1)
+            ? (((data & 0377) << 8) | (kmc_sel2 & 0377))
+            : ((data & 0377) | (kmc_sel2 & 0177400));
+            }
+        if (kmc_running) {
+            if ((kmc_sel2 & KMC_RDI) && (!(data & KMC_RDI))) {
+                kmc_sel2 = data;
+                kmc_doinput();
+                }
+            else
+                if ((kmc_sel2 & KMC_RDO) && (!(data & KMC_RDO))) {
+                    kmc_sel2 = data;
+                    kmc_tryoutput();
+                    }
+                else {
+                    kmc_sel2 = data;
+                    }
+            }
+        else {
+            kmc_sel2 = data;
+            }
+        break;
+    case 02:
+        if (kmc_sel0 & KMC_RMO) {
+            kmc_sel6 = kmc_microcode[data & (KMC_CRAMSIZE - 1)];
+            }
+        kmc_sel4 = data;
+        break;
+    case 03:
+        kmc_sel6 = data;
+        break;
     }
-    break;
-  case 01:
-    if (access == WRITEB) {
-      data = (PA & 1)
-	? (((data & 0377) << 8) | (kmc_sel2 & 0377))
-	: ((data & 0377) | (kmc_sel2 & 0177400));
+
+if (kmc_running) {
+    if (kmc_output) {
+        kmc_tryoutput();
+        }
+    if (kmc_sel0 & KMC_RQI) {
+        if (!(kmc_sel2 & KMC_RDO)) {
+            kmc_sel2 |= KMC_RDI;
+            }
+        }
+
+    kmc_updints();
     }
-	if (kmc_running)
-	{
-		if ((kmc_sel2 & KMC_RDI) && (!(data & KMC_RDI))) {
-			kmc_sel2 = data;
-			kmc_doinput();
-		} else if ((kmc_sel2 & KMC_RDO) && (!(data & KMC_RDO))) {
-			kmc_sel2 = data;
-			kmc_tryoutput();
-		} else {
-			kmc_sel2 = data;
-		}
-	}
-	else
-	{
-		kmc_sel2 = data;
-	}
-    break;
-  case 02:
-    if (kmc_sel0 & KMC_RMO) {
-      kmc_sel6 = kmc_microcode[data & (KMC_CRAMSIZE - 1)];
-    }
-    kmc_sel4 = data;
-    break;
-  case 03:
-    kmc_sel6 = data;
-    break;
-  }
 
-  if (kmc_running)
-  {
-	  if (kmc_output) {
-		  kmc_tryoutput();
-	  }
-	  if (kmc_sel0 & KMC_RQI) {
-		  if (!(kmc_sel2 & KMC_RDO)) {
-			  kmc_sel2 |= KMC_RDI;
-		  }
-	  }
-
-	  kmc_updints();
-  }
-
-  return SCPE_OK;
+return SCPE_OK;
 }
 
 int32 kmc_rxint (void)
 {
-	int32 ans = 0; /* no interrupt request active */
-	if (kmc_rxi != 0)
-	{
-		ans = kmc_dib.vec;
-		kmc_clrrxint();
-	}
+int32 ans = 0; /* no interrupt request active */
 
-	sim_debug(DF_TRC, &kmc_dev, "rx interrupt ack %d\n", ans);
+if (kmc_rxi != 0) {
+    ans = kmc_dib.vec;
+    kmc_clrrxint();
+    }
 
-	return ans;
+sim_debug(DF_TRC, &kmc_dev, "rx interrupt ack %d\n", ans);
+
+return ans;
 }
 
 int32 kmc_txint (void)
 {
-	int32 ans = 0; /* no interrupt request active */
-	if (kmc_txi != 0)
-	{
-		ans = kmc_dib.vec + 4;
-		kmc_clrtxint();
-	}
+int32 ans = 0; /* no interrupt request active */
 
-	sim_debug(DF_TRC, &kmc_dev, "tx interrupt ack %d\n", ans);
+if (kmc_txi != 0) {
+    ans = kmc_dib.vec + 4;
+    kmc_clrtxint();
+    }
 
-	return ans;
+sim_debug(DF_TRC, &kmc_dev, "tx interrupt ack %d\n", ans);
+
+return ans;
 }
 
 /*
@@ -960,22 +946,23 @@ int32 kmc_txint (void)
 
 t_stat kmc_svc (UNIT* uptr)
 {
-    int dupno;
+int dupno;
 
-    for (dupno=0; dupno<MAXDUP; dupno++) {
-        int32 linkstate = dup_get_DCD (dupno);
+for (dupno=0; dupno<MAXDUP; dupno++) {
+    int32 linkstate = dup_get_DCD (dupno);
 
-        if ((dup[dupno].dupnumber != -1) && 
-            (linkstate != dup[dupno].linkstate)) {
-            /* Here is where we must notify the OS of the link state transition... FIXME */
-            dup[dupno].linkstate = linkstate;
-            }
+    if ((dup[dupno].dupnumber != -1) && 
+        (linkstate != dup[dupno].linkstate)) {
+        /* Here is where we must notify the OS of the link state transition... FIXME */
+        dup[dupno].linkstate = linkstate;
         }
-    if (kmc_output) {
-        kmc_tryoutput();		/* Try to do an output transaction. */
     }
-    sim_activate_after(uptr, 2000000);
-    return SCPE_OK;
+
+if (kmc_output)
+    kmc_tryoutput();		/* Try to do an output transaction. */
+
+sim_activate_after(uptr, 2000000);
+return SCPE_OK;
 }
 
 /*
@@ -984,13 +971,13 @@ t_stat kmc_svc (UNIT* uptr)
 
 t_stat kmc_reset(DEVICE* dptr)
 {
-    int dupno;
+int dupno;
 
-    for (dupno=0; dupno<MAXDUP; dupno++)
-        dup[dupno].dupnumber = -1;
-	kmc_sel0 = 0;
-	kmc_sel2 = 0;
-	kmc_sel4 = 0;
-	kmc_sel6 = 0;
-    return auto_config (dptr->name, ((dptr->flags & DEV_DIS)? 0: 1 ));  /* auto config */
+for (dupno=0; dupno<MAXDUP; dupno++)
+    dup[dupno].dupnumber = -1;
+kmc_sel0 = 0;
+kmc_sel2 = 0;
+kmc_sel4 = 0;
+kmc_sel6 = 0;
+return auto_config (dptr->name, ((dptr->flags & DEV_DIS)? 0: 1 ));  /* auto config */
 }
