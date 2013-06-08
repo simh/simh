@@ -365,6 +365,8 @@ extern int32 int_req[IPL_HLVL];
 #define    CDCSR_HOPPER     (1u << CDCSR_V_HOPPER)
 #define    CDCSR_PACK       (1u << CDCSR_V_PACK)
 
+#define    CDCSR_ANYERR     (CDCSR_RDRCHK | CDCSR_EOF | CDCSR_OFFLINE | CDCSR_DATAERR | CDCSR_LATE | CDCSR_NXM)
+
 #define    CDCSR_IMP        (CSR_ERR | CDCSR_RDRCHK | CDCSR_EOF | CDCSR_OFFLINE | \
                              CDCSR_DATAERR | CDCSR_LATE | CDCSR_NXM | \
                              CDCSR_PWRCLR | CDCSR_RDY | CSR_IE | \
@@ -417,12 +419,12 @@ static int16    hcard[82];                              /* Hollerith format */
 static char     ccard[82];                              /* DEC compressed format */
 static char     acard[82];                              /* ASCII format */
 /* CR/CM registers */
-static int32    crs = 0;                                /* control/status */
+static int32    crs = CSR_ERR | CRCSR_OFFLINE | CRCSR_SUPPLY; /* control/status */
 static int32    crb1 = 0;                               /* 12-bit Hollerith characters */
 static int32    crb2 = 0;                               /* 8-bit compressed characters */
 static int32    crm = 0;                                /* CMS maintenance register */
 /* CD registers */
-static int32    cdst = 0;                               /* control/status */
+static int32    cdst = CSR_ERR | CDCSR_OFFLINE | CDCSR_HOPPER; /* Control/status - off-line until attached */
 static int32    cdcc = 0;                               /* column count */
 static int32    cdba = 0;                               /* current address, low 16 bits */
 static int32    cddb = 0;                               /* data, 2nd status */
@@ -949,7 +951,7 @@ t_stat cr_rd (  int32   *data,
 {
     switch ((PA >> 1) & 03) {
     case 0:        /* CSR */
-        if (cdst & (077000))
+        if (cdst & (CDCSR_ANYERR))
             cdst |= CSR_ERR;
         else
             cdst &= ~CSR_ERR;
@@ -994,7 +996,7 @@ t_stat cr_rd (  int32   *data,
               * status even while busy (rather than the zone).  Might be wrong.
               */
             *data = 0100000 | (cddbs & (CDDB_READ|CDDB_PICK|CDDB_STACK)) |
-                 ((cdst & CDCSR_OFFLINE) ?
+                 ((crs & CRCSR_BUSY) ?
                 cddb & 0777 : 0777);
         if (DEBUG_PRS (cr_dev))
             fprintf (sim_deb, "cr_rd crm %06o cddb %06o data %06o\n",
@@ -1022,6 +1024,8 @@ t_stat cr_wr (  int32   data,
             crs = (crs & ~CRCSR_RW) | (data & CRCSR_RW);
             /* Clear status bits after CSR load */
             crs &= ~(CSR_ERR | CRCSR_ONLINE | CRCSR_CRDDONE | CRCSR_TIMERR);
+            if (crs & CRCSR_OFFLINE)
+                crs |= CSR_ERR;
             if (DEBUG_PRS (cr_dev))
                 fprintf (sim_deb, "cr_wr data %06o crs %06o\n",
                     data, crs);
@@ -1057,7 +1061,7 @@ t_stat cr_wr (  int32   data,
                 cdst &= (CDCSR_OFFLINE | CDCSR_RDY | CDCSR_HOPPER);
                 if( (cr_unit.flags & UNIT_ATT) && !feof(cr_unit.fileref) && !ferror(cr_unit.fileref) )
                     cdst &= ~(CDCSR_HOPPER);
-                if (cdst & (077000))
+                if (cdst & (CDCSR_ANYERR))
                     cdst |= CSR_ERR;
                 cdst |= CDCSR_RDY;
                 break;
@@ -1223,7 +1227,7 @@ readFault:
                 blowerState = BLOW_STOP;
                 cdst |= CDCSR_RDY;
                 if (cdst & (CDCSR_RDRCHK | CDCSR_HOPPER))
-                    cdst |= CDCSR_OFFLINE;
+                    cdst |= CSR_ERR | CDCSR_OFFLINE;
                 if (cdst & CSR_IE)
                     SET_INT (CR);
             }
@@ -1365,6 +1369,8 @@ t_stat cr_reset (   DEVICE  *dptr    )
     currCol = 1;
     crs &= ~(CSR_ERR|CRCSR_CRDDONE|CRCSR_TIMERR|CRCSR_ONLINE|CRCSR_BUSY|
          CRCSR_COLRDY|CSR_IE|CRCSR_EJECT|CSR_GO);
+    if (crs & (CRCSR_OFFLINE))
+        crs |= CSR_ERR;
     crb1 = 0;
     crb2 = 0;
     crm = 0;
@@ -1372,6 +1378,8 @@ t_stat cr_reset (   DEVICE  *dptr    )
           CDCSR_NXM|CSR_IE|CDCSR_XBA17|CDCSR_XBA16|CDCSR_ONLINE|
           CDCSR_PACK|CSR_GO);
     cdst |= CDCSR_RDY;
+    if (cdst & CDCSR_ANYERR)
+        cdst |= CSR_ERR;
     cdcc = 0;
     cdba = 0;
     cddb = 0;
@@ -1597,7 +1605,7 @@ t_stat cr_set_stop (    UNIT    *uptr,
         fprintf (sim_deb, "set_stop\n");
     crs &= ~CRCSR_ONLINE;
     crs |= CSR_ERR | CRCSR_OFFLINE;
-    cdst |= CDCSR_OFFLINE;
+    cdst |= CSR_ERR | CDCSR_OFFLINE;
     /* CD11 does not appear to interrupt on STOP. */
     if (CR11_CTL(uptr) && (crs & CSR_IE))
         SET_INT (CR);
