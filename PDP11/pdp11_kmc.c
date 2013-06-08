@@ -195,7 +195,7 @@ t_stat dma_read(int32 ba, uint8* data, int length)
 
 #define MAXQUEUE 16     /* Number of rx bdl's we can handle. */
 
-#define MAXMSG 2000     /* Largest message we handle. */
+#define MAXMSG (6+2+8192+2)    /* Largest message we handle = DDCMP header+BCC+Data+BCC. */
 
 /* local variables: */
 
@@ -210,7 +210,8 @@ int    kmc_txi;
 uint16 kmc_microcode[KMC_CRAMSIZE];
 
 struct dupblock {
-  int32  dupnumber;         /* Line Number of all DUP11's on Unibus */
+  int32  dupnumber;         /* Line Number amongst all DUP11's on Unibus (-1 == unassigned) */
+  int32  linkstate;         /* Line Link Status (i.e. 1 when DCD/DSR is on, 0 otherwise */
   uint32 rxqueue[MAXQUEUE]; /* Queue of bd's to receive into. */
   uint32 rxcount;           /* No. bd's in above. */
   uint32 rxnext;            /* Next bd to receive into. */
@@ -728,6 +729,7 @@ void kmc_doinput(void)
     */
     sim_debug(DF_CMD, &kmc_dev, "Running DDCMP in full duplex on Line %d (dup %d):\n", line, d->dupnumber);
     dup_set_DDCMP (d->dupnumber, TRUE);
+    d->linkstate = 0;                               /* Link not up yet. */
     dup_set_DTR (d->dupnumber, (kmc_sel6 & 0400) ? TRUE : FALSE);
     dup_set_callback_mode (d->dupnumber, dup_receive, dup_send_complete);
     break;
@@ -960,8 +962,15 @@ t_stat kmc_svc (UNIT* uptr)
 {
     int dupno;
 
-    dupno = uptr->u3;
+    for (dupno=0; dupno<MAXDUP; dupno++) {
+        int32 linkstate = dup_get_DCD (dupno);
 
+        if ((dup[dupno].dupnumber != -1) && 
+            (linkstate != dup[dupno].linkstate)) {
+            /* Here is where we must notify the OS of the link state transition... FIXME */
+            dup[dupno].linkstate = linkstate;
+            }
+        }
     if (kmc_output) {
         kmc_tryoutput();		/* Try to do an output transaction. */
     }
@@ -975,6 +984,10 @@ t_stat kmc_svc (UNIT* uptr)
 
 t_stat kmc_reset(DEVICE* dptr)
 {
+    int dupno;
+
+    for (dupno=0; dupno<MAXDUP; dupno++)
+        dup[dupno].dupnumber = -1;
 	kmc_sel0 = 0;
 	kmc_sel2 = 0;
 	kmc_sel4 = 0;
