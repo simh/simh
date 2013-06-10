@@ -1144,7 +1144,7 @@ switch (fnc) {                                          /* case on function */
             for (i = wc; i < awc; i++)                  /* fill buf */
                 hkxb[i] = 0;
             if (wc && !err) {                           /* write buf */
-                fxwrite (hkxb, sizeof (uint16), wc, uptr->fileref);
+                fxwrite (hkxb, sizeof (uint16), awc, uptr->fileref);
                 err = ferror (uptr->fileref);
                 }
             }                                           /* end if wr */
