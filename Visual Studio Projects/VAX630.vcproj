@@ -69,7 +69,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib SDL-StaticD.lib SDLmain-StaticD.lib"
+				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib SDL-StaticD.lib dxguid.lib"
 				OutputFile="$(OutDir)\MicroVAX2.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/libSDL/SDL-1.2.15/lib/&quot;"
@@ -160,7 +160,7 @@
 			<Tool
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
-				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib SDL-Static.lib SDLmain-Static.lib"
+				AdditionalDependencies="wpcap.lib packet.lib wsock32.lib winmm.lib SDL-Static.lib dxguid.lib"
 				OutputFile="$(OutDir)\MicroVAX2.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;;&quot;../../windows-build/libSDL/SDL-1.2.15/lib/&quot;"

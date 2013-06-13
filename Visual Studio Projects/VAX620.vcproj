@@ -305,6 +305,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_video.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax630_io.c"
 				>
 			</File>
@@ -318,6 +322,10 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax630_syslist.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_2681.c"
 				>
 			</File>
 			<File
@@ -341,6 +349,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\VAX\vax_lk.c"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax_mmu.c"
 				>
 			</File>
@@ -354,6 +366,14 @@
 			</File>
 			<File
 				RelativePath="..\VAX\vax_syscm.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_vc.c"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_vs.c"
 				>
 			</File>
 			<File
@@ -438,7 +458,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\sim_video.h"
+				>
+			</File>
+			<File
 				RelativePath="..\VAX\vax630_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\VAX\vax_2681.h"
 				>
 			</File>
 			<File
