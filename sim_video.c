@@ -730,6 +730,17 @@ sprintf(SDLVersion, "SDL Version %d.%d.%d", ver->major, ver->minor, ver->patch);
 return (const char *)SDLVersion;
 }
 
+t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+return SCPE_NOFNC;
+}
+
+t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+fprintf (st, "ReleaseKey=Ctrl-Right-Shift");
+return SCPE_OK;
+}
+
 #else
 
 /* Non-implemented versions */
@@ -768,5 +779,17 @@ const char *vid_version (void)
 {
 return "No Video Support";
 }
+
+t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+return SCPE_NOFNC;
+}
+
+t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+fprintf (st, "no release key");
+return SCPE_OK;
+}
+
 
 #endif

@@ -184,6 +184,8 @@ MTAB vc_mod[] = {
         &vc_set_enable, NULL, NULL, "Enable VCB01 (QVSS)" },
     { MTAB_XTD|MTAB_VDV, 0, NULL, "DISABLE",
         &vc_set_enable, NULL, NULL, "Disable VCB01 (QVSS)" },
+    { MTAB_XTD|MTAB_VDV, 0, "RELEASEKEY", NULL,
+        NULL, &vid_show_release_key, NULL, "Display the window focus release key" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 004, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
@@ -629,6 +631,14 @@ if (dptr->flags & DEV_DIS)
 r = vid_open (VC_XSIZE, VC_YSIZE);                      /* display size */
 if (r != SCPE_OK)
     return r;
+printf ("QVSS Display Created.  ");
+vid_show_release_key (stdout, NULL, 0, NULL);
+printf ("\n");
+if (sim_log) {
+    fprintf (sim_log, "QVSS Display Created.  ");
+    vid_show_release_key (sim_log, NULL, 0, NULL);
+    fprintf (sim_log, "\n");
+    }
 sim_activate_abs (&vc_unit, tmxr_poll);
 return auto_config (NULL, 0);                           /* run autoconfig */
 }
