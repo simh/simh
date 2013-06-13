@@ -12,7 +12,10 @@ rem            ROM images are consistent with the ROM images from which they
 rem            are derived.
 rem     BUILD  To validate that the required dependent libraries and include
 rem            files are available in the directory ..\..\windows-build\
-rem            These libraries currently include winpcap and pthreads.
+rem            These libraries currently include winpcap and pthreads and 
+rem            optionally SDL.
+rem     LIBSDL To validate that the required dependent SDL libraries and include
+rem            files are available in the directory ..\..\windows-build\
 rem
 rem  In addition to the optional activities mentioned above, other activities
 rem  are also performed.  These include:
@@ -30,6 +33,7 @@ if "%1" == "" goto _done_args
 set _arg=
 if /I "%1" == "ROM"    set _arg=ROM
 if /I "%1" == "BUILD"  set _arg=BUILD
+if /I "%1" == "LIBSDL" set _arg=LIBSDL
 if "%_arg%" == ""      echo *** warning *** unknown parameter %0
 if not "%_arg%" == ""  set _X_%_arg%=%_arg%
 shift
@@ -56,15 +60,26 @@ popd
 :_check_build
 if "%_X_BUILD%" == "" goto _done_build
 if exist ../../windows-build-windows-build move ../../windows-build-windows-build ../../windows-build >NUL
-if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice
-if not exist ../../windows-build/pthreads/pthread.h goto _notice
+if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice1
+if not exist ../../windows-build/pthreads/pthread.h goto _notice1
+if "%_X_LIBSDL%" == "" goto _done_build
+if not exist ../../windows-build/libSDL/SDL-1.2.15/include/SDL.h goto _notice2
 goto _done_build
-:_notice
+:_notice1
 echo ****************************************************
 echo ****************************************************
 echo **  The required build support is not available.  **
 echo ****************************************************
 echo ****************************************************
+goto _ProjectInfo
+:_notice2
+echo ****************************************************
+echo ****************************************************
+echo **  The required build support is out of date.    **
+echo ****************************************************
+echo ****************************************************
+goto _ProjectInfo
+:_ProjectInfo
 type 0ReadMe_Projects.txt
 exit 1
 :_done_build

@@ -55,9 +55,10 @@ extern int32 int_req[IPL_HLVL];
 extern jmp_buf save_env;
 extern int32 p1;
 extern int32 trpirq, mem_err;
+extern DEVICE vc_dev, lk_dev, vs_dev;
 
 int32 conisp, conpc, conpsl;                            /* console reg */
-int32 sys_model = 0;
+int32 sys_model = 0;                                    /* MicroVAX or VAXstation */
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
 
 static struct boot_dev boot_tab[] = {
@@ -74,6 +75,8 @@ t_stat vax610_boot_parse (int32 flag, char *ptr);
 t_stat cpu_boot (int32 unitno, DEVICE *dptr);
 
 extern int32 intexc (int32 vec, int32 cc, int32 ipl, int ei);
+extern int32 vc_mem_rd (int32 pa);
+extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 iccs_rd (void);
 extern int32 todr_rd (void);
 extern int32 rxcs_rd (void);
@@ -277,7 +280,7 @@ struct reglink {                                        /* register linkage */
     };
 
 struct reglink regtable[] = {
-/*    { QVMBASE, QVMBASE+QVMSIZE, &qv_mem_rd, &qv_mem_wr }, */
+    { QVMBASE, QVMBASE+QVMSIZE, &vc_mem_rd, &vc_mem_wr },
     { 0, 0, NULL, NULL }
     };
 
@@ -411,7 +414,7 @@ if (gbuf[0]) {
         if (unitno == -1)
             continue;
         R[0] = boot_tab[i].code | (('0' + unitno) << 24);
-        R[1] = 0xC0;
+        R[1] = (sys_model ? 0x80 : 0xC0);
         R[2] = 0;
         R[3] = 0;
         R[4] = 0;
@@ -421,7 +424,7 @@ if (gbuf[0]) {
     }
 else {
     R[0] = 0;
-    R[1] = 0xC0;
+    R[1] = (sys_model ? 0x80 : 0xC0);
     R[2] = 0;
     R[3] = 0;
     R[4] = 0;
@@ -499,12 +502,39 @@ return "system devices";
 
 t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
+#if defined(HAVE_LIBSDL) 
+char gbuf[CBUFSIZE];
+
+if ((cptr == NULL) || (!*cptr))
+    return SCPE_ARG;
+cptr = get_glyph (cptr, gbuf, 0);
+if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
+   sys_model = 0;
+   vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
+   lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
+   vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
+   strcpy (sim_name, "MicroVAX I (KA610)");
+   reset_all (0);                                       /* reset everything */
+   }
+else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
+   sys_model = 1;
+   vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
+   lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
+   vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
+   strcpy (sim_name, "VAXStation I (KA610)");
+   reset_all (0);                                       /* reset everything */
+   }
+else
+   return SCPE_ARG;
+return SCPE_OK;
+#else
 return SCPE_NOFNC;
+#endif
 }
 
 t_stat cpu_print_model (FILE *st)
 {
-fprintf (st, "MicroVAX I");
+fprintf (st, (sys_model ? "VAXstation I" : "MicroVAX I"));
 return SCPE_OK;
 }
 

@@ -8,8 +8,8 @@
     VAX/11 730
     VAX/11 750
     VAX 8600/8650
-    MicroVAX I
-    MicroVAX II
+    MicroVAX I & VAXStation I
+    MicroVAX II & VAXStation II
     rtVAX 1000 (or Industrial VAX 620)
     
 #### Howard Harte has implemented a Lincoln Labs TX-0 simulator.
@@ -50,6 +50,8 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     DHU11 (device VH) on Unibus systems now has 16 ports per multiplexer.
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
     MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer) command to change between system types
+    MicroVAX I has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
+    MicroVAX II has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
 
 #### Terminal Multiplexer additions
     Added support for TCP connections using IPv4 and/or IPv6.
