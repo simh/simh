@@ -320,6 +320,16 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info using libSDL:  $(call find_lib,SDL) $(call find_include,SDL/SDL))
     endif
   endif
+  ifneq (,$(VIDEO_USEFUL))
+    ifeq (,$(findstring HAVE_LIBSDL,$(OS_CCDEFS)))
+      $(info *** Warning ***)
+      $(info *** Warning *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
+      $(info *** Warning *** functionality if video support were available on your system.)
+      $(info *** Warning *** Install the development components of libSDL and rebuild)
+      $(info *** Warning *** your simulator to enable this extra functionality.)
+      $(info *** Warning ***)
+    endif
+  endif
   ifneq (,$(NETWORK_USEFUL))
     ifneq (,$(call find_include,pcap))
       ifneq (,$(call find_lib,$(PCAPLIB)))
@@ -511,6 +521,7 @@ else
     ifeq (libSDL,$(shell if exist ..\windows-build\libSDL\SDL-1.2.15\include\SDL.h echo libSDL))
       OS_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL-1.2.15\include
       OS_LDFLAGS += -lSDL -lSDLmain -L..\windows-build\libSDL\SDL-1.2.15\lib
+      VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
     else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
@@ -612,6 +623,9 @@ ifneq (clean,$(MAKECMDGOALS))
   $(info *** $(BUILD_FEATURES).)
   ifneq (,$(NETWORK_FEATURES))
     $(info *** $(NETWORK_FEATURES).)
+  endif
+  ifneq (,$(VIDEO_FEATURES))
+    $(info *** $(VIDEO_FEATURES).)
   endif
   ifneq (,$(GIT_COMMIT_ID))
     $(info ***)
