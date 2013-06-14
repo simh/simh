@@ -1311,8 +1311,27 @@ GET_SWITCHES (cptr);
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
     if ((cmdp = find_cmd (gbuf))) {
-        if (*cptr)
-            return SCPE_2MARG;
+        if (*cptr) {
+            if ((cmdp->action == &set_cmd) || (cmdp->action == &show_cmd)) {
+                DEVICE *dptr;
+                UNIT *uptr;
+                t_stat r;
+
+                cptr = get_glyph (cptr, gbuf, 0);
+                dptr = find_unit (gbuf, &uptr);
+                if (dptr == NULL) {
+                    dptr = find_dev (gbuf);
+                    if (dptr == NULL)
+                        return SCPE_2MARG;
+                    }
+                r = help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                if (sim_log)
+                    help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                return r;
+                }
+            else
+                return SCPE_2MARG;
+            }
         if (cmdp->help) {
             fputs (cmdp->help, stdout);
             if (sim_log)
