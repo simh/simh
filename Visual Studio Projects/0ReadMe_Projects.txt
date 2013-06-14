@@ -48,5 +48,5 @@ in this directory.
 
 If you are using a version of Visual Studio beyond Visual Studio 2008, then 
 your later version of Visual Studio will automatically convert the Visual 
-Studio 2008 project fils.  You should ignore any warnings produced by the 
+Studio 2008 project files.  You should ignore any warnings produced by the 
 conversion process.
