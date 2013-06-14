@@ -161,21 +161,21 @@ DIB vc_dib = {
 UNIT vc_unit = { UDATA (&vc_svc, UNIT_IDLE, 0) };
 
 REG vc_reg[] = {
-    { HRDATA (CSR, vc_csr, 16) },
-    { HRDATA (CURX, vc_curx, 9) },
-    { HRDATA (MPOS, vc_mpos, 16) },
-    { HRDATA (ICDR, vc_icdr, 16) },
-    { HRDATA (ICSR, vc_icsr, 16) },
-    { HRDATA (IRR, vc_intc.irr, 8) },
-    { HRDATA (IMR, vc_intc.imr, 8) },
-    { HRDATA (ISR, vc_intc.isr, 8) },
-    { HRDATA (ACR, vc_intc.acr, 8) },
-    { HRDATA (MODE, vc_intc.mode, 8) },
-    { HRDATA (IPTR, vc_intc.ptr, 8), REG_HRO },
-    { BRDATA (VEC, vc_intc.vec, 16, 32, 8) },
-    { BRDATA (CRTC, vc_crtc, 16, 8, CRTC_SIZE) },
-    { HRDATA (CRTCP, vc_crtc_p, 8) },
-    { BRDATA (MAP, vc_map, 16, 16, 1024) },
+    { HRDATAD (CSR,        vc_csr, 16, "Control and status register") },
+    { HRDATAD (CURX,      vc_curx,  9, "Cursor X-position") },
+    { HRDATAD (MPOS,      vc_mpos, 16, "Mouse position register") },
+    { HRDATAD (ICDR,      vc_icdr, 16, "Interrupt controller data register") },
+    { HRDATAD (ICSR,      vc_icsr, 16, "Interrupt controller command/status register") },
+    { HRDATAD (IRR,   vc_intc.irr,  8, "Interrupt controller request") },
+    { HRDATAD (IMR,   vc_intc.imr,  8, "Interrupt controller mask") },
+    { HRDATAD (ISR,   vc_intc.isr,  8, "Interrupt controller status") },
+    { HRDATAD (ACR,   vc_intc.acr,  8, "Interrupt controller Auto-clear mask") },
+    { HRDATAD (MODE, vc_intc.mode,  8, "Interrupt controller mode") },
+    { HRDATA  (IPTR,  vc_intc.ptr,  8), REG_HRO },
+    { BRDATA  (VEC,   vc_intc.vec, 16, 32, 8) },
+    { BRDATAD (CRTC,      vc_crtc, 16, 8, CRTC_SIZE, "CRTC registers") },
+    { HRDATAD (CRTCP,   vc_crtc_p,  8, "CRTC pointer") },
+    { BRDATAD (MAP,        vc_map, 16, 16, 1024, "Scanline map") },
     { NULL }
     };
 
