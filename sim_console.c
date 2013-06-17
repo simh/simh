@@ -521,7 +521,7 @@ t_bool got_command;
 t_bool close_session = FALSE;
 TMLN *lp;
 char cbuf[4*CBUFSIZE], gbuf[CBUFSIZE], *cptr, *argv[1] = {NULL};
-CTAB *cmdp;
+CTAB *cmdp = NULL;
 uint32 read_start_time;
 t_offset cmd_log_start;
 
