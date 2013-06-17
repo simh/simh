@@ -155,8 +155,8 @@ The "!" command (execute a command on the local OS), now returns the command's e
 
     HELP dev
     HELP dev ATTACH
-    HELP dev SET
-    HELP dev SHOW
+    HELP dev SET  (aka HELP SET dev)
+    HELP dev SHOW (aka HELP SHOW dev)
     HELP dev REGISTERS
 
 #### Generic scp support Clock Coscheduling as opposed to per simulator implementations.
