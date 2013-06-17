@@ -83,6 +83,20 @@
 #define MT_MBRK         60                              /* microbreak */
 #define MT_MAX          63                              /* last valid IPR */
 
+/* CPU */
+
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
+                              NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
+                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", "MODEL={MICROVAX|VAXSTATION}",     \
+                              &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" }
+
+/* QVSS memory space */
+
+#define QVMAWIDTH       18                              /* QVSS mem addr width */
+#define QVMSIZE         (1u << QVMAWIDTH)               /* QVSS mem length */
+#define QVMAMASK        (QVMSIZE - 1)                   /* QVSS mem addr mask */
+#define QVMBASE         0x3C0000                        /* QVSS mem base */
+
 /* Memory */
 
 #define MAXMEMWIDTH     22                              /* max mem, KA610 */
@@ -90,8 +104,9 @@
 #define MAXMEMWIDTH_X   22                              /* max mem, KA610 */
 #define MAXMEMSIZE_X    (1 << MAXMEMWIDTH_X)
 #define INITMEMSIZE     (1 << 22)                       /* initial memory size */
+#define VS_MEMSIZE      (((cpu_unit.capac > QVMBASE) ? QVMBASE : cpu_unit.capac))
 #define MEMSIZE         (cpu_unit.capac)
-#define ADDR_IS_MEM(x)  (((uint32) (x)) < MEMSIZE)
+#define ADDR_IS_MEM(x)  (((uint32) (x)) < (sys_model ? VS_MEMSIZE : MEMSIZE))
 #undef  PAMASK
 #define PAMASK          0x203FFFFF                      /* KA610 needs a special mask */
 #define MEM_MODIFIERS   { UNIT_MSIZE, (1u << 19), NULL, "512K", &cpu_set_size, NULL, NULL, "Set Memory to 512K bytes" },\
@@ -101,10 +116,6 @@
                         { UNIT_MSIZE, (1u << 22), NULL, "4M",   &cpu_set_size, NULL, NULL, "Set Memory to 4M bytes" },  \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
-#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0, "LEDS", NULL,                               \
-                              NULL, &cpu_show_leds, NULL, "Display the CPU LED values" },       \
-                            { MTAB_XTD|MTAB_VDV, 0, "MODEL", NULL,                              \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" }
 
 /* Qbus I/O page */
 
@@ -159,10 +170,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        4                               /* lines per DZV mux */
 #define VH_MUXES        4                               /* max # of DHQ muxes */
-#define DLX_LINES       16                              /* max # of KL11/DL11's */
-#define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
-#define AUTO_LNT        34                              /* autoconfig ranks */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
@@ -308,6 +316,10 @@ typedef struct {
 #define LOG_CPU_I       0x1                             /* intexc */
 #define LOG_CPU_R       0x2                             /* REI */
 #define LOG_CPU_P       0x4                             /* context */
+
+/* System model */
+
+extern int32 sys_model;
 
 /* Function prototypes for virtual memory interface */
 

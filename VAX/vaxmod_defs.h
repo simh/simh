@@ -258,10 +258,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        4                               /* lines per DZV mux */
 #define VH_MUXES        4                               /* max # of DHQ muxes */
-#define DLX_LINES       16                              /* max # of KL11/DL11's */
-#define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
-#define AUTO_LNT        34                              /* autoconfig ranks */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */

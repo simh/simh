@@ -388,8 +388,8 @@ struct sim_device {
 #define DEV_V_UF        16                              /* user flags */
 #define DEV_V_RSV       31                              /* reserved */
 
-#define DEV_DIS         (1 << DEV_V_DIS)                /* device can be set enabled or disabled */
-#define DEV_DISABLE     (1 << DEV_V_DISABLE)            /* device is currently disabled */
+#define DEV_DIS         (1 << DEV_V_DIS)                /* device is currently disabled */
+#define DEV_DISABLE     (1 << DEV_V_DISABLE)            /* device can be set enabled or disabled */
 #define DEV_DYNM        (1 << DEV_V_DYNM)               /* device requires call on msize routine to change memory size */
 #define DEV_DEBUG       (1 << DEV_V_DEBUG)              /* device supports SET DEBUG command */
 #define DEV_SECTORS     (1 << DEV_V_SECTORS)            /* capacity is 512 byte sectors */

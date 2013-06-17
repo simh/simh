@@ -32,7 +32,7 @@
 #if defined(VAX_620)
 char sim_name[] = "rtVAX1000 (KA620)";
 #else
-char sim_name[] = "MicroVAX II (KA630)";
+char sim_name[32] = "MicroVAX II (KA630)";
 #endif
 
 extern DEVICE cpu_dev;
@@ -53,6 +53,9 @@ extern DEVICE tq_dev;
 extern DEVICE dz_dev;
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE vh_dev;
+extern DEVICE vc_dev;
+extern DEVICE lk_dev;
+extern DEVICE vs_dev;
 
 extern void WriteB (uint32 pa, int32 val);
 extern void rom_wr_B (int32 pa, int32 val);
@@ -73,6 +76,11 @@ DEVICE *sim_devices[] = {
     &vh_dev,
     &cr_dev,
     &lpt_dev,
+#if defined(USE_SIM_VIDEO) && defined(HAVE_LIBSDL)
+    &lk_dev,
+    &vs_dev,
+    &vc_dev,
+#endif
     &rl_dev,
     &rq_dev,
     &rqb_dev,

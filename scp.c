@@ -221,6 +221,7 @@
 #include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
+#include "sim_video.h"
 #include "sim_sock.h"
 #include <signal.h>
 #include <ctype.h>
@@ -1310,8 +1311,27 @@ GET_SWITCHES (cptr);
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
     if ((cmdp = find_cmd (gbuf))) {
-        if (*cptr)
-            return SCPE_2MARG;
+        if (*cptr) {
+            if ((cmdp->action == &set_cmd) || (cmdp->action == &show_cmd)) {
+                DEVICE *dptr;
+                UNIT *uptr;
+                t_stat r;
+
+                cptr = get_glyph (cptr, gbuf, 0);
+                dptr = find_unit (gbuf, &uptr);
+                if (dptr == NULL) {
+                    dptr = find_dev (gbuf);
+                    if (dptr == NULL)
+                        return SCPE_2MARG;
+                    }
+                r = help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                if (sim_log)
+                    help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                return r;
+                }
+            else
+                return SCPE_2MARG;
+            }
         if (cmdp->help) {
             fputs (cmdp->help, stdout);
             if (sim_log)
@@ -2811,6 +2831,9 @@ if (flag) {
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
+#if defined (USE_SIM_VIDEO)
+    fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
+#endif
     fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
 #if defined(__VMS)
     if (1) {
@@ -6138,7 +6161,7 @@ return SCPE_OK;
 
         sim_activate            add entry to event queue
         sim_activate_abs        add entry to event queue even if event already scheduled
-        sim_activate_notbefure  add entry to event queue even if event already scheduled
+        sim_activate_notbefore  add entry to event queue even if event already scheduled
                                 but not before the specified time
         sim_activate_after      add entry to event queue after a specified amount of wall time
         sim_cancel              remove entry from event queue

@@ -70,7 +70,7 @@
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\MicroVAX3900.exe"
+				OutputFile="$(OutDir)\VAX.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="true"
@@ -101,7 +101,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copy result to legacy binary name (VAX.exe)"
-				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)VAX$(TargetExt)&quot; "
+				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; "
 			/>
 		</Configuration>
 		<Configuration
@@ -163,7 +163,7 @@
 				Name="VCLinkerTool"
 				AdditionalOptions="/fixed:no"
 				AdditionalDependencies="wsock32.lib winmm.lib"
-				OutputFile="$(OutDir)\MicroVAX3900.exe"
+				OutputFile="$(OutDir)\VAX.exe"
 				LinkIncremental="1"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="true"
@@ -196,7 +196,7 @@
 			<Tool
 				Name="VCPostBuildEventTool"
 				Description="Copy result to legacy binary name (VAX.exe)"
-				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)VAX$(TargetExt)&quot; "
+				CommandLine="if exist &quot;$(TargetPath)&quot; copy &quot;$(TargetPath)&quot; &quot;$(TargetDir)MicroVAX3900$(TargetExt)&quot; "
 			/>
 		</Configuration>
 	</Configurations>
