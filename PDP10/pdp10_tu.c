@@ -99,6 +99,8 @@
 #define UDENS           u4                              /* unit density */
 #define  UD_UNK         0                               /* unknown */
 #define MT_MAXFR        (1 << 16)                       /* max data buf */
+#define TU_STATEFLAGS   u5                              /* Simulator state flags */
+#define TUS_ATTPENDING  0000001                         /* Attach pending */
 
 /* MTCS1 - 172440 - control/status 1 */
 
@@ -665,13 +667,18 @@ switch (fnc) {                                          /* case on function */
         tuer = 0;                                       /* clear errors */
         tutc = tutc & ~TC_FCS;                          /* clear fc status */
         tufs = tufs & ~(FS_SAT | FS_SSC | FS_ID | FS_ERR);
-        sim_cancel (uptr);                              /* reset drive */
+        if (!(uptr->TU_STATEFLAGS & TUS_ATTPENDING))
+            sim_cancel (uptr);                          /* stop motion, not on-line delay */
         uptr->USTAT = 0;
     case FNC_NOP:
         tucs1 = tucs1 & ~CS1_GO;                        /* no operation */
         return;
 
     case FNC_RIP:                                       /* read-in preset */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
+            set_tuer (ER_UNS);
+            break;
+            }
         tutc = TC_RIP;                                  /* density = 800 */
         sim_tape_rewind (&tu_unit[0]);                  /* rewind unit 0 */
         tu_unit[0].USTAT = 0;
@@ -680,7 +687,7 @@ switch (fnc) {                                          /* case on function */
         return;
 
     case FNC_UNLOAD:                                    /* unload */
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
@@ -692,7 +699,7 @@ switch (fnc) {                                          /* case on function */
         return; 
 
     case FNC_REWIND:
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
@@ -703,7 +710,7 @@ switch (fnc) {                                          /* case on function */
         return;
 
     case FNC_SPACEF:
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
@@ -715,7 +722,7 @@ switch (fnc) {                                          /* case on function */
         goto GO_XFER;
 
     case FNC_SPACER:
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
@@ -728,7 +735,7 @@ switch (fnc) {                                          /* case on function */
 
     case FNC_WREOF:                                     /* write tape mark */
     case FNC_ERASE:                                     /* erase */
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
@@ -762,7 +769,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_WCHKF:                                     /* wchk = read */
     case FNC_READF:                                     /* read */
     DATA_XFER:
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* unattached? */
+        if ((tufs & FS_MOL) == 0) {                     /* unattached? */
             set_tuer (ER_UNS);
             break;
             }
@@ -807,6 +814,17 @@ t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
 
 drv = (int32) (uptr - tu_dev.units);                    /* get drive # */
+
+/* Set MOL for a delayed attach */
+if (uptr->TU_STATEFLAGS & TUS_ATTPENDING) {
+    uptr->TU_STATEFLAGS &= ~TUS_ATTPENDING;             /* Allow transition to on-line */
+    tufs = tufs | FS_ATA | FS_SSC;                      /* set attention */
+    if ((GET_FMTR (tucs2) == 0) && (GET_DRV (tutc) == drv)) /* selected drive? */
+        tufs = tufs | FS_SAT;                           /* set slave attn */
+    update_tucs (CS1_SC, drv);                          /* update status */
+    return SCPE_OK;
+}
+
 if (uptr->USTAT & FS_REW) {                             /* rewind or unload? */
     sim_tape_rewind (uptr);                             /* rewind tape */
     uptr->USTAT = 0;                                    /* clear status */
@@ -1019,17 +1037,21 @@ if ((flag & ~tucs1) & CS1_DONE)                         /* DONE 0 to 1? */
     tuiff = (tucs1 & CS1_IE)? 1: 0;                     /* CSTB INTR <- IE */
 if (GET_FMTR (tucs2) == 0) {                            /* formatter present? */
     tufs = (tufs & ~FS_DYN) | FS_FPR;
-    if (tu_unit[drv].flags & UNIT_ATT) {
-        tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
-        if (tu_unit[drv].UDENS == TC_1600)
-            tufs = tufs | FS_PE;
-        if (sim_tape_wrp (&tu_unit[drv]))
-            tufs = tufs | FS_WRL;
-        if (!act) {
-            if (sim_tape_bot (&tu_unit[drv]))
-                tufs = tufs | FS_BOT;
-            if (sim_tape_eot (&tu_unit[drv]))
-                tufs = tufs | FS_EOT;
+    if (tu_unit[drv].TU_STATEFLAGS & TUS_ATTPENDING)    /* Delayed on-line timer running? */
+        act = 0;                                        /* Not a tape motion op */
+    else {
+        if (tu_unit[drv].flags & UNIT_ATT) {
+            tufs = tufs | FS_MOL | tu_unit[drv].USTAT;
+            if (tu_unit[drv].UDENS == TC_1600)
+                tufs = tufs | FS_PE;
+            if (sim_tape_wrp (&tu_unit[drv]))
+                tufs = tufs | FS_WRL;
+            if (!act) {
+                if (sim_tape_bot (&tu_unit[drv]))
+                    tufs = tufs | FS_BOT;
+                if (sim_tape_eot (&tu_unit[drv]))
+                    tufs = tufs | FS_EOT;
+                }
             }
         }
     if (tuer)
@@ -1139,7 +1161,8 @@ int_req = int_req & ~INT_TU;                            /* clear interrupt */
 for (u = 0; u < TU_NUMDR; u++) {                        /* loop thru units */
     uptr = tu_dev.units + u;
     sim_tape_reset (uptr);                              /* clear pos flag */
-    sim_cancel (uptr);                                  /* cancel activity */
+    if (!uptr->TU_STATEFLAGS & TUS_ATTPENDING)          /* Delayed on-line must survive massbus clear */
+        sim_cancel (uptr);                              /* cancel activity */
     uptr->USTAT = 0;
     }
 if (xbuf == NULL)
@@ -1161,10 +1184,20 @@ if (r != SCPE_OK)
     return r;
 uptr->USTAT = 0;                                        /* clear unit status */
 uptr->UDENS = UD_UNK;                                   /* unknown density */
+/* Delay setting MOL since we may have just detached a previous file.
+ * In that case, the OS must see MOL clear, so that it will know that the
+ * drive was off-line.  This ensures that the OS will detect a tape change.
+ * 100 msec should suffice - though a real operator would take longer!
+ * Here, we ensure that the off-line transition from detach causes an attention
+ * interrupt.  The on-line transition will happen later.
+ */
 tufs = tufs | FS_ATA | FS_SSC;                          /* set attention */
 if ((GET_FMTR (tucs2) == 0) && (GET_DRV (tutc) == drv)) /* selected drive? */
     tufs = tufs | FS_SAT;                               /* set slave attn */
+uptr->TU_STATEFLAGS |= TUS_ATTPENDING;
 update_tucs (CS1_SC, drv);                              /* update status */
+sim_cancel(uptr);
+sim_activate_after (uptr,100*1000);
 return r;
 }
 
@@ -1179,12 +1212,18 @@ if (!(uptr->flags & UNIT_ATT))                          /* attached? */
 if (sim_is_active (uptr)) {                             /* unit active? */
     sim_cancel (uptr);                                  /* cancel operation */
     tuer = tuer | ER_UNS;                               /* set formatter error */
-    if ((uptr->USTAT & FS_REW) == 0)                    /* data transfer? */
+    if (uptr->TU_STATEFLAGS & TUS_ATTPENDING)
+        uptr->TU_STATEFLAGS &= ~TUS_ATTPENDING;
+    else if ((uptr->USTAT & FS_REW) == 0)               /* data transfer? */
         tucs1 = tucs1 | CS1_DONE | CS1_TRE;             /* set done, err */
     }
 uptr->USTAT = 0;                                        /* clear status flags */
 tufs = tufs | FS_ATA | FS_SSC;                          /* set attention */
+if ((GET_FMTR (tucs2) == 0) && (GET_DRV (tutc) == drv)) /* selected drive? */
+    tufs = tufs | FS_SAT;                               /* set slave attn */
+uptr->flags &= ~UNIT_ATT;                               /* Ensure MOL is cleared */
 update_tucs (CS1_SC, drv);                              /* update status */
+uptr->flags |= UNIT_ATT;
 return sim_tape_detach (uptr);
 }
 
