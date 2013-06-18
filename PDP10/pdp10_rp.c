@@ -74,6 +74,7 @@
 #define RP_NUMDR        8                               /* #drives */
 #define RP_NUMWD        128                             /* 36b words/sector */
 #define RP_MAXFR        32768                           /* max transfer */
+#define SPINUP_DLY      (1000*1000)                     /* Spinup delay, usec */
 #define GET_SECTOR(x,d) ((int) fmod (sim_gtime() / ((double) (x)), \
                     ((double) drv_tab[d].sect)))
 #define MBA_RP_CTRL     0                               /* RP drive */
@@ -85,7 +86,9 @@
 #define UNIT_V_DTYPE    (UNIT_V_UF + 1)                 /* disk type */
 #define UNIT_M_DTYPE    7
 #define UNIT_V_AUTO     (UNIT_V_UF + 4)                 /* autosize */
-#define UNIT_V_DUMMY    (UNIT_V_UF + 5)                 /* dummy flag */
+#define UNIT_V_UTS      (UNIT_V_UF + 5)                 /* Up to speed */
+#define UNIT_UTS        (1u << UNIT_V_UTS)
+#define UNIT_V_DUMMY    (UNIT_V_UF + 6)                 /* dummy flag */
 #define UNIT_WLK        (1 << UNIT_V_WLK)
 #define UNIT_DTYPE      (UNIT_M_DTYPE << UNIT_V_DTYPE)
 #define UNIT_AUTO       (1 << UNIT_V_AUTO)
@@ -239,8 +242,8 @@
                         GET_SF (fs)) * drv_tab[d].sect) + GET_SC (fs))
 
 /* RPCC - 176736 - current cylinder */
-/* RPER2 - 176740 - error status 2 - drive unsafe conditions - unimplemented */
-/* RPER3 - 176742 - error status 3 - more unsafe conditions - unimplemented */
+/* RPER2 - 176740 - error status 2 - drive unsafe conditions */
+/* RPER3 - 176742 - error status 3 - more unsafe conditions */
 /* RPEC1 - 176744 - ECC status 1 - unimplemented */
 /* RPEC2 - 176746 - ECC status 2 - unimplemented */
 
@@ -622,7 +625,7 @@ if (reg_in_drive[j] && (rp_unit[drv].flags & UNIT_DIS)) { /* nx disk */
     update_rpcs (CS1_SC, drv);                          /* request intr */
     return SCPE_OK;
     }
-if (reg_in_drive[j] && sim_is_active (&rp_unit[drv])) { /* unit busy? */
+if (reg_in_drive[j] && sim_is_active (uptr) && (uptr->flags & UNIT_UTS)) { /* unit busy? */
     set_rper (ER1_RMR, drv);                            /* won't write */
     update_rpcs (0, drv);
     return SCPE_OK;
@@ -650,7 +653,7 @@ switch (j) {                                            /* decode PA<5:1> */
                 rpcs2 = rpcs2 | CS2_NED;                /* set error flag */
                 cs1f = CS1_SC;                          /* req interrupt */
                 }
-            else if (sim_is_active (uptr))
+            else if (sim_is_active (uptr) && (uptr->flags & UNIT_UTS))
                 set_rper (ER1_RMR, drv);                /* won't write */
             else if (data & CS1_GO) {                   /* start op */
                 uptr->FUNC = GET_FNC (data);            /* set func */
@@ -793,12 +796,16 @@ switch (fnc) {                                          /* case on function */
         rpda[drv] = 0;
         rpof[drv] = 0;                                  /* clear offset */
     case FNC_PACK:                                      /* pack acknowledge */
+        if ((uptr->flags & UNIT_UTS) == 0) {            /* not attached? */
+            set_rper (ER1_UNS, drv);                    /* unsafe */
+            break;
+            }
         rpds[drv] = rpds[drv] | DS_VV;                  /* set volume valid */
         return;
 
     case FNC_OFFSET:                                    /* offset mode */
     case FNC_RETURN:
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
+        if ((uptr->flags & UNIT_UTS) == 0) {            /* not attached? */
             set_rper (ER1_UNS, drv);                    /* unsafe */
             break;
             }
@@ -811,7 +818,7 @@ switch (fnc) {                                          /* case on function */
         dc = 0;                                         /* seek to 0 */
     case FNC_SEEK:                                      /* seek */
     case FNC_SEARCH:                                    /* search */
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
+        if ((uptr->flags & UNIT_UTS) == 0) {            /* not attached? */
             set_rper (ER1_UNS, drv);                    /* unsafe */
             break;
             }
@@ -834,7 +841,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_WCHK:                                      /* write check */
     case FNC_READ:                                      /* read */
     case FNC_READH:                                     /* read headers */
-        if ((uptr->flags & UNIT_ATT) == 0) {            /* not attached? */
+        if ((uptr->flags & UNIT_UTS) == 0) {            /* not attached? */
             set_rper (ER1_UNS, drv);                    /* unsafe */
             break;
             }
@@ -877,6 +884,13 @@ static d10 dbuf[RP_MAXFR];
 
 dtype = GET_DTYPE (uptr->flags);                        /* get drive type */
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
+if ((uptr->flags & UNIT_UTS) == 0) {                    /* Transition to up-to-speed */
+    uptr->flags |= UNIT_UTS;
+    rpds[drv] = DS_ATA | DS_MOL | DS_DPR | DS_RDY |
+               ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+    update_rpcs (CS1_SC, drv);
+    return SCPE_OK;
+    }
 rpds[drv] = (rpds[drv] & ~DS_PIP) | DS_RDY;             /* change drive status */
 
 switch (uptr->FUNC) {                                   /* case on function */
@@ -893,6 +907,8 @@ switch (uptr->FUNC) {                                   /* case on function */
 
     case FNC_UNLOAD:                                    /* unload */
         rp_detach (uptr);                               /* detach unit */
+        rpds[drv] &= ~DS_ATA;                           /* Unload does not interrupt */
+        update_rpcs (0, drv);
         break;
 
     case FNC_RECAL:                                     /* recalibrate */
@@ -1048,7 +1064,7 @@ uptr = rp_dev.units + drv;                              /* get unit */
 if (rp_unit[drv].flags & UNIT_DIS)
     rpds[drv] = rper1[drv] = 0;
 else rpds[drv] = (rpds[drv] | DS_DPR) & ~DS_PGM;
-if (rp_unit[drv].flags & UNIT_ATT)
+if (rp_unit[drv].flags & UNIT_UTS)
     rpds[drv] = rpds[drv] | DS_MOL;
 else rpds[drv] = rpds[drv] & ~(DS_MOL | DS_VV | DS_RDY);
 if (rper1[drv] | rper2[drv] | rper3[drv])
@@ -1057,15 +1073,17 @@ else rpds[drv] = rpds[drv] & ~DS_ERR;
 
 rpcs1 = (rpcs1 & ~(CS1_SC | CS1_MCPE | CS1_MBZ | CS1_DRV)) | CS1_DVA | flag;
 rpcs1 = rpcs1 | (uptr->FUNC << CS1_V_FNC);
-if (sim_is_active (uptr))
+if (sim_is_active (uptr) && (uptr->flags & UNIT_UTS))
     rpcs1 = rpcs1 | CS1_GO;
 if (rpcs2 & CS2_ERR)
     rpcs1 = rpcs1 | CS1_TRE | CS1_SC;
 else if (rpcs1 & CS1_TRE)
     rpcs1 = rpcs1 | CS1_SC;
 for (i = 0; i < RP_NUMDR; i++) {
-    if (rpds[i] & DS_ATA)
+    if (rpds[i] & DS_ATA) {
         rpcs1 = rpcs1 | CS1_SC;
+        break;
+        }
     }
 if (rpiff || ((rpcs1 & CS1_SC) && (rpcs1 & CS1_DONE) && (rpcs1 & CS1_IE)))
     int_req = int_req | INT_RP;
@@ -1096,14 +1114,23 @@ rpiff = 0;                                              /* clear CSTB INTR */
 int_req = int_req & ~INT_RP;                            /* clear intr req */
 for (i = 0; i < RP_NUMDR; i++) {
     uptr = rp_dev.units + i;
-    sim_cancel (uptr);
     uptr->CYL = uptr->FUNC = 0;
     if (uptr->flags & UNIT_ATT)
-        rpds[i] = (rpds[i] & DS_VV) | DS_DPR | DS_RDY | DS_MOL |
-                ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
-    else if (uptr->flags & UNIT_DIS)
-        rpds[i] = 0;
-    else rpds[i] = DS_DPR;
+        if (uptr->flags & UNIT_UTS) {
+            sim_cancel (uptr);
+            rpds[i] = (rpds[i] & DS_VV) | DS_DPR | DS_RDY | DS_MOL |
+                       ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+            } else {
+            if (!sim_is_active (uptr))
+                sim_activate_after (uptr, SPINUP_DLY);
+            rpds[i] = DS_DPR | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+            }
+    else {
+        sim_cancel (uptr);
+        if (uptr->flags & UNIT_DIS)
+            rpds[i] = 0;
+        else rpds[i] = DS_DPR;
+    }
     rper1[i] = 0;
     rper2[i] = 0;
     rper3[i] = 0;
@@ -1123,19 +1150,16 @@ return SCPE_OK;
 
 t_stat rp_attach (UNIT *uptr, char *cptr)
 {
-int32 drv, i, p;
+int32 i, p;
 t_stat r;
 
 uptr->capac = drv_tab[GET_DTYPE (uptr->flags)].size;
 r = attach_unit (uptr, cptr);
 if (r != SCPE_OK)
     return r;
-drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
-rpds[drv] = DS_ATA | DS_MOL | DS_RDY | DS_DPR |
-    ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
-rper1[drv] = 0;
-update_rpcs (CS1_SC, drv);
-
+sim_cancel (uptr);
+uptr->flags &= ~UNIT_UTS;
+sim_activate_after (uptr, SPINUP_DLY);
 if ((uptr->flags & UNIT_AUTO) == 0)                     /* autosize? */
     return SCPE_OK;
 if ((p = sim_fsize (uptr->fileref)) == 0)
@@ -1147,6 +1171,7 @@ for (i = 0; drv_tab[i].sect != 0; i++) {
         return SCPE_OK;
         }
     }
+/* File is larger than max known disk.  This should probably fail. */
 return SCPE_OK;
 }
 
@@ -1163,12 +1188,14 @@ rpds[drv] = (rpds[drv] & ~(DS_MOL | DS_RDY | DS_WRL | DS_VV | DS_OF)) |
     DS_ATA;
 if (sim_is_active (uptr)) {                             /* unit active? */
     sim_cancel (uptr);                                  /* cancel operation */
-    rper1[drv] = rper1[drv] | ER1_OPI;                  /* set drive error */
-    if (uptr->FUNC >= FNC_WCHK)                         /* data transfer? */
-        rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;             /* set done, err */
+    if (uptr->flags & UNIT_UTS) {
+        rper1[drv] = rper1[drv] | ER1_OPI;              /* set drive error */
+        if (uptr->FUNC >= FNC_WCHK)                     /* data transfer? */
+            rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;         /* set done, err */
+        }
     }
-if (!sim_is_running)                                    /* from console? */
-    update_rpcs (CS1_SC, drv);                          /* request intr */
+uptr->flags &= ~UNIT_UTS;
+update_rpcs (0, drv);                                  /* request intr */
 return detach_unit (uptr);
 }
 
@@ -1184,102 +1211,116 @@ uptr->capac = drv_tab[dtype].size;
 return SCPE_OK;
 }
 
-/* Device bootstrap */
+/* Device bootstrap
+ * The DEC and ITS versions are word-for-word identical, except that
+ * the DEC RDIO/WRIO are replaced by IORDQ and IOWRQ.  This is hand
+ * assembled code, so please always make changes in both.
+ */
 
 #define BOOT_START      0377000                         /* start */
 #define BOOT_LEN (sizeof (boot_rom_dec) / sizeof (d10))
 
 static const d10 boot_rom_dec[] = {
-    INT64_C(0515040000001),                 /* boot:hrlzi 1,1       ; uba # */
+    INT64_C(0510040000000)+FE_RHBASE,       /* boot:hllz 1,FE_RHBASE   ; uba # */
     INT64_C(0201000140001),                 /*      movei 0,140001  ; vld,fst,pg 1 */
     INT64_C(0713001000000)+(IOBA_UBMAP+1 & RMASK),   /*      wrio 0,763001(1); set ubmap */
-    INT64_C(0435040000000)+(IOBA_RP & RMASK),        /*      iori 1,776700   ; rh addr */
-    INT64_C(0202040000000)+FE_RHBASE,                /*      movem 1,FE_RHBASE */
+    INT64_C(0200040000000)+FE_RHBASE,       /*      move 1,FE_RHBASE */
     INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
     INT64_C(0713001000010),                 /*      wrio 0,10(1)    ; ->RPCS2 */
+    INT64_C(0200240000000)+FE_UNIT,         /*      move 5,FE_UNIT  ; unit */
+    INT64_C(0713241000010),                 /*      wrio 5,10(1)    ; select ->RPCS2 */
+    INT64_C(0712001000012),                 /*      rdio 0,12(1)    ; RPDS */
+    INT64_C(0640000010600),                 /*      trc  0,10600    ; MOL + DPR + RDY */
+    INT64_C(0642000010600),                 /*      trce 0,10600    ; */
+    INT64_C(0254000377010),                 /*      jrst .-3        ; wait */
+    INT64_C(0201000000377),                 /*      movei 0,377     ; All units */
+    INT64_C(0713001000016),                 /*      wrio 0,16(1)    ; Clear on-line attns */
     INT64_C(0201000000021),                 /*      movei 0,21      ; preset */
     INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->RPCS1 */
     INT64_C(0201100000001),                 /*      movei 2,1       ; blk #1 */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0306140505755),                 /*      cain 3,sixbit /HOM/ */
-    INT64_C(0254000377023),                 /*      jrst .+6        ; match */
+    INT64_C(0254000377032),                 /*      jrst .+6        ; match */
     INT64_C(0201100000010),                 /*      movei 2,10      ; blk #10 */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
-    INT64_C(0254200377022),                 /*      halt .          ; inv home */
+    INT64_C(0254200377031),                 /*      halt .          ; inv home */
     INT64_C(0336100001103),                 /*      skipn 2,1103    ; pg of ptrs */
-    INT64_C(0254200377024),                 /*      halt .          ; inv ptr */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0254200377033),                 /*      halt .          ; inv ptr */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0336100001004),                 /*      skipn 2,1004    ; mon boot */
-    INT64_C(0254200377027),                 /*      halt .          ; inv ptr */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0254200377036),                 /*      halt .          ; inv ptr */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0254000001000),                 /*      jrst 1000       ; start */
-    INT64_C(0201140176000),                 /* rdbl:movei 3,176000  ; wd cnt */
-    INT64_C(0201200004000),                 /*      movei 4,4000    ; addr */
-    INT64_C(0200240000000)+FE_UNIT,         /*      move 5,FE_UNIT  ; unit */
+    INT64_C(0201140176000),                 /* rdbl:movei 3,176000  ; wd cnt 1P = -512*2 */
+    INT64_C(0201200004000),                 /*      movei 4,4000    ; 11 addr => M[1000] */
     INT64_C(0200300000002),                 /*      move 6,2 */
     INT64_C(0242300777750),                 /*      lsh 6,-24.      ; cyl */
     INT64_C(0713141000002),                 /*      wrio 3,2(1)     ; ->RPWC */
     INT64_C(0713201000004),                 /*      wrio 4,4(1)     ; ->RPBA */
     INT64_C(0713101000006),                 /*      wrio 2,6(1)     ; ->RPDA */
-    INT64_C(0713241000010),                 /*      wrio 5,10(1)    ; ->RPCS2 */
     INT64_C(0713301000034),                 /*      wrio 6,34(1)    ; ->RPDC */
     INT64_C(0201000000071),                 /*      movei 0,71      ; read+go */
     INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->RPCS1 */
     INT64_C(0712341000000),                 /*      rdio 7,0(1)     ; read csr */
     INT64_C(0606340000200),                 /*      trnn 7,200      ; test rdy */
-    INT64_C(0254000377046),                 /*      jrst .-2        ; loop */
+    INT64_C(0254000377053),                 /*      jrst .-2        ; loop */
     INT64_C(0602340100000),                 /*      trne 7,100000   ; test err */
-    INT64_C(0254200377052),                 /*      halt */
+    INT64_C(0254200377057),                 /*      halt . */
     INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
     };
 
 static const d10 boot_rom_its[] = {
-    INT64_C(0515040000001),                 /* boot:hrlzi 1,1       ; uba # */
+    INT64_C(0510040000001)+FE_RHBASE,       /* boot:hllzi 1,FE_RHBASE ; uba # */
     INT64_C(0201000140001),                 /*      movei 0,140001  ; vld,fst,pg 1 */
     INT64_C(0715000000000)+(IOBA_UBMAP+1 & RMASK),   /*      iowrq 0,763001  ; set ubmap */
-    INT64_C(0435040000000)+(IOBA_RP & RMASK),        /*      iori 1,776700   ; rh addr */
-    INT64_C(0202040000000)+FE_RHBASE,       /*      movem 1,FE_RHBASE */
+    INT64_C(0200040000000)+FE_RHBASE,       /*      move 1,FE_RHBASE */
     INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
     INT64_C(0715001000010),                 /*      iowrq 0,10(1)   ; ->RPCS2 */
+    INT64_C(0200240000000)+FE_UNIT,         /*      move 5,FE_UNIT  ; unit */
+    INT64_C(0715241000010),                 /*      iowrq 5,10(1)   ; ->RPCS2 */
+    INT64_C(0711001000012),                 /*      iordq 0,12(1)   ; RPDS */
+    INT64_C(0640000010600),                 /*      trc  0,10600    ; MOL + DPR + RDY */
+    INT64_C(0642000010600),                 /*      trce 0,10600    ; */
+    INT64_C(0254000377010),                 /*      jrst .-3        ; wait */
+    INT64_C(0201000000377),                 /*      movei 0,377     ; All units */
+    INT64_C(0715001000016),                 /*      iowrq 0,16(1)   ; Clear on-line attns */
     INT64_C(0201000000021),                 /*      movei 0,21      ; preset */
     INT64_C(0715001000000),                 /*      iowrq 0,0(1)    ; ->RPCS1 */
     INT64_C(0201100000001),                 /*      movei 2,1       ; blk #1 */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0306140505755),                 /*      cain 3,sixbit /HOM/ */
-    INT64_C(0254000377023),                 /*      jrst .+6        ; match */
+    INT64_C(0254000377032),                 /*      jrst .+6        ; match */
     INT64_C(0201100000010),                 /*      movei 2,10      ; blk #10 */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
-    INT64_C(0254200377022),                 /*      halt .          ; inv home */
+    INT64_C(0254200377031),                 /*      halt .          ; inv home */
     INT64_C(0336100001103),                 /*      skipn 2,1103    ; pg of ptrs */
-    INT64_C(0254200377024),                 /*      halt .          ; inv ptr */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0254200377033),                 /*      halt .          ; inv ptr */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0336100001004),                 /*      skipn 2,1004    ; mon boot */
-    INT64_C(0254200377027),                 /*      halt .          ; inv ptr */
-    INT64_C(0265740377032),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0254200377036),                 /*      halt .          ; inv ptr */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0254000001000),                 /*      jrst 1000       ; start */
-    INT64_C(0201140176000),                 /* rdbl:movei 3,176000  ; wd cnt */
+    INT64_C(0201140176000),                 /* rdbl:movei 3,176000  ; wd cnt 1P = -512 *2 */
     INT64_C(0201200004000),                 /*      movei 4,4000    ; addr */
-    INT64_C(0200240000000)+FE_UNIT,         /*      move 5,FE_UNIT  ; unit */
     INT64_C(0200300000002),                 /*      move 6,2 */
     INT64_C(0242300777750),                 /*      lsh 6,-24.      ; cyl */
     INT64_C(0715141000002),                 /*      iowrq 3,2(1)    ; ->RPWC */
     INT64_C(0715201000004),                 /*      iowrq 4,4(1)    ; ->RPBA */
     INT64_C(0715101000006),                 /*      iowrq 2,6(1)    ; ->RPDA */
-    INT64_C(0715241000010),                 /*      iowrq 5,10(1)   ; ->RPCS2 */
     INT64_C(0715301000034),                 /*      iowrq 6,34(1)   ; ->RPDC */
     INT64_C(0201000000071),                 /*      movei 0,71      ; read+go */
     INT64_C(0715001000000),                 /*      iowrq 0,0(1)    ; ->RPCS1 */
     INT64_C(0711341000000),                 /*      iordq 7,0(1)    ; read csr */
     INT64_C(0606340000200),                 /*      trnn 7,200      ; test rdy */
-    INT64_C(0254000377046),                 /*      jrst .-2        ; loop */
+    INT64_C(0254000377053),                 /*      jrst .-2        ; loop */
     INT64_C(0602340100000),                 /*      trne 7,100000   ; test err */
-    INT64_C(0254200377052),                 /*      halt */
+    INT64_C(0254200377057),                 /*      halt */
     INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
     };
 
@@ -1287,8 +1328,15 @@ t_stat rp_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 extern a10 saved_PC;
+UNIT *uptr;
 
-M[FE_UNIT] = unitno & CS2_M_UNIT;
+unitno &= CS2_M_UNIT;
+uptr = rp_dev.units + unitno;
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_NOATT;
+
+M[FE_RHBASE] = rp_dib.ba;
+M[FE_UNIT] = unitno;
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];
 saved_PC = BOOT_START;
