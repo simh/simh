@@ -70,6 +70,7 @@
 
 #include "pdp10_defs.h"
 #include <math.h>
+#include <assert.h>
 
 #define RP_NUMDR        8                               /* #drives */
 #define RP_NUMWD        128                             /* 36b words/sector */
@@ -1232,7 +1233,8 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0713001000010),                 /*      wrio 0,10(1)    ; ->RPCS2 */
     INT64_C(0200240000000)+FE_UNIT,         /*      move 5,FE_UNIT  ; unit */
     INT64_C(0713241000010),                 /*      wrio 5,10(1)    ; select ->RPCS2 */
-    INT64_C(0712001000012),                 /*      rdio 0,12(1)    ; RPDS */
+
+    INT64_C(0712001000012),                 /*10    rdio 0,12(1)    ; RPDS */
     INT64_C(0640000010600),                 /*      trc  0,10600    ; MOL + DPR + RDY */
     INT64_C(0642000010600),                 /*      trce 0,10600    ; */
     INT64_C(0254000377010),                 /*      jrst .-3        ; wait */
@@ -1240,7 +1242,8 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0713001000016),                 /*      wrio 0,16(1)    ; Clear on-line attns */
     INT64_C(0201000000021),                 /*      movei 0,21      ; preset */
     INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->RPCS1 */
-    INT64_C(0201100000001),                 /*      movei 2,1       ; blk #1 */
+
+    INT64_C(0201100000001),                 /*20    movei 2,1       ; blk #1 */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0306140505755),                 /*      cain 3,sixbit /HOM/ */
@@ -1248,7 +1251,8 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0201100000010),                 /*      movei 2,10      ; blk #10 */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
-    INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
+
+    INT64_C(0302140505755),                 /*30    caie 3,sixbit /HOM/ */
     INT64_C(0254000377061),                 /*      jrst alt2        ; inv home */
     INT64_C(0336100001103),                 /* pg:  skipn 2,1103    ; pg of ptrs */
     INT64_C(0254200377033),                 /*      halt .          ; inv ptr */
@@ -1256,7 +1260,8 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0336100001004),                 /*      skipn 2,1004    ; mon boot */
     INT64_C(0254200377036),                 /*      halt .          ; inv ptr */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
-    INT64_C(0254000001000),                 /*      jrst 1000       ; start */
+
+    INT64_C(0254000001000),                 /*40    jrst 1000       ; start */
     INT64_C(0201140176000),                 /* rdbl:movei 3,176000  ; wd cnt 1P = -512*2 */
     INT64_C(0201200004000),                 /*      movei 4,4000    ; 11 addr => M[1000] */
     INT64_C(0200300000002),                 /*      move 6,2 */
@@ -1264,7 +1269,8 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0713141000002),                 /*      wrio 3,2(1)     ; ->RPWC */
     INT64_C(0713201000004),                 /*      wrio 4,4(1)     ; ->RPBA */
     INT64_C(0713101000006),                 /*      wrio 2,6(1)     ; ->RPDA */
-    INT64_C(0713301000034),                 /*      wrio 6,34(1)    ; ->RPDC */
+
+    INT64_C(0713301000034),                 /*50    wrio 6,34(1)    ; ->RPDC */
     INT64_C(0201000000071),                 /*      movei 0,71      ; read+go */
     INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->RPCS1 */
     INT64_C(0712341000000),                 /*      rdio 7,0(1)     ; read csr */
@@ -1272,7 +1278,8 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0254000377053),                 /*      jrst .-2        ; loop */
     INT64_C(0602340100000),                 /*      trne 7,100000   ; test err */
     INT64_C(0254200377057),                 /*      halt . */
-    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+
+    INT64_C(0254017000000),                 /*60    jrst 0(17)      ; return */
     INT64_C(0201100000012),                 /*alt2: movei 2,10.     ; blk #10. */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
@@ -1290,7 +1297,8 @@ static const d10 boot_rom_its[] = {
     INT64_C(0715001000010),                 /*      iowrq 0,10(1)   ; ->RPCS2 */
     INT64_C(0200240000000)+FE_UNIT,         /*      move 5,FE_UNIT  ; unit */
     INT64_C(0715241000010),                 /*      iowrq 5,10(1)   ; ->RPCS2 */
-    INT64_C(0711001000012),                 /*      iordq 0,12(1)   ; RPDS */
+
+    INT64_C(0711001000012),                 /*10    iordq 0,12(1)   ; RPDS */
     INT64_C(0640000010600),                 /*      trc  0,10600    ; MOL + DPR + RDY */
     INT64_C(0642000010600),                 /*      trce 0,10600    ; */
     INT64_C(0254000377010),                 /*      jrst .-3        ; wait */
@@ -1298,7 +1306,8 @@ static const d10 boot_rom_its[] = {
     INT64_C(0715001000016),                 /*      iowrq 0,16(1)   ; Clear on-line attns */
     INT64_C(0201000000021),                 /*      movei 0,21      ; preset */
     INT64_C(0715001000000),                 /*      iowrq 0,0(1)    ; ->RPCS1 */
-    INT64_C(0201100000001),                 /*      movei 2,1       ; blk #1 */
+
+    INT64_C(0201100000001),                 /*20    movei 2,1       ; blk #1 */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0306140505755),                 /*      cain 3,sixbit /HOM/ */
@@ -1306,7 +1315,8 @@ static const d10 boot_rom_its[] = {
     INT64_C(0201100000010),                 /*      movei 2,10      ; blk #10 */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
-    INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
+
+    INT64_C(0302140505755),                 /*30    caie 3,sixbit /HOM/ */
     INT64_C(0254000377061),                 /*      jrst alt2       ; inv home */
     INT64_C(0336100001103),                 /* pg:  skipn 2,1103    ; pg of ptrs */
     INT64_C(0254200377033),                 /*      halt .          ; inv ptr */
@@ -1314,7 +1324,8 @@ static const d10 boot_rom_its[] = {
     INT64_C(0336100001004),                 /*      skipn 2,1004    ; mon boot */
     INT64_C(0254200377036),                 /*      halt .          ; inv ptr */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
-    INT64_C(0254000001000),                 /*      jrst 1000       ; start */
+
+    INT64_C(0254000001000),                 /*40    jrst 1000       ; start */
     INT64_C(0201140176000),                 /* rdbl:movei 3,176000  ; wd cnt 1P = -512 *2 */
     INT64_C(0201200004000),                 /*      movei 4,4000    ; addr */
     INT64_C(0200300000002),                 /*      move 6,2 */
@@ -1322,7 +1333,8 @@ static const d10 boot_rom_its[] = {
     INT64_C(0715141000002),                 /*      iowrq 3,2(1)    ; ->RPWC */
     INT64_C(0715201000004),                 /*      iowrq 4,4(1)    ; ->RPBA */
     INT64_C(0715101000006),                 /*      iowrq 2,6(1)    ; ->RPDA */
-    INT64_C(0715301000034),                 /*      iowrq 6,34(1)   ; ->RPDC */
+
+    INT64_C(0715301000034),                 /*50    iowrq 6,34(1)   ; ->RPDC */
     INT64_C(0201000000071),                 /*      movei 0,71      ; read+go */
     INT64_C(0715001000000),                 /*      iowrq 0,0(1)    ; ->RPCS1 */
     INT64_C(0711341000000),                 /*      iordq 7,0(1)    ; read csr */
@@ -1330,8 +1342,9 @@ static const d10 boot_rom_its[] = {
     INT64_C(0254000377053),                 /*      jrst .-2        ; loop */
     INT64_C(0602340100000),                 /*      trne 7,100000   ; test err */
     INT64_C(0254200377057),                 /*      halt */
-    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
-    INT64_C(0201100000012),                 /* alt2:movei 2,10.     ; blk #10 */
+
+    INT64_C(0254017000000),                 /*60    jrst 0(17)      ; return */
+    INT64_C(0201100000012),                 /* alt2:movei 2,10.     ; blk #10. */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
@@ -1352,6 +1365,9 @@ if (!(uptr->flags & UNIT_ATT))
 
 M[FE_RHBASE] = rp_dib.ba;
 M[FE_UNIT] = unitno;
+
+assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
+
 if (sim_switches & SWMASK ('A'))
     M[FE_KEEPA] = ((d10) 010);                /* <32>: Autoboot */
 else

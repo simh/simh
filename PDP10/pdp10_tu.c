@@ -92,6 +92,7 @@
 
 #include "pdp10_defs.h"
 #include "sim_tape.h"
+#include <assert.h>
 
 #define TU_NUMFM        1                               /* #formatters */
 #define TU_NUMDR        8                               /* #drives */
@@ -1264,7 +1265,7 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0200300000000)+FE_UNIT,         /*      move 6,FE_UNIT  ; fmtr */
     INT64_C(0713301000010),                 /*      wrio 6,10(1)    ; ->MTCS2 */
 
-    INT64_C(0200240000000)+FE_MTFMT,        /*      move 5,FE_MTFMT ; slave, dens, fmt */
+    INT64_C(0200240000000)+FE_MTFMT,        /*10    move 5,FE_MTFMT ; slave, dens, fmt */
     INT64_C(0713241000032),                 /*      wrio 5,32(1)    ; ->MTTC */
     INT64_C(0712001000012),                 /*      rdio 0,12(1)    ; MTFS */
     INT64_C(0640000010600),                 /*      trc  0,10600    ; MOL + DPR + RDY */
@@ -1273,7 +1274,7 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0201000000011),                 /*      movei 0,11      ; clr+go */
     INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->MTCS1 */
 
-    INT64_C(0201000000377),                 /*      movei 0,1       ; Formatter */
+    INT64_C(0201000000377),                 /*20    movei 0,1       ; Formatter */
     INT64_C(0242006000000),                 /*      lsh 0,(6)       ; attn bit */
     INT64_C(0713001000016),                 /*      wrio 0,16(1)    ; Clear on-line attn */
     INT64_C(0201100000031),                 /*      movei 2,31      ; space f */
@@ -1282,6 +1283,7 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0265740377030),                 /*      jsp 17,tpop     ; read boot */
     INT64_C(0254000001000),                 /*      jrst 1000       ; start */
 
+                                            /*30 */
     INT64_C(0713241000032),                 /* tpop:wrio 5,32(1)    ; ->MTTC */
     INT64_C(0201000000011),                 /*      movei 0,11      ; clr+go */
     INT64_C(0713001000000),                 /*      wrio 0,0(1)     ; ->MTCS1 */
@@ -1291,7 +1293,7 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0713201000004),                 /*      wrio 4,4(1)     ; ->MTBA */
     INT64_C(0400400000000),                 /*      setz 10,        ; max fc */
 
-    INT64_C(0713401000006),                 /*      wrio 10,6(1)    ; ->MTFC */
+    INT64_C(0713401000006),                 /*40    wrio 10,6(1)    ; ->MTFC */
     INT64_C(0713301000010),                 /*      wrio 6,10(1)    ; ->MTCS2 reset errs */
     INT64_C(0713241000032),                 /*      wrio 5,32(1)    ; ->MTTC reset errs */
     INT64_C(0713101000000),                 /*      wrio 2,0(1)     ; OP ->MTCS1 */
@@ -1300,7 +1302,7 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0254000377044),                 /*      jrst .-2        ; loop */
     INT64_C(0606340040000),                 /*      trnn 7,40000    ; test err */
 
-    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+    INT64_C(0254017000000),                 /*50    jrst 0(17)      ; return */
     INT64_C(0712341000014),                 /*      rdio 7,14(1)    ; read err */
     INT64_C(0302340001000),                 /*      caie 7,1000     ; fce? */
     INT64_C(0254200377053),                 /*      halt . */
@@ -1317,7 +1319,7 @@ static const d10 boot_rom_its[] = {
     INT64_C(0200300000000)+FE_UNIT,         /*      move 6,FE_UNIT  ; fmtr */
     INT64_C(0714301000010),                 /*      iowri 6,10(1)   ; ->MTFS */
 
-    INT64_C(0200240000000)+FE_MTFMT,        /*      move 5,FE_MTFMT ; slave, dens, fmt */
+    INT64_C(0200240000000)+FE_MTFMT,        /*20    move 5,FE_MTFMT ; slave, dens, fmt */
     INT64_C(0714241000032),                 /*      iowri 5,32(1)   ; ->MTTC */
     INT64_C(0710001000012),                 /*      iordi 0,12(1)   ; read FS */
     INT64_C(0640000010600),                 /*      trc  0,10600    ; MOL + DPR + RDY */
@@ -1326,7 +1328,7 @@ static const d10 boot_rom_its[] = {
     INT64_C(0201000000011),                 /*      movei 0,11      ; clr+go */
     INT64_C(0714001000000),                 /*      iowri 0,0(1)    ; ->MTCS1 */
 
-    INT64_C(0201000000377),                 /*      movei 0,1       ; Formatter */
+    INT64_C(0201000000377),                 /*30    movei 0,1       ; Formatter */
     INT64_C(0242006000000),                 /*      lsh 0,(6)       ; attn bit */
     INT64_C(0714001000016),                 /*      iowri 0,16(1)    ; Clear on-line attn */
     INT64_C(0201100000031),                 /*      movei 2,31      ; space f */
@@ -1335,6 +1337,7 @@ static const d10 boot_rom_its[] = {
     INT64_C(0265740377030),                 /*      jsp 17,tpop     ; read boot */
     INT64_C(0254000001000),                 /*      jrst 1000       ; start */
 
+                                            /*30 */
     INT64_C(0714241000032),                 /* tpop:iowri 5,32(1)   ; ->MTTC */
     INT64_C(0201000000011),                 /*      movei 0,11      ; clr+go */
     INT64_C(0714001000000),                 /*      iowri 0,0(1)    ; ->MTCS1 */
@@ -1344,7 +1347,7 @@ static const d10 boot_rom_its[] = {
     INT64_C(0714201000004),                 /*      iowri 4,4(1)    ; ->MTBA */
     INT64_C(0400400000000),                 /*      setz 10,        ; max fc */
 
-    INT64_C(0714401000006),                 /*      iowri 10,6(1)    ; ->MTFC */
+    INT64_C(0714401000006),                 /*40    iowri 10,6(1)    ; ->MTFC */
     INT64_C(0714301000010),                 /*      iowri 6,10(1)   ; ->MTFS */
     INT64_C(0714241000032),                 /*      iowri 5,32(1)   ; ->MTTC */
     INT64_C(0714101000000),                 /*      iowri 2,0(1)    ; ->MTCS1 */
@@ -1353,7 +1356,7 @@ static const d10 boot_rom_its[] = {
     INT64_C(0254000377044),                 /*      jrst .-2        ; loop */
     INT64_C(0606340040000),                 /*      trnn 7,40000    ; test err */
 
-    INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+    INT64_C(0254017000000),                 /*50    jrst 0(17)      ; return */
     INT64_C(0710341000014),                 /*      iordi 7,14(1)   ; read err */
     INT64_C(0302340001000),                 /*      caie 7,1000     ; fce? */
     INT64_C(0254200377053),                 /*      halt . */
@@ -1374,7 +1377,7 @@ if (!(uptr->flags & UNIT_ATT))
 M[FE_RHBASE] = tu_dib.ba;
 M[FE_UNIT] = 0;                             /* Only one formatter in this implementation */
 
-assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its);
+assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
 
 M[FE_MTFMT] = (unitno & TC_M_UNIT) | (TC_1600 << TC_V_DEN) | (TC_10C << TC_V_FMT);
 tu_unit[unitno].pos = 0;
