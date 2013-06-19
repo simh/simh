@@ -1215,6 +1215,9 @@ return SCPE_OK;
  * The DEC and ITS versions are word-for-word identical, except that
  * the DEC RDIO/WRIO are replaced by IORDQ and IOWRQ.  This is hand
  * assembled code, so please always make changes in both.
+ * Due to a typo in the KS Console rom, block 010 is read for the
+ * alternate HOM block.  The correct block is 012.  For compatibiliy,
+ * we will do what the hardware did first, what's right if it fails (as it will).
  */
 
 #define BOOT_START      0377000                         /* start */
@@ -1241,13 +1244,13 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0306140505755),                 /*      cain 3,sixbit /HOM/ */
-    INT64_C(0254000377032),                 /*      jrst .+6        ; match */
+    INT64_C(0254000377032),                 /*      jrst pg         ; match */
     INT64_C(0201100000010),                 /*      movei 2,10      ; blk #10 */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
-    INT64_C(0254200377031),                 /*      halt .          ; inv home */
-    INT64_C(0336100001103),                 /*      skipn 2,1103    ; pg of ptrs */
+    INT64_C(0254000377061),                 /*      jrst alt2        ; inv home */
+    INT64_C(0336100001103),                 /* pg:  skipn 2,1103    ; pg of ptrs */
     INT64_C(0254200377033),                 /*      halt .          ; inv ptr */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0336100001004),                 /*      skipn 2,1004    ; mon boot */
@@ -1270,6 +1273,12 @@ static const d10 boot_rom_dec[] = {
     INT64_C(0602340100000),                 /*      trne 7,100000   ; test err */
     INT64_C(0254200377057),                 /*      halt . */
     INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+    INT64_C(0201100000012),                 /*alt2: movei 2,10.     ; blk #10. */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
+    INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
+    INT64_C(0254200377065),                 /*      halt .          ; inv home */
+    INT64_C(0254000377032),                 /*      jrst pg         ; Read ptrs */
     };
 
 static const d10 boot_rom_its[] = {
@@ -1293,13 +1302,13 @@ static const d10 boot_rom_its[] = {
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0306140505755),                 /*      cain 3,sixbit /HOM/ */
-    INT64_C(0254000377032),                 /*      jrst .+6        ; match */
+    INT64_C(0254000377032),                 /*      jrst pg         ; match */
     INT64_C(0201100000010),                 /*      movei 2,10      ; blk #10 */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
     INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
-    INT64_C(0254200377031),                 /*      halt .          ; inv home */
-    INT64_C(0336100001103),                 /*      skipn 2,1103    ; pg of ptrs */
+    INT64_C(0254000377061),                 /*      jrst alt2       ; inv home */
+    INT64_C(0336100001103),                 /* pg:  skipn 2,1103    ; pg of ptrs */
     INT64_C(0254200377033),                 /*      halt .          ; inv ptr */
     INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
     INT64_C(0336100001004),                 /*      skipn 2,1004    ; mon boot */
@@ -1322,6 +1331,12 @@ static const d10 boot_rom_its[] = {
     INT64_C(0602340100000),                 /*      trne 7,100000   ; test err */
     INT64_C(0254200377057),                 /*      halt */
     INT64_C(0254017000000),                 /*      jrst 0(17)      ; return */
+    INT64_C(0201100000012),                 /* alt2:movei 2,10.     ; blk #10 */
+    INT64_C(0265740377041),                 /*      jsp 17,rdbl     ; read */
+    INT64_C(0204140001000),                 /*      movs 3,1000     ; id word */
+    INT64_C(0302140505755),                 /*      caie 3,sixbit /HOM/ */
+    INT64_C(0254200377065),                 /*      halt .          ; inv home */
+    INT64_C(0254000377032),                 /*      jrst pg         ; Read ptrs */
     };
 
 t_stat rp_boot (int32 unitno, DEVICE *dptr)
@@ -1337,6 +1352,11 @@ if (!(uptr->flags & UNIT_ATT))
 
 M[FE_RHBASE] = rp_dib.ba;
 M[FE_UNIT] = unitno;
+if (sim_switches & SWMASK ('A'))
+    M[FE_KEEPA] = ((d10) 010);                /* <32>: Autoboot */
+else
+    M[FE_KEEPA] = 0;
+
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];
 saved_PC = BOOT_START;
