@@ -418,7 +418,7 @@ if (c >= 0) {                                           /* poll connect */
     TMLN *lp = &sim_rem_con_tmxr.ldsc[c];
     char wru_name[8];
 
-    sim_activate_after(uptr+1, 1000000);                /* start data poll after 100ms */
+    sim_activate_after(uptr+1, 1000000);                /* start data poll after 1 second */
     lp->rcve = 1;                                       /* rcv enabled */
     sim_rem_buf_ptr[c] = 0;                             /* start with empty command buffer */
     if (isprint(sim_int_char&0xFF))
