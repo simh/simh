@@ -447,8 +447,8 @@ if (lp->modem_control) {
 if ((!lp->mp->buffered) && (!lp->txbfd)) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
-    lp->txb = (char *)realloc (lp->txb, lp->txbsz);
     }
+lp->txb = (char *)realloc (lp->txb, lp->txbsz);
 return;
 }
 
