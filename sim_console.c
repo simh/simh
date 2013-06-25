@@ -155,8 +155,8 @@ int32 sim_del_char = '\b';                              /* delete character */
 #else
 int32 sim_del_char = 0177;
 #endif
-static t_stat sim_con_poll_svc (UNIT *uptr);                       /* console connection poll routine */
-static t_stat sim_con_reset (DEVICE *dptr);                        /* console reset routine */
+static t_stat sim_con_poll_svc (UNIT *uptr);                /* console connection poll routine */
+static t_stat sim_con_reset (DEVICE *dptr);                 /* console reset routine */
 UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };   /* console connection unit */
 /* debugging bitmaps */
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
@@ -319,9 +319,9 @@ while (*cptr != 0) {
 return SCPE_OK;
 }
 
-t_stat sim_rem_con_poll_svc (UNIT *uptr);                /* remote console connection poll routine */
-t_stat sim_rem_con_data_svc (UNIT *uptr);                /* remote console connection data routine */
-t_stat sim_rem_con_reset (DEVICE *dptr);                 /* remote console reset routine */
+t_stat sim_rem_con_poll_svc (UNIT *uptr);               /* remote console connection poll routine */
+t_stat sim_rem_con_data_svc (UNIT *uptr);               /* remote console connection data routine */
+t_stat sim_rem_con_reset (DEVICE *dptr);                /* remote console reset routine */
 UNIT sim_rem_con_unit[2] = {
     { UDATA (&sim_rem_con_poll_svc, 0, 0)  },           /* remote console connection polling unit */
     { UDATA (&sim_rem_con_data_svc, 0, 0)  }};          /* console data handling unit */
@@ -421,6 +421,7 @@ if (c >= 0) {                                           /* poll connect */
     sim_activate_after(uptr+1, 1000000);                /* start data poll after 1 second */
     lp->rcve = 1;                                       /* rcv enabled */
     sim_rem_buf_ptr[c] = 0;                             /* start with empty command buffer */
+    sim_rem_single_mode[c] = FALSE;                     /* in single command mode */
     if (isprint(sim_int_char&0xFF))
         sprintf(wru_name, "'%c'", sim_int_char&0xFF);
     else
@@ -580,6 +581,9 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_linemsgf (lp, "Simulation will resume automatically if input is not received in %d seconds\n", sim_rem_read_timeout);
                 }
             else {
+                if ((c == '\n') ||  /* Ignore bare LF between commands (Microsoft Telnet bug) */
+                    (c == '\r'))    /* Ignore empty commands */
+                    continue;
                 if ((c == '\004') || (c == '\032')) { /* EOF character (^D or ^Z) ? */
                     tmxr_linemsgf (lp, "\r\nGoodbye\r\n");
                     tmxr_send_buffered_data (lp);           /* flush any buffered data */
@@ -820,6 +824,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
         tmxr_linemsgf (lp, "\r\nGoodbye\r\n");
         tmxr_send_buffered_data (lp);           /* flush any buffered data */
         tmxr_reset_ln (lp);
+        sim_rem_single_mode[i] = FALSE;
         }
     }
 if (stepping)
