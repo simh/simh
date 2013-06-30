@@ -50,9 +50,9 @@ int32 vs_bptr = 0;
 int32 vs_datalen = 0;
 int32 vs_x = 0;                                         /* X-axis motion */
 int32 vs_y = 0;                                         /* Y-axis motion */
-t_bool vs_l = 0;
-t_bool vs_m = 0;
-t_bool vs_r = 0;
+t_bool vs_l = 0;                                        /* Left button state */
+t_bool vs_m = 0;                                        /* Middle button state */
+t_bool vs_r = 0;                                        /* Right button state */
 uint8 vs_buf[10];
 
 DEVICE vs_dev;

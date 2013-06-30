@@ -340,8 +340,8 @@ typedef struct {
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
 #define IPL_QVSS        (0x14 - IPL_HMIN)
-#define IPL_DMCRX       (0x15 - IPL_HMIN)
-#define IPL_DMCTX       (0x15 - IPL_HMIN)
+#define IPL_DMCRX       (0x14 - IPL_HMIN)
+#define IPL_DMCTX       (0x14 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */

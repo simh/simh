@@ -51,7 +51,7 @@
 #define ISTS_TBI        0x0010                          /* Transmitter ready B */
 #define ISTS_RBI        0x0020                          /* Receiver ready B */
 #define ISTS_CBB        0x0040                          /* Change in break B */
-#define ISTS_IPC        0c0080                          /* Interrupt port change */
+#define ISTS_IPC        0x0080                          /* Interrupt port change */
 
 #define MODE_V_CHM      6                               /* Channel mode */
 #define MODE_M_CHM      0x3
@@ -163,7 +163,7 @@ switch (rg) {
                 break;
 
             case 3:
-                ctx->port[PORT_A].sts &= ~STS_TXR;
+                ctx->port[PORT_B].sts &= ~STS_TXR;
                 break;
 
             case 4:
@@ -252,18 +252,18 @@ if (ctx->port[PORT_A].cmd & CMD_ETX) {                  /* Transmitter A enabled
     ctx->ists |= ISTS_TAI;                              /* set int */
     }
 else {
-    ctx->port[PORT_A].sts &= ~STS_TXR;                 /* clear ready */
-    ctx->port[PORT_A].sts &= ~STS_TXE;                 /* clear empty */
+    ctx->port[PORT_A].sts &= ~STS_TXR;                  /* clear ready */
+    ctx->port[PORT_A].sts &= ~STS_TXE;                  /* clear empty */
     ctx->ists &= ~ISTS_TAI;                             /* clear int */
     }
-if (ctx->port[PORT_B].cmd & CMD_ETX) {                 /* Transmitter B enabled? */
-    ctx->port[PORT_B].sts |= STS_TXR;                  /* ready */
-    ctx->port[PORT_B].sts |= STS_TXE;                  /* empty */
+if (ctx->port[PORT_B].cmd & CMD_ETX) {                  /* Transmitter B enabled? */
+    ctx->port[PORT_B].sts |= STS_TXR;                   /* ready */
+    ctx->port[PORT_B].sts |= STS_TXE;                   /* empty */
     ctx->ists |= ISTS_TBI;                              /* set int */
     }
 else {
-    ctx->port[PORT_B].sts &= ~STS_TXR;                 /* clear ready */
-    ctx->port[PORT_B].sts &= ~STS_TXE;                 /* clear empty */
+    ctx->port[PORT_B].sts &= ~STS_TXR;                  /* clear ready */
+    ctx->port[PORT_B].sts &= ~STS_TXE;                  /* clear empty */
     ctx->ists &= ~ISTS_TBI;                             /* clear int */
     }
 if ((ctx->ists & ctx->imask) > 0)                       /* unmasked ints? */

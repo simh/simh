@@ -178,4 +178,6 @@ const char *vid_version (void);
 t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 
+extern t_bool vid_active;
+
 #endif

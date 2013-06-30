@@ -28,6 +28,8 @@
 
 #include "sim_video.h"
 
+t_bool vid_active = FALSE;
+
 #if HAVE_LIBSDL
 #include <SDL.h>
 #include <SDL_thread.h>
@@ -59,7 +61,6 @@ typedef struct {
 
 int vid_thread (void* arg);
 
-t_bool vid_active;
 t_bool vid_key_state[SDLK_LAST];
 t_bool vid_mouse_captured;
 int32 vid_width;

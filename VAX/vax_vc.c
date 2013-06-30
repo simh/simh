@@ -32,17 +32,105 @@
 #include "sim_video.h"
 #include "vax_2681.h"
 
-#define CSR_MOD         0x0001                          /* Monitor size */
-#define CSR_VID         0x0004                          /* Video output en */
-#define CSR_FNC         0x0008                          /* Cursor function */
-#define CSR_VRB         0x0010                          /* Video readback en */
-#define CSR_TST         0x0020                          /* Test bit */
-#define CSR_CUR         0x0080                          /* Cursor active */
-#define CSR_V_MS        6                               /* Mouse buttons */
-#define CSR_M_MS        0x7
-#define CSR_V_MA        11                              /* Memory base addr */
-#define CSR_M_MA        0xF
-#define CSR_RW          (CSR_IE|CSR_TST|CSR_VRB|CSR_FNC|CSR_VID)
+/* CSR - control/status register */
+
+BITFIELD vc_csr_bits[] = {
+    BIT(MOD),                           /* Monitor size */
+#define CSR_V_MDO 0
+#define CSR_MOD     (1<<CSR_V_MDO)
+    BITNCF(1),                          /* unused */
+    BIT(VID),                           /* Video output en */
+#define CSR_V_VID     2
+#define CSR_VID     (1<<CSR_V_VID)
+    BIT(FNC),                           /* Cursor function */
+#define CSR_V_FNC     3
+#define CSR_FNC     (1<<CSR_V_FNC)
+    BIT(VRB),                           /* Video readback en */
+#define CSR_V_VRB     4
+#define CSR_VRB     (1<<CSR_V_VRB)
+    BIT(TST),                           /* Test bit */
+#define CSR_V_TST     5
+#define CSR_TST     (1<<CSR_V_TST)
+    BIT(IEN),                           /* Interrupt Enable */
+#define CSR_V_IEN     6
+#define CSR_IEN     (1<<CSR_V_IEN)
+    BIT(CUR),                           /* Cursor active */
+#define CSR_V_CUR     7
+#define CSR_CUR     (1<<CSR_V_CUR)
+    BIT(MSA),                           /* Mouse Button A */
+#define CSR_V_MSA     8
+#define CSR_MSA     (1<<CSR_V_MSA)
+    BIT(MSA),                           /* Mouse Button B */
+#define CSR_V_MSB     9
+#define CSR_MSB     (1<<CSR_V_MSB)
+    BIT(MSA),                           /* Mouse Button C */
+#define CSR_V_MSC     10
+#define CSR_MSC     (1<<CSR_V_MSC)
+    BITF(MA,8),                         /* Memory Bank Switch (Base Address) */
+#define CSR_V_MA      11
+#define CSR_S_MA      4
+#define CSR_M_MA  (((1<<CSR_S_MA)-1)<<CSR_V_MA)
+    BITNCF(1),                          /* unused */
+    ENDBITS
+};
+#define CSR_RW          (CSR_IEN|CSR_TST|CSR_VRB|CSR_FNC|CSR_VID)
+
+/* ICSR - interrupt controller command/status register */
+
+BITFIELD vc_icsr_bits[] = {
+    BITF(IRRVEC,3),                     /* IRR Vector */
+#define ICSR_V_IRRVEC  0
+#define ICSR_S_IRRVEC  3
+#define ICSR_M_IRRVEC  (((1<<ICSR_S_IRRVEC)-1)<<ICSR_V_IRRVEC)
+    BIT(MMS),                           /* Master Mask */
+#define ICSR_V_MMS     3
+#define ICSR_MMS       (1<<ICSR_V_MMS)
+    BIT(INM),                           /* Interrupt Mode */
+#define ICSR_V_INM     4
+#define ICSR_INM       (1<<ICSR_V_INM)
+    BIT(PRM),                           /* Priority Mode */
+#define ICSR_V_PRM     5
+#define ICSR_PRM       (1<<ICSR_V_PRM)
+    BIT(ENA),                           /* Enable */
+#define ICSR_V_ENA     6
+#define ICSR_ENA       (1<<ICSR_V_ENA)
+    BIT(GRI),                           /* Group Interrupt */
+#define ICSR_V_GRI     7
+#define ICSR_GRI       (1<<ICSR_V_GRI)
+    BITNCF(8),                          /* unused */
+    ENDBITS
+};
+
+
+char *vc_icm_rp_names[] = {"ISR", "IMR", "IRR", "ACR"};
+
+/* mode - interrupt controller mode register */
+
+BITFIELD vc_ic_mode_bits[] = {
+    BIT(PM),                            /* Priority Mode */
+#define ICM_V_PM     0
+#define ICM_PM       (1<<ICM_V_PM)
+    BIT(PM),                            /* Vector Selection */
+#define ICM_V_VS     1
+#define ICM_VS       (1<<ICM_V_VS)
+    BIT(IM),                            /* Interrupt Mode */
+#define ICM_V_IM     2
+#define ICM_IM       (1<<ICM_V_IM)
+    BIT(GIP),                           /* Group Interrupt Polarity */
+#define ICM_V_GIP    3
+#define ICM_GIP      (1<<ICM_V_GIP)
+    BIT(REQP),                          /* Interrupt Request Polarity */
+#define ICM_V_REQP  4
+#define ICM_REQP     (1<<ICM_V_REQP)
+    BITFNAM(RP,2,vc_icm_rp_names),      /* Register Preselect */
+#define ICM_V_RP    5
+#define ICM_S_RP    2
+#define ICM_M_RP     (((1<<ICM_S_RP)-1)<<ICM_V_RP)
+    BIT(MM),                            /* Master Mask */
+#define ICM_V_MM    7
+#define ICM_MM       (1<<ICM_V_MM)
+    ENDBITS
+};
 
 #define CRTCP_REG       0x001F                          /* CRTC internal register address */
 #define CRTCP_VB        0x0020                          /* Vertical blank */
@@ -155,27 +243,54 @@ char *vc_description (DEVICE *dptr);
 
 DIB vc_dib = {
     IOBA_AUTO, IOLN_QVSS, &vc_rd, &vc_wr,
-    1, IVCL (QVSS), 0, { &vc_inta }
+    2, IVCL (QVSS), VEC_AUTO, { &vc_inta, &vc_inta }
+    };
+
+/* Debugging Bisim_tmaps */
+
+#define DBG_REG         0x0100                          /* register activity */
+#define DBG_INT0        0x0001                          /* interrupt 0 */
+#define DBG_INT1        0x0002                          /* interrupt 1 */
+#define DBG_INT2        0x0004                          /* interrupt 2 */
+#define DBG_INT3        0x0008                          /* interrupt 3 */
+#define DBG_INT4        0x0010                          /* interrupt 4 */
+#define DBG_INT5        0x0020                          /* interrupt 5 */
+#define DBG_INT6        0x0040                          /* interrupt 6 */
+#define DBG_INT7        0x0080                          /* interrupt 7 */
+#define DBG_INT         0x00FF                          /* interrupt 0-7 */
+
+DEBTAB vc_debug[] = {
+    {"REG",     DBG_REG},
+    {"DUART",   DBG_INT0},
+    {"VSYNC",   DBG_INT1},
+    {"MOUSE",   DBG_INT2},
+    {"CSTRT",   DBG_INT3},
+    {"MBA",     DBG_INT4},
+    {"MBB",     DBG_INT5},
+    {"MBC",     DBG_INT6},
+    {"SPARE",   DBG_INT7},
+    {"INT",     DBG_INT0|DBG_INT1|DBG_INT2|DBG_INT3|DBG_INT4|DBG_INT5|DBG_INT6|DBG_INT7},
+    {0}
     };
 
 UNIT vc_unit = { UDATA (&vc_svc, UNIT_IDLE, 0) };
 
 REG vc_reg[] = {
-    { HRDATAD (CSR,        vc_csr, 16, "Control and status register") },
-    { HRDATAD (CURX,      vc_curx,  9, "Cursor X-position") },
-    { HRDATAD (MPOS,      vc_mpos, 16, "Mouse position register") },
-    { HRDATAD (ICDR,      vc_icdr, 16, "Interrupt controller data register") },
-    { HRDATAD (ICSR,      vc_icsr, 16, "Interrupt controller command/status register") },
-    { HRDATAD (IRR,   vc_intc.irr,  8, "Interrupt controller request") },
-    { HRDATAD (IMR,   vc_intc.imr,  8, "Interrupt controller mask") },
-    { HRDATAD (ISR,   vc_intc.isr,  8, "Interrupt controller status") },
-    { HRDATAD (ACR,   vc_intc.acr,  8, "Interrupt controller Auto-clear mask") },
-    { HRDATAD (MODE, vc_intc.mode,  8, "Interrupt controller mode") },
-    { HRDATA  (IPTR,  vc_intc.ptr,  8), REG_HRO },
-    { BRDATA  (VEC,   vc_intc.vec, 16, 32, 8) },
-    { BRDATAD (CRTC,      vc_crtc, 16, 8, CRTC_SIZE, "CRTC registers") },
-    { HRDATAD (CRTCP,   vc_crtc_p,  8, "CRTC pointer") },
-    { BRDATAD (MAP,        vc_map, 16, 16, 1024, "Scanline map") },
+    { HRDATADF (CSR,        vc_csr, 16, "Control and status register",                  vc_csr_bits) },
+    { HRDATAD  (CURX,      vc_curx,  9, "Cursor X-position") },
+    { HRDATAD  (MPOS,      vc_mpos, 16, "Mouse position register") },
+    { HRDATAD  (ICDR,      vc_icdr, 16, "Interrupt controller data register") },
+    { HRDATADF (ICSR,      vc_icsr, 16, "Interrupt controller command/status register", vc_icsr_bits) },
+    { HRDATAD  (IRR,   vc_intc.irr,  8, "Interrupt controller request") },
+    { HRDATAD  (IMR,   vc_intc.imr,  8, "Interrupt controller mask") },
+    { HRDATAD  (ISR,   vc_intc.isr,  8, "Interrupt controller status") },
+    { HRDATAD  (ACR,   vc_intc.acr,  8, "Interrupt controller Auto-clear mask") },
+    { HRDATADF (MODE, vc_intc.mode,  8, "Interrupt controller mode",                    vc_ic_mode_bits) },
+    { HRDATA   (IPTR,  vc_intc.ptr,  8), REG_HRO },
+    { BRDATA   (VEC,   vc_intc.vec, 16, 32, 8) },
+    { BRDATAD  (CRTC,      vc_crtc, 16, 8, CRTC_SIZE, "CRTC registers") },
+    { HRDATAD  (CRTCP,   vc_crtc_p,  8, "CRTC pointer") },
+    { BRDATAD  (MAP,        vc_map, 16, 16, 1024, "Scanline map") },
     { NULL }
     };
 
@@ -198,8 +313,8 @@ DEVICE vc_dev = {
     1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &vc_reset,
     NULL, NULL, NULL,
-    &vc_dib, DEV_DIS | DEV_QBUS, 0,
-    NULL, NULL, NULL, &vc_help, NULL, NULL, 
+    &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
+    vc_debug, NULL, NULL, &vc_help, NULL, NULL, 
     &vc_description
     };
 
@@ -208,6 +323,41 @@ UART2681 vc_uart = {
     { { &lk_wr, &lk_rd }, { &vs_wr, &vs_rd } }
     };
 
+char *vc_regnames[] = {
+    "CSR",          /* +0 */
+    "CUR-X",        /* +2 */
+    "MPOS",         /* +4 */
+    "",             /* +6 spare */
+    "CRTCA",        /* +8 */
+    "CRTCD",        /* +10 */
+    "ICDR",         /* +12 */
+    "ICSR",         /* +14 */
+    "",             /* +16 spare */
+    "",             /* +18 spare */
+    "",             /* +20 spare */
+    "",             /* +22 spare */
+    "",             /* +24 spare */
+    "",             /* +26 spare */
+    "",             /* +28 spare */
+    "",             /* +30 spare */
+    "UART1A2A",     /* +32 */
+    "UARTSTCLA",    /* +34 */
+    "UARTCMDA",     /* +36 */
+    "UARTBUFA",     /* +38 */
+    "",             /* +40 spare */
+    "UARTIMSK",     /* +42 */
+    "",             /* +44 spare */
+    "",             /* +46 spare */
+    "UART1B2B",     /* +48 */
+    "UARTSTCLB",    /* +50 */
+    "UARTCMDB",     /* +52 */
+    "UARTBUFB",     /* +54 */
+    "",             /* +56 spare */
+    "",             /* +56 spare */
+    "",             /* +58 spare */
+    "",             /* +60 spare */
+    "",             /* +62 spare */
+};
 
 t_stat vc_rd (int32 *data, int32 PA, int32 access)
 {
@@ -241,7 +391,7 @@ switch ((PA >> 1) & 0x1F) {                             /* decode PA<1> */
         break;
 
     case 6:                                             /* ICDR */
-        switch ((vc_intc.mode >> 5) & 0x3) {
+        switch ((vc_intc.mode & ICM_M_RP) >> ICM_V_RP) {
         
             case 0:                                     /* ISR */
                 *data = vc_intc.isr;
@@ -263,9 +413,9 @@ switch ((PA >> 1) & 0x1F) {                             /* decode PA<1> */
 
     case 7:                                             /* ICSR */
         *data = vc_icsr | 0x40;                         /* Chip enabled */
-        *data |= (vc_intc.mode & 0x1) ? 0x20 : 0;       /* Priority mode */
-        *data |= (vc_intc.mode & 0x4) ? 0x10 : 0;       /* Interrupt mode */
-        *data |= (vc_intc.mode & 0x80) ? 0x8 : 0;       /* Master mask */
+        *data |= (vc_intc.mode & ICM_PM) ? 0x20 : 0;    /* Priority mode */
+        *data |= (vc_intc.mode & ICM_IM) ? 0x10 : 0;    /* Interrupt mode */
+        *data |= (vc_intc.mode & ICM_MM) ? 0x8 : 0;     /* Master mask */
         if (vc_icsr & 0x80) {                           /* Group int pending */
             for (i = 0; i < 8; i++) {
                 if (vc_intc.isr & (1u << i)) {
@@ -291,7 +441,7 @@ switch ((PA >> 1) & 0x1F) {                             /* decode PA<1> */
     default:                                            /* Spares */
         break;
         }                                               /* end switch PA */
-
+sim_debug (DBG_REG, &vc_dev, "vc_rd(%s) data=0x%04X\n", vc_regnames[(PA >> 1) & 0x1F], *data);
 return SCPE_OK;
 }
 
@@ -300,6 +450,7 @@ t_stat vc_wr (int32 data, int32 PA, int32 access)
 uint32 rg = (PA >> 1) & 0x1F;
 uint32 crtc_rg;
 
+sim_debug (DBG_REG, &vc_dev, "vc_wr(%s) data=0x%04X\n", vc_regnames[(PA >> 1) & 0x1F], data);
 switch ((PA >> 1) & 0x1F) {                             /* decode PA<1> */
 
     case 0:                                             /* CSR */
@@ -481,20 +632,30 @@ void vc_checkint (void)
 {
 uint32 i;
 uint32 msk = (vc_intc.irr & ~vc_intc.imr);              /* unmasked interrutps */
-vc_icsr &= ~0x87;                                       /* clear GRI & vector */
+vc_icsr &= ~(ICSR_GRI|ICSR_M_IRRVEC);                   /* clear GRI & vector */
 
 if ((vc_intc.mode & 0x80) && ~(vc_intc.mode & 0x4)) {   /* group int MM & not polled */
     for (i = 0; i < 8; i++) {
         if (msk & (1u << i)) {
-            vc_icsr |= (0x80 | i);
+            vc_icsr |= (ICSR_GRI | i);
             }
         }
-    if (vc_icsr & 0x80)
+    if ((vc_csr & CSR_IEN)  && (vc_icsr & ICSR_GRI)) {
+        if (!(int_req[IPL_QVSS] & (INT_QVSS)))
+            sim_debug (DBG_INT, &vc_dev, "vc_checkint(SET_INT) icsr=0x%x\n", vc_icsr);
         SET_INT (QVSS);
-    else
+        }
+    else {
+        if ((int_req[IPL_QVSS] & (INT_QVSS)))
+            sim_debug (DBG_INT, &vc_dev, "vc_checkint(CLR_INT)\n");
         CLR_INT (QVSS);
+        }
     }
-else CLR_INT (QVSS);
+else {
+    if ((int_req[IPL_QVSS] & (INT_QVSS)))
+        sim_debug (DBG_INT, &vc_dev, "vc_checkint(CLR_INT)\n");
+    CLR_INT (QVSS);
+    }
 }
 
 void vc_clrint (int32 src)
@@ -502,6 +663,7 @@ void vc_clrint (int32 src)
 uint32 msk = (1u << src);
 vc_intc.irr &= ~msk;
 vc_intc.isr &= ~msk;
+sim_debug (msk, &vc_dev, "vc_clrint(%d)\n", src);
 vc_checkint ();
 }
 
@@ -509,6 +671,7 @@ void vc_setint (int32 src)
 {
 uint32 msk = (1u << src);
 vc_intc.irr |= msk;
+sim_debug (msk, &vc_dev, "vc_setint(%d)\n", src);
 vc_checkint ();
 }
 
@@ -524,6 +687,7 @@ int32 vc_inta (void)
 {
 uint32 i;
 uint32 msk = (vc_intc.irr & ~vc_intc.imr);              /* unmasked interrutps */
+int32 result;
 
 for (i = 0; i < 8; i++) {
     if (msk & (1u << i)) {
@@ -532,9 +696,12 @@ for (i = 0; i < 8; i++) {
             vc_intc.isr &= ~(1u << i);
         else vc_intc.isr |= (1u << i);
         vc_checkint();
-        return (vc_intc.vec[i] + VEC_Q);
+        result = (vc_intc.vec[i] + VEC_Q);
+        sim_debug (DBG_INT, &vc_dev, "Int Ack Vector: 0%03o (0x%X)\n", result, result);
+        return result;
         }
     }
+sim_debug (DBG_INT, &vc_dev, "Int Ack Vector: 0%03o\n", 0);
 return 0;                                               /* no intr req */
 }
 
@@ -616,7 +783,7 @@ vc_intc.acr = 0;
 vc_intc.mode = 0x80;
 vc_icsr = 0;
 
-vc_csr = (0xF << CSR_V_MA) | CSR_MOD;
+vc_csr = (((QVMBASE >> QVMAWIDTH) & ((1<<CSR_S_MA)-1)) << CSR_V_MA) | CSR_MOD;
 vc_curx = 0;
 vc_mpos = 0;
 
@@ -628,16 +795,18 @@ vc_crtc_p = (CRTCP_LPF | CRTCP_VB);
 if (dptr->flags & DEV_DIS)
     return vid_close ();
 
-r = vid_open (VC_XSIZE, VC_YSIZE);                      /* display size */
-if (r != SCPE_OK)
-    return r;
-printf ("QVSS Display Created.  ");
-vid_show_release_key (stdout, NULL, 0, NULL);
-printf ("\n");
-if (sim_log) {
-    fprintf (sim_log, "QVSS Display Created.  ");
-    vid_show_release_key (sim_log, NULL, 0, NULL);
-    fprintf (sim_log, "\n");
+if (!vid_active)  {
+    r = vid_open (VC_XSIZE, VC_YSIZE);                      /* display size */
+    if (r != SCPE_OK)
+        return r;
+    printf ("QVSS Display Created.  ");
+    vid_show_release_key (stdout, NULL, 0, NULL);
+    printf ("\n");
+    if (sim_log) {
+        fprintf (sim_log, "QVSS Display Created.  ");
+        vid_show_release_key (sim_log, NULL, 0, NULL);
+        fprintf (sim_log, "\n");
+        }
     }
 sim_activate_abs (&vc_unit, tmxr_poll);
 return auto_config (NULL, 0);                           /* run autoconfig */
