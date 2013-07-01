@@ -4653,7 +4653,6 @@ return sim_cancel (&sim_step_unit);
 void int_handler (int sig)
 {
 stop_cpu = 1;
-sim_interval = 0;           /* should speed up stop detection */
 return;
 }
 
