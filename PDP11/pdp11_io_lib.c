@@ -498,7 +498,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { "TA" },          1,  1,  0, 0,
         {017500}, {0260} },                             /* TA11 */
     { { "QVSS" },        1,  2, 64, 8, 
-        {017200}, {0100} },                             /* QVSS - fx CSR, fx VEC */
+        {017200} },                                     /* QVSS - fx CSR */
     { { NULL },          1,  1,  8, 4 },                /* VS31 */
     { { NULL },          1,  1,  0, 4,
         {016200} },                                     /* LNV11 - fx CSR */
