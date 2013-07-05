@@ -31,6 +31,8 @@
 #ifndef PDP11_DDCMP_H_
 #define PDP11_DDCMP_H_    0
 
+#include "sim_tmxr.h"
+
 /* DDCMP packet types */
 
 #define DDCMP_SYN  0226u    /* Sync character on synchronous links */
@@ -141,5 +143,122 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
 }
 
 uint16 ddcmp_crc16(uint16 crc, const void* vbuf, size_t len);
+
+/* Get packet from specific line
+
+   Inputs:
+        *lp     =       pointer to terminal line descriptor
+        **pbuf  =       pointer to pointer of packet contents
+        *psize  =       pointer to packet size
+
+   Output:
+        SCPE_LOST       link state lost
+        SCPE_OK         Packet returned OR no packet available
+
+   Implementation notes:
+
+    1. If a packet is not yet available, then the pbuf address returned is
+       NULL, but success (SCPE_OK) is returned
+       receive break status associated with the character is cleared, and
+       SCPE_BREAK is ORed into the return value.
+*/
+
+static t_stat ddcmp_tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, uint16 *psize)
+{
+int32 c;
+size_t payloadsize;
+
+while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
+    c &= ~TMXR_VALID;
+    if (lp->rxpboffset + 1 > lp->rxpbsize) {
+        lp->rxpbsize += 512;
+        lp->rxpb = (uint8 *)realloc (lp->rxpb, lp->rxpbsize);
+        }
+    lp->rxpb[lp->rxpboffset] = c;
+    if ((lp->rxpboffset == 0) && ((c == DDCMP_SYN) || (c == DDCMP_DEL))) {
+        tmxr_debug (TMXR_DBG_PRCV, lp, "Ignoring Interframe Sync Character", (char *)&lp->rxpb[0], 1);
+        continue;
+        }
+    lp->rxpboffset += 1;
+    if (lp->rxpboffset == 1) {
+        switch (c) {
+            default:
+                tmxr_debug (TMXR_DBG_PRCV, lp, "Ignoring unexpected byte in DDCMP mode", (char *)&lp->rxpb[0], 1);
+                lp->rxpboffset = 0;
+            case DDCMP_SOH:
+            case DDCMP_ENQ:
+            case DDCMP_DLE:
+                continue;
+            }
+        }
+    if (lp->rxpboffset >= 8) {
+        if (lp->rxpb[0] == DDCMP_ENQ) { /* Control Message? */
+            ++lp->rxpcnt;
+            *pbuf = lp->rxpb;
+            *psize = 8;
+            lp->rxpboffset = 0;
+            ddcmp_packet_trace (TMXR_DBG_PRCV, lp->mp->dptr, "<<< RCV Packet", lp->rxpb, *psize, TRUE);
+            return SCPE_OK;
+            }
+        payloadsize  = ((lp->rxpb[2] & 0x3F) << 8)| lp->rxpb[1];
+        if (lp->rxpboffset >= 10 + payloadsize) {
+            ++lp->rxpcnt;
+            *pbuf = lp->rxpb;
+            *psize = 10 + payloadsize;
+            ddcmp_packet_trace (TMXR_DBG_PRCV, lp->mp->dptr, "<<< RCV Packet", lp->rxpb, *psize, TRUE);
+            lp->rxpboffset = 0;
+            return SCPE_OK;
+            }
+        }
+    }
+*pbuf = NULL;
+*psize = 0;
+if (lp->conn)
+    return SCPE_OK;
+return SCPE_LOST;
+}
+
+/* Store packet in line buffer
+
+   Inputs:
+        *lp     =       pointer to line descriptor
+        *buf    =       pointer to packet data
+        size    =       size of packet
+
+   Outputs:
+        status  =       ok, connection lost, or stall
+
+   Implementation notea:
+
+    1. If the line is not connected, SCPE_LOST is returned.
+    2. If prior packet transmission still in progress, SCPE_STALL is 
+       returned and no packet data is stored.  The caller must retry later.
+*/
+static t_stat ddcmp_tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size)
+{
+t_stat r;
+
+if (!lp->conn)
+    return SCPE_LOST;
+if (lp->txppoffset < lp->txppsize) {
+    tmxr_debug (TMXR_DBG_PXMT, lp, "Skipped Sending Packet - Transmit Busy", (char *)&lp->txpb[3], size);
+    return SCPE_STALL;
+    }
+if (lp->txpbsize < size) {
+    lp->txpbsize = size;
+    lp->txpb = (uint8 *)realloc (lp->txpb, lp->txpbsize);
+    }
+memcpy (lp->txpb, buf, size);
+lp->txppsize = size;
+lp->txppoffset = 0;
+ddcmp_packet_trace (TMXR_DBG_PXMT, lp->mp->dptr, ">>> XMT Packet", lp->txpb, lp->txppsize, TRUE);
+++lp->txpcnt;
+while ((lp->txppoffset < lp->txppsize) && 
+       (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
+   ++lp->txppoffset;
+tmxr_send_buffered_data (lp);
+return lp->conn ? SCPE_OK : SCPE_LOST;
+}
+
 
 #endif /* PDP11_DDCMP_H_ */
