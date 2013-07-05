@@ -2526,7 +2526,7 @@ char gbuf[CBUFSIZE], *cvptr;
 DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
-SHTAB *shtb, *shptr;
+SHTAB *shtb = NULL, *shptr;
 
 static SHTAB show_glob_tab[] = {
     { "CONFIGURATION", &show_config, 0 },
@@ -2636,7 +2636,7 @@ while (*cptr != 0) {                                    /* do all mods */
             }                                           /* end if */
         }                                               /* end for */
     if (mptr->mask == 0) {                              /* no match? */
-        if ((shptr = find_shtab (shtb, gbuf)))          /* global match? */
+        if (shtb && (shptr = find_shtab (shtb, gbuf)))          /* global match? */
             shptr->action (ofile, dptr, uptr, shptr->arg, cptr);
         else return SCPE_ARG;
         }                                               /* end if */
