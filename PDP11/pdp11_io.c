@@ -243,6 +243,18 @@ int32 Map_ReadB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
 
+if (ba >= IOPAGEBASE) {
+    int32 value;
+
+    while (bc) {
+        if (iopageR( &value, (ba & ~1), READ) != SCPE_OK)
+            break;
+        *buf++ = (uint8) (((ba & 1)? (value >> 8): value) & 0xff);
+        ba++;
+        bc--;
+        }
+    return bc;
+    }
 ba = ba & BUSMASK;                                      /* trim address */
 lim = ba + bc;
 if (cpu_bme) {                                          /* map enabled? */
@@ -275,6 +287,19 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
+if (ba >= IOPAGEBASE) {
+    int32 value;
+    if ((ba & 1) || (bc & 1))
+        return bc;
+    while (bc) {
+        if (iopageR( &value, ba, READ) != SCPE_OK)
+            break;
+        *buf++ = (uint16) (value & 0xffff);
+        ba += 2;
+        bc -= 2;
+        }
+    return bc;
+    }
 ba = (ba & BUSMASK) & ~01;                              /* trim, align addr */
 lim = ba + (bc & ~01);
 if (cpu_bme) {                                          /* map enabled? */
@@ -303,6 +328,15 @@ int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf)
 {
 uint32 alim, lim, ma;
 
+if (ba >= IOPAGEBASE) {
+    while (bc) {
+        if (iopageW( ((int32) *buf++) & 0xff, ba, WRITEB) != SCPE_OK)
+            break;
+        ba++;
+        bc--;
+        }
+    return bc;
+}
 ba = ba & BUSMASK;                                      /* trim address */
 lim = ba + bc;
 if (cpu_bme) {                                          /* map enabled? */
@@ -335,6 +369,17 @@ int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf)
 {
 uint32 alim, lim, ma;
 
+if (ba >= IOPAGEBASE) {
+    if ((ba & 1) || (bc & 1))
+        return bc;
+    while (bc) {
+        if (iopageW( ((int32) *buf++) & 0xffff, ba, WRITE) != SCPE_OK)
+            break;
+        ba += 2;
+        bc -= 2;
+        }
+    return bc;
+}
 ba = (ba & BUSMASK) & ~01;                              /* trim, align addr */
 lim = ba + (bc & ~01);
 if (cpu_bme) {                                          /* map enabled? */
