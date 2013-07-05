@@ -72,6 +72,8 @@ typedef int SERHANDLE;
 #define TMXR_DBG_CON    0x080000                         /* Debug Connection Activities */
 #define TMXR_DBG_ASY    0x100000                         /* Debug Asynchronous Activities */
 #define TMXR_DBG_TRC    0x200000                         /* Debug trace routine calls */
+#define TMXR_DBG_PXMT   0x400000                         /* Debug Transmit Packet Data */
+#define TMXR_DBG_PRCV   0x800000                         /* Debug Received Packet Data */
 
 /* Modem Control Bits */
 
@@ -111,9 +113,11 @@ struct tmln {
     int32               rxbpr;                          /* rcv buf remove */
     int32               rxbpi;                          /* rcv buf insert */
     int32               rxcnt;                          /* rcv count */
+    int32               rxpcnt;                         /* rcv packet count */
     int32               txbpr;                          /* xmt buf remove */
     int32               txbpi;                          /* xmt buf insert */
     int32               txcnt;                          /* xmt count */
+    int32               txpcnt;                         /* xmt packet count */
     int32               txdrp;                          /* xmt drop count */
     int32               txbsz;                          /* xmt buffer size */
     int32               txbfd;                          /* xmt buffered flag */
@@ -125,6 +129,13 @@ struct tmln {
     char                rxb[TMXR_MAXBUF];               /* rcv buffer */
     char                rbr[TMXR_MAXBUF];               /* rcv break */
     char                *txb;                           /* xmt buffer */
+    uint8               *rxpb;                          /* rcv packet buffer */
+    uint32              rxpbsize;                       /* rcv packet buffer size */
+    uint32              rxpboffset;                     /* rcv packet buffer offset */
+    uint8               *txpb;                          /* xmt packet buffer */
+    uint32              txpbsize;                       /* xmt packet buffer size */
+    uint32              txppsize;                       /* xmt packet packet size */
+    uint32              txppoffset;                     /* xmt packet buffer offset */
     TMXR                *mp;                            /* back pointer to mux */
     char                *serconfig;                     /* line config */
     SERHANDLE           serport;                        /* serial port handle */
@@ -156,8 +167,10 @@ int32 tmxr_poll_conn (TMXR *mp);
 t_stat tmxr_reset_ln (TMLN *lp);
 t_stat tmxr_detach_ln (TMLN *lp);
 int32 tmxr_getc_ln (TMLN *lp);
+t_stat tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, size_t *psize);
 void tmxr_poll_rx (TMXR *mp);
 t_stat tmxr_putc_ln (TMLN *lp, int32 chr);
+t_stat tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size);
 void tmxr_poll_tx (TMXR *mp);
 int32 tmxr_send_buffered_data (TMLN *lp);
 t_stat tmxr_open_master (TMXR *mp, char *cptr);
@@ -186,6 +199,8 @@ t_stat tmxr_show_log (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_dscln (UNIT *uptr, int32 val, char *cptr, void *desc);
 int32 tmxr_rqln (TMLN *lp);
 int32 tmxr_tqln (TMLN *lp);
+int32 tmxr_tpqln (TMLN *lp);
+t_bool tmxr_tpbusyln (TMLN *lp);
 t_stat tmxr_set_lnorder (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tmxr_show_lnorder (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tmxr_show_summ (FILE *st, UNIT *uptr, int32 val, void *desc);
