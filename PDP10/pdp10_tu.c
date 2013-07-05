@@ -1382,10 +1382,7 @@ assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
 M[FE_MTFMT] = (unitno & TC_M_UNIT) | (TC_1600 << TC_V_DEN) | (TC_10C << TC_V_FMT);
 tu_unit[unitno].pos = 0;
 
-if (sim_switches & SWMASK ('A'))
-    M[FE_KEEPA] = ((d10) 010);              /* <32>: Autoboot */
-else
-    M[FE_KEEPA] = 0;
+M[FE_KEEPA] = (M[FE_KEEPA] & ~INT64_C(0xFF)) | ((sim_switches & SWMASK ('A'))? 010 : 0);
 
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];

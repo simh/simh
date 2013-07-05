@@ -335,6 +335,8 @@ extern int32 int_req;
 extern int32 ubmap[UBANUM][UMAP_MEMSIZE];               /* Unibus maps */
 extern int32 ubcs[UBANUM];
 extern UNIT cpu_unit;
+extern uint32 fe_bootrh;
+extern int32 fe_bootunit;
 
 int32 rpcs1 = 0;                                        /* control/status 1 */
 int32 rpwc = 0;                                         /* word count */
@@ -1363,15 +1365,12 @@ uptr = rp_dev.units + unitno;
 if (!(uptr->flags & UNIT_ATT))
     return SCPE_NOATT;
 
-M[FE_RHBASE] = rp_dib.ba;
-M[FE_UNIT] = unitno;
+M[FE_RHBASE] = fe_bootrh = rp_dib.ba;
+M[FE_UNIT] = fe_bootunit = unitno;
 
 assert (sizeof(boot_rom_dec) == sizeof(boot_rom_its));
 
-if (sim_switches & SWMASK ('A'))
-    M[FE_KEEPA] = ((d10) 010);                /* <32>: Autoboot */
-else
-    M[FE_KEEPA] = 0;
+M[FE_KEEPA] = (M[FE_KEEPA] & ~INT64_C(0xFF)) | ((sim_switches & SWMASK ('A'))? 010 : 0);
 
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = Q_ITS? boot_rom_its[i]: boot_rom_dec[i];

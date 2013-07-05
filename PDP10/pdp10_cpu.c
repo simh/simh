@@ -151,6 +151,10 @@ typedef struct {
     d10         ac;
     } InstHistory;
 
+extern a10 fe_xct;                                      /* Front-end forced XCT */
+extern DEVICE pag_dev;
+extern t_stat pag_reset (DEVICE *dptr);
+
 d10 *M = NULL;                                          /* memory */
 d10 acs[AC_NBLK * AC_NUM] = { 0 };                      /* AC blocks */
 d10 *ac_cur, *ac_prv;                                   /* AC cur, prv (dyn) */
@@ -708,19 +712,45 @@ xct_cnt = 0;                                            /* count XCT's */
 if (sim_interval <= 0) {                                /* check clock queue */
     if ((i = sim_process_event ()))                     /* error?  stop sim */
         ABORT (i);
-    pi_eval ();                                         /* eval pi system */
+    if (fe_xct)
+        qintr = -1;
+    else
+        pi_eval ();                                     /* eval pi system */
     }
 
 /* PI interrupt (Unibus or system flags).
    On the KS10, only JSR and XPCW are allowed as interrupt instructions.
    Because of exec mode addressing, and unconditional processing of flags,
    they are explicitly emulated here.
+   On a keep-alive failure, the console (fe) forces the CPU 'XCT' the 
+   instruction at exec 71.  This is close enough to an interrupt that it is
+   treated as one here.  TOPS-10 and TOPS-20 use JSR or XPCW, which are 
+   really the only sensible instructions, as diagnosing a KAF requires the
+   PC/FLAGS of the fault.
+   On a reload-request from the OS, the fe loads the bootstrap code and sets
+   saved_PC.  Here, the CPU is partially reset and redirected.  (Preserving
+   PC history, among other things.)  The FE has already reset IO.
 */
 
 if (qintr) {
     int32 vec, uba;
     pager_pi = TRUE;                                    /* flag in pi seq */
-    if ((vec = pi_ub_vec (qintr, &uba))) {              /* Unibus interrupt? */
+    if (fe_xct) {                                       /* Console forced execute? */
+        qintr = 0;
+        if (fe_xct == 1) {                              /* Forced reload */
+            PC = saved_PC;                              /* Bootstrap PC */
+            pager_pi = FALSE;
+            ebr = ubr = 0;                              /* Exec mode, paging & PI off */
+            pag_reset (&pag_dev);
+            pi_on = pi_enb = pi_act= pi_prq =
+                apr_enb = apr_flg = apr_lvl = its_1pr = 0;
+            rlog = 0;
+            set_newflags (0, FALSE);
+            fe_xct = 0;
+            continue;
+        }
+        inst = ReadE(fe_xct);                           /* Exec address of instruction */
+    } else if ((vec = pi_ub_vec (qintr, &uba))) {       /* Unibus interrupt? */
         mb = ReadP (epta + EPT_UBIT + uba);             /* get dispatch table */
         if (mb == 0)                                    /* invalid? stop */
             ABORT (STOP_ZERINT);
@@ -750,9 +780,16 @@ if (qintr) {
         JUMP (rs[1]);                                   /* set new PC */
         set_newflags (rs[0], FALSE);                    /* set new flags */
         }
-    else ABORT (STOP_ILLINT);                           /* invalid instr */
-    pi_act = pi_act | pi_l2bit[qintr];                  /* set level active */
-    pi_eval ();                                         /* eval pi system */
+    else {
+        fe_xct = 0;
+        ABORT (STOP_ILLINT);                            /* invalid instr */
+        }
+    if (fe_xct)
+        fe_xct = 0;
+    else {
+        pi_act = pi_act | pi_l2bit[qintr];              /* set level active */
+        pi_eval ();                                     /* eval pi system */
+        }
     pager_pi = FALSE;                                   /* end of sequence */
     if (sim_interval)                                   /* charge for instr */
         sim_interval--;
