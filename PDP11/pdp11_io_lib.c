@@ -298,9 +298,77 @@ t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
 uint32 i, j;
 DEVICE *dptr;
 DIB *dibp;
+uint32 maxaddr, maxname;
+int32 maxvec, vecwid;
+char valbuf[40];
 
 if (build_dib_tab ())                                   /* build IO page */
     return SCPE_OK;
+
+maxaddr = 0;
+maxvec = 0;
+maxname = 0;
+
+for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
+    size_t l;
+    if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
+        dibp = iodibp[i];                               /* DIB for block */
+        for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
+            if (((DIB*) sim_devices[j]->ctxt) == dibp) {
+                dptr = sim_devices[j];                  /* locate device */
+                break;
+                }                                       /* end if */
+            }                                           /* end for j */
+        if ((dibp->ba+ dibp->lnt - 1) > maxaddr)
+            maxaddr = dibp->ba+ dibp->lnt - 1;
+        if (dibp->vec > maxvec)
+            maxvec = dibp->vec;
+        l = strlen (dptr? sim_dname (dptr): "CPU");
+        if (l>maxname)
+            maxname = (int32)l;
+        }                                               /* end if */
+    }                                                   /* end for i */
+maxaddr = fprint_val (NULL, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
+sprintf (valbuf, "%03o", maxvec);
+vecwid = maxvec = (int32) strlen (valbuf);
+if (vecwid < 3)
+    vecwid = 3;
+
+j = strlen ("Address");
+i = (maxaddr*2)+3+1;
+if (i <= j)
+    i = 0;
+else
+    i -= j;
+maxaddr = i+j;
+fprintf (st, "%*.*sAddress%*.*s", i/2, i/2, " ", (i/2)+i%2, (i/2)+i%2, " ");
+
+j = strlen ("Vector");
+i = ((maxvec*2)+1+1);
+if (i <= j)
+    i = 0;
+else
+    i -= j;
+maxvec = i+j;
+fprintf (st, " %*.*sVector%*.*s", i/2, i/2, " ", (i/2)+i%2, (i/2)+i%2, " ");
+
+fprintf (st, " BR Device\n");
+for (i = 0; i < maxaddr; i++)
+    fputc ('-', st);
+fprintf (st, " ");
+for (i = 0; i < (uint32)maxvec; i++)
+    fputc ('-', st);
+
+fprintf (st, " -- ");
+
+i = strlen ("Device");
+if (maxname < i)
+    maxname = i;
+
+for (i = 0; i < maxname; i++)
+    fputc ('-', st);
+fputc ('\n', st);
+
 for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
     if (iodibp[i] && (iodibp[i] != dibp)) {             /* new block? */
         dibp = iodibp[i];                               /* DIB for block */
@@ -313,9 +381,23 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
         fprint_val (st, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
         fprintf (st, " - ");
         fprint_val (st, (t_value) dibp->ba + dibp->lnt - 1, DEV_RDX, 32, PV_LEFT);
-        fprintf (st, "%c\t%s\n",                        /* print block entry */
-            (dibp->ba < IOPAGEBASE + AUTO_CSRBASE + AUTO_CSRMAX)? '*': ' ',
-            dptr? sim_dname (dptr): "CPU");
+        fprintf (st, "%c ",                        /* print block entry */
+            (dibp->ba < IOPAGEBASE + AUTO_CSRBASE + AUTO_CSRMAX)? '*': ' ');
+        if (dibp->vec == 0)
+            fprintf (st, "%*s", ((vecwid*2)+1+1), " ");
+        else {
+            fprintf (st, "%0*o", vecwid, dibp->vec);
+            if (dibp->vnum > 1)
+                fprintf (st, "-%0*o", vecwid, dibp->vec + (4 * (dibp->vnum - 1)));
+            else
+                fprintf (st, " %*s", vecwid, " ");
+            fprintf (st, "%1s", (dibp->vnum >= AUTO_VECBASE)? "*": " ");
+            }
+        if (dibp->vnum || dibp->vloc)
+            fprintf (st, " %2u", dibp->vloc/32);
+        else
+            fprintf (st, "   ");
+        fprintf (st, " %s\n", dptr? sim_dname (dptr): "CPU");
         }                                               /* end if */
     }                                                   /* end for i */
 return SCPE_OK;

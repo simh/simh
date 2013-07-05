@@ -6098,6 +6098,8 @@ return val;
         format  =       leading zeroes format
    Outputs:
         status  =       error status
+        if stream is NULL, returns length of output that would
+        have been generated.
 */
 
 t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
@@ -6134,6 +6136,8 @@ switch (format) {
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
         d = d - commas;
         if (width > MAX_WIDTH) {
+            if (!stream)
+                return width;
             fprintf (stream, "%*s", -((int)width), dbuf);
             return SCPE_OK;
             }
@@ -6154,6 +6158,8 @@ switch (format) {
             d = MAX_WIDTH - (ndigits + commas);
         break;
     }
+if (!stream)
+    return strlen(dbuf+d);
 if (fputs (&dbuf[d], stream) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
