@@ -31,6 +31,8 @@ obj/
 _ReSharper*/
 [Tt]est[Rr]esult*
 *.o
+*~
+*#
 BIN/
 ipch/
 # We only care about specific files in the Visual Studio Projects 

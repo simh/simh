@@ -1229,11 +1229,11 @@ int pcap_sendpacket(pcap_t* handle, const u_char* msg, int len)
 #if defined(_WIN32) || defined(__CYGWIN__)
 /* extracted from WinPcap's Packet32.h */
 struct _PACKET_OID_DATA {
-    uint32 Oid;					///< OID code. See the Microsoft DDK documentation or the file ntddndis.h
-								///< for a complete list of valid codes.
-    uint32 Length;				///< Length of the data field
-    uint8 Data[1];				///< variable-lenght field that contains the information passed to or received 
-								///< from the adapter.
+    uint32 Oid;                 ///< OID code. See the Microsoft DDK documentation or the file ntddndis.h
+                                ///< for a complete list of valid codes.
+    uint32 Length;              ///< Length of the data field
+    uint8 Data[1];              ///< variable-lenght field that contains the information passed to or received 
+                                ///< from the adapter.
 }; 
 typedef struct _PACKET_OID_DATA PACKET_OID_DATA, *PPACKET_OID_DATA;
 typedef void **LPADAPTER;

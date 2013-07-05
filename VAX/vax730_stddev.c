@@ -1070,15 +1070,15 @@ int32 sel = TXDB_GETSEL (data);                         /* get selection */
 if (sel == TXDB_MISC) {                                 /* misc function? */
     switch (data & MISC_MASK) {                         /* case on function */
 
-	case MISC_CLWS:
+    case MISC_CLWS:
     case MISC_CLCS:
         break;
 
-	case MISC_SWDN:
+    case MISC_SWDN:
         ABORT (STOP_SWDN);
         break;
     
-	case MISC_BOOT:
+    case MISC_BOOT:
         ABORT (STOP_BOOT);
         break;
         }

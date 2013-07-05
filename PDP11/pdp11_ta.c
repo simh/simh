@@ -1,6 +1,6 @@
 /* pdp11_ta.c: PDP-11 cassette tape simulator
 
-   Copyright (c) 2007-2008, Robert M Supnik
+   Copyright (c) 2007-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,7 +24,9 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    ta           TA11/TU60 cassette tape
-
+   
+   06-Jun-13    RMS     Reset must set RDY (Ian Hammond)
+                        Added CAPS-11 bootstrap (Ian Hammond)
    06-Aug-07    RMS     Foward op at BOT skips initial file gap
 
    Magnetic tapes are represented as a series of variable records
@@ -129,6 +131,7 @@ t_stat ta_svc (UNIT *uptr);
 t_stat ta_reset (DEVICE *dptr);
 t_stat ta_attach (UNIT *uptr, char *cptr);
 t_stat ta_detach (UNIT *uptr);
+t_stat ta_boot (int32 unitno, DEVICE *dptr);
 void ta_go (void);
 t_stat ta_map_err (UNIT *uptr, t_stat st);
 UNIT *ta_busy (void);
@@ -143,7 +146,6 @@ uint32 ta_crc (uint8 *buf, uint32 cnt);
    ta_reg       TA register list
    ta_mod       TA modifier list
 */
-
 #define IOLN_TA         004
 
 DIB ta_dib = {
@@ -197,8 +199,8 @@ DEVICE ta_dev = {
     "TA", ta_unit, ta_reg, ta_mod,
     TA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ta_reset,
-    NULL, &ta_attach, &ta_detach,
-    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_TAPE
+    &ta_boot, &ta_attach, &ta_detach,
+    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_UBUS | DEV_TAPE
     };
 
 /* I/O dispatch routines, I/O addresses 17777500 - 17777503
@@ -445,8 +447,8 @@ switch (uptr->FNC) {                                    /* case on function */
 ta_cs |= TACS_RDY;                                      /* set ready */
 ta_updsta (uptr);                                       /* update status */
 if (DEBUG_PRS (ta_dev))
-    fprintf (sim_deb, ">>TA done: op=%o, status = %o, pos=%d\n",
-             uptr->FNC, ta_cs, uptr->pos);
+    fprintf (sim_deb, ">>TA done: op=%o, status = %o, dstatus = %o, pos=%d\n",
+             uptr->FNC, ta_cs, uptr->UST, uptr->pos);
 return r;
 }
 
@@ -565,7 +567,7 @@ t_stat ta_reset (DEVICE *dptr)
 uint32 u;
 UNIT *uptr;
 
-ta_cs = 0;
+ta_cs = TACS_RDY;                                       /* init sets RDY */
 ta_idb = 0;
 ta_odb = 0;
 ta_write = 0;
@@ -610,4 +612,55 @@ r = sim_tape_detach (uptr);
 ta_updsta (NULL);
 uptr->UST = 0;
 return r;
+}
+
+/* Bootstrap routine */
+
+#define BOOT_START      01000                           /* start */
+#define BOOT_ENTRY      (BOOT_START)
+#define BOOT_CSR        (BOOT_START + 002)              /* CSR */
+#define BOOT_LEN        (sizeof (boot_rom) / sizeof (uint16))
+
+static const uint16 boot_rom[] = {
+0012700,                /* mov #tacs,r0 */
+0177500,
+0005010,                /* clr (r0) */
+0010701,                /* 3$: mov pc,r1 */
+0062701,                /* add #20-here,r1 */
+0000052,
+0012702,                /* mov #375,r2 */
+0000375,
+0112103,                /* movb (r1)+,r3 */
+0112110,                /* 5$: movb (r1)+,(r0) */
+0100413,                /* bmi 15$ */
+0130310,                /* 10$: bitb r3,(r0) */
+0001776,                /* beq 10$ */
+0105202,                /* incb r2 */
+0100772,                /* bmi 5$ */
+0116012,                /* movb 2(r0),r2 */
+0000002,
+0120337,                /* cmpb r3,@#0 */
+0000000,
+0001767,                /* beq 10$ */
+0000000,                /* 12$: halt */
+0000755,                /* br 3$ */
+0005710,                /* 15$: tst (r0) */
+0100774,                /* bmi 12$ */
+0005007,                /* clr pc */
+0017640,                /* $20: (data) */
+0002415,
+0112024
+};
+
+t_stat ta_boot (int32 unitno, DEVICE *dptr)
+{
+int32 i;
+extern int32 saved_PC;
+extern uint16 *M;
+
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = boot_rom[i];
+M[BOOT_CSR >> 1] = ta_dib.ba & DMASK;
+saved_PC = BOOT_ENTRY;
+return SCPE_OK;
 }

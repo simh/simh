@@ -34,7 +34,7 @@ for /F "usebackq tokens=3" %%i in (`findstr/C:"#define SIM_VERSION_MODE" ..\sim_
 if "%_SIM_PATCH%" equ "-0" set _SIM_PATCH=
 set _ZipName=simh-%_SIM_MAJOR%.%_SIM_MINOR%%_SIM_PATCH%%_SIM_VERSION_MODE%--%D_YYYY%-%D_MM%-%D_DD%-%GIT_COMMIT_ID:~0,8%.zip
 set _ZipPath=..\..\%BIN_REPO%\
-vcbuild /rebuild Simh.sln "Release|Win32"
+vcbuild /M2 /useenv /rebuild Simh.sln "Release|Win32"
 if exist "%ProgramFiles%\7-Zip\7z.exe" "%ProgramFiles%\7-Zip\7z.exe" a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
 if exist "%ProgramFiles(x86)%\7-Zip\7z.exe" "%ProgramFiles(x86)%\7-Zip\7z.exe" a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"
 if exist "%PROGRAMW6432%\7-Zip\7z.exe" "%PROGRAMW6432%\7-Zip\7z.exe" a -tzip "%_ZipPath%%_ZipName%" "..\BIN\NT\Win32-Release\*.exe"

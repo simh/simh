@@ -221,6 +221,7 @@
 #include "sim_tape.h"
 #include "sim_ether.h"
 #include "sim_serial.h"
+#include "sim_video.h"
 #include "sim_sock.h"
 #include <signal.h>
 #include <ctype.h>
@@ -1310,8 +1311,27 @@ GET_SWITCHES (cptr);
 if (*cptr) {
     cptr = get_glyph (cptr, gbuf, 0);
     if ((cmdp = find_cmd (gbuf))) {
-        if (*cptr)
-            return SCPE_2MARG;
+        if (*cptr) {
+            if ((cmdp->action == &set_cmd) || (cmdp->action == &show_cmd)) {
+                DEVICE *dptr;
+                UNIT *uptr;
+                t_stat r;
+
+                cptr = get_glyph (cptr, gbuf, 0);
+                dptr = find_unit (gbuf, &uptr);
+                if (dptr == NULL) {
+                    dptr = find_dev (gbuf);
+                    if (dptr == NULL)
+                        return SCPE_2MARG;
+                    }
+                r = help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                if (sim_log)
+                    help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                return r;
+                }
+            else
+                return SCPE_2MARG;
+            }
         if (cmdp->help) {
             fputs (cmdp->help, stdout);
             if (sim_log)
@@ -2506,7 +2526,7 @@ char gbuf[CBUFSIZE], *cvptr;
 DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
-SHTAB *shtb, *shptr;
+SHTAB *shtb = NULL, *shptr;
 
 static SHTAB show_glob_tab[] = {
     { "CONFIGURATION", &show_config, 0 },
@@ -2616,7 +2636,7 @@ while (*cptr != 0) {                                    /* do all mods */
             }                                           /* end if */
         }                                               /* end for */
     if (mptr->mask == 0) {                              /* no match? */
-        if ((shptr = find_shtab (shtb, gbuf)))          /* global match? */
+        if (shtb && (shptr = find_shtab (shtb, gbuf)))          /* global match? */
             shptr->action (ofile, dptr, uptr, shptr->arg, cptr);
         else return SCPE_ARG;
         }                                               /* end if */
@@ -2811,6 +2831,9 @@ if (flag) {
     fprintf (st, "\n\t\tMemory Access: %s Endian", sim_end ? "Little" : "Big");
     fprintf (st, "\n\t\tMemory Pointer Size: %d bits", (int)sizeof(dptr)*8);
     fprintf (st, "\n\t\t%s", sim_toffset_64 ? "Large File (>2GB) support" : "No Large File support");
+#if defined (USE_SIM_VIDEO)
+    fprintf (st, "\n\t\tSDL Video support: %s", vid_version());
+#endif
     fprintf (st, "\n\t\tOS clock tick size: %dms", os_tick_size);
 #if defined(__VMS)
     if (1) {
@@ -3633,12 +3656,15 @@ if (dptr == NULL)                                       /* found dev? */
     return SCPE_NXDEV;
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
-if ((uptr->flags & UNIT_ATT) &&                         /* already attached? */
-    !(uptr->dynflags & UNIT_ATTMULT)) {                 /* and only single attachable */
-    r = scp_detach_unit (dptr, uptr);                   /* detach it */
-    if (r != SCPE_OK)                                   /* error? */
-        return r;
-    }
+if (uptr->flags & UNIT_ATT)                             /* already attached? */
+    if (!(uptr->dynflags & UNIT_ATTMULT) &&             /* and only single attachable */
+        !(dptr->flags & DEV_DONTAUTO)) {                /* and auto detachable */
+        r = scp_detach_unit (dptr, uptr);               /* detach it */
+        if (r != SCPE_OK)                               /* error? */
+            return r;
+        }
+    else
+        return SCPE_ALATT;                              /* Already attached */
 sim_trim_endspc (cptr);                                 /* trim trailing spc */
 return scp_attach_unit (dptr, uptr, cptr);              /* attach */
 }
@@ -4627,7 +4653,6 @@ return sim_cancel (&sim_step_unit);
 void int_handler (int sig)
 {
 stop_cpu = 1;
-sim_interval = 0;           /* should speed up stop detection */
 return;
 }
 
@@ -6073,6 +6098,8 @@ return val;
         format  =       leading zeroes format
    Outputs:
         status  =       error status
+        if stream is NULL, returns length of output that would
+        have been generated.
 */
 
 t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
@@ -6109,6 +6136,8 @@ switch (format) {
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
         d = d - commas;
         if (width > MAX_WIDTH) {
+            if (!stream)
+                return width;
             fprintf (stream, "%*s", -((int)width), dbuf);
             return SCPE_OK;
             }
@@ -6129,6 +6158,8 @@ switch (format) {
             d = MAX_WIDTH - (ndigits + commas);
         break;
     }
+if (!stream)
+    return strlen(dbuf+d);
 if (fputs (&dbuf[d], stream) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
@@ -6138,7 +6169,7 @@ return SCPE_OK;
 
         sim_activate            add entry to event queue
         sim_activate_abs        add entry to event queue even if event already scheduled
-        sim_activate_notbefure  add entry to event queue even if event already scheduled
+        sim_activate_notbefore  add entry to event queue even if event already scheduled
                                 but not before the specified time
         sim_activate_after      add entry to event queue after a specified amount of wall time
         sim_cancel              remove entry from event queue

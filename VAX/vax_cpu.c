@@ -1480,7 +1480,7 @@ for ( ;; ) {
 
                 default:
                     RSVD_ADDR_FAULT;                    /* end case idxspec */
-					}
+                    }
 
                 switch (disp & (DR_ACMASK|DR_SPFLAG|DR_LNMASK)) { /* case acc+lnt */
                 case VB:
@@ -2954,7 +2954,7 @@ for ( ;; ) {
         if (op7 < 0) {
             Read (op8, L_BYTE, WA);
             Read ((op8 + 7) & LMASK, L_BYTE, WA);
-			}
+            }
         if (op5 >= 0)
             R[op5] = temp;
         else Write (op6, temp, L_LONG, WA);
@@ -2970,7 +2970,7 @@ for ( ;; ) {
         if (op7 < 0) {
             Read (op8, L_BYTE, WA);
             Read ((op8 + 7) & LMASK, L_BYTE, WA);
-			}
+            }
         if (op5 >= 0)
             R[op5] = temp;
         else Write (op6, temp, L_LONG, WA);

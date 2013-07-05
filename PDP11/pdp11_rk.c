@@ -430,9 +430,9 @@ if (((uptr->flags & UNIT_ATT) == 0) ||                  /* not att or busy? */
     }
 if ((rkcs & RKCS_FMT) &&                                /* format and */
     (func != RKCS_READ) && (func != RKCS_WRITE)) {      /* not read or write? */
-	rk_set_done (RKER_PGE);
-	return;
-	}
+    rk_set_done (RKER_PGE);
+    return;
+    }
 if ((func == RKCS_WRITE) &&                             /* write and locked? */
     (uptr->flags & UNIT_WPRT)) {
     rk_set_done (RKER_WLK);
@@ -650,7 +650,7 @@ if (error != 0) {
         rkcs = rkcs | RKCS_ERR;
     if (rker & RKER_HARD)
         rkcs = rkcs | RKCS_HERR;
-	}
+    }
 if (rkcs & CSR_IE) {                                    /* int enable? */
     rkintq = rkintq | RK_CTLI;                          /* set ctrl int */
     SET_INT (RK);                                       /* request int */

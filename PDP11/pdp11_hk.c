@@ -214,7 +214,7 @@ BITFIELD hk_da_bits[] = {
 #define CS2_MBZ         (CS2_CLR)
 #define CS2_RW          0000037
 #define CS2_ERR         (CS2_UFE | CS2_MDS | CS2_PGE | CS2_NEM | \
-						 CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
+                         CS2_NED | CS2_PE | CS2_WCE | CS2_DLT )
 #define GET_UNIT(x)     (((x) >> CS2_V_UNIT) & CS2_M_UNIT)
 
 BITFIELD hk_cs2_bits[] = {
@@ -959,9 +959,9 @@ if (fnc_cyl[fnc] &&                                     /* need valid cyl */
    ((GET_CY (hkdc) >= HK_CYL (uptr)) ||                 /* bad cylinder */
     (GET_SF (hkda) >= HK_NUMSF) ||                      /* bad surface */
     (GET_SC (hkda) >= HK_NUMSC))) {                     /* or bad sector? */
-	hk_cmderr (ER_IAE, drv);                            /* illegal addr */
-	return;
-	}
+    hk_cmderr (ER_IAE, drv);                            /* illegal addr */
+    return;
+    }
 
 hkcs1 = (hkcs1 | CS1_GO) & ~CS1_DONE;                   /* set go, clear done */
 switch (fnc) {                                          /* case on function */
@@ -1144,7 +1144,7 @@ switch (fnc) {                                          /* case on function */
             for (i = wc; i < awc; i++)                  /* fill buf */
                 hkxb[i] = 0;
             if (wc && !err) {                           /* write buf */
-                fxwrite (hkxb, sizeof (uint16), wc, uptr->fileref);
+                fxwrite (hkxb, sizeof (uint16), awc, uptr->fileref);
                 err = ferror (uptr->fileref);
                 }
             }                                           /* end if wr */

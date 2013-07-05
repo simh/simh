@@ -89,6 +89,17 @@
 #define MT_MBRK         60                              /* microbreak */
 #define MT_MAX          63                              /* last valid IPR */
 
+/* CPU */
+
+#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL", "MODEL={MICROVAX|VAXSTATION}",        \
+                              &cpu_set_model, &cpu_show_model, NULL, "Set/Show the simulator CPU Model" },  \
+                            { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}",                     \
+                              &sysd_set_diag, &sysd_show_diag, NULL, "Set/Show boot rom diagnostic mode" }, \
+                            { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",                      \
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Enable autoboot (Disable Halt)" },    \
+                            { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",                    \
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" }
+
 /* Memory */
 
 #define MAXMEMWIDTH     24                              /* max mem, std KA655 */
@@ -107,14 +118,6 @@
                         { UNIT_MSIZE, (1u << 24), NULL, "16M", &cpu_set_size, NULL, NULL, "Set Memory to 16M bytes" },                           \
                         { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "MEMORY", NULL, NULL, &cpu_show_memory, NULL, "Display memory configuration" }
 extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
-#define CPU_MODEL_MODIFIERS { MTAB_XTD|MTAB_VDV, 0,          "MODEL",      NULL,                            \
-                              NULL, &cpu_show_model, NULL, "Display the simulator CPU Model" },             \
-                            { MTAB_XTD|MTAB_VDV, 0,          "DIAG", "DIAG={FULL|MIN}",                     \
-                              &sysd_set_diag, &sysd_show_diag, NULL, "Set/Show boot rom diagnostic mode" }, \
-                            { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",                      \
-                              &sysd_set_halt, &sysd_show_halt, NULL, "Enable autoboot (Disable Halt)" },    \
-                            { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",                    \
-                              &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" }
 
 /* Qbus I/O page */
 
@@ -165,6 +168,13 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define ADDR_IS_QBM(x)  ((((uint32) (x)) >= QBMBASE) && \
                         (((uint32) (x)) < (QBMBASE + QBMSIZE)))
 
+/* QVSS memory space */
+
+#define QVMAWIDTH       18                              /* QVSS mem addr width */
+#define QVMSIZE         (1u << QVMAWIDTH)               /* QVSS mem length */
+#define QVMAMASK        (QVMSIZE - 1)                   /* QVSS mem addr mask */
+#define QVMBASE         0x303C0000                      /* QVSS mem base */
+
 /* Other address spaces */
 
 #define ADDR_IS_CDG(x)  (0)
@@ -207,10 +217,7 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define DZ_MUXES        4                               /* max # of DZV muxes */
 #define DZ_LINES        4                               /* lines per DZV mux */
 #define VH_MUXES        4                               /* max # of DHQ muxes */
-#define DLX_LINES       16                              /* max # of KL11/DL11's */
-#define DCX_LINES       16                              /* max # of DC11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
-#define AUTO_LNT        34                              /* autoconfig ranks */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */
 #define DEV_V_QBUS      (DEV_V_UF + 1)                  /* Qbus */
@@ -333,8 +340,8 @@ typedef struct {
 #define IPL_QDSS        (0x14 - IPL_HMIN)
 #define IPL_CR          (0x14 - IPL_HMIN)
 #define IPL_QVSS        (0x14 - IPL_HMIN)
-#define IPL_DMCRX       (0x15 - IPL_HMIN)
-#define IPL_DMCTX       (0x15 - IPL_HMIN)
+#define IPL_DMCRX       (0x14 - IPL_HMIN)
+#define IPL_DMCTX       (0x14 - IPL_HMIN)
 
 #define IPL_HMAX        0x17                            /* highest hwre level */
 #define IPL_HMIN        0x14                            /* lowest hwre level */

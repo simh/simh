@@ -1,6 +1,6 @@
 /* pdp11_cpumod.c: PDP-11 CPU model-specific features
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    system       PDP-11 model-specific registers
 
+   06-Jun-13    RMS     Fixed change model to set memory size last
    20-May-08    RMS     Added JCSR default for KDJ11B, KDJ11E
    22-Apr-08    RMS     Fixed write behavior of 11/70 MBRK, LOSIZE, HISIZE
                         (Walter Mueller)
@@ -1090,14 +1091,14 @@ if (val >= MOD_MAX)
     return SCPE_IERR;
 if (val == (int32) cpu_model)
     return SCPE_OK;
-if (MEMSIZE > cpu_tab[val].maxm)
-    cpu_set_size (uptr, cpu_tab[val].maxm, NULL, NULL);
-if (MEMSIZE > cpu_tab[val].maxm)
-    return SCPE_INCOMP;
 cpu_model = val;
 cpu_type = 1u << cpu_model;
 cpu_opt = cpu_tab[cpu_model].std;
 cpu_set_bus (cpu_opt);
+if (MEMSIZE > cpu_tab[val].maxm)
+    cpu_set_size (uptr, cpu_tab[val].maxm, NULL, NULL);
+if (MEMSIZE > cpu_tab[val].maxm)
+    return SCPE_INCOMP;
 reset_all (0);                                          /* reset world */
 return SCPE_OK;
 }

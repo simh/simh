@@ -803,7 +803,7 @@ if (r->sign) {                                          /* negate? */
     if (fdvneg) {                                       /* fdvr special? */
         val[1] = ~val[1] & MMASK;                       /* 1's comp */
         val[0] = ~val[0] & DMASK;
-		}
+        }
     else {                                              /* 2's comp */
         DMOVN (val);
         }

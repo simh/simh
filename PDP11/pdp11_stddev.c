@@ -29,7 +29,7 @@
    18-Apr-12    RMS     Modified to use clock coscheduling
    20-May-08    RMS     Standardized clock delay at 1mips
    18-Jun-07    RMS     Added UNIT_IDLE flag to console input, clock
-   29-Oct-06	RMS     Synced keyboard and clock
+   29-Oct-06    RMS     Synced keyboard and clock
                         Added clock coscheduling support
    05-Jul-06    RMS     Added UC only support for early DOS/RSTS
    22-Nov-05    RMS     Revised for new terminal processing routines
