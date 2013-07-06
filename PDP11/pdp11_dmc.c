@@ -101,10 +101,11 @@ The other test was to configure DECnet on VMS 4.6 and do SET HOST.
 #define TRACE_BYTES_PER_LINE 16
 
 struct csrs {
-    uint16 sel0;
-    uint16 sel2;
-    uint16 sel4;
-    uint16 sel6;
+    uint16 *sel0;
+    uint16 *sel2;
+    uint16 *sel4;
+    uint16 *sel6;
+    uint16 *sel10;
 };
 
 typedef struct csrs CSRS;
@@ -195,6 +196,8 @@ struct dmc_controller {
     CSRS *csrs;
     CSRS *shadow_csrs;
     DEVICE *device;
+    UNIT *unit;
+    int index;                  /* Index in controller array */
     ControllerState state;
     TransferState transfer_state; /* current transfer state (type of transfer) */
     int transfer_type;
@@ -226,6 +229,8 @@ t_stat dmc_attach (UNIT * uptr, char * cptr);
 t_stat dmc_detach (UNIT * uptr);
 int32 dmc_rxint (void);
 int32 dmc_txint (void);
+t_stat dmc_setnumdevices (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dmc_shownumdevices (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
@@ -279,34 +284,48 @@ DEBTAB dmc_debug[] = {
     {0}
 };
 
-UNIT dmc0_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
-UNIT dmc1_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
-UNIT dmc2_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
-UNIT dmc3_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
+UNIT dmc_units[DMC_NUMDEVICE];
 
-UNIT dmpa_unit = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
+UNIT dmc_unit_template = { UDATA (&dmc_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) };
+
+UNIT dmp_units[DMP_NUMDEVICE];
 
 CSRS dmc_csrs[DMC_NUMDEVICE];
+uint16 dmc_sel0[DMC_NUMDEVICE];
+uint16 dmc_sel2[DMC_NUMDEVICE];
+uint16 dmc_sel4[DMC_NUMDEVICE];
+uint16 dmc_sel6[DMC_NUMDEVICE];
 CSRS dmc_shadow_csrs[DMC_NUMDEVICE];
+uint16 dmc_shadow_sel0[DMC_NUMDEVICE];
+uint16 dmc_shadow_sel2[DMC_NUMDEVICE];
+uint16 dmc_shadow_sel4[DMC_NUMDEVICE];
+uint16 dmc_shadow_sel6[DMC_NUMDEVICE];
 
 CSRS dmp_csrs[DMP_NUMDEVICE];
+uint16 dmp_sel0[DMC_NUMDEVICE];
+uint16 dmp_sel2[DMC_NUMDEVICE];
+uint16 dmp_sel4[DMC_NUMDEVICE];
+uint16 dmp_sel6[DMC_NUMDEVICE];
+uint16 dmp_sel10[DMC_NUMDEVICE];
 CSRS dmp_shadow_csrs[DMP_NUMDEVICE];
+uint16 dmp_shadow_sel0[DMC_NUMDEVICE];
+uint16 dmp_shadow_sel2[DMC_NUMDEVICE];
+uint16 dmp_shadow_sel4[DMC_NUMDEVICE];
+uint16 dmp_shadow_sel6[DMC_NUMDEVICE];
+uint16 dmp_shadow_sel10[DMC_NUMDEVICE];
 
-LINE dmc_line[DMC_NUMDEVICE] =
-{
-    { 0, INVALID_SOCKET },
-    { 0, INVALID_SOCKET },
-    { 0, INVALID_SOCKET },
-    { 0, INVALID_SOCKET }
-};
+LINE dmc_line[DMC_NUMDEVICE];
+
+LINE dmc_line_template = 
+    { 0, INVALID_SOCKET };
+
+uint32 dmc_rxi_summary = 0;         /* Receive Interrupt Summary for all controllers */
+uint32 dmc_txi_summary = 0;         /* Transmit Interrupt Summary for all controllers */
 
 BUFFER_QUEUE dmc_receive_queues[DMC_NUMDEVICE];
 BUFFER_QUEUE dmc_transmit_queues[DMC_NUMDEVICE];
 
-LINE dmp_line[DMP_NUMDEVICE] =
-{
-    { 0, INVALID_SOCKET }
-};
+LINE dmp_line[DMP_NUMDEVICE];
 
 BUFFER_QUEUE dmp_receive_queues[DMP_NUMDEVICE];
 BUFFER_QUEUE dmp_transmit_queues[DMP_NUMDEVICE];
@@ -314,189 +333,143 @@ BUFFER_QUEUE dmp_transmit_queues[DMP_NUMDEVICE];
 UNIT_STATS dmc_stats[DMC_NUMDEVICE];
 UNIT_STATS dmp_stats[DMP_NUMDEVICE];
 
-REG dmca_reg[] = {
-    { HRDATA (SEL0, dmc_csrs[0].sel0, 16) },
-    { HRDATA (SEL2, dmc_csrs[0].sel2, 16) },
-    { HRDATA (SEL4, dmc_csrs[0].sel4, 16) },
-    { HRDATA (SEL6, dmc_csrs[0].sel6, 16) },
-    { GRDATA (BSEL0, dmc_csrs[0].sel0, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL1, dmc_csrs[0].sel0, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL2, dmc_csrs[0].sel2, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL3, dmc_csrs[0].sel2, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL4, dmc_csrs[0].sel4, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL5, dmc_csrs[0].sel4, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL6, dmc_csrs[0].sel6, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL7, dmc_csrs[0].sel6, DEV_RDX, 8, 8) },
-    { HRDATA (SHADOWSEL0, dmc_shadow_csrs[0].sel0, 16), REG_HRO },
-    { HRDATA (SHADOWSEL2, dmc_shadow_csrs[0].sel2, 16), REG_HRO },
-    { HRDATA (SHADOWSEL4, dmc_shadow_csrs[0].sel4, 16), REG_HRO },
-    { HRDATA (SHADOWSEL6, dmc_shadow_csrs[0].sel6, 16), REG_HRO },
-    { BRDATA (PEER, dmc_line[0].peer, 16, 8, sizeof(dmc_line[0].peer)), REG_HRO},
-    { HRDATA (MODE, dmc_line[0].isPrimary, 32), REG_HRO },
-    { HRDATA (SPEED, dmc_line[0].speed, 32), REG_HRO },
-    { NULL }  };
-
-REG dmcb_reg[] = {
-    { HRDATA (SEL0, dmc_csrs[1].sel0, 16) },
-    { HRDATA (SEL2, dmc_csrs[1].sel2, 16) },
-    { HRDATA (SEL4, dmc_csrs[1].sel4, 16) },
-    { HRDATA (SEL6, dmc_csrs[1].sel6, 16) },
-    { GRDATA (BSEL0, dmc_csrs[1].sel0, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL1, dmc_csrs[1].sel0, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL2, dmc_csrs[1].sel2, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL3, dmc_csrs[1].sel2, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL4, dmc_csrs[1].sel4, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL5, dmc_csrs[1].sel4, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL6, dmc_csrs[1].sel6, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL7, dmc_csrs[1].sel6, DEV_RDX, 8, 8) },
-    { HRDATA (SHADOWSEL0, dmc_shadow_csrs[1].sel0, 16), REG_HRO },
-    { HRDATA (SHADOWSEL2, dmc_shadow_csrs[1].sel2, 16), REG_HRO },
-    { HRDATA (SHADOWSEL4, dmc_shadow_csrs[1].sel4, 16), REG_HRO },
-    { HRDATA (SHADOWSEL6, dmc_shadow_csrs[1].sel6, 16), REG_HRO },
-    { BRDATA (PEER, dmc_line[1].peer, 16, 8, sizeof(dmc_line[1].peer)), REG_HRO},
-    { HRDATA (MODE, dmc_line[1].isPrimary, 32), REG_HRO },
-    { HRDATA (SPEED, dmc_line[1].speed, 32), REG_HRO },
-    { NULL }  };
-
-REG dmcc_reg[] = {
-    { HRDATA (SEL0, dmc_csrs[2].sel0, 16) },
-    { HRDATA (SEL2, dmc_csrs[2].sel2, 16) },
-    { HRDATA (SEL4, dmc_csrs[2].sel4, 16) },
-    { HRDATA (SEL6, dmc_csrs[2].sel6, 16) },
-    { GRDATA (BSEL0, dmc_csrs[2].sel0, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL1, dmc_csrs[2].sel0, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL2, dmc_csrs[2].sel2, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL3, dmc_csrs[2].sel2, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL4, dmc_csrs[2].sel4, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL5, dmc_csrs[2].sel4, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL6, dmc_csrs[2].sel6, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL7, dmc_csrs[2].sel6, DEV_RDX, 8, 8) },
-    { HRDATA (SHADOWSEL0, dmc_shadow_csrs[2].sel0, 16), REG_HRO },
-    { HRDATA (SHADOWSEL2, dmc_shadow_csrs[2].sel2, 16), REG_HRO },
-    { HRDATA (SHADOWSEL4, dmc_shadow_csrs[2].sel4, 16), REG_HRO },
-    { HRDATA (SHADOWSEL6, dmc_shadow_csrs[2].sel6, 16), REG_HRO },
-    { BRDATA (PEER, dmc_line[2].peer, 16, 8, sizeof(dmc_line[2].peer)), REG_HRO},
-    { HRDATA (MODE, dmc_line[2].isPrimary, 32), REG_HRO },
-    { HRDATA (SPEED, dmc_line[2].speed, 32), REG_HRO },
-    { NULL }  };
-
-REG dmcd_reg[] = {
-    { HRDATA (SEL0, dmc_csrs[3].sel0, 16) },
-    { HRDATA (SEL2, dmc_csrs[3].sel2, 16) },
-    { HRDATA (SEL4, dmc_csrs[3].sel4, 16) },
-    { HRDATA (SEL6, dmc_csrs[3].sel6, 16) },
-    { GRDATA (BSEL0, dmc_csrs[3].sel0, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL1, dmc_csrs[3].sel0, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL2, dmc_csrs[3].sel2, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL3, dmc_csrs[3].sel2, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL4, dmc_csrs[3].sel4, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL5, dmc_csrs[3].sel4, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL6, dmc_csrs[3].sel6, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL7, dmc_csrs[3].sel6, DEV_RDX, 8, 8) },
-    { HRDATA (SHADOWSEL0, dmc_shadow_csrs[3].sel0, 16), REG_HRO },
-    { HRDATA (SHADOWSEL2, dmc_shadow_csrs[3].sel2, 16), REG_HRO },
-    { HRDATA (SHADOWSEL4, dmc_shadow_csrs[3].sel4, 16), REG_HRO },
-    { HRDATA (SHADOWSEL6, dmc_shadow_csrs[3].sel6, 16), REG_HRO },
-    { BRDATA (PEER, dmc_line[3].peer, 16, 8, sizeof(dmc_line[3].peer)), REG_HRO},
-    { HRDATA (MODE, dmc_line[3].isPrimary, 32), REG_HRO },
-    { HRDATA (SPEED, dmc_line[3].speed, 32), REG_HRO },
+REG dmc_reg[] = {
+    { BRDATA (SEL0, dmc_sel0, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SEL2, dmc_sel2, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SEL4, dmc_sel4, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SEL6, dmc_sel6, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { GRDATA (RXINT, dmc_rxi_summary, DEV_RDX, 32, 0) },
+    { GRDATA (TXINT, dmc_txi_summary, DEV_RDX, 32, 0) },
+    { BRDATA (SHADOWSEL0, dmc_shadow_sel0, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL2, dmc_shadow_sel2, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL4, dmc_shadow_sel4, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL6, dmc_shadow_sel6, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (LINES, dmc_line, 16, 8, sizeof(dmc_line)), REG_HRO},
     { NULL }  };
 
 REG dmp_reg[] = {
-    { HRDATA (SEL0, dmc_csrs[3].sel0, 16) },
-    { HRDATA (SEL2, dmc_csrs[3].sel2, 16) },
-    { HRDATA (SEL4, dmc_csrs[3].sel4, 16) },
-    { HRDATA (SEL6, dmc_csrs[3].sel6, 16) },
-    { GRDATA (BSEL0, dmc_csrs[3].sel0, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL1, dmc_csrs[3].sel0, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL2, dmc_csrs[3].sel2, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL3, dmc_csrs[3].sel2, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL4, dmc_csrs[3].sel4, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL5, dmc_csrs[3].sel4, DEV_RDX, 8, 8) },
-    { GRDATA (BSEL6, dmc_csrs[3].sel6, DEV_RDX, 8, 0) },
-    { GRDATA (BSEL7, dmc_csrs[3].sel6, DEV_RDX, 8, 8) },
-    { HRDATA (SHADOWSEL0, dmp_shadow_csrs[0].sel0, 16), REG_HRO },
-    { HRDATA (SHADOWSEL2, dmp_shadow_csrs[0].sel2, 16), REG_HRO },
-    { HRDATA (SHADOWSEL4, dmp_shadow_csrs[0].sel4, 16), REG_HRO },
-    { HRDATA (SHADOWSEL6, dmp_shadow_csrs[0].sel6, 16), REG_HRO },
-    { BRDATA (PEER, dmp_line[0].peer, 16, 8, sizeof(dmp_line[0].peer)), REG_HRO},
-    { HRDATA (MODE, dmp_line[0].isPrimary, 32), REG_HRO },
-    { HRDATA (SPEED, dmp_line[0].speed, 32), REG_HRO },
+    { BRDATA (SEL0, dmp_sel0, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SEL2, dmp_sel2, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SEL4, dmp_sel4, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SEL6, dmp_sel6, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL0, dmp_shadow_sel0, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL2, dmp_shadow_sel2, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL4, dmp_shadow_sel4, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (SHADOWSEL6, dmp_shadow_sel6, DEV_RDX, 16, DMC_NUMDEVICE) },
+    { BRDATA (LINES, dmp_line, 16, 8, sizeof(dmp_line)), REG_HRO},
     { NULL }  };
 
+extern DEVICE dmc_dev;
+
 MTAB dmc_mod[] = {
-    { MTAB_XTD|MTAB_VDV,          0, "PEER", "PEER=address:port",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
+        &dmc_setnumdevices, &dmc_shownumdevices, (void *) &dmc_dev, "Display number of devices" },
+    { MTAB_XTD|MTAB_VUN,          0, "PEER", "PEER=address:port",
         &dmc_setpeer, &dmc_showpeer, NULL, "Display destination/source depends on LINEMODE" },
-    { MTAB_XTD|MTAB_VDV,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
+    { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
         &dmc_setspeed, &dmc_showspeed, NULL, "Display rate limit" },
-#ifdef DMP
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR,0, "TYPE", "TYPE" ,&dmc_settype, &dmc_showtype, NULL, "Set/Display device type"  },
-#endif
-    { MTAB_XTD|MTAB_VDV,          0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}",
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR,0, "TYPE", "TYPE={DMR,DMC}" ,&dmc_settype, &dmc_showtype, NULL, "Set/Display device type"  },
+    { MTAB_XTD|MTAB_VUN,          0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}",
         &dmc_setlinemode, &dmc_showlinemode, NULL, "Display the connection orientation" },
-    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 0, "STATS", "STATS",
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, "STATS", "STATS",
         &dmc_setstats, &dmc_showstats, NULL, "Display statistics" },
-    { MTAB_XTD|MTAB_VDV,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
+    { MTAB_XTD|MTAB_VUN,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
         &dmc_setconnectpoll, &dmc_showconnectpoll, NULL, "Display connection poll interval" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR,        006, "ADDRESS", "ADDRESS",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,        020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR,          0, "VECTOR", "VECTOR",
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
+        &set_vec,  &show_vec,  NULL, "Interrupt vector" },
+    { 0 },
+};
+
+extern DEVICE dmp_dev;
+
+MTAB dmp_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
+        &dmc_setnumdevices, &dmc_shownumdevices, (void *) &dmp_dev, "Display number of devices" },
+    { MTAB_XTD|MTAB_VUN,          0, "PEER", "PEER=address:port",
+        &dmc_setpeer, &dmc_showpeer, NULL, "Display destination/source depends on LINEMODE" },
+    { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
+        &dmc_setspeed, &dmc_showspeed, NULL, "Display rate limit" },
+    { MTAB_XTD|MTAB_VUN,          0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}",
+        &dmc_setlinemode, &dmc_showlinemode, NULL, "Display the connection orientation" },
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, "STATS", "STATS",
+        &dmc_setstats, &dmc_showstats, NULL, "Display statistics" },
+    { MTAB_XTD|MTAB_VUN,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
+        &dmc_setconnectpoll, &dmc_showconnectpoll, NULL, "Display connection poll interval" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,        020, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
+        &set_vec,  &show_vec,  NULL, "Interrupt vector" },
+    { 0 },
+};
+
+extern DEVICE dmv_dev;
+
+MTAB dmv_mod[] = {
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
+        &dmc_setnumdevices, &dmc_shownumdevices, (void *) &dmv_dev, "Display number of devices" },
+    { MTAB_XTD|MTAB_VUN,          0, "PEER", "PEER=address:port",
+        &dmc_setpeer, &dmc_showpeer, NULL, "Display destination/source depends on LINEMODE" },
+    { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
+        &dmc_setspeed, &dmc_showspeed, NULL, "Display rate limit" },
+    { MTAB_XTD|MTAB_VUN,          0, "LINEMODE", "LINEMODE={PRIMARY|SECONDARY}",
+        &dmc_setlinemode, &dmc_showlinemode, NULL, "Display the connection orientation" },
+    { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, "STATS", "STATS",
+        &dmc_setstats, &dmc_showstats, NULL, "Display statistics" },
+    { MTAB_XTD|MTAB_VUN,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
+        &dmc_setconnectpoll, &dmc_showconnectpoll, NULL, "Display connection poll interval" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,        020, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
         &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 },
 };
 
 #define IOLN_DMC        010
-DIB dmc0_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
-DIB dmc1_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
-DIB dmc2_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
-DIB dmc3_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
+
+DIB dmc_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
 
 #define IOLN_DMP        010
 
 DIB dmp_dib = { IOBA_AUTO, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }};
 
-DEVICE dmc_dev[] =
-{
-    { "DMC0", &dmc0_unit, dmca_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
-    NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc0_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description },
-    { "DMC1", &dmc1_unit, dmcb_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
-    NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc1_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description },
-    { "DMC2", &dmc2_unit, dmcc_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
-    NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc2_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description },
-    { "DMC3", &dmc3_unit, dmcd_reg, dmc_mod, DMC_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
-    NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
-    &dmc3_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description }
-};
+#define IOLN_DMV        020
 
-#ifdef DMP
-DEVICE dmp_dev[] =
-{
-    { "DMP", &dmp_unit, dmp_reg, dmc_mod, DMP_UNITSPERDEVICE, DMC_RDX, 8, 1, DMC_RDX, 8,
-    NULL,NULL,&dmc_reset,NULL,&dmc_attach,&dmc_detach,
+DIB dmv_dib = { IOBA_AUTO, IOLN_DMV, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }};
+
+DEVICE dmc_dev =
+    { "DMC", dmc_units, dmc_reg, dmc_mod, 1, DMC_RDX, 8, 1, DMC_RDX, 8,
+    NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
+    &dmc_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmc_description };
+
+/*
+   We have two devices defined here (dmp_dev and dmv_dev) which have the 
+   same units.  This would normally never be allowed since two devices can't
+   actually share units.  This problem is avoided in this case since both 
+   devices start out as disabled and the logic in dmc_reset allows only 
+   one of these devices to be enabled at a time.  The DMP device is allowed 
+   on Unibus systems and the DMV device Qbus systems.
+   This monkey business is necessary due to the fact that although both
+   the DMP and DMV devices have almost the same functionality and almost
+   the same register programming interface, they are different enough that
+   they fall in different priorities in the autoconfigure address and vector
+   rules.
+ */
+DEVICE dmp_dev =
+    { "DMP", dmp_units, dmp_reg, dmp_mod, 1, DMC_RDX, 8, 1, DMC_RDX, 8,
+    NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
     &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0, dmc_debug,
-    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmp_description }
-};
-#endif
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmp_description };
 
-CTLR dmc_ctrls[] =
-{
-    { &dmc_csrs[0], &dmc_shadow_csrs[0], &dmc_dev[0], Initialised, Idle, 0, 0, &dmc_line[0], &dmc_receive_queues[0], &dmc_transmit_queues[0], &dmc_stats[0], INVALID_SOCKET, 30, DMC },
-    { &dmc_csrs[1], &dmc_shadow_csrs[1], &dmc_dev[1], Initialised, Idle, 0, 0, &dmc_line[1], &dmc_receive_queues[1], &dmc_transmit_queues[1], &dmc_stats[1], INVALID_SOCKET, 30, DMC },
-    { &dmc_csrs[2], &dmc_shadow_csrs[2], &dmc_dev[2], Initialised, Idle, 0, 0, &dmc_line[2], &dmc_receive_queues[2], &dmc_transmit_queues[2], &dmc_stats[2], INVALID_SOCKET, 30, DMC },
-    { &dmc_csrs[3], &dmc_shadow_csrs[3], &dmc_dev[3], Initialised, Idle, 0, 0, &dmc_line[3], &dmc_receive_queues[3], &dmc_transmit_queues[3], &dmc_stats[3], INVALID_SOCKET, 30, DMC },
-#ifdef DMP
-    { &dmp_csrs[0], &dmp_shadow_csrs[0], &dmp_dev[0], Initialised, Idle, 0, 0, &dmp_line[0], &dmp_receive_queues[0], &dmp_transmit_queues[0], &dmp_stats[0], INVALID_SOCKET, -1, 30, DMP }
-#endif
-};
+DEVICE dmv_dev =
+    { "DMV", dmp_units, dmp_reg, dmv_mod, 1, DMC_RDX, 8, 1, DMC_RDX, 8,
+    NULL, NULL, &dmc_reset, NULL, &dmc_attach, &dmc_detach,
+    &dmp_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG, 0, dmc_debug,
+    NULL, NULL, &dmc_help, &dmc_help_attach, NULL, &dmp_description };
 
-extern int32 tmxr_poll; /* calibrated delay */
+CTLR dmc_ctrls[DMC_NUMDEVICE + DMP_NUMDEVICE];
 
 void dmc_reset_unit_stats(UNIT_STATS *s)
 {
@@ -549,7 +522,7 @@ CTLR *dmc_get_controller_from_unit(UNIT *unit)
     CTLR *ans = NULL;
     for (i = 0; i < DMC_NUMDEVICE + DMP_NUMDEVICE; i++)
     {
-        if (dmc_ctrls[i].device->units == unit)
+        if (dmc_ctrls[i].unit == unit)
         {
             ans = &dmc_ctrls[i];
             break;
@@ -566,26 +539,10 @@ CTLR* dmc_get_controller_from_address(uint32 address)
     {
         DIB *dib = (DIB *)dmc_ctrls[i].device->ctxt;
         if ((address >= dib->ba) && (address < (dib->ba + dib->lnt)))
-            return &dmc_ctrls[i];
+            return &dmc_ctrls[(address - dib->ba) >> ((UNIBUS) ? 3 : 4)];
     }
     /* not found */
     return 0;
-}
-
-CTLR *dmc_get_controller_from_device(DEVICE *device)
-{
-    int i;
-    CTLR *ans = NULL;
-    for (i = 0; i < DMC_NUMDEVICE + DMP_NUMDEVICE; i++)
-    {
-        if (dmc_ctrls[i].device == device)
-        {
-            ans = &dmc_ctrls[i];
-            break;
-        }
-    }
-
-    return ans;
 }
 
 t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc)
@@ -668,7 +625,7 @@ t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc)
         }
     case DMP:
         {
-            fprintf(st, "type=DMP");
+            fprintf(st, "type=%s", (UNIBUS) ? "DMP" : "DMV");
             break;
         }
     default:
@@ -682,34 +639,24 @@ t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc)
 
 t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc)
 {
-    char buf[80];
+    char gbuf[80];
     t_stat status = SCPE_OK;
     CTLR *controller = dmc_get_controller_from_unit(uptr);
 
-    if (!cptr) return SCPE_IERR;
+    if (!cptr) return SCPE_2FARG;
     if (dmc_is_attached(uptr)) return SCPE_ALATT;
-    if (sscanf(cptr, "%s", buf) != 1)
+    cptr = get_glyph (cptr, gbuf, 0);
+    if (strcmp (gbuf,"DMC")==0)
     {
-        status = SCPE_ARG;
+        controller->dev_type = DMC;
+    }
+    else if (strcmp (gbuf,"DMR")==0)
+    {
+        controller->dev_type = DMR;
     }
     else
     {
-        if (strcmp(buf,"DMC")==0)
-        {
-            controller->dev_type = DMC;
-        }
-        else if  (strcmp(buf,"DMR")==0)
-        {
-            controller->dev_type = DMR;
-        }
-        else if  (strcmp(buf,"DMP")==0)
-        {
-            controller->dev_type = DMP;
-        }
-        else
-        {
-            status = SCPE_ARG;
-        }
+        status = SCPE_ARG;
     }
 
     return status;
@@ -819,28 +766,72 @@ t_stat dmc_setlinemode (UNIT* uptr, int32 val, char* cptr, void* desc)
     return status;
 }
 
+/* SET LINES processor */
+
+t_stat dmc_setnumdevices (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+    int32 newln;
+    uint32 i;
+    t_stat r;
+    DEVICE *dptr = (DEVICE *)desc;
+    int maxunits = (&dmc_dev == dptr) ? DMC_NUMDEVICE : DMP_NUMDEVICE;
+    DIB *dibptr = (DIB *)dptr->ctxt;
+    int addrlnt = (UNIBUS) ? IOLN_DMC : IOLN_DMV;
+
+    for (i=0; i<dptr->numunits; i++)
+        if (dptr->units[i].flags&UNIT_ATT)
+            return SCPE_ALATT;
+    if (cptr == NULL)
+        return SCPE_ARG;
+    newln = (int32) get_uint (cptr, 10, maxunits, &r);
+    if ((r != SCPE_OK) || (newln == dptr->numunits))
+        return r;
+    if (newln == 0)
+        return SCPE_ARG;
+    dibptr->lnt = newln * addrlnt;                      /* set length */
+    dptr->numunits = newln;
+    return dmc_reset ((DEVICE *)desc);                  /* setup devices and auto config */
+}
+
+t_stat dmc_shownumdevices (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+    DEVICE *dptr = (UNIBUS) ? find_dev_from_unit (uptr) : &dmv_dev;
+
+    fprintf (st, "lines=%d", dptr->numunits);
+    return SCPE_OK;
+}
+
+
 t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-    fprintf(st, "The DMC11 is a synchronous serial point-to-point communications device.\n");
-    fprintf(st, "A real DMC11 transports data using DDCMP, the emulated device makes a\n");
+    char devname[16];
+
+    sprintf(devname, "%s11", (dptr == &dmc_dev) ? "DMC" : ((UNIBUS) ? "DMP" : "DMV"));
+    fprintf(st, "The %s is a synchronous serial point-to-point communications device.\n", devname);
+    fprintf(st, "A real %s transports data using DDCMP, the emulated device makes a\n", devname);
     fprintf(st, "TCP/IP connection to another emulated device and sends length-prefixed\n");
     fprintf(st, "messages across the connection, each message representing a single buffer\n");
-    fprintf(st, "passed to the DMC11. The DMC11 can be used for point-to-point DDCMP\n");
+    fprintf(st, "passed to the %s. The %s can be used for point-to-point DDCMP\n", devname, devname);
     fprintf(st, "connections carrying DECnet and other types of networking, e.g. from ULTRIX\n");
     fprintf(st, "or DSM.\n\n");
-    fprintf(st, "The line mode of the two ends of the link must be set. One end must always\n");
+    fprintf(st, "A total of %d %s devices can be simulated concurrently. The number\n", (dptr == &dmc_dev) ? DMC_NUMDEVICE : DMP_NUMDEVICE, devname);
+    fprintf(st, "of simulated %s devices or lines can be specified with command:\n", devname);
+    fprintf(st, "\n");
+    fprintf(st, "   sim> SET %s LINES=n\n", dptr->name);
+    fprintf(st, "\n");
+    fprintf(st, "The line mode of the two ends of a link must be set. One end must always\n");
     fprintf(st, "be primary and one end always secondary, setting both to primary or both\n");
     fprintf(st, "to secondary will not work. If there are firewall problems at one side,\n");
     fprintf(st, "set that side to be primary as the primary always initiates the TCP/IP\n");
     fprintf(st, "connection.\n");
     fprintf(st, "\n");
-    fprintf(st, "   sim> SET DMC0 LINEMODE= {PRIMARY|SECONDARY}\n");
+    fprintf(st, "   sim> SET %s0 LINEMODE= {PRIMARY|SECONDARY}\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "To set the host and port to which data is to be transmitted use the\n");
     fprintf(st, "following command (required for PRIMARY and SECONDARY, secondary will check\n");
     fprintf(st, "it is receiving from the configured primary):\n");
     fprintf(st, "\n");
-    fprintf(st, "   sim> SET DMC0 PEER=host:port\n");
+    fprintf(st, "   sim> SET %s0 PEER=host:port\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "The device must be attached to a receive port, use the ATTACH command\n");
     fprintf(st, "specifying the receive port number, even if the line mode is primary.\n");
@@ -848,14 +839,14 @@ t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
     fprintf(st, "The minimum interval between attempts to connect to the other side is set\n");
     fprintf(st, "using the following command:\n");
     fprintf(st, "\n");
-    fprintf(st, "   sim> SET DMC0 CONNECTPOLL=n\n");
+    fprintf(st, "   sim> SET %s0 CONNECTPOLL=n\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "Where n is the number of seconds. The default is 30 seconds.\n");
     fprintf(st, "\n");
     fprintf(st, "If you want to experience the actual data rates of the physical hardware you\n");
     fprintf(st, "can set the bit rate of the simulated line can be set using the following\n");
     fprintf(st, "command:\n\n");
-    fprintf(st, "   sim> SET DMC0 SPEED=n\n");
+    fprintf(st, "   sim> SET %s0 SPEED=n\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "Where n is the number of data bits per second that the simulated line runs\n");
     fprintf(st, "at.  In practice this is implemented as a delay in reading the bytes from\n");
@@ -865,16 +856,16 @@ t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
     fprintf(st, "To configure two simulators to talk to each other use the following example:\n");
     fprintf(st, "\n");
     fprintf(st, "Machine 1\n");
-    fprintf(st, "   sim> SET DMC0 ENABLE\n");
-    fprintf(st, "   sim> SET DMC0 PRIMARY\n");
-    fprintf(st, "   sim> SET DMC0 PEER=LOCALHOST:2222\n");
-    fprintf(st, "   sim> ATTACH DMC0 1111\n");
+    fprintf(st, "   sim> SET %s ENABLE\n", dptr->name);
+    fprintf(st, "   sim> SET %s0 LINEMODE=PRIMARY\n", dptr->name);
+    fprintf(st, "   sim> SET %s0 PEER=LOCALHOST:2222\n", dptr->name);
+    fprintf(st, "   sim> ATTACH %s0 1111\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "Machine 2\n");
-    fprintf(st, "   sim> SET DMC0 ENABLE\n");
-    fprintf(st, "   sim> SET DMC0 SECONDARY\n");
-    fprintf(st, "   sim> SET DMC0 PEER= LOCALHOST:1111\n");
-    fprintf(st, "   sim> ATTACH DMC0 2222\n");
+    fprintf(st, "   sim> SET %s ENABLE\n", dptr->name);
+    fprintf(st, "   sim> SET %s0 LINEMODE=SECONDARY\n", dptr->name);
+    fprintf(st, "   sim> SET %s0 PEER= LOCALHOST:1111\n", dptr->name);
+    fprintf(st, "   sim> ATTACH %s0 2222\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "Debugging\n");
     fprintf(st, "=========\n");
@@ -891,11 +882,11 @@ t_stat dmc_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
     fprintf(st, "\n");
     fprintf(st, "To get a full trace use\n");
     fprintf(st, "\n");
-    fprintf(st, "   sim> SET DMC0 DEBUG\n");
+    fprintf(st, "   sim> SET %s DEBUG\n", dptr->name);
     fprintf(st, "\n");
     fprintf(st, "However it is recommended to use the following when sending traces:\n");
     fprintf(st, "\n");
-    fprintf(st, "   sim> SET DMC0 DEBUG=REG;INFO;WARN\n");
+    fprintf(st, "   sim> SET %s DEBUG=REG;INFO;WARN\n", dptr->name);
     fprintf(st, "\n");
     return SCPE_OK;
 }
@@ -906,7 +897,7 @@ t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cp
     fprintf (st, "The communication line performs input and output through a TCP session\n");
     fprintf (st, "connected to a user-specified port.  The ATTACH command specifies the");
     fprintf (st, "port to be used:\n\n");
-    fprintf (st, "   sim> ATTACH %s {interface:}port        set up listening port\n\n", dptr->name);
+    fprintf (st, "   sim> ATTACH %sn {interface:}port        set up listening port\n\n", dptr->name);
     fprintf (st, "where port is a decimal number between 1 and 65535 that is not being used for\n");
     fprintf (st, "other TCP/IP activities. An ATTACH is required even if in PRIMARY mode. \n\n");
     return SCPE_OK;
@@ -915,30 +906,41 @@ t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cp
 void dmc_setrxint(CTLR *controller)
 {
     controller->rxi = 1;
+    dmc_rxi_summary |= (1u << controller->index);
     SET_INT(DMCRX);
 }
 
 void dmc_clrrxint(CTLR *controller)
 {
     controller->rxi = 0;
-    CLR_INT(DMCRX);
+    dmc_rxi_summary &= ~(1u << controller->index);
+    if (!dmc_rxi_summary)
+        CLR_INT(DMCRX);
+    else
+        SET_INT(DMCRX);
 }
 
 void dmc_settxint(CTLR *controller)
 {
     controller->txi = 1;
+    dmc_txi_summary |= (1u << controller->index);
     SET_INT(DMCTX);
 }
 
 void dmc_clrtxint(CTLR *controller)
 {
     controller->txi = 0;
+    dmc_txi_summary &= ~(1u << controller->index);
+    if (!dmc_txi_summary)
+        CLR_INT(DMCTX);
+    else
+        SET_INT(DMCTX);
     CLR_INT(DMCTX);
 }
 
 int dmc_getsel(int addr)
 {
-    return (addr >> 1) & 03;
+    return (addr >> 1) & ((UNIBUS) ? 03 : 07);
 }
 
 uint16 dmc_bitfld(int data, int start_bit, int length)
@@ -1046,26 +1048,41 @@ void dmc_dumpregsel6(CTLR *controller, int trace_level, char *prefix, uint16 dat
         dmc_bitfld(data, SEL6_LOST_DATA_BIT, 1) ? "LOST_DATA " : "");
 }
 
+void dmc_dumpregsel10(CTLR *controller, int trace_level, char *prefix, uint16 data)
+{
+    sim_debug(
+        trace_level,
+        controller->device,
+        "%s SEL10 (0x%04x) %s\n",
+        prefix,
+        data,
+        dmc_bitfld(data, SEL6_LOST_DATA_BIT, 1) ? "LOST_DATA " : "");
+}
+
 uint16 dmc_getreg(CTLR *controller, int reg, int ext)
 {
     uint16 ans = 0;
     switch (dmc_getsel(reg))
     {
     case 00:
-        ans = controller->csrs->sel0;
+        ans = *controller->csrs->sel0;
         if (ext) dmc_dumpregsel0(controller, DBG_REG, "Getting", ans);
         break;
     case 01:
-        ans = controller->csrs->sel2;
+        ans = *controller->csrs->sel2;
         if (ext) dmc_dumpregsel2(controller, DBG_REG, "Getting", ans);
         break;
     case 02:
-        ans = controller->csrs->sel4;
+        ans = *controller->csrs->sel4;
         if (ext) dmc_dumpregsel4(controller, DBG_REG, "Getting", ans);
         break;
     case 03:
-        ans = controller->csrs->sel6;
+        ans = *controller->csrs->sel6;
         if (ext) dmc_dumpregsel6(controller, DBG_REG, "Getting", ans);
+        break;
+    case 04:
+        ans = *controller->csrs->sel10;
+        if (ext) dmc_dumpregsel10(controller, DBG_REG, "Getting", ans);
         break;
     default:
         {
@@ -1083,34 +1100,42 @@ void dmc_setreg(CTLR *controller, int reg, uint16 data, int ext)
     {
     case 00:
         dmc_dumpregsel0(controller, DBG_REG, trace, data);
-        controller->csrs->sel0 = data;
+        *controller->csrs->sel0 = data;
         if (!ext)
         {
-            controller->shadow_csrs->sel0 = data;
+            *controller->shadow_csrs->sel0 = data;
         }
         break;
     case 01:
         dmc_dumpregsel2(controller, DBG_REG, trace, data);
-        controller->csrs->sel2 = data;
+        *controller->csrs->sel2 = data;
         if (!ext)
         {
-            controller->shadow_csrs->sel2 = data;
+            *controller->shadow_csrs->sel2 = data;
         }
         break;
     case 02:
         dmc_dumpregsel4(controller, DBG_REG, trace, data);
-        controller->csrs->sel4 = data;
+        *controller->csrs->sel4 = data;
         if (!ext)
         {
-            controller->shadow_csrs->sel4 = data;
+            *controller->shadow_csrs->sel4 = data;
         }
         break;
     case 03:
         dmc_dumpregsel6(controller, DBG_REG, trace, data);
-        controller->csrs->sel6 = data;
+        *controller->csrs->sel6 = data;
         if (!ext)
         {
-            controller->shadow_csrs->sel6 = data;
+            *controller->shadow_csrs->sel6 = data;
+        }
+        break;
+    case 04:
+        dmc_dumpregsel10(controller, DBG_REG, trace, data);
+        *controller->csrs->sel10 = data;
+        if (!ext)
+        {
+            *controller->shadow_csrs->sel10 = data;
         }
         break;
     default:
@@ -1122,12 +1147,12 @@ void dmc_setreg(CTLR *controller, int reg, uint16 data, int ext)
 
 int dmc_is_master_clear_set(CTLR *controller)
 {
-    return controller->csrs->sel0 & MASTER_CLEAR_MASK;
+    return *controller->csrs->sel0 & MASTER_CLEAR_MASK;
 }
 
 int dmc_is_lu_loop_set(CTLR *controller)
 {
-    return controller->csrs->sel0 & LU_LOOP_MASK;
+    return *controller->csrs->sel0 & LU_LOOP_MASK;
 }
 
 int dmc_is_rqi_set(CTLR *controller)
@@ -1135,11 +1160,11 @@ int dmc_is_rqi_set(CTLR *controller)
     int ans = 0;
     if (dmc_is_dmc(controller))
     {
-        ans = controller->csrs->sel0 & DMC_RQI_MASK;
+        ans = *controller->csrs->sel0 & DMC_RQI_MASK;
     }
     else
     {
-        ans = controller->csrs->sel0 & DMP_RQI_MASK;
+        ans = *controller->csrs->sel0 & DMP_RQI_MASK;
     }
     return ans;
 }
@@ -1149,11 +1174,11 @@ int dmc_is_rdyi_set(CTLR *controller)
     int ans = 0;
     if (dmc_is_dmc(controller))
     {
-        ans = controller->csrs->sel0 & DMC_RDYI_MASK;
+        ans = *controller->csrs->sel0 & DMC_RDYI_MASK;
     }
     else
     {
-        ans = controller->csrs->sel2 & DMP_RDYI_MASK;
+        ans = *controller->csrs->sel2 & DMP_RDYI_MASK;
     }
     return ans;
 }
@@ -1163,11 +1188,11 @@ int dmc_is_iei_set(CTLR *controller)
     int ans = 0;
     if (dmc_is_dmc(controller))
     {
-        ans = controller->csrs->sel0 & DMC_IEI_MASK;
+        ans = *controller->csrs->sel0 & DMC_IEI_MASK;
     }
     else
     {
-        ans = controller->csrs->sel0 & DMP_IEI_MASK;
+        ans = *controller->csrs->sel0 & DMP_IEI_MASK;
     }
 
     return ans;
@@ -1177,11 +1202,11 @@ int dmc_is_ieo_set(CTLR *controller)
     int ans = 0;
     if (dmc_is_dmc(controller))
     {
-        ans = controller->csrs->sel2 & DMC_IEO_MASK;
+        ans = *controller->csrs->sel2 & DMC_IEO_MASK;
     }
     else
     {
-        ans = controller->csrs->sel0 & DMP_IEO_MASK;
+        ans = *controller->csrs->sel0 & DMP_IEO_MASK;
     }
 
     return ans;
@@ -1191,35 +1216,35 @@ int dmc_is_in_io_set(CTLR *controller)
     int ans = 0;
     if (dmc_is_dmc(controller))
     {
-        ans = controller->csrs->sel0 & DMC_IN_IO_MASK;
+        ans = *controller->csrs->sel0 & DMC_IN_IO_MASK;
     }
     else
     {
-        ans = !controller->csrs->sel2 & DMP_IN_IO_MASK;
+        ans = !*controller->csrs->sel2 & DMP_IN_IO_MASK;
     }
 
     return ans;
 }
 int dmc_is_out_io_set(CTLR *controller)
 {
-    int ans = controller->shadow_csrs->sel2 & OUT_IO_MASK;
+    int ans = *controller->shadow_csrs->sel2 & OUT_IO_MASK;
     return ans;
 }
 
 int dmc_is_rdyo_set(CTLR *controller)
 {
-    return controller->csrs->sel2 & DMC_RDYO_MASK;
+    return *controller->csrs->sel2 & DMC_RDYO_MASK;
 }
 
 void dmc_set_rdyi(CTLR *controller)
 {
     if (dmc_is_dmc(controller))
     {
-        dmc_setreg(controller, 0, controller->csrs->sel0 | DMC_RDYI_MASK, 0);
+        dmc_setreg(controller, 0, *controller->csrs->sel0 | DMC_RDYI_MASK, 0);
     }
     else
     {
-        dmc_setreg(controller, 2, controller->csrs->sel2 | DMP_RDYI_MASK, 0);
+        dmc_setreg(controller, 2, *controller->csrs->sel2 | DMP_RDYI_MASK, 0);
     }
 
     if (dmc_is_iei_set(controller))
@@ -1232,17 +1257,17 @@ void dmc_clear_rdyi(CTLR *controller)
 {
     if (dmc_is_dmc(controller))
     {
-        dmc_setreg(controller, 0, controller->csrs->sel0 & ~DMC_RDYI_MASK, 0);
+        dmc_setreg(controller, 0, *controller->csrs->sel0 & ~DMC_RDYI_MASK, 0);
     }
     else
     {
-        dmc_setreg(controller, 2, controller->csrs->sel2 & ~DMP_RDYI_MASK, 0);
+        dmc_setreg(controller, 2, *controller->csrs->sel2 & ~DMP_RDYI_MASK, 0);
     }
 }
 
 void dmc_set_rdyo(CTLR *controller)
 {
-    dmc_setreg(controller, 2, controller->csrs->sel2 | DMC_RDYO_MASK, 0);
+    dmc_setreg(controller, 2, *controller->csrs->sel2 | DMC_RDYO_MASK, 0);
 
     if (dmc_is_ieo_set(controller))
     {
@@ -1252,17 +1277,17 @@ void dmc_set_rdyo(CTLR *controller)
 
 void dmc_set_lost_data(CTLR *controller)
 {
-    dmc_setreg(controller, 6, controller->csrs->sel6 | LOST_DATA_MASK, 0);
+    dmc_setreg(controller, 6, *controller->csrs->sel6 | LOST_DATA_MASK, 0);
 }
 
 void dmc_clear_master_clear(CTLR *controller)
 {
-    dmc_setreg(controller, 0, controller->csrs->sel0 & ~MASTER_CLEAR_MASK, 0);
+    dmc_setreg(controller, 0, *controller->csrs->sel0 & ~MASTER_CLEAR_MASK, 0);
 }
 
 void dmc_set_run(CTLR *controller)
 {
-    dmc_setreg(controller, 0, controller->csrs->sel0 | RUN_MASK, 0);
+    dmc_setreg(controller, 0, *controller->csrs->sel0 | RUN_MASK, 0);
 }
 
 int dmc_get_input_transfer_type(CTLR *controller)
@@ -1271,32 +1296,32 @@ int dmc_get_input_transfer_type(CTLR *controller)
 
     if (dmc_is_dmc(controller))
     {
-        ans = controller->csrs->sel0 & DMC_TYPE_INPUT_MASK;
+        ans = *controller->csrs->sel0 & DMC_TYPE_INPUT_MASK;
     }
     else
     {
-        ans = controller->csrs->sel2 & DMP_TYPE_INPUT_MASK;
+        ans = *controller->csrs->sel2 & DMP_TYPE_INPUT_MASK;
     }
 
     return ans;
 }
 int dmc_get_output_transfer_type(CTLR *controller)
 {
-    return controller->shadow_csrs->sel2 & TYPE_OUTPUT_MASK;
+    return *controller->shadow_csrs->sel2 & TYPE_OUTPUT_MASK;
 }
 void dmc_set_type_output(CTLR *controller, int type)
 {
-    dmc_setreg(controller, 2, controller->csrs->sel2 | (type & TYPE_OUTPUT_MASK), 0);
+    dmc_setreg(controller, 2, *controller->csrs->sel2 | (type & TYPE_OUTPUT_MASK), 0);
 }
 
 void dmc_set_out_io(CTLR *controller)
 {
-    dmc_setreg(controller, 2, controller->csrs->sel2 | OUT_IO_MASK, 0);
+    dmc_setreg(controller, 2, *controller->csrs->sel2 | OUT_IO_MASK, 0);
 }
 
 void dmc_clear_out_io(CTLR *controller)
 {
-    dmc_setreg(controller, 2, controller->csrs->sel2 & ~OUT_IO_MASK, 0);
+    dmc_setreg(controller, 2, *controller->csrs->sel2 & ~OUT_IO_MASK, 0);
 }
 
 void dmc_process_master_clear(CTLR *controller)
@@ -1314,7 +1339,7 @@ void dmc_process_master_clear(CTLR *controller)
     else
     {
         /* preserve contents of BSEL3 if DMC-11 */
-        dmc_setreg(controller, 2, controller->csrs->sel2 & 0xFF00, 0);
+        dmc_setreg(controller, 2, *controller->csrs->sel2 & 0xFF00, 0);
     }
     if (controller->dev_type == DMP)
     {
@@ -1338,8 +1363,8 @@ void dmc_process_master_clear(CTLR *controller)
     controller->transfer_state = Idle;
     dmc_set_run(controller);
 
-    sim_cancel (controller->device->units);                                  /* stop poll */
-    sim_clock_coschedule (controller->device->units, tmxr_poll);             /* reactivate */
+    sim_cancel (controller->unit);                                  /* stop poll */
+    sim_clock_coschedule (controller->unit, tmxr_poll);             /* reactivate */
 }
 
 void dmc_start_input_transfer(CTLR *controller)
@@ -1422,7 +1447,7 @@ t_stat dmc_svc(UNIT* uptr)
         dmc_timer_start(poll_timer);
     }
 
-    if (dmc_is_attached(controller->device->units))
+    if (dmc_is_attached(controller->unit))
     {
         dmc_line_update_speed_stats(controller->line);
 
@@ -1434,7 +1459,7 @@ t_stat dmc_svc(UNIT* uptr)
     }
 
     /* resubmit service timer */
-    sim_clock_coschedule (controller->device->units, tmxr_poll);
+    sim_clock_coschedule (controller->unit, tmxr_poll);
 
     dmc_timer_stop(poll_timer);
     if (dmc_timer_started(between_polls_timer))
@@ -1716,7 +1741,7 @@ t_stat dmc_open_master_socket(CTLR *controller, char *port)
         }
         else
         {
-            printf ("DMC-11 %s listening on port %s\n", controller->device->name, port);
+            printf ("%s-11 %s%d listening on port %s\n", (controller->dev_type == DMC) ? "DMC" : ((controller->dev_type == DMR) ? "DMR" : ((UNIBUS) ? "DMP" : "DMV")), controller->device->name, (int)(controller->unit-controller->device->units), port);
         }
     }
 
@@ -2175,8 +2200,8 @@ void dmc_process_input_transfer_completion(CTLR *controller)
     {
         if (!dmc_is_rqi_set(controller))
         {
-            uint16 sel4 = controller->csrs->sel4;
-            uint16 sel6 = controller->csrs->sel6;
+            uint16 sel4 = *controller->csrs->sel4;
+            uint16 sel6 = *controller->csrs->sel6;
             dmc_clear_rdyi(controller);
             if (controller->transfer_type == TYPE_BASEI)
             {
@@ -2216,7 +2241,7 @@ void dmc_process_input_transfer_completion(CTLR *controller)
     {
         if (!dmc_is_rdyi_set(controller))
         {
-            uint16 sel6 = controller->csrs->sel6;
+            uint16 sel6 = *controller->csrs->sel6;
             if (controller->transfer_type == TYPE_DMP_MODE)
             {
                 uint16 mode = sel6 & DMP_TYPE_INPUT_MASK;
@@ -2276,8 +2301,8 @@ void dmc_process_command(CTLR *controller)
             dmc_start_input_transfer(controller);
         }
         else if (dmc_is_dmc (controller) &&
-                 controller->csrs->sel0 & ROMI_MASK &&
-                 controller->csrs->sel6 == DSPDSR)
+                 *controller->csrs->sel0 & ROMI_MASK &&
+                 *controller->csrs->sel6 == DSPDSR)
             /* DMC-11 or DMR-11, see if ROMI bit is set.  If so, if SEL6 is
                0x22b3 (read line status instruction), set the DTR bit in SEL2.  */
         {
@@ -2333,7 +2358,7 @@ t_stat dmc_wr(int32 data, int32 PA, int32 access)
         dmc_setreg(controller, PA, (oldValue & ~mask) | (data & mask), 1);
     }
 
-    if (dmc_is_attached(controller->device->units) && (dmc_getsel(reg) == 0 || dmc_getsel(reg) == 1))
+    if (dmc_is_attached(controller->unit) && (dmc_getsel(reg) == 0 || dmc_getsel(reg) == 1))
     {
         dmc_process_command(controller);
     }
@@ -2345,13 +2370,13 @@ int32 dmc_rxint (void)
 {
     int i;
     int32 ans = 0; /* no interrupt request active */
-    for (i=0; i<DMC_NUMDEVICE; i++)
+    for (i=0; i<DMC_NUMDEVICE+DMP_NUMDEVICE; i++)
     {
         CTLR *controller = &dmc_ctrls[i];
         if (controller->rxi != 0)
         {
             DIB *dib = (DIB *)controller->device->ctxt;
-            ans = dib->vec;
+            ans = dib->vec + (8 * (int)(controller->unit - controller->device->units));
             dmc_clrrxint(controller);
             break;
         }
@@ -2364,13 +2389,13 @@ int32 dmc_txint (void)
 {
     int i;
     int32 ans = 0; /* no interrupt request active */
-    for (i=0; i<DMC_NUMDEVICE; i++)
+    for (i=0; i<DMC_NUMDEVICE+DMP_NUMDEVICE; i++)
     {
         CTLR *controller = &dmc_ctrls[i];
         if (controller->txi != 0)
         {
             DIB *dib = (DIB *)controller->device->ctxt;
-            ans = dib->vec + 4;
+            ans = dib->vec + 4 + (8 * (int)(controller->unit - controller->device->units));
             dmc_clrtxint(controller);
             break;
         }
@@ -2382,19 +2407,100 @@ int32 dmc_txint (void)
 t_stat dmc_reset (DEVICE *dptr)
 {
     t_stat ans = SCPE_OK;
-    CTLR *controller = dmc_get_controller_from_device(dptr);
+    CTLR *controller;
+    uint32 i, j;
 
-    sim_debug(DBG_TRC, dptr, "dmc_reset()\n");
+    sim_debug(DBG_TRC, dptr, "dmc_reset(%s)\n", dptr->name);
 
-    dmc_buffer_queue_init_all(controller);
-    dmc_clrrxint(controller);
-    dmc_clrtxint(controller);
-    sim_cancel (controller->device->units); /* stop poll */
+    /* Connect structures together */
+    for (i=0; i < DMC_NUMDEVICE; i++)
+    {
+        dmc_csrs[i].sel0 = &dmc_sel0[i];
+        dmc_csrs[i].sel2 = &dmc_sel2[i];
+        dmc_csrs[i].sel4 = &dmc_sel4[i];
+        dmc_csrs[i].sel6 = &dmc_sel6[i];
+        dmc_shadow_csrs[i].sel0 = &dmc_shadow_sel0[i];
+        dmc_shadow_csrs[i].sel2 = &dmc_shadow_sel2[i];
+        dmc_shadow_csrs[i].sel4 = &dmc_shadow_sel4[i];
+        dmc_shadow_csrs[i].sel6 = &dmc_shadow_sel6[i];
+        controller = &dmc_ctrls[i];
+        controller->csrs = &dmc_csrs[i];
+        controller->shadow_csrs = &dmc_shadow_csrs[i];
+        controller->line = &dmc_line[i];
+        controller->receive_queue = &dmc_receive_queues[i];
+        controller->transmit_queue = &dmc_transmit_queues[i];;
+        controller->stats = &dmc_stats[i];
+        controller->device = &dmc_dev;
+        controller->unit = &controller->device->units[i];
+        controller->index = i;
+    }
+    for (i=0; i < DMP_NUMDEVICE; i++)
+    {
+        dmp_csrs[i].sel0 = &dmp_sel0[i];
+        dmp_csrs[i].sel2 = &dmp_sel2[i];
+        dmp_csrs[i].sel4 = &dmp_sel4[i];
+        dmp_csrs[i].sel6 = &dmp_sel6[i];
+        dmp_csrs[i].sel10 = &dmp_sel10[i];
+        dmp_shadow_csrs[i].sel0 = &dmp_shadow_sel0[i];
+        dmp_shadow_csrs[i].sel2 = &dmp_shadow_sel2[i];
+        dmp_shadow_csrs[i].sel4 = &dmp_shadow_sel4[i];
+        dmp_shadow_csrs[i].sel6 = &dmp_shadow_sel6[i];
+        dmp_shadow_csrs[i].sel10 = &dmp_shadow_sel10[i];
+        controller = &dmc_ctrls[i+DMC_NUMDEVICE];
+        controller->csrs = &dmp_csrs[i];
+        controller->shadow_csrs = &dmp_shadow_csrs[i];
+        controller->line = &dmp_line[i];
+        controller->receive_queue = &dmp_receive_queues[i];
+        controller->transmit_queue = &dmp_transmit_queues[i];;
+        controller->stats = &dmp_stats[i];
+        controller->device = (UNIBUS) ? &dmp_dev : &dmv_dev;
+        controller->dev_type = DMP;
+        controller->unit = &controller->device->units[i];
+        controller->index = i + DMC_NUMDEVICE;
+    }
+    if (0 == dmc_units[0].flags)         /* First Time Initializations */
+    {
+        for (i=0; i < DMC_NUMDEVICE; i++)
+        {
+            controller = &dmc_ctrls[i];
+            controller->state = Initialised;
+            controller->transfer_state = Idle;
+            controller->master_socket = INVALID_SOCKET;
+            controller->connect_poll_interval = 30;
+            controller->dev_type = DMC;
+            dmc_line[i].socket = INVALID_SOCKET;
+            dmc_dev.units[i] = dmc_unit_template;
+        }
+        for (i=0; i < DMP_NUMDEVICE; i++)
+        {
+            controller = &dmc_ctrls[i+DMC_NUMDEVICE];
+            controller->state = Initialised;
+            controller->transfer_state = Idle;
+            controller->master_socket = INVALID_SOCKET;
+            controller->connect_poll_interval = 30;
+            dmp_line[i].socket = INVALID_SOCKET;
+            dmp_dev.units[i] = dmc_unit_template;
+        }
+    }
+
+    ans = auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : dptr->numunits);
 
     if (!(dptr->flags & DEV_DIS))
     {
-        ans = auto_config (dptr->name, DMC_UNITSPERDEVICE);
+        for (i = 0; i < DMC_NUMDEVICE + DMP_NUMDEVICE; i++)
+        {
+            if (dmc_ctrls[i].device == dptr)
+            {
+                controller = &dmc_ctrls[i];
+                dmc_buffer_queue_init_all(controller);
+                dmc_clrrxint(controller);
+                dmc_clrtxint(controller);
+                for (j=0; j<dptr->numunits; j++)
+                    sim_cancel (&dptr->units[j]); /* stop poll */
+            }
+        }
     }
+
     return ans;
 }
 
@@ -2442,6 +2548,7 @@ char *dmc_description (DEVICE *dptr)
 
 char *dmp_description (DEVICE *dptr)
     {
-    return "DMP11 Synchronous network controller";
+    return (UNIBUS) ? "DMP11 Synchronous network controller"
+                    : "DMV11 Synchronous network controller";
     }
 

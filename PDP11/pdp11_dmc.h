@@ -43,25 +43,28 @@
 #ifndef PDP11_DMC_H
 #define PDP11_DMC_H
 
-#if defined (VM_VAX)                                  /* VAX version */
+#if defined (VM_VAX)                                    /* VAX version */
 #include "vax_defs.h"
-extern int32 int_req[IPL_HLVL];
 #elif defined(VM_PDP10)
 #include "pdp10_defs.h"
-//#define IPL_HLVL        8                               /* # int levels */
-extern int32 int_req;
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
-extern int32 int_req[IPL_HLVL];
 #endif
+
+extern int32 IREQ (HLVL);
+extern int32 tmxr_poll;                                 /* calibrated delay */
+extern int32 clk_tps;                                   /* clock ticks per second */
+extern int32 tmr_poll;                                  /* instructions per tick */
 
 #include "sim_sock.h"
 
-#define DMC_NUMDEVICE 4 /* # DMC-11 devices */
-#define DMC_UNITSPERDEVICE 1 /* # units per DMC-11 */
+#if !defined(DMC_NUMDEVICE)
+#define DMC_NUMDEVICE 8         /* MAX # DMC-11 devices */
+#endif
 
-#define DMP_NUMDEVICE 1 /* # DMP-11 devices */
-#define DMP_UNITSPERDEVICE 1 /* # units per DMP-11 */
+#if !defined(DMP_NUMDEVICE)
+#define DMP_NUMDEVICE 8         /* MAX # DMP-11/DMV-11 devices */
+#endif
 
 #define DMC_RDX                     8
 
