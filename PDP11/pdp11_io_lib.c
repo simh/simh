@@ -298,7 +298,7 @@ t_stat show_iospace (FILE *st, UNIT *uptr, int32 val, void *desc)
 uint32 i, j;
 DEVICE *dptr;
 DIB *dibp;
-uint32 maxaddr, maxname;
+uint32 maxaddr, maxname, maxdev;
 int32 maxvec, vecwid;
 char valbuf[40];
 
@@ -308,6 +308,7 @@ if (build_dib_tab ())                                   /* build IO page */
 maxaddr = 0;
 maxvec = 0;
 maxname = 0;
+maxdev = 1;
 
 for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
     size_t l;
@@ -326,6 +327,9 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
         l = strlen (dptr? sim_dname (dptr): "CPU");
         if (l>maxname)
             maxname = (int32)l;
+        j = (dptr? dptr->numunits: 1);
+        if (j > maxdev)
+            maxdev = j;
         }                                               /* end if */
     }                                                   /* end for i */
 maxaddr = fprint_val (NULL, (t_value) dibp->ba, DEV_RDX, 32, PV_LEFT);
@@ -333,6 +337,8 @@ sprintf (valbuf, "%03o", maxvec);
 vecwid = maxvec = (int32) strlen (valbuf);
 if (vecwid < 3)
     vecwid = 3;
+sprintf (valbuf, "%u", maxdev);
+maxdev = (uint32)strlen (valbuf);
 
 j = strlen ("Address");
 i = (maxaddr*2)+3+1;
@@ -352,7 +358,7 @@ else
 maxvec = i+j;
 fprintf (st, " %*.*sVector%*.*s", i/2, i/2, " ", (i/2)+i%2, (i/2)+i%2, " ");
 
-fprintf (st, " BR Device\n");
+fprintf (st, " BR %*.*s# Device\n", (maxdev -1), (maxdev-1));
 for (i = 0; i < maxaddr; i++)
     fputc ('-', st);
 fprintf (st, " ");
@@ -360,6 +366,10 @@ for (i = 0; i < (uint32)maxvec; i++)
     fputc ('-', st);
 
 fprintf (st, " -- ");
+for (i=0; i < maxdev; i++) {
+    fputc ('-', st);
+}
+fputc (' ', st);
 
 i = strlen ("Device");
 if (maxname < i)
@@ -397,7 +407,7 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
             fprintf (st, " %2u", dibp->vloc/32);
         else
             fprintf (st, "   ");
-        fprintf (st, " %s\n", dptr? sim_dname (dptr): "CPU");
+        fprintf (st, " %*u %s\n", maxdev, (dptr? dptr->numunits: 1), dptr? sim_dname (dptr): "CPU");
         }                                               /* end if */
     }                                                   /* end for i */
 return SCPE_OK;
@@ -526,10 +536,10 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { NULL },          1,  3,  0, 8,
       {015000, 015040, 015100, 015140, }},              /* DV11 */
     { { NULL },          1,  2,  8, 8 },                /* LK11A */
-    { { "DMC0", "DMC1", "DMC2", "DMC3" }, 
+    { { "DMC" }, 
                          1,  2,  8, 8 },                /* DMC11 */
     { { "DZ" },          1,  2,  8, 8 },                /* DZ11 */
-    { { "KMC" },         1,  2,  8, 8 },                /* KMC11 */
+    { { "KDP" },         1,  2,  8, 8 },                /* KMC11 */
     { { NULL },          1,  2,  8, 8 },                /* LPP11 */
     { { NULL },          1,  2,  8, 8 },                /* VMV21 */
     { { NULL },          1,  2, 16, 8 },                /* VMV31 */
