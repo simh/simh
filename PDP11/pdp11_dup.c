@@ -503,7 +503,7 @@ if (dup >= dup_desc.lines)                              /* validate line number 
 
 orig_val = regs[(PA >> 1) & 03][dup];
 if (PA & 1)                                             /* unaligned byte access? */
-    data = ((data << 8) & (orig_val & 0xFF)) & 0xFFFF;  /* Merge with original word */
+    data = ((data << 8) | (orig_val & 0xFF)) & 0xFFFF;  /* Merge with original word */
 else
     if (access == WRITEB)                               /* byte access? */
         data = (orig_val & 0xFF00) | (data & 0xFF);     /* Merge with original high word */
