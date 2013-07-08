@@ -160,7 +160,7 @@ DEVICE dli_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, &dlx_attach, &dlx_detach,
-    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
     };
 
 /* DLO data structures
@@ -219,7 +219,7 @@ DEVICE dlo_dev = {
     DLX_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, NULL, NULL,
-    NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
+    NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* Terminal input routines */
