@@ -71,30 +71,38 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
     if (detail) {
         int i, same, group, sidx, oidx;
         char outbuf[80], strbuf[18];
-        static char hex[] = "0123456789ABCDEF";
+        static const char hex[] = "0123456789ABCDEF";
+        static const char *const flags [4] = { "  ", " Q", "S ", "SQ" };
+        static const char *const nak[18] = { "", " (HCRC)", " (DCRC)", " (REPREPLY)", /* 0-3 */
+                                             "", "", "", "",                          /* 4-7 */
+                                             " (NOBUF)", " (RXOVR)", "", "",          /* 8-11 */
+                                             "", "", "", "",                          /* 12-15 */
+                                             " (TOOLONG)", " (HDRFMT)" };             /* 16-17 */
+        const char *flag = flags[msg[2]>>6];
+        int msg2 = msg[2] & 0x3F;
 
         switch (msg[0]) {
             case DDCMP_SOH:   /* Data Message */
-                sim_debug (reason, dptr, "Data Message, Link: %d, Count: %d, Resp: %d, Num: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)|msg[1], msg[3], msg[4], 
-                                            (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)|msg[1]))) ? "OK" : "BAD");
+                sim_debug (reason, dptr, "Data Message, Flags: %s, Count: %d, Resp: %d, Num: %d, HDRCRC: %s, DATACRC: %s\n", flag, (msg2 << 8)|msg[1], msg[3], msg[4], 
+                                            (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+((msg2 << 8)|msg[1]))) ? "OK" : "BAD");
                 break;
             case DDCMP_ENQ:   /* Control Message */
                 sim_debug (reason, dptr, "Control: Type: %d ", msg[1]);
                 switch (msg[1]) {
                     case 1: /* ACK */
-                        sim_debug (reason, dptr, "(ACK) ACKSUB: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
+                        sim_debug (reason, dptr, "(ACK) ACKSUB: %d, Flags: %s, Resp: %d\n", msg2, flag, msg[3]);
                         break;
                     case 2: /* NAK */
-                        sim_debug (reason, dptr, "(NAK) Reason: %d, Link: %d, Resp: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[3]);
+                        sim_debug (reason, dptr, "(NAK) Reason: %d%s, Flags: %s, Resp: %d\n", msg2, ((msg2 > 17)? "": nak[msg2]), flag, msg[3]);
                         break;
                     case 3: /* REP */
-                        sim_debug (reason, dptr, "(REP) REPSUB: %d, Link: %d, Num: %d\n", msg[2] & 0x3F, msg[2]>>6, msg[4]);
+                        sim_debug (reason, dptr, "(REP) REPSUB: %d, Flags: %s, Num: %d\n", msg2, flag, msg[4]);
                         break;
                     case 6: /* STRT */
-                        sim_debug (reason, dptr, "(STRT) STRTSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
+                        sim_debug (reason, dptr, "(STRT) STRTSUB: %d, Flags: %s\n", msg2, flag);
                         break;
                     case 7: /* STACK */
-                        sim_debug (reason, dptr, "(STACK) STCKSUB: %d, Link: %d\n", msg[2] & 0x3F, msg[2]>>6);
+                        sim_debug (reason, dptr, "(STACK) STCKSUB: %d, Flags: %s\n", msg2, flag);
                         break;
                     default: /* Unknown */
                         sim_debug (reason, dptr, "(Unknown=0%o)\n", msg[1]);
@@ -108,8 +116,8 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
                     }
                 break;
             case DDCMP_DLE:   /* Maintenance Message */
-                sim_debug (reason, dptr, "Maintenance Message, Link: %d, Count: %d, HDRCRC: %s, DATACRC: %s\n", msg[2]>>6, ((msg[2] & 0x3F) << 8)| msg[1], 
-                                            (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+(((msg[2] & 0x3F) << 8)| msg[1]))) ? "OK" : "BAD");
+                sim_debug (reason, dptr, "Maintenance Message, Flags: %s, Count: %d, HDRCRC: %s, DATACRC: %s\n", flag, (msg2 << 8)| msg[1], 
+                                            (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+((msg2 << 8)| msg[1]))) ? "OK" : "BAD");
                 break;
             }
         for (i=same=0; i<len; i += 16) {
