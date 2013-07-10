@@ -403,7 +403,7 @@ static const int *codeTbl =                            /* punch translation tabl
 #endif
 static  struct trans {
     const char *const name;
-    const int  *const table;
+    const int  *table;
 } transcodes[] = {
     { "DEFAULT", o29_code, },
     { "026", o26_dec_code, },
