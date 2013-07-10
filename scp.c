@@ -2526,7 +2526,7 @@ char gbuf[CBUFSIZE], *cvptr;
 DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
-SHTAB *shtb, *shptr;
+SHTAB *shtb = NULL, *shptr;
 
 static SHTAB show_glob_tab[] = {
     { "CONFIGURATION", &show_config, 0 },
@@ -2636,7 +2636,7 @@ while (*cptr != 0) {                                    /* do all mods */
             }                                           /* end if */
         }                                               /* end for */
     if (mptr->mask == 0) {                              /* no match? */
-        if ((shptr = find_shtab (shtb, gbuf)))          /* global match? */
+        if (shtb && (shptr = find_shtab (shtb, gbuf)))          /* global match? */
             shptr->action (ofile, dptr, uptr, shptr->arg, cptr);
         else return SCPE_ARG;
         }                                               /* end if */
@@ -6099,6 +6099,8 @@ return val;
         format  =       leading zeroes format
    Outputs:
         status  =       error status
+        if stream is NULL, returns length of output that would
+        have been generated.
 */
 
 t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
@@ -6135,6 +6137,8 @@ switch (format) {
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
         d = d - commas;
         if (width > MAX_WIDTH) {
+            if (!stream)
+                return width;
             fprintf (stream, "%*s", -((int)width), dbuf);
             return SCPE_OK;
             }
@@ -6155,6 +6159,8 @@ switch (format) {
             d = MAX_WIDTH - (ndigits + commas);
         break;
     }
+if (!stream)
+    return strlen(dbuf+d);
 if (fputs (&dbuf[d], stream) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
