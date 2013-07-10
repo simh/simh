@@ -721,7 +721,11 @@ if (sim_interval <= 0) {                                /* check clock queue */
 /* PI interrupt (Unibus or system flags).
    On the KS10, only JSR and XPCW are allowed as interrupt instructions.
    Because of exec mode addressing, and unconditional processing of flags,
-   they are explicitly emulated here.
+   they are explicitly emulated here.  Note that the KS microcode does not
+   perform an EA calc on interrupt instructions, which this emulation does.
+   This is an implementation restriction of the KS.  The KS does not restrict
+   the CONSOLE EXECUTE function which is merged into this path in SimH.  
+
    On a keep-alive failure, the console (fe) forces the CPU 'XCT' the 
    instruction at exec 71.  This is close enough to an interrupt that it is
    treated as one here.  TOPS-10 and TOPS-20 use JSR or XPCW, which are 
@@ -766,14 +770,19 @@ if (qintr) {
         its_1pr = 0;                                    /* clear 1-proc */
         }
     if (op == OP_JSR) {                                 /* JSR? */
-        ea = calc_ea (inst, MM_CUR);                    /* calc ea, cur mode */
-        WriteE (ea, FLPC);                              /* save flags+PC, exec */
-        JUMP (INCA (ea));                               /* PC = ea + 1 */
+        d10 flpc = FLPC;
+
         set_newflags (0, FALSE);                        /* set new flags */
+        ea = calc_ea (inst, MM_CUR);                    /* calc ea, cur mode */
+        WriteE (ea, flpc);                              /* save flags+PC, exec */
+        JUMP (INCA (ea));                               /* PC = ea + 1 */
         }
     else if ((op == OP_JRST) && (ac == AC_XPCW)) {      /* XPCW? */
+        d10 flz = XWD (flags, 0);
+
+        set_newflags (0, FALSE);                        /* set exec flags */
         ea = calc_ea (inst, MM_CUR);                    /* calc ea, cur mode */
-        WriteE (ea, XWD (flags, 0));                    /* write flags, exec */
+        WriteE (ea, flz);                               /* write flags, exec */
         WriteE (ADDA (ea, 1), PC);                      /* write PC, exec */
         rs[0] = ReadE (ADDA (ea, 2));                   /* read new flags */
         rs[1] = ReadE (ADDA (ea, 3));                   /* read new PC */
