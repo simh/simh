@@ -1448,7 +1448,7 @@ if (cp->csta < CST_UP) {                                /* still init? */
             if ((cp->saw & SA_S4H_LF)
                 && cp->perr) rq_plf (cp, cp->perr);
             cp->perr = 0;
-			}
+            }
         break;
         }                                               /* end switch */  
                       
@@ -1675,9 +1675,9 @@ if ((uptr = rq_getucb (cp, lu)) &&                      /* valid lu? */
     (tpkt = uptr->cpkt) &&                              /* queued pkt? */
     (GETP32 (tpkt, CMD_REFL) == ref) &&                 /* match ref? */
     (GETP (tpkt, CMD_OPC, OPC) >= OP_ACC)) {            /* rd/wr cmd? */
-	cp->pak[pkt].d[GCS_STSL] = cp->pak[tpkt].d[RW_WBCL];
-	cp->pak[pkt].d[GCS_STSH] = cp->pak[tpkt].d[RW_WBCH];
-	}
+    cp->pak[pkt].d[GCS_STSL] = cp->pak[tpkt].d[RW_WBCL];
+    cp->pak[pkt].d[GCS_STSH] = cp->pak[tpkt].d[RW_WBCH];
+    }
 else {
     cp->pak[pkt].d[GCS_STSL] = 0;                       /* return 0 */
     cp->pak[pkt].d[GCS_STSH] = 0;
@@ -3094,7 +3094,7 @@ fprintf (st, "ability to set units write enabled or write locked, and to set the
 fprintf (st, "type to one of many disk types:\n");
 fprint_set_help (st, dptr);
 fprintf (st, "set RQn RAUSER{=n}        Set disk type to RA82 with n MB's\n");
-fprintf (st, "set -L RQn RAUSER{=n}		Set disk type to RA82 with n LBN's\n\n");
+fprintf (st, "set -L RQn RAUSER{=n}     Set disk type to RA82 with n LBN's\n\n");
 fprintf (st, "The type options can be used only when a unit is not attached to a file.\n");
 fprintf (st, "RAUSER is a \"user specified\" disk; the user can specify the size of the\n");
 fprintf (st, "disk in either MB (1000000 bytes) or logical block numbers (LBN's, 512 bytes\n");

@@ -18,6 +18,7 @@ For Example, the directory structure should look like:
     .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
     .../simh/windows-build/pthreads/pthread.h
     .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
+    .../simh/windows-build/libSDL/SDL-1.2.15/include/SDL.h
 
 The contents of the windows-build directory can be downloaded from:
 
@@ -47,5 +48,5 @@ in this directory.
 
 If you are using a version of Visual Studio beyond Visual Studio 2008, then 
 your later version of Visual Studio will automatically convert the Visual 
-Studio 2008 project fils.  You should ignore any warnings produced by the 
+Studio 2008 project files.  You should ignore any warnings produced by the 
 conversion process.

@@ -387,7 +387,7 @@ if (lnt < L_LONG) {
     int32 t = cqbic_rd (pa);
     nval = ((val & mask) << sc) | (t & ~(mask << sc));
     val = val << sc;
-	}
+    }
 else nval = val;
 switch (rg) {
 

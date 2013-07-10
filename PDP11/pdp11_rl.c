@@ -175,7 +175,7 @@ extern UNIT cpu_unit;
 #define  RLCS_WRITE     (5)
 #define  RLCS_READ      (6)
 #define  RLCS_RNOHDR    (7)
-#define	 RLCS_SPECIAL   (8)                             /* internal function, drive state */
+#define  RLCS_SPECIAL   (8)                             /* internal function, drive state */
 #define RLCS_V_FUNC     (1)
 #define RLCS_M_MEX      (03)                            /* memory extension */
 #define RLCS_V_MEX      (4)
@@ -381,11 +381,11 @@ static const char * const state[] = {
 
 /* I/O dispatch routines, I/O addresses 17774400 - 17774411
 
-   17774400	RLCS    read/write
-   17774402	RLBA    read/write
-   17774404	RLDA    read/write
-   17774406	RLMP    read/write
-   17774410	RLBAE   read/write
+   17774400 RLCS    read/write
+   17774402 RLBA    read/write
+   17774404 RLDA    read/write
+   17774406 RLMP    read/write
+   17774410 RLBAE   read/write
 */
 
 t_stat rl_rd (int32 *data, int32 PA, int32 access)
@@ -395,7 +395,7 @@ UNIT *uptr;
 switch ((PA >> 1) & 07) {                               /* decode PA<2:1> */
 
     case 0:                                             /* RLCS */
-	rlcs = (rlcs & ~RLCS_MEX) | ((rlbae & RLCS_M_MEX) << RLCS_V_MEX);
+    rlcs = (rlcs & ~RLCS_MEX) | ((rlbae & RLCS_M_MEX) << RLCS_V_MEX);
 /*
 The DRDY signal is sent by the selected drive to indicate that it
 is ready to read or write or seek.  It is sent when the heads are
@@ -513,7 +513,7 @@ bit is cleared by software.  If set, check for interrupts and return.
             if (newc != curr)
             uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_SEEK; /* move the positioner */
 /* TBD: if a head switch, sector should be RL_NUMSC/2? */
-            uptr->TRK = (newc << RLDA_V_CYL) |		/* put on track */
+            uptr->TRK = (newc << RLDA_V_CYL) |      /* put on track */
                 ((rlda & RLDA_SK_HD)? RLDA_HD1: RLDA_HD0);
 /*
 Real timing:
@@ -782,7 +782,7 @@ was removed in a later ECO.
             uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_BRUSH;
         } else {
             uptr->STAT |= RLDS_BHO;
-			uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_HLOAD;
+            uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_HLOAD;
         }
         sim_activate (uptr, 200 * rl_swait);
         break;
@@ -810,7 +810,7 @@ Initiated by depressing the Run (LOAD) switch.
 */
     case RLDS_UNL:      /* unload pressed, heads unloaded, spin down */
         uptr->STAT = (uptr->STAT & ~RLDS_M_STATE) | RLDS_DOWN;
-        uptr->STAT &= ~RLDS_HDO;	/* retract heads */
+        uptr->STAT &= ~RLDS_HDO;    /* retract heads */
         /* actual time is ~30 seconds */
         sim_activate (uptr, 200 * rl_swait);
         break;
@@ -866,7 +866,7 @@ if (uptr->FNC == RLCS_RNOHDR) {
 } else {
     /* bad cyl or sector? */
     if (((uptr->TRK & RLDA_CYL) != (rlda & RLDA_CYL)) || (GET_SECT (rlda) >= RL_NUMSC)) {
-        rl_set_done (RLCS_ERR | RLCS_HDE | RLCS_INCMP);	/* wrong cylinder? */
+        rl_set_done (RLCS_ERR | RLCS_HDE | RLCS_INCMP); /* wrong cylinder? */
         return (SCPE_OK);
         }
     da = GET_DA (rlda) * RL_NUMWD;                      /* get disk addr */
@@ -1148,7 +1148,7 @@ t_stat rl_set_ctrl (UNIT *uptr, int32 val, char *cptr, void *desc)
 t_stat rl_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc)
 {
     char    *s = "RLV12";
-	
+
     if (UNIBUS)
         s = "RL11";
     else if (rl_dev.flags & DEV_RLV11)

@@ -54,13 +54,18 @@
 BUILD_SINGLE := $(MAKECMDGOALS) $(BLANK_SUFFIX)
 ifneq (,$(or $(findstring pdp11,$(MAKECMDGOALS)),$(findstring vax,$(MAKECMDGOALS)),$(findstring all,$(MAKECMDGOALS))))
   NETWORK_USEFUL = true
+  ifneq (,$(or $(findstring microvax1,$(MAKECMDGOALS)),$(findstring microvax2,$(MAKECMDGOALS))))
+    VIDEO_USEFUL = true
+  endif
   ifneq (,$(findstring all,$(MAKECMDGOALS))$(word 2,$(MAKECMDGOALS)))
     BUILD_MULTIPLE = s
+    VIDEO_USEFUL = true
   endif
 else
   ifeq ($(MAKECMDGOALS),)
     # default target is all
     NETWORK_USEFUL = true
+    VIDEO_USEFUL = true
     BUILD_MULTIPLE = s
     BUILD_SINGLE := all $(BUILD_SINGLE)
   endif
@@ -308,6 +313,23 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DHAVE_FNMATCH    
     endif
   endif
+  ifneq (,$(call find_include,SDL/SDL))
+    ifneq (,$(call find_lib,SDL))
+      OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+      OS_LDFLAGS += -lSDL
+      $(info using libSDL:  $(call find_lib,SDL) $(call find_include,SDL/SDL))
+    endif
+  endif
+  ifneq (,$(VIDEO_USEFUL))
+    ifeq (,$(findstring HAVE_LIBSDL,$(OS_CCDEFS)))
+      $(info *** Warning ***)
+      $(info *** Warning *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
+      $(info *** Warning *** functionality if video support were available on your system.)
+      $(info *** Warning *** Install the development components of libSDL and rebuild)
+      $(info *** Warning *** your simulator to enable this extra functionality.)
+      $(info *** Warning ***)
+    endif
+  endif
   ifneq (,$(NETWORK_USEFUL))
     ifneq (,$(call find_include,pcap))
       ifneq (,$(call find_lib,$(PCAPLIB)))
@@ -495,8 +517,28 @@ else
       NETWORK_FEATURES = - dynamic networking support using libpcap components found in the MinGW directories
     endif
   endif
-  OS_CCDEFS =  -fms-extensions $(PTHREADS_CCDEFS)
-  OS_LDFLAGS = -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
+  ifneq (,$(VIDEO_USEFUL))
+    ifeq (libSDL,$(shell if exist ..\windows-build\libSDL\SDL-1.2.15\include\SDL.h echo libSDL))
+      OS_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL-1.2.15\include
+      OS_LDFLAGS += -lSDL -lSDLmain -L..\windows-build\libSDL\SDL-1.2.15\lib
+      VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
+    else
+      $(info ***********************************************************************)
+      $(info ***********************************************************************)
+      $(info **  This build could produce simulators with video capabilities.     **)
+      $(info **  However, the required files to achieve this can't be found on    **)
+      $(info **  this system.  Download the file:                                 **)
+      $(info **  https://github.com/simh/windows-build/archive/windows-build.zip  **)
+      $(info **  Refer to the file:                                               **)
+      $(info **  "Visual Studio Projects\0ReadMe_Projects.txt" for where to place **)
+      $(info **  the 'windows-build' folder extracted from that zip file.         **)
+      $(info ***********************************************************************)
+      $(info ***********************************************************************)
+      $(info .)
+    endif
+  endif
+  OS_CCDEFS += -fms-extensions $(PTHREADS_CCDEFS)
+  OS_LDFLAGS += -lm -lwsock32 -lwinmm $(PTHREADS_LDFLAGS)
   EXE = .exe
   ifneq (binexists,$(shell if exist BIN echo binexists))
     MKDIRBIN = if not exist BIN mkdir BIN
@@ -582,6 +624,9 @@ ifneq (clean,$(MAKECMDGOALS))
   ifneq (,$(NETWORK_FEATURES))
     $(info *** $(NETWORK_FEATURES).)
   endif
+  ifneq (,$(VIDEO_FEATURES))
+    $(info *** $(VIDEO_FEATURES).)
+  endif
   ifneq (,$(GIT_COMMIT_ID))
     $(info ***)
     $(info *** git commit id is $(GIT_COMMIT_ID).)
@@ -613,7 +658,8 @@ LDFLAGS := $(OS_LDFLAGS) $(NETWORK_LDFLAGS) $(LDFLAGS_O)
 #
 BIN = BIN/
 SIM = scp.c sim_console.c sim_fio.c sim_timer.c sim_sock.c \
-	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c
+	sim_tmxr.c sim_ether.c sim_tape.c sim_disk.c sim_serial.c \
+	sim_video.c
 
 
 #
@@ -684,25 +730,27 @@ VAX_OPT = -DVM_VAX -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OP
 VAX610 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c ${VAXD}/vax_cmode.c \
 	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c ${VAXD}/vax_syscm.c \
-	${VAXD}/vax610_stddev.c ${VAXD}/vax610_sysdev.c \
-	${VAXD}/vax610_io.c ${VAXD}/vax610_syslist.c ${VAXD}/vax610_mem.c \
+	${VAXD}/vax610_stddev.c ${VAXD}/vax610_sysdev.c ${VAXD}/vax610_io.c \
+	${VAXD}/vax610_syslist.c ${VAXD}/vax610_mem.c ${VAXD}/vax_vc.c \
+	${VAXD}/vax_lk.c ${VAXD}/vax_vs.c ${VAXD}/vax_2681.c \
 	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_io_lib.c
-VAX610_OPT = -DVM_VAX -DVAX_610 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX610_OPT = -DVM_VAX -DVAX_610 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 VAX630 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \
 	${VAXD}/vax_cis.c ${VAXD}/vax_octa.c ${VAXD}/vax_cmode.c \
 	${VAXD}/vax_mmu.c ${VAXD}/vax_sys.c ${VAXD}/vax_syscm.c \
 	${VAXD}/vax_watch.c ${VAXD}/vax630_stddev.c ${VAXD}/vax630_sysdev.c \
-	${VAXD}/vax630_io.c ${VAXD}/vax630_syslist.c \
+	${VAXD}/vax630_io.c ${VAXD}/vax630_syslist.c ${VAXD}/vax_vc.c \
+	${VAXD}/vax_lk.c ${VAXD}/vax_vs.c ${VAXD}/vax_2681.c \
 	${PDP11D}/pdp11_rl.c ${PDP11D}/pdp11_rq.c ${PDP11D}/pdp11_ts.c \
 	${PDP11D}/pdp11_dz.c ${PDP11D}/pdp11_lp.c ${PDP11D}/pdp11_tq.c \
 	${PDP11D}/pdp11_xq.c ${PDP11D}/pdp11_vh.c ${PDP11D}/pdp11_cr.c \
 	${PDP11D}/pdp11_io_lib.c
 VAX620_OPT = -DVM_VAX -DVAX_620 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
-VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
+VAX630_OPT = -DVM_VAX -DVAX_630 -DUSE_INT64 -DUSE_ADDR64 -DUSE_SIM_VIDEO -I ${VAXD} -I ${PDP11D} ${NETWORK_OPT}
 
 
 VAX730 = ${VAXD}/vax_cpu.c ${VAXD}/vax_cpu1.c ${VAXD}/vax_fpa.c \

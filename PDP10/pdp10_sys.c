@@ -110,6 +110,7 @@ const char *sim_stop_messages[] = {
     "Nested XCT limit exceeded",
     "Invalid I/O controller",
     "Address stop",
+    "Console FE halt",
     "Panic stop"
      };
 

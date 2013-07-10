@@ -466,29 +466,29 @@ switch (rg) {
             val = VAX860_SID | VAX860_TYP | VAX860_ECO | VAX860_PLANT | VAX860_SN;
         break;
 
-	case MT_PAMACC:                                     /* PAMACC */
+    case MT_PAMACC:                                     /* PAMACC */
         val = pamm[pamloc >> 20];
         val = val | (pamloc & PAMACC_ADDR);
-		break;
+        break;
 
-	case MT_PAMLOC:                                     /* PAMLOC */
-		val = pamloc & PAMLOC_ADDR;
-		break;
+    case MT_PAMLOC:                                     /* PAMLOC */
+        val = pamloc & PAMLOC_ADDR;
+        break;
 
-	case MT_MDCTL:                                      /* MDCTL */
-		val = mdctl & MDCTL_RW;
+    case MT_MDCTL:                                      /* MDCTL */
+        val = mdctl & MDCTL_RW;
 
-	case MT_EHSR:                                       /* EHSR */
-		val = ehsr & EHSR_VMSE;
-		break;
+    case MT_EHSR:                                       /* EHSR */
+        val = ehsr & EHSR_VMSE;
+        break;
         
-	case MT_CSWP:                                       /* CSWP */
+    case MT_CSWP:                                       /* CSWP */
         val = cswp & 0xF;
-		break;
+        break;
 
-	case MT_MERG:                                       /* MERG */
+    case MT_MERG:                                       /* MERG */
         val = 0;
-		break;
+        break;
 
     case MT_STXCS:                                      /* STXCS */
        val = stxcs_rd ();
@@ -536,42 +536,42 @@ switch (rg) {
 
     case MT_TXDB:                                       /* TXDB */
         txdb_wr (val);
-		break;
+        break;
 
-	case MT_PAMACC:                                     /* PAMACC (not impl) */
-		break;
+    case MT_PAMACC:                                     /* PAMACC (not impl) */
+        break;
 
-	case MT_PAMLOC:                                     /* PAMLOC */
-		pamloc = val & PAMLOC_ADDR;
-		break;
+    case MT_PAMLOC:                                     /* PAMLOC */
+        pamloc = val & PAMLOC_ADDR;
+        break;
 
-	case MT_MDCTL:                                      /* MDCTL */
-		mdctl = val & MDCTL_RW;
-		break;
+    case MT_MDCTL:                                      /* MDCTL */
+        mdctl = val & MDCTL_RW;
+        break;
 
-	case MT_EHSR:                                       /* EHSR */
+    case MT_EHSR:                                       /* EHSR */
         ehsr = val & EHSR_VMSE;
-		break;
+        break;
 
-	case MT_CSWP:                                       /* CSWP */
+    case MT_CSWP:                                       /* CSWP */
         cswp = val & 0xF;
-		break;
+        break;
         
-	case MT_MERG:                                       /* MERG (not impl) */
-		break;
+    case MT_MERG:                                       /* MERG (not impl) */
+        break;
 
     case MT_CRBT:                                       /* CRBT (not impl) */
         break;
 
     case MT_STXCS:                                      /* STXCS */
-	    stxcs_wr (val);
+        stxcs_wr (val);
         break;
 
     case MT_STXDB:                                      /* STXDB */
-	    stxdb_wr (val);
+        stxdb_wr (val);
         break;
 
-	default:
+    default:
         RSVD_OPND_FAULT;
         }
 
@@ -613,7 +613,7 @@ return 0;
 void WriteReg (int32 pa, int32 val, int32 lnt)
 {
 if (ADDR_IS_SBIA (pa)) {                                /* SBI adapter space? */
-	sbia_wr (pa, val, lnt);
+    sbia_wr (pa, val, lnt);
     SET_IRQL;
     return;
 }

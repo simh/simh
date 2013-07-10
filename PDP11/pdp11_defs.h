@@ -484,7 +484,6 @@ typedef struct {
 #define DCX_LINES       16                              /* max # of DC11's */
 #define DUP_LINES       8                               /* max # of DUP11/DPV11's */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
-#define AUTO_LNT        34                              /* autoconfig ranks */
 #define DIB_MAX         100                             /* max DIBs */
 
 #define DEV_V_UBUS      (DEV_V_UF + 0)                  /* Unibus */

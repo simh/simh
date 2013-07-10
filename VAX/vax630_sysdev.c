@@ -55,7 +55,7 @@
 #define UNIT_NODELAY    (1u << UNIT_V_NODELAY)
 
 t_stat vax630_boot (int32 flag, char *ptr);
-int32 sys_model = 0;
+int32 sys_model = 0;                                    /* MicroVAX or VAXstation */
 
 /* Special boot command, overrides regular boot */
 
@@ -106,8 +106,8 @@ CTAB vax630_cmd[] = {
 #define MSER_MCD1       0x00000200                      /* Mem Code 1 */
 #define MSER_MBZ        0xFFFFFC04
 #define MSER_RD         (MSER_PE | MSER_WWP | MSER_LEB | \
-	                     MSER_DQPE | MSER_CQPE | MSER_CLPE | \
-						 MSER_NXM | MSER_MCD0 | MSER_MCD1)
+                         MSER_DQPE | MSER_CQPE | MSER_CLPE | \
+                         MSER_NXM | MSER_MCD0 | MSER_MCD1)
 #define MSER_WR         (MSER_PE | MSER_WWP)
 #define MSER_RS         (MSER_LEB | MSER_DQPE | MSER_CQPE | MSER_CLPE | MSER_NXM)
 
@@ -139,6 +139,7 @@ extern UNIT clk_unit;
 extern jmp_buf save_env;
 extern int32 p1;
 extern int32 tmr_poll;
+extern DEVICE vc_dev, lk_dev, vs_dev;
 
 uint32 *rom = NULL;                                     /* boot ROM */
 uint32 *nvr = NULL;                                     /* non-volatile mem */
@@ -182,6 +183,8 @@ extern int32 qbmap_rd (int32 pa);
 extern void qbmap_wr (int32 pa, int32 val, int32 lnt);
 extern int32 qbmem_rd (int32 pa);
 extern void qbmem_wr (int32 pa, int32 val, int32 lnt);
+extern int32 vc_mem_rd (int32 pa);
+extern void vc_mem_wr (int32 pa, int32 val, int32 lnt);
 extern int32 wtc_rd (int32 pa);
 extern void wtc_wr (int32 pa, int32 val, int32 lnt);
 extern void wtc_set_valid (void);
@@ -409,7 +412,7 @@ fprintf (st, "Read-only memory (ROM)\n\n");
 fprintf (st, "The boot ROM consists of a single unit, simulating the 64KB boot ROM.  It has\n");
 fprintf (st, "no registers.  The boot ROM is loaded with a binary byte stream using the \n");
 fprintf (st, "LOAD -r command:\n\n");
-fprintf (st, "   LOAD -r KA630.BIN		load ROM image KA630.BIN\n\n");
+fprintf (st, "   LOAD -r KA630.BIN      load ROM image KA630.BIN\n\n");
 fprintf (st, "When the simulator starts running (via the BOOT command), if the ROM has\n");
 fprintf (st, "not yet been loaded, an attempt will be made to automatically load the\n");
 fprintf (st, "ROM image from the file ka655x.bin in the current working directory.\n");
@@ -708,7 +711,7 @@ struct reglink regtable[] = {
     { ROMBASE, ROMBASE+ROMSIZE+ROMSIZE, &rom_rd, NULL },
     { NVRBASE, NVRBASE+NVRSIZE, &nvr_rd, &nvr_wr },
     { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr },
-/*    { QVMBASE, QVMBASE+QVMSIZE, &qv_mem_rd, &qv_mem_wr }, */
+    { QVMBASE, QVMBASE+QVMSIZE, &vc_mem_rd, &vc_mem_wr },
     { QBMBASE, QBMBASE+QBMSIZE, &qbmem_rd, &qbmem_wr },
     { 0, 0, NULL, NULL }
     };
@@ -825,8 +828,8 @@ p2 = mchk_va + 4;                                       /* save vap */
 st = 0;
 if (p1 & 0x80) {                                        /* mref? */
     cc = intexc (SCB_MCHK, cc, 0, IE_EXC);              /* take normal exception */
-	if (!(ka_mser & MSER_CQPE) && !(ka_mser & MSER_CLPE))
-		ka_mser |= MSER_NXM;
+    if (!(ka_mser & MSER_CQPE) && !(ka_mser & MSER_CLPE))
+        ka_mser |= MSER_NXM;
 }
 else cc = intexc (SCB_MCHK, cc, 0, IE_SVE);             /* take severe exception */
 acc = ACC_MASK (KERN);                                  /* in kernel mode */
@@ -957,12 +960,44 @@ ka_diag_full = 0;
 return SCPE_OK;
 }
 
+t_stat cpu_set_model (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+#if defined(HAVE_LIBSDL)
+char gbuf[CBUFSIZE];
+
+if ((cptr == NULL) || (!*cptr))
+    return SCPE_ARG;
+cptr = get_glyph (cptr, gbuf, 0);
+if (MATCH_CMD(gbuf, "MICROVAX") == 0) {
+    sys_model = 0;
+    vc_dev.flags = vc_dev.flags | DEV_DIS;               /* disable QVSS */
+    lk_dev.flags = lk_dev.flags | DEV_DIS;               /* disable keyboard */
+    vs_dev.flags = vs_dev.flags | DEV_DIS;               /* disable mouse */
+    strcpy (sim_name, "MicroVAX II (KA630)");
+    reset_all (0);                                       /* reset everything */
+    }
+else if (MATCH_CMD(gbuf, "VAXSTATION") == 0) {
+    sys_model = 1;
+    vc_dev.flags = vc_dev.flags & ~DEV_DIS;              /* enable QVSS */
+    lk_dev.flags = lk_dev.flags & ~DEV_DIS;              /* enable keyboard */
+    vs_dev.flags = vs_dev.flags & ~DEV_DIS;              /* enable mouse */
+    strcpy (sim_name, "VAXStation II (KA630)");
+    reset_all (0);                                       /* reset everything */
+    }
+else
+    return SCPE_ARG;
+return SCPE_OK;
+#else
+return SCPE_NOFNC;
+#endif
+}
+
 t_stat cpu_print_model (FILE *st)
 {
 #if defined(VAX_620)
 fprintf (st, "rtVAX 1000");
 #else
-fprintf (st, "MicroVAX II");
+fprintf (st, (sys_model ? "VAXstation II" : "MicroVAX II"));
 #endif
 return SCPE_OK;
 }

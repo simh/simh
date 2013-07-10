@@ -178,7 +178,7 @@ typedef unsigned long           t_uint64;
 #define t_uint64                unsigned long long
 #endif                                                  /* end 64b */
 #ifndef INT64_C
-#define INT64_C(x)		x ## LL
+#define INT64_C(x)      x ## LL
 #endif
 
 #if defined (USE_INT64)                                 /* 64b data */
@@ -384,15 +384,17 @@ struct sim_device {
 #define DEV_V_TYPE      4                               /* Attach type */
 #define DEV_S_TYPE      3                               /* Width of Type Field */
 #define DEV_V_SECTORS   7                               /* Unit Capacity is in 512byte sectors */
+#define DEV_V_DONTAUTO  8                               /* Do not auto detach already attached units */
 #define DEV_V_UF_31     12                              /* user flags, V3.1 */
 #define DEV_V_UF        16                              /* user flags */
 #define DEV_V_RSV       31                              /* reserved */
 
-#define DEV_DIS         (1 << DEV_V_DIS)                /* device can be set enabled or disabled */
-#define DEV_DISABLE     (1 << DEV_V_DISABLE)            /* device is currently disabled */
+#define DEV_DIS         (1 << DEV_V_DIS)                /* device is currently disabled */
+#define DEV_DISABLE     (1 << DEV_V_DISABLE)            /* device can be set enabled or disabled */
 #define DEV_DYNM        (1 << DEV_V_DYNM)               /* device requires call on msize routine to change memory size */
 #define DEV_DEBUG       (1 << DEV_V_DEBUG)              /* device supports SET DEBUG command */
 #define DEV_SECTORS     (1 << DEV_V_SECTORS)            /* capacity is 512 byte sectors */
+#define DEV_DONTAUTO    (1 << DEV_V_DONTAUTO)           /* Do not auto detach already attached units */
 #define DEV_NET         0                               /* Deprecated - meaningless */
 
 
