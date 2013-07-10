@@ -388,10 +388,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PDP11\pdp11_dmc.h"
-				>
-			</File>
-			<File
 				RelativePath="..\PDP11\pdp11_io_lib.h"
 				>
 			</File>
