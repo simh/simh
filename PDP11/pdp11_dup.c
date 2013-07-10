@@ -747,7 +747,6 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
 sim_debug (DBG_TRC, DUPDPTR, "dup_put_msg_bytes(dup=%d, len=%d, start=%s, end=%s) %s\n", 
            dup, len, start ? "TRUE" : "FALSE", end ? "TRUE" : "FALSE", breturn ? "Good" : "Busy");
 if (breturn && (tmxr_tpbusyln (&dup_ldsc[dup]) || dup_xmtpkbytes[dup])) {
-    ddcmp_packet_trace (DBG_PKT, DUPDPTR, ">>> XMT Packet", dup_xmtpacket[dup], dup_xmtpkoffset[dup], TRUE);
     if (dup_xmt_complete_callback[dup])
         dup_svc(dup_units+dup);
     }
