@@ -469,6 +469,7 @@ switch ((PA >> 1) & 03) {                               /* case on PA<2:1> */
     case 00:                                            /* RXCSR */
         dup_get_modem (dup);
         *data = dup_rxcsr[dup];
+        dup_rxcsr[dup] &= ~(RXCSR_M_DSCHNG|RXCSR_M_BDATSET);
         break;
 
     case 01:                                            /* RXDBUF */
@@ -596,6 +597,7 @@ static t_stat dup_get_modem (int32 dup)
 int32 modem_bits;
 int32 old_rxcsr_a_modem_bits, new_rxcsr_a_modem_bits, old_rxcsr_b_modem_bits, new_rxcsr_b_modem_bits;
 TMLN *lp = &dup_desc.ldsc[dup];
+t_bool new_modem_change = FALSE;
 
 old_rxcsr_a_modem_bits = dup_rxcsr[dup] & RXCSR_A_MODEM_BITS;
 old_rxcsr_b_modem_bits = dup_rxcsr[dup] & RXCSR_B_MODEM_BITS;
@@ -606,17 +608,15 @@ new_rxcsr_a_modem_bits = (((modem_bits & TMXR_MDM_RNG) ? RXCSR_M_RING : 0) |
 new_rxcsr_b_modem_bits = ((modem_bits & TMXR_MDM_DSR) ? RXCSR_M_DSR : 0);
 dup_rxcsr[dup] &= ~(RXCSR_A_MODEM_BITS | RXCSR_B_MODEM_BITS);
 dup_rxcsr[dup] |= new_rxcsr_a_modem_bits | new_rxcsr_b_modem_bits;
-if (old_rxcsr_a_modem_bits != new_rxcsr_a_modem_bits)
+if (old_rxcsr_a_modem_bits != new_rxcsr_a_modem_bits) {
     dup_rxcsr[dup] |= RXCSR_M_DSCHNG;
-else
-    dup_rxcsr[dup] &= ~RXCSR_M_DSCHNG;
-if (old_rxcsr_b_modem_bits != new_rxcsr_b_modem_bits)
+    new_modem_change = TRUE;
+    }
+if (old_rxcsr_b_modem_bits != new_rxcsr_b_modem_bits) {
     dup_rxcsr[dup] |= RXCSR_M_BDATSET;
-else
-    dup_rxcsr[dup] &= ~RXCSR_M_BDATSET;
-if (dup_modem_change_callback[dup] &&
-    ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) ||
-     (dup_rxcsr[dup] & RXCSR_M_BDATSET)))
+    new_modem_change = TRUE;
+    }
+if (dup_modem_change_callback[dup] && new_modem_change)
      dup_modem_change_callback[dup](dup);
 if ((dup_rxcsr[dup] & RXCSR_M_DSCHNG) &&
     (dup_rxcsr[dup] & RXCSR_M_DSCIE))
