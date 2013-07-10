@@ -363,6 +363,8 @@ static MTAB dup_mod[] = {
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
         &set_vec, &show_vec_mux, (void *) &dup_desc, "Interrupt vector" },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "CONNECTIONS", NULL,
+        NULL, &tmxr_show_cstat, (void *) &dup_desc, "Display current connections" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "LINES", "LINES=n",
         &dup_setnl, &tmxr_show_lines, (void *) &dup_desc, "Display number of lines" },
     { 0 }
