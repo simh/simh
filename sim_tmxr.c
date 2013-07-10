@@ -68,9 +68,11 @@
    tmxr_detach_ln -                     reset line and close per line listener and outgoing destination
    tmxr_getc_ln -                       get character for line
    tmxr_get_packet_ln -                 get packet from line
+   tmxr_get_packet_ln_ex -              get packet from line with separater byte
    tmxr_poll_rx -                       poll receive
    tmxr_putc_ln -                       put character for line
    tmxr_put_packet_ln -                 put packet on line
+   tmxr_put_packet_ln_ex -              put packet on line with separator byte
    tmxr_poll_tx -                       poll transmit
    tmxr_send_buffered_data -            transmit buffered data
    tmxr_set_modem_control_passthru -    enable modem control on a multiplexer
@@ -1341,6 +1343,8 @@ return val;
         *lp     =       pointer to terminal line descriptor
         **pbuf  =       pointer to pointer of packet contents
         *psize  =       pointer to packet size
+        frame_byte -    byte which separates packets in the tcp stream
+                        (0 means no separation character)
 
    Output:
         SCPE_LOST       link state lost
@@ -1356,28 +1360,34 @@ return val;
 
 t_stat tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, size_t *psize)
 {
+return tmxr_get_packet_ln_ex (lp, pbuf, psize, 0);
+}
+
+t_stat tmxr_get_packet_ln_ex (TMLN *lp, const uint8 **pbuf, size_t *psize, uint8 frame_byte)
+{
 int32 c;
 size_t pktsize;
+size_t fc_size = (frame_byte ? 1 : 0);
 
 while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
     if (lp->rxpboffset + 1 > lp->rxpbsize) {
         lp->rxpbsize += 512;
         lp->rxpb = (uint8 *)realloc (lp->rxpb, lp->rxpbsize);
         }
-    lp->rxpb[lp->rxpboffset] = c;
-    if ((lp->rxpboffset == 0) && (c != 0x1E)) {
-        tmxr_debug (TMXR_DBG_PRCV, lp, "Received Unexpected Byte", (char *)&lp->rxpb[lp->rxpboffset], 1);
+    if ((lp->rxpboffset == 0) && (fc_size) && (c != frame_byte)) {
+        tmxr_debug (TMXR_DBG_PRCV, lp, "Received Unexpected Framing Byte", (char *)&lp->rxpb[lp->rxpboffset], 1);
         continue;
         }
+    lp->rxpb[lp->rxpboffset] = c & 0xFF;
     lp->rxpboffset += 1;
-    if (lp->rxpboffset >= 3) {
-        pktsize = (lp->rxpb[1] << 8) | lp->rxpb[2];
+    if (lp->rxpboffset >= (2 + fc_size)) {
+        pktsize = (lp->rxpb[0+fc_size] << 8) | lp->rxpb[1+fc_size];
         if (pktsize == (lp->rxpboffset - 2)) {
             ++lp->rxpcnt;
-            *pbuf = &lp->rxpb[3];
+            *pbuf = &lp->rxpb[2+fc_size];
             *psize = pktsize;
             lp->rxpboffset = 0;
-            tmxr_debug (TMXR_DBG_PRCV, lp, "Received Packet", (char *)&lp->rxpb[3], pktsize);
+            tmxr_debug (TMXR_DBG_PRCV, lp, "Received Packet", (char *)&lp->rxpb[2+fc_size], pktsize);
             return SCPE_OK;
             }
         }
@@ -1600,6 +1610,7 @@ return SCPE_STALL;                                      /* char not sent */
         *lp     =       pointer to line descriptor
         *buf    =       pointer to packet data
         size    =       size of packet
+        frame_char =    inter-packet franing character (0 means no frame character)
 
    Outputs:
         status  =       ok, connection lost, or stall
@@ -1612,7 +1623,13 @@ return SCPE_STALL;                                      /* char not sent */
 */
 t_stat tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size)
 {
+return tmxr_put_packet_ln_ex (lp, buf, size, 0);
+}
+
+t_stat tmxr_put_packet_ln_ex (TMLN *lp, const uint8 *buf, size_t size, uint8 frame_byte)
+{
 t_stat r;
+size_t fc_size = (frame_byte ? 1 : 0);
 
 if (!lp->conn)
     return SCPE_LOST;
@@ -1620,17 +1637,17 @@ if (lp->txppoffset < lp->txppsize) {
     tmxr_debug (TMXR_DBG_PXMT, lp, "Skipped Sending Packet - Transmit Busy", (char *)&lp->txpb[3], size);
     return SCPE_STALL;
     }
-if (lp->txpbsize < size + 3) {
-    lp->txpbsize = size + 3;
+if (lp->txpbsize < size + 2 + fc_size) {
+    lp->txpbsize = size + 2 + fc_size;
     lp->txpb = (uint8 *)realloc (lp->txpb, lp->txpbsize);
     }
-lp->txpb[0] = 0x1E; /* Record Separator to Frame packet */
-lp->txpb[1] = (size >> 8) & 0xFF;
-lp->txpb[2] = size & 0xFF;
-memcpy (lp->txpb + 3, buf, size);
-lp->txppsize = size + 3;
+lp->txpb[0] = frame_byte;
+lp->txpb[0+fc_size] = (size >> 8) & 0xFF;
+lp->txpb[1+fc_size] = size & 0xFF;
+memcpy (lp->txpb + 2 + fc_size, buf, size);
+lp->txppsize = size + 2 + fc_size;
 lp->txppoffset = 0;
-tmxr_debug (TMXR_DBG_PXMT, lp, "Sending Packet", (char *)&lp->txpb[3], size);
+tmxr_debug (TMXR_DBG_PXMT, lp, "Sending Packet", (char *)&lp->txpb[2+fc_size], size);
 ++lp->txpcnt;
 while ((lp->txppoffset < lp->txppsize) && 
        (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
@@ -4000,7 +4017,7 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
     if (tmxr_debug_buf)
         tmxr_debug_buf[tmxr_debug_buf_used] = '\0';
 
-    if (!lp->notelnet) {
+    if (lp->notelnet) {
         int same, group, sidx, oidx;
         char outbuf[80], strbuf[18];
         static char hex[] = "0123456789ABCDEF";
