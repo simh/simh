@@ -428,15 +428,15 @@ MTAB dmv_mod[] = {
 
 #define IOLN_DMC        010
 
-DIB dmc_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint} };
+DIB dmc_dib = { IOBA_AUTO, IOLN_DMC, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint}, IOLN_DMC };
 
 #define IOLN_DMP        010
 
-DIB dmp_dib = { IOBA_AUTO, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }};
+DIB dmp_dib = { IOBA_AUTO, IOLN_DMP, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }, IOLN_DMP};
 
 #define IOLN_DMV        020
 
-DIB dmv_dib = { IOBA_AUTO, IOLN_DMV, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }};
+DIB dmv_dib = { IOBA_AUTO, IOLN_DMV, &dmc_rd, &dmc_wr, 2, IVCL (DMCRX), VEC_AUTO, {&dmc_rxint, &dmc_txint }, IOLN_DMV};
 
 DEVICE dmc_dev =
     { "DMC", dmc_units, dmc_reg, dmc_mod, 1, DMC_RDX, 8, 1, DMC_RDX, 8,

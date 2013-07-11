@@ -322,7 +322,8 @@ DIB dup_dib = {
     2,          /* # of vectors */
     IVCL (DUPRX),
     VEC_AUTO,
-    { &dup_rxinta, &dup_txinta }/* int. ack. routines */
+    { &dup_rxinta, &dup_txinta },/* int. ack. routines */
+    IOLN_DUP,    /* IO space per line */
 };
 
 static UNIT dup_unit_template = {
