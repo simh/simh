@@ -483,6 +483,8 @@ typedef struct {
 #define DLX_LINES       16                              /* max # of KL11/DL11's */
 #define DCX_LINES       16                              /* max # of DC11's */
 #define DUP_LINES       8                               /* max # of DUP11/DPV11's */
+#define KMC_UNITS       2                               /* max # of KMC11s */
+#define INITIAL_KMCS    0                               /* Number to initially enable */
 #define MT_MAXFR        (1 << 16)                       /* magtape max rec */
 #define DIB_MAX         100                             /* max DIBs */
 
