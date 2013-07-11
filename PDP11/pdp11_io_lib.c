@@ -327,7 +327,8 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
         l = strlen (dptr? sim_dname (dptr): "CPU");
         if (l>maxname)
             maxname = (int32)l;
-        j = (dptr? dptr->numunits: 1);
+        j = (dibp->ulnt? dibp->lnt/dibp->ulnt:
+             (dptr? dptr->numunits: 1));
         if (j > maxdev)
             maxdev = j;
         }                                               /* end if */
@@ -407,7 +408,9 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
             fprintf (st, " %2u", dibp->vloc/32);
         else
             fprintf (st, "   ");
-        fprintf (st, " %*u %s\n", maxdev, (dptr? dptr->numunits: 1), dptr? sim_dname (dptr): "CPU");
+        fprintf (st, " %*u %s\n", maxdev,  (dibp->ulnt? dibp->lnt/dibp->ulnt:
+                                            (dptr? dptr->numunits: 1)),
+                 dptr? sim_dname (dptr): "CPU");
         }                                               /* end if */
     }                                                   /* end for i */
 return SCPE_OK;

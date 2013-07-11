@@ -187,7 +187,7 @@ static DIB rc_dib = {
     IOLN_RC,
     &rc_rd,
     &rc_wr,
-    1, IVCL (RC), VEC_AUTO, { NULL }
+    1, IVCL (RC), VEC_AUTO, { NULL }, IOLN_RC,
 };
 
 static UNIT rc_unit = {

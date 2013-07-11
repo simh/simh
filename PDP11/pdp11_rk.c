@@ -216,7 +216,7 @@ t_stat rk_boot (int32 unitno, DEVICE *dptr);
 
 DIB rk_dib = {
     IOBA_AUTO, IOLN_RK, &rk_rd, &rk_wr,
-    1, IVCL (RK), VEC_AUTO, { &rk_inta }
+    1, IVCL (RK), VEC_AUTO, { &rk_inta }, IOLN_RK,
     };
 
 UNIT rk_unit[] = {

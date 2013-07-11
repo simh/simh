@@ -275,7 +275,7 @@ char *rl_description (DEVICE *dptr);
 
 static DIB rl_dib = {
     IOBA_AUTO, IOLN_RL, &rl_rd, &rl_wr,
-    1, IVCL (RL), VEC_AUTO, { NULL } };
+    1, IVCL (RL), VEC_AUTO, { NULL }, IOLN_RL };
 
 static UNIT rl_unit[] = {
     { UDATA (&rl_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+

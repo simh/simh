@@ -118,7 +118,7 @@ void dlx_reset_ln (int32 ln);
 
 DIB dli_dib = {
     IOBA_AUTO, IOLN_DL * DLX_LINES, &dlx_rd, &dlx_wr,
-    2, IVCL (DLI), VEC_AUTO, { &dli_iack, &dlo_iack }
+    2, IVCL (DLI), VEC_AUTO, { &dli_iack, &dlo_iack }, IOLN_DL,
     };
 
 UNIT dli_unit = { UDATA (&dli_svc, 0, 0), KBD_POLL_WAIT };

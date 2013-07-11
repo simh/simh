@@ -293,7 +293,8 @@ char *dz_description (DEVICE *dptr);
 
 DIB dz_dib = {
     IOBA_AUTO, IOLN_DZ * DZ_MUXES, &dz_rd, &dz_wr,
-    2, IVCL (DZRX), VEC_AUTO, { &dz_rxinta, &dz_txinta }
+    2, IVCL (DZRX), VEC_AUTO, { &dz_rxinta, &dz_txinta },
+    IOLN_DZ,
     };
 
 UNIT dz_unit = { UDATA (&dz_svc, UNIT_IDLE|UNIT_ATTABLE|DZ_8B_DFLT, 0) };

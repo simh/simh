@@ -417,7 +417,7 @@ UNIT *tq_getucb (uint32 lu);
 
 DIB tq_dib = {
     IOBA_AUTO, IOLN_TQ, &tq_rd, &tq_wr,
-    1, IVCL (TQ), 0, { &tq_inta }
+    1, IVCL (TQ), 0, { &tq_inta }, IOLN_TQ,
     };
 
 UNIT tq_unit[] = {

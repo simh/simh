@@ -144,7 +144,7 @@ void rx_done (int32 esr_flags, int32 new_ecode);
 
 DIB rx_dib = {
     IOBA_AUTO, IOLN_RX, &rx_rd, &rx_wr,
-    1, IVCL (RX), VEC_AUTO, { NULL }
+    1, IVCL (RX), VEC_AUTO, { NULL }, IOLN_RX,
     };
 
 UNIT rx_unit[] = {

@@ -154,7 +154,7 @@ char *dcx_description (DEVICE *dptr);
 
 DIB dci_dib = {
     IOBA_AUTO, IOLN_DC * DCX_LINES, &dcx_rd, &dcx_wr,
-    2, IVCL (DCI), VEC_AUTO, { &dci_iack, &dco_iack }
+    2, IVCL (DCI), VEC_AUTO, { &dci_iack, &dco_iack }, IOLN_DC,
     };
 
 UNIT dci_unit = { UDATA (&dci_svc, 0, 0), KBD_POLL_WAIT };

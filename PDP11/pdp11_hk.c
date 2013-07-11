@@ -581,7 +581,7 @@ char *hk_description (DEVICE *dptr);
 
 DIB hk_dib = {
     IOBA_AUTO, IOLN_HK, &hk_rd, &hk_wr,
-    1, IVCL (HK), VEC_AUTO, { NULL }
+    1, IVCL (HK), VEC_AUTO, { NULL }, IOLN_HK,
     };
 
 UNIT hk_unit[] = {

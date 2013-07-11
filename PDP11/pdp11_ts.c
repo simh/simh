@@ -311,7 +311,7 @@ char *ts_description (DEVICE *dptr);
 
 DIB ts_dib = {
     IOBA_AUTO, IOLN_TS, &ts_rd, &ts_wr,
-    1, IVCL (TS), VEC_AUTO, { NULL }
+    1, IVCL (TS), VEC_AUTO, { NULL }, IOLN_TS
     };
 
 UNIT ts_unit = { UDATA (&ts_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) };

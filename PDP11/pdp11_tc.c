@@ -319,7 +319,7 @@ int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
 
 DIB dt_dib = {
     IOBA_AUTO, IOLN_TC, &dt_rd, &dt_wr,
-    1, IVCL (DTA), VEC_AUTO, { NULL }
+    1, IVCL (DTA), VEC_AUTO, { NULL }, IOLN_TC,
     };
 
 UNIT dt_unit[] = {

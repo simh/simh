@@ -201,7 +201,7 @@ static DIB kg_dib = {
     (IOLN_KG + 2) * KG_UNITS,
     &kg_rd,
     &kg_wr,
-    0, 0, 0, { NULL }
+    0, 0, 0, { NULL }, IOLN_KG+2
 };
 
 static UNIT kg_unit[] = {
