@@ -191,7 +191,7 @@ t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 DIB tm_dib = {
     IOBA_AUTO, IOLN_TM, &tm_rd, &tm_wr,
-    1, IVCL (TM), VEC_AUTO, { NULL }
+    1, IVCL (TM), VEC_AUTO, { NULL }, IOLN_TM,
     };
 
 UNIT tm_unit[] = {

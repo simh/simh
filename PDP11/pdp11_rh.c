@@ -207,7 +207,7 @@ static int32 mba_mapofs[(MBA_OFSMASK + 1) >> 1] = {
 
 DIB mba0_dib = {
     IOBA_AUTO, IOLN_RP, &mba_rd, &mba_wr,
-    1, IVCL (RP), VEC_AUTO, { &mba0_inta }
+    1, IVCL (RP), VEC_AUTO, { &mba0_inta }, IOLN_RP,
     };
 
 UNIT mba0_unit = { UDATA (NULL, 0, 0) };

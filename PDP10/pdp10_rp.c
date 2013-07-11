@@ -387,7 +387,7 @@ t_stat rp_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 DIB rp_dib = {
     IOBA_RP, IOLN_RP, &rp_rd, &rp_wr,
-    1, IVCL (RP), VEC_RP, { &rp_inta }
+    1, IVCL (RP), VEC_RP, { &rp_inta }, IOLN_RP
     };
 
 UNIT rp_unit[] = {

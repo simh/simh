@@ -1129,8 +1129,8 @@ while (done == 0) {                                     /* sort ascending */
             }
         }
     }                                                   /* end while */
-fprintf (st, "     Address       Vector  BR Device\n"
-             "----------------- -------- -- ------\n");
+fprintf (st, "     Address       Vector  BR  # Device\n"
+             "----------------- -------- -- -- ------\n");
 for (i = 0; dib_tab[i] != NULL; i++) {                  /* print table */
     for (j = 0, dptr = NULL; sim_devices[j] != NULL; j++) {
         if (((DIB*) sim_devices[j]->ctxt) == dib_tab[i]) {
@@ -1156,7 +1156,8 @@ for (i = 0; dib_tab[i] != NULL; i++) {                  /* print table */
                             (dib_tab[i]->vloc<=19)? 5: 4);
     else
         fprintf (st, "   ");
-    fprintf (st, " %s\n", dptr? sim_dname (dptr): "CPU");
+    fprintf (st, " %2u %s\n", (dib_tab[i]->ulnt? dib_tab[i]->lnt/dib_tab[i]->ulnt:
+                               (dptr? dptr->numunits: 1)), dptr? sim_dname (dptr): "CPU");
     }
 return SCPE_OK;
 }

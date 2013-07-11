@@ -857,7 +857,7 @@ MSC rq_ctx = { 0 };
 
 DIB rq_dib = {
     IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
-    1, IVCL (RQ), 0, { &rq_inta }
+    1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
 UNIT rq_unit[] = {

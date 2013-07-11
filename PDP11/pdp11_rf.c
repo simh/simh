@@ -145,7 +145,7 @@ uint32 update_rfcs (uint32 newcs, uint32 newdae);
 
 DIB rf_dib = {
     IOBA_AUTO, IOLN_RF, &rf_rd, &rf_wr,
-    1, IVCL (RF), VEC_AUTO, {NULL}
+    1, IVCL (RF), VEC_AUTO, {NULL}, IOLN_RF,
     };
 
 

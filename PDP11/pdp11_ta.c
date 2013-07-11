@@ -150,7 +150,7 @@ uint32 ta_crc (uint8 *buf, uint32 cnt);
 
 DIB ta_dib = {
     IOBA_AUTO, IOLN_TA, &ta_rd, &ta_wr,
-    1, IVCL (TA), VEC_AUTO, { NULL }
+    1, IVCL (TA), VEC_AUTO, { NULL }, IOLN_TA
     };
 
 UNIT ta_unit[] = {

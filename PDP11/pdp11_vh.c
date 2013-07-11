@@ -361,7 +361,8 @@ static DIB vh_dib = {
     2,          /* # of vectors */
     IVCL (VHRX),
     VEC_FLOAT,
-    { &vh_rxinta, &vh_txinta }  /* int. ack. routines */
+    { &vh_rxinta, &vh_txinta },  /* int. ack. routines */
+    IOLN_VH,    /* IO space per device */
 };
 
 static UNIT vh_unit[VH_MUXES] = {

@@ -613,6 +613,7 @@ struct pdp_dib {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routines */
+    uint32              ulnt;                           /* IO length per unit */
 };
 
 typedef struct pdp_dib DIB;

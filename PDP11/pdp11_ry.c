@@ -180,7 +180,7 @@ char *ry_description (DEVICE *dptr);
 
 DIB ry_dib = {
     IOBA_AUTO, IOLN_RY, &ry_rd, &ry_wr,
-    1, IVCL (RY), VEC_AUTO, { NULL }
+    1, IVCL (RY), VEC_AUTO, { NULL }, IOLN_RY,
     };
 
 UNIT ry_unit[] = {

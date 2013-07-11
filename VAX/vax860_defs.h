@@ -321,6 +321,7 @@ typedef struct {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routine */
+    uint32              ulnt;                           /* IO length per unit */
     } DIB;
 
 /* Unibus I/O page layout - XUB,RQB,RQC,RQD float based on number of DZ's

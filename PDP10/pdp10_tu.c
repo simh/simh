@@ -359,7 +359,7 @@ t_stat tu_map_err (UNIT *uptr, t_stat st, t_bool qdt);
 
 DIB tu_dib = {
     IOBA_TU, IOLN_TU, &tu_rd, &tu_wr,
-    1, IVCL (TU), VEC_TU, { &tu_inta }
+    1, IVCL (TU), VEC_TU, { &tu_inta }, IOLN_TU,
     };
 
 UNIT tu_unit[] = {

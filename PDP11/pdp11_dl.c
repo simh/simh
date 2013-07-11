@@ -118,7 +118,7 @@ void dlx_reset_ln (int32 ln);
 
 DIB dli_dib = {
     IOBA_AUTO, IOLN_DL * DLX_LINES, &dlx_rd, &dlx_wr,
-    2, IVCL (DLI), VEC_AUTO, { &dli_iack, &dlo_iack }
+    2, IVCL (DLI), VEC_AUTO, { &dli_iack, &dlo_iack }, IOLN_DL,
     };
 
 UNIT dli_unit = { UDATA (&dli_svc, 0, 0), KBD_POLL_WAIT };
@@ -160,7 +160,7 @@ DEVICE dli_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, &dlx_attach, &dlx_detach,
-    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
+    &dli_dib, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
     };
 
 /* DLO data structures
@@ -219,7 +219,7 @@ DEVICE dlo_dev = {
     DLX_LINES, 10, 31, 1, 8, 8,
     NULL, NULL, &dlx_reset,
     NULL, NULL, NULL,
-    NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS
+    NULL, DEV_UBUS | DEV_QBUS | DEV_DISABLE | DEV_DIS | DEV_MUX
     };
 
 /* Terminal input routines */
