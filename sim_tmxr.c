@@ -3442,6 +3442,9 @@ if ((lp->sock) || (lp->connecting)) {                   /* tcp connection? */
     else                                                /* incoming connection */
         fprintf (st, "Connection from IP address %s\n", lp->ipad);
     }
+else
+    if (lp->destination)                                /* remote connection? */
+        fprintf (st, "Connecting to remote port %s\n", lp->destination);/* print port name */
 if (lp->sock) {
     char *sockname, *peername;
 
