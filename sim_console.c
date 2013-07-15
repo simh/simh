@@ -986,6 +986,7 @@ t_stat sim_set_logon (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
 t_stat r;
+time_t now;
 
 if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
     return SCPE_2FARG;
@@ -1001,6 +1002,8 @@ if (!sim_quiet)
              sim_logfile_name (sim_log, sim_log_ref));
 fprintf (sim_log, "Logging to file \"%s\"\n", 
              sim_logfile_name (sim_log, sim_log_ref));  /* start of log */
+time(&now);
+fprintf (sim_log, "Logging to file \"%s\" at %s", sim_logfile_name (sim_log, sim_log_ref), ctime(&now));
 return SCPE_OK;
 }
 
@@ -1039,7 +1042,9 @@ t_stat sim_set_debon (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
 t_stat r;
+time_t now;
 
+sim_deb_switches = sim_switches;                        /* save debug switches */
 if ((cptr == NULL) || (*cptr == 0))                     /* need arg */
     return SCPE_2FARG;
 cptr = get_glyph_nc (cptr, gbuf, 0);                    /* get file name */
@@ -1049,12 +1054,37 @@ r = sim_open_logfile (gbuf, FALSE, &sim_deb, &sim_deb_ref);
 
 if (r != SCPE_OK)
     return r;
-if (!sim_quiet)
+
+if (sim_deb_switches & SWMASK ('R')) {
+    clock_gettime(CLOCK_REALTIME, &sim_deb_basetime);
+    if (!(sim_deb_switches & (SWMASK ('A') || SWMASK ('T'))))
+        sim_deb_switches |= SWMASK ('T');
+    }
+if (sim_deb_switches & SWMASK ('P'))
+    sim_deb_PC = find_reg ("PC", NULL, sim_dflt_dev);
+if (!sim_quiet) {
     printf ("Debug output to \"%s\"\n", 
             sim_logfile_name (sim_deb, sim_deb_ref));
-if (sim_log)
+    if (sim_deb_switches & SWMASK ('P'))
+        printf ("   Debug messages contain current PC value\n");
+    if (sim_deb_switches & SWMASK ('T'))
+        printf ("   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    if (sim_deb_switches & SWMASK ('A'))
+        printf ("   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    }
+if (sim_log) {
     fprintf (sim_log, "Debug output to \"%s\"\n", 
                       sim_logfile_name (sim_deb, sim_deb_ref));
+    if (sim_deb_switches & SWMASK ('P'))
+        fprintf (sim_log, "   Debug messages contain current PC value\n");
+    if (sim_deb_switches & SWMASK ('T'))
+        fprintf (sim_log, "   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    if (sim_deb_switches & SWMASK ('A'))
+        fprintf (sim_log, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    }
+time(&now);
+fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
+
 return SCPE_OK;
 }
 
@@ -1068,6 +1098,8 @@ if (sim_deb == NULL)                                    /* no log? */
     return SCPE_OK;
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
+sim_deb_switches = 0;
+sim_deb_PC = NULL;
 if (!sim_quiet)
     printf ("Debug output disabled\n");
 if (sim_log)
@@ -1081,9 +1113,16 @@ t_stat sim_show_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cpt
 {
 if (cptr && (*cptr != 0))
     return SCPE_2MARG;
-if (sim_deb)
+if (sim_deb) {
     fprintf (st, "Debug output enabled to \"%s\"\n", 
                  sim_logfile_name (sim_deb, sim_deb_ref));
+    if (sim_deb_switches & SWMASK ('P'))
+        fprintf (st, "   Debug messages contain current PC value\n");
+    if (sim_deb_switches & SWMASK ('T'))
+        fprintf (st, "   Debug messages display time of day as hh:mm:ss.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    if (sim_deb_switches & SWMASK ('A'))
+        fprintf (st, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
+    }
 else fprintf (st, "Debug output disabled\n");
 return SCPE_OK;
 }
