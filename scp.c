@@ -476,6 +476,9 @@ FILE *sim_log = NULL;                                   /* log file */
 FILEREF *sim_log_ref = NULL;                            /* log file file reference */
 FILE *sim_deb = NULL;                                   /* debug file */
 FILEREF *sim_deb_ref = NULL;                            /* debug file file reference */
+int32 sim_deb_switches = 0;                             /* debug switches */
+REG *sim_deb_PC = NULL;                                 /* debug PC register pointer */
+struct timespec sim_deb_basetime;                       /* debug timestamp relative base time */
 char *sim_prompt = NULL;                                /* prompt string */
 static FILE *sim_gotofile;                              /* the currently open do file */
 static int32 sim_goto_line[MAX_DO_NEST_LVL+1];          /* the current line number in the currently open do file */
@@ -2289,15 +2292,19 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
     ctbr = set_dev_tab;                                 /* global table */
     lvl = MTAB_VDV;                                     /* device match */
+    GET_SWITCHES (cptr);                                /* get more switches */
     }
 else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
     if (uptr == NULL)                                   /* invalid unit */
         return SCPE_NXUN;
     ctbr = set_unit_tab;                                /* global table */
     lvl = MTAB_VUN;                                     /* unit match */
+    GET_SWITCHES (cptr);                                /* get more switches */
     }
-else if ((gcmdp = find_ctab (set_glob_tab, gbuf)))      /* global? */
+else if ((gcmdp = find_ctab (set_glob_tab, gbuf))) {    /* global? */
+    GET_SWITCHES (cptr);                                /* get more switches */
     return gcmdp->action (gcmdp->arg, cptr);            /* do the rest */
+    }
 else {
     if (sim_dflt_dev->modifiers)
         for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
@@ -2314,6 +2321,7 @@ else {
     }
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
+GET_SWITCHES (cptr);                                    /* get more switches */
 
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph (svptr = cptr, gbuf, ',');         /* get modifier */
@@ -6103,7 +6111,7 @@ return val;
         have been generated.
 */
 
-t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
+t_stat sprint_val (char *buffer, t_value val, uint32 radix,
     uint32 width, uint32 format)
 {
 #define MAX_WIDTH ((int) ((CHAR_BIT * sizeof (t_value) * 4 + 3)/3))
@@ -6137,9 +6145,9 @@ switch (format) {
             dbuf[MAX_WIDTH - (digit * 4)] = ',';
         d = d - commas;
         if (width > MAX_WIDTH) {
-            if (!stream)
+            if (!buffer)
                 return width;
-            fprintf (stream, "%*s", -((int)width), dbuf);
+            sprintf (buffer, "%*s", -((int)width), dbuf);
             return SCPE_OK;
             }
         else
@@ -6159,9 +6167,26 @@ switch (format) {
             d = MAX_WIDTH - (ndigits + commas);
         break;
     }
-if (!stream)
+if (!buffer)
     return strlen(dbuf+d);
-if (fputs (&dbuf[d], stream) == EOF)
+if (width < strlen(dbuf+d))
+    return SCPE_IOERR;
+strcpy(buffer, dbuf+d);
+return SCPE_OK;
+}
+
+t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
+    uint32 width, uint32 format)
+{
+char dbuf[MAX_WIDTH + 1];
+t_stat r;
+
+if (!stream)
+    return sprint_val (NULL, val, radix, width, format);
+if (width > MAX_WIDTH)
+    width = MAX_WIDTH;
+r = sprint_val (dbuf, val, radix, width, format);
+if (fputs (dbuf, stream) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
 }
@@ -6844,7 +6869,7 @@ return SCPE_OK;
 /* Debug printout routines, from Dave Hittner */
 
 const char* debug_bstates = "01_^";
-const char* debug_fmt     = "DBG(%.0f)%s> %s %s: ";
+char debug_line_prefix[256];
 int32 debug_unterm  = 0;
 
 /* Finds debug phrase matching bitmask from from device DEBTAB table */
@@ -6870,12 +6895,35 @@ return debtab_nomatch;
 
 /* Prints standard debug prefix unless previous call unterminated */
 
-static void sim_debug_prefix (uint32 dbits, DEVICE* dptr)
+static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr)
 {
-if (!debug_unterm) {
-    char* debug_type = get_dbg_verb (dbits, dptr);
-    fprintf(sim_deb, debug_fmt, sim_gtime(), AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
+char* debug_type = get_dbg_verb (dbits, dptr);
+static const char* debug_fmt     = "DBG(%.0f)%s> %s %s: ";
+char tim_t[32] = "";
+char tim_a[32] = "";
+char pc_s[64] = "";
+struct timespec time_now;
+
+if (sim_deb_switches & (SWMASK ('T') | SWMASK ('R') | SWMASK ('A'))) {
+    clock_gettime(CLOCK_REALTIME, &time_now);
+    if (sim_deb_switches & SWMASK ('R'))
+        sim_timespec_diff (&time_now, &time_now, &sim_deb_basetime);
     }
+if (sim_deb_switches & SWMASK ('T')) {
+    struct tm *now = gmtime(&time_now.tv_sec);
+
+    sprintf(tim_t, "%02d:%02d:%02d.%03d ", now->tm_hour, now->tm_min, now->tm_sec, (int)(time_now.tv_nsec/1000000));
+    }
+if (sim_deb_switches & SWMASK ('A')) {
+    sprintf(tim_t, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
+    }
+if (sim_deb_switches & SWMASK ('P')) {
+    t_value val = get_rval (sim_deb_PC, 0);
+    sprintf(pc_s, "-%s:", sim_deb_PC->name);
+    sprint_val (&pc_s[strlen(pc_s)], val, sim_deb_PC->radix, sim_deb_PC->width, sim_deb_PC->flags & REG_FMT);
+    }
+sprintf(debug_line_prefix, "DBG(%s%s%.0f%s)%s> %s %s: ", tim_t, tim_a, sim_gtime(), pc_s, AIO_MAIN_THREAD ? "" : "+", dptr->name, debug_type);
+return debug_line_prefix;
 }
 
 void fprint_fields (FILE *stream, t_value before, t_value after, BITFIELD* bitdefs)
@@ -6927,7 +6975,7 @@ void sim_debug_bits(uint32 dbits, DEVICE* dptr, BITFIELD* bitdefs,
     uint32 before, uint32 after, int terminate)
 {
 if (sim_deb && (dptr->dctrl & dbits)) {
-    sim_debug_prefix(dbits, dptr);                      /* print prefix if required */
+    fprintf(sim_deb, "%s", sim_debug_prefix(dbits, dptr));                      /* print prefix if required */
     fprint_fields (sim_deb, (t_value)before, (t_value)after, bitdefs); /* print xlation, transition */
     if (terminate)
         fprintf(sim_deb, "\r\n");
@@ -6954,6 +7002,7 @@ if (sim_deb && (dptr->dctrl & dbits)) {
     va_list arglist;
     int32 i, j, len;
     char* debug_type = get_dbg_verb (dbits, dptr);
+    const char* debug_prefix = sim_debug_prefix(dbits, dptr);   /* prefix to print if required */
 
     buf[bufsize-1] = '\0';
 
@@ -7004,10 +7053,8 @@ if (sim_deb && (dptr->dctrl & dbits)) {
             if (i > j) {
                 if (debug_unterm)
                     fprintf (sim_deb, "%.*s\r\n", i-j, &buf[j]);
-                else                                    /* print prefix when required */
-                    fprintf (sim_deb, "DBG(%.0f)%s> %s %s: %.*s\r\n", sim_gtime(), 
-                                                                    AIO_MAIN_THREAD ? "" : "+",
-                                                                    dptr->name, debug_type, i-j, &buf[j]);
+                else                                /* print prefix when required */
+                    fprintf (sim_deb, "%s%.*s\r\n", debug_prefix, i-j, &buf[j]);
                 debug_unterm = 0;
                 }
             j = i + 1;
@@ -7016,10 +7063,8 @@ if (sim_deb && (dptr->dctrl & dbits)) {
     if (i > j) {
         if (debug_unterm)
             fprintf (sim_deb, "%.*s", i-j, &buf[j]);
-        else                                    /* print prefix when required */
-            fprintf (sim_deb, "DBG(%.0f)%s> %s %s: %.*s", sim_gtime(), 
-                                                            AIO_MAIN_THREAD ? "" : "+",
-                                                            dptr->name, debug_type, i-j, &buf[j]);
+        else                                        /* print prefix when required */
+            fprintf (sim_deb, "DBG(%.0f)%s> %s %s: %.*s", debug_prefix, i-j, &buf[j]);
         }
 
 /* Set unterminated flag for next time */
