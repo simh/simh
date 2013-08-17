@@ -25,6 +25,7 @@
 
    vs           VSXXX-nn pointing device
 
+   09-Aug-2013  MB      Added definitions for self test report
    11-Jun-2013  MB      First version
 */
 
@@ -38,6 +39,20 @@
 
 #define VSXXX_PROMPT    0
 #define VSXXX_INC       1
+
+#define VSXXX_REV       0                               /* hardware revision */
+
+/* Report bit definitions */
+
+#define RPT_SYNC      0x80                              /* synchronise */
+#define RPT_TABP      0x40                              /* tablet position */
+#define RPT_TEST      0x20                              /* self test */
+#define RPT_TAB       0x4                               /* tablet device */
+#define RPT_MOU       0x2                               /* mouse device */
+#define RPT_V_MFR     4                                 /* manufacturer location ID */
+#define RPT_REV       0xF                               /* revision number */
+#define RPT_BC        0x7                               /* button code */
+#define RPT_EC        0x7F                              /* error code */
 
 /* Debugging Bitmaps */
 
@@ -156,11 +171,11 @@ switch (c) {
     case 0x54:                                          /* T */
         sim_debug (DBG_CMD, &vs_dev, "test\n", c);
         vs_reset (&vs_dev);
-        vs_state = VSXXX_TEST;
-        vs_buf[0] = 0xA0;                               /* send ID */
-        vs_buf[1] = 0x12;
-        vs_buf[2] = 0x00;
-        vs_buf[3] = 0x00;
+        vs_state = VSXXX_TEST;                          /* send self test report */
+        vs_buf[0] = RPT_TEST | RPT_SYNC | (VSXXX_REV & RPT_REV);
+        vs_buf[1] = (1 << RPT_V_MFR) | RPT_MOU;         /* device type, build location */
+        vs_buf[2] = 0;                                  /* error code <6:0> (0 = OK) */
+        vs_buf[3] = 0;                                  /* button code <2:0> (0 = OK) */
         vs_bptr = 0;
         vs_state = VSXXX_SEND;
         vs_datalen = 4;
@@ -179,7 +194,7 @@ return SCPE_OK;
 
 void vs_sendupd (void)
 {
-vs_buf[0] = 0x80;
+vs_buf[0] = RPT_SYNC;
 vs_buf[0] |= (((vs_x >= 0) ? 1 : 0) << 4);              /* sign bits */
 vs_buf[0] |= (((vs_y >= 0) ? 1 : 0) << 3);
 vs_buf[0] |= (((vs_l) ? 1 : 0) << 2);                   /* button states */

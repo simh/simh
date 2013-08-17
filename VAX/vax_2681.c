@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   09-Aug-2013  MB      Fixed reporting of status bits in receiver buffer
    11-Jun-2013  MB      First version
 */
 
@@ -209,7 +210,7 @@ switch (rg) {
         break;
 
     case 3:                                             /* tx/rx buf A */
-        data = ctx->port[PORT_A].buf;
+        data = ctx->port[PORT_A].buf | (ctx->port[PORT_A].sts << 8);
         ctx->port[PORT_A].sts &= ~STS_RXR;
         ctx->ists &= ~ISTS_RAI;
         ua2681_update_rxi (ctx);
@@ -230,7 +231,7 @@ switch (rg) {
         break;
 
     case 11:                                            /* tx/rx buf B */
-        data = ctx->port[PORT_B].buf;
+        data = ctx->port[PORT_B].buf | (ctx->port[PORT_B].sts << 8);
         ctx->port[PORT_B].sts &= ~STS_RXR;
         ctx->ists &= ~ISTS_RBI;
         ua2681_update_rxi (ctx);
