@@ -743,6 +743,8 @@ for (ln = 0; ln < VC_YSIZE; ln++) {
             if ((ln >= CUR_Y) && (ln < (CUR_Y + 16))) { /* cursor on this line? */
                 cur = &vc_cur[((ln - CUR_Y) << 4)];     /* get image base */
                 for (col = 0; col < 16; col++) {
+                    if ((CUR_X + col) >= 1024)          /* Part of cursor off screen? */
+                        continue;                       /* Skip */
                     if (CUR_F)                          /* mask function */
                         line[CUR_X + col] = line[CUR_X + col] | cur[col];
                     else
