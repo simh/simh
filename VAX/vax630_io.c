@@ -41,6 +41,18 @@
 #define QBIPC_RW        (QBIPC_AHLT | QBIPC_DBIE | QBIPC_LME | QBIPC_DB)
 #define QBIPC_MASK      (QBIPC_RW | QBIPC_QPE )
 
+BITFIELD qb_ipc_bits[] = {
+    BIT(DB),                                /* doorbell req NI */
+    BITNCF(4),                              /* Unused */
+    BIT(LME),                               /* local mem enb */
+    BIT(DBIE),                              /* dbell int enb NI */
+    BITNCF(1),                              /* Unused */
+    BIT(AHLT),                              /* aux halt NI */
+    BITNCF(6),                              /* Unused */
+    BIT(QPE),                               /* Qbus dma parity err */
+    ENDBITS
+};
+
 /* Qbus map registers */
 
 #define QBNMAPR         8192                            /* number of map reg */
@@ -117,12 +129,24 @@ MTAB qba_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_REG  0x0001                                 /* trace read/write registers */
+#define DBG_IPL  0x0002                                 /* trace Interrupt */
+#define DBG_MAP  0x0004                                 /* trace Map register changes */
+
+DEBTAB qba_debug[] = {
+  {"REG",    DBG_REG},
+  {"IPL",    DBG_IPL},
+  {"MAP",    DBG_MAP},
+  {0}
+};
+
 DEVICE qba_dev = {
     "QBA", &qba_unit, qba_reg, qba_mod,
     1, 16, QBMAWIDTH, 2, 16, 16,
     &qba_ex, &qba_dep, &qba_reset,
     NULL, NULL, NULL,
-    &qba_dib, DEV_QBUS, 0, NULL, NULL, NULL, &qba_help, NULL, NULL,
+    &qba_dib, DEV_QBUS | DEV_DEBUG, 0, qba_debug, NULL, NULL, &qba_help, NULL, NULL,
     &qba_description
     };
 
@@ -275,6 +299,10 @@ return 0;
 t_stat dbl_rd (int32 *data, int32 addr, int32 access)
 {
 *data = qb_ipc & QBIPC_MASK;
+
+sim_debug(DBG_REG, &qba_dev, "dbl_rd(addr=0x%08X, data=0x%X) ", addr, *data);
+sim_debug_bits(DBG_REG, &qba_dev, qb_ipc_bits, (uint32)*data, (uint32)*data, TRUE);
+
 return SCPE_OK;
 }
 
@@ -282,6 +310,7 @@ t_stat dbl_wr (int32 data, int32 addr, int32 access)
 {
 int32 sc = (addr & 3) << 3;
 int32 nval = data << sc;
+int32 old_val = qb_ipc;
 
 qb_ipc = nval & QBIPC_RW;
 
@@ -290,6 +319,9 @@ if ((addr & 3) == 0)                                    /* low byte only */
 qb_ipc = qb_ipc & ~QBIPC_AHLT;                          /* Read only on arbiter */
 if (!(qb_ipc & QBIPC_DBIE))
     qb_ipc = qb_ipc & ~QBIPC_DB;                        /* Read only when not DBIE */
+
+sim_debug(DBG_REG, &qba_dev, "qba_wr(addr=0x%08X, data=0x%X) ", addr, data);
+sim_debug_bits(DBG_REG, &qba_dev, qb_ipc_bits, (uint32)old_val, (uint32)qb_ipc, TRUE);
 return SCPE_OK;
 }
 
