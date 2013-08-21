@@ -98,7 +98,9 @@
                             { MTAB_XTD|MTAB_VDV, 0,          "AUTOBOOT",   "AUTOBOOT",                      \
                               &sysd_set_halt, &sysd_show_halt, NULL, "Enable autoboot (Disable Halt)" },    \
                             { MTAB_XTD|MTAB_VDV|MTAB_NMO, 1, "NOAUTOBOOT", "NOAUTOBOOT",                    \
-                              &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" }
+                              &sysd_set_halt, &sysd_show_halt, NULL, "Disable autoboot (Enable Halt)" },    \
+                            { MTAB_XTD|MTAB_VDV, 0,          "LEDS", NULL,                                  \
+                              NULL,           &sysd_show_leds, NULL, "Display the CPU LED values" }
 
 /* Memory */
 
@@ -150,14 +152,15 @@ extern t_stat cpu_show_memory (FILE* st, UNIT* uptr, int32 val, void* desc);
 #define QBMAPAMASK      (QBMAPSIZE - 1)                 /* map addr mask */
 #define QBMAPBASE       0x20088000                      /* map addr base */
 
-/* Non-volatile RAM - 128 Bytes long */
+/* Non-volatile RAM - 128 Bytes (of addressing to address 64 Bytes) */
 
 #define NVRAWIDTH       7                               /* NVR addr width */
-#define NVRSIZE         (1u << NVRAWIDTH)               /* NVR length */
-#define NVRAMASK        (NVRSIZE - 1)                   /* NVR addr mask */
+#define NVRASIZE        (1u << NVRAWIDTH)               /* NVR address length */
+#define NVRSIZE         ((1u << NVRAWIDTH) >> 1)        /* NVR length (bytes) */
+#define NVRAMASK        (NVRASIZE - 1)                  /* NVR addr mask */
 #define NVRBASE         0x200B8000                      /* NVR base */
 #define ADDR_IS_NVR(x)  ((((uint32) (x)) >= NVRBASE) && \
-                        (((uint32) (x)) < (NVRBASE + NVRSIZE)))
+                        (((uint32) (x)) < (NVRBASE + NVRASIZE)))
 
 /* Qbus memory space */
 
@@ -400,6 +403,7 @@ extern t_stat sysd_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat sysd_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc);
+extern t_stat sysd_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 
 #endif

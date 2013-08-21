@@ -142,7 +142,7 @@ extern int32 tmr_poll;
 extern DEVICE vc_dev, lk_dev, vs_dev;
 
 uint32 *rom = NULL;                                     /* boot ROM */
-uint32 *nvr = NULL;                                     /* non-volatile mem */
+uint8 *nvr = NULL;                                     /* non-volatile mem */
 int32 conisp, conpc, conpsl;                            /* console reg */
 int32 ka_bdr = BDR_BRKENB;                              /* KA630 boot diag */
 int32 ka_mser = 0;                                      /* KA630 mem sys err */
@@ -201,6 +201,15 @@ extern void txcs_wr (int32 dat);
 extern void txdb_wr (int32 dat);
 extern void ioreset_wr (int32 dat);
 
+/* debugging bitmaps */
+#define DBG_REG  0x0001                                 /* trace read/write registers */
+
+DEBTAB nvr_debug[] = {
+  {"REG",    DBG_REG},
+  {0}
+};
+
+
 /* ROM data structures
 
    rom_dev      ROM device descriptor
@@ -248,7 +257,7 @@ DEVICE nvr_dev = {
     1, 16, NVRAWIDTH, 4, 16, 32,
     &nvr_ex, &nvr_dep, &nvr_reset,
     NULL, &nvr_attach, &nvr_detach,
-    NULL, 0, 0, NULL, NULL, NULL, &nvr_help, NULL, NULL, 
+    NULL, DEV_DEBUG, 0, nvr_debug, NULL, NULL, &nvr_help, NULL, NULL, 
     &nvr_description
     };
 
@@ -439,24 +448,42 @@ return "read-only memory";
 
 int32 nvr_rd (int32 pa)
 {
-int32 rg = (pa - NVRBASE) >> 2;
+int32 rg = (pa - NVRBASE) >> 1;
+int32 result;
 
-if (rg < 7)                                             /* watch chip */
-    return wtc_rd (pa);
+if (rg < 14)                                             /* watch chip */
+    result = wtc_rd (pa);
 else
-    return nvr[rg];
+    if (rg & 1)
+        result = ((int32)nvr[rg]) << 16;
+    else
+        result = nvr[rg] | (((int32)nvr[rg+1]) << 16);
+
+sim_debug (DBG_REG, &nvr_dev, "nvr_rd(pa=0x%X) returns: 0x%X\n", pa, result);
+
+return result;
 }
 
 void nvr_wr (int32 pa, int32 val, int32 lnt)
 {
-int32 rg = (pa - NVRBASE) >> 2;
+int32 rg = (pa - NVRBASE) >> 1;
+uint32 orig_nvr = nvr[rg] | (nvr[rg+1] << 8);
 
-if (rg < 7)                                             /* watch chip */
+if (rg < 14)                                             /* watch chip */
     wtc_wr (pa, val, lnt);
 else {
-    int32 sc = (pa & 3) << 3;                           /* merge */
-    int32 mask = 0xFF;
-    nvr[rg] = ((val & mask) << sc) | (nvr[rg] & ~(mask << sc));
+    int32 v = val;
+    int32 r = rg;
+    int32 l = lnt;
+
+    while (l > 0) {
+        nvr[r] = (uint8)v;
+        ++r;
+        l -= 2;
+        v = (v >> 16);
+        }
+
+    sim_debug (DBG_REG, &nvr_dev, "nvr_wr(pa=0x%X,val=0x%04X,lnt=%d) nvr[%02X] was %04X now %04X\n", pa, val, lnt, rg, orig_nvr, nvr[rg] | (nvr[rg+1] << 8));
     }
 }
 
@@ -468,9 +495,9 @@ uint32 addr = (uint32) exta;
 
 if ((vptr == NULL) || (addr & 03))
     return SCPE_ARG;
-if (addr >= NVRSIZE)
+if (addr >= NVRBASE+NVRASIZE)
     return SCPE_NXM;
-*vptr = nvr[addr >> 2];
+*vptr = nvr[addr >> 1] | (nvr[(addr >> 1) + 1] << 8);
 return SCPE_OK;
 }
 
@@ -482,9 +509,10 @@ uint32 addr = (uint32) exta;
 
 if (addr & 03)
     return SCPE_ARG;
-if (addr >= NVRSIZE)
+if (addr >= NVRBASE+NVRASIZE)
     return SCPE_NXM;
-nvr[addr >> 2] = (uint32) val;
+nvr[addr >> 1] = (uint8) val;
+nvr[(addr >> 1) + 1] = (uint8) (val >> 8);
 return SCPE_OK;
 }
 
@@ -493,8 +521,8 @@ return SCPE_OK;
 t_stat nvr_reset (DEVICE *dptr)
 {
 if (nvr == NULL) {
-    nvr = (uint32 *) calloc (NVRSIZE >> 2, sizeof (uint32));
-    nvr_unit.filebuf = nvr;
+    nvr = (uint8 *) calloc (NVRSIZE, sizeof (*nvr));
+    nvr_unit.filebuf = (void *)nvr;
     }
 if (nvr == NULL)
     return SCPE_MEM;
@@ -504,7 +532,7 @@ return SCPE_OK;
 t_stat nvr_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 fprintf (st, "Non-volatile Memory (NVR)\n\n");
-fprintf (st, "The NVR simulates 128 bytes of battery-backed up memory.\n");
+fprintf (st, "The NVR simulates %d bytes of battery-backed up memory.\n", NVRSIZE);
 fprintf (st, "When the simulator starts, NVR is cleared to 0, and the battery-low indicator\n");
 fprintf (st, "is set.  Alternately, NVR can be attached to a file.  This allows the NVR\n");
 fprintf (st, "state to be preserved across simulator runs.  Successfully attaching an NVR\n");
@@ -709,7 +737,7 @@ struct reglink {                                        /* register linkage */
 struct reglink regtable[] = {
     { QBMAPBASE, QBMAPBASE+QBMAPSIZE, &qbmap_rd, &qbmap_wr },
     { ROMBASE, ROMBASE+ROMSIZE+ROMSIZE, &rom_rd, NULL },
-    { NVRBASE, NVRBASE+NVRSIZE, &nvr_rd, &nvr_wr },
+    { NVRBASE, NVRBASE+NVRASIZE, &nvr_rd, &nvr_wr },
     { KABASE, KABASE+KASIZE, &ka_rd, &ka_wr },
     { QVMBASE, QVMBASE+QVMSIZE, &vc_mem_rd, &vc_mem_wr },
     { QBMBASE, QBMBASE+QBMSIZE, &qbmem_rd, &qbmem_wr },
@@ -927,6 +955,16 @@ t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc)
 fprintf(st, "%s", ka_hltenab ? "NOAUTOBOOT" : "AUTOBOOT");
 return SCPE_OK;
 }
+
+t_stat sysd_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+fprintf (st, "leds=(%s,%s,%s,%s)", ka_bdr&8 ? "ON" : "OFF", 
+                                   ka_bdr&4 ? "ON" : "OFF", 
+                                   ka_bdr&2 ? "ON" : "OFF", 
+                                   ka_bdr&1 ? "ON" : "OFF");
+return SCPE_OK;
+}
+
 
 /* SYSD reset */
 

@@ -108,7 +108,7 @@ t_stat sim_load (FILE *fileref, char *cptr, char *fnam, int flag)
 {
 t_stat r;
 int32 i;
-uint32 origin, limit;
+uint32 origin, limit, step = 1;
 
 if (flag)                                               /* dump? */
     return SCPE_ARG;
@@ -118,7 +118,8 @@ if (sim_switches & SWMASK ('R')) {                      /* ROM? */
     }
 else if (sim_switches & SWMASK ('N')) {                 /* NVR? */
     origin = NVRBASE;
-    limit = NVRBASE + NVRSIZE;
+    limit = NVRBASE + NVRASIZE;
+    step = 2;
     }
 else {
     origin = 0;                                         /* memory */
@@ -135,7 +136,7 @@ while ((i = getc (fileref)) != EOF) {                   /* read byte stream */
     if (sim_switches & SWMASK ('R'))                    /* ROM? */
         rom_wr_B (origin, i);                           /* not writeable */
     else WriteB (origin, i);                            /* store byte */
-    origin = origin + 1;
+    origin = origin + step;
     }
 return SCPE_OK;
 }
