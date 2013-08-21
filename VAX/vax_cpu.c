@@ -408,6 +408,31 @@ UNIT cpu_unit = {
     UDATA (&cpu_idle_svc, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
     };
 
+char *psl_modes[] = {"K", "E", "S", "U"};
+
+
+BITFIELD psl_bits[] = {
+    BIT(C),                                 /* Carry */
+    BIT(V),                                 /* Overflow */
+    BIT(Z),                                 /* Zero */
+    BIT(N),                                 /* Negative */
+    BIT(T),                                 /* trace */
+    BIT(IV),                                /* Integer overflow */
+    BIT(FU),                                /* Floating underflow */
+    BIT(DV),                                /* Decimal overflow */
+    BITNCF(8),                              /* MBZ */
+    BITFFMT(IPL,5,%d),                      /* IPL */
+    BITNCF(1),                              /* MBZ */
+    BITFNAM(PRVMOD,2,psl_modes),            /* Previous Access Mode */
+    BITFNAM(CURMOD,2,psl_modes),            /* Current Access Mode */
+    BIT(IS),                                /* Interrupt Stack */
+    BIT(FPD),                               /* First Part Done */
+    BITNCF(2),                              /* MBZ */
+    BIT(TP),                                /* Trace Pending */
+    BIT(CM),                                /* Compatibility Mode */
+    ENDBITS
+};
+
 REG cpu_reg[] = {
     { HRDATAD (PC,      R[nPC], 32, "program counter") },
     { HRDATAD (R0,        R[0], 32, "General Purpose Register 0") },
@@ -428,7 +453,7 @@ REG cpu_reg[] = {
     { HRDATAD (AP,      R[nAP], 32, "Alias for R12") },
     { HRDATAD (FP,      R[nFP], 32, "Alias for R13") },
     { HRDATAD (SP,      R[nSP], 32, "Alias for R14") },
-    { HRDATAD (PSL,        PSL, 32, "processor status longword") },
+    { HRDATADF(PSL,        PSL, 32, "processor status longword", psl_bits) },
     { HRDATAD (CC,         PSL,  4, "condition codes, PSL<3:0>") },
     { HRDATAD (KSP,       KSP,  32, "kernel stack pointer") },
     { HRDATAD (ESP,       ESP,  32, "executive stack pointer") },
