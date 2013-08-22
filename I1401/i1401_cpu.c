@@ -1,6 +1,6 @@
 /* i1401_cpu.c: IBM 1401 CPU simulator
 
-   Copyright (c) 1993-2011, Robert M. Supnik
+   Copyright (c) 1993-2012, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-Oct-12    RMS     Clear storage and branch preserves B register (Van Snyder)
    19-Mar-11    RMS     Reverted multiple tape indicator implementation
    20-Jan-11    RMS     Fixed branch on EOT indicator per hardware (Van Snyder)
    07-Nov-10    RMS     Fixed divide not to clear word marks in quotient
@@ -177,6 +178,14 @@ typedef struct {
                         else BS = BA + 0; \
                         PCQ_ENTRY; \
                         IS = AS;
+
+#define BRANCH_CS       if (ADDR_ERR (AS)) { \
+                            reason = STOP_INVBR; \
+                            break; \
+                            } \
+                        PCQ_ENTRY; \
+                        IS = AS;
+
 
 uint8 M[MAXMEMSIZE] = { 0 };                            /* main memory */
 int32 saved_IS = 0;                                     /* saved IS */
@@ -1563,6 +1572,9 @@ CHECK_LENGTH:
    5,6          invalid B-address
    7            branch
    8+           one operand, branch ignored
+
+   Note that clear storage and branch does not overwrite the B register,
+   unlike all other branches
 */
 
     case OP_CS:                                         /* clear storage */
@@ -1572,7 +1584,7 @@ CHECK_LENGTH:
         if (BS < 0)                                     /* wrap if needed */
             BS = BS + MEMSIZE;
         if (ilnt == 7) {                                /* branch variant? */
-            BRANCH;
+            BRANCH_CS;                                  /* special branch */
             }
         break;
 
