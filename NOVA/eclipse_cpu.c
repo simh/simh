@@ -3625,7 +3625,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         PC = (PC + 1) & AMASK;
         continue;
     }    
-    if ((IR & 0103777) == 0100650) {                    /* FDD Div double by AC */
+    if ((IR & 0103777) == 0100750) {                    /* FDD Div double by AC */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
         if (Debug_Flags == 1) {
@@ -3680,7 +3680,7 @@ if ((IR & 0100017) == 0100010) {                        /* This pattern for all 
         FPSR |= ((PC - 1) & AMASK);
         continue;
     }    
-    if ((IR & 0103777) == 0101650) {                    /* FDMD Div double by memory */
+    if ((IR & 0103777) == 0101750) {                    /* FDMD Div double by memory */
         if (!(fpu_unit.flags & UNIT_UP))
             continue;
         if (Debug_Flags == 1) {

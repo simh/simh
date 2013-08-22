@@ -88,10 +88,10 @@
 /* Macros to handle the flags in the CCR */
 #define CCR_ALWAYS_ON       (0xC0)        /* for 6800 */
 #define CCR_MSK (HF|IF|NF|ZF|VF|CF)
-#define TOGGLE_FLAG(FLAG)   ((CCR) ^= FLAG)
-#define SET_FLAG(FLAG)      ((CCR) |= FLAG)
-#define CLR_FLAG(FLAG)      ((CCR) &= ~FLAG)
-#define GET_FLAG(FLAG)      ((CCR) & FLAG)
+#define TOGGLE_FLAG(FLAG)   (CCR ^= (FLAG))
+#define SET_FLAG(FLAG)      (CCR |= (FLAG))
+#define CLR_FLAG(FLAG)      (CCR &= ~(FLAG))
+#define GET_FLAG(FLAG)      (CCR & (FLAG))
 #define COND_SET_FLAG(COND,FLAG) \
     if (COND) SET_FLAG(FLAG); else CLR_FLAG(FLAG)
 #define COND_SET_FLAG_N(VAR) \
