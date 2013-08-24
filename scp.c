@@ -1188,6 +1188,8 @@ if ((dptr->modifiers) && (dptr->numunits != 1)) {
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
+        if ((!mptr->valid) && MODMASK(mptr,MTAB_XTD))
+            continue;                                           /* skip show only modifiers */
         if (mptr->mstring) {
             fprint_header (st, &found, header);
             sprintf (buf, "set %s%s %s%s", sim_dname (dptr), (dptr->numunits > 1) ? "n" : "0", mptr->mstring, (strchr(mptr->mstring, '=')) ? "" : (MODMASK(mptr,MTAB_VALR) ? "=val" : (MODMASK(mptr,MTAB_VALO) ? "{=val}": "")));
@@ -2529,7 +2531,7 @@ return r;
 
 t_stat show_cmd_fi (FILE *ofile, int32 flag, char *cptr)
 {
-uint32 lvl;
+uint32 lvl = 0xFFFFFFFF;
 char gbuf[CBUFSIZE], *cvptr;
 DEVICE *dptr;
 UNIT *uptr;
@@ -2629,7 +2631,7 @@ while (*cptr != 0) {                                    /* do all mods */
         *cvptr++ = 0;
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if (((mptr->mask & MTAB_XTD)?                   /* right level? */
-            (mptr->mask & lvl): (MTAB_VUN & lvl)) &&
+            ((mptr->mask & lvl) == lvl): (MTAB_VUN & lvl)) &&
             ((mptr->disp && mptr->pstring &&            /* named disp? */
             (MATCH_CMD (gbuf, mptr->pstring) == 0))
  //           ||
