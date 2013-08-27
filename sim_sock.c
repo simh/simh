@@ -610,6 +610,14 @@ if (validate_addr) {
             break;
             }
         }
+    if (status != SCPE_OK) {
+        /* be generous and allow successful validations against variations of localhost addresses */
+        if (((0 == strcmp("127.0.0.1", hostp)) && 
+             (0 == strcmp("::1", validate_addr))) ||
+            ((0 == strcmp("127.0.0.1", validate_addr)) && 
+             (0 == strcmp("::1", hostp))))
+            status = SCPE_OK;
+        }
     p_freeaddrinfo (ai_host);
     p_freeaddrinfo (ai_validate);
     return status;
