@@ -258,7 +258,7 @@ Simulators for the Windows platform are built and made available on a regular ba
 
 The prebuilt Windows binaries will run on all versions of Microsoft Windows from Windows XP onward.
 
-They can be accessed at https://github.com/simh/simh-Win32-Download
+They can be accessed at https://github.com/simh/Win32-Development-Binaries
 
 Several relatively recent versions should be available which you can download and use directly.
 
