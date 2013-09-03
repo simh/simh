@@ -1,6 +1,6 @@
 /* pdp11_hk.c - RK611/RK06/RK07 disk controller
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,9 +25,14 @@
 
    hk           RK611/RK06/RK07 disk
 
-   10-Dec-12    RMS     Fixed interrupt logic
+   01-Sep-13    RMS     Revised error handling to command-response model
+                        Revised interrupt logic to follow the hardware
+   10-Jun-13    RMS     Fixed bug to write through end of sector (Oleg Safiullin)
+   18-Apr-13    RMS     Fixed ATN setting on errors
+                        Changed wrong drive type to status, not fatal error
+   10-Dec-12    RMS     Fixed interrupt logic and CCLR unit cancellation
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
-   29-Apr-07    RMS     NOP and DCLR (at least) do not check drive type
+   29-Apr-07    RMS     NOP and DCLR (at least) do not check drive type [wrong]
                         MR2 and MR3 only updated on NOP
    17-Nov-05    RMS     Removed unused variable
    13-Nov-05    RMS     Fixed overlapped seek interaction with NOP, DCLR, PACK
@@ -42,16 +47,13 @@
    29-Dec-03    RMS     Added 18b Qbus support
    25-Apr-03    RMS     Revised for extended file support
 
-   This is a somewhat abstracted implementation of the RK611, more closely
-   modelled on third party clones than DEC's own implementation.  In particular,
-   the drive-to-controller serial communications system is simulated only at
-   a level equal to the Emulex SC21.
-
-   The RK611 functions only in 18b Unibus systems with I/O maps.  The Emulex
-   SC02/C was a Qbus work-alike with a unique extension to 22b addressing.  It
+   The RK611 functions only in 18b Unibus systems with I/O maps. The Emulex
+   SC02/C was a Qbus work-alike with a unique extension to 22b addressing. It
    was only supported in Ultrix-11 and other third party software.
 
    This module includes ideas from a previous implementation by Fred Van Kempen.
+   However, the interrupt logic has been rewritten to follow the bug-for-bug
+   peculiarities of the RK611 controller.
 */
 
 #if defined (VM_PDP10)                                  /* PDP10 version */
@@ -98,7 +100,7 @@ extern uint16 *M;
 #define CYL             u3                              /* current cylinder */
 #define FNC             u4                              /* function */
 
-/* HKCS1 - 177440 - control/status 1 */
+/* HKCS1 - 177440 - control/status 1 ^ = calculated dynamically */
 
 #define CS1_GO          CSR_GO                          /* go */
 #define CS1_V_FNC       1                               /* function pos */
@@ -277,7 +279,7 @@ BITFIELD hk_ds_bits[] = {
 #define ER_SKI          0000002                         /* seek incomp */
 #define ER_NXF          0000004                         /* non-exec func */
 #define ER_PAR          0000010                         /* parity err */
-#define ER_FER          0000020                         /* format err NI */
+#define ER_FER          0000020                         /* format err */
 #define ER_DTY          0000040                         /* drive type err */
 #define ER_ECH          0000100                         /* ECC hard err NI */
 #define ER_BSE          0000200                         /* bad sector err NI */
@@ -540,6 +542,9 @@ int32 hkmr2 = 0;
 int32 hkmr3 = 0;
 int32 hkdc = 0;                                         /* cylinder */
 int32 hkspr = 0;                                        /* spare */
+int32 hkci = 0;                                         /* ctlr interrupt */
+int32 hkdi = 0;                                         /* drive interrupt */
+int32 hkei = 0;                                         /* error interrupt */
 int32 hk_cwait = 5;                                     /* command time */
 int32 hk_swait = 10;                                    /* seek time */
 int32 hk_rwait = 10;                                    /* rotate time */
@@ -547,7 +552,7 @@ int32 hk_min2wait = 300;                                /* min time to 2nd int *
 int16 hkdb[3] = { 0 };                                  /* data buffer silo */
 int16 hk_off[HK_NUMDR] = { 0 };                         /* saved offset */
 int16 hk_dif[HK_NUMDR] = { 0 };                         /* cylinder diff */
-static uint8 reg_in_drive[16] = {
+static const uint8 reg_in_drive[16] = {
  0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 DEVICE hk_dev;
@@ -558,11 +563,12 @@ t_stat hk_reset (DEVICE *dptr);
 t_stat hk_boot (int32 unitno, DEVICE *dptr);
 t_stat hk_attach (UNIT *uptr, char *cptr);
 t_stat hk_detach (UNIT *uptr);
+int32 hk_inta (void);
 int32 hk_rdmr2 (int32 msg);
 int32 hk_rdmr3 (int32 msg);
 void update_hkcs (int32 flags, int32 drv);
 void update_hkds (int32 drv);
-void hk_cmderr (int32 err, int32 drv);
+void hk_err (int32 cs1e, int32 cs2e, int32 drve, int32 drv);
 void hk_go (int32 drv);
 t_stat hk_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat hk_set_bad (UNIT *uptr, int32 val, char *cptr, void *desc);
@@ -581,7 +587,7 @@ char *hk_description (DEVICE *dptr);
 
 DIB hk_dib = {
     IOBA_AUTO, IOLN_HK, &hk_rd, &hk_wr,
-    1, IVCL (HK), VEC_AUTO, { NULL }, IOLN_HK,
+    1, IVCL (HK), VEC_AUTO, { &hk_inta }, IOLN_HK,
     };
 
 UNIT hk_unit[] = {
@@ -618,6 +624,9 @@ REG hk_reg[] = {
     { GRDATAD (HKMR2,          hkmr2, DEV_RDX, 16, 0, "maintenance register 2"), REG_RO },
     { GRDATAD (HKMR3,          hkmr3, DEV_RDX, 16, 0, "maintenance register 3"), REG_RO },
     { GRDATAD (HKSPR,          hkspr, DEV_RDX, 16, 0, "spare register") },
+    { FLDATAD (HKCI,            hkci, 0,              "ctlr interrupt flop") },
+    { FLDATAD (HKDI,            hkdi, 0,              "drive interrupt flop") },
+    { FLDATAD (HKEI,            hkei, 0,              "error interrupt flop") },
     { FLDATAD (INT,        IREQ (HK), INT_V_HK,       "interrupt pending flag") },
     { FLDATAD (ERR,            hkcs1, CSR_V_ERR,      "error flag (CSR<15>)") },
     { FLDATAD (DONE,           hkcs1, CSR_V_DONE,     "device done flag (CSR1<7>)") },
@@ -625,7 +634,7 @@ REG hk_reg[] = {
     { DRDATAD (CTIME,       hk_cwait, 24,             "command time"), REG_NZ + PV_LEFT },
     { DRDATAD (STIME,       hk_swait, 24,             "seek time, per cylinder"), REG_NZ + PV_LEFT },
     { DRDATAD (RTIME,       hk_rwait, 24,             "rotational delay"), REG_NZ + PV_LEFT },
-    { DRDATA  (MIN2TIME, hk_min2wait, 24), REG_NZ + PV_LEFT + REG_HRO },
+    { DRDATAD (MIN2TIME, hk_min2wait, 24,             "minimum time between DONE and ATA"), REG_NZ + PV_LEFT },
     { URDATA  (FNC,   hk_unit[0].FNC, DEV_RDX, 5, 0,
               HK_NUMDR, REG_HRO) },
     { URDATA  (CYL, hk_unit[0].CYL, DEV_RDX, 10, 0,
@@ -696,8 +705,7 @@ int32 drv, i, j;
 drv = GET_UNIT (hkcs2);                                 /* get current unit */
 j = (PA >> 1) & 017;                                    /* get reg offset */
 if (reg_in_drive[j] && (hk_unit[drv].flags & UNIT_DIS)) { /* nx disk */
-    hkcs2 = hkcs2 | CS2_NED;                            /* set error flag */
-    update_hkcs (0, drv);
+    hk_err (CS1_ERR|CS1_DONE, CS2_NED, 0, drv);         /* set err, stop op */
     *data = 0;
     return SCPE_OK;
     }
@@ -706,7 +714,7 @@ update_hkcs (0, drv);                                   /* update status */
 switch (j) {                                            /* decode PA<4:1> */
 
     case 000:                                           /* HKCS1 */
-        *data = hkcs1;
+        *data = (hkcs1 & ~CS1_DI) | (hkdi? CS1_DI: 0);  /* DI dynamic */
         break;
 
     case 001:                                           /* HKWC */
@@ -785,11 +793,14 @@ int32 drv, i, j, old_val = 0, new_val = 0;
 
 drv = GET_UNIT (hkcs2);                                 /* get current unit */
 j = (PA >> 1) & 017;                                    /* get reg offset */
+if (reg_in_drive[j] && (hk_unit[drv].flags & UNIT_DIS)) { /* nx disk */
+    hk_err (CS1_ERR|CS1_DONE, CS2_NED, 0, drv);         /* set err, stop op */
+    return SCPE_OK;
+    }
 if ((hkcs1 & CS1_GO) &&                                 /* busy? */
     !(((j == 0) && (data & CS1_CCLR)) ||                /* not cclr or sclr? */
       ((j == 4) && (data & CS2_CLR)))) {
-    hkcs2 = hkcs2 | CS2_PGE;                            /* prog error */
-    update_hkcs (0, drv);
+    hk_err (CS1_ERR|CS1_DONE, CS2_PGE, 0, drv);         /* set err, stop op */
     return SCPE_OK;
     }
 
@@ -805,7 +816,7 @@ switch (j) {                                            /* decode PA<4:1> */
             hkda = hkdc = 0;
             hkba = hkwc = 0;
             hkspr = hkof = 0;
-            CLR_INT (HK);                               /* clr int */
+            hkci = hkdi = hkei = 0;                     /* clr int flops */
             for (i = 0; i < HK_NUMDR; i++) {            /* stop data xfr */
                 if (sim_is_active (&hk_unit[i]) &&
                     ((hk_unit[i].FNC & CS1_M_FNC) >= FNC_XFER))
@@ -814,21 +825,15 @@ switch (j) {                                            /* decode PA<4:1> */
             drv = 0;
             break;
             }
-        if (data & CS1_IE) {                            /* setting IE? */
-            if (data & CS1_DONE) {                      /* write to DONE+IE? */
-                sim_debug (HKDEB_INT, &hk_dev, "hk_wr(SET_INT)\n");
-                SET_INT (HK);
-                }
-            }
-        else {
-            sim_debug (HKDEB_INT, &hk_dev, "hk_wr(CLR_INT)\n");
-            CLR_INT (HK);                              /* no, clr intr */
+        if (((data & CS1_IE) != 0) && ((data & CS1_DONE) != 0)) {
+            sim_debug (HKDEB_INT, &hk_dev, "hk_wr(ctlr int)\n");
+            hkci = 1;                                   /* set ctlr intr */
             }
         hkcs1 = (hkcs1 & ~CS1_RW) | (data & CS1_RW);    /* merge data */
         if (SC02C)
             hkspr = (hkspr & ~CS1_M_UAE) | GET_UAE (hkcs1);
-        if ((data & CS1_GO) && !(hkcs1 & CS1_ERR))      /* go? */
-            hk_go (drv);
+        if (((data & CS1_GO) != 0) && ((hkcs1 & CS1_ERR) == 0))
+            hk_go (drv);                                /* go & ~err? */
         new_val = hkcs1;
         break;  
 
@@ -910,12 +915,12 @@ return SCPE_OK;
 void hk_go (int32 drv)
 {
 int32 fnc, t;
+t_bool dte;
 UNIT *uptr;
 
-static uint8 fnc_cdt[16] = {
-    0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+static uint8 fnc_dte[16] = {
+    0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0
     };
-
 static uint8 fnc_nxf[16] = {
     0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 0, 0, 0
     };
@@ -933,51 +938,65 @@ fnc = GET_FNC (hkcs1);
 sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d strt: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
              drv, hk_funcs[fnc], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
 uptr = hk_dev.units + drv;                              /* get unit */
+dte = ((hkcs1 & CS1_DT) !=0) != ((uptr->flags & UNIT_DTYPE) != 0);
+
 if (fnc != FNC_NOP)                                     /* !nop, clr msg sel */
     hkmr = hkmr & ~MR_MS;
 if (uptr->flags & UNIT_DIS) {                           /* nx unit? */
-    hkcs2 = hkcs2 | CS2_NED;                            /* set error flag */
-    update_hkcs (CS1_DONE, drv);                        /* done */
+    hk_err (CS1_ERR|CS1_DONE, CS2_NED, 0, drv);         /* set err, no op */
     return;
     }
-if (fnc_cdt[fnc] &&                                     /* need dtype match? */
-    (((hkcs1 & CS1_DT) != 0) != ((uptr->flags & UNIT_DTYPE) != 0))) {
-    hk_cmderr (ER_DTY, drv);                            /* type error */
-    return;
+if ((hkcs1 & CS1_FMT) != 0) {                           /* 18b format? */
+   hk_err (CS1_ERR|CS1_DONE, 0, ER_FER, drv);           /* set err, no op */
+   return;
+   }
+if (fnc_dte[fnc] && dte) {                              /* need drv match ? */
+    hker[drv] = hker[drv] | ER_DTY;                     /* drive type mismatch? */
+    hk_err (CS1_ERR|CS1_DONE, 0, ER_DTY, drv);          /* set err, no op */
     }
 if (fnc_nxf[fnc] && ((hkds[drv] & DS_VV) == 0)) {       /* need vol valid? */
-    hk_cmderr (ER_NXF, drv);                            /* non exec func */
+    hkds[drv] = hkds[drv] | DS_ATA;                     /* set ATTN */
+    hk_err (CS1_ERR|CS1_DI|CS1_DONE, 0, ER_NXF, drv);   /* set err, no op */
     return;
     }
 if (fnc_att[fnc] && !(uptr->flags & UNIT_ATT)) {        /* need attached? */
-    hk_cmderr (ER_UNS, drv);                            /* unsafe */
+    hkds[drv] = hkds[drv] | DS_ATA;                     /* set ATTN */
+    hk_err (CS1_ERR|CS1_DI|CS1_DONE, 0, ER_UNS, drv);   /* set err, no op */
     return;
     }
 if (fnc_rdy[fnc] && sim_is_active (uptr))               /* need inactive? */
     return;
 if (fnc_cyl[fnc] &&                                     /* need valid cyl */
    ((GET_CY (hkdc) >= HK_CYL (uptr)) ||                 /* bad cylinder */
-    (GET_SF (hkda) >= HK_NUMSF) ||                      /* bad surface */
-    (GET_SC (hkda) >= HK_NUMSC))) {                     /* or bad sector? */
-    hk_cmderr (ER_IAE, drv);                            /* illegal addr */
-    return;
-    }
+    (GET_SF (hkda) >= HK_NUMSF))) {                     /* bad surface */
+	hk_err (CS1_ERR|CS1_DONE, 0, ER_SKI|ER_IAE, drv);   /* set err, no op */
+	return;
+	}
+
 
 hkcs1 = (hkcs1 | CS1_GO) & ~CS1_DONE;                   /* set go, clear done */
+hkci = hkdi = hkei = 0;                                 /* clear all intr */
+CLR_INT (HK);
+
 switch (fnc) {                                          /* case on function */
 
-/* Instantaneous functions (unit may be busy, can't schedule thread) */
+/* Instantaneous functions (unit may be busy, can't schedule thread,
+   can't overwrite unit function field) */
 
-    case FNC_NOP:                                       /* no operation/select drive */
+    case FNC_NOP:                                       /* no operation */
         hkmr2 = hk_rdmr2 (GET_MS (hkmr));               /* get serial msgs */
         hkmr3 = hk_rdmr3 (GET_MS (hkmr));
-        update_hkcs (CS1_DONE, drv);                    /* done */
+        if (dte)                                        /* drive type err? */
+            hk_err (CS1_ERR|CS1_DONE, 0, ER_DTY, drv);
+        else update_hkcs (CS1_DONE, drv);               /* done */
         break;
 
     case FNC_DCLR:                                      /* drive clear */
         hkds[drv] &= ~DS_ATA;                           /* clr ATA */        
-        hker[drv] = 0;                                  /* clear errors */
-        update_hkcs (CS1_DONE, drv);                    /* done */
+        hker[drv] = 0;                                  /* clr err */
+        if (dte)                                        /* drive type err? */
+            hk_err (CS1_ERR|CS1_DONE, 0, ER_DTY, drv);
+        else update_hkcs (CS1_DONE, drv);               /* done */
         break;
 
     case FNC_PACK:                                      /* pack acknowledge */
@@ -1012,15 +1031,19 @@ switch (fnc) {                                          /* case on function */
     case FNC_WCHK:                                      /* write check */
     case FNC_READ:                                      /* read */
     case FNC_READH:                                     /* read headers */
+        if (GET_SC (hkda) >= HK_NUMSC) {                /* invalid sector? */
+            hk_err (CS1_ERR|CS1_DONE, 0, ER_OPI, drv);  /* set err, no op */
+            return;
+            }
         hk_dif[drv] = hkdc - uptr->CYL;                 /* cyl diff */
         t = abs (hk_dif[drv]);                          /* |cyl diff| */
-        sim_activate (uptr, hk_rwait + (hk_swait * t)); /* schedule */
         uptr->FNC = fnc;                                /* save function */
+        sim_activate (uptr, hk_rwait + (hk_swait * t)); /* schedule */
         uptr->CYL = hkdc;                               /* update cyl */
         return;
 
     default:
-        hk_cmderr (ER_ILF, drv);                        /* not supported */
+        hk_err (CS1_ERR|CS1_DONE, 0, ER_ILF, drv);      /* not supported */
         break;
         }
 return;
@@ -1060,7 +1083,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_OFFSET:                                    /* offset */
         if (uptr->FNC & FNC_2ND) {                      /* 2nd int? */
             hkds[drv] = (hkds[drv] & ~DS_PIP) | DS_ATA; /* upd sta */
-            update_hkcs (CS1_DI, drv);                  /* drive intr */
+            update_hkcs (CS1_DI, drv);                  /* ATN set */
             }
         else {
             uptr->FNC = uptr->FNC | FNC_2ND;            /* second state */
@@ -1074,7 +1097,7 @@ switch (fnc) {                                          /* case on function */
     case FNC_SEEK:                                      /* seek */
         if (uptr->FNC & FNC_2ND) {                      /* 2nd int? */
             hkds[drv] = (hkds[drv] & ~DS_PIP) | DS_ATA; /* upd sta */
-            update_hkcs (CS1_DI, drv);                  /* drive intr */
+            update_hkcs (CS1_DI, drv);                  /* ATN set */
             }
         else {
             uptr->FNC = uptr->FNC | FNC_2ND;            /* second state */
@@ -1102,7 +1125,7 @@ switch (fnc) {                                          /* case on function */
 
     case FNC_WRITE:                                     /* write */
         if (uptr->flags & UNIT_WPRT) {                  /* write locked? */
-            hk_cmderr (ER_WLE, drv);                    /* command error */
+            hk_err (CS1_ERR|CS1_DONE, 0, ER_WLE, drv);  /* set err, stop op */
             return SCPE_OK;
             }
     case FNC_WCHK:                                      /* write check */
@@ -1128,7 +1151,7 @@ switch (fnc) {                                          /* case on function */
             if (hkcs2 & CS2_UAI) {                      /* no addr inc? */
                 if ((t = Map_ReadW (ba, 2, &comp))) {   /* get 1st wd */
                     wc = 0;                             /* NXM, no xfr */
-                    hkcs2 = hkcs2 | CS2_NEM;            /* set nxm err */
+                    hk_err (CS1_ERR, CS2_NEM, 0, drv);
                     }
                 for (i = 0; i < wc; i++)
                     hkxb[i] = comp;
@@ -1136,7 +1159,7 @@ switch (fnc) {                                          /* case on function */
             else {                                      /* normal */
                 if ((t = Map_ReadW (ba, wc << 1, hkxb))) {/* get buf */
                     wc = wc - (t >> 1);                 /* NXM, adj wc */
-                    hkcs2 = hkcs2 | CS2_NEM;            /* set nxm err */
+                     hk_err (CS1_ERR, CS2_NEM, 0, drv);
                     }
                 ba = ba + (wc << 1);                    /* adv ba */
                 }
@@ -1156,13 +1179,13 @@ switch (fnc) {                                          /* case on function */
             if (hkcs2 & CS2_UAI) {                      /* no addr inc? */
                 if ((t = Map_WriteW (ba, 2, &hkxb[wc - 1]))) {
                     wc = 0;                             /* NXM, no xfr */
-                    hkcs2 = hkcs2 | CS2_NEM;            /* set nxm err */
+                    hk_err (CS1_ERR, CS2_NEM, 0, drv);
                     }
                 }
             else {                                      /* normal */
                 if ((t = Map_WriteW (ba, wc << 1, hkxb))) {/* put buf */
                     wc = wc - (t >> 1);                 /* NXM, adj wc */
-                    hkcs2 = hkcs2 | CS2_NEM;            /* set nxm err */
+                    hk_err (CS1_ERR, CS2_NEM, 0, drv);
                     }
                 ba = ba + (wc << 1);                    /* adv ba */
                 }
@@ -1175,15 +1198,15 @@ switch (fnc) {                                          /* case on function */
             awc = wc;
             for (wc = 0; wc < awc; wc++) {              /* loop thru buf */
                 if (Map_ReadW (ba, 2, &comp)) {         /* read word */
-                    hkcs2 = hkcs2 | CS2_NEM;            /* set error */
+                    hk_err (CS1_ERR, CS2_NEM, 0, drv);
                     break;
                     }
                 if (comp != hkxb[wc]) {                 /* compare wd */
-                    hkcs2 = hkcs2 | CS2_WCE;            /* set error */
+                    hk_err (CS1_ERR, CS2_WCE, 0, drv);
                     break;
                     }
-                if ((hkcs2 & CS2_UAI)
-                    == 0) ba = ba + 2;
+                if ((hkcs2 & CS2_UAI) == 0)
+                    ba = ba + 2;
                 }
             }                                           /* end else wchk */
 
@@ -1200,7 +1223,7 @@ switch (fnc) {                                          /* case on function */
         hkdc = da / HK_NUMSF;
 
         if (err != 0) {                                 /* error? */
-            hk_cmderr (ER_PAR, drv);                    /* set drive error */
+            hk_err (CS1_ERR|CS1_DONE, 0, ER_PAR, drv);  /* set drive error */
             perror ("HK I/O error");
             clearerr (uptr->fileref);
             return SCPE_IOERR;
@@ -1216,9 +1239,12 @@ return SCPE_OK;
 
 /* Controller status update
 
-   Check for done transition
    Update drive status
    Update HKCS1
+   Check for done transition
+      clock CI from IE
+      set DI if any ATN bits set
+   Check for DI set if no transition but DONE is set
    Update interrupt request
 */
 
@@ -1228,21 +1254,24 @@ int32 i, old_hkcs1 = hkcs1, old_hkcs2 = hkcs2;
 
 sim_debug (HKDEB_TRC, &hk_dev, "update_hkcs(flag=0%o, drv=%d)\n", flag, drv);
 update_hkds (drv);                                      /* upd drv status */
-hkcs1 = (hkcs1 & (CS1_DT|CS1_UAE|CS1_DONE|CS1_IE|CS1_SPA|CS1_FNC|CS1_GO)) | flag;
-if (hkcs1 & CS1_DONE)                                   /* done? clear GO */
-    hkcs1 = hkcs1 & ~CS1_GO;
-for (i = 0; i < HK_NUMDR; i++) {                        /* if ATA, set DI */
-    if (hkds[i] & DS_ATA)
-        hkcs1 = hkcs1 | CS1_DI;
-    }
-if (hker[drv] || (hkcs1 & (CS1_PAR | CS1_CTO)) || (hkcs2 & CS2_ERR))
-    hkcs1 = hkcs1 | CS1_ERR;                            /* if err, set ERR */
-if (hkcs1 & CS1_IE) {                                   /* intr enable? */
-    if (((hkcs1 & CS1_DONE) && ((old_hkcs1 & CS1_DONE) == 0)) ||
-        ((hkcs1 & CS1_DI) && (hkcs1 & CS1_DONE))) {     /* done 0->1 or DI&done? */
-        sim_debug (HKDEB_INT, &hk_dev, "update_hkcs(SET_INT)\n");
-        SET_INT (HK);
+hkcs1 = (hkcs1 & (CS1_ERR|CS1_DT|CS1_UAE|CS1_DONE|CS1_IE|CS1_SPA|CS1_FNC|CS1_GO)) |
+    (flag & ~CS1_DI);
+if ((hkcs1 & CS1_DONE) != 0) {                          /* done? */
+    hkcs1 = hkcs1 & ~CS1_GO;                            /* clear go */
+    if ((old_hkcs1 & CS1_DONE) == 0) {                  /* done 0->1? */
+        hkci = (hkcs1 & CS1_IE)? 1: 0;                  /* clk CI from IE */
+        for (i = 0; i < HK_NUMDR; i++) {                /* if ATA, set DI */
+            if (hkds[i] & DS_ATA)
+                hkdi = 1;
+            }
         }
+    else if ((flag & CS1_DI) != 0)                      /* done set; new ATN? */
+        hkdi = 1;                                       /* set drv int */
+    }
+else hkdi = 0;                                          /* not done, clr DI */
+if (((hkcs1 & CS1_IE) != 0) && (hkci || hkdi || hkei)) {/* int enab & set? */
+    sim_debug (HKDEB_INT, &hk_dev, "update_hkcs(SET_INT)\n");
+    SET_INT (HK);
     }
 else {
     sim_debug (HKDEB_INT, &hk_dev, "update_hkcs(CLR_INT)\n");
@@ -1253,8 +1282,12 @@ if (old_hkcs1 != hkcs1)
 if (old_hkcs2 != hkcs2)
     sim_debug_bits (HKDEB_OPS, &hk_dev, hk_cs2_bits, old_hkcs2, hkcs2, 1);
 if (flag & CS1_DONE) {                                  /* set done */
-    sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d done: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o\n",
-             drv, hk_funcs[GET_FNC (hkcs1)], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc);
+    sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d done: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o, ci=%d, di=%d\n",
+             drv, hk_funcs[GET_FNC (hkcs1)], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc, hkci, hkdi);
+    }
+if (flag & CS1_DI) {                                  /* set ATA? */
+    sim_debug (HKDEB_OPS, &hk_dev, ">>HK%d ATA: fnc=%s, cs1=%o, cs2=%o, ds=%o, er=%o, cyl=%o, da=%o, ba=%o, wc=%o, ci=%d, di=%d\n",
+             drv, hk_funcs[GET_FNC (hkcs1)], hkcs1, hkcs2, hkds[drv], hker[drv], hkdc, hkda, hkba, hkwc, hkci, hkdi);
     }
 return;
 }
@@ -1271,36 +1304,45 @@ if (hk_unit[drv].flags & UNIT_DIS) {                    /* disabled? */
     }
 sim_debug (HKDEB_TRC, &hk_dev, "update_hkds(drv=%d)\n", drv);
 hkds[drv] = (hkds[drv] & (DS_VV | DS_PIP | DS_ATA)) | DS_VLD | DS_DRA;
+if (hk_unit[drv].flags & UNIT_RK07)
+    hkds[drv] = hkds[drv] | DS_DT;
 if (hk_unit[drv].flags & UNIT_ATT) {                    /* attached? */
     if (!sim_is_active (&hk_unit[drv]))                 /* not busy? */
         hkds[drv] = hkds[drv] | DS_RDY;                 /* set RDY */
-    if (hker[drv])                                      /* err? set ATA */
-        hkds[drv] = hkds[drv] | DS_ATA;
     if (hk_off[drv])                                    /* offset? set OF */
         hkds[drv] = hkds[drv] | DS_OF;
     if (hk_unit[drv].flags & UNIT_WPRT)                 /* write locked? */
         hkds[drv] = hkds[drv] | DS_WRL;                 /* set WRL */
     }
-else {
+else
     hkds[drv] = hkds[drv] & ~(DS_PIP | DS_VV);          /* no, clr PIP,VV */
-    hker[drv] = 0;                                      /* no errors */
-    }
-if (hk_unit[drv].flags & UNIT_RK07)
-    hkds[drv] = hkds[drv] | DS_DT;
 if (old_ds != hkds[drv])
     sim_debug_bits (HKDEB_TRC, &hk_dev, hk_ds_bits, old_ds, hkds[drv], 1);
 return;
 }
 
-/* Set error and abort command */
+/* Set errors */
 
-void hk_cmderr (int32 err, int32 drv)
+void hk_err (int32 cs1e, int32 cs2e, int32 drve, int32 drv)
 {
-sim_debug (HKDEB_TRC, &hk_dev, "update_hkds(drv=%d, err=%d)\n", drv, err);
-hker[drv] = hker[drv] | err;                            /* set error */
-hkds[drv] = hkds[drv] | DS_ATA;                         /* set attn */
-update_hkcs (CS1_DONE, drv);                            /* set done */
+sim_debug (HKDEB_TRC, &hk_dev, "hk_err(drv=%d, cs1e=%d, cs2e=%d, drve=%d)\n", drv, cs1e, cs2e, drve);
+hker[drv] = hker[drv] | drve;                           /* set drv error */
+hkcs2 = hkcs2 | cs2e;                                   /* set cs2 err */
+if ((cs1e & CS1_ERR) != 0)                              /* set combined err? */                              
+    hkei = 1;                                           /* then set EI */
+if ((cs1e & CS1_DONE) != 0)                             /* set done? */
+    update_hkcs (CS1_ERR|CS1_DONE, drv);                /* stop now */
+else
+    hkcs1 = hkcs1 | cs1e;                               /* no, just upd */
 return;
+}
+
+/* Interrupt routine */
+
+int32 hk_inta (void)
+{
+hkci = hkdi = hkei = 0;                                 /* clear all flops */
+return hk_dib.vec;                                      /* return vector */
 }
 
 /* Diagnostic registers
@@ -1421,12 +1463,13 @@ hkmr = hkmr2 = hkmr3 = 0;
 hkda = hkdc = 0;
 hkba = hkwc = 0;
 hkof = hkspr = 0;
+hkci = hkdi = hkei = 0;                                 /* clear intr flops */
 CLR_INT (HK);                                           /* clear intr req */
 for (i = 0; i < HK_NUMDR; i++) {                        /* stop operations */
     uptr = hk_dev.units + i;
     sim_cancel (uptr);
     if (uptr->flags & UNIT_ATT)
-        hkds[i] = hkds[i] & DS_VV;
+        hkds[i] = hkds[i] & (DS_VV | DS_DT);
     else hkds[i] = 0;
     uptr->CYL = uptr->FNC = 0;                          /* clear state */
     hk_dif[i] = 0;
@@ -1446,18 +1489,23 @@ t_stat hk_attach (UNIT *uptr, char *cptr)
 {
 uint32 drv, p;
 t_stat r;
+int32 old_hkds;
 
 uptr->capac = HK_SIZE (uptr);
 r = attach_unit (uptr, cptr);                           /* attach unit */
 if (r != SCPE_OK)                                       /* error? */
     return r;
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */
-hkds[drv] = DS_ATA | DS_RDY | ((uptr->flags & UNIT_WPRT)? DS_WRL: 0);
+old_hkds = hkds[drv];                                   /* save hkds */
+hkds[drv] = DS_ATA | DS_RDY |
+    ((uptr->flags & UNIT_WPRT)? DS_WRL: 0) |
+    ((uptr->flags & UNIT_DTYPE)? DS_DT: 0);
 hker[drv] = 0;                                          /* upd drv status */
 hk_off[drv] = 0;
 hk_dif[drv] = 0;
 uptr->CYL = 0;
-update_hkcs (CS1_DI, drv);                              /* upd ctlr status */
+if ((old_hkds & DS_ATA) == 0)                           /* ATN transition? */
+    update_hkcs (CS1_DI, drv);                          /* upd ctlr status */
 
 p = sim_fsize (uptr->fileref);                          /* get file size */
 if (p == 0) {                                           /* new disk image? */
@@ -1483,18 +1531,21 @@ return SCPE_OK;
 t_stat hk_detach (UNIT *uptr)
 {
 uint32 drv;
+int32 old_hkds;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 drv = (uint32) (uptr - hk_dev.units);                   /* get drv number */
-hkds[drv] = (hkds[drv] & ~(DS_RDY | DS_WRL | DS_VV | DS_OF)) | DS_ATA;
+old_hkds = hkds[drv];
+hkds[drv] = (hkds[drv] & ~(DS_RDY | DS_WRL | DS_VV | DS_OF | DS_PIP)) | DS_ATA;
 if (sim_is_active (uptr)) {                             /* unit active? */
     sim_cancel (uptr);                                  /* cancel operation */
     hker[drv] = hker[drv] | ER_OPI;                     /* set drive error */
     if ((uptr->FNC & FNC_2ND) == 0)                     /* expecting done? */
-        update_hkcs (CS1_DONE, drv);                    /* set done */
+        update_hkcs (CS1_ERR|CS1_DONE, drv);            /* set done */
     }
-update_hkcs (CS1_DI, drv);                              /* request intr */
+if ((old_hkds & DS_ATA) == 0)                           /* ATN transition? */
+    update_hkcs (CS1_DI, drv);                          /* upd ctlr status */
 return detach_unit (uptr);
 }
 
