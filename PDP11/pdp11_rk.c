@@ -203,6 +203,8 @@ void rk_go (void);
 void rk_set_done (int32 error);
 void rk_clr_done (void);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
+t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *rk_description (DEVICE *dptr);
 
 /* RK11 data structures
 
@@ -239,33 +241,35 @@ UNIT rk_unit[] = {
     };
 
 REG rk_reg[] = {
-    { ORDATA (RKCS, rkcs, 16) },
-    { ORDATA (RKDA, rkda, 16) },
-    { ORDATA (RKBA, rkba, 16) },
-    { ORDATA (RKWC, rkwc, 16) },
-    { ORDATA (RKDS, rkds, 16) },
-    { ORDATA (RKER, rker, 16) },
-    { ORDATA (INTQ, rkintq, 9) },
-    { ORDATA (DRVN, last_drv, 3) },
-    { FLDATA (INT, IREQ (RK), INT_V_RK) },
-    { FLDATA (ERR, rkcs, CSR_V_ERR) },
-    { FLDATA (DONE, rkcs, CSR_V_DONE) },
-    { FLDATA (IE, rkcs, CSR_V_IE) },
-    { DRDATA (STIME, rk_swait, 24), PV_LEFT },
-    { DRDATA (RTIME, rk_rwait, 24), PV_LEFT },
-    { FLDATA (STOP_IOE, rk_stopioe, 0) },
+    { ORDATAD (RKCS, rkcs, 16, "control/status") },
+    { ORDATAD (RKDA, rkda, 16, "disk address") },
+    { ORDATAD (RKBA, rkba, 16, "memory address") },
+    { ORDATAD (RKWC, rkwc, 16, "word count") },
+    { ORDATAD (RKDS, rkds, 16, "drive status") },
+    { ORDATAD (RKER, rker, 16, "error status") },
+    { ORDATAD (INTQ, rkintq, 9, "interrupt queue") },
+    { ORDATAD (DRVN, last_drv, 3, "last r/w drive") },
+    { FLDATAD (INT, IREQ (RK), INT_V_RK, "interrupt pending flag") },
+    { FLDATAD (ERR, rkcs, CSR_V_ERR, "error flag (CSR<15>)") },
+    { FLDATAD (DONE, rkcs, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (IE, rkcs, CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (STIME, rk_swait, 24, "seek time, per cylinder"), PV_LEFT },
+    { DRDATAD (RTIME, rk_rwait, 24, "rotational delay"), PV_LEFT },
+    { FLDATAD (STOP_IOE, rk_stopioe, 0, "stop on I/O error flag") },
     { ORDATA (DEVADDR, rk_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, rk_dib.vec, 16), REG_HRO },
     { NULL }
     };
 
 MTAB rk_mod[] = {
-    { UNIT_HWLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_HWLK, UNIT_HWLK, "write locked", "LOCKED", NULL },
-    { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { UNIT_HWLK,        0, "write enabled", "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable disk drive" },
+    { UNIT_HWLK, UNIT_HWLK, "write locked",  "LOCKED", 
+        NULL, NULL, NULL, "Write lock disk drive"  },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
+        &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -274,7 +278,9 @@ DEVICE rk_dev = {
     RK_NUMDR, 8, 24, 1, 8, 16,
     NULL, NULL, &rk_reset,
     &rk_boot, NULL, NULL,
-    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18
+    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18, 0,
+    NULL, NULL, NULL, &rk_help, NULL, NULL,
+    &rk_description 
     };
 
 /* I/O dispatch routine, I/O addresses 17777400 - 17777416
@@ -757,4 +763,27 @@ M[BOOT_UNIT >> 1] = unitno & RK_M_NUMDR;
 M[BOOT_CSR >> 1] = (rk_dib.ba & DMASK) + 012;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
+}
+
+t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+fprintf (st, "RK11/RKV11 cartridge disk (RK05) controller (RK)\n\n");
+fprintf (st, "Options include the ability to set units write enabled or write locked,\n");
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprintf (st, "\nThe RK11 supports the BOOT command.  The RK11 is disabled in a Qbus\n");
+fprintf (st, "system with more than 256KB of memory.\n");
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         STOP_IOE   processed as\n");
+fprintf (st, "    not attached  1          report error and stop\n");
+fprintf (st, "                  0          disk not ready\n\n");
+fprintf (st, "    end of file   x          assume rest of disk is zero\n");
+fprintf (st, "    OS I/O error  x          report error and stop\n");
+return SCPE_OK;
+}
+
+char *rk_description (DEVICE *dptr)
+{
+return "RK11/RKV11 cartridge disk controller";
 }

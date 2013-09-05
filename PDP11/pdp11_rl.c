@@ -336,7 +336,6 @@ static const MTAB rl_mod[] = {
         &rl_set_load, NULL,            NULL, "Unload drive" },
     { MTAB_XTD|MTAB_VUN|MTAB_NMO,        0, "DSTATE", NULL, 
         NULL, &rl_show_dstate, NULL, "Display drive state" },
-
     { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
         NULL, NULL, NULL, "Write enable disk drive" },
     { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
