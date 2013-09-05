@@ -1185,6 +1185,13 @@ if (dptr->flags & DEV_DEBUG) {
         }
     }
 if ((dptr->modifiers) && (dptr->numunits != 1)) {
+    if (dptr->units->flags & UNIT_DISABLE) {
+        fprint_header (st, &found, header);
+        sprintf (buf, "set %sn ENABLE", sim_dname (dptr));
+        fprintf (st,  "%-30s\tEnables unit %sn\n", buf, sim_dname (dptr));
+        sprintf (buf, "set %sn DISABLE", sim_dname (dptr));
+        fprintf (st,  "%-30s\tDisables unit %sn\n", buf, sim_dname (dptr));
+        }
     for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
         if ((!MODMASK(mptr,MTAB_VUN)) && MODMASK(mptr,MTAB_XTD))
             continue;                                           /* skip device only modifiers */
@@ -2320,6 +2327,8 @@ else {
             }
     if (!dptr)
         return SCPE_NXDEV;                              /* no match */
+    lvl = MTAB_VDV;                                     /* device match */
+    uptr = dptr->units;                                 /* first unit */
     }
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
