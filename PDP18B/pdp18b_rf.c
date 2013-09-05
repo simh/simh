@@ -1,6 +1,6 @@
 /* pdp18b_rf.c: fixed head disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    rf           (PDP-9) RF09/RF09
                 (PDP-15) RF15/RS09
 
+   03-Sep-13    RMS     Added explicit void * cast
    04-Oct-06    RMS     Fixed bug, DSCD does not clear function register
    15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    14-Jan-04    RMS     Revised IO device call interface
@@ -265,7 +266,7 @@ return dat;
 t_stat rf_svc (UNIT *uptr)
 {
 int32 f, pa, d, t;
-int32 *fbuf = uptr->filebuf;
+int32 *fbuf = (int32 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     rf_updsta (RFS_NED | RFS_DON);                      /* set nxd, done */

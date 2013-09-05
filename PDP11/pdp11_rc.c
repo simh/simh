@@ -1,6 +1,6 @@
 /* pdp11_rc.c: RC11/RS64 fixed head disk simulator
 
-   Copyright (c) 2007-2008, John A. Dundas III
+   Copyright (c) 2007-2013, John A. Dundas III
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rc           RC11/RS64 fixed head disk
 
+   03-Dec-13    RMS     Added explicit void * cast
    28-Dec-07    JAD     Correct extraction of unit number from da in rc_svc.
                         Clear _all_ error bits when a new operation starts.
                         Passes all diagnostics in all configurations.
@@ -448,7 +449,7 @@ static t_stat rc_svc (UNIT *uptr)
 {
     uint32      ma, da, t, u_old, u_new, last_da = 0;
     uint16      dat;
-    uint16      *fbuf = uptr->filebuf;
+    uint16      *fbuf = (uint16 *) uptr->filebuf;
 
     if ((uptr->flags & UNIT_BUF) == 0) {                /* not buf? abort */
         update_rccs (RCCS_NED | RCCS_DONE, 0);          /* nx disk */

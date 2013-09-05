@@ -1,6 +1,6 @@
 /* nova_dsk.c: 4019 fixed head disk simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dsk          fixed head disk
 
+   03-Sep-13    RMS     Added explicit void * cast
    04-Jul-07    BKR     device name changed to DG's DSK from DEC's DK,
                         DEV_xxx macros now used for consistency,
                         added secret DG DIC function,
@@ -235,7 +236,7 @@ return rval;
 t_stat dsk_svc (UNIT *uptr)
 {
 int32 i, da, pa;
-int16 *fbuf = uptr->filebuf;
+int16 *fbuf = (int16 *) uptr->filebuf;
 
 DEV_CLR_BUSY( INT_DSK ) ;
 DEV_SET_DONE( INT_DSK ) ;

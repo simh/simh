@@ -1,6 +1,6 @@
 /* pdp8_rx.c: RX8E/RX01, RX28/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rx           RX8E/RX01, RX28/RX02 floppy disk
 
+   03-Sep-13    RMS     Added explicit void * cast
    15-May-06    RMS     Fixed bug in autosize attach (Dave Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    05-Nov-03    RMS     Fixed bug in RX28 read status (Charles Dickman)
@@ -366,7 +367,7 @@ return;
 t_stat rx_svc (UNIT *uptr)
 {
 int32 i, func, byptr, bps, wps;
-int8 *fbuf = uptr->filebuf;
+int8 *fbuf = (int8 *) uptr->filebuf;
 uint32 da;
 #define PTR12(x) (((x) + (x) + (x)) >> 1)
 

@@ -1,6 +1,6 @@
 /* pdp1_drm.c: PDP-1 drum simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
    drp          Type 23 parallel drum
    drm          Type 24 serial drum
 
+   03-Sep-13    RMS     Added explicit void * cast
    21-Dec-06    RMS     Added 16-chan SBS support
    08-Dec-03    RMS     Added parallel drum support
                         Fixed bug in DBL/DCN decoding
@@ -276,7 +277,7 @@ return (stop_inst << IOT_V_REASON) | dat;               /* stop if requested */
 t_stat drm_svc (UNIT *uptr)
 {
 uint32 i, da;
-uint32 *fbuf = uptr->filebuf;
+uint32 *fbuf = (uint32 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drm_err = 1;                                        /* set error */

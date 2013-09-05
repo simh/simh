@@ -1,6 +1,6 @@
 /* pdp11_rx.c: RX11/RX01 floppy disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rx           RX11/RX01 floppy disk
 
+   03-Sep-13    RMS     Added explicit void * cast
    07-Jul-05    RMS     Removed extraneous externs
    12-Oct-02    RMS     Added autoconfigure support
    08-Oct-02    RMS     Added variable address support to bootstrap
@@ -332,7 +333,7 @@ t_stat rx_svc (UNIT *uptr)
 {
 int32 i, func;
 uint32 da;
-int8 *fbuf = uptr->filebuf;
+int8 *fbuf = (int8 *) uptr->filebuf;
 
 func = RXCS_GETFNC (rx_csr);                            /* get function */
 switch (rx_state) {                                     /* case on state */

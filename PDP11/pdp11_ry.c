@@ -1,6 +1,6 @@
 /* pdp11_ry.c: RX211/RXV21/RX02 floppy disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ry           RX211/RXV21/RX02 floppy disk
 
+   03-Sep-13    RMS     Added explicit void * cast
    15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    07-Jul-05    RMS     Removed extraneous externs
    18-Feb-05    RMS     Fixed bug in boot code (Graham Toal)
@@ -386,7 +387,7 @@ t_stat ry_svc (UNIT *uptr)
 int32 i, t, func, bps;
 static uint8 estat[8];
 uint32 ba, da;
-int8 *fbuf = uptr->filebuf;
+int8 *fbuf = (int8 *) uptr->filebuf;
 
 func = RYCS_GETFNC (ry_csr);                            /* get function */
 bps = (ry_csr & RYCS_DEN)? RY_NUMBY: RX_NUMBY;          /* get sector size */
