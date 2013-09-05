@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   02-Sep-13    RMS     Added third Massbus adapter and RS drive
    11-Dec-11    RMS     Fixed priority of PIRQ vs IO; added INT_INTERNALn
    22-May-10    RMS     Added check for 64b definitions
    19-Nov-08    RMS     Moved I/O support routines to I/O library
@@ -598,10 +599,11 @@ typedef struct pdp_dib DIB;
 #define INT_V_TU        15
 #define INT_V_RF        16
 #define INT_V_RC        17
-#define INT_V_DMCRX     18
-#define INT_V_DMCTX     19
-#define INT_V_DUPRX     20
-#define INT_V_DUPTX     21
+#define INT_V_RS        18
+#define INT_V_DMCRX     19
+#define INT_V_DMCTX     20
+#define INT_V_DUPRX     21
+#define INT_V_DUPTX     22
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
@@ -645,6 +647,7 @@ typedef struct pdp_dib DIB;
 #define INT_TU          (1u << INT_V_TU)
 #define INT_RF          (1u << INT_V_RF)
 #define INT_RC          (1u << INT_V_RC)
+#define INT_RS          (1u << INT_V_RS)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_DUPRX       (1u << INT_V_DUPRX)
@@ -695,6 +698,7 @@ typedef struct pdp_dib DIB;
 #define IPL_TU          5
 #define IPL_RF          5
 #define IPL_RC          5
+#define IPL_RS          5
 #define IPL_DMCRX       5
 #define IPL_DMCTX       5
 #define IPL_DUPRX       5
@@ -741,9 +745,10 @@ typedef struct pdp_dib DIB;
 
 /* Massbus definitions */
 
-#define MBA_NUM         2                               /* number of MBA's */
+#define MBA_NUM         3                               /* number of MBA's */
 #define MBA_RP          0                               /* MBA for RP */
 #define MBA_TU          1                               /* MBA for TU */
+#define MBA_RS          2                               /* MBA for RS */
 #define MBA_RMASK       037                             /* max 32 reg */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */

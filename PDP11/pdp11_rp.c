@@ -639,6 +639,8 @@ REG rp_reg[] = {
     };
 
 MTAB rp_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0, "MASSBUS", NULL, 
+        NULL, &mba_show_num, NULL, "Display Massbus number" },
     { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
         NULL, NULL, NULL, "Write enable disk drive" },
     { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 

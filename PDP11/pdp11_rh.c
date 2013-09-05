@@ -1,6 +1,6 @@
 /* pdp11_rh.c: PDP-11 Massbus adapter simulator
 
-   Copyright (c) 2005-2012, Robert M Supnik
+   Copyright (c) 2005-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rha, rhb             RH11/RH70 Massbus adapter
 
+   02-Sep-13    RMS     Added third Massbus adapter, debug printouts
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    02-Feb-08    RMS     Fixed DMA memory address limit test (John Dundas)
    17-May-07    RMS     Moved CS1 drive enable to devices
@@ -172,6 +173,7 @@ t_stat mba_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat mba_show_type (FILE *st, UNIT *uptr, int32 val, void *desc);
 int32 mba0_inta (void);
 int32 mba1_inta (void);
+int32 mba2_inta (void);
 void mba_set_int (uint32 mb);
 void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
@@ -273,6 +275,41 @@ MTAB mba1_mod[] = {
     { 0 }
     };
 
+#define IOLN_RS         040
+
+DIB mba2_dib = {
+    IOBA_AUTO, IOLN_RS, &mba_rd, &mba_wr,
+    1, IVCL (RS), VEC_AUTO, { &mba2_inta }
+    };
+
+UNIT mba2_unit = { UDATA (NULL, 0, 0) };
+
+REG mba2_reg[] = {
+    { ORDATA (CS1, massbus[2].cs1, 16) },
+    { ORDATA (WC, massbus[2].wc, 16) },
+    { ORDATA (BA, massbus[2].ba, 16) },
+    { ORDATA (CS2, massbus[2].cs2, 16) },
+    { ORDATA (DB, massbus[2].db, 16) },
+    { ORDATA (BAE, massbus[2].bae, 6) },
+    { ORDATA (CS3, massbus[2].cs3, 16) },
+    { FLDATA (IFF, massbus[2].iff, 0) },
+    { FLDATA (INT, IREQ (TU), INT_V_TU) },
+    { FLDATA (SC, massbus[2].cs1, CSR_V_ERR) },
+    { FLDATA (DONE, massbus[2].cs1, CSR_V_DONE) },
+    { FLDATA (IE, massbus[2].cs1, CSR_V_IE) },
+    { ORDATA (DEVADDR, mba2_dib.ba, 32), REG_HRO },
+    { ORDATA (DEVVEC, mba2_dib.vec, 16), REG_HRO },
+    { NULL }
+    };
+
+MTAB mba2_mod[] = {
+    { MTAB_XTD|MTAB_VDV, 0040, "ADDRESS", "ADDRESS",
+      &set_addr, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
+      &set_vec, &show_vec, NULL },
+    { 0 }
+    };
+
 DEVICE mba_dev[] = {
     {
     "RHA", &mba0_unit, mba0_reg, mba0_mod,
@@ -287,6 +324,13 @@ DEVICE mba_dev[] = {
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
     &mba1_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
+    },
+    {
+    "RHC", &mba2_unit, mba2_reg, mba2_mod,
+    1, 0, 0, 0, 0, 0,
+    NULL, NULL, &mba_reset,
+    NULL, NULL, NULL,
+    &mba2_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
     }
     };
 
@@ -416,6 +460,9 @@ switch (ofs) {                                          /* case on reg */
                     massbus[mb].cs1 &= ~(CS1_TRE | CS1_MCPE | CS1_DONE);
                     massbus[mb].cs2 &= ~CS2_ERR;        /* clear errors */
                     massbus[mb].cs3 &= ~(CS3_ERR | CS3_DBL);
+                    if (DEBUG_PRS (mba_dev[mb]))
+                        fprintf (sim_deb, ">>RH%d STRT: cs1=%o, cs2=%o,ba=%o, wc=%o\n",
+                            mb, massbus[mb].cs1, massbus[mb].cs2, massbus[mb].ba, massbus[mb].wc);
                     }
                 }
             }
@@ -624,6 +671,9 @@ return i;
 void mba_set_don (uint32 mb)
 {
 mba_upd_cs1 (CS1_DONE, 0, mb);
+if (DEBUG_PRS (mba_dev[mb]))
+    fprintf (sim_deb, ">>RH%d DONE: cs1=%o, cs2=%o,ba=%o, wc=%o\n",
+        mb, massbus[mb].cs1, massbus[mb].cs2, massbus[mb].ba, massbus[mb].wc);
 return;
 }
 
@@ -727,6 +777,14 @@ massbus[1].iff = 0;                                     /* clear CSTB INTR */
 return mba1_dib.vec;                                    /* acknowledge */
 }
 
+int32 mba2_inta (void)
+{
+massbus[2].cs1 &= ~CS1_IE;                              /* clear int enable */
+massbus[2].cs3 &= ~CS1_IE;                              /* in both registers */
+massbus[2].iff = 0;                                     /* clear CSTB INTR */
+return mba2_dib.vec;                                    /* acknowledge */
+}
+
 /* Map physical address to Massbus number, offset */
 
 uint32 mba_map_pa (int32 pa, int32 *ofs)
@@ -784,11 +842,15 @@ return auto_config (0, 0);
 
 void mba_set_enbdis (uint32 mb, t_bool dis)
 {
+t_bool orig;
 if (mb >= MBA_NUM)                                      /* valid MBA? */
     return;
+orig = mba_dev[mb].flags & DEV_DIS;
 if (dis)
     mba_dev[mb].flags |= DEV_DIS;
 else mba_dev[mb].flags &= ~DEV_DIS;
+if (orig ^ dis)
+    mba_reset (&mba_dev[mb]);                           /* reset on change */
 return;
 }
 

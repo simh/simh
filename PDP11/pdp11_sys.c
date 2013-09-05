@@ -1,6 +1,6 @@
 /* pdp11_sys.c: PDP-11 simulator interface
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Sep-13    RMS     Added third Massbus, RS03/RS04
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    15-May-08    RMS     Added KE11-A, DC11 support
@@ -92,6 +93,7 @@ extern DEVICE rx_dev;
 extern DEVICE ry_dev;
 extern DEVICE mba_dev[];
 extern DEVICE rp_dev;
+extern DEVICE rs_dev;
 extern DEVICE rq_dev, rqb_dev, rqc_dev, rqd_dev;
 extern DEVICE tm_dev;
 extern DEVICE tq_dev;
@@ -131,6 +133,7 @@ DEVICE *sim_devices[] = {
     &sys_dev,
     &mba_dev[0],
     &mba_dev[1],
+    &mba_dev[2],
     &clk_dev,
     &pclk_dev,
     &ptr_dev,
@@ -153,6 +156,7 @@ DEVICE *sim_devices[] = {
     &rx_dev,
     &ry_dev,
     &rp_dev,
+    &rs_dev,
     &rq_dev,
     &rqb_dev,
     &rqc_dev,
