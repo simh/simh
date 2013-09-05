@@ -25,6 +25,7 @@
 
    mt           7-track magtape
 
+   03-Sep-13    RMS     Read TMK does not write GM+WM to memory
    19-Mar-11    RMS     Restored lost edit to insert EOF in memory on read EOF
                         Reverted multiple tape indicator implementation
    20-Jan-11    RMS     Fixed branch on END indicator per hardware (Van Snyder)
@@ -341,6 +342,8 @@ switch (mod) {
                 return STOP_WRAP;
                 }
             }
+        if (st == MTSE_TMK)                             /* if TMK, no GM+WM */
+            break;
         if (M[BS] != (BCD_GRPMRK + WM)) {               /* not GM+WM at end? */
             if (flag & MD_WM)                           /* LCA: clear WM */
                 M[BS] = BCD_GRPMRK;
