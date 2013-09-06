@@ -408,7 +408,7 @@ UNIT cpu_unit = {
     UDATA (&cpu_idle_svc, UNIT_FIX|UNIT_BINK, INITMEMSIZE)
     };
 
-char *psl_modes[] = {"K", "E", "S", "U"};
+const char *psl_modes[] = {"K", "E", "S", "U"};
 
 
 BITFIELD psl_bits[] = {

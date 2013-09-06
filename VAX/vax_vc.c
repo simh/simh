@@ -102,7 +102,7 @@ BITFIELD vc_icsr_bits[] = {
 };
 
 
-char *vc_icm_rp_names[] = {"ISR", "IMR", "IRR", "ACR"};
+const char *vc_icm_rp_names[] = {"ISR", "IMR", "IRR", "ACR"};
 
 /* mode - interrupt controller mode register */
 

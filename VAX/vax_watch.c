@@ -42,7 +42,7 @@
 #define WTC_CSRA_DV     (WTC_CSRA_M_DV << WTC_CSRA_V_DV)
 #define WTC_CSRA_UIP    0x80                            /* update in progess (BUSY) */
 #define WTC_CSRA_WR     (WTC_CSRA_RS | WTC_CSRA_DV)
-char *wtc_dv_modes[] = {"4.194304MHz", "1.048576MHz", "32.768KHz", "Any", "Any", "Test-Only", "Test-Only", "Test-Only"};
+const char *wtc_dv_modes[] = {"4.194304MHz", "1.048576MHz", "32.768KHz", "Any", "Any", "Test-Only", "Test-Only", "Test-Only"};
 BITFIELD wtc_csra_bits[] = {
     BITNCF(4),                              /* Rate Select - unused MBZ for VMS */
     BITFNAM(DV,3,wtc_dv_modes),             /* Divider Select */
@@ -59,9 +59,9 @@ BITFIELD wtc_csra_bits[] = {
 #define WTC_CSRB_UIE    0x10                            /* update ended interrupt enable (Not Used by VMS) */
 #define WTC_CSRB_SQWE   0x08                            /* square wave enable (Not Used by VMS) */
 #define WTC_CSRB_WR     (WTC_CSRB_DSE | WTC_CSRB_2412 | WTC_CSRB_DM | WTC_CSRB_SET)
-char *wtc_dse_modes[] = {"Disabled", "Enabled"};
-char *wtc_hr_modes[] = {"12Hr", "24Hr"};
-char *wtc_data_modes[] = {"BCD", "Binary"};
+const char *wtc_dse_modes[] = {"Disabled", "Enabled"};
+const char *wtc_hr_modes[] = {"12Hr", "24Hr"};
+const char *wtc_data_modes[] = {"BCD", "Binary"};
 BITFIELD wtc_csrb_bits[] = {
     BITFNAM(DST,1,wtc_dse_modes),           /* Daylight Savings Time Enable */
     BITFNAM(24HR,1,wtc_hr_modes),           /* 24/12 Hour Mode */
@@ -95,7 +95,7 @@ BITFIELD* wtc_bitdefs[] = {wtc_value_bits, wtc_value_bits, wtc_value_bits, wtc_v
 
 #define WTC_MODE_STD    0
 #define WTC_MODE_VMS    1
-char *wtc_modes[] = {"Std", "VMS"};
+const char *wtc_modes[] = {"Std", "VMS"};
 BITFIELD wtc_mode_bits[] = {
     BITFNAM(MODE,1,wtc_modes),              /* Watch Date/Time mode */
     ENDBITS
