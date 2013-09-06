@@ -992,7 +992,7 @@ if (rlxb == NULL)
     rlxb = (uint16 *) calloc (RL_MAXFR, sizeof (uint16));
 if (rlxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Attach routine */

@@ -1480,7 +1480,7 @@ if (hkxb == NULL)
     hkxb = (uint16 *) calloc (HK_MAXFR, sizeof (uint16));
 if (hkxb == NULL)
     return SCPE_MEM;
-return SCPE_OK;
+return auto_config (0, 0);
 }
 
 /* Device attach */
