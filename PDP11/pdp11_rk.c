@@ -358,12 +358,12 @@ UNIT rk_unit[] = {
     };
 
 REG rk_reg[] = {
-    { ORDATAD (RKCS, rkcs, 16, "control/status") },
-    { ORDATAD (RKDA, rkda, 16, "disk address") },
-    { ORDATAD (RKBA, rkba, 16, "memory address") },
-    { ORDATAD (RKWC, rkwc, 16, "word count") },
-    { ORDATAD (RKDS, rkds, 16, "drive status") },
-    { ORDATAD (RKER, rker, 16, "error status") },
+    { ORDATADF (RKCS, rkcs, 16, "control/status", rk_cs_bits) },
+    { ORDATADF (RKDA, rkda, 16, "disk address", rk_da_bits) },
+    { ORDATADF (RKBA, rkba, 16, "memory address", rk_ba_bits) },
+    { ORDATADF (RKWC, rkwc, 16, "word count", rk_wc_bits) },
+    { ORDATADF (RKDS, rkds, 16, "drive status", rk_ds_bits) },
+    { ORDATADF (RKER, rker, 16, "error status", rk_er_bits) },
     { ORDATAD (INTQ, rkintq, 9, "interrupt queue") },
     { ORDATAD (DRVN, last_drv, 3, "last r/w drive") },
     { FLDATAD (INT, IREQ (RK), INT_V_RK, "interrupt pending flag") },
