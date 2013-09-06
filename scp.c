@@ -1338,7 +1338,7 @@ if (*cptr) {
                     }
                 r = help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
                 if (sim_log)
-                    help_dev_help (stdout, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                    help_dev_help (sim_log, dptr, uptr, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
                 return r;
                 }
             else
