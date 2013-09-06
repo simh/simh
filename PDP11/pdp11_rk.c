@@ -97,40 +97,75 @@
 
 /* RKDS */
 
+BITFIELD rk_ds_bits[] = {
 #define RKDS_SC         0000017                         /* sector counter */
+  BITF(SC,4),
 #define RKDS_ON_SC      0000020                         /* on sector */
+  BIT(ON_SC),
 #define RKDS_WLK        0000040                         /* write locked */
+  BIT(WLK),
 #define RKDS_RWS        0000100                         /* rd/wr/seek ready */
+  BIT(RWS),
 #define RKDS_RDY        0000200                         /* drive ready */
+  BIT(RDY),
 #define RKDS_SC_OK      0000400                         /* SC valid */
+  BIT(SC_OK),
 #define RKDS_INC        0001000                         /* seek incomplete */
+  BIT(INC),
 #define RKDS_UNSAFE     0002000                         /* unsafe */
+  BIT(UNSAFE),
 #define RKDS_RK05       0004000                         /* RK05 */
+  BIT(RK05),
 #define RKDS_PWR        0010000                         /* power low */
+  BIT(PWR),
 #define RKDS_ID         0160000                         /* drive ID */
 #define RKDS_V_ID       13
+  BITF(ID,3),
+  ENDBITS
+};
 
 /* RKER */
 
+BITFIELD rk_er_bits[] = {
 #define RKER_WCE        0000001                         /* write check */
+  BIT(WCE),
 #define RKER_CSE        0000002                         /* checksum */
+  BIT(CSE),
 #define RKER_NXS        0000040                         /* nx sector */
+  BIT(NXS),
 #define RKER_NXC        0000100                         /* nx cylinder */
+  BIT(NXC),
 #define RKER_NXD        0000200                         /* nx drive */
+  BIT(NXD),
 #define RKER_TE         0000400                         /* timing error */
+  BIT(TE),
 #define RKER_DLT        0001000                         /* data late */
+  BIT(DLT),
 #define RKER_NXM        0002000                         /* nx memory */
+  BIT(NXM),
 #define RKER_PGE        0004000                         /* programming error */
+  BIT(PGE),
 #define RKER_SKE        0010000                         /* seek error */
+  BIT(SKE),
 #define RKER_WLK        0020000                         /* write lock */
+  BIT(WLK),
 #define RKER_OVR        0040000                         /* overrun */
+  BIT(OVR),
 #define RKER_DRE        0100000                         /* drive error */
+  BIT(DRE),
 #define RKER_IMP        0177743                         /* implemented */
 #define RKER_SOFT       (RKER_WCE+RKER_CSE)             /* soft errors */
 #define RKER_HARD       0177740                         /* hard errors */
+  ENDBITS
+};
 
 /* RKCS */
 
+static const char *rk_funcs[] = {
+    "CTLRESET", "WRITE", "READ", "WCHK", "SEEK", "RCHK", "DRVRESET", "WLK"};
+
+BITFIELD rk_cs_bits[] = {
+  BIT(GO),
 #define RKCS_M_FUNC     0000007                         /* function */
 #define  RKCS_CTLRESET  0
 #define  RKCS_WRITE     1
@@ -141,38 +176,91 @@
 #define  RKCS_DRVRESET  6
 #define  RKCS_WLK       7
 #define RKCS_V_FUNC     1
+  BITFNAM(FUNC,3,rk_funcs),
 #define RKCS_MEX        0000060                         /* memory extension */
 #define RKCS_V_MEX      4
+  BITF(MEX,2),
+  BIT(IE),
+  BIT(DONE),
 #define RKCS_SSE        0000400                         /* stop on soft err */
+  BIT(SSE),
+  BITNC,
 #define RKCS_FMT        0002000                         /* format */
+  BIT(FMT),
 #define RKCS_INH        0004000                         /* inhibit increment */
+  BIT(INH),
+  BITNC,
 #define RKCS_SCP        0020000                         /* search complete */
+  BIT(SCP),
 #define RKCS_HERR       0040000                         /* hard error */
+  BIT(HERR),
 #define RKCS_ERR        0100000                         /* error */
+  BIT(ERR),
 #define RKCS_REAL       0026776                         /* kept here */
 #define RKCS_RW         0006576                         /* read/write */
 #define GET_FUNC(x)     (((x) >> RKCS_V_FUNC) & RKCS_M_FUNC)
+  ENDBITS
+};
 
 /* RKDA */
 
+BITFIELD rk_da_bits[] = {
 #define RKDA_V_SECT     0                               /* sector */
 #define RKDA_M_SECT     017
+  BITF(SECT,4),
 #define RKDA_V_TRACK    4                               /* track */
 #define RKDA_M_TRACK    0777
+  BITF(SURF,1),
 #define RKDA_V_CYL      5                               /* cylinder */
 #define RKDA_M_CYL      0377
+  BITF(CYL,8),
 #define RKDA_V_DRIVE    13                              /* drive */
 #define RKDA_M_DRIVE    07
 #define RKDA_DRIVE      (RKDA_M_DRIVE << RKDA_V_DRIVE)
+  BITF(DRIVE,3),
 #define GET_SECT(x)     (((x) >> RKDA_V_SECT) & RKDA_M_SECT)
 #define GET_CYL(x)      (((x) >> RKDA_V_CYL) & RKDA_M_CYL)
 #define GET_TRACK(x)    (((x) >> RKDA_V_TRACK) & RKDA_M_TRACK)
 #define GET_DRIVE(x)    (((x) >> RKDA_V_DRIVE) & RKDA_M_DRIVE)
 #define GET_DA(x)       ((GET_TRACK (x) * RK_NUMSC) + GET_SECT (x))
+  ENDBITS
+};
+
+/* RKWC */
+
+BITFIELD rk_wc_bits[] = {
+  BITF(WC,16),
+  ENDBITS
+};
 
 /* RKBA */
 
+BITFIELD rk_ba_bits[] = {
 #define RKBA_IMP        0177776                         /* implemented */
+  BITF(BA,16),
+  ENDBITS
+};
+
+BITFIELD *rk_reg_bits[] = {
+    rk_ds_bits,
+    rk_er_bits,
+    rk_cs_bits,
+    rk_wc_bits,
+    rk_ba_bits,
+    rk_da_bits,
+    NULL,
+    NULL,
+    };
+
+/* Debug detail levels */
+
+#define RKDEB_OPS       001                             /* transactions */
+#define RKDEB_RRD       002                             /* reg reads */
+#define RKDEB_RWR       004                             /* reg writes */
+#define RKDEB_TRC       010                             /* trace */
+#define RKDEB_INT       020                             /* interrupts */
+
+
 
 #define RK_MIN          10
 #define MAX(x,y)        (((x) > (y))? (x): (y))
@@ -193,6 +281,26 @@ int32 rk_stopioe = 1;                                   /* stop on error */
 int32 rk_swait = 10;                                    /* seek time */
 int32 rk_rwait = 10;                                    /* rotate time */
 
+char *rk_regnames[] = {
+    "RKDS",
+    "RKER",
+    "RKCS",
+    "RKWC",
+    "RKBA",
+    "RKDA",
+    "unused",
+    "RKDB",
+    };
+
+int32 *rk_regs[] = {
+    &rkds,
+    &rker,
+    &rkcs,
+    &rkwc,
+    &rkba,
+    &rkda,
+    };
+
 DEVICE rk_dev;
 t_stat rk_rd (int32 *data, int32 PA, int32 access);
 t_stat rk_wr (int32 data, int32 PA, int32 access);
@@ -205,6 +313,15 @@ void rk_clr_done (void);
 t_stat rk_boot (int32 unitno, DEVICE *dptr);
 t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *rk_description (DEVICE *dptr);
+
+DEBTAB rk_deb[] = {
+    { "OPS", RKDEB_OPS },
+    { "RRD", RKDEB_RRD },
+    { "RWR", RKDEB_RWR },
+    { "INTERRUPT", RKDEB_INT },
+    { "TRACE", RKDEB_TRC },
+    { NULL, 0 }
+    };
 
 /* RK11 data structures
 
@@ -278,8 +395,8 @@ DEVICE rk_dev = {
     RK_NUMDR, 8, 24, 1, 8, 16,
     NULL, NULL, &rk_reset,
     &rk_boot, NULL, NULL,
-    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18, 0,
-    NULL, NULL, NULL, &rk_help, NULL, NULL,
+    &rk_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG, 0,
+    rk_deb, NULL, NULL, &rk_help, NULL, NULL,
     &rk_description 
     };
 
@@ -304,9 +421,11 @@ UNIT *uptr;
 switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
     case 0:                                             /* RKDS: read only */
-        rkds = (rkds & RKDS_ID) | RKDS_RK05 | RKDS_SC_OK |
+        rkds = (rkds & RKDS_ID) | RKDS_SC_OK |
             (rand () % RK_NUMSC);                       /* random sector */
         uptr = rk_dev.units + GET_DRIVE (rkda);         /* selected unit */
+        if (!(uptr->flags & UNIT_DIS))                  /* enabled? */
+            rkds = rkds | RKDS_RK05;
         if (uptr->flags & UNIT_ATT)                     /* attached? */
             rkds = rkds | RKDS_RDY;
         if (!sim_is_active (uptr))                      /* idle? */
@@ -316,11 +435,11 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
         if (GET_SECT (rkda) == (rkds & RKDS_SC))
             rkds = rkds | RKDS_ON_SC;
         *data = rkds;
-        return SCPE_OK;
+        break;
 
     case 1:                                             /* RKER: read only */
         *data = rker & RKER_IMP;
-        return SCPE_OK;
+        break;
 
     case 2:                                             /* RKCS */
         rkcs = rkcs & RKCS_REAL;
@@ -329,35 +448,40 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
         if (rker & RKER_HARD)
             rkcs = rkcs | RKCS_HERR;
         *data = rkcs;
-        return SCPE_OK;
+        break;
 
     case 3:                                             /* RKWC */
         *data = rkwc;
-        return SCPE_OK;
+        break;
 
     case 4:                                             /* RKBA */
         *data = rkba & RKBA_IMP;
-        return SCPE_OK;
+        break;
 
     case 5:                                             /* RKDA */
         *data = rkda;
-        return SCPE_OK;
+        break;
 
     default:
         *data = 0;
         return SCPE_OK;
         }                                               /* end switch */
+sim_debug (RKDEB_RRD, &rk_dev, ">>RK read: %s=0%o\n", rk_regnames[(PA >> 1) & 07], *data);
+sim_debug_bits (RKDEB_RRD, &rk_dev, rk_reg_bits[(PA >> 1) & 07], *data, *data, 1);
+return SCPE_OK;
 }
 
 t_stat rk_wr (int32 data, int32 PA, int32 access)
 {
+int32 old_val = *rk_regs[(PA >> 1) & 07], new_val = 0;
+
 switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
     case 0:                                             /* RKDS: read only */
-        return SCPE_OK;
+        break;
 
     case 1:                                             /* RKER: read only */
-        return SCPE_OK;
+        break;
 
     case 2:                                             /* RKCS */
         rkcs = rkcs & RKCS_REAL;
@@ -365,28 +489,30 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
             data = (PA & 1)? (rkcs & 0377) | (data << 8): (rkcs & ~0377) | data;
         if ((data & CSR_IE) == 0) {                     /* int disable? */
             rkintq = 0;                                 /* clr int queue */
+            sim_debug (RKDEB_INT, &rk_dev, "rk_wr(CLR_INT)\n");
             CLR_INT (RK);                               /* clr int request */
             }
         else if ((rkcs & (CSR_DONE + CSR_IE)) == CSR_DONE) {
             rkintq = rkintq | RK_CTLI;                  /* queue ctrl int */
+            sim_debug (RKDEB_INT, &rk_dev, "rk_wr(SET_INT)\n");
             SET_INT (RK);                               /* set int request */
             }
         rkcs = (rkcs & ~RKCS_RW) | (data & RKCS_RW);
         if ((rkcs & CSR_DONE) && (data & CSR_GO))       /* new function? */
             rk_go ();
-        return SCPE_OK;
+        break;
 
     case 3:                                             /* RKWC */
         if (access == WRITEB)
             data = (PA & 1)? (rkwc & 0377) | (data << 8): (rkwc & ~0377) | data;
         rkwc = data;
-        return SCPE_OK;
+        break;
 
     case 4:                                             /* RKBA */
         if (access == WRITEB)
             data = (PA & 1)? (rkba & 0377) | (data << 8): (rkba & ~0377) | data;
         rkba = data & RKBA_IMP;
-        return SCPE_OK;
+        break;
 
     case 5:                                             /* RKDA */
         if ((rkcs & CSR_DONE) == 0)
@@ -394,11 +520,14 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
         if (access == WRITEB)
             data = (PA & 1)? (rkda & 0377) | (data << 8): (rkda & ~0377) | data;
         rkda = data;
-        return SCPE_OK;
+        break;
 
     default:
         return SCPE_OK;
         }                                               /* end switch */
+sim_debug (RKDEB_RWR, &rk_dev, ">>RK write: %s=0%o\n", rk_regnames[(PA >> 1) & 07], data);
+sim_debug_bits (RKDEB_RWR, &rk_dev, rk_reg_bits[(PA >> 1) & 07], old_val, *rk_regs[(PA >> 1) & 07], 1);
+return SCPE_OK;
 }
 
 /* Initiate new function */
@@ -415,6 +544,7 @@ if (func == RKCS_CTLRESET) {                            /* control reset? */
     rkba = 0;
     rkcs = CSR_DONE;
     rkintq = 0;                                         /* clr int queue */
+    sim_debug (RKDEB_INT, &rk_dev, "rk_go(CLR_INT)\n");
     CLR_INT (RK);                                       /* clr int request */
     return;
     }
@@ -498,11 +628,14 @@ if (uptr->FUNC == RKCS_SEEK) {                          /* seek */
     rkcs = rkcs | RKCS_SCP;                             /* set seek done */
     if (rkcs & CSR_IE) {                                /* ints enabled? */
         rkintq = rkintq | RK_SCPI (drv);                /* queue request */
-        if (rkcs & CSR_DONE)
+        if (rkcs & CSR_DONE) {
+            sim_debug (RKDEB_INT, &rk_dev, "rk_svc(SET_INT)\n");
             SET_INT (RK);
+            }
         }
     else {
         rkintq = 0;                                     /* clear queue */
+        sim_debug (RKDEB_INT, &rk_dev, "rk_svc(CLR_INT)\n");
         CLR_INT (RK);                                   /* clear interrupt */
         }
     return SCPE_OK;
@@ -659,10 +792,12 @@ if (error != 0) {
     }
 if (rkcs & CSR_IE) {                                    /* int enable? */
     rkintq = rkintq | RK_CTLI;                          /* set ctrl int */
+    sim_debug (RKDEB_INT, &rk_dev, "rk_set_done(SET_INT)\n");
     SET_INT (RK);                                       /* request int */
     }
 else {
     rkintq = 0;                                         /* clear queue */
+    sim_debug (RKDEB_INT, &rk_dev, "rk_set_done(CLR_INT)\n");
     CLR_INT (RK);
     }
 return;
@@ -672,6 +807,7 @@ void rk_clr_done (void)
 {
 rkcs = rkcs & ~CSR_DONE;                                /* clear done */
 rkintq = rkintq & ~RK_CTLI;                             /* clear ctl int */
+sim_debug (RKDEB_INT, &rk_dev, "rk_clr_done(CLR_INT)\n");
 CLR_INT (RK);                                           /* clear int req */
 return;
 }
@@ -683,14 +819,17 @@ int32 i;
 for (i = 0; i <= RK_NUMDR; i++) {                       /* loop thru intq */
     if (rkintq & (1u << i)) {                           /* bit i set? */
         rkintq = rkintq & ~(1u << i);                   /* clear bit i */
-        if (rkintq)                                     /* queue next */
+        if (rkintq) {                                    /* queue next */
+            sim_debug (RKDEB_INT, &rk_dev, "rk_inta(SET_INT)\n");
             SET_INT (RK);
+            }
         rkds = (rkds & ~RKDS_ID) |                      /* id drive */
             (((i == 0)? last_drv: i - 1) << RKDS_V_ID);
+        sim_debug (RKDEB_INT, &rk_dev, "rk_inta(vec=0%o)\n", rk_dib.vec);
         return rk_dib.vec;                              /* return vector */
         }
     }
-rkintq = 0;                                             /* clear queue */
+rkintq = 0;                                           /* clear queue */
 return 0;                                               /* passive release */
 }
 
@@ -704,6 +843,7 @@ UNIT *uptr;
 rkcs = CSR_DONE;
 rkda = rkba = rker = rkds = 0;
 rkintq = last_drv = 0;
+sim_debug (RKDEB_INT, &rk_dev, "rk_reset(CLR_INT)\n");
 CLR_INT (RK);
 for (i = 0; i < RK_NUMDR; i++) {
     uptr = rk_dev.units + i;
