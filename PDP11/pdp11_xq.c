@@ -333,6 +333,24 @@ UNIT xqa_unit[] = {
  { UDATA (&xq_tmrsvc, UNIT_IDLE|UNIT_DIS, 0) },
 };
 
+BITFIELD xq_csr_bits[] = {
+  BIT(RE), BIT(SR), BIT(NI), BIT(BD), BIT(XL), BIT(RL), BIT(IE), BIT(XI),
+  BIT(IL), BIT(EL), BIT(SE), BIT(RR), BIT(OK), BIT(CA), BIT(PE), BIT(RI),
+  ENDBITS
+};
+
+BITFIELD xq_var_bits[] = {
+  BIT(ID), BIT(RR), BIT(V0), BIT(V1), BIT(V2), BIT(V3), BIT(V4), BIT(V5),
+  BIT(V6), BIT(V7), BIT(S1), BIT(S2), BIT(S3), BIT(RS), BIT(OS), BIT(MS),
+  ENDBITS
+};
+
+BITFIELD xq_srr_bits[] = {
+  BIT(RS0), BIT(RS1), BITNC,    BITNC,    BITNC,    BITNC,    BITNC,    BITNC,
+  BITNC,    BIT(TBL), BIT(IME), BIT(PAR), BIT(NXM), BITNC, BIT(CHN), BIT(FES),
+  ENDBITS
+};
+
 REG xqa_reg[] = {
   { GRDATA ( SA0,  xqa.mac[0], XQ_RDX, 8, 0), REG_RO|REG_FIT},
   { GRDATA ( SA1,  xqa.mac[1], XQ_RDX, 8, 0), REG_RO|REG_FIT},
@@ -342,12 +360,12 @@ REG xqa_reg[] = {
   { GRDATA ( SA5,  xqa.mac[5], XQ_RDX, 8, 0), REG_RO|REG_FIT},
   { GRDATA ( MX0,  xqa.mac_checksum[0], XQ_RDX, 8, 0), REG_RO|REG_FIT},
   { GRDATA ( MX1,  xqa.mac_checksum[1], XQ_RDX, 8, 0), REG_RO|REG_FIT},
-  { GRDATA ( RBDL, xqa.rbdl[0], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( RBDH, xqa.rbdl[1], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( XBDL, xqa.xbdl[0], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( XBDH, xqa.xbdl[1], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( VAR,  xqa.var,  XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( CSR,  xqa.csr,  XQ_RDX, 16, 0), REG_FIT },
+  { GRDATAD ( RBDL, xqa.rbdl[0], XQ_RDX, 16, 0, "Receive BDL Address(low)"), REG_FIT },
+  { GRDATAD ( RBDH, xqa.rbdl[1], XQ_RDX, 16, 0, "Receive BDL Address(high)"), REG_FIT },
+  { GRDATAD ( XBDL, xqa.xbdl[0], XQ_RDX, 16, 0, "Transmit BDL Address(low)"), REG_FIT },
+  { GRDATAD ( XBDH, xqa.xbdl[1], XQ_RDX, 16, 0, "Transmit BDL Address(high)"), REG_FIT },
+  { GRDATADF ( VAR,  xqa.var,  XQ_RDX, 16, 0, "Vector Address Register ", xq_var_bits), REG_FIT },
+  { GRDATADF ( CSR,  xqa.csr,  XQ_RDX, 16, 0, "Control and Status Register", xq_csr_bits), REG_FIT },
   { FLDATA ( INT,  xqa.irq, 0) },
   { GRDATA ( TYPE,  xqa.type,  XQ_RDX, 32, 0), REG_FIT },
   { GRDATA ( MODE,  xqa.mode,  XQ_RDX, 32, 0), REG_FIT },
@@ -365,10 +383,10 @@ REG xqa_reg[] = {
   { BRDATA ( SETUP_MACS, &xqa.setup.macs, XQ_RDX, 8, sizeof(xqa.setup.macs)), REG_HRO},
   { BRDATA ( STATS, &xqa.stats, XQ_RDX, 8, sizeof(xqa.stats)), REG_HRO},
   { BRDATA ( TURBO_INIT, &xqa.init, XQ_RDX, 8, sizeof(xqa.init)), REG_HRO},
-  { GRDATA ( SRR,  xqa.srr,  XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( SRQR,  xqa.srqr,  XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( IBA,  xqa.iba,  XQ_RDX, 32, 0), REG_FIT },
-  { GRDATA ( ICR,  xqa.icr,  XQ_RDX, 16, 0), REG_FIT },
+  { GRDATADF ( SRR,  xqa.srr,  XQ_RDX, 16, 0, "Status and Response Register", xq_srr_bits), REG_FIT },
+  { GRDATAD ( SRQR,  xqa.srqr,  XQ_RDX, 16, 0, "Synchronous Request Register"), REG_FIT },
+  { GRDATAD ( IBA,  xqa.iba,  XQ_RDX, 32, 0, "Init Block Address Register"), REG_FIT },
+  { GRDATAD ( ICR,  xqa.icr,  XQ_RDX, 16, 0, "Interrupt Request Register"), REG_FIT },
   { GRDATA ( IPEND,  xqa.pending_interrupt,  XQ_RDX, 16, 0), REG_FIT },
   { GRDATA ( TBINDX, xqa.tbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( RBINDX, xqa.rbindx, XQ_RDX, 32, 0), REG_HRO},
@@ -398,12 +416,12 @@ REG xqb_reg[] = {
   { GRDATA ( SA5,  xqb.mac[5], XQ_RDX, 8, 0), REG_RO|REG_FIT},
   { GRDATA ( MX0,  xqb.mac_checksum[0], XQ_RDX, 8, 0), REG_RO|REG_FIT},
   { GRDATA ( MX1,  xqb.mac_checksum[1], XQ_RDX, 8, 0), REG_RO|REG_FIT},
-  { GRDATA ( RBDL, xqb.rbdl[0], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( RBDH, xqb.rbdl[1], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( XBDL, xqb.xbdl[0], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( XBDH, xqb.xbdl[1], XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( VAR,  xqb.var,  XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( CSR,  xqb.csr,  XQ_RDX, 16, 0), REG_FIT },
+  { GRDATAD ( RBDL, xqb.rbdl[0], XQ_RDX, 16, 0, "Receive BDL Address(low)"), REG_FIT },
+  { GRDATAD ( RBDH, xqb.rbdl[1], XQ_RDX, 16, 0, "Receive BDL Address(high)"), REG_FIT },
+  { GRDATAD ( XBDL, xqb.xbdl[0], XQ_RDX, 16, 0, "Transmit BDL Address(low)"), REG_FIT },
+  { GRDATAD ( XBDH, xqb.xbdl[1], XQ_RDX, 16, 0, "Transmit BDL Address(high)"), REG_FIT },
+  { GRDATADF ( VAR,  xqb.var,  XQ_RDX, 16, 0, "Vector Address Register", xq_var_bits), REG_FIT },
+  { GRDATADF ( CSR,  xqb.csr,  XQ_RDX, 16, 0, "Control and Status Register", xq_csr_bits), REG_FIT },
   { FLDATA ( INT,  xqb.irq, 0) },
   { GRDATA ( TYPE,  xqb.type,  XQ_RDX, 32, 0), REG_FIT },
   { GRDATA ( MODE,  xqb.mode,  XQ_RDX, 32, 0), REG_FIT },
@@ -421,10 +439,10 @@ REG xqb_reg[] = {
   { BRDATA ( SETUP_MACS, &xqb.setup.macs, XQ_RDX, 8, sizeof(xqb.setup.macs)), REG_HRO},
   { BRDATA ( STATS, &xqb.stats, XQ_RDX, 8, sizeof(xqb.stats)), REG_HRO},
   { BRDATA ( TURBO_INIT, &xqb.init, XQ_RDX, 8, sizeof(xqb.init)), REG_HRO},
-  { GRDATA ( SRR,  xqb.srr,  XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( SRQR,  xqb.srqr,  XQ_RDX, 16, 0), REG_FIT },
-  { GRDATA ( IBA,  xqb.iba,  XQ_RDX, 32, 0), REG_FIT },
-  { GRDATA ( ICR,  xqb.icr,  XQ_RDX, 16, 0), REG_FIT },
+  { GRDATADF ( SRR,  xqb.srr,  XQ_RDX, 16, 0, "Status and Response Register", xq_srr_bits), REG_FIT },
+  { GRDATAD ( SRQR,  xqb.srqr,  XQ_RDX, 16, 0, "Synchronous Request Register"), REG_FIT },
+  { GRDATAD ( IBA,  xqb.iba,  XQ_RDX, 32, 0, "Init Block Address Register"), REG_FIT },
+  { GRDATAD ( ICR,  xqb.icr,  XQ_RDX, 16, 0, "Interrupt Request Register"), REG_FIT },
   { GRDATA ( IPEND,  xqb.pending_interrupt,  XQ_RDX, 16, 0), REG_FIT },
   { GRDATA ( TBINDX, xqb.tbindx, XQ_RDX, 32, 0), REG_HRO},
   { GRDATA ( RBINDX, xqb.rbindx, XQ_RDX, 32, 0), REG_HRO},
@@ -519,24 +537,6 @@ const char* const xq_xmit_regnames[] = {
 
 const char* const xqt_xmit_regnames[] = {
   "IBAL", "IBAH", "ICR", "", "SRQR", "", "", "ARQR"
-};
-
-BITFIELD xq_csr_bits[] = {
-  BIT(RE), BIT(SR), BIT(NI), BIT(BD), BIT(XL), BIT(RL), BIT(IE), BIT(XI),
-  BIT(IL), BIT(EL), BIT(SE), BIT(RR), BIT(OK), BIT(CA), BIT(PE), BIT(RI),
-  ENDBITS
-};
-
-BITFIELD xq_var_bits[] = {
-  BIT(ID), BIT(RR), BIT(V0), BIT(V1), BIT(V2), BIT(V3), BIT(V4), BIT(V5),
-  BIT(V6), BIT(V7), BIT(S1), BIT(S2), BIT(S3), BIT(RS), BIT(OS), BIT(MS),
-  ENDBITS
-};
-
-BITFIELD xq_srr_bits[] = {
-  BIT(RS0), BIT(RS1), BITNC,    BITNC,    BITNC,    BITNC,    BITNC,    BITNC,
-  BITNC,    BIT(TBL), BIT(IME), BIT(PAR), BIT(NXM), BITNC, BIT(CHN), BIT(FES),
-  ENDBITS
 };
 
 /* internal debugging routines */

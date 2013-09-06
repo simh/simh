@@ -267,10 +267,10 @@ struct xq_device {
 
                                                         /* I/O register storage */
 
-  uint16            rbdl[2];
-  uint16            xbdl[2];
-  uint16            var;
-  uint16            csr;
+  uint16            rbdl[2];                            /* Receive Buffer Descriptor List */
+  uint16            xbdl[2];                            /* Transmit Buffer Descriptor List */
+  uint16            var;                                /* Vector Address Register */
+  uint16            csr;                                /* Control and Status Register */
 
   uint16            srr;                                /* Status and Response Register - DELQA-T only */
   uint16            srqr;                               /* Synchronous Request Register - DELQA-T only */
