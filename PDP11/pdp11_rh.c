@@ -179,7 +179,8 @@ void mba_clr_int (uint32 mb);
 void mba_upd_cs1 (uint32 set, uint32 clr, uint32 mb);
 void mba_set_cs2 (uint32 flg, uint32 mb);
 uint32 mba_map_pa (int32 pa, int32 *ofs);
-DEVICE mba0_dev, mba1_dev;
+t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *rh_description (DEVICE *dptr);
 
 extern uint32 Map_Addr (uint32 ba);
 
@@ -316,21 +317,27 @@ DEVICE mba_dev[] = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
-    &mba0_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS
+    &mba0_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS, 0,
+    NULL, NULL, NULL, &rh_help, NULL, NULL,
+    &rh_description 
     },
     {
     "RHB", &mba1_unit, mba1_reg, mba1_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
-    &mba1_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
+    &mba1_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS, 0,
+    NULL, NULL, NULL, &rh_help, NULL, NULL,
+    &rh_description 
     },
     {
     "RHC", &mba2_unit, mba2_reg, mba2_mod,
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &mba_reset,
     NULL, NULL, NULL,
-    &mba2_dib, DEV_DEBUG | DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_QBUS
+    &mba2_dib, DEV_DEBUG | DEV_DISABLE | DEV_UBUS | DEV_QBUS, 0,
+    NULL, NULL, NULL, &rh_help, NULL, NULL,
+    &rh_description 
     }
     };
 
@@ -917,3 +924,37 @@ if (dibp->ack[0])                                       /* set abort dispatch */
 return SCPE_OK;
 }
 
+t_stat rh_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" RH70/RH11 Massbus adapters (RHA, RHB, RHC)\n"
+"\n"
+" The RH70/RH11 Massbus adapters interface Massbus peripherals to the memory\n"
+" bus or Unibus of the CPU.  The simulator provides three Massbus adapters.\n"
+" The first, RHA, is configured for the RP family of disk drives.  The\n"
+" second, RHB, is configured for the TU family of tape controllers.  The\n"
+" third, RHC, is configured for the RS family of fixed head disks.  By\n"
+" default, RHA is enabled, and RHB and RHC are disabled.  In a Unibus system,\n"
+" the RH adapters implement 22b addressing for the 11/70 and 18b addressing\n"
+" for all other models.  In a Qbus system, the RH adapters always implement\n"
+" 22b addressing.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n";
+fprintf (st, "%s", text);
+fprint_show_help (st, dptr);
+fprintf (st, "\nEach RH adapter implements these registers:\n");
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
+char *rh_description (DEVICE *dptr)
+{
+if (dptr == &mba_dev[0])
+    return "RH70/RH11 Massbus adapter (for RP)";
+else
+    if (dptr == &mba_dev[1])
+        return "RH70/RH11 Massbus adapter (for TU)";
+    else
+        return "RH70/RH11 Massbus adapter (for RS)";
+}

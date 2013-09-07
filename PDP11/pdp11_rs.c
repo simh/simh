@@ -702,7 +702,8 @@ return SCPE_OK;
 t_stat rs_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 fprintf (st, "RS03/RS04 Massbus disk controller (RS)\n\n");
-fprintf (st, "Options include the ability to set units write enabled or write locked,\n");
+fprintf (st, "The RS controller implements the Massbus family fixed head disks.  RS\n");
+fprintf (st, "options include the ability to set units write enabled or write locked,\n");
 fprintf (st, "to set the drive type to RS03, RS04, or autosize:\n\n");
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
@@ -713,8 +714,8 @@ fprintf (st, "\nError handling is as follows:\n\n");
 fprintf (st, "    error         STOP_IOE   processed as\n");
 fprintf (st, "    not attached  1          report error and stop\n");
 fprintf (st, "                  0          disk not ready\n\n");
-fprintf (st, "    end of file   x          assume rest of disk is zero\n");
-fprintf (st, "    OS I/O error  x          report error and stop\n");
+fprintf (st, "RS data files are buffered in memory; therefore, end of file and OS I/O\n");
+fprintf (st, "errors cannot occur.\n");
 return SCPE_OK;
 }
 
