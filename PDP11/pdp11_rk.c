@@ -421,19 +421,20 @@ UNIT *uptr;
 switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
     case 0:                                             /* RKDS: read only */
-        rkds = (rkds & RKDS_ID) | RKDS_SC_OK |
-            (rand () % RK_NUMSC);                       /* random sector */
+        rkds = rkds & RKDS_ID; /* identified unit */
         uptr = rk_dev.units + GET_DRIVE (rkda);         /* selected unit */
-        if (!(uptr->flags & UNIT_DIS))                  /* enabled? */
-            rkds = rkds | RKDS_RK05;
-        if (uptr->flags & UNIT_ATT)                     /* attached? */
-            rkds = rkds | RKDS_RDY;
-        if (!sim_is_active (uptr))                      /* idle? */
-            rkds = rkds | RKDS_RWS;
-        if (uptr->flags & UNIT_WPRT)
-            rkds = rkds | RKDS_WLK;
-        if (GET_SECT (rkda) == (rkds & RKDS_SC))
-            rkds = rkds | RKDS_ON_SC;
+        if (!(uptr->flags & UNIT_DIS)) {                /* not disabled? */
+            rkds = rkds | RKDS_RK05 | RKDS_SC_OK |      /* random sector */
+                (rand () % RK_NUMSC);
+            if (uptr->flags & UNIT_ATT)                 /* attached? */
+                rkds = rkds | RKDS_RDY;
+            if (!sim_is_active (uptr))                  /* idle? */
+                rkds = rkds | RKDS_RWS;
+            if (uptr->flags & UNIT_WPRT)                /* write locked? */
+                rkds = rkds | RKDS_WLK;
+            if (GET_SECT (rkda) == (rkds & RKDS_SC))
+                rkds = rkds | RKDS_ON_SC;
+            }
         *data = rkds;
         break;
 
@@ -907,8 +908,38 @@ return SCPE_OK;
 
 t_stat rk_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "RK11/RKV11 cartridge disk (RK05) controller (RK)\n\n");
-fprintf (st, "Options include the ability to set units write enabled or write locked,\n");
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" RK11/RKV11 cartridge disk (RK05) controller (RK)\n"
+"\n"
+" This simulation only simulates the RK05 disk drive.\n"
+" After 1973, you couldn't have an RK02 in a system. Except for an early\n"
+" version of DOS11, no PDP11 operating system supported it.\n"
+"\n"
+" DEC did two versions of the RK11 controller for the PDP11: the RK11-C and\n"
+" the RK11-D (There's also a -E for the PDP-15.). The -C is described in\n"
+" the 1972 PDP11 Peripherals handbook. In that controller, RKDS<11>\n"
+" distinguishes an RK02 (low density, 128 words/sector) drive from an RK03\n"
+" (high density, 256 words/drive).\n"
+"\n"
+" By 1973, the RK11-C had been superseded by the RK11-D. The RK11-D only\n"
+" supports high density drives: the RK03 Diablo drive, and the RK05 DEC\n"
+" drive.  In the RK11-D, RKDS<11> distinguishes between an RK03 (Diablo)\n"
+" and an RK05 (DEC) drive.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" From the point of view of software, the RK03/RK05 distinction is cosmetic.\n"
+" At the hardware level, RK05s had to be daisy-chained in front of RK03s,\n"
+" because RK03s did not receive/propagate the power fail signals. Daisy-chain\n"
+" order is different than unit-number order and cannot be detected from\n"
+" software.\n"
+"\n"
+" There is no known way to test an RK11-C, as none of the existing software\n"
+" sets support it. RT, RSTS/E, and M/M+ were all released after the RK11-D\n"
+" and do not support the RK11-C.\n"
+"\n"
+" Options include the ability to set units write enabled or write locked.\n";
+fprintf (st, "%s", text);
 fprint_set_help (st, dptr);
 fprint_show_help (st, dptr);
 fprintf (st, "\nThe RK11 supports the BOOT command.  The RK11 is disabled in a Qbus\n");
