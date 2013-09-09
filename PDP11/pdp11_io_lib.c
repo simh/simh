@@ -754,6 +754,7 @@ t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds)
 int32 i;
 t_addr da;
 uint16 *buf;
+uint32 packid = (uint32)time(NULL);
 
 if ((sec < 2) || (wds < 16))
     return SCPE_ARG;
@@ -768,7 +769,8 @@ if (sim_fseek (uptr->fileref, da, SEEK_SET))
     return SCPE_IOERR;
 if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
     return SCPE_MEM;
-buf[0] = buf[1] = 012345u;
+buf[0] = (uint16)packid;
+buf[1] = (uint16)(packid >> 16);
 buf[2] = buf[3] = 0;
 for (i = 4; i < wds; i++)
     buf[i] = 0177777u;

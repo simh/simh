@@ -1404,6 +1404,7 @@ t_addr da;
 int32 wds = ctx->sector_size/sizeof (uint16);
 uint16 *buf;
 DEVICE *dptr;
+uint32 packid = (uint32)time(NULL);
 
 if ((sec < 2) || (wds < 16))
     return SCPE_ARG;
@@ -1419,7 +1420,8 @@ if (!get_yn ("Overwrite last track? [N]", FALSE))
     return SCPE_OK;
 if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
     return SCPE_MEM;
-buf[0] = buf[1] = 012345u;
+buf[0] = (uint16)packid;
+buf[1] = (uint16)(packid >> 16);
 buf[2] = buf[3] = 0;
 for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
