@@ -35,6 +35,7 @@
 #endif
 #include "sim_sock.h"
 #include "sim_tmxr.h"
+#include "sim_ether.h"
 
 extern int32 autcon_enb;
 extern int32 int_vec[IPL_HLVL][32];
@@ -754,7 +755,8 @@ t_stat pdp11_bad_block (UNIT *uptr, int32 sec, int32 wds)
 int32 i;
 t_addr da;
 uint16 *buf;
-uint32 packid = (uint32)time(NULL);
+char *namebuf, *c;
+uint32 packid;
 
 if ((sec < 2) || (wds < 16))
     return SCPE_ARG;
@@ -769,6 +771,18 @@ if (sim_fseek (uptr->fileref, da, SEEK_SET))
     return SCPE_IOERR;
 if ((buf = (uint16 *) malloc (wds * sizeof (uint16))) == NULL)
     return SCPE_MEM;
+if ((namebuf = (char *) malloc (1 + strlen (uptr->filename))) == NULL) {
+    free (buf);
+    return SCPE_MEM;
+    }
+strcpy (namebuf, uptr->filename);
+if ((c = strrchr (namebuf, '/')))
+    strcpy (namebuf, c+1);
+if ((c = strrchr (namebuf, '\\')))
+    strcpy (namebuf, c+1);
+if ((c = strrchr (namebuf, ']')))
+    strcpy (namebuf, c+1);
+packid = eth_crc32(0, namebuf, strlen (namebuf));
 buf[0] = (uint16)packid;
 buf[1] = (uint16)(packid >> 16);
 buf[2] = buf[3] = 0;
@@ -776,6 +790,7 @@ for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
 for (i = 0; (i < sec) && (i < 10); i++)
     sim_fwrite (buf, sizeof (uint16), wds, uptr->fileref);
+free (namebuf);
 free (buf);
 if (ferror (uptr->fileref))
     return SCPE_IOERR;
