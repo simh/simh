@@ -134,6 +134,8 @@ t_stat rf_boot (int32 unitno, DEVICE *dptr);
 t_stat rf_attach (UNIT *uptr, char *cptr);
 t_stat rf_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 uint32 update_rfcs (uint32 newcs, uint32 newdae);
+t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *rf_description (DEVICE *dptr);
 
 /* RF11 data structures
 
@@ -156,40 +158,40 @@ UNIT rf_unit = {
     };
 
 REG rf_reg[] = {
-    { ORDATA (RFCS, rf_cs, 16) },
-    { ORDATA (RFWC, rf_wc, 16) },
-    { ORDATA (RFCMA, rf_cma, 16) },
-    { ORDATA (RFDA, rf_da, 16) },
-    { ORDATA (RFDAE, rf_dae, 16) },
-    { ORDATA (RFDBR, rf_dbr, 16) },
-    { ORDATA (RFMR, rf_maint, 16) },
-    { ORDATA (RFWLK, rf_wlk, 32) },
-    { FLDATA (INT, IREQ (RF), INT_V_RF) },
-    { FLDATA (ERR, rf_cs, CSR_V_ERR) },
-    { FLDATA (DONE, rf_cs, CSR_V_DONE) },
-    { FLDATA (IE, rf_cs, CSR_V_IE) },
-    { DRDATA (TIME, rf_time, 24), REG_NZ + PV_LEFT },
-    { FLDATA (BURST, rf_burst, 0) },
-    { FLDATA (STOP_IOE, rf_stopioe, 0) },
+    { ORDATAD (RFCS, rf_cs, 16, "control/status") },
+    { ORDATAD (RFWC, rf_wc, 16, "word count") },
+    { ORDATAD (RFCMA, rf_cma, 16, "current memory address") },
+    { ORDATAD (RFDA, rf_da, 16, "current disk address") },
+    { ORDATAD (RFDAE, rf_dae, 16, "disk address extension") },
+    { ORDATAD (RFDBR, rf_dbr, 16, "data buffer") },
+    { ORDATAD (RFMR, rf_maint, 16, "maintenance register") },
+    { ORDATAD (RFWLK, rf_wlk, 32, "write lock switches") },
+    { FLDATAD (INT, IREQ (RF), INT_V_RF, "interrupt pending flag") },
+    { FLDATAD (ERR, rf_cs, CSR_V_ERR, "device error flag") },
+    { FLDATAD (DONE, rf_cs, CSR_V_DONE, "device done flag") },
+    { FLDATAD (IE, rf_cs, CSR_V_IE, "interrupt enable flag") },
+    { DRDATAD (TIME, rf_time, 24, "rotational delay, per word"), REG_NZ + PV_LEFT },
+    { FLDATAD (BURST, rf_burst, 0, "burst flag") },
+    { FLDATAD (STOP_IOE, rf_stopioe, 0, "stop on I/O error") },
     { ORDATA (DEVADDR, rf_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, rf_dib.vec, 16), REG_HRO },
     { NULL }
     };
 
 MTAB rf_mod[] = {
-    { UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", &rf_set_size },
-    { UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P", &rf_set_size },
-    { UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P", &rf_set_size },
-    { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P", &rf_set_size },
-    { UNIT_PLAT, (4 << UNIT_V_PLAT), NULL, "5P", &rf_set_size },
-    { UNIT_PLAT, (5 << UNIT_V_PLAT), NULL, "6P", &rf_set_size },
-    { UNIT_PLAT, (6 << UNIT_V_PLAT), NULL, "7P", &rf_set_size },
-    { UNIT_PLAT, (7 << UNIT_V_PLAT), NULL, "8P", &rf_set_size },
-    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL },
-    { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { UNIT_PLAT, (0 << UNIT_V_PLAT), NULL, "1P", &rf_set_size, NULL, NULL, "set drive to one platter (256K)" },
+    { UNIT_PLAT, (1 << UNIT_V_PLAT), NULL, "2P", &rf_set_size, NULL, NULL, "set drive to two platters (512K)" },
+    { UNIT_PLAT, (2 << UNIT_V_PLAT), NULL, "3P", &rf_set_size, NULL, NULL, "set drive to three platters (768K)" },
+    { UNIT_PLAT, (3 << UNIT_V_PLAT), NULL, "4P", &rf_set_size, NULL, NULL, "set drive to four platters (1024K)" },
+    { UNIT_PLAT, (4 << UNIT_V_PLAT), NULL, "5P", &rf_set_size, NULL, NULL, "set drive to five platters (1280K)" },
+    { UNIT_PLAT, (5 << UNIT_V_PLAT), NULL, "6P", &rf_set_size, NULL, NULL, "set drive to six platters (1536K)" },
+    { UNIT_PLAT, (6 << UNIT_V_PLAT), NULL, "7P", &rf_set_size, NULL, NULL, "set drive to seven platters (1792K)" },
+    { UNIT_PLAT, (7 << UNIT_V_PLAT), NULL, "8P", &rf_set_size, NULL, NULL, "set drive to eight platters (2048K)" },
+    { UNIT_AUTO, UNIT_AUTO, "autosize", "AUTOSIZE", NULL, NULL, NULL, "set drive to autosize platters" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
+        &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -198,7 +200,9 @@ DEVICE rf_dev = {
     1, 8, 21, 1, 8, 16,
     NULL, NULL, &rf_reset,
     &rf_boot, &rf_attach, NULL,
-    &rf_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG
+    &rf_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
+    NULL, NULL, NULL, &rf_help, NULL, NULL,
+    &rf_description
     };
 
 /* I/O dispatch routine, I/O addresses 17777460 - 17777476 */
@@ -502,4 +506,68 @@ if (uptr->flags & UNIT_ATT)
 uptr->capac = UNIT_GETP (val) * RF_DKSIZE;
 uptr->flags = uptr->flags & ~UNIT_AUTO;
 return SCPE_OK;
+}
+
+t_stat rf_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *text2, *text3;
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"RF11/RS11 Fixed Head Disk Controller (RF)\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" The RFll-A is a fast, low-cost, random·access bulk-storage system.  An\n"
+" RFll-A provides 262,144 17-bit words (16 data bits and 1 parity bit)\n"
+" of storage. Up to eight RSll disk platters can be controlled by one RFll\n"
+" Controller for a total of 2,047,152 words of storage.  An RFll-A includes\n"
+" a Control Unit and the first Disk Drive.\n"
+"\n"
+" The RF11-A  is unique in fixed head disks because each word is address-\n"
+" able. Data transfers may be as small as one word or as large as 65,536\n"
+" words. Individual words or groups of words may be read or rewritten\n"
+" without any limits of fixed blocks or sectors, providing optimum use of\n"
+" both disk storage and main memory in the PDP-11 system.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" The RSll disk contains a nickel·cobalt·plated disk driven by a hysterisis\n"
+" synchronous motor. Data is recorded on a single disk surface by 128\n"
+" fixed read/write heads.\n"
+" Operation\n"
+" Fast track switching time permits spiral read or write.  Data may be\n"
+" written in blocks from 1 to 65,536 words.  The RFll Control automatic-\n"
+" ally continues on the next track, or on the next disk surface, when the\n"
+" last address on a track or surface has been used.\n";
+fprintf (st, "%s", text);
+fprint_set_help (st, dptr);
+text2 = 
+"\n"
+" The default is one platter.  The RF11 supports the BOOT command.  The\n"
+" RF11 is disabled at startup and is automatically disabled in a Qbus\n"
+" system.\n";
+fprintf (st, "%s", text2);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+text3 = 
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" The RF11 is a DMA device.  If BURST = 0, word transfers are scheduled\n"
+" individually; if BURST = 1, the entire transfer occurs in a single DMA\n"
+" transfer.\n"
+"\n"
+" Error handling is as follows:\n"
+"\n"
+"   error          STOP_IOE     processed as\n"
+"\n"
+"   not attached    1           report error and stop\n"
+"                   0           non-existent disk\n"
+"\n"
+" RF11 data files are buffered in memory; therefore, end of file and OS\n"
+" I/O errors cannot occur.\n";
+fprintf (st, "%s", text2);
+return SCPE_OK;
+}
+
+char *rf_description (DEVICE *dptr)
+{
+return "RF11-A Fixed Head Disk controller";
 }

@@ -70,6 +70,8 @@ t_stat ke_rd (int32 *data, int32 PA, int32 access);
 t_stat ke_wr (int32 data, int32 PA, int32 access);
 t_stat ke_reset (DEVICE *dptr);
 uint32 ke_set_SR (void);
+t_stat ke_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *ke_description (DEVICE *dptr);
 
 #define IOLN_KE         020
 
@@ -80,16 +82,16 @@ UNIT ke_unit = {
     };
 
 REG ke_reg[] = {
-    { ORDATA (AC, ke_AC, 16) },
-    { ORDATA (MQ, ke_MQ, 16) },
-    { ORDATA (SC, ke_SC, 6) },
-    { ORDATA (SR, ke_SR, 8) },
+    { ORDATAD (AC, ke_AC, 16, "accumulator") },
+    { ORDATAD (MQ, ke_MQ, 16, "multiplier-quotient") },
+    { ORDATAD (SC, ke_SC,  6, "shift count") },
+    { ORDATAD (SR, ke_SR,  8, "status register") },
     { NULL }
     };
 
 MTAB ke_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL,
-      NULL, &show_addr, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", NULL,
+        NULL, &show_addr, NULL, "Bus address" },
     { 0 }
     };
 
@@ -98,7 +100,9 @@ DEVICE ke_dev = {
     1, 10, 31, 1, 8, 8,
     NULL, NULL, &ke_reset,
     NULL, NULL, NULL,
-    &ke_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS
+    &ke_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS, 0,
+    NULL, NULL, NULL, &ke_help, NULL, NULL,
+    &ke_description 
     };
 
 /* KE read - reads are always 16b, to even addresses */
@@ -347,4 +351,33 @@ ke_SC = 0;
 ke_AC = 0;
 ke_MQ = 0;
 return auto_config(0, 0);
+}
+
+t_stat ke_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"KE11A Extended Arithmetic Option (KE)\n"
+"\n"
+" The KE11A extended arithmetic option (KE) provides multiply, divide,\n"
+" normalization, and multi-bit shift capability on Unibus PDP-11’s that\n"
+" lack the EIS instruction set.\n"
+"\n"
+" The KE11-A performs five arithmetic operations.\n"
+"   a. Multiplication\n"
+"   b. Division\n"
+"   c. Three different shift operations on data operands of up to 32 bits.\n"
+"\n"
+" In practice, it was only sold with the PDP-11/20.\n"
+" The KE is disabled by default.\n";
+fprintf (st, "%s", text);
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
+char *ke_description (DEVICE *dptr)
+{
+return "KE11-A extended arithmetic element";
 }

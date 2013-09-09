@@ -306,6 +306,8 @@ void dt_stopunit (UNIT *uptr);
 int32 dt_comobv (int32 val);
 int32 dt_csum (UNIT *uptr, int32 blk);
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
+t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *dt_description (DEVICE *dptr);
 
 /* DT data structures
 
@@ -345,42 +347,44 @@ UNIT dt_unit[] = {
 #define DT_TIMER        (DT_NUMDR)
 
 REG dt_reg[] = {
-    { ORDATA (TCST, tcst, 16) },
-    { ORDATA (TCCM, tccm, 16) },
-    { ORDATA (TCWC, tcwc, 16) },
-    { ORDATA (TCBA, tcba, 16) },
-    { ORDATA (TCDT, tcdt, 16) },
-    { FLDATA (INT, IREQ (DTA), INT_V_DTA) },
-    { FLDATA (ERR, tccm, CSR_V_ERR) },
-    { FLDATA (DONE, tccm, CSR_V_DONE) },
-    { FLDATA (IE, tccm, CSR_V_DONE) },
-    { DRDATA (CTIME, dt_ctime, 31), REG_NZ },
-    { DRDATA (LTIME, dt_ltime, 31), REG_NZ },
-    { DRDATA (DCTIME, dt_dctime, 31), REG_NZ },
-    { ORDATA (SUBSTATE, dt_substate, 1) },
+    { ORDATAD (TCST, tcst, 16, "status register") },
+    { ORDATAD (TCCM, tccm, 16, "command register") },
+    { ORDATAD (TCWC, tcwc, 16, "word count register") },
+    { ORDATAD (TCBA, tcba, 16, "bus address register") },
+    { ORDATAD (TCDT, tcdt, 16, "data register") },
+    { FLDATAD (INT, IREQ (DTA), INT_V_DTA, "interrupt pending flag") },
+    { FLDATAD (ERR, tccm, CSR_V_ERR, "error flag") },
+    { FLDATAD (DONE, tccm, CSR_V_DONE, "done flag") },
+    { FLDATAD (IE, tccm, CSR_V_DONE, "interrupt enable flag") },
+    { DRDATAD (CTIME, dt_ctime, 31, "time to complete transport stop"), REG_NZ },
+    { DRDATAD (LTIME, dt_ltime, 31, "time between lines"), REG_NZ },
+    { DRDATAD (DCTIME, dt_dctime, 31, "time to decelerate to a full stop"), REG_NZ },
+    { ORDATAD (SUBSTATE, dt_substate, 1, "read/write command substate") },
     { DRDATA (LBLK, dt_logblk, 12), REG_HIDDEN },
-    { URDATA (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
-              DT_NUMDR, PV_LEFT | REG_RO) },
-    { URDATA (STATT, dt_unit[0].STATE, 8, 18, 0,
-              DT_NUMDR, REG_RO) },
+    { URDATAD (POS, dt_unit[0].pos, 10, T_ADDR_W, 0,
+              DT_NUMDR, PV_LEFT | REG_RO, "position, in lines, units 0 to 7") },
+    { URDATAD (STATT, dt_unit[0].STATE, 8, 18, 0,
+              DT_NUMDR, REG_RO, "unit state, units 0 to 7") },
     { URDATA (LASTT, dt_unit[0].LASTT, 10, 32, 0,
               DT_NUMDR, REG_HRO) },
-    { FLDATA (STOP_OFFR, dt_stopoffr, 0) },
+    { FLDATAD (STOP_OFFR, dt_stopoffr, 0, "stop on off-reel error") },
     { ORDATA (DEVADDR, dt_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, dt_dib.vec, 16), REG_HRO },
     { NULL }
     };
 
 MTAB dt_mod[] = {
-    { UNIT_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { UNIT_WLK, UNIT_WLK, "write locked", "LOCKED", NULL }, 
-    { UNIT_8FMT + UNIT_11FMT, 0, "18b", NULL, NULL },
-    { UNIT_8FMT + UNIT_11FMT, UNIT_8FMT, "12b", NULL, NULL },
-    { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL, NULL },
-    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { UNIT_WLK,        0, "write enabled", "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable tape drive" },
+    { UNIT_WLK, UNIT_WLK, "write locked",  "LOCKED", 
+        NULL, NULL, NULL, "Write lock tape drive"  },
+    { UNIT_8FMT + UNIT_11FMT,          0, "18b", NULL },
+    { UNIT_8FMT + UNIT_11FMT,  UNIT_8FMT, "12b", NULL },
+    { UNIT_8FMT + UNIT_11FMT, UNIT_11FMT, "16b", NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
+        &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -397,7 +401,8 @@ DEVICE dt_dev = {
     NULL, NULL, &dt_reset,
     &dt_boot, &dt_attach, &dt_detach,
     &dt_dib, DEV_DISABLE | DEV_DIS | DEV_UBUS | DEV_DEBUG, 0,
-    dt_deb, NULL, NULL
+    dt_deb, NULL, NULL, &dt_help, NULL, NULL,
+    &dt_description
     };
 
 /* IO dispatch routines, I/O addresses 17777340 - 17777350 */
@@ -1343,4 +1348,157 @@ uptr->filebuf = NULL;                                   /* clear buf ptr */
 uptr->flags = (uptr->flags | UNIT_11FMT) & ~UNIT_8FMT;  /* default fmt */
 uptr->capac = DT_CAPAC;                                 /* default size */
 return detach_unit (uptr);
+}
+
+t_stat dt_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *text2;
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"TC11/TU56 DECtape Controller (DT)\n"
+"\n"
+" The TCll is a DECtape system consists a Controller and up to 4 dual-unit\n"
+" bidirectional magnetic-tape transports, and DECtape 3/4-inch magnetic\n"
+" tape on 3.9-inch reels.  Low cost, low maintenance and high reliability\n"
+" are assured by:\n"
+"\n"
+"   - Simply designed transport mechanisms which have no capstans and\n"
+"     no pinch rollers.\n"
+"   - Hydrodynamically lubricated tape guiding (the tape floats on air\n"
+"     over the tape guides while in motion)\n"
+"   - Redundant recording\n"
+"   - Manchester phase recording techniques (virtually eliminate drop outs)\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" Each transport has a read/write head for information recording and\n"
+" playback on five channels of tape.  The system stores information at\n"
+" fixed positions on magnetic tape as in magnetic disk or drum storage\n"
+" devices, rather than at unknown or variable positions as in conventional\n"
+" magnetic tape systems.  This feature allows replacement of blocks of\n"
+" data on tape in a random fashion without disturbing other previously\n"
+" recorded information.  In particular, during the writing of information\n"
+" on tape, the system reads format (mark) and timing information from the\n"
+" tape and uses this information to determine the exact position at which\n"
+" to record the information to be written. Similarly, in reading, the\n"
+" same mark and timing information is used to locate data to be played\n"
+" back from the tape.\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" The system utilizes a lO-track read/write head. The first five tracks\n"
+" on the tape include a timing track, a mark track, and three data tracks.\n"
+" The other five tracks are identical counterparts and are used for\n"
+" redundant recording to increase system reliability.  The redundant\n"
+" recording of each character bit on non-adjacent tracks materially\n"
+" reduces bit dropouts and minimizes the effect of skew. The use of\n"
+" Manchester phase recording, rather than amplitude sensing techniques,\n"
+" virtually eliminates dropouts.\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" The timing and mark channels control the timing of operations within\n"
+" the Controller and establish the format of data contained on the \n"
+" information channels. The timing and mark channels are recorded prior\n"
+" to all normal data reading and writing on the information channels. The\n"
+" timing of operations performed by the tape drive and some control\n"
+" functions are determined by the information on the timing channel.\n"
+" Therefore, wide variations in the speed of tape motion do not affect\n"
+" system performance.\n"
+"\n"
+" The standard format tape is divided into 578 blocks. The structure of\n"
+" each block is symmetric: block numbers and checksums are recorded at\n"
+" both ends of a block and thus searching, reading, or writing can occur\n"
+" in either direction.  However, a block read in the opposite direction\n"
+" than it was written will have the order of the data words reversed.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" Information read from the mark channel is used during reading and\n"
+" writing data to indicate the beginning and end of data blocks and to\n"
+" determine the functions performed by the system in each control mode.\n"
+" The data tracks ara located in the middle of the tape where the effect\n"
+" of skew is minimum.  The data in one bit position of each track is\n"
+" referred to as a line or as a character.  Since. six lines make up a\n"
+" word, the tape can record, 18-bit data words.  During normal data\n"
+" writing, the Controller disassembles the 18-bit word and distributes\n"
+" the bits so they are recorded as six 3·bit characters. Since PDP-11\n"
+" words are l6·bits long, the Controller writes the extra two bits as 0's\n"
+" and ignores them when reading.  However, during special modes, the\n"
+" extra two bits can be written and recovered.\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" A 260 foot reel of DECtape is divided into three major areas: end zones\n"
+" (forward and reverse), extension zones (forward and reverse), and the\n"
+" information zone.  The two end zones (each approximately 10 feet) mark\n"
+" the end of the physical tape and are used for winding the tape around\n"
+" the heads and onto the take·up reel.  These zones never contain data.\n"
+" The forward and reverse extension areas mark the end of the information\n"
+" region of the tape. Their length is sufficient to ensure that once the\n"
+" end zone is entered and tape motion is reversed; there is adequate\n"
+" distance for the transport to come up to proper tape speed before\n"
+" entering the information area.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" The information area, consists of blocks of data.  The standard is a\n"
+" nominal 578 blocks, each containing 256 data words (nominally). In \n"
+" addition each block contains 10 control words.\n"
+"\n"
+" The blocks permit digital data to be partitioned into groups of words\n"
+" which are interrelated while at the same time reducing the amount of\n"
+" storage area that would be needed for addressing individual words.  A\n"
+" simple example of such a group of words is a program.  A program can\n"
+" be stored and retrieved from magnetic tape in a single block format\n"
+" because it is not necessary to be able to retrieve only a single word\n"
+" from the program.  It is necessary; however, to be able to retrieve\n"
+" different programs which may not be related in any way. Thus, each\n"
+" program can be stored in a different block on the tape.\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" Since DECtape is a fixed address system, the programmer need not know\n"
+" accurately where the tape has stopped. To locate a specific point on\n"
+" tape he must only start the tape motion in the search mode. The address\n"
+" of the block currently passing over the head is read into the DECtape\n"
+" Control and loaded into an interface register.  Simultaneously, a flag\n"
+" is set and a program interrupt can occur.  The program can then compare\n"
+" the block number found with the desired block address and tape motion\n"
+" continued or reversed accordingly.\n"
+"\n"
+" DECtape options include the ability to make units write enabled or write\n"
+" locked.\n"
+" The TC11 supports the BOOT command.  The TC11 is automatically disabled\n"
+" in a Qbus system.\n"
+"\n"
+" The TC11 supports supports PDP-8 format, PDP-11 format, and 18b format\n"
+" DECtape images.  ATTACH assumes the image is in PDP-11 format; the user\n"
+" can force other choices with switches:\n"
+"\n"
+"   -t             PDP-8 format\n"
+"   -f             18b format\n"
+"   -a             autoselect based on file size\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" The DECtape controller is a data-only simulator; the timing and mark\n"
+" track, and block header and trailer, are not stored.  Thus, the WRITE\n"
+" TIMING AND MARK TRACK function is not supported; the READ ALL function\n"
+" always returns the hardware standard block header and trailer; and the\n"
+" WRITE ALL function dumps non-data words into the bit bucket.\n";
+fprintf (st, "%s", text);
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+text2 = 
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" It is critically important to maintain certain timing relationships\n"
+" among the DECtape parameters, or the DECtape simulator will fail to\n"
+" operate correctly.\n"
+"\n"
+"    -  LTIME must be at least 6\n"
+"    -  DCTIME needs to be at least 100 times LTIME\n"
+"\n"
+" Acceleration time is set to 75% of deceleration time.\n";
+fprintf (st, "%s", text2);
+return SCPE_OK;
+}
+
+char *dt_description (DEVICE *dptr)
+{
+return "TC11/TU56 DECtape controller";
 }

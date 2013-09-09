@@ -138,6 +138,8 @@ UNIT *ta_busy (void);
 void ta_set_tr (void);
 uint32 ta_updsta (UNIT *uptr);
 uint32 ta_crc (uint8 *buf, uint32 cnt);
+t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *ta_description (DEVICE *dptr);
 
 /* TA data structures
 
@@ -159,39 +161,41 @@ UNIT ta_unit[] = {
     };
 
 REG ta_reg[] = {
-    { ORDATA (TACS, ta_cs, 16) },
-    { ORDATA (TAIDB, ta_idb, 8) },
-    { ORDATA (TAODB, ta_odb, 8) },
-    { FLDATA (WRITE, ta_write, 0) },
-    { FLDATA (INT, IREQ (TA), INT_V_TA) },
-    { FLDATA (ERR, ta_cs, CSR_V_ERR) },
-    { FLDATA (TR, ta_cs, CSR_V_DONE) },
-    { FLDATA (IE, ta_cs, CSR_V_IE) },
-    { DRDATA (BPTR, ta_bptr, 17) },
-    { DRDATA (BLNT, ta_blnt, 17) },
-    { DRDATA (STIME, ta_stime, 24), PV_LEFT + REG_NZ },
-    { DRDATA (CTIME, ta_ctime, 24), PV_LEFT + REG_NZ },
-    { FLDATA (STOP_IOE, ta_stopioe, 0) },
-    { URDATA (UFNC, ta_unit[0].FNC, 8, 5, 0, TA_NUMDR, 0), REG_HRO },
-    { URDATA (UST, ta_unit[0].UST, 8, 2, 0, TA_NUMDR, 0), REG_HRO },
-    { URDATA (POS, ta_unit[0].pos, 10, T_ADDR_W, 0,
-              TA_NUMDR, PV_LEFT | REG_RO) },
+    { ORDATAD (TACS, ta_cs, 16, "control/status register") },
+    { ORDATAD (TAIDB, ta_idb, 8, "input data buffer") },
+    { ORDATAD (TAODB, ta_odb, 8, "output data buffer") },
+    { FLDATAD (WRITE, ta_write, 0, "TA60 write operation flag") },
+    { FLDATAD (INT, IREQ (TA), INT_V_TA, "interrupt request") },
+    { FLDATAD (ERR, ta_cs, CSR_V_ERR, "error flag") },
+    { FLDATAD (TR, ta_cs, CSR_V_DONE, "transfer request flag") },
+    { FLDATAD (IE, ta_cs, CSR_V_IE, "interrupt enable flag") },
+    { DRDATAD (BPTR, ta_bptr, 17, "buffer pointer") },
+    { DRDATAD (BLNT, ta_blnt, 17, "buffer length") },
+    { DRDATAD (STIME, ta_stime, 24, "operation start time"), PV_LEFT + REG_NZ },
+    { DRDATAD (CTIME, ta_ctime, 24, "character latency"), PV_LEFT + REG_NZ },
+    { FLDATAD (STOP_IOE, ta_stopioe, 0, "stop on I/O errors flag") },
+    { URDATA (UFNC, ta_unit[0].FNC, 8, 5, 0, TA_NUMDR, REG_HRO), },
+    { URDATA (UST, ta_unit[0].UST, 8, 2, 0, TA_NUMDR, REG_HRO), },
+    { URDATAD (POS, ta_unit[0].pos, 10, T_ADDR_W, 0,
+              TA_NUMDR, PV_LEFT | REG_RO, "position") },
     { ORDATA (DEVADDR, ta_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, ta_dib.vec, 16), REG_HRO },
     { NULL }
     };
 
 MTAB ta_mod[] = {
-    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", NULL },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", NULL }, 
+    { MTUF_WLK,        0, "write enabled", "WRITEENABLED", 
+        NULL, NULL, NULL, "Write enable tape drive" },
+    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED", 
+        NULL, NULL, NULL, "Write lock tape drive"  },
 //    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
 //      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
     { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", NULL,
-      NULL, &sim_tape_show_capac, NULL },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, IOLN_TA, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+      NULL, &sim_tape_show_capac, NULL, "Display tape capacity" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 1, "VECTOR", "VECTOR",
+        &set_vec, &show_vec, NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -200,7 +204,9 @@ DEVICE ta_dev = {
     TA_NUMDR, 10, 31, 1, 8, 8,
     NULL, NULL, &ta_reset,
     &ta_boot, &ta_attach, &ta_detach,
-    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_UBUS | DEV_TAPE
+    &ta_dib, DEV_DISABLE | DEV_DIS | DEV_DEBUG | DEV_UBUS | DEV_TAPE, 0,
+    NULL, NULL, NULL, &ta_help, NULL, NULL,
+    &ta_description 
     };
 
 /* I/O dispatch routines, I/O addresses 17777500 - 17777503
@@ -663,4 +669,36 @@ for (i = 0; i < BOOT_LEN; i++)
 M[BOOT_CSR >> 1] = ta_dib.ba & DMASK;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
+}
+
+t_stat ta_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" TA11/TA60 Cassette Tape (CT)\n"
+"\n"
+" The TA11 is a programmed I/O controller supporting two cassette drives\n"
+" (0 and 1).  The TA11 can be used like a small magtape under RT11 and\n"
+" RSX-11M, and with the CAPS-11 operating system.  Cassettes are simulated\n"
+" as magnetic tapes with a fixed capacity (93,000 characters).  The tape\n"
+" format is always SimH standard.\n"
+" The TA11 is disabled by default.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n";
+fprintf (st, "%s", text);
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         processed as\n");
+fprintf (st, "    not attached  tape not ready\n\n");
+fprintf (st, "    end of file   end of medium\n");
+fprintf (st, "    OS I/O error  fatal tape error\n\n");
+sim_tape_attach_help (st, dptr, uptr, flag, cptr);
+return SCPE_OK;
+}
+
+char *ta_description (DEVICE *dptr)
+{
+return "TA11/TA60 Cassette Tape";
 }

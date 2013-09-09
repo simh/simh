@@ -178,6 +178,8 @@ int32 tm_updcsta (UNIT *uptr);
 void tm_set_done (void);
 t_stat tm_map_err (UNIT *uptr, t_stat st);
 t_stat tm_vlock (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *tm_description (DEVICE *dptr);
 
 /* MT data structures
 
@@ -206,37 +208,39 @@ UNIT tm_unit[] = {
     };
 
 REG tm_reg[] = {
-    { ORDATA (MTS, tm_sta, 16) },
-    { ORDATA (MTC, tm_cmd, 16) },
-    { ORDATA (MTBRC, tm_bc, 16) },
-    { ORDATA (MTCMA, tm_ca, 16) },
-    { ORDATA (MTD, tm_db, 8) },
-    { ORDATA (MTRD, tm_rdl, 16) },
-    { FLDATA (INT, IREQ (TM), INT_V_TM) },
-    { FLDATA (ERR, tm_cmd, CSR_V_ERR) },
-    { FLDATA (DONE, tm_cmd, CSR_V_DONE) },
-    { FLDATA (IE, tm_cmd, CSR_V_IE) },
-    { FLDATA (STOP_IOE, tm_stopioe, 0) },
-    { DRDATA (TIME, tm_time, 24), PV_LEFT },
-    { URDATA (UST, tm_unit[0].USTAT, 8, 16, 0, TM_NUMDR, 0) },
-    { URDATA (POS, tm_unit[0].pos, 10, T_ADDR_W, 0,
-              TM_NUMDR, PV_LEFT | REG_RO) },
+    { ORDATAD (MTS, tm_sta, 16, "status") },
+    { ORDATAD (MTC, tm_cmd, 16, "command") },
+    { ORDATAD (MTCMA, tm_ca, 16, "memory address") },
+    { ORDATAD (MTBRC, tm_bc, 16, "byte/record count") },
+    { ORDATAD (MTD, tm_db, 8, "data buffer") },
+    { ORDATAD (MTRD, tm_rdl, 16, "read lines") },
+    { FLDATAD (INT, IREQ (TM), INT_V_TM, "interrupt pending flag") },
+    { FLDATAD (ERR, tm_cmd, CSR_V_ERR, "error flag") },
+    { FLDATAD (DONE, tm_cmd, CSR_V_DONE, "device done flag") },
+    { FLDATAD (IE, tm_cmd, CSR_V_IE, "interrupt enable flag") },
+    { FLDATAD (STOP_IOE, tm_stopioe, 0, "stop on I/O error") },
+    { DRDATAD (TIME, tm_time, 24, "delay"), PV_LEFT },
+    { URDATAD (UST, tm_unit[0].USTAT, 8, 16, 0, TM_NUMDR, 0, "unit status, units 0 to 7") },
+    { URDATAD (POS, tm_unit[0].pos, 10, T_ADDR_W, 0,
+              TM_NUMDR, PV_LEFT | REG_RO, "position, units 0 to 7") },
     { ORDATA (DEVADDR, tm_dib.ba, 32), REG_HRO },
     { ORDATA (DEVVEC, tm_dib.vec, 16), REG_HRO },
     { NULL }
     };
 
 MTAB tm_mod[] = {
-    { MTUF_WLK, 0, "write enabled", "WRITEENABLED", &tm_vlock },
-    { MTUF_WLK, MTUF_WLK, "write locked", "LOCKED", &tm_vlock }, 
-    { MTAB_XTD|MTAB_VUN, 0, "FORMAT", "FORMAT",
-      &sim_tape_set_fmt, &sim_tape_show_fmt, NULL },
-    { MTAB_XTD|MTAB_VUN, 0, "CAPACITY", "CAPACITY",
-      &sim_tape_set_capac, &sim_tape_show_capac, NULL },
-    { MTAB_XTD|MTAB_VDV, 020, "ADDRESS", "ADDRESS",
-      &set_addr, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", "VECTOR",
-      &set_vec, &show_vec, NULL },
+    { MTUF_WLK,        0, "write enabled", "WRITEENABLED", 
+        &tm_vlock, NULL, NULL, "Write enable tape drive" },
+    { MTUF_WLK, MTUF_WLK, "write locked",  "LOCKED", 
+        &tm_vlock, NULL, NULL, "Write lock tape drive"  },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "FORMAT", "FORMAT",
+        &sim_tape_set_fmt, &sim_tape_show_fmt, NULL, "Set/Display tape format (SIMH, E11, TPC, P7B)" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR, 0,       "CAPACITY", "CAPACITY",
+        &sim_tape_set_capac, &sim_tape_show_capac, NULL, "Set/Display capacity" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 010, "ADDRESS", "ADDRESS",
+        &set_addr, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
+        &set_vec,  &show_vec,  NULL, "Interrupt vector" },
     { 0 }
     };
 
@@ -245,7 +249,9 @@ DEVICE tm_dev = {
     TM_NUMDR, 10, T_ADDR_W, 1, 8, 8,
     NULL, NULL, &tm_reset,
     &tm_boot, &tm_attach, &tm_detach,
-    &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | DEV_TAPE
+    &tm_dib, DEV_DISABLE | DEV_UBUS | DEV_Q18 | DEV_DEBUG | DEV_TAPE, 0,
+    NULL, NULL, NULL, &tm_help, NULL, NULL,
+    &tm_description 
     };
 
 /* I/O dispatch routines, I/O addresses 17772520 - 17772532
@@ -729,3 +735,61 @@ M[BOOT_CSR >> 1] = (tm_dib.ba & DMASK) + 06;
 saved_PC = BOOT_ENTRY;
 return SCPE_OK;
 } 
+
+t_stat tm_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *text2;
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"TM11 Magnetic Tape Controller (TM)\n"
+"\n"
+" The TM11 is a high-performance, low-cost magnetic tape system ideally\n"
+" suited for writing, reading, and storing large volumes of data and\n"
+" programs in a serial manner.  Because the system reads and writes in\n"
+" industry-compatible format, information can be transferred between a\n"
+" PDP11 and other computers.\n"
+" The 10 1/2-inch tape reels contain up to 2400 feet of tape upon which\n"
+" over 180 million bits of data can be stored on hight density 9-track\n"
+" tape or over 140 million bits can be stored on high density 7-track tape.\n"
+"\n"
+" A Magtape System consists of up to 8 tape transports and a Control Unit.\n"
+" Transports are capable of operation with seven or nine-track tape and a\n"
+" system can contain any combination of 7-track and 9-track units.\n"
+"\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" The TM11 supports the BOOT command.  The bootstrap supports both\n"
+" original and DEC standard boot formats.  Originally, a tape bootstrap\n"
+" read and executed the first record on tape.  To allow for ANSI labels,\n"
+" the DEC standard bootstrap skipped the first record and read and executed\n"
+" the second.  The DEC standard is the default; to bootstrap an original\n"
+" format tape, use the command BOOT –O MTn.  The TM11 is automatically\n"
+" disabled in a Qbus system with more than 256KB of memory.\n";
+fprintf (st, "%s", text);
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+text2 = 
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n"
+" It is critically important to maintain certain timing relationships\n"
+" among the DECtape parameters, or the DECtape simulator will fail to\n"
+" operate correctly.\n"
+"\n"
+"    -  LTIME must be at least 6\n"
+"    -  DCTIME needs to be at least 100 times LTIME\n"
+"\n"
+" Acceleration time is set to 75% of deceleration time.\n";
+fprintf (st, "%s", text2);
+fprintf (st, "\nError handling is as follows:\n\n");
+fprintf (st, "    error         processed as\n");
+fprintf (st, "    not attached  tape not ready\n\n");
+fprintf (st, "    end of file   bad tape\n");
+fprintf (st, "    OS I/O error  fatal tape error\n\n");
+sim_tape_attach_help (st, dptr, uptr, flag, cptr);
+return SCPE_OK;
+}
+
+char *tm_description (DEVICE *dptr)
+{
+return "TM11 Magnet Tape controller";
+}

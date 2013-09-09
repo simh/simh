@@ -175,6 +175,8 @@ static t_stat kg_wr (int32, int32, int32);
 static t_stat kg_reset (DEVICE *);
 static void do_poly (int, t_bool);
 static t_stat set_units (UNIT *, int32, char *, void *);
+t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
+char *kg_description (DEVICE *dptr);
 
 /* 16-bit rotate right */
 
@@ -216,45 +218,19 @@ static UNIT kg_unit[] = {
 };
 
 static const REG kg_reg[] = {
-    { ORDATA (SR0, kg_unit[0].SR, 16) },
-    { ORDATA (SR1, kg_unit[1].SR, 16) },
-    { ORDATA (SR2, kg_unit[2].SR, 16) },
-    { ORDATA (SR3, kg_unit[3].SR, 16) },
-    { ORDATA (SR4, kg_unit[4].SR, 16) },
-    { ORDATA (SR5, kg_unit[5].SR, 16) },
-    { ORDATA (SR6, kg_unit[6].SR, 16) },
-    { ORDATA (SR7, kg_unit[7].SR, 16) },
-    { ORDATA (BCC0, kg_unit[0].BCC, 16) },
-    { ORDATA (BCC1, kg_unit[1].BCC, 16) },
-    { ORDATA (BCC2, kg_unit[2].BCC, 16) },
-    { ORDATA (BCC3, kg_unit[3].BCC, 16) },
-    { ORDATA (BCC4, kg_unit[4].BCC, 16) },
-    { ORDATA (BCC5, kg_unit[5].BCC, 16) },
-    { ORDATA (BCC6, kg_unit[6].BCC, 16) },
-    { ORDATA (BCC7, kg_unit[7].BCC, 16) },
-    { ORDATA (DR0, kg_unit[0].DR, 16) },
-    { ORDATA (DR1, kg_unit[1].DR, 16) },
-    { ORDATA (DR2, kg_unit[2].DR, 16) },
-    { ORDATA (DR3, kg_unit[3].DR, 16) },
-    { ORDATA (DR4, kg_unit[4].DR, 16) },
-    { ORDATA (DR5, kg_unit[5].DR, 16) },
-    { ORDATA (DR6, kg_unit[6].DR, 16) },
-    { ORDATA (DR7, kg_unit[7].DR, 16) },
-    { ORDATA (PULSCNT0, kg_unit[0].PULSCNT, 16) },
-    { ORDATA (PULSCNT1, kg_unit[1].PULSCNT, 16) },
-    { ORDATA (PULSCNT2, kg_unit[2].PULSCNT, 16) },
-    { ORDATA (PULSCNT3, kg_unit[3].PULSCNT, 16) },
-    { ORDATA (PULSCNT4, kg_unit[4].PULSCNT, 16) },
-    { ORDATA (PULSCNT5, kg_unit[5].PULSCNT, 16) },
-    { ORDATA (PULSCNT6, kg_unit[6].PULSCNT, 16) },
-    { ORDATA (PULSCNT7, kg_unit[7].PULSCNT, 16) },
+    { URDATAD (SR,           kg_unit[0].SR, DEV_RDX, 16, 0, KG_UNITS, 0, "control and status register; R/W") },
+    { URDATAD (BCC,         kg_unit[0].BCC, DEV_RDX, 16, 0, KG_UNITS, 0, "result block check character; R/O") },
+    { URDATAD (DR,           kg_unit[0].DR, DEV_RDX, 16, 0, KG_UNITS, 0, "input data register; W/O") },
+    { URDATAD (PULSCNT, kg_unit[0].PULSCNT, DEV_RDX, 16, 0, KG_UNITS, 0, "polynomial cycle stage") },
     { ORDATA (DEVADDR, kg_dib.ba, 32), REG_HRO },
     { NULL }
 };
 
 static const MTAB kg_mod[] = {
-    { MTAB_XTD|MTAB_VDV, 0, "ADDRESS", NULL, NULL, &show_addr, NULL },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "UNITS=0..8", &set_units, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV|MTAB_VALR, 020, "ADDRESS", NULL,
+        NULL, &show_addr, NULL, "Bus address" },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "UNITS=1..8", 
+        &set_units, NULL, NULL, "Specify number of KG devices" },
     { 0 }
 };
 
@@ -283,7 +259,11 @@ DEVICE kg_dev = {
     0,                                                  /* debug control */
     (DEBTAB *) &kg_debug,                               /* debug flags */
     NULL,                                               /* memory size chage */
-    NULL                                                /* logical name */
+    NULL,                                                /* logical name */
+    &kg_help,                                           /* help */
+    NULL,                                               /* attach help */
+    NULL,                                               /* help context */
+    &kg_description,                                    /* description */
 };
                                                        /* KG I/O address routines */
 
@@ -407,7 +387,7 @@ static t_stat kg_reset (DEVICE *dptr)
         kg_unit[i].BCC = 0;
         kg_unit[i].PULSCNT = 0;
     }
-    return auto_config(0, 0);
+    return auto_config(dptr->name, (dptr->flags & DEV_DIS) ? 0 : kg_dev.numunits);
 }
 
 static void cycleOneBit (int unit)
@@ -468,6 +448,10 @@ static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
     units = get_uint (s, 10, KG_UNITS, &stat);
     if (stat != SCPE_OK)
         return (stat);
+    if (units == 0)
+        return SCPE_ARG;
+    if (units == kg_dev.numunits)
+        return SCPE_OK;
     for (i = 0; i < KG_UNITS; i++) {
         if (i < units)
             kg_unit[i].flags &= ~UNIT_DIS;
@@ -475,5 +459,36 @@ static t_stat set_units (UNIT *u, int32 val, char *s, void *desc)
             kg_unit[i].flags |= UNIT_DIS;
     }
     kg_dev.numunits = units;
+    kg_reset (&kg_dev);
     return (SCPE_OK);
+}
+
+t_stat kg_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
+{
+const char *const text =
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+" KG11-A Communications Arithmetic Option (KG)\n"
+"\n"
+" The KG11-A is a programmed I/O, non-interrupting, dedicated arithmetic\n"
+" processor for the Unibus.  The device is used to compute the block check\n"
+" character (BCC) over a block of data, typically in data communication\n"
+" applications.  The KG11 can compute three different Cyclic Redundancy\n"
+" Check (CRC) polynomials (CRC-16, CRC-12, CRC-CCITT) and two Longitudinal\n"
+" Redundancy Checks (LRC, Exclusive-OR; LRC-8, LRC-16).  Up to eight units\n"
+" may be contiguously present in a single machine and are all located at\n"
+" fixed addresses.  This simulation implements all functionality of the\n"
+" device including the ability to single step computation of the BCC.\n"
+" The KG is disabled by default.\n"
+/*567901234567890123456789012345678901234567890123456789012345678901234567890*/
+"\n";
+fprintf (st, "%s", text);
+fprint_set_help (st, dptr);
+fprint_show_help (st, dptr);
+fprint_reg_help (st, dptr);
+return SCPE_OK;
+}
+
+char *kg_description (DEVICE *dptr)
+{
+return "KG11-A Communications Arithmetic Option";
 }
