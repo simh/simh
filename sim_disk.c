@@ -1435,7 +1435,7 @@ if ((c = strrchr (namebuf, ']')))
     strcpy (namebuf, c+1);
 packid = eth_crc32(0, namebuf, strlen (namebuf));
 buf[0] = (uint16)packid;
-buf[1] = (uint16)(packid >> 16);
+buf[1] = (uint16)(packid >> 16) & 0x7FFF;   /* Make sure MSB is clear */
 buf[2] = buf[3] = 0;
 for (i = 4; i < wds; i++)
     buf[i] = 0177777u;
