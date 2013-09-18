@@ -1160,16 +1160,12 @@ while (*cptr != 0) {                                    /* do all mods */
             return r;
         }
     else {
-        r = sim_parse_addr (gbuf, NULL, 0, NULL, NULL, 0, NULL, NULL);
-        if (r == SCPE_OK) {
-            if (sim_con_tmxr.master)                        /* already open? */
-                sim_set_notelnet (0, NULL);                 /* close first */
-            r = tmxr_attach (&sim_con_tmxr, &sim_con_unit, gbuf);/* open master socket */
-            if (r == SCPE_OK)
-                sim_activate_after(&sim_con_unit, 1000000); /* check for connection in 1 second */
-            return r;
-            }
-        return SCPE_NOPARAM;
+        if (sim_con_tmxr.master)                        /* already open? */
+            sim_set_notelnet (0, NULL);                 /* close first */
+        r = tmxr_attach (&sim_con_tmxr, &sim_con_unit, gbuf);/* open master socket */
+        if (r == SCPE_OK)
+            sim_activate_after(&sim_con_unit, 1000000); /* check for connection in 1 second */
+        return r;
         }
     }
 return SCPE_OK;
