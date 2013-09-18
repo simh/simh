@@ -1,6 +1,6 @@
 /* pdp8_sys.c: PDP-8 simulator interface
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   17-Sep-13    RMS     Fixed recognition of initial field change (Dave Gesswein)
    24-Mar-09    RMS     Added link to FPP
    24-Jun-08    RMS     Fixed bug in new rim loader (Don North)
    24-May-08    RMS     Fixed signed/unsigned declaration inconsistency
@@ -190,11 +191,11 @@ t_stat sim_load_bin (FILE *fi)
 int32 hi, lo, wd, csum, t;
 uint32 field, newf, origin;
 
+csum = origin = field = newf = 0;                       /* init */
 do {                                                    /* skip leader */
     if ((hi = sim_bin_getc (fi, &newf)) == EOF)
         return SCPE_FMT;
     } while ((hi == 0) || (hi >= 0200));
-csum = origin = field = newf = 0;                       /* init */
 for (;;) {                                              /* data blocks */
     if ((lo = sim_bin_getc (fi, &newf)) == EOF)         /* low char */
         return SCPE_FMT;
