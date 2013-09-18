@@ -1,6 +1,6 @@
 /* pdp8_cpu.c: PDP-8 CPU simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          central processor
 
+   17-Sep-13    RMS     Fixed boot in wrong field problem (Dave Gesswein)
    28-Apr-07    RMS     Removed clock initialization
    30-Oct-06    RMS     Added idle and infinite loop detection
    30-Sep-06    RMS     Fixed SC value after DVI overflow (Don North)
@@ -323,7 +324,8 @@ t_stat reason;
 
 /* Restore register state */
 
-if (build_dev_tab ()) return SCPE_STOP;                 /* build dev_tab */
+if (build_dev_tab ())                                   /* build dev_tab */
+    return SCPE_STOP;
 PC = saved_PC & 007777;                                 /* load local copies */
 IF = saved_PC & 070000;
 DF = saved_DF & 070000;
@@ -1364,6 +1366,15 @@ if (pcq_r)
 else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
+}
+
+/* Set PC for boot (PC<14:12> will typically be 0) */
+
+void cpu_set_bootpc (int32 pc)
+{
+saved_PC = pc;                                          /* set PC, IF */
+saved_DF = IB = pc & 070000;                            /* set IB, DF */
+return;
 }
 
 /* Memory examine */

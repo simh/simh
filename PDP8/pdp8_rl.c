@@ -1,6 +1,6 @@
 /* pdp8_rl.c: RL8A cartridge disk simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl           RL8A cartridge disk
 
+   17-Sep-13    RMS     Changed to use central set_bootpc routine
    25-Oct-05    RMS     Fixed IOT 61 decode bug (David Gesswein)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    04-Jan-04    RMS     Changed attach routine to use sim_fsize
@@ -690,7 +691,6 @@ static const uint16 boot_rom[] = {
 t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 if (unitno)                                             /* only unit 0 */
     return SCPE_ARG;
@@ -699,6 +699,6 @@ if (rl_dib.dev != DEV_RL)                               /* only std devno */
 rl_unit[unitno].TRK = 0;
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
 }

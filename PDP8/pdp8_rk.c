@@ -1,6 +1,6 @@
 /* pdp8_rk.c: RK8E cartridge disk simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rk           RK8E/RK05 cartridge disk
 
+   17-Sep-13    RMS     Changed to use central set_bootpc routine
+   18-Mar-13    RMS     Raised RK_MIN so that RKLFMT will work (Mark Pizzolato)
    25-Apr-03    RMS     Revised for extended file support
    04-Oct-02    RMS     Added DIB, device number support
    06-Jan-02    RMS     Changed enable/disable support
@@ -121,7 +123,7 @@
                             ((rk_cmd & RKC_IE) != 0)) \
                             int_req = int_req | INT_RK; \
                         else int_req = int_req & ~INT_RK
-#define RK_MIN          45
+#define RK_MIN          50
 #define MAX(x,y)        (((x) > (y))? (x): (y))
 
 extern uint16 M[];
@@ -451,13 +453,12 @@ static const uint16 boot_rom[] = {
 t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 if (rk_dib.dev != DEV_RK)                               /* only std devno */
     return STOP_NOTSTD;
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
 M[BOOT_UNIT] = (unitno & RK_M_NUMDR) << 1;
-saved_PC = BOOT_START;
+cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
 }

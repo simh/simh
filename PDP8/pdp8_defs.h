@@ -1,6 +1,6 @@
 /* pdp8_defs.h: PDP-8 simulator definitions
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,8 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   18-Sep-13    RMS     Added set_bootpc prototype
    18-Apr-12    RMS     Removed separate timer for additional terminals;
-                        added clock_cosched prototype
+                        Added clock_cosched prototype
    22-May-10    RMS     Added check for 64b definitions
    21-Aug-07    RMS     Added FPP8 support
    13-Dec-06    RMS     Added TA8E support
@@ -209,5 +210,7 @@ typedef struct {
 
 t_stat set_dev (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat show_dev (FILE *st, UNIT *uptr, int32 val, void *desc);
+
+void cpu_set_bootpc (int32 pc);
 
 #endif

@@ -25,6 +25,7 @@
 
    rx           RX8E/RX01, RX28/RX02 floppy disk
 
+   17-Sep-13    RMS     Changed to use central set_bootpc routine
    03-Sep-13    RMS     Added explicit void * cast
    15-May-06    RMS     Fixed bug in autosize attach (Dave Gesswein)
    04-Jan-04    RMS     Changed sim_fsize calling sequence
@@ -735,7 +736,6 @@ static const uint16 boot2_rom[] = {
 t_stat rx_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 M[];
 
 if (rx_dib.dev != DEV_RX)                               /* only std devno */
@@ -743,13 +743,13 @@ if (rx_dib.dev != DEV_RX)                               /* only std devno */
 if (rx_28) {
     for (i = 0; i < BOOT2_LEN; i++)
         M[BOOT2_START + i] = boot2_rom[i];
-    saved_PC = BOOT2_ENTRY;
+    cpu_set_bootpc (BOOT2_ENTRY);
     }
 else {
     for (i = 0; i < BOOT_LEN; i++)
         M[BOOT_START + i] = boot_rom[i];
     M[BOOT_INST] = unitno? 07024: 07004;
-    saved_PC = BOOT_ENTRY;
+    cpu_set_bootpc (BOOT_ENTRY);
     }
 return SCPE_OK;
 }

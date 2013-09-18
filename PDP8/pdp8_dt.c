@@ -1,6 +1,6 @@
 /* pdp8_dt.c: PDP-8 DECtape simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    dt           TC08/TU56 DECtape
 
-   23-Jun-06	RMS     Fixed switch conflict in ATTACH
+   17-Sep-13    RMS     Changed to use central set_bootpc routine
+   23-Jun-06    RMS     Fixed switch conflict in ATTACH
    07-Jan-06    RMS     Fixed unaligned register access bug (Doug Carman)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    25-Jan-04    RMS     Revised for device debug support
@@ -380,7 +381,8 @@ int32 pulse = IR & 07;
 int32 old_dtsa = dtsa, fnc;
 UNIT *uptr;
 
-if (pulse & 01) AC = AC | dtsa;                         /* DTRA */
+if (pulse & 01)                                         /* DTRA */
+    AC = AC | dtsa;
 if (pulse & 06) {                                       /* select */
     if (pulse & 02)                                     /* DTCA */
         dtsa = 0;
@@ -1011,7 +1013,8 @@ return SCPE_OK;
 
 int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos, int32 dir)
 {
-if (relpos >= DT_HTLIN) relpos = relpos - (DT_WSIZE * DTU_BSIZE (uptr));
+if (relpos >= DT_HTLIN)
+    relpos = relpos - (DT_WSIZE * DTU_BSIZE (uptr));
 if (dir) {                                              /* reverse */
     switch (relpos / DT_WSIZE) {
     case 6:                                             /* rev csm */
@@ -1176,7 +1179,6 @@ static const uint16 boot_rom[] = {
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 if (unitno)                                             /* only unit 0 */
     return SCPE_ARG;
@@ -1185,7 +1187,7 @@ if (dt_dib.dev != DEV_DTA)                              /* only std devno */
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
 }
 

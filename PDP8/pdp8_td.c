@@ -1,6 +1,6 @@
 /* pdp8_td.c: PDP-8 simple DECtape controller (TD8E) simulator
 
-   Copyright (c) 1993-2011, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -28,8 +28,9 @@
 
    td           TD8E/TU56 DECtape
 
+   17-Sep-13    RMS     Changed to use central set_bootpc routine
    23-Mar-11    RMS     Fixed SDLC to clear AC (from Dave Gesswein)
-   23-Jun-06	RMS     Fixed switch conflict in ATTACH
+   23-Jun-06    RMS     Fixed switch conflict in ATTACH
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Jan-04    RMS     Changed sim_fsize calling sequence, added STOP_OFFR
 
@@ -100,7 +101,7 @@
 
 /* 16b, 18b, 36b DECtape constants */
 
-#define D18_WSIZE       6                               /* word sizein lines */
+#define D18_WSIZE       6                               /* word size in lines */
 #define D18_BSIZE       384                             /* block size in 12b */
 #define D18_TSIZE       578                             /* tape size */
 #define D18_LPERB       (DT_HTLIN + (D18_BSIZE * DT_WSIZE) + DT_HTLIN)
@@ -741,7 +742,6 @@ static const uint16 boot_rom[] = {
 t_stat td_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 if (unitno)
     return SCPE_ARG;                                    /* only unit 0 */
@@ -750,7 +750,7 @@ if (td_dib.dev != DEV_TD8E)
 td_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
 }
 
@@ -910,7 +910,8 @@ int32 td_set_mtk (int32 code, int32 u, int32 k)
 {
 int32 i;
 
-for (i = 5; i >= 0; i--) tdb_mtk[u][k++] = (code >> i) & 1;
+for (i = 5; i >= 0; i--)
+    tdb_mtk[u][k++] = (code >> i) & 1;
 return k;
 }
 

@@ -1,6 +1,6 @@
 /* pdp8_ct.c: PDP-8 cassette tape simulator
 
-   Copyright (c) 2006-2011, Robert M Supnik
+   Copyright (c) 2006-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,9 +25,10 @@
 
    ct           TA8E/TU60 cassette tape
 
+   17-Sep-07    RMS     Changed to use central set_bootpc routine
    13-Aug-07    RMS     Fixed handling of BEOT
    06-Aug-07    RMS     Foward op at BOT skips initial file gap
-   30-May-2007  RMS     Fixed typo (Norm Lastovica)
+   30-May-07    RMS     Fixed typo (Norm Lastovica)
 
    Magnetic tapes are represented as a series of variable records
    of the form:
@@ -718,13 +719,12 @@ static const uint16 boot_rom[] = {
 t_stat ct_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 M[];
 
 if ((ct_dib.dev != DEV_CT) || unitno)                   /* only std devno */
      return STOP_NOTSTD;
 for (i = 0; i < BOOT_LEN; i++)
     M[BOOT_START + i] = boot_rom[i];
-saved_PC = BOOT_START;
+cpu_set_bootpc (BOOT_START);
 return SCPE_OK;
 }
