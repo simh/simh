@@ -168,7 +168,7 @@ struct key_event {
 typedef struct mouse_event SIM_MOUSE_EVENT;
 typedef struct key_event SIM_KEY_EVENT;
 
-t_stat vid_open (uint32 width, uint32 height);
+t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height);
 t_stat vid_close (void);
 t_stat vid_poll_kb (SIM_KEY_EVENT *ev);
 t_stat vid_poll_mouse (SIM_MOUSE_EVENT *ev);
@@ -179,5 +179,9 @@ t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 
 extern t_bool vid_active;
+
+#define SIM_VID_DBG_MOUSE   0x01000000
+#define SIM_VID_DBG_KEY     0x02000000
+#define SIM_VID_DBG_VIDEO   0x04000000
 
 #endif

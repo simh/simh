@@ -270,6 +270,9 @@ DEBTAB vc_debug[] = {
     {"MBC",     DBG_INT6},
     {"SPARE",   DBG_INT7},
     {"INT",     DBG_INT0|DBG_INT1|DBG_INT2|DBG_INT3|DBG_INT4|DBG_INT5|DBG_INT6|DBG_INT7},
+    {"VMOUSE",  SIM_VID_DBG_MOUSE},
+    {"VKEY",    SIM_VID_DBG_KEY},
+    {"VVIDEO",  SIM_VID_DBG_VIDEO},
     {0}
     };
 
@@ -798,7 +801,7 @@ if (dptr->flags & DEV_DIS)
     return vid_close ();
 
 if (!vid_active)  {
-    r = vid_open (VC_XSIZE, VC_YSIZE);                      /* display size */
+    r = vid_open (dptr, VC_XSIZE, VC_YSIZE);            /* display size */
     if (r != SCPE_OK)
         return r;
     printf ("QVSS Display Created.  ");

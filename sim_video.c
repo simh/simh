@@ -71,8 +71,9 @@ SDL_Thread *vid_thread_id;                              /* event thread handle *
 SDL_Color vid_palette[256];
 KEY_EVENT_QUEUE vid_key_events;                         /* keyboard events */
 MOUSE_EVENT_QUEUE vid_mouse_events;                     /* mouse events */
+DEVICE *vid_dev;
 
-t_stat vid_open (uint32 width, uint32 height)
+t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height)
 {
 if (!vid_active) {
     vid_active = TRUE;
@@ -106,6 +107,7 @@ if (!vid_active) {
     SDL_SetColors (vid_image, vid_palette, 0, 2);
 
     memset (&vid_key_state, 0, sizeof(vid_key_state));
+    vid_dev = dptr;
     }
 return SCPE_OK;
 }
@@ -120,6 +122,7 @@ if (vid_active) {
     user_event.user.code = EVENT_CLOSE;
     user_event.user.data1 = NULL;
     user_event.user.data2 = NULL;
+    vid_dev = NULL;
 
     SDL_PushEvent (&user_event);
     }
@@ -536,6 +539,7 @@ if (vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_key_events.sem) == 0) {
+    sim_debug (SIM_VID_DBG_KEY,vid_dev, "Keyboard Event: State: %d, Keysym: %d\n", event->state, event->keysym);
     if (vid_key_events.count < MAX_EVENTS) {
         if (event->state == SDL_PRESSED) {
             if (!vid_key_state[event->keysym.sym]) {    /* Key was not down before */
@@ -585,6 +589,7 @@ if ((event->x == 0) ||
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_mouse_events.sem) == 0) {
+    sim_debug (SIM_VID_DBG_MOUSE,vid_dev, "Mouse Move Event: (%d,%d)\n", event->xrel, event->yrel);
     if (vid_mouse_events.count < MAX_EVENTS) {
         ev.x_rel = event->xrel;
         ev.y_rel = (-event->yrel);
@@ -628,6 +633,7 @@ if (!vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_mouse_events.sem) == 0) {
+    sim_debug (SIM_VID_DBG_MOUSE,vid_dev, "Mouse Button Event: State: %d, Button: %d, (%d,%d)\n", event->state, event->button, event->x, event->y);
     if (vid_mouse_events.count < MAX_EVENTS) {
         state = (event->state == SDL_PRESSED) ? TRUE : FALSE;
         ev.x_rel = 0;
