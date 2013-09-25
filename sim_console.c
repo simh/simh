@@ -1057,7 +1057,7 @@ if (r != SCPE_OK)
 
 if (sim_deb_switches & SWMASK ('R')) {
     clock_gettime(CLOCK_REALTIME, &sim_deb_basetime);
-    if (!(sim_deb_switches & (SWMASK ('A') || SWMASK ('T'))))
+    if (!(sim_deb_switches & (SWMASK ('A') | SWMASK ('T'))))
         sim_deb_switches |= SWMASK ('T');
     }
 if (sim_deb_switches & SWMASK ('P'))
