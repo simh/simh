@@ -233,7 +233,10 @@
 #endif
 #include <sys/stat.h>
 
-#if defined(HAVE_DLOPEN)                                 /* Dynamic Readline support */
+#if defined(HAVE_LIBSDL) && defined(USE_SIM_VIDEO)      /* SDL*/
+#include <SDL/SDL.h>
+#endif
+#if defined(HAVE_DLOPEN)                                /* Dynamic Readline support */
 #include <dlfcn.h>
 #endif
 

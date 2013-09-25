@@ -318,6 +318,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
       OS_LDFLAGS += -lSDL
       $(info using libSDL:  $(call find_lib,SDL) $(call find_include,SDL/SDL))
+      ifeq (Darwin,$(OSTYPE))
+        OS_LDFLAGS += -lSDLmain -lobjc -framework cocoa
+      endif
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
