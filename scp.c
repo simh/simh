@@ -233,8 +233,8 @@
 #endif
 #include <sys/stat.h>
 
-#if defined(HAVE_LIBSDL) && defined(USE_SIM_VIDEO)      /* SDL*/
-#include <SDL/SDL.h>
+#if defined(HAVE_LIBSDL) && defined(USE_SIM_VIDEO)      /* SDL (Simple DirectMedial Layer) */
+#include <SDL.h>
 #endif
 #if defined(HAVE_DLOPEN)                                /* Dynamic Readline support */
 #include <dlfcn.h>

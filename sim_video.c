@@ -67,7 +67,7 @@ int32 vid_width;
 int32 vid_height;
 SDL_Surface *vid_image;                                 /* video buffer */
 SDL_Surface *vid_window;                                /* window handle */
-SDL_Thread *vid_thread_id;                              /* event thread handle */
+SDL_Thread *vid_thread_handle;                          /* event thread handle */
 SDL_Color vid_palette[256];
 KEY_EVENT_QUEUE vid_key_events;                         /* keyboard events */
 MOUSE_EVENT_QUEUE vid_mouse_events;                     /* mouse events */
@@ -76,9 +76,6 @@ DEVICE *vid_dev;
 t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height)
 {
 if (!vid_active) {
-    if (SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE) < 0) {
-        return SCPE_OPENERR;
-        }
     vid_active = TRUE;
     vid_width = width;
     vid_height = height;
@@ -93,38 +90,14 @@ if (!vid_active) {
     vid_mouse_events.count = 0;
     vid_mouse_events.sem = SDL_CreateSemaphore (1);
 
-    vid_window = SDL_SetVideoMode (vid_width, vid_height, 8, 0);
-
-    if (vid_window == NULL) {
-        vid_close ();
-        return SCPE_OPENERR;
-        }
-
-    if (SDL_EnableKeyRepeat (SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL) < 0) {
-        vid_close ();
-        return SCPE_OPENERR;
-        }
-
-    SDL_WM_SetCaption (&sim_name[0], &sim_name[0]);
     vid_dev = dptr;
 
-    vid_thread_id = SDL_CreateThread (vid_thread, NULL);
-    if (vid_thread_id == NULL) {
+    vid_thread_handle = SDL_CreateThread (vid_thread, NULL);
+    if (vid_thread_handle == NULL) {
         vid_close ();
         return SCPE_OPENERR;
         }
     
-    vid_image = SDL_CreateRGBSurface (SDL_SWSURFACE, width, height, 8, 0, 0, 0, 0);
-
-    vid_palette[0].r = 0;
-    vid_palette[0].g = 0;
-    vid_palette[0].b = 0;
-    vid_palette[1].r = 255;
-    vid_palette[1].g = 255;
-    vid_palette[1].b = 255;
-    SDL_SetColors (vid_image, vid_palette, 0, 2);
-
-    memset (&vid_key_state, 0, sizeof(vid_key_state));
     sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
 return SCPE_OK;
@@ -137,7 +110,7 @@ int status;
 
 if (vid_active) {
     vid_active = FALSE;
-    if (vid_thread_id) {
+    if (vid_thread_handle) {
         sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_close()\n");
         user_event.type = SDL_USEREVENT;
         user_event.user.code = EVENT_CLOSE;
@@ -145,8 +118,8 @@ if (vid_active) {
         user_event.user.data2 = NULL;
 
         SDL_PushEvent (&user_event);
-        SDL_WaitThread (vid_thread_id, &status);
-        vid_thread_id = NULL;
+        SDL_WaitThread (vid_thread_handle, &status);
+        vid_thread_handle = NULL;
         vid_dev = NULL;
         }
     if (vid_mouse_events.sem) {
@@ -157,7 +130,6 @@ if (vid_active) {
         SDL_DestroySemaphore(vid_key_events.sem);
         vid_key_events.sem = NULL;
         }
-    SDL_Quit ();
     }
 return SCPE_OK;
 }
@@ -749,6 +721,29 @@ static char *eventtypes[] = {
     };
 
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Starting\n");
+
+SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE);
+
+vid_window = SDL_SetVideoMode (vid_width, vid_height, 8, 0);
+
+SDL_EnableKeyRepeat (SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+
+vid_image = SDL_CreateRGBSurface (SDL_SWSURFACE, vid_width, vid_height, 8, 0, 0, 0, 0);
+
+vid_palette[0].r = 0;
+vid_palette[0].g = 0;
+vid_palette[0].b = 0;
+vid_palette[1].r = 255;
+vid_palette[1].g = 255;
+vid_palette[1].b = 255;
+SDL_SetColors (vid_image, vid_palette, 0, 2);
+
+SDL_WM_SetCaption (&sim_name[0], &sim_name[0]);
+
+memset (&vid_key_state, 0, sizeof(vid_key_state));
+
+sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Started\n");
+
 while (vid_active) {
     if (SDL_WaitEvent (&event)) {
         switch (event.type) {
@@ -778,6 +773,7 @@ while (vid_active) {
             }
         }
     }
+SDL_Quit ();
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Exiting\n");
 return 0;
 }
@@ -806,7 +802,7 @@ return SCPE_OK;
 
 /* Non-implemented versions */
 
-t_stat vid_open (uint32 width, uint32 height)
+t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height)
 {
 return SCPE_NOFNC;
 }
