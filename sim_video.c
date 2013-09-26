@@ -76,6 +76,9 @@ DEVICE *vid_dev;
 t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height)
 {
 if (!vid_active) {
+    if (SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE) < 0) {
+        return SCPE_OPENERR;
+        }
     vid_active = TRUE;
     vid_width = width;
     vid_height = height;
@@ -90,9 +93,24 @@ if (!vid_active) {
     vid_mouse_events.count = 0;
     vid_mouse_events.sem = SDL_CreateSemaphore (1);
 
+    vid_window = SDL_SetVideoMode (vid_width, vid_height, 8, 0);
+
+    if (vid_window == NULL) {
+        vid_close ();
+        return SCPE_OPENERR;
+        }
+
+    if (SDL_EnableKeyRepeat (SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL) < 0) {
+        vid_close ();
+        return SCPE_OPENERR;
+        }
+
+    SDL_WM_SetCaption (&sim_name[0], &sim_name[0]);
+    vid_dev = dptr;
+
     vid_thread_id = SDL_CreateThread (vid_thread, NULL);
     if (vid_thread_id == NULL) {
-        vid_active = FALSE;
+        vid_close ();
         return SCPE_OPENERR;
         }
     
@@ -107,7 +125,7 @@ if (!vid_active) {
     SDL_SetColors (vid_image, vid_palette, 0, 2);
 
     memset (&vid_key_state, 0, sizeof(vid_key_state));
-    vid_dev = dptr;
+    sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_open() - Success\n");
     }
 return SCPE_OK;
 }
@@ -115,16 +133,31 @@ return SCPE_OK;
 t_stat vid_close (void)
 {
 SDL_Event user_event;
+int status;
 
 if (vid_active) {
     vid_active = FALSE;
-    user_event.type = SDL_USEREVENT;
-    user_event.user.code = EVENT_CLOSE;
-    user_event.user.data1 = NULL;
-    user_event.user.data2 = NULL;
-    vid_dev = NULL;
+    if (vid_thread_id) {
+        sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_close()\n");
+        user_event.type = SDL_USEREVENT;
+        user_event.user.code = EVENT_CLOSE;
+        user_event.user.data1 = NULL;
+        user_event.user.data2 = NULL;
 
-    SDL_PushEvent (&user_event);
+        SDL_PushEvent (&user_event);
+        SDL_WaitThread (vid_thread_id, &status);
+        vid_thread_id = NULL;
+        vid_dev = NULL;
+        }
+    if (vid_mouse_events.sem) {
+        SDL_DestroySemaphore(vid_mouse_events.sem);
+        vid_mouse_events.sem = NULL;
+        }
+    if (vid_key_events.sem) {
+        SDL_DestroySemaphore(vid_key_events.sem);
+        vid_key_events.sem = NULL;
+        }
+    SDL_Quit ();
     }
 return SCPE_OK;
 }
@@ -530,6 +563,7 @@ if (vid_mouse_captured) {
     if (!KeyStates)
         KeyStates = SDL_GetKeyState(&numkeys);
     if ((event->state == SDL_PRESSED) && KeyStates[SDLK_RSHIFT] && (KeyStates[SDLK_LCTRL] || KeyStates[SDLK_RCTRL])) {
+        sim_debug (SIM_VID_DBG_KEY, vid_dev, "vid_key() - Cursor Release\n");
         SDL_WM_GrabInput (SDL_GRAB_OFF);                /* relese cursor */
         SDL_ShowCursor (SDL_ENABLE);                    /* show cursor */
         vid_mouse_captured = FALSE;
@@ -539,7 +573,7 @@ if (vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_key_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_KEY,vid_dev, "Keyboard Event: State: %d, Keysym: %d\n", event->state, event->keysym);
+    sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %d, Keysym: %d\n", event->state, event->keysym);
     if (vid_key_events.count < MAX_EVENTS) {
         if (event->state == SDL_PRESSED) {
             if (!vid_key_state[event->keysym.sym]) {    /* Key was not down before */
@@ -589,7 +623,7 @@ if ((event->x == 0) ||
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_mouse_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_MOUSE,vid_dev, "Mouse Move Event: (%d,%d)\n", event->xrel, event->yrel);
+    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Move Event: (%d,%d)\n", event->xrel, event->yrel);
     if (vid_mouse_events.count < MAX_EVENTS) {
         ev.x_rel = event->xrel;
         ev.y_rel = (-event->yrel);
@@ -619,6 +653,7 @@ t_bool state;
 if (!vid_mouse_captured) {
     if ((event->state == SDL_PRESSED) &&
         (event->button == SDL_BUTTON_LEFT)) {               /* left click and cursor not captured? */
+        sim_debug (SIM_VID_DBG_KEY, vid_dev, "vid_mouse_button() - Cursor Captured\n");
         SDL_WM_GrabInput (SDL_GRAB_ON);                     /* lock cursor to window */
         SDL_ShowCursor (SDL_DISABLE);                       /* hide cursor */
         cx = vid_width / 2;
@@ -633,7 +668,7 @@ if (!vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_mouse_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_MOUSE,vid_dev, "Mouse Button Event: State: %d, Button: %d, (%d,%d)\n", event->state, event->button, event->x, event->y);
+    sim_debug (SIM_VID_DBG_MOUSE, vid_dev, "Mouse Button Event: State: %d, Button: %d, (%d,%d)\n", event->state, event->button, event->x, event->y);
     if (vid_mouse_events.count < MAX_EVENTS) {
         state = (event->state == SDL_PRESSED) ? TRUE : FALSE;
         ev.x_rel = 0;
@@ -670,32 +705,50 @@ vid_dst.y = 0;
 vid_dst.w = vid_width;
 vid_dst.h = vid_height;
 
+sim_debug (SIM_VID_DBG_VIDEO, vid_dev, "Video Update Event: \n");
 SDL_BlitSurface (vid_image, NULL, vid_window, &vid_dst);
 SDL_UpdateRects (vid_window, 1, &vid_dst);
 }
 
 int vid_thread (void* arg)
 {
-int vid_bpp = 8;
-int vid_flags = 0;
 SDL_Event event;
+static char *eventtypes[] = {
+    "NOEVENT",			/**< Unused (do not remove) */
+    "ACTIVEEVENT",			/**< Application loses/gains visibility */
+    "KEYDOWN",			/**< Keys pressed */
+    "KEYUP",			/**< Keys released */
+    "MOUSEMOTION",			/**< Mouse moved */
+    "MOUSEBUTTONDOWN",		/**< Mouse button pressed */
+    "MOUSEBUTTONUP",		/**< Mouse button released */
+    "JOYAXISMOTION",		/**< Joystick axis motion */
+    "JOYBALLMOTION",		/**< Joystick trackball motion */
+    "JOYHATMOTION",		/**< Joystick hat position change */
+    "JOYBUTTONDOWN",		/**< Joystick button pressed */
+    "JOYBUTTONUP",			/**< Joystick button released */
+    "QUIT",			/**< User-requested quit */
+    "SYSWMEVENT",			/**< System specific event */
+    "EVENT_RESERVEDA",		/**< Reserved for future use.. */
+    "EVENT_RESERVEDB",		/**< Reserved for future use.. */
+    "VIDEORESIZE",			/**< User resized video mode */
+    "VIDEOEXPOSE",			/**< Screen needs to be redrawn */
+    "EVENT_RESERVED2",		/**< Reserved for future use.. */
+    "EVENT_RESERVED3",		/**< Reserved for future use.. */
+    "EVENT_RESERVED4",		/**< Reserved for future use.. */
+    "EVENT_RESERVED5",		/**< Reserved for future use.. */
+    "EVENT_RESERVED6",		/**< Reserved for future use.. */
+    "EVENT_RESERVED7",		/**< Reserved for future use.. */
+    "USEREVENT",            /** Events SDL_USEREVENT(24) through SDL_MAXEVENTS-1(31) are for your use */
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    ""
+    };
 
-if (SDL_Init (SDL_INIT_VIDEO|SDL_INIT_NOPARACHUTE) < 0) {
-    return SCPE_OPENERR;
-    }
-
-vid_window = SDL_SetVideoMode (vid_width, vid_height, vid_bpp, vid_flags);
-
-if (vid_window == NULL) {
-    return SCPE_OPENERR;
-    }
-
-if (SDL_EnableKeyRepeat (SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL) < 0) {
-    return SCPE_OPENERR;
-    }
-
-SDL_WM_SetCaption (&sim_name[0], &sim_name[0]);
-
+sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Starting\n");
 while (vid_active) {
     if (SDL_WaitEvent (&event)) {
         switch (event.type) {
@@ -720,11 +773,12 @@ while (vid_active) {
                 break;
 
             default:
+                sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Ignored Event: Type: %s(%d)\n", eventtypes[event.type], event.type);
                 break;
             }
         }
     }
-SDL_Quit ();
+sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Exiting\n");
 return 0;
 }
 
