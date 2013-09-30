@@ -54,6 +54,7 @@
 */
 
 #include "pdp10_defs.h"
+#include "ctype.h"
 
 /* Time (seconds) of idleness before data flushed to attached file. */
 #ifndef LP20_IDLE_TIME
