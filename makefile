@@ -314,12 +314,24 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     endif
   endif
   ifneq (,$(call find_include,SDL/SDL))
-    ifneq (,$(call find_lib,SDL))
-      OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
-      OS_LDFLAGS += -lSDL
-      $(info using libSDL:  $(call find_lib,SDL) $(call find_include,SDL/SDL))
-      ifeq (Darwin,$(OSTYPE))
-        OS_LDFLAGS += -lSDLmain -lobjc -framework cocoa
+    SDL_VERSION = $(shell grep SDL_MAJOR_VERSION $(call find_include,SDL/SDL_version) | awk '{ print $$3 }')
+    ifeq (2,$(SDL_VERSION))
+      ifneq (,$(call find_lib,SDL2))
+        OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+        OS_LDFLAGS += -lSDL2
+        $(info using libSDL2:  $(call find_lib,SDL2) $(call find_include,SDL/SDL))
+        ifeq (Darwin,$(OSTYPE))
+          OS_LDFLAGS += -lobjc -framework cocoa
+        endif
+      endif
+    else
+      ifneq (,$(call find_lib,SDL))
+        OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+        OS_LDFLAGS += -lSDL
+        $(info using libSDL:  $(call find_lib,SDL) $(call find_include,SDL/SDL))
+        ifeq (Darwin,$(OSTYPE))
+          OS_LDFLAGS += -lobjc -framework cocoa
+        endif
       endif
     endif
   endif
@@ -328,7 +340,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Warning ***)
       $(info *** Warning *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
       $(info *** Warning *** functionality if video support were available on your system.)
-      $(info *** Warning *** Install the development components of libSDL and rebuild)
+      $(info *** Warning *** Install the development components of libSDL2 and rebuild)
       $(info *** Warning *** your simulator to enable this extra functionality.)
       $(info *** Warning ***)
     endif

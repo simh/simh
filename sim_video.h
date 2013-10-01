@@ -172,13 +172,14 @@ t_stat vid_open (DEVICE *dptr, uint32 width, uint32 height);
 t_stat vid_close (void);
 t_stat vid_poll_kb (SIM_KEY_EVENT *ev);
 t_stat vid_poll_mouse (SIM_MOUSE_EVENT *ev);
-void vid_draw (int32 x, int32 y, int32 w, int32 h, uint8 *buf);
+void vid_draw (int32 x, int32 y, int32 w, int32 h, uint32 *buf);
 void vid_refresh (void);
 const char *vid_version (void);
 t_stat vid_set_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 
 extern t_bool vid_active;
+extern uint32 vid_mono_palette[2];
 
 #define SIM_VID_DBG_MOUSE   0x01000000
 #define SIM_VID_DBG_KEY     0x02000000

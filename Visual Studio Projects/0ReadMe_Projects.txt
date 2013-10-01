@@ -18,7 +18,7 @@ For Example, the directory structure should look like:
     .../simh/simhv38-2-rc1/BIN/Nt/Win32-Release/vax.exe
     .../simh/windows-build/pthreads/pthread.h
     .../simh/windows-build/winpcap/WpdPack/Include/pcap.h
-    .../simh/windows-build/libSDL/SDL-1.2.15/include/SDL.h
+    .../simh/windows-build/libSDL/SDL2-2.0.0/include/SDL.h
 
 The contents of the windows-build directory can be downloaded from:
 

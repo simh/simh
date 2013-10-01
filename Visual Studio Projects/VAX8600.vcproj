@@ -70,7 +70,7 @@
 				AdditionalOptions="/fixed:no"
 				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX8600.exe"
-				LinkIncremental="1"
+				LinkIncremental="2"
 				AdditionalLibraryDirectories="&quot;../../windows-build/winpcap/Wpdpack/Lib/&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)\VAX8600.pdb"

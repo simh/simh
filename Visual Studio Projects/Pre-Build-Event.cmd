@@ -63,7 +63,7 @@ if exist ../../windows-build-windows-build move ../../windows-build-windows-buil
 if not exist ../../windows-build/winpcap/Wpdpack/Include/pcap.h goto _notice1
 if not exist ../../windows-build/pthreads/pthread.h goto _notice1
 if "%_X_LIBSDL%" == "" goto _done_build
-if not exist ../../windows-build/libSDL/SDL-1.2.15/include/SDL.h goto _notice2
+if not exist ../../windows-build/libSDL/SDL2-2.0.0/include/SDL.h goto _notice2
 if not exist "../../windows-build/libSDL/Microsoft DirectX SDK (June 2010)/Lib/x86/dxguid.lib" goto _notice2
 goto _done_build
 :_notice1

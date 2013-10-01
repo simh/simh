@@ -70,7 +70,7 @@
 				AdditionalOptions="/fixed:no"
 				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\VAX730.exe"
-				LinkIncremental="1"
+				LinkIncremental="2"
 				AdditionalLibraryDirectories="../../winpcap/Wpdpack/Lib/;&quot;../../pthreads/Pre-built.2/lib/&quot;"
 				GenerateDebugInformation="true"
 				ProgramDatabaseFile="$(OutDir)\VAX730.pdb"
