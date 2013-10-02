@@ -360,7 +360,7 @@ else
 maxvec = i+j;
 fprintf (st, " %*.*sVector%*.*s", i/2, i/2, " ", (i/2)+i%2, (i/2)+i%2, " ");
 
-fprintf (st, " BR %*.*s# Device\n", (maxdev -1), (maxdev-1));
+fprintf (st, " BR %*.*s# Device\n", (maxdev -1), (maxdev-1), " ");
 for (i = 0; i < maxaddr; i++)
     fputc ('-', st);
 fprintf (st, " ");
