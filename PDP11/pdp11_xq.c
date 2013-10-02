@@ -400,7 +400,7 @@ REG xqa_reg[] = {
 };
 
 DIB xqb_dib = { IOBA_AUTO, IOLN_XQ, &xq_rd, &xq_wr,
-        1, IVCL (XQ), 0, { &xq_int } };
+                1, IVCL (XQ), 0, { &xq_int }, IOLN_XQ };
 
 UNIT xqb_unit[] = {
  { UDATA (&xq_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 2047) },  /* receive timer */

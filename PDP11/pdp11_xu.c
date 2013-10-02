@@ -134,7 +134,7 @@ char *xu_description (DEVICE *dptr);
 #define IOLN_XU        010
 
 DIB xua_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
-1, IVCL (XU), VEC_AUTO, {&xu_int}, IOLN_XU };
+                1, IVCL (XU), VEC_AUTO, {&xu_int}, IOLN_XU };
 
 UNIT xua_unit[] = {
  { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) },     /* receive timer */
@@ -231,10 +231,8 @@ DEVICE xu_dev = {
     &xu_description
   };
 
-#define IOLN_XU         010
-
 DIB xub_dib = { IOBA_AUTO, IOLN_XU, &xu_rd, &xu_wr,
-        1, IVCL (XU), 0, { &xu_int }, IOLN_XU };
+                1, IVCL (XU), 0, { &xu_int }, IOLN_XU };
 
 UNIT xub_unit[] = {
  { UDATA (&xu_svc, UNIT_IDLE|UNIT_ATTABLE|UNIT_DISABLE, 0) }      /* receive timer */

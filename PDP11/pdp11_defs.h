@@ -512,7 +512,9 @@ struct pdp_dib {
     int32               vloc;                           /* locator */
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routines */
-    uint32             ulnt;                            /* IO length per-unit */
+    uint32              ulnt;                           /* IO length per-device */
+                                                        /* Only need to be populated */
+                                                        /* when numunits != num devices */
     };
 
 typedef struct pdp_dib DIB;

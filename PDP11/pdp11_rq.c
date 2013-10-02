@@ -1028,7 +1028,7 @@ MSC rqb_ctx = { 1 };
 
 DIB rqb_dib = {
     IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
-    1, IVCL (RQ), 0, { &rq_inta }
+    1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
 UNIT rqb_unit[] = {
@@ -1103,7 +1103,7 @@ MSC rqc_ctx = { 2 };
 
 DIB rqc_dib = {
     IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
-    1, IVCL (RQ), 0, { &rq_inta }
+    1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
 UNIT rqc_unit[] = {
@@ -1178,7 +1178,7 @@ MSC rqd_ctx = { 3 };
 
 DIB rqd_dib = {
     IOBA_AUTO, IOLN_RQ, &rq_rd, &rq_wr,
-    1, IVCL (RQ), 0, { &rq_inta }
+    1, IVCL (RQ), 0, { &rq_inta }, IOLN_RQ
     };
 
 UNIT rqd_unit[] = {

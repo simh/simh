@@ -245,7 +245,7 @@ MTAB mba0_mod[] = {
 
 DIB mba1_dib = {
     IOBA_AUTO, IOLN_TU, &mba_rd, &mba_wr,
-    1, IVCL (TU), VEC_AUTO, { &mba1_inta }
+    1, IVCL (TU), VEC_AUTO, { &mba1_inta }, IOLN_TU
     };
 
 UNIT mba1_unit = { UDATA (NULL, 0, 0) };
@@ -280,7 +280,7 @@ MTAB mba1_mod[] = {
 
 DIB mba2_dib = {
     IOBA_AUTO, IOLN_RS, &mba_rd, &mba_wr,
-    1, IVCL (RS), VEC_AUTO, { &mba2_inta }
+    1, IVCL (RS), VEC_AUTO, { &mba2_inta }, IOLN_RS
     };
 
 UNIT mba2_unit = { UDATA (NULL, 0, 0) };
