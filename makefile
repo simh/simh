@@ -317,6 +317,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
     ifneq (,$(call find_lib,SDL2))
       OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
       OS_LDFLAGS += -lSDL2
+      VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
       $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
       ifeq (Darwin,$(OSTYPE))
         OS_LDFLAGS += -lobjc -framework cocoa
@@ -327,6 +328,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       ifneq (,$(call find_lib,SDL))
         OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
         OS_LDFLAGS += -lSDL
+        VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
         $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
         ifeq (Darwin,$(OSTYPE))
           OS_LDFLAGS += -lobjc -framework cocoa
@@ -532,10 +534,10 @@ else
     endif
   endif
   ifneq (,$(VIDEO_USEFUL))
-    ifeq (libSDL,$(shell if exist ..\windows-build\libSDL\SDL-1.2.15\include\SDL.h echo libSDL))
-      OS_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL-1.2.15\include
-      OS_LDFLAGS += -lSDL -lSDLmain -L..\windows-build\libSDL\SDL-1.2.15\lib
-      VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
+    ifeq (libSDL,$(shell if exist ..\windows-build\libSDL\SDL2-2.0.0\include\SDL.h echo libSDL))
+      OS_CCDEFS += -DHAVE_LIBSDL -I..\windows-build\libSDL\SDL2-2.0.0\include
+      OS_LDFLAGS += -lSDL2 -L..\windows-build\libSDL\SDL2-2.0.0\lib
+      VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
     else
       $(info ***********************************************************************)
       $(info ***********************************************************************)
