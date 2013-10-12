@@ -1,6 +1,6 @@
 /* pdp1_dcs.c: PDP-1D terminal multiplexor simulator
 
-   Copyright (c) 2006-2008, Robert M Supnik
+   Copyright (c) 2006-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    dcs          Type 630 data communications subsystem
 
+   11-Oct-2013  RMS     Poll DCS immediately after attach to pick up connect
    19-Nov-2008  RMS     Revised for common TMXR show routines
 
    This module implements up to 32 individual serial interfaces.
@@ -347,7 +348,7 @@ t_stat r;
 r = tmxr_attach (&dcs_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error */
     return r;
-sim_activate_abs (uptr, tmxr_poll);                     /* start poll */
+sim_activate_abs (uptr, 0);                             /* start poll at once */
 return SCPE_OK;
 }
 

@@ -1320,7 +1320,7 @@ return;
         (a^x)(b^y)      TMP
 
    Note that the low bit of each digit is the same as the low bit of
-   the sum of the digits, ignoring the cary, since the low bit of the
+   the sum of the digits, ignoring the carry, since the low bit of the
    sum is the xor of the bits.
 
    Now compute I+J+66 to get decimal addition with carry forced left

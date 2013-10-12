@@ -933,7 +933,7 @@ if ((uptr = tq_getucb (lu))) {                          /* get unit */
                 tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
                     break;
                 }
-            prv = tpkt;
+            prv = tpkt;                                 /* no match, next */
             }
         }
     if (tpkt) {                                         /* found target? */
