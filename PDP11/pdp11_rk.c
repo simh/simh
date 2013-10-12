@@ -1,6 +1,6 @@
 /* pdp11_rk.c: RK11/RKV11 cartridge disk simulator
 
-   Copyright (c) 1993-2009, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rk           RK11/RKV11/RK05 cartridge disk
 
+   06-Sep-13    RMS     Fixed RKDS content for non-existent disk (Mark Pizzolato)
    20-Mar-09    RMS     Fixed bug in read header (Walter F Mueller)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -296,17 +297,20 @@ UNIT *uptr;
 switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
 
     case 0:                                             /* RKDS: read only */
-        rkds = (rkds & RKDS_ID) | RKDS_RK05 | RKDS_SC_OK |
-            (rand () % RK_NUMSC);                       /* random sector */
+        rkds = rkds & RKDS_ID;                          /* identified unit */
         uptr = rk_dev.units + GET_DRIVE (rkda);         /* selected unit */
-        if (uptr->flags & UNIT_ATT)                     /* attached? */
-            rkds = rkds | RKDS_RDY;
-        if (!sim_is_active (uptr))                      /* idle? */
-            rkds = rkds | RKDS_RWS;
-        if (uptr->flags & UNIT_WPRT)
-            rkds = rkds | RKDS_WLK;
-        if (GET_SECT (rkda) == (rkds & RKDS_SC))
-            rkds = rkds | RKDS_ON_SC;
+        if (!(uptr->flags & UNIT_DIS)) {                /* not disabled? */
+            rkds = rkds | RKDS_RK05 | RKDS_SC_OK |      /* random sector */
+                (rand () % RK_NUMSC);
+            if (uptr->flags & UNIT_ATT)                 /* attached? */
+                rkds = rkds | RKDS_RDY;
+            if (!sim_is_active (uptr))                  /* idle? */
+                rkds = rkds | RKDS_RWS;
+            if (uptr->flags & UNIT_WPRT)                /* write locked? */
+                rkds = rkds | RKDS_WLK;
+            if (GET_SECT (rkda) == (rkds & RKDS_SC))
+                rkds = rkds | RKDS_ON_SC;
+            }
         *data = rkds;
         return SCPE_OK;
 
@@ -413,7 +417,7 @@ if (func == RKCS_CTLRESET) {                            /* control reset? */
 rker = rker & ~RKER_SOFT;                               /* clear soft errors */
 if (rker == 0)                                          /* redo summary */
     rkcs = rkcs & ~RKCS_ERR;
-rkcs = rkcs & ~RKCS_SCP;                                /* clear sch compl*/
+rkcs = rkcs & ~RKCS_SCP;                                /* clear sch compl */
 rk_clr_done ();                                         /* clear done */
 last_drv = GET_DRIVE (rkda);                            /* get drive no */
 uptr = rk_dev.units + last_drv;                         /* select unit */

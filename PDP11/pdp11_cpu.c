@@ -1,6 +1,6 @@
 /* pdp11_cpu.c: PDP-11 CPU simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   10-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
    29-Dec-08    RMS     Fixed failure to clear cpu_bme on RESET (Walter Mueller)
@@ -696,7 +697,8 @@ if (abortval != 0) {
     if ((trapea > 0) && stop_vecabort)
         reason = STOP_VECABORT;
     if ((trapea < 0) &&                                 /* stack push abort? */
-        (CPUT (STOP_STKA) || stop_spabort)) reason = STOP_SPABORT;
+        (CPUT (STOP_STKA) || stop_spabort))
+        reason = STOP_SPABORT;
     if (trapea == ~MD_KER) {                            /* kernel stk abort? */
         setTRAP (TRAP_RED);
         setCPUERR (CPUE_RED);
@@ -722,7 +724,7 @@ while (reason == 0)  {
         cpu_astop = 0;
         reason = SCPE_STOP;
         break;
-		}
+        }
 
     if (sim_interval <= 0) {                            /* intv cnt expired? */
         reason = sim_process_event ();                  /* process events */
@@ -815,7 +817,7 @@ while (reason == 0)  {
     if (sim_brk_summ && sim_brk_test (PC, SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         continue;
-		}
+        }
 
     if (update_MM) {                                    /* if mm not frozen */
         MMR1 = 0;
@@ -913,7 +915,8 @@ while (reason == 0)  {
                 trap_req = calc_ints (ipl, trap_req);
                 JMP_PC (src);
                 if (CPUT (HAS_RTT) && tbit &&           /* RTT impl? */
-                    (IR == 000002)) setTRAP (TRAP_TRC); /* RTI immed trap */
+                    (IR == 000002))
+                    setTRAP (TRAP_TRC);                 /* RTI immed trap */
                 break;
             case 7:                                     /* MFPT */
                 if (CPUT (HAS_MFPT))                    /* implemented? */
@@ -1358,7 +1361,8 @@ while (reason == 0)  {
             }
         else {
             dst = srcreg? R[srcspec]: ReadW (GeteaW (srcspec));
-            if (!dstreg) ea = GeteaW (dstspec);
+            if (!dstreg)
+                ea = GeteaW (dstspec);
             }
         N = GET_SIGN_W (dst);
         Z = GET_Z (dst);
@@ -1894,6 +1898,7 @@ while (reason == 0)  {
                 R[dstspec] = (R[dstspec] & 0177400) | dst;
             else PWriteB (dst, last_pa);
             break;
+
 /* Notes:
    - MTPS cannot alter the T bit
    - MxPD must mask GeteaW returned address, dspace is from cm not pm
@@ -1987,7 +1992,8 @@ while (reason == 0)  {
             }
         else {
             dst = srcreg? R[srcspec] & 0377: ReadB (GeteaB (srcspec));
-            if (!dstreg) ea = GeteaB (dstspec);
+            if (!dstreg)
+                ea = GeteaB (dstspec);
             }
         N = GET_SIGN_B (dst);
         Z = GET_Z (dst);
@@ -2167,20 +2173,20 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
 
     case 2:                                             /* (R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 (020 | reg);
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 (020 | reg);
         adr = ReadW (adr | ds);
         return (adr | dsenable);
 
     case 4:                                             /* -(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 (0360 | reg);
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
@@ -2188,7 +2194,7 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
 
     case 5:                                             /* @-(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 (0360 | reg);
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
@@ -2225,13 +2231,13 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
     case 2:                                                     /* (R)+ */
         delta = 1 + (reg >= 6);                         /* 2 if R6, PC */
         R[reg] = ((adr = R[reg]) + delta) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 ((delta << 3) | reg);
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 (020 | reg);
         adr = ReadW (adr | ds);
         return (adr | dsenable);
@@ -2239,7 +2245,7 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
     case 4:                                             /* -(R) */
         delta = 1 + (reg >= 6);                         /* 2 if R6, PC */
         adr = R[reg] = (R[reg] - delta) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 ((((-delta) & 037) << 3) | reg);
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
@@ -2247,7 +2253,7 @@ switch (spec >> 3) {                                    /* decode spec<5:3> */
 
     case 5:                                             /* @-(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = calc_MMR1 (0360 | reg);
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);

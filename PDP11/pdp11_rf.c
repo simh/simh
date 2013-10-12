@@ -1,6 +1,6 @@
 /* pdp11_rf.c: RF11 fixed head disk simulator
 
-   Copyright (c) 2006-2012, Robert M Supnik
+   Copyright (c) 2006-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rf           RF11 fixed head disk
 
+   03-Sep-13    RMS     Added WC to debug printout
    19-Mar-12    RMS     Fixed bug in updating mem addr extension (Peter Schorn)
    25-Dec-06    RMS     Fixed bug in unit mask (John Dundas)
    26-Jun-06    RMS     Cloned from RF08 simulator
@@ -266,8 +267,8 @@ switch ((PA >> 1) & 07) {                               /* decode PA<3:1> */
             rf_cs &= ~(RFCS_WCHK|RFCS_DPAR|RFCS_NED|RFCS_WLK|RFCS_MXFR|RFCS_DONE);
             CLR_INT (RF);
             if (DEBUG_PRS (rf_dev))
-                fprintf (sim_deb, ">>RF start: cs = %o, da = %o, ma = %o\n",
-                    update_rfcs (0, 0), GET_DEX (rf_dae) | rf_da, GET_MEX (rf_cs) | rf_cma);
+                fprintf (sim_deb, ">>RF start: cs = %o, da = %o, ma = %o, wc = %o\n",
+                    update_rfcs (0, 0), GET_DEX (rf_dae) | rf_da, GET_MEX (rf_cs) | rf_cma, rf_wc);
             }
         break;
 
@@ -321,7 +322,7 @@ t_stat rf_svc (UNIT *uptr)
 {
 uint32 ma, da, t;
 uint16 dat;
-uint16 *fbuf = uptr->filebuf;
+uint16 *fbuf = (uint16 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     update_rfcs (RFCS_NED|RFCS_DONE, 0);                /* nx disk */

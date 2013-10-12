@@ -1,6 +1,6 @@
 /* pdp11_fp.c: PDP-11 floating point simulator (32b version)
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    04-Oct-04    RMS     Added FIS instructions
    19-Jan-03    RMS     Changed mode definitions for Apple Dev Kit conflict
@@ -106,7 +107,7 @@
 #define FPS_C           (1u << FPS_V_C)
 #define FPS_CC          (FPS_N + FPS_Z + FPS_V + FPS_C)
 #define FPS_RW          (FPS_ER + FPS_ID + FPS_IUV + FPS_IU + FPS_IV + \
-                    FPS_IC + FPS_D + FPS_L + FPS_T + FPS_CC)
+                         FPS_IC + FPS_D + FPS_L + FPS_T + FPS_CC)
 
 /* Floating point exception codes */
 
@@ -584,20 +585,20 @@ switch (spec >> 3) {                                    /* case on spec */
         if (reg == 7)
             len = 2;
         R[reg] = ((adr = R[reg]) + len) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = (len << 3) | reg;
         return (adr | ds);
 
     case 3:                                             /* @(R)+ */
         R[reg] = ((adr = R[reg]) + 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = 020 | reg;
         adr = ReadW (adr | ds);
         return (adr | dsenable);
 
     case 4:                                             /* -(R) */
         adr = R[reg] = (R[reg] - len) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = (((-len) & 037) << 3) | reg;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
@@ -605,7 +606,7 @@ switch (spec >> 3) {                                    /* case on spec */
 
     case 5:                                             /* @-(R) */
         adr = R[reg] = (R[reg] - 2) & 0177777;
-        if (update_MM)
+        if (update_MM && (reg != 7))
             MMR1 = 0360 | reg;
         if ((reg == 6) && (cm == MD_KER) && (adr < (STKLIM + STKL_Y)))
             set_stack_trap (adr);
@@ -675,8 +676,10 @@ else {
         (ReadW (exta | ((VA + 6) & 0177777)) << FP_V_F3);
     else fptr->l = 0;
     }
-if ((GET_SIGN (fptr->h) != 0) && (GET_EXP (fptr->h) == 0) &&
-    (fpnotrap (FEC_UNDFV) == 0)) ABORT (TRAP_INT);
+if ((GET_SIGN (fptr->h) != 0) &&
+    (GET_EXP (fptr->h) == 0) &&
+    (fpnotrap (FEC_UNDFV) == 0))
+    ABORT (TRAP_INT);
 return;
 }
 
@@ -744,7 +747,7 @@ if (IR & 000740) {                                      /* defined? */
     if (CPUT (CPUT_03))                                 /* 11/03 reads word */
         ReadW (exta | R[reg]);
     ABORT (TRAP_ILL);
-	}
+    }
 FEC = 0;                                                /* no errors */
 FPS = FPS_IU|FPS_IV;                                    /* trap ovf,unf */
 
@@ -1227,7 +1230,8 @@ int32 fpnotrap (int32 code)
 {
 static const int32 test_code[] = { 0, 0, 0, FPS_IC, FPS_IV, FPS_IU, FPS_IUV };
 
-if ((code >= FEC_ICVT) && (code <= FEC_UNDFV) &&
+if ((code >= FEC_ICVT) &&
+    (code <= FEC_UNDFV) &&
     ((FPS & test_code[code >> 1]) == 0))
     return TRUE;
 FPS = FPS | FPS_ER;

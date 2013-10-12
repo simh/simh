@@ -1,6 +1,6 @@
 /* nova_cpu.c: NOVA CPU simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    cpu          Nova central processor
 
+   17-Mar-13    RMS     Added clarifying brances to IND_STEP macro (Dave Bryan)
    04-Jul-07    BKR     DEV_SET/CLR macros now used,
                         support for non-existant devices added
                         CPU bootstrap code warning: high-speed devices may not boot properly,
@@ -243,11 +244,14 @@
 #define STK_CHECK(x,y)  if (((x) & 0377) < (y)) \
                             int_req = int_req | INT_STK
 #define IND_STEP(x)     M[x] & A_IND;  /* return next level indicator */ \
-                        if ( ((x) <= AUTO_TOP) && ((x) >= AUTO_INC) )    \
-                            if ( (x) < AUTO_DEC )    \
+                        if (((x) <= AUTO_TOP) && ((x) >= AUTO_INC)) {    \
+                            if ( (x) < AUTO_DEC ) {    \
                                 M[x] = (M[x] + 1) & DMASK;    \
-                            else    \
+                                }   \
+                            else {    \
                                 M[x] = (M[x] - 1) & DMASK;    \
+                                }   \
+                            }   \
                         x = M[x] & AMASK
 
 #define INCREMENT_PC    PC = (PC + 1) & AMASK           /* increment PC */

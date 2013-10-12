@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   08-May-12    RMS     Fixed memory leaks in save/restore (Peter Schorn)
    20-Mar-12    MP      Fixes to "SHOW <x> SHOW" commands
    06-Jan-12    JDB     Fixed "SHOW DEVICE" with only one enabled unit (Dave Bryan)  
    13-Jan-11    MP      Added "SHOW SHOW" and "SHOW <dev> SHOW" commands
@@ -2344,8 +2345,10 @@ for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {     /* loop thru devices */
                 for (l = 0; (l < SRBSIZ) && (k < high); l++,
                      k = k + (dptr->aincr)) {           /* check for 0 block */
                     r = dptr->examine (&val, k, uptr, SIM_SW_REST);
-                    if (r != SCPE_OK)
+                    if (r != SCPE_OK) {
+                        free (mbuf);
                         return r;
+                        }
                     if (val) zeroflg = FALSE;
                     SZ_STORE (sz, val, mbuf, l);
                     }                                   /* end for l */
@@ -2549,19 +2552,26 @@ for ( ;; ) {                                            /* device loop */
             if ((mbuf = calloc (SRBSIZ, sz)) == NULL)
                 return SCPE_MEM;
             for (k = 0; k < high; ) {                   /* loop thru mem */
-                READ_I (blkcnt);                        /* block count */
+                if (sim_fread (&blkcnt, sizeof (blkcnt), 1, rfile) == 0) {
+                    free (mbuf);                        /* read blk cnt */
+                    return SCPE_IOERR;
+                    }
                 if (blkcnt < 0)                         /* compressed? */
                     limit = -blkcnt;
                 else limit = sim_fread (mbuf, sz, blkcnt, rfile);
-                if (limit <= 0)                         /* invalid or err? */
+                if (limit <= 0) {                       /* invalid or err? */
+                    free (mbuf);
                     return SCPE_IOERR;
+                    }
                 for (j = 0; j < limit; j++, k = k + (dptr->aincr)) {
                     if (blkcnt < 0)                     /* compressed? */
                         val = 0;
                     else SZ_LOAD (sz, val, mbuf, j);    /* saved value */
                     r = dptr->deposit (val, k, uptr, SIM_SW_REST);
-                    if (r != SCPE_OK)
+                    if (r != SCPE_OK) {
+                        free (mbuf);
                         return r;
+                        }
                     }                                   /* end for j */
                 }                                       /* end for k */
             free (mbuf);                                /* dealloc buffer */

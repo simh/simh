@@ -1,6 +1,6 @@
 /* pdp11_tq.c: TMSCP tape controller simulator
 
-   Copyright (c) 2002-2011, Robert M Supnik
+   Copyright (c) 2002-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
    17-Aug-11    RMS     Added CAPACITY modifier
    14-Jan-11    MP      Various fixes discovered while exploring Ultrix issue:
                         - Set UNIT_SXC flag when a tape mark is encountered 
@@ -877,6 +878,7 @@ if (uptr = tq_getucb (lu)) {                            /* get unit */
                 tq_pkt[prv].link = tq_pkt[tpkt].link;   /* unlink */
                     break;
                 }
+            prv = tpkt;                                 /* no match, next */
             }
         }
     if (tpkt) {                                         /* found target? */

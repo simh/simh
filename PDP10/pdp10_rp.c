@@ -1,6 +1,6 @@
 /* pdp10_rp.c - RH11/RP04/05/06/07 RM02/03/05/80 "Massbus" disk controller
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    rp           RH/RP/RM moving head disks
 
+   17-Mar-13    RMS     Fixed incorrect copy/paste from pdp11_rp.c
+   08-Dec-12    RMS     UNLOAD does not set ATTN (Mark Pizzolato)
    12-Nov-05    RMS     Fixed DCLR not to clear drive address
    07-Jul-05    RMS     Removed extraneous externs
    18-Mar-05    RMS     Added attached test to detach routine
@@ -32,7 +34,7 @@
    04-Jan-04    RMS     Changed sim_fsize calling sequence
    23-Jul-03    RMS     Fixed bug in read header stub
    25-Apr-03    RMS     Revised for extended file support
-   21-Nov-02    RMS     Fixed bug in bootstrap (reported by Michael Thompson)
+   21-Nov-02    RMS     Fixed bug in bootstrap (Michael Thompson)
    29-Sep-02    RMS     Added variable vector support
                         New data structures
    30-Nov-01    RMS     Added read only unit, extended SET/SHOW support support
@@ -45,7 +47,7 @@
    28-Sep-01    RMS     Fixed interrupt handling for SC/ATA
    23-Aug-01    RMS     Added read/write header stubs for ITS
                         (found by Mirian Crzig Lennox) 
-   13-Jul-01    RMS     Changed fread call to fxread (found by Peter Schorn)
+   13-Jul-01    RMS     Changed fread call to fxread (Peter Schorn)
    14-May-01    RMS     Added check for unattached drive
 
    The "Massbus style" disks consisted of several different large
@@ -807,6 +809,13 @@ switch (fnc) {                                          /* case on function */
         return;
 
     case FNC_UNLOAD:                                    /* unload */
+        if (drv_tab[dtype].ctrl == MBA_RM_CTRL) {       /* RM? */
+            set_rper (ER1_ILF, drv);                    /* not supported */
+            break;
+            }
+        rp_detach (uptr);                               /* detach unit */
+        return;
+
     case FNC_RECAL:                                     /* recalibrate */
         dc = 0;                                         /* seek to 0 */
     case FNC_SEEK:                                      /* seek */
@@ -1155,6 +1164,7 @@ return SCPE_OK;
 t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
+extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
@@ -1167,7 +1177,8 @@ if (sim_is_active (uptr)) {                             /* unit active? */
     if (uptr->FUNC >= FNC_WCHK)                         /* data transfer? */
         rpcs1 = rpcs1 | CS1_DONE | CS1_TRE;             /* set done, err */
     }
-update_rpcs (CS1_SC, drv);                              /* request intr */
+if (!sim_is_running)                                    /* from console? */
+    update_rpcs (CS1_SC, drv);                          /* request intr */
 return detach_unit (uptr);
 }
 

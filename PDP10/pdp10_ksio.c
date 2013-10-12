@@ -1,6 +1,6 @@
 /* pdp10_ksio.c: PDP-10 KS10 I/O subsystem simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    uba          Unibus adapters
 
+   27-May-13    RMS     Fixed bugs in Unibus adapter code
    22-Sep-05    RMS     Fixed declarations (from Sterling Garwood)
    25-Jan-04    RMS     Added stub floating address routine
    12-Mar-03    RMS     Added logical name support
@@ -429,7 +430,14 @@ for (i = 0; dibp = dib_tab[i]; i++ ) {
 UBNXM_FAIL (pa, mode);
 }
 
-/* Mapped read and write routines - used by standard Unibus devices on Unibus 1 */
+/* Mapped read and write routines - used by standard Unibus devices on Unibus 1
+   The only devices that use these routines are standard 16b Unibus devices.
+   18b Unibus devices (the RP and TU) do their own reads and writes.
+
+   These routines would be more efficient if Map_Addr10 was only called
+   at a page boundary, but I don't think it's worth the added complexity.
+
+   The upper two bits of the 18b halfword are not preserved on writes to memory. */
 
 a10 Map_Addr10 (a10 ba, int32 ub)
 {
@@ -493,7 +501,7 @@ for ( ; ba < lim; ba++) {                               /* by bytes */
         }
     mask = 0377;
     M[pa10] = (M[pa10] & ~(mask << ubashf[ba & 3])) |
-        (((d10) *buf++) << ubashf[ba & 3]);
+        (((d10) (*buf++ & 0377)) << ubashf[ba & 3]);
     }
 return 0;
 }
@@ -506,16 +514,16 @@ d10 val;
 
 ba = ba & ~01;                                          /* align start */
 lim = ba + (bc & ~01);
-for ( ; ba < lim; ba++) {                               /* by bytes */
+for ( ; ba < lim; ba = ba + 2) {                        /* by words */
     pa10 = Map_Addr10 (ba, 1);                          /* map addr */
     if ((pa10 < 0) || MEM_ADDR_NXM (pa10)) {            /* inv map or NXM? */
         ubcs[1] = ubcs[1] | UBCS_TMO;                   /* UBA times out */
         return (lim - ba);                              /* return bc */
         }
-    val = *buf++;                                       /* get data */
+    val = (*buf++) & 0177777;                           /* get 16b data */
     if (ba & 2)
-        M[pa10] = (M[pa10] & 0777777600000) | val;
-    else M[pa10] = (M[pa10] & 0600000777777) | (val << 18);
+        M[pa10] = (M[pa10] & 0777777000000) | val;
+    else M[pa10] = (M[pa10] & 0000000777777) | (val << 18);
     }
 return 0;
 }

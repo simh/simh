@@ -859,11 +859,11 @@ if (mot & DTS_DIR)                                      /* update pos */
 else uptr->pos = uptr->pos + delta;
 if (((int32) uptr->pos < 0) ||
     ((int32) uptr->pos > (DTU_FWDEZ (uptr) + DT_EZLIN))) {
-	detach_unit (uptr);									/* off reel? */
+	detach_unit (uptr);                             /* off reel? */
 	uptr->STATE = uptr->pos = 0;
 	unum = (int32) (uptr - dt_dev.units);
-	if (unum == DTA_GETUNIT (dtsa))						/* if selected, */
-		dt_seterr (uptr, DTB_SEL);						/* error */
+	if (unum == DTA_GETUNIT (dtsa))                 /* if selected, */
+		dt_seterr (uptr, DTB_SEL);              /* error */
 	return TRUE;
 	}
 return FALSE;

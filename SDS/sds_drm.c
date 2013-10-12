@@ -1,6 +1,6 @@
 /* sds_drm.c: SDS 940 Project Genie drum simulator
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    drm          drum
+
+   03-Sep-13    RMS     Added explicit void * cast
 
    The drum is buffered in memory.
 
@@ -191,7 +193,7 @@ t_stat drm_svc (UNIT *uptr)
 {
 int32 t, rda;
 uint32 dpc, dwd;
-uint32 *fbuf = uptr->filebuf;
+uint32 *fbuf = (uint32 *) uptr->filebuf;
 
 if (drm_sta != DRM_SXFR) {                              /* fetch drum prog? */
     dpc = M[DRM_PC];                                    /* get drum PC */

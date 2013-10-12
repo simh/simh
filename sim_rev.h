@@ -36,6 +36,103 @@
 
 patch   date            module(s) and fix(es)
 
+  1     tbd             h316_stddev.c:
+                        - fixed TTY output behavior (Bob Armstrong)
+
+                        h316_sys.c:
+                        - added symbolic names for IO devices
+                        - fixed handling of SMK and OTK
+  
+                        i1401_lp.c:
+                        - fixed printer chain selection
+
+                        id_pas.c:
+                        - poll PAS immediately after attach to pick up connect
+
+                        nova_cpu.c:
+                        - added clarifying braces (Dave Bryan)
+
+                        pdp1_dcs.c:
+                        - poll DCS immediately after attach to pick up connect
+
+                        pdp10_rp.c:
+                        - fixed incorrect copy/paste from pdp11_rp.c
+
+                        pdp10_tu.c:
+                        - fixed bug in read/write check reverse (Dave Bryan)
+
+                        pdp11_defs.h:
+                        - fixed base address for RQB, RQC, RQD
+                        - added address and IPL data for RS03/RS04
+
+                        pdp11_cpu.c:
+                        - MMR1 does not track PC changes (Johnny Billquist)
+
+                        pdp11_cpumod.c:
+                        - fixed model change to set memory size as last step
+
+                        pdp11_dc.c, pdp11_dl.c"
+                        - poll input immediately after attach to pick up connect
+
+                        pdp11_fp.c:
+                        - MMR1 does not track PC changes (Johnny Billquist)
+
+                        pdp11_hk.c:
+                        - rewrote error handling
+                        - rewrote interrupt handling
+
+                        pdp11_rh.c:
+                        - added third Massbus adapter, debug printouts
+
+                        pdp11_rk.c:
+                        - fixed behavior of RKDS with non-existant drives (Mark Pizzolato)
+
+                        pdp11_rp.c:
+                        - UNLOAD shouldn't set ATTN (Mark Pizzolato)
+
+                        pdp11_rs.c:
+                        - first release
+
+                        pdp11_rq.c:
+                        - fixed bug in ABORT link walk loop (Dave Bryan)
+
+                        pdp11_sys.c:
+                        - added third Massbus adapter, RS03/RS04
+
+                        pdp11_ta.c:
+                        - fixed bug to set RDY on reset (Ian Hammond)
+                        - added CAPS-11 bootstrap (Ian Hammond)
+
+                        pdp11_tq.c:
+                        - fixed bug in ABORT link walk loop (Dave Bryan)
+
+                        pdp15_tt1.c:
+                        - poll TTIX immediately after attach to pick up connect
+
+                        pdp8_cpu.c:
+                        - fixed "boot in wrong field" bug (Dave Gesswein)
+
+                        pdp8_ct.c, pdp8_df.c, pdp8_dt.c, pdp8_rf.c, pdp8_rk.c,
+                        pdp8_rl.c, pdp8_rx.c, pdp8_td.c:
+                        - changed to use central cpu_setboot routine
+
+                        pdp8_rk.c:
+                        - raised RK_MIN so that RKLFMT will work (Mark Pizzolato)
+                        - changed to use central cpu_setboot routine
+
+                        pdp8_sys.c:
+                        - fixed recognition of initial field change (Dave Gesswein)
+
+                        pdp8_ttx.c:
+                        - poll TTIX immediately after attach to pick up connect (Mark Pizzolato)
+
+                        vax780_defs.h, vaxmod_defs.h:
+                        - fixed base address for RQB, RQC, RQD
+
+                        vax780_mba.c:
+                        - block interrupt if data transfer in progress (Mark Pizzolato)
+
+
   0     01-May-2012     scp.c:
                         - added *nix READLINE support (Mark Pizzolato)
                         - fixed handling of DO with no arguments (Dave Bryan)
@@ -208,7 +305,7 @@ patch   date            module(s) and fix(es)
 
                         pdp11_io.c:
                         - fixed Qbus interrupts to treat all IO devices (except clock) as BR4
-			- fixed order of int_internal (Jordi Guillaumes i Pons)
+			            - fixed order of int_internal (Jordi Guillaumes i Pons)
 
                         ppd11_rf.c
                         - fixed bug in updating mem addr extension (Peter Schorn)

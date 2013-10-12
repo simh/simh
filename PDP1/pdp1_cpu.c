@@ -25,7 +25,7 @@
 
    cpu          PDP-1 central processor
 
-   210Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
+   21-Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
    30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
    28-Jun-06    RMS     Fixed bugs in MUS and DIV

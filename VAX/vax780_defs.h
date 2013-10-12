@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    05-Nov-11    RMS     Added VEC_QMODE definition
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    29-Apr-07    RMS     Modified model-specific reserved operand check macros
@@ -277,9 +278,9 @@ typedef struct {
 #define IOLN_XUB        010
 #define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
 #define IOLN_RQB        004
-#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
+#define IOBA_RQC        (IOBA_RQB + IOLN_RQB)
 #define IOLN_RQC        004
-#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
+#define IOBA_RQD        (IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* UDA50 */
 #define IOLN_RQ         004

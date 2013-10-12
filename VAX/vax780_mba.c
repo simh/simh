@@ -1,6 +1,6 @@
 /* vax780_mba.c: VAX 11/780 Massbus adapter
 
-   Copyright (c) 2004-2008, Robert M Supnik
+   Copyright (c) 2004-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    mba0, mba1           RH780 Massbus adapter
 
+   08-Dec-12    RMS     Block interrupt if data transfer in progress (Mark Pizzolato)
    28-May-08    RMS     Inlined physical memory routines
 */
 
@@ -695,7 +696,7 @@ if (set & MBASR_ABORTS)
 if (set & (MBASR_DTCMP|MBASR_DTABT))
     mba_sr[mb] &= ~MBASR_DTBUSY;
 mba_sr[mb] = (mba_sr[mb] | set) & ~clr;
-if ((set & MBASR_INTR) && (mba_cr[mb] & MBACR_IE))
+if ((set & MBASR_INTR) && (mba_cr[mb] & MBACR_IE) && !(mba_sr[mb] & MBASR_DTBUSY))
     mba_set_int (mb);
 if ((set & MBASR_ERRORS) && (DEBUG_PRI (mba_dev[mb], MBA_DEB_ERR)))
     fprintf (sim_deb, ">>MBA%d: CS error = %X\n", mb, mba_sr[mb]);

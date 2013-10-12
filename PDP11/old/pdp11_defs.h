@@ -1,6 +1,6 @@
 /* pdp11_defs.h: PDP-11 simulator definitions
 
-   Copyright (c) 1993-2013, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,6 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
-   02-Sep-13    RMS     Added third Massbus adapter and RS drive
    12-Dec-12    RMS     Fixed base address for RQB, RQC, RQD
    11-Dec-11    RMS     Fixed priority of PIRQ vs IO; added INT_INTERNALn
    22-May-10    RMS     Added check for 64b definitions
@@ -534,8 +533,6 @@ typedef struct pdp_dib DIB;
 #define IOLN_VH         020
 #define IOBA_UBM        (IOPAGEBASE + 010200)           /* Unibus map */
 #define IOLN_UBM        (UBM_LNT_LW * sizeof (int32))
-#define IOBA_RS         (IOPAGEBASE + 012040)           /* RHC: RS03/RS04 */
-#define IOLN_RS         040
 #define	IOBA_KG         (IOPAGEBASE + 010700)           /* KG11-A */
 #define	IOLN_KG         006
 #define IOBA_RQ         (IOPAGEBASE + 012150)           /* RQDX3 */
@@ -550,7 +547,7 @@ typedef struct pdp_dib DIB;
 #define IOLN_KIPAR      020
 #define IOBA_KDPAR      (IOPAGEBASE + 012360)
 #define IOLN_KDPAR      020
-#define IOBA_TU         (IOPAGEBASE + 012440)           /* RHB: TU */
+#define IOBA_TU         (IOPAGEBASE + 012440)           /* TU */
 #define IOLN_TU         040
 #define IOBA_MMR3       (IOPAGEBASE + 012516)           /* MMR3 */
 #define IOLN_MMR3       002
@@ -574,7 +571,7 @@ typedef struct pdp_dib DIB;
 #define IOLN_XU         010
 #define IOBA_DL         (IOPAGEBASE + 016500)           /* extra KL11/DL11 */
 #define IOLN_DL         (DLX_LINES * 010)
-#define IOBA_RP         (IOPAGEBASE + 016700)           /* RHA: RP/RM */
+#define IOBA_RP         (IOPAGEBASE + 016700)           /* RP/RM */
 #define IOLN_RP         054
 #define IOBA_CR         (IOPAGEBASE + 017160)           /* CD/CR/CM */
 #define IOLN_CR         010
@@ -666,7 +663,6 @@ typedef struct pdp_dib DIB;
 #define INT_V_TU        15
 #define INT_V_RF        16
 #define INT_V_RC        17
-#define INT_V_RS        18
 
 #define INT_V_PIR4      0                               /* BR4 */
 #define INT_V_TTI       1
@@ -710,7 +706,6 @@ typedef struct pdp_dib DIB;
 #define INT_TU          (1u << INT_V_TU)
 #define INT_RF          (1u << INT_V_RF)
 #define INT_RC          (1u << INT_V_RC)
-#define INT_RS          (1u << INT_V_RS)
 #define INT_PIR4        (1u << INT_V_PIR4)
 #define INT_TTI         (1u << INT_V_TTI)
 #define INT_TTO         (1u << INT_V_TTO)
@@ -757,7 +752,6 @@ typedef struct pdp_dib DIB;
 #define IPL_TU          5
 #define IPL_RF          5
 #define IPL_RC          5
-#define IPL_RS          5
 #define IPL_PTR         4
 #define IPL_PTP         4
 #define IPL_TTI         4
@@ -795,7 +789,6 @@ typedef struct pdp_dib DIB;
 #define VEC_RL          0160
 #define VEC_LPT         0200
 #define VEC_RF          0204
-#define VEC_RS          0204
 #define VEC_HK          0210
 #define VEC_RC          0210
 #define VEC_RK          0220
@@ -827,10 +820,9 @@ typedef struct pdp_dib DIB;
 
 /* Massbus definitions */
 
-#define MBA_NUM         3                               /* number of MBA's */
+#define MBA_NUM         2                               /* number of MBA's */
 #define MBA_RP          0                               /* MBA for RP */
 #define MBA_TU          1                               /* MBA for TU */
-#define MBA_RS          2                               /* MBA for RS */
 #define MBA_RMASK       037                             /* max 32 reg */
 #define MBE_NXD         1                               /* nx drive */
 #define MBE_NXR         2                               /* nx reg */

@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   08-Dec-12    RMS     UNLOAD shouldn't set ATTN (Mark Pizzolato)
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
    12-Nov-05	RMS     Fixed DriveClear, does not clear disk address
@@ -709,6 +710,13 @@ switch (fnc) {                                          /* case on function */
         return SCPE_OK;
 
     case FNC_UNLOAD:                                    /* unload */
+        if (drv_tab[dtype].ctrl == RM_CTRL) {           /* RM? */
+            rp_set_er (ER1_ILF, drv);                   /* not supported */
+            break;
+            }
+        rp_detach (uptr);                               /* detach unit */
+        return SCPE_OK;
+
     case FNC_RECAL:                                     /* recalibrate */
         dc = 0;                                         /* seek to 0 */
     case FNC_SEEK:                                      /* seek */
@@ -1011,12 +1019,14 @@ return SCPE_OK;
 t_stat rp_detach (UNIT *uptr)
 {
 int32 drv;
+extern int32 sim_is_running;
 
 if (!(uptr->flags & UNIT_ATT))                          /* attached? */
     return SCPE_OK;
 drv = (int32) (uptr - rp_dev.units);                    /* get drv number */
 rpds[drv] = rpds[drv] & ~(DS_MOL | DS_RDY | DS_WRL | DS_VV | DS_OFM);
-rp_update_ds (DS_ATA, drv);                             /* request intr */
+if (!sim_is_running)                                    /* from console? */
+    rp_update_ds (DS_ATA, drv);                         /* request intr */
 return detach_unit (uptr);
 }
 

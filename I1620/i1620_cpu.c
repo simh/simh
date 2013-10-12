@@ -26,7 +26,7 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
-   28-May-06    RMS     Fixed bug in cpu history Peter Schorn)
+   28-May-06    RMS     Fixed bug in cpu history (Peter Schorn)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
@@ -523,7 +523,7 @@ while (reason == 0) {                                   /* loop until halted */
             break;
             }
         }
-    else if (flags & IF_IMM)                             /* immediate? */
+    else if (flags & IF_IMM)                            /* immediate? */
         QAR = qla;
 
     if (hst_lnt) {                                      /* history enabled? */
@@ -1376,7 +1376,8 @@ uint32 add_one_digit (uint32 dst, uint32 src, uint32 *cry)
 {
 uint32 res;
 
-if (*cry) src = src + 1;                                /* cry in? incr src */
+if (*cry)                                               /* cry in? incr src */
+    src = src + 1;
 if (src >= 10) {                                        /* src > 10? */
     src = src - 10;                                     /* src -= 10 */
     *cry = 1;                                           /* carry out */

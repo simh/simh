@@ -1,6 +1,6 @@
 /* i1401_lp.c: IBM 1403 line printer simulator
 
-   Copyright (c) 1993-2008, Robert M. Supnik
+   Copyright (c) 1993-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    lpt          1403 line printer
 
+   16-Apr-13    RMS     Fixed printer chain selection
    19-Jan-07    RMS     Added UNIT_TEXT flag
    07-Mar-05    RMS     Fixed bug in write_line (Van Snyder)
    25-Apr-03    RMS     Revised for extended file support
@@ -49,17 +50,17 @@ t_stat lpt_attach (UNIT *uptr, char *cptr);
 t_stat space (int32 lines, int32 lflag);
 
 char *pch_table_old[4] = {
-    bcd_to_ascii_old, bcd_to_pca, bcd_to_pch, bcd_to_ascii_old
+    bcd_to_ascii_old, bcd_to_ascii_old, bcd_to_pca, bcd_to_pch 
     };
 char *pch_table[4] = {
-    bcd_to_ascii_a, bcd_to_pca, bcd_to_pch, bcd_to_ascii_h
+    bcd_to_ascii_a, bcd_to_ascii_h, bcd_to_pca, bcd_to_pch
     };
 
 #define UNIT_V_FT       (UNIT_V_UF + 0)
 #define UNIT_V_48       (UNIT_V_UF + 1)
 #define UNIT_FT         (1 << UNIT_V_FT)
 #define UNIT_48         (1 << UNIT_V_48)
-#define GET_PCHAIN(x)   (((x) >> UNIT_V_FT) & (UNIT_FT|UNIT_48))
+#define GET_PCHAIN(x)   (((x) >> UNIT_V_FT) & 03)
 #define CHP(ch,val)     ((val) & (1 << (ch)))
 
 /* LPT data structures
@@ -119,9 +120,10 @@ if ((lpt_unit.flags & UNIT_ATT) == 0)                   /* attached? */
 wm = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_SQUARE);
 sup = ((ilnt == 2) || (ilnt == 5)) && (mod == BCD_S);
 ind[IN_LPT] = 0;                                        /* clear error */
+t = GET_PCHAIN (lpt_unit.flags);
 if (conv_old)                                           /* get print chain */
-    bcd2asc = pch_table_old[GET_PCHAIN (lpt_unit.flags)];
-else bcd2asc = pch_table[GET_PCHAIN (lpt_unit.flags)];
+    bcd2asc = pch_table_old[t];
+else bcd2asc = pch_table[t];
 for (i = 0; i < LPT_WIDTH; i++) {                       /* convert print buf */
     t = M[LPT_BUF + i];
     if (wm)                                             /* wmarks -> 1 or sp */

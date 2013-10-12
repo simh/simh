@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2012, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    11-Dec-11    RMS     Moved all Qbus devices to BR4; deleted RP definitions
    25-Nov-11    RMS     Added VEC_QBUS definition
    29-Apr-07    RMS     Separated checks for PxBR and SBR
@@ -280,9 +281,9 @@ typedef struct {
 #define IOLN_DZ         010
 #define IOBA_RQB        (IOPAGEBASE + 000334 +  (020 * (DZ_MUXES / 2)))
 #define IOLN_RQB        004
-#define IOBA_RQC        (IOPAGEBASE + IOBA_RQB + IOLN_RQB)
+#define IOBA_RQC        (IOBA_RQB + IOLN_RQB)
 #define IOLN_RQC        004
-#define IOBA_RQD        (IOPAGEBASE + IOBA_RQC + IOLN_RQC)
+#define IOBA_RQD        (IOBA_RQC + IOLN_RQC)
 #define IOLN_RQD        004
 #define IOBA_VH         (IOPAGEBASE + 000440)           /* DHQ11 */
 #define IOLN_VH         020

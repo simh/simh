@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2010, Robert M Supnik
+   Copyright (c) 2002-2016, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
    14-Jan-09    JH      Added support for RD32 disc drive
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
    31-Oct-05    RMS     Fixed address width for large files
@@ -1371,6 +1372,7 @@ if (uptr = rq_getucb (cp, lu)) {                        /* get unit */
                 cp->pak[prv].link = cp->pak[tpkt].link;
                 break;
                 }
+            prv = tpkt;                                 /* no match, next */
             }
         }
     if (tpkt) {                                         /* found target? */

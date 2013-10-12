@@ -1,6 +1,6 @@
 /* pdp10_tu.c - PDP-10 RH11/TM03/TU45 magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,8 @@
 
    tu           RH11/TM03/TU45 magtape
 
-   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (found by Naoki Hamada)
+   17-Mar-13    RMS     Fixed bug in read/write check reverse (Dave Bryan)
+   29-Apr-07    RMS     Fixed bug in setting FCE on TMK (Naoki Hamada)
    16-Feb-06    RMS     Added tape capacity checking
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Jul-05    RMS     Removed extraneous externs
@@ -42,8 +43,8 @@
    28-Mar-03    RMS     Added multiformat support
    28-Feb-03    RMS     Revised for magtape library
    27-Jan-03    RMS     Changed to dynamically allocate buffer
-   21-Nov-02    RMS     Fixed bug in bootstrap (reported by Michael Thompson)
-                        Fixed bug in read (reported by Harris Newman)
+   21-Nov-02    RMS     Fixed bug in bootstrap (Michael Thompson)
+                        Fixed bug in read (Harris Newman)
    29-Sep-02    RMS     Added variable vector support
                         New data structures
    28-Aug-02    RMS     Added end of medium support
@@ -964,7 +965,7 @@ switch (fnc) {                                          /* case on function */
                 MAPM (ba10 - i, mpa10, UMAP_RRV);
                 }
             val = ((fmt == TC_10C)? (((d10) xbuf [--j]) & 017): 0);
-            for (k = 0; k < 4; i++)
+            for (k = 0; k < 4; k++)
                 v[k] = xbuf[--j];
             val = val | (v[0] << 4) | (v[1] << 12) | (v[2] << 20) | (v[3] << 28);
             if (fnc == FNC_READR)                       /* read? store */

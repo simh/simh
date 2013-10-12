@@ -1,6 +1,6 @@
 /* pdp10_defs.h: PDP-10 simulator definitions
 
-   Copyright (c) 1993-2010, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   30-Jun-13    RMS     Fixed IPL4 mask definition (Tim Litt)
    22-May-10    RMS     Added check for 64b addresses
    01-Feb-07    RMS     Added CD support
    29-Oct-06    RMS     Added clock coscheduling function
@@ -734,7 +735,7 @@ typedef struct pdp_dib DIB;
 #define INT_IPL7        0x0000000F                      /* int level masks */
 #define INT_IPL6        0x000000F0
 #define INT_IPL5        0x000FFF00
-#define INT_IPL4        0x3FF00000
+#define INT_IPL4        0x7FF00000
 
 #define VEC_Q           0000                            /* vector base */
 #define VEC_PTR         0070                            /* interrupt vectors */

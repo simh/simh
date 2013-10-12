@@ -87,6 +87,7 @@
 
   Revision History:
 
+   06-Jun-13    RMS     Default start state is disabled
    03-Jan-10    JAD     Eliminate gcc warnings
    01-Feb-07    RMS     Added PDP-10 support
    12-May-06    JAD     Modify the DEBUG code to use the SIMH DEBUG_x
@@ -181,7 +182,7 @@ extern int32 int_req[IPL_HLVL];
 #else                                                   /* PDP-11 version */
 #include "pdp11_defs.h"
 extern int32 int_req[IPL_HLVL];
-#define DFLT_DIS        (0)
+#define DFLT_DIS        (DEV_DIS)
 #define DFLT_CR11       (UNIT_CR11)
 #define DFLT_CPM        285
 #endif

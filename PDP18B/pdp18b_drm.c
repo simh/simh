@@ -1,6 +1,6 @@
 /* pdp18b_drm.c: drum/fixed head disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    drm          (PDP-4,PDP-7) Type 24 serial drum
 
+   03-Sep-13    RMS     Added explicit void * cast
    14-Jan-04    RMS     Revised IO device call interface
    26-Oct-03    RMS     Cleaned up buffer copy code
    05-Dec-02    RMS     Updated from Type 24 documentation
@@ -181,7 +182,7 @@ t_stat drm_svc (UNIT *uptr)
 {
 int32 i;
 uint32 da;
-int32 *fbuf = uptr->filebuf;
+int32 *fbuf = (int32 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     drm_err = 1;                                        /* set error */

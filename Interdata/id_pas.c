@@ -1,6 +1,6 @@
 /* id_pas.c: Interdata programmable async line adapter simulator
 
-   Copyright (c) 2001-2012, Robert M Supnik
+   Copyright (c) 2001-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    pas          Programmable asynchronous line adapter(s)
 
+   11-Oct-13    RMS     Poll PAS immediately to pick up initial connect
    18-Apr-12    RMS     Revised to use clock coscheduling
    21-Mar-12    RMS     Fixed TT_GET_MODE test to use TTUF_MODE_x (Michael Bloom)
    19-Nov-08    RMS     Revised for common TMXR show routines
@@ -485,7 +486,7 @@ t_stat r;
 r = tmxr_attach (&pas_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error */
     return r;
-sim_activate (uptr, 100);                               /* quick poll */
+sim_activate (uptr, 0);                                 /* immediate poll */
 return SCPE_OK;
 }
 

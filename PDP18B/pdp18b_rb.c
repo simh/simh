@@ -1,6 +1,6 @@
 /* pdp18b_rb.c: RB09 fixed head disk simulator
 
-   Copyright (c) 2003-2008, Robert M Supnik
+   Copyright (c) 2003-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rb           RB09 fixed head disk
 
+   03-Sep-13    RMS     Added explicit void * cast
    14-Jan-04    RMS     Revised IO device call interface
    26-Oct-03    RMS     Cleaned up buffer copy code
 
@@ -240,7 +241,7 @@ return r;
 t_stat rb_svc (UNIT *uptr)
 {
 int32 t, sw;
-int32 *fbuf = uptr->filebuf;
+int32 *fbuf = (int32 *) uptr->filebuf;
 
 if ((uptr->flags & UNIT_BUF) == 0) {                    /* not buf? abort */
     rb_updsta (RBS_NRY | RBS_DON);                      /* set nxd, done */

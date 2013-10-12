@@ -1,6 +1,6 @@
 /* id_fd.c: Interdata floppy disk simulator
 
-   Copyright (c) 2001-2012, Robert M Supnik
+   Copyright (c) 2001-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    fd           M46-630 floppy disk
 
+   03-Sep-13    RMS     Added explicit void * cast
    19-Mar-12    RMS     Fixed macro naming conflict (Mark Pizzolato)
 
    A diskette consists of 77 tracks, each with 26 sectors of 128B.  The
@@ -306,7 +307,7 @@ return 0;
 t_stat fd_svc (UNIT *uptr)
 {
 uint32 i, u, tk, sc, crc, fnc, da;
-uint8 *fbuf = uptr->filebuf;
+uint8 *fbuf = (uint8 *) uptr->filebuf;
 
 u = uptr - fd_dev.units;                                /* get unit number */
 fnc = GET_FNC (uptr->FNC);                              /* get function */
