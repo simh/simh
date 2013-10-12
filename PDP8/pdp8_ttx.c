@@ -360,7 +360,7 @@ t_stat r;
 r = tmxr_attach (&ttx_desc, uptr, cptr);                /* attach */
 if (r != SCPE_OK)                                       /* error */
     return r;
-sim_activate (uptr, tmxr_poll);                         /* start poll */
+sim_activate (uptr, 0);                                 /* start poll */
 return SCPE_OK;
 }
 
