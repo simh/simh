@@ -1,0 +1,25 @@
+
+   Spacewar! was conceived in 1961 by Martin Graetz, Stephen Russell, and
+   Wayne Wiitanen. It was first realized on the PDP-1 in 1962 by Stephen
+   Russell, Peter Samson, Dan Edwards, and Martin Graetz, together with
+   Alan Kotok, Steve Piner, and Robert A Saunders. Spacewar! is in the
+   public domain, but this credit paragraph must accompany all
+   distributed versions of the program.
+   
+   This is the original version! Martin Graetz provided us with a printed
+   version of the source. We typed in in again - it was about 40 pages
+   long - and re-assembled it with a PDP-1 assembler written in PERL. The
+   resulting binary runs on a PDP-1 emulator written as a Java applet.
+   The code is extremely faithful to the original. There are only two
+   changes. 1)The spaceships have been made bigger and 2) The overall
+   timing has been special cased to deal with varying machine speeds.
+   
+   The sources are available in a subdirectory called "sources".
+   
+   The "a", "s", "d", "f" keys control one of the spaceships. The "k",
+   "l", ";", "'" keys control the other. The controls are spin one way,
+   spin the other, thrust, and fire.
+   
+   Barry Silverman
+   Brian Silverman
+   Vadim Gerasimov

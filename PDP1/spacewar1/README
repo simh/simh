@@ -1,0 +1,64 @@
+Preliminary PDP-1 Spacewar README
+Phil Budne
+February 9, 2004
+
+Both spacewar.mac and macro1.c are available from Phil's CVS server.
+see http://www.ultimate.com/phil/xy
+
+cvs -d :pserver:anonymous@cvs.ultimate.com:/home/cvs login
+Password: anonymous
+cvs -d :pserver:anonymous@cvs.ultimate.com:/home/cvs co history/pdp1
+
+
+README.MIT
+	readme from MIT
+	contains history, and instructions
+
+spacewar.mac
+        spacewar 3.1  (24 sep 62) retyped at MIT from a listing,
+	originally assembled using a Perl macro-expander and assembler,
+	and run under a Java PDP-1 emulator.
+
+	This version modified by Phil Budne to assemble under his
+	version of "macro1" (see below)
+
+	Note that low memory (locations 6 thru 31) contains various
+	manifest constants which can be tweaked to alter the game's
+	behavior!
+
+spacewar.rim
+	above assembled by Phil Budne's macro1
+
+	PDP-1 RIM of "loader" followed by loader blocks:
+
+		PDP-1 simulator V4.0
+		sim> set dpy enable
+		sim> attach ptr spacewar.rim
+		sim> boot ptr
+
+	controls compatible with MIT Java simulation, see README.LCS
+	or display/README from your SIMH distribution
+
+munch.mac
+	"munching squares" display hack, reconstructed
+	from world.std.com/~dpbsmith/munch.html
+
+munch.rim
+	binary of munching squares.
+
+	reads console switches:
+            Upto 18 simulated console switches, toggled by hitting keys:
+
+            123 456 789 qwe rty uio
+
+            space bar clears all switches.
+
+	assembled with '-r' option, so it can be "loaded" directly:
+	
+	PDP-1 simulator V4.0
+	sim> set dpy enable
+	sim> load munch.rim
+	sim> run
+
+macro1.c
+	Phil Budne's version of the MACRO cross-assembler

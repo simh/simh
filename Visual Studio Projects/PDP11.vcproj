@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_SHARED;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -129,7 +129,7 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../;../PDP11/;&quot;../../windows-build/winpcap/Wpdpack/Include&quot;;&quot;../../windows-build/pthreads&quot;"
-				PreprocessorDefinitions="USE_SHARED;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="USE_SHARED;USE_DISPLAY;VM_PDP11;_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;PTW32_STATIC_LIB;SIM_ASYNCH_IO;USE_READER_THREAD;SIM_NEED_GIT_COMMIT_ID"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -191,6 +191,10 @@
 			Name="Source Files"
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
+			<File
+				RelativePath="..\display\display.c"
+				>
+			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_cis.c"
 				>
@@ -340,6 +344,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_vt.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_xq.c"
 				>
 			</File>
@@ -407,11 +415,23 @@
 				RelativePath="..\sim_tmxr.c"
 				>
 			</File>
+			<File
+				RelativePath="..\display\vt11.c"
+				>
+			</File>
+			<File
+				RelativePath="..\display\win32.c"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
+			<File
+				RelativePath="..\display\display.h"
+				>
+			</File>
 			<File
 				RelativePath="..\PDP11\pdp11_cpumod.h"
 				>
@@ -502,6 +522,14 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\display\vt11.h"
+				>
+			</File>
+			<File
+				RelativePath="..\display\ws.h"
 				>
 			</File>
 		</Filter>

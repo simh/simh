@@ -1,24 +1,29 @@
-# $Id: smakefile,v 1.17 2004/01/24 08:31:56 phil Exp - revised by DAG
+# $Id: smakefile,v 1.6 2005/11/05 02:06:14 phil Exp $
 
 # Makefile for test programs (standard Unix "make" version)
 
 # Unix:
-#	comment out Windows defs, uncomment Unix defs,
-#	edit Unix defs to fit your compiler/library environment, then
-#	(g)make
+#       comment out OS X, Windows defs, uncomment Unix defs,
+#       edit Unix defs to fit your compiler/library environment, then
+#       make -f smakefile
+#
+# OS X (Carbon)
+#       comment out Unix, Windows defs, uncomment OS X defs
+#       make -f smakefile
 #
 # Win32 (Cygwin)
-#	comment out Unix defs, uncomment Windows defs, then
-#	make
+#       comment out Unix defs, uncomment Windows defs, then
+#       make -f smakefile
 #
 # Win32 (MINGW)
-#	comment out Unix defs, uncomment Windows defs, then
-#	mingw32-make
+#       comment out Unix defs, uncomment Windows defs, then
+#       mingw32-make
 
 DISP_DEFS=-DTEST_DIS=DIS_VR48 -DTEST_RES=RES_HALF # -DDEBUG_VT11
 
 #Unix environments
-CC=cc # gcc -Wunused
+CC=cc
+#CC=gcc -Wunused
 #X11BASE=/usr/X11R6
 #X11LIBDIR=$(X11BASE)/lib
 #X11INCDIR=$(X11BASE)/include
@@ -29,8 +34,18 @@ EXT=
 PROF=-g # -pg
 OPT=-O # -O2
 CFLAGS=$(OPT) $(PROF) $(OSFLAGS) $(DISP_DEFS)
-CC=cc # gcc -Wunused
 LDFLAGS=$(PROF)
+
+##OS X
+#CC=cc -Wunused
+#LIBS=-framework Carbon
+#OSFLAGS=
+#DRIVER=carbon.o
+#EXT=
+#PROF=-g # -pg
+#OPT=-O # -O2
+#CFLAGS=$(OPT) $(PROF) $(OSFLAGS) $(DISP_DEFS)
+#LDFLAGS=$(PROF)
 
 ##Win32 environments
 #LIBS=-lgdi32
@@ -43,33 +58,34 @@ LDFLAGS=$(PROF)
 #CC=gcc -Wunused
 LDFLAGS=$(PROF)
 
-ALL=	munch$(EXT) vt11$(EXT)
-ALL:	$(ALL)
+ALL=    munch$(EXT) vt11$(EXT)
+ALL:    $(ALL)
 
 # munching squares; see README file for
 # how to use console switches
 
-MUNCH=$(DRIVER) display.o test.o
+MUNCH=$(DRIVER) xy.o test.o
 munch$(EXT): $(MUNCH)
-	$(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
+        $(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
 
-VT11=$(DRIVER) vt11.o vttest.o display.o
+VT11=$(DRIVER) vt11.o vttest.o xy.o
 vt11$(EXT): $(VT11)
-	$(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
+        $(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
 
-display.o: display.h ws.h
-vt11.o: display.h vt11.h
-x11.o: ws.h display.h
+xy.o: xy.h ws.h
+vt11.o: xy.h vt11.h
+x11.o: ws.h xy.h
+carbon.o: ws.h
 win32.o: ws.h
-test.o: display.h vt11.h
-vttest.o: display.h vt11.h vtmacs.h
+test.o: xy.h vt11.h
+vttest.o: xy.h vt11.h vtmacs.h
 
 clean:
-	rm -f *.o *~ .#*	# Unix
-#	if exist *.o del /q *.o		# Win32
-#	if exist *~ del /q *~		# Win32
-#	if exist .#* del /q .#*		# Win32
+        rm -f *.o *~ .#*        # Unix
+#       if exist *.o del /q *.o         # Win32
+#       if exist *~ del /q *~           # Win32
+#       if exist .#* del /q .#*         # Win32
 
 clobber: clean
-	rm -f $(ALL)		# Unix
-#	if exist *.exe del /q *.exe	# Win32
+        rm -f $(ALL)            # Unix
+#       if exist *.exe del /q *.exe     # Win32

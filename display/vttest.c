@@ -1,11 +1,11 @@
 /*
- * $Id: vttest.c,v 1.10 2004/02/07 06:31:21 phil Exp $
+ * $Id: vttest.c,v 1.15 2005/08/06 21:09:05 phil Exp $
  * VT11 test
  * Phil Budne <phil@ultimate.com>
  * September 13, 2003
- * Substantially revised by Douglas A. Gwyn, 27 Jan. 2004
+ * Substantially revised by Douglas A. Gwyn, 05 Aug 2005
  *
- *	XXX -- assumes ASCII host character set
+ *      XXX -- assumes ASCII host character set
  *
  * In addition to providing some display tests, this program serves as an
  * example of how the VT11/VS60 display processor simulator can be used
@@ -22,7 +22,7 @@
  * safely modify the display without stopping the display processor, which
  * is asynchronously interpreting the display file.
  */
-#undef	FRAME1STOP	/* define to pause after first frame of a section */
+#undef  FRAME1STOP      /* define to pause after first frame of a section */
 
 #ifndef TEST_DIS
 #define TEST_DIS DIS_VR48
@@ -32,39 +32,40 @@
 #define TEST_RES RES_HALF
 #endif
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "ws.h"				/* for ws_beep() */
-#include "display.h"
+#include "ws.h"                         /* for ws_beep() */
+#include "xy.h"
 #include "vt11.h"
 #include "vtmacs.h"
 
-#define	USEC	3			/* simulated microseconds per cycle;
-					   making this large causes flicker! */
+#define USEC    3                       /* simulated microseconds per cycle;
+                                           making this large causes flicker! */
 
-#define	JMPA	0160000			/* first word of DJMP_ABS */
+#define JMPA    0160000                 /* first word of DJMP_ABS */
 
-#define	SUPSCR	021			/* SUPERSCRIPT char */
-#define	SUBSCR	022			/* SUBSCRIPT char */
-#define	ENDSUP	023			/* END SUPERSCRIPT char */
-#define	ENDSUB	024			/* END SUBSCRIPT char */
+#define SUPSCR  021                     /* SUPERSCRIPT char */
+#define SUBSCR  022                     /* SUBSCRIPT char */
+#define ENDSUP  023                     /* END SUPERSCRIPT char */
+#define ENDSUB  024                     /* END SUBSCRIPT char */
 
 /* The following display file (whose words might be larger than 16 bits) is
    divided into sections, each ended by a display-stop-with-interrupt
    instruction followed by an extra word.  The display-stop interrupt handler
    replaces these two words with a jump to the start of the section, causing
    an endless refresh loop.  To advance to the next section, activate the
-   "tip switch" (mouse button 1); this works even if simulating a VT11.	*/
+   "tip switch" (mouse button 1); this works even if simulating a VT11. */
 
-#define	ENDSECT	LSRA(ST_STOP,SI_GENERATE,LI_SAME,IT_SAME,RF_UNSYNC,MN_SAME), 0,
-#define	ENDFILE	LSRA(ST_STOP,SI_GENERATE,LI_SAME,IT_SAME,RF_UNSYNC,MN_SAME), 1,
+#define ENDSECT LSRA(ST_STOP,SI_GENERATE,LI_SAME,IT_SAME,RF_UNSYNC,MN_SAME), 0,
+#define ENDFILE LSRA(ST_STOP,SI_GENERATE,LI_SAME,IT_SAME,RF_UNSYNC,MN_SAME), 1,
 
 /* FILE VT.  Static displays that work for both VT11 and VS60. */
 
 unsigned short VT[] = {
     /* SECTION 1.  Box just inside VR14 area using all four line types.
-	Suitable for VT11 and VS60. */
+        Suitable for VT11 and VS60. */
 
     LSRA(ST_SAME, SI_SAME, LI_INTENSIFY, IT_NORMAL, RF_UNSYNC, MN_SAME),
 
@@ -86,7 +87,7 @@ unsigned short VT[] = {
     ENDSECT
 
     /* SECTION 2.  All text characters (both normal and italic).
-	Suitable for VT11 and VS60. */
+        Suitable for VT11 and VS60. */
 
     LSRA(ST_SAME, SI_SAME, LI_INTENSIFY, IT_NORMAL, RF_UNSYNC, MN_SAME),
 
@@ -138,7 +139,7 @@ unsigned short VT[] = {
     ENDSECT
 
     /* SECTION 3.  Fancy display involving all VT11 graphic modes.
-	Suitable for VT11 and VS60. */
+        Suitable for VT11 and VS60. */
 
     LSRA(ST_SAME, SI_SAME, LI_INTENSIFY, IT_NORMAL, RF_UNSYNC, MN_SAME),
 
@@ -810,7 +811,7 @@ unsigned short VT[] = {
     ENDSECT
 
     /* SECTION 4.  Clipping tests.
-	Suitable for VT11 and VS60. */
+        Suitable for VT11 and VS60. */
 
     LSRA(ST_SAME, SI_SAME, LI_INTENSIFY, IT_NORMAL, RF_UNSYNC, MN_SAME),
 
@@ -843,32 +844,33 @@ unsigned short LP[] = {
     /* SECTION 1.  "rubber-band" dot-dash vector to tracking object. */
 
     SGM(GM_APOINT, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
-    APOINT(I_OFF, 01000, 01000),	/* screen center */
+    APOINT(I_OFF, 01000, 01000),        /* screen center */
 
     SGM(GM_LVECT, IN_4, LP_DIS, BL_SAME, LT_DDASH),
     /* following coordinates are updated by LP hit intr. handler: */
-    LVECT(I_ON, 0, 0),			/* tracking object center */
+    LVECT(I_ON, 0, 0),                  /* tracking object center */
 
     SGM(GM_SVECT, IN_7, LP_ENA, BL_SAME, LT_SOLID),
-    SVECT(I_OFF, 1, -31),
-    SVECT(I_ON, -2, 0),
-    SVECT(I_OFF, 2, 0),
-    SVECT(I_ON, 0, 62),
-    SVECT(I_ON, -2, 0),
-    SVECT(I_OFF, 2, 0),
-    SVECT(I_ON, 30, -30),
-    SVECT(I_OFF, 0, -2),
-    SVECT(I_ON, 0, 2),
-    SVECT(I_ON, -62, 0),
-    SVECT(I_OFF, 0, -2),
-    SVECT(I_ON, 0, 2),
+    SVECT(I_OFF, 0, 30),
+    SVECT(I_ON, 0, -60),
+    SVECT(I_OFF, 30, 30),
+    SVECT(I_ON, -60, 0),
     SVECT(I_ON, 30, 30),
-    SVECT(I_ON, 0, -62),
-    SVECT(I_ON, -30, 30),
-    SVECT(I_ON, 62, 0),
+    SVECT(I_ON, 30, -30),
     SVECT(I_ON, -30, -30),
-#if 0					/* not needed for this app */
-    SVECT(I_OFF, -1, 31),		/* "flyback" vector */
+    SVECT(I_ON, -30, 30),
+    SVECT(I_OFF, 10, 0),
+    SVECT(I_ON, 20, 20),
+    SVECT(I_ON, 20, -20),
+    SVECT(I_ON, -20, -20),
+    SVECT(I_ON, -20, 20),
+    SVECT(I_OFF, 10, 0),
+    SVECT(I_ON, 10, 10),
+    SVECT(I_ON, 10, -10),
+    SVECT(I_ON, -10, -10),
+    SVECT(I_ON, -10, 10),
+#if 0                                   /* not needed for this app */
+    SVECT(I_OFF, 0, -10),               /* "flyback" vector */
 #endif
 
     ENDSECT
@@ -890,10 +892,10 @@ unsigned short VS[] = {
 
     SGM(GM_CHAR, IN_SAME, LP_SAME, BL_OFF, LT_SAME),
     CHAR('F','o'), CHAR('l','l'), CHAR('o','w'), CHAR('i','n'), CHAR('g',' '),
-	CHAR('t','e'), CHAR('s','t'), CHAR('s',' '), CHAR('d','o'),
-	CHAR(' ','n'), CHAR('o','t'), CHAR(' ','w'), CHAR('o','r'),
-	CHAR('k',' '), CHAR('f','o'), CHAR('r',' '), CHAR('V','T'),
-	CHAR('1','1'), CHAR(';',0),
+        CHAR('t','e'), CHAR('s','t'), CHAR('s',' '), CHAR('d','o'),
+        CHAR(' ','n'), CHAR('o','t'), CHAR(' ','w'), CHAR('o','r'),
+        CHAR('k',' '), CHAR('f','o'), CHAR('r',' '), CHAR('V','T'),
+        CHAR('1','1'), CHAR(';',0),
 
     /* italic text */
     LSRA(ST_SAME, SI_SAME, LI_SAME, IT_ITALIC, RF_UNSYNC, MN_SAME),
@@ -920,20 +922,20 @@ unsigned short VS[] = {
     SGM(GM_CHAR, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
     LSRC(RO_SAME, CS_CHANGE, 0, VS_SAME, 0),
     CHAR(' ',' '), CHAR('S','m'), CHAR('a','l'), CHAR('l',':'), CHAR(' ','1'),
-	CHAR('/','2'),
+        CHAR('/','2'),
     LSRC(RO_SAME, CS_CHANGE, 1, VS_SAME, 0),
     CHAR(' ',' '), CHAR('N','o'), CHAR('r','m'), CHAR('a','l'), CHAR(':',' '),
-	CHAR('1',0),
+        CHAR('1',0),
     LSRC(RO_SAME, CS_CHANGE, 2, VS_SAME, 0),
     CHAR(' ',' '), CHAR('B','i'), CHAR('g',':'), CHAR(' ','1'), CHAR('-','1'),
-	CHAR('/','2'),
+        CHAR('/','2'),
     LSRC(RO_SAME, CS_CHANGE, 3, VS_SAME, 0),
     CHAR(' ',' '), CHAR('L','a'), CHAR('r','g'), CHAR('e',':'), CHAR(' ','2'),
-	CHAR('\r','\n'), CHAR('\r','\n'),
+        CHAR('\r','\n'),
     CHAR(' ',' '), CHAR('A',SUBSCR), CHAR('B',SUBSCR), CHAR('C',SUBSCR),
-	CHAR('D',ENDSUB), CHAR(ENDSUB,ENDSUB), CHAR('W',SUPSCR),
-	CHAR('X',SUPSCR), CHAR('Y',SUPSCR), CHAR('Z',ENDSUP),
-	CHAR(ENDSUP,ENDSUP), CHAR('!','!'),
+        CHAR('D',ENDSUB), CHAR(ENDSUB,ENDSUB), CHAR('W',SUPSCR),
+        CHAR('X',SUPSCR), CHAR('Y',SUPSCR), CHAR('Z',ENDSUP),
+        CHAR(ENDSUP,ENDSUP), CHAR('!','!'),
 
     /* vertical text, 4 sizes */
     SGM(GM_APOINT, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
@@ -942,20 +944,20 @@ unsigned short VS[] = {
     SGM(GM_CHAR, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
     LSRC(RO_VERTICAL, CS_CHANGE, 0, VS_SAME, 0),
     CHAR(' ',' '), CHAR('S','m'), CHAR('a','l'), CHAR('l',':'), CHAR(' ','1'),
-	CHAR('/','2'),
+        CHAR('/','2'),
     LSRC(RO_SAME, CS_CHANGE, 1, VS_SAME, 0),
     CHAR(' ',' '), CHAR('N','o'), CHAR('r','m'), CHAR('a','l'), CHAR(':',' '),
-	CHAR('1',0),
+        CHAR('1',0),
     LSRC(RO_SAME, CS_CHANGE, 2, VS_SAME, 0),
     CHAR(' ',' '), CHAR('B','i'), CHAR('g',':'), CHAR(' ','1'), CHAR('-','1'),
-	CHAR('/','2'),
+        CHAR('/','2'),
     LSRC(RO_SAME, CS_CHANGE, 3, VS_SAME, 0),
     CHAR(' ',' '), CHAR('L','a'), CHAR('r','g'), CHAR('e',':'), CHAR(' ','2'),
-	CHAR('\r','\n'), CHAR('\r','\n'),
+        CHAR('\r','\n'),
     CHAR(' ',' '), CHAR('A',SUBSCR), CHAR('B',SUBSCR), CHAR('C',SUBSCR),
-	CHAR('D',ENDSUB), CHAR(ENDSUB,ENDSUB), CHAR('W',SUPSCR),
-	CHAR('X',SUPSCR), CHAR('Y',SUPSCR), CHAR('Z',ENDSUP),
-	CHAR(ENDSUP,ENDSUP), CHAR('!','!'),
+        CHAR('D',ENDSUB), CHAR(ENDSUB,ENDSUB), CHAR('W',SUPSCR),
+        CHAR('X',SUPSCR), CHAR('Y',SUPSCR), CHAR('Z',ENDSUP),
+        CHAR(ENDSUP,ENDSUP), CHAR('!','!'),
 
     /* horizontal text, sub/superscript examples from DECgraphic-11 manual */
     SGM(GM_APOINT, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
@@ -964,11 +966,11 @@ unsigned short VS[] = {
     LSRC(RO_HORIZONTAL, CS_CHANGE, 2, VS_SAME, 0),
     SGM(GM_CHAR, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
     CHAR('C',SUBSCR), CHAR('2',ENDSUB), CHAR('H',SUBSCR), CHAR('5',ENDSUB),
-	CHAR('O','H'), CHAR(' ',' '),
+        CHAR('O','H'), CHAR(' ',' '),
     CHAR(016,000), CHAR(017,'='), CHAR(016,003), CHAR(017,'('),
-	CHAR('x',SUBSCR), CHAR('i',ENDSUB), CHAR('-','q'), CHAR(SUBSCR,'i'),
-	CHAR(ENDSUB,')'), CHAR(SUPSCR,'2'), CHAR(ENDSUP,'e'), CHAR(SUPSCR,'-'),
-	CHAR('i',SUPSCR), CHAR('2',ENDSUP), CHAR(ENDSUP,0),
+        CHAR('x',SUBSCR), CHAR('i',ENDSUB), CHAR('-','q'), CHAR(SUBSCR,'i'),
+        CHAR(ENDSUB,')'), CHAR(SUPSCR,'2'), CHAR(ENDSUP,'e'), CHAR(SUPSCR,'-'),
+        CHAR('i',SUPSCR), CHAR('2',ENDSUP), CHAR(ENDSUP,0),
 
     LSRC(RO_SAME, CS_CHANGE, 1, VS_SAME, 0),
     LSRA(ST_SAME, SI_SAME, LI_SAME, IT_SAME, RF_SAME, MN_MENU),
@@ -1018,7 +1020,7 @@ unsigned short VS[] = {
 
     /* SECTION 3.  3D data, but depth cueing disabled. */
 
-    LSRBB(ZD_YES, ED_ENA, DQ_OFF, ES_YES),	/* but term char not used */
+    LSRBB(ZD_YES, ED_ENA, DQ_OFF, ES_YES),      /* but term char not used */
     LSRA(ST_SAME, SI_SAME, LI_BRIGHTDOWN, IT_SAME, RF_30, MN_MAIN),
 
     SGM(GM_APOINT, IN_4, LP_ENA, BL_OFF, LT_LDASH),
@@ -1053,7 +1055,7 @@ unsigned short VS[] = {
 
     /* SECTION 4. 3D data, with depth cueing enabled. */
 
-    LSRBB(ZD_YES, ED_ENA, DQ_ON, ES_YES),	/* but term char not used */
+    LSRBB(ZD_YES, ED_ENA, DQ_ON, ES_YES),       /* but term char not used */
     LSRA(ST_SAME, SI_SAME, LI_BRIGHTDOWN, IT_SAME, RF_EXT, MN_MAIN),
 
     SGM(GM_APOINT, IN_4, LP_ENA, BL_OFF, LT_DDASH),
@@ -1137,16 +1139,150 @@ unsigned short VS[] = {
 
     /* SECTION 7. Offset, vector scale, and clipping. */
 
-    /* XXX  need test for offset, vector scale, and clipping */
+    LSRA(ST_SAME, SI_SAME, LI_BRIGHTDOWN, IT_NORMAL, RF_UNSYNC, MN_MAIN),
+    LSRC(RO_HORIZONTAL, CS_CHANGE, 1, VS_CHANGE, 4),
+
+    SGM(GM_APOINT, IN_3, LP_ENA, BL_OFF, LT_SOLID),
+    OFFSET(0, 0),
+    APOINT(I_ON, 01040, 01040),
+    APOINT(I_ON, 01040, 0740),
+    APOINT(I_ON, 0740, 01040),
+    APOINT(I_ON, 0740, 0740),
+
+    SGM(GM_APOINT, IN_5, LP_SAME, BL_ON, LT_SAME),
+    OFFSET(06, 010),
+    APOINT(I_ON, 01040, 01040),
+    APOINT(I_ON, 01040, 0740),
+    APOINT(I_ON, 0740, 01040),
+    APOINT(I_ON, 0740, 0740),
+
+    OFFSET(014, 020),
+    LSRC(RO_HORIZONTAL, CS_SAME, 0, VS_CHANGE, 8),
+    SGM(GM_APOINT, IN_7, LP_ENA, BL_SAME, LT_SAME),
+    APOINT(I_ON, 0420, 0420),
+    SGM(GM_RPOINT, IN_7, LP_SAME, BL_SAME, LT_SAME),
+    RPOINT(I_ON, 0, -040),
+    RPOINT(I_ON, -040, 040),
+    RPOINT(I_ON, 0, -040),
+
+    /* XXX  need test for clipping */
+
+    ENDSECT
 
     /* END OF TEST SECTIONS. */
 
     ENDFILE
 };
 
-static unsigned short *df;		/* -> start of current display file */
-static uint16 start;			/* initial DPC for section of d.file */
-static int more;			/* set until end of d.file seen */
+/* FILE WF.  Rotating wire-frame display that works only for VS60. */
+
+unsigned short WF[] = {
+
+    /* SECTION 1. 3D data, with depth cueing enabled. */
+
+    LSRBB(ZD_YES, ED_ENA, DQ_ON, ES_NO),
+    LSRA(ST_SAME, SI_SAME, LI_BRIGHTDOWN, IT_SAME, RF_40, MN_MAIN),
+
+    SGM(GM_APOINT, IN_4, LP_ENA, BL_OFF, LT_DDASH),
+    APOINT3(I_OFF, 0, 0, 0),    /* cube coords filled in by wf_update() */
+
+    SGM(GM_AVECT, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_OFF, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    SGM(GM_AVECT, IN_SAME, LP_SAME, BL_SAME, LT_SOLID),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_OFF, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_OFF, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+    AVECT3(I_OFF, 0, 0, 0),
+    AVECT3(I_ON, 0, 0, 0),
+
+    LSRA(ST_SAME, SI_SAME, LI_SAME, IT_SAME, RF_SAME, MN_MENU),
+    SGM(GM_APOINT, IN_7, LP_ENA, BL_OFF, LT_SAME),
+    APOINT3(I_OFF, 0, 1000, 0200),
+    SGM(GM_CHAR, IN_SAME, LP_SAME, BL_SAME, LT_SAME),
+    CHAR('4','0'), CHAR('H','z'), CHAR(' ','S'), CHAR('y','n'), CHAR('c',0),
+
+    ENDSECT
+
+    /* END OF TEST SECTIONS. */
+
+    ENDFILE
+};
+
+static unsigned short *df;              /* -> start of current display file */
+static uint16 start;                    /* initial DPC for section of d.file */
+static int more;                        /* set until end of d.file seen */
+
+static void
+wf_update(int first_time) {
+    double c, s;                        /* cosine, sine of rotation angle */
+    int x, y, z;                        /* rotated coordinates */
+    static int xc = 01000, yc = 01000, zc = 0;  /* cube center coords */
+    static int vp = 010000;             /* distance to vanishing point */
+    static struct {
+        int offset;                     /* WF[] offset (words) of vector data */
+        int i;                          /* I_ON or I_OFF */
+        int x, y, z;                    /* coords of cube corner point */
+    } *dp, data[] = {
+        3, I_OFF, 00400, 00400, 0400,
+        7, I_ON, 01400, 00400, 0400,
+        10, I_ON, 01400, 01400, 0400,
+        13, I_ON, 00400, 01400, 0400,
+        16, I_ON, 00400, 00400, 0400,
+        19, I_OFF, 00400, 00400, -0400,
+        22, I_ON, 01400, 00400, -0400,
+        25, I_ON, 01400, 01400, -0400,
+        28, I_ON, 00400, 01400, -0400,
+        31, I_ON, 00400, 00400, -0400,
+        35, I_ON, 00400, 00400, 0400,
+        38, I_OFF, 01400, 00400, 0400,
+        41, I_ON, 01400, 00400, -0400,
+        44, I_OFF, 01400, 01400, -0400,
+        47, I_ON, 01400, 01400, 0400,
+        50, I_OFF, 00400, 01400, 0400,
+        53, I_ON, 00400, 01400, -0400,
+        -1                              /* end-of-data marker */
+    };
+    static double rot = 0.0;            /* total amount of rotation, degrees */
+    if (first_time) {
+        /* tilt cube toward viewer */
+        c = cos(30.0 * 3.14159/180.0);
+        s = sin(30.0 * 3.14159/180.0);
+        for (dp = data; dp->offset >= 0; ++dp) {
+                z = zc + ((dp->z - zc) * c + (dp->y - yc) * s);
+                y = yc + ((dp->y - yc) * c - (dp->z - zc) * s);
+                WF[dp->offset    ] = dp->i | (SGN_(dp->x) << 13) | MAG_(dp->x);
+                WF[dp->offset + 1] = (SGN_(y) << 13) | MAG_(y);
+                WF[dp->offset + 2] = (SGN_(z) << 13) | (MAG_(z) << 2);
+                /* X coord. unchanged because rotation is parallel to X axis */
+                dp->y = y;
+                dp->z = z;
+        }
+    } else
+        if ((rot += 1.0) >= 360.0)      /* rotation increment */
+            rot -= 360.0;
+    c = cos(rot * 3.14159/180.0);
+    s = sin(rot * 3.14159/180.0);
+    for (dp = data; dp->offset >= 0; ++dp) {
+        x = xc + ((dp->x - xc) * c + (dp->z - zc) * s);
+        z = zc + ((dp->z - zc) * c - (dp->x - xc) * s);
+        /* apply (approximate) perspective */
+        x = x * (1.0 + (double)z / vp );
+        y = dp->y * (1.0 + (double)z / vp );
+        WF[dp->offset    ] = dp->i | (SGN_(x) << 13) | MAG_(x);
+        WF[dp->offset + 1] = (SGN_(y) << 13) | MAG_(y);
+        WF[dp->offset + 2] = (SGN_(z) << 13) | (MAG_(z) << 2);
+    }
+}
 
 int
 main(void) {
@@ -1159,17 +1295,17 @@ main(void) {
 
     puts("initial tests work for both VT11 and VS60");
     for (df = VT, start = 0, more = 1; more; ) {
-	vt11_reset();			/* reset everything */
-	vt11_set_dpc(start);		/* start section */
-	c = 0;
-	while (vt11_cycle(USEC, 1)) {
-	    display_sync();		/* XXX push down? */
-	    if (display_lp_sw)		/* tip switch activated */
-		c = 1;			/* flag: break requested */
-	    if (c && !display_lp_sw)	/* wait for switch release */
-		break;
-	}
-	/* end of section */
+        vt11_reset();                   /* reset everything */
+        vt11_set_dpc(start);            /* start section */
+        c = 0;
+        while (vt11_cycle(USEC, 1)) {
+            display_sync();             /* XXX push down? */
+            if (display_lp_sw)          /* tip switch activated */
+                c = 1;                  /* flag: break requested */
+            if (c && !display_lp_sw)    /* wait for switch release */
+                break;
+        }
+        /* end of section */
     }
     /* end of display file */
 
@@ -1179,40 +1315,60 @@ main(void) {
     puts("move the light pen through the tracking object");
     fflush(stdout);
     for (df = LP, start = 0, more = 1; more; ) {
-	vt11_reset();			/* reset everything */
-	vt11_set_dpc(start);		/* start section */
-	c = 0;
-	while (vt11_cycle(USEC, 1)) {
-	    display_sync();		/* XXX push down? */
-	    if (display_lp_sw)		/* tip switch activated */
-		c = 1;			/* flag: break requested */
-	    if (c && !display_lp_sw)	/* wait for switch release */
-		break;
-	    /* [dynamic modifications to the display file can be done here] */
-	}
-	/* end of section */
+        vt11_reset();                   /* reset everything */
+        vt11_set_dpc(start);            /* start section */
+        c = 0;
+        while (vt11_cycle(USEC, 1)) {
+            display_sync();             /* XXX push down? */
+            if (display_lp_sw)          /* tip switch activated */
+                c = 1;                  /* flag: break requested */
+            if (c && !display_lp_sw)    /* wait for switch release */
+                break;
+            /* [dynamic modifications to the display file can be done here] */
+        }
+        /* end of section */
     }
     /* end of display file */
 
-    /* VS60 tests  */
+    /* VS60 tests */
 
     ws_beep();
     puts("following tests require VS60");
     for (df = VS, start = 0, more = 1; more; ) {
-	vt11_reset();			/* reset everything */
-	vt11_set_str((uint16)(0200 | '~'));	/* set terminating char. */
-	vt11_set_anr((uint16)(040000 | (2<<12) | 04000 | 01234));
-					/* set associative name 0123x */
-	vt11_set_dpc(start);		/* start section */
-	c = 0;
-	while (vt11_cycle(USEC, 1)) {
-	    display_sync();		/* XXX push down? */
-	    if (display_lp_sw)		/* tip switch activated */
-		c = 1;			/* flag: break requested */
-	    if (c && !display_lp_sw)	/* wait for switch release */
-		break;
-	}
-	/* end of section */
+        vt11_reset();                   /* reset everything */
+        vt11_set_str((uint16)(0200 | '~'));     /* set terminating char. */
+        vt11_set_anr((uint16)(040000 | (2<<12) | 04000 | 01234));
+                                        /* set associative name 0123x */
+        vt11_set_dpc(start);            /* start section */
+        c = 0;
+        while (vt11_cycle(USEC, 1)) {
+            display_sync();             /* XXX push down? */
+            if (display_lp_sw)          /* tip switch activated */
+                c = 1;                  /* flag: break requested */
+            if (c && !display_lp_sw)    /* wait for switch release */
+                break;
+        }
+        /* end of section */
+    }
+    /* end of display file */
+
+    /* VS60 rotating wire-frame display */
+
+    puts("press and release tip switch (button 1) for next display");
+    fflush(stdout);
+    wf_update(1);                       /* do first-time init */
+    for (df = WF, start = 0, more = 1; more; ) {
+        vt11_reset();                   /* reset everything */
+        vt11_set_dpc(start);            /* start section */
+        c = 0;
+        while (vt11_cycle(USEC, 1)) {
+            display_sync();             /* XXX push down? */
+            if (display_lp_sw)          /* tip switch activated */
+                c = 1;                  /* flag: break requested */
+            if (c && !display_lp_sw)    /* wait for switch release */
+                break;
+        }
+        /* end of section */
     }
     /* end of display file */
 
@@ -1245,57 +1401,65 @@ vt_fetch(uint32 addr, vt11word *w) {
 
 void
 vt_stop_intr(void) {
-    uint16 dpc = vt11_get_dpc();	/* -> just after DSTOP instruction */
-    if (df[dpc/2] == 0) {		/* ENDSECT */
+    uint16 dpc = vt11_get_dpc();        /* -> just after DSTOP instruction */
+    if (df[dpc/2] == 0) {               /* ENDSECT */
 #ifdef FRAME1STOP
-	int c;
-	puts("end of first pass through this test pattern; display frozen");
-	puts("enter newline to refresh this section or EOF to quit");
-	fflush(stdout);
-	while ((c = getchar()) != '\n')
-	    if (c == EOF)
-		exit(0);			/* user aborted test */
+        int c;
+        puts("end of pass through this test pattern; display frozen");
+        puts("enter newline to refresh this section or EOF to quit");
+        fflush(stdout);
+        while ((c = getchar()) != '\n')
+            if (c == EOF)
+                exit(0);                /* user aborted test */
 #endif
-	df[dpc/2 - 1] = JMPA;
-	df[dpc/2] = start;
-	start = dpc + 2;			/* save start of next section */
-	vt11_set_dpc(dpc - 2);		/* reset; then JMPA to old start */
-	puts("press and release tip switch (mouse button 1) for next display");
-	fflush(stdout);
-    } else				/* ENDFILE */
-	more = 0;
+        if (df == WF) {
+            wf_update(0);
+            vt11_set_dpc(0);            /* restart modified display */
+            start = dpc + 2;            /* save start of next section */
+        } else {
+            df[dpc/2 - 1] = JMPA;
+            df[dpc/2] = start;
+            start = dpc + 2;            /* save start of next section */
+            vt11_set_dpc(dpc - 2);      /* reset; then JMPA to old start */
+            puts("press and release tip switch (button 1) for next display");
+            fflush(stdout);
+        }
+    } else                              /* ENDFILE */
+        more = 0;
 }
 
 void
 vt_lpen_intr(void) {
     if (df == LP) {
-	int dx = (int)(vt11_get_xpr() & 01777) - 01000;
-	int dy = (int)(vt11_get_ypr() & 01777) - 01000;
-	if (dx < 0)
-	    dx = (-dx) | 020000;	/* negative */
-	if (dy < 0)
-	    dy = (-dy) | 020000;	/* negative */
+        int dx = (int)(vt11_get_xpr() & 01777) - 01000;
+        int dy = (int)(vt11_get_ypr() & 01777) - 01000;
+        if (dx < 0)
+            dx = (-dx) | 020000;        /* negative */
+        if (dy < 0)
+            dy = (-dy) | 020000;        /* negative */
 
-	df[4] = dx | I_ON;		/* visible */
-	df[5] = dy;
+        df[4] = dx | I_ON;              /* visible */
+        df[5] = dy;
     } else {
-	printf("VT11 lightpen interrupt (%d,%d)\n",
-		(int)vt11_get_xpr() & 01777, (int)vt11_get_ypr() & 01777);
-	fflush(stdout);
+        printf("VT11 lightpen interrupt (0%o,0%o)\n",
+                (unsigned)vt11_get_xpr() & 01777,
+                (unsigned)vt11_get_ypr() & 01777);
+        fflush(stdout);
     }
-    vt11_set_dpc((uint16)1);		/* resume */
+    vt11_set_dpc((uint16)1);            /* resume */
 }
 
 void
 vt_char_intr(void) {
     puts("VT11 illegal character/timeout interrupt");
     fflush(stdout);
-    vt11_set_dpc((uint16)1);		/* resume */
+    vt11_set_dpc((uint16)1);            /* resume */
 }
 
 void
 vt_name_intr(void) {
     puts("VS60 name-match interrupt");
     fflush(stdout);
-    vt11_set_dpc((uint16)1);		/* resume */
+    vt11_set_dpc((uint16)1);            /* resume */
 }
+

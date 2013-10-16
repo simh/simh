@@ -32,7 +32,6 @@
 /* unless you're writing a new driver, you shouldn't be looking here! */
 
 extern int ws_init(char *, int, int, int); 
-extern void ws_close(void);   // 2006-07-19 SAI
 extern void *ws_color_rgb(int, int, int);
 extern void *ws_color_black(void);
 extern void *ws_color_white(void);

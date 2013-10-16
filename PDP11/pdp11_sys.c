@@ -41,6 +41,7 @@
    22-Jul-05    RMS     Fixed missing , in initializer (Doug Gwyn)
    22-Dec-03    RMS     Added second DEUNA/DELUA support
    18-Oct-03    RMS     Added DECtape off reel message
+   14-Sep-03    PLB     Added VT11 support
    06-May-03    RMS     Added support for second DEQNA/DELQA
    09-Jan-03    RMS     Added DELUA/DEUNA support
    17-Oct-02    RMS     Fixed bugs in branch, SOB address parsing
@@ -100,6 +101,9 @@ extern DEVICE tq_dev;
 extern DEVICE ts_dev;
 extern DEVICE tu_dev;
 extern DEVICE ta_dev;
+#ifdef USE_DISPLAY
+extern DEVICE vt_dev;
+#endif
 extern DEVICE xq_dev, xqb_dev;
 extern DEVICE xu_dev, xub_dev;
 extern DEVICE ke_dev;
@@ -167,6 +171,9 @@ DEVICE *sim_devices[] = {
     &tq_dev,
     &tu_dev,
     &ta_dev,
+#ifdef USE_DISPLAY
+    &vt_dev,
+#endif
     &xq_dev,
     &xqb_dev,
     &xu_dev,

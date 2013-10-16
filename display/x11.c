@@ -1,5 +1,5 @@
 /*
- * $Id: x11.c,v 1.29 2004/02/03 21:23:51 phil Exp $
+ * $Id: x11.c,v 1.32 2005/01/14 18:58:03 phil Exp $
  * X11 support for XY display simulator
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -7,9 +7,9 @@
  * Changes from Douglas A. Gwyn, Jan 8, 2004
  *
  * started from PDP-8/E simulator (vc8e.c & kc8e.c);
- *	This PDP8 Emulator was written by Douglas W. Jones at the
- *	University of Iowa.  It is distributed as freeware, of
- *	uncertain function and uncertain utility.
+ *      This PDP8 Emulator was written by Douglas W. Jones at the
+ *      University of Iowa.  It is distributed as freeware, of
+ *      uncertain function and uncertain utility.
  */
 
 /*
@@ -42,7 +42,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ws.h"
-#include "display.h"
+#include "xy.h"
 
 #include <X11/X.h>
 #include <X11/Xlib.h>
@@ -58,10 +58,6 @@
 #ifndef PIX_SIZE
 #define PIX_SIZE 1
 #endif
-
-//#define FULL_SCREEN 1
-#define NO_CURSOR 1
-#define NO_BORDER 1
 
 /*
  * light pen location
@@ -84,9 +80,9 @@ static int xoffset, yoffset;
 
 static GC whiteGC;              /* gc with white foreground */
 static GC blackGC;              /* gc with black foreground */
-static int buttons = 0;		/* tracks state of all buttons */
+static int buttons = 0;         /* tracks state of all buttons */
 
-static int os_pollfd(int, int);	/* forward */
+static int os_pollfd(int, int); /* forward */
 
 /* here on any mouse button down, AND movement when any button down */
 static void
@@ -101,6 +97,7 @@ handle_button_press(w, d, e, b)
     x = e->xbutton.x;
     y = e->xbutton.y;
 #ifdef FULL_SCREEN
+    /* untested! */
     x -= xoffset;
     y -= yoffset;
 #endif
@@ -109,12 +106,10 @@ handle_button_press(w, d, e, b)
     y *= PIX_SIZE;
 #endif
 
-#ifndef NO_CURSUR
     if (!display_tablet)
-	/* crosshair cursor to indicate tip of active pen */
-	XDefineCursor(dpy, XtWindow(crt),
-			(Cursor) XCreateFontCursor(dpy, XC_crosshair));
-#endif
+        /* crosshair cursor to indicate tip of active pen */
+        XDefineCursor(dpy, XtWindow(crt),
+                        (Cursor) XCreateFontCursor(dpy, XC_crosshair));
 
     y = ypixels - y - 1;
     /*printf("lightpen at %d,%d\n", x, y); fflush(stdout);*/
@@ -122,16 +117,16 @@ handle_button_press(w, d, e, b)
     ws_lp_y = y;
 
     if (e->type == ButtonPress) {
-	buttons |= e->xbutton.button;
+        buttons |= e->xbutton.button;
 
-	if (e->xbutton.button == 1) {
-	    display_lp_sw = 1;
-	    /*printf("tip switch activated\n"); fflush(stdout);*/
-	}
+        if (e->xbutton.button == 1) {
+            display_lp_sw = 1;
+            /*printf("tip switch activated\n"); fflush(stdout);*/
+        }
     }
 
     if (b)
-	*b = TRUE;
+        *b = TRUE;
 }
 
 static void
@@ -141,25 +136,23 @@ handle_button_release(w, d, e, b)
     XEvent *e;
     Boolean *b;
 {
-    if ((buttons &= ~e->xbutton.button) == 0) {	/* all buttons released */
-#ifndef NO_CURSOR
-	if (!display_tablet)
-	    /* pencil cursor (close to a pen!) to indicate inactive pen posn */
-	    XDefineCursor(dpy, XtWindow(crt),
-				(Cursor) XCreateFontCursor(dpy, XC_pencil));
-#endif
+    if ((buttons &= ~e->xbutton.button) == 0) { /* all buttons released */
+        if (!display_tablet)
+            /* pencil cursor (close to a pen!) to indicate inactive pen posn */
+            XDefineCursor(dpy, XtWindow(crt),
+                                (Cursor) XCreateFontCursor(dpy, XC_pencil));
 
-	/* XXX change cursor back?? */
-	ws_lp_x = ws_lp_y = -1;
+        /* XXX change cursor back?? */
+        ws_lp_x = ws_lp_y = -1;
     }
 
     if (e->xbutton.button == 1) {
-	display_lp_sw = 0;
-	/*printf("tip switch deactivated\n"); fflush(stdout);*/
+        display_lp_sw = 0;
+        /*printf("tip switch deactivated\n"); fflush(stdout);*/
     }
 
     if (b)
-	*b = TRUE;
+        *b = TRUE;
 }
 
 static void
@@ -174,10 +167,10 @@ handle_key_press(w, d, e, b)
 
     /*printf("key %d down\n", key); fflush(stdout);*/
     if ((key & 0xff00) == 0)
-	display_keydown(key);
+        display_keydown(key);
 
     if (b)
-	*b = TRUE;
+        *b = TRUE;
 }
 
 static void
@@ -192,10 +185,10 @@ handle_key_release(w, d, e, b)
 
     /*printf("key %d up\n", key); fflush(stdout);*/
     if ((key & 0xff00) == 0)
-	display_keyup(key);
+        display_keyup(key);
 
     if (b)
-	*b = TRUE;
+        *b = TRUE;
 }
 
 static void
@@ -208,13 +201,13 @@ handle_exposure(w, d, e, b)
     display_repaint();
 
     if (b)
-	*b = TRUE;
+        *b = TRUE;
 }
 
 int
-ws_init(char *crtname,		/* crt type name */
-    int xp, int yp,		/* screen size in pixels */
-    int colors)			/* colors to support (not used) */
+ws_init(char *crtname,          /* crt type name */
+    int xp, int yp,             /* screen size in pixels */
+    int colors)                 /* colors to support (not used) */
 {
     Arg arg[25];
     XGCValues gcvalues;
@@ -223,7 +216,7 @@ ws_init(char *crtname,		/* crt type name */
     char *argv[1];
     int height, width;
 
-    xpixels = xp;		/* save screen size */
+    xpixels = xp;               /* save screen size */
     ypixels = yp;
 
     XtToolkitInitialize();
@@ -231,20 +224,16 @@ ws_init(char *crtname,		/* crt type name */
     argc = 0;
     argv[0] = NULL;
     dpy = XtOpenDisplay( app_context, NULL, NULL, crtname, NULL, 0,
-			&argc, argv);
+                        &argc, argv);
 
     scr = DefaultScreen(dpy);
 
     crtshell = XtAppCreateShell( crtname, /* app name */
-				crtname, /* app class */
-				#ifdef NO_BORDER
-				overrideShellWidgetClass,
-				#else
-				applicationShellWidgetClass, /* wclass */
-				#endif
-				dpy, /* display */
-				NULL, /* arglist */
-				0);	/* nargs */
+                                crtname, /* app class */
+                                applicationShellWidgetClass, /* wclass */
+                                dpy, /* display */
+                                NULL, /* arglist */
+                                0);     /* nargs */
 
     cmap = DefaultColormap(dpy, scr);
 
@@ -264,13 +253,14 @@ ws_init(char *crtname,		/* crt type name */
     width = xpixels*PIX_SIZE;
     height = ypixels*PIX_SIZE;
 #endif
-    XtSetArg(arg[n], XtNwidth, width);				n++;
-    XtSetArg(arg[n], XtNheight, height);			n++;
-    XtSetArg(arg[n], XtNbackground, BlackPixel( dpy, scr ));	n++;
-    
+    XtSetArg(arg[n], XtNwidth, width);                          n++;
+    XtSetArg(arg[n], XtNheight, height);                        n++;
+    XtSetArg(arg[n], XtNbackground, BlackPixel( dpy, scr ));    n++;
+
     crt = XtCreateWidget( crtname, widgetClass, crtshell, arg, n);
     XtManageChild(crt);
     XtPopup(crtshell, XtGrabNonexclusive);
+    XtSetKeyboardFocus(crtshell, crt);  /* experimental? */
 
     /*
      * Create black and white Graphics Contexts
@@ -279,47 +269,34 @@ ws_init(char *crtname,		/* crt type name */
     gcvalues.foreground = BlackPixel( dpy, scr );
     gcvalues.background = BlackPixel( dpy, scr );
     blackGC = XCreateGC(dpy, XtWindow(crt),
-			GCForeground | GCBackground, &gcvalues);
+                        GCForeground | GCBackground, &gcvalues);
 
     gcvalues.foreground = WhitePixel( dpy, scr );
     whiteGC = XCreateGC(dpy, XtWindow(crt),
-			GCForeground | GCBackground, &gcvalues);
+                        GCForeground | GCBackground, &gcvalues);
 
-#ifndef NO_CURSOR
     if (!display_tablet) {
-	/* pencil cursor */
-	XDefineCursor(dpy, XtWindow(crt),
-		      (Cursor) XCreateFontCursor(dpy, XC_pencil));
+        /* pencil cursor */
+        XDefineCursor(dpy, XtWindow(crt),
+                      (Cursor) XCreateFontCursor(dpy, XC_pencil));
     }
-#endif
 
     /*
      * Setup to handle events
      */
 
     XtAddEventHandler(crt, ButtonPressMask|ButtonMotionMask, FALSE,
-		      handle_button_press, NULL);
+                      handle_button_press, NULL);
     XtAddEventHandler(crt, ButtonReleaseMask, FALSE,
-		      handle_button_release, NULL);
+                      handle_button_release, NULL);
     XtAddEventHandler(crt, KeyPressMask, FALSE,
-		      handle_key_press, NULL);
+                      handle_key_press, NULL);
     XtAddEventHandler(crt, KeyReleaseMask, FALSE,
-		      handle_key_release, NULL);
+                      handle_key_release, NULL);
     XtAddEventHandler(crt, ExposureMask, FALSE,
-		      handle_exposure, NULL);
+                      handle_exposure, NULL);
     return 1;
 } /* ws_init */
-
-
-/* Added 2006-07-19 SAI */
-
-void ws_close(void)
-{
-
-   XtCloseDisplay(dpy);
-
-}
-
 
 void *
 ws_color_black(void)
@@ -344,12 +321,12 @@ ws_color_rgb(int r, int g, int b)
     /* ignores flags */
 
     if (XAllocColor(dpy, cmap, &color)) {
-	XGCValues gcvalues;
-	memset(&gcvalues, 0, sizeof(gcvalues));
-	gcvalues.foreground = gcvalues.background = color.pixel;
-	return XCreateGC(dpy, XtWindow(crt),
-			 GCForeground | GCBackground,
-			 &gcvalues);
+        XGCValues gcvalues;
+        memset(&gcvalues, 0, sizeof(gcvalues));
+        gcvalues.foreground = gcvalues.background = color.pixel;
+        return XCreateGC(dpy, XtWindow(crt),
+                         GCForeground | GCBackground,
+                         &gcvalues);
     }
     /* allocation failed */
     return NULL;
@@ -362,21 +339,21 @@ ws_display_point(int x, int y, void *color)
     GC gc = (GC) color;
 
     if (x > xpixels || y > ypixels)
-	return;
+        return;
 
-    y = ypixels - y - 1;		/* X11 coordinate system */
+    y = ypixels - y - 1;                /* X11 coordinate system */
 
 #ifdef FULL_SCREEN
     x += xoffset;
     y += yoffset;
 #endif
     if (gc == NULL)
-	gc = blackGC;			/* default to off */
+        gc = blackGC;                   /* default to off */
 #if PIX_SIZE == 1
     XDrawPoint(dpy, XtWindow(crt), gc, x, y);
 #else
     XFillRectangle(dpy, XtWindow(crt), gc,
-		   x*PIX_SIZE, y*PIX_SIZE, PIX_SIZE, PIX_SIZE);
+                   x*PIX_SIZE, y*PIX_SIZE, PIX_SIZE, PIX_SIZE);
 #endif
 }
 
@@ -403,10 +380,10 @@ elapsed(struct elapsed_state *ep)
 
     gettimeofday(&ep->tvs[ep->new], NULL);
     if (ep->tvs[!ep->new].tv_sec == 0)
-	val = ~0L;
+        val = ~0L;
     else
-	val = ((ep->tvs[ep->new].tv_sec - ep->tvs[!ep->new].tv_sec) * 1000000 +
-	       (ep->tvs[ep->new].tv_usec - ep->tvs[!ep->new].tv_usec));
+        val = ((ep->tvs[ep->new].tv_sec - ep->tvs[!ep->new].tv_sec) * 1000000 +
+               (ep->tvs[ep->new].tv_usec - ep->tvs[!ep->new].tv_usec));
     ep->new = !ep->new;
     return val;
 }
@@ -415,33 +392,33 @@ elapsed(struct elapsed_state *ep)
 int
 ws_poll(int *valp, int maxusec)
 {
-    static struct elapsed_state es;	/* static to avoid clearing! */
+    static struct elapsed_state es;     /* static to avoid clearing! */
 
 #ifdef WS_POLL_DEBUG
     printf("ws_poll %d\n", maxusec);
     fflush(stdout);
 #endif
-    elapsed(&es);			/* start clock */
+    elapsed(&es);                       /* start clock */
     do {
-	unsigned long e;
+        unsigned long e;
 
-	/* tried checking return, but lost on TCP connections? */
-	os_pollfd(ConnectionNumber(dpy), maxusec);
+        /* tried checking return, but lost on TCP connections? */
+        os_pollfd(ConnectionNumber(dpy), maxusec);
 
-	while (XtAppPending(app_context)) {
-	    XEvent event;
+        while (XtAppPending(app_context)) {
+            XEvent event;
 
-	    /* XXX check for connection loss; set *valp? return 0 */
-	    XtAppNextEvent(app_context, &event );
-	    XtDispatchEvent( &event );
-	}
-	e = elapsed(&es);
+            /* XXX check for connection loss; set *valp? return 0 */
+            XtAppNextEvent(app_context, &event );
+            XtDispatchEvent( &event );
+        }
+        e = elapsed(&es);
 #ifdef WS_POLL_DEBUG
-	printf(" maxusec %d e %d\r\n", maxusec, e);
-	fflush(stdout);
+        printf(" maxusec %d e %d\r\n", maxusec, e);
+        fflush(stdout);
 #endif
-	maxusec -= e;
-    } while (maxusec > 10000);	/* 10ms */
+        maxusec -= e;
+    } while (maxusec > 10000);  /* 10ms */
     return 1;
 }
 
@@ -455,14 +432,14 @@ ws_loop(void (*func)(void *), void *arg)
 
     /* XXX use XtAppAddWorkProc & XtAppMainLoop? */
     while (ws_poll(&val,0))
-	(*func)(arg);
+        (*func)(arg);
     return val;
 }
 
 void
 ws_beep(void)
 {
-    XBell(dpy, 0);			/* ring at base volume */
+    XBell(dpy, 0);                      /* ring at base volume */
     XFlush(dpy);
 }
 
@@ -498,13 +475,13 @@ os_pollfd(int fd, int maxus)
     fd_set rfds;
     struct timeval tv;
 
-    if (maxus >= 1000000) {		/* not bloody likely, avoid divide */
-	tv.tv_sec = maxus / 1000000;
-	tv.tv_usec = maxus % 1000000;
+    if (maxus >= 1000000) {             /* not bloody likely, avoid divide */
+        tv.tv_sec = maxus / 1000000;
+        tv.tv_usec = maxus % 1000000;
     }
     else {
-	tv.tv_sec = 0;
-	tv.tv_usec = maxus;
+        tv.tv_sec = 0;
+        tv.tv_usec = maxus;
     }
     FD_ZERO(&rfds);
     FD_SET(fd, &rfds);

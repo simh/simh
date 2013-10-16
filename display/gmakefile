@@ -1,22 +1,26 @@
-# $Id: gmakefile,v 1.17 2004/01/24 08:31:56 phil Exp - revised by DAG
+# $Id: gmakefile,v 1.24 2005/11/05 02:06:14 phil Exp $
 
 # (GNU) Makefile for test programs under Unix/X11 and Win32
 #
 # Unix:
-#	edit Unix defs to fit your compiler/library environment, then
-#	gmake -f gmakefile
+#       edit Unix defs to fit your compiler/library environment, then
+#       gmake -f gmakefile
 # or if GNU make is the default:
-#	make -f gmakefile
+#       make -f gmakefile
+#
+# OS X (Carbon)
+#       make -f gmakefile OSX=1
 #
 # Win32 (Cygwin)
-#	make WIN32=1
+#       make -f gmakefile WIN32=1
 #
 # Win32 (MINGW):
-#	mingw32-make -f gmakefile WIN32=1
+#       mingw32-make -f gmakefile WIN32=1
 
 DISP_DEFS=-DTEST_DIS=DIS_VR48 -DTEST_RES=RES_HALF # -DDEBUG_VT11
 
 ifeq ($(WIN32),)
+ifeq ($(OSX),)
 #Unix environments
 X11BASE=/usr/X11R6
 X11LIBDIR=$(X11BASE)/lib
@@ -25,6 +29,10 @@ LIBS=-L$(X11LIBDIR) -lXt -lX11 -lm
 OSFLAGS=-I$(X11INCDIR)
 DRIVER=x11.o
 EXT=
+else
+DRIVER=carbon.o
+LIBS=-framework Carbon
+endif
 else
 #Win32 environments
 LIBS=-lgdi32
@@ -39,39 +47,40 @@ CFLAGS=$(OPT) $(PROF) $(OSFLAGS) $(DISP_DEFS)
 CC=gcc -Wunused
 LDFLAGS=$(PROF)
 
-ALL=	munch$(EXT) vt11$(EXT)
-ALL:	$(ALL)
+ALL=    munch$(EXT) vt11$(EXT)
+ALL:    $(ALL)
 
 # munching squares; see README file for
 # how to use console switches
 
-MUNCH=$(DRIVER) display.o test.o
+MUNCH=$(DRIVER) xy.o test.o
 munch$(EXT): $(MUNCH)
-	$(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
+        $(CC) $(LDFLAGS) -o munch$(EXT) $(MUNCH) $(LIBS)
 
-VT11=$(DRIVER) vt11.o vttest.o display.o
+VT11=$(DRIVER) vt11.o vttest.o xy.o
 vt11$(EXT): $(VT11)
-	$(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
+        $(CC) $(LDFLAGS) -o vt11$(EXT) $(VT11) $(LIBS)
 
-display.o: display.h ws.h
-vt11.o: display.h vt11.h
-x11.o: ws.h display.h
+xy.o: xy.h ws.h
+vt11.o: xy.h vt11.h
+x11.o: ws.h xy.h
+carbon.o: ws.h
 win32.o: ws.h
-test.o: display.h vt11.h
-vttest.o: display.h vt11.h vtmacs.h
+test.o: xy.h vt11.h
+vttest.o: xy.h vt11.h vtmacs.h
 
 clean:
 ifeq ($(WIN32),)
-	rm -f *.o *~ .#*
+        rm -f *.o *~ .#*
 else
-	if exist *.o del /q *.o
-	if exist *~ del /q *~
-	if exist .#* del /q .#*
+        if exist *.o del /q *.o
+        if exist *~ del /q *~
+        if exist .#* del /q .#*
 endif
 
 clobber: clean
 ifeq ($(WIN32),)
-	rm -f $(ALL)
+        rm -f $(ALL)
 else
-	if exist *.exe del /q *.exe
+        if exist *.exe del /q *.exe
 endif

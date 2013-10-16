@@ -1,0 +1,114 @@
+		     PLAYING MOONLANDER (LEM)
+
+
+The object of moonlander is to land a lunar module on the
+surface of the moon.  The program will run on any 8K GT40
+with a light pen and a clock.  If you are attached to a PDP-10
+you may use the ROM bootstrap to bring over the assembled
+binary.  If you are not "talking" to a PDP-10, you may load
+in the binary loader (absolute loader) and load in the paper
+tape version of the program.  Note: the program will destroy
+the binary loader when it starts running.
+
+When the program is loaded, it will automatically start and
+display an "introductory message" on the screen.  Future
+restart of the program will not cause this message to be
+displayed.  Should any problems occur, the program may be
+restarted at any time at location zero (000000).  Power fail
+protection is also provided.  After starting (or restarting),
+you then start playing the actual game.  All numbers, speeds,
+weights, etc., are actual numbers.  They are for real.  To
+make the game more possible for an average person to play, I
+have given him about 25 to 50% more fuel in the final stages
+of landing than he would actually have.
+
+What the user sees on the screen is a broad and extremely
+mountainous view of the moon.  On the right is a list of data
+parameters which the user may examine.  They are height,
+altitude, angle, fuel left, thrust, weight, horizontal velocity,
+vertical velocity, horizontal acceleration, vertical accelera-
+tion, distance and seconds.  At the top of the screen, any
+four of the values may be displayed.  To display an item, the
+user points the light pen at the item he wishes to display.
+The item will then start blinking, to indicate that this is the
+item to be displayed.  The user then points the light pen at
+one of the previously displayed items at the top of the screen.
+The old item disappears and is replaced by the new item.
+Note that it is possible to display any item anywhere, and even
+possible to display one item four times at the top.  Anyway,
+the parameters mean the following.  Height is the height in
+feet above the surface (terrain) of the moon.  It is the "radar"
+height.  Altitude is the height above the "mean" height of the
+moon ( I guess you would call it "mare" level).  Thus altitude
+is not affected by terrain.  Angle is the angle of the ship in
+relationship to the vertical.  10 degrees, -70 degrees, etc.
+Fuel left is the amount of fuel left in pounds.  Thrust is the
+amount of thrust (pounds) currently being produced by the engine.
+Weight is the current earth weight of the ship.  As fuel is
+burned off, the acceleration will increase due to a lessening of
+weight.  The horizontal velocity is the current horizontal speed
+of the ship, in feet per second.  It is necessary to land at
+under 10 fps horizontal, or else the ship will tip over.
+Vertical velocity is the downward speed of the ship.  Try to
+keep it under 30 for the first few landings, until you get
+better.  A perfect landing is under 8 fps.  The horizontal
+and vertical accelerations are just those, in f/sec/sec.
+With no power, the vertical acceleration is about 5 fp/s/s
+down (-5).  Distance is the horizontal distance (X direction)
+you are from the projected landing site.  Try to stay within
+500 feet of this distance, because there are not too many
+spots suitable for landing on the moon.  Seconds is just the
+time since you started trying to land.  Thus you now know how
+to display information and what they mean.
+
+To control the ship, two controls are provided.  The first
+controls the rolling or turning of the ship.  This is accom-
+plished by four arrows just above the display menu.  Two point
+left and two point right.  The two pointing left mean rotate
+left and the two pointing right mean rotate right.  There is
+a big and a little one in each direction.  The big one means
+to rotate "fast" and the small one means to rotate "slow".
+Thus to rotate fast left, you point the light pen at
+left arrow.  To rotate slow right, you point the light pen at
+the small arrow pointing to the right.  The arrow will get
+slightly brighter to indicate you have chosen it.  Above the
+arrow there is a bright, solid bar.  This bar is your throttle
+bar.  To its left there is a number in percent (say 50%).  This
+number indicates the percentage of full thrust your rocket
+engine is developing.  The engine can develop anywhere from
+10% to 100% thrust - full thrust is 10,500 pounds.  The
+engine thrust cannot fall below 10%.  That is the way Grumman
+built it (actually the subcontractor).  To increase or decrease
+your thrust, you merely slide the light pen up and down the bar.
+The indicated percentage thrust will change accordingly.
+
+Now we come to actually flying the beast.  The module appears
+in the upper left hand corner of the screen and is traveling
+down and to the right.  Your job is to land at the correct
+spot (for the time being, we will say this is when the
+distance and height both reach zero).  The first picture you
+see, with the module in the upper left hand corner, is not
+drawn to scale (the module appears too big in relationship
+to the mountains).  Should you successfully get below around
+400 feet altitude, the view will now change to a closeup
+view of the landing site, and everything will be in scale.
+Remember, it is not easy to land the first few times, but
+don't be disappointed, you'll do it.  Be careful, the game
+is extremely addictive.  It is also quite dynamic.
+
+Incorporated in the game are just about everything the GT40
+can do.  Letters, italics, light pen letters, a light bar,
+dynamic motion, various line types and intensities (the moon
+is not all the same brightness you know).  It also shows that
+the GT40 can do a lot of calculations while maintaining a
+reasonable display.
+
+There are three possible landing sites on the Moon:
+
+    1.  On the extreme left of the landscape
+
+    2.  A small flat area to the right of the mountains
+
+    3.  In the large "flat" area on the right
+
+Good Luck!

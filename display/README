@@ -40,9 +40,9 @@ We're not GUI programmers, so the code is PRIMITIVE!!
 Started from VC8E simulator by Douglas W. Jones
 (distribution 5, of Feb 4, 1997);
 
-	This PDP8 Emulator was written by Douglas W. Jones at the
-	University of Iowa.  It is distributed as freeware, of
-	uncertain function and uncertain utility.
+        This PDP8 Emulator was written by Douglas W. Jones at the
+        University of Iowa.  It is distributed as freeware, of
+        uncertain function and uncertain utility.
 
 Original phosphor decay constants for Type 30 display from XMame 0.72.1
 
@@ -71,30 +71,30 @@ makefile.
 To compile test programs:
 ========================
 On Unix:
-	# edit smakefile to match your environment
-	make -f smakefile
+        # edit smakefile to match your environment
+        make -f smakefile
 or
-	gmake -f gmakefile
+        gmake -f gmakefile
 
 On Win32 (using Cygwin);
-	make -f gmakefile WIN32=1
+        make -f gmakefile WIN32=1
 
 On Win32 (using MINGW):
-	# edit smakefile to match your environment
-	make -f smakefile
+        # edit smakefile to match your environment
+        make -f smakefile
 or
-	mingw32-make -f gmakefile WIN32=1
+        mingw32-make -f gmakefile WIN32=1
 or
-	execute build-mingw.bat in a DOS command window
+        execute build-mingw.bat in a DOS command window
 
 creates:
 
-	munch:	standalone simulation of PDP-1 munching squares;
-		examines console "test switches" (see next section)
+        munch:  standalone simulation of PDP-1 munching squares;
+                examines console "test switches" (see next section)
 
-	vt11:	sequences through VT11/VS60 simulator test displays;
-		shows how the diplay-processor simulator can be used
-		from applications other than PDP-11 simulators
+        vt11:   sequences through VT11/VS60 simulator test displays;
+                shows how the diplay-processor simulator can be used
+                from applications other than PDP-11 simulators
 
 Console switches:
 ================
@@ -110,13 +110,13 @@ Spacewar Switches:
 
 Key presses for simulated Spacewar control box switches;
 
-action				player
-				1	2
-rotate clockwise		a	k
-rotate counter clockwise	s	l
-fire engines			d	;
-launch torpedo			f	'
-hyperspace (both at once)	as	kl
+action                          player
+                                1       2
+rotate clockwise                a       k
+rotate counter clockwise        s       l
+fire engines                    d       ;
+launch torpedo                  f       '
+hyperspace (both at once)       as      kl
 
 Light pen:
 =========
@@ -131,28 +131,28 @@ Too many compile time parameters:
 
 Read the comments in display.c for more explanations!!
 
-DISPLAY_TYPE	default display type, one of:
-		DIS_VR14, DIS_VR17, DIS_VR20, DIS_VR48, DIS_TYPE30, DIS_TYPE340
-		selects screen characteristics (phosphor, dimensions).
+DISPLAY_TYPE    default display type, one of:
+                DIS_VR14, DIS_VR17, DIS_VR20, DIS_VR48, DIS_TYPE30, DIS_TYPE340
+                selects screen characteristics (phosphor, dimensions).
 
-		Only affects programs which do not make an expicit
-		display_init() call.
+                Only affects programs which do not make an expicit
+                display_init() call.
 
-PIX_SCALE	one of RES_FULL, RES_HALF, RES_QUARTER, RES_EIGHTH
-		selects default display scaling factor.
+PIX_SCALE       one of RES_FULL, RES_HALF, RES_QUARTER, RES_EIGHTH
+                selects default display scaling factor.
 
-PEN_RADIUS	default radius of light pen in (scaled) pixels
+PEN_RADIUS      default radius of light pen in (scaled) pixels
 
-MAXELAPSED	Upper limit in real microseconds between polls/delays
-MINELAPSED	Lower limit in real microseconds between polls/delays
-MINDELAY	Lower limit in real microseconds for attempted delay
-MAXDELAY	Upper limit in real microseconds for attempted delay
-GAINSHIFT	delay_check increment/decrement gain factor
+MAXELAPSED      Upper limit in real microseconds between polls/delays
+MINELAPSED      Lower limit in real microseconds between polls/delays
+MINDELAY        Lower limit in real microseconds for attempted delay
+MAXDELAY        Upper limit in real microseconds for attempted delay
+GAINSHIFT       delay_check increment/decrement gain factor
 
 In display system support (x11.c, win32.c);
 
-PIX_SIZE	selects displayed pixel size (default 1)
-		makes screen larger, useful when display scaled to small size
+PIX_SIZE        selects displayed pixel size (default 1)
+                makes screen larger, useful when display scaled to small size
 
 Programming interface:
 =====================

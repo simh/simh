@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../;../PDP1/"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;USE_DISPLAY"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -128,7 +128,7 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../;../PDP1/"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;USE_DISPLAY"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -190,6 +190,10 @@
 			Filter="cpp;c;cxx;def;odl;idl;hpj;bat;asm"
 			>
 			<File
+				RelativePath="..\display\display.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP1\pdp1_clk.c"
 				>
 			</File>
@@ -199,6 +203,10 @@
 			</File>
 			<File
 				RelativePath="..\PDP1\pdp1_dcs.c"
+				>
+			</File>
+			<File
+				RelativePath="..\PDP1\pdp1_dpy.c"
 				>
 			</File>
 			<File
@@ -261,11 +269,19 @@
 				RelativePath="..\sim_tmxr.c"
 				>
 			</File>
+			<File
+				RelativePath="..\display\win32.c"
+				>
+			</File>
 		</Filter>
 		<Filter
 			Name="Header Files"
 			Filter="h;hpp;hxx;hm;inl;inc"
 			>
+			<File
+				RelativePath="..\display\display.h"
+				>
+			</File>
 			<File
 				RelativePath="..\PDP1\pdp1_defs.h"
 				>
@@ -316,6 +332,10 @@
 			</File>
 			<File
 				RelativePath="..\sim_tmxr.h"
+				>
+			</File>
+			<File
+				RelativePath="..\display\ws.h"
 				>
 			</File>
 		</Filter>

@@ -1,5 +1,5 @@
 /*
- * $Id: win32.c,v 1.38 2004/02/07 06:32:01 phil Exp $
+ * $Id: win32.c,v 1.39 2005/01/14 18:58:03 phil Exp $
  * Win32 support for XY display simulator
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -47,14 +47,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "ws.h"
-#include "display.h"
+#include "xy.h"
 
 #ifndef PIX_SIZE
 #define PIX_SIZE 1
 #endif
 
 #define APP_CLASS "XYAppClass"
-#define APP_MENU "XYAppMenu"		/* ?? */
+#define APP_MENU "XYAppMenu"            /* ?? */
 
 /*
  * light pen location
@@ -77,8 +77,8 @@ static __inline int
 map_key(int k)
 {
     switch (k) {
-    case 186: return ';';		/* VK_OEM_1? */
-    case 222: return '\'';		/* VK_OEM_7? */
+    case 186: return ';';               /* VK_OEM_1? */
+    case 222: return '\'';              /* VK_OEM_7? */
     }
     return k;
 }
@@ -115,9 +115,9 @@ mousepos(DWORD lp)
 
     /* if window has been stretched, can get out of range bits!! */
     if (x >= 0 && x < xpixels && y >= 0 && y < ypixels) {
-	/* checked by display_add_point() */
-	ws_lp_x = x;
-	ws_lp_y = y;
+        /* checked by display_add_point() */
+        ws_lp_x = x;
+        ws_lp_y = y;
     }
 }
 
@@ -128,56 +128,56 @@ patsy(HWND wh, UINT msg, WPARAM wp, LPARAM lp) /* "WndProc" */
     /* printf("msg %d\n", msg); */
     switch (msg) {
     case WM_DESTROY:
-	PostQuitMessage(0);
-	return 0;
+        PostQuitMessage(0);
+        return 0;
 
     case WM_MOUSEMOVE:
-	if (wp & (MK_LBUTTON|MK_MBUTTON|MK_RBUTTON)) {
+        if (wp & (MK_LBUTTON|MK_MBUTTON|MK_RBUTTON)) {
 #ifdef SWITCH_CURSORS
-	    if (ws_lp_x == -1 && !display_tablet)
-		SetCursor(cross);
+            if (ws_lp_x == -1 && !display_tablet)
+                SetCursor(cross);
 #endif
-	    mousepos(lp);
-	}
+            mousepos(lp);
+        }
 #ifdef SWITCH_CURSORS
-	else if (ws_lp_x != -1 && !display_tablet)
-	    SetCursor(arrow);
+        else if (ws_lp_x != -1 && !display_tablet)
+            SetCursor(arrow);
 #endif
-	break;				/* return?? */
+        break;                          /* return?? */
 
     case WM_LBUTTONDOWN:
-	display_lp_sw = 1;
+        display_lp_sw = 1;
     case WM_MBUTTONDOWN:
     case WM_RBUTTONDOWN:
 #ifdef SWITCH_CURSORS
-	if (!display_tablet)
-	    SetCursor(cross);
+        if (!display_tablet)
+            SetCursor(cross);
 #endif
-	mousepos(lp);
-	break;				/* return?? */
+        mousepos(lp);
+        break;                          /* return?? */
 
     case WM_LBUTTONUP:
-	display_lp_sw = 0;
+        display_lp_sw = 0;
     case WM_MBUTTONUP:
     case WM_RBUTTONUP:
 #ifdef SWITCH_CURSORS
-	if (!display_tablet)
-	    SetCursor(arrow);
+        if (!display_tablet)
+            SetCursor(arrow);
 #endif
-	ws_lp_x = ws_lp_y = -1;
-	break;				/* return?? */
+        ws_lp_x = ws_lp_y = -1;
+        break;                          /* return?? */
 
     case WM_KEYDOWN:
-	keydown(wp);
-	break;
+        keydown(wp);
+        break;
 
     case WM_KEYUP:
-	keyup(wp);
-	break;
+        keyup(wp);
+        break;
 
     case WM_PAINT:
-	display_repaint();
-	break;				/* return?? */
+        display_repaint();
+        break;                          /* return?? */
     }
     return DefWindowProc(wh, msg, wp, lp);
 }
@@ -188,18 +188,18 @@ ws_poll(int *valp, int maxus)
 #ifdef THREADS
     /* msgthread handles window events; just delay simulator */
     if (maxus > 0)
-	Sleep((maxus+999)/1000);
+        Sleep((maxus+999)/1000);
 #else
     MSG msg;
     DWORD start;
     int maxms = (maxus + 999) / 1000;
 
     for (start = GetTickCount(); GetTickCount() - start < maxms; Sleep(1)) {
-	/* empty message queue without blocking */
-	while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-	    TranslateMessage(&msg);
-	    DispatchMessage(&msg);
-	}
+        /* empty message queue without blocking */
+        while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
     }
 #endif
     return 1;
@@ -211,7 +211,7 @@ ws_loop(void (*func)(void *), void *arg)
 {
     int val;
     while (ws_poll(&val, 0))
-	(*func)(arg);
+        (*func)(arg);
     return val;
 }
 
@@ -223,37 +223,37 @@ ws_init2(void) {
 
 #ifdef SWITCH_CURSORS
     if (!display_tablet) {
-	arrow = LoadCursor(NULL, IDC_ARROW);
-	cross = LoadCursor(NULL, IDC_CROSS);
+        arrow = LoadCursor(NULL, IDC_ARROW);
+        cross = LoadCursor(NULL, IDC_CROSS);
     }
 #endif
 
     black_brush = GetStockObject(BLACK_BRUSH);
     white_brush = GetStockObject(WHITE_BRUSH);
 
-    wc.lpszClassName	= APP_CLASS;
-    wc.lpfnWndProc	= patsy;
-    wc.style		= CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
-			/* also CS_NOCLOSE? CS_SAVEBITS? */
+    wc.lpszClassName    = APP_CLASS;
+    wc.lpfnWndProc      = patsy;
+    wc.style            = CS_OWNDC | CS_VREDRAW | CS_HREDRAW;
+                        /* also CS_NOCLOSE? CS_SAVEBITS? */
 
-    wc.hInstance	= static_inst = GetModuleHandleA(0);
-    wc.hIcon		= LoadIcon(NULL, IDI_APPLICATION);
+    wc.hInstance        = static_inst = GetModuleHandleA(0);
+    wc.hIcon            = LoadIcon(NULL, IDI_APPLICATION);
 #ifdef SWITCH_CURSORS
-    wc.hCursor		= NULL;
+    wc.hCursor          = NULL;
 #else
-    wc.hCursor		= display_tablet ? NULL : LoadCursor(NULL, IDC_CROSS);
+    wc.hCursor          = display_tablet ? NULL : LoadCursor(NULL, IDC_CROSS);
 #endif
-    wc.hbrBackground	= black_brush;
-    wc.lpszMenuName	= APP_MENU;
-    wc.cbClsExtra	= 0;
-    wc.cbWndExtra	= 0; 
+    wc.hbrBackground    = black_brush;
+    wc.lpszMenuName     = APP_MENU;
+    wc.cbClsExtra       = 0;
+    wc.cbWndExtra       = 0; 
     /* WNDCLASSEX/RegisterClassEx include hIconSm (small icon) */
     RegisterClass(&wc);
 
     /* 
      * WS_OVERLAPPEDWINDOW=>
-     *	WS_OVERLAPPED, WS_CAPTION, WS_SYSMENU, WS_THICKFRAME,
-     *	WS_MINIMIZEBOX, WS_MAXIMIZEBOX
+     *  WS_OVERLAPPED, WS_CAPTION, WS_SYSMENU, WS_THICKFRAME,
+     *  WS_MINIMIZEBOX, WS_MAXIMIZEBOX
      *
      * WS_CHILD (no menu bar), WS_POPUP (mutually exclusive)
      */
@@ -263,15 +263,15 @@ ws_init2(void) {
     h = (ypixels*PIX_SIZE)+32;
     /* XXX -- above values work with XP; Phil had +10,+30 */
 
-    static_wh = CreateWindow(APP_CLASS,		/* registered class name */
-			     window_name,	/* window name */
-			     WS_OVERLAPPED,	/* style */
-			     CW_USEDEFAULT, CW_USEDEFAULT, /* X,Y */
-			     w, h,
-			     NULL,		/* HWND hWndParent */
-			     NULL,		/* HMENU hMenu */
-			     static_inst,	/* application instance */
-			     NULL);		/* lpParam */
+    static_wh = CreateWindow(APP_CLASS,         /* registered class name */
+                             window_name,       /* window name */
+                             WS_OVERLAPPED,     /* style */
+                             CW_USEDEFAULT, CW_USEDEFAULT, /* X,Y */
+                             w, h,
+                             NULL,              /* HWND hWndParent */
+                             NULL,              /* HMENU hMenu */
+                             static_inst,       /* application instance */
+                             NULL);             /* lpParam */
 
     ShowWindow(static_wh, SW_SHOW);
     UpdateWindow(static_wh);
@@ -292,8 +292,8 @@ msgthread(LPVOID arg)
     init_done = 1;
 
     while (GetMessage(&msg, NULL, 0, 0) > 0) {
-	TranslateMessage(&msg);
-	DispatchMessage(&msg);
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
     }
     return msg.wParam;
 }
@@ -301,17 +301,17 @@ msgthread(LPVOID arg)
 static void
 ws_thread_init(void)
 {
-    HANDLE th = CreateThread(NULL,		/* sec. attr. */
-			     0,			/* stack size */
-			     msgthread,
-			     NULL,		/* param */
-			     0,			/* flags */
-			     &msgthread_id);
+    HANDLE th = CreateThread(NULL,              /* sec. attr. */
+                             0,                 /* stack size */
+                             msgthread,
+                             NULL,              /* param */
+                             0,                 /* flags */
+                             &msgthread_id);
     CloseHandle(th);
 
     /* XXX use a mutex; don't wait forever!! */
     while (!init_done)
-	;
+            Sleep(200);
 }
 #endif /* THREADS */
 
@@ -328,7 +328,7 @@ ws_init(char *name, int xp, int yp, int colors)
 #else
     ws_init2();
 #endif
-    return 1;				/* XXX return errors!! */
+    return 1;                           /* XXX return errors!! */
 }
 
 void *
@@ -358,9 +358,9 @@ ws_display_point(int x, int y, void *color)
     HBRUSH brush = color;
 
     if (x > xpixels || y > ypixels)
-	return;
+        return;
 
-    y = ypixels - 1 - y;		/* invert y, top left origin */
+    y = ypixels - 1 - y;                /* invert y, top left origin */
 
     /* top left corner */
     r.left = x*PIX_SIZE;
@@ -371,7 +371,7 @@ ws_display_point(int x, int y, void *color)
     r.bottom = (y+1)*PIX_SIZE;
 
     if (brush == NULL)
-	brush = black_brush;
+        brush = black_brush;
 
     dc = GetDC(static_wh);
     FillRect(dc, &r, brush);
@@ -390,7 +390,7 @@ ws_beep(void) {
     MessageBeep(MB_OK);
 #else
     /* works over terminal service? Plays default sound/beep on Win9x/ME */
-    Beep(440, 500);			/* Hz, ms. */
+    Beep(440, 500);                     /* Hz, ms. */
 #endif
 }
 
@@ -410,9 +410,9 @@ os_elapsed(void)
      */
     t[new] = GetTickCount();
     if (t[!new] == 0)
-	ret = ~0L;			/* +INF */
+        ret = ~0L;                      /* +INF */
     else
-	ret = (t[new] - t[!new]) * 1000;
-    new = !new;				/* Ecclesiastes III */
+        ret = (t[new] - t[!new]) * 1000;
+    new = !new;                         /* Ecclesiastes III */
     return ret;
 }

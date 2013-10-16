@@ -1,0 +1,21 @@
+munching squares
+
+1000/
+
+// from dpbsmith's web page:
+// http://world.std.com/~dpbsmith/munch.html
+
+// classic: 04000
+// fun: 1, 4014, 4016, 100000
+
+foo,	lat
+	add \v
+	dac v
+	rcl 9s
+	xor v
+	dpy-4000
+	jmp foo
+
+variables
+
+start foo

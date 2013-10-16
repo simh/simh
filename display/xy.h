@@ -1,5 +1,5 @@
 /*
- * $Id: display.h,v 1.13 2004/01/24 08:34:33 phil Exp $
+ * $Id: xy.h,v 1.13 2004/01/24 08:34:33 phil Exp $
  * interface to O/S independent layer of XY display simulator
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -41,7 +41,6 @@ enum display_type {
     DIS_VR17 = 17,
     DIS_VR20 = 20,
     DIS_TYPE30 = 30,
-        DIS_TX0 = 33,
     DIS_VR48 = 48,
     DIS_TYPE340 = 340
 };
@@ -86,7 +85,7 @@ extern int display_age(int,int);
 #define DISPLAY_INT_MIN 0               /* lowest "on" level */
 
 /*
- * plot a point; argumen        ts are x, y, intensity, color (0/1)
+ * plot a point; arguments are x, y, intensity, color (0/1)
  * returns true if light pen active (mouse button down)
  * at (or very near) this location.
  *
@@ -139,5 +138,5 @@ extern unsigned char display_tablet;
  * users of this library are expected to provide these calls.
  * simulator will set 18 simulated switches.
  */
-extern unsigned long cpu_get_switches(void);	/* get current switch state */
-extern void cpu_set_switches(unsigned long);	/* set switches */
+extern unsigned long cpu_get_switches(void);    /* get current switch state */
+extern void cpu_set_switches(unsigned long);    /* set switches */

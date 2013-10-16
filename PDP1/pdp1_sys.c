@@ -58,7 +58,9 @@ extern DEVICE dt_dev;
 extern DEVICE drm_dev;
 extern DEVICE drp_dev;
 extern DEVICE dcs_dev, dcsl_dev;
+#if defined(USE_DISPLAY)
 extern DEVICE dpy_dev;
+#endif
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern int32 M[];
@@ -95,7 +97,9 @@ DEVICE *sim_devices[] = {
     &drp_dev,
     &dcs_dev,
     &dcsl_dev,
-/*  &dpy_dev, */
+#if defined(USE_DISPLAY)
+    &dpy_dev,
+#endif
     NULL
     };
 

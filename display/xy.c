@@ -1,5 +1,5 @@
 /*
- * $Id: display.c,v 1.57 2004/02/04 16:59:01 phil Exp $
+ * $Id: xy.c,v 1.59 2005/01/14 18:58:04 phil Exp $
  * Simulator and host O/S independent XY display simulator
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -7,9 +7,9 @@
  * with changes by Douglas A. Gwyn, 21 Jan. 2004
  *
  * started from PDP-8/E simulator vc8e.c;
- *  This PDP8 Emulator was written by Douglas W. Jones at the
- *  University of Iowa.  It is distributed as freeware, of
- *  uncertain function and uncertain utility.
+ *      This PDP8 Emulator was written by Douglas W. Jones at the
+ *      University of Iowa.  It is distributed as freeware, of
+ *      uncertain function and uncertain utility.
  */
 
 /*
@@ -41,9 +41,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <limits.h>         /* for USHRT_MAX */
+#include <limits.h>                     /* for USHRT_MAX */
 #include "ws.h"
-#include "display.h"
+#include "xy.h"
 
 /*
  * The user may select (at compile time) how big a window is used to
@@ -85,15 +85,15 @@
 #define ELEMENTS(X) (sizeof(X)/sizeof(X[0]))
 
 struct phosphor {
-    double red, green, blue;
-    double level;           /* decay level (0.5 for half life) */
-    double t_level;         /* seconds to decay to level */
+    float red, green, blue;
+    float level;                        /* decay level (0.5 for half life) */
+    float t_level;                      /* seconds to decay to level */
 };
 
 struct color {
     struct phosphor *phosphors;
     int nphosphors;
-    int half_life;          /* for refresh calc */
+    int half_life;                      /* for refresh calc */
 };
 
 struct display {
@@ -104,14 +104,15 @@ struct display {
 };
 
 /*
+ * P7 phosphor for type 30 (16ADP7(A?) CRT)
  * original phosphor constants from Raphael Nabet's XMame 0.72.1 PDP-1 sim.
- * not even sure Type30 really used P17 (guess by Daniel P. B. Smith)
+ * fast blue (.05s half life), and slow green (.2s half life)
  */
-static struct phosphor p17[] = {
-    {0.11, 0.11, 1.0,  0.5, 0.05},  /* fast blue */
-    {1.0,  1.0,  0.11, 0.5, 0.20}   /* slow yellow/green */
+static struct phosphor p7[] = {
+    {0.11, 0.11, 1.0,  0.5, 0.05},      /* fast blue */
+    {1.0,  1.0,  0.11, 0.5, 0.20}       /* slow yellow/green */
 };
-static struct color color_p17 = { p17, ELEMENTS(p17), 125000 };
+static struct color color_p7 = { p7, ELEMENTS(p7), 125000 };
 
 /* green phosphor for VR14, VR17, VR20 */
 static struct phosphor p29[] = {{0.0260, 1.0, 0.00121, 0.5, 0.025}};
@@ -129,23 +130,6 @@ static struct phosphor pred[] = { {1.0, 0.37, 0.37, 0.5, 0.10} };
 static struct color color_red = { pred, ELEMENTS(pred), 100000 };
 
 static struct display displays[] = {
-   /*
-     * TX-0
-     * 
-     *
-     * Unknown manufacturer
-     * 
-     * 12" tube, 
-     * maximum dot size ???
-     * 50us point plot time (20,000 points/sec)
-     * P17 Phosphor??? Two phosphor layers:
-     * fast blue (.05s half life), and slow green (.2s half life)
-     * 
-     * 
-     */
-    { DIS_TX0, "MIT TX-0", &color_p17, NULL, 512, 512 },
-
-    
     /*
      * Type 30
      * PDP-1/4/5/8/9/10 "Precision CRT" display system
@@ -155,12 +139,11 @@ static struct display displays[] = {
      * 16" tube, 14 3/8" square raster
      * maximum dot size .015"
      * 50us point plot time (20,000 points/sec)
-     * P17 Phosphor??? Two phosphor layers:
-     * fast blue (.05s half life), and slow green (.2s half life)
+     * P7 Phosphor? Two phosphor layers: fast blue, slow yellow/green
      * 360 lb
      * 7A at 115+-10V 60Hz
      */
-    { DIS_TYPE30, "Type 30", &color_p17, NULL, 1024, 1024 },
+    { DIS_TYPE30, "Type 30", &color_p7, NULL, 1024, 1024 },
 
     /*
      * VR14
@@ -223,7 +206,7 @@ static struct display displays[] = {
      * 0,0 at lower left
      * 8 intensity levels
      */
-    { DIS_TYPE340, "Type 340", &color_p17, NULL, 1024, 1024 }
+    { DIS_TYPE340, "Type 340", &color_p7, NULL, 1024, 1024 }
 };
 
 /*
@@ -252,9 +235,9 @@ static struct display displays[] = {
  *
  * refresh_rate = ((1e6*LEVELS_PER_HALFLIFE)/PHOSPHOR_HALF_LIFE)
  * refresh_interval = 1e6/DELAY_UNIT/refresh_rate
- *          = PHOSPHOR_HALF_LIFE/LEVELS_PER_HALF_LIFE
+ *                  = PHOSPHOR_HALF_LIFE/LEVELS_PER_HALF_LIFE
  * intensities = (HALF_LIVES_TO_DISPLAY*PHOSPHOR_HALF_LIFE)/refresh_interval
- *         = HALF_LIVES_TO_DISPLAY*LEVELS_PER_HALFLIFE
+ *             = HALF_LIVES_TO_DISPLAY*LEVELS_PER_HALFLIFE
  *
  * See also comments on display_age()
  *
@@ -314,15 +297,15 @@ typedef unsigned short delay_t;
 #define DELAY_T_MAX USHRT_MAX
 
 struct point {
-    struct point *next;         /* next entry in queue */
-    struct point *prev;         /* prev entry in queue */
-    delay_t delay;              /* delta T in DELAY_UNITs */
-    unsigned char ttl;          /* zero means off, not linked in */
-    unsigned char level : 7;    /* intensity level */
-    unsigned char color : 1;    /* for VR20 (two colors) */
+    struct point *next;                 /* next entry in queue */
+    struct point *prev;                 /* prev entry in queue */
+    delay_t delay;                      /* delta T in DELAY_UNITs */
+    unsigned char ttl;                  /* zero means off, not linked in */
+    unsigned char level : 7;            /* intensity level */
+    unsigned char color : 1;            /* for VR20 (two colors) */
 };
 
-static struct point *points;    /* allocated array of points */
+static struct point *points;            /* allocated array of points */
 static struct point _head;
 #define head (&_head)
 
@@ -404,12 +387,12 @@ queue_point(struct point *p)
 
 #ifdef PARANOIA
     if (p->ttl == 0 || p->ttl > MAXTTL)
-    printf("queuing %d,%d level %d!\n", X(p), Y(p), p->level);
+        printf("queuing %d,%d level %d!\n", X(p), Y(p), p->level);
     if (d > DELAY_T_MAX)
-    printf("queuing %d,%d delay %d!\n", X(p), Y(p), d);
+        printf("queuing %d,%d delay %d!\n", X(p), Y(p), d);
     if (queue_interval > DELAY_T_MAX)
-    printf("queue_interval (%d) > DELAY_T_MAX (%d)\n",
-           (int)queue_interval, DELAY_T_MAX);
+        printf("queue_interval (%d) > DELAY_T_MAX (%d)\n",
+               (int)queue_interval, DELAY_T_MAX);
 #endif /* PARANOIA defined */
 
     p->next = head;
@@ -436,14 +419,14 @@ queue_point(struct point *p)
  * if more than MAXELAPSED microseconds elapsed while simulating
  * delay_check simulated microseconds, decrease delay_check.
  */
-#define MAXELAPSED 100000       /* 10Hz */
+#define MAXELAPSED 100000               /* 10Hz */
 
 /*
  * lower bound for elapsed time between elapsed time checks.
  * if fewer than MINELAPSED microseconds elapsed while simulating
  * delay_check simulated microseconds, increase delay_check.
  */
-#define MINELAPSED 50000        /* 20Hz */
+#define MINELAPSED 50000                /* 20Hz */
 
 /*
  * upper bound for delay (sleep/poll).
@@ -454,7 +437,7 @@ queue_point(struct point *p)
  * should be <= MAXELAPSED
  */
 #ifndef MAXDELAY
-#define MAXDELAY 100000         /* 100ms */
+#define MAXDELAY 100000                 /* 100ms */
 #endif /* MAXDELAY not defined */
 
 /*
@@ -466,7 +449,7 @@ queue_point(struct point *p)
  * should be <= MINELAPSED
  */
 #ifndef MINDELAY
-#define MINDELAY 50000          /* 50ms */
+#define MINDELAY 50000                  /* 50ms */
 #endif /* MINDELAY not defined */
 
 /*
@@ -475,7 +458,7 @@ queue_point(struct point *p)
  * Fast systems should ramp up quickly.
  */
 #ifndef INITIAL_DELAY_CHECK
-#define INITIAL_DELAY_CHECK 1000    /* 1ms */
+#define INITIAL_DELAY_CHECK 1000        /* 1ms */
 #endif /* INITIAL_DELAY_CHECK */
 
 /*
@@ -483,7 +466,7 @@ queue_point(struct point *p)
  * of delay_check
  */
 #ifndef GAINSHIFT
-#define GAINSHIFT 3         /* gain=0.125 (12.5%) */
+#define GAINSHIFT 3                     /* gain=0.125 (12.5%) */
 #endif /* GAINSHIFT not defined */
 
 static void
@@ -501,11 +484,11 @@ display_delay(int t, int slowdown)
     if (sim_time < delay_check)
         return;
 
-    elapsed = os_elapsed();     /* read and reset elapsed timer */
-    if (elapsed == ~0L) {       /* first time thru? */
-        slowdown = 0;           /* no adjustments */
+    elapsed = os_elapsed();             /* read and reset elapsed timer */
+    if (elapsed == ~0L) {               /* first time thru? */
+        slowdown = 0;                   /* no adjustments */
         elapsed = sim_time;
-        }
+    }
 
     /*
      * get delta between elapsed (real) time, and simulated time.
@@ -514,7 +497,7 @@ display_delay(int t, int slowdown)
     if (slowdown)
         delay = sim_time - elapsed;
     else
-        delay = 0;              /* just poll */
+        delay = 0;                      /* just poll */
 
 #ifdef DEBUG_DELAY2
     printf("sim %d elapsed %d delay %d\r\n", sim_time, elapsed, delay);
@@ -543,20 +526,18 @@ display_delay(int t, int slowdown)
 #ifdef DEBUG_DELAY
             printf("reduced period to %d\r\n", delay_check);
 #endif /* DEBUG_DELAY defined */
-            }
         }
-    else 
-        if ((elapsed < MINELAPSED) || (slowdown && (delay < MINDELAY))) {
-            /* too little elapsed time passed, or delta very small */
-            int gain = delay_check>>GAINSHIFT;
-
-            if (gain == 0)
-                gain = 1;           /* make sure some change made! */
-            delay_check += gain;
+    }
+    else if (elapsed < MINELAPSED || slowdown && delay < MINDELAY) {
+        /* too little elapsed time passed, or delta very small */
+        int gain = delay_check>>GAINSHIFT;
+        if (gain == 0)
+            gain = 1;                   /* make sure some change made! */
+        delay_check += gain;
 #ifdef DEBUG_DELAY
-            printf("increased period to %d\r\n", delay_check);
+        printf("increased period to %d\r\n", delay_check);
 #endif /* DEBUG_DELAY defined */
-            }
+    }
     if (delay < 0)
         delay = 0;
     /* else if delay < MINDELAY, clamp at MINDELAY??? */
@@ -564,7 +545,7 @@ display_delay(int t, int slowdown)
     /* poll for window system events and/or delay */
     ws_poll(NULL, delay);
 
-    sim_time = 0;                   /* reset simulated time clock */
+    sim_time = 0;                       /* reset simulated time clock */
 
     /*
      * delay (poll/sleep) time included in next "elapsed" period
@@ -584,8 +565,8 @@ display_delay(int t, int slowdown)
  */
 
 int
-display_age(int t,          /* simulated us since last call */
-        int slowdown)       /* slowdown to simulated speed */
+display_age(int t,                      /* simulated us since last call */
+            int slowdown)               /* slowdown to simulated speed */
 {
     struct point *p;
     static int elapsed = 0;
@@ -609,11 +590,11 @@ display_age(int t,          /* simulated us since last call */
         int x, y;
 
         /* look at oldest entry */
-        if (p->delay > t) {         /* further than our reach? */
-            p->delay -= t;          /* update head */
-            queue_interval -= t;    /* update span */
-            break;                  /* quit */
-            }
+        if (p->delay > t) {             /* further than our reach? */
+            p->delay -= t;              /* update head */
+            queue_interval -= t;        /* update span */
+            break;                      /* quit */
+        }
 
         x = X(p);
         y = Y(p);
@@ -626,8 +607,8 @@ display_age(int t,          /* simulated us since last call */
         p->prev->next = p->next;
         p->next->prev = p->prev;
 
-        t -= p->delay;              /* lessen our reach */
-        queue_interval -= p->delay; /* update queue span */
+        t -= p->delay;                  /* lessen our reach */
+        queue_interval -= p->delay;     /* update queue span */
 
         ws_display_point(x, y, colors[p->color][p->level][--p->ttl]);
         changed = 1;
@@ -635,7 +616,7 @@ display_age(int t,          /* simulated us since last call */
         /* queue it back up, unless we just turned it off! */
         if (p->ttl > 0)
             queue_point(p);
-        }
+    }
     return changed;
 } /* display_age */
 
@@ -656,19 +637,19 @@ display_repaint(void) {
 
 /* (0,0) is lower left */
 static int
-intensify(int x,            /* 0..xpixels */
-      int y,                /* 0..ypixels */
-      int level,            /* 0..MAXLEVEL */
-      int color)            /* for VR20! 0 or 1 */
+intensify(int x,                        /* 0..xpixels */
+          int y,                        /* 0..ypixels */
+          int level,                    /* 0..MAXLEVEL */
+          int color)                    /* for VR20! 0 or 1 */
 {
     struct point *p;
     int bleed;
 
     if (x < 0 || x >= xpixels || y < 0 || y >= ypixels)
-        return 0;           /* limit to display */
+        return 0;                       /* limit to display */
 
     p = P(x,y);
-    if (p->ttl) {           /* currently lit? */
+    if (p->ttl) {                       /* currently lit? */
 #ifdef LOUD
         printf("%d,%d old level %d ttl %d new %d\r\n",
                x, y, p->level, p->ttl, level);
@@ -682,15 +663,13 @@ intensify(int x,            /* 0..xpixels */
         else
             p->next->delay += p->delay;
         p->next->prev = p->prev;
-        }
+    }
 
-    bleed = 0;              /* no bleeding for now */
+    bleed = 0;                          /* no bleeding for now */
 
     /* EXP: doesn't work... yet */
     /* if "recently" drawn, same or brighter, same color, make even brighter */
-    if (p->ttl >= MAXTTL*2/3 && 
-        level >= p->level && 
-        p->color == color &&
+    if (p->ttl >= MAXTTL*2/3 && level >= p->level && p->color == color &&
         level < MAXLEVEL)
         level++;
 
@@ -701,19 +680,19 @@ intensify(int x,            /* 0..xpixels */
     if (p->ttl != MAXTTL || p->level != level || p->color != color) {
         p->ttl = MAXTTL;
         p->level = level;
-        p->color = color;   /* save color even if monochrome */
+        p->color = color;               /* save color even if monochrome */
         ws_display_point(x, y, colors[p->color][p->level][p->ttl-1]);
-        }
+    }
 
-    queue_point(p);         /* put at end of list */
+    queue_point(p);                     /* put at end of list */
     return bleed;
 }
 
 int
-display_point(int x,        /* 0..xpixels (unscaled) */
-          int y,            /* 0..ypixels (unscaled) */
-          int level,        /* DISPLAY_INT_xxx */
-          int color)        /* for VR20! 0 or 1 */
+display_point(int x,                    /* 0..xpixels (unscaled) */
+              int y,                    /* 0..ypixels (unscaled) */
+              int level,                /* DISPLAY_INT_xxx */
+              int color)                /* for VR20! 0 or 1 */
 {
     long lx, ly;
 
@@ -726,15 +705,15 @@ display_point(int x,        /* 0..xpixels (unscaled) */
         if (scale == 2) {
             x >>= 1;
             y >>= 1;
-            }
+        }
         else {
             x /= scale;
             y /= scale;
-            }
         }
+    }
 
 #if DISPLAY_INT_MIN > 0
-    level -= DISPLAY_INT_MIN;       /* make zero based */
+    level -= DISPLAY_INT_MIN;           /* make zero based */
 #endif
     intensify(x, y, level, color);
     /* no bleeding for now (used to recurse for neighbor points) */
@@ -759,23 +738,22 @@ phosphor_init(struct phosphor *phosphors, int nphosphors, int color)
     /* for each display ttl level; newest to oldest */
     for (ttl = NTTL-1; ttl > 0; ttl--) {
         struct phosphor *pp;
-        double rr, rg, rb;  /* real values */
+        double rr, rg, rb;              /* real values */
 
         /* fractional seconds */
         double t = ((double)(NTTL-1-ttl))/refresh_rate;
 
-        int ilevel;         /* intensity levels */
+        int ilevel;                     /* intensity levels */
         int p;
 
         /* sum over all phosphors in mixture */
         rr = rg = rb = 0.0;
         for (pp = phosphors, p = 0; p < nphosphors; pp++, p++) {
             double decay = pow(pp->level, t/pp->t_level);
-
             rr += decay * pp->red;
             rg += decay * pp->green;
             rb += decay * pp->blue;
-            }
+        }
 
         /* scale for brightness for each intensity level */
         for (ilevel = MAXLEVEL; ilevel >= 0; ilevel--) {
@@ -788,30 +766,30 @@ phosphor_init(struct phosphor *phosphors, int nphosphors, int color)
               * for each of R G and B to be greater than 1.0
               */
 
-             r = (int)(rr * level_scale[ilevel] * 0xffff);
+             r = rr * level_scale[ilevel] * 0xffff;
              if (r > 0xffff) r = 0xffff;
 
-             g = (int)(rg * level_scale[ilevel] * 0xffff);
+             g = rg * level_scale[ilevel] * 0xffff;
              if (g > 0xffff) g = 0xffff;
 
-             b = (int)(rb * level_scale[ilevel] * 0xffff);
+             b = rb * level_scale[ilevel] * 0xffff;
              if (b > 0xffff) b = 0xffff;
 
              cp = ws_color_rgb(r, g, b);
-             if (!cp) {                     /* allocation failed? */
-             if (ttl == MAXTTL-1) {         /* brand new */
-                 if (ilevel == MAXLEVEL)    /* highest intensity? */
-                     cp = ws_color_white(); /* use white */
-                 else
-                     cp = colors[color][ilevel+1][ttl]; /* use next lvl */
-             } /* brand new */
-             else if (r + g + b >= 0xffff*3/3) /* light-ish? */
-                 cp = colors[color][ilevel][ttl+1]; /* use previous TTL */
+             if (!cp) {                         /* allocation failed? */
+                 if (ttl == MAXTTL-1) {         /* brand new */
+                     if (ilevel == MAXLEVEL)    /* highest intensity? */
+                         cp = ws_color_white(); /* use white */
+                     else
+                         cp = colors[color][ilevel+1][ttl]; /* use next lvl */
+                 } /* brand new */
+                 else if (r + g + b >= 0xffff*3/3) /* light-ish? */
+                     cp = colors[color][ilevel][ttl+1]; /* use previous TTL */
                  else
                      cp = ws_color_black();
              }
              colors[color][ilevel][ttl] = cp;
-        } /* for each intensity level */
+         } /* for each intensity level */
     } /* for each TTL */
 } /* phosphor_init */
 
@@ -820,7 +798,6 @@ find_type(enum display_type type)
 {
     int i;
     struct display *dp;
-
     for (i = 0, dp = displays; i < ELEMENTS(displays); i++, dp++)
         if (dp->type == type)
             return dp;
@@ -839,17 +816,17 @@ display_init(enum display_type type, int sf)
         /* cannot change type once started */
         /* XXX say something???? */
         return type == display_type;
-        }
+    }
 
     if (init_failed)
-        return 0;               /* avoid thrashing */
+        return 0;                       /* avoid thrashing */
 
-    init_failed = 1;            /* assume the worst */
+    init_failed = 1;                    /* assume the worst */
     dp = find_type(type);
     if (!dp) {
         fprintf(stderr, "Unknown display type %d\r\n", (int)type);
         goto failed;
-        }
+    }
 
     /* Initialize display list */
     head->next = head->prev = head;
@@ -879,7 +856,7 @@ display_init(enum display_type type, int sf)
         if (dp->color1->half_life > half_life)
             half_life = COLOR_HALF_LIFE(dp->color1);
         ncolors++;
-        }
+    }
 
     /* before phosphor_init; */
     refresh_rate = (1000000*LEVELS_PER_HALFLIFE)/half_life;
@@ -894,19 +871,19 @@ display_init(enum display_type type, int sf)
     if (refresh_interval < 1) {
         /* decrease DELAY_UNIT? */
         fprintf(stderr, "NOTE! refresh_interval too small: %d\r\n",
-                        refresh_interval);
+                refresh_interval);
 
         /* dunno if this is a good idea, but might be better than dying */
         refresh_interval = 1;
-        }
+    }
 
     /* point lifetime in DELAY_UNITs will not fit in p->delay field! */
     if (refresh_interval > DELAY_T_MAX) {
         /* increase DELAY_UNIT? */
         fprintf(stderr, "bad refresh_interval %d > DELAY_T_MAX %d\r\n",
-            refresh_interval, DELAY_T_MAX);
+                refresh_interval, DELAY_T_MAX);
         goto failed;
-        }
+    }
 
     /*
      * before phosphor_init;
@@ -920,7 +897,7 @@ display_init(enum display_type type, int sf)
         level_scale[i] = ((float)i+1+BOOST)/(NLEVELS+BOOST);
 
     points = (struct point *)calloc((size_t)xpixels,
-                    ypixels * sizeof(struct point));
+                                    ypixels * sizeof(struct point));
     if (!points)
         goto failed;
 
@@ -933,7 +910,7 @@ display_init(enum display_type type, int sf)
         phosphor_init(dp->color1->phosphors, dp->color1->nphosphors, 1);
 
     initialized = 1;
-    init_failed = 0;            /* hey, we made it! */
+    init_failed = 0;                    /* hey, we made it! */
     return 1;
 
  failed:

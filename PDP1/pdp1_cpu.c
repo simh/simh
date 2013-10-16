@@ -25,13 +25,14 @@
 
    cpu          PDP-1 central processor
 
-   210Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
+   21-Mar-12    RMS     Fixed & vs && in Ea_ch (Michael Bloom)
    30-May-07    RMS     Fixed typo in SBS clear (Norm Lastovica)
    28-Dec-06    RMS     Added 16-channel SBS support, PDP-1D support
    28-Jun-06    RMS     Fixed bugs in MUS and DIV
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    09-Nov-04    RMS     Added instruction history
+   08-Feb-04    PLB     Added display device spacewar/test switches
    07-Sep-03    RMS     Added additional explanation on I/O simulation
    01-Sep-03    RMS     Added address switches for hardware readin
    23-Jul-03    RMS     Revised to detect I/O wait hang
@@ -360,6 +361,10 @@ extern int32 dt (int32 inst, int32 dev, int32 dat);
 extern int32 drm (int32 inst, int32 dev, int32 dat);
 extern int32 clk (int32 inst, int32 dev, int32 dat);
 extern int32 dcs (int32 inst, int32 dev, int32 dat);
+#ifdef USE_DISPLAY
+extern int32 dpy (int32 inst, int32 dev, int32 dat, int32 dat2);
+extern int32 spacewar (int32 inst, int32 dev, int32 dat);
+#endif
 
 const int32 sc_map[512] = {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4,     /* 00000xxxx */
@@ -1203,6 +1208,11 @@ while (reason == 0) {                                   /* loop until halted */
             io_data = ptp (IR, dev, IO);
             break;
 
+#ifdef USE_DISPLAY
+        case 007:                                       /* display */
+            io_data = dpy (IR, dev, IO, AC);
+            break;
+#endif
         case 010:                                       /* leave ring mode */
             if (cpu_unit.flags & UNIT_1D)
                 PF = PF & ~PF_RNG;
@@ -1212,7 +1222,12 @@ while (reason == 0) {                                   /* loop until halted */
         case 011:                                       /* enter ring mode */
             if (cpu_unit.flags & UNIT_1D)
                 PF = PF | PF_RNG;
-            else reason = stop_inst;
+            else
+#ifdef USE_DISPLAY
+                io_data = spacewar (IR, dev, IO);
+#else
+                reason = stop_inst;
+#endif
             break;
 
        case 022:                                        /* data comm sys */
@@ -1685,3 +1700,19 @@ for (k = 0; k < lnt; k++) {                             /* print specified */
     }                                                   /* end for */
 return SCPE_OK;
 }
+
+#ifdef USE_DISPLAY
+/* set "test switches"; from display code */
+void
+cpu_set_switches(unsigned long bits)
+{
+/* just what we want; smaller CPUs might want to shift down? */
+TW = bits;
+}
+
+unsigned long
+cpu_get_switches(void)
+{
+return TW;
+}
+#endif

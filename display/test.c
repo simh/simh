@@ -1,5 +1,5 @@
 /*
- * $Id: test.c,v 1.23 2004/02/07 06:31:20 phil Exp $
+ * $Id: test.c,v 1.24 2005/01/14 18:58:00 phil Exp $
  * XY Display simulator test program (PDP-1 Munching Squares)
  * Phil Budne <phil@ultimate.com>
  * September 2003
@@ -52,7 +52,7 @@
 #define EXIT_FAILURE 1
 #endif
 
-#include "display.h"
+#include "xy.h"
 
 static unsigned long test_switches = 0;
 
@@ -79,49 +79,49 @@ munch(void) {
     int x, y;
     
     ac = test_switches;
-    ac += v;				/* add v */
+    ac += v;                            /* add v */
     if (ac & ~0777777) {
       ac++;
       ac &= 0777777;
     }
-    v = ac;				/* dac v */
+    v = ac;                             /* dac v */
 
-    ac <<= 9;				/* rcl 9s */
+    ac <<= 9;                           /* rcl 9s */
     io <<= 9;
     io |= ac>>18;
     ac &= 0777777;
     ac |= io>>18;
     io &= 0777777;
 
-    ac ^= v;				/* xor v */
+    ac ^= v;                            /* xor v */
 
     /* convert +/-512 one's complement to 0..1022, origin in lower left */
-    y = (io >> 8) & 01777;		/* hi 10 */
+    y = (io >> 8) & 01777;              /* hi 10 */
     if (y & 01000)
-	y ^= 01000;
+        y ^= 01000;
     else
-	y += 511;
+        y += 511;
 
-    x = (ac >> 8) & 01777;		/* hi 10 */
-    if (x & 01000)			/* negative */
-	x ^= 01000;
+    x = (ac >> 8) & 01777;              /* hi 10 */
+    if (x & 01000)                      /* negative */
+        x ^= 01000;
     else
-	x += 511;
+        x += 511;
 
     if (display_point(x, y, DISPLAY_INT_MAX, 0))
-	printf("light pen hit at (%d,%d)\n", x, y);
+        printf("light pen hit at (%d,%d)\n", x, y);
 
-/*#define US 100000			/* 100ms (10/sec) */
-/*#define US 50000			/* 50ms (20/sec) */
-/*#define US 20000			/* 20ms (50/sec) */
-/*#define US 10000			/* 10ms (100/sec) */
+/*#define US 100000                     /* 100ms (10/sec) */
+/*#define US 50000                      /* 50ms (20/sec) */
+/*#define US 20000                      /* 20ms (50/sec) */
+/*#define US 10000                      /* 10ms (100/sec) */
 #define US 0
-    us += 50;				/* 10 5us PDP-1 memory cycles */
+    us += 50;                           /* 10 5us PDP-1 memory cycles */
     if (us >= US) {
       display_age(us, 1);
       us = 0;
     }
-    display_sync();			/* XXX push down */
+    display_sync();                     /* XXX push down */
 }
 
 #ifdef T2
@@ -134,17 +134,17 @@ t2(void) {
 
     display_init(TEST_DIS, TEST_RES);
     for (x = INTENSITIES-1; x >= 0; x--) {
-	for (y = 0; y < 20; y++) {
-	    ws_display_point(x*4, y, x, 0);
-	    ws_display_point(x*4+1, y, x, 0);
-	    ws_display_point(x*4+2, y, x, 0);
-	    ws_display_point(x*4+3, y, x, 0);
-	}
-	display_sync();
+        for (y = 0; y < 20; y++) {
+            ws_display_point(x*4, y, x, 0);
+            ws_display_point(x*4+1, y, x, 0);
+            ws_display_point(x*4+2, y, x, 0);
+            ws_display_point(x*4+3, y, x, 0);
+        }
+        display_sync();
     }
     fflush(stdout);
     for (;;)
-	/* wait */ ;
+        /* wait */ ;
 }
 #endif
 
@@ -162,23 +162,23 @@ t3(void) {
 
     display_init(TEST_DIS, TEST_RES);
     for (x = DISPLAY_INT_MAX; x >= 0; x--) {
-	for (y = 0; y < 20; y++) {
-	    display_point(x*2, y*2, x, 0);
-	}
-	display_sync();
+        for (y = 0; y < 20; y++) {
+            display_point(x*2, y*2, x, 0);
+        }
+        display_sync();
     }
     fflush(stdout);
     for (;;)
-	/* wait */ ;
+        /* wait */ ;
 }
 #endif
 
 int
 main(void) {
     if (!display_init(TEST_DIS, TEST_RES))
-	exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
 
-    cpu_set_switches(04000UL);		/* classic starting value */
+    cpu_set_switches(04000UL);          /* classic starting value */
     for (;;) {
 #ifdef T2
       t2();
