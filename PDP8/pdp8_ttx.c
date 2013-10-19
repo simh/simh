@@ -119,12 +119,30 @@ MTAB ttix_mod[] = {
     { 0 }
     };
 
+#define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
+#define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_MDM  TMXR_DBG_MDM                           /* display Modem Signals */
+#define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
+#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
+#define DBG_ASY  TMXR_DBG_ASY                           /* display Asynchronous Activities */
+
+DEBTAB ttx_debug[] = {
+  {"XMT",    DBG_XMT},
+  {"RCV",    DBG_RCV},
+  {"MDM",    DBG_MDM},
+  {"CON",    DBG_CON},
+  {"TRC",    DBG_TRC},
+  {"ASY",    DBG_ASY},
+  {0}
+};
+
 DEVICE ttix_dev = {
     "TTIX", &ttix_unit, ttix_reg, ttix_mod,
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &ttix_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_MUX | DEV_DISABLE
+    &ttix_dib, DEV_DEBUG | DEV_MUX | DEV_DISABLE,
+    0, ttx_debug
     };
 
 /* TTOx data structures
@@ -170,7 +188,8 @@ DEVICE ttox_dev = {
     4, 10, 31, 1, 8, 8,
     NULL, NULL, &ttox_reset, 
     NULL, NULL, NULL,
-    NULL, DEV_DISABLE
+    NULL, DEV_DISABLE | DEV_DEBUG,
+    0, ttx_debug
     };
 
 /* Terminal input: IOT routine */
@@ -181,6 +200,7 @@ int32 pulse = inst & 07;                                /* IOT pulse */
 int32 ln = TTX_GETLN (inst);                            /* line # */
 int32 itti = (INT_TTI1 << ln);                          /* rx intr */
 int32 itto = (INT_TTO1 << ln);                          /* tx intr */
+int32 itti_data;
 
 switch (pulse) {                                        /* case IR<9:11> */
 
@@ -195,10 +215,11 @@ switch (pulse) {                                        /* case IR<9:11> */
     case 2:                                             /* KCC */
         dev_done = dev_done & ~itti;                    /* clear flag */
         int_req = int_req & ~itti;
+        sim_activate_abs (&ttix_unit, ttix_unit.wait);  /* check soon for more input */
         return 0;                                       /* clear AC */
 
     case 4:                                             /* KRS */
-        return (AC | ttix_buf[ln]);                     /* return buf */
+        return ttix_buf[ln];                            /* return buf */
 
     case 5:                                             /* KIE */
         if (AC & 1)
@@ -210,7 +231,9 @@ switch (pulse) {                                        /* case IR<9:11> */
     case 6:                                             /* KRB */
         dev_done = dev_done & ~itti;                    /* clear flag */
         int_req = int_req & ~itti;
-        return ttix_buf[ln];                            /* return buf */
+        itti_data = ttix_buf[ln];                       /* return buf */
+        sim_activate_abs (&ttix_unit, ttix_unit.wait);  /* check soon for more input */
+        return itti_data;
 
     default:
         return (stop_inst << IOT_V_REASON) + AC;
