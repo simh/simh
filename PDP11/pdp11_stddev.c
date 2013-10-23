@@ -113,17 +113,17 @@ DIB tti_dib = {
     1, IVCL (TTI), VEC_TTI, { NULL }
     };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE, 0), SERIAL_IN_WAIT };
 
 REG tti_reg[] = {
-    { ORDATA (BUF, tti_unit.buf, 8) },
-    { ORDATA (CSR, tti_csr, 16) },
-    { FLDATA (INT, IREQ (TTI), INT_V_TTI) },
-    { FLDATA (ERR, tti_csr, CSR_V_ERR) },
-    { FLDATA (DONE, tti_csr, CSR_V_DONE) },
-    { FLDATA (IE, tti_csr, CSR_V_IE) },
-    { DRDATA (POS, tti_unit.pos, T_ADDR_W), PV_LEFT },
-    { DRDATA (TIME, tti_unit.wait, 24), PV_LEFT },
+    { HRDATAD (BUF,       tti_unit.buf,          8, "last data item processed") },
+    { HRDATAD (CSR,            tti_csr,         16, "control/status register") },
+    { FLDATAD (INT,         IREQ (TTI),  INT_V_TTI, "interrupt pending flag") },
+    { FLDATAD (DONE,           tti_csr, CSR_V_DONE, "device done flag (CSR<7>)") },
+    { FLDATAD (ERR,            tti_csr,  CSR_V_ERR, "device error flag (CSR<15>)") },
+    { FLDATAD (IE,             tti_csr,   CSR_V_IE, "interrupt enable flag (CSR<6>)") },
+    { DRDATAD (POS,       tti_unit.pos,   T_ADDR_W, "number of characters input"), PV_LEFT },
+    { DRDATAD (TIME,     tti_unit.wait,         24, "input polling interval"), PV_LEFT },
     { NULL }
     };
 
@@ -258,6 +258,7 @@ switch ((PA >> 1) & 01) {                               /* decode PA<1> */
         tti_csr = tti_csr & ~CSR_DONE;
         CLR_INT (TTI);
         *data = tti_unit.buf & 0377;
+        sim_activate_abs (&tti_unit, tti_unit.wait);    /* check soon for more input */
         return SCPE_OK;
         }                                               /* end switch PA */
 

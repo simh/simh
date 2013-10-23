@@ -274,10 +274,10 @@ extern int32 con_halt (int32 code, int32 cc);
 */
 
 UNIT tti_unit[] = {
-    { UDATA (&tti_svc, TT_MODE_8B, 0), 0 },
-    { UDATA (&tti_svc, TT_MODE_8B, 0), 0 },
-    { UDATA (&tti_svc, TT_MODE_8B, 0), 0 },
-    { UDATA (&tti_svc, TT_MODE_8B, 0), 0 },
+    { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), 0 },
+    { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), 0 },
+    { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), 0 },
+    { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_8B, 0), 0 },
     };
 
 REG tti_reg[] = {

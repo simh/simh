@@ -66,7 +66,7 @@ t_stat tty_set_mode (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 DIB tti_dib = { DEV_TTI, 1, { &tti } };
 
-UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_KSR, 0), 0 };
+UNIT tti_unit = { UDATA (&tti_svc, UNIT_IDLE|TT_MODE_KSR, 0), SERIAL_IN_WAIT };
 
 REG tti_reg[] = {
     { ORDATA (BUF, tti_unit.buf, 8) },
@@ -164,6 +164,7 @@ switch (IR & 07) {                                      /* decode IR<9:11> */
     case 6:                                             /* KRB */
         dev_done = dev_done & ~INT_TTI;                 /* clear flag */
         int_req = int_req & ~INT_TTI;
+        sim_activate_abs (&tti_unit, tti_unit.wait);    /* check soon for more input */
         return (tti_unit.buf);                          /* return buffer */
 
     default:
