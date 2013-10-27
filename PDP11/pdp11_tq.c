@@ -25,6 +25,7 @@
 
    tq           TQK50 tape controller
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
    17-Aug-11    RMS     Added CAPACITY modifier
    14-Jan-11    MP      Various fixes discovered while exploring Ultrix issue:
@@ -2147,14 +2148,13 @@ static const uint16 boot_rom[] = {
 t_stat tq_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & 3;
 M[BOOT_CSR >> 1] = tq_dib.ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

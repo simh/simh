@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    08-Dec-12    RMS     UNLOAD shouldn't set ATTN (Mark Pizzolato)
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    21-Nov-05    RMS     Enable/disable device also enables/disables Massbus adapter
@@ -1086,7 +1087,6 @@ static const uint16 boot_rom[] = {
 t_stat rp_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
 extern uint16 *M;
 UNIT *uptr = rp_dev.units + unitno;
 
@@ -1097,7 +1097,7 @@ M[BOOT_CSR >> 1] = mba_get_csr (rp_dib.ba) & DMASK;
 if (drv_tab[GET_DTYPE (uptr->flags)].ctrl == RP_CTRL)
     M[BOOT_START >> 1] = 042102;                        /* "BD" */
 else M[BOOT_START >> 1] = 042122;                       /* "RD" */
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

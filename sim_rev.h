@@ -64,14 +64,16 @@ patch   date            module(s) and fix(es)
                         pdp11_defs.h:
                         - fixed base address for RQB, RQC, RQD
                         - added address and IPL data for RS03/RS04
+                        - added cpu_set_boot prototype
 
                         pdp11_cpu.c:
                         - MMR1 does not track PC changes (Johnny Billquist)
+                        - added cpu_set_boot
 
                         pdp11_cpumod.c:
                         - fixed model change to set memory size as last step
 
-                        pdp11_dc.c, pdp11_dl.c"
+                        pdp11_dc.c, pdp11_dl.c:
                         - poll input immediately after attach to pick up connect
 
                         pdp11_fp.c:
@@ -80,21 +82,29 @@ patch   date            module(s) and fix(es)
                         pdp11_hk.c:
                         - rewrote error handling
                         - rewrote interrupt handling
+                        - revised to use new boot setup routine
+
+                        pdp11_rf.c, pdp11_rx.c, pdp11_ry.c, pdp11_tc.c,
+                        pdp11_tm.c, pdp11_ts.c, pdp11_tu.c:
+                        - revised to use new boot setup routine
 
                         pdp11_rh.c:
                         - added third Massbus adapter, debug printouts
 
                         pdp11_rk.c:
                         - fixed behavior of RKDS with non-existant drives (Mark Pizzolato)
+                        - revised to use new boot setup routine
 
                         pdp11_rp.c:
                         - UNLOAD shouldn't set ATTN (Mark Pizzolato)
+                        - revised to use new boot setup routine
 
                         pdp11_rs.c:
-                        - first release
+                        - revised to use new boot setup routine
 
                         pdp11_rq.c:
                         - fixed bug in ABORT link walk loop (Dave Bryan)
+                        - revised to use new boot setup routine
 
                         pdp11_sys.c:
                         - added third Massbus adapter, RS03/RS04
@@ -102,9 +112,11 @@ patch   date            module(s) and fix(es)
                         pdp11_ta.c:
                         - fixed bug to set RDY on reset (Ian Hammond)
                         - added CAPS-11 bootstrap (Ian Hammond)
+                        - revised to use new boot setup routine
 
                         pdp11_tq.c:
                         - fixed bug in ABORT link walk loop (Dave Bryan)
+                        - revised to use new boot setup routine
 
                         pdp15_tt1.c:
                         - poll TTIX immediately after attach to pick up connect

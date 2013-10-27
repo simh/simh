@@ -1,6 +1,6 @@
 /* pdp11_tc.c: PDP-11 DECtape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tc           TC11/TU56 DECtape
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    23-Jun-06	RMS     Fixed switch conflict in ATTACH
    10-Feb-06    RMS     READ sets extended data bits in TCST (Alan Frisbie)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -1184,14 +1185,13 @@ static const uint16 boot_rom[] = {
 t_stat dt_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
 
 dt_unit[unitno].pos = DT_EZLIN;
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & DT_M_NUMDR;
 M[BOOT_CSR >> 1] = (dt_dib.ba & DMASK) + 02;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

@@ -26,6 +26,7 @@
    The author gratefully acknowledges the help of Max Burnet, Megan Gentry,
    and John Wilson in resolving questions about the PDP-11
 
+   23-Oct-13    RMS     Added cpu_set_boot prototype
    02-Sep-13    RMS     Added third Massbus adapter and RS drive
    12-Dec-12    RMS     Fixed base address for RQB, RQC, RQD
    11-Dec-11    RMS     Fixed priority of PIRQ vs IO; added INT_INTERNALn
@@ -864,6 +865,8 @@ void mba_set_enbdis (uint32 mb, t_bool dis);
 t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 int32 clk_cosched (int32 wait);
+
+void cpu_set_boot (int32 pc);
 
 #include "pdp11_io_lib.h"
 

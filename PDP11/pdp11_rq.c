@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2016, Robert M Supnik
+   Copyright (c) 2002-2013, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq           RQDX3 disk controller
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    17-Mar-13    RMS     Fixed bug in ABORT link walk loop (Dave Bryan)
    14-Jan-09    JH      Added support for RD32 disc drive
    18-Jun-07    RMS     Added UNIT_IDLE flag to timer thread
@@ -2497,7 +2498,6 @@ static const uint16 boot_rom[] = {
 t_stat rq_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
 extern uint16 *M;
 DIB *dibp = (DIB *) dptr->ctxt;
 
@@ -2505,7 +2505,7 @@ for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & 3;
 M[BOOT_CSR >> 1] = dibp->ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

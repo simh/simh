@@ -25,6 +25,7 @@
 
    rk           RK11/RKV11/RK05 cartridge disk
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    06-Sep-13    RMS     Fixed RKDS content for non-existent disk (Mark Pizzolato)
    20-Mar-09    RMS     Fixed bug in read header (Walter F Mueller)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -751,12 +752,11 @@ static const uint16 boot_rom[] = {
 t_stat rk_boot (int32 unitno, DEVICE *dptr)
 {
 int32 i;
-extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RK_M_NUMDR;
 M[BOOT_CSR >> 1] = (rk_dib.ba & DMASK) + 012;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
