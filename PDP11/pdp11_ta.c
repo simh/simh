@@ -25,6 +25,7 @@
 
    ta           TA11/TU60 cassette tape
    
+   23-Oct-13    RMS     Revised for new boot setup routine
    06-Jun-13    RMS     Reset must set RDY (Ian Hammond)
                         Added CAPS-11 bootstrap (Ian Hammond)
    06-Aug-07    RMS     Foward op at BOT skips initial file gap
@@ -660,14 +661,13 @@ static const uint16 boot_rom[] = {
 
 t_stat ta_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 saved_PC;
+size_t i;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_CSR >> 1] = ta_dib.ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

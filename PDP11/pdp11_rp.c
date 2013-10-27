@@ -1,6 +1,6 @@
 /* pdp11_rp.c - RP04/05/06/07 RM02/03/05/80 Massbus disk controller
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rp           RH/RP/RM moving head disks
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    06-Mar-11    MP      Converted to using sim_disk library and refactored 
                         for Asynch I/O.
                         Set STIME value to default of 26 which allows VMS V4.x 
@@ -1469,7 +1470,6 @@ static const uint16 boot_rom[] = {
 t_stat rp_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 *M;
 UNIT *uptr = dptr->units + unitno;
 
@@ -1480,7 +1480,7 @@ M[BOOT_CSR >> 1] = mba_get_csr (rp_dib.ba) & DMASK;
 if (drv_tab[GET_DTYPE (uptr->flags)].ctrl == RP_CTRL)
     M[BOOT_START >> 1] = 042102;                        /* "BD" */
 else M[BOOT_START >> 1] = 042122;                       /* "RD" */
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

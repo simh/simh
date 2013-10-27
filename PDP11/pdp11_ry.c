@@ -25,6 +25,7 @@
 
    ry           RX211/RXV21/RX02 floppy disk
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    03-Sep-13    RMS     Added explicit void * cast
    15-May-06    RMS     Fixed bug in autosize attach (David Gesswein)
    07-Jul-05    RMS     Removed extraneous externs
@@ -692,7 +693,6 @@ static const uint16 boot_rom[] = {
 t_stat ry_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 *M;
 
 if ((ry_unit[unitno & RX_M_NUMDR].flags & UNIT_DEN) == 0)
@@ -701,7 +701,7 @@ for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
 M[BOOT_CSR >> 1] = ry_dib.ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

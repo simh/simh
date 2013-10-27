@@ -24,6 +24,8 @@
    in this Software without prior written authorization from Robert M Supnik.
 
    rs           RS03/RS04 fixed head disks
+
+   23-Oct-13    RMS     Revised for new boot setup routine
 */
 
 #if defined (VM_PDP10)
@@ -686,8 +688,7 @@ static const uint16 boot_rom[] = {
 
 t_stat rs_boot (int32 unitno, DEVICE *dptr)
 {
-int32 i;
-extern int32 saved_PC;
+size_t i;
 extern uint16 *M;
 UNIT *uptr = rs_dev.units + unitno;
 
@@ -695,7 +696,7 @@ for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & (RS_NUMDR - 1);
 M[BOOT_CSR >> 1] = mba_get_csr (rs_dib.ba) & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

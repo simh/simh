@@ -1,6 +1,6 @@
 /* pdp11_tm.c: PDP-11 magnetic tape simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tm           TM11/TU10 magtape
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    16-Feb-06    RMS     Added tape capacity checking
    31-Oct-05    RMS     Fixed address width for large files
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -719,7 +720,6 @@ static const uint16 boot2_rom[] = {
 t_stat tm_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 sim_tape_rewind (&tm_unit[unitno]);
 if (sim_switches & SWMASK ('O')) {
@@ -732,7 +732,7 @@ else {
     }
 M[BOOT_UNIT >> 1] = unitno;
 M[BOOT_CSR >> 1] = (tm_dib.ba & DMASK) + 06;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 } 
 

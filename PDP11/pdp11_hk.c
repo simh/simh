@@ -25,6 +25,7 @@
 
    hk           RK611/RK06/RK07 disk
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    01-Sep-13    RMS     Revised error handling to command-response model
                         Revised interrupt logic to follow the hardware
    10-Jun-13    RMS     Fixed bug to write through end of sector (Oleg Safiullin)
@@ -1612,13 +1613,12 @@ static const uint16 boot_rom[] = {
 t_stat hk_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & CS2_M_UNIT;
 M[BOOT_CSR >> 1] = hk_dib.ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

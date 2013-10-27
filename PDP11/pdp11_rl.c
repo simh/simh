@@ -1,6 +1,6 @@
 /* pdp11_rl.c: RL11 (RLV12) cartridge disk simulator
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    rl           RL11(RLV12)/RL01/RL02 cartridge disk
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    24-Mar-11    JAD     Various changes to support diagnostics, including:
                         - distinguish between RLV11 & 12
                         - more complete drive state
@@ -1212,13 +1213,12 @@ t_stat rl_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
 extern uint16 *M;
-extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RLCS_M_DRIVE;
 M[BOOT_CSR >> 1] = rl_dib.ba & 0177777;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

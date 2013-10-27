@@ -1,6 +1,6 @@
 /* pdp11_tu.c - PDP-11 TM02/TU16 TM03/TU45/TU77 Massbus magnetic tape controller
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    tu           TM02/TM03 magtape
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    18-Apr-11    MP      Fixed t_addr printouts for 64b big-endian systems
    17-May-07    RMS     CS1 DVA resides in device, not MBA
    29-Apr-07    RMS     Fixed bug in setting FCE on TMK Naoki Hamada)
@@ -1045,14 +1046,13 @@ static const uint16 boot_rom[] = {
 t_stat tu_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & (TU_NUMDR - 1);
 M[BOOT_CSR >> 1] = mba_get_csr (tu_dib.ba) & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 
