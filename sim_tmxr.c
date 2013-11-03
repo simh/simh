@@ -1317,6 +1317,7 @@ if (lp->conn && lp->rcve) {                             /* conn & enb? */
     }                                                   /* end if conn */
 if (lp->rxbpi == lp->rxbpr)                             /* empty? zero ptrs */
     lp->rxbpi = lp->rxbpr = 0;
+tmxr_debug_return(lp, val);
 return val;
 }
 

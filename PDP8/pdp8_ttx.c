@@ -119,12 +119,29 @@ MTAB ttix_mod[] = {
     { 0 }
     };
 
+/* debugging bitmaps */
+#define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
+#define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_RET  TMXR_DBG_RET                           /* display Returned Received Data */
+#define DBG_CON  TMXR_DBG_CON                           /* display connection activities */
+#define DBG_TRC  TMXR_DBG_TRC                           /* display trace routine calls */
+
+DEBTAB ttx_debug[] = {
+  {"XMT",    DBG_XMT},
+  {"RCV",    DBG_RCV},
+  {"RET",    DBG_RET},
+  {"CON",    DBG_CON},
+  {"TRC",    DBG_TRC},
+  {0}
+};
+
 DEVICE ttix_dev = {
     "TTIX", &ttix_unit, ttix_reg, ttix_mod,
     1, 10, 31, 1, 8, 8,
     &tmxr_ex, &tmxr_dep, &ttix_reset,
     NULL, &ttx_attach, &ttx_detach,
-    &ttix_dib, DEV_MUX | DEV_DISABLE,
+    &ttix_dib, DEV_MUX | DEV_DISABLE | DEV_DEBUG,
+    0, ttx_debug
     };
 
 /* TTOx data structures
@@ -170,7 +187,8 @@ DEVICE ttox_dev = {
     4, 10, 31, 1, 8, 8,
     NULL, NULL, &ttox_reset, 
     NULL, NULL, NULL,
-    NULL, DEV_DISABLE
+    NULL, DEV_DISABLE | DEV_DEBUG,
+    0, ttx_debug
     };
 
 /* Terminal input: IOT routine */
@@ -236,6 +254,8 @@ if (ln >= 0)                                            /* got one? rcv enb*/
 tmxr_poll_rx (&ttx_desc);                               /* poll for input */
 for (ln = 0; ln < TTX_LINES; ln++) {                    /* loop thru lines */
     if (ttx_ldsc[ln].conn) {                            /* connected? */
+        if (dev_done & (INT_TTI1 << ln))                /* Last character still pending? */
+            continue;
         if ((temp = tmxr_getc_ln (&ttx_ldsc[ln]))) {    /* get char */
             if (temp & SCPE_BREAK)                      /* break? */
                 c = 0;

@@ -179,6 +179,8 @@ t_stat tti_svc (UNIT *uptr)
 int32 c;
 
 sim_clock_coschedule (uptr, tmxr_poll);                 /* continue poll */
+if (dev_done & INT_TTI)                                 /* prior character still pending? */
+    return SCPE_OK;
 if ((c = sim_poll_kbd ()) < SCPE_KFLAG)                 /* no char or error? */
     return c;
 if (c & SCPE_BREAK)                                     /* break? */

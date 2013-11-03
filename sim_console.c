@@ -162,12 +162,14 @@ UNIT sim_con_unit = { UDATA (&sim_con_poll_svc, 0, 0)  };   /* console connectio
 #define DBG_TRC  TMXR_DBG_TRC                           /* trace routine calls */
 #define DBG_XMT  TMXR_DBG_XMT                           /* display Transmitted Data */
 #define DBG_RCV  TMXR_DBG_RCV                           /* display Received Data */
+#define DBG_RET  TMXR_DBG_RET                           /* display Returned Received Data */
 #define DBG_ASY  TMXR_DBG_ASY                           /* asynchronous thread activity */
 
 static DEBTAB sim_con_debug[] = {
   {"TRC",    DBG_TRC},
   {"XMT",    DBG_XMT},
   {"RCV",    DBG_RCV},
+  {"RET",    DBG_RET},
   {"ASY",    DBG_ASY},
   {0}
 };

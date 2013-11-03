@@ -68,10 +68,11 @@ typedef int SERHANDLE;
 
 #define TMXR_DBG_XMT    0x010000                         /* Debug Transmit Data */
 #define TMXR_DBG_RCV    0x020000                         /* Debug Received Data */
-#define TMXR_DBG_MDM    0x040000                         /* Debug Modem Signals */
-#define TMXR_DBG_CON    0x080000                         /* Debug Connection Activities */
-#define TMXR_DBG_ASY    0x100000                         /* Debug Asynchronous Activities */
-#define TMXR_DBG_TRC    0x200000                         /* Debug trace routine calls */
+#define TMXR_DBG_RET    0x040000                         /* Debug Returned Received Data */
+#define TMXR_DBG_MDM    0x080000                         /* Debug Modem Signals */
+#define TMXR_DBG_CON    0x100000                         /* Debug Connection Activities */
+#define TMXR_DBG_ASY    0x200000                         /* Debug Asynchronous Activities */
+#define TMXR_DBG_TRC    0x400000                         /* Debug trace routine calls */
 
 /* Modem Control Bits */
 
@@ -203,6 +204,7 @@ t_stat tmxr_stop_poll (void);
 void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize);
 extern FILE *sim_deb;                                   /* debug file */
 #define tmxr_debug(dbits, lp, msg, buf, bufsize) if (sim_deb && (lp)->mp->dptr && ((dbits) & (lp)->mp->dptr->dctrl)) _tmxr_debug (dbits, lp, msg, buf, bufsize); else (void)0
+#define tmxr_debug_return(lp, val) if (sim_deb && (val) && (lp)->mp->dptr && (TMXR_DBG_RET & (lp)->mp->dptr->dctrl)) sim_debug (TMXR_DBG_RET, (lp)->mp->dptr, "Ln%d: 0x%x\n", (int)((lp)-(lp)->mp->ldsc), val); else (void)0
 #define tmxr_debug_trace(mp, msg) if (sim_deb && (mp)->dptr && (TMXR_DBG_TRC & (mp)->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, mp->dptr, "%s\n", (msg)); else (void)0
 #define tmxr_debug_trace_line(lp, msg) if (sim_deb && (lp)->mp && (lp)->mp->dptr && (TMXR_DBG_TRC & (lp)->mp->dptr->dctrl)) sim_debug (TMXR_DBG_TRC, (lp)->mp->dptr, "Ln%d:%s\n", (int)((lp)-(lp)->mp->ldsc), (msg)); else (void)0
 #define tmxr_debug_connect(mp, msg) if (sim_deb && (mp)->dptr && (TMXR_DBG_CON & (mp)->dptr->dctrl)) sim_debug (TMXR_DBG_CON, mp->dptr, "%s\n", (msg)); else (void)0
