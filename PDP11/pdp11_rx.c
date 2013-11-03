@@ -25,6 +25,7 @@
 
    rx           RX11/RX01 floppy disk
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    03-Sep-13    RMS     Added explicit void * cast
    07-Jul-05    RMS     Removed extraneous externs
    12-Oct-02    RMS     Added autoconfigure support
@@ -526,13 +527,12 @@ static const uint16 boot_rom[] = {
 t_stat rx_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 *M;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & RX_M_NUMDR;
 M[BOOT_CSR >> 1] = rx_dib.ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }

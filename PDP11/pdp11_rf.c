@@ -25,6 +25,7 @@
 
    rf           RF11 fixed head disk
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    03-Sep-13    RMS     Added explicit void * cast
    19-Mar-12    RMS     Fixed bug in updating mem addr extension (Peter Schorn)
    25-Dec-06    RMS     Fixed bug in unit mask (John Dundas)
@@ -468,12 +469,11 @@ static const uint16 boot_rom[] = {
 t_stat rf_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 
 for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_CSR >> 1] = (rf_dib.ba & DMASK) + 012;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

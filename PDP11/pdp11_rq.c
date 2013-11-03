@@ -1,6 +1,6 @@
 /* pdp11_rq.c: MSCP disk controller simulator
 
-   Copyright (c) 2002-2010, Robert M Supnik
+   Copyright (c) 2002-2013, Robert M Supnik
    Derived from work by Stephen F. Shirron
 
    Permission is hereby granted, free of charge, to any person obtaining a
@@ -26,6 +26,7 @@
 
    rq           MSCP disk controller
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    09-Dec-12    MB      Added support for changing controller type.
    24-Oct-12    MB      Added mapped transfers for VAX
    29-Jan-11    HUH     Added RC25, RCF25 and RA80 disks
@@ -2933,7 +2934,6 @@ static const uint16 boot_rom[] = {
 t_stat rq_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 *M;
 DIB *dibp = (DIB *) dptr->ctxt;
 
@@ -2941,7 +2941,7 @@ for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_UNIT >> 1] = unitno & 3;
 M[BOOT_CSR >> 1] = dibp->ba & DMASK;
-saved_PC = BOOT_ENTRY;
+cpu_set_boot (BOOT_ENTRY);
 return SCPE_OK;
 }
 

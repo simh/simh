@@ -1,6 +1,6 @@
 /* pdp11_ts.c: TS11/TSV05 magnetic tape simulator
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 
    ts           TS11/TSV05 magtape
 
+   23-Oct-13    RMS     Revised for new boot setup routine
    19-Mar-12    RMS     Fixed declaration of cpu_opt (Mark Pizzolato)
    22-May-10    RMS     Fixed t_addr printouts for 64b big-endian systems
                         (Mark Pizzolato)
@@ -1158,7 +1159,6 @@ static const uint16 boot_rom[] = {
 t_stat ts_boot (int32 unitno, DEVICE *dptr)
 {
 size_t i;
-extern int32 saved_PC;
 extern uint16 *M;
 
 sim_tape_rewind (&ts_unit);
@@ -1166,7 +1166,7 @@ for (i = 0; i < BOOT_LEN; i++)
     M[(BOOT_START >> 1) + i] = boot_rom[i];
 M[BOOT_CSR0 >> 1] = ts_dib.ba & DMASK;
 M[BOOT_CSR1 >> 1] = (ts_dib.ba & DMASK) + 02;
-saved_PC = BOOT_START;
+cpu_set_boot (BOOT_START);
 return SCPE_OK;
 }
  

@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   23-Oct-13    RMS     Fixed PS behavior on initialization and boot
    10-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
    19-Mar-12    RMS     Fixed declaration of sim_switches (Mark Pizzolato)
@@ -2992,7 +2993,9 @@ t_stat cpu_reset (DEVICE *dptr)
 {
 PIRQ = 0;
 STKLIM = 0;
-PSW = 000340;
+if (CPUT (CPUT_T))                                      /* T11? */
+    PSW = 000340;                                       /* start at IPL 7 */
+else PSW = 0;                                           /* else at IPL 0 */
 MMR0 = 0;
 MMR1 = 0;
 MMR2 = 0;
@@ -3010,6 +3013,15 @@ else return SCPE_IERR;
 sim_brk_types = sim_brk_dflt = SWMASK ('E');
 set_r_display (0, MD_KER);
 return SCPE_OK;
+}
+
+/* Boot setup routine */
+
+void cpu_set_boot (int32 pc)
+{
+saved_PC = pc;
+PSW = 000340;
+return;
 }
 
 /* Memory examine */
