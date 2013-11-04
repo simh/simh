@@ -151,7 +151,7 @@
 				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\ID16.exe"
 				LinkIncremental="1"
-				GenerateDebugInformation="true"
+				GenerateDebugInformation="false"
 				SubSystem="1"
 				OptimizeReferences="2"
 				EnableCOMDATFolding="2"

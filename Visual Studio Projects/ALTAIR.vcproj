@@ -151,7 +151,7 @@
 				AdditionalDependencies="wsock32.lib winmm.lib"
 				OutputFile="$(OutDir)\ALTAIR.exe"
 				LinkIncremental="1"
-				GenerateDebugInformation="true"
+				GenerateDebugInformation="false"
 				ProgramDatabaseFile="$(OutDir)\ALTAIR.pdb"
 				SubSystem="1"
 				OptimizeReferences="2"
