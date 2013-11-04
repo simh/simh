@@ -1033,7 +1033,18 @@ return rbytes;
 
 int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes)
 {
-return send (sock, msg, nbytes, 0);
+int32 err, sbytes = send (sock, msg, nbytes, 0);
+
+if (sbytes == SOCKET_ERROR) {
+    err = WSAGetLastError ();
+    if (err == WSAEWOULDBLOCK)                          /* no data */
+        return 0;
+#if defined(EAGAIN)
+    if (err == EAGAIN)                                  /* no data */
+        return 0;
+#endif
+    }
+return sbytes;
 }
 
 void sim_close_sock (SOCKET sock, t_bool master)
