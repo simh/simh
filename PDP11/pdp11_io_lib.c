@@ -301,6 +301,7 @@ DEVICE *dptr;
 DIB *dibp;
 uint32 maxaddr, maxname, maxdev;
 int32 maxvec, vecwid;
+int32 brbase = 0;
 char valbuf[40];
 
 if (build_dib_tab ())                                   /* build IO page */
@@ -310,6 +311,9 @@ maxaddr = 0;
 maxvec = 0;
 maxname = 0;
 maxdev = 1;
+#if defined (VM_VAX)
+brbase = 4;
+#endif
 
 for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
     size_t l;
@@ -406,7 +410,7 @@ for (i = 0, dibp = NULL; i < (IOPAGESIZE >> 1); i++) {  /* loop thru entries */
             fprintf (st, "%1s", (dibp->vnum >= AUTO_VECBASE)? "*": " ");
             }
         if (dibp->vnum || dibp->vloc)
-            fprintf (st, " %2u", dibp->vloc/32);
+            fprintf (st, " %2u", brbase + dibp->vloc/32);
         else
             fprintf (st, "   ");
         fprintf (st, " %*u %s\n", maxdev,  (dibp->ulnt? dibp->lnt/dibp->ulnt:
