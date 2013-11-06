@@ -3677,7 +3677,7 @@ if (dptr == NULL)                                       /* found dev? */
     return SCPE_NXDEV;
 if (uptr == NULL)                                       /* valid unit? */
     return SCPE_NXUN;
-if (uptr->flags & UNIT_ATT)                             /* already attached? */
+if (uptr->flags & UNIT_ATT) {                           /* already attached? */
     if (!(uptr->dynflags & UNIT_ATTMULT) &&             /* and only single attachable */
         !(dptr->flags & DEV_DONTAUTO)) {                /* and auto detachable */
         r = scp_detach_unit (dptr, uptr);               /* detach it */
@@ -3688,6 +3688,7 @@ if (uptr->flags & UNIT_ATT)                             /* already attached? */
         if (!(uptr->dynflags & UNIT_ATTMULT))
             return SCPE_ALATT;                          /* Already attached */
         }
+    }
 sim_trim_endspc (cptr);                                 /* trim trailing spc */
 return scp_attach_unit (dptr, uptr, cptr);              /* attach */
 }
