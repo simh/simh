@@ -516,7 +516,7 @@ const char *const text =
 "RF11/RS11 Fixed Head Disk Controller (RF)\n"
 "\n"
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
-" The RFll-A is a fast, low-cost, random·access bulk-storage system.  An\n"
+" The RFll-A is a fast, low-cost, random-access bulk-storage system.  An\n"
 " RFll-A provides 262,144 17-bit words (16 data bits and 1 parity bit)\n"
 " of storage. Up to eight RSll disk platters can be controlled by one RFll\n"
 " Controller for a total of 2,047,152 words of storage.  An RFll-A includes\n"
@@ -529,7 +529,7 @@ const char *const text =
 " both disk storage and main memory in the PDP-11 system.\n"
 /*567901234567890123456789012345678901234567890123456789012345678901234567890*/
 "\n"
-" The RSll disk contains a nickel·cobalt·plated disk driven by a hysterisis\n"
+" The RSll disk contains a nickel-cobalt-plated disk driven by a hysterisis\n"
 " synchronous motor. Data is recorded on a single disk surface by 128\n"
 " fixed read/write heads.\n"
 " Operation\n"

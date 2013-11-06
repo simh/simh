@@ -644,19 +644,22 @@ if ((vc_intc.mode & 0x80) && ~(vc_intc.mode & 0x4)) {   /* group int MM & not po
             }
         }
     if ((vc_csr & CSR_IEN)  && (vc_icsr & ICSR_GRI)) {
-        if (!(int_req[IPL_QVSS] & (INT_QVSS)))
+        if (!(int_req[IPL_QVSS] & (INT_QVSS))) {
             sim_debug (DBG_INT, &vc_dev, "vc_checkint(SET_INT) icsr=0x%x\n", vc_icsr);
+            }
         SET_INT (QVSS);
         }
     else {
-        if ((int_req[IPL_QVSS] & (INT_QVSS)))
+        if ((int_req[IPL_QVSS] & (INT_QVSS))) {
             sim_debug (DBG_INT, &vc_dev, "vc_checkint(CLR_INT)\n");
+            }
         CLR_INT (QVSS);
         }
     }
 else {
-    if ((int_req[IPL_QVSS] & (INT_QVSS)))
+    if ((int_req[IPL_QVSS] & (INT_QVSS))) {
         sim_debug (DBG_INT, &vc_dev, "vc_checkint(CLR_INT)\n");
+        }
     CLR_INT (QVSS);
     }
 }

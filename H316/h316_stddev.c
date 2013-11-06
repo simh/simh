@@ -598,7 +598,7 @@ switch (inst) {                                         /* case on opcode */
             tty_busy = 0;
             tty_mode = 0;                               /* mode is input */
             tty_2nd = 0;
-/*          sim_cancel (&tty_unit[TTO]);                /* cancel output */
+/*          sim_cancel (&tty_unit[TTO]);              *//* cancel output */
             }
         CLR_INT (INT_TTY);                              /* clear intr */
         break;

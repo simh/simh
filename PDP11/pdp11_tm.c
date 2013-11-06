@@ -762,7 +762,7 @@ const char *const text =
 " read and executed the first record on tape.  To allow for ANSI labels,\n"
 " the DEC standard bootstrap skipped the first record and read and executed\n"
 " the second.  The DEC standard is the default; to bootstrap an original\n"
-" format tape, use the command BOOT –O MTn.  The TM11 is automatically\n"
+" format tape, use the command BOOT -O MTn.  The TM11 is automatically\n"
 " disabled in a Qbus system with more than 256KB of memory.\n";
 fprintf (st, "%s", text);
 fprint_set_help (st, dptr);

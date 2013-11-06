@@ -3684,9 +3684,10 @@ if (uptr->flags & UNIT_ATT)                             /* already attached? */
         if (r != SCPE_OK)                               /* error? */
             return r;
         }
-    else
+    else {
         if (!(uptr->dynflags & UNIT_ATTMULT))
             return SCPE_ALATT;                          /* Already attached */
+        }
 sim_trim_endspc (cptr);                                 /* trim trailing spc */
 return scp_attach_unit (dptr, uptr, cptr);              /* attach */
 }

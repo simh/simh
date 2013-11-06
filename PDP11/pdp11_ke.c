@@ -360,7 +360,7 @@ const char *const text =
 "KE11A Extended Arithmetic Option (KE)\n"
 "\n"
 " The KE11A extended arithmetic option (KE) provides multiply, divide,\n"
-" normalization, and multi-bit shift capability on Unibus PDP-11’s that\n"
+" normalization, and multi-bit shift capability on Unibus PDP-11's that\n"
 " lack the EIS instruction set.\n"
 "\n"
 " The KE11-A performs five arithmetic operations.\n"
