@@ -553,8 +553,8 @@ if (vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_key_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %d, Keysym: %d\n", event->state, event->keysym);
     if (vid_key_events.count < MAX_EVENTS) {
+        sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %d, Keysym: %d\n", event->state, event->keysym);
         if (event->state == SDL_PRESSED) {
             if (!vid_key_state[event->keysym.sym]) {    /* Key was not down before */
                 vid_key_state[event->keysym.sym] = TRUE;
@@ -575,6 +575,9 @@ if (SDL_SemWait (vid_key_events.sem) == 0) {
         vid_key_events.count++;
         if (vid_key_events.tail == MAX_EVENTS)
             vid_key_events.tail = 0;
+        }
+    else {
+        sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event DISCARDED: State: %d, Keysym: %d\n", event->state, event->keysym);
         }
     SDL_SemPost (vid_key_events.sem);
     }
@@ -1266,11 +1269,11 @@ if (vid_mouse_captured) {
 if (!sim_is_running)
     return;
 if (SDL_SemWait (vid_key_events.sem) == 0) {
-    sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %d, Keysym: %d\n", event->state, event->keysym);
+    sim_debug (SIM_VID_DBG_KEY, vid_dev, "Keyboard Event: State: %d, Keysym(scancode,sym): (%d,%d)\n", event->state, event->keysym.scancode, event->keysym.sym);
     if (vid_key_events.count < MAX_EVENTS) {
         if (event->state == SDL_PRESSED) {
-            if (!vid_key_state[event->keysym.sym]) {    /* Key was not down before */
-                vid_key_state[event->keysym.sym] = TRUE;
+            if (!vid_key_state[event->keysym.scancode]) {    /* Key was not down before */
+                vid_key_state[event->keysym.scancode] = TRUE;
                 ev.key = vid_map_key (event->keysym.sym);
                 ev.state = SIM_KEYPRESS_DOWN;
                 }
@@ -1280,7 +1283,7 @@ if (SDL_SemWait (vid_key_events.sem) == 0) {
                 }
             }
         else {
-            vid_key_state[event->keysym.sym] = FALSE;
+            vid_key_state[event->keysym.scancode] = FALSE;
             ev.key = vid_map_key (event->keysym.sym);
             ev.state = SIM_KEYPRESS_UP;
             }
@@ -1533,6 +1536,8 @@ if (!vid_texture) {
     SDL_Quit ();
     return 0;
     }
+
+SDL_StopTextInput ();
 
 sim_debug (SIM_VID_DBG_VIDEO|SIM_VID_DBG_KEY|SIM_VID_DBG_MOUSE, vid_dev, "vid_thread() - Started\n");
 
