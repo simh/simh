@@ -228,7 +228,6 @@ DEVICE vc_dev;
 t_stat vc_rd (int32 *data, int32 PA, int32 access);
 t_stat vc_wr (int32 data, int32 PA, int32 access);
 t_stat vc_svc (UNIT *uptr);
-t_stat vc_vsync (UNIT *uptr);
 t_stat vc_reset (DEVICE *dptr);
 t_stat vc_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc);
 void vc_setint (int32 src);
@@ -282,10 +281,7 @@ DEBTAB vc_debug[] = {
     {0}
     };
 
-UNIT vc_unit[] = {
-    { UDATA (&vc_svc, UNIT_IDLE, 0) },
-    { UDATA (&vc_vsync, UNIT_DIS+UNIT_IDLE, 0) }
-    };
+UNIT vc_unit = { UDATA (&vc_svc, UNIT_IDLE, 0) };
 
 REG vc_reg[] = {
     { HRDATADF (CSR,        vc_csr, 16, "Control and status register",                  vc_csr_bits) },
@@ -321,8 +317,8 @@ MTAB vc_mod[] = {
     };
 
 DEVICE vc_dev = {
-    "QVSS", vc_unit, vc_reg, vc_mod,
-    2, DEV_RDX, 20, 1, DEV_RDX, 8,
+    "QVSS", &vc_unit, vc_reg, vc_mod,
+    1, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &vc_reset,
     NULL, NULL, NULL,
     &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
@@ -466,6 +462,10 @@ sim_debug (DBG_REG, &vc_dev, "vc_wr(%s) data=0x%04X\n", vc_regnames[(PA >> 1) & 
 switch (rg) {
 
     case 0:                                             /* CSR */
+        if ((data & CSR_IEN) && ((vc_csr & CSR_IEN) == 0)) {
+            sim_cancel (&vc_unit);                      /* reactivate with short delay */
+            sim_activate (&vc_unit, VSYNC_TIME);        /* in case software checks for vsync */
+            }
         vc_csr = (vc_csr & ~CSR_RW) | (data & CSR_RW);
         break;
 
@@ -583,9 +583,16 @@ switch (rg) {
 return SCPE_OK;
 }
 
+extern jmp_buf save_env;
+extern int32 p1;
+
 int32 vc_mem_rd (int32 pa)
 {
 uint32 rg = (pa >> 2) & 0xFFFF;
+
+if (!vc_buf)                                            /* QVSS disabled? */
+    MACH_CHECK (MCHK_READ);                             /* Invalid memory reference */
+
 return vc_buf[rg];
 }
 
@@ -596,6 +603,9 @@ int32 nval, i;
 int32 sc;
 uint32 scrln, bufln;
 uint32 idx;
+
+if (!vc_buf)                                            /* QVSS disabled? */
+    MACH_CHECK (MCHK_WRITE);                            /* Invalid memory reference */
 
 if (lnt < L_LONG) {
     int32 mask = (lnt == L_WORD)? 0xFFFF: 0xFF;
@@ -779,14 +789,7 @@ if (updated)                                            /* video updated? */
 
 ua2681_svc (&vc_uart);                                  /* service DUART */
 vc_setint (IRQ_VSYNC);                                  /* VSYNC int */
-sim_activate (uptr, tmxr_poll);                         /* reactivate */
-return SCPE_OK;
-}
-
-t_stat vc_vsync (UNIT *uptr)
-{
-vc_setint (IRQ_VSYNC);                                  /* VSYNC int */
-sim_activate (uptr, VSYNC_TIME);                        /* reactivate */
+sim_clock_coschedule (uptr, tmxr_poll);                 /* reactivate */
 return SCPE_OK;
 }
 
@@ -796,8 +799,7 @@ uint32 i;
 t_stat r;
 
 CLR_INT (QVSS);                                         /* clear int req */
-sim_cancel (&vc_unit[0]);                               /* stop poll */
-sim_cancel (&vc_unit[1]);                               /* stop VSYNC */
+sim_cancel (&vc_unit);                                  /* stop poll */
 ua2681_reset (&vc_uart);                                /* reset DUART */
 
 vc_intc.ptr = 0;                                        /* interrupt controller */
@@ -841,8 +843,7 @@ if (!vid_active)  {
         fprintf (sim_log, "\n");
         }
     }
-sim_activate_abs (&vc_unit[0], tmxr_poll);
-sim_activate_abs (&vc_unit[1], VSYNC_TIME);
+sim_activate_abs (&vc_unit, tmxr_poll);
 return auto_config (NULL, 0);                           /* run autoconfig */
 }
 
