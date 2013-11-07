@@ -274,10 +274,12 @@ int32 rxdb_rd (void)
 {
 int32 t = tti_unit.buf;                                 /* char + error */
 
-tti_csr = tti_csr & ~CSR_DONE;                          /* clr done */
-tti_unit.buf = tti_unit.buf & 0377;                     /* clr errors */
-CLR_INT (TTI);
-sim_activate_abs (&tti_unit, tti_unit.wait);            /* check soon for more input */
+if (tti_csr & CSR_DONE) {                               /* Input pending ? */
+    tti_csr = tti_csr & ~CSR_DONE;                      /* clr done */
+    tti_unit.buf = tti_unit.buf & 0377;                 /* clr errors */
+    CLR_INT (TTI);
+    sim_activate_abs (&tti_unit, tti_unit.wait);        /* check soon for more input */
+    }
 return t;
 }
 
