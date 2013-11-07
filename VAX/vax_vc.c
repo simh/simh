@@ -25,6 +25,8 @@
 
    vc           Qbus video subsystem
 
+   06-Nov-2013  MB      Increased the speed of v-sync interrupts, which
+                        was too slow for some O/S drivers.
    11-Jun-2013  MB      First version
 */
 
@@ -170,6 +172,8 @@ BITFIELD vc_ic_mode_bits[] = {
 #define VC_XSIZE        1024
 #define VC_YSIZE        864
 
+#define VC_MEMSIZE      (1u << 16)                      /* video memory size */
+
 #define VCMAP_VLD       0x80000000                      /* valid */
 #define VCMAP_LN        0x00000FFF                      /* buffer line */
 
@@ -180,6 +184,8 @@ BITFIELD vc_ic_mode_bits[] = {
                          vc_crtc[CRTC_CSCS])            /* cursor Y */
 #define CUR_V            ((vc_crtc[CRTC_CSCS] & 0x20) == 0) /* cursor visible */
 #define CUR_F            (vc_csr & CSR_FNC)             /* cursor function */
+
+#define VSYNC_TIME      8000                            /* vertical sync interval */
 
 #define IOLN_QVSS       0100
 
@@ -215,16 +221,16 @@ uint32 vc_crtc_p = 0;                                   /* CRTC pointer */
 uint32 vc_icdr = 0;                                     /* Interrupt controller data */
 uint32 vc_icsr = 0;                                     /* Interrupt controller status */
 uint32 vc_map[1024];                                    /* Scanline map */
-uint32 vc_buf[(1u << 16)];                              /* Video memory */
+uint32 *vc_buf = NULL;                                  /* Video memory */
 uint8 vc_cur[256];                                      /* Cursor image */
 
 DEVICE vc_dev;
 t_stat vc_rd (int32 *data, int32 PA, int32 access);
 t_stat vc_wr (int32 data, int32 PA, int32 access);
 t_stat vc_svc (UNIT *uptr);
+t_stat vc_vsync (UNIT *uptr);
 t_stat vc_reset (DEVICE *dptr);
 t_stat vc_set_enable (UNIT *uptr, int32 val, char *cptr, void *desc);
-void vc_powerdown (void);
 void vc_setint (int32 src);
 int32 vc_inta (void);
 void vc_clrint (int32 src);
@@ -276,7 +282,10 @@ DEBTAB vc_debug[] = {
     {0}
     };
 
-UNIT vc_unit = { UDATA (&vc_svc, UNIT_IDLE, 0) };
+UNIT vc_unit[] = {
+    { UDATA (&vc_svc, UNIT_IDLE, 0) },
+    { UDATA (&vc_vsync, UNIT_DIS+UNIT_IDLE, 0) }
+    };
 
 REG vc_reg[] = {
     { HRDATADF (CSR,        vc_csr, 16, "Control and status register",                  vc_csr_bits) },
@@ -312,8 +321,8 @@ MTAB vc_mod[] = {
     };
 
 DEVICE vc_dev = {
-    "QVSS", &vc_unit, vc_reg, vc_mod,
-    1, DEV_RDX, 20, 1, DEV_RDX, 8,
+    "QVSS", vc_unit, vc_reg, vc_mod,
+    2, DEV_RDX, 20, 1, DEV_RDX, 8,
     NULL, NULL, &vc_reset,
     NULL, NULL, NULL,
     &vc_dib, DEV_DIS | DEV_QBUS | DEV_DEBUG, 0,
@@ -368,7 +377,7 @@ uint32 rg = (PA >> 1) & 0x1F;
 uint32 crtc_rg, i;
 
 *data = 0;
-switch ((PA >> 1) & 0x1F) {                             /* decode PA<1> */
+switch (rg) {
 
     case 0:                                             /* CSR */
         *data = vc_csr;
@@ -454,7 +463,7 @@ uint32 rg = (PA >> 1) & 0x1F;
 uint32 crtc_rg;
 
 sim_debug (DBG_REG, &vc_dev, "vc_wr(%s) data=0x%04X\n", vc_regnames[(PA >> 1) & 0x1F], data);
-switch ((PA >> 1) & 0x1F) {                             /* decode PA<1> */
+switch (rg) {
 
     case 0:                                             /* CSR */
         vc_csr = (vc_csr & ~CSR_RW) | (data & CSR_RW);
@@ -774,13 +783,21 @@ sim_activate (uptr, tmxr_poll);                         /* reactivate */
 return SCPE_OK;
 }
 
+t_stat vc_vsync (UNIT *uptr)
+{
+vc_setint (IRQ_VSYNC);                                  /* VSYNC int */
+sim_activate (uptr, VSYNC_TIME);                        /* reactivate */
+return SCPE_OK;
+}
+
 t_stat vc_reset (DEVICE *dptr)
 {
 uint32 i;
 t_stat r;
 
 CLR_INT (QVSS);                                         /* clear int req */
-sim_cancel (&vc_unit);                                  /* stop poll */
+sim_cancel (&vc_unit[0]);                               /* stop poll */
+sim_cancel (&vc_unit[1]);                               /* stop VSYNC */
 ua2681_reset (&vc_uart);                                /* reset DUART */
 
 vc_intc.ptr = 0;                                        /* interrupt controller */
@@ -800,13 +817,21 @@ for (i = 0; i < CRTC_SIZE; i++)
 vc_crtc[CRTC_CSCS] = 0x20;                              /* hide cursor */
 vc_crtc_p = (CRTCP_LPF | CRTCP_VB);
 
-if (dptr->flags & DEV_DIS)
+if (dptr->flags & DEV_DIS) {
+    free (vc_buf);
+    vc_buf = NULL;
     return vid_close ();
+    }
 
 if (!vid_active)  {
     r = vid_open (dptr, VC_XSIZE, VC_YSIZE);            /* display size */
     if (r != SCPE_OK)
         return r;
+    vc_buf = (uint32 *) calloc (VC_MEMSIZE, sizeof (uint32));
+    if (vc_buf == NULL) {
+        vid_close ();
+        return SCPE_MEM;
+        }
     printf ("QVSS Display Created.  ");
     vid_show_release_key (stdout, NULL, 0, NULL);
     printf ("\n");
@@ -816,7 +841,8 @@ if (!vid_active)  {
         fprintf (sim_log, "\n");
         }
     }
-sim_activate_abs (&vc_unit, tmxr_poll);
+sim_activate_abs (&vc_unit[0], tmxr_poll);
+sim_activate_abs (&vc_unit[1], VSYNC_TIME);
 return auto_config (NULL, 0);                           /* run autoconfig */
 }
 
