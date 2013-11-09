@@ -25,6 +25,7 @@
 
    vc           Qbus video subsystem
 
+   08-Nov-2013  MB      Implemented mouse position register
    06-Nov-2013  MB      Increased the speed of v-sync interrupts, which
                         was too slow for some O/S drivers.
    11-Jun-2013  MB      First version
@@ -169,10 +170,11 @@ BITFIELD vc_ic_mode_bits[] = {
 #define IRQ_MBC         6                               /* Mouse button C */
 #define IRQ_SPARE       7                               /* (spare) */
 
-#define VC_XSIZE        1024
+#define VC_XSIZE        1024                            /* screen size */
 #define VC_YSIZE        864
-
 #define VC_MEMSIZE      (1u << 16)                      /* video memory size */
+
+#define VC_MOVE_MAX     49                              /* mouse movement max (per update) */
 
 #define VCMAP_VLD       0x80000000                      /* valid */
 #define VCMAP_LN        0x00000FFF                      /* buffer line */
@@ -735,6 +737,7 @@ t_stat vc_svc (UNIT *uptr)
 t_bool updated = FALSE;                                 /* flag for refresh */
 uint32 line[1024];
 uint32 ln, col, off;
+int32 xpos, ypos, dx, dy;
 uint8 *cur;
 
 vc_crtc_p = vc_crtc_p ^ CRTCP_VB;                       /* Toggle VBI */
@@ -758,6 +761,32 @@ vc_cur_x = CUR_X;                                       /* store cursor data */
 vc_cur_y = CUR_Y;
 vc_cur_v = CUR_V;
 vc_cur_f = CUR_F;
+
+xpos = vc_mpos & 0xFF;                                  /* get current mouse position */
+ypos = (vc_mpos >> 8) & 0xFF;
+dx = vid_mouse_xrel;                                    /* get relative movement */
+dy = vid_mouse_yrel;
+if (dx > VC_MOVE_MAX)                                   /* limit movement */
+    dx = VC_MOVE_MAX;
+else if (dx < -VC_MOVE_MAX)
+    dx = -VC_MOVE_MAX;
+if (dy > VC_MOVE_MAX)
+    dy = VC_MOVE_MAX;
+else if (dy < -VC_MOVE_MAX)
+    dy = -VC_MOVE_MAX;
+xpos += dx;                                             /* add to counters */
+ypos += dy;
+vc_mpos = ((ypos & 0xFF) << 8) | (xpos & 0xFF);         /* update register */
+vid_mouse_xrel = 0;                                     /* reset counters for next poll */
+vid_mouse_yrel = 0;
+
+vc_csr |= (CSR_MSA | CSR_MSB | CSR_MSC);                /* reset button states */
+if (vid_mouse_b3)                                       /* set new button states */
+    vc_csr &= ~CSR_MSA;
+if (vid_mouse_b2)
+    vc_csr &= ~CSR_MSB;
+if (vid_mouse_b1)
+    vc_csr &= ~CSR_MSC;
 
 for (ln = 0; ln < VC_YSIZE; ln++) {
     if ((vc_map[ln] & VCMAP_VLD) == 0) {                /* line invalid? */

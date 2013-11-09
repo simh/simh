@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from the author.
 
+   08-Nov-2013  MB      Added globals for current mouse status
    11-Jun-2013  MB      First version
 */
 
@@ -180,6 +181,11 @@ t_stat vid_show_release_key (FILE* st, UNIT* uptr, int32 val, void* desc);
 
 extern t_bool vid_active;
 extern uint32 vid_mono_palette[2];
+extern int32 vid_mouse_xrel;                            /* mouse cumulative x rel */
+extern int32 vid_mouse_yrel;                            /* mouse cumulative y rel */
+extern t_bool vid_mouse_b1;                             /* mouse button 1 state */
+extern t_bool vid_mouse_b2;                             /* mouse button 2 state */
+extern t_bool vid_mouse_b3;                             /* mouse button 3 state */
 
 #define SIM_VID_DBG_MOUSE   0x01000000
 #define SIM_VID_DBG_KEY     0x02000000
