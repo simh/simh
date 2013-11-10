@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   09-Nov-13    MB      Fixed reading/writing of unaligned data
    24-Oct-12    MB      Added support for KA620 virtual addressing
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Inlined physical memory routines
@@ -202,6 +203,8 @@ if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {      /* cross page? */
     }
 else pa1 = (pa + 4) & PAMASK;                           /* not cross page */
 bo = pa & 3;
+pa = pa & ~3;                                           /* convert to aligned */
+pa1 = pa1 & ~3;
 if (lnt >= L_LONG) {                                    /* lw unaligned? */
     sc = bo << 3;
     wl = ReadL (pa);                                    /* read both lw */
@@ -268,6 +271,8 @@ if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
     }
 else pa1 = (pa + 4) & PAMASK;
 bo = pa & 3;
+pa = pa & ~3;                                           /* convert to aligned */
+pa1 = pa1 & ~3;
 wl = ReadL (pa);
 if (lnt >= L_LONG) {
     sc = bo << 3;
