@@ -342,6 +342,7 @@ void (*sim_vm_post) (t_bool from_scp) = NULL;
 CTAB *sim_vm_cmd = NULL;
 void (*sim_vm_fprint_addr) (FILE *st, DEVICE *dptr, t_addr addr) = NULL;
 t_addr (*sim_vm_parse_addr) (DEVICE *dptr, char *cptr, char **tptr) = NULL;
+t_value (*sim_vm_pc_value) (void) = NULL;
 
 /* Prototypes */
 
@@ -1474,6 +1475,8 @@ t_stat echo_cmd (int32 flag, char *cptr)
 puts (cptr);
 if (sim_log)
     fprintf (sim_log, "%s\n", cptr);
+if (sim_deb)
+    fprintf (sim_deb, "\n%s\n", cptr);
 return SCPE_OK;
 }
 
@@ -6934,7 +6937,12 @@ if (sim_deb_switches & SWMASK ('A')) {
     sprintf(tim_t, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
     }
 if (sim_deb_switches & SWMASK ('P')) {
-    t_value val = get_rval (sim_deb_PC, 0);
+    t_value val;
+    
+    if (sim_vm_pc_value)
+        val = (*sim_vm_pc_value)();
+    else
+        val = get_rval (sim_deb_PC, 0);
     sprintf(pc_s, "-%s:", sim_deb_PC->name);
     sprint_val (&pc_s[strlen(pc_s)], val, sim_deb_PC->radix, sim_deb_PC->width, sim_deb_PC->flags & REG_FMT);
     }
