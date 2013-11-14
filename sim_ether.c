@@ -3031,6 +3031,11 @@ if ((addr_count > 0) && (dev->reflections > 0)) {
       sprintf(&buf2[strlen(buf2)], "%s(ether src %s)", (*buf2) ? " or " : "", mac);
     }
   sprintf (&buf[strlen(buf)], ")");
+  if (1 == strlen(buf2)) {          /* all addresses were multicast? */
+    buf[strlen(buf)-6] = '\0';      /* Remove "not ()" */
+    if (strlen(buf) > 0)
+        buf[strlen(buf)-5] = '\0';  /* remove " and " */
+    }
   }
 if (strlen(buf) > 0)
   sprintf(&buf[strlen(buf)], ")");
