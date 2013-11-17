@@ -3124,6 +3124,7 @@ return SCPE_OK;
 t_stat show_all_mods (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, int32 *toks)
 {
 MTAB *mptr;
+t_stat r = SCPE_OK;
 
 if (dptr->modifiers == NULL)
     return SCPE_OK;
@@ -3136,8 +3137,9 @@ for (mptr = dptr->modifiers; mptr->mask != 0; mptr++) {
             fprintf (st, "\n");
             *toks = 0;
             }
-        fprint_sep (st, toks);
-        show_one_mod (st, dptr, uptr, mptr, NULL, 0);
+        if (r == SCPE_OK)
+            fprint_sep (st, toks);
+        r = show_one_mod (st, dptr, uptr, mptr, NULL, 0);
         }
     }
 return SCPE_OK;
@@ -3146,10 +3148,11 @@ return SCPE_OK;
 t_stat show_one_mod (FILE *st, DEVICE *dptr, UNIT *uptr, MTAB *mptr,
     char *cptr, int32 flag)
 {
+t_stat r = SCPE_OK;
 //t_value val;
 
 if (mptr->disp)
-    mptr->disp (st, uptr, mptr->match, cptr? cptr: mptr->desc);
+    r = mptr->disp (st, uptr, mptr->match, cptr? cptr: mptr->desc);
 //else if ((mptr->mask & MTAB_XTD) && (mptr->mask & MTAB_VAL)) {
 //    REG *rptr = (REG *) mptr->desc;
 //    fprintf (st, "%s=", mptr->pstring);
@@ -3158,9 +3161,9 @@ if (mptr->disp)
 //        rptr->flags & REG_FMT);
 //    }
 else fputs (mptr->pstring, st);
-if (flag && !((mptr->mask & MTAB_XTD) && MODMASK(mptr,MTAB_NMO)))
+if ((r == SCPE_OK) && (flag && !((mptr->mask & MTAB_XTD) && MODMASK(mptr,MTAB_NMO))))
     fputc ('\n', st);
-return SCPE_OK;
+return r;
 }
 
 /* Show show commands */
