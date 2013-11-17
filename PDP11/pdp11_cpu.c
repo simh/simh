@@ -630,11 +630,18 @@ DEVICE cpu_dev = {
     NULL, &cpu_set_size, NULL
     };
 
+t_value pdp11_pc_value (void)
+{
+return (t_value)PC;
+}
+
 t_stat sim_instr (void)
 {
 int abortval, i;
 volatile int32 trapea;                                  /* used by setjmp */
 t_stat reason;
+
+sim_vm_pc_value = &pdp11_pc_value;
 
 /* Restore register state
 
