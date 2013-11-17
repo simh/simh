@@ -48,6 +48,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     DZ devices optionally support full modem control (and port speed settings 
         when connected to serial ports).
     DHU11 (device VH) on Unibus systems now has 16 ports per multiplexer.
+    XQ devices (DEQNA, DELQA and DELQA-T) are bootable on Qbus PDP11 simulators
     MicroVAX 3900 and MicroVAX II have SET CPU AUTOBOOT option
     MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer) command to change between system types
     MicroVAX I has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types

@@ -263,6 +263,7 @@ struct xq_device {
   uint16            coalesce_latency;                   /* microseconds to hold-off interrupts when not polling */
   uint16            coalesce_latency_ticks;             /* instructions in coalesce_latency microseconds */
   struct xq_sanity  sanity;                             /* sanity timer information */
+  t_bool            lockmode;                           /* DEQNA-Lock mode */
                                                         /*- initialized values - DO NOT MOVE */
 
                                                         /* I/O register storage */
@@ -360,6 +361,32 @@ typedef struct xq_controller CTLR;
 #define XQ_DSC_S  0x1000                                /* Setup bit                [Transmit only] */
 #define XQ_DSC_L  0x0080                                /* Low Byte Termination bit [Transmit only] */
 #define XQ_DSC_H  0x0040                                /* High Byte Start bit      [Transmit only] */
+
+/* DEQNA - DELQA Receive Status Word 1 */
+#define XQ_RST_UNUSED    0x8000                         /* Unused buffer */
+#define XQ_RST_LASTNOT   0xC000                         /* Used but Not Last segment */
+#define XQ_RST_LASTERR   0x4000                         /* Used, Last segment, with errors */
+#define XQ_RST_LASTNOERR 0x0000                         /* Used, Last segment, without errors */
+#define XQ_RST_RUNT      0x4800                         /* Runt packet, internal loopback unsuccessful */
+#define XQ_RST_ESETUP    0x2000                         /* Setup packet, internal loopback or external loopback packet */
+#define XQ_RST_DISCARD   0x1000                         /* Runt packet, internal loopback unsuccessful */
+#define XQ_RST_RUNT      0x4800                         /* Runt packet, internal loopback unsuccessful */
+#define XQ_RST_FRAMEERR  0x5006                         /* Framing Error in packet */
+#define XQ_RST_CRCERR    0x5002                         /* CRC Error in packet */
+#define XQ_RST_OVERFLOW  0x0001                         /* Receiver overflowed, packet(s) lost */
+
+/* DEQNA - DELQA Transmit Status Word 1 */
+#define XQ_XMT_UNUSED    0x8000                         /* Unused buffer */
+#define XQ_XMT_LASTNOT   0xC000                         /* Used but Not Last segment */
+#define XQ_XMT_LASTERR   0x4000                         /* Used, Last segment, with errors */
+#define XQ_XMT_LASTNOERR 0x0000                         /* Used, Last segment, without errors */
+#define XQ_XMT_LOSS      0x5000                         /* Carrier Loss during transmission error */
+#define XQ_XMT_NOCARRIER 0x4800                         /* No Carrier during transmission error */
+#define XQ_XMT_STE16     0x0400                         /* Sanity timer enabled with timeout of 4 minutes */
+#define XQ_XMT_ABORT     0x4200                         /* Transmission aborted due to excessive collisions */
+#define XQ_XMT_FAIL      0x0100                         /* Heartbeat collision check failure */
+
+#define XQ_LONG_PACKET   0x0600                         /* DEQNA Long Packet Limit (1536 bytes) */
 
 /* DEQNA - DELQA Normal Mode Setup Packet Flags */
 #define XQ_SETUP_MC 0x0001                              /* multicast bit */

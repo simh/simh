@@ -273,6 +273,8 @@ t_stat xq_show_type (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_type (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_poll (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat xq_set_poll (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, void* desc);
@@ -296,6 +298,8 @@ void xq_setint (CTLR* xq);
 void xq_clrint (CTLR* xq);
 int32 xq_int (void);
 void xq_csr_set_clr(CTLR* xq, uint16 set_bits, uint16 clear_bits);
+void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba);
+t_stat xq_boot (int32 unitno, DEVICE *dptr);
 t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 char *xq_description (DEVICE *dptr);
 
@@ -307,7 +311,8 @@ struct xq_device    xqa = {
   XQ_T_DELQA,                               /* mode */
   XQ_SERVICE_INTERVAL,                      /* poll */
   0, 0,                                     /* coalesce */
-  {0}                                       /* sanity */
+  {0},                                      /* sanity */
+  0                                         /* DEQNA-Lock mode */
   };
 
 struct xq_device    xqb = {
@@ -318,7 +323,8 @@ struct xq_device    xqb = {
   XQ_T_DELQA,                               /* mode */
   XQ_SERVICE_INTERVAL,                      /* poll */
   0, 0,                                     /* coalesce */
-  {0}                                       /* sanity */
+  {0},                                      /* sanity */
+  0                                         /* DEQNA-Lock mode */
   };
 
 /* SIMH device structures */
@@ -477,9 +483,11 @@ MTAB xq_mod[] = {
   { MTAB_XTD|MTAB_VDV, 0, "POLL", "POLL={DEFAULT|DISABLED|4..2500}",
     &xq_set_poll, &xq_show_poll, NULL, "Display the current polling mode" },
 #endif
-  { MTAB_XTD|MTAB_VDV|MTAB_NMO|MTAB_VALR, 0, "SANITY", "SANITY={ON|OFF}",
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "SANITY", "SANITY={ON|OFF}",
     &xq_set_sanity, &xq_show_sanity, NULL, "Sanity timer" },
-  { MTAB_XTD|MTAB_VDV|MTAB_NMO , 0, "LEDS", NULL,
+  { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "DEQNALOCK", "DEQNALOCK={ON|OFF}",
+    &xq_set_lockmode, &xq_show_lockmode, NULL, "DEQNA-Lock mode" },
+  { MTAB_XTD|MTAB_VDV,           0, "LEDS", NULL,
     NULL, &xq_show_leds, NULL, "Display status LEDs" },
   { 0 },
 };
@@ -502,7 +510,7 @@ DEVICE xq_dev = {
   "XQ", xqa_unit, xqa_reg, xq_mod,
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
-  NULL, &xq_attach, &xq_detach,
+  &xq_boot, &xq_attach, &xq_detach,
   &xqa_dib, DEV_DISABLE | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
   0, xq_debug, NULL, NULL, &xq_help, NULL, NULL, 
   &xq_description
@@ -512,7 +520,7 @@ DEVICE xqb_dev = {
   "XQB", xqb_unit, xqb_reg, xq_mod,
   2, XQ_RDX, 11, 1, XQ_RDX, 16,
   &xq_ex, &xq_dep, &xq_reset,
-  NULL, &xq_attach, &xq_detach,
+  &xq_boot, &xq_attach, &xq_detach,
   &xqb_dib, DEV_DISABLE | DEV_DIS | DEV_QBUS | DEV_DEBUG | DEV_ETHER,
   0, xq_debug, NULL, NULL, NULL, NULL, NULL, 
   &xq_description
@@ -585,8 +593,19 @@ t_stat xq_ex (t_value* vptr, t_addr addr, UNIT* uptr, int32 sw)
 {
   /* on PDP-11, allow EX command to look at bootrom */
 #ifdef VM_PDP11
-  if (addr <= sizeof(xq_bootrom)/2)
-    *vptr = xq_bootrom[addr];
+  CTLR* xq = xq_unit2ctlr(uptr);
+  uint16 *bootrom;
+
+  if (xq->var->type == XQ_T_DEQNA)
+    bootrom = xq_bootrom_deqna;
+  else
+    if (xq->var->type == XQ_T_DELQA)
+      bootrom = xq_bootrom_delqa;
+    else
+      if (xq->var->type == XQ_T_DELQA_PLUS)
+        bootrom = xq_bootrom_delqat;
+  if (addr <= sizeof(xq_bootrom_delqa)/2)
+    *vptr = bootrom[addr];
   else
     *vptr = 0;
   return SCPE_OK;
@@ -810,11 +829,7 @@ t_stat xq_show_sanity (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
-  fprintf(st, "sanity=");
-  switch (xq->var->sanity.enabled) {
-    case 2:  fprintf(st, "ON\n");  break;
-    default: fprintf(st, "OFF\n"); break;
-  }
+  fprintf(st, "sanity=%s", (xq->var->sanity.enabled == 2) ? "ON" : "OFF");
   return SCPE_OK;
 }
 
@@ -832,13 +847,38 @@ t_stat xq_set_sanity (UNIT* uptr, int32 val, char* cptr, void* desc)
   return SCPE_OK;
 }
 
+t_stat xq_show_lockmode (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+
+  if (xq->var->type == XQ_T_DEQNA) return SCPE_NOFNC;
+  fprintf(st, "DEQNALock=%s", (xq->var->lockmode) ? "ON" : "OFF");
+  return SCPE_OK;
+}
+
+t_stat xq_set_lockmode (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+  CTLR* xq = xq_unit2ctlr(uptr);
+  if (!cptr) return SCPE_IERR;
+  if (uptr->flags & UNIT_ATT) return SCPE_ALATT;
+  if (xq->var->type == XQ_T_DEQNA) return SCPE_NOFNC;
+
+  /* this assumes that the parameter has already been upcased */
+  if      (!strcmp(cptr, "ON"))  xq->var->lockmode = 1;
+  else if (!strcmp(cptr, "OFF")) xq->var->lockmode = 0;
+  else return SCPE_ARG;
+  xq->var->mode = (xq->var->lockmode ? XQ_T_DEQNA : XQ_T_DELQA);
+
+  return SCPE_OK;
+}
+
 t_stat xq_show_leds (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
   CTLR* xq = xq_unit2ctlr(uptr);
 
-  fprintf(st, "leds=(%s,%s,%s)\n", xq->var->setup.l1 ? "ON" : "OFF", 
-                                   xq->var->setup.l2 ? "ON" : "OFF", 
-                                   xq->var->setup.l3 ? "ON" : "OFF");
+  fprintf(st, "leds=(%s,%s,%s)", xq->var->setup.l1 ? "ON" : "OFF", 
+                                 xq->var->setup.l2 ? "ON" : "OFF", 
+                                 xq->var->setup.l3 ? "ON" : "OFF");
   return SCPE_OK;
 }
 
@@ -923,12 +963,14 @@ t_stat xq_rd(int32* data, int32 PA, int32 access)
         *data = 0xFF00 | xq->var->mac_checksum[index];
       else
         *data = 0xFF00 | xq->var->mac[index];
+      sim_debug(DBG_REG, xq->dev, "   data=0x%X\n", *data);
       break;
     case 2:
     case 3:
     case 4:
     case 5:
       *data = 0xFF00 | xq->var->mac[index];
+      sim_debug(DBG_REG, xq->dev, "   data=0x%X\n", *data);
       break;
     case 6:
       if (xq->var->mode != XQ_T_DELQA_PLUS) {
@@ -936,7 +978,7 @@ t_stat xq_rd(int32* data, int32 PA, int32 access)
         sim_debug     (DBG_VAR, xq->dev, ", vec = 0%o\n", (xq->var->var & XQ_VEC_IV));
         *data = xq->var->var;
       } else {
-        sim_debug_bits(DBG_VAR, xq->dev, xq_srr_bits, xq->var->srr, xq->var->srr, 0);
+        sim_debug_bits(DBG_VAR, xq->dev, xq_srr_bits, xq->var->srr, xq->var->srr, 1);
         *data = xq->var->srr;
       }
       break;
@@ -965,8 +1007,14 @@ t_stat xq_process_rbdl(CTLR* xq)
 
   sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl\n");
 
+  if (xq->var->csr & XQ_CSR_RL)
+      return SCPE_OK;
+
   /* process buffer descriptors */
   while(1) {
+
+    /* DEQNA stops processing if nothing in read queue while loading boot code */
+    if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count) && (xq->var->csr & XQ_CSR_BD)) break;
 
     /* get receive bdl from memory */
     xq->var->rbdl_buf[0] = 0xFFFF;
@@ -974,20 +1022,23 @@ t_stat xq_process_rbdl(CTLR* xq)
     rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
     if (rstatus || wstatus) return xq_nxm_error(xq);
 
+    /* DEQNA stops normal processing if nothing in read queue */
+    if ((xq->var->type == XQ_T_DEQNA) && (!xq->var->ReadQ.count)) break;
+
     /* invalid buffer? */
     if (~xq->var->rbdl_buf[1] & XQ_DSC_V) {
       xq_csr_set_clr(xq, XQ_CSR_RL, 0);
       return SCPE_OK;
     }
 
+    /* DELQA stops processing if nothing in read queue */
+    if (!xq->var->ReadQ.count) break;
+
     /* explicit chain buffer? */
     if (xq->var->rbdl_buf[1] & XQ_DSC_C) {
       xq->var->rbdl_ba = ((xq->var->rbdl_buf[1] & 0x3F) << 16) | xq->var->rbdl_buf[2];
       continue;
     }
-
-    /* stop processing if nothing in read queue */
-    if (!xq->var->ReadQ.count) break;
 
     /* get status words */
     rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
@@ -999,7 +1050,10 @@ t_stat xq_process_rbdl(CTLR* xq)
     /* decode buffer length - two's complement (in words) */
     w_length = ~xq->var->rbdl_buf[3] + 1;
     b_length = w_length * 2;
-    if (xq->var->rbdl_buf[1] & XQ_DSC_H) b_length -= 1;
+    if (xq->var->rbdl_buf[1] & XQ_DSC_H) {
+      b_length -= 1;
+      address += 1;
+    }
     if (xq->var->rbdl_buf[1] & XQ_DSC_L) b_length -= 1;
 
     item = &xq->var->ReadQ.item[xq->var->ReadQ.head];
@@ -1012,13 +1066,13 @@ t_stat xq_process_rbdl(CTLR* xq)
     if (item->packet.used) {
       int used = item->packet.used;
       rbl -= used;
-      rbuf = &item->packet.msg[used];
+      rbuf = &rbuf[used];
     } else {
       /* there should be no need to adjust runt packets 
          the physical layer (sim_ether) won't deliver any short packets 
          via eth_read, so the only short packets which get here are loopback
-         packets sent by the host diagnostics */
-      if ((item->type != 1) && (rbl < ETH_MIN_PACKET)) {
+         packets sent by the host diagnostics (OR short setup packets) */
+      if ((item->type == 2) && (rbl < ETH_MIN_PACKET)) {
         xq->var->stats.runt += 1;
         sim_debug(DBG_WRN, xq->dev, "Runt detected, size = %d\n", rbl);
         /* pad runts with zeros up to minimum size - this allows "legal" (size - 60)
@@ -1027,8 +1081,8 @@ t_stat xq_process_rbdl(CTLR* xq)
         rbl = ETH_MIN_PACKET;
       };
 
-      /* adjust oversized packets */
-      if (rbl > ETH_FRAME_SIZE) {
+      /* adjust oversized non-loopback packets */
+      if ((item->type != 1) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
         sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
@@ -1055,12 +1109,26 @@ t_stat xq_process_rbdl(CTLR* xq)
     switch (item->type) {
       case 0: /* setup packet */
         xq->var->stats.setup += 1;
-        xq->var->rbdl_buf[4] = 0x2700; /* set esetup and RBL 10:8 */
+        xq->var->rbdl_buf[4] = 0x2700;      /* set esetup and RBL 10:8 */
+        if (xq->var->type == XQ_T_DEQNA) {  /* Strange DEQNA behavior */
+          uint16 qdtc_chip_extra = 0xC000;
+
+          if (b_length <= rbl + 2) {
+            wstatus = Map_WriteW(address + rbl, 2, &qdtc_chip_extra);
+            if (wstatus) return xq_nxm_error(xq);
+          }
+        }
         break;
       case 1: /* loopback packet */
         xq->var->stats.loop += 1;
-        xq->var->rbdl_buf[4] = 0x2000;         /* loopback flag */
+        xq->var->rbdl_buf[4] = XQ_RST_LASTNOERR;
+        if (xq->var->type == XQ_T_DEQNA)
+          xq->var->rbdl_buf[4] |= ((rbl < ETH_MIN_PACKET) ? ((xq->var->csr & XQ_CSR_RE) ? XQ_RST_RUNT : 0) : 0);
+        else
+          xq->var->rbdl_buf[4] |= ((rbl < ETH_MIN_PACKET) ? ((xq->var->csr & XQ_CSR_RE) ? ((0 != memcmp(&xq->var->setup.macs[0], rbuf, 6)) ? XQ_RST_RUNT : 0) : 0) : 0);
         xq->var->rbdl_buf[4] |= (rbl & 0x0700); /* high bits of rbl */
+        if (xq->var->csr & XQ_CSR_EL)
+            xq->var->rbdl_buf[4] |= XQ_RST_ESETUP;/* loopback flag */
         break;
       case 2: /* normal packet */
         rbl -= 60;    /* keeps max packet size in 11 bits */
@@ -1069,16 +1137,19 @@ t_stat xq_process_rbdl(CTLR* xq)
         break;
     }
     if (item->packet.used < item->packet.len)
-      xq->var->rbdl_buf[4] |= 0xC000;            /* not last segment */
+      xq->var->rbdl_buf[4] |= XQ_RST_LASTNOT;   /* not last segment */
     xq->var->rbdl_buf[5] = ((rbl & 0x00FF) << 8) | (rbl & 0x00FF);
     if (xq->var->ReadQ.loss) {
       sim_debug(DBG_WRN, xq->dev, "ReadQ overflow!\n");
-      xq->var->rbdl_buf[4] |= 0x0001;   /* set overflow bit */
+      xq->var->rbdl_buf[4] |= XQ_RST_OVERFLOW;  /* set overflow bit */
       xq->var->stats.dropped += xq->var->ReadQ.loss;
-      xq->var->ReadQ.loss = 0;          /* reset loss counter */
+      xq->var->ReadQ.loss = 0;                  /* reset loss counter */
       }
-    if ((rbl + ((item->type == 2) ? 60 : 0)) > ETH_MAX_PACKET)
-      xq->var->rbdl_buf[4] |= 0x4000;   /* set Error bit (LONG) */
+    if (((~xq->var->csr & XQ_CSR_EL) &&
+         ((rbl + ((item->type == 2) ? 60 : 0)) > ETH_MAX_PACKET)) ||
+        ((xq->var->csr & XQ_CSR_EL) && (item->type == 1) && 
+         (rbl >= XQ_LONG_PACKET)))
+      xq->var->rbdl_buf[4] |= XQ_RST_LASTERR;   /* set Error bit (LONG) */
 
     /* update read status words*/
     wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
@@ -1087,11 +1158,12 @@ t_stat xq_process_rbdl(CTLR* xq)
     sim_debug(DBG_TRC, xq->dev, "xq_process_rdbl(bd=0x%X, addr=0x%X, size=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X)\n", xq->var->rbdl_ba, address, b_length, rbl + ((item->type == 2) ? 60 : 0), xq->var->rbdl_buf[4], xq->var->rbdl_buf[5]);
 
     /* remove packet from queue */
-    if (item->packet.used >= item->packet.len)
+    if (item->packet.used >= item->packet.len) {
       ethq_remove(&xq->var->ReadQ);
 
-    /* mark transmission complete */
-    xq_csr_set_clr(xq, XQ_CSR_RI, 0);
+      /* signal reception complete */
+      xq_csr_set_clr(xq, XQ_CSR_RI, 0);
+      }
 
     /* set to next bdl (implicit chain) */
     xq->var->rbdl_ba += 12;
@@ -1176,9 +1248,12 @@ t_stat xq_process_setup(CTLR* xq)
   memset(xq->var->setup.macs, '\0', sizeof(xq->var->setup.macs));
   for (i = 0; i < 7; i++)
     for (j = 0; j < 6; j++) {
+      if ((uint32)((i +   01) + (j * 8)) >= xq->var->write_buffer.len)
+        continue;
       xq->var->setup.macs[i]  [j] = xq->var->write_buffer.msg[(i +   01) + (j * 8)];
-      if (xq->var->write_buffer.len > 112)
-        xq->var->setup.macs[i+7][j] = xq->var->write_buffer.msg[(i + 0101) + (j * 8)];
+      if ((uint32)((i + 0101) + (j * 8)) >= xq->var->write_buffer.len)
+        continue;
+      xq->var->setup.macs[i+7][j] = xq->var->write_buffer.msg[(i + 0101) + (j * 8)];
     }
 
   /*
@@ -1283,7 +1358,7 @@ t_stat xq_process_setup(CTLR* xq)
 t_stat xq_process_xbdl(CTLR* xq)
 {
   const uint16  implicit_chain_status[2] = {XQ_DSC_V | XQ_DSC_C, 1};
-  const uint16  write_success[2] = {0, 1 /*Non-Zero TDR*/};
+  uint16  write_success[2] = {0x2000 /* Bit 13 Always Set */, 1 /*Non-Zero TDR*/};
   uint16 b_length, w_length;
   int32 rstatus, wstatus;
   uint32 address;
@@ -1305,6 +1380,16 @@ t_stat xq_process_xbdl(CTLR* xq)
     wstatus = Map_WriteW(xq->var->xbdl_ba,     2, &xq->var->xbdl_buf[0]);
     if (rstatus || wstatus) return xq_nxm_error(xq);
 
+    /* compute host memory address */
+    address = ((xq->var->xbdl_buf[1] & 0x3F) << 16) | xq->var->xbdl_buf[2];
+
+    /* explicit chain buffer? */
+    if (xq->var->xbdl_buf[1] & XQ_DSC_C) {
+      xq->var->xbdl_ba = address;
+      sim_debug(DBG_WRN, xq->dev, "XBDL chaining to buffer descriptor at: 0x%X\n", address);
+      continue;
+    }
+
     /* invalid buffer? */
     if (~xq->var->xbdl_buf[1] & XQ_DSC_V) {
       xq_csr_set_clr(xq, XQ_CSR_XL, 0);
@@ -1312,21 +1397,14 @@ t_stat xq_process_xbdl(CTLR* xq)
       return SCPE_OK;
     }
 
-    /* compute host memory address */
-    address = ((xq->var->xbdl_buf[1] & 0x3F) << 16) | xq->var->xbdl_buf[2];
-
     /* decode buffer length - two's complement (in words) */
     w_length = ~xq->var->xbdl_buf[3] + 1;
     b_length = w_length * 2;
-    if (xq->var->xbdl_buf[1] & XQ_DSC_H) b_length -= 1;
-    if (xq->var->xbdl_buf[1] & XQ_DSC_L) b_length -= 1;
-
-    /* explicit chain buffer? */
-    if (xq->var->xbdl_buf[1] & XQ_DSC_C) {
-      xq->var->xbdl_ba = address;
-      sim_debug(DBG_WRN, xq->dev, "XBDL chained buffer encountered: %d\n", b_length);
-      continue;
+    if (xq->var->xbdl_buf[1] & XQ_DSC_H) {
+      b_length -= 1;
+      address += 1;
     }
+    if (xq->var->xbdl_buf[1] & XQ_DSC_L) b_length -= 1;
 
     /* add to transmit buffer, making sure it's not too big */
     if ((xq->var->write_buffer.len + b_length) > sizeof(xq->var->write_buffer.msg)) {
@@ -1340,18 +1418,19 @@ t_stat xq_process_xbdl(CTLR* xq)
 
     /* end of message? */
     if (xq->var->xbdl_buf[1] & XQ_DSC_E) {
-      if (((~xq->var->csr & XQ_CSR_RE) && ((~xq->var->csr & XQ_CSR_IL) || (xq->var->csr & XQ_CSR_EL))) ||  /* loopback */
+      if (((~xq->var->csr & XQ_CSR_IL) || (xq->var->csr & XQ_CSR_EL)) ||  /* loopback */
            (xq->var->xbdl_buf[1] & XQ_DSC_S)) { /* or setup packet (forces loopback regardless of state) */
         if (xq->var->xbdl_buf[1] & XQ_DSC_S) { /* setup packet */
           status = xq_process_setup(xq);
-
-          /* put packet in read buffer */
-          ethq_insert (&xq->var->ReadQ, 0, &xq->var->write_buffer, status);
+          ethq_insert (&xq->var->ReadQ, 0, &xq->var->write_buffer, status);/* put packet in read buffer */
         } else { /* loopback */
-          /* put packet in read buffer */
-          ethq_insert (&xq->var->ReadQ, 1, &xq->var->write_buffer, 0);
+          if (((~xq->var->csr & XQ_CSR_RL) &&        /* If a buffer descriptor list is good */
+               (xq->var->rbdl_buf[1] & XQ_DSC_V)) || /* AND the descriptor is valid */
+              (xq->var->csr & XQ_CSR_EL))            /* OR External Loopback */
+            ethq_insert (&xq->var->ReadQ, 1, &xq->var->write_buffer, 0);
           if ((DBG_PCK & xq->dev->dctrl) && xq->var->etherface)
             eth_packet_trace_ex(xq->var->etherface, xq->var->write_buffer.msg, xq->var->write_buffer.len, "xq-write-loopback", DBG_DAT & xq->dev->dctrl, DBG_PCK);
+          write_success[0] |= XQ_XMT_FAIL;
         }
 
         /* update write status */
@@ -1366,7 +1445,7 @@ t_stat xq_process_xbdl(CTLR* xq)
         /* reset sanity timer */
         xq_reset_santmr(xq);
 
-        /* mark transmission complete */
+        /* signal transmission complete */
         xq_csr_set_clr(xq, XQ_CSR_XI, 0);
 
         /* now trigger "read" of setup or loopback packet */
@@ -1388,7 +1467,7 @@ t_stat xq_process_xbdl(CTLR* xq)
 
     } else { /* not at end-of-message */
 
-      sim_debug(DBG_WRN, xq->dev, "XBDL processing implicit chain buffer segment\n");
+      sim_debug(DBG_WRN, xq->dev, "XBDL implicitly chaining to buffer descriptor at: 0x%X\n", xq->var->xbdl_ba+12);
       /* update bdl status words */
       wstatus = Map_WriteW(xq->var->xbdl_ba + 8, 4, (uint16*) implicit_chain_status);
       if(wstatus) return xq_nxm_error(xq);
@@ -1407,30 +1486,33 @@ void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba)
   uint32 address, initial_bdl_ba = bdl_ba;
   int32 rstatus;
 
+  if ((!sim_deb) || (!(xq->dev->dctrl & DBG_TRC)))/* Do nothing if not debugging */
+      return;
+
   sim_debug(DBG_TRC, xq->dev, "  Descriptor list at: 0x%X\n", bdl_ba);
 
   while (1) {
 
     /* get the beginning of the buffer descriptor */
-    rstatus = Map_ReadW (bdl_ba, 4, &bdl_buf[0]);
+    rstatus = Map_ReadW (bdl_ba, 6, &bdl_buf[0]);
     if (rstatus) return;
+
+    /* explicit chain buffer? */
+    if (bdl_buf[1] & XQ_DSC_C) {
+      sim_debug(DBG_TRC, xq->dev, "    descriptor=0x%X, flags=0x%04X, bits=0x%04X, chain=0x%X\n", bdl_ba, bdl_buf[0], bdl_buf[1] & 0xFFC0, ((bdl_buf[1] & 0x3F) << 16) | bdl_buf[2]);
+      bdl_ba = ((bdl_buf[1] & 0x3F) << 16) | bdl_buf[2];
+      if (initial_bdl_ba == bdl_ba)
+          break;
+      continue;
+      }
 
     /* invalid buffer? */
     if (~bdl_buf[1] & XQ_DSC_V)
       break;
 
     /* get the rest of the buffer descriptor */
-    rstatus = Map_ReadW (bdl_ba + 4, 8, &bdl_buf[2]);
+    rstatus = Map_ReadW (bdl_ba + 6, 6, &bdl_buf[3]);
     if (rstatus) return;
-
-    /* explicit chain buffer? */
-    if (bdl_buf[1] & XQ_DSC_C) {
-      sim_debug(DBG_TRC, xq->dev, "    descriptor=0x%X, flags=0x%04X, chain=0x%X\n", bdl_ba, bdl_buf[0], ((bdl_buf[1] & 0x3F) << 16) | bdl_buf[2]);
-      bdl_ba = ((bdl_buf[1] & 0x3F) << 16) | bdl_buf[2];
-      if (initial_bdl_ba == bdl_ba)
-          break;
-      continue;
-      }
 
     /* get host memory address */
     address = ((bdl_buf[1] & 0x3F) << 16) | bdl_buf[2];
@@ -1438,7 +1520,10 @@ void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba)
     /* decode buffer length - two's complement (in words) */
     w_length = ~bdl_buf[3] + 1;
     b_length = w_length * 2;
-    if (bdl_buf[1] & XQ_DSC_H) b_length -= 1;
+    if (bdl_buf[1] & XQ_DSC_H) {
+      b_length -= 1;
+      address += 1;
+    }
     if (bdl_buf[1] & XQ_DSC_L) b_length -= 1;
 
     sim_debug(DBG_TRC, xq->dev, "    descriptor=0x%X, flags=0x%04X, bits=0x%04X, addr=0x%X, len=0x%X, st1=0x%04X, st2=0x%04X\n", 
@@ -1446,6 +1531,8 @@ void xq_show_debug_bdl(CTLR* xq, uint32 bdl_ba)
 
     bdl_ba += 12;
     }
+
+  sim_debug(DBG_TRC, xq->dev, "    descriptor=0x%X, flags=0x%04X, bits=0x%04X\n", bdl_ba, bdl_buf[0], bdl_buf[1] & 0xFFC0);
 }
 
 t_stat xq_dispatch_rbdl(CTLR* xq)
@@ -1465,6 +1552,9 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
   /* get address of first receive buffer */
   xq->var->rbdl_ba = ((xq->var->rbdl[1] & 0x3F) << 16) | (xq->var->rbdl[0] & ~01);
 
+  /* When debugging, walk and display the buffer descriptor list */
+  xq_show_debug_bdl(xq, xq->var->rbdl_ba);
+
   /* get first receive buffer */
   xq->var->rbdl_buf[0] = 0xFFFF;
   wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
@@ -1476,9 +1566,6 @@ t_stat xq_dispatch_rbdl(CTLR* xq)
     xq_csr_set_clr(xq, XQ_CSR_RL, 0);
     return SCPE_OK;
     }
-
-  /* When debugging, walk and display the buffer descriptor list */
-  xq_show_debug_bdl(xq, xq->var->rbdl_ba);
 
   /* process any waiting packets in receive queue */
   if (xq->var->ReadQ.count)
@@ -1580,8 +1667,8 @@ t_stat xq_process_turbo_rbdl(CTLR* xq)
         rbl = ETH_MIN_PACKET;
       };
 
-      /* adjust oversized packets */
-      if (rbl > ETH_FRAME_SIZE) {
+      /* adjust oversized non-loopback packets */
+      if ((item->type != 1) && (rbl > ETH_FRAME_SIZE)) {
         xq->var->stats.giant += 1;
         sim_debug(DBG_WRN, xq->dev, "Giant detected, size=%d\n", rbl);
         /* trim giants down to maximum size - no documentation on how to handle the data loss */
@@ -1961,7 +2048,7 @@ void xq_sw_reset(CTLR* xq)
 t_stat xq_wr_var(CTLR* xq, int32 data)
 {
   uint16 save_var = xq->var->var;
-  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data= 0x%08X\n", data);
+  sim_debug(DBG_REG, xq->dev, "xq_wr_var(data= 0x%08X)\n", data);
   
   switch (xq->var->type) {
     case XQ_T_DEQNA:
@@ -1969,14 +2056,21 @@ t_stat xq_wr_var(CTLR* xq, int32 data)
       break;
     case XQ_T_DELQA:
     case XQ_T_DELQA_PLUS:
-      xq->var->var = (xq->var->var & XQ_VEC_RO) | (data & XQ_VEC_RW);
+      if (xq->var->lockmode)
+        xq->var->var = data & (XQ_VEC_IV | XQ_VEC_ID);
+      else
+        xq->var->var = (data & ~XQ_VEC_RO) | (XQ_VEC_ID & XQ_VEC_RW);
 
-      /* if switching to DEQNA-LOCK mode clear VAR<14:10> */
-      if (~xq->var->var & XQ_VEC_MS) {
-        xq->var->mode = XQ_T_DEQNA;
-        xq->var->var &= ~(XQ_VEC_OS | XQ_VEC_RS | XQ_VEC_ST);
-      } else {
-        xq->var->mode = XQ_T_DELQA;
+      if ((save_var ^ xq->var->var) & XQ_VEC_MS) { /* DEQNA-Lock mode changing? */
+        if (~xq->var->var & XQ_VEC_MS) {
+          /* if switching to DEQNA-LOCK mode clear VAR<14:10> */
+          sim_debug(DBG_REG, xq->dev, "xq_wr_var(DELQA switching to DEQNA-Lock mode\n");
+          xq->var->mode = XQ_T_DEQNA;
+          xq->var->var &= ~(XQ_VEC_OS | XQ_VEC_RS | XQ_VEC_ST);
+        } else {
+          sim_debug(DBG_REG, xq->dev, "xq_wr_var(DELQA switching to DEQNA Normal mode\n");
+          xq->var->mode = XQ_T_DELQA;
+        }
       }
 
       /* if Self Test is on, turn it off to signal completion */
@@ -2008,190 +2102,55 @@ t_stat xq_process_bootrom (CTLR* xq)
   NOTE: BOOT ROMs are a PDP-11ism, since they contain PDP-11 binary code.
         the host is responsible for creating two *2KB* receive buffers.
 
-  RSTS/E v10.1 source (INIONE.MAR/XHLOOK:) indicates that both the DEQNA and
+  RSTS/E v10.1 source (INIONE.MAC/XHLOOK:) indicates that both the DEQNA and
   DELQA will set receive status word 1 bits 15 & 14 on both packets. It also
   states that a hardware bug in the DEQNA will set receive status word 1 bit 15
   (only) in the *third* receive buffer (oops!).
 
   RSTS/E v10.1 will run the Citizenship test from the bootrom after loading it.
-  Documentation on the Boot ROM can be found in INIQNA.MAR.
+  Documentation on the Boot ROM can be found in INIQNA.MAC.
   */
 
-  int32 rstatus, wstatus;
-  uint16 b_length, w_length;
-  uint32 address;
-  uint8*  bootrom = (uint8*) xq_bootrom;
-  size_t  i;
-  int     checksum;
+  ETH_PACK pack;
+  uint8*  bootrom_b;
+  size_t bootrom_size;
 
   sim_debug(DBG_TRC, xq->dev, "xq_process_bootrom()\n");
-
-  /*
-  RSTS/E v10.1 invokes the Citizenship tests in the Bootrom. For some
-  reason, the current state of the XQ emulator cannot pass these. So,
-  to get moving on RSTE/E support, we will replace the following line in
-  INIQNA.MAR/CITQNA::
-    70$: MOV (R2),R0 ;get the status word
-  with
-    70$: CLR R0      ;force success
-  to cause the Citizenship test to return success to RSTS/E.
-
-  At some point, the real problem (failure to pass citizenship diagnostics)
-  does need to be corrected to find incompatibilities in the emulation, and to
-  ultimately allow it to pass Digital hardware diagnostic tests.
-  */
-  for (i=0; i<sizeof(xq_bootrom)/2; i++)
-    if (xq_bootrom[i] == 011200) {  /* MOV (R2),R0 */
-      xq_bootrom[i] = 005000;       /* CLR R0 */
-      break;
-    }
-
-  /* recalculate checksum, which is a simple byte sum */
-  for (i=0, checksum=0; i<sizeof(xq_bootrom)-2; i++)
-    checksum += bootrom[i];
-
-  /* set new checksum */
-  xq_bootrom[sizeof(xq_bootrom)/2-1] = checksum;
-
-  /* --------------------------- bootrom part 1 -----------------------------*/
-
-  /* get receive bdl from memory */
-  xq->var->rbdl_buf[0] = 0xFFFF;
-  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
-  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
-  if (rstatus || wstatus) return xq_nxm_error(xq);
-
-  /* invalid buffer? */
-  if (~xq->var->rbdl_buf[1] & XQ_DSC_V) {
-    xq_csr_set_clr(xq, XQ_CSR_RL, 0);
-    return SCPE_OK;
-  }
-
-  /* get status words */
-  rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
-  if (rstatus) return xq_nxm_error(xq);
-
-  /* get host memory address */
-  address = ((xq->var->rbdl_buf[1] & 0x3F) << 16) | xq->var->rbdl_buf[2];
-
-  /* decode buffer length - two's complement (in words) */
-  w_length = ~xq->var->rbdl_buf[3] + 1;
-  b_length = w_length * 2;
-  if (xq->var->rbdl_buf[1] & XQ_DSC_H) b_length -= 1;
-  if (xq->var->rbdl_buf[1] & XQ_DSC_L) b_length -= 1;
-
-  /* make sure entire packet fits in buffer */
-  assert(b_length >= sizeof(xq_bootrom)/2);
-
-  /* send data to host */
-  wstatus = Map_WriteB(address, sizeof(xq_bootrom)/2, bootrom);
-  if (wstatus) return xq_nxm_error(xq);
-
-  /* update read status words */
-  xq->var->rbdl_buf[4] = XQ_DSC_V | XQ_DSC_C;   /* valid, chain */
-  xq->var->rbdl_buf[5] = 0;
-
-  /* update read status words*/
-  wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
-  if (wstatus) return xq_nxm_error(xq);
-
-  /* set to next bdl (implicit chain) */
-  xq->var->rbdl_ba += 12;
-
-  /* --------------------------- bootrom part 2 -----------------------------*/
-
-  /* get receive bdl from memory */
-  xq->var->rbdl_buf[0] = 0xFFFF;
-  wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
-  rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
-  if (rstatus || wstatus) return xq_nxm_error(xq);
-
-  /* invalid buffer? */
-  if (~xq->var->rbdl_buf[1] & XQ_DSC_V) {
-    xq_csr_set_clr(xq, XQ_CSR_RL, 0);
-    return SCPE_OK;
-  }
-
-  /* get status words */
-  rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
-  if (rstatus) return xq_nxm_error(xq);
-
-  /* get host memory address */
-  address = ((xq->var->rbdl_buf[1] & 0x3F) << 16) | xq->var->rbdl_buf[2];
-
-  /* decode buffer length - two's complement (in words) */
-  w_length = ~xq->var->rbdl_buf[3] + 1;
-  b_length = w_length * 2;
-  if (xq->var->rbdl_buf[1] & XQ_DSC_H) b_length -= 1;
-  if (xq->var->rbdl_buf[1] & XQ_DSC_L) b_length -= 1;
-
-  /* make sure entire packet fits in buffer */
-  assert(b_length >= sizeof(xq_bootrom)/2);
-
-  /* send data to host */
-  wstatus = Map_WriteB(address, sizeof(xq_bootrom)/2, &bootrom[2048]);
-  if (wstatus) return xq_nxm_error(xq);
-
-  /* update read status words */
-  xq->var->rbdl_buf[4] = XQ_DSC_V | XQ_DSC_C;   /* valid, chain */
-  xq->var->rbdl_buf[5] = 0;
-
-  /* update read status words*/
-  wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
-  if (wstatus) return xq_nxm_error(xq);
-
-  /* set to next bdl (implicit chain) */
-  xq->var->rbdl_ba += 12;
-
-  /* --------------------------- bootrom part 3 -----------------------------*/
-
-  switch (xq->var->type) {
-    case XQ_T_DEQNA:
-
-      /* get receive bdl from memory */
-      xq->var->rbdl_buf[0] = 0xFFFF;
-      wstatus = Map_WriteW(xq->var->rbdl_ba,     2, &xq->var->rbdl_buf[0]);
-      rstatus = Map_ReadW (xq->var->rbdl_ba + 2, 6, &xq->var->rbdl_buf[1]);
-      if (rstatus || wstatus) return xq_nxm_error(xq);
-
-      /* invalid buffer? */
-      if (~xq->var->rbdl_buf[1] & XQ_DSC_V) {
-        xq_csr_set_clr(xq, XQ_CSR_RL, 0);
-        return SCPE_OK;
-      }
-
-      /* get status words */
-      rstatus = Map_ReadW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
-      if (rstatus) return xq_nxm_error(xq);
-
-      /* update read status words */
-      xq->var->rbdl_buf[4] = XQ_DSC_V;   /* valid */
-      xq->var->rbdl_buf[5] = 0;
-
-      /* update read status words*/
-      wstatus = Map_WriteW(xq->var->rbdl_ba + 8, 4, &xq->var->rbdl_buf[4]);
-      if (wstatus) return xq_nxm_error(xq);
-
-      /* set to next bdl (implicit chain) */
-      xq->var->rbdl_ba += 12;
-      break;
-
-    default:
-      break;
-  } /* switch */
-
-  /* --------------------------- Done, finish up -----------------------------*/
-
-  /* mark transmission complete */
-  xq_csr_set_clr(xq, XQ_CSR_RI, 0);
-
-  /* reset sanity timer */
-  xq_reset_santmr(xq);
 
   /* Turn on all 3 DEQNA Leds */
   xq->var->setup.l1 = 1;
   xq->var->setup.l2 = 1;
   xq->var->setup.l3 = 1;
+
+  /* reset sanity timer */
+  xq_reset_santmr(xq);
+
+  if (xq->var->type == XQ_T_DEQNA) {
+    bootrom_b = (uint8*)xq_bootrom_deqna;
+    bootrom_size = sizeof(xq_bootrom_deqna);
+  } else {
+    if (xq->var->type == XQ_T_DELQA) {
+      bootrom_b = (uint8*)xq_bootrom_delqa;
+      bootrom_size = sizeof(xq_bootrom_delqa);
+    } else {
+      if (xq->var->type == XQ_T_DELQA_PLUS) {
+        bootrom_b = (uint8*)xq_bootrom_delqat;
+        bootrom_size = sizeof(xq_bootrom_delqat);
+      }
+    }
+  }
+  
+  memset (&pack, 0, sizeof(pack));
+  pack.len = bootrom_size;
+  pack.used = 0;
+  if (bootrom_size <= sizeof(pack.msg))
+      memcpy (pack.msg, bootrom_b, bootrom_size);
+  else
+      pack.oversize = bootrom_b;
+  ethq_insert (&xq->var->ReadQ, 1, &pack, 0);
+
+  /* pump the FIFO into memory */
+  xq_process_rbdl (xq);
 
   return SCPE_OK;
 }
@@ -2423,6 +2382,7 @@ t_stat xq_wr(int32 data, int32 PA, int32 access)
           break;
         case 3:   /* receive bdl high bits */
           xq->var->rbdl[1] = data;
+          xq_csr_set_clr(xq, 0, XQ_CSR_RL);
           xq_dispatch_rbdl(xq); /* start receive operation */
           break;
         case 4:   /* transmit bdl low bits */
@@ -2430,6 +2390,7 @@ t_stat xq_wr(int32 data, int32 PA, int32 access)
           break;
         case 5:   /* transmit bdl high bits */
           xq->var->xbdl[1] = data;
+          xq_csr_set_clr(xq, 0, XQ_CSR_XL);
           xq_dispatch_xbdl(xq); /* start transmit operation */
           break;
         case 6:   /* vector address register */
@@ -2465,8 +2426,8 @@ t_stat xq_reset(DEVICE* dptr)
       break;
     case XQ_T_DELQA:
     case XQ_T_DELQA_PLUS:
-      xq->var->var = XQ_VEC_MS | XQ_VEC_OS;
-      xq->var->mode = XQ_T_DELQA;
+      xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled == 2) ? XQ_VEC_OS : 0);
+      xq->var->mode = (xq->var->lockmode ? XQ_T_DEQNA : XQ_T_DELQA);
       break;
   }
   xq->dib->vec = 0;
@@ -2507,6 +2468,7 @@ t_stat xq_reset(DEVICE* dptr)
   }
 
   if (sim_switches & SWMASK ('P')) { /* Powerup? */
+    memset (&xq->var->setup, 0, sizeof(xq->var->setup));
     /* Turn on all 3 DEQNA Leds */
     xq->var->setup.l1 = 1;
     xq->var->setup.l2 = 1;
@@ -2518,7 +2480,7 @@ t_stat xq_reset(DEVICE* dptr)
 
 void xq_reset_santmr(CTLR* xq)
 {
-  sim_debug(DBG_TRC, xq->dev, "xq_reset_santmr()\n");
+  sim_debug(DBG_TRC, xq->dev, "xq_reset_santmr(enable=%d, qsecs=%d)\n", (xq->var->sanity.enabled ? 1 : 0), xq->var->sanity.quarter_secs);
   if (xq->var->sanity.enabled) {
     sim_debug(DBG_SAN, xq->dev, "SANITY TIMER RESETTING, qsecs: %d\n", xq->var->sanity.quarter_secs);
 
@@ -2671,7 +2633,7 @@ t_stat xq_tmrsvc(UNIT* uptr)
         sim_debug(DBG_TRC, xq->dev, "xq_tmrsvc(DELQA-PLUS Host Inactivity Expired\n");
         xq->var->mode = XQ_T_DELQA;
         xq->var->iba = xq->var->srr = 0;
-        xq->var->var = XQ_VEC_MS | XQ_VEC_OS;
+        xq->var->var = (xq->var->lockmode ? 0 : XQ_VEC_MS) | ((xq->var->sanity.enabled == 2) ? XQ_VEC_OS : 0);
       }
     }
 
@@ -2984,12 +2946,43 @@ void xq_debug_turbo_setup(CTLR* xq)
             xq->dev->name, xq->var->init.tdra_h, xq->var->init.tdra_l);
 }
 
+t_stat xq_boot (int32 unitno, DEVICE *dptr)
+{
+#ifdef VM_PDP11
+size_t i;
+DIB *dib = (DIB *)dptr->ctxt;
+CTLR *xq = xq_unit2ctlr(&dptr->units[unitno]);
+uint16 *bootrom;
+extern int32 REGFILE[6][2];                 /* R0-R5, two sets */
+extern uint16 *M;                           /* Memory */
+
+if (xq->var->type == XQ_T_DEQNA)
+  bootrom = xq_bootrom_deqna;
+else
+  if (xq->var->type == XQ_T_DELQA)
+    bootrom = xq_bootrom_delqa;
+  else
+    if (xq->var->type == XQ_T_DELQA_PLUS)
+      bootrom = xq_bootrom_delqat;
+
+for (i = 0; i < BOOT_LEN; i++)
+    M[(BOOT_START >> 1) + i] = bootrom[i];
+cpu_set_boot (BOOT_ENTRY);
+REGFILE[0][0] = 0;
+REGFILE[1][0] = dib->ba;
+return SCPE_OK;
+#else
+return SCPE_NOFNC;
+#endif
+}
+
 t_stat xq_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
 fprintf (st, "DELQA-T/DELQA/DEQNA Qbus Ethernet Controllers\n\n");
 fprintf (st, "The simulator implements two DELQA-T/DELQA/DEQNA Qbus Ethernet controllers\n");
 fprintf (st, "(XQ, XQB).  Initially, XQ is enabled, and XQB is disabled.  Options allow\n");
-fprintf (st, "control of the MAC address, the controller type, and the sanity timer.\n\n");
+fprintf (st, "control of the MAC address, the controller type, the sanity timer and\n");
+fprintf (st, "for the DELQA and DELQA-T devices a DEQNA-Lock mode.\n\n");
 fprint_set_help (st, dptr);
 fprintf (st, "\nConfigured options and controller state can be displayed with:\n\n");
 fprint_show_help (st, dptr);
@@ -2999,11 +2992,9 @@ fprintf (st, "there is only one SIMH DELQA-T/DELQA/DEQNA controller on your LAN.
 fprintf (st, "with the same MAC address will see each other's packets, resulting in a serious\n");
 fprintf (st, "mess.\n\n");
 fprintf (st, "The DELQA-T type/mode is better and faster but may not be usable by older or\n");
-fprintf (st, "non-DEC OS's.  Also, be aware that DEQNA mode is not supported on many most\n");
-fprintf (st, "recent OS's. The DEQNA-LOCK mode of the DELQA card is emulated by setting the\n");
-fprintf (st, "controller to DEQNA -- there is no need for a separate mode.  DEQNA-LOCK mode\n");
-fprintf (st, "behaves exactly like a DEQNA, except for the operation of the VAR and MOP\n");
-fprintf (st, "processing.\n\n");
+fprintf (st, "non-DEC OS's.  Also, be aware that DEQNA type is not supported on some more\n");
+fprintf (st, "recent OS's. DEQNA-LOCK mode behaves exactly like a DEQNA, except for the\n");
+fprintf (st, "operation of the VAR and MOP processing.\n\n");
 fprintf (st, "The SANITY command change or display the INITIALIZATION sanity timer (DEQNA\n");
 fprintf (st, "jumper W3/DELQA switch S4).  The INITIALIZATION sanity timer has a default\n");
 fprintf (st, "timeout of 4 minutes, and cannot be turned off, just reset.  The normal sanity\n");
@@ -3025,6 +3016,9 @@ fprintf (st, "the simulator's ability to execute instructions efficiently.\n");
 fprintf (st, "\nTo access the network, the simulated Ethernet controller must be attached to a\n");
 fprintf (st, "real Ethernet interface.\n\n");
 eth_attach_help(st, dptr, uptr, flag, cptr);
+#ifdef VM_PDP11
+fprintf (st, "On PDP-11 simulators, the XQ device is bootable.\n\n");
+#endif
 fprintf (st, "One final note: because of its asynchronous nature, the XQ controller is not\n");
 fprintf (st, "limited to the network speed of the real DELQA-T/DELQA/DEQNA controllers, nor\n");
 fprintf (st, "the 10Mbit/sec of a standard Ethernet.  Attach it to a Fast Ethernet (100\n");
