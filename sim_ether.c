@@ -670,7 +670,7 @@ static int eth_open_device_count = 0;
 #if defined (USE_NETWORK) || defined (USE_SHARED)
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
-eth_open_devices = realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
+eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
 eth_open_devices[eth_open_device_count++] = dev;
 }
 
@@ -824,7 +824,7 @@ void ethq_insert_data(ETH_QUE* que, int32 type, const uint8 *data, int used, siz
       memcpy(&item->packet.msg[len], crc_data, ETH_CRC_SIZE);
     }
   else {
-    item->packet.oversize = realloc (item->packet.oversize, ((len > crc_len) ? len : crc_len));
+    item->packet.oversize = (uint8 *)realloc (item->packet.oversize, ((len > crc_len) ? len : crc_len));
     memcpy(item->packet.oversize, data, ((len > crc_len) ? len : crc_len));
     if (crc_data && (crc_len > len))
       memcpy(&item->packet.oversize[len], crc_data, ETH_CRC_SIZE);
@@ -1282,7 +1282,7 @@ static int pcap_mac_if_win32(char *AdapterName, unsigned char MACAddress[6])
 
   /* Allocate a buffer to get the MAC adress */
 
-  OidData = malloc(6 + sizeof(PACKET_OID_DATA));
+  OidData = (PACKET_OID_DATA *)malloc(6 + sizeof(PACKET_OID_DATA));
   if (OidData == NULL) {
     p_PacketCloseAdapter(lpAdapter);
 #ifdef _WIN32
@@ -1845,7 +1845,7 @@ if (sim_log) fprintf (sim_log, msg, savname);
 eth_get_nic_hw_addr(dev, savname);
 
 /* save name of device */
-dev->name = malloc(strlen(savname)+1);
+dev->name = (char *)malloc(strlen(savname)+1);
 strcpy(dev->name, savname);
 
 /* save debugging information */
@@ -2216,7 +2216,7 @@ if (NULL != (request = dev->write_buffers))
   dev->write_buffers = request->next;
 pthread_mutex_unlock (&dev->writer_lock);
 if (NULL == request)
-  request = malloc(sizeof(*request));
+  request = (struct write_request *)malloc(sizeof(*request));
 
 /* Copy buffer contents */
 request->packet.len = packet->len;
@@ -2700,7 +2700,7 @@ int bpf_used;
 
 if ((dev->have_host_nic_phy_addr) &&
     (LOOPBACK_PHYSICAL_RESPONSE(dev->host_nic_phy_hw_addr, dev->physical_addr, data))) {
-  u_char *datacopy = malloc(header->len);
+  u_char *datacopy = (u_char *)malloc(header->len);
 
   memcpy(datacopy, data, header->len);
   memcpy(datacopy, dev->physical_addr, sizeof(ETH_MAC));
@@ -2781,10 +2781,10 @@ if (bpf_used ? to_me : (to_me && !from_me)) {
     int crc_len = 0;
     uint8 crc_data[4];
     uint32 len = header->len;
-    u_char* moved_data = NULL;
+    u_char *moved_data = NULL;
 
     if (header->len < ETH_MIN_PACKET) {   /* Pad runt packets before CRC append */
-      moved_data = malloc(ETH_MIN_PACKET);
+      moved_data = (u_char *)malloc(ETH_MIN_PACKET);
       memcpy(moved_data, data, len);
       memset(moved_data + len, 0, ETH_MIN_PACKET-len);
       len = ETH_MIN_PACKET;

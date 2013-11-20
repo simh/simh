@@ -136,6 +136,7 @@ BRKTAB *sim_brk_fnd (t_addr loc);
 uint32 sim_brk_test (t_addr bloc, uint32 btyp);
 void sim_brk_clrspc (uint32 spc);
 char *match_ext (char *fnam, char *ext);
+t_stat show_version (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat set_dev_debug (DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat show_dev_debug (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 const char *sim_error_text (t_stat stat);

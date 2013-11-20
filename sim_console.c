@@ -618,7 +618,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                             }
                         if (sim_rem_buf_ptr[i]+80 >= sim_rem_buf_size[i]) {
                             sim_rem_buf_size[i] += 1024;
-                            sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                            sim_rem_buf[i] = (char *)realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
                             }
                         strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue due to timeout");
                         tmxr_linemsgf (lp, "%s\n", sim_rem_buf[i]);
@@ -656,7 +656,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_linemsg (lp, "\r\n");
                     if (sim_rem_buf_ptr[i]+1 >= sim_rem_buf_size[i]) {
                         sim_rem_buf_size[i] += 1024;
-                        sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                        sim_rem_buf[i] = (char *)realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
                         }
                     sim_rem_buf[i][sim_rem_buf_ptr[i]++] = '\0';
                     got_command = TRUE;
@@ -670,7 +670,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     if (!sim_rem_single_mode[i]) {
                         if (sim_rem_buf_ptr[i]+80 >= sim_rem_buf_size[i]) {
                             sim_rem_buf_size[i] += 1024;
-                            sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                            sim_rem_buf[i] = (char *)realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
                             }
                         strcpy (sim_rem_buf[i], "CONTINUE         ! Automatic continue before close");
                         tmxr_linemsgf (lp, "%s\n", sim_rem_buf[i]);
@@ -682,7 +682,7 @@ for (i=(was_stepping ? sim_rem_step_line : 0);
                     tmxr_putc_ln (lp, c);
                     if (sim_rem_buf_ptr[i]+2 >= sim_rem_buf_size[i]) {
                         sim_rem_buf_size[i] += 1024;
-                        sim_rem_buf[i] = realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
+                        sim_rem_buf[i] = (char *)realloc (sim_rem_buf[i], sim_rem_buf_size[i]);
                         }
                     sim_rem_buf[i][sim_rem_buf_ptr[i]++] = c;
                     sim_rem_buf[i][sim_rem_buf_ptr[i]] = '\0';
@@ -895,15 +895,15 @@ if (sim_rem_con_tmxr.master)
 for (i=0; i<sim_rem_con_tmxr.lines; i++)
     free (sim_rem_buf[i]);
 sim_rem_con_tmxr.lines = lines;
-sim_rem_con_tmxr.ldsc = realloc (sim_rem_con_tmxr.ldsc, sizeof(*sim_rem_con_tmxr.ldsc)*lines);
+sim_rem_con_tmxr.ldsc = (TMLN *)realloc (sim_rem_con_tmxr.ldsc, sizeof(*sim_rem_con_tmxr.ldsc)*lines);
 memset (sim_rem_con_tmxr.ldsc, 0, sizeof(*sim_rem_con_tmxr.ldsc)*lines);
-sim_rem_buf = realloc (sim_rem_buf, sizeof(*sim_rem_buf)*lines);
+sim_rem_buf = (char **)realloc (sim_rem_buf, sizeof(*sim_rem_buf)*lines);
 memset (sim_rem_buf, 0, sizeof(*sim_rem_buf)*lines);
-sim_rem_buf_size = realloc (sim_rem_buf_size, sizeof(*sim_rem_buf_size)*lines);
+sim_rem_buf_size = (int32 *)realloc (sim_rem_buf_size, sizeof(*sim_rem_buf_size)*lines);
 memset (sim_rem_buf_size, 0, sizeof(*sim_rem_buf_size)*lines);
-sim_rem_buf_ptr = realloc (sim_rem_buf_ptr, sizeof(*sim_rem_buf_ptr)*lines);
+sim_rem_buf_ptr = (int32 *)realloc (sim_rem_buf_ptr, sizeof(*sim_rem_buf_ptr)*lines);
 memset (sim_rem_buf_ptr, 0, sizeof(*sim_rem_buf_ptr)*lines);
-sim_rem_single_mode = realloc (sim_rem_single_mode, sizeof(*sim_rem_single_mode)*lines);
+sim_rem_single_mode = (t_bool *)realloc (sim_rem_single_mode, sizeof(*sim_rem_single_mode)*lines);
 memset (sim_rem_single_mode, 0, sizeof(*sim_rem_single_mode)*lines);
 return SCPE_OK;
 }
@@ -1086,6 +1086,7 @@ if (sim_log) {
     }
 time(&now);
 fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
+show_version (sim_deb, NULL, NULL, 0, NULL);
 
 return SCPE_OK;
 }
@@ -1381,7 +1382,7 @@ else if (strcmp (gbuf, "STDERR") == 0) {                /* output to stderr? */
     *pref = NULL;
     }
 else {
-    *pref = calloc (1, sizeof(**pref));
+    *pref = (FILEREF *)calloc (1, sizeof(**pref));
     if (!*pref)
         return SCPE_MEM;
     get_glyph_nc (filename, gbuf, 0);                   /* reparse */

@@ -104,7 +104,7 @@ while (fgets (line, sizeof(line)-1, iFile)) {
         case '\n':
             break;
         case 'u': /* unsigned char {array_name}[] */
-            *prom_array_name = calloc(512, sizeof(char));
+            *prom_array_name = (char *)calloc(512, sizeof(char));
             if (1 == sscanf (line, "unsigned char %s[]", *prom_array_name)) {
                 c = strchr (*prom_array_name, '[');
                 if (c)
@@ -116,7 +116,7 @@ while (fgets (line, sizeof(line)-1, iFile)) {
             while (1 == sscanf (c, "0x%2Xd,", &byte)) {
                 if (bytes_written >= allocated_size) {
                     allocated_size += 2048;
-                    *pROMData = realloc(*pROMData, allocated_size);
+                    *pROMData = (unsigned char *)realloc(*pROMData, allocated_size);
                     }
                 *(*pROMData + bytes_written++) = byte;
                 c += 5;
@@ -155,7 +155,7 @@ if (stat (rom_filename, &statb)) {
     fclose (rFile);
     return -1;
     }
-ROMData = malloc (statb.st_size);
+ROMData = (unsigned char *)malloc (statb.st_size);
 if ((size_t)(statb.st_size) != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
     printf ("Error reading '%s': %s\n", rom_filename, strerror(errno));
     fclose (rFile);
@@ -242,7 +242,7 @@ if (statb.st_size != expected_size) {
     fclose (rFile);
     return -1;
     }
-ROMData = malloc (statb.st_size);
+ROMData = (unsigned char *)malloc (statb.st_size);
 if ((size_t)(statb.st_size) != fread (ROMData, sizeof(*ROMData), statb.st_size, rFile)) {
     printf ("Error reading '%s': %s\n", rom_filename, strerror(errno));
     fclose (rFile);

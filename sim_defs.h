@@ -332,7 +332,7 @@ typedef uint32          t_addr;
 /*         indicate inclusion on a list                     */
 /* and                                                      */
 /*     2 - to not be a valid/possible pointer (alignment)   */
-#define QUEUE_LIST_END ((void *)1)
+#define QUEUE_LIST_END ((UNIT *)1)
 
 /* Device data structure */
 
@@ -1020,8 +1020,8 @@ extern int32 sim_asynch_inst_latency;
 #else
 #error "Implementation of function InterlockedCompareExchangePointer() is needed to build with USE_AIO_INTRINSICS"
 #endif
-#define AIO_QUEUE_VAL InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL)
-#define AIO_QUEUE_SET(val, queue) InterlockedCompareExchangePointer(&sim_asynch_queue, val, queue)
+#define AIO_QUEUE_VAL (UNIT *)(InterlockedCompareExchangePointer(&sim_asynch_queue, sim_asynch_queue, NULL))
+#define AIO_QUEUE_SET(val, queue) (UNIT *)(InterlockedCompareExchangePointer(&sim_asynch_queue, val, queue))
 #define AIO_UPDATE_QUEUE                                                         \
     if (AIO_QUEUE_VAL != QUEUE_LIST_END) { /* List !Empty */                     \
       UNIT *q, *uptr;                                                            \

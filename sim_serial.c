@@ -182,7 +182,7 @@ return NULL;
 
 static struct open_serial_device *_serial_add_to_open_list (SERHANDLE port, TMLN *line, const char *name, const char *config)
 {
-serial_open_devices = realloc(serial_open_devices, (++serial_open_device_count)*sizeof(*serial_open_devices));
+serial_open_devices = (struct open_serial_device *)realloc(serial_open_devices, (++serial_open_device_count)*sizeof(*serial_open_devices));
 memset(&serial_open_devices[serial_open_device_count-1], 0, sizeof(serial_open_devices[serial_open_device_count-1]));
 serial_open_devices[serial_open_device_count-1].port = port;
 serial_open_devices[serial_open_device_count-1].line = line;
@@ -455,7 +455,7 @@ if (status != SCPE_OK) {                                /* port configuration er
     }
 
 if ((port != INVALID_HANDLE) && (*config) && (lp)) {
-    lp->serconfig = realloc (lp->serconfig, 1 + strlen (config));
+    lp->serconfig = (char *)realloc (lp->serconfig, 1 + strlen (config));
     strcpy (lp->serconfig, config);
     }
 if (port != INVALID_HANDLE)
@@ -506,7 +506,7 @@ if (strcmp (sptr, ".5") == 0)                           /* 1.5 stop bits request
 r = sim_config_os_serial (port, config);
 dev = _get_open_device (port);
 if (dev) {
-    dev->line->serconfig = realloc (dev->line->serconfig, 1 + strlen (sconfig));
+    dev->line->serconfig = (char *)realloc (dev->line->serconfig, 1 + strlen (sconfig));
     strcpy (dev->line->serconfig, sconfig);
     }
 return r;
