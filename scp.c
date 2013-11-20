@@ -2247,7 +2247,7 @@ DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
 CTAB *gcmdp;
-C1TAB *ctbr, *glbr;
+C1TAB *ctbr = NULL, *glbr;
 
 static CTAB set_glob_tab[] = {
     { "CONSOLE", &sim_set_console, 0 },
@@ -3731,16 +3731,22 @@ if (sim_switches & SWMASK ('R')) {                      /* read only? */
     if (uptr->fileref == NULL)                          /* open fail? */
         return attach_err (uptr, SCPE_OPENERR);         /* yes, error */
     uptr->flags = uptr->flags | UNIT_RO;                /* set rd only */
-    if (!sim_quiet)
+    if (!sim_quiet) {
         printf ("%s: unit is read only\n", sim_dname (dptr));
+        if (sim_log)
+            fprintf (sim_log, "%s: unit is read only\n", sim_dname (dptr));
+        }
     }
 else {
     if (sim_switches & SWMASK ('N')) {                  /* new file only? */
         uptr->fileref = sim_fopen (cptr, "wb+");        /* open new file */
         if (uptr->fileref == NULL)                      /* open fail? */
             return attach_err (uptr, SCPE_OPENERR);     /* yes, error */
-        if (!sim_quiet)
+        if (!sim_quiet) {
             printf ("%s: creating new file\n", sim_dname (dptr));
+            if (sim_log)
+                fprintf (sim_log, "%s: creating new file\n", sim_dname (dptr));
+            }
         }
     else {                                              /* normal */
         uptr->fileref = sim_fopen (cptr, "rb+");        /* open r/w */
@@ -3756,8 +3762,11 @@ else {
                 if (uptr->fileref == NULL)              /* open fail? */
                     return attach_err (uptr, SCPE_OPENERR); /* yes, error */
                 uptr->flags = uptr->flags | UNIT_RO;    /* set rd only */
-                if (!sim_quiet)
+                if (!sim_quiet) {
                     printf ("%s: unit is read only\n", sim_dname (dptr));
+                    if (sim_log)
+                        fprintf (sim_log, "%s: unit is read only\n", sim_dname (dptr));
+                    }
                 }
             else {                                      /* doesn't exist */
                 if (sim_switches & SWMASK ('E'))        /* must exist? */
@@ -3765,8 +3774,11 @@ else {
                 uptr->fileref = sim_fopen (cptr, "wb+");/* open new file */
                 if (uptr->fileref == NULL)              /* open fail? */
                     return attach_err (uptr, SCPE_OPENERR); /* yes, error */
-                if (!sim_quiet)
+                if (!sim_quiet) {
                     printf ("%s: creating new file\n", sim_dname (dptr));
+                    if (sim_log)
+                        fprintf (sim_log, "%s: creating new file\n", sim_dname (dptr));
+                    }
                 }
             }                                           /* end if null */
         }                                               /* end else */
@@ -3777,7 +3789,11 @@ if (uptr->flags & UNIT_BUFABLE) {                       /* buffer? */
         uptr->filebuf = calloc (cap, SZ_D (dptr));      /* allocate */
     if (uptr->filebuf == NULL)                          /* no buffer? */
         return attach_err (uptr, SCPE_MEM);             /* error */
-    if (!sim_quiet) printf ("%s: buffering file in memory\n", sim_dname (dptr));
+    if (!sim_quiet) {
+        printf ("%s: buffering file in memory\n", sim_dname (dptr));
+        if (sim_log)
+            fprintf (sim_log, "%s: buffering file in memory\n", sim_dname (dptr));
+        }
     uptr->hwmark = (uint32)sim_fread (uptr->filebuf,    /* read file */
         SZ_D (dptr), cap, uptr->fileref);
     uptr->flags = uptr->flags | UNIT_BUF;               /* set buffered */
@@ -3891,8 +3907,11 @@ if ((dptr = find_dev_from_unit (uptr)) == NULL)
 if (uptr->flags & UNIT_BUF) {
     uint32 cap = (uptr->hwmark + dptr->aincr - 1) / dptr->aincr;
     if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {
-        if (!sim_quiet)
+        if (!sim_quiet) {
             printf ("%s: writing buffer to file\n", sim_dname (dptr));
+            if (sim_log)
+                fprintf (sim_log, "%s: writing buffer to file\n", sim_dname (dptr));
+            }
         rewind (uptr->fileref);
         sim_fwrite (uptr->filebuf, SZ_D (dptr), cap, uptr->fileref);
         if (ferror (uptr->fileref))
@@ -4713,7 +4732,7 @@ return;
 
 t_stat exdep_cmd (int32 flag, char *cptr)
 {
-char gbuf[CBUFSIZE], *gptr, *tptr;
+char gbuf[CBUFSIZE], *gptr, *tptr = NULL;
 int32 opt;
 t_addr low, high;
 t_stat reason;
@@ -5663,6 +5682,7 @@ DEVICE *dptr;
 
 if (uptr == NULL)                                       /* arg error? */
     return NULL;
+*uptr = NULL;
 if ((dptr = find_dev (cptr))) {                         /* exact match? */
     if (qdisable (dptr))                                /* disabled? */
         return NULL;
@@ -5770,6 +5790,7 @@ int32 i;
 DEVICE *dptr;
 REG *rptr, *srptr = NULL;
 
+*gdptr = NULL;
 for (i = 0; (dptr = sim_devices[i]) != 0; i++) {        /* all dev */
     if (dptr->flags & DEV_DIS)                          /* skip disabled */
         continue;
@@ -5985,13 +6006,14 @@ SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr)
 {
 int32 c, logop, cmpop;
 t_value logval, cmpval;
-char *sptr, *tptr;
+const char *sptr;
+char *tptr;
 const char logstr[] = "|&^", cmpstr[] = "=!><";
 
 logval = cmpval = 0;
 if (*cptr == 0)                                         /* check for clause */
     return NULL;
-for (logop = cmpop = -1; (c = *cptr++); ) {               /* loop thru clauses */
+for (logop = cmpop = -1; (c = *cptr++); ) {             /* loop thru clauses */
     if ((sptr = strchr (logstr, c))) {                  /* check for mask */
         logop = (int32)(sptr - logstr);
         logval = strtotv (cptr, &tptr, radix);
@@ -6203,13 +6225,12 @@ t_stat fprint_val (FILE *stream, t_value val, uint32 radix,
     uint32 width, uint32 format)
 {
 char dbuf[MAX_WIDTH + 1];
-t_stat r;
 
 if (!stream)
     return sprint_val (NULL, val, radix, width, format);
 if (width > MAX_WIDTH)
     width = MAX_WIDTH;
-r = sprint_val (dbuf, val, radix, width, format);
+sprint_val (dbuf, val, radix, width, format);
 if (fputs (dbuf, stream) == EOF)
     return SCPE_IOERR;
 return SCPE_OK;
@@ -6922,7 +6943,6 @@ return debtab_nomatch;
 static const char *sim_debug_prefix (uint32 dbits, DEVICE* dptr)
 {
 char* debug_type = get_dbg_verb (dbits, dptr);
-static const char* debug_fmt     = "DBG(%.0f)%s> %s %s: ";
 char tim_t[32] = "";
 char tim_a[32] = "";
 char pc_s[64] = "";
@@ -6940,7 +6960,7 @@ if (sim_deb_switches & SWMASK ('T')) {
     sprintf(tim_t, "%02d:%02d:%02d.%03d ", now->tm_hour, now->tm_min, now->tm_sec, (int)(time_now.tv_nsec/1000000));
     }
 if (sim_deb_switches & SWMASK ('A')) {
-    sprintf(tim_t, "%lld.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
+    sprintf(tim_t, "%" LL_FMT "d.%03d ", (long long)(time_now.tv_sec), (int)(time_now.tv_nsec/1000000));
     }
 if (sim_deb_switches & SWMASK ('P')) {
     t_value val;
@@ -7032,7 +7052,6 @@ if (sim_deb && (dptr->dctrl & dbits)) {
     char *buf = stackbuf;
     va_list arglist;
     int32 i, j, len;
-    char* debug_type = get_dbg_verb (dbits, dptr);
     const char* debug_prefix = sim_debug_prefix(dbits, dptr);   /* prefix to print if required */
 
     buf[bufsize-1] = '\0';

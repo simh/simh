@@ -209,6 +209,12 @@ typedef uint32          t_addr;
 #define STACKBUFSIZE 2048
 #endif
 
+#if defined (_WIN32) /* Actually, a GCC issue */
+#define LL_FMT "I64"
+#else
+#define LL_FMT "ll"
+#endif
+
 #if defined (VMS) && (defined (__ia64) || defined (__ALPHA))
 #define HAVE_GLOB
 #endif
