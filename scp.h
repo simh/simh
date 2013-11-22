@@ -155,6 +155,17 @@ void _sim_debug (uint32 dbits, DEVICE* dptr, const char* fmt, ...);
 #define sim_debug(dbits, dptr, ...) if (sim_deb && ((dptr)->dctrl & dbits)) _sim_debug (dbits, dptr, __VA_ARGS__); else (void)0
 #endif
 void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
+#define SCP_HELP_FLAT   (1u << 31)       /* Force flat help when prompting is not possible */
+#define SCP_HELP_ONECMD (1u << 30)       /* Display one topic, do not prompt */
+#define SCP_HELP_ATTACH (1u << 29)       /* Top level topic is ATTACH help */
+t_stat scp_help (FILE *st, struct sim_device *dptr,
+                 struct sim_unit *uptr, int32 flag, const char *help, char *cptr, ...);
+t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
+                  struct sim_unit *uptr, int32 flag, const char *help, char *cptr, va_list ap);
+t_stat scp_helpFromFile (FILE *st, struct sim_device *dptr,
+                         struct sim_unit *uptr, int32 flag, const char *help, char *cptr, ...);
+t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
+                          struct sim_unit *uptr, int32 flag, const char *help, char *cptr, va_list ap);
 
 /* Global data */
 

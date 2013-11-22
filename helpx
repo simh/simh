@@ -1,0 +1,514 @@
+#!/usr/bin/perl
+
+# Extract utility for SimH help text
+
+
+#  Copyright (c) 2013, Timothe Litt
+
+#  Permission is hereby granted, free of charge, to any person obtaining a
+#  copy of this software and associated documentation files (the "Software"),
+#  to deal in the Software without restriction, including without limitation
+#  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+#  and/or sell copies of the Software, and to permit persons to whom the
+#  Software is furnished to do so, subject to the following conditions:
+
+#  The above copyright notice and this permission notice shall be included in
+#  all copies or substantial portions of the Software.
+
+#  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+#  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
+#  THE AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+#  IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+#  CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+#  Except as contained in this notice, the name of the author shall not be
+#  used in advertising or otherwise to promote the sale, use or other dealings
+#  in this Software without prior written authorization from the author.
+
+use warnings;
+use strict;
+
+# This utility attempts to read the C source of an emulator device and convert
+# its help function to the structured help format.  Manual editing of the result
+# will be required, but the mechanical work is done by the tool.
+#
+# A template for organizing the help into standard topics/subtopics is inserted
+# along with the translation.  At this writing, everything is experimental, so
+# the 'standard' format may change.  Nonetheless, this is suitable for experimentation.
+
+use File::Basename;
+
+my $prg = basename $0;
+
+my $rtn;
+my $ifn = '-';
+my $ofn = '-';
+my $line;
+my $update;
+
+while (@ARGV) {
+    if( $ARGV[0] eq '--' ) {
+	last;
+    }
+    if( $ARGV[0] eq '-dev' ) {
+	shift;
+	$rtn = shift;
+	$rtn .= "_help";
+	next;
+    }
+    if( $ARGV[0] eq '-u' ) {
+	$update = 1;
+	shift;
+	next;
+    }
+    last if( $ARGV[0] !~ /^-/ );
+
+    printf STDERR << "USAGE_";
+Usage:
+$prg -u -dev devname -func rtn infile outfile
+
+devname is used to look for the existing help function name.
+E.g. if the routine is cr_help, use -dev cr.
+
+Alternatively, use -func to specify the full function name.
+
+infile and outfile default to - (stdin and stdout)
+
+$prg will attempt to produce a sensible device help string, although you
+should expect that the result will require manual editing.  Complex C
+constructs (preprocessor conditionals, if statements that generate strings)
+are not automatically translated, but the old code will be preserved.
+
+However, as it may have been partially translated, the result may not compile.
+
+A template is installed so that you can move your information into the standard
+sections.
+
+Source code in the help function is reformatted - not to any particular
+style, but as a consequence of how it is tokenized and parsed.  Use your
+favorite pretty-printer if you don't like the results.
+
+Normally, just the help function is output.  -u will output the entire file
+(-u = "update")
+
+USAGE_
+
+    exit (0);
+}
+
+unless( defined $rtn ) {
+    die "The help function must be specified with -func or -dev; -help for usage\n";
+}
+
+if( @ARGV ) {
+    $ifn = shift;
+}
+if( @ARGV ) {
+    $ofn = shift;
+}
+
+open( STDIN, "<$ifn" ) or
+    die "Unable to open $ifn for input: $!\n";
+
+open( STDOUT, ">$ofn" ) or
+    die "Unable to open $ofn for output: $!\n";
+
+$line = "";
+while( <STDIN> ) {
+
+    # Look for the help function
+    if( /^(?:static\s+)?t_stat\s+$rtn\s*\(/ ) {
+	$line = $_;
+	while( $line !~ /\{/ && $line !~ /\)\s*;/ ) {
+	    my $cont = <STDIN>;
+	    if( !defined $cont ) {
+		die "EOF in function definition\n";
+	    }
+	    $line .= $cont;
+	}
+	if( $line =~ /\)\s*;/ ) { # Just a prototype
+	    if( $update ) {
+		print $line;
+	    }
+	    $line = "";
+	    next;
+	}
+	# Process the function body
+	my $f = $line;
+	my $b = '';
+	my $bl = 1;
+	my( %vargs, @vargs );
+	my $help = '';
+	my $comments = '';
+
+	# Each statement in the body
+	while (1) {
+	    my ($tok, $val) = gettok();
+	    last if( !defined $tok );
+
+	    if ($tok eq '{') {                  # Track brace level
+		$bl++;
+		$b .= $tok;
+	    } elsif ($tok eq '}') {
+		die "Unmatched }\n" if ( --$bl < 0 );
+		$b .= $tok;
+		last if (!$bl);                # End of function
+	    } elsif ($tok eq 'word' && $val eq 'fprintf') {
+		# fprintf ( st, "string" ,args );
+		# Save embedded comments, but don't confuse the parse.
+		($tok, $val) = gettok(\$comments);
+		if( $tok ne '(' ) {
+		    $b .= " $val";
+		    next;
+		}
+		($tok, $val) = gettok(\$comments);
+		if( $tok ne 'word' || $val ne 'st' ) {
+		    $b .= "fprintf ($val";
+		    next;
+		}
+		($tok, $val) = gettok(\$comments);
+		if( $tok ne ',' ) {
+		    $b .= "fprintf (st$val";
+		    next;
+		}
+		($tok, $val) = gettok(\$comments);
+		if( $tok ne 'QS' ) {
+		    $b .= "fprintf (st, $val";
+		    next;
+		}
+		# Concatenate adjacent strings
+		my $string = '';
+		while( $tok eq 'QS' ) {
+		    $string .= substr( $val, 1, length( $ val ) -2);
+		    ($tok, $val) = gettok(\$comments);
+		}
+		# Check for format codes.  plain %s is all that can be automated
+		if ($string =~ /(%[^%s])/) {
+		    print STDERR "Line $.: Unsupported format code $1 in help string.  Please convert to %s\n";
+		}
+		# Rework argument list
+		my $arg = '';
+		my @vlist;
+		my $pl = 1;             # Paren level
+		while( $tok eq ',' ) {
+		    ($tok, $val) = gettok(\$comments);
+		    while( $tok ne ',' ) {
+			if( $tok eq '(' ) {
+			    $pl++;
+			} elsif( $tok eq ')' ) {
+			    die "Unmatched )" if( --$pl < 0);
+			    last if( !$pl );
+			}
+			$arg .= " $val";
+			($tok, $val) = gettok(\$comments);
+		    }
+		    if( !length $arg ) {
+			print STDERR "Line $.: null argument to fprintf in $rtn\n";
+			$string = "<<NULL>>";
+		    }
+		    unless( exists $vargs{$arg} ) {   # Assign each unique arg an index
+			$vargs{$arg} = @vargs;
+			push @vargs, $arg;
+		    }
+		    push @vlist, $vargs{$arg};        # Remember offset in this list
+		    $arg = '';
+		}
+		die "Line $.: Missing ')' in fprintf\n" if( $tok ne ')' );
+		($tok, $val) = gettok(\$comments);
+		die "Line $.: Missing ';' in fprintf\n" if( $tok ne ';' );
+
+		# Replace each escape with positional %s in new list.
+		my $n = 0;
+		$string =~ s/%([.\dlhs# +Lqjzt-]*[diouxXeEfFgGaAcspnm%])/
+		  sprintf "%%%us",$vlist[$n++]+1/eg;
+		$help .= $string;
+		next;
+	    } elsif ($tok eq 'word' && $val =~ /^fprint_(set|show|reg)_help(?:_ex)?$/) {
+		my %alt = ( set  => "\$Set commands", 
+			    show => "\$Show commmands", 
+			    reg  => "\$Registers" );
+		$b .= "/* Use \"$alt{$1}\" topic instead:\n";
+		do {
+		    $b .= " $val";
+		    ($tok, $val) = gettok (\$comments);
+		} while ($tok ne ';');
+		$b .= ";\n*/\n";
+		next;
+	    }
+
+	    # Random function body content
+
+	    $b .= " $val";
+	}
+	# End of function - output new one
+	print $f;                       # Function header
+	print "const char helpString[] =\n";
+
+	print << 'TEMPLATE_';
+/* Template for re-arranging your help.
+ * Lines marked with '+' in the translation seemed to be indented and will
+ * indent 4 columns for each '+'.  See scp_help.h for a worked-out example.
+ * The '*'s in the next line represent the standard text width of a help line */
+     /****************************************************************************/
+    " Insert your device summary here.  Keep it short.  Be sure to put a leading\n"
+    " space at the start of each line.  Blank lines do appear in the output;\n"
+    " don't add extras.\n"
+    "1 Hardware Description\n"
+    " The details of the hardware.  Feeds & speeds are OK here.\n"
+    "2 Models\n"
+    " If the device was offered in distinct models, a subtopic for each\n"
+    "3 Model A\n"
+    " Description of model A\n"
+    "3 Model B\n"
+    " Description of model B\n"
+    "2 $Registers\n"
+    " The register list of the device will automagically display above this\n"
+    " line.  Add any special notes.\n"
+    "1 Configuration\n"
+    " How to configure the device under SimH.  Use subtopics\n"
+    " if there is a lot of detail.\n"
+    "2 $Set commands\n"
+    " The SET commands for the device will automagically display above\n"
+    " this line.  Add any special notes.\n"
+    "2 OSNAME1\n"
+    " Operating System-specif configuration details\n"
+    " If the device needs special configuration for a particular OS, a subtopic\n"
+    " for each such OS goes here.\n"
+    "2 Files\n"
+    " If the device uses external files (tapes, cards, disks, configuration)\n"
+    " Create a subtopic for each here.\n"
+    "3 Config file 1\n"
+    " Description.\n"
+    "2 Examples\n"
+    " Provide usable examples for configuring complex devices.\n"
+    " If the examples are more than a couple of lines, make a subtopic for each.\n"
+    "1 Operation\n"
+    " How to operate the device under SimH.  Attach, runtime events\n"
+    " (e.g. how to load cards or mount a tape)\n"
+    "1 Monitoring\n"
+    " How to obtain and interpret status\n"
+    "2 $Show commands\n"
+    " The SHOW commands for the device will automagically display above\n"
+    " this line.  Add any special notes.\n"
+    "1 Restrictions\n"
+    " If some aspects of the device aren't emulated or some host\n"
+    " host environments that aren't (fully) supported, list them here.\n"
+    "1 Debugging\n"
+    "  Debugging information - provided by the device.  Tips for common problems.\n"
+    "1 Related Devices\n"
+    " If devices are configured or used together, list the other devices here.\n"
+    " E.G. The DEC KMC/DUP are two hardware devices that are closely related;\n"
+    " The KMC controlls the DUP on behalf of the OS.\n"
+
+    /* **** Your converted help text starts hare **** */
+
+TEMPLATE_
+
+	my @lines = split /(\\n|\n)/, $help;
+	while( @lines ) {
+	    my $line = shift @lines;
+	    my $term = shift @lines;
+	    if ($term eq "\\n") {
+		$line .= $term;
+		$term = "\n";
+	    }
+	    if( $line =~ s/^(\s+)// ) {
+		$line = ('+' x ((length( $1 ) +3)/4)) . $line;
+	    } else {
+		$line = ' ' . $line;
+	    }
+
+	    print "    \"$line\"\n" ;
+	}
+	print "    ;\n";
+	print $b;                       # Stuff from body of old function
+	if( length $comments ) {
+	    print "\n$comments";
+	}
+
+	# Call scp_help
+
+	print "\nreturn scp_help (st, dptr, uptr, helpString, cptr";
+
+	%vargs = reverse %vargs;
+	while( @vargs ) {
+	    print ",\n                " . shift( @vargs );
+	}
+
+	print  ");\n}\n";
+    } else {
+	if( $update ) {
+	    print $_;
+	}
+	next;
+    }
+}
+
+exit (0);
+
+my @pending;
+sub nextc {
+    if( @pending ) {
+	my $c = shift @pending;
+	return $c;
+    }
+    return getc;
+}
+
+sub gettoken {
+    my $c;
+    my $ql = 0;
+    my $cl = 0;
+    my $tok = '';
+
+    while( defined(($c = nextc())) ) {
+	if( $cl ) {
+	    if( $c eq '*' ) {
+		$c = nextc;
+		die "EOF in comment\n" if( !defined $c );
+
+		if ($c eq '/') {
+		    $tok .= '*/';
+		    return ('comment', $tok);
+		}
+		push @pending, $c;
+		$c = '*';
+	    }
+	    $tok .= $c;
+	    next;
+	} elsif( $c eq '/' ) {
+	    $c = nextc;
+	    if( $c eq '*' ) {
+		if (length $tok) {
+		    push @pending, '/', '*';
+		    return ('word', $tok);
+		}
+		$cl = 1;
+		$tok = '/*';
+		next;
+	    }
+	    push @pending, $c;
+	    $c = '/';
+	}
+	if( $ql ) {
+	    if( $c eq '\\' ) {
+		$c = nextc;
+		die "EOF in string\n" if( !defined $c );
+
+		$tok .= "\\$c"; # eval "\"\\$c\"";
+		next;
+	    }
+	    if( $c eq $ql ) {
+		$tok .= $ql;
+		return ("QS", $tok);
+	    }
+	    $tok .= $c;
+	    next;
+	}
+	if( $c eq '"' || $c eq "'" ) {
+	    $ql = $c;
+	    $tok = $c;
+	    next;
+	}
+	if ($c =~ /^\s$/) {
+	    if( length $tok ) {
+		return ('word', $tok);
+	    }
+	    next;
+	}
+	if ($c =~ /^\w$/) {
+	    $tok .= $c;
+	    next;
+	}
+	if( length $tok ) {
+	    push @pending, $c;
+	    return ('word', $tok);
+	}
+	if ($c eq '-') {
+	    $c = nextc;
+	    if( $c =~ /^[>=-]$/ ) {
+		return ('op', "-$c");
+	    }
+	    push @pending, $c;
+	    return ('op', '-');
+	}
+	if( $c eq '<' ) {
+	    $c = nextc;
+	    if( $c eq '=' ) {
+		return ('op', "<$c");
+	    }
+	    if( $c eq '<' ) {
+		my $c2 = nextc;
+		if( $c2 eq '=' ) {
+		    return ('op', "<<=");
+		}
+		push @pending, $c2;
+		return ('op', '<<');
+	    }
+	    push @pending, $c;
+	    return ('op', '<');
+	}
+	if( $c eq '>' ) {
+	    $c = nextc;
+	    if( $c eq '=' ) {
+		return ('op', ">$c");
+	    }
+	    if( $c eq '>' ) {
+		my $c2 = nextc;
+		if( $c2 eq '=' ) {
+		    return ('op', ">>=");
+		}
+		push @pending, $c2;
+		return ('op', '>>');
+	    }
+	    push @pending, $c;
+	    return ('op', '>');
+	}
+	if( $c eq '=' ) {
+	    $c = nextc;
+	    if( $c eq '=' ) {
+		return ('op', '==');
+	    }
+	    push @pending, $c;
+	    return ('op', '=');
+	}
+	if ($c =~ m,^[!*+/%&^|]$,) {
+	    my $c2 = nextc;
+	    if( $c2 eq '=' ) {
+		return ('op', "$c$c2");
+	    }
+	    push @pending, $c2;
+	    return ('op', $c);
+	}
+	if( $c =~ /^[&|]$/ ) {
+	    my $c2 = nextc;
+	    if( $c2 eq $c ) {
+		return ('op', "$c$c");
+	    }
+	    push @pending, $c2;
+	    return ('op', $c);
+	}
+
+	if ($c =~ /^[#}]$/ ) {
+	    return ($c, "\n$c");
+	}
+	return ($c, ($c =~ /^[{;]$/? "$c\n" : $c));
+    }
+    return (undef, '<<EOF>>');
+}
+
+sub gettok {
+    my $comments = $_[0];
+
+    while( 1 ) {
+	my( $token, $value ) = gettoken();
+	return ($token, $value) if( !defined $token );
+
+	if( $token eq 'comment' && $comments ) {
+	    $$comments .= $value . "\n";
+	    next;
+	}
+	return ($token, $value);
+    }
+}
