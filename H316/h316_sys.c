@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   21-May-13    RLA     Add IMP/TIP devices
    01-Dec-04    RMS     Fixed fprint_opr calling sequence
    24-Oct-03    RMS     Added DMA/DMC support
    17-Sep-01    RMS     Removed multiconsole support
@@ -41,6 +42,11 @@ extern DEVICE clk_dev;
 extern DEVICE dp_dev;
 extern DEVICE fhd_dev;
 extern DEVICE mt_dev;
+#ifdef VM_IMPTIP
+extern DEVICE rtc_dev, wdt_dev, imp_dev;
+extern DEVICE mi1_dev, mi2_dev, mi3_dev, mi4_dev, mi5_dev;
+extern DEVICE hi1_dev, hi2_dev, hi3_dev, hi4_dev;
+#endif
 extern REG cpu_reg[];
 extern uint16 M[];
 
@@ -64,12 +70,19 @@ DEVICE *sim_devices[] = {
     &cpu_dev,
     &ptr_dev,
     &ptp_dev,
-    &tty_dev,
     &lpt_dev,
-    &clk_dev,
-    &dp_dev,
-    &fhd_dev,
+    &tty_dev,
     &mt_dev,
+    &clk_dev,
+    &fhd_dev,
+    &dp_dev,
+#ifdef VM_IMPTIP
+    &wdt_dev,
+    &rtc_dev,
+    &imp_dev,
+    &mi1_dev, &mi2_dev, &mi3_dev, &mi4_dev, &mi5_dev,
+    &hi1_dev, &hi2_dev, &hi3_dev, &hi4_dev,
+#endif
     NULL
     };
 

@@ -868,8 +868,9 @@ PDP8_OPT = -I ${PDP8D}
 H316D = H316
 H316 = ${H316D}/h316_stddev.c ${H316D}/h316_lp.c ${H316D}/h316_cpu.c \
 	${H316D}/h316_sys.c ${H316D}/h316_mt.c ${H316D}/h316_fhd.c \
-	${H316D}/h316_dp.c
-H316_OPT = -I ${H316D}
+	${H316D}/h316_dp.c ${H316D}/h316_rtc.c ${H316D}/h316_imp.c \
+	${H316D}/h316_hi.c ${H316D}/h316_mi.c ${H316D}/h316_udp.c 
+H316_OPT = -I ${H316D} -D VM_IMPTIP
 
 
 HP2100D = HP2100
