@@ -68,6 +68,7 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     Serial Console Support
     Separate TCP listening ports per line
     Outgoing connections per line (virtual Null Modem cable).
+    Packet sending and reception semantics for simulated network device support using either TCP or UDP transport.
 
 #### Asynchronous I/O
     * Disk and Tape I/O can be asynchronous.  Asynchronous support exists 

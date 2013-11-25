@@ -114,7 +114,7 @@ struct tmln {
     int32               tsta;                           /* Telnet state */
     int32               rcve;                           /* rcv enable */
     int32               xmte;                           /* xmt enable */
-    int32               dstb;                           /* disable Tlnt bin */
+    int32               dstb;                           /* disable Telnet binary mode */
     t_bool              notelnet;                       /* raw binary data (no telnet interpretation) */
     int32               rxbpr;                          /* rcv buf remove */
     int32               rxbpi;                          /* rcv buf insert */
@@ -151,6 +151,7 @@ struct tmln {
     char                *destination;                   /* Outgoing destination address:port */
     t_bool              loopback;                       /* Line in loopback mode */
     t_bool              halfduplex;                     /* Line in half-duplex mode */
+    t_bool              datagram;                       /* Line is datagram packet oriented */
     int32               lpbpr;                          /* loopback buf remove */
     int32               lpbpi;                          /* loopback buf insert */
     int32               lpbcnt;                         /* loopback buf used count */
@@ -176,6 +177,7 @@ struct tmxr {
     uint32              last_poll_time;                 /* time of last connection poll */
     t_bool              notelnet;                       /* default telnet capability for incoming connections */
     t_bool              modem_control;                  /* multiplexer supports modem control behaviors */
+    t_bool              datagram;                       /* Lines are datagram packet oriented */
     };
 
 int32 tmxr_poll_conn (TMXR *mp);

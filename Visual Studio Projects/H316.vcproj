@@ -45,7 +45,7 @@
 				Name="VCCLCompilerTool"
 				Optimization="0"
 				AdditionalIncludeDirectories="./;../"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;VM_IMPTIP"
 				MinimalRebuild="true"
 				BasicRuntimeChecks="3"
 				RuntimeLibrary="1"
@@ -128,7 +128,7 @@
 				InlineFunctionExpansion="1"
 				OmitFramePointers="true"
 				AdditionalIncludeDirectories="./;../"
-				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID"
+				PreprocessorDefinitions="_CRT_NONSTDC_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;SIM_NEED_GIT_COMMIT_ID;VM_IMPTIP"
 				StringPooling="true"
 				RuntimeLibrary="0"
 				EnableFunctionLevelLinking="true"
@@ -202,11 +202,27 @@
 				>
 			</File>
 			<File
+				RelativePath="..\H316\h316_hi.c"
+				>
+			</File>
+			<File
+				RelativePath="..\H316\h316_imp.c"
+				>
+			</File>
+			<File
 				RelativePath="..\H316\h316_lp.c"
 				>
 			</File>
 			<File
+				RelativePath="..\H316\h316_mi.c"
+				>
+			</File>
+			<File
 				RelativePath="..\H316\h316_mt.c"
+				>
+			</File>
+			<File
+				RelativePath="..\H316\h316_rtc.c"
 				>
 			</File>
 			<File
@@ -215,6 +231,10 @@
 			</File>
 			<File
 				RelativePath="..\H316\h316_sys.c"
+				>
+			</File>
+			<File
+				RelativePath="..\H316\h316_udp.c"
 				>
 			</File>
 			<File
@@ -264,6 +284,10 @@
 			>
 			<File
 				RelativePath="..\H316\h316_defs.h"
+				>
+			</File>
+			<File
+				RelativePath="..\H316\h316_imp.h"
 				>
 			</File>
 			<File

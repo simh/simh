@@ -27,6 +27,7 @@
                 4651 disk subsystem
                 4720 disk subsystem
 
+    3-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    04-Sep-05    RMS     Fixed missing return (Peter Schorn)
    15-Jul-05    RMS     Fixed bug in attach routine
@@ -269,7 +270,7 @@ t_stat dp_showformat (FILE *st, UNIT *uptr, int32 val, void *desc);
    dp_mod       DP modifier list
 */
 
-DIB dp_dib = { DP, DMC1, 1, &dpio };
+DIB dp_dib = { DP, 1, DMC1, IOBUS, INT_V_DP, INT_V_NONE, &dpio, 0 };
 
 UNIT dp_unit[] = {
     { UDATA (&dp_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+

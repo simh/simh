@@ -104,6 +104,7 @@
 t_stat sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, const char *default_port, const char *validate_addr);
 SOCKET sim_master_sock (const char *hostport, t_stat *parse_status);
 SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port);
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram);
 SOCKET sim_accept_conn (SOCKET master, char **connectaddr);
 int32 sim_check_conn (SOCKET sock, t_bool rd);
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);

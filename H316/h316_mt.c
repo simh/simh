@@ -25,6 +25,7 @@
 
    mt           516-4100 seven track magnetic tape
 
+    3-Jul-13    RLA     compatibility changes for extended interrupts
    19-Mar-12    RMS     Fixed declaration of chan_req (Mark Pizzolato)
    09-Jun-07    RMS     Fixed bug in write without stop (Theo Engel)
    16-Feb-06    RMS     Added tape capacity checking
@@ -119,7 +120,7 @@ void mt_wrwd (UNIT *uptr, uint32 dat);
    mt_mod       MT modifier list
 */
 
-DIB mt_dib = { MT, IOBUS, MT_NUMDR, &mtio };
+DIB mt_dib = { MT, MT_NUMDR, IOBUS, IOBUS, INT_V_MT, INT_V_NONE, &mtio, 0 };
 
 UNIT mt_unit[] = {
     { UDATA (&mt_svc, UNIT_ATTABLE + UNIT_ROABLE + UNIT_DISABLE, 0) },

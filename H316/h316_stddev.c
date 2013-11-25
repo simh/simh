@@ -30,6 +30,7 @@
 
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
+    3-Jul-13    RLA     compatibility changes for extended interrupts
    09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    03-Apr-06    RMS     Fixed bugs in punch state handling (Theo Engel)
@@ -158,7 +159,7 @@ t_stat ttp_write (int32 c);
    ptr_reg      PTR register list
 */
 
-DIB ptr_dib = { PTR, IOBUS, 1, &ptrio };
+DIB ptr_dib = { PTR, 1, IOBUS, IOBUS, INT_V_PTR, INT_V_NONE, &ptrio, 0 };
 
 UNIT ptr_unit = {
     UDATA (&ptr_svc, UNIT_SEQ+UNIT_ATTABLE+UNIT_ROABLE, 0),
@@ -203,7 +204,7 @@ DEVICE ptr_dev = {
    ptp_reg      PTP register list
 */
 
-DIB ptp_dib = { PTP, IOBUS, 1, &ptpio };
+DIB ptp_dib = { PTP, 1, IOBUS, IOBUS, INT_V_PTP, INT_V_NONE, &ptpio, 0 };
 
 UNIT ptp_unit = {
     UDATA (&ptp_svc, UNIT_SEQ+UNIT_ATTABLE, 0), SERIAL_OUT_WAIT
@@ -243,7 +244,7 @@ DEVICE ptp_dev = {
 #define TTR     2
 #define TTP     3
 
-DIB tty_dib = { TTY, IOBUS, 1, &ttyio };
+DIB tty_dib = { TTY, 1, IOBUS, IOBUS, INT_V_TTY, INT_V_NONE, &ttyio, 0 };
 
 UNIT tty_unit[] = {
     { UDATA (&tti_svc, TT_MODE_KSR, 0), KBD_POLL_WAIT },
@@ -308,7 +309,7 @@ DEVICE tty_dev = {
    clk_reg      CLK register list
 */
 
-DIB clk_dib = { CLK_KEYS, IOBUS, 1, &clkio };
+DIB clk_dib = { CLK_KEYS, 1, IOBUS, IOBUS, INT_V_CLK, INT_V_NONE, &clkio, 0 };
 
 UNIT clk_unit = { UDATA (&clk_svc, 0, 0), 16000 };
 

@@ -862,6 +862,10 @@ if (lp->destination || lp->port || lp->txlogname) {
         sprintf (growstring(&tptr, 32), ",Buffered=%d", lp->txbsz);
     if (!lp->txbfd && (lp->mp->buffered > 0))
         sprintf (growstring(&tptr, 32), ",UnBuffered");
+    if (lp->mp->datagram != lp->datagram)
+        sprintf (growstring(&tptr, 8), ",%s", lp->datagram ? "UDP" : "TCP");
+    if (lp->port)
+        sprintf (growstring(&tptr, 12 + strlen (lp->port)), ",%s%s", lp->port, ((lp->mp->notelnet != lp->notelnet) && (!lp->datagram)) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
     if (lp->destination) {
         if (lp->serport) {
             char portname[CBUFSIZE];
@@ -870,10 +874,8 @@ if (lp->destination || lp->port || lp->txlogname) {
             sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s%s", portname, strcmp("9600-8N1", lp->serconfig) ? ";" : "", strcmp("9600-8N1", lp->serconfig) ? lp->serconfig : "");
             }
         else
-            sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s", lp->destination, (lp->mp->notelnet != lp->notelnet) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
+            sprintf (growstring(&tptr, 25 + strlen (lp->destination)), ",Connect=%s%s", lp->destination, ((lp->mp->notelnet != lp->notelnet) && (!lp->datagram)) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
         }
-    if (lp->port)
-        sprintf (growstring(&tptr, 12 + strlen (lp->port)), ",%s%s", lp->port, (lp->mp->notelnet != lp->notelnet) ? (lp->notelnet ? ";notelnet" : ";telnet") : "");
     if (lp->txlogname)
         sprintf (growstring(&tptr, 12 + strlen (lp->txlogname)), ",Log=%s", lp->txlogname);
     if (lp->loopback)
@@ -1136,7 +1138,7 @@ for (i = 0; i < mp->lines; i++) {                       /* check each line in se
         (!lp->modem_control || (lp->modembits & TMXR_MDM_DTR))) {
         sprintf (msg, "tmxr_poll_conn() - establishing outgoing connection to: %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
-        lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, lp->datagram);
         }
 
     }
@@ -1204,7 +1206,7 @@ if ((lp->destination) && (!lp->serport)) {
     if ((!lp->modem_control) || (lp->modembits & TMXR_MDM_DTR)) {
         sprintf (msg, "tmxr_reset_ln_ex() - connecting to %s", lp->destination);
         tmxr_debug_connect_line (lp, msg);
-        lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+        lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, lp->datagram);
         }
     }
 tmxr_init_line (lp);                                /* initialize line state */
@@ -1382,7 +1384,7 @@ if (lp->mp && lp->modem_control) {                  /* This API ONLY works on mo
 
                 sprintf (msg, "tmxr_set_get_modem_bits() - establishing outgoing connection to: %s", lp->destination);
                 tmxr_debug_connect_line (lp, msg);
-                lp->connecting = sim_connect_sock (lp->destination, "localhost", NULL);
+                lp->connecting = sim_connect_sock_ex (lp->datagram ? lp->port : NULL, lp->destination, "localhost", NULL, lp->datagram);
                 }
             }
         }
@@ -1900,6 +1902,8 @@ if (nbytes) {                                           /* >0? write */
             lp->txbpr = 0;
         lp->txcnt = lp->txcnt + sbytes;                 /* update counts */
         nbytes = nbytes - sbytes;
+        if ((nbytes == 0) && (lp->datagram))            /* if Empty buffer on datagram line */
+            lp->txbpi = lp->txbpr = 0;                  /* Start next packet at beginning of buffer */
         }
     if (sbytes < 0) {                                   /* I/O Error? */
         lp->txbpi = lp->txbpr = 0;                      /* Drop the data we already know we can't send */
@@ -2012,7 +2016,7 @@ char tbuf[CBUFSIZE], listen[CBUFSIZE], destination[CBUFSIZE],
 SOCKET sock;
 SERHANDLE serport;
 char *tptr = cptr;
-t_bool nolog, notelnet, listennotelnet, unbuffered, modem_control, loopback;
+t_bool nolog, notelnet, listennotelnet, unbuffered, modem_control, loopback, datagram;
 TMLN *lp;
 t_stat r = SCPE_ARG;
 
@@ -2031,6 +2035,7 @@ while (*tptr) {
     memset(port,        '\0', sizeof(port));
     memset(option,      '\0', sizeof(option));
     nolog = notelnet = listennotelnet = unbuffered = loopback = FALSE;
+    datagram = mp->datagram;
     if (line != -1)
         notelnet = listennotelnet = mp->notelnet;
     modem_control = mp->modem_control;
@@ -2100,6 +2105,18 @@ while (*tptr) {
                 modem_control = TRUE;
                 continue;
                 }
+            if ((0 == MATCH_CMD (gbuf, "DATAGRAM")) || (0 == MATCH_CMD (gbuf, "UDP"))) {
+                if ((NULL != cptr) && ('\0' != *cptr))
+                    return SCPE_2MARG;
+                notelnet = datagram = TRUE;
+                continue;
+                }
+            if ((0 == MATCH_CMD (gbuf, "STREAM")) || (0 == MATCH_CMD (gbuf, "TCP"))) {
+                if ((NULL != cptr) && ('\0' != *cptr))
+                    return SCPE_2MARG;
+                datagram = FALSE;
+                continue;
+                }
             if (0 == MATCH_CMD (gbuf, "CONNECT")) {
                 if ((NULL == cptr) || ('\0' == *cptr))
                     return SCPE_ARG;
@@ -2114,21 +2131,24 @@ while (*tptr) {
                     strncpy (hostport, cptr, sizeof(hostport)-1);
                     if ((cptr = strchr (hostport, ';')))
                         *(cptr++) = '\0';
-                    sock = sim_connect_sock (hostport, "localhost", NULL);
-                    if (sock != INVALID_SOCKET)
-                        sim_close_sock (sock, 0);
-                    else
-                        return SCPE_ARG;
                     if (cptr) {
                         get_glyph (cptr, cptr, 0);          /* upcase this string */
                         if (0 == MATCH_CMD (cptr, "NOTELNET"))
                             notelnet = TRUE;
                         else
                             if (0 == MATCH_CMD (cptr, "TELNET"))
-                                notelnet = FALSE;
+                                if (datagram)
+                                    return SCPE_ARG;
+                                else
+                                    notelnet = FALSE;
                             else
                                 return SCPE_ARG;
                         }
+                    sock = sim_connect_sock_ex (NULL, hostport, "localhost", NULL, datagram);
+                    if (sock != INVALID_SOCKET)
+                        sim_close_sock (sock, 0);
+                    else
+                        return SCPE_ARG;
                     cptr = hostport;
                     }
                 strcpy(destination, cptr);
@@ -2231,7 +2251,7 @@ while (*tptr) {
                     }
                 }
             }
-        if (listen[0]) {
+        if ((listen[0]) && (!datagram)) {
             sock = sim_master_sock (listen, &r);            /* make master socket */
             if (r != SCPE_OK)
                 return r;
@@ -2306,7 +2326,16 @@ while (*tptr) {
                     }
                 }
             else {
-                sock = sim_connect_sock (destination, "localhost", NULL);
+                lp->datagram = datagram;
+                if (datagram) {
+                    if (listen[0]) {
+                        lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
+                        strcpy(lp->port, listen);           /* save port */
+                        }
+                    else
+                        return SCPE_ARG;
+                    }
+                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, datagram);
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
                     lp->destination = (char *)malloc(1+strlen(destination));
@@ -2370,7 +2399,7 @@ while (*tptr) {
                 lp->txlog = NULL;
                 }
             }
-        if (listen[0]) {
+        if ((listen[0]) && (!datagram)) {
             if ((mp->lines == 1) && (mp->master))           /* single line mux can have either line specific OR mux listener but NOT both */
                 return SCPE_ARG;
             sock = sim_master_sock (listen, &r);            /* make master socket */
@@ -2409,7 +2438,16 @@ while (*tptr) {
                     }
                 }
             else {
-                sock = sim_connect_sock (destination, "localhost", NULL);
+                lp->datagram = datagram;
+                if (datagram) {
+                    if (listen[0]) {
+                        lp->port = (char *)realloc (lp->port, 1 + strlen (listen));
+                        strcpy(lp->port, listen);           /* save port */
+                        }
+                    else
+                        return SCPE_ARG;
+                    }
+                sock = sim_connect_sock_ex (datagram ? listen : NULL, destination, "localhost", NULL, datagram);
                 if (sock != INVALID_SOCKET) {
                     _mux_detach_line (lp, FALSE, TRUE);
                     lp->destination = (char *)malloc(1+strlen(destination));
@@ -3673,7 +3711,10 @@ if (ln >= 0)
 
 if ((lp->sock) || (lp->connecting)) {                   /* tcp connection? */
     if (lp->destination)                                /* remote connection? */
-        fprintf (st, "Connection to remote port %s\n", lp->destination);/* print port name */
+        if (lp->datagram)
+            fprintf (st, "Datagram Connection from %s to remote port %s\n", lp->port, lp->destination);/* print port name */
+        else
+            fprintf (st, "Connection to remote port %s\n", lp->destination);/* print port name */
     else                                                /* incoming connection */
         fprintf (st, "Connection from IP address %s\n", lp->ipad);
     }
@@ -3689,7 +3730,7 @@ if (lp->sock) {
     free (peername);
     }
 
-if (lp->port)
+if ((lp->port) && (!lp->datagram))
     fprintf (st, "Listening on port %s\n", lp->port);   /* print port name */
 
 if (lp->serport)                                        /* serial connection? */
