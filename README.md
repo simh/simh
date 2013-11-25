@@ -42,7 +42,9 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     RQ device has a settable controller type (RQDX3, UDA50, KLESI, RUX50)
     RQ disks default to Autosize without regard to disk type
     RQ disks on PDP11 can have RAUSER size beyond 2GB
-    DMC11 DDCMP DECnet device simulation from Rob Jarratt.  Up to 4 DMC11 devices are supported.
+    DMC11/DMR11 DDCMP DECnet device simulation.  Up to 8 DMC devices are supported.
+    KDP11 on PDP11 for DECnet
+    DUP11 on PDP11 for DECnet connectivity to talk to DMC, KDP or other DUP devices
     DZ on Unibus systems can have up to 256 ports (default of 32), on 
         Qbus systems 128 port limit (default of 16).
     DZ devices optionally support full modem control (and port speed settings 
@@ -53,6 +55,9 @@ A remote console session will close when an EOF character is entered (i.e. ^D or
     MicroVAX 3900 has a SET CPU MODEL=(MicroVAX|VAXServer) command to change between system types
     MicroVAX I has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
     MicroVAX II has a SET CPU MODEL=(MicroVAX|VAXSTATION) command to change between system types
+
+#### PDP10 Enhancements
+    KDP11 (from Timothe Litt) for DECnet connectivity to simulators with DMC, DUP or KDP devices
 
 #### Terminal Multiplexer additions
     Added support for TCP connections using IPv4 and/or IPv6.

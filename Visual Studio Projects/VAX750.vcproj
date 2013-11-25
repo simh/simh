@@ -207,10 +207,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PDP11\pdp11_dup.c"
-				>
-			</File>
-			<File
 				RelativePath="..\PDP11\pdp11_dz.c"
 				>
 			</File>
@@ -396,7 +392,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\PDP11\pdp11_dmc.h"
+				RelativePath="..\PDP11\pdp11_dup.h"
 				>
 			</File>
 			<File

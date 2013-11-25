@@ -115,7 +115,8 @@ typedef t_int64         d10;                            /* PDP-10 data (36b) */
 #define STOP_ILLIOC     10                              /* invalid UBA num */
 #define STOP_ASTOP      11                              /* address stop */
 #define STOP_CONSOLE    12                              /* FE halt */
-#define STOP_UNKNOWN    13                              /* unknown stop  */
+#define STOP_IOALIGN    13                              /* DMA word access to odd address */
+#define STOP_UNKNOWN    14                              /* unknown stop  */
 #define PAGE_FAIL       -1                              /* page fail */
 #define INTERRUPT       -2                              /* interrupt */
 #define ABORT(x)        longjmp (save_env, (x))         /* abort */
@@ -614,6 +615,10 @@ struct pdp_dib {
     int32               vec;                            /* value */
     int32               (*ack[VEC_DEVMAX])(void);       /* ack routines */
     uint32              ulnt;                           /* IO length per unit */
+    uint32              flags;                          /* Special flags */
+#define DIB_M_REGSIZE   03                              /* Device register size */
+#define DIB_REG16BIT     00
+#define DIB_REG18BIT     01
 };
 
 typedef struct pdp_dib DIB;
@@ -622,6 +627,8 @@ typedef struct pdp_dib DIB;
 
 #define DZ_MUXES        4                               /* max # of muxes */
 #define DZ_LINES        8                               /* lines per mux */
+#define KMC_UNITS       1                               /* max # of KMCs */
+#define INITIAL_KMCS    0                               /* Number initially enabled */
 #define DUP_LINES       4                               /* max # of DUP11's */
 #define DIB_MAX         100                             /* max DIBs */
 
@@ -700,9 +707,10 @@ typedef struct pdp_dib DIB;
 
 #define INT_V_RP        6                               /* RH11/RP,RM drives */
 #define INT_V_TU        7                               /* RH11/TM03/TU45 */
-#define INT_V_DMCRX     13
-#define INT_V_DMCTX     14
-#define INT_V_XU        15                              /* DEUNA/DELUA */
+#define INT_V_KMCA      8                               /* KMC11 */
+#define INT_V_KMCB      9
+#define INT_V_DMCRX     8                               /* DMC11/DMR11 */
+#define INT_V_DMCTX     9
 #define INT_V_DZRX      16                              /* DZ11 */
 #define INT_V_DZTX      17
 #define INT_V_RY        18                              /* RX211 */
@@ -715,6 +723,8 @@ typedef struct pdp_dib DIB;
 
 #define INT_RP          (1u << INT_V_RP)
 #define INT_TU          (1u << INT_V_TU)
+#define INT_KMCA        (1u << INT_V_KMCA)
+#define INT_KMCB        (1u << INT_V_KMCB)
 #define INT_DMCRX       (1u << INT_V_DMCRX)
 #define INT_DMCTX       (1u << INT_V_DMCTX)
 #define INT_XU          (1u << INT_V_XU)
@@ -730,8 +740,8 @@ typedef struct pdp_dib DIB;
 
 #define IPL_RP          6                               /* int levels */
 #define IPL_TU          6
-#define IPL_DMCRX       5
-#define IPL_DMCTX       5
+#define IPL_KMCA        5
+#define IPL_KMCB        5
 #define IPL_XU          5
 #define IPL_DZRX        5
 #define IPL_DZTX        5
@@ -759,8 +769,6 @@ typedef struct pdp_dib DIB;
 #define VEC_CR          0230
 #define VEC_RP          0254
 #define VEC_RY          0264
-#define VEC_DZRX        0340
-#define VEC_DZTX        0344
 #define VEC_LP20        0754
 #define VEC_AUTO        0                               /* Set by Auto Configure */
 

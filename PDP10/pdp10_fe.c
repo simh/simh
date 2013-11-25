@@ -265,8 +265,8 @@ if (M[FE_KEEPA] & INT64_C(0020000000000)) {              /* KSRLD - "Forced" (ac
     }
 else if (M[FE_KEEPA] & INT64_C(0010000000000)) {        /* KPACT */
     d10 kav = M[FE_KEEPA] & INT64_C(0000000177400);     /* KPALIV */
-    if (kaf_unit.u3 != (uint32)kav) {
-        kaf_unit.u3 = (uint32)kav;
+    if (kaf_unit.u3 != (int32)kav) {
+        kaf_unit.u3 = (int32)kav;
         kaf_unit.u4 = 0;
         }
     else if (++kaf_unit.u4 >= 15) {

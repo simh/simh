@@ -256,6 +256,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\PDP11\pdp11_kmc.c"
+				>
+			</File>
+			<File
 				RelativePath="..\PDP11\pdp11_lp.c"
 				>
 			</File>

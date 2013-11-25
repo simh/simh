@@ -155,41 +155,41 @@ d10 xlate (d10 by, a10 tblad, d10 *xflgs, int32 pflgs);
 void filldst (d10 fill, int32 ac, d10 cnt, int32 pflgs);
 
 static const d10 pwrs10[23][2] = {
-           INT64_C(0),           INT64_C(0),
-           INT64_C(0),           INT64_C(1),
-           INT64_C(0),          INT64_C(10),
-           INT64_C(0),         INT64_C(100),
-           INT64_C(0),        INT64_C(1000),
-           INT64_C(0),       INT64_C(10000),
-           INT64_C(0),      INT64_C(100000),
-           INT64_C(0),     INT64_C(1000000),
-           INT64_C(0),    INT64_C(10000000),
-           INT64_C(0),   INT64_C(100000000),
-           INT64_C(0),  INT64_C(1000000000),
-           INT64_C(0), INT64_C(10000000000),
-           INT64_C(2), INT64_C(31280523264),
-          INT64_C(29),  INT64_C(3567587328),
-         INT64_C(291),  INT64_C(1316134912),
-        INT64_C(2910), INT64_C(13161349120),
-       INT64_C(29103), INT64_C(28534276096),
-      INT64_C(291038), INT64_C(10464854016),
-     INT64_C(2910383),  INT64_C(1569325056),
-    INT64_C(29103830), INT64_C(15693250560),
-   INT64_C(291038304), INT64_C(19493552128),
-  INT64_C(2910383045), INT64_C(23136829440),
- INT64_C(29103830456), INT64_C(25209864192)
+{           INT64_C(0),           INT64_C(0),},
+{           INT64_C(0),           INT64_C(1),},
+{           INT64_C(0),          INT64_C(10),},
+{           INT64_C(0),         INT64_C(100),},
+{           INT64_C(0),        INT64_C(1000),},
+{           INT64_C(0),       INT64_C(10000),},
+{           INT64_C(0),      INT64_C(100000),},
+{           INT64_C(0),     INT64_C(1000000),},
+{           INT64_C(0),    INT64_C(10000000),},
+{           INT64_C(0),   INT64_C(100000000),},
+{           INT64_C(0),  INT64_C(1000000000),},
+{           INT64_C(0), INT64_C(10000000000),},
+{           INT64_C(2), INT64_C(31280523264),},
+{          INT64_C(29),  INT64_C(3567587328),},
+{         INT64_C(291),  INT64_C(1316134912),},
+{        INT64_C(2910), INT64_C(13161349120),},
+{       INT64_C(29103), INT64_C(28534276096),},
+{      INT64_C(291038), INT64_C(10464854016),},
+{     INT64_C(2910383),  INT64_C(1569325056),},
+{    INT64_C(29103830), INT64_C(15693250560),},
+{   INT64_C(291038304), INT64_C(19493552128),},
+{  INT64_C(2910383045), INT64_C(23136829440),},
+{ INT64_C(29103830456), INT64_C(25209864192),},
  };
 
 int xtend (int32 ac, int32 ea, int32 pflgs)
 {
 d10 b1, b2, ppi; 
-d10 xinst, xoff, digit, f1, f2, rs[2];
+d10 xinst, xoff = 0, digit, f1, f2, rs[2];
 d10 xflgs = 0;
-a10 e1, entad;
+a10 e1 = 0, entad;
 int32 p1 = ADDAC (ac, 1);
 int32 p3 = ADDAC (ac, 3);
 int32 p4 = ADDAC (ac, 4);
-int32 flg, i, s2, t, pp, pat, xop, xac, ret;
+int32 flg, i, s2 = 0, t, pp, pat, xop, xac, ret;
 
 xinst = Read (ea, MM_OPND);                             /* get extended instr */
 xop = GET_OP (xinst);                                   /* get opcode */

@@ -810,7 +810,7 @@ return;
 t_stat tu_svc (UNIT *uptr)
 {
 int32 fnc, fmt, i, j, k, wc10, ba10;
-int32 ba, fc, wc, drv, mpa10, vpn;
+int32 ba, fc, wc, drv, mpa10 = 0, vpn;
 d10 val, v[4];
 t_mtrlnt tbc;
 t_stat st, r = SCPE_OK;
@@ -1258,7 +1258,7 @@ return sim_tape_detach (uptr);
 static const d10 boot_rom_dec[] = {
     INT64_C(0510040000000)+FE_RHBASE,       /* boot:hllz  1,FE_RHBASE ; uba # */
     INT64_C(0201000040001),                 /*      movei 0,40001   ; vld,pg 1 */
-    INT64_C(0713001000000)+(IOBA_UBMAP+1 & RMASK),   /*      wrio 0,763001(1); set ubmap */
+    INT64_C(0713001000000)+((IOBA_UBMAP+1) & RMASK),   /*      wrio 0,763001(1); set ubmap */
     INT64_C(0200040000000)+FE_RHBASE,       /*      move 1,FE_RHBASE */
     INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
     INT64_C(0713001000010),                 /*      wrio 0,10(1)    ; ->MTFS */
@@ -1312,7 +1312,7 @@ static const d10 boot_rom_dec[] = {
 static const d10 boot_rom_its[] = {
     INT64_C(0510040000000)+FE_RHBASE,       /* boot:hllz 1,FE_RHBASE ; uba # - not used */
     INT64_C(0201000040001),                 /*      movei 0,40001   ; vld,pg 1 */
-    INT64_C(0714000000000)+(IOBA_UBMAP+1 & RMASK),   /*      iowri 0,763001  ; set ubmap */
+    INT64_C(0714000000000)+((IOBA_UBMAP+1) & RMASK),   /*      iowri 0,763001  ; set ubmap */
     INT64_C(0200040000000)+FE_RHBASE,       /*      move 1,FE_RHBASE */
     INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
     INT64_C(0714001000010),                 /*      iowri 0,10(1)   ; ->MTFS */

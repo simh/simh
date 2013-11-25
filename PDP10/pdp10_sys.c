@@ -56,6 +56,8 @@ extern DEVICE ry_dev;
 extern DEVICE cr_dev;
 extern DEVICE lp20_dev;
 extern DEVICE dup_dev;
+extern DEVICE kmc_dev;
+extern DEVICE dmc_dev;
 extern UNIT cpu_unit;
 extern REG cpu_reg[];
 extern d10 *M;
@@ -92,6 +94,8 @@ DEVICE *sim_devices[] = {
     &tu_dev,
     &dz_dev,
     &dup_dev,
+    &kmc_dev,
+    &dmc_dev,
     NULL
     };
 
@@ -109,6 +113,7 @@ const char *sim_stop_messages[] = {
     "Invalid I/O controller",
     "Address stop",
     "Console FE halt",
+    "Unaligned DMA",
     "Panic stop"
      };
 

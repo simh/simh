@@ -1229,7 +1229,7 @@ return SCPE_OK;
 static const d10 boot_rom_dec[] = {
     INT64_C(0510040000000)+FE_RHBASE,       /* boot:hllz 1,FE_RHBASE   ; uba # */
     INT64_C(0201000140001),                 /*      movei 0,140001  ; vld,fst,pg 1 */
-    INT64_C(0713001000000)+(IOBA_UBMAP+1 & RMASK),   /*      wrio 0,763001(1); set ubmap */
+    INT64_C(0713001000000)+((IOBA_UBMAP+1) & RMASK),   /*      wrio 0,763001(1); set ubmap */
     INT64_C(0200040000000)+FE_RHBASE,       /*      move 1,FE_RHBASE */
     INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
     INT64_C(0713001000010),                 /*      wrio 0,10(1)    ; ->RPCS2 */
@@ -1293,7 +1293,7 @@ static const d10 boot_rom_dec[] = {
 static const d10 boot_rom_its[] = {
     INT64_C(0510040000001)+FE_RHBASE,       /* boot:hllzi 1,FE_RHBASE ; uba # */
     INT64_C(0201000140001),                 /*      movei 0,140001  ; vld,fst,pg 1 */
-    INT64_C(0715000000000)+(IOBA_UBMAP+1 & RMASK),   /*      iowrq 0,763001  ; set ubmap */
+    INT64_C(0715000000000)+((IOBA_UBMAP+1) & RMASK),   /*      iowrq 0,763001  ; set ubmap */
     INT64_C(0200040000000)+FE_RHBASE,       /*      move 1,FE_RHBASE */
     INT64_C(0201000000040),                 /*      movei 0,40      ; ctrl reset */
     INT64_C(0715001000010),                 /*      iowrq 0,10(1)   ; ->RPCS2 */
