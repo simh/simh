@@ -69,6 +69,8 @@
 /* OS dependent routines
 
    sim_master_sock      create master socket
+   sim_connect_sock     connect a socket to a remote destination
+   sim_connect_sock_ex  connect a socket to a remote destination
    sim_accept_conn      accept connection
    sim_read_sock        read from socket
    sim_write_sock       write from socket
@@ -95,6 +97,11 @@ return INVALID_SOCKET;
 }
 
 SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port)
+{
+return INVALID_SOCKET;
+}
+
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram)
 {
 return INVALID_SOCKET;
 }
@@ -710,12 +717,12 @@ return 0;
 
 #endif                                                  /* endif !Win32 && !VMS */
 
-static SOCKET sim_create_sock (int af)
+static SOCKET sim_create_sock_ex (int af, t_bool datagram)
 {
 SOCKET newsock;
 int32 err;
 
-newsock = socket (af, SOCK_STREAM, 0);                  /* create socket */
+newsock = socket (af, (datagram ? SOCK_DGRAM : SOCK_STREAM), 0);/* create socket */
 if (newsock == INVALID_SOCKET) {                        /* socket error? */
     err = WSAGetLastError ();
 #if defined(WSAEAFNOSUPPORT)
@@ -725,6 +732,11 @@ if (newsock == INVALID_SOCKET) {                        /* socket error? */
     return sim_err_sock (newsock, "socket", 0);         /* report error and return */
     }
 return newsock;
+}
+
+static SOCKET sim_create_sock (int af)
+{
+return sim_create_sock_ex (af, FALSE);
 }
 
 /*
@@ -823,27 +835,70 @@ return newsock;                                         /* got it! */
 
 SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port)
 {
+return sim_connect_sock_ex (NULL, hostport, default_host, default_port, FALSE);
+}
+
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram)
+{
 SOCKET newsock = INVALID_SOCKET;
 int32 sta;
 char host[CBUFSIZE], port[CBUFSIZE];
 t_stat r;
 struct addrinfo hints;
-struct addrinfo *result = NULL;
+struct addrinfo *result = NULL, *source = NULL;
 
 r = sim_parse_addr (hostport, host, sizeof(host), default_host, port, sizeof(port), default_port, NULL);
 if (r != SCPE_OK)
-    return newsock;
+    return INVALID_SOCKET;
 
 memset(&hints, 0, sizeof(hints));
 hints.ai_family = AF_UNSPEC;
-hints.ai_protocol = IPPROTO_TCP;
-hints.ai_socktype = SOCK_STREAM;
+hints.ai_protocol = (datagram ? IPPROTO_UDP : IPPROTO_TCP);
+hints.ai_socktype = (datagram ? SOCK_DGRAM : SOCK_STREAM);
 if (p_getaddrinfo(host[0] ? host : NULL, port[0] ? port : NULL, &hints, &result))
-    return newsock;
-newsock = sim_create_sock (result->ai_family);          /* create socket */
+    return INVALID_SOCKET;
+
+if (sourcehostport) {
+
+    /* Validate the local/source side address which we'll bind to */
+    r = sim_parse_addr (sourcehostport, host, sizeof(host), NULL, port, sizeof(port), NULL, NULL);
+    if (r != SCPE_OK) {
+        p_freeaddrinfo (result);
+        return INVALID_SOCKET;
+        }
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_flags = AI_PASSIVE;
+    hints.ai_family = result->ai_family;                /* Same family as connect destination */
+    hints.ai_protocol = (datagram ? IPPROTO_UDP : IPPROTO_TCP);
+    hints.ai_socktype = (datagram ? SOCK_DGRAM : SOCK_STREAM);
+    if (p_getaddrinfo(host[0] ? host : NULL, port[0] ? port : NULL, &hints, &source)) {
+        p_freeaddrinfo (result);
+        return INVALID_SOCKET;
+        }
+
+    newsock = sim_create_sock_ex (result->ai_family, datagram);/* create socket */
+    if (newsock == INVALID_SOCKET) {                    /* socket error? */
+        p_freeaddrinfo (result);
+        p_freeaddrinfo (source);
+        return newsock;
+        }
+
+    sta = bind (newsock, source->ai_addr, source->ai_addrlen);
+    p_freeaddrinfo(source);
+    source = NULL;
+    if (sta == SOCKET_ERROR) {                          /* bind error? */
+        p_freeaddrinfo (result);
+        return sim_err_sock (newsock, "bind", 1);
+        }
+    }
+
 if (newsock == INVALID_SOCKET) {                        /* socket error? */
-    p_freeaddrinfo (result);
-    return newsock;
+    newsock = sim_create_sock_ex (result->ai_family, datagram);/* create socket */
+    if (newsock == INVALID_SOCKET) {                    /* socket error? */
+        p_freeaddrinfo (result);
+        return newsock;
+        }
     }
 
 sta = sim_setnonblock (newsock);                        /* set nonblocking */
