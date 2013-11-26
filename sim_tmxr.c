@@ -664,7 +664,10 @@ else {                                                  /* Telnet connection */
     written = sim_write_sock (lp->sock, &(lp->txb[i]), length);
 
     if (written == SOCKET_ERROR)                        /* did an error occur? */
-        return -1;                                      /* return error indication */
+        if (lp->datagram)
+            return written;                             /* ignore errors on datagram sockets */
+        else
+            return -1;                                  /* return error indication */
     else
         return written;
     }
@@ -1543,19 +1546,19 @@ return val;
        NULL, but success (SCPE_OK) is returned
 */
 
-t_stat tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, size_t *psize)
+t_stat tmxr_get_packet_ln (TMLN *lp, uint8 **pbuf, size_t *psize)
 {
 return tmxr_get_packet_ln_ex (lp, pbuf, psize, 0);
 }
 
-t_stat tmxr_get_packet_ln_ex (TMLN *lp, const uint8 **pbuf, size_t *psize, uint8 frame_byte)
+t_stat tmxr_get_packet_ln_ex (TMLN *lp, uint8 **pbuf, size_t *psize, uint8 frame_byte)
 {
 int32 c;
 size_t pktsize;
 size_t fc_size = (frame_byte ? 1 : 0);
 
 while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
-    if (lp->rxpboffset + 1 > lp->rxpbsize) {
+    if (lp->rxpboffset + 3 > lp->rxpbsize) {
         lp->rxpbsize += 512;
         lp->rxpb = (uint8 *)realloc (lp->rxpb, lp->rxpbsize);
         }
@@ -1563,8 +1566,15 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
         tmxr_debug (TMXR_DBG_PRCV, lp, "Received Unexpected Framing Byte", (char *)&lp->rxpb[lp->rxpboffset], 1);
         continue;
         }
-    lp->rxpb[lp->rxpboffset] = c & 0xFF;
-    lp->rxpboffset += 1;
+    if ((lp->datagram) && (lp->rxpboffset == fc_size)) {
+        /* Datagram packet length is provided as a part of the natural datagram 
+           delivery, for TCP lines, we read the packet length from the data stream.
+           So, here we stuff packet size into head of packet buffer so it looks like
+           it was delivered by TCP and the below return logic doesn't have to worry */
+        lp->rxpb[lp->rxpboffset++] = (uint8)(((1 + lp->rxbpi - lp->rxbpr) >> 8) & 0xFF);
+        lp->rxpb[lp->rxpboffset++] = (uint8)((1 + lp->rxbpi - lp->rxbpr) & 0xFF);
+        }
+    lp->rxpb[lp->rxpboffset++] = c & 0xFF;
     if (lp->rxpboffset >= (2 + fc_size)) {
         pktsize = (lp->rxpb[0+fc_size] << 8) | lp->rxpb[1+fc_size];
         if (pktsize == (lp->rxpboffset - 2)) {
@@ -1606,15 +1616,17 @@ for (i = 0; i < mp->lines; i++) {                       /* loop thru lines */
     nbytes = 0;
     if (lp->rxbpi == 0)                                 /* need input? */
         nbytes = tmxr_read (lp,                         /* yes, read */
-            lp->rxbsz - TMXR_GUARD);                  /* leave spc for Telnet cruft */
+            lp->rxbsz - TMXR_GUARD);                    /* leave spc for Telnet cruft */
     else if (lp->tsta)                                  /* in Telnet seq? */
         nbytes = tmxr_read (lp,                         /* yes, read to end */
             lp->rxbsz - lp->rxbpi);
 
     if (nbytes < 0) {                                   /* line error? */
-        if (!lp->txbfd || lp->notelnet) 
-            lp->txbpi = lp->txbpr = 0;                  /* Drop the data we already know we can't send */
-        tmxr_close_ln (lp);                             /* disconnect line */
+        if (!lp->datagram) {                            /* ignore errors reading UDP sockets */
+            if (!lp->txbfd || lp->notelnet) 
+                lp->txbpi = lp->txbpr = 0;              /* Drop the data we already know we can't send */
+            tmxr_close_ln (lp);                         /* disconnect line */
+            }
         }
 
     else if (nbytes > 0) {                              /* if data rcvd */
@@ -1816,6 +1828,7 @@ t_stat tmxr_put_packet_ln_ex (TMLN *lp, const uint8 *buf, size_t size, uint8 fra
 {
 t_stat r;
 size_t fc_size = (frame_byte ? 1 : 0);
+size_t pktlen_size = (lp->datagram ? 0 : 2);
 
 if (!lp->conn)
     return SCPE_LOST;
@@ -1823,17 +1836,19 @@ if (lp->txppoffset < lp->txppsize) {
     tmxr_debug (TMXR_DBG_PXMT, lp, "Skipped Sending Packet - Transmit Busy", (char *)&lp->txpb[3], size);
     return SCPE_STALL;
     }
-if (lp->txpbsize < size + 2 + fc_size) {
-    lp->txpbsize = size + 2 + fc_size;
+if (lp->txpbsize < size + pktlen_size + fc_size) {
+    lp->txpbsize = size + pktlen_size + fc_size;
     lp->txpb = (uint8 *)realloc (lp->txpb, lp->txpbsize);
     }
 lp->txpb[0] = frame_byte;
-lp->txpb[0+fc_size] = (size >> 8) & 0xFF;
-lp->txpb[1+fc_size] = size & 0xFF;
-memcpy (lp->txpb + 2 + fc_size, buf, size);
-lp->txppsize = size + 2 + fc_size;
+if (!lp->datagram) {
+    lp->txpb[0+fc_size] = (size >> 8) & 0xFF;
+    lp->txpb[1+fc_size] = size & 0xFF;
+    }
+memcpy (lp->txpb + pktlen_size + fc_size, buf, size);
+lp->txppsize = size + pktlen_size + fc_size;
 lp->txppoffset = 0;
-tmxr_debug (TMXR_DBG_PXMT, lp, "Sending Packet", (char *)&lp->txpb[2+fc_size], size);
+tmxr_debug (TMXR_DBG_PXMT, lp, "Sending Packet", (char *)&lp->txpb[pktlen_size+fc_size], size);
 ++lp->txpcnt;
 while ((lp->txppoffset < lp->txppsize) && 
        (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
@@ -1896,7 +1911,6 @@ if (nbytes) {                                           /* >0? write */
         sbytes = tmxr_write (lp, nbytes);               /* write all data */
     else
         sbytes = tmxr_write (lp, lp->txbsz - lp->txbpr);/* write to end buf */
-
     if (sbytes >= 0) {                                  /* ok? */
         tmxr_debug (TMXR_DBG_XMT, lp, "Sent", &(lp->txb[lp->txbpr]), sbytes);
         lp->txbpr = (lp->txbpr + sbytes);               /* update remove ptr */

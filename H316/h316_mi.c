@@ -319,6 +319,7 @@ MIDB   *const mi_midbs  [MI_NUM] = {&mi1_db,   &mi2_db,   &mi3_db,   &mi4_db,   
 void mi_reset_rx (uint16 line)
 {
   PMIDB(line)->iloop = PMIDB(line)->lloop = FALSE;
+  udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, FALSE);
   PMIDB(line)->rxerror = PMIDB(line)->rxpending = FALSE;
   PMIDB(line)->rxtotal = 0;
   CLR_RX_IRQ(line);  CLR_RX_IEN(line);
@@ -328,6 +329,7 @@ void mi_reset_rx (uint16 line)
 void mi_reset_tx (uint16 line)
 {
   PMIDB(line)->iloop = PMIDB(line)->lloop = FALSE;
+  udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, FALSE);
   PMIDB(line)->txtotal = PMIDB(line)->txdelay = 0;
   CLR_TX_IRQ(line);  CLR_TX_IEN(line);
 }
@@ -424,10 +426,7 @@ void mi_start_tx (uint16 line)
   if (PMIDB(line)->iloop) {
     mi_rx_local(line, next, count);
   } else if (PMIDB(line)->link != NOLINK) {
-    if (PMIDB(line)->lloop)
-      ret = udp_send_self(PDEVICE(line), PMIDB(line)->link, &M[next], count);
-    else
-      ret = udp_send(PDEVICE(line), PMIDB(line)->link, &M[next], count);
+    ret = udp_send(PDEVICE(line), PMIDB(line)->link, &M[next], count);
     if (ret != SCPE_OK) mi_link_error(line);
   }
 
@@ -581,15 +580,21 @@ int32 mi_io (uint16 line, int32 inst, int32 fnc, int32 dat, int32 dev)
       case 001:
         // MnUNXP - un-cross patch modem ...
         sim_debug(IMP_DBG_IOT,PDEVICE(line),"un-cross patch modem (PC=%06o)\n", PC-1);
-        PMIDB(line)->iloop = PMIDB(line)->lloop = FALSE;  return dat;
+        PMIDB(line)->iloop = PMIDB(line)->lloop = FALSE;  
+        udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, FALSE);
+        return dat;
       case 002:
         // MnLXP - enable line cross patch ...
         sim_debug(IMP_DBG_IOT,PDEVICE(line),"enable line cross patch (PC=%06o)\n", PC-1);
-        PMIDB(line)->lloop = TRUE;  PMIDB(line)->iloop = FALSE;  return dat;
+        PMIDB(line)->lloop = TRUE;  
+        udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, TRUE);
+        PMIDB(line)->iloop = FALSE;  return dat;
       case 003:
         // MnIXP - enable interface cross patch ...
         sim_debug(IMP_DBG_IOT,PDEVICE(line),"enable interface cross patch (PC=%06o)\n", PC-1);
-        PMIDB(line)->iloop = TRUE;  PMIDB(line)->lloop = FALSE;  return dat;
+        PMIDB(line)->iloop = TRUE;  PMIDB(line)->lloop = FALSE;  
+        udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, FALSE);
+        return dat;
       case 004:
         // MnIN - start modem input ...
         mi_debug_mio(line, PDIB(line)->rxdmc, "input");

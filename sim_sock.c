@@ -599,7 +599,7 @@ if (hostp != NULL) {
         hostp[strlen(hostp)-1] = '\0';
         }
     }
-if (host)                                               /* host wanted? */
+if (host) {                                             /* host wanted? */
     if (hostp != NULL) {
         if (strlen(hostp) >= host_len)
             return SCPE_ARG;                            /* no room */
@@ -613,12 +613,14 @@ if (host)                                               /* host wanted? */
                     strcpy (host, default_host);
         }
     else {
-        if (default_host)
+        if (default_host) {
             if (strlen(default_host) >= host_len)
                 return SCPE_ARG;                        /* no room */
             else
                 strcpy (host, default_host);
+            }
         }
+    }
 if (validate_addr) {
     struct addrinfo *ai_host, *ai_validate, *ai;
     t_stat status;
