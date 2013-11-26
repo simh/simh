@@ -1830,7 +1830,7 @@ t_stat r;
 size_t fc_size = (frame_byte ? 1 : 0);
 size_t pktlen_size = (lp->datagram ? 0 : 2);
 
-if (!lp->conn)
+if ((!lp->conn) && (!lp->loopback))
     return SCPE_LOST;
 if (lp->txppoffset < lp->txppsize) {
     tmxr_debug (TMXR_DBG_PXMT, lp, "Skipped Sending Packet - Transmit Busy", (char *)&lp->txpb[3], size);
@@ -1854,7 +1854,7 @@ while ((lp->txppoffset < lp->txppsize) &&
        (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
    ++lp->txppoffset;
 tmxr_send_buffered_data (lp);
-return lp->conn ? SCPE_OK : SCPE_LOST;
+return (lp->conn || lp->loopback) ? SCPE_OK : SCPE_LOST;
 }
 
 /* Poll for output
