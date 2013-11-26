@@ -159,6 +159,7 @@ struct tmln {
     char                *lpb;                           /* loopback buffer */
     UNIT                *uptr;                          /* input polling unit (default to mp->uptr) */
     UNIT                *o_uptr;                        /* output polling unit (default to lp->uptr)*/
+    DEVICE              *dptr;                          /* line specific device */
     };
 
 struct tmxr {

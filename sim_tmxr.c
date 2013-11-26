@@ -1327,6 +1327,7 @@ return tmxr_clear_modem_control_passthru_state (mp, FALSE);
 t_stat tmxr_set_get_modem_bits (TMLN *lp, int32 bits_to_set, int32 bits_to_clear, int32 *incoming_bits)
 {
 int32 before_modem_bits, incoming_state;
+DEVICE *dptr;
 
 tmxr_debug_trace_line (lp, "tmxr_set_get_modem_bits()");
 
@@ -1355,9 +1356,10 @@ if ((lp->sock) || (lp->serport) || (lp->loopback)) {
 else
     incoming_state = 0;
 lp->modembits |= incoming_state;
-if (sim_deb && lp->mp && lp->mp->dptr) {
-    sim_debug_bits (TMXR_DBG_MDM, lp->mp->dptr, tmxr_modem_bits, before_modem_bits, lp->modembits, FALSE);
-    sim_debug (TMXR_DBG_MDM, lp->mp->dptr, " - Line %d - %p\n", (int)(lp-lp->mp->ldsc), lp->txb);
+dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
+if (sim_deb && lp->mp && dptr) {
+    sim_debug_bits (TMXR_DBG_MDM, dptr, tmxr_modem_bits, before_modem_bits, lp->modembits, FALSE);
+    sim_debug (TMXR_DBG_MDM, dptr, " - Line %d - %p\n", (int)(lp-lp->mp->ldsc), lp->txb);
     }
 if (incoming_bits)
     *incoming_bits = lp->modembits;
@@ -3251,7 +3253,7 @@ else {
         TMLN *lp;
         char *attach;
 
-        fprintf(st, "Multiplexer device: %s, ", mp->dptr->name);
+        fprintf(st, "Multiplexer device: %s, ", (mp->dptr ? sim_dname (mp->dptr) : ""));
         attach = tmxr_mux_attach_string (NULL, mp);
         fprintf(st, "attached to %s, ", attach);
         free (attach);
@@ -3269,6 +3271,8 @@ else {
         for (j = 0; j < mp->lines; j++) {
             lp = mp->ldsc + j;
             if (mp->lines > 1) {
+                if (lp->dptr && (mp->dptr != lp->dptr))
+                    fprintf (st, "Device: %s ", sim_dname(lp->dptr));
                 fprintf (st, "Line: %d", j);
                 if (mp->notelnet != lp->notelnet)
                     fprintf (st, " - %stelnet", lp->notelnet ? "no" : "");
@@ -3756,7 +3760,7 @@ if (lp->modem_control) {
                                                 (lp->modembits & TMXR_MDM_DSR) ? "DSR " : "");
     }
 
-if ((lp->serport == 0) && (lp->sock))
+if ((lp->serport == 0) && (lp->sock) && (!lp->datagram))
     fprintf (st, " %s\n", (lp->notelnet) ? "Telnet disabled (RAW data)" : "Telnet protocol");
 if (lp->txlog)
     fprintf (st, " Logging to %s\n", lp->txlogname);
@@ -4290,7 +4294,9 @@ return optsize;
 
 void _tmxr_debug (uint32 dbits, TMLN *lp, const char *msg, char *buf, int bufsize)
 {
-if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
+DEVICE *dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
+
+if ((dptr) && (dbits & dptr->dctrl)) {
     int i;
 
     tmxr_debug_buf_used = 0;
@@ -4309,9 +4315,9 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
                 }
             if (same > 0) {
                 if (lp->mp->lines > 1)
-                    sim_debug (dbits, lp->mp->dptr, "Line:%d %04X thru %04X same as above\n", (int)(lp-lp->mp->ldsc), i-(16*same), i-1);
+                    sim_debug (dbits, dptr, "Line:%d %04X thru %04X same as above\n", (int)(lp-lp->mp->ldsc), i-(16*same), i-1);
                 else
-                    sim_debug (dbits, lp->mp->dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
+                    sim_debug (dbits, dptr, "%04X thru %04X same as above\n", i-(16*same), i-1);
                 same = 0;
                 }
             group = (((bufsize - i) > 16) ? 16 : (bufsize - i));
@@ -4327,15 +4333,15 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
             outbuf[oidx] = '\0';
             strbuf[sidx] = '\0';
             if (lp->mp->lines > 1)
-                sim_debug (dbits, lp->mp->dptr, "Line:%d %04X%-48s %s\n", (int)(lp-lp->mp->ldsc), i, outbuf, strbuf);
+                sim_debug (dbits, dptr, "Line:%d %04X%-48s %s\n", (int)(lp-lp->mp->ldsc), i, outbuf, strbuf);
             else
-                sim_debug (dbits, lp->mp->dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
+                sim_debug (dbits, dptr, "%04X%-48s %s\n", i, outbuf, strbuf);
             }
         if (same > 0) {
             if (lp->mp->lines > 1)
-                sim_debug (dbits, lp->mp->dptr, "Line:%d %04X thru %04X same as above\n", (int)(lp-lp->mp->ldsc), i-(16*same), bufsize-1);
+                sim_debug (dbits, dptr, "Line:%d %04X thru %04X same as above\n", (int)(lp-lp->mp->ldsc), i-(16*same), bufsize-1);
             else
-                sim_debug (dbits, lp->mp->dptr, "%04X thru %04X same as above\n", i-(16*same), bufsize-1);
+                sim_debug (dbits, dptr, "%04X thru %04X same as above\n", i-(16*same), bufsize-1);
             }
         }
     else {
@@ -4376,9 +4382,9 @@ if ((lp->mp->dptr) && (dbits & lp->mp->dptr->dctrl)) {
                 }
             }
         if (lp->mp->lines > 1)
-            sim_debug (dbits, lp->mp->dptr, "Line:%d %s %d bytes '%s'\n", (int)(lp-lp->mp->ldsc), msg, bufsize, tmxr_debug_buf);
+            sim_debug (dbits, dptr, "Line:%d %s %d bytes '%s'\n", (int)(lp-lp->mp->ldsc), msg, bufsize, tmxr_debug_buf);
         else
-            sim_debug (dbits, lp->mp->dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
+            sim_debug (dbits, dptr, "%s %d bytes '%s'\n", msg, bufsize, tmxr_debug_buf);
         }
     }
 }
