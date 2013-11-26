@@ -604,7 +604,20 @@ if (host)                                               /* host wanted? */
         if (strlen(hostp) >= host_len)
             return SCPE_ARG;                            /* no room */
         else
-            strcpy (host, hostp);
+            if (('\0' != hostp[0]) || (default_host == NULL))
+                strcpy (host, hostp);
+            else
+                if (strlen(default_host) >= host_len)
+                    return SCPE_ARG;                    /* no room */
+                else
+                    strcpy (host, default_host);
+        }
+    else {
+        if (default_host)
+            if (strlen(default_host) >= host_len)
+                return SCPE_ARG;                        /* no room */
+            else
+                strcpy (host, default_host);
         }
 if (validate_addr) {
     struct addrinfo *ai_host, *ai_validate, *ai;
