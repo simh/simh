@@ -561,14 +561,20 @@ tmxr_linemsgf (lp, "\nDisconnected from the %s simulator\n\n", sim_name);/* repo
 return;
 }
 
-static int32 loop_write (TMLN *lp, char *buf, int32 length)
+static int32 loop_write_ex (TMLN *lp, char *buf, int32 length, t_bool prefix_datagram)
 {
 int32 written = 0;
+int32 loopfree = lp->lpbsz - lp->lpbcnt;
 
+if (lp->datagram && prefix_datagram) {
+    if ((size_t)loopfree < (size_t)(length + sizeof(length)))
+        return written;
+    loop_write_ex (lp, (char *)&length, sizeof(length), FALSE);
+    }
 while (length) {
     int32 chunksize;
-    int32 loopfree = lp->lpbsz - lp->lpbcnt;
 
+    loopfree = lp->lpbsz - lp->lpbcnt;
     if (loopfree == 0)
         break;
     if (loopfree < length)
@@ -589,7 +595,12 @@ lp->lpbcnt += written;
 return written;
 }
 
-static int32 loop_read (TMLN *lp, char *buf, int32 bufsize)
+static int32 loop_write (TMLN *lp, char *buf, int32 length)
+{
+return loop_write_ex (lp, buf, length, TRUE);
+}
+
+static int32 loop_read_ex (TMLN *lp, char *buf, int32 bufsize)
 {
 int32 bytesread = 0;
 
@@ -615,6 +626,21 @@ while (bufsize > 0) {
     }
 lp->lpbcnt -= bytesread;
 return bytesread;
+}
+
+static int32 loop_read (TMLN *lp, char *buf, int32 bufsize)
+{
+if (lp->datagram) {
+    int32 pktsize;
+
+    if (lp->lpbcnt < sizeof(pktsize))
+        return 0;
+    if ((sizeof(pktsize) != loop_read_ex (lp, (char *)&pktsize, sizeof(pktsize))) ||
+        (pktsize > bufsize))
+        return -1;
+    bufsize = pktsize;
+    }
+return loop_read_ex (lp, buf, bufsize);
 }
 
 /* Read from a line.
