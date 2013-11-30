@@ -341,8 +341,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       $(info *** Warning ***)
       $(info *** Warning *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
       $(info *** Warning *** functionality if video support were available on your system.)
-      $(info *** Warning *** Install the development components of libSDL2 and rebuild)
-      $(info *** Warning *** your simulator to enable this extra functionality.)
+      $(info *** Warning *** Install the development components of libSDL packaged by your)
+      $(info *** Warning *** operating system distribution and rebuild your simulator to)
+      $(info *** Warning *** enable this extra functionality.)
       $(info *** Warning ***)
     endif
   endif
