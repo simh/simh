@@ -126,12 +126,6 @@
    duplex and bidirectional - data can be sent and received in both directions
    independently.  Real modems and host cards were exactly the same.
 
-   One last comment - there's a nice sim_sock module which provides platform
-   independent TCP functions. Unfortunately there is no UDP equivalent, and this
-   module doesn't use sim_sock.  Sorry.  Even more unfortunate is that the
-   current implementation is WIN32/WINSOCK specific.  Sorry again.  There's no
-   reason why it couldn't be ported to other platforms, but somebody will have
-   to write the missing code.
 */
 #ifdef VM_IMPTIP
 #include "sim_defs.h"           // simh machine independent definitions
@@ -283,7 +277,7 @@ t_stat udp_create (DEVICE *dptr, char *premote, int32 *pln)
   if ((ret = udp_parse_remote(link, premote)) != SCPE_OK) return ret;
 
   // Create the socket connection to the destination ...
-  sprintf(linkinfo, "Line=%d,%s,UDP,Connect=%s", link, udp_links[link].lport, udp_links[link].rhostport);
+  sprintf(linkinfo, "Buffer=%d,Line=%d,%s,UDP,Connect=%s", sizeof(UDP_PACKET)+sizeof(int32), link, udp_links[link].lport, udp_links[link].rhostport);
   ret = tmxr_open_master (&udp_tmxr, linkinfo);
   if (ret != SCPE_OK) return ret;
 
