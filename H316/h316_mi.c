@@ -190,6 +190,8 @@ void mi_rx_local (uint16 line, uint16 txnext, uint16 txcount);
 t_stat mi_reset (DEVICE *dptr);
 t_stat mi_attach (UNIT *uptr, char *cptr);
 t_stat mi_detach (UNIT *uptr);
+t_stat mi_set_loopback (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 
 
@@ -255,7 +257,9 @@ REG mi5_reg[] = MI_REG(5);
 
 // Modem Device Modifiers ...
 //  These are the modifiers simh uses for the "SET MIn" and "SHOW MIn" commands.
-#define MI_MOD(N) {                                                                     \
+#define MI_MOD(N) {                                                                            \
+  { MTAB_XTD|MTAB_VDV, 1, "LOOPBACK", "LOCALLOOP",   &mi_set_loopback, &mi_show_loopback, NULL }, \
+  { MTAB_XTD|MTAB_VDV, 0, NULL,       "NOLOCALLOOP", &mi_set_loopback, NULL,              NULL },     \
   { 0 }                                                                                                                 \
 }
 MTAB mi1_mod[] = MI_MOD(1), mi2_mod[] = MI_MOD(2);
@@ -723,6 +727,29 @@ t_stat mi_detach (UNIT *uptr)
   PMIDB(line)->link = NOLINK;  uptr->flags &= ~UNIT_ATT;
   free (uptr->filename);  uptr->filename = NULL;
   return mi_reset(PDEVICE(line));
+}
+
+t_stat mi_set_loopback (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+  t_stat ret; uint16 line = uptr->mline;
+
+  if (PMIDB(line)->link == NOLINK)
+    return SCPE_UNATT;
+  ret = udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, val);
+  if (ret == SCPE_OK)
+    PMIDB(line)->lloop = val;
+  return ret;
+}
+
+t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+  uint16 line = uptr->mline;
+
+  if (PMIDB(line)->iloop)
+    fprintf (st, ", Internal Loopback");
+  if (PMIDB(line)->lloop)
+    fprintf (st, ", Local Loopback");
+  return SCPE_OK;
 }
 
 #endif // #ifdef VM_IMPTIP from the very top
