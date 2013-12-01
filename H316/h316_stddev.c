@@ -31,6 +31,8 @@
    10-Sep-13    RMS     Fixed several bugs in the TTY logic
                         Added SET file type commands to PTR/PTP
     3-Jul-13    RLA     compatibility changes for extended interrupts
+   23-May-13    RLA     Move the SMK/OTK to h316_cpu (where it belongs!)
+                        Allow the CLK device to be disabled
    09-Jun-07    RMS     Fixed bug in clock increment (Theo Engel)
    30-Sep-06    RMS     Fixed handling of non-printable characters in KSR mode
    03-Apr-06    RMS     Fixed bugs in punch state handling (Theo Engel)
@@ -336,7 +338,7 @@ DEVICE clk_dev = {
     1, 0, 0, 0, 0, 0,
     NULL, NULL, &clk_reset,
     NULL, NULL, NULL,
-    &clk_dib, 0
+    &clk_dib, /* [RLA] */ DEV_DISABLE
     };
 
 /* Paper tape reader: IO routine */
@@ -893,32 +895,28 @@ switch (inst) {                                         /* case on opcode */
             if (!TST_INTREQ (INT_CLK))
                 return IOSKIP (dat);
             }
-        else if ((fnc & 007) == 002) {                  /* mem parity? */
-            if (((fnc == 002) && !TST_INT (INT_MPE)) ||
-                ((fnc == 012) && TST_INT (INT_MPE)))
-                return IOSKIP (dat);
-            }
+        // [RLA]  I'm not sure where this comes from - I can't find any H316
+        // [RLA] documentation that supports this.  According to my manual,
+        // [RLA] skip on memory parity error (SPS) is opcode 101200 and skip
+        // [RLA] on no parity error (SPN) is 100200.  Neither of these look
+        // [RLA] like an SKS to device 20.  
+        //
+        // [RLA]   In any case this code can't stay here since the clock can
+        // [RLA] now be disabled.  It'll have to move to h316_cpu.c no matter
+        // [RLA] how it's supposed to work.
+        //
+        // [RLA] else if ((fnc & 007) == 002) {             /* mem parity? */
+        // [RLA]     if (((fnc == 002) && !TST_INT (INT_MPE)) ||
+        // [RLA]         ((fnc == 012) && TST_INT (INT_MPE)))
+        // [RLA]         return IOSKIP (dat);
+        // [RLA]     }
         else return IOBADFNC (dat);                     /* invalid fnc */
         break;
 
     case ioOTA:                                         /* OTA */
-        if (fnc == 000)                                 /* SMK */
-            dev_enb = dat;
-        else if (fnc == 010) {                          /* OTK */
-            C = (dat >> 15) & 1;                        /* set C */
-            if (cpu_unit.flags & UNIT_HSA)              /* HSA included? */
-                dp = (dat >> 14) & 1;                   /* set dp */
-            if (cpu_unit.flags & UNIT_EXT) {            /* ext opt? */
-                if (dat & 020000) {                     /* ext set? */
-                    ext = 1;                            /* yes, set */
-                    extoff_pending = 0;
-                    }
-                else extoff_pending = 1;                /* no, clr later */
-                }
-            sc = dat & 037;                             /* set sc */
-            }
-        else return IOBADFNC (dat);
-        break;
+        // [RLA]   This case never gets here - OTA with device 20 is the SMK or
+        // [RLA] OTK instructions, and those are handled directly in h316_cpu.c
+        return IOBADFNC (dat);
         }
 
 return dat;
