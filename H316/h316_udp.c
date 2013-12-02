@@ -359,7 +359,7 @@ int32 udp_receive_packet (int32 link, UDP_PACKET *ppkt)
   // of the checking for valid packets, unexpected packets, duplicate or out of
   // sequence packets.  That's strictly the caller's problem!
   size_t pktsiz;
-  uint8 *pbuf;
+  const uint8 *pbuf;
   t_stat ret;
 
   udp_lines[link].rcve = TRUE;          // Enable receiver

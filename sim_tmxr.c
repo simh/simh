@@ -1572,12 +1572,12 @@ return val;
        NULL, but success (SCPE_OK) is returned
 */
 
-t_stat tmxr_get_packet_ln (TMLN *lp, uint8 **pbuf, size_t *psize)
+t_stat tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, size_t *psize)
 {
 return tmxr_get_packet_ln_ex (lp, pbuf, psize, 0);
 }
 
-t_stat tmxr_get_packet_ln_ex (TMLN *lp, uint8 **pbuf, size_t *psize, uint8 frame_byte)
+t_stat tmxr_get_packet_ln_ex (TMLN *lp, const uint8 **pbuf, size_t *psize, uint8 frame_byte)
 {
 int32 c;
 size_t pktsize;
