@@ -31,6 +31,7 @@
    26-Jun-13    RLA     Rewritten from TCP version
    26-Nov-13    MP      Rewritten to use TMXR layer packet semantics thus
                         allowing portability to all simh hosts.
+    2-Dec-13    RLA     Improve error recovery if the other simh is restarted
 
    OVERVIEW
 
@@ -341,6 +342,7 @@ t_stat udp_send (DEVICE *dptr, int32 link, uint16 *pdata, uint16 count)
 
 t_stat udp_set_link_loopback (DEVICE *dptr, int32 link, t_bool enable_loopback)
 {
+  // Enable or disable the local (interface) loopback on this link...
   if ((link < 0) || (link >= MAXLINKS)) return SCPE_IERR;
   if (!udp_links[link].used) return SCPE_IERR;
   if (dptr != udp_links[link].dptr) return SCPE_IERR;
@@ -423,12 +425,25 @@ int32 udp_receive (DEVICE *dptr, int32 link, uint16 *pdata, uint16 maxbuf)
     // this packet is greater than that, then we must have missed one or two
     // packets.  In that case we MUST update rxsequence to match this one;
     // otherwise the two ends could never resynchronize after a lost packet.
+    //
+    //  And there's one final complication to worry about - if the simh on the
+    // other end is restarted for some reason, then his sequence numbers will
+    // reset to zero.  In that case we'll never recover synchronization without
+    // special efforts.  The hack is to check for a packet sequence number of
+    // zero and, if we find it, force synchronization.  This improves the
+    // situation, but I freely admit that it's possible to think of a number of
+    // cases where this also fails.  The only absolute solution is to implement
+    // a more complicated system with non-IMP control messages exchanged between
+    // the modem emulation on both ends.  That'd be nice, but I'll leave it as
+    // an exercise for later.
     pktseq = ntohl(pkt.sequence);
-    if (pktseq < udp_links[link].rxsequence) {
+    if ((pktseq == 0) && (udp_links[link].rxsequence != 0)) {
+      sim_debug(IMP_DBG_UDP, dptr, "link %d - remote modem restarted\n", link);
+    } else if (pktseq < udp_links[link].rxsequence) {
       sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet out of sequence 1 (expected=%d received=%d\n", link, udp_links[link].rxsequence, pktseq);
-      continue;
+      continue;  // discard this packet!
     }
-    if (pktseq != udp_links[link].rxsequence) {
+    else if (pktseq != udp_links[link].rxsequence) {
       sim_debug(IMP_DBG_UDP, dptr, "link %d - received packet out of sequence 2 (expected=%d received=%d\n", link, udp_links[link].rxsequence, pktseq);
     }
     udp_links[link].rxsequence = pktseq+1;
