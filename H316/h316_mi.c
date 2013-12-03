@@ -155,8 +155,8 @@
         LINKNO  32      link number for h316_udp module
         BPS     32      simulated bps for UDP delay calculations
                         actual baud rate for physical COM ports
-        LLOOP    1      local loopback enabled
-        RLOOP    1      remote loopback enabled
+        ILOOP    1      interface (local) loopback enabled
+        RLOOP    1      remote (line) loopback enabled
 
    Most of these values will be found in the Modem Information Data Block (aka
    "MIDB") but a few are stored elsewhere (e.g. IRQ/IEN are in the CPU's dev_int
@@ -165,7 +165,7 @@
    TODO
 
    Implement checksum handling
-   Implement local/remote loopback
+   Implement remote loopback
 */
 #ifdef VM_IMPTIP
 #include "h316_defs.h"          // H316 emulator definitions
@@ -247,8 +247,8 @@ UNIT mi5_unit = MI_UNIT(5);
   { DRDATA (TXTOT,  mi##N##_db.txtotal,  32), REG_RO + PV_LEFT },       \
   { DRDATA (LINK,   mi##N##_db.link,     32), REG_RO + PV_LEFT },       \
   { DRDATA (BPS,    mi##N##_db.bps,      32), REG_NZ + PV_LEFT },       \
-  { FLDATA (LLOOP,  mi##N##_db.lloop,     0),          PV_RZRO },       \
-  { FLDATA (ILOOP,  mi##N##_db.iloop,     0),          PV_RZRO },       \
+  { FLDATA (LLOOP,  mi##N##_db.lloop,     0), REG_RO + PV_RZRO },       \
+  { FLDATA (ILOOP,  mi##N##_db.iloop,     0), REG_RO + PV_RZRO },       \
   { NULL }                                                              \
 }
 REG mi1_reg[] = MI_REG(1), mi2_reg[] = MI_REG(2);
@@ -257,10 +257,12 @@ REG mi5_reg[] = MI_REG(5);
 
 // Modem Device Modifiers ...
 //  These are the modifiers simh uses for the "SET MIn" and "SHOW MIn" commands.
-#define MI_MOD(N) {                                                                            \
-  { MTAB_XTD|MTAB_VDV, 1, "LOOPBACK", "LOCALLOOP",   &mi_set_loopback, &mi_show_loopback, NULL }, \
-  { MTAB_XTD|MTAB_VDV, 0, NULL,       "NOLOCALLOOP", &mi_set_loopback, NULL,              NULL },     \
-  { 0 }                                                                                                                 \
+#define MI_MOD(N) {                                                                                        \
+  { MTAB_XTD|MTAB_VDV, 0, "LOOPBACK",      "LOOPINTERFACE",   &mi_set_loopback, &mi_show_loopback, NULL }, \
+  { MTAB_XTD|MTAB_VDV, 1, NULL,            "NOLOOPINTERFACE", &mi_set_loopback, NULL,              NULL }, \
+  { MTAB_XTD|MTAB_VDV, 2, NULL,            "LOOPLINE",        &mi_set_loopback, NULL,              NULL }, \
+  { MTAB_XTD|MTAB_VDV, 3, NULL,            "NOLOOPLINE",      &mi_set_loopback, NULL,              NULL }, \
+  { 0 }                                                                                                    \
 }
 MTAB mi1_mod[] = MI_MOD(1), mi2_mod[] = MI_MOD(2);
 MTAB mi3_mod[] = MI_MOD(3), mi4_mod[] = MI_MOD(4);
@@ -731,13 +733,23 @@ t_stat mi_detach (UNIT *uptr)
 
 t_stat mi_set_loopback (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-  t_stat ret; uint16 line = uptr->mline;
+  t_stat ret = SCPE_OK; uint16 line = uptr->mline;
 
-  if (PMIDB(line)->link == NOLINK)
-    return SCPE_UNATT;
-  ret = udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, val);
-  if (ret == SCPE_OK)
-    PMIDB(line)->lloop = val;
+  switch (val) {
+    case 0:     // LOOPINTERFACE
+    case 1:     // NOLOOPINTERFACE
+      PMIDB(line)->iloop = (val == 0) ? 1 : 0;
+      break;
+    case 2:     // LOOPLINE
+    case 3:     // NOLOOPLINE
+      if (PMIDB(line)->link == NOLINK)
+        return SCPE_UNATT;
+      val = (val == 2) ? 1 : 0;
+      ret = udp_set_link_loopback (PDEVICE(line), PMIDB(line)->link, val);
+      if (ret == SCPE_OK)
+        PMIDB(line)->lloop = val;
+      break;
+    }
   return ret;
 }
 
@@ -746,9 +758,9 @@ t_stat mi_show_loopback (FILE *st, UNIT *uptr, int32 val, void *desc)
   uint16 line = uptr->mline;
 
   if (PMIDB(line)->iloop)
-    fprintf (st, ", Internal Loopback");
+    fprintf (st, "Interface (local) Loopback");
   if (PMIDB(line)->lloop)
-    fprintf (st, ", Local Loopback");
+    fprintf (st, "Line (remote) Loopback");
   return SCPE_OK;
 }
 
