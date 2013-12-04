@@ -677,8 +677,8 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 //   There was actually a UNIBUS RRD50 controller too, but I don't know if it
 // used the same MSCP type as the QBUS version or not...
 #define KRQ50_CTYPE     6               // QBUS RRD40/50 CDROM controller
-#define KRQ50_UQPM      13
-#define KRQ50_MODEL     13
+#define KRQ50_UQPM      16
+#define KRQ50_MODEL     16
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
