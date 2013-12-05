@@ -551,12 +551,19 @@ char *hostp, *portp;
 char *endc;
 unsigned long portval;
 
-if ((cptr == NULL) || (*cptr == 0))
-    return SCPE_ARG;
 if ((host != NULL) && (host_len != 0))
     memset (host, 0, host_len);
 if ((port != NULL) && (port_len != 0))
     memset (port, 0, port_len);
+if ((cptr == NULL) || (*cptr == 0)) {
+    if (((default_host == NULL) || (*default_host == 0)) && ((default_port == NULL) || (*default_port == 0)))
+        return SCPE_ARG;
+    if ((strlen(default_host) >= host_len) || (strlen(default_port) >= port_len))
+        return SCPE_ARG;                            /* no room */
+    strcpy (host, default_host);
+    strcpy (port, default_port);
+    return SCPE_OK;
+    }
 gbuf[sizeof(gbuf)-1] = '\0';
 strncpy (gbuf, cptr, sizeof(gbuf)-1);
 hostp = gbuf;                                           /* default addr */
@@ -622,7 +629,7 @@ if (host) {                                             /* host wanted? */
         }
     }
 if (validate_addr) {
-    struct addrinfo *ai_host, *ai_validate, *ai;
+    struct addrinfo *ai_host, *ai_validate, *ai, *aiv;
     t_stat status;
 
     if (hostp == NULL)
@@ -635,11 +642,13 @@ if (validate_addr) {
         }
     status = SCPE_ARG;
     for (ai = ai_host; ai != NULL; ai = ai->ai_next) {
-        if ((ai->ai_addrlen == ai_validate->ai_addrlen) &&
-            (ai->ai_family == ai_validate->ai_family) &&
-            (0 == memcmp (ai->ai_addr, ai_validate->ai_addr, ai->ai_addrlen))) {
-            status = SCPE_OK;
-            break;
+        for (aiv = ai_validate; aiv != NULL; aiv = aiv->ai_next) {
+            if ((ai->ai_addrlen == aiv->ai_addrlen) &&
+                (ai->ai_family == aiv->ai_family) &&
+                (0 == memcmp (ai->ai_addr, aiv->ai_addr, ai->ai_addrlen))) {
+                status = SCPE_OK;
+                break;
+                }
             }
         }
     if (status != SCPE_OK) {
@@ -656,6 +665,60 @@ if (validate_addr) {
     }
 return SCPE_OK;   
 }
+
+/* sim_parse_addr_ex    localport:host:port
+
+   Presumption is that the input, if it doesn't contain a ':' character is a port specifier.
+   If the host field contains one or more colon characters (i.e. it is an IPv6 address), 
+   the IPv6 address MUST be enclosed in square bracket characters (i.e. Domain Literal format)
+
+        llll:w.x.y.z:rrrr
+        llll:name.domain.com:rrrr
+        llll::rrrr
+        rrrr
+        w.x.y.z:rrrr
+        [w.x.y.z]:rrrr
+        name.domain.com:rrrr
+
+   Inputs:
+        cptr    =       pointer to input string
+        default_host
+                =       optional pointer to default host if none specified
+        host_len =      length of host buffer
+        default_port
+                =       optional pointer to default port if none specified
+        port_len =      length of port buffer
+
+   Outputs:
+        host    =       pointer to buffer for IP address (may be NULL), 0 = none
+        port    =       pointer to buffer for IP port (may be NULL), 0 = none
+        localport
+                =       pointer to buffer for local IP port (may be NULL), 0 = none
+        result  =       status (SCPE_OK on complete success or SCPE_ARG if 
+                        parsing can't happen due to bad syntax, a value is 
+                        out of range, a result can't fit into a result buffer, 
+                        a service name doesn't exist, or a validation name 
+                        doesn't match the parsed host)
+*/
+t_stat sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, char *localport, size_t localport_len, const char *default_port)
+{
+char *hostp;
+
+if ((localport != NULL) && (localport_len != 0))
+    memset (localport, 0, localport_len);
+hostp = strchr (cptr, ':');
+if ((hostp != NULL) && ((hostp[1] == '[') || (NULL != strchr (hostp+1, ':')))) {
+    if ((localport != NULL) && (localport_len != 0)) {
+        localport_len -= 1;
+        if (localport_len > (size_t)(hostp-cptr))
+            localport_len = (size_t)(hostp-cptr);
+        memcpy (localport, cptr, localport_len);
+        }
+    return sim_parse_addr (hostp+1, host, hostlen, default_host, port, port_len, default_port, NULL);
+    }
+return sim_parse_addr (cptr, host, hostlen, default_host, port, port_len, default_port, NULL);
+}
+
 
 void sim_init_sock (void)
 {

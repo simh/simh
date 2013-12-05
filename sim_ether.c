@@ -1410,6 +1410,8 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 {
   memset(&dev->host_nic_phy_hw_addr, 0, sizeof(dev->host_nic_phy_hw_addr));
   dev->have_host_nic_phy_addr = 0;
+  if (dev->eth_api != ETH_API_PCAP)
+    return;
 #if defined(_WIN32) || defined(__CYGWIN__)
   if (!pcap_mac_if_win32(devname, dev->host_nic_phy_hw_addr))
     dev->have_host_nic_phy_addr = 1;
@@ -1426,8 +1428,6 @@ static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
         "egrep [0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]:[0-9a-fA-F]?[0-9a-fA-F]",
         NULL};
 
-    if (0 == strncmp("vde:", devname, 4))
-      return;
     memset(command, 0, sizeof(command));
     for (i=0; patterns[i] && (0 == dev->have_host_nic_phy_addr); ++i) {
       snprintf(command, sizeof(command)-1, "ifconfig %s | %s  >NIC.hwaddr", devname, patterns[i]);
@@ -1484,12 +1484,12 @@ ETH_DEV* volatile dev = (ETH_DEV*)arg;
 int status = 0;
 int sched_policy;
 struct sched_param sched_priority;
-#if defined (_WIN32)
-HANDLE hWait = pcap_getevent ((pcap_t*)dev->handle);
-#else
 int sel_ret;
 int do_select = 0;
-int select_fd = 0;
+SOCKET select_fd = 0;
+#if defined (_WIN32)
+HANDLE hWait = (dev->eth_api == ETH_API_PCAP) ? pcap_getevent ((pcap_t*)dev->handle) : NULL;
+#endif
 
 switch (dev->eth_api) {
   case ETH_API_PCAP:
@@ -1500,11 +1500,11 @@ switch (dev->eth_api) {
     break;
   case ETH_API_TAP:
   case ETH_API_VDE:
+  case ETH_API_UDP:
     do_select = 1;
     select_fd = dev->fd_handle;
     break;
   }
-#endif
 
 sim_debug(dev->dbit, dev->dptr, "Reader Thread Starting\n");
 
@@ -1515,26 +1515,31 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
-while (dev->handle) {
+while (dev->fd_handle) {
 #if defined (_WIN32)
-  if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250)) {
-#else
-  fd_set setl;
-  struct timeval timeout;
-
-  if (do_select) {
-    FD_ZERO(&setl);
-    FD_SET(select_fd, &setl);
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 250*1000;
-    sel_ret = select(1+select_fd, &setl, NULL, NULL, &timeout);
+  if (dev->eth_api == ETH_API_PCAP) {
+    if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250))
+      sel_ret = 1;
     }
-  else
-    sel_ret = 1;
-  if (sel_ret < 0 && errno != EINTR) break;
-  if (sel_ret > 0) {
+  if (dev->eth_api == ETH_API_UDP)
 #endif /* _WIN32 */
-    if (!dev->handle)
+  if (1) {
+    fd_set setl;
+    struct timeval timeout;
+
+    if (do_select) {
+      FD_ZERO(&setl);
+      FD_SET(select_fd, &setl);
+      timeout.tv_sec = 0;
+      timeout.tv_usec = 250*1000;
+      sel_ret = select(1+select_fd, &setl, NULL, NULL, &timeout);
+      }
+    else
+      sel_ret = 1;
+    if (sel_ret < 0 && errno != EINTR) break;
+    }
+  if (sel_ret > 0) {
+    if (!dev->fd_handle)
       break;
     /* dispatch read request queue available packets */
     switch (dev->eth_api) {
@@ -1579,6 +1584,23 @@ while (dev->handle) {
           }
         break;
 #endif /* USE_VDE_NETWORK */
+      case ETH_API_UDP:
+        if (1) {
+          struct pcap_pkthdr header;
+          int len;
+          u_char buf[ETH_MAX_JUMBO_FRAME];
+
+          memset(&header, 0, sizeof(header));
+          len = (int)sim_read_sock (select_fd, (char *)buf, (int32)sizeof(buf));
+          if (len > 0) {
+            status = 1;
+            header.caplen = header.len = len;
+            _eth_callback((u_char *)dev, &header, buf);
+            }
+          else
+            status = 0;
+          }
+        break;
       }
     if ((status > 0) && (dev->asynch_io)) {
       int wakeup_needed;
@@ -1616,7 +1638,7 @@ pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 
 pthread_mutex_lock (&dev->writer_lock);
-while (dev->handle) {
+while (dev->fd_handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
   while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
@@ -1819,17 +1841,48 @@ else
       }
 #else
     strncpy(errbuf, "No support for vde: network devices", sizeof(errbuf)-1);
-#endif /* !defined(__linux) && !defined(USE_BSDTUNTAP) */
+#endif /* defined(USE_VDE_NETWORK) */
     }
   else {
-    dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-    if (!dev->handle) { /* can't open device */
-      msg = "Eth: pcap_open_live error - %s\r\n";
-      printf (msg, errbuf);
-      if (sim_log) fprintf (sim_log, msg, errbuf);
-      return SCPE_OPENERR;
+    if (0 == strncmp("udp:", savname, 4)) {
+      char localport[CBUFSIZE], host[CBUFSIZE], port[CBUFSIZE];
+      char hostport[2*CBUFSIZE];
+
+      if (!strcmp(savname, "udp:sourceport:remotehost:remoteport")) {
+        msg = "Eth: Must specify actual udp host and ports(i.e. udp:1224:somehost.com:2234)\r\n";
+        printf (msg, errbuf);
+        if (sim_log) fprintf (sim_log, msg, errbuf);
+        return SCPE_OPENERR;
+        }
+
+      if (SCPE_OK != sim_parse_addr_ex (savname+4, host, sizeof(host), "localhost", port, sizeof(port), localport, sizeof(localport), NULL))
+        return SCPE_OPENERR;
+
+      if (localport[0] == '\0')
+        strcpy (localport, port);
+      sprintf (hostport, "%s:%s", host, port);
+      if ((SCPE_OK == sim_parse_addr (hostport, NULL, 0, NULL, NULL, 0, NULL, "localhost")) &&
+          (0 == strcmp (localport, port))) {
+        msg = "Eth: Must specify different udp localhost ports\r\n";
+        printf (msg, errbuf);
+        if (sim_log) fprintf (sim_log, msg, errbuf);
+        return SCPE_OPENERR;
+        }
+      dev->fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, TRUE);
+      if (INVALID_SOCKET == dev->fd_handle)
+          return SCPE_OPENERR;
+      dev->eth_api = ETH_API_UDP;
       }
-    dev->eth_api = ETH_API_PCAP;
+    else {
+      dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
+      if (!dev->handle) { /* can't open device */
+        msg = "Eth: pcap_open_live error - %s\r\n";
+        printf (msg, errbuf);
+        if (sim_log) fprintf (sim_log, msg, errbuf);
+        return SCPE_OPENERR;
+        }
+      dev->eth_api = ETH_API_PCAP;
+      }
     }
 if (errbuf[0]) {
   msg = "Eth: open error - %s\r\n";
@@ -1866,7 +1919,8 @@ if (1) {
   pthread_attr_t attr;
 
 #if defined(_WIN32)
-  pcap_setmintocopy (dev->handle, 0);
+  if (dev->eth_api == ETH_API_PCAP)
+    pcap_setmintocopy (dev->handle, 0);
 #endif
   ethq_init (&dev->read_queue, 200);         /* initialize FIFO queue */
   pthread_mutex_init (&dev->lock, NULL);
@@ -1918,7 +1972,7 @@ t_stat eth_close(ETH_DEV* dev)
 {
 char* msg = "Eth: closed %s\r\n";
 pcap_t *pcap;
-int pcap_fd;
+SOCKET pcap_fd;
 
 /* make sure device exists */
 if (!dev) return SCPE_UNATT;
@@ -1963,6 +2017,14 @@ switch (dev->eth_api) {
 #endif
 #ifdef USE_VDE_NETWORK
   case ETH_API_VDE:
+    vde_close((VDECONN*)pcap);
+    break;
+#endif
+  case ETH_API_UDP:
+    sim_close_sock(pcap_fd, TRUE);
+    break;
+#ifdef USE_SLIRP_NETWORK
+  case ETH_API_NAT:
     vde_close((VDECONN*)pcap);
     break;
 #endif
@@ -2178,6 +2240,9 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
           status = 1;
       break;
 #endif
+    case ETH_API_UDP:
+      status = (((int32)packet->len == sim_write_sock (dev->fd_handle, (char *)packet->msg, (int32)packet->len)) ? 0 : -1);
+      break;
     }
   ++dev->packets_sent;              /* basic bookkeeping */
   /* On error, correct loopback bookkeeping */
@@ -2721,6 +2786,7 @@ switch (dev->eth_api) {
 #endif /* USE_BPF */
   case ETH_API_TAP:
   case ETH_API_VDE:
+  case ETH_API_UDP:
     bpf_used = 0;
     to_me = 0;
     eth_packet_trace (dev, data, header->len, "received");
@@ -2902,6 +2968,23 @@ do {
         }
       break;
 #endif /* USE_VDE_NETWORK */
+    case ETH_API_UDP:
+      if (1) {
+        struct pcap_pkthdr header;
+        int len;
+        u_char buf[ETH_MAX_JUMBO_FRAME];
+
+        memset(&header, 0, sizeof(header));
+        len = (int)sim_read_sock (dev->fd_handle, buf, (int32)sizeof(buf));
+        if (len > 0) {
+          status = 1;
+          header.caplen = header.len = len;
+          _eth_callback((u_char *)dev, &header, buf);
+          }
+        else
+          status = 0;
+        }
+      break;
     }
   } while ((status) && (0 == packet->len));
 
@@ -3221,6 +3304,20 @@ if (used < max) {
 if (used < max) {
   sprintf(list[used].name, "%s", "vde:device");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
+  ++used;
+  }
+#endif
+
+if (used < max) {
+  sprintf(list[used].name, "%s", "udp:sourceport:remotehost:remoteport");
+  sprintf(list[used].desc, "%s", "Integrated UDP bridge support");
+  ++used;
+  }
+
+#ifdef USE_SLIRP_NETWORK
+if (used < max) {
+  sprintf(list[used].name, "%s", "nat:device");
+  sprintf(list[used].desc, "%s", "Integrated User Mode NAT support");
   ++used;
   }
 #endif

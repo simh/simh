@@ -67,6 +67,7 @@
 #define SIM_ETHER_H
 
 #include "sim_defs.h"
+#include "sim_sock.h"
 
 /* make common BSD code a bit easier to read in this file */
 /* OS/X seems to define and compile using one of these BSD types */
@@ -212,11 +213,13 @@ typedef struct eth_item ETH_ITEM;
 struct eth_device {
   char*         name;                                   /* name of ethernet device */
   void*         handle;                                 /* handle of implementation-specific device */
-  int           fd_handle;                              /* fd to kernel device (where needed) */
+  SOCKET        fd_handle;                              /* fd to kernel device (where needed) */
   int           eth_api;                                /* Designator for which API is being used to move packets */
 #define ETH_API_PCAP 0                                  /* Pcap API in use */
 #define ETH_API_TAP  1                                  /* tun/tap API in use */
 #define ETH_API_VDE  2                                  /* VDE API in use */
+#define ETH_API_UDP  3                                  /* UDP API in use */
+#define ETH_API_NAT  4                                  /* NAT (SLiRP) API in use */
   ETH_PCALLBACK read_callback;                          /* read callback function */
   ETH_PCALLBACK write_callback;                         /* write callback function */
   ETH_PACK*     read_packet;                            /* read packet */
