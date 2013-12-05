@@ -612,25 +612,73 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define RA80_MED        0x25641050
 #define RA80_FLGS       RQDF_SDI
 
+// [RLA]   Most of these RA70 parameters came from doing a DUSTAT on a real
+// [RLA] RA70 drive.  The remainder are just educated guesses...
+#define RA70_DTYPE      20              /* SDI drive */
+#define RA70_SECT       33              /* +1 spare/track */
+#define RA70_SURF       11              /* tracks/cylinder */
+#define RA70_CYL        1507            /* 0-1506 user */
+#define RA70_TPG        RA70_SURF
+#define RA70_GPC        1
+#define RA70_XBN        0               /* ??? */
+#define RA70_DBN        0               /* ??? */
+#define RA70_LBN        547041          /* 33*11*1507 */
+#define RA70_RCTS       198             /* Size of the RCT */
+#define RA70_RCTC       7               /* Number of RCT copies */
+#define RA70_RBN        16577           /* 1*11*1507 */
+#define RA70_MOD        0               /* ??? */
+#define RA70_MED        0x25641046      /* RA70 MEDIA ID */
+#define RA70_FLGS       RQDF_SDI
+
+// [RLA] Likewise for the RA73 ...
+#define RA73_DTYPE      21              /* SDI drive */
+#define RA73_SECT       70              /* +1 spare/track */
+#define RA73_SURF       21              /* tracks/cylinder */
+#define RA73_CYL        2667            /* 0-2666 user */
+#define RA73_TPG        RA73_SURF
+#define RA73_GPC        1
+#define RA73_XBN        0               /* ??? */
+#define RA73_DBN        0               /* ??? */
+#define RA73_LBN        3920490         /* 70*21*2667 */
+#define RA73_RCTS       198             /* Size of the RCT ??????*/
+#define RA73_RCTC       7               /* Number of RCT copies */
+#define RA73_RBN        56007           /* 1*21*2667 */
+#define RA73_MOD        0               /* ??? */
+#define RA73_MED        0x25641049      /* RA73 MEDIA ID */
+#define RA73_FLGS       RQDF_SDI
+
 /* Controller parameters */
 
 #define DEFAULT_CTYPE   0
 
-#define KLESI_CTYPE     1
+// [RLA] THis should be checked - I think the KLESI UQPM/MODEL should be 3!
+// AFAIK the UNIBUS KLESI and QBUS KLESI used the same controller type ...
+#define KLESI_CTYPE     1               // RC25 controller (UNIBUS and QBUS both)
 #define KLESI_UQPM      1
 #define KLESI_MODEL     1
 
-#define RUX50_CTYPE     2
+// [RLA] This should be checked - I think the RUX50 UQPM/MODEL should be 10!
+#define RUX50_CTYPE     2               // UNIBUS RX50-only controller
 #define RUX50_UQPM      2
 #define RUX50_MODEL     2
 
-#define UDA50_CTYPE     3
+#define UDA50_CTYPE     3               // UNIBUS SDI (RAxx) controller
 #define UDA50_UQPM      6
 #define UDA50_MODEL     6
 
-#define RQDX3_CTYPE     4
+#define RQDX3_CTYPE     4               // QBUS RX50/RDxx controller
 #define RQDX3_UQPM      19
 #define RQDX3_MODEL     19
+
+#define KDA50_CTYPE     5               // QBUS SDI (RAxx) controller
+#define KDA50_UQPM      13
+#define KDA50_MODEL     13
+
+//   There was actually a UNIBUS RRD50 controller too, but I don't know if it
+// used the same MSCP type as the QBUS version or not...
+#define KRQ50_CTYPE     6               // QBUS RRD40/50 CDROM controller
+#define KRQ50_UQPM      16
+#define KRQ50_MODEL     16
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -678,6 +726,8 @@ static struct drvtyp drv_tab[] = {
     { RQ_DRV (RC25), "RC25" },
     { RQ_DRV (RCF25), "RCF25" },
     { RQ_DRV (RA80), "RA80" },
+    { RQ_DRV (RA70), "RA70" },
+    { RQ_DRV (RA73), "RA73" },
     { 0 }
     };
 
@@ -696,6 +746,8 @@ static struct ctlrtyp ctlr_tab[] = {
     { RQ_CTLR (RUX50), "RUX50" },
     { RQ_CTLR (UDA50), "UDA50" },
     { RQ_CTLR (RQDX3), "RQDX3" },
+    { RQ_CTLR (KDA50), "KDA50" },
+    { RQ_CTLR (KRQ50), "KRQ50" },
     { 0 }
     };
 
@@ -934,13 +986,17 @@ MTAB rq_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_NMO, RQ_SH_ALL, "ALL", NULL,
       NULL, &rq_show_ctrl, NULL, "Display complete controller state" },
     { MTAB_XTD|MTAB_VDV, RQDX3_CTYPE, NULL, "RQDX3",
-      &rq_set_ctype, NULL, NULL, "Set RQDX3 Controller Type" },
+      &rq_set_ctype, NULL, NULL, "Set RQDX3 (QBUS RX50/RDnn) Controller Type" },
     { MTAB_XTD|MTAB_VDV, UDA50_CTYPE, NULL, "UDA50",
-      &rq_set_ctype, NULL, NULL, "Set UDA50 Controller Type" },
+      &rq_set_ctype, NULL, NULL, "Set UDA50 (UNIBUS SDI RAnn) Controller Type" },
+    { MTAB_XTD|MTAB_VDV, KDA50_CTYPE, NULL, "KDA50",
+      &rq_set_ctype, NULL, NULL, "Set KDA50 (QBUS SDI RAnn) Controller Type" },
+    { MTAB_XTD|MTAB_VDV, KRQ50_CTYPE, NULL, "KRQ50",
+      &rq_set_ctype, NULL, NULL, "Set KRQ50 (CDROM) Controller Type" },
     { MTAB_XTD|MTAB_VDV, KLESI_CTYPE, NULL, "KLESI",
-      &rq_set_ctype, NULL, NULL, "Set KLESI Controller Type"  },
+      &rq_set_ctype, NULL, NULL, "Set KLESI (RC25) Controller Type"  },
     { MTAB_XTD|MTAB_VDV, RUX50_CTYPE, NULL, "RUX50",
-      &rq_set_ctype, NULL, NULL, "Set RUX50 Controller Type" },
+      &rq_set_ctype, NULL, NULL, "Set RUX50 (UNIBUS RX50) Controller Type" },
     { MTAB_XTD|MTAB_VUN|MTAB_NMO, 0, "UNITQ", NULL,
       NULL, &rq_show_unitq, NULL, "Display unit queue" },
     { MTAB_XTD|MTAB_VUN, RX50_DTYPE, NULL, "RX50",
@@ -969,10 +1025,14 @@ MTAB rq_mod[] = {
       &rq_set_type, NULL, NULL, "Set RRD40 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RRD40_DTYPE, NULL, "CDROM",
       &rq_set_type, NULL, NULL, "Set CDROM Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RA70_DTYPE, NULL, "RA70",
+      &rq_set_type, NULL, NULL, "Set RA70 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RA71_DTYPE, NULL, "RA71",
       &rq_set_type, NULL, NULL, "Set RA71 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RA72_DTYPE, NULL, "RA72",
       &rq_set_type, NULL, NULL, "Set RA72 Disk Type" },
+    { MTAB_XTD|MTAB_VUN, RA73_DTYPE, NULL, "RA73",
+      &rq_set_type, NULL, NULL, "Set RA73 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RA90_DTYPE, NULL, "RA90",
       &rq_set_type, NULL, NULL, "Set RA90 Disk Type" },
     { MTAB_XTD|MTAB_VUN, RA92_DTYPE, NULL, "RA92",
@@ -3089,9 +3149,9 @@ fprintf (st, "UDA50 MSCP Disk Controller (%s)\n\n", dptr->name);
 fprintf (st, "The simulator implements four MSCP disk controllers, RQ, RQB, RQC, RQD.\n");
 fprintf (st, "Initially, RQB, RQC, and RQD are disabled.  Each RQ controller simulates\n");
 fprintf (st, "an MSCP disk controller with four drives.  The MSCP controller type can be\n");
-fprintf (st, "specified as one of RQDX3, UDA50, KLESI or RUX50.  RQ options include the\n");
-fprintf (st, "ability to set units write enabled or write locked, and to set the drive\n");
-fprintf (st, "type to one of many disk types:\n");
+fprintf (st, "specified as one of RQDX3, UDA50, KDA50, KRQ50, KLESI or RUX50.  RQ options\n");
+fprintf (st, "include the ability to set units write enabled or write locked, and to set\n");
+fprintf (st, "the drive type to one of many disk types:\n");
 fprint_set_help (st, dptr);
 fprintf (st, "set RQn RAUSER{=n}        Set disk type to RA82 with n MB's\n");
 fprintf (st, "set -L RQn RAUSER{=n}     Set disk type to RA82 with n LBN's\n\n");
