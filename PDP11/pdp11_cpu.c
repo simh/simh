@@ -25,6 +25,7 @@
 
    cpu          PDP-11 CPU
 
+   05-Dec-13    RMS     Fixed bug in CSM (John Dundas)
    23-Oct-13    RMS     Fixed PS behavior on initialization and boot
    10-Apr-13    RMS     MMR1 does not track PC changes (Johnny Billquist)
    29-Apr-12    RMS     Fixed compiler warning (Mark Pizzolato)
@@ -1298,7 +1299,7 @@ while (reason == 0)  {
             break;
 
         case 070:                                       /* CSM */
-            if ((CPUT (HAS_CSM) && (MMR3 & MMR3_CSM)) || (cm != MD_KER)) {
+            if (CPUT (HAS_CSM) && (MMR3 & MMR3_CSM) && (cm != MD_KER)) {
                 dst = dstreg? R[dstspec]: ReadW (GeteaW (dstspec));
                 PSW = get_PSW () & ~PSW_CC;             /* PSW, cc = 0 */
                 STACKFILE[cm] = SP;
