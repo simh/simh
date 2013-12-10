@@ -651,13 +651,11 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 
 #define DEFAULT_CTYPE   0
 
-// [RLA] THis should be checked - I think the KLESI UQPM/MODEL should be 3!
 // AFAIK the UNIBUS KLESI and QBUS KLESI used the same controller type ...
 #define KLESI_CTYPE     1               // RC25 controller (UNIBUS and QBUS both)
 #define KLESI_UQPM      1
 #define KLESI_MODEL     1
 
-// [RLA] This should be checked - I think the RUX50 UQPM/MODEL should be 10!
 #define RUX50_CTYPE     2               // UNIBUS RX50-only controller
 #define RUX50_UQPM      2
 #define RUX50_MODEL     2
@@ -674,11 +672,13 @@ x  RA73 70(+1)  21      2667+   21      1       ?       3920490
 #define KDA50_UQPM      13
 #define KDA50_MODEL     13
 
-//   There was actually a UNIBUS RRD50 controller too, but I don't know if it
-// used the same MSCP type as the QBUS version or not...
 #define KRQ50_CTYPE     6               // QBUS RRD40/50 CDROM controller
 #define KRQ50_UQPM      16
 #define KRQ50_MODEL     16
+
+#define KRU50_CTYPE     7               // UNIBUS RRD40/50 CDROM controller
+#define KRU50_UQPM      26
+#define KRU50_MODEL     26
 
 struct drvtyp {
     int32       sect;                                   /* sectors */
@@ -748,6 +748,7 @@ static struct ctlrtyp ctlr_tab[] = {
     { RQ_CTLR (RQDX3), "RQDX3" },
     { RQ_CTLR (KDA50), "KDA50" },
     { RQ_CTLR (KRQ50), "KRQ50" },
+    { RQ_CTLR (KRU50), "KRU50" },
     { 0 }
     };
 
@@ -992,7 +993,9 @@ MTAB rq_mod[] = {
     { MTAB_XTD|MTAB_VDV, KDA50_CTYPE, NULL, "KDA50",
       &rq_set_ctype, NULL, NULL, "Set KDA50 (QBUS SDI RAnn) Controller Type" },
     { MTAB_XTD|MTAB_VDV, KRQ50_CTYPE, NULL, "KRQ50",
-      &rq_set_ctype, NULL, NULL, "Set KRQ50 (CDROM) Controller Type" },
+      &rq_set_ctype, NULL, NULL, "Set KRQ50 (QBUS CDROM) Controller Type" },
+    { MTAB_XTD|MTAB_VDV, KRU50_CTYPE, NULL, "KRU50",
+      &rq_set_ctype, NULL, NULL, "Set KRU50 (UNIBUS CDROM) Controller Type" },
     { MTAB_XTD|MTAB_VDV, KLESI_CTYPE, NULL, "KLESI",
       &rq_set_ctype, NULL, NULL, "Set KLESI (RC25) Controller Type"  },
     { MTAB_XTD|MTAB_VDV, RUX50_CTYPE, NULL, "RUX50",
