@@ -1515,7 +1515,7 @@ pthread_getschedparam (pthread_self(), &sched_policy, &sched_priority);
 ++sched_priority.sched_priority;
 pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 
-while (dev->fd_handle) {
+while (dev->handle) {
 #if defined (_WIN32)
   if (dev->eth_api == ETH_API_PCAP) {
     if (WAIT_OBJECT_0 == WaitForSingleObject (hWait, 250))
@@ -1539,7 +1539,7 @@ while (dev->fd_handle) {
     if (sel_ret < 0 && errno != EINTR) break;
     }
   if (sel_ret > 0) {
-    if (!dev->fd_handle)
+    if (!dev->handle)
       break;
     /* dispatch read request queue available packets */
     switch (dev->eth_api) {
@@ -1638,7 +1638,7 @@ pthread_setschedparam (pthread_self(), sched_policy, &sched_priority);
 sim_debug(dev->dbit, dev->dptr, "Writer Thread Starting\n");
 
 pthread_mutex_lock (&dev->writer_lock);
-while (dev->fd_handle) {
+while (dev->handle) {
   pthread_cond_wait (&dev->writer_cond, &dev->writer_lock);
   while (NULL != (request = dev->write_requests)) {
     /* Pull buffer off request list */
@@ -1872,6 +1872,7 @@ else
       if (INVALID_SOCKET == dev->fd_handle)
           return SCPE_OPENERR;
       dev->eth_api = ETH_API_UDP;
+      dev->handle = (void *)1;  /* Flag used to indicated open */
       }
     else {
       dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
