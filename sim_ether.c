@@ -134,14 +134,14 @@
                       on the libpcap/kernel packet timeout specified on 
                       pcap_open_live.  If USE_READER_THREAD is not set, then 
                       MUST_DO_SELECT is irrelevant
-  USE_TAP_NETWORK   - Specifies that support for tap networking should be 
+  HAVE_TAP_NETWORK  - Specifies that support for tap networking should be 
                       included.  This can be leveraged, along with OS bridging
                       capabilities to share a single LAN interface.  This 
                       allows device names of the form tap:tap0 to be specified
                       at open time.  This functionality is only useful/needed 
                       on *nix platforms since native sharing of Windows NIC 
                       devices works with no external magic.
-  USE_VDE_NETWORK   - Specifies that support for vde networking should be 
+  HAVE_VDE_NETWORK  - Specifies that support for vde networking should be 
                       included.  This can be leveraged, along with OS bridging
                       capabilities to share a single LAN interface.  It also
                       can allow a simulator to have useful networking 
@@ -667,7 +667,6 @@ void eth_zero(ETH_DEV* dev)
 static ETH_DEV **eth_open_devices = NULL;
 static int eth_open_device_count = 0;
 
-#if defined (USE_NETWORK) || defined (USE_SHARED)
 static void _eth_add_to_open_list (ETH_DEV* dev)
 {
 eth_open_devices = (ETH_DEV**)realloc(eth_open_devices, (eth_open_device_count+1)*sizeof(*eth_open_devices));
@@ -686,7 +685,6 @@ for (i=0; i<eth_open_device_count; ++i)
         break;
         }
 }
-#endif
 
 t_stat eth_show (FILE* st, UNIT* uptr, int32 val, void* desc)
 {
@@ -842,6 +840,8 @@ ethq_insert_data(que, type, pack->oversize ? pack->oversize : pack->msg, pack->u
 /*============================================================================*/
 
 #if !defined (USE_NETWORK) && !defined (USE_SHARED)
+const char *eth_capabilities(void)
+    {return "no Ethernet";}
 t_stat eth_open(ETH_DEV* dev, char* name, DEVICE* dptr, uint32 dbit)
   {return SCPE_NOFNC;}
 t_stat eth_close (ETH_DEV* dev)
@@ -875,6 +875,22 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
   {}
 #else    /* endif unimplemented */
 
+const char *eth_capabilities(void)
+ {
+ return "Ethernet Packet transport"
+#if defined (HAVE_PCAP_NETWORK)
+     ":PCAP"
+#endif
+#if defined (HAVE_TAP_NETWORK)
+     ":TAP"
+#endif
+#if defined (HAVE_VDE_NETWORK)
+     ":VDE"
+#endif
+     ":UDP";
+ }
+
+#if defined (HAVE_PCAP_NETWORK)
 /*============================================================================*/
 /*      WIN32, Linux, and xBSD routines use WinPcap and libpcap packages      */
 /*        OpenVMS Alpha uses a WinPcap port and an associated execlet         */
@@ -887,24 +903,33 @@ void eth_show_dev (FILE* st, ETH_DEV* dev)
 
 #include <pcap.h>
 #include <string.h>
+#else
+struct pcap_pkthdr {
+    uint32 caplen;  /* length of portion present */
+    uint32 len;     /* length this packet (off wire) */
+};
+#define PCAP_ERRBUF_SIZE 256
+typedef void * pcap_t;  /* Pseudo Type to avoid compiler errors */
+#define DLT_EN10MB 1    /* Dummy Value to avoid compiler errors */
+#endif /* HAVE_PCAP_NETWORK */
 
-#ifdef USE_TAP_NETWORK
+#ifdef HAVE_TAP_NETWORK
 #if defined(__linux) || defined(__linux__)
 #include <sys/ioctl.h> 
 #include <net/if.h> 
 #include <linux/if_tun.h> 
-#elif defined(USE_BSDTUNTAP)
+#elif defined(HAVE_BSDTUNTAP)
 #include <sys/types.h>
 #include <net/if_types.h>
 #include <net/if.h>
 #else /* We don't know how to do this on the current platform */
-#undef USE_TAP_NETWORK
+#undef HAVE_TAP_NETWORK
 #endif
-#endif /* USE_TAP_NETWORK */
+#endif /* HAVE_TAP_NETWORK */
 
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
 #include <libvdeplug.h>
-#endif /* USE_VDE_NETWORK */
+#endif /* HAVE_VDE_NETWORK */
 
 /* Allows windows to look up user-defined adapter names */
 #if defined(_WIN32)
@@ -1404,7 +1429,7 @@ static int pcap_mac_if_vms(char *AdapterName, unsigned char MACAddress[6])
       return -1;
   return 0;
 }
-#endif
+#endif /* defined (__VMS) && !defined(__VAX) */
 
 static void eth_get_nic_hw_addr(ETH_DEV* dev, char *devname)
 {
@@ -1493,9 +1518,11 @@ HANDLE hWait = (dev->eth_api == ETH_API_PCAP) ? pcap_getevent ((pcap_t*)dev->han
 
 switch (dev->eth_api) {
   case ETH_API_PCAP:
+#if defined (HAVE_PCAP_NETWORK)
 #if defined (MUST_DO_SELECT)
     do_select = 1;
     select_fd = pcap_get_selectable_fd((pcap_t *)dev->handle);
+#endif
 #endif
     break;
   case ETH_API_TAP:
@@ -1543,10 +1570,12 @@ while (dev->handle) {
       break;
     /* dispatch read request queue available packets */
     switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
       case ETH_API_PCAP:
         status = pcap_dispatch ((pcap_t*)dev->handle, -1, &_eth_callback, (u_char*)dev);
         break;
-#ifdef USE_TAP_NETWORK
+#endif
+#ifdef HAVE_TAP_NETWORK
       case ETH_API_TAP:
         if (1) {
           struct pcap_pkthdr header;
@@ -1564,8 +1593,8 @@ while (dev->handle) {
             status = 0;
           }
         break;
-#endif /* USE_TAP_NETWORK */
-#ifdef USE_VDE_NETWORK
+#endif /* HAVE_TAP_NETWORK */
+#ifdef HAVE_VDE_NETWORK
       case ETH_API_VDE:
         if (1) {
           struct pcap_pkthdr header;
@@ -1583,7 +1612,7 @@ while (dev->handle) {
             status = 0;
           }
         break;
-#endif /* USE_VDE_NETWORK */
+#endif /* HAVE_VDE_NETWORK */
       case ETH_API_UDP:
         if (1) {
           struct pcap_pkthdr header;
@@ -1740,7 +1769,7 @@ if (0 == strncmp("tap:", savname, 4)) {
   int  tun = -1;    /* TUN/TAP Socket */
   int  on = 1;
 
-#if defined(USE_TAP_NETWORK)
+#if defined(HAVE_TAP_NETWORK)
   if (!strcmp(savname, "tap:tapN")) {
     msg = "Eth: Must specify actual tap device name (i.e. tap:tap0)\r\n";
     printf (msg, errbuf);
@@ -1748,7 +1777,7 @@ if (0 == strncmp("tap:", savname, 4)) {
     return SCPE_OPENERR;
     }
 #endif
-#if (defined(__linux) || defined(__linux__)) && defined(USE_TAP_NETWORK)
+#if (defined(__linux) || defined(__linux__)) && defined(HAVE_TAP_NETWORK)
   if ((tun = open("/dev/net/tun", O_RDWR)) >= 0) {
     struct ifreq ifr; /* Interface Requests */
 
@@ -1773,7 +1802,7 @@ if (0 == strncmp("tap:", savname, 4)) {
     }
   else
     strncpy(errbuf, strerror(errno), sizeof(errbuf)-1);
-#elif defined(USE_BSDTUNTAP) && defined(USE_TAP_NETWORK)
+#elif defined(HAVE_BSDTUNTAP) && defined(HAVE_TAP_NETWORK)
   if (1) {
     char dev_name[64] = "";
 
@@ -1815,7 +1844,7 @@ if (0 == strncmp("tap:", savname, 4)) {
   }
 #else
   strncpy(errbuf, "No support for tap: devices", sizeof(errbuf)-1);
-#endif /* !defined(__linux) && !defined(USE_BSDTUNTAP) */
+#endif /* !defined(__linux) && !defined(HAVE_BSDTUNTAP) */
   if (0 == errbuf[0]) {
     dev->eth_api = ETH_API_TAP;
     dev->handle = (void *)1;  /* Flag used to indicated open */
@@ -1823,7 +1852,7 @@ if (0 == strncmp("tap:", savname, 4)) {
   }
 else
   if (0 == strncmp("vde:", savname, 4)) {
-#if defined(USE_VDE_NETWORK)
+#if defined(HAVE_VDE_NETWORK)
     struct vde_open_args voa;
 
     memset(&voa, 0, sizeof(voa));
@@ -1841,7 +1870,7 @@ else
       }
 #else
     strncpy(errbuf, "No support for vde: network devices", sizeof(errbuf)-1);
-#endif /* defined(USE_VDE_NETWORK) */
+#endif /* defined(HAVE_VDE_NETWORK) */
     }
   else {
     if (0 == strncmp("udp:", savname, 4)) {
@@ -1875,6 +1904,7 @@ else
       dev->handle = (void *)1;  /* Flag used to indicated open */
       }
     else {
+#if defined(HAVE_PCAP_NETWORK)
       dev->handle = (void*) pcap_open_live(savname, bufsz, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
       if (!dev->handle) { /* can't open device */
         msg = "Eth: pcap_open_live error - %s\r\n";
@@ -1883,6 +1913,9 @@ else
         return SCPE_OPENERR;
         }
       dev->eth_api = ETH_API_PCAP;
+#else
+      strncpy (errbuf, "Unknown or unsupported network device", sizeof(errbuf)-1);
+#endif
       }
     }
 if (errbuf[0]) {
@@ -1906,7 +1939,7 @@ strcpy(dev->name, savname);
 dev->dptr = dptr;
 dev->dbit = dbit;
 
-#if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__)
+#if !defined(HAS_PCAP_SENDPACKET) && defined (xBSD) && !defined (__APPLE__) && defined (HAVE_PCAP_NETWORK)
 /* Tell the kernel that the header is fully-formed when it gets it.
    This is required in order to fake the src address. */
 if (dev->eth_api == ETH_API_PCAP) {
@@ -2008,15 +2041,17 @@ ethq_destroy (&dev->read_queue);         /* release FIFO queue */
 #endif
 
 switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
   case ETH_API_PCAP:
     pcap_close(pcap);
     break;
-#ifdef USE_TAP_NETWORK
+#endif
+#ifdef HAVE_TAP_NETWORK
   case ETH_API_TAP:
     close(pcap_fd);
     break;
 #endif
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
   case ETH_API_VDE:
     vde_close((VDECONN*)pcap);
     break;
@@ -2221,15 +2256,17 @@ if ((packet->len >= ETH_MIN_PACKET) && (packet->len <= ETH_MAX_PACKET)) {
 
     /* dispatch write request (synchronous; no need to save write info to dev) */
   switch (dev->eth_api) {
+#ifdef HAVE_PCAP_NETWORK
     case ETH_API_PCAP:
       status = pcap_sendpacket((pcap_t*)dev->handle, (u_char*)packet->msg, packet->len);
       break;
-#ifdef USE_TAP_NETWORK
+#endif
+#ifdef HAVE_TAP_NETWORK
     case ETH_API_TAP:
       status = (((int)packet->len == write(dev->fd_handle, (void *)packet->msg, packet->len)) ? 0 : -1);
       break;
 #endif
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
     case ETH_API_VDE:
       status = vde_send((VDECONN*)dev->handle, (void *)packet->msg, packet->len, 0);
       if ((status == (int)packet->len) || (status == 0))
@@ -2931,7 +2968,7 @@ do {
     case ETH_API_PCAP:
       status = pcap_dispatch((pcap_t*)dev->handle, 1, &_eth_callback, (u_char*)dev);
       break;
-#ifdef USE_TAP_NETWORK
+#ifdef HAVE_TAP_NETWORK
     case ETH_API_TAP:
       if (1) {
         struct pcap_pkthdr header;
@@ -2949,8 +2986,8 @@ do {
           status = 0;
         }
       break;
-#endif /* USE_TAP_NETWORK */
-#ifdef USE_VDE_NETWORK
+#endif /* HAVE_TAP_NETWORK */
+#ifdef HAVE_VDE_NETWORK
     case ETH_API_VDE:
       if (1) {
         struct pcap_pkthdr header;
@@ -2968,7 +3005,7 @@ do {
           status = 0;
         }
       break;
-#endif /* USE_VDE_NETWORK */
+#endif /* HAVE_VDE_NETWORK */
     case ETH_API_UDP:
       if (1) {
         struct pcap_pkthdr header;
@@ -3022,7 +3059,6 @@ t_stat eth_filter_hash(ETH_DEV* dev, int addr_count, ETH_MAC* const addresses,
                        ETH_MULTIHASH* const hash)
 {
 int i;
-bpf_u_int32  bpf_subnet, bpf_netmask;
 char buf[114+66*ETH_FILTER_MAX];
 char errbuf[PCAP_ERRBUF_SIZE];
 char mac[20];
@@ -3167,11 +3203,13 @@ sim_debug(dev->dbit, dev->dptr, "BPF string is: |%s|\n", buf);
 /* get netmask, which is a required argument for compiling.  The value, 
    in our case isn't actually interesting since the filters we generate 
    aren't referencing IP fields, networks or values */
-if ((dev->eth_api == ETH_API_PCAP) && (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0))
-  bpf_netmask = 0;
 
 #ifdef USE_BPF
 if (dev->eth_api == ETH_API_PCAP) {
+  bpf_u_int32  bpf_subnet, bpf_netmask;
+
+  if (pcap_lookupnet(dev->name, &bpf_subnet, &bpf_netmask, errbuf)<0)
+    bpf_netmask = 0;
   /* compile filter string */
   if ((status = pcap_compile(dev->handle, &bpf, buf, 1, bpf_netmask)) < 0) {
     sprintf(errbuf, "%s", pcap_geterr(dev->handle));
@@ -3233,14 +3271,17 @@ return SCPE_OK;
 */
 int eth_host_devices(int used, int max, ETH_LIST* list)
 {
-pcap_t* conn;
-int i, j, datalink;
+pcap_t* conn = NULL;
+int i, j, datalink = 0;
 char errbuf[PCAP_ERRBUF_SIZE];
 
 for (i=0; i<used; ++i) {
   /* Cull any non-ethernet interface types */
+#if defined(HAVE_PCAP_NETWORK)
   conn = pcap_open_live(list[i].name, ETH_MAX_PACKET, ETH_PROMISC, PCAP_READ_TIMEOUT, errbuf);
-  if (NULL != conn) datalink = pcap_datalink(conn), pcap_close(conn);
+  if (NULL != conn)
+    datalink = pcap_datalink(conn), pcap_close(conn);
+#endif
   if ((NULL == conn) || (datalink != DLT_EN10MB)) {
     for (j=i; j<used-1; ++j)
       list[j] = list[j+1];
@@ -3290,7 +3331,7 @@ for (i=0; i<used; i++) {
   } /* for */
 #endif
 
-#ifdef USE_TAP_NETWORK
+#ifdef HAVE_TAP_NETWORK
 if (used < max) {
 #if defined(__OpenBSD__)
   sprintf(list[used].name, "%s", "tap:tunN");
@@ -3301,7 +3342,7 @@ if (used < max) {
   ++used;
   }
 #endif
-#ifdef USE_VDE_NETWORK
+#ifdef HAVE_VDE_NETWORK
 if (used < max) {
   sprintf(list[used].name, "%s", "vde:device");
   sprintf(list[used].desc, "%s", "Integrated VDE support");
@@ -3329,10 +3370,10 @@ return used;
 int eth_devices(int max, ETH_LIST* list)
 {
 int i = 0;
+char errbuf[PCAP_ERRBUF_SIZE];
 #ifndef DONT_USE_PCAP_FINDALLDEVS
 pcap_if_t* alldevs;
 pcap_if_t* dev;
-char errbuf[PCAP_ERRBUF_SIZE];
 
 memset(list, 0, max*sizeof(*list));
 errbuf[0] = '\0';

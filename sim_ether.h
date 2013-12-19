@@ -105,7 +105,7 @@
 #endif /* USE_SETNONBLOCK */
 #undef PCAP_READ_TIMEOUT
 #define PCAP_READ_TIMEOUT 15
-#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__)) || defined (USE_TAP_NETWORK) || defined (USE_VDE_NETWORK)
+#if (!defined (xBSD) && !defined(_WIN32) && !defined(VMS) && !defined(__CYGWIN__)) || defined (HAVE_TAP_NETWORK) || defined (HAVE_VDE_NETWORK)
 #define MUST_DO_SELECT 1
 #endif
 #endif /* USE_READER_THREAD */
@@ -119,13 +119,22 @@
 #undef USE_SHARED
 #endif
 
+/* USE_SHARED implies shared pcap, so force HAVE_PCAP_NETWORK */
+#if defined(USE_SHARED) && !defined(HAVE_PCAP_NETWORK)
+#define HAVE_PCAP_NETWORK 1
+#endif
+
 /*
   USE_BPF is defined to let this code leverage the libpcap/OS kernel provided 
   BPF packet filtering.  This generally will enhance performance.  It may not 
   be available in some environments and/or it may not work correctly, so 
   undefining this will still provide working code here.
 */
+#if defined(HAVE_PCAP_NETWORK)
 #define USE_BPF 1
+#else
+#define DONT_USE_PCAP_FINDALLDEVS 1
+#endif
 
 #if defined (USE_READER_THREAD)
 #include <pthread.h>
@@ -314,5 +323,6 @@ void ethq_insert_data(ETH_QUE* que, int32 type,         /* insert item into FIFO
                   size_t crc_len, const uint8 *crc_data, int32 status);
 t_stat ethq_destroy(ETH_QUE* que);                      /* release FIFO queue */
 
+const char *eth_capabilities(void);
 
 #endif                                                  /* _SIM_ETHER_H */

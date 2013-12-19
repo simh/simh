@@ -512,11 +512,6 @@ static const char *sim_sa64 = "64b addresses";
 #else
 static const char *sim_sa64 = "32b addresses";
 #endif
-#if defined (USE_NETWORK) || defined (USE_SHARED)
-static const char *sim_snet = "Ethernet support";
-#else
-static const char *sim_snet = "no Ethernet";
-#endif
 
 /* Tables and strings */
 
@@ -2825,7 +2820,7 @@ if (flag) {
     fprintf (st, "\n\tSimulator Framework Capabilities:");
     fprintf (st, "\n\t\t%s", sim_si64);
     fprintf (st, "\n\t\t%s", sim_sa64);
-    fprintf (st, "\n\t\t%s", sim_snet);
+    fprintf (st, "\n\t\t%s", eth_capabilities());
     idle_capable = sim_timer_idle_capable (&os_tick_size);
     fprintf (st, "\n\t\tIdle/Throttling support is %savailable", ((idle_capable == 0) ? "NOT " : ""));
     if (sim_disk_vhd_support())
@@ -4068,7 +4063,7 @@ REG *rptr;
 fprintf (sfile, "%s\n%s\n%s\n%s\n%s\n%.0f\n",
     save_vercur,                                        /* [V2.5] save format */
     sim_name,                                           /* sim name */
-    sim_si64, sim_sa64, sim_snet,                       /* [V3.5] options */
+    sim_si64, sim_sa64, eth_capabilities(),             /* [V3.5] options */
     sim_time);                                          /* [V3.2] sim time */
 WRITE_I (sim_rtime);                                    /* [V2.6] sim rel time */
 
@@ -6291,7 +6286,7 @@ UPDATE_SIM_TIME;                                        /* update sim time */
 
 if (sim_clock_queue == QUEUE_LIST_END) {                /* queue empty? */
     sim_interval = noqueue_time = NOQUEUE_WAIT;         /* flag queue empty */
-    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Emptry New Interval = %d\n", sim_interval);
+    sim_debug (SIM_DBG_EVENT, sim_dflt_dev, "Queue Empty New Interval = %d\n", sim_interval);
     return SCPE_OK;
     }
 do {

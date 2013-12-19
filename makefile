@@ -313,30 +313,30 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       OS_CCDEFS += -DHAVE_FNMATCH    
     endif
   endif
-  ifneq (,$(call find_include,SDL2/SDL))
-    ifneq (,$(call find_lib,SDL2))
-      OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
-      OS_LDFLAGS += -lSDL2
-      VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
-      $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
-      ifeq (Darwin,$(OSTYPE))
-        OS_LDFLAGS += -lobjc -framework cocoa
-      endif
-    endif
-  else
-    ifneq (,$(call find_include,SDL/SDL))
-      ifneq (,$(call find_lib,SDL))
-        OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
-        OS_LDFLAGS += -lSDL
-        VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
-        $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
+  ifneq (,$(VIDEO_USEFUL))
+    ifneq (,$(call find_include,SDL2/SDL))
+      ifneq (,$(call find_lib,SDL2))
+        OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL2/SDL))
+        OS_LDFLAGS += -lSDL2
+        VIDEO_FEATURES = - video capabilities provided by libSDL2 (Simple Directmedia Layer)
+        $(info using libSDL2: $(call find_lib,SDL2) $(call find_include,SDL2/SDL))
         ifeq (Darwin,$(OSTYPE))
           OS_LDFLAGS += -lobjc -framework cocoa
         endif
       endif
+    else
+      ifneq (,$(call find_include,SDL/SDL))
+        ifneq (,$(call find_lib,SDL))
+          OS_CCDEFS += -DHAVE_LIBSDL -I$(dir $(call find_include,SDL/SDL))
+          OS_LDFLAGS += -lSDL
+          VIDEO_FEATURES = - video capabilities provided by libSDL (Simple Directmedia Layer)
+          $(info using libSDL: $(call find_lib,SDL) $(call find_include,SDL/SDL))
+          ifeq (Darwin,$(OSTYPE))
+            OS_LDFLAGS += -lobjc -framework cocoa
+          endif
+        endif
+      endif
     endif
-  endif
-  ifneq (,$(VIDEO_USEFUL))
     ifeq (,$(findstring HAVE_LIBSDL,$(OS_CCDEFS)))
       $(info *** Warning ***)
       $(info *** Warning *** The simulator$(BUILD_MULTIPLE) you are building could provide more)
@@ -349,9 +349,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
   endif
   ifneq (,$(NETWORK_USEFUL))
     ifneq (,$(call find_include,pcap))
+      NETWORK_CCDEFS += -DHAVE_PCAP_NETWORK -I$(dir $(call find_include,pcap))
+      NETWORK_LAN_FEATURES += PCAP
       ifneq (,$(call find_lib,$(PCAPLIB)))
         ifneq ($(USE_NETWORK),) # Network support specified on the GNU make command line
-          NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+          NETWORK_CCDEFS += -DUSE_NETWORK
           $(info *** Warning ***)
           $(info *** Warning *** Statically linking against libpcap is provides no measurable)
           $(info *** Warning *** benefits over dynamically linking libpcap.)
@@ -368,26 +370,20 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
           NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
         else # default build uses dynamic libpcap
-          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
+          NETWORK_CCDEFS += -DUSE_SHARED
           $(info using libpcap: $(call find_include,pcap))
           NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
         endif
       else
+        LIBEXTSAVE := $(LIBEXT)
+        LIBEXT = a
         ifneq (,$(call find_lib,$(PCAPLIB)))
-          NETWORK_CCDEFS = -DUSE_SHARED -I$(dir $(call find_include,pcap))
-          NETWORK_FEATURES = - dynamic networking support using $(OSNAME) provided libpcap components
-          $(info using libpcap: $(call find_include,pcap))
-        else
-          LIBEXTSAVE := $(LIBEXT)
-          LIBEXT = a
-          ifneq (,$(call find_lib,$(PCAPLIB)))
-            NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
-            NETWORK_LDFLAGS := -L$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
-            NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
-            $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
-          endif
-          LIBEXT = $(LIBEXTSAVE)        
+          NETWORK_CCDEFS += -DUSE_NETWORK
+          NETWORK_LDFLAGS := -L$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
+          NETWORK_FEATURES = - static networking support using $(OSNAME) provided libpcap components
+          $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
         endif
+        LIBEXT = $(LIBEXTSAVE)        
       endif
     else
       # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
@@ -405,11 +401,11 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           ifneq (,$(call find_lib,$(PCAPLIB)))
             $(info using libpcap: $(call find_lib,$(PCAPLIB)) $(call find_include,pcap))
             ifeq (cygwin,$(OSTYPE))
-              NETWORK_CCDEFS = -DUSE_NETWORK -I$(dir $(call find_include,pcap))
+              NETWORK_CCDEFS = -DUSE_NETWORK -DHAVE_PCAP_NETWORK -I$(dir $(call find_include,pcap))
               NETWORK_LDFLAGS = -L$(dir $(call find_lib,$(PCAPLIB))) -Wl,-R,$(dir $(call find_lib,$(PCAPLIB))) -l$(PCAPLIB)
               NETWORK_FEATURES = - static networking support using libpcap components located in the cygwin directories
             else
-              NETWORK_CCDEFS := -DUSE_NETWORK -isystem -I$(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
+              NETWORK_CCDEFS := -DUSE_NETWORK -DHAVE_PCAP_NETWORK -isystem -I$(dir $(call find_include,pcap)) $(call find_lib,$(PCAPLIB))
               NETWORK_FEATURES = - networking support using libpcap components from www.tcpdump.org
               $(info *** Warning ***)
               $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) being built with networking support using)
@@ -426,56 +422,79 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
           else
             $(error using libpcap: $(call find_include,pcap) missing $(PCAPLIB).$(LIBEXT))
           endif
+          NETWORK_LAN_FEATURES += PCAP
         endif
         LIBEXT = $(LIBEXTSAVE)
+      else
+        $(info *** Warning ***)
+        $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT)
+        $(info *** Warning *** libpcap networking support)
+        $(info *** Warning ***)
+        $(info *** Warning *** To build simulator(s) with libpcap networking support you)
+        $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
+        $(info *** Warning *** regarding the needed libpcap development components for your)
+        $(info *** Warning *** $(OSTYPE) platform)
+        $(info *** Warning ***)
       endif
     endif
-    ifneq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
-      # Given we have libpcap components, consider other network connections as well
-      ifneq (,$(call find_lib,vdeplug))
-        # libvdeplug requires the use of the OS provided libpcap
-        ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
-          ifneq (,$(call find_include,libvdeplug))
-            # Provide support for vde networking
-            NETWORK_CCDEFS += -DUSE_VDE_NETWORK
-            ifeq (Darwin,$(OSTYPE))
-              NETWORK_LDFLAGS += -lvdeplug -L$(dir $(call find_lib,vdeplug))
-            else
-              NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
-            endif
-            $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
+    # Consider other network connections
+    ifneq (,$(call find_lib,vdeplug))
+      # libvdeplug requires the use of the OS provided libpcap
+      ifeq (,$(findstring usr/local,$(NETWORK_CCDEFS)))
+        ifneq (,$(call find_include,libvdeplug))
+          # Provide support for vde networking
+          NETWORK_CCDEFS += -DHAVE_VDE_NETWORK
+          NETWORK_LAN_FEATURES += VDE
+          ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+            NETWORK_CCDEFS += -DUSE_NETWORK
           endif
+          ifeq (Darwin,$(OSTYPE))
+            NETWORK_LDFLAGS += -lvdeplug -L$(dir $(call find_lib,vdeplug))
+          else
+            NETWORK_LDFLAGS += -lvdeplug -Wl,-R,$(dir $(call find_lib,vdeplug)) -L$(dir $(call find_lib,vdeplug))
+          endif
+          $(info using libvdeplug: $(call find_lib,vdeplug) $(call find_include,libvdeplug))
         endif
       endif
-      ifeq (,$(findstring USE_VDE_NETWORK,$(NETWORK_CCDEFS)))
-        # Support is available on Linux for libvdeplug.  Advise on its usage
-        ifneq (,$(findstring Linux,$(OSTYPE)))
-          $(info *** Warning ***)
-          $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built with)
-          $(info *** Warning *** minimal libpcap networking support)
-          $(info *** Warning ***)
-          $(info *** Warning *** Simulators on your $(OSNAME) platform can also be built with)
-          $(info *** Warning *** extended Ethernet networking support by using VDE Ethernet.)
-          $(info *** Warning ***)
-          $(info *** Warning *** To build simulator(s) with extended networking support you)
-          $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
-          $(info *** Warning *** regarding the needed libvdeplug components for your $(OSNAME))
-          $(info *** Warning *** platform)
-          $(info *** Warning ***)
-        endif
+    endif
+    ifeq (,$(findstring HAVE_VDE_NETWORK,$(NETWORK_CCDEFS)))
+      # Support is available on Linux for libvdeplug.  Advise on its usage
+      ifneq (,$(findstring Linux,$(OSTYPE)))
+        $(info *** Warning ***)
+        $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built with)
+        $(info *** Warning *** minimal libpcap networking support)
+        $(info *** Warning ***)
+        $(info *** Warning *** Simulators on your $(OSNAME) platform can also be built with)
+        $(info *** Warning *** extended Ethernet networking support by using VDE Ethernet.)
+        $(info *** Warning ***)
+        $(info *** Warning *** To build simulator(s) with extended networking support you)
+        $(info *** Warning *** should read 0readme_ethernet.txt and follow the instructions)
+        $(info *** Warning *** regarding the needed libvdeplug components for your $(OSNAME))
+        $(info *** Warning *** platform)
+        $(info *** Warning ***)
       endif
-      ifneq (,$(call find_include,linux/if_tun))
-        # Provide support for Tap networking on Linux
-        NETWORK_CCDEFS += -DUSE_TAP_NETWORK
+    endif
+    ifneq (,$(call find_include,linux/if_tun))
+      # Provide support for Tap networking on Linux
+      NETWORK_CCDEFS += -DHAVE_TAP_NETWORK
+      NETWORK_LAN_FEATURES += TAP
+      ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+        NETWORK_CCDEFS += -DUSE_NETWORK
       endif
-      ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
-        # Provide support for Tap networking on BSD platforms (including OS X)
-        NETWORK_CCDEFS += -DUSE_TAP_NETWORK -DUSE_BSDTUNTAP
+    endif
+    ifeq (bsdtuntap,$(shell if $(TEST) -e /usr/include/net/if_tun.h -o -e /Library/Extensions/tap.kext; then echo bsdtuntap; fi))
+      # Provide support for Tap networking on BSD platforms (including OS X)
+      NETWORK_CCDEFS += -DHAVE_TAP_NETWORK -DHAVE_BSDTUNTAP
+      NETWORK_LAN_FEATURES += TAP
+      ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+        NETWORK_CCDEFS += -DUSE_NETWORK
       endif
-    else
-      NETWORK_FEATURES = - WITHOUT networking support
+    endif
+    ifeq (,$(findstring USE_NETWORK,$(NETWORK_CCDEFS))$(findstring USE_SHARED,$(NETWORK_CCDEFS)))
+      NETWORK_CCDEFS += -DUSE_NETWORK
+      NETWORK_FEATURES = - WITHOUT Local LAN networking support
       $(info *** Warning ***)
-      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT networking support)
+      $(info *** Warning *** $(BUILD_SINGLE)Simulator$(BUILD_MULTIPLE) are being built WITHOUT LAN networking support)
       $(info *** Warning ***)
       $(info *** Warning *** To build simulator(s) with networking support you should read)
       $(info *** Warning *** 0readme_ethernet.txt and follow the instructions regarding the)
@@ -640,6 +659,9 @@ ifneq (clean,$(MAKECMDGOALS))
   $(info *** $(BUILD_FEATURES).)
   ifneq (,$(NETWORK_FEATURES))
     $(info *** $(NETWORK_FEATURES).)
+  endif
+  ifneq (,$(NETWORK_LAN_FEATURES))
+    $(info *** - Local LAN packet transports: $(NETWORK_LAN_FEATURES))
   endif
   ifneq (,$(VIDEO_FEATURES))
     $(info *** $(VIDEO_FEATURES).)
