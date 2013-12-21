@@ -1,6 +1,6 @@
 /* vaxmod_defs.h: VAX model-specific definitions file
 
-   Copyright (c) 1998-2012, Robert M Supnik
+   Copyright (c) 1998-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   20-Dec-13    RMS     Added prototypes for unaligned IO and register handling
    12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
    11-Dec-11    RMS     Moved all Qbus devices to BR4; deleted RP definitions
    25-Nov-11    RMS     Added VEC_QBUS definition
@@ -470,5 +471,12 @@ int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 int32 clk_cosched (int32 wait);
 
 #include "pdp11_io_lib.h"
+
+/* Function prototypes for system-specific unaligned support */
+
+int32 ReadIOU (uint32 pa, int32 lnt);
+int32 ReadRegU (uint32 pa, int32 lnt);
+void WriteIOU (uint32 pa, int32 val, int32 lnt);
+void WriteRegU (uint32 pa, int32 val, int32 lnt);
 
 #endif

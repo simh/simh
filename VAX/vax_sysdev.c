@@ -1,6 +1,6 @@
 /* vax_sysdev.c: VAX 3900 system-specific logic
 
-   Copyright (c) 1998-2011, Robert M Supnik
+   Copyright (c) 1998-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -32,6 +32,7 @@
    cso          console storage output
    sysd         system devices (SSC miscellany)
 
+   20-Dec-13    RMS     Added unaligned register space access routines
    23-Dec-10    RMS     Added power clear call to boot routine (Mark Pizzolato)
    25-Oct-05    RMS     Automated CMCTL extended memory
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
@@ -214,6 +215,9 @@ int32 ssc_adsm[2] = { 0 };                              /* addr strobes */
 int32 ssc_adsk[2] = { 0 };
 int32 cdg_dat[CDASIZE >> 2];                            /* cache data */
 static uint32 rom_delay = 0;
+static const int32 insert[4] = {
+    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
+    };
 
 t_stat rom_ex (t_value *vptr, t_addr exta, UNIT *uptr, int32 sw);
 t_stat rom_dep (t_value val, t_addr exta, UNIT *uptr, int32 sw);
@@ -961,6 +965,20 @@ MACH_CHECK (MCHK_READ);
 return 0;
 }
 
+/* ReadRegU - read register space, unaligned
+
+   Inputs:
+        pa      =       physical address
+        lnt     =       length in bytes (1, 2, or 3)
+   Output:
+        returned data, not shifted
+*/
+
+int32 ReadRegU (uint32 pa, int32 lnt)
+{
+return ReadReg (pa & ~03, L_LONG);
+}
+
 /* WriteReg - write register space
 
    Inputs:
@@ -983,6 +1001,26 @@ for (p = &regtable[0]; p->low != 0; p++) {
     }
 ssc_bto = ssc_bto | SSCBTO_BTO | SSCBTO_RWT;
 MACH_CHECK (MCHK_WRITE);
+return;
+}
+
+/* WriteRegU - write register space, unaligned
+
+   Inputs:
+        pa      =       physical address
+        val     =       data to write, right justified in 32b longword
+        lnt     =       length (1, 2, or 3)
+   Outputs:
+        none
+*/
+
+void WriteRegU (uint32 pa, int32 val, int32 lnt)
+{
+int32 sc = (pa & 03) << 3;
+int32 dat = ReadReg (pa & ~03, L_LONG);
+
+dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
+WriteReg (pa & ~03, dat, L_LONG);
 return;
 }
 
