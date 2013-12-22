@@ -397,7 +397,12 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
-#include "pdp11_io_lib.h"
+/* Function prototypes for system-specific unaligned support */
+
+int32 ReadIOU (uint32 pa, int32 lnt);
+int32 ReadRegU (uint32 pa, int32 lnt);
+void WriteIOU (uint32 pa, int32 val, int32 lnt);
+void WriteRegU (uint32 pa, int32 val, int32 lnt);
 
 extern t_stat sysd_set_diag (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat sysd_show_diag (FILE *st, UNIT *uptr, int32 val, void *desc);
@@ -405,5 +410,6 @@ extern t_stat sysd_set_halt (UNIT *uptr, int32 val, char *cptr, void *desc);
 extern t_stat sysd_show_halt (FILE *st, UNIT *uptr, int32 val, void *desc);
 extern t_stat sysd_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc);
 
+#include "pdp11_io_lib.h"
 
 #endif

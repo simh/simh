@@ -60,6 +60,9 @@ extern DEVICE vc_dev, lk_dev, vs_dev;
 int32 conisp, conpc, conpsl;                            /* console reg */
 int32 sys_model = 0;                                    /* MicroVAX or VAXstation */
 char cpu_boot_cmd[CBUFSIZE]  = { 0 };                   /* boot command */
+static const int32 insert[4] = {
+    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
+    };
 
 static struct boot_dev boot_tab[] = {
     { "RQ",  "DUA", 0x00415544 },                       /* DUAn */
@@ -304,6 +307,20 @@ for (p = &regtable[0]; p->low != 0; p++) {
 MACH_CHECK (MCHK_READ);
 }
 
+/* ReadRegU - read register space, unaligned
+
+   Inputs:
+        pa      =       physical address
+        lnt     =       length in bytes (1, 2, or 3)
+   Output:
+        returned data, not shifted
+*/
+
+int32 ReadRegU (uint32 pa, int32 lnt)
+{
+return ReadReg (pa & ~03, L_LONG);
+}
+
 /* WriteReg - write register space
 
    Inputs:
@@ -326,6 +343,26 @@ for (p = &regtable[0]; p->low != 0; p++) {
     }
 mem_err = 1;
 SET_IRQL;
+}
+
+/* WriteRegU - write register space, unaligned
+
+   Inputs:
+        pa      =       physical address
+        val     =       data to write, right justified in 32b longword
+        lnt     =       length (1, 2, or 3)
+   Outputs:
+        none
+*/
+
+void WriteRegU (uint32 pa, int32 val, int32 lnt)
+{
+int32 sc = (pa & 03) << 3;
+int32 dat = ReadReg (pa & ~03, L_LONG);
+
+dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
+WriteReg (pa & ~03, dat, L_LONG);
+return;
 }
 
 /* Special boot command - linked into SCP by initial reset

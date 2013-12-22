@@ -425,6 +425,14 @@ t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
 
+/* Function prototypes for system-specific unaligned support
+   11/750 treats unaligned like aligned */
+
+#define ReadIOU(p,l)        ReadIO (p,l)
+#define ReadRegU(p,l)       ReadReg (p,l)
+#define WriteIOU(p,v,l)     WriteIO (p, v, l)
+#define WriteRegU(p,v,l)    WriteReg (p, v, l)
+
 #include "pdp11_io_lib.h"
 
 #endif

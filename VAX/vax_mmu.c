@@ -1,6 +1,6 @@
 /* vax_mmu.c - VAX memory management
 
-   Copyright (c) 1998-2008, Robert M Supnik
+   Copyright (c) 1998-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   09-Nov-13    MB      Fixed reading/writing of unaligned data
+   29-Nov-13    RMS     Reworked unaligned flows
    24-Oct-12    MB      Added support for KA620 virtual addressing
    21-Jul-08    RMS     Removed inlining support
    28-May-08    RMS     Inlined physical memory routines
@@ -58,7 +58,6 @@ typedef struct {
     } TLBENT;
 
 extern uint32 *M;
-extern const uint32 align[4];
 extern int32 PSL;
 extern int32 mapen;
 extern int32 p1, p2;
@@ -110,6 +109,8 @@ extern int32 ReadIO (uint32 pa, int32 lnt);
 extern void WriteIO (uint32 pa, int32 val, int32 lnt);
 extern int32 ReadReg (uint32 pa, int32 lnt);
 extern void WriteReg (uint32 pa, int32 val, int32 lnt);
+int32 ReadU (uint32 pa, int32 lnt);
+void WriteU (uint32 pa, int32 val, int32 lnt);
 
 /* TLB data structures
 
@@ -199,24 +200,22 @@ if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {      /* cross page? */
     if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
         ((acc & TLB_WACC) && ((xpte.pte & TLB_M) == 0)))
         xpte = fill (va + lnt, lnt, acc, NULL);         /* fill if needed */
-    pa1 = (xpte.pte & TLB_PFN) | VA_GETOFF (va + 4);
+    pa1 = ((xpte.pte & TLB_PFN) | VA_GETOFF (va + 4)) & ~03;
     }
-else pa1 = (pa + 4) & PAMASK;                           /* not cross page */
+else pa1 = ((pa + 4) & PAMASK) & ~03;                   /* not cross page */
 bo = pa & 3;
-pa = pa & ~3;                                           /* convert to aligned */
-pa1 = pa1 & ~3;
 if (lnt >= L_LONG) {                                    /* lw unaligned? */
     sc = bo << 3;
-    wl = ReadL (pa);                                    /* read both lw */
-    wh = ReadL (pa1);                                   /* extract */
-    return ((((wl >> sc) & align[bo]) | (wh << (32 - sc))) & LMASK);
+    wl = ReadU (pa, L_LONG - bo);                       /* read both fragments */
+    wh = ReadU (pa1, bo);                               /* extract */
+    return ((wl | (wh << (32 - sc))) & LMASK);
     }
-else if (bo == 1)
-    return ((ReadL (pa) >> 8) & WMASK);
+else if (bo == 1)                                       /* read within lw */
+    return ReadU (pa, L_WORD);
 else {
-    wl = ReadL (pa);                                    /* word cross lw */
-    wh = ReadL (pa1);                                   /* read, extract */
-    return (((wl >> 24) & 0xFF) | ((wh & 0xFF) << 8));
+    wl = ReadU (pa, L_BYTE);                            /* word cross lw */
+    wh = ReadU (pa1, L_BYTE);                           /* read, extract */
+    return (wl | (wh << 8));
     }
 }
 
@@ -234,7 +233,7 @@ else {
 void Write (uint32 va, int32 val, int32 lnt, int32 acc)
 {
 int32 vpn, off, tbi, pa;
-int32 pa1, bo, sc, wl, wh;
+int32 pa1, bo, sc;
 TLBENT xpte;
 
 mchk_va = va;
@@ -267,31 +266,20 @@ if (mapen && ((uint32)(off + lnt) > VA_PAGSIZE)) {
     if (((xpte.pte & acc) == 0) || (xpte.tag != vpn) ||
         ((xpte.pte & TLB_M) == 0))
         xpte = fill (va + lnt, lnt, acc, NULL);
-    pa1 = (xpte.pte & TLB_PFN) | VA_GETOFF (va + 4);
+    pa1 = ((xpte.pte & TLB_PFN) | VA_GETOFF (va + 4)) & ~03;
     }
-else pa1 = (pa + 4) & PAMASK;
+else pa1 = ((pa + 4) & PAMASK) & ~03;
 bo = pa & 3;
-pa = pa & ~3;                                           /* convert to aligned */
-pa1 = pa1 & ~3;
-wl = ReadL (pa);
 if (lnt >= L_LONG) {
     sc = bo << 3;
-    wh = ReadL (pa1);
-    wl = (wl & insert[bo]) | ((val << sc) & LMASK);
-    wh = (wh & ~insert[bo]) | ((val >> (32 - sc)) & insert[bo]);
-    WriteL (pa, wl);
-    WriteL (pa1, wh);
+    WriteU (pa, val & insert[L_LONG - bo], L_LONG - bo);
+    WriteU (pa1, (val >> (32 - sc)) & insert[bo], bo);
     }
-else if (bo == 1) {
-    wl = (wl & 0xFF0000FF) | (val << 8);
-    WriteL (pa, wl);
-    }
-else {
-    wh = ReadL (pa1);
-    wl = (wl & 0x00FFFFFF) | ((val & 0xFF) << 24);
-    wh = (wh & 0xFFFFFF00) | ((val >> 8) & 0xFF);
-    WriteL (pa, wl);
-    WriteL (pa1, wh);
+else if (bo == 1)                                       /* read within lw */
+    WriteU (pa, val & WMASK, L_WORD);
+else {                                                  /* word cross lw */
+    WriteU (pa, val & BMASK, L_BYTE);
+    WriteU (pa1, (val >> 8) & BMASK, L_BYTE);
     }
 return;
 }
@@ -362,7 +350,8 @@ SIM_INLINE int32 ReadL (uint32 pa)
 if (ADDR_IS_MEM (pa))
     return M[pa >> 2];
 mchk_ref = REF_V;
-if (ADDR_IS_IO (pa)) return ReadIO (pa, L_LONG);
+if (ADDR_IS_IO (pa))
+    return ReadIO (pa, L_LONG);
 return ReadReg (pa, L_LONG);
 }
 
@@ -375,6 +364,30 @@ mchk_ref = REF_P;
 if (ADDR_IS_IO (pa))
     return ReadIO (pa, L_LONG);
 return ReadReg (pa, L_LONG);
+}
+
+/* Read unaligned physical (in virtual context)
+
+   Inputs:
+        pa      =       physical address
+        lnt     =       length in bytes (1, 2, or 3)
+   Output:
+        returned data
+*/
+
+int32 ReadU (uint32 pa, int32 lnt)
+{
+int32 dat;
+int32 sc = (pa & 3) << 3;
+if (ADDR_IS_MEM (pa))
+    dat = M[pa >> 2];
+else {
+    mchk_ref = REF_V;
+    if (ADDR_IS_IO (pa))
+        dat = ReadIOU (pa, lnt);
+    else dat = ReadRegU (pa, lnt);
+    }
+return ((dat >> sc) & insert[lnt]);
 }
 
 /* Write aligned physical (in virtual context, unless indicated)
@@ -445,6 +458,33 @@ else {
     }
 return;
 }
+
+/* Write unaligned physical (in virtual context)
+
+   Inputs:
+        pa      =       physical address
+        val     =       data to be written, right justified in 32b longword
+        lnt     =       length (1, 2, or 3 bytes)
+   Output:
+        none
+*/
+
+void WriteU (uint32 pa, int32 val, int32 lnt)
+{
+if (ADDR_IS_MEM (pa)) {
+    int32 bo = pa & 3;
+    int32 sc = bo << 3;
+    M[pa >> 2] = (M[pa >> 2] & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
+    }
+else {
+    mchk_ref = REF_V;
+    if ADDR_IS_IO (pa)
+        WriteIOU (pa, val, lnt);
+    else WriteRegU (pa, val, lnt);
+    }
+return;
+}
+
 
 /* TLB fill
 

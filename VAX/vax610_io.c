@@ -124,7 +124,7 @@ MACH_CHECK (MCHK_WRITE);                                /* FIXME: is this correc
 return;
 }
 
-/* ReadIO - read I/O space
+/* ReadIO - read I/O space - aligned access
 
    Inputs:
         pa      =       physical address
@@ -145,7 +145,49 @@ SET_IRQL;
 return iod;
 }
 
-/* WriteIO - write I/O space
+/* ReadIOU - read I/O space - unaligned access
+
+   Inputs:
+        pa      =       physical address
+        lnt     =       length (1, 2, 3 bytes)
+   Output:
+        data, not shifted
+
+Note that all of these cases are presented to the existing aligned IO routine:
+
+bo = 0, byte, word, or longword length
+bo = 2, word
+bo = 1, 2, 3, byte length
+
+All the other cases are end up at ReadIOU and WriteIOU, and they must turn
+the request into the exactly correct number of Qbus accesses AND NO MORE,
+because Qbus reads can have side-effects, and word read-modify-write is NOT
+the same as a byte write.
+
+Note that the sum of the pa offset and the length cannot be greater than 4.
+The read cases are:
+
+bo = 0, byte or word - read one word
+bo = 0, tribyte - read two words
+bo = 1, byte - read one word
+bo = 1, word or tribyte - read two words
+bo = 2, byte or word - read one word
+bo = 3, byte - read one word
+*/
+
+int32 ReadIOU (uint32 pa, int32 lnt)
+{
+int32 iod;
+
+iod = ReadQb (pa);                                      /* wd from Qbus */
+if ((lnt + (pa & 1)) <= 2)                              /* byte or (word & even) */
+    iod = iod << ((pa & 2)? 16: 0);                     /* one op */
+else iod = (ReadQb (pa + 2) << 16) | iod;               /* two ops, get 2nd wd */
+SET_IRQL;
+return iod;
+}
+
+/* WriteIO - write I/O space - aligned access
 
    Inputs:
         pa      =       physical address
@@ -164,6 +206,54 @@ else if (lnt == L_WORD)
 else {
     WriteQb (pa, val & 0xFFFF, WRITE);
     WriteQb (pa + 2, (val >> 16) & 0xFFFF, WRITE);
+    }
+SET_IRQL;
+return;
+}
+
+/* WriteIOU - write I/O space
+
+   Inputs:
+        pa      =       physical address
+        val     =       data to write, right justified in 32b longword
+        lnt     =       length (1, 2, or 3 bytes)
+   Outputs:
+        none
+
+The write cases are:
+
+bo = x, lnt = byte - write one byte
+bo = 0 or 2, lnt = word - write one word
+bo = 1, lnt = word - write two bytes
+bo = 0, lnt = tribyte - write word, byte
+bo = 1, lnt = tribyte - write byte, word
+*/
+
+void WriteIOU (uint32 pa, int32 val, int32 lnt)
+{
+switch (lnt) {
+case L_BYTE:                                            /* byte */
+    WriteQb (pa, val & BMASK, WRITEB);
+    break;
+
+case L_WORD:                                            /* word */
+    if (pa & 1) {                                       /* odd addr? */
+        WriteQb (pa, val & BMASK, WRITEB);
+        WriteQb (pa + 1, (val >> 8) & BMASK, WRITEB);
+        }
+    else WriteQb (pa, val & WMASK, WRITE);
+    break;
+
+case 3:                                                 /* tribyte */
+    if (pa & 1) {                                       /* odd addr? */
+        WriteQb (pa, val & BMASK, WRITEB);              /* byte then word */
+        WriteQb (pa + 1, (val >> 8) & WMASK, WRITE);
+        }
+    else {                                              /* even */
+        WriteQb (pa, val & WMASK, WRITE);               /* word then byte */
+        WriteQb (pa + 2, (val >> 16) & BMASK, WRITEB);
+        }
+    break;
     }
 SET_IRQL;
 return;

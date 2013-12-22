@@ -149,6 +149,9 @@ int32 ka_mser = 0;                                      /* KA630 mem sys err */
 int32 ka_cear = 0;                                      /* KA630 cpu err */
 int32 ka_dear = 0;                                      /* KA630 dma err */
 static uint32 rom_delay = 0;
+static const int32 insert[4] = {
+    0x00000000, 0x000000FF, 0x0000FFFF, 0x00FFFFFF
+    };
 t_bool ka_diag_full = FALSE;
 t_bool ka_hltenab = TRUE;                               /* Halt Enable / Autoboot flag */
 
@@ -778,6 +781,20 @@ for (p = &regtable[0]; p->low != 0; p++) {
 MACH_CHECK (MCHK_READ);
 }
 
+/* ReadRegU - read register space, unaligned
+
+   Inputs:
+        pa      =       physical address
+        lnt     =       length in bytes (1, 2, or 3)
+   Output:
+        returned data, not shifted
+*/
+
+int32 ReadRegU (uint32 pa, int32 lnt)
+{
+return ReadReg (pa & ~03, L_LONG);
+}
+
 /* WriteReg - write register space
 
    Inputs:
@@ -800,6 +817,26 @@ for (p = &regtable[0]; p->low != 0; p++) {
     }
 
 MACH_CHECK (MCHK_WRITE);
+}
+
+/* WriteRegU - write register space, unaligned
+
+   Inputs:
+        pa      =       physical address
+        val     =       data to write, right justified in 32b longword
+        lnt     =       length (1, 2, or 3)
+   Outputs:
+        none
+*/
+
+void WriteRegU (uint32 pa, int32 val, int32 lnt)
+{
+int32 sc = (pa & 03) << 3;
+int32 dat = ReadReg (pa & ~03, L_LONG);
+
+dat = (dat & ~(insert[lnt] << sc)) | ((val & insert[lnt]) << sc);
+WriteReg (pa & ~03, dat, L_LONG);
+return;
 }
 
 /* KA630 registers */

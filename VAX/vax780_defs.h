@@ -1,6 +1,6 @@
 /* vax780_defs.h: VAX 780 model-specific definitions file
 
-   Copyright (c) 2004-2011, Robert M Supnik
+   Copyright (c) 2004-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,9 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
-   05-Nov-11    RMS     Added VEC_QBUS definition
+   29-Nov-13    RMS     Added system-specific unaligned routines
+   12-Dec-12    RMS     Fixed IO base address for RQB, RQC, RQD
+   05-Nov-11    RMS     Added VEC_QMODE definition
    19-Nov-08    RMS     Moved I/O support routines to I/O library
    29-Apr-07    RMS     Modified model-specific reserved operand check macros
                         to reflect 780 microcode patches (found by Naoki Hamada)
@@ -435,6 +437,14 @@ t_stat mba_show_num (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat show_nexus (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 void sbi_set_errcnf (void);
+
+/* Function prototypes for system-specific unaligned support
+   11/780 treats unaligned like aligned */
+
+#define ReadIOU(p,l)        ReadIO (p,l)
+#define ReadRegU(p,l)       ReadReg (p,l)
+#define WriteIOU(p,v,l)     WriteIO (p, v, l)
+#define WriteRegU(p,v,l)    WriteReg (p, v, l)
 
 #include "pdp11_io_lib.h"
 

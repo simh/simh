@@ -345,6 +345,13 @@ int32 Map_ReadW (uint32 ba, int32 bc, uint16 *buf);
 int32 Map_WriteB (uint32 ba, int32 bc, uint8 *buf);
 int32 Map_WriteW (uint32 ba, int32 bc, uint16 *buf);
 
+/* Function prototypes for system-specific unaligned support */
+
+int32 ReadIOU (uint32 pa, int32 lnt);
+int32 ReadRegU (uint32 pa, int32 lnt);
+void WriteIOU (uint32 pa, int32 val, int32 lnt);
+void WriteRegU (uint32 pa, int32 val, int32 lnt);
+
 t_stat cpu_show_leds (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #include "pdp11_io_lib.h"
