@@ -334,7 +334,7 @@ else {
     fixed[1] = NULL;
     ips = fixed;
     }
-for (ip=ips; *ip != NULL; ++ip) {
+for (ip=ips; (ip != NULL) && (*ip != NULL); ++ip) {
     ai = (struct addrinfo *)calloc(1, sizeof(*ai));
     if (NULL == ai) {
         s_freeaddrinfo(result);
@@ -556,7 +556,7 @@ if ((host != NULL) && (host_len != 0))
 if ((port != NULL) && (port_len != 0))
     memset (port, 0, port_len);
 if ((cptr == NULL) || (*cptr == 0)) {
-    if (((default_host == NULL) || (*default_host == 0)) && ((default_port == NULL) || (*default_port == 0)))
+    if (((default_host == NULL) || (*default_host == 0)) || ((default_port == NULL) || (*default_port == 0)))
         return SCPE_ARG;
     if ((strlen(default_host) >= host_len) || (strlen(default_port) >= port_len))
         return SCPE_ARG;                            /* no room */

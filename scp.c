@@ -3390,7 +3390,9 @@ if (dir) {
     char FileName[PATH_MAX + 1], *MatchName;
     char *c;
     struct tm *local;
+#if defined (HAVE_GLOB)
     int i;
+#endif
 
     MatchName = 1 + strrchr (cptr, '/');
     printf (" Directory of %s\n\n", DirName[0] ? DirName : "/");
@@ -7959,6 +7961,7 @@ t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
 #define XPANDQ 512
             p = (char *) realloc (help, ((size_t)size) + XPANDQ +1);
             if (!p) {
+                free (help);
                 fclose (fp);
                 return SCPE_MEM;
             }
