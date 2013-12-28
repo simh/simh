@@ -558,6 +558,8 @@ if ((port != NULL) && (port_len != 0))
 if ((cptr == NULL) || (*cptr == 0)) {
     if (((default_host == NULL) || (*default_host == 0)) || ((default_port == NULL) || (*default_port == 0)))
         return SCPE_ARG;
+    if ((host == NULL) || (port == NULL))
+        return SCPE_ARG;                            /* no place */
     if ((strlen(default_host) >= host_len) || (strlen(default_port) >= port_len))
         return SCPE_ARG;                            /* no room */
     strcpy (host, default_host);
