@@ -311,7 +311,7 @@ t_stat sim_instr (void)
     while (reason == 0) {               /* loop until halted */
 //    dump_regs1();
         if (sim_interval <= 0)          /* check clock queue */
-            if ((reason = sim_process_event ())) 
+            if ((reason = sim_process_event ()))
                 break;
             if (mem_fault) {            /* memory fault? */
                 mem_fault = 0;          /* reset fault flag */
@@ -1886,8 +1886,7 @@ int32 get_flag(int32 flg)
 void condevalVa(int32 op1, int32 op2)
 {
     if (get_flag(CF)) {
-        COND_SET_FLAG_V(((op1 & 0x80) && (op2 & 0x80)) || (
-            ((op1 & 0x80) == 0) && ((op2 & 0x80) == 0)));
+        COND_SET_FLAG_V((op1 & op2 & 0x80) || (((op1 | op2) & 0x80) == 0));
     }
 }
 
@@ -1896,8 +1895,7 @@ void condevalVa(int32 op1, int32 op2)
 void condevalVs(int32 op1, int32 op2)
 {
     if (get_flag(CF)) {
-        COND_SET_FLAG_V(((op1 & 0x80) && ((op2 & 0x80) == 0)) || 
-            (((op1 & 0x80) == 0) && (op2 & 0x80)));
+        COND_SET_FLAG_V(op1 & op2 & 0x80);
     }
 }
 
