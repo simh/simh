@@ -1090,8 +1090,8 @@ void pcap_close(pcap_t* a) {
   }
 }
 
-/* OpenBSD, AIX and OS/X on PowerPC have an ancient declaration of pcap_compile which doesn't have a const in the bpf string argument */
-#if defined (__OpenBSD__) || defined (_AIX) || (defined (__APPLE__) && defined (__POWERPC__))
+/* Some platforms's pcap.h have an ancient declaration of pcap_compile which doesn't have a const in the bpf string argument */
+#if !defined (BPF_CONST_STRING)
 int pcap_compile(pcap_t* a, struct bpf_program* b, char* c, int d, bpf_u_int32 e) {
 #else
 int pcap_compile(pcap_t* a, struct bpf_program* b, const char* c, int d, bpf_u_int32 e) {

@@ -80,6 +80,12 @@ Linux (Ubuntu 10.04):
 
     # Run simulator and "attach xq tap:tap0"
     
+
+Linux (Fedora Core 18, 20, etc.):
+    yum install gcc
+    yum install libpcap-devel
+    yum install uml-utilities
+
 OpenBSD (OpenBSD 4.6)
 
     /sbin/ifconfig tun0 create
@@ -207,7 +213,7 @@ Building on Windows:
 
  The contents of the windows-build directory can be downloaded from:
 
-    https://github.com/downloads/simh/simh/windows-build.zip
+    https://github.com/simh/windows-build/archive/windows-build.zip
 
 
  There are Windows batch files provided to initiate compiles using the MinGW
@@ -269,10 +275,15 @@ for details.
 
 Building on Linux, {Free|Net|Open}BSD, OS/X, Solaris, other *nix:
 
- 1. Get/make/install the libpcap-dev package for your operating system. Sources:
+ 1. Get/make/install the libpcap-dev package (or libpcap-devel) for your 
+    operating system. Sources:
       All    : http://www.tcpdump.org/
       Older versions of libpcap can be found, for various systems, at:
-      Linux  : search for your variant on http://rpmfind.net
+      Linux  : 
+                Debian Based distributions: 
+                       # apt-get install libpcap-dev
+                RedHat/Fedora Based distributions:
+                       # yum install libpcap-devel
       OS/X   : Apple Developer's site?
       HP-UX  : ftp://hpux.connect.org.uk/hpux/Networking/Admin/
 
