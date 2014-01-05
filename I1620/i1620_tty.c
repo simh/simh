@@ -1,6 +1,6 @@
 /* i1620_tty.c: IBM 1620 typewriter
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2014, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    tty          console typewriter
 
+   02-Jan-14    RMS     Added variable tab stops
+   10-Dec-13    RMS     Fixed DN wraparound (Bob Armstrong)
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    22-Dec-02    RMS     Added break test
 */
@@ -34,6 +36,19 @@
 #define TTO_COLMAX      80
 
 int32 tto_col = 0;
+uint8 tto_tabs[TTO_COLMAX + 1] = {
+ 0,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1,0,0,0,0,0,0,0,
+ 1
+};
 
 extern uint8 M[MAXMEMSIZE];
 extern uint8 ind[NUM_IND];
@@ -44,10 +59,11 @@ void tti_unlock (void);
 t_stat tti_rnum (int8 *c);
 t_stat tti_ralp (int8 *c);
 t_stat tti_read (int8 *c);
-t_stat tto_num (uint32 pa, uint32 len);
+t_stat tto_num (uint32 pa, uint32 len, t_bool dump);
 t_stat tto_write (uint32 c);
 t_stat tty_svc (UNIT *uptr);
 t_stat tty_reset (DEVICE *dptr);
+t_stat tty_set_fixtabs (UNIT *uptr, int32 val, char *cptr, void *desc);
 
 /* TTY data structures
 
@@ -64,8 +80,20 @@ REG tty_reg[] = {
     { NULL }
     };
 
+MTAB tty_mod[] = {
+    { MTAB_XTD|MTAB_VDV, TTO_COLMAX, NULL, "TABS",
+      &sim_tt_settabs, NULL, (void *) tto_tabs },
+    { MTAB_XTD|MTAB_VDV|MTAB_NMO, TTO_COLMAX, "TABS", NULL,
+      NULL, &sim_tt_showtabs, (void *) tto_tabs },
+    { MTAB_XTD|MTAB_VDV, 0, NULL, "NOTABS",
+      &tty_set_fixtabs, NULL, NULL },
+    { MTAB_XTD|MTAB_VDV, 8, NULL, "DEFAULTTABS",
+      &tty_set_fixtabs, NULL, NULL },
+    { 0 }
+    };
+
 DEVICE tty_dev = {
-    "TTY", &tty_unit, tty_reg, NULL,
+    "TTY", &tty_unit, tty_reg, tty_mod,
     1, 10, 31, 1, 8, 7,
     NULL, NULL, &tty_reset,
     NULL, NULL, NULL
@@ -214,10 +242,10 @@ switch (op) {                                           /* case on op */
         break;  
 
     case OP_DN:
-        return tto_num (pa, 20000 - (pa % 20000));      /* dump numeric */
+        return tto_num (pa, 20000 - (pa % 20000), TRUE);/* dump numeric */
 
     case OP_WN:
-        return tto_num (pa, 0);                         /* type numeric */
+        return tto_num (pa, 0, FALSE);                  /* type numeric */
 
     case OP_WA:
         for (i = 0; i < MEMSIZE; i = i + 2) {           /* stop runaway */
@@ -307,16 +335,15 @@ return SCPE_OK;
 
 /* Write numerically - cannot generate parity errors */
 
-t_stat tto_num (uint32 pa, uint32 len)
+t_stat tto_num (uint32 pa, uint32 len, t_bool dump)
 {
 t_stat r;
 uint8 d;
-uint32 i, end;
+uint32 i;
 
-end = pa + len;
 for (i = 0; i < MEMSIZE; i++) {                         /* (stop runaway) */
     d = M[pa];                                          /* get char */
-    if (len? (pa >= end):                               /* dump: end reached? */
+    if (dump? (len-- == 0):                             /* dump: end reached? */
        ((d & REC_MARK) == REC_MARK))                    /* write: rec mark? */
         return SCPE_OK;                                 /* end operation */
     if (d & FLAG)                                       /* flag? */
@@ -336,23 +363,23 @@ t_stat tto_write (uint32 c)
 int32 rpt;
 
 if (c == '\t') {                                        /* tab? */
-    rpt = 8 - (tto_col % 8);                            /* distance to next */
-    tto_col = tto_col + rpt;                            /* tab over */
-    while (rpt-- > 0)                                   /* use spaces */
-        sim_putchar (' ');
-    return SCPE_OK;
+    for (rpt = tto_col + 1;                             /* find tab stop */
+        (tto_tabs[rpt] == 0) && (rpt <= TTO_COLMAX);
+        rpt++) ;
+    for ( ; tto_col < rpt; tto_col++)
+        sim_putchar (' ');                              /* use spaces */
     }
-if (c == '\r') {                                        /* return? */
+else if (c == '\r') {                                   /* return? */
     sim_putchar ('\r');                                 /* crlf */
     sim_putchar ('\n');
     tto_col = 0;                                        /* clear colcnt */
     return SCPE_OK;
     }
-if ((c == '\n') || (c == 007)) {                        /* non-spacing? */
+else if ((c == '\n') || (c == 007)) {                   /* non-spacing? */
     sim_putchar (c);
     return SCPE_OK;
     }
-if (c == '\b')                                          /* backspace? */
+else if (c == '\b')                                     /* backspace? */
     tto_col = tto_col? tto_col - 1: 0;
 else tto_col++;                                         /* normal */
 if (tto_col > TTO_COLMAX) {                             /* line wrap? */
@@ -360,7 +387,8 @@ if (tto_col > TTO_COLMAX) {                             /* line wrap? */
     sim_putchar ('\n');
     tto_col = 0;
     }
-sim_putchar (c);
+if (c != '\t')
+    sim_putchar (c);
 return SCPE_OK;
 }
 
@@ -382,6 +410,7 @@ t_stat tty_reset (DEVICE *dptr)
 {
 sim_activate (&tty_unit, tty_unit.wait);                /* activate poll */
 tto_col = 0;
+tto_tabs[TTO_COLMAX] = 1;                               /* tab stop at limit */
 return SCPE_OK;
 }
 
@@ -391,4 +420,18 @@ void tti_unlock (void)
 {
 tto_write ('>');
 return;
+}
+
+/* Set tab stops at fixed modulus */
+
+t_stat tty_set_fixtabs (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+int32 i;
+
+for (i = 0; i < TTO_COLMAX; i++) {
+    if ((val != 0) && (i != 0) && ((i % val) == 0))
+        tto_tabs[i] = 1;
+    else tto_tabs[i] = 0;
+    }
+return SCPE_OK;
 }

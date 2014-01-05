@@ -1,6 +1,6 @@
 /* i1620_pt.c: IBM 1621/1624 paper tape reader/punch simulator
 
-   Copyright (c) 2002-2012, Robert M Supnik
+   Copyright (c) 2002-2013, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    ptr          1621 paper tape reader
    ptp          1624 paper tape punch
 
+   21-Dec-13    RMS     Fixed translation of paper tape code X0C
+   10-Dec-13    RMS     Fixed DN wraparound (Bob Armstrong)
    19-Mar-12    RMS     Fixed declaration of io_stop (Mark Pizzolato)
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    25-Apr-03    RMS     Revised for extended file support
@@ -49,7 +51,7 @@ t_stat ptr_boot (int32 unitno, DEVICE *dptr);
 t_stat ptr_read (uint8 *c, t_bool ignfeed);
 t_stat ptp_reset (DEVICE *dptr);
 t_stat ptp_write (uint32 c);
-t_stat ptp_num (uint32 pa, uint32 len);
+t_stat ptp_num (uint32 pa, uint32 len, t_bool dump);
 
 /* PTR data structures
 
@@ -129,7 +131,7 @@ const int8 ptr_to_num[128] = {
  0x18, 0x19, 0x1A, 0x1B, 0x1C, 0x10, 0x1E, 0x1F,
  0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* XO */
  0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F,
- 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* XOC */
+ 0x10, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,        /* XOC */
  0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x00, 0x0E, 0x0F
  };
 
@@ -212,7 +214,7 @@ const int8 alp_to_ptp[256] = {
 
 t_stat ptr (uint32 op, uint32 pa, uint32 f0, uint32 f1)
 {
-uint32 i;
+uint32 i, q = 0;
 int8 mc;
 uint8 ptc;
 t_stat r, sta;
@@ -229,6 +231,8 @@ switch (op) {                                           /* case on op */
                 M[pa] = REC_MARK;                       /* store rec mark */
                 return sta;                             /* done */
                 }
+            if (pa == 18976)
+                q++;
             if (bad_par[ptc]) {                         /* bad parity? */
                 ind[IN_RDCHK] = 1;                      /* set read check */
                 if (io_stop)                            /* set return status */
@@ -389,10 +393,10 @@ t_stat r;
 switch (op) {                                           /* decode op */
 
     case OP_DN:
-        return ptp_num (pa, 20000 - (pa % 20000));      /* dump numeric */
+        return ptp_num (pa, 20000 - (pa % 20000), TRUE);/* dump numeric */
 
     case OP_WN:
-        return ptp_num (pa, 0);                         /* punch numeric */
+        return ptp_num (pa, 0, FALSE);                  /* punch numeric */
 
     case OP_WA:
         for (i = 0; i < MEMSIZE; i = i + 2) {           /* stop runaway */
@@ -456,16 +460,15 @@ return STOP_RWRAP;
 
 /* Punch tape numeric - cannot generate parity errors */
 
-t_stat ptp_num (uint32 pa, uint32 len)
+t_stat ptp_num (uint32 pa, uint32 len, t_bool dump)
 {
 t_stat r;
 uint8 d;
-uint32 i, end;
+uint32 i;
 
-end = pa + len;
 for (i = 0; i < MEMSIZE; i++) {                         /* stop runaway */
     d = M[pa] & (FLAG | DIGIT);                         /* get char */
-    if (len? (pa >= end):                               /* dump: end reached? */
+    if (dump? (len-- == 0):                             /* dump: end reached? */
        ((d & REC_MARK) == REC_MARK))                    /* write: rec mark? */
         return ptp_write (PT_EL);                       /* end record */
     r = ptp_write (num_to_ptp[d]);                      /* write */

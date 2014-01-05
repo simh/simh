@@ -1,6 +1,6 @@
 /* i1620_cd.c: IBM 1622 card reader/punch
 
-   Copyright (c) 2002-2012, Robert M. Supnik
+   Copyright (c) 2002-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
    cdr          1622 card reader
    cdp          1622 card punch
 
+   10-Dec-13    RMS     Fixed WA card punch translations (Bob Armstrong)
+                        Fixed card reader EOL processing (Bob Armstrong)
    19-Mar-12    RMS     Fixed declarations of saved_pc, io_stop (Mark Pizzolato)
    19-Jan-07    RMS     Set UNIT_TEXT flag
    13-Jul-06    RMS     Fixed card reader fgets call (Tom McBride)
@@ -112,7 +114,7 @@ DEVICE cdp_dev = {
 
 /* Card reader (ASCII) to numeric (one digit) */
 
-const char cdr_to_num[128] = {
+const int8 cdr_to_num[128] = {
  0x00,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 00 */
    -1, 0x00, 0x00,   -1,   -1, 0x00,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 10 */
@@ -133,7 +135,7 @@ const char cdr_to_num[128] = {
 
 /* Numeric (flag + digit) to card punch (ASCII) */
 
-const char num_to_cdp[32] = {
+const int8 num_to_cdp[32] = {
  '0', '1', '2', '3', '4', '5', '6', '7',                /* 0 */
  '8', '9', '|', ',', ' ', '"', ' ', '"',
  ']', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* F + 0 */
@@ -149,7 +151,7 @@ const char num_to_cdp[32] = {
    12-7-8 (}) reads as 5F
 */
 
-const char cdr_to_alp[128] = {
+const int8 cdr_to_alp[128] = {
  0x00,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 00 */
    -1, 0x00, 0x00,   -1,   -1, 0x00,   -1,   -1,
    -1,   -1,   -1,   -1,   -1,   -1,   -1,   -1,        /* 10 */
@@ -184,11 +186,21 @@ const char cdr_to_alp[128] = {
    There is no way to punch 0-5-8 (~), 0-6-8 (\),
    11-5-8 (]), 11-6-8 (;), 11-7-8 (_),
    12-5-8 ([), or 12-6-8 (<)
+
+According to Bob Armstrong,
+   the FORTRAN compiler is sneaky and actually punches numeric
+   data (i.e. data that it knows will be read back using RNCD)
+   in alphameric mode with WACD. Because of that there are some
+   alpha to ASCII translations that absolutely MUST work out right
+   or otherwise we won't be able to load FORTRAN object decks.
+
+     50 - must "punch" as ] (flagged zero) (used to be "_")
+     0A - must "punch" as | (record mark)  (used to be "'")
 */
 
 const char alp_to_cdp[256] = {
  ' ',  -1, '?', '.', ')',  -1,  -1, '}',                /* 00 */
-  -1,  -1, '\'', -1,  -1,  -1,  -1, '"',
+  -1,  -1, '|', -1,  -1,  -1,  -1, '"',
  '+',  -1, '!', '$', '*', ']',  -1,  -1,                /* 10 */ 
   -1,  -1,  -1,  -1,  -1,  -1,  -1,  -1,
  '-', '/', '|', ',', '(',  -1,  -1,  -1,                /* 20 */
@@ -197,7 +209,7 @@ const char alp_to_cdp[256] = {
   -1,  -1, '|',  -1,  -1,  -1,  -1, '"',
   -1, 'A', 'B', 'C', 'D', 'E', 'F', 'G',                /* 40 */
  'H', 'I',  -1,  -1,  -1,  -1,  -1,  -1,
- '_', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* 50 */
+ ']', 'J', 'K', 'L', 'M', 'N', 'O', 'P',                /* 50 */
  'Q', 'R', '?', '=',  -1,  -1,  -1, '}',
   -1, '/', 'S', 'T', 'U', 'V', 'W', 'X',                /* 60 */
  'Y', 'Z', '|', ',',  -1,  -1,  -1,  -1,
@@ -279,7 +291,12 @@ switch (op) {                                           /* case on op */
 return sta;
 }
 
-/* Fill card reader buffer - all errors are hard errors */
+/* Fill card reader buffer - all errors are hard errors
+
+   As Bob Armstrong pointed out, this routines needs to account
+   for variants in text file formats, which may terminate lines
+   with cr-lf (Windows), lf (UNIX), or cr (Mac).
+*/
 
 t_stat cdr_read (void)
 {
@@ -301,6 +318,22 @@ if (ferror (cdr_unit.fileref)) {                        /* error? */
     perror ("CDR I/O error");
     clearerr (cdr_unit.fileref);
     return SCPE_IOERR;
+    }
+if ((i = strlen (cdr_buf)) > 0) {                       /* anything at all? */
+    if (cdr_buf[i-1] == '\n') {                         /* line end in \n? */
+        cdr_buf[i-1] = 0;                               /* remove it */
+        }
+    else if (cdr_buf[i-1] == '\r') {                    /* line end in \r? */
+        cdr_buf[i-1] = 0;                               /* remove it */
+        cdr_unit.pos = ftell (cdr_unit.fileref);        /* save position */
+        if (fgetc (cdr_unit.fileref) != '\n')           /* next char not \n? */
+            fseek (cdr_unit.fileref, cdr_unit.pos, SEEK_SET); /* then rewind */  
+        }
+    else {                                              /* line too long */
+        ind[IN_RDCHK] = 1;
+        perror ("CDR line too long");
+        return SCPE_IOERR;
+        }
     }
 cdr_unit.pos = ftell (cdr_unit.fileref);                /* update position */
 getc (cdr_unit.fileref);                                /* see if more */
@@ -362,7 +395,7 @@ uint8 z, d;
 switch (op) {                                           /* decode op */
 
     case OP_DN:
-        return cdp_num (pa, 20000 - (pa % 20000), TRUE); /* dump numeric */
+        return cdp_num (pa, 20000 - (pa % 20000), TRUE);/* dump numeric */
 
     case OP_WN:
         return cdp_num (pa, CD_LEN, FALSE);             /* write numeric */
@@ -404,7 +437,8 @@ while (ncd-- >= 0) {                                    /* until done */
         break;
     for (i = 0; i < len; i++) {                         /* one card */
         d = M[pa] & (FLAG | DIGIT);                     /* get char */
-        if (dump && (d == FLAG)) cdc = '-';             /* dump? F+0 is diff */
+        if (dump && (d == FLAG))                        /* dump? F+0 is diff */
+            cdc = '-';
         else cdc = num_to_cdp[d];                       /* translate */
         if (cdc < 0) {                                  /* bad char? */
             ind[IN_WRCHK] = 1;                          /* set write check */

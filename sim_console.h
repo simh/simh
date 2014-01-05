@@ -1,6 +1,6 @@
 /* sim_console.h: simulator console I/O library headers
 
-   Copyright (c) 1993-2008, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Jan-14    RMS     Added tab stop routines
    22-Jun-06    RMS     Implemented SET/SHOW PCHAR
    22-Nov-05    RMS     Added central input/output conversion support
    05-Nov-04    RMS     Moved SET/SHOW DEBUG under CONSOLE hierarchy
@@ -77,5 +78,7 @@ t_stat sim_os_poll_kbd (void);
 t_stat sim_os_putchar (int32 out);
 int32 sim_tt_inpcvt (int32 c, uint32 mode);
 int32 sim_tt_outcvt (int32 c, uint32 mode);
+t_stat sim_tt_settabs (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat sim_tt_showtabs (FILE *st, UNIT *uptr, int32 val, void *desc);
 
 #endif
