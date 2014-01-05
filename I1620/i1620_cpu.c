@@ -1,6 +1,6 @@
 /* i1620_cpu.c: IBM 1620 CPU simulator
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,9 @@
    This CPU module incorporates code and comments from the 1620 simulator by
    Geoff Kuenning, with his permission.
 
-   28-May-06    RMS     Fixed bug in cpu history Peter Schorn)
+   10-Dec-13    RMS     Fixed several bugs in add and compare (Bob Armstrong)
+                        Fixed handling of P field in K instruction (Bob Armstrong)
+   28-May-06    RMS     Fixed bug in cpu history (Peter Schorn)
    22-Sep-05    RMS     Fixed declarations (Sterling Garwood)
    16-Aug-05    RMS     Fixed C++ declaration and cast problems
    07-Nov-04    RMS     Added instruction history
@@ -291,7 +293,7 @@ const int32 op_table[100] = {
     IF_VPA + IF_VQA,                                    /* TR */
     IF_VPA,                                             /* SF */
     IF_VPA,                                             /* CF */
-    IF_VPA,                                             /* K */
+    0,                                                  /* K */
     IF_VPA,                                             /* DN */
     IF_VPA,                                             /* RN */
     IF_VPA,                                             /* RA */
@@ -382,6 +384,21 @@ t_stat (*iodisp[NUM_IO])(uint32 op, uint32 pa, uint32 f0, uint32 f1) = {
     NULL, NULL, NULL, NULL, NULL,
     NULL, NULL, NULL, NULL, NULL,                       /* 90 - 99 */
     NULL, NULL, NULL, NULL, NULL
+    };
+
+/* K instruction validate P field table */
+
+const uint8 k_valid_p[NUM_IO] = {
+    0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
 
 /* Indicator table: -1 = illegal, +1 = resets when tested */
@@ -687,11 +704,12 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_OVERFL;
         break;
 
+/* IBM's diagnostics try a compare that generates a carry out; it does not
+   generate overflow. Therefore, do not set overflow on a carry out status. */
+
     case OP_C:
     case OP_CM:
         reason = add_field (PAR, QAR, TRUE, FALSE, 0, &sta); /* sub, nostore */
-        if (sta == ADD_CARRY)                           /* cout => ovflo */
-            ind[IN_OVF] = 1;
         if (ar_stop && ind[IN_OVF])
             reason = STOP_OVERFL;
         break;
@@ -703,7 +721,7 @@ while (reason == 0) {                                   /* loop until halted */
         reason = mul_field (PAR, QAR);                  /* multiply */
         break;
 
-/* IO instructions - P is valid */
+/* IO instructions - P is valid, except for K */
 
     case OP_RA:
     case OP_WA:
@@ -711,11 +729,25 @@ while (reason == 0) {                                   /* loop until halted */
             reason = STOP_INVEAD;                       /* stop */
             break;
             }
-    case OP_K:
     case OP_DN:
     case OP_RN:
     case OP_WN:
         dev = get_2d (ADDR_A (saved_PC, I_IO));         /* get IO dev */
+        f0 = M[ADDR_A (saved_PC, I_CTL)] & DIGIT;       /* get function */
+        f1 = M[ADDR_A (saved_PC, I_CTL + 1)] & DIGIT;
+        if ((dev < 0) || (iodisp[dev] == NULL))         /* undefined dev? */
+            reason = STOP_INVIO;                        /* stop */
+        else reason = iodisp[dev] (op, PAR, f0, f1);    /* call device */
+        break;
+
+    case OP_K:
+        dev = get_2d (ADDR_A (saved_PC, I_IO));         /* get IO dev */
+        if (k_valid_p[dev]) {                          /* validate P? */
+            reason = get_addr (pla, 5, TRUE, &PAR);     /* get P addr */
+            if (reason != SCPE_OK)                      /* stop if error */
+                 break;
+            }
+        else PAR = 0;
         f0 = M[ADDR_A (saved_PC, I_CTL)] & DIGIT;       /* get function */
         f1 = M[ADDR_A (saved_PC, I_CTL + 1)] & DIGIT;
         if ((dev < 0) || (iodisp[dev] == NULL))         /* undefined dev? */
@@ -1296,7 +1328,8 @@ return SCPE_OK;
 
    Reference Manual: "When the sum is zero, the sign of the P field
    is retained."
-*/
+
+   Bob Armstrong: record marks are treated by add as though they were zero */
 
 t_stat add_field (uint32 d, uint32 s, t_bool sub, t_bool sto, uint32 skp, int32 *sta)
 {
@@ -1312,6 +1345,10 @@ ind[IN_EZ] = 1;                                         /* assume zero */
 
 dst = M[d] & DIGIT;                                     /* 1st digits */
 src = M[s] & DIGIT;
+if (dst == REC_MARK)                                    /* chk for rec mark */
+    dst = 0;
+if (src == REC_MARK)
+    src = 0;
 if (BAD_DIGIT (dst) || BAD_DIGIT (src))                 /* bad digit? */
      return STOP_INVDIG;
 if (comp)                                               /* complement? */
@@ -1322,11 +1359,15 @@ if (sto)                                                /* store */
 MM (d); MM (s);                                         /* decr mem addrs */
 do {
     dst = M[d] & DIGIT;                                 /* get dst digit */
+    if (dst == REC_MARK)
+        dst = 0;
     dst_f = M[d] & FLAG;                                /* get dst flag */
     if (src_f)                                          /* src done? src = 0 */
         src = 0;
     else {
         src = M[s] & DIGIT;                             /* get src digit */
+        if (src == REC_MARK)
+            src = 0;
         if (cnt >= skp)                                 /* get src flag */
             src_f = M[s] & FLAG;
         MM (s);                                         /* decr src addr */
@@ -1344,12 +1385,18 @@ do {
     } while (dst_f == 0);                               /* until dst done */
 if (!src_f)                                             /* !src done? ovf */
     ind[IN_OVF] = 1;
+
+/* Because recomplement is done (model 1) with table lookup, the first digit
+   must be explicitly 10s complemented, and not 9s complemented with a carry
+   in of 1. (Bob Armstrong) */
+
 if (comp && !cry && !ind[IN_EZ]) {                      /* recomp needed? */
     ind[IN_HP] = ind[IN_HP] ^ 1;                        /* flip indicator */
     if (sto) {                                          /* storing? */
-        for (cry = 1, dp = dsv; dp != d; ) {            /* rescan */
+        for (cry = 0, dp = dsv; dp != d; ) {            /* rescan */
             dst = M[dp] & DIGIT;                        /* get dst digit */
-            res = add_one_digit (9 - dst, 0, &cry);     /* "add" */
+            dst = (dp == dsv)? (10 - dst): (9 - dst);	/* 10 or 9s comp */
+            res = add_one_digit (0, dst, &cry);         /* "add" */
             M[dp] = (M[dp] & FLAG) | res;               /* store */
             MM (dp);                                    /* decr dst addr */
             }
@@ -1371,7 +1418,8 @@ uint32 add_one_digit (uint32 dst, uint32 src, uint32 *cry)
 {
 uint32 res;
 
-if (*cry) src = src + 1;                                /* cry in? incr src */
+if (*cry)                                               /* cry in? incr src */
+    src = src + 1;
 if (src >= 10) {                                        /* src > 10? */
     src = src - 10;                                     /* src -= 10 */
     *cry = 1;                                           /* carry out */

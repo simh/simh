@@ -1,6 +1,6 @@
 /* i1620_lp.c: IBM 1443 line printer simulator
 
-   Copyright (c) 2002-2008, Robert M. Supnik
+   Copyright (c) 2002-2013, Robert M. Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,8 @@
 
    lpt          1443 line printer
 
+   10-Dec-13    RMS     Fixed DN wraparound (Bob Armstrong)
+                        Fixed test on VFU 10 (Bob Armstrong)
    19-Jan-07    RMS     Added UNIT_TEXT flag
    21-Sep-05    RMS     Revised translation tables for 7094/1401 compatibility
    29-Dec-03    RMS     Fixed bug in scheduling
@@ -56,7 +58,7 @@ t_stat lpt_svc (UNIT *uptr);
 t_stat lpt_reset (DEVICE *dptr);
 t_stat lpt_attach (UNIT *uptr, char *cptr);
 void lpt_buf_init (void);
-t_stat lpt_num (uint32 pa, uint32 len, uint32 f1);
+t_stat lpt_num (uint32 pa, uint32 len, uint32 f1, t_bool dump);
 t_stat lpt_print (void);
 t_stat lpt_space (int32 lines, int32 lflag);
 
@@ -169,10 +171,10 @@ switch (op) {                                           /* decode op */
         break;
 
     case OP_DN:
-        return lpt_num (pa, 20000 - (pa % 20000), f1);  /* dump numeric */
+        return lpt_num (pa, 20000 - (pa % 20000), f1, TRUE);  /* dump numeric */
 
     case OP_WN:
-        return lpt_num (pa, 0, f1);                     /* write numeric */
+        return lpt_num (pa, 0, f1, FALSE);              /* write numeric */
 
     case OP_WA:
         for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {     /* only fill buf */
@@ -205,18 +207,16 @@ return SCPE_OK;
 
 /* Print numeric */
 
-t_stat lpt_num (uint32 pa, uint32 len, uint32 f1)
+t_stat lpt_num (uint32 pa, uint32 len, uint32 f1, t_bool dump)
 {
-uint32 end;
 uint8 d;
 int8 lpc;
 t_stat r, sta;
 
 sta = SCPE_OK;
-end = pa + len;
 for ( ; lpt_bptr < LPT_BSIZE; lpt_bptr++) {             /* only fill buf */
     d = M[pa];                                          /* get digit */
-    if (len? (pa >= end):                               /* end reached? */
+    if (dump? (len-- == 0):                             /* end reached? */
         ((d & REC_MARK) == REC_MARK))
         break;
     lpc = num_to_lpt[d];                                /* translate */
@@ -270,7 +270,7 @@ lpt_savctrl = 0x61;                                     /* reset ctrl */
 if ((ctrl & K_LIN) == ((ctrl & K_IMM)? 0: K_LIN))       /* space lines? */
     return lpt_space (ctrl & K_LCNT, FALSE);
 chan = lpt_savctrl & K_CHAN;                            /* basic chan */
-if (lpt_savctrl & K_CH10) {                             /* chan 10-12? */
+if ((lpt_savctrl & K_CH10) == 0) {                      /* chan 10-12? */
     if (chan == 0)
         chan = 10;
     else if (chan == 3)

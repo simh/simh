@@ -394,7 +394,7 @@ if (opcode[i].str == NULL)
 if (I_GETQP (opfl) == I_M_QNP)                          /* Q no print? */
     qmp = 0;
 
-fprintf (of, "%s", opcode[i].str);                            /* print opcode */
+fprintf (of, "%s", opcode[i].str);                      /* print opcode */
 if (I_GETPP (opfl) == I_M_PP)                           /* P required? */
     fprint_addr (of, ' ', &val[I_P], I_M_QX);
 else if ((I_GETPP (opfl) == I_M_PCP) && (pmp || qmp))   /* P opt & needed? */

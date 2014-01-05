@@ -1,6 +1,6 @@
 /* sim_console.c: simulator console I/O library
 
-   Copyright (c) 1993-2012, Robert M Supnik
+   Copyright (c) 1993-2014, Robert M Supnik
 
    Permission is hereby granted, free of charge, to any person obtaining a
    copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
    used in advertising or otherwise to promote the sale, use or other dealings
    in this Software without prior written authorization from Robert M Supnik.
 
+   02-Jan-14    RMS     Added tab stop routines
    18-Mar-12    RMS     Removed unused reference to sim_switches (Dave Bryan)
    07-Dec-11    MP      Added sim_ttisatty to support reasonable behaviour (i.e. 
                         avoid in infinite loop) in the main command input
@@ -75,7 +76,7 @@
    01-Feb-02    RMS     Added VAX fix (Robert Alan Byer)
    19-Sep-01    RMS     More MacOS changes
    31-Aug-01    RMS     Changed int64 to t_int64 for Windoze
-   20-Jul-01    RMS     Added Macintosh support (Louis Chretien, Peter Schorn, Ben Supnik)
+   20-Jul-01    RMS     Added MacOS support (Louis Chretien, Peter Schorn, Ben Supnik)
    15-May-01    RMS     Added logging support
    05-Mar-01    RMS     Added clock calibration support
    08-Dec-00    BKR     Added OS/2 support (Bruce Ray)
@@ -1597,6 +1598,59 @@ if (md != TTUF_MODE_8B) {
     }
 else c = c & 0377;
 return c;
+}
+
+/* Tab stop array handling
+
+   *desc points to a uint8 array of length val
+
+   Columns with tabs set are non-zero; columns without tabs are 0 */
+
+t_stat sim_tt_settabs (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+uint8 *temptabs, *tabs = (uint8 *) desc;
+int32 i, d;
+t_stat r;
+char gbuf[CBUFSIZE];
+
+if ((cptr == NULL) || (tabs == NULL) || (val <= 1))
+    return SCPE_IERR;
+if (*cptr == 0)
+    return SCPE_2FARG;
+if ((temptabs = (uint8 *)malloc (val)) == NULL)
+    return SCPE_MEM;
+for (i = 0; i < val; i++)
+    temptabs[i] = 0;
+do {
+    cptr = get_glyph (cptr, gbuf, ';');
+    d = get_uint (gbuf, 10, val, &r);
+    if ((r != SCPE_OK) || (d == 0)) {
+        free (temptabs);
+        return SCPE_ARG;
+        }
+    temptabs[d - 1] = 1;
+    } while (*cptr != 0);
+for (i = 0; i < val; i++)
+    tabs[i] = temptabs[i];
+free (temptabs);
+return SCPE_OK;
+}
+
+t_stat sim_tt_showtabs (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+uint8 *tabs = (uint8 *) desc;
+int32 i, any;
+
+if ((st == NULL) || (val == 0) || (desc == NULL))
+    return SCPE_IERR;
+for (i = any = 0; i < val; i++) {
+    if (tabs[i] != 0) {
+        fprintf (st, (any? ";%d": "%d"), i + 1);
+        any = 1;
+        }
+    }
+fprintf (st, (any? "\n": "no tabs set\n"));
+return SCPE_OK;
 }
 
 
