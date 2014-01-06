@@ -349,7 +349,7 @@ return TRUE;
 
 static void *remqueue (QH *entry)
 {
-if (entry->queue->count <= 0)
+if (entry->queue->count == 0)
     return NULL;
 entry->prev->next = entry->next;
 entry->next->prev = entry->prev;

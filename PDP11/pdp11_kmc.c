@@ -654,7 +654,7 @@ static void kmc_ctrlIn (int32 k, dupstate *d, int line);
 
 /* Receive functions */
 void kmc_rxBufferIn(dupstate *d, int32 ba, uint32 sel6v);
-static void kdp_receive(int dupidx, int count);
+static void kdp_receive(int32 dupidx, int count);
 
 /* Transmit functions */
 static void kmc_txBufferIn(dupstate *d, int32 ba, uint32 sel6v);
@@ -2036,7 +2036,7 @@ void kmc_rxBufferIn(dupstate *d, int32 ba, uint32 sel6v) {
  * requires them for other modes.
  */
 
-static void kdp_receive(int dupidx, int count) {
+static void kdp_receive(int32 dupidx, int count) {
     int32 k;
     dupstate* d;
     UNIT *rxup;

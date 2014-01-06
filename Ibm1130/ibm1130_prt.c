@@ -649,7 +649,7 @@ static t_stat prt1403_svc(UNIT *uptr)
 
 /* delete_cmd - SCP command to delete a file */
 
-static t_stat delete_cmd (int flag, char *cptr)
+static t_stat delete_cmd (int32 flag, char *cptr)
 {
 	char gbuf[CBUFSIZE];
 	int status;

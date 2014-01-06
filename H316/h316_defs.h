@@ -175,7 +175,7 @@ typedef struct h316_dib DIB;
 #define INT_V_NODEF     17              /* int not deferred */
 #define INT_V_ON        18              /* int on */
 #define INT_V_EXTD      16              /* first extended interrupt */
-#define INT_V_NONE      -1              /* no interrupt used */
+#define INT_V_NONE      0xffffffff      /* no interrupt used */
 
 /* I/O macros */
 

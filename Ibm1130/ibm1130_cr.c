@@ -887,7 +887,7 @@ static t_stat cp_set_code (UNIT *uptr, int32 match, char *cptr, void *desc)
 	return SCPE_OK;
 }
 
-t_stat load_cr_boot (int drvno, int switches)
+t_stat load_cr_boot (int32 drvno, int switches)
 {
 	int i;
 	char *name, msg[80];
@@ -972,7 +972,7 @@ t_stat load_cr_boot (int drvno, int switches)
 	return SCPE_OK;
 }
 
-t_stat cr_boot (int unitno, DEVICE *dptr)
+t_stat cr_boot (int32 unitno, DEVICE *dptr)
 {
 	t_stat rval;
 	int i;

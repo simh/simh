@@ -269,7 +269,7 @@ void xio_t2741_terminal (int32 addr, int32 func, int32 modify);				/* IO selectr
 void xio_error 			(char *msg);
 
 void   bail (char *msg);
-t_stat load_cr_boot (int drv, int switches);
+t_stat load_cr_boot (int32 drv, int switches);
 t_stat cr_boot (int32 unitno, DEVICE *dptr);
 t_stat cr_rewind (void);
 t_stat cr_detach (UNIT *uptr);

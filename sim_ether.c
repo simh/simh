@@ -3013,7 +3013,7 @@ do {
         u_char buf[ETH_MAX_JUMBO_FRAME];
 
         memset(&header, 0, sizeof(header));
-        len = (int)sim_read_sock (dev->fd_handle, buf, (int32)sizeof(buf));
+        len = (int)sim_read_sock (dev->fd_handle, (char *)buf, (int32)sizeof(buf));
         if (len > 0) {
           status = 1;
           header.caplen = header.len = len;
