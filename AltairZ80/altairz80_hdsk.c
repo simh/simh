@@ -46,7 +46,7 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr);
 static t_stat hdsk_detach(UNIT *uptr);
 static uint32 is_imd(const UNIT *uptr);
 static void assignFormat(UNIT *uptr);
-static void verifyDiskInfo(const DISK_INFO info, const char unitChar);
+static void verifyDiskInfo(const DISK_INFO *info, const char unitChar);
 
 #define UNIT_V_HDSK_WLK         (UNIT_V_UF + 0) /* write locked                             */
 #define UNIT_HDSK_WLK           (1 << UNIT_V_HDSK_WLK)
@@ -347,28 +347,28 @@ static void assignFormat(UNIT *uptr) {
     }
 }
 
-static void verifyDiskInfo(const DISK_INFO info, const char unitChar) {
+static void verifyDiskInfo(const DISK_INFO *info, const char unitChar) {
     uint32 track, head;
-    if (info.ntracks < 1)
+    if (info->ntracks < 1)
         printf("HDSK%c (IMD): WARNING: Number of tracks is 0.\n", unitChar);
-    if (info.nsides < 1) {
+    if (info->nsides < 1) {
         printf("HDSK%c (IMD): WARNING: Number of sides is 0.\n", unitChar);
         return;
     }
-    for (track = 0; track < info.ntracks / info.nsides; track++)
-        for (head = 0; head < info.nsides; head++) {
-            if (info.track[track][head].nsects != info.track[1][0].nsects)
+    for (track = 0; track < info->ntracks / info->nsides; track++)
+        for (head = 0; head < info->nsides; head++) {
+            if (info->track[track][head].nsects != info->track[1][0].nsects)
                 printf("HDSK%c (IMD): WARNING: For track %i and head %i expected number of sectors "
                        "%i but got %i.\n", unitChar, track, head,
-                       info.track[1][0].nsects, info.track[track][head].nsects);
-            if (info.track[track][head].sectsize != info.track[1][0].sectsize)
+                       info->track[1][0].nsects, info->track[track][head].nsects);
+            if (info->track[track][head].sectsize != info->track[1][0].sectsize)
                 printf("HDSK%c (IMD): WARNING: For track %i and head %i expected sector size "
                        "%i but got %i.\n", unitChar, track, head,
-                       info.track[1][0].sectsize, info.track[track][head].sectsize);
-            if (info.track[track][head].start_sector != info.track[1][0].start_sector)
+                       info->track[1][0].sectsize, info->track[track][head].sectsize);
+            if (info->track[track][head].start_sector != info->track[1][0].start_sector)
                 printf("HDSK%c (IMD): WARNING: For track %i and head %i expected start sector "
                        "%i but got %i.\n", unitChar, track, head,
-                       info.track[1][0].start_sector, info.track[track][head].start_sector);
+                       info->track[1][0].start_sector, info->track[track][head].start_sector);
         }
 }
 
@@ -395,7 +395,7 @@ static t_stat hdsk_attach(UNIT *uptr, char *cptr) {
         hdsk_imd[thisUnitIndex] = diskOpen(uptr -> fileref, sim_deb && (hdsk_dev.dctrl & VERBOSE_MSG));
         if (hdsk_imd[thisUnitIndex] == NULL)
             return SCPE_IOERR;
-        verifyDiskInfo(*hdsk_imd[thisUnitIndex], '0' + thisUnitIndex);
+        verifyDiskInfo(hdsk_imd[thisUnitIndex], '0' + thisUnitIndex);
         uptr -> HDSK_NUMBER_OF_TRACKS = hdsk_imd[thisUnitIndex] -> ntracks;
         uptr -> HDSK_SECTORS_PER_TRACK = hdsk_imd[thisUnitIndex] -> track[1][0].nsects;
         uptr -> HDSK_SECTOR_SIZE = hdsk_imd[thisUnitIndex] -> track[1][0].sectsize;
