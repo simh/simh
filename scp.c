@@ -1758,8 +1758,9 @@ return stat | SCPE_NOMESSAGE;                           /* suppress message sinc
    A Tokens preceeded and followed by % characters are expanded as environment
    variables, and if one isn't found then can be one of several special 
    variables: 
-          %DATE%              yyyy/mm/dd
+          %DATE%              yyyy-mm-dd
           %TIME%              hh:mm:ss
+          %STIME%             hh_mm_ss
           %CTIME%             Www Mmm dd hh:mm:ss yyyy
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
@@ -1847,11 +1848,15 @@ for (; *ip && (op < oend); ) {
                     time(&now);
                     tmnow = localtime(&now);
                     if (!strcmp ("DATE", gbuf)) {
-                        sprintf (rbuf, "%4d/%02d/%02d", tmnow->tm_year+1900, tmnow->tm_mon+1, tmnow->tm_mday);
+                        sprintf (rbuf, "%4d-%02d-%02d", tmnow->tm_year+1900, tmnow->tm_mon+1, tmnow->tm_mday);
                         ap = rbuf;
                         }
                     else if (!strcmp ("TIME", gbuf)) {
                         sprintf (rbuf, "%02d:%02d:%02d", tmnow->tm_hour, tmnow->tm_min, tmnow->tm_sec);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("STIME", gbuf)) {
+                        sprintf (rbuf, "%02d_%02d_%02d", tmnow->tm_hour, tmnow->tm_min, tmnow->tm_sec);
                         ap = rbuf;
                         }
                     else if (!strcmp ("CTIME", gbuf)) {

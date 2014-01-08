@@ -212,7 +212,7 @@ The "!" command (execute a command on the local OS), now returns the command's e
 #### Command Processing Enhancements
 
 ##### Environment variable insertion
-Built In variables %DATE%, %TIME%, %CTIME%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
+Built In variables %DATE%, %TIME%, %STIME%, %CTIME%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
 Command Aliases
 
    Token "%0" expands to the command file name. 
@@ -228,8 +228,9 @@ Command Aliases
    variables, and if one isn't found then can be one of several special 
    variables: 
    
-          %DATE%              yyyy/mm/dd
+          %DATE%              yyyy-mm-dd
           %TIME%              hh:mm:ss
+          %STIME%             hh_mm_ss
           %CTIME%             Www Mmm dd hh:mm:ss yyyy
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
