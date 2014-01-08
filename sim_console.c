@@ -1623,7 +1623,7 @@ for (i = 0; i < val; i++)
     temptabs[i] = 0;
 do {
     cptr = get_glyph (cptr, gbuf, ';');
-    d = get_uint (gbuf, 10, val, &r);
+    d = (int32)get_uint (gbuf, 10, val, &r);
     if ((r != SCPE_OK) || (d == 0)) {
         free (temptabs);
         return SCPE_ARG;

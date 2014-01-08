@@ -132,6 +132,9 @@
 */
 #if defined(HAVE_PCAP_NETWORK)
 #define USE_BPF 1
+#if defined (_WIN32) && !defined (BPF_CONST_STRING)
+#define BPF_CONST_STRING 1
+#endif
 #else
 #define DONT_USE_PCAP_FINDALLDEVS 1
 #endif
