@@ -212,7 +212,7 @@ The "!" command (execute a command on the local OS), now returns the command's e
 #### Command Processing Enhancements
 
 ##### Environment variable insertion
-Built In variables %DATE%, %TIME%, %STIME%, %CTIME%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
+Built In variables %DATE%, %TIME%, %DATETIME%, %LDATE%, %LTIME%, %CTIME%, %DATE_YYYY%, %DATE_YY%, %DATE_MM%, %DATE_DD%, %DATE_D%, %DATE_WYYYY%, %DATE_WW%, %TIME_HH%, %TIME_MM%, %TIME_SS%, %STATUS%, %TSTATUS%, %SIM_VERIFY%, %SIM_QUIET%, %SIM_MESSAGE%
 Command Aliases
 
    Token "%0" expands to the command file name. 
@@ -230,8 +230,21 @@ Command Aliases
    
           %DATE%              yyyy-mm-dd
           %TIME%              hh:mm:ss
-          %STIME%             hh_mm_ss
-          %CTIME%             Www Mmm dd hh:mm:ss yyyy
+          %DATETIME%          yyyy-mm-ddThh:mm:ss
+          %LDATE%             mm/dd/yy (Locale Formatted)
+          %LTIME%             hh:mm:ss am/pm (Locale Formatted)
+          %CTIME%             Www Mmm dd hh:mm:ss yyyy (Locale Formatted)
+          %DATE_YYYY%         yyyy        (0000-9999)
+          %DATE_YY%           yy          (00-99)
+          %DATE_MM%           mm          (01-12)
+          %DATE_DD%           dd          (01-31)
+          %DATE_WW%           ww          (01-53)     ISO 8601 week number
+          %DATE_WYYYY%        yyyy        (0000-9999) ISO 8601 week year number
+          %DATE_D%            d           (1-7)       ISO 8601 day of week
+          %DATE_JJJ%          jjj         (001-366) day of year
+          %TIME_HH%           hh          (00-23)
+          %TIME_MM%           mm          (00-59)
+          %TIME_SS%           ss          (00-59)
           %STATUS%            Status value from the last command executed
           %TSTATUS%           The text form of the last status value
           %SIM_VERIFY%        The Verify/Verbose mode of the current Do command file

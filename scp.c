@@ -1785,7 +1785,11 @@ char gbuf[CBUFSIZE];
 char *ip = instr, *op, *ap, *oend, *istart, *tmpbuf;
 char rbuf[CBUFSIZE];
 int i;
+time_t now;
+struct tm *tmnow;
 
+time(&now);
+tmnow = localtime(&now);
 tmpbuf = (char *)malloc(instr_size);
 op = tmpbuf;
 oend = tmpbuf + instr_size - 2;
@@ -1842,11 +1846,7 @@ for (; *ip && (op < oend); ) {
                 ip += 1 + strlen (gbuf);
                 if (*ip == '%') ++ip;
                 if (!ap) {
-                    time_t now;
-                    struct tm *tmnow;
-
-                    time(&now);
-                    tmnow = localtime(&now);
+                    /* ISO 8601 format date/time info */
                     if (!strcmp ("DATE", gbuf)) {
                         sprintf (rbuf, "%4d-%02d-%02d", tmnow->tm_year+1900, tmnow->tm_mon+1, tmnow->tm_mday);
                         ap = rbuf;
@@ -1855,13 +1855,92 @@ for (; *ip && (op < oend); ) {
                         sprintf (rbuf, "%02d:%02d:%02d", tmnow->tm_hour, tmnow->tm_min, tmnow->tm_sec);
                         ap = rbuf;
                         }
-                    else if (!strcmp ("STIME", gbuf)) {
-                        sprintf (rbuf, "%02d_%02d_%02d", tmnow->tm_hour, tmnow->tm_min, tmnow->tm_sec);
+                    else if (!strcmp ("DATETIME", gbuf)) {
+                        sprintf (rbuf, "%04d-%02d-%02dT%02d:%02d:%02d", tmnow->tm_year+1900, tmnow->tm_mon+1, tmnow->tm_mday, tmnow->tm_hour, tmnow->tm_min, tmnow->tm_sec);
+                        ap = rbuf;
+                        }
+                    /* Locale oriented formatted date/time info */
+                    if (!strcmp ("LDATE", gbuf)) {
+                        strftime (rbuf, sizeof(rbuf), "%x", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("LTIME", gbuf)) {
+#if defined(HAVE_C99_STRFTIME)
+                        strftime (rbuf, sizeof(rbuf), "%r", tmnow);
+#else
+                        strftime (rbuf, sizeof(rbuf), "%p", tmnow);
+                        if (rbuf[0])
+                            strftime (rbuf, sizeof(rbuf), "%I:%M:%S %p", tmnow);
+                        else
+                            strftime (rbuf, sizeof(rbuf), "%H:%M:%S", tmnow);
+#endif
                         ap = rbuf;
                         }
                     else if (!strcmp ("CTIME", gbuf)) {
+#if defined(HAVE_C99_STRFTIME)
+                        strftime (rbuf, sizeof(rbuf), "%c", tmnow);
+#else
                         strcpy (rbuf, ctime(&now));
                         rbuf[strlen (rbuf)-1] = '\0';    /* remove trailing \n */
+#endif
+                        ap = rbuf;
+                        }
+                    /* Separate Date/Time info */
+                    else if (!strcmp ("DATE_YYYY", gbuf)) {/* Year (0000-9999) */
+                        strftime (rbuf, sizeof(rbuf), "%Y", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_YY", gbuf)) {/* Year (00-99) */
+                        strftime (rbuf, sizeof(rbuf), "%y", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_MM", gbuf)) {/* Month number (01-12) */
+                        strftime (rbuf, sizeof(rbuf), "%m", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_DD", gbuf)) {/* Day of Month (01-31) */
+                        strftime (rbuf, sizeof(rbuf), "%d", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_D", gbuf)) { /* ISO 8601 weekday number (1-7) */
+                        sprintf (rbuf, "%d", (tmnow->tm_wday ? tmnow->tm_wday : 7));
+                        ap = rbuf;
+                        }
+                    else if ((!strcmp ("DATE_WW", gbuf)) ||   /* ISO 8601 week number (01-53) */
+                             (!strcmp ("DATE_WYYYY", gbuf))) {/* ISO 8601 week year number (0000-9999) */
+                        int iso_yr = tmnow->tm_year + 1900;
+                        int iso_wk = (tmnow->tm_yday + 11 - (tmnow->tm_wday ? tmnow->tm_wday : 7))/7;;
+
+                        if (iso_wk == 0) {
+                            iso_yr = iso_yr - 1;
+                            tmnow->tm_yday += 365 + ((iso_yr % 4) == 0) ? 1 : 0;    /* Adjust for Leap Year (Correct thru 2099) */
+                            iso_wk = (tmnow->tm_yday + 11 - (tmnow->tm_wday ? tmnow->tm_wday : 7))/7;
+                            }
+                        else
+                            if ((iso_wk == 53) && (((31 - tmnow->tm_mday) + tmnow->tm_wday) < 4)) {
+                                ++iso_yr;
+                                iso_wk = 1;
+                                }
+                        if (!strcmp ("DATE_WW", gbuf))
+                            sprintf (rbuf, "%02d", iso_wk);
+                        else
+                            sprintf (rbuf, "%04d", iso_yr);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("DATE_JJJ", gbuf)) {/* day of year (001-366) */
+                        strftime (rbuf, sizeof(rbuf), "%j", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("TIME_HH", gbuf)) {/* Hour of day (00-23) */
+                        strftime (rbuf, sizeof(rbuf), "%H", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("TIME_MM", gbuf)) {/* Minute of hour (00-59) */
+                        strftime (rbuf, sizeof(rbuf), "%M", tmnow);
+                        ap = rbuf;
+                        }
+                    else if (!strcmp ("TIME_SS", gbuf)) {/* Second of minute (00-59) */
+                        strftime (rbuf, sizeof(rbuf), "%S", tmnow);
                         ap = rbuf;
                         }
                     else if (!strcmp ("STATUS", gbuf)) {

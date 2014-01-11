@@ -219,6 +219,10 @@ typedef uint32          t_addr;
 #define HAVE_GLOB
 #endif
 
+#if defined (__linux) || defined (VMS) || defined (__APPLE__)
+#define HAVE_C99_STRFTIME 1
+#endif
+
 /* Stubs for inlining */
 
 #define SIM_INLINE
