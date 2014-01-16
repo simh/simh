@@ -400,9 +400,9 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
       endif
     else
       # On non-Linux platforms, we'll still try to provide deprecated support for libpcap in /usr/local
+      INCPATHSAVE := $(INCPATH)
       ifeq (,$(findstring Linux,$(OSTYPE)))
         # Look for package built from tcpdump.org sources with default install target (or cygwin winpcap)
-        INCPATHSAVE := $(INCPATH)
         INCPATH += /usr/local/include
         PCAP_H_FOUND = $(call find_include,pcap)
       endif
