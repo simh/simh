@@ -1913,7 +1913,7 @@ for (; *ip && (op < oend); ) {
 
                         if (iso_wk == 0) {
                             iso_yr = iso_yr - 1;
-                            tmnow->tm_yday += 365 + ((iso_yr % 4) == 0) ? 1 : 0;    /* Adjust for Leap Year (Correct thru 2099) */
+                            tmnow->tm_yday += 365 + (((iso_yr % 4) == 0) ? 1 : 0);  /* Adjust for Leap Year (Correct thru 2099) */
                             iso_wk = (tmnow->tm_yday + 11 - (tmnow->tm_wday ? tmnow->tm_wday : 7))/7;
                             }
                         else
