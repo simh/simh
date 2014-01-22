@@ -42,6 +42,6 @@ ipch/
 !Visual Studio Projects/*.sln
 !Visual Studio Projects/0ReadMe_Projects.txt
 Visual Studio Projects/*
-.DS_Store*/
+.DS_Store
 
 
