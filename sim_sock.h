@@ -78,6 +78,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <netinet/in.h>                                 /* for sockaddr_in */
+#include <netinet/tcp.h>                                /* for TCP_NODELAY */
 #include <arpa/inet.h>                                  /* for inet_addr and inet_ntoa */
 #include <netdb.h>
 #include <sys/time.h>                                   /* for EMX */
@@ -105,8 +106,9 @@ t_stat sim_parse_addr (const char *cptr, char *host, size_t hostlen, const char 
 t_stat sim_parse_addr_ex (const char *cptr, char *host, size_t hostlen, const char *default_host, char *port, size_t port_len, char *localport, size_t local_port_len, const char *default_port);
 SOCKET sim_master_sock (const char *hostport, t_stat *parse_status);
 SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port);
-SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram);
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram, t_bool nodelay);
 SOCKET sim_accept_conn (SOCKET master, char **connectaddr);
+SOCKET sim_accept_conn_ex (SOCKET master, char **connectaddr, t_bool nodelay);
 int32 sim_check_conn (SOCKET sock, t_bool rd);
 int32 sim_read_sock (SOCKET sock, char *buf, int32 nbytes);
 int32 sim_write_sock (SOCKET sock, char *msg, int32 nbytes);

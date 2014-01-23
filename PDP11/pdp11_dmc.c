@@ -3293,6 +3293,8 @@ uint32 i, j;
 
 sim_debug(DBG_TRC, dptr, "dmc_reset(%s)\n", dptr->name);
 
+dmc_desc.packet = TRUE;
+dmp_desc.packet = TRUE;
 /* Connect structures together */
 for (i=0; i < DMC_NUMDEVICE; i++) {
     dmc_csrs[i].sel0 = &dmc_sel0[i];

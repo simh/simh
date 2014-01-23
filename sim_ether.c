@@ -1897,7 +1897,7 @@ else
         if (sim_log) fprintf (sim_log, msg, errbuf);
         return SCPE_OPENERR;
         }
-      dev->fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, TRUE);
+      dev->fd_handle = sim_connect_sock_ex (localport, hostport, NULL, NULL, TRUE, FALSE);
       if (INVALID_SOCKET == dev->fd_handle)
           return SCPE_OPENERR;
       dev->eth_api = ETH_API_UDP;

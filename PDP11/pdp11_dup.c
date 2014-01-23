@@ -1190,6 +1190,7 @@ int32 i, ndev;
 
 sim_debug(DBG_TRC, dptr, "dup_reset()\n");
 
+dup_desc.packet = TRUE;
 if ((UNIBUS) && (dptr == &dpv_dev)) {
     if (!(dptr->flags & DEV_DIS)) {
         printf ("Can't enable Qbus device on Unibus system\n");

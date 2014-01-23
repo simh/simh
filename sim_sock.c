@@ -101,7 +101,7 @@ SOCKET sim_connect_sock (const char *hostport, const char *default_host, const c
 return INVALID_SOCKET;
 }
 
-SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram)
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram, t_bool nodelay)
 {
 return INVALID_SOCKET;
 }
@@ -797,6 +797,33 @@ return 0;
 
 #endif                                                  /* endif !Win32 && !VMS */
 
+static int32 sim_setnodelay (SOCKET sock)
+{
+int nodelay = 1;
+int sta;
+
+/* disable Nagle algorithm */
+sta = setsockopt (sock, IPPROTO_TCP, TCP_NODELAY, (char *)&nodelay, sizeof(nodelay));
+if (sta == -1)
+    return SOCKET_ERROR;
+
+#if defined(TCP_NODELAYACK)
+/* disable delayed ack algorithm */
+sta = setsockopt (sock, IPPROTO_TCP, TCP_NODELAYACK, (char *)&nodelay, sizeof(nodelay));
+if (sta == -1)
+    return SOCKET_ERROR;
+#endif
+
+#if defined(TCP_QUICKACK)
+/* disable delayed ack algorithm */
+sta = setsockopt (sock, IPPROTO_TCP, TCP_QUICKACK, (char *)&nodelay, sizeof(nodelay));
+if (sta == -1)
+    return SOCKET_ERROR;
+#endif
+
+return sta;
+}
+
 static SOCKET sim_create_sock_ex (int af, t_bool datagram)
 {
 SOCKET newsock;
@@ -915,10 +942,10 @@ return newsock;                                         /* got it! */
 
 SOCKET sim_connect_sock (const char *hostport, const char *default_host, const char *default_port)
 {
-return sim_connect_sock_ex (NULL, hostport, default_host, default_port, FALSE);
+return sim_connect_sock_ex (NULL, hostport, default_host, default_port, FALSE, FALSE);
 }
 
-SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram)
+SOCKET sim_connect_sock_ex (const char *sourcehostport, const char *hostport, const char *default_host, const char *default_port, t_bool datagram, t_bool nodelay)
 {
 SOCKET newsock = INVALID_SOCKET;
 int32 sta;
@@ -986,6 +1013,13 @@ if (sta == SOCKET_ERROR) {                              /* fcntl error? */
     p_freeaddrinfo (result);
     return sim_err_sock (newsock, "fcntl", 1);
     }
+if ((!datagram) && (nodelay)) {
+    sta = sim_setnodelay (newsock);                     /* set nodelay */
+    if (sta == SOCKET_ERROR) {                          /* setsock error? */
+        p_freeaddrinfo (result);
+        return sim_err_sock (newsock, "setnodelay", 1);
+        }
+    }
 sta = connect (newsock, result->ai_addr, result->ai_addrlen);
 p_freeaddrinfo (result);
 if ((sta == SOCKET_ERROR) && 
@@ -997,6 +1031,11 @@ return newsock;                                         /* got it! */
 }
 
 SOCKET sim_accept_conn (SOCKET master, char **connectaddr)
+{
+return sim_accept_conn_ex (master, connectaddr, FALSE);
+}
+
+SOCKET sim_accept_conn_ex (SOCKET master, char **connectaddr, t_bool nodelay)
 {
 int32 sta, err;
 #if defined (macintosh) || defined (__linux) || defined (__linux__) || \
@@ -1039,6 +1078,13 @@ if (connectaddr != NULL) {
 sta = sim_setnonblock (newsock);                        /* set nonblocking */
 if (sta == SOCKET_ERROR)                                /* fcntl error? */
     return sim_err_sock (newsock, "fcntl", 0);
+
+if (nodelay) {
+    sta = sim_setnodelay (newsock);                        /* set nonblocking */
+    if (sta == SOCKET_ERROR)                               /* setsockopt error? */
+        return sim_err_sock (newsock, "setnodelay", 0);
+    }
+
 return newsock;
 }
 
