@@ -2124,12 +2124,25 @@ if ((std_input == NULL) ||                              /* No keyboard for */
 return (WAIT_OBJECT_0 == WaitForSingleObject (std_input, ms_timeout));
 }
 
+#define BELL_CHAR         7         /* Bell Character */
+#define BELL_INTERVAL_MS  500       /* No more than 2 Bell Characters Per Second */
 static t_stat sim_os_putchar (int32 c)
 {
 DWORD unused;
+static uint32 last_bell_time;
 
-if (c != 0177)
-    WriteConsoleA(std_output, &c, 1, &unused, NULL);
+if (c != 0177) {
+    if (c == BELL_CHAR) {
+        uint32 now = sim_os_msec ();
+
+        if ((now - last_bell_time) > BELL_INTERVAL_MS) {
+            WriteConsoleA(std_output, &c, 1, &unused, NULL);
+            last_bell_time = now;
+            }
+        }
+    else
+        WriteConsoleA(std_output, &c, 1, &unused, NULL);
+    }
 return SCPE_OK;
 }
 
