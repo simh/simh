@@ -921,7 +921,16 @@ else if (*argv[0]) {                                    /* sim name arg? */
     if ((np = match_ext (nbuf, "EXE")))                 /* remove .exe */
         *np = 0;
     strcat (nbuf, ".ini\"");                            /* add .ini" */
-    stat = do_cmd (-1, nbuf);                           /* proc cmd file */
+    stat = do_cmd (-1, nbuf) & ~SCPE_NOMESSAGE;         /* proc default cmd file */
+    if (stat == SCPE_OPENERR) {                         /* didn't exist/can't open? */
+        np = strrchr (nbuf, '/');                       /* stript path and try again in cwd */
+        if (np == NULL)
+            np = strrchr (nbuf, '\\');
+        if (np != NULL) {
+            *np = '"';
+            stat = do_cmd (-1, np) & ~SCPE_NOMESSAGE;   /* proc default cmd file */
+            }
+        }
     }
 
 stat = SCPE_BARE_STATUS(stat);                          /* remove possible flag */
