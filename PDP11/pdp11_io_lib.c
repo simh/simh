@@ -47,6 +47,10 @@ extern t_stat build_dib_tab (void);
 
 static DIB *iodibp[IOPAGESIZE >> 1];
 
+#if !defined(UNIMEMSIZE)
+#define UNIMEMSIZE      001000000                       /* 2**18 */
+#endif
+
 #define AUTO_MAXC       32              /* Maximum number of controllers */
 #define AUTO_CSRBASE    0010
 #define AUTO_CSRMAX    04000
@@ -765,6 +769,7 @@ t_stat auto_config (char *name, int32 nctrl)
 {
 uint32 csr = IOPAGEBASE + AUTO_CSRBASE;
 uint32 vec = VEC_Q + AUTO_VECBASE;
+extern UNIT cpu_unit;
 AUTO_CON *autp;
 DEVICE *dptr;
 DIB *dibp;
@@ -801,8 +806,9 @@ for (autp = auto_tab; autp->numc >= 0; autp++) {        /* loop thru table */
             !(dptr->flags & (DEV_UBUS | DEV_QBUS | DEV_Q18)) )
             continue;
         /* Sanity check that enabled devices can work on the current bus */
-        if ((!UNIBUS && !(dptr->flags & DEV_QBUS)) ||
-            (UNIBUS && !(dptr->flags & (DEV_UBUS | DEV_Q18)))) {
+        if (!((UNIBUS && (dptr->flags & (DEV_UBUS | DEV_Q18))) ||
+             ((!UNIBUS) && ((dptr->flags & DEV_QBUS) || 
+                            ((dptr->flags & DEV_Q18) && (MEMSIZE <= UNIMEMSIZE)))))) {
             dptr->flags |= DEV_DIS;
             if (sim_switches & SWMASK ('P'))
                 continue;
