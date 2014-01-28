@@ -1,4 +1,5 @@
 *.jpg binary
+*.png binary
 *.sln binary
 *.vcproj binary
 *.exe binary
