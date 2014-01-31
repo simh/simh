@@ -1709,7 +1709,7 @@ AUTO_CON auto_tab[] = {/*c  #v  am vm  fxa   fxv */
     { { "KDP" },         1,  2,  0, 0, 
         {0000540}, {0540} },                             /* KMC11-A comm IOP-DUP ucode - fx CSR, fx VEC */
     { { "DMR" },         1,  2,  0, 0, 
-        {0000700}, {0440} },                             /* DMR11 comm - fx CSR, fx VEC */
+        {0004000}, {0610} },                             /* DMR11 comm - fx CSR, fx VEC */
 #else
     { { "QBA" },         1,  0,  0, 0, 
         {017500} },                                     /* doorbell - fx CSR, no VEC */
