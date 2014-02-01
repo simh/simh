@@ -110,9 +110,9 @@ char *sim_dname (DEVICE *dptr);
 char *sim_uname (UNIT *dptr);
 t_stat get_yn (char *ques, t_stat deflt);
 char *get_sim_opt (int32 opt, char *cptr, t_stat *st);
-char *get_glyph (char *iptr, char *optr, char mchar);
-char *get_glyph_nc (char *iptr, char *optr, char mchar);
-char *get_glyph_quoted (char *iptr, char *optr, char mchar);
+char *get_glyph (const char *iptr, char *optr, char mchar);
+char *get_glyph_nc (const char *iptr, char *optr, char mchar);
+char *get_glyph_quoted (const char *iptr, char *optr, char mchar);
 t_value get_uint (char *cptr, uint32 radix, t_value max, t_stat *status);
 char *get_range (DEVICE *dptr, char *cptr, t_addr *lo, t_addr *hi,
     uint32 rdx, t_addr max, char term);
@@ -159,13 +159,13 @@ void fprint_stopped_gen (FILE *st, t_stat v, REG *pc, DEVICE *dptr);
 #define SCP_HELP_ONECMD (1u << 30)       /* Display one topic, do not prompt */
 #define SCP_HELP_ATTACH (1u << 29)       /* Top level topic is ATTACH help */
 t_stat scp_help (FILE *st, struct sim_device *dptr,
-                 struct sim_unit *uptr, int32 flag, const char *help, char *cptr, ...);
+                 struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, ...);
 t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
-                  struct sim_unit *uptr, int32 flag, const char *help, char *cptr, va_list ap);
+                  struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, va_list ap);
 t_stat scp_helpFromFile (FILE *st, struct sim_device *dptr,
-                         struct sim_unit *uptr, int32 flag, const char *help, char *cptr, ...);
+                         struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, ...);
 t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
-                          struct sim_unit *uptr, int32 flag, const char *help, char *cptr, va_list ap);
+                          struct sim_unit *uptr, int32 flag, const char *help, const char *cptr, va_list ap);
 
 /* Global data */
 

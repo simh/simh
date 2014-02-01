@@ -549,7 +549,8 @@ struct sim_ctab {
     t_stat              (*action)(int32 flag, char *cptr);
                                                         /* action routine */
     int32               arg;                            /* argument */
-    char                *help;                          /* help string */
+    const char          *help;                          /* help string/structured locator */
+    const char          *help_base;                     /* structured help base*/
     void                (*message)(const char *unechoed_cmdline, t_stat stat);
                                                         /* message printing routine */
     };

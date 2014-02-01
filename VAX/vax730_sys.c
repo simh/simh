@@ -141,7 +141,7 @@ DEVICE sysb_dev = {
 CTAB vax730_cmd[] = {
     { "BOOT", &vax730_boot, RU_BOOT,
       "bo{ot} <device>{/R5:flg} boot device\n"
-      "                         type HELP CPU to see bootable devices\n", &run_cmd_message },
+      "                         type HELP CPU to see bootable devices\n", NULL, &run_cmd_message },
     { NULL }
     };
 

@@ -303,7 +303,7 @@ return SCPE_OK;
 CTAB vax860_cmd[] = {
     { "BOOT", &vax860_boot, RU_BOOT,
       "bo{ot} <device>{/R5:flg} boot device\n"
-      "                         type HELP CPU to see bootable devices\n", &run_cmd_message },
+      "                         type HELP CPU to see bootable devices\n", NULL, &run_cmd_message },
     { NULL }
     };
 

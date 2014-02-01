@@ -397,7 +397,7 @@ BRKTAB *sim_brk_new (t_addr loc);
 
 SCHTAB *get_search (char *cptr, int32 radix, SCHTAB *schptr);
 int32 test_search (t_value val, SCHTAB *schptr);
-static char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc, t_bool quote);
+static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote);
 int32 get_switches (char *cptr);
 char *get_sim_sw (char *cptr);
 t_stat get_aval (t_addr addr, DEVICE *dptr, UNIT *uptr);
@@ -441,10 +441,12 @@ t_stat set_verify (int32 flag, char *cptr);
 t_stat set_message (int32 flag, char *cptr);
 t_stat set_quiet (int32 flag, char *cptr);
 t_stat set_asynch (int32 flag, char *cptr);
+t_stat sim_show_asynch (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr);
 t_stat do_cmd_label (int32 flag, char *cptr, char *label);
 void int_handler (int signal);
 t_stat set_prompt (int32 flag, char *cptr);
-
+t_stat sim_set_asynch (int32 flag, char *cptr);
+t_stat sim_set_environment (int32 flag, char *cptr);
 /* Global data */
 
 DEVICE *sim_dflt_dev = NULL;
@@ -598,200 +600,834 @@ const t_value width_mask[] = { 0,
 #endif
     };
 
+static const char simh_help[] =
+       /***************** 80 character line width template *************************/
+      "1Commands\n"
+#define HLP_RESET       "*Commands Resetting Devices"
+       /***************** 80 character line width template *************************/
+      "2Resetting Devices\n"
+      " The RESET command (abbreviation RE) resets a device or the entire simulator\n"
+      " to a predefined condition.  If switch -p is specified, the device is reset\n"
+      " to its power-up state:\n\n"
+      "++RESET                  reset all devices\n"
+      "++RESET -p               powerup all devices\n"
+      "++RESET ALL              reset all devices\n"
+      "++RESET <device>         reset specified device\n\n"
+      " Typically, RESET stops any in-progress I/O operation, clears any interrupt\n"
+      " request, and returns the device to a quiescent state.  It does not clear\n"
+      " main memory or affect I/O connections.\n"
+#define HLP_EXAMINE     "*Commands Examining_and_Changing_State"
+#define HLP_IEXAMINE    "*Commands Examining_and_Changing_State"
+#define HLP_DEPOSIT     "*Commands Examining_and_Changing_State"
+#define HLP_IDEPOSIT    "*Commands Examining_and_Changing_State"
+       /***************** 80 character line width template *************************/
+      "2Examining and Changing State\n"
+      " There are four commands to examine and change state:\n\n"
+      "++EXAMINE (abbreviated E) examines state\n"
+      "++DEPOSIT (abbreviated D) changes state\n"
+      "++IEXAMINE (interactive examine, abbreviated IE) examines state and allows\n"
+      "++++the user to interactively change it\n"
+      "++IDEPOSIT (interactive deposit, abbreviated ID) allows the user to\n"
+      "++++interactively change state\n\n"
+      " All four commands take the form\n\n"
+      "++command {modifiers} <object list>\n\n"
+      " Deposit must also include a deposit value at the end of the command.\n\n"
+      " There are four kinds of modifiers: switches, device/unit name, search\n"
+      " specifier, and for EXAMINE, output file.  Switches have been described\n"
+      " previously.  A device/unit name identifies the device and unit whose\n"
+      " address space is to be examined or modified.  If no device is specified,\n"
+      " the CPU (main memory)is selected; if a device but no unit is specified,\n"
+      " unit 0 of the device is selected.\n\n"
+      " The search specifier provides criteria for testing addresses or registers\n"
+      " to see if they should be processed.  A specifier consists of a logical\n"
+      " operator, a relational operator, or both, optionally separated by spaces.\n\n"
+      "++{<logical op> <value>} <relational op> <value>\n\n"
+       /***************** 80 character line width template *************************/
+      " where the logical operator is & (and), | (or), or ^ (exclusive or), and the\n"
+      " relational operator is = or == (equal), ! or != (not equal), >= (greater\n"
+      " than or equal), > (greater than), <= (less than or equal), or < (less than).\n"
+      " If a logical operator is specified without a relational operator, it is\n"
+      " ignored.  If a relational operator is specified without a logical operator,\n"
+      " no logical operation is performed.  All comparisons are unsigned.\n\n"
+      " The output file modifier redirects command output to a file instead of the\n"
+      " console.  An output file modifier consists of @ followed by a valid file\n"
+      " name.\n\n"
+      " Modifiers may be specified in any order.  If multiple modifiers of the\n"
+      " same type are specified, later modifiers override earlier modifiers.  Note\n"
+      " that if the device/unit name comes after the search specifier, the search\n"
+      " values will interpreted in the radix of the CPU, rather than of the\n"
+      " device/unit.\n\n"
+      " The \"object list\" consists of one or more of the following, separated by\n"
+      " commas:\n\n"
+       /***************** 80 character line width template *************************/
+      "++register               the specified register\n"
+      "++register[sub1-sub2]    the specified register array locations,\n"
+      "++                       starting at location sub1 up to and\n"
+      "++                       including location sub2\n"
+      "++register[sub1/length]  the specified register array locations,\n"
+      "++                       starting at location sub1 up to but\n"
+      "++                       not including sub1+length\n"
+      "++register[ALL]          all locations in the specified register\n"
+      "++                       array\n"
+      "++register1-register2    all the registers starting at register1\n"
+      "++                       up to and including register2\n"
+      "++address				the specified location\n"
+      "++address1-address2      all locations starting at address1 up to\n"
+      "++                       and including address2\n"
+      "++address/length         all location starting at address up to\n"
+      "++                       but not including address+length\n"
+      "++STATE                  all registers in the device\n"
+      "++ALL                    all locations in the unit\n"
+      "3Switches\n"
+      " Switches can be used to control the format of display information:\n\n"
+       /***************** 80 character line width template *************************/
+      "++-a					display as ASCII\n"
+      "++-c					display as character string\n"
+      "++-m					display as instruction mnemonics\n"
+      "++-o					display as octal\n"
+      "++-d					display as decimal\n"
+      "++-h					display as hexadecimal\n\n"
+      " The simulators typically accept symbolic input (see documentation with each\n"
+      " simulator).\n\n"
+      "3Examples\n"
+      " Examples:\n\n"
+      "++ex 1000-1100           examine 1000 to 1100\n"
+      "++de PC 1040             set PC to 1040\n"
+      "++ie 40-50               interactively examine 40:50\n"
+      "++ie >1000 40-50         interactively examine the subset\n"
+      "++                       of locations 40:50 that are >1000\n"
+      "++ex rx0 50060           examine 50060, RX unit 0\n"
+      "++ex rx sbuf[3-6]        examine SBUF[3] to SBUF[6] in RX\n"
+      "++de all 0				set main memory to 0\n"
+      "++de &77>0 0				set all addresses whose low order\n"
+      "++                       bits are non-zero to 0\n"
+      "++ex -m @memdump.txt 0-7777	dump memory to file\n\n"
+      " Note: to terminate an interactive command, simply type a bad value\n"
+      "       (eg, XYZ) when input is requested.\n"
+#define HLP_EVALUATE    "*Commands Evaluating_Instructions"
+       /***************** 80 character line width template *************************/
+      "2Evaluating Instructions\n"
+      " The EVAL command evaluates a symbolic expression and returns the equivalent\n"
+      " numeric value.  This is useful for obtaining numeric arguments for a search\n"
+      " command:\n\n"
+      "++EVAL <expression>\n"
+       /***************** 80 character line width template *************************/
+      "2Loading and Saving Programs\n"
+#define HLP_LOAD        "*Commands Loading_and_Saving_Programs LOAD"
+      "3LOAD\n"
+      " The LOAD command (abbreviation LO) loads a file in binary loader format:\n\n"
+      "++LOAD <filename> {implementation options}\n\n"
+      " The types of formats supported are implementation specific.  Options (such\n"
+      " as load within range) are also implementation specific.\n\n"
+#define HLP_DUMP        "*Commands Loading_and_Saving_Programs DUMP"
+      "3DUMP\n"
+      " The DUMP command (abbreviation DU) dumps memory in binary loader format:\n\n"
+      "++DUMP <filename> {implementation options}\n\n"
+      " The types of formats supported are implementation specific.  Options (such\n"
+      " as dump within range) are also implementation specific.\n"
+       /***************** 80 character line width template *************************/
+      "2Saving and Restoring State\n"
+#define HLP_SAVE        "*Commands Saving_and_Restoring_State SAVE"
+      "3SAVE\n"
+      " The SAVE command (abbreviation SA) save the complete state of the simulator\n"
+      " to a file.  This includes the contents of main memory and all registers,\n"
+      " and the I/O connections of devices:\n\n"
+      "++SAVE <filename>\n\n"
+#define HLP_RESTORE     "*Commands Saving_and_Restoring_State RESTORE"
+      "3RESTORE\n"
+      " The RESTORE command (abbreviation REST, alternately GET) restores a\n"
+      " previously saved simulator state:\n\n"
+      "++RESTORE <filename>\n"
+      "3Notes:\n"
+      " 1) SAVE file format compresses zeroes to minimize file size.\n"
+      " 2) The simulator can't restore active incoming telnet sessions to\n"
+      " multiplexer devices, but the listening ports will be restored across a\n"
+      " save/restore.\n"
+       /***************** 80 character line width template *************************/
+      "2Running A Simulated Program\n"
+#define HLP_RUN         "*Commands Running_A_Simulated_Program RUN"
+      "3RUN\n"
+      " The RUN command (abbreviated RU) resets all devices, deposits its argument\n"
+      " (if given) in the PC, and starts execution.  If no argument is given,\n"
+      " execution starts at the current PC.\n"
+#define HLP_GO          "*Commands Running_A_Simulated_Program GO"
+      "3GO\n"
+      " The GO command does not reset devices, deposits its argument (if given)\n"
+      " in the PC, and starts execution.  If no argument is given, execution\n"
+      " starts at the current PC.\n"
+#define HLP_CONTINUE    "*Commands Running_A_Simulated_Program CONTINUE"
+      "3CONTINUE\n"
+      " The CONT command (abbreviated CO) does not reset devices and resumes\n"
+      " execution at the current PC.\n"
+#define HLP_STEP        "*Commands Running_A_Simulated_Program STEP"
+      "3STEP\n"
+      " The STEP command (abbreviated S) resumes execution at the current PC for\n"
+      " the number of instructions given by its argument.  If no argument is\n"
+      " supplied, one instruction is executed.\n"
+#define HLP_BOOT        "*Commands Running_A_Simulated_Program BOOT"
+      "3BOOT\n"
+      " The BOOT command (abbreviated BO) resets all devices and bootstraps the\n"
+      " device and unit given by its argument.  If no unit is supplied, unit 0 is\n"
+      " bootstrapped.  The specified unit must be attached.\n"
+       /***************** 80 character line width template *************************/
+      "2Stopping The Simulator\n"
+      " Programs run until the simulator detects an error or stop condition, or\n"
+      " until the user forces a stop condition.\n"
+      "3Simulator Detected Stop Conditions\n"
+      " These simulator-detected conditions stop simulation:\n\n"
+      "++-  HALT instruction.  If a HALT instruction is decoded, simulation stops.\n"
+      "++-  Breakpoint.  The simulator may support breakpoints (see below).\n"
+      "++-  I/O error.  If an I/O error occurs during simulation of an I/O\n"
+      "+++operation, and the device stop-on-I/O-error flag is set, simulation\n"
+      "+++usually stops.\n\n"
+      "++-  Processor condition.  Certain processor conditions can stop\n"
+      "+++simulation; these are described with the individual simulators.\n"
+      "3User Specified Stop Conditions\n"
+      " Typing the interrupt character stops simulation.  The interrupt character\n"
+      " is defined by the WRU (where are you) console option and is initially set\n"
+      " to 005 (^E).\n\n"
+       /***************** 80 character line width template *************************/
+#define HLP_BREAK       "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions BREAK"
+#define HLP_NOBREAK     "*Commands Stopping_The_Simulator User_Specified_Stop_Conditions BREAK"
+      "4Breakpoints\n"
+      " A simulator may offer breakpoint capability.  A simulator may define\n"
+      " breakpoints of different types, identified by letter (for example, E for\n"
+      " execution, R for read, W for write, etc).  At the moment, most simulators\n"
+      " support only E (execution) breakpoints.\n\n"
+      " Associated with a breakpoint are a count and, optionally, one or more\n"
+      " actions.  Each time the breakpoint is taken, the associated count is\n"
+      " decremented.  If the count is less than or equal to 0, the breakpoint\n"
+      " occurs; otherwise, it is deferred.  When the breakpoint occurs, the\n"
+      " optional actions are automatically executed.\n\n"
+      " A breakpoint is set by the BREAK command:\n"
+      "++BREAK {-types} {<addr range>{[count]},{addr range...}}{;action;action...}\n\n"
+      " If no type is specified, the simulator-specific default breakpoint type\n"
+      " (usually E for execution) is used.  If no address range is specified, the\n"
+      " current PC is used.  As with EXAMINE and DEPOSIT, an address range may be a\n"
+      " single address, a range of addresses low-high, or a relative range of\n"
+      " address/length.\n"
+       /***************** 80 character line width template *************************/
+      "5Examples:\n"
+      "++BREAK                      set E break at current PC\n"
+      "++BREAK -e 200               set E break at 200\n"
+      "++BREAK 2000/2[2]            set E breaks at 2000,2001 with count = 2\n"
+      "++BREAK 100;EX AC;D MQ 0     set E break at 100 with actions EX AC and\n"
+      "++                           D MQ 0\n"
+      "++BREAK 100;                 delete action on break at 100\n\n"
+      " Currently set breakpoints can be displayed with the SHOW BREAK command:\n\n"
+      "++SHOW {-types} BREAK {ALL|<addr range>{,<addr range>...}}\n\n"
+      " Locations with breakpoints of the specified type are displayed.\n\n"
+      " Finally, breakpoints can be cleared by the NOBREAK command.\n"
+       /***************** 80 character line width template *************************/
+      "2Connecting and Disconnecting Devices\n"
+      " Except for main memory and network devices, units are simulated as\n"
+      " unstructured binary disk files in the host file system.  Before using a\n"
+      " simulated unit, the user must specify the file to be accessed by that unit.\n"
+#define HLP_ATTACH      "*Commands Connecting_and_Disconnecting_Devices ATTACH"
+      "3ATTACH\n"
+      " The ATTACH (abbreviation AT) command associates a unit and a file:\n"
+      "++ATTACH <unit> <filename>\n\n"
+      "4Switches\n"
+      "5-n\n"
+      " If the -n switch is specified when an attach is executed, a new file is\n"
+      " created, and an appropriate message is printed.\n"
+      "5-e\n"
+      " If the file does not exist, and the -e switch was not specified, a new\n"
+      " file is created, and an appropriate message is printed.  If the -e switch\n"
+      " was specified, a new file is not created, and an error message is printed.\n"
+      "5-r\n"
+      " If the -r switch is specified, or the file is write protected, ATTACH tries\n"
+      " to open the file read only.  If the file does not exist, or the unit does\n"
+      " not support read only operation, an error occurs.  Input-only devices, such\n"
+      " as paper-tape readers, and devices with write lock switches, such as disks\n"
+      " and tapes, support read only operation; other devices do not.  If a file is\n"
+      " attached read only, its contents can be examined but not modified.\n"
+      "5-f\n"
+      " For simulated magnetic tapes, the ATTACH command can specify the format of\n"
+      " the attached tape image file:\n\n"
+      "++ATTACH -f <tape_unit> <format> <filename>\n\n"
+      " The currently supported tape image file formats are:\n\n"
+      "++SIMH                   SIMH simulator format\n"
+      "++E11                    E11 simulator format\n"
+      "++TPC                    TPC format\n"
+      "++P7B                    Pierce simulator 7-track format\n\n"
+       /***************** 80 character line width template *************************/
+      " For some simulated disk devices, the ATTACH command can specify the format\n"
+      " of the attached disk image file:\n\n"
+      "++ATTACH -f <disk_unit> <format> <filename>\n\n"
+      " The currently supported disk image file formats are:\n\n"
+      "++SIMH                   SIMH simulator format\n"
+      "++VHD                    Virtual Disk format\n"
+      "++RAW                    platform specific access to physical disk or\n"
+      "++                       CDROM drives\n"
+      " The disk format can also be set with the SET command prior to ATTACH:\n\n"
+      "++SET <disk_unit> FORMAT=<format>\n"
+      "++ATT <disk_unit> <filename>\n\n"
+       /***************** 80 character line width template *************************/
+      " The format of an attached tape or disk file can be displayed with the SHOW\n"
+      " command:\n"
+      "++SHOW <unit> FORMAT\n"
+      " For Telnet-based terminal emulation devices, the ATTACH command associates\n"
+      " the master unit with a TCP/IP listening port:\n\n"
+      "++ATTACH <unit> <port>\n\n"
+      " The port is a decimal number between 1 and 65535 that is not already used\n"
+      " other TCP/IP applications.\n"
+      " For Ethernet emulators, the ATTACH command associates the simulated Ethernet\n"
+      " with a physical Ethernet device:\n\n"
+      "++ATTACH <unit> <physical device name>\n"
+       /***************** 80 character line width template *************************/
+#define HLP_DETACH      "*Commands Connecting_and_Disconnecting_Devices DETACH"
+      "3DETACH\n"
+      " The DETACH (abbreviation DET) command breaks the association between a unit\n"
+      " and a file, port, or network device:\n\n"
+      "++DETACH ALL             detach all units\n"
+      "++DETACH <unit>          detach specified unit\n"
+      " The EXIT command performs an automatic DETACH ALL.\n"
+      "2Controlling Simulator Operating Environment\n"
+      "3Working Directory\n"
+#define HLP_CD          "*Commands Controlling_Simulator_Operating_Environment Working_Directory CD"
+      "4CD\n"
+      " Set the current working directory:\n"
+      "++CD path\n"
+      "4SET_DEFAULT\n"
+      " Set the current working directory:\n"
+      "++SET DEFAULT path\n"
+#define HLP_PWD         "*Commands Controlling_Simulator_Operating_Environment Working_Directory PWD"
+      "4PWD\n"
+      "++PWD\n"
+      " Display the current working directory:\n"
+      "2Listing Files\n"
+#define HLP_DIR         "*Commands Listing_Files DIR"
+      "3DIR\n"
+      "++DIR {path}                list directory files\n"
+#define HLP_LS          "*Commands Listing_Files LS"
+      "3LS\n"
+      "++LS {path}                 list directory files\n"
+#define HLP_SET         "*Commands SET"
+      "2SET\n"
+       /***************** 80 character line width template *************************/
+#define HLP_SET_CONSOLE "*Commands SET CONSOLE"
+      "3Console\n"
+      "+set console arg{,arg...}    set console options\n"
+      "+set console WRU             specify console drop to simh character\n"
+      "+set console BRK             specify console Break character\n"
+      "+set console DEL             specify console delete character\n"
+      "+set console PCHAR           specify console printable characters\n"
+      "+set console TELNET=port     specify console telnet port\n"
+      "+set console TELNET=LOG=log_file\n"
+      "++++++++                     specify console telnet logging to the\n"
+      "++++++++                     specified destination {LOG,STDOUT,STDERR,\n"
+      "++++++++                     DEBUG or filename)\n"
+      "+set console TELNET=NOLOG    disables console telnet logging\n"
+      "+set console TELNET=BUFFERED[=bufsize]\n"
+      "++++++++                     specify console telnet buffering\n"
+      "+set console TELNET=NOBUFFERED\n"
+      "++++++++                     disables console telnet buffering\n"
+      "+set console TELNET=UNBUFFERED\n"
+      "++++++++                     disables console telnet buffering\n"
+      "+set console NOTELNET        disable console telnet\n"
+      "+set console SERIAL=serialport[;config]\n"
+      "++++++++                     specify console serial port and optionally\n"
+      "++++++++                     the port config (i.e. ;9600-8n1)\n"
+      "+set console NOSERIAL        disable console serial session\n"
+      "+set console LOG=log_file    enable console logging to the\n"
+      "++++++++                     specified destination {STDOUT,STDERR,DEBUG\n"
+      "++++++++                     or filename)\n"
+      "+set console NOLOG           disable console logging\n"
+       /***************** 80 character line width template *************************/
+#define HLP_SET_REMOTE "*Commands SET REMOTE"
+      "3Remote\n"
+      "+set remote TELNET=port      specify remote console telnet port\n"
+      "+set remote NOTELNET         disables remote console\n"
+      "+set remote CONNECTIONS=n    specify number of concurrent remote\n"
+      "++++++++                     console sessions\n"
+      "+set remote TIMEOUT=n        specify number of seconds without input\n"
+      "++++++++                     before automatic continue\n"
+#define HLP_SET_DEFAULT "*Commands SET Working_Directory"
+      "3Working Directory\n"
+      "+set default <dir>           set the current directory\n"
+      "+cd <dir>                    set the current directory\n"
+#define HLP_SET_LOG    "*Commands SET Log"
+      "3Log\n"
+      "+set log log_file            specify the log destination\n"
+      "++++++++                     (STDOUT,DEBUG or filename)\n"
+      "+set nolog                   disables any currently active logging\n"
+#define HLP_SET_DEBUG  "*Commands SET Debug"
+      "3Debug\n"
+      "+set debug debug_file        specify the debug destination\n"
+      "++++++++                     (STDOUT,STDERR,LOG or filename)\n"
+      "+set nodebug                 disables any currently active debug output\n"
+#define HLP_SET_BREAK  "*Commands SET Breakpoints"
+      "3Breakpoints\n"
+      "+set break <list>            set breakpoints\n"
+      "+set nobreak <list>          clear breakpoints\n"
+       /***************** 80 character line width template *************************/
+#define HLP_SET_THROTTLE "*Commands SET Throttle"
+      "3Throttle\n"
+      "+set throttle {x{M|K|%%}}|{x/t}\n"
+      "++++++++                     set simulation rate\n"
+      "+set nothrottle              set simulation rate to maximum\n"
+#define HLP_SET_ASYNCH "*Commands SET Asynch"
+      "3Asynch\n"
+      "+set asynch                  enable asynchronous I/O\n"
+      "+set noasynch                disable asynchronous I/O\n"
+#define HLP_SET_ENVIRON "*Commands SET Asynch"
+      "3Environment\n"
+      "+set environment name=val    set environment variable\n"
+      "+set environment name        clear environment variable\n"
+#define HLP_SET_ON      "*Commands SET Command_Status_Trap_Dispatching"
+      "3Command Status Trap Dispatching\n"
+      "+set on                      enables error checking after command\n"
+      "++++++++                     execution\n"
+      "+set noon                    disables error checking after command\n"
+      "++++++++                     execution\n"
+      "+set on inherit              enables inheritance of ON state and\n"
+      "++++++++                     actions into do command files\n"
+      "+set on noinherit            disables inheritance of ON state and\n"
+      "++++++++                     actions into do command files\n"
+#define HLP_SET_VERIFY "*Commands SET Command_Execution_Display"
+#define HLP_SET_VERIFY "*Commands SET Command_Execution_Display"
+      "3Command Execution Display\n"
+      "+set verify                  re-enables display of command file\n"
+      "++++++++                     processed commands\n"
+      "+set verbose                 re-enables display of command file\n"
+      "++++++++                     processed commands\n"
+      "+set noverify                disables display of command file processed\n"
+      "++++++++                     commands\n"
+      "+set noverbose               disables display of command file processed\n"
+      "++++++++                     commands\n"
+#define HLP_SET_MESSAGE "*Commands SET Command_Error_Status_Display"
+      "3Command Error Status Display\n"
+      "+set message                 re-enables display of command file error\n"
+      "++++++++                     messages\n"
+      "+set nomessage               disables display of command file error\n"
+      "++++++++                     messages\n"
+#define HLP_SET_QUIET "*Commands SET Command_Output_Display"
+      "3Command Output Display\n"
+      "+set quiet                   disables suppression of some output and\n"
+      "++++++++                     messages\n"
+      "+set noquiet                 re-enables suppression of some output and\n"
+      "++++++++                     messages\n"
+#define HLP_SET_PROMPT "*Commands SET Command_Prompt"
+      "3Command Prompt\n"
+      "+set prompt \"string\"        sets an alternate simulator prompt string\n"
+      "3Device and Unit\n"
+      "+set <dev> OCT|DEC|HEX       set device display radix\n"
+      "+set <dev> ENABLED           enable device\n"
+      "+set <dev> DISABLED          disable device\n"
+      "+set <dev> DEBUG{=arg}       set device debug flags\n"
+      "+set <dev> NODEBUG={arg}     clear device debug flags\n"
+      "+set <dev> arg{,arg...}      set device parameters (see show modifiers)\n"
+      "+set <unit> ENABLED          enable unit\n"
+      "+set <unit> DISABLED         disable unit\n"
+      "+set <unit> arg{,arg...}     set unit parameters (see show modifiers)\n"
+      "+help <dev> set              displays the device specific set commands\n"
+      "++++++++                     available\n"
+       /***************** 80 character line width template *************************/
+#define HLP_SHOW        "*Commands SHOW"
+      "2SHOW\n"
+      "+sh{ow} br{eak} <list>       show breakpoints\n"
+      "+sh{ow} con{figuration}      show configuration\n"
+      "+sh{ow} cons{ole} {arg}      show console options\n"
+      "+sh{ow} dev{ices}            show devices\n"
+      "+sh{ow} fea{tures}           show system devices with descriptions\n"
+      "+sh{ow} m{odifiers}          show modifiers for all devices\n" 
+      "+sh{ow} s{how}               show SHOW commands for all devices\n" 
+      "+sh{ow} n{ames}              show logical names\n"
+      "+sh{ow} q{ueue}              show event queue\n"
+      "+sh{ow} ti{me}               show simulated time\n"
+      "+sh{ow} th{rottle}           show simulation rate\n"
+      "+sh{ow} a{synch}             show asynchronouse I/O state\n" 
+      "+sh{ow} ve{rsion}            show simulator version\n"
+      "+sh{ow} def{ault}            show current directory\n" 
+      "+sh{ow} re{mote}             show remote console configuration\n" 
+      "+sh{ow} <dev> RADIX          show device display radix\n"
+      "+sh{ow} <dev> DEBUG          show device debug flags\n"
+      "+sh{ow} <dev> MODIFIERS      show device modifiers\n"
+      "+sh{ow} <dev> NAMES          show device logical name\n"
+      "+sh{ow} <dev> SHOW           show device SHOW commands\n"
+      "+sh{ow} <dev> {arg,...}      show device parameters\n"
+      "+sh{ow} <unit> {arg,...}     show unit parameters\n"
+      "+sh{ow} ethernet             show ethernet devices\n"
+      "+sh{ow} serial               show serial devices\n"
+      "+sh{ow} multiplexer          show open multiplexer devices\n"
+      "+sh{ow} clocks               show calibrated timers\n"
+      "+sh{ow} on                   show on condition actions\n"
+      "+h{elp} <dev> show           displays the device specific show commands\n"
+      "++++++++                     available\n"
+#define HLP_SHOW_CONFIG         "*Commands SHOW"
+#define HLP_SHOW_DEVICES        "*Commands SHOW"
+#define HLP_SHOW_FEATURES       "*Commands SHOW"
+#define HLP_SHOW_QUEUE          "*Commands SHOW"
+#define HLP_SHOW_TIME           "*Commands SHOW"
+#define HLP_SHOW_MODIFIERS      "*Commands SHOW"
+#define HLP_SHOW_NAMES          "*Commands SHOW"
+#define HLP_SHOW_SHOW           "*Commands SHOW"
+#define HLP_SHOW_VERSION        "*Commands SHOW"
+#define HLP_SHOW_DEFAULT        "*Commands SHOW"
+#define HLP_SHOW_CONSOLE        "*Commands SHOW"
+#define HLP_SHOW_REMOTE         "*Commands SHOW"
+#define HLP_SHOW_BREAK          "*Commands SHOW"
+#define HLP_SHOW_LOG            "*Commands SHOW"
+#define HLP_SHOW_DEBUG          "*Commands SHOW"
+#define HLP_SHOW_THROTTLE       "*Commands SHOW"
+#define HLP_SHOW_ASYNCH         "*Commands SHOW"
+#define HLP_SHOW_ETHERNET       "*Commands SHOW"
+#define HLP_SHOW_SERIAL         "*Commands SHOW"
+#define HLP_SHOW_MULTIPLEXER    "*Commands SHOW"
+#define HLP_SHOW_CLOCKS         "*Commands SHOW"
+#define HLP_SHOW_ON             "*Commands SHOW"
+#define HLP_HELP                "*Commands HELP"
+       /***************** 80 character line width template *************************/
+      "2HELP\n"
+      "+h{elp}                      type this message\n"
+      "+h{elp} <command>            type help for command\n" 
+      "+h{elp} <dev>                type help for device\n"
+      "+h{elp} <dev> registers      type help for device register variables\n"
+      "+h{elp} <dev> attach         type help for device specific ATTACH command\n"
+      "+h{elp} <dev> set            type help for device specific SET commands\n"
+      "+h{elp} <dev> show           type help for device specific SHOW commands\n"
+      "+h{elp} <dev> <command>      type help for device specific <command> command\n"
+       /***************** 80 character line width template *************************/
+      "2Altering The Simulated Configuration\n"
+      " In most simulators, the SET <device> DISABLED command removes the\n"
+      " specified device from the configuration.  A DISABLED device is invisible\n"
+      " to running programs.  The device can still be RESET, but it cannot be\n"
+      " ATTAChed, DETACHed, or BOOTed.  SET <device> ENABLED restores a disabled\n"
+      " device to a configuration.\n\n"
+      " Most multi-unit devices allow units to be enabled or disabled:\n\n"
+      "++SET <unit> ENABLED\n"
+      "++SET <unit> DISABLED\n\n"
+      " When a unit is disabled, it will not be displayed by SHOW DEVICE.\n\n"
+#define HLP_ASSIGN      "*Commands Logical_Names"
+#define HLP_DEASSIGN    "*Commands Logical_Names"
+      "2Logical Names\n"
+      " The standard device names can be supplemented with logical names.  Logical\n"
+      " names must be unique within a simulator (that is, they cannot be the same\n"
+      " as an existing device name).  To assign a logical name to a device:\n\n"
+      "++ASSIGN <device> <log-name>      assign log-name to device\n\n"
+      " To remove a logical name:\n\n"
+      "++DEASSIGN <device>               remove logical name\n\n"
+      " To show the current logical name assignment:\n\n"
+      "++SHOW <device> NAMES            show logical name, if any\n\n"
+      " To show all logical names:\n\n"
+      "++SHOW NAMES\n\n"
+       /***************** 80 character line width template *************************/
+#define HLP_DO          "*Commands Executing_Command_Files"
+      "2Executing Command Files\n"
+      " The simulator can execute command files with the DO command:\n\n"
+      "++DO <filename> {arguments...}       execute commands in file\n\n"
+      " The DO command allows command files to contain substitutable arguments.\n"
+      " The string %%n, where n is between 1 and 9, is replaced with argument n\n"
+      " from the DO command line. The string %%0 is replaced with <filename>.\n"
+      " The sequences \\%% and \\\\ are replaced with the literal characters %% and \\,\n"
+      " respectively.  Arguments with spaces can be enclosed in matching single\n"
+      " or double quotation marks.\n\n"
+      " DO commands may be nested up to ten invocations deep.\n\n"
+      "3Switches\n"
+      " If the switch -v is specified, the commands in the file are echoed before\n"
+      " they are executed.\n\n"
+      " If the switch -e is specified, command processing (including nested command\n"
+      " invocations) will be aborted if a command error is encountered.\n"
+      " (Simulation stop never abort processing; use ASSERT to catch unexpected\n"
+      " stops.)  Without the switch, all errors except ASSERT failures will be\n"
+      " ignored, and command processing will continue.\n\n"
+      " If the switch -o is specified, the on conditions and actions from the\n"
+      " calling command file will be inherited in the command file being invoked.\n"
+      " If the switch -q is specified, the quiet mode will be explicitly enabled\n"
+      " for the called command file, otherwise quiet mode is inherited from the\n"
+      " calling context.\n"
+       /***************** 80 character line width template *************************/
+#define HLP_GOTO        "*Commands Executing_Command_Files GOTO"
+      "3GOTO\n"
+      " Commands in a command file execute in sequence until either an error\n"
+      " trap occurs (when a command completes with an error status), or when an\n"
+      " explict request is made to start command execution elsewhere with the\n"
+      " GOTO command:\n\n"
+      "++GOTO <label>\n\n"
+      " Labels are lines in a command file which the first non whitespace\n"
+      " character is a \":\".  The target of a goto is the first matching label\n"
+      " in the current do command file which is encountered.  Since labels\n"
+      " don't do anything else besides being the targets of goto's, they could\n"
+      " also be used to provide comments in do command files, for example::\n\n"
+      "++:: This is a comment\n"
+
+#define HLP_RETURN      "*Commands Executing_Command_Files RETURN"
+      "3RETURN\n"
+      "++return                   return from command file with last command status\n"
+      "++return {-Q} <status>     return from command file with specific status\n"
+#define HLP_SHIFT       "*Commands Executing_Command_Files SHIFT"
+      "3SHIFT\n"
+      "++shift                    shift the command file's positional parameters\n"
+#define HLP_CALL        "*Commands Executing_Command_Files CALL"
+      "3CALL\n"
+      "++call                     transfer control to a labeled subroutine\n"
+      "                         a command file.\n"
+#define HLP_ON          "*Commands Executing_Command_Files ON"
+      "3ON\n"
+      "++on <condition> <action>  perform action(s) after condition\n"
+      "++on <condition>           clear action for specific condition\n"
+#define HLP_PROCEED     "*Commands Executing_Command_Files PROCEED"
+#define HLP_IGNORE      "*Commands Executing_Command_Files PROCEED"
+      "3PROCEED/IGNORE\n"
+      "++proceed                  continue command file execution without doing anything\n"
+      "++ignore                   continue command file execution without doing anything\n"
+
+#if 0
+
+    GOTO <Label>                 Command is now available.  Labels are lines 
+                                 in which the first non whitespace character 
+                                 is a ":".  The target of a goto is the first 
+                                 matching label in the current do command 
+                                 file which is encountered.  Since labels 
+                                 don't do anything else besides being the 
+                                 targets of goto's, they could be used to 
+                                 provide comments in do command files, for 
+                                 example (":: This is a comment")
+    SET ON                       Enables error trapping for currently defined 
+                                 traps (by ON commands)
+    SET NOON                     Disables error trapping for currently 
+                                 defined traps (by ON commands)
+    RETURN                       Return from the current do command file 
+                                 execution with the status from the last 
+                                 executed command
+    RETURN <statusvalue>         Return from the current do command file 
+                                 execution with the indicated status.  Status 
+                                 can be a number or a SCPE_<conditionname> 
+                                 name string.
+    ON <statusvalue> commandtoprocess{; additionalcommandtoprocess}
+                                 Sets the action(s) to take when the specific 
+                                 error status is returned by a command in the 
+                                 currently running do command file.  Multiple 
+                                 actions can be specified with each delimited 
+                                 by a semicolon character (just like 
+                                 breakpoint action commands).
+    ON ERROR commandtoprocess{; additionalcommandtoprocess}
+                                 Sets the default action(s) to take when any 
+                                 otherwise unspecified error status is returned 
+                                 by a command in the currently running do 
+                                 command file.  Multiple actions can be 
+                                 specified with each delimited by a semicolon 
+                                 character (just like breakpoint action 
+                                 commands).
+    ON <statusvalue>                   
+    ON ERROR                     Clears the default actions to take when any 
+                                 otherwise unspecified error status is 
+                                 returned by a command in the currently 
+                                 running do command file.
+
+
+Error traps can be taken for any command which returns a status other than SCPE_STEP, SCPE_OK, and SCPE_EXIT.   
+
+ON Traps can specify any status value from the following list: NXM, UNATT, IOERR, CSUM, FMT, NOATT, OPENERR, MEM, ARG, STEP, UNK, RO, INCOMP, STOP, TTIERR, TTOERR, EOF, REL, NOPARAM, ALATT, TIMER, SIGERR, TTYERR, SUB, NOFNC, UDIS, NORO, INVSW, MISVAL, 2FARG, 2MARG, NXDEV, NXUN, NXREG, NXPAR, NEST, IERR, MTRLNT, LOST, TTMO, STALL, AFAIL.  These values can be indicated by name or by their internal numeric value (not recommended).
+
+Interactions with ASSERT command and "DO -e":
+DO -e		is equivalent to SET ON, which by itself it equivalent to "SET ON; ON ERROR RETURN".
+ASSERT		failure have several different actions:
+       If error trapping is not enabled then AFAIL causes exit from the current do command file.
+       If error trapping is enabled and an explicit "ON AFAIL" action is defined, then the specified action is performed.
+       If error trapping is enabled and no "ON AFAIL" action is defined, then an AFAIL causes exit from the current do command file.
+
+#endif
+
+
+#define HLP_ECHO        "*Commands Executing_Command_Files Displaying_Arbitrary_Text"
+       /***************** 80 character line width template *************************/
+      "3Displaying Arbitrary Text\n"
+      " The ECHO command is a useful way of annotating command files.  ECHO prints\n"
+      " out its arguments on the console (and log):\n\n"
+      "++ECHO <string>      output string to console\n\n"
+      " If there is no argument, ECHO prints a blank line on the console.  This\n"
+      " may be used to provide spacing in the console display or log.\n"
+       /***************** 80 character line width template *************************/
+#define HLP_ASSERT      "*Commands Executing_Command_Files Testing_Simulator_State"
+      "3Testing Simulator State\n"
+      " The ASSERT command tests a simulator state condition and halts command\n"
+      " file execution if the condition is false:\n\n"
+      "++ASSERT {<dev>} <reg>{<logical-op><value>}<conditional-op><value>\n\n"
+      " If <dev> is not specified, CPU is assumed.  <reg> is a register (scalar\n"
+      " or subscripted) belonging to the indicated device.  The <conditional-op>\n"
+      " and optional <logical-op> are the same as those used for \"search\n"
+      " specifiers\" by the EXAMINE and DEPOSIT commands.  The <value>s are\n"
+      " expressed in the radix specified for <reg>, not in the radix for the\n"
+      " device.\n\n"
+      " If the <logical-op> and <value> are specified, the target register value\n"
+      " is first altered as indicated.  The result is then compared to the\n"
+      " <value> via the <conditional-op>.  If the result is false, an\n"
+      " \"Assertion failed\" message is printed, and any running command file\n"
+      " is aborted.  Otherwise, the command has no effect.\n\n"
+      "4Examples:\n"
+      " A command file might be used to bootstrap an operating system that\n"
+      " halts after the initial load from disk.  The ASSERT command is then\n"
+      " used to confirm that the load completed successfully by examining the\n"
+      " CPU's \"A\" register for the expected value:\n\n"
+      "++; OS bootstrap command file\n"
+      "++;\n"
+      "++ATTACH DS0 os.disk\n"
+      "++BOOT DS\n"
+      "++; A register contains error code; 0 = good boot\n"
+      "++ASSERT A=0\n"
+      "++ATTACH MT0 sys.tape\n"
+      "++ATTACH MT1 user.tape\n"
+      "++RUN\n\n"
+       /***************** 80 character line width template *************************/
+      " In the example, if the A register is not 0, the \"ASSERT A=0\" command will\n"
+      " be echoed, the command file will be aborted with an \"Assertion failed\"\n"
+      " message.  Otherwise, the command file will continue to bring up the\n"
+      " operating system.\n"
+       /***************** 80 character line width template *************************/
+#define HLP_EXIT        "*Commands Exiting_The_Simulator"
+      "2Exiting The Simulator\n"
+      " EXIT (synonyms QUIT and BYE) returns control to the operating system.\n"
+#define HLP_SPAWN       "*Commands Executing_System_Commands"
+      "2Executing System Commands\n"
+      " The simulator can execute operating system commands with the ! (spawn)\n"
+      " command:\n\n"
+      "++!                    execute local command interpreter\n"
+      "++! <command>          execute local host command\n"
+      " If no operating system command is provided, the simulator attempts to\n"
+      " launch the host operating system's command shell.\n"
+      " The exit status from the command which was executed is set as the command\n"
+      " completion status for the ! command.  This may influence any enabled ON\n"
+      " condition traps\n";
+
+
 static CTAB cmd_table[] = {
-    { "RESET", &reset_cmd, 0,
-      "r{eset} {ALL|<device>}   reset simulator\n" },
-    { "EXAMINE", &exdep_cmd, EX_E,
-      "e{xamine} <list>         examine memory or registers\n" },
-    { "IEXAMINE", &exdep_cmd, EX_E+EX_I,
-      "ie{xamine} <list>        interactive examine memory or registers\n" },
-    { "DEPOSIT", &exdep_cmd, EX_D,
-      "d{eposit} <list> <val>   deposit in memory or registers\n" },
-    { "IDEPOSIT", &exdep_cmd, EX_D+EX_I,
-      "id{eposit} <list>        interactive deposit in memory or registers\n" },
-    { "EVALUATE", &eval_cmd, 0,
-      "ev{aluate} <expr>        evaluate symbolic expression\n" },
-    { "RUN", &run_cmd, RU_RUN,
-      "ru{n} {new PC}           reset and start simulation\n", &run_cmd_message },
-    { "GO", &run_cmd, RU_GO,
-      "go {new PC}              start simulation\n", &run_cmd_message }, 
-    { "STEP", &run_cmd, RU_STEP,
-      "s{tep} {n}               simulate n instructions\n", &run_cmd_message },
-    { "CONTINUE", &run_cmd, RU_CONT,
-      "c{ont}                   continue simulation\n", &run_cmd_message },
-    { "BOOT", &run_cmd, RU_BOOT,
-      "b{oot} <unit>            bootstrap unit\n", &run_cmd_message },
-    { "BREAK", &brk_cmd, SSH_ST,
-      "br{eak} <list>           set breakpoints\n" },
-    { "NOBREAK", &brk_cmd, SSH_CL,
-      "nobr{eak} <list>         clear breakpoints\n" },
-    { "ATTACH", &attach_cmd, 0,
-      "at{tach} <unit> <file>   attach file to simulated unit\n"
-      "h{elp} <dev> attach      displays any device specific attach help\n" },
-    { "DETACH", &detach_cmd, 0,
-      "det{ach} <unit>          detach file from simulated unit\n" },
-    { "ASSIGN", &assign_cmd, 0,
-      "as{sign} <device> <name> assign logical name for device\n" },
-    { "DEASSIGN", &deassign_cmd, 0,
-      "dea{ssign} <device>      deassign logical name for device\n" },
-    { "SAVE", &save_cmd, 0,
-      "sa{ve} <file>            save simulator to file\n" },
-    { "RESTORE", &restore_cmd, 0,
-      "rest{ore}|ge{t} <file>   restore simulator from file\n" },
-    { "GET", &restore_cmd, 0, NULL },
-    { "LOAD", &load_cmd, 0,
-      "l{oad} <file> {<args>}   load binary file\n" },
-    { "DUMP", &load_cmd, 1,
-      "du(mp) <file> {<args>}   dump binary file\n" },
-    { "EXIT", &exit_cmd, 0,
-      "exi{t}|q{uit}|by{e}      exit from simulation\n" },
-    { "QUIT", &exit_cmd, 0, NULL },
-    { "BYE", &exit_cmd, 0, NULL },
-    { "CD", &set_default_cmd, 0,
-      "cd                       set the current directory\n" },
-    { "PWD", &pwd_cmd, 0, 
-      "pwd                      show current directory\n" },
-    { "DIR", &dir_cmd, 0, 
-      "dir {dir}                list directory files\n" },
-    { "LS", &dir_cmd, 0, 
-      "ls {dir}                 list directory files\n" },
-    { "SET", &set_cmd, 0,
-      "set console arg{,arg...} set console options\n"
-      "set console WRU          specify console drop to simh char\n"
-      "set console BRK          specify console Break character\n"
-      "set console DEL          specify console delete char\n"
-      "set console PCHAR        specify console printable chars\n"
-      "set console TELNET=port  specify console telnet port\n"
-      "set console TELNET=LOG=log_file\n"
-      "                         specify console telnet logging to the\n"
-      "                         specified destination {LOG,STDOUT,STDERR,DEBUG\n"
-      "                         or filename)\n"
-      "set console TELNET=NOLOG disables console telnet logging\n"
-      "set console TELNET=BUFFERED[=bufsize]\n"
-      "                         specify console telnet buffering\n"
-      "set console TELNET=NOBUFFERED\n"
-      "                         disables console telnet buffering\n"
-      "set console TELNET=UNBUFFERED\n"
-      "                         disables console telnet buffering\n"
-      "set console NOTELNET     disable console telnet\n"
-      "set console SERIAL=serialport[;config]\n"
-      "                         specify console serial port and optionally\n"
-      "                         the port config (i.e. ;9600-8n1)\n"
-      "set console NOSERIAL     disable console serial session\n"
-      "set console LOG=log_file enable console logging to the\n"
-      "                         specified destination {STDOUT,STDERR,DEBUG\n"
-      "                         or filename)\n"
-      "set console NOLOG        disable console logging\n"
-      "set remote TELNET=port   specify remote console telnet port\n"
-      "set remote NOTELNET      disables remote console\n"
-      "set remote CONNECTIONS=n specify number of concurrent remote console sessions\n"
-      "set remote TIMEOUT=n     specify number of seconds without input before\n"
-      "                         automatic continue\n"
-      "set default <dir>        set the current directory\n"
-      "set log log_file         specify the log destination\n"
-      "                         (STDOUT,DEBUG or filename)\n"
-      "set nolog                disables any currently active logging\n"
-      "set debug debug_file     specify the debug destination\n"
-      "                         (STDOUT,STDERR,LOG or filename)\n"
-      "set nodebug              disables any currently active debug output\n"
-      "set break <list>         set breakpoints\n"
-      "set nobreak <list>       clear breakpoints\n"
-      "set throttle {x{M|K|%}}|{x/t}\n"
-      "                         set simulation rate\n"
-      "set nothrottle           set simulation rate to maximum\n"
-      "set asynch               enable asynchronous I/O\n"
-      "set noasynch             disable asynchronous I/O\n"
-      "set environment name=val set environment variable\n"
-      "set on                   enables error checking after command execution\n"
-      "set noon                 disables error checking after command execution\n"
-      "set on inherit           enables inheritance of ON state and actions into do command files\n"
-      "set on noinherit         disables inheritance of ON state and actions into do command files\n"
-      "set verify               re-enables display of command file processed commands\n"
-      "set verbose              re-enables display of command file processed commands\n"
-      "set noverify             disables display of command file processed commands\n"
-      "set noverbose            disables display of command file processed commands\n"
-      "set message              re-enables display of command file error messages\n"
-      "set nomessage            disables display of command file error messages\n"
-      "set quiet                disables suppression of some output and messages\n"
-      "set noquiet              re-enables suppression of some output and messages\n"
-      "set prompt \"string\"      sets an alternate simulator prompt string\n"
-      "set <dev> OCT|DEC|HEX    set device display radix\n"
-      "set <dev> ENABLED        enable device\n"
-      "set <dev> DISABLED       disable device\n"
-      "set <dev> DEBUG{=arg}    set device debug flags\n"
-      "set <dev> NODEBUG={arg}  clear device debug flags\n"
-      "set <dev> arg{,arg...}   set device parameters (see show modifiers)\n"
-      "set <unit> ENABLED       enable unit\n"
-      "set <unit> DISABLED      disable unit\n"
-      "set <unit> arg{,arg...}  set unit parameters (see show modifiers)\n"
-      "help <dev> set           displays the device specific set commands available\n" },
-    { "SHOW", &show_cmd, 0,
-      "sh{ow} br{eak} <list>    show breakpoints\n"
-      "sh{ow} con{figuration}   show configuration\n"
-      "sh{ow} cons{ole} {arg}   show console options\n"
-      "sh{ow} dev{ices}         show devices\n"
-      "sh{ow} fea{tures}        show system devices with descriptions\n"
-      "sh{ow} m{odifiers}       show modifiers for all devices\n" 
-      "sh{ow} s{how}            show SHOW commands for all devices\n" 
-      "sh{ow} n{ames}           show logical names\n"
-      "sh{ow} q{ueue}           show event queue\n"
-      "sh{ow} ti{me}            show simulated time\n"
-      "sh{ow} th{rottle}        show simulation rate\n"
-      "sh{ow} a{synch}          show asynchronouse I/O state\n" 
-      "sh{ow} ve{rsion}         show simulator version\n"
-      "sh{ow} def{ault}         show current directory\n" 
-      "sh{ow} re{mote}          show remote console configuration\n" 
-      "sh{ow} <dev> RADIX       show device display radix\n"
-      "sh{ow} <dev> DEBUG       show device debug flags\n"
-      "sh{ow} <dev> MODIFIERS   show device modifiers\n"
-      "sh{ow} <dev> NAMES       show device logical name\n"
-      "sh{ow} <dev> SHOW        show device SHOW commands\n"
-      "sh{ow} <dev> {arg,...}   show device parameters\n"
-      "sh{ow} <unit> {arg,...}  show unit parameters\n"
-      "sh{ow} ethernet          show ethernet devices\n"
-      "sh{ow} serial            show serial devices\n"
-      "sh{ow} multiplexer       show open multiplexer devices\n"
-      "sh{ow} clocks            show calibrated timers\n"
-      "sh{ow} on                show on condition actions\n"
-      "h{elp} <dev> show        displays the device specific show commands available\n" },
-    { "DO", &do_cmd, 1,
-      "do {-V} {-O} {-E} {-Q} <file> {arg,arg...}\n"
-      "                         process command file\n" },
-    { "GOTO", &goto_cmd, 1,
-      "goto <label>             goto label in command file\n" },
-    { "RETURN", &return_cmd, 0,
-      "return                   return from command file with last command status\n"
-      "return {-Q} <status>     return from command file with specific status\n" },
-    { "SHIFT", &shift_cmd, 0,
-      "shift                    shift the command file's positional parameters\n" },
-    { "CALL", &call_cmd, 0,
-      "call                     transfer control to a labeled subroutine\n"
-      "                         a command file.\n" },
-    { "ON", &on_cmd, 0,
-      "on <condition> <action>  perform action(s) after condition\n"
-      "on <condition>           clear action for specific condition\n" },
-    { "PROCEED", &noop_cmd, 0,
-      "proceed                  continue command file execution without doing anything\n" },
-    { "IGNORE", &noop_cmd, 0,
-      "ignore                   continue command file execution without doing anything\n" },
-    { "ECHO", &echo_cmd, 0,
-      "echo <string>            display <string>\n" },
-    { "ASSERT", &assert_cmd, 0,
-      "assert {<dev>} <cond>    test simulator state against condition\n" },
-    { "!", &spawn_cmd, 0,
-      "!                        execute local command interpreter\n"
-      "! <command>              execute local host command\n" },
-    { "HELP", &help_cmd, 0,
-      "h{elp}                   type this message\n"
-      "h{elp} <command>         type help for command\n" 
-      "h{elp} <dev>             type help for device\n"
-      "h{elp} <dev> registers   type help for device register variables\n"
-      "h{elp} <dev> attach      type help for device specific ATTACH command\n"
-      "h{elp} <dev> set         type help for device specific SET commands\n"
-      "h{elp} <dev> show        type help for device specific SHOW commands\n"
-      "h{elp} <dev> <command>   type help for device specific <command> command\n" },
+    { "RESET",      &reset_cmd,     0,          HLP_RESET },
+    { "EXAMINE",    &exdep_cmd,     EX_E,       HLP_EXAMINE },
+    { "IEXAMINE",   &exdep_cmd,     EX_E+EX_I,  HLP_IEXAMINE },
+    { "DEPOSIT",    &exdep_cmd,     EX_D,       HLP_DEPOSIT },
+    { "IDEPOSIT",   &exdep_cmd,     EX_D+EX_I,  HLP_IDEPOSIT },
+    { "EVALUATE",   &eval_cmd,      0,          HLP_EVALUATE },
+    { "RUN",        &run_cmd,       RU_RUN,     HLP_RUN,        NULL, &run_cmd_message },
+    { "GO",         &run_cmd,       RU_GO,      HLP_GO,         NULL, &run_cmd_message },
+    { "STEP",       &run_cmd,       RU_STEP,    HLP_STEP,       NULL, &run_cmd_message },
+    { "CONTINUE",   &run_cmd,       RU_CONT,    HLP_CONTINUE,   NULL, &run_cmd_message },
+    { "BOOT",       &run_cmd,       RU_BOOT,    HLP_BOOT,       NULL, &run_cmd_message },
+    { "BREAK",      &brk_cmd,       SSH_ST,     HLP_BREAK },
+    { "NOBREAK",    &brk_cmd,       SSH_CL,     HLP_NOBREAK },
+    { "ATTACH",     &attach_cmd,    0,          HLP_ATTACH },
+    { "DETACH",     &detach_cmd,    0,          HLP_DETACH },
+    { "ASSIGN",     &assign_cmd,    0,          HLP_ASSIGN },
+    { "DEASSIGN",   &deassign_cmd,  0,          HLP_DEASSIGN },
+    { "SAVE",       &save_cmd,      0,          HLP_SAVE  },
+    { "RESTORE",    &restore_cmd,   0,          HLP_RESTORE },
+    { "GET",        &restore_cmd,   0,          NULL },
+    { "LOAD",       &load_cmd,      0,          HLP_LOAD },
+    { "DUMP",       &load_cmd,      1,          HLP_DUMP },
+    { "EXIT",       &exit_cmd,      0,          HLP_EXIT },
+    { "QUIT",       &exit_cmd,      0,          NULL },
+    { "BYE",        &exit_cmd,      0,          NULL },
+    { "CD",         &set_default_cmd, 0,        HLP_CD },
+    { "PWD",        &pwd_cmd,       0,          HLP_PWD },
+    { "DIR",        &dir_cmd,       0,          HLP_DIR },
+    { "LS",         &dir_cmd,       0,          HLP_LS },
+    { "SET",        &set_cmd,       0,          HLP_SET },
+    { "SHOW",       &show_cmd,      0,          HLP_SHOW },
+    { "DO",         &do_cmd,        1,          HLP_DO },
+    { "GOTO",       &goto_cmd,      1,          HLP_GOTO },
+    { "RETURN",     &return_cmd,    0,          HLP_RETURN },
+    { "SHIFT",      &shift_cmd,     0,          HLP_SHIFT },
+    { "CALL",       &call_cmd,      0,          HLP_CALL },
+    { "ON",         &on_cmd,        0,          HLP_ON },
+    { "PROCEED",    &noop_cmd,      0,          HLP_PROCEED },
+    { "IGNORE",     &noop_cmd,      0,          HLP_IGNORE },
+    { "ECHO",       &echo_cmd,      0,          HLP_ECHO },
+    { "ASSERT",     &assert_cmd,    0,          HLP_ASSERT },
+    { "!",          &spawn_cmd,     0,          HLP_SPAWN },
+    { "HELP",       &help_cmd,      0,          HLP_HELP },
     { NULL, NULL, 0 }
     };
+
+static CTAB set_glob_tab[] = {
+    { "CONSOLE",    &sim_set_console,           0, HLP_SET_CONSOLE },
+    { "REMOTE",     &sim_set_remote_console,    0, HLP_SET_REMOTE },
+    { "BREAK",      &brk_cmd,              SSH_ST, HLP_SET_BREAK },
+    { "NOBREAK",    &brk_cmd,              SSH_CL, HLP_SET_BREAK },
+    { "DEFAULT",    &set_default_cmd,           1, HLP_SET_DEFAULT },
+    { "TELNET",     &sim_set_telnet,            0 },            /* deprecated */
+    { "NOTELNET",   &sim_set_notelnet,          0 },            /* deprecated */
+    { "LOG",        &sim_set_logon,             0, HLP_SET_LOG  },
+    { "NOLOG",      &sim_set_logoff,            0, HLP_SET_LOG  },
+    { "DEBUG",      &sim_set_debon,             0, HLP_SET_DEBUG  },
+    { "NODEBUG",    &sim_set_deboff,            0, HLP_SET_DEBUG  },
+    { "THROTTLE",   &sim_set_throt,             1, HLP_SET_THROTTLE },
+    { "NOTHROTTLE", &sim_set_throt,             0, HLP_SET_THROTTLE },
+    { "ASYNCH",     &sim_set_asynch,            1, HLP_SET_ASYNCH },
+    { "NOASYNCH",   &sim_set_asynch,            0, HLP_SET_ASYNCH },
+    { "ENVIRONMENT", &sim_set_environment,      1, HLP_SET_ENVIRON },
+    { "ON",         &set_on,                    1, HLP_SET_ON },
+    { "NOON",       &set_on,                    0, HLP_SET_ON },
+    { "VERIFY",     &set_verify,                1, HLP_SET_VERIFY },
+    { "VEBOSE",     &set_verify,                1, HLP_SET_VERIFY },
+    { "NOVERIFY",   &set_verify,                0, HLP_SET_VERIFY },
+    { "NOVEBOSE",   &set_verify,                0, HLP_SET_VERIFY },
+    { "MESSAGE",    &set_message,               1, HLP_SET_MESSAGE },
+    { "NOMESSAGE",  &set_message,               0, HLP_SET_MESSAGE },
+    { "QUIET",      &set_quiet,                 1, HLP_SET_QUIET },
+    { "NOQUIET",    &set_quiet,                 0, HLP_SET_QUIET },
+    { "PROMPT",     &set_prompt,                0, HLP_SET_PROMPT },
+    { NULL,         NULL,                       0 }
+    };
+
+static C1TAB set_dev_tab[] = {
+    { "OCTAL",      &set_dev_radix,     8 },
+    { "DECIMAL",    &set_dev_radix,     10 },
+    { "HEX",        &set_dev_radix,     16 },
+    { "ENABLED",    &set_dev_enbdis,    1 },
+    { "DISABLED",   &set_dev_enbdis,    0 },
+    { "DEBUG",      &set_dev_debug,     1 },
+    { "NODEBUG",    &set_dev_debug,     0 },
+    { NULL,         NULL,               0 }
+    };
+
+static C1TAB set_unit_tab[] = {
+    { "ENABLED",    &set_unit_enbdis,   1 },
+    { "DISABLED",   &set_unit_enbdis,   0 },
+    { NULL,         NULL,               0 }
+    };
+
+static SHTAB show_glob_tab[] = {
+    { "CONFIGURATION",  &show_config,               0, HLP_SHOW_CONFIG },
+    { "DEVICES",        &show_config,               1, HLP_SHOW_DEVICES },
+    { "FEATURES",       &show_config,               2, HLP_SHOW_FEATURES },
+    { "QUEUE",          &show_queue,                0, HLP_SHOW_QUEUE },
+    { "TIME",           &show_time,                 0, HLP_SHOW_TIME },
+    { "MODIFIERS",      &show_mod_names,            0, HLP_SHOW_MODIFIERS },
+    { "NAMES",          &show_log_names,            0, HLP_SHOW_NAMES },
+    { "SHOW",           &show_show_commands,        0, HLP_SHOW_SHOW },
+    { "VERSION",        &show_version,              1, HLP_SHOW_VERSION },
+    { "DEFAULT",        &show_default,              0, HLP_SHOW_DEFAULT },
+    { "CONSOLE",        &sim_show_console,          0, HLP_SHOW_CONSOLE },
+    { "REMOTE",         &sim_show_remote_console,   0, HLP_SHOW_REMOTE },
+    { "BREAK",          &show_break,                0, HLP_SHOW_BREAK },
+    { "LOG",            &sim_show_log,              0, HLP_SHOW_LOG },
+    { "TELNET",         &sim_show_telnet,           0 },    /* deprecated */
+    { "DEBUG",          &sim_show_debug,            0, HLP_SHOW_DEBUG },
+    { "THROTTLE",       &sim_show_throt,            0, HLP_SHOW_THROTTLE },
+    { "ASYNCH",         &sim_show_asynch,           0, HLP_SHOW_ASYNCH },
+    { "ETHERNET",       &eth_show_devices,          0, HLP_SHOW_ETHERNET },
+    { "SERIAL",         &sim_show_serial,           0, HLP_SHOW_SERIAL },
+    { "MULTIPLEXER",    &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
+    { "MUX",            &tmxr_show_open_devices,    0, HLP_SHOW_MULTIPLEXER },
+    { "CLOCKS",         &sim_show_timers,           0, HLP_SHOW_CLOCKS },
+    { "ON",             &show_on,                   0, HLP_SHOW_ON },
+    { NULL,             NULL,                       0 }
+    };
+
+static SHTAB show_dev_tab[] = {
+    { "RADIX",      &show_dev_radix,            0 },
+    { "DEBUG",      &show_dev_debug,            0 },
+    { "MODIFIERS",  &show_dev_modifiers,        0 },
+    { "NAMES",      &show_dev_logicals,         0 },
+    { "SHOW",       &show_dev_show_commands,    0 },
+    { NULL,         NULL,                       0 }
+    };
+
+static SHTAB show_unit_tab[] = {
+    { NULL, NULL, 0 }
+    };
+
 
 #if defined(_WIN32) || defined(__hpux)
 static
@@ -925,7 +1561,9 @@ else if (*argv[0]) {                                    /* sim name arg? */
     if (stat == SCPE_OPENERR) {                         /* didn't exist/can't open? */
         np = strrchr (nbuf, '/');                       /* stript path and try again in cwd */
         if (np == NULL)
-            np = strrchr (nbuf, '\\');
+            np = strrchr (nbuf, '\\');                  /* windows path separator */
+        if (np == NULL)
+            np = strrchr (nbuf, ']');                   /* VMS path separator */
         if (np != NULL) {
             *np = '"';
             stat = do_cmd (-1, np) & ~SCPE_NOMESSAGE;   /* proc default cmd file */
@@ -1029,18 +1667,64 @@ return SCPE_EXIT;
 
 /* Help command */
 
+
+/* Used when sorting a list of command names */
+static int _cmd_name_compare (const void *pa, const void *pb)
+{
+CTAB **a = (CTAB **)pa;
+CTAB **b = (CTAB **)pb;
+
+return strcmp((*a)->name, (*b)->name);
+}
+
 void fprint_help (FILE *st)
 {
 CTAB *cmdp;
+CTAB **hlp_cmdp = NULL;
+int cmd_cnt = 0;
+int cmd_size = 0;
+size_t max_cmdname_size = 0;
+int i, line_offset;
 
 for (cmdp = sim_vm_cmd; cmdp && (cmdp->name != NULL); cmdp++) {
-    if (cmdp->help)
-        fputs (cmdp->help, st);
+    if (cmdp->help) {
+        if (cmd_cnt >= cmd_size) {
+            cmd_size += 20;
+            hlp_cmdp = realloc (hlp_cmdp, sizeof(*hlp_cmdp)*cmd_size);
+            }
+        hlp_cmdp[cmd_cnt] = cmdp;
+        ++cmd_cnt;
+        if (strlen(cmdp->name) > max_cmdname_size)
+            max_cmdname_size = strlen(cmdp->name);
+        }
     }
 for (cmdp = cmd_table; cmdp && (cmdp->name != NULL); cmdp++) {
-    if (cmdp->help && (!sim_vm_cmd || !find_ctab (sim_vm_cmd, cmdp->name)))
-        fputs (cmdp->help, st);
+    if (cmdp->help && (!sim_vm_cmd || !find_ctab (sim_vm_cmd, cmdp->name))) {
+        if (cmd_cnt >= cmd_size) {
+            cmd_size += 20;
+            hlp_cmdp = realloc (hlp_cmdp, sizeof(*hlp_cmdp)*cmd_size);
+            }
+        hlp_cmdp[cmd_cnt] = cmdp;
+        ++cmd_cnt;
+        if (strlen (cmdp->name) > max_cmdname_size)
+            max_cmdname_size = strlen(cmdp->name);
+        }
     }
+fprintf (st, "Help is available for the following commands:\n\n    ");
+qsort (hlp_cmdp, cmd_cnt, sizeof(*hlp_cmdp), _cmd_name_compare);
+line_offset = 4;
+for (i=0; i<cmd_cnt; ++i) {
+    fputs (hlp_cmdp[i]->name, st);
+    line_offset += 5 + max_cmdname_size;
+    if (line_offset + max_cmdname_size > 79) {
+        line_offset = 4;
+        fprintf (st, "\n    ");
+        }
+    else
+        fprintf (st, "%*s", (int)(max_cmdname_size + 5 - strlen (hlp_cmdp[i]->name)), "");
+    }
+free (hlp_cmdp);
+fprintf (st, "\n");
 return;
 }
 
@@ -1323,6 +2007,23 @@ fprint_reg_help_ex (st, dptr, TRUE);
 return SCPE_OK;
 }
 
+t_stat help_cmd_output (int32 flag, const char *help, const char *help_base)
+{
+switch (help[0]) {
+    case '*':
+        scp_help (stdout, NULL, NULL, flag, help_base ? help_base : simh_help, help+1);
+        if (sim_log)
+            scp_help (sim_log, NULL, NULL, flag | SCP_HELP_FLAT, help_base ? help_base : simh_help, help+1);
+        break;
+    default:
+        fputs (help, stdout);
+        if (sim_log)
+            fputs (help, sim_log);
+        break;
+    }
+return SCPE_OK;
+}
+
 t_stat help_cmd (int32 flag, char *cptr)
 {
 char gbuf[CBUFSIZE];
@@ -1342,46 +2043,55 @@ if (*cptr) {
 
                 cptr = get_glyph (cptr, gbuf, 0);
                 dptr = find_unit (gbuf, &uptr);
-                if (dptr == NULL) {
+                if (dptr == NULL)
                     dptr = find_dev (gbuf);
-                    if (dptr == NULL)
-                        return SCPE_2MARG;
+                if (dptr != NULL) {
+                    r = help_dev_help (stdout, dptr, uptr, flag, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                    if (sim_log)
+                        help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
+                    return r;
                     }
-                r = help_dev_help (stdout, dptr, uptr, flag, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
-                if (sim_log)
-                    help_dev_help (sim_log, dptr, uptr, flag | SCP_HELP_FLAT, (cmdp->action == &set_cmd) ? "SET" : "SHOW");
-                return r;
+                if (cmdp->action == &set_cmd) { /* HELP SET xxx (not device or unit) */
+                    if ((cmdp = find_ctab (set_glob_tab, gbuf)) &&
+                         (cmdp->help))
+                        return help_cmd_output (flag, cmdp->help, cmdp->help_base);
+                    }
+                else { /* HELP SHOW xxx (not device or unit) */
+                    SHTAB *shptr = find_shtab (show_glob_tab, gbuf);
+
+                    if ((shptr == NULL) || (shptr->help == NULL) || (*shptr->help == '\0'))
+                        return SCPE_ARG;
+                    return help_cmd_output (flag, shptr->help, NULL);
+                    }
+                return SCPE_ARG;
                 }
             else
                 return SCPE_2MARG;
             }
         if (cmdp->help) {
-            fputs (cmdp->help, stdout);
-            if (sim_log)
-                fputs (cmdp->help, sim_log);
             if (strcmp (cmdp->name, "HELP") == 0) {
                 DEVICE *dptr;
                 int i;
 
                 for (i = 0; (dptr = sim_devices[i]) != NULL; i++) {
                     if (dptr->help) {
-                        fprintf (stdout, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+                        fprintf (stdout, "h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
                         if (sim_log)
-                            fprintf (sim_log, "h{elp} %-17s type help for device %s\n", dptr->name, dptr->name);
+                            fprintf (sim_log, "h{elp} %-17s display help for device %s\n", dptr->name, dptr->name);
                         }
                     if (dptr->attach_help || 
                         (DEV_TYPE(dptr) == DEV_MUX) ||
                         (DEV_TYPE(dptr) == DEV_DISK) ||
                         (DEV_TYPE(dptr) == DEV_TAPE)) {
-                        fprintf (stdout, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                        fprintf (stdout, "h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
                         if (sim_log)
-                            fprintf (sim_log, "h{elp} %s ATTACH\t type help for device %s ATTACH command\n", dptr->name, dptr->name);
+                            fprintf (sim_log, "h{elp} %s ATTACH\t display help for device %s ATTACH command\n", dptr->name, dptr->name);
                         }
                     if (dptr->registers) {
                         if (dptr->registers->name != NULL) {
-                            fprintf (stdout, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                            fprintf (stdout, "h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
                             if (sim_log)
-                                fprintf (sim_log, "h{elp} %s REGISTERS\t type help for device %s register variables\n", dptr->name, dptr->name);
+                                fprintf (sim_log, "h{elp} %s REGISTERS\t display help for device %s register variables\n", dptr->name, dptr->name);
                             }
                         }
                     if (dptr->modifiers) {
@@ -1389,9 +2099,9 @@ if (*cptr) {
 
                         for (mptr = dptr->modifiers; mptr->pstring != NULL; mptr++) {
                             if (mptr->help) {
-                                fprintf (stdout, "h{elp} %s SET\t\t type help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
+                                fprintf (stdout, "h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
                                 if (sim_log)
-                                    fprintf (sim_log, "h{elp} %s SET\t\t type help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
+                                    fprintf (sim_log, "h{elp} %s SET\t\t display help for device %s SET commands (modifiers)\n", dptr->name, dptr->name);
                                 break;
                                 }
                             }
@@ -1406,6 +2116,7 @@ if (*cptr) {
                             sim_dflt_dev->help (sim_log, sim_dflt_dev, sim_dflt_dev->units, 0, cmdp->name);
                     }
                 }
+            help_cmd_output (flag, cmdp->help, cmdp->help_base);
             }
         else { /* no help so it is likely a command alias */
             CTAB *cmdpa;
@@ -2345,54 +3056,6 @@ MTAB *mptr;
 CTAB *gcmdp;
 C1TAB *ctbr = NULL, *glbr;
 
-static CTAB set_glob_tab[] = {
-    { "CONSOLE", &sim_set_console, 0 },
-    { "REMOTE", &sim_set_remote_console, 0 },
-    { "BREAK", &brk_cmd, SSH_ST },
-    { "DEFAULT", &set_default_cmd, 1 },
-    { "NOBREAK", &brk_cmd, SSH_CL },
-    { "TELNET", &sim_set_telnet, 0 },                   /* deprecated */
-    { "NOTELNET", &sim_set_notelnet, 0 },               /* deprecated */
-    { "LOG", &sim_set_logon, 0 },                       /* deprecated */
-    { "NOLOG", &sim_set_logoff, 0 },                    /* deprecated */
-    { "DEBUG", &sim_set_debon, 0 },                     /* deprecated */
-    { "NODEBUG", &sim_set_deboff, 0 },                  /* deprecated */
-    { "THROTTLE", &sim_set_throt, 1 },
-    { "NOTHROTTLE", &sim_set_throt, 0 },
-    { "ASYNCH", &sim_set_asynch, 1 },
-    { "NOASYNCH", &sim_set_asynch, 0 },
-    { "ENVIRONMENT", &sim_set_environment, 1 },
-    { "ON", &set_on, 1 },
-    { "NOON", &set_on, 0 },
-    { "VERIFY", &set_verify, 1 },
-    { "VEBOSE", &set_verify, 1 },
-    { "NOVERIFY", &set_verify, 0 },
-    { "NOVEBOSE", &set_verify, 0 },
-    { "MESSAGE", &set_message, 1 },
-    { "NOMESSAGE", &set_message, 0 },
-    { "QUIET", &set_quiet, 1 },
-    { "NOQUIET", &set_quiet, 0 },
-    { "PROMPT", &set_prompt, 0 },
-    { NULL, NULL, 0 }
-    };
-
-static C1TAB set_dev_tab[] = {
-    { "OCTAL", &set_dev_radix, 8 },
-    { "DECIMAL", &set_dev_radix, 10 },
-    { "HEX", &set_dev_radix, 16 },
-    { "ENABLED", &set_dev_enbdis, 1 },
-    { "DISABLED", &set_dev_enbdis, 0 },
-    { "DEBUG", &set_dev_debug, 1 },
-    { "NODEBUG", &set_dev_debug, 0 },
-    { NULL, NULL, 0 }
-    };
-
-static C1TAB set_unit_tab[] = {
-    { "ENABLED", &set_unit_enbdis, 1 },
-    { "DISABLED", &set_unit_enbdis, 0 },
-    { NULL, NULL, 0 }
-    };
-
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
     return SCPE_2FARG;
@@ -2647,47 +3310,6 @@ DEVICE *dptr;
 UNIT *uptr;
 MTAB *mptr;
 SHTAB *shtb = NULL, *shptr;
-
-static SHTAB show_glob_tab[] = {
-    { "CONFIGURATION", &show_config, 0 },
-    { "DEVICES", &show_config, 1 },
-    { "FEATURES", &show_config, 2 },
-    { "QUEUE", &show_queue, 0 },
-    { "TIME", &show_time, 0 },
-    { "MODIFIERS", &show_mod_names, 0 },
-    { "NAMES", &show_log_names, 0 },
-    { "SHOW", &show_show_commands, 0 },
-    { "VERSION", &show_version, 1 },
-    { "DEFAULT", &show_default, 0 },
-    { "CONSOLE", &sim_show_console, 0 },
-    { "REMOTE", &sim_show_remote_console, 0 },
-    { "BREAK", &show_break, 0 },
-    { "LOG", &sim_show_log, 0 },                        /* deprecated */
-    { "TELNET", &sim_show_telnet, 0 },                  /* deprecated */
-    { "DEBUG", &sim_show_debug, 0 },                    /* deprecated */
-    { "THROTTLE", &sim_show_throt, 0 },
-    { "ASYNCH", &sim_show_asynch, 0 },
-    { "ETHERNET", &eth_show_devices, 0 },
-    { "SERIAL", &sim_show_serial, 0 },
-    { "MULTIPLEXER", &tmxr_show_open_devices, 0 },
-    { "MUX", &tmxr_show_open_devices, 0 },
-    { "CLOCKS", &sim_show_timers, 0 },
-    { "ON", &show_on, 0 },
-    { NULL, NULL, 0 }
-    };
-
-static SHTAB show_dev_tab[] = {
-    { "RADIX", &show_dev_radix, 0 },
-    { "DEBUG", &show_dev_debug, 0 },
-    { "MODIFIERS", &show_dev_modifiers, 0 },
-    { "NAMES", &show_dev_logicals, 0 },
-    { "SHOW", &show_dev_show_commands, 0 },
-    { NULL, NULL, 0 }
-    };
-
-static SHTAB show_unit_tab[] = {
-    { NULL, NULL, 0 }
-    };
 
 GET_SWITCHES (cptr);                                    /* get switches */
 if (*cptr == 0)                                         /* must be more */
@@ -5562,7 +6184,7 @@ return cptr;
         result  =       pointer to next character in input string
 */
 
-static char *get_glyph_gen (char *iptr, char *optr, char mchar, t_bool uc, t_bool quote)
+static const char *get_glyph_gen (const char *iptr, char *optr, char mchar, t_bool uc, t_bool quote)
 {
 t_bool quoting = FALSE;
 char quote_char = 0;
@@ -5594,19 +6216,19 @@ while (isspace (*iptr))                                 /* absorb spaces */
 return iptr;
 }
 
-char *get_glyph (char *iptr, char *optr, char mchar)
+char *get_glyph (const char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, TRUE, FALSE);
+return (char *)get_glyph_gen (iptr, optr, mchar, TRUE, FALSE);
 }
 
-char *get_glyph_nc (char *iptr, char *optr, char mchar)
+char *get_glyph_nc (const char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, FALSE, FALSE);
+return (char *)get_glyph_gen (iptr, optr, mchar, FALSE, FALSE);
 }
 
-char *get_glyph_quoted (char *iptr, char *optr, char mchar)
+char *get_glyph_quoted (const char *iptr, char *optr, char mchar)
 {
-return get_glyph_gen (iptr, optr, mchar, FALSE, TRUE);
+return (char *)get_glyph_gen (iptr, optr, mchar, FALSE, TRUE);
 }
 
 /* Trim trailing spaces from a string
@@ -7262,11 +7884,12 @@ typedef struct topic {
 
 static volatile struct {
     const char *error;
+    const char *prox;
     size_t block;
     size_t line;
-} help_where = { "", 0, 0 };
+} help_where = { "", NULL, 0, 0 };
 jmp_buf (help_env);
-#define FAIL(why,text) { help_where.error = #text; longjmp (help_env, (why)); }
+#define FAIL(why,text,here) { help_where.error = #text; help_where.prox = here; longjmp (help_env, (why)); }
 
 /* Add to topic text.
  * Expands text buffer as necessary.
@@ -7280,7 +7903,7 @@ static void appendText (TOPIC *topic, const char *text, size_t len) {
 
     newt = (char *)realloc (topic->text, topic->len + len +1);
     if (!newt) {
-        FAIL (SCPE_MEM, No memory);
+        FAIL (SCPE_MEM, No memory, NULL);
     }
     topic->text = newt;
     memcpy (newt + topic->len, text, len);
@@ -7399,14 +8022,14 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                                 }
                                 if (( *htext != 'H' && *htext != 's') ||
                                     n == 0 || n >= VSMAX)
-                                    FAIL (SCPE_ARG, Invalid escape);
+                                    FAIL (SCPE_ARG, Invalid escape, htext);
                                 while (n > vsnum) { /* Get arg pointer if not cached */
                                     vstrings[vsnum++] = va_arg (ap, char *);
                                 }
                                 start = vstrings[n-1]; /* Insert selected string */
                                 if (*htext == 'H') {   /* Append as more input */
                                     if (asnum >= VSMAX) {
-                                        FAIL (SCPE_ARG, Too many blocks);
+                                        FAIL (SCPE_ARG, Too many blocks, htext);
                                     }
                                     astrings[asnum++] = (char *)start;
                                     break;
@@ -7430,7 +8053,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                                 appendText (topic, start, ep-start);
                                 break;
                             }
-                            FAIL (SCPE_ARG, Invalid escape);
+                            FAIL (SCPE_ARG, Invalid escape, htext);
                         } /* switch (escape) */
                         start = ++htext;
                         continue;                   /* Current line */
@@ -7455,7 +8078,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                     n += (n * 10) + (*htext++ - '0');
                 }
                 if ((htext == start) || !n) {
-                    FAIL (SCPE_ARG, Invalid topic heading);
+                    FAIL (SCPE_ARG, Invalid topic heading, htext);
                 }
                 if (n <= topic->level) {            /* Find level for new topic */
                     while (n <= topic->level) {
@@ -7463,21 +8086,21 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                     }
                 } else {
                     if (n > topic->level +1) {      /* Skipping down more than 1 */
-                        FAIL (SCPE_ARG, Level not contiguous); /* E.g. 1 3, not reasonable */
+                        FAIL (SCPE_ARG, Level not contiguous, htext); /* E.g. 1 3, not reasonable */
                     }
                 }
                 while (*htext && (*htext != '\n') && isspace (*htext)) {
                     htext++;
                 }
                 if (!*htext || (*htext == '\n')) {  /* Name missing */
-                    FAIL (SCPE_ARG, Missing topic name);
+                    FAIL (SCPE_ARG, Missing topic name, htext);
                 }
                 start = htext;
                 while (*htext && (*htext != '\n')) {
                     htext++;
                 }
                 if (start == htext) {               /* Name NULL */
-                    FAIL (SCPE_ARG, Null topic name);
+                    FAIL (SCPE_ARG, Null topic name, htext);
                 }
                 excluded = FALSE;
                 if (*start == '?') {                /* Conditional topic? */
@@ -7487,7 +8110,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                         n += (n * 10) + (*start++ - '0');
                     }
                     if (!*start || *start == '\n'|| n == 0 || n >= VSMAX)
-                        FAIL (SCPE_ARG, Invalid parameter number);
+                        FAIL (SCPE_ARG, Invalid parameter number, start);
                     while (n > vsnum) {             /* Get arg pointer if not cached */
                         vstrings[vsnum++] = va_arg (ap, char *);
                     }
@@ -7501,12 +8124,12 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                 }                    
                 newt = (TOPIC *) calloc (sizeof (TOPIC), 1);
                 if (!newt) {
-                    FAIL (SCPE_MEM, No memory);
+                    FAIL (SCPE_MEM, No memory, NULL);
                 }
                 newt->title = (char *) malloc ((htext - start)+1);
                 if (!newt->title) {
                     free (newt);
-                    FAIL (SCPE_MEM, No memory);
+                    FAIL (SCPE_MEM, No memory, NULL);
                 }
                 memcpy (newt->title, start, htext - start);
                 newt->title[htext - start] = '\0';
@@ -7522,7 +8145,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                 if (!children) {
                     free (newt->title);
                     free (newt);
-                    FAIL (SCPE_MEM, No memory);
+                    FAIL (SCPE_MEM, No memory, NULL);
                 }
                 topic->children = children;
                 topic->children[topic->kids++] = newt;
@@ -7539,7 +8162,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                     free (newt->title);
                     topic->children[topic->kids -1] = NULL;
                     free (newt);
-                    FAIL (SCPE_MEM, No memory);
+                    FAIL (SCPE_MEM, No memory, NULL);
                 }
                 sprintf (newt->label, "%s%s", topic->label, nbuf);
                 topic = newt;
@@ -7550,7 +8173,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                     htext++;
                 continue;
             }
-            FAIL (SCPE_ARG, Unknown line type);     /* Unknown line */
+            FAIL (SCPE_ARG, Unknown line type, NULL);     /* Unknown line */
         } /* htext not at end */
         memset (vstrings, 0, VSMAX * sizeof (char *));
         vsnum = 0;
@@ -7569,7 +8192,7 @@ static char *helpPrompt ( TOPIC *topic, const char *pstring, t_bool oneword ) {
     if (topic->level == 0) {
         prefix = (char *) calloc (2,1);
         if (!prefix) {
-            FAIL (SCPE_MEM, No memory);
+            FAIL (SCPE_MEM, No memory, NULL);
         }
         prefix[0] = '\n';
     } else {
@@ -7580,7 +8203,7 @@ static char *helpPrompt ( TOPIC *topic, const char *pstring, t_bool oneword ) {
                             strlen (pstring) +1);
     if (!newp) {
         free (prefix);
-        FAIL (SCPE_MEM, No memory);
+        FAIL (SCPE_MEM, No memory, NULL);
     }
     strcpy (newp, prefix);
     if (topic->level != 0)
@@ -7731,7 +8354,7 @@ static int matchHelpTopicName (TOPIC *topic, const char *token) {
 
 t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
                   struct sim_unit *uptr, int32 flag,
-                  const char *help, char *cptr, va_list ap) {
+                  const char *help, const char *cptr, va_list ap) {
 
     TOPIC top = { 0, NULL, NULL, &top, NULL, 0, NULL, 0, 0};
     TOPIC *topic = &top;
@@ -7747,8 +8370,8 @@ t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
     static const char onecmd_help[] = { "%s help." };
     static const char help_help[] = {
         /****|***********************80 column width guide********************************/
-        "    This help command provides hierarchical help.  To see more information, type\n"
-        "    an offered subtopic name.  To move back a level, just type <CR>.\n"
+        "    This help command provides hierarchical help.  To see more information,\n"
+        "    type an offered subtopic name.  To move back a level, just type <CR>.\n"
         "    To review the current topic/subtopic, type \"?\".\n"
         "    To view all subtopics, type \"*\".\n"
         "    To exit help at any time, type EXIT.\n"
@@ -7757,8 +8380,13 @@ t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
     if ((failed = setjmp (help_env)) != 0) {
         fprintf (stderr, "\nHelp was unable to process the help for this device.\n"
                          "Error in block %u line %u: %s\n"
-                         "Please contact the device maintainer.\n", 
-                 (int)help_where.block, (int)help_where.line, help_where.error);
+                         "%s%0.*s%s"
+                         " Please contact the device maintainer.\n", 
+                 (int)help_where.block, (int)help_where.line, help_where.error, 
+                 help_where.prox ? "Near '" : "", 
+                 help_where.prox ? 15 : 0, 
+                 help_where.prox ? help_where.prox : "", 
+                 help_where.prox ? "'" : "");
         cleanHelp (&top);
         return failed;
     }
@@ -7810,6 +8438,7 @@ t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
             break;
         }
         if (!strcmp (gbuf, "HELP")) {           /* HELP (about help) */
+            fprintf (st, "\n");
             fputs (help_help, st);
             break;
         }
@@ -7960,7 +8589,7 @@ t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
 
 t_stat scp_help (FILE *st, struct sim_device *dptr,
                  struct sim_unit *uptr, int32 flag,
-                 const char *help, char *cptr, ...) {
+                 const char *help, const char *cptr, ...) {
     t_stat r;
     va_list ap;
 
@@ -7982,7 +8611,7 @@ t_stat scp_help (FILE *st, struct sim_device *dptr,
 t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
                          struct sim_unit *uptr, int32 flag,
                           const char *helpfile,
-                          char *cptr, va_list ap) {
+                          const char *cptr, va_list ap) {
     FILE *fp;
     char *help, *p;
     t_offset size, n;
@@ -8076,7 +8705,7 @@ t_stat scp_vhelpFromFile (FILE *st, struct sim_device *dptr,
 
 t_stat scp_helpFromFile (FILE *st, struct sim_device *dptr,
                          struct sim_unit *uptr, int32 flag,
-                         const char *helpfile, char *cptr, ...) {
+                         const char *helpfile, const char *cptr, ...) {
     t_stat r;
     va_list ap;
 

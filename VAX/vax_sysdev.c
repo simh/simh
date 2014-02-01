@@ -72,7 +72,7 @@ int32 sys_model = 0;
 
 CTAB vax_cmd[] = {
     { "BOOT", &vax_boot, RU_BOOT,
-      "bo{ot}                   boot simulator\n", &run_cmd_message },
+      "bo{ot}                   boot simulator\n", NULL, &run_cmd_message },
     { NULL }
     };
 
