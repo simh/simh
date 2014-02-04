@@ -615,14 +615,13 @@ void ddcmp_SendDataMessage        (CTLR *controller);
 void ddcmp_SendMaintMessage       (CTLR *controller);
 void ddcmp_SetXSetNUM             (CTLR *controller);
 
-typedef struct _ddcmp_state_table
-{
-int RuleNumber;
-DDCMP_LinkState State;
-DDCMP_Condition_Routine Conditions[10];
-DDCMP_LinkState NewState;
-DDCMP_LinkAction_Routine Actions[10];
-} DDCMP_STATETABLE;
+typedef struct _ddcmp_state_table {
+    int RuleNumber;
+    DDCMP_LinkState State;
+    DDCMP_Condition_Routine Conditions[10];
+    DDCMP_LinkState NewState;
+    DDCMP_LinkAction_Routine Actions[10];
+    } DDCMP_STATETABLE;
 
 DDCMP_STATETABLE DDCMP_TABLE[] = {
     { 0, All,         {ddcmp_UserHalt},            Halt,           {ddcmp_StopTimer}},
@@ -730,6 +729,137 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
     {44, All}           /* End of Table */
     };
 
+typedef struct _ddcmp_condition_name {
+    DDCMP_Condition_Routine Condition;
+    const char *Name;
+    } DDCMP_CONDITION_NAME;
+
+#define NAME(name) {ddcmp_##name,#name}
+DDCMP_CONDITION_NAME ddcmp_Condition_Names[] = {
+    NAME(UserHalt),
+    NAME(UserStartup),
+    NAME(UserMaintenanceMode),
+    NAME(ReceiveStack),
+    NAME(ReceiveStrt),
+    NAME(TimerRunning),
+    NAME(TimerNotRunning),
+    NAME(TimerExpired),
+    NAME(ReceiveMaintMessage),
+    NAME(ReceiveAck),
+    NAME(ReceiveNak),
+    NAME(ReceiveRep),
+    NAME(NUMEqRplus1),
+    NAME(NUMGtRplus1),
+    NAME(ReceiveDataMsg),
+    NAME(ReceiveMaintMsg),
+    NAME(ALtRESPleN),
+    NAME(ALeRESPleN),
+    NAME(RESPleAOrRESPgtN),
+    NAME(TltNplus1),
+    NAME(TeqNplus1),
+    NAME(ReceiveMessageError),
+    NAME(NumEqR),
+    NAME(NumNeR),
+    NAME(TransmitterIdle),
+    NAME(TramsmitterBusy),
+    NAME(SACKisSet),
+    NAME(SACKisClear),
+    NAME(SNAKisSet),
+    NAME(SNAKisClear),
+    NAME(SREPisSet),
+    NAME(SREPisClear),
+    NAME(UserSendMessage),
+    NAME(LineConnected),
+    NAME(LineDisconnected),
+    NAME(DataMessageSent),
+    NAME(REPMessageSent),
+    {NULL, NULL}
+    };
+
+char *ddcmp_conditions(DDCMP_Condition_Routine *Conditions)
+{
+static char buf[512];
+DDCMP_CONDITION_NAME *Name;
+
+buf[0] = '\0';
+while (*Conditions)
+    {
+    for (Name = ddcmp_Condition_Names; Name->Condition != NULL; ++Name) {
+        if (Name->Condition == *Conditions)
+            break;
+        }
+    ++Conditions;
+    if (Name->Name)
+        sprintf (&buf[strlen(buf)], "%s%s", Name->Name, *Conditions ? " && " : "");
+    }
+return buf;
+}
+
+typedef struct _ddcmp_action_name {
+    DDCMP_LinkAction_Routine Action;
+    const char *Name;
+    } DDCMP_ACTION_NAME;
+
+DDCMP_ACTION_NAME ddcmp_Actions[] = {
+    NAME(StartTimer),
+    NAME(StopTimer),
+    NAME(ResetVariables),
+    NAME(SendStrt),
+    NAME(SendStack),
+    NAME(SendAck),
+    NAME(SendNak),
+    NAME(SendRep),
+    NAME(SetSACK),
+    NAME(ClearSACK),
+    NAME(SetSNAK),
+    NAME(ClearSNAK),
+    NAME(SetSREP),
+    NAME(ClearSREP),
+    NAME(IncrementR),
+    NAME(SetAeqRESP),
+    NAME(SetTequalAplus1),
+    NAME(IncrementT),
+    NAME(SetNAKreason3),
+    NAME(SetNAKreason2),
+    NAME(NAKMissingPackets),
+    NAME(IfTleAthenSetTeqAplus1),
+    NAME(IfAltXthenStartTimer),
+    NAME(IfAgeXthenStopTimer),
+    NAME(Ignore),
+    NAME(GiveBufferToUser),
+    NAME(CompleteAckedTransmits),
+    NAME(ReTransmitMessageT),
+    NAME(NotifyDisconnect),
+    NAME(NotifyStartRcvd),
+    NAME(NotifyMaintRcvd),
+    NAME(SendDataMessage),
+    NAME(SendMaintMessage),
+    NAME(SetXSetNUM),
+    {NULL, NULL}
+    };
+
+char *ddcmp_actions(DDCMP_LinkAction_Routine *Actions)
+{
+static char buf[512];
+DDCMP_ACTION_NAME *Name;
+
+buf[0] = '\0';
+while (*Actions)
+    {
+    for (Name = ddcmp_Actions; Name->Action != NULL; ++Name) {
+        if (Name->Action == *Actions)
+            break;
+        }
+    ++Actions;
+    if (Name->Name)
+        sprintf (&buf[strlen(buf)], "%s%s", Name->Name, *Actions ? " && " : "");
+    }
+return buf;
+}
+
+
+DDCMP_LinkState NewState;
+DDCMP_LinkAction_Routine Actions[10];
 
 #define ctlr up7                        /* Unit back pointer to controller */
 
@@ -1562,7 +1692,7 @@ void dmc_setinint(CTLR *controller)
 if (!dmc_is_iei_set(controller))
     return;
 if (!controller->in_int) {
-    sim_debug(DBG_INT, controller->device, "SET_INT(RX:%d)\n", controller->index);
+    sim_debug(DBG_INT, controller->device, "SET_INT(RX:%s%d)\n", controller->device->name, controller->index);
     }
 controller->in_int = 1;
 dmc_ini_summary |= (1u << controller->index);
@@ -1573,7 +1703,7 @@ void dmc_clrinint(CTLR *controller)
 {
 controller->in_int = 0;
 if (dmc_ini_summary & (1u << controller->index)) {
-    sim_debug(DBG_INT, controller->device, "CLR_INT(RX:%d)\n", controller->index);
+    sim_debug(DBG_INT, controller->device, "CLR_INT(RX:%s%d)\n", controller->device->name, controller->index);
     }
 dmc_ini_summary &= ~(1u << controller->index);
 if (!dmc_ini_summary)
@@ -1587,7 +1717,7 @@ void dmc_setoutint(CTLR *controller)
 if (!dmc_is_ieo_set(controller))
     return;
 if (!controller->out_int) {
-    sim_debug(DBG_INT, controller->device, "SET_INT(TX:%d)\n", controller->index);
+    sim_debug(DBG_INT, controller->device, "SET_INT(TX:%s%d)\n", controller->device->name, controller->index);
     }
 controller->out_int = 1;
 dmc_outi_summary |= (1u << controller->index);
@@ -1598,7 +1728,7 @@ void dmc_clroutint(CTLR *controller)
 {
 controller->out_int = 0;
 if (dmc_outi_summary & (1u << controller->index)) {
-    sim_debug(DBG_INT, controller->device, "CLR_INT(TX:%d)\n", controller->index);
+    sim_debug(DBG_INT, controller->device, "CLR_INT(TX:%s%d)\n", controller->device->name, controller->index);
     }
 dmc_outi_summary &= ~(1u << controller->index);
 if (!dmc_outi_summary)
@@ -1635,7 +1765,8 @@ if (dmc_is_dmc(controller)) {
     sim_debug(
         trace_level,
         controller->device,
-        "%s SEL0 (0x%04x) %s%s%s%s%s%s%s%s%s\n",
+        "%s%d: %s SEL0 (0x%04x) %s%s%s%s%s%s%s%s%s\n",
+        controller->device->name, controller->index,
         prefix,
         data,
         dmc_bitfld(data, DMC_SEL0_V_RUN, 1) ? "RUN " : "",
@@ -1653,7 +1784,8 @@ else {
     sim_debug(
         trace_level,
         controller->device,
-        "%s SEL0 (0x%04x) %s%s%s%s%s%s\n",
+        "%s%d: %s SEL0 (0x%04x) %s%s%s%s%s%s\n",
+        controller->device->name, controller->index,
         prefix,
         data,
         dmc_bitfld(data, DMC_SEL0_V_RUN, 1) ? "RUN " : "",
@@ -1677,7 +1809,8 @@ type_str = dmc_types[type];
 sim_debug(
     trace_level,
     controller->device,
-    "%s SEL2 (0x%04x) PRIO=%d LINE=%d %s%s%s%s\n",
+    "%s%d: %s SEL2 (0x%04x) PRIO=%d LINE=%d %s%s%s%s\n",
+    controller->device->name, controller->index,
     prefix,
     data,
     dmc_bitfld(data, SEL2_PRIO_BIT, SEL2_PRIO_BIT_LENGTH),
@@ -1695,7 +1828,8 @@ if (dmc_is_rdyi_set(controller)) {
     sim_debug(
         trace_level,
         controller->device,
-        "%s SEL4 (0x%04x) %s%s%s%s%s%s%s%s\n",
+        "%s%d: %s SEL4 (0x%04x) %s%s%s%s%s%s%s%s\n",
+        controller->device->name, controller->index,
         prefix,
         data,
         dmc_bitfld(data, DMC_SEL4_V_RI, 1) ? "RI " : "",
@@ -1711,7 +1845,8 @@ else {
     sim_debug(
         trace_level,
         controller->device,
-        "%s SEL4 (0x%04x)\n",
+        "%s%d: %s SEL4 (0x%04x)\n",
+        controller->device->name, controller->index,
         prefix,
         data);
     }
@@ -1723,7 +1858,8 @@ if (dmc_is_rdyi_set(controller)) {
     sim_debug(
         trace_level,
         controller->device,
-        "%s SEL6 (0x%04x) %s%s\n",
+        "%s%d: %s SEL6 (0x%04x) %s%s\n",
+        controller->device->name, controller->index,
         prefix,
         data,
         dmc_bitfld(data, DMC_SEL6_M_LOSTDATA, 1) ? "LOST_DATA " : "",
@@ -1733,7 +1869,8 @@ else {
     sim_debug(
         trace_level,
         controller->device,
-        "%s SEL6 (0x%04x)\n",
+        "%s%d: %s SEL6 (0x%04x)\n",
+        controller->device->name, controller->index,
         prefix,
         data);
     }
@@ -1744,7 +1881,8 @@ void dmc_dumpregsel10(CTLR *controller, int trace_level, char *prefix, uint16 da
 sim_debug(
     trace_level,
     controller->device,
-    "%s SEL10 (0x%04x) %s\n",
+    "%s%d: %s SEL10 (0x%04x) %s\n",
+    controller->device->name, controller->index,
     prefix,
     data,
     dmc_bitfld(data, DMC_SEL6_M_LOSTDATA, 1) ? "LOST_DATA " : "");
@@ -1776,7 +1914,7 @@ switch (dmc_getsel(reg)) {
         dmc_dumpregsel10(controller, ctx, "Getting", ans);
         break;
     default:
-        sim_debug(DBG_WRN, controller->device, "dmc_getreg(). Invalid register %d", reg);
+        sim_debug(DBG_WRN, controller->device, "%s%d: dmc_getreg(). Invalid register %d", controller->device->name, controller->index, reg);
         break;
     }
 
@@ -1809,7 +1947,7 @@ switch (dmc_getsel(reg)) {
         *controller->csrs->sel10 = data;
         break;
     default:
-        sim_debug(DBG_WRN, controller->device, "dmc_setreg(). Invalid register %d", reg);
+        sim_debug(DBG_WRN, controller->device, "%s%d: dmc_setreg(). Invalid register %d", controller->device->name, controller->index, reg);
     }
 }
 
@@ -1972,7 +2110,7 @@ return (*controller->modem);
 void dmc_set_modem_dtr(CTLR *controller)
 {
 if (dmc_is_attached(controller->unit) && (!(DMC_SEL4_M_DTR & *controller->modem))) {
-    sim_debug(DBG_MDM, controller->device, "DTR State Change to UP(ON)\n");
+    sim_debug(DBG_MDM, controller->device, "%s%d: DTR State Change to UP(ON)\n", controller->device->name, controller->index);
     tmxr_set_get_modem_bits (controller->line, TMXR_MDM_DTR|TMXR_MDM_RTS, 0, NULL);
     dmc_get_modem(controller);
     controller->line->rcve = 1;
@@ -1982,7 +2120,7 @@ if (dmc_is_attached(controller->unit) && (!(DMC_SEL4_M_DTR & *controller->modem)
 void dmc_clr_modem_dtr(CTLR *controller)
 {
 if (*controller->modem & DMC_SEL4_M_DTR) {
-    sim_debug(DBG_MDM, controller->device, "DTR State Change to DOWN(OFF)\n");
+    sim_debug(DBG_MDM, controller->device, "%s%d: DTR State Change to DOWN(OFF)\n", controller->device->name, controller->index);
     }
 tmxr_set_get_modem_bits (controller->line, 0, TMXR_MDM_DTR|TMXR_MDM_RTS, NULL);
 dmc_get_modem(controller);
@@ -2023,7 +2161,7 @@ void dmc_process_master_clear(CTLR *controller)
 {
 CONTROL_OUT *control;
 
-sim_debug(DBG_INF, controller->device, "Master clear\n");
+sim_debug(DBG_INF, controller->device, "%s%d: Master clear\n", controller->device->name, controller->index);
 dmc_clear_master_clear(controller);
 dmc_clr_modem_dtr(controller);
 controller->link.state = Halt;
@@ -2059,7 +2197,7 @@ dmc_set_run(controller);
 
 void dmc_start_input_transfer(CTLR *controller)
 {
-sim_debug(DBG_INF, controller->device, "Starting input transfer\n");
+sim_debug(DBG_INF, controller->device, "%s%d: Starting input transfer\n", controller->device->name, controller->index);
 controller->transfer_state = InputTransfer;
 dmc_set_rdyi(controller);
 }
@@ -2070,7 +2208,7 @@ if ((!controller->control_out) ||
     (controller->transfer_state != Idle) || 
     (dmc_is_rdyo_set(controller)))
     return;
-sim_debug(DBG_INF, controller->device, "Starting control output transfer: SEL6 = 0x%04X\n", controller->control_out->sel6);
+sim_debug(DBG_INF, controller->device, "%s%d: Starting control output transfer: SEL6 = 0x%04X\n", controller->device->name, controller->index, controller->control_out->sel6);
 controller->transfer_state = OutputControl;
 dmc_setreg (controller, 6, controller->control_out->sel6, DBG_RGC);
 dmc_set_type_output(controller, DMC_C_TYPE_CNTL);
@@ -2103,7 +2241,7 @@ t_stat dmc_svc(UNIT* uptr)
 CTLR *controller = dmc_get_controller_from_unit(uptr);
 DEVICE *dptr = controller->device;
 
-sim_debug(DBG_TRC, dptr, "dmc_svc()\n");
+sim_debug(DBG_TRC, dptr, "dmc_svc(%s%d)\n", controller->device->name, controller->index);
 
 if (dmc_is_attached(controller->unit)) {
     /* Perform delayed register actions */
@@ -2309,10 +2447,10 @@ if (buffer) {
     buffer->address = address;
     buffer->count = count;
     assert (insqueue (&buffer->hdr, q->hdr.prev)); /* Insert at tail */
-    sim_debug(DBG_INF, q->controller->device, "Queued %s buffer address=0x%08x count=%d\n", q->name, address, count);
+    sim_debug(DBG_INF, q->controller->device, "%s%d: Queued %s buffer address=0x%08x count=%d\n", q->controller->device->name, q->controller->index, q->name, address, count);
     }
 else {
-    sim_debug(DBG_WRN, q->controller->device, "Failed to queue %s buffer address=0x%08x, queue full\n", q->name, address);
+    sim_debug(DBG_WRN, q->controller->device, "%s%d: Failed to queue %s buffer address=0x%08x, queue full\n", q->controller->device->name, q->controller->index, q->name, address);
     // TODO: Report error here.
     }
 return buffer;
@@ -2374,11 +2512,11 @@ if ((!head) ||
 count = head->actual_bytes_transferred;
 switch (head->type) {
     case Receive:
-        sim_debug(DBG_INF, controller->device, "Starting data output transfer for receive, address=0x%08x, count=%d\n", head->address, count);
+        sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for receive, address=0x%08x, count=%d\n", controller->device->name, controller->index, head->address, count);
         dmc_set_type_output(controller, DMC_C_TYPE_RBACC);
         break;
     case TransmitData:
-        sim_debug(DBG_INF, controller->device, "Starting data output transfer for transmit, address=0x%08x, count=%d\n", head->address, count);
+        sim_debug(DBG_INF, controller->device, "%s%d: Starting data output transfer for transmit, address=0x%08x, count=%d\n", controller->device->name, controller->index, head->address, count);
         dmc_set_type_output(controller, DMC_C_TYPE_XBACC);
         break;
     default:
@@ -2397,7 +2535,7 @@ BUFFER *buffer;
 if ((dmc_is_rdyo_set(controller)) ||
     (controller->transfer_state != OutputTransfer))
     return;
-sim_debug(DBG_INF, controller->device, "Output transfer completed\n");
+sim_debug(DBG_INF, controller->device, "%s%d: Output transfer completed\n", controller->device->name, controller->index);
 buffer = (BUFFER *)remqueue (controller->completion_queue->hdr.next);
 assert (insqueue (&buffer->hdr, controller->free_queue->hdr.prev));
 controller->transmit_buffer_output_transfers_completed++;
@@ -2439,7 +2577,7 @@ if (dmc_is_dmc(controller)) {
             case DMC_C_TYPE_BASEIN:
                 *controller->baseaddr = dmc_get_addr(controller);
                 *controller->basesize = dmc_get_count(controller);
-                sim_debug(DBG_INF, controller->device, "Completing Base In input transfer, base address=0x%08x count=%d\n", *controller->baseaddr, *controller->basesize);
+                sim_debug(DBG_INF, controller->device, "%s%d: Completing Base In input transfer, base address=0x%08x count=%d\n", controller->device->name, controller->index, *controller->baseaddr, *controller->basesize);
                 break;
             case DMC_C_TYPE_XBACC:
                 if (1) {
@@ -2451,7 +2589,7 @@ if (dmc_is_dmc(controller)) {
                     memset (buffer->transfer_buffer, 0, DDCMP_HEADER_SIZE);
                     n = Map_ReadB (buffer->address, buffer->count, buffer->transfer_buffer + DDCMP_HEADER_SIZE);
                     if (n > 0) {
-                        sim_debug(DBG_WRN, controller->device, "DMA error\n");
+                        sim_debug(DBG_WRN, controller->device, "%s%d: DMA error\n", controller->device->name, controller->index);
                         }
                     buffer->count += DDCMP_HEADER_SIZE + DDCMP_CRC_SIZE;
                     controller->transmit_buffer_input_transfers_completed++;
@@ -2469,7 +2607,8 @@ if (dmc_is_dmc(controller)) {
                 ddcmp_dispatch (controller, 0);
                 break;
             case DMC_C_TYPE_CNTL:
-                sim_debug(DBG_INF, controller->device, "Control In Command Received(%s MODE%s%s)\n", 
+                sim_debug(DBG_INF, controller->device, "%s%d: Control In Command Received(%s MODE%s%s)\n", 
+                                                       controller->device->name, controller->index,
                                                        (sel6&DMC_SEL6_M_MAINT) ? "MAINTENANCE" : "DDCMP", 
                                                        (sel6&DMC_SEL6_M_HDX) ? ", Half Duples" : "", 
                                                        (sel6&DMC_SEL6_M_LONGSTRT) ? ", Long Start Timer" : "");
@@ -2478,7 +2617,7 @@ if (dmc_is_dmc(controller)) {
                 ddcmp_dispatch (controller, (sel6&DMC_SEL6_M_MAINT) ? DDCMP_EVENT_MAINTMODE : 0);
                 return;
             case DMC_C_TYPE_HALT:
-                sim_debug(DBG_INF, controller->device, "Halt Command Received\n");
+                sim_debug(DBG_INF, controller->device, "%s%d: Halt Command Received\n", controller->device->name, controller->index);
                 controller->state = Halted;
                 ddcmp_dispatch(controller, 0);
                 dmc_clr_modem_dtr(controller);
@@ -2503,22 +2642,22 @@ else {  /* DMP */
             else
                 config = (mode & 2) ? "Tributary station" : "Control Station";
 
-            sim_debug(DBG_INF, controller->device, "Completing Mode input transfer, %s %s\n", duplex, config);
+            sim_debug(DBG_INF, controller->device, "%s%d: Completing Mode input transfer, %s %s\n", controller->device->name, controller->index, duplex, config);
             }
         else 
             if (controller->transfer_type == DMP_C_TYPE_CNTL) {
-                sim_debug(DBG_WRN, controller->device, "Control command (not processed yet)\n");
+                sim_debug(DBG_WRN, controller->device, "%s%d: Control command (not processed yet)\n", controller->device->name, controller->index);
                 }
             else 
                 if (controller->transfer_type == DMP_C_TYPE_RBACC) {
-                    sim_debug(DBG_WRN, controller->device, "Receive Buffer command (not processed yet)\n");
+                    sim_debug(DBG_WRN, controller->device, "%s%d: Receive Buffer command (not processed yet)\n", controller->device->name, controller->index);
                     }
                 else 
                     if (controller->transfer_type == DMP_C_TYPE_XBACC) {
-                        sim_debug(DBG_WRN, controller->device, "Transmit Buffer command (not processed yet)\n");
+                        sim_debug(DBG_WRN, controller->device, "%s%d: Transmit Buffer command (not processed yet)\n", controller->device->name, controller->index);
                         }
                     else {
-                        sim_debug(DBG_WRN, controller->device, "Unrecognised command code %hu\n", controller->transfer_type);
+                        sim_debug(DBG_WRN, controller->device, "%s%d: Unrecognised command code %hu\n", controller->device->name, controller->index, controller->transfer_type);
                         }
 
         controller->transfer_state = Idle;
@@ -3075,13 +3214,13 @@ for (table=DDCMP_TABLE; table->Conditions[0] != NULL; ++table) {
             }
         if (!match)
             continue;
-        sim_debug (DBG_INF, controller->device, "ddcmp_dispatch(%X) - %s conditions matching for rule %d, initiating actions\n", EventMask, states[table->State], table->RuleNumber);
+        sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - %s conditions matching for rule %d(%s), initiating actions (%s)\n", controller->device->name, controller->index, EventMask, states[table->State], table->RuleNumber, ddcmp_conditions(table->Conditions), ddcmp_actions(table->Actions));
         while (*action != NULL) {
             (*action)(controller);
             ++action;
             }
         if (table->NewState != controller->link.state) {
-            sim_debug (DBG_INF, controller->device, "ddcmp_dispatch(%X) - state changing from %s to %s\n", EventMask, states[controller->link.state], states[table->NewState]);
+            sim_debug (DBG_INF, controller->device, "%s%d: ddcmp_dispatch(%X) - state changing from %s to %s\n", controller->device->name, controller->index, EventMask, states[controller->link.state], states[table->NewState]);
             controller->link.state = table->NewState;
             }
         }
@@ -3170,7 +3309,7 @@ if (dmc_is_dmc (controller) &&
             dmc_setreg (controller, 6, 0x0391, DBG_RGC); /* Not Low Speed uCode value (0x390) */
             break;
         default:
-            sim_debug(DBG_WRN, controller->device, "dmc_process_command(). Unknown Microcode instruction 0x%04x", *controller->csrs->sel6);
+            sim_debug(DBG_WRN, controller->device, "%s%d: dmc_process_command(). Unknown Microcode instruction 0x%04x", controller->device->name, controller->index, *controller->csrs->sel6);
             break;
         }
     *controller->csrs->sel0 &= ~DMC_SEL0_M_STEPUP;
@@ -3183,7 +3322,7 @@ else {
         }
     }
 if (tmxr_get_line_loopback (controller->line) ^ dmc_is_lu_loop_set (controller)) {
-    sim_debug(DBG_INF, controller->device, "%s loopback mode\n", dmc_is_lu_loop_set (controller) ? "Enabling" : "Disabling");
+    sim_debug(DBG_INF, controller->device, "%s%d: %s loopback mode\n", controller->device->name, controller->index, dmc_is_lu_loop_set (controller) ? "Enabling" : "Disabling");
     tmxr_set_line_loopback (controller->line, dmc_is_lu_loop_set (controller));
     }
 }
@@ -3195,10 +3334,10 @@ int reg = PA & ((UNIBUS) ? 07 : 017);
 
 *data = dmc_getreg(controller, PA, DBG_REG);
 if (access == READ) {
-    sim_debug(DBG_REG, controller->device, "dmc_rd(), addr=0x%08x, SEL%d, data=0x%04x\n", PA, reg, *data);
+    sim_debug(DBG_REG, controller->device, "dmc_rd(%s%d), addr=0x%08x, SEL%d, data=0x%04x\n", controller->device->name, controller->index, PA, reg, *data);
     }
 else {
-    sim_debug(DBG_REG, controller->device, "dmc_rd(), addr=0x%08x, BSEL%d, data=%02x\n", PA, reg, *data & 0xFF);
+    sim_debug(DBG_REG, controller->device, "dmc_rd(%s%d), addr=0x%08x, BSEL%d, data=%02x\n", controller->device->name, controller->index, PA, reg, *data & 0xFF);
     }
 
 return SCPE_OK;
@@ -3211,15 +3350,15 @@ int reg = PA & ((UNIBUS) ? 07 : 017);
 uint16 oldValue = dmc_getreg(controller, PA, 0);
 
 if (access == WRITE) {
-    sim_debug(DBG_REG, controller->device, "dmc_wr(), addr=0x%08x, SEL%d, newdata=0x%04x, olddata=0x%04x\n", PA, reg, data, oldValue);
+    sim_debug(DBG_REG, controller->device, "dmc_wr(%s%d), addr=0x%08x, SEL%d, newdata=0x%04x, olddata=0x%04x\n", controller->device->name, controller->index, PA, reg, data, oldValue);
     }
 else {
-    sim_debug(DBG_REG, controller->device, "dmc_wr(), addr=0x%08x, BSEL%d, newdata=%02x, olddata=0x%02x\n", PA, reg, data & 0xFF, ((PA&1) ? oldValue>>8 : oldValue) & 0xFF);
+    sim_debug(DBG_REG, controller->device, "dmc_wr(%s%d), addr=0x%08x, BSEL%d, newdata=%02x, olddata=0x%02x\n", controller->device->name, controller->index, PA, reg, data & 0xFF, ((PA&1) ? oldValue>>8 : oldValue) & 0xFF);
     }
 
 if (access == WRITE) {
     if (PA & 1) {
-        sim_debug(DBG_WRN, controller->device, "dmc_wr(), Unexpected non-16-bit write access to SEL%d\n", reg);
+        sim_debug(DBG_WRN, controller->device, "dmc_wr(%s%d), Unexpected non-16-bit write access to SEL%d\n", controller->device->name, controller->index, reg);
         }
     dmc_setreg(controller, PA, data, DBG_REG);
     }
