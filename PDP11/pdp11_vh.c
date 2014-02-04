@@ -365,9 +365,8 @@ static DIB vh_dib = {
     IOLN_VH,    /* IO space per device */
 };
 
-static UNIT vh_unit[VH_MUXES] = {
+static UNIT vh_unit[VH_MUXES+1] = {
     { UDATA (&vh_svc, UNIT_IDLE|UNIT_ATTABLE, 0) },
-    { UDATA (&vh_timersvc, UNIT_IDLE, 0) },
 };
 
 static const REG vh_reg[] = {
@@ -1365,11 +1364,14 @@ static t_stat vh_reset (    DEVICE  *dptr   )
         vh_desc.lines = VH_MUXES*VH_LINES;
     for (i = 0; i < vh_desc.lines; i++)
         vh_parm[i].tmln = &vh_ldsc[i];
-    vh_dev.numunits = (vh_desc.lines / VH_LINES);
+    vh_dev.numunits = (vh_desc.lines / VH_LINES) + 1;
+    vh_unit[vh_dev.numunits-1].action = &vh_timersvc;
+    vh_unit[vh_dev.numunits-1].flags = UNIT_DIS;
     for (i = 0; i < vh_desc.lines/VH_LINES; i++) {
         /* if Unibus, force DHU mode */
         if (UNIBUS)
             vh_unit[i].flags |= UNIT_MODEDHU;
+        vh_unit[i].flags &= ~UNIT_DIS;
         vh_clear (i, TRUE);
     }
     vh_rxi = vh_txi = 0;
@@ -1492,7 +1494,8 @@ if (newln < vh_desc.lines) {
 vh_dib.lnt = (newln / VH_LINES) * IOLN_VH;              /* set length */
 vh_desc.lines = newln;
 ndev = ((vh_dev.flags & DEV_DIS)? 0: (vh_desc.lines / VH_LINES));
-vh_dev.numunits = (newln / VH_LINES);
+vh_dev.numunits = (newln / VH_LINES) + 1;
+vh_reset (&vh_dev);
 return auto_config (vh_dev.name, ndev);                 /* auto config */
 }
 
