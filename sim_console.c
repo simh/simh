@@ -1084,11 +1084,33 @@ if (!sim_quiet) {
         if (sim_deb_switches & SWMASK ('A'))
             fprintf (sim_log, "   Debug messages display time of day as seconds.msec%s\n", sim_deb_switches & SWMASK ('R') ? " relative to the start of debugging" : "");
         }
+    time(&now);
+    fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
+    show_version (sim_deb, NULL, NULL, 0, NULL);
     }
-time(&now);
-fprintf (sim_deb, "Debug output to \"%s\" at %s", sim_logfile_name (sim_deb, sim_deb_ref), ctime(&now));
-show_version (sim_deb, NULL, NULL, 0, NULL);
 
+return SCPE_OK;
+}
+
+t_stat sim_debug_flush (void)
+{
+int32 saved_quiet = sim_quiet;
+int32 saved_sim_switches = sim_switches;
+int32 saved_deb_switches = sim_deb_switches;
+struct timespec saved_deb_basetime = sim_deb_basetime;
+char saved_debug_filename[CBUFSIZE];
+
+if (sim_deb == NULL)                                    /* no debug? */
+    return SCPE_OK;
+
+strcpy (saved_debug_filename, sim_logfile_name (sim_deb, sim_deb_ref));
+
+sim_quiet = 1;
+sim_set_deboff (0, NULL);
+sim_switches = saved_deb_switches;
+sim_set_debon (0, saved_debug_filename);
+sim_deb_basetime = saved_deb_basetime;
+sim_switches = saved_sim_switches;
 return SCPE_OK;
 }
 
@@ -1098,16 +1120,17 @@ t_stat sim_set_deboff (int32 flag, char *cptr)
 {
 if (cptr && (*cptr != 0))                               /* now eol? */
     return SCPE_2MARG;
-if (sim_deb == NULL)                                    /* no log? */
+if (sim_deb == NULL)                                    /* no debug? */
     return SCPE_OK;
 sim_close_logfile (&sim_deb_ref);
 sim_deb = NULL;
 sim_deb_switches = 0;
 sim_deb_PC = NULL;
-if (!sim_quiet)
+if (!sim_quiet) {
     printf ("Debug output disabled\n");
-if (sim_log)
-    fprintf (sim_log, "Debug output disabled\n");
+    if (sim_log)
+        fprintf (sim_log, "Debug output disabled\n");
+    }
 return SCPE_OK;
 }
 

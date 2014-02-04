@@ -953,10 +953,31 @@ static const char simh_help[] =
       "++++++++                     (STDOUT,DEBUG or filename)\n"
       "+set nolog                   disables any currently active logging\n"
 #define HLP_SET_DEBUG  "*Commands SET Debug"
+       /***************** 80 character line width template *************************/
       "3Debug\n"
       "+set debug debug_file        specify the debug destination\n"
       "++++++++                     (STDOUT,STDERR,LOG or filename)\n"
       "+set nodebug                 disables any currently active debug output\n"
+      "4Switches\n"
+      " Debug message output contains a timestamp which indicates the number of\n"
+      " simulated instructions which have been executed prior to the debug event.\n\n"
+      " Debug message output can be enhanced to contain additional, potentially\n"
+      " useful information.\n"
+      "5-T\n"
+      " The -T switch causes debug output to contain a time of day displayed\n"
+      " as hh:mm:ss.msec.\n"
+      "5-A\n"
+      " The -A switch causes debug output to contain a time of day displayed\n"
+      " as seconds.msec.\n"
+      "5-R\n"
+      " The -R switch causes the time of day displayed due to the -T or -A\n"
+      " switches to be relative to the start time of debugging.  If neither\n"
+      " -T or -A is explicitly specified, -T is implied.\n"
+      "5-P\n"
+      " The -P switch adds the output of the PC register variable to each debug\n"
+      " message.  This may not be useful on all simulators if they either don't\n"
+      " have a register called PC, or if the PC register variable is actually\n"
+      " constructed from several different internal variables.\n"
 #define HLP_SET_BREAK  "*Commands SET Breakpoints"
       "3Breakpoints\n"
       "+set break <list>            set breakpoints\n"
@@ -1052,6 +1073,7 @@ static const char simh_help[] =
       "+sh{ow} serial               show serial devices\n"
       "+sh{ow} multiplexer          show open multiplexer devices\n"
       "+sh{ow} clocks               show calibrated timers\n"
+      "+sh{ow} throttle             show throttle info\n"
       "+sh{ow} on                   show on condition actions\n"
       "+h{elp} <dev> show           displays the device specific show commands\n"
       "++++++++                     available\n"
@@ -5306,7 +5328,7 @@ signal (SIGTERM, SIG_DFL);                              /* cancel WRU */
 if (sim_log)                                            /* flush console log */
     fflush (sim_log);
 if (sim_deb)                                            /* flush debug log */
-    fflush (sim_deb);
+    sim_debug_flush ();
 for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files */
     for (j = 0; j < dptr->numunits; j++) {              /* if not buffered in mem */
         uptr = dptr->units + j;
