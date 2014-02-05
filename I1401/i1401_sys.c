@@ -51,7 +51,6 @@ extern REG cpu_reg[];
 extern uint8 M[];
 extern char ascii_to_bcd_old[128], ascii_to_bcd[128];
 extern char bcd_to_ascii_old[64], bcd_to_ascii_a[64], bcd_to_ascii_h[64];
-extern char *get_glyph (char *cptr, char *gbuf, char term);
 extern int32 store_addr_h (int32 addr);
 extern int32 store_addr_t (int32 addr);
 extern int32 store_addr_u (int32 addr);

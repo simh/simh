@@ -8195,7 +8195,7 @@ static TOPIC *buildHelp (TOPIC *topic, struct sim_device *dptr,
                     htext++;
                 continue;
             }
-            FAIL (SCPE_ARG, Unknown line type, NULL);     /* Unknown line */
+            FAIL (SCPE_ARG, Unknown line type, htext);     /* Unknown line */
         } /* htext not at end */
         memset (vstrings, 0, VSMAX * sizeof (char *));
         vsnum = 0;
@@ -8402,11 +8402,11 @@ t_stat scp_vhelp (FILE *st, struct sim_device *dptr,
     if ((failed = setjmp (help_env)) != 0) {
         fprintf (stderr, "\nHelp was unable to process the help for this device.\n"
                          "Error in block %u line %u: %s\n"
-                         "%s%0.*s%s"
+                         "%s%*.*s%s"
                          " Please contact the device maintainer.\n", 
                  (int)help_where.block, (int)help_where.line, help_where.error, 
                  help_where.prox ? "Near '" : "", 
-                 help_where.prox ? 15 : 0, 
+                 help_where.prox ? 15 : 0, help_where.prox ? 15 : 0, 
                  help_where.prox ? help_where.prox : "", 
                  help_where.prox ? "'" : "");
         cleanHelp (&top);
