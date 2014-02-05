@@ -646,6 +646,7 @@ struct sim_fileref {
 /* The following macros define structure contents */
 
 #define UDATA(act,fl,cap) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,NULL,0,0
+#define UDATAFLUSH(act,fl,cap,flush) NULL,act,NULL,NULL,NULL,0,0,(fl),0,(cap),0,flush,0,0
 
 #if defined (__STDC__) || defined (_WIN32)
 /* Right Justified Octal Register Data */
