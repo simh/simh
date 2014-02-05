@@ -625,11 +625,18 @@ static t_stat jrst_tab[16] = {
 #define POPF            if (LRZ (AC(ac)) == RMASK) SETF (F_T2)
 #define DMOVNF          if (rs[1] == 0) { MOVNF (rs[0]); }
 
+t_value pdp10_pc_value (void)
+{
+return (t_value)pager_PC;
+}
+
 t_stat sim_instr (void)
 {
 a10 PC;                                                 /* set by setjmp */
 int abortval = 0;                                       /* abort value */
 t_stat r;
+
+sim_vm_pc_value = &pdp10_pc_value;
 
 /* Restore register state */
 
