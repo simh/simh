@@ -194,6 +194,7 @@ static t_stat ddcmp_tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, uint16 *ps
 {
 int32 c;
 size_t payloadsize;
+char msg[32];
 
 while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
     c &= ~TMXR_VALID;
@@ -224,7 +225,11 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
             *pbuf = lp->rxpb;
             *psize = DDCMP_HEADER_SIZE;
             lp->rxpboffset = 0;
-            ddcmp_packet_trace (DDCMP_DBG_PRCV, lp->mp->dptr, "<<< RCV Packet", lp->rxpb, *psize);
+            if (lp->mp->lines > 1)
+                sprintf (msg, "Line%d: <<< RCV Packet", (int)(lp-lp->mp->ldsc));
+            else
+                strcpy (msg, "<<< RCV Packet");
+            ddcmp_packet_trace (DDCMP_DBG_PRCV, lp->mp->dptr, msg, lp->rxpb, *psize);
             return SCPE_OK;
             }
         payloadsize  = ((lp->rxpb[2] & 0x3F) << 8)| lp->rxpb[1];
@@ -232,7 +237,11 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
             ++lp->rxpcnt;
             *pbuf = lp->rxpb;
             *psize = 10 + payloadsize;
-            ddcmp_packet_trace (DDCMP_DBG_PRCV, lp->mp->dptr, "<<< RCV Packet", lp->rxpb, *psize);
+            if (lp->mp->lines > 1)
+                sprintf (msg, "Line%d: <<< RCV Packet", (int)(lp-lp->mp->ldsc));
+            else
+                strcpy (msg, "<<< RCV Packet");
+            ddcmp_packet_trace (DDCMP_DBG_PRCV, lp->mp->dptr, msg, lp->rxpb, *psize);
             lp->rxpboffset = 0;
             return SCPE_OK;
             }
@@ -264,6 +273,7 @@ return SCPE_LOST;
 static t_stat ddcmp_tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size)
 {
 t_stat r;
+char msg[32];
 
 if (!lp->conn)
     return SCPE_LOST;
@@ -278,7 +288,11 @@ if (lp->txpbsize < size) {
 memcpy (lp->txpb, buf, size);
 lp->txppsize = size;
 lp->txppoffset = 0;
-ddcmp_packet_trace (DDCMP_DBG_PXMT, lp->mp->dptr, ">>> XMT Packet", lp->txpb, lp->txppsize);
+if (lp->mp->lines > 1)
+    sprintf (msg, "Line%d: >>> XMT Packet", (int)(lp-lp->mp->ldsc));
+else
+    strcpy (msg, ">>> XMT Packet");
+ddcmp_packet_trace (DDCMP_DBG_PXMT, lp->mp->dptr, msg, lp->txpb, lp->txppsize);
 ++lp->txpcnt;
 while ((lp->txppoffset < lp->txppsize) && 
        (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))

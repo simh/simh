@@ -1692,7 +1692,7 @@ void dmc_setinint(CTLR *controller)
 if (!dmc_is_iei_set(controller))
     return;
 if (!controller->in_int) {
-    sim_debug(DBG_INT, controller->device, "SET_INT(RX:%s%d)\n", controller->device->name, controller->index);
+    sim_debug(DBG_INT, controller->device, "SET_INT(RX:%s%d) summary=0x%x\n", controller->device->name, controller->index, dmc_ini_summary);
     }
 controller->in_int = 1;
 dmc_ini_summary |= (1u << controller->index);
@@ -1703,7 +1703,7 @@ void dmc_clrinint(CTLR *controller)
 {
 controller->in_int = 0;
 if (dmc_ini_summary & (1u << controller->index)) {
-    sim_debug(DBG_INT, controller->device, "CLR_INT(RX:%s%d)\n", controller->device->name, controller->index);
+    sim_debug(DBG_INT, controller->device, "CLR_INT(RX:%s%d) summary=0x%x\n", controller->device->name, controller->index, dmc_ini_summary);
     }
 dmc_ini_summary &= ~(1u << controller->index);
 if (!dmc_ini_summary)
@@ -1717,7 +1717,7 @@ void dmc_setoutint(CTLR *controller)
 if (!dmc_is_ieo_set(controller))
     return;
 if (!controller->out_int) {
-    sim_debug(DBG_INT, controller->device, "SET_INT(TX:%s%d)\n", controller->device->name, controller->index);
+    sim_debug(DBG_INT, controller->device, "SET_INT(TX:%s%d) summary=0x%x\n", controller->device->name, controller->index, dmc_outi_summary );
     }
 controller->out_int = 1;
 dmc_outi_summary |= (1u << controller->index);
@@ -1728,14 +1728,13 @@ void dmc_clroutint(CTLR *controller)
 {
 controller->out_int = 0;
 if (dmc_outi_summary & (1u << controller->index)) {
-    sim_debug(DBG_INT, controller->device, "CLR_INT(TX:%s%d)\n", controller->device->name, controller->index);
+    sim_debug(DBG_INT, controller->device, "CLR_INT(TX:%s%d) summary=0x%x\n", controller->device->name, controller->index, dmc_outi_summary);
     }
 dmc_outi_summary &= ~(1u << controller->index);
 if (!dmc_outi_summary)
     CLR_INT(DMCTX);
 else
     SET_INT(DMCTX);
-CLR_INT(DMCTX);
 }
 
 int dmc_getsel(int addr)
@@ -3397,7 +3396,7 @@ for (i=0; i<DMC_NUMDEVICE+DMP_NUMDEVICE; i++) {
         DIB *dib = (DIB *)controller->device->ctxt;
         ans = dib->vec + (8 * (int)(controller->unit - controller->device->units));
         dmc_clrinint(controller);
-        sim_debug(DBG_INT, controller->device, "RXINTA Device %d - Vector: 0x%x\n", (int)(controller->unit-controller->device->units), ans);
+        sim_debug(DBG_INT, controller->device, "RXINTA Device %d - Vector: 0x%x(0%3o)\n", (int)(controller->unit-controller->device->units), ans, ans);
         break;
         }
     }
@@ -3416,7 +3415,7 @@ for (i=0; i<DMC_NUMDEVICE+DMP_NUMDEVICE; i++) {
         DIB *dib = (DIB *)controller->device->ctxt;
         ans = dib->vec + 4 + (8 * (int)(controller->unit - controller->device->units));
         dmc_clroutint(controller);
-        sim_debug(DBG_INT, controller->device, "TXINTA Device %d - Vector: 0x%x\n", (int)(controller->unit-controller->device->units), ans);
+        sim_debug(DBG_INT, controller->device, "TXINTA Device %d - Vector: 0x%x(0%3o)\n", (int)(controller->unit-controller->device->units), ans, ans);
         break;
         }
     }
