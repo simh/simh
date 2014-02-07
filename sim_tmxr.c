@@ -449,10 +449,7 @@ lp->rxbpr = lp->rxbpi = lp->rxcnt = lp->rxpcnt = 0;     /* init receive indexes 
 if (!lp->txbfd || lp->notelnet)                         /* if not buffered telnet */
     lp->txbpr = lp->txbpi = lp->txcnt = lp->txpcnt = 0; /*   init transmit indexes */
 lp->txdrp = 0;
-if (lp->modem_control) {
-    lp->modembits &= ~TMXR_MDM_INCOMING;
-    lp->modembits |= TMXR_MDM_CTS | TMXR_MDM_DSR;
-    }
+tmxr_set_get_modem_bits (lp, 0, 0, NULL);
 if ((!lp->mp->buffered) && (!lp->txbfd)) {
     lp->txbfd = 0;
     lp->txbsz = TMXR_MAXBUF;
@@ -1385,7 +1382,11 @@ if ((lp->sock) || (lp->serport) || (lp->loopback)) {
         incoming_state = TMXR_MDM_RNG | TMXR_MDM_DCD | TMXR_MDM_DSR;
     }
 else
-    incoming_state = 0;
+    if ((lp->master) || (lp->mp && lp->mp->master) ||
+        (lp->port && lp->destination))
+        incoming_state = TMXR_MDM_DCD | TMXR_MDM_DSR;
+    else
+        incoming_state = 0;
 lp->modembits |= incoming_state;
 dptr = (lp->dptr ? lp->dptr : (lp->mp ? lp->mp->dptr : NULL));
 if (sim_deb && lp->mp && dptr) {
