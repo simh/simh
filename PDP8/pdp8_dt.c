@@ -282,7 +282,7 @@ int32 dt77 (int32 IR, int32 AC);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
 t_stat dt_attach (UNIT *uptr, char *cptr);
-t_stat dt_flush (UNIT *uptr);
+void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 t_stat dt_boot (int32 unitno, DEVICE *dptr);
 void dt_deselect (int32 oldf);
@@ -1278,7 +1278,7 @@ return SCPE_OK;
    If 16b or 18b, convert 12b buffer to 16b or 18b and write to file
    Deallocate buffer
 */
-t_stat dt_flush (UNIT* uptr)
+void dt_flush (UNIT* uptr)
 {
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *fbuf;
@@ -1314,7 +1314,6 @@ if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any 
         perror ("I/O error");
     }
 uptr->WRITTEN = FALSE;                                  /* no longer dirty */
-return SCPE_OK;
 }
 
 t_stat dt_detach (UNIT* uptr)
