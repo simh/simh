@@ -882,6 +882,8 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_set_microdiag (UNIT* uptr, int32 val, char* cptr, void* desc);
+t_stat dmc_show_microdiag (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showtype (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setstats (UNIT* uptr, int32 val, char* cptr, void* desc);
@@ -965,6 +967,7 @@ char dmc_port[DMC_NUMDEVICE][CBUFSIZE];
 uint32 dmc_baseaddr[DMC_NUMDEVICE];
 uint16 dmc_basesize[DMC_NUMDEVICE];
 uint8 dmc_modem[DMC_NUMDEVICE];
+t_bool dmc_microdiag[DMC_NUMDEVICE];
 
 CSRS dmp_csrs[DMP_NUMDEVICE];
 uint16 dmp_sel0[DMC_NUMDEVICE];
@@ -1014,6 +1017,7 @@ REG dmc_reg[] = {
     { BRDATAD (SEL4,              dmc_sel4, DEV_RDX, 16, DMC_NUMDEVICE,         "Select 4 CSR") },
     { BRDATAD (SEL6,              dmc_sel6, DEV_RDX, 16, DMC_NUMDEVICE,         "Select 6 CSR") },
     { BRDATAD (SPEED,            dmc_speed, DEV_RDX, 32, DMC_NUMDEVICE,         "line speed") },
+    { BRDATAD (DIAG,         dmc_microdiag, DEV_RDX,  1, DMC_NUMDEVICE,         "Microdiagnostic Enabled") },
     { BRDATAD (PEER,              dmc_peer, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "peer address:port") },
     { BRDATAD (PORT,              dmc_port, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "listen port") },
     { BRDATAD (BASEADDR,      dmc_baseaddr, DEV_RDX, 32, DMC_NUMDEVICE,         "program set base address") },
@@ -1047,6 +1051,8 @@ MTAB dmc_mod[] = {
         &dmc_setpeer, &dmc_showpeer, NULL, "Display destination/source" },
     { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
         &dmc_setspeed, &dmc_showspeed, NULL, "Display rate limit" },
+    { MTAB_XTD|MTAB_VUN,          0, "MICRODIAG", "MICRODIAG={ENABLE,DISABLE}" ,
+        &dmc_set_microdiag, &dmc_show_microdiag, NULL, "MicroDiagnostic Enable" },
 #if !defined (VM_PDP10)
     { MTAB_XTD|MTAB_VUN|MTAB_VALR,0, "TYPE", "TYPE={DMR,DMC}" ,&dmc_settype, &dmc_showtype, NULL, "Set/Display device type"  },
 #endif
@@ -1253,6 +1259,32 @@ newspeed = (int32) get_uint (cptr, 10, 100000000, &r);
 if (r != SCPE_OK)
     return r;
 speeds[dmc] = newspeed;
+return SCPE_OK;
+}
+
+t_stat dmc_show_microdiag (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+int32 dmc = (int32)(uptr-dmc_dev.units);
+
+fprintf(st, "MicroDiag=%s", dmc_microdiag[dmc] ? "enabled" : "disabled");
+return SCPE_OK;
+}
+
+t_stat dmc_set_microdiag(UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+int32 dmc = (int32)(uptr-dmc_dev.units);
+char gbuf[CBUFSIZE];
+
+if ((cptr == NULL) || (*cptr == '\0'))
+    return SCPE_ARG;
+get_glyph (cptr, gbuf, 0);
+if (MATCH_CMD (gbuf, "ENABLE") == 0)
+    dmc_microdiag[dmc] = TRUE;
+else
+    if (MATCH_CMD (gbuf, "DISABLE") == 0)
+        dmc_microdiag[dmc] = FALSE;
+    else
+        return SCPE_ARG;
 return SCPE_OK;
 }
 
@@ -2172,8 +2204,18 @@ while ((control = controller->control_out)) {
 controller->control_out = NULL;
 dmc_setreg(controller, 0, 0, DBG_RGC);
 if (controller->dev_type == DMR) {
-    /* DMR-11 indicates microdiagnostics complete when this is set */
-    dmc_setreg(controller, 2, 0x8000, DBG_RGC);
+    if (dmc_is_attached(controller->unit)) {
+        /* Indicates microdiagnostics complete */
+        if (((*controller->csrs->sel0 & DMC_SEL0_M_UDIAG) != 0) ^
+            (dmc_microdiag[controller->index]))
+            dmc_setreg(controller, 2, 0x8000, DBG_RGC);/* Microdiagnostics Complete */
+        else
+            dmc_setreg(controller, 2, 0x4000, DBG_RGC); /* Microdiagnostics Inhibited */
+        }
+    else {
+        /* Indicate M8203 (Line Unit) test failed */
+        dmc_setreg(controller, 2, 0x0200, DBG_RGC);
+        }
     }
 else {
     /* preserve contents of BSEL3 if DMC-11 */
@@ -2191,7 +2233,8 @@ else
 dmc_buffer_queue_init_all(controller);
 
 controller->transfer_state = Idle;
-dmc_set_run(controller);
+if (dmc_is_attached(controller->unit))
+    dmc_set_run(controller);
 }
 
 void dmc_start_input_transfer(CTLR *controller)
@@ -2242,16 +2285,16 @@ DEVICE *dptr = controller->device;
 
 sim_debug(DBG_TRC, dptr, "dmc_svc(%s%d)\n", controller->device->name, controller->index);
 
-if (dmc_is_attached(controller->unit)) {
-    /* Perform delayed register actions */
-    if (controller->dmc_wr_delay) {
-        controller->dmc_wr_delay = 0;
-        dmc_process_command(controller);
-        if (controller->link.xmt_buffer) {
-            sim_activate_notbefore (uptr, controller->link.xmt_buffer->buffer_return_time);
-            return SCPE_OK;
-            }
+/* Perform delayed register actions */
+if (controller->dmc_wr_delay) {
+    controller->dmc_wr_delay = 0;
+    dmc_process_command(controller);
+    if (controller->link.xmt_buffer) {
+        sim_activate_notbefore (uptr, controller->link.xmt_buffer->buffer_return_time);
+        return SCPE_OK;
         }
+    }
+if (dmc_is_attached(controller->unit)) {
     /* Speed limited transmissions are completed here after the appropriate service delay */
     if (controller->link.xmt_buffer) {
         dmc_complete_transmit(controller);
@@ -3374,8 +3417,7 @@ else {
     dmc_setreg(controller, PA, (oldValue & ~mask) | (data & mask), DBG_REG);
     }
 
-if (dmc_is_attached(controller->unit) && 
-    (dmc_getsel(reg) == 0 || dmc_getsel(reg) == 1)) {/* writes to SEL0 and SEL2 are actionable */
+if ((dmc_getsel(reg) == 0) || (dmc_getsel(reg) == 1)) {/* writes to SEL0 and SEL2 are actionable */
     if (0 == controller->dmc_wr_delay) {    /* Not waiting? */
         controller->dmc_wr_delay = 10;      /* Wait a bit before acting on the changed register */
         sim_activate_abs (controller->unit, controller->dmc_wr_delay);
@@ -3496,6 +3538,7 @@ if (0 == dmc_units[0].flags) {       /* First Time Initializations */
 #endif
         dmc_dev.units[i] = dmc_unit_template;
         controller->unit->ctlr = (void *)controller;
+        dmc_microdiag[i] = TRUE;
         }
     tmxr_set_modem_control_passthru (&dmc_desc);   /* We always want Modem Control */
     dmc_units[dmc_dev.numunits-2] = dmc_poll_unit_template;
