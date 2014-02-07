@@ -353,12 +353,18 @@ while (reason == 0) {                                   /* loop until halted */
         }
 
     MA = IF | PC;                                       /* form PC */
-    if (sim_brk_summ && sim_brk_test (MA, SWMASK ('E'))) { /* breakpoint? */
+    if (sim_brk_summ && 
+        sim_brk_test (MA, (1u << SIM_BKPT_V_SPC) | SWMASK ('E'))) { /* breakpoint? */
         reason = STOP_IBKPT;                            /* stop simulation */
         break;
 		}
 
     IR = M[MA];                                         /* fetch instruction */
+    if (sim_brk_summ && 
+        sim_brk_test (IR, (2u << SIM_BKPT_V_SPC) | SWMASK ('I'))) { /* breakpoint? */
+        reason = STOP_OPBKPT;                            /* stop simulation */
+        break;
+        }
     PC = (PC + 1) & 07777;                              /* increment PC */
     int_req = int_req | INT_NO_ION_PENDING;             /* clear ION delay */
     sim_interval = sim_interval - 1;
@@ -1364,7 +1370,8 @@ pcq_r = find_reg ("PCQ", NULL, dptr);
 if (pcq_r)
     pcq_r->qptr = 0;
 else return SCPE_IERR;
-sim_brk_types = sim_brk_dflt = SWMASK ('E');
+sim_brk_types = SWMASK ('E') | SWMASK('I');
+sim_brk_dflt = SWMASK ('E');
 return SCPE_OK;
 }
 

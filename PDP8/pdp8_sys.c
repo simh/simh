@@ -119,6 +119,7 @@ const char *sim_stop_messages[] = {
     "Unimplemented instruction",
     "HALT instruction",
     "Breakpoint",
+    "Opcode Breakpoint",
     "Non-standard device number",
     "DECtape off reel",
     "Infinite loop"
