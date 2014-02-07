@@ -261,7 +261,7 @@
 #define MAX_DO_NEST_LVL 20                              /* DO cmd nesting level */
 #define SRBSIZ          1024                            /* save/restore buffer */
 #define SIM_BRK_INILNT  4096                            /* bpt tbl length */
-#define SIM_BRK_ALLTYP  0xFFFFFFFF
+#define SIM_BRK_ALLTYP  0xFFFFFFFB
 #define UPDATE_SIM_TIME                                         \
     if (1) {                                                    \
         int32 _x;                                               \
@@ -799,25 +799,30 @@ static const char simh_help[] =
       " decremented.  If the count is less than or equal to 0, the breakpoint\n"
       " occurs; otherwise, it is deferred.  When the breakpoint occurs, the\n"
       " optional actions are automatically executed.\n\n"
-      " A breakpoint is set by the BREAK command:\n"
-      "++BREAK {-types} {<addr range>{[count]},{addr range...}}{;action;action...}\n\n"
+      " A breakpoint is set by the BREAK or the SET BREAK commands:\n\n"
+      "++BREAK {-types} {<addr range>{[count]},{addr range...}}{;action;action...}\n"
+      "++SET BREAK {-types} {<addr range>{[count]},{addr range...}}{;action;action...}\n\n"
       " If no type is specified, the simulator-specific default breakpoint type\n"
       " (usually E for execution) is used.  If no address range is specified, the\n"
       " current PC is used.  As with EXAMINE and DEPOSIT, an address range may be a\n"
       " single address, a range of addresses low-high, or a relative range of\n"
       " address/length.\n"
        /***************** 80 character line width template *************************/
-      "5Examples:\n"
+      "5Displaying Breakpoints\n"
+      " Currently set breakpoints can be displayed with the SHOW BREAK command:\n\n"
+      "++SHOW {-C} {-types} BREAK {ALL|<addr range>{,<addr range>...}}\n\n"
+      " Locations with breakpoints of the specified type are displayed.\n\n"
+      " The -C switch displays the selected breakpoint(s) formatted as commands\n"
+      " which may be subsequently used to establish the same breakpoint(s).\n\n"
+      "5Removing Breakpoints\n"
+      " Breakpoints can be cleared by the NOBREAK or the SET NOBREAK commands.\n"
+      "5Examples\n"
       "++BREAK                      set E break at current PC\n"
       "++BREAK -e 200               set E break at 200\n"
       "++BREAK 2000/2[2]            set E breaks at 2000,2001 with count = 2\n"
       "++BREAK 100;EX AC;D MQ 0     set E break at 100 with actions EX AC and\n"
-      "++                           D MQ 0\n"
+      "+++++++++D MQ 0\n"
       "++BREAK 100;                 delete action on break at 100\n\n"
-      " Currently set breakpoints can be displayed with the SHOW BREAK command:\n\n"
-      "++SHOW {-types} BREAK {ALL|<addr range>{,<addr range>...}}\n\n"
-      " Locations with breakpoints of the specified type are displayed.\n\n"
-      " Finally, breakpoints can be cleared by the NOBREAK command.\n"
        /***************** 80 character line width template *************************/
       "2Connecting and Disconnecting Devices\n"
       " Except for main memory and network devices, units are simulated as\n"
@@ -974,10 +979,8 @@ static const char simh_help[] =
       " switches to be relative to the start time of debugging.  If neither\n"
       " -T or -A is explicitly specified, -T is implied.\n"
       "5-P\n"
-      " The -P switch adds the output of the PC register variable to each debug\n"
-      " message.  This may not be useful on all simulators if they either don't\n"
-      " have a register called PC, or if the PC register variable is actually\n"
-      " constructed from several different internal variables.\n"
+      " The -P switch adds the output of the PC (Program Counter) to each debug\n"
+      " message.\n"
 #define HLP_SET_BREAK  "*Commands SET Breakpoints"
       "3Breakpoints\n"
       "+set break <list>            set breakpoints\n"
@@ -1047,7 +1050,7 @@ static const char simh_help[] =
        /***************** 80 character line width template *************************/
 #define HLP_SHOW        "*Commands SHOW"
       "2SHOW\n"
-      "+sh{ow} br{eak} <list>       show breakpoints\n"
+      "+sh{ow} {-c} br{eak} <list>  show breakpoints\n"
       "+sh{ow} con{figuration}      show configuration\n"
       "+sh{ow} cons{ole} {arg}      show console options\n"
       "+sh{ow} dev{ices}            show devices\n"
@@ -3342,6 +3345,7 @@ if ((dptr = find_dev (gbuf))) {                         /* device match? */
     uptr = dptr->units;                                 /* first unit */
     shtb = show_dev_tab;                                /* global table */
     lvl = MTAB_VDV;                                     /* device match */
+    GET_SWITCHES (cptr);                                /* get more switches */
     }
 else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
     if (uptr == NULL)                                   /* invalid unit */
@@ -3350,9 +3354,12 @@ else if ((dptr = find_unit (gbuf, &uptr))) {            /* unit match? */
         return SCPE_UDIS;
     shtb = show_unit_tab;                               /* global table */
     lvl = MTAB_VUN;                                     /* unit match */
+    GET_SWITCHES (cptr);                                /* get more switches */
     }
-else if ((shptr = find_shtab (show_glob_tab, gbuf)))    /* global? */
+else if ((shptr = find_shtab (show_glob_tab, gbuf))) {  /* global? */
+    GET_SWITCHES (cptr);                                /* get more switches */
     return shptr->action (ofile, NULL, NULL, shptr->arg, cptr);
+    }
 else {
     if (sim_dflt_dev->modifiers)
         for (mptr = sim_dflt_dev->modifiers; mptr->mask != 0; mptr++) {
@@ -3378,6 +3385,7 @@ if (*cptr == 0) {                                       /* now eol? */
     }
 if (dptr->modifiers == NULL)                            /* any modifiers? */
     return SCPE_NOPARAM;
+GET_SWITCHES (cptr);                                    /* get more switches */
 
 while (*cptr != 0) {                                    /* do all mods */
     cptr = get_glyph (cptr, gbuf, ',');                 /* get modifier */
@@ -7490,24 +7498,38 @@ BRKTAB *bp = sim_brk_fnd (loc);
 DEVICE *dptr;
 int32 i, any;
 
-if (sw == 0)
-    sw = SIM_BRK_ALLTYP;
+if ((sw == 0) || (sw == SWMASK ('C')))
+    sw = SIM_BRK_ALLTYP | ((sw == SWMASK ('C')) ? SWMASK ('C') : 0);
 if (!bp || (!(bp->typ & sw)))
     return SCPE_OK;
 dptr = sim_dflt_dev;
 if (dptr == NULL)
     return SCPE_OK;
-if (sim_vm_fprint_addr)
-    sim_vm_fprint_addr (st, dptr, loc);
-else fprint_val (st, loc, dptr->aradix, dptr->awidth, PV_LEFT);
-fprintf (st, ":\t");
+if (sw & SWMASK ('C'))
+    fprintf (st, "SET BREAK ");
+else {
+    if (sim_vm_fprint_addr)
+        sim_vm_fprint_addr (st, dptr, loc);
+    else fprint_val (st, loc, dptr->aradix, dptr->awidth, PV_LEFT);
+    fprintf (st, ":\t");
+    }
 for (i = any = 0; i < 26; i++) {
     if ((bp->typ >> i) & 1) {
-        if (any)
-            fprintf (st, ", ");
-        fputc (i + 'A', st);
+        if ((sw & SWMASK ('C')) == 0) {
+            if (any)
+                fprintf (st, ", ");
+            fputc (i + 'A', st);
+            }
+        else
+            fprintf (st, "-%c", i + 'A');
         any = 1;
         }
+    }
+if (sw & SWMASK ('C')) {
+    fprintf (st, " ");
+    if (sim_vm_fprint_addr)
+        sim_vm_fprint_addr (st, dptr, loc);
+    else fprint_val (st, loc, dptr->aradix, dptr->awidth, PV_LEFT);
     }
 if (bp->cnt > 0)
     fprintf (st, " [%d]", bp->cnt);
@@ -7523,8 +7545,8 @@ t_stat sim_brk_showall (FILE *st, int32 sw)
 {
 BRKTAB *bp;
 
-if (sw == 0)
-    sw = SIM_BRK_ALLTYP;
+if ((sw == 0) || (sw == SWMASK ('C')))
+    sw = SIM_BRK_ALLTYP | ((sw == SWMASK ('C')) ? SWMASK ('C') : 0);
 for (bp = sim_brk_tab; bp < (sim_brk_tab + sim_brk_ent); bp++) {
     if (bp->typ & sw)
         sim_brk_show (st, bp->addr, sw);
@@ -7707,6 +7729,12 @@ if (sim_deb_switches & SWMASK ('A')) {
 if (sim_deb_switches & SWMASK ('P')) {
     t_value val;
     
+    /* Some simulators expose the PC as a register, some don't expose it or expose a register 
+       which is not a variable which is updated during instruction execution (i.e. only upon
+       exit of sim_instr()).  For the -P debug option to be effective, such a simulator should
+       provide a routine which returns the value of the current PC and set the sim_vm_pc_value
+       routine pointer to that routine.
+     */
     if (sim_vm_pc_value)
         val = (*sim_vm_pc_value)();
     else
