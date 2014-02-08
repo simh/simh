@@ -191,34 +191,45 @@ t_stat sim_load_bin (FILE *fi)
 {
 int32 hi, lo, wd, csum, t;
 uint32 field, newf, origin;
+int32 sections_read = 0;
 
-csum = origin = field = newf = 0;                       /* init */
-do {                                                    /* skip leader */
-    if ((hi = sim_bin_getc (fi, &newf)) == EOF)
-        return SCPE_FMT;
-    } while ((hi == 0) || (hi >= 0200));
-for (;;) {                                              /* data blocks */
-    if ((lo = sim_bin_getc (fi, &newf)) == EOF)         /* low char */
-        return SCPE_FMT;
-    wd = (hi << 6) | lo;                                /* form word */
-    t = hi;                                             /* save for csum */
-    if ((hi = sim_bin_getc (fi, &newf)) == EOF)         /* next char */
-        return SCPE_FMT;
-    if (hi == 0200) {                                   /* end of tape? */
-        if ((csum - wd) & 07777)                        /* valid csum? */
-            return SCPE_CSUM;
-        return SCPE_OK;
+for (;;) {
+    csum = origin = field = newf = 0;                   /* init */
+    do {                                                /* skip leader */
+        if ((hi = sim_bin_getc (fi, &newf)) == EOF)
+           if (sections_read != 0) {
+              printf ("%d sections sucessfully read\n\r", sections_read);
+              return SCPE_OK;
+           } else
+              return SCPE_FMT;
+        } while ((hi == 0) || (hi >= 0200));
+    for (;;) {                                          /* data blocks */
+        if ((lo = sim_bin_getc (fi, &newf)) == EOF)     /* low char */
+            return SCPE_FMT;
+        wd = (hi << 6) | lo;                            /* form word */
+        t = hi;                                         /* save for csum */
+        if ((hi = sim_bin_getc (fi, &newf)) == EOF)     /* next char */
+            return SCPE_FMT;
+        if (hi == 0200) {                               /* end of tape? */
+            if ((csum - wd) & 07777) {                  /* valid csum? */
+                if (sections_read != 0)
+                   printf ("%d sections sucessfully read\n\r", sections_read);
+                return SCPE_CSUM;
+            }
+            sections_read++;
+            break;
+            }
+        csum = csum + t + lo;                           /* add to csum */
+        if (wd > 07777)                                 /* chan 7 set? */
+            origin = wd & 07777;                        /* new origin */
+        else {                                          /* no, data */
+            if ((field | origin) >= MEMSIZE) 
+                return SCPE_NXM;
+            M[field | origin] = wd;
+            origin = (origin + 1) & 07777;
+            }
+        field = newf;                                   /* update field */
         }
-    csum = csum + t + lo;                               /* add to csum */
-    if (wd > 07777)                                     /* chan 7 set? */
-        origin = wd & 07777;                            /* new origin */
-    else {                                              /* no, data */
-        if ((field | origin) >= MEMSIZE) 
-            return SCPE_NXM;
-        M[field | origin] = wd;
-        origin = (origin + 1) & 07777;
-        }
-    field = newf;                                       /* update field */
     }
 return SCPE_IERR;
 }
