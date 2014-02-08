@@ -121,6 +121,7 @@
 #define UNIT_11FMT      (1 << UNIT_V_11FMT)
 #define STATE           u3                              /* unit state */
 #define LASTT           u4                              /* last time update */
+#define WRITTEN         u5                              /* device buffer is dirty and needs flushing */
 #define DT_WC           030                             /* word count */
 #define DT_CA           031                             /* current addr */
 #define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
@@ -348,6 +349,7 @@ int32 dt_iors (void);
 t_stat dt_svc (UNIT *uptr);
 t_stat dt_reset (DEVICE *dptr);
 t_stat dt_attach (UNIT *uptr, char *cptr);
+void dt_flush (UNIT *uptr);
 t_stat dt_detach (UNIT *uptr);
 void dt_deselect (int32 oldf);
 void dt_newsa (int32 newf);
@@ -370,22 +372,22 @@ int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
 DIB dt_dib = { DEV_DTA, 2, &dt_iors, { &dt75, &dt76 } };
 
 UNIT dt_unit[] = {
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) },
-    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-             UNIT_ROABLE, DT_CAPAC) }
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
+    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+                  UNIT_ROABLE, DT_CAPAC, &dt_flush) }
     };
 
 REG dt_reg[] = {
@@ -1053,6 +1055,7 @@ switch (fnc) {                                          /* at speed, check fnc *
             if (dir)                                    /* rev? comp obv */
                 dtdb = dt_comobv (dtdb);
             fbuf[ba] = dtdb;                            /* write word */
+            uptr->WRITTEN = TRUE;
             if (ba >= uptr->hwmark)
                 uptr->hwmark = ba + 1;
             if (M[DT_WC] == 0)
@@ -1486,27 +1489,16 @@ return SCPE_OK;
    Deallocate buffer
 */
 
-t_stat dt_detach (UNIT* uptr)
+void dt_flush (UNIT* uptr)
 {
 uint16 pdp8b[D8_NBSIZE];
 uint16 pdp11b[D18_BSIZE];
-uint32 ba, k, *fbuf;
-int32 u = uptr - dt_dev.units;
+int32 k;
+uint32 ba, *fbuf;
 
-if (!(uptr->flags & UNIT_ATT))
-    return SCPE_OK;
-if (sim_is_active (uptr)) {
-    sim_cancel (uptr);
-    if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
-        dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
-        DT_UPDINT;
-		}
-    uptr->STATE = uptr->pos = 0;
-    }
-fbuf = (uint32 *) uptr->filebuf;                        /* file buffer */
-if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
     rewind (uptr->fileref);                             /* start of file */
+    fbuf = (uint32 *) uptr->filebuf;                    /* file buffer */
     if (uptr->flags & UNIT_8FMT) {                      /* 12b? */
         for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */
             for (k = 0; k < D8_NBSIZE; k = k + 3) {     /* loop blk */
@@ -1521,19 +1513,42 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
                 break;
             }                                           /* end loop file */
         }                                               /* end if 12b */
-    else if (uptr->flags & UNIT_11FMT) {                /* 16b? */
-        for (ba = 0; ba < uptr->hwmark; ) {             /* loop thru file */
-            for (k = 0; k < D18_BSIZE; k++)             /* loop blk */
-                pdp11b[k] = fbuf[ba++] & 0177777;
-            fxwrite (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
-            if (ferror (uptr->fileref))
-                break;
-            }                                           /* end loop file */
-        }                                               /* end if 16b */
-    else fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
-        uptr->hwmark, uptr->fileref);
+    else
+        if (uptr->flags & UNIT_11FMT) {                 /* 16b? */
+            for (ba = 0; ba < uptr->hwmark; ) {         /* loop thru file */
+                for (k = 0; k < D18_BSIZE; k++)         /* loop blk */
+                    pdp11b[k] = fbuf[ba++] & 0177777;
+                fxwrite (pdp11b, sizeof (uint16), D18_BSIZE, uptr->fileref);
+                if (ferror (uptr->fileref))
+                    break;
+                }                                       /* end loop file */
+            }                                           /* end if 16b */
+        else 
+            fxwrite (uptr->filebuf, sizeof (uint32),       /* write file */
+                     uptr->hwmark, uptr->fileref);
     if (ferror (uptr->fileref))
         perror ("I/O error");
+    }
+uptr->WRITTEN = FALSE;                                  /* no longer dirty */
+}
+
+t_stat dt_detach (UNIT* uptr)
+{
+int32 u = uptr - dt_dev.units;
+
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_OK;
+if (sim_is_active (uptr)) {
+    sim_cancel (uptr);
+    if ((u == DTA_GETUNIT (dtsa)) && (dtsa & DTA_STSTP)) {
+        dtsb = dtsb | DTB_ERF | DTB_SEL | DTB_DTF;
+        DT_UPDINT;
+		}
+    uptr->STATE = uptr->pos = 0;
+    }
+if (uptr->hwmark && ((uptr->flags & UNIT_RO) == 0)) {   /* any data? */
+    printf ("%s%d: writing buffer to file\n", sim_dname (&dt_dev), u);
+    dt_flush (uptr);
     }                                                   /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
 uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */
