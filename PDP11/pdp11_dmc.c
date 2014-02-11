@@ -638,7 +638,8 @@ DDCMP_STATETABLE DDCMP_TABLE[] = {
                                                                     ddcmp_StopTimer}},
     { 6, IStart,      {ddcmp_ReceiveStrt},         AStart,         {ddcmp_SendStack, 
                                                                     ddcmp_StartTimer}},
-    { 7, IStart,      {ddcmp_TimerExpired},        IStart,         {ddcmp_SendStrt, 
+    { 7, IStart,      {ddcmp_TimerExpired},        IStart,         {ddcmp_ResetVariables, 
+                                                                    ddcmp_SendStrt, 
                                                                     ddcmp_StartTimer}},
     { 8, IStart,      {ddcmp_ReceiveMaintMsg},     Maintenance,    {ddcmp_ResetVariables, 
                                                                     ddcmp_NotifyMaintRcvd}},
@@ -853,7 +854,7 @@ while (*Actions)
         }
     ++Actions;
     if (Name->Name)
-        sprintf (&buf[strlen(buf)], "%s%s", Name->Name, *Actions ? " && " : "");
+        sprintf (&buf[strlen(buf)], "%s%s", Name->Name, *Actions ? " + " : "");
     }
 return buf;
 }
@@ -1428,6 +1429,48 @@ if (detail) {
             fprintf (st, "   actual_bytes_transferred: 0x%04X\n", buffer->actual_bytes_transferred);
             if (buffer->buffer_return_time)
                 fprintf (st, "   buffer_return_time:       0x%08X\n", buffer->buffer_return_time);
+            if (strcmp(queue->name, "transmit") == 0) {
+                uint8 *msg = buffer->transfer_buffer;
+                static const char *const flags [4] = { "..", ".Q", "S.", "SQ" };
+                static const char *const nak[18] = { "", " (HCRC)", " (DCRC)", " (REPREPLY)", /* 0-3 */
+                                                     "", "", "", "",                          /* 4-7 */
+                                                     " (NOBUF)", " (RXOVR)", "", "",          /* 8-11 */
+                                                     "", "", "", "",                          /* 12-15 */
+                                                     " (TOOLONG)", " (HDRFMT)" };             /* 16-17 */
+                const char *flag = flags[msg[2]>>6];
+                int msg2 = msg[2] & 0x3F;
+
+                switch (msg[0]) {
+                    case DDCMP_SOH:   /* Data Message */
+                        fprintf (st, "Data Message, Count: %d, Num: %d, Flags: %s, Resp: %d, HDRCRC: %s, DATACRC: %s\n", (msg2 << 8)|msg[1], msg[4], flag, msg[3], 
+                                                    (0 == ddcmp_crc16 (0, msg, 8)) ? "OK" : "BAD", (0 == ddcmp_crc16 (0, msg+8, 2+((msg2 << 8)|msg[1]))) ? "OK" : "BAD");
+                        break;
+                    case DDCMP_ENQ:   /* Control Message */
+                        fprintf (st, "Control: Type: %d ", msg[1]);
+                        switch (msg[1]) {
+                            case DDCMP_CTL_ACK: /* ACK */
+                                fprintf (st, "(ACK) ACKSUB: %d, Flags: %s, Resp: %d\n", msg2, flag, msg[3]);
+                                break;
+                            case DDCMP_CTL_NAK: /* NAK */
+                                fprintf (st, "(NAK) Reason: %d%s, Flags: %s, Resp: %d\n", msg2, ((msg2 > 17)? "": nak[msg2]), flag, msg[3]);
+                                break;
+                            case DDCMP_CTL_REP: /* REP */
+                                fprintf (st, "(REP) REPSUB: %d, Num: %d, Flags: %s\n", msg2, msg[4], flag);
+                                break;
+                            case DDCMP_CTL_STRT: /* STRT */
+                                fprintf (st, "(STRT) STRTSUB: %d, Flags: %s\n", msg2, flag);
+                                break;
+                            case DDCMP_CTL_STACK: /* STACK */
+                                fprintf (st, "(STACK) STCKSUB: %d, Flags: %s\n", msg2, flag);
+                                break;
+                            default: /* Unknown */
+                                fprintf (st, "(Unknown=0%o)\n", msg[1]);
+                                break;
+                            }
+                        if (buffer->count != DDCMP_HEADER_SIZE)
+                            fprintf (st, "Unexpected Control Message Length: %d expected %d\n", buffer->count, DDCMP_HEADER_SIZE);
+                    }
+                }
             same = 0;
             }
         else
