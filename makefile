@@ -225,6 +225,7 @@ ifeq ($(WIN32),)  #*nix Environments (&& cygwin)
             endif
             ifeq (usrpkglib,$(shell if $(TEST) -d /usr/pkg/lib; then echo usrpkglib; fi))
               LIBPATH += /usr/pkg/lib
+              INCPATH += /usr/pkg/include
               OS_LDFLAGS += -L/usr/pkg/lib -R/usr/pkg/lib
             endif
             ifeq (/usr/local/lib,$(findstring /usr/local/lib,$(LIBPATH)))
