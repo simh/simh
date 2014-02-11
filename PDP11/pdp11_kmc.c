@@ -93,14 +93,6 @@
 #define KMC_DIS 0
 #endif
 
-/* Data troll facility
- *
- * Enables data troll, which simulates imperfect links.
- */
-#ifndef KMC_TROLL
-#define KMC_TROLL 1
-#endif
-
 /* Define DUP_RXRESYNC to disable/enable RCVEN at the expected times.
  * This is used to resynch the receiver, but I'm not sure if it would
  * cause the emulated DUP to lose data...especially with QSYNC
@@ -479,10 +471,6 @@ static QH        kmc_freecqHead[KMC_UNITS];
 #define              freecqHead kmc_freecqHead[k]
 static int32     kmc_freecqCount[KMC_UNITS];
 #define              freecqCount kmc_freecqCount[k]
-#if KMC_TROLL
-static int32     kmc_trollHungerLevel[KMC_UNITS];
-#define              trollHungerLevel kmc_trollHungerLevel[k]
-#endif
 
 /* *** End of per-KMC state *** */
 
@@ -502,10 +490,6 @@ static t_stat kmc_showDeviceCount (FILE *st, UNIT *txup, int32 val, void *desc);
 #endif
 static t_stat kmc_setLineSpeed (UNIT *txup, int32 val, char *cptr, void *desc);
 static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc);
-#if KMC_TROLL
-static t_stat kmc_setTrollHunger (UNIT *txup, int32 val, char *cptr, void *desc);
-static t_stat kmc_showTrollHunger (FILE *st, UNIT *txup, int32 val, void *desc);
-#endif
 static t_stat kmc_showStatus (FILE *st, UNIT *up, int32 v, void *dp);
 
 static t_stat kmc_help (FILE *st, struct sim_device *dptr,
@@ -604,10 +588,6 @@ MTAB kmc_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "DEVICES", "DEVICES=n",
         &kmc_setDeviceCount, &kmc_showDeviceCount, NULL, "Display number of KMC devices enabled" },
 #endif
-#if KMC_TROLL
-    { MTAB_XTD|MTAB_VUN|MTAB_VALR|MTAB_NMO, 0, "TROLL", "TROLL=appetite",
-      &kmc_setTrollHunger, &kmc_showTrollHunger, NULL, "Appetite in milligulps" },
-#endif
     { 0 },
     };
 
@@ -689,9 +669,6 @@ static int32 kmc_BintAck (void);
 static t_bool kmc_printBufferIn (int32 k, DEVICE *dev, int32 line, t_bool rx,
                                  int32 count, int32 ba, uint16 sel6v);
 static t_bool kmc_printBDL(int32 k, uint32 dbits, DEVICE *dev, uint8 line, int32 ba, int prbuf);
-#if KMC_TROLL
-static t_bool kmc_feedTroll (int32 k, int32 line, uint8 *msg, t_bool rx);
-#endif
 
 /* Environment */
 static const char *kmc_verifyUcode (int32 k);
@@ -720,9 +697,6 @@ static t_stat kmc_reset(DEVICE* dptr) {
             d->kmc = -1;
             d->dupidx = -1;
             d->linespeed = DFLT_SPEED;
-        }
-        for (k = 0; ((uint32)k) < kmc_dev.numunits; k++) {
-            trollHungerLevel = 0;
         }
     }
 
@@ -1189,14 +1163,6 @@ static t_stat kmc_txService (UNIT *txup) {
              */
         case TXMRDY:                            /* Data with OS-embedded HCRC */
             d->txstate = TXACT; 
-#if KMC_TROLL
-            if (trollHungerLevel) {             /* Troll in the house? */
-                if (kmc_feedTroll (k, d->line, d->txmsg + d->txslen, TRUE)) {
-                    kmc_txComplete (d->dupidx, 0);
-                    TXDELAY (TXDONE, TXDONE_DELAY);
-                }
-            }
-#endif
             assert (d->txmsg[d->txslen + 0] != DDCMP_ENQ);
             assert (((d->txmlen - d->txslen) > 8) &&    /* Data, length should match count */
                     (((size_t)(((d->txmsg[d->txslen + 2] & 077) << 8) | d->txmsg[d->txslen + 1])) ==
@@ -1210,14 +1176,6 @@ static t_stat kmc_txService (UNIT *txup) {
 
         case TXRDY:                             /* Control or DATA with KDP-CRCH */
             d->txstate = TXACT;                 /* Note that DUP can complete before returning */
-#if KMC_TROLL
-            if (trollHungerLevel) {             /* Troll in the house? */
-                if (kmc_feedTroll (k, d->line, d->txmsg + d->txslen, TRUE)) {
-                    kmc_txComplete (d->dupidx, 0);
-                    TXDELAY (TXDONE, TXDONE_DELAY);
-                }
-            }
-#endif
             if (d->txmsg[d->txslen + 0] == DDCMP_ENQ) { /* Control message */
                 assert ((d->txmlen - d->txslen) == 6);
                 if (!dup_put_msg_bytes (d->dupidx, d->txmsg, d->txslen + 6, TRUE, TRUE)) {
@@ -1365,14 +1323,6 @@ static t_stat kmc_rxService (UNIT *rxup) {
 #endif
             break;
         }
-
-#if KMC_TROLL
-        if (trollHungerLevel) {                 /* Troll in the house? */
-            if (kmc_feedTroll (k, d->line, d->rxmsg, TRUE)) {
-                break;
-            }
-        }
-#endif
 
         d->rxstate = RXBDL;
         d->rxused   = 0;
@@ -2694,73 +2644,6 @@ static t_bool kmc_printBDL(int32 k, uint32 dbits, DEVICE *dev, uint8 line, int32
     return TRUE;
 }
 
-/* Evaluate the troll's appetite.
- *
- * A message can be eaten (dropped), nibbled (corrupted) or spared.
- *
- * The probability of a message not being spared is trollHungerLevel,
- * expressed in milli-gulps - 0.1%.  The troll selects which action
- * to taken on selected messages with equal probability.
- *
- * Nibbled messages' CRCs are changed when possible to simplify
- * identifying them when debugging.  When it's too much work to
- * find the CRC, the first byte of data is changed.  The change
- * is an XOR to make it possible to reconstruct the original data.
- *
- * A particularly unfortunate message can be nibbled by both
- * the transmitter and receiver; thus the troll applies a direction-
- * dependent pattern.
- *
- * Return TRUE if the troll ate the message.
- * Return FALSE if the message was nibbled or spared.
- */
-#if KMC_TROLL
-static t_bool kmc_feedTroll (int32 k, int32 line, uint8 *msg, t_bool rx) {
-#if defined(_POSIX_VERSION) || defined (_XOPEN_VERSION)
-    double r = (double)random();
-    double rmax = (double)0x7fffffff;
-#else
-    double r = rand();
-    double rmax = (double)RAND_MAX;
-#endif
-
-    if (msg[0] == DDCMP_ENQ) {
-        int eat =  0 + (int) (2000.0 * (r / rmax));
-        
-        if (eat <= (trollHungerLevel * 2)) {    /* Hungry? */
-            if (eat <= trollHungerLevel) {      /* Eat the packet */
-                sim_debug (DF_PKT, &kmc_dev, "KMC%u line %u: troll ate a %s control message\n",
-                           k, line, (rx? "rx" : "tx"));
-                return TRUE;
-            }
-            sim_debug (DF_PKT, &kmc_dev, "KMC%u line %u: troll bit %d control CRC\n",
-                       k, line, (rx? "rx" : "tx"));
-            msg[6] ^= rx? 0114: 0154;           /* Eat the CRC */
-        }
-    } else {
-        int eat =  0 + (int) (3000.0 * (r / rmax));
-
-        if (eat <= (trollHungerLevel * 3)) {    /* Hungry? */
-            if (eat <= trollHungerLevel) {      /* Eat the packet */
-                sim_debug (DF_PKT, &kmc_dev, "KMC%u line %u: troll ate a %s %s message\n",
-                           k, line, (rx? "rx" : "tx"), ((msg[0] == DDCMP_SOH)? "data" : "maintenance"));
-                return TRUE;
-            }
-            if (eat <= (trollHungerLevel * 2)) { /* HCRC */
-                sim_debug (DF_PKT, &kmc_dev, "KMC%u line %u: troll bit %s %s HCRC\n",
-                           k, line, (rx? "rx" : "tx"), ((msg[0] == DDCMP_SOH)? "data" : "maintenance"));
-                msg[6] ^= rx? 0124: 0164;
-            } else {                            /* DCRC */
-                sim_debug (DF_PKT, &kmc_dev, "KMC%u line %u: troll bit %s %s DCRC\n",
-                           k, line, (rx? "rx" : "tx"), ((msg[0] == DDCMP_SOH)? "data" : "maintenance"));
-                msg[8] ^= rx? 0114: 0154;       /* Rather than find the CRC, the first data byte will do */
-            }
-        }
-    }
-    return FALSE;
-}
-#endif
-
 /* Verify that the microcode image is one that this code knows how to emulate.
  * As far as I know, there was COMM IOP-DUP V1.0 and one patch, V1.0A.
  * This is the patched version, which I have verified by rebuilding the
@@ -2990,45 +2873,6 @@ static t_stat kmc_showLineSpeed (FILE *st, UNIT *txup, int32 val, void *desc) {
 
     return SCPE_OK;
 }
-
-#if KMC_TROLL
-/* Manage the troll's appetite, in units of milli-gulps.
- *
- * See kmc_feedTroll for usage.
- */
-static t_stat kmc_setTrollHunger (UNIT *txup, int32 val, char *cptr, void *desc) {
-    int32 k = txup->unit_kmc;
-    t_stat r;
-    int32 appetite;
-
-    if (cptr == NULL)
-        return SCPE_ARG;
-
-    appetite = (int32) get_uint (cptr, 10, 999, &r);
-    if (r != SCPE_OK) {
-        return r;
-    }
-
-    trollHungerLevel = appetite;
-
-    return SCPE_OK;
-}
-
-/* Display the troll's appetite */
-
-static t_stat kmc_showTrollHunger (FILE *st, UNIT *txup, int32 val, void *desc) {
-    int32 k = txup->unit_kmc;
-
-    if (trollHungerLevel) {
-        fprintf (st, "Troll's share: %u milligulps (%.1f%% of messages processed)\n",
-                 trollHungerLevel, ((double)trollHungerLevel)/10.0);
-    } else {
-        fprintf (st, "Troll is not at the table\n");
-    }
-
-    return SCPE_OK;
-}
-#endif
 
 /* Show KMC status */
 

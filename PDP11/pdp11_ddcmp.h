@@ -173,6 +173,81 @@ if (sim_deb && dptr && (reason & dptr->dctrl)) {
 
 uint16 ddcmp_crc16(uint16 crc, const void* vbuf, size_t len);
 
+/* Data corruption troll, which simulates imperfect links.
+ */
+
+/* Evaluate the corruption troll's appetite.
+ *
+ * A message can be eaten (dropped), nibbled (corrupted) or spared.
+ *
+ * The probability of a message not being spared is trollHungerLevel,
+ * expressed in milli-gulps - 0.1%.  The troll selects which action
+ * to taken on selected messages with equal probability.
+ *
+ * Nibbled messages' CRCs are changed when possible to simplify
+ * identifying them when debugging.  When it's too much work to
+ * find the CRC, the first byte of data is changed.  The change
+ * is an XOR to make it possible to reconstruct the original data.
+ *
+ * A particularly unfortunate message can be nibbled by both
+ * the transmitter and receiver; thus the troll applies a direction-
+ * dependent pattern.
+ *
+ * Return TRUE if the troll ate the message.
+ * Return FALSE if the message was nibbled or spared.
+ */
+static t_bool ddcmp_feedCorruptionTroll (TMLN *lp, uint8 *msg, t_bool rx, int32 trollHungerLevel)
+{
+double r, rmax;
+char msgbuf[80];
+
+if (trollHungerLevel == 0)
+    return FALSE;
+#if defined(_POSIX_VERSION) || defined (_XOPEN_VERSION)
+r = (double)random();
+rmax = (double)0x7fffffff;
+#else
+r = rand();
+rmax = (double)RAND_MAX;
+#endif
+if (msg[0] == DDCMP_ENQ) {
+    int eat =  0 + (int) (2000.0 * (r / rmax));
+    
+    if (eat <= (trollHungerLevel * 2)) {    /* Hungry? */
+        if (eat <= trollHungerLevel) {      /* Eat the packet */
+            sprintf (msgbuf, "troll ate a %s control message", rx ? "RCV" : "XMT");
+            tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
+            return TRUE;
+            }
+        sprintf (msgbuf, "troll bit a %s control message", rx ? "RCV" : "XMT");
+        tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
+        msg[6] ^= rx? 0114: 0154;           /* Eat the CRC */
+        }
+    } 
+else {
+    int eat =  0 + (int) (3000.0 * (r / rmax));
+
+    if (eat <= (trollHungerLevel * 3)) {    /* Hungry? */
+        if (eat <= trollHungerLevel) {      /* Eat the packet */
+            sprintf (msgbuf, "troll ate a %s %s message", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
+            tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
+            return TRUE;
+            }
+        if (eat <= (trollHungerLevel * 2)) { /* HCRC */
+            sprintf (msgbuf, "troll bit a %s %s message", rx ? "RCV" : "XMT", (msg[0] == DDCMP_SOH)? "data" : "maintenance");
+            tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
+            msg[6] ^= rx? 0124: 0164;
+            } 
+        else {                            /* DCRC */
+            sprintf (msgbuf, "troll bit %s %s DCRC\n", (rx? "RCV" : "XMT"), ((msg[0] == DDCMP_SOH)? "data" : "maintenance"));
+            tmxr_debug_msg (rx ? DDCMP_DBG_PRCV : DDCMP_DBG_PXMT, lp, msgbuf);
+            msg[8] ^= rx? 0114: 0154;       /* Rather than find the CRC, the first data byte will do */
+            }
+        }
+    }
+return FALSE;
+}
+
 /* Get packet from specific line
 
    Inputs:
@@ -190,7 +265,7 @@ uint16 ddcmp_crc16(uint16 crc, const void* vbuf, size_t len);
        NULL, but success (SCPE_OK) is returned
 */
 
-static t_stat ddcmp_tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, uint16 *psize)
+static t_stat ddcmp_tmxr_get_packet_ln (TMLN *lp, const uint8 **pbuf, uint16 *psize, int32 corruptrate)
 {
 int32 c;
 size_t payloadsize;
@@ -230,6 +305,8 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
             else
                 strcpy (msg, "<<< RCV Packet");
             ddcmp_packet_trace (DDCMP_DBG_PRCV, lp->mp->dptr, msg, lp->rxpb, *psize);
+            if (ddcmp_feedCorruptionTroll (lp, lp->rxpb, TRUE, corruptrate))
+                break;
             return SCPE_OK;
             }
         payloadsize  = ((lp->rxpb[2] & 0x3F) << 8)| lp->rxpb[1];
@@ -243,6 +320,8 @@ while (TMXR_VALID & (c = tmxr_getc_ln (lp))) {
                 strcpy (msg, "<<< RCV Packet");
             ddcmp_packet_trace (DDCMP_DBG_PRCV, lp->mp->dptr, msg, lp->rxpb, *psize);
             lp->rxpboffset = 0;
+            if (ddcmp_feedCorruptionTroll (lp, lp->rxpb, TRUE, corruptrate))
+                break;
             return SCPE_OK;
             }
         }
@@ -270,7 +349,7 @@ return SCPE_LOST;
     2. If prior packet transmission still in progress, SCPE_STALL is 
        returned and no packet data is stored.  The caller must retry later.
 */
-static t_stat ddcmp_tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size)
+static t_stat ddcmp_tmxr_put_packet_ln (TMLN *lp, const uint8 *buf, size_t size, int32 corruptrate)
 {
 t_stat r;
 char msg[32];
@@ -293,15 +372,17 @@ if (lp->mp->lines > 1)
 else
     strcpy (msg, ">>> XMT Packet");
 ddcmp_packet_trace (DDCMP_DBG_PXMT, lp->mp->dptr, msg, lp->txpb, lp->txppsize);
-++lp->txpcnt;
-while ((lp->txppoffset < lp->txppsize) && 
-       (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
-   ++lp->txppoffset;
-tmxr_send_buffered_data (lp);
+if (!ddcmp_feedCorruptionTroll (lp, lp->txpb, FALSE, corruptrate)) {
+    ++lp->txpcnt;
+    while ((lp->txppoffset < lp->txppsize) && 
+           (SCPE_OK == (r = tmxr_putc_ln (lp, lp->txpb[lp->txppoffset]))))
+       ++lp->txppoffset;
+    tmxr_send_buffered_data (lp);
+    }
 return lp->conn ? SCPE_OK : SCPE_LOST;
 }
 
-static t_stat ddcmp_tmxr_put_packet_crc_ln (TMLN *lp, uint8 *buf, size_t size)
+static t_stat ddcmp_tmxr_put_packet_crc_ln (TMLN *lp, uint8 *buf, size_t size, int32 corruptrate)
 {
 uint16 hdr_crc16 = ddcmp_crc16(0, buf, DDCMP_HEADER_SIZE-DDCMP_CRC_SIZE);
 
@@ -312,7 +393,7 @@ if (size > DDCMP_HEADER_SIZE) {
     buf[size-DDCMP_CRC_SIZE] = data_crc16 & 0xFF;
     buf[size-DDCMP_CRC_SIZE+1] = (data_crc16>>8) & 0xFF;
     }
-return ddcmp_tmxr_put_packet_ln (lp, buf, size);
+return ddcmp_tmxr_put_packet_ln (lp, buf, size, corruptrate);
 }
 
 static void ddcmp_build_data_packet (uint8 *buf, size_t size, uint8 flags, uint8 sequence, uint8 ack)
@@ -338,7 +419,7 @@ buf[5] = 1;
 static t_stat ddcmp_tmxr_put_data_packet_ln (TMLN *lp, uint8 *buf, size_t size, uint8 flags, uint8 sequence, uint8 ack)
 {
 ddcmp_build_data_packet (buf, size, flags, sequence, ack);
-return ddcmp_tmxr_put_packet_crc_ln (lp, buf, size);
+return ddcmp_tmxr_put_packet_crc_ln (lp, buf, size, 0);
 }
 
 static void ddcmp_build_control_packet (uint8 *buf, uint8 type, uint8 subtype, uint8 flags, uint8 sndr, uint8 rcvr)
@@ -355,7 +436,7 @@ buf[5] = 1;                         /* ADDR */
 static t_stat ddcmp_tmxr_put_control_packet_ln (TMLN *lp, uint8 *buf, uint8 type, uint8 subtype, uint8 flags, uint8 sndr, uint8 rcvr)
 {
 ddcmp_build_control_packet (buf, type, subtype, flags, sndr, rcvr);
-return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE);
+return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE, 0);
 }
 
 static void ddcmp_build_ack_packet (uint8 *buf, uint8 ack, uint8 flags)
@@ -366,7 +447,7 @@ ddcmp_build_control_packet (buf, DDCMP_CTL_ACK, 0, flags, 0, ack);
 static t_stat ddcmp_tmxr_put_ack_packet_ln (TMLN *lp, uint8 *buf, uint8 ack, uint8 flags)
 {
 ddcmp_build_ack_packet (buf, ack, flags);
-return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE);
+return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE, 0);
 }
 
 static void ddcmp_build_nak_packet (uint8 *buf, uint8 reason, uint8 nack, uint8 flags)
@@ -397,7 +478,7 @@ ddcmp_build_control_packet (buf, DDCMP_CTL_STRT, 0, DDCMP_FLAG_SELECT|DDCMP_FLAG
 static t_stat ddcmp_tmxr_put_start_packet_ln (TMLN *lp, uint8 *buf)
 {
 ddcmp_build_start_packet (buf);
-return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE);
+return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE, 0);
 }
 
 static void ddcmp_build_start_ack_packet (uint8 *buf)
@@ -408,7 +489,7 @@ ddcmp_build_control_packet (buf, DDCMP_CTL_STACK, 0, DDCMP_FLAG_SELECT|DDCMP_FLA
 static t_stat ddcmp_tmxr_put_start_ack_packet_ln (TMLN *lp, uint8 *buf)
 {
 ddcmp_build_start_ack_packet (buf);
-return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE);
+return ddcmp_tmxr_put_packet_crc_ln (lp, buf, DDCMP_HEADER_SIZE, 0);
 }
 
 #endif /* PDP11_DDCMP_H_ */

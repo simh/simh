@@ -87,6 +87,7 @@ static uint16 dup_xmtpkoffset[DUP_LINES];                      /* xmt buffer off
 static uint32 dup_xmtpkstart[DUP_LINES];                       /* xmt packet start time */
 static uint16 dup_xmtpkbytes[DUP_LINES];                       /* xmt packet size of packet */
 static uint16 dup_xmtpkdelaying[DUP_LINES];                    /* xmt packet speed delaying completion */
+static int32 dup_corruption[DUP_LINES];                       /* data corrupting troll hunger value */
 
 static PACKET_DATA_AVAILABLE_CALLBACK dup_rcv_packet_data_callback[DUP_LINES];
 static PACKET_TRANSMIT_COMPLETE_CALLBACK dup_xmt_complete_callback[DUP_LINES];
@@ -114,6 +115,8 @@ static void dup_set_txint (int32 dup);
 static t_stat dup_setnl (UNIT *uptr, int32 val, char *cptr, void *desc);
 static t_stat dup_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
 static t_stat dup_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
+static t_stat dup_setcorrupt (UNIT *uptr, int32 val, char *cptr, void *desc);
+static t_stat dup_showcorrupt (FILE *st, UNIT *uptr, int32 val, void *desc);
 static t_stat dup_set_W3 (UNIT* uptr, int32 val, char* cptr, void* desc);
 static t_stat dup_show_W3 (FILE* st, UNIT* uptr, int32 val, void* desc);
 static t_stat dup_set_W5 (UNIT* uptr, int32 val, char* cptr, void* desc);
@@ -364,6 +367,7 @@ static REG dup_reg[] = {
     { BRDATAD  (TPDELAY,dup_xmtpkdelaying,  DEV_RDX, 16, DUP_LINES, "transmit packet completion delay") },
     { BRDATAD  (TPSTART,   dup_xmtpkstart,  DEV_RDX, 32, DUP_LINES, "transmit digest packet start time") },
     { BRDATAD  (RPINOFF,   dup_rcvpkinoff,  DEV_RDX, 16, DUP_LINES, "receive digest packet offset") },
+    { BRDATAD  (CORRUPT,   dup_corruption,  DEV_RDX, 32, DUP_LINES, "data corruption factor (0.1%)") },
     { NULL }
     };
 
@@ -373,6 +377,8 @@ static TMXR dup_desc = { INITIAL_DUP_LINES, 0, 0, NULL };      /* mux descriptor
 static MTAB dup_mod[] = {
     { MTAB_XTD|MTAB_VUN,          0, "SPEED", "SPEED=bits/sec (0=unrestricted)" ,
         &dup_setspeed, &dup_showspeed, NULL, "Display rate limit" },
+    { MTAB_XTD|MTAB_VUN,          0, "CORRUPTION", "CORRUPTION=factor (0=uncorrupted)" ,
+        &dup_setcorrupt, &dup_showcorrupt, NULL, "Display corruption factor (0.1% of packets)" },
     { MTAB_XTD|MTAB_VUN,          1, "W3", NULL ,
         NULL, &dup_show_W3, NULL, "Display Reset Option" },
     { MTAB_XTD|MTAB_VUN,          1, NULL, "W3" ,
@@ -910,7 +916,7 @@ if (!tmxr_tpbusyln(&dup_ldsc[dup])) {  /* Not Busy sending? */
         dup_xmtpacket[dup][dup_xmtpkoffset[dup]++] = crc16 >> 8;
         if ((dup_xmtpkoffset[dup] > 8) || (dup_xmtpacket[dup][0] == DDCMP_ENQ)) {
             dup_xmtpkbytes[dup] = dup_xmtpkoffset[dup];
-            ddcmp_tmxr_put_packet_ln (&dup_ldsc[dup], dup_xmtpacket[dup], dup_xmtpkbytes[dup]);
+            ddcmp_tmxr_put_packet_ln (&dup_ldsc[dup], dup_xmtpacket[dup], dup_xmtpkbytes[dup], dup_corruption[dup]);
             }
         }
     breturn = TRUE;
@@ -1057,7 +1063,7 @@ for (dup=active=attached=0; dup < dup_desc.lines; dup++) {
         uint16 size;
 
         if (dup_parcsr[dup] & PARCSR_M_DECMODE)
-            ddcmp_tmxr_get_packet_ln (lp, &buf, &size);
+            ddcmp_tmxr_get_packet_ln (lp, &buf, &size, dup_corruption[dup]);
         else {
             size_t size_t_size;
 
@@ -1318,6 +1324,36 @@ dup_speed[dup] = newspeed;
 return SCPE_OK;
 }
 
+/* SET/SHOW CORRUPTION processor */
+
+static t_stat dup_showcorrupt (FILE* st, UNIT* uptr, int32 val, void* desc)
+{
+DEVICE *dptr = DUPDPTR;
+int32 dup = (int32)(uptr-dptr->units);
+
+if (dup_corruption[dup])
+    fprintf(st, "Corruption=%d milligulps (%.1f%% of messages processed)", dup_corruption[dup], ((double)dup_corruption[dup])/10.0);
+else
+    fprintf(st, "No Corruption");
+return SCPE_OK;
+}
+
+static t_stat dup_setcorrupt (UNIT* uptr, int32 val, char* cptr, void* desc)
+{
+DEVICE *dptr = DUPDPTR;
+int32 dup = (int32)(uptr-dptr->units);
+t_stat r;
+int32 appetite;
+
+if (cptr == NULL)
+    return SCPE_ARG;
+appetite = (int32) get_uint (cptr, 10, 999, &r);
+if (r != SCPE_OK)
+    return r;
+dup_corruption[dup] = appetite;
+return SCPE_OK;
+}
+
 /* SET/SHOW W3 processor */
 
 static t_stat dup_show_W3 (FILE* st, UNIT* uptr, int32 val, void* desc)
@@ -1421,38 +1457,191 @@ return dup_reset (dptr);                            /* setup lines and auto conf
 
 static t_stat dup_help (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "Bit Serial Synchronous interface (%s)\n\n", dptr->name);
-fprintf (st, "The %s connects two systems to provide a network connection.\n", dptr->name);
-fprintf (st, "A maximum of %d %s devices/lines can be configured in the system.\n", DUP_LINES, dptr->name);
-fprintf (st, "The number of configured devices can be changed with:\n\n");
-fprintf (st, "   sim> SET %s LINES=n\n\n", dptr->name);
-fprintf (st, "If you want to experience the actual data rates of the physical hardware you\n");
-fprintf (st, "can set the bit rate of the simulated line can be set using the following\n");
-fprintf (st, "command:\n\n");
-fprintf (st, "   sim> SET %sn SPEED=bps\n\n", dptr->name);
-fprintf (st, "Where bps is the number of data bits per second that the simulated line runs\n");
-fprintf (st, "at.  Use a value of zero to run at full speed with no artificial\n");
-fprintf (st, "throttling.\n\n");
-fprint_set_help (st, dptr);
-fprint_show_help (st, dptr);
-fprint_reg_help (st, dptr);
-return SCPE_OK;
+const char helpString[] =
+ /* The '*'s in the next line represent the standard text width of a help line */
+     /****************************************************************************/
+    " The %D11 is a single-line, program controlled, double buffered\n"
+    " communications device designed to interface the %1s system to a\n"
+    " serial synchronous line. The original hardware is capable of handling\n"
+    " a wide variety of protocols, including byte oriented protocols, such\n"
+    " as DDCMP and BISYNC and bit-oriented protocols such as SDLC, HDLC\n"
+    " and ADCCP.  The emulated device currently only supports connections\n"
+    " using the DDCMP protocol.\n\n"
+    " The %D11 is ideally suited for interfacing the %1s system\n"
+    " to medium-speed synchronous lines for remote batch, remote data\n"
+    " collection, remote concentration and network applications. Multiple\n"
+    " %D11's on a %1s allow its use in applications requiring several\n"
+    " synchronous lines.\n\n"
+    " The %D11 is capable of transmitting data at the maximum speed of\n"
+    " 9600 baud.  The emulated device can move data at significantly faster\n"
+    " data rates.  The maximum emulated rate is dependent on the host CPU's\n"
+    " available cycles.\n"
+    "1 Hardware Description\n"
+    " The %1s %D11 consists of a microprocessor module and a synchronous line unit\n"
+    " module.\n"
+    "2 $Registers\n"
+    "\n"
+    " These registers contain the emulated state of the device.  These values\n"
+    " don't necessarily relate to any detail of the original device being\n"
+    " emulated but are merely internal details of the emulation.\n"
+    "1 Configuration\n"
+    " A %D device is configured with various simh SET and ATTACH commands\n"
+    "2 $Set commands\n"
+    "3 Lines\n"
+    " A maximum of %2s %D11 devices can be emulated concurrently in the %S\n"
+    " simulator. The number of simulated %D devices or lines can be\n"
+    " specified with command:\n"
+    "\n"
+    "+sim> SET %D LINES=n\n"
+    "3 Peer\n"
+    " To set the host and port to which data is to be transmitted use the\n"
+    " following command:\n"
+    "\n"
+    "+sim> SET %U PEER=host:port\n"
+    "3 Connectpoll\n"
+    " The minimum interval between attempts to connect to the other side is set\n"
+    " using the following command:\n"
+    "\n"
+    "+sim> SET %U CONNECTPOLL=n\n"
+    "\n"
+    " Where n is the number of seconds. The default is %3s seconds.\n"
+    "3 Speed\n"
+    " If you want to experience the actual data rates of the physical hardware\n"
+    " you can set the bit rate of the simulated line can be set using the\n"
+    " following command:\n"
+    "\n"
+    "+sim> SET %U SPEED=n\n"
+    "\n"
+    " Where n is the number of data bits per second that the simulated line\n"
+    " runs at.  In practice this is implemented as a delay while transmitting\n"
+    " bytes to the socket.  Use a value of zero to run at full speed with no\n"
+    " artificial throttling.\n"
+    "3 Corruption\n"
+    " Corruption Troll - the DDCMP emulation includes the ability to enable a\n"
+    " process that will intentionally drop or corrupt some messages.  This\n"
+    " emulates the less-than-perfect communications lines encountered in the\n"
+    " real world, and enables network monitoring software to see non-zero error\n"
+    " counters.\n"
+    "\n"
+    " The troll selects messages with a probablility selected by the SET %U\n"
+    " CORRUPT command.  The units are 0.1%%; that is, a value of 1 means that\n"
+    " every message has a 1/1000 chance of being selected to be corrupted\n"
+    " or discarded.\n"
+     /****************************************************************************/
+#define DUP_HLP_ATTACH "Configuration Attach"
+    "2 Attach\n"
+    " The communication line performs input and output through a TCP session\n"
+    " (or UDP session) connected to a user-specified port.  The ATTACH command\n"
+    " specifies the port to be used as well as the peer address:\n"
+    "\n"
+    "+sim> ATTACH %U {interface:}port{,UDP},Connect=peerhost:port\n"
+    "\n"
+    " where port is a decimal number between 1 and 65535 that is not being\n"
+    " used for other TCP/IP activities.\n"
+    "\n"
+    " Specifying symmetric attach configuration (with both a listen port and\n"
+    " a peer address) will cause the side receiving an incoming\n"
+    " connection to validate that the connection actually comes from the\n"
+    " connecction destination system.\n"
+    " A symmetric attach configuration is required when using UDP packet\n"
+    " transport.\n"
+    "\n"
+    " The default connection uses TCP transport between the local system and\n"
+    " the peer.  Alternatively, UDP can be used by specifying UDP on the\n"
+    " ATTACH command.\n"
+    "\n"
+    "2 Examples\n"
+    " To configure two simulators to talk to each other use the following\n"
+    " example:\n"
+    " \n"
+    " Machine 1\n"
+    "+sim> SET %D ENABLE\n"
+    "+sim> ATTACH %U 1111,connect=LOCALHOST:2222\n"
+    " \n"
+    " Machine 2\n"
+    "+sim> SET %D ENABLE\n"
+    "+sim> ATTACH %U 2222,connect=LOCALHOST:1111\n"
+    "\n"
+    "1 Monitoring\n"
+    " The %D device and %U line configuration and state can be displayed with\n"
+    " one of the available show commands.\n"
+    "2 $Show commands\n"
+    "1 Diagnostics\n"
+    " Corruption Troll - the DDCMP emulation includes a process that will\n"
+    " intentionally drop or corrupt some messages.  This emulates the\n"
+    " less-than-perfect communications lines encountered in the real world,\n"
+    " and enables network monitoring software to see non-zero error counters.\n"
+    "\n"
+    " The troll selects messages with a probablility selected by the SET %U\n"
+    " CORRUPT command.  The units are 0.1%%; that is, a value of 1 means that\n"
+    " every message has a 1/1000 chance of being selected to be corrupted\n"
+    " or discarded.\n"
+    "1 Restrictions\n"
+    " Real hardware synchronous connections could operate in Multi-Point mode.\n"
+    " Multi-Point mode was a way of sharing a single wire with multiple\n"
+    " destination systems or devices.  Multi-Point mode is not currently\n"
+    " emulated by this or other simulated synchronous devices.\n"
+    "\n"
+    "1 Implementation\n"
+    " A real %D11 transports host generated protocol implemented data via a\n"
+    " synchronous connection, the emulated device makes a TCP (or UDP)\n"
+    " connection to another emulated device which either speaks DDCMP over the\n"
+    " TCP connection directly, or interfaces to a simulated computer where the\n"
+    " operating system speaks the DDCMP protocol on the wire.\n"
+    "\n"
+    " The %D11 can be used for point-to-point DDCMP connections carrying\n"
+    " DECnet and other types of networking, e.g. from ULTRIX or DSM.\n"
+    "1 Debugging\n"
+    " The simulator has a number of debug options, these are:\n"
+    "\n"
+    "++REG     Shows whenever a CSR is programatically read or written\n"
+    "++++and the current value.\n"
+    "++INT     Shows Interrupt activity.\n"
+    "++PKT     Shows Packet activity.\n"
+    "++XMT     Shows Transmitted data.\n"
+    "++RCV     Shows Received data.\n"
+    "++MDM     Shows Modem Signal Transitions.\n"
+    "++CON     Shows connection activities.\n"
+    "++TRC     Shows routine call traces.\n"
+    "++ASY     Shows Asynchronous activities.\n"
+    "\n"
+    " To get a full trace use\n"
+    "\n"
+    "+sim> SET %D DEBUG\n"
+    "\n"
+    " However it is recommended to use the following when sending traces:\n"
+    "\n"
+    "+sim> SET %D DEBUG=REG;PKT;XMT;RCV;CON\n"
+    "\n"
+    "1 Related Devices\n"
+    " The %D11 can facilitate communication with other simh simulators which\n"
+    " have emulated synchronous network devices available.  These include\n"
+    " the following:\n"
+    "\n"
+    "++DUP11*       Unibus PDP11 simulators\n"
+    "++DPV11*       Qbus PDP11 simulators\n"
+    "++KDP11*       Unibus PDP11 simulators and PDP10 simulators\n"
+    "++DMR11        Unibus PDP11 simulators and Unibus VAX simulators\n"
+    "++DMC11        Unibus PDP11 simulators and Unibus VAX simulators\n"
+    "++DMP11        Unibus PDP11 simulators and Unibus VAX simulators\n"
+    "++DMV11        Qbus VAX simulators\n"
+    "\n"
+    "++* Indicates systems which have OS provided DDCMP implementations.\n"
+    ;
+char busname[16];
+char devcount[16];
+char connectpoll[16];
+
+sprintf (busname, UNIBUS ? "Unibus" : "Qbus");
+sprintf (devcount, "%d", DUP_LINES);
+sprintf (connectpoll, "%d", DUP_CONNECT_POLL);
+
+return scp_help (st, dptr, uptr, flag, helpString, cptr, busname, devcount, connectpoll);
 }
 
 static t_stat dup_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-fprintf (st, "The communication line performs input and output through a TCP session\n");
-fprintf (st, "connected to a user-specified port.  The ATTACH command specifies the\n");
-fprintf (st, "port to be used as well as the peer address:\n\n");
-fprintf (st, "   sim> ATTACH %sn {interface:}port{,UDP},Connect=peerhost:port\n\n", dptr->name);
-fprintf (st, "where port is a decimal number between 1 and 65535 that is not being used for\n");
-fprintf (st, "other TCP/IP activities.\n\n");
-fprintf (st, "Specifying symmetric attach configuration (with both a listen port and\n");
-fprintf (st, "a peer address) will cause the side receiving an incoming\n");
-fprintf (st, "connection to validate that the connection actually comes from the\n");
-fprintf (st, "connecction destination system.\n\n");
-fprintf (st, "A symmetric attach configuration is required when using UDP packet transport.\n\n");
-return SCPE_OK;
+return dup_help (st, dptr, uptr, flag, DUP_HLP_ATTACH);
 }
 
 static char *dup_description (DEVICE *dptr)

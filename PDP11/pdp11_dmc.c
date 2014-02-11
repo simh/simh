@@ -517,6 +517,7 @@ typedef struct dmc_controller {
     uint32 *baseaddr;
     uint16 *basesize;
     uint8 *modem;
+    int32 *corruption_factor;
     uint32 buffers_received_from_net;
     uint32 buffers_transmitted_to_net;
     uint32 receive_buffer_output_transfers_completed;
@@ -882,6 +883,8 @@ t_stat dmc_setpeer (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showpeer (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_setspeed (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_showspeed (FILE* st, UNIT* uptr, int32 val, void* desc);
+t_stat dmc_setcorrupt (UNIT *uptr, int32 val, char *cptr, void *desc);
+t_stat dmc_showcorrupt (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat dmc_set_microdiag (UNIT* uptr, int32 val, char* cptr, void* desc);
 t_stat dmc_show_microdiag (FILE* st, UNIT* uptr, int32 val, void* desc);
 t_stat dmc_settype (UNIT* uptr, int32 val, char* cptr, void* desc);
@@ -968,6 +971,7 @@ uint32 dmc_baseaddr[DMC_NUMDEVICE];
 uint16 dmc_basesize[DMC_NUMDEVICE];
 uint8 dmc_modem[DMC_NUMDEVICE];
 t_bool dmc_microdiag[DMC_NUMDEVICE];
+int32 dmc_corruption[DMC_NUMDEVICE];
 
 CSRS dmp_csrs[DMP_NUMDEVICE];
 uint16 dmp_sel0[DMC_NUMDEVICE];
@@ -982,6 +986,7 @@ char dmp_port[DMP_NUMDEVICE][CBUFSIZE];
 uint32 dmp_baseaddr[DMP_NUMDEVICE];
 uint16 dmp_basesize[DMP_NUMDEVICE];
 uint8 dmp_modem[DMP_NUMDEVICE];
+int32 dmp_corruption[DMC_NUMDEVICE];
 
 TMLN dmc_ldsc[DMC_NUMDEVICE];               /* line descriptors */
 TMXR dmc_desc = { 1, NULL, 0, dmc_ldsc };   /* mux descriptor */
@@ -1017,6 +1022,7 @@ REG dmc_reg[] = {
     { BRDATAD (SEL4,              dmc_sel4, DEV_RDX, 16, DMC_NUMDEVICE,         "Select 4 CSR") },
     { BRDATAD (SEL6,              dmc_sel6, DEV_RDX, 16, DMC_NUMDEVICE,         "Select 6 CSR") },
     { BRDATAD (SPEED,            dmc_speed, DEV_RDX, 32, DMC_NUMDEVICE,         "line speed") },
+    { BRDATAD (CORRUPT,     dmc_corruption, DEV_RDX, 32, DMC_NUMDEVICE,         "data corruption factor (0.1%)") },
     { BRDATAD (DIAG,         dmc_microdiag, DEV_RDX,  1, DMC_NUMDEVICE,         "Microdiagnostic Enabled") },
     { BRDATAD (PEER,              dmc_peer, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "peer address:port") },
     { BRDATAD (PORT,              dmc_port, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "listen port") },
@@ -1035,6 +1041,7 @@ REG dmp_reg[] = {
     { BRDATAD (SEL6,              dmp_sel6, DEV_RDX, 16, DMC_NUMDEVICE,         "Select 6 CSR") },
     { BRDATAD (SEL10,            dmp_sel10, DEV_RDX, 16, DMP_NUMDEVICE,         "Select 10 CSR") },
     { BRDATAD (SPEED,            dmp_speed, DEV_RDX, 32, DMC_NUMDEVICE,         "line speed") },
+    { BRDATAD (CORRUPT,     dmp_corruption, DEV_RDX, 32, DMC_NUMDEVICE,         "data corruption factor (0.1%)") },
     { BRDATAD (PEER,              dmp_peer, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "peer address:port") },
     { BRDATAD (PORT,              dmp_port, DEV_RDX,  8, DMC_NUMDEVICE*CBUFSIZE, "listen port") },
     { BRDATAD (BASEADDR,      dmp_baseaddr, DEV_RDX, 32, DMC_NUMDEVICE,         "program set base address") },
@@ -1064,6 +1071,8 @@ MTAB dmc_mod[] = {
         NULL, &dmc_showddcmp, NULL, "Display DDCMP state information" },
     { MTAB_XTD|MTAB_VDV,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
         &dmc_setconnectpoll, &dmc_showconnectpoll, (void *) &dmc_connect_poll, "Display connection poll interval" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR|MTAB_NMO, 0, "CORRUPT", "CORRUPTION=factor (0=uncorrupted)" ,
+      &dmc_setcorrupt, &dmc_showcorrupt, NULL, "Display corruption factor (0.1% of packets)" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,        020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
@@ -1087,6 +1096,8 @@ MTAB dmp_mod[] = {
         NULL, &dmc_showddcmp, NULL, "Display DDCMP state information" },
     { MTAB_XTD|MTAB_VDV,          0, "CONNECTPOLL", "CONNECTPOLL=seconds",
         &dmc_setconnectpoll, &dmc_showconnectpoll, (void *) &dmp_connect_poll, "Display connection poll interval" },
+    { MTAB_XTD|MTAB_VUN|MTAB_VALR|MTAB_NMO, 0, "CORRUPTION", "CORRUPTION=factor (0=uncorrupted)" ,
+      &dmc_setcorrupt, &dmc_showcorrupt, NULL, "Display corruption factor (0.1% of packets)" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,        020, "ADDRESS", "ADDRESS",
         &set_addr, &show_addr, NULL, "Bus address" },
     { MTAB_XTD|MTAB_VDV|MTAB_VALR,          1, "VECTOR", "VECTOR",
@@ -1267,6 +1278,47 @@ t_stat dmc_show_microdiag (FILE* st, UNIT* uptr, int32 val, void* desc)
 int32 dmc = (int32)(uptr-dmc_dev.units);
 
 fprintf(st, "MicroDiag=%s", dmc_microdiag[dmc] ? "enabled" : "disabled");
+return SCPE_OK;
+}
+
+/* Manage the corruption troll's appetite, in units of milli-gulps.
+ *
+ * See ddcmp_feedCorruptionTroll for usage.
+ */
+t_stat dmc_setcorrupt (UNIT *uptr, int32 val, char *cptr, void *desc)
+{
+DEVICE *dptr = (UNIBUS) ? ((&dmc_dev == find_dev_from_unit(uptr)) ? &dmc_dev : &dmp_dev) : &dmv_dev;
+int32 dmc = (int32)(uptr-dptr->units);
+int32 *hunger = (dptr == &dmc_dev) ? &dmc_corruption[dmc] : &dmp_corruption[dmc];
+t_stat r;
+int32 appetite;
+
+if ((cptr == NULL) || (*cptr == '\0'))
+    return SCPE_ARG;
+
+appetite = (int32) get_uint (cptr, 10, 999, &r);
+if (r != SCPE_OK)
+    return r;
+
+*hunger = appetite;
+
+return SCPE_OK;
+}
+
+/* Display the corruption troll's appetite */
+
+t_stat dmc_showcorrupt (FILE *st, UNIT *uptr, int32 val, void *desc)
+{
+DEVICE *dptr = (UNIBUS) ? ((&dmc_dev == find_dev_from_unit(uptr)) ? &dmc_dev : &dmp_dev) : &dmv_dev;
+int32 dmc = (int32)(uptr-dptr->units);
+int32 *hunger = (dptr == &dmc_dev) ? &dmc_corruption[dmc] : &dmp_corruption[dmc];
+
+if (*hunger)
+    fprintf(st, "Corruption=%d milligulps (%.1f%% of messages processed)", 
+             *hunger, ((double)*hunger)/10.0);
+else
+    fprintf(st, "No Corruption");
+
 return SCPE_OK;
 }
 
@@ -1570,7 +1622,7 @@ const char helpString[] =
     " simulator. The number of simulated %1s devices or lines can be\n"
     " specified with command:\n"
     "\n"
-    "+sim> SET %U LINES=n\n"
+    "+sim> SET %D LINES=n\n"
     "3 Peer\n"
     " To set the host and port to which data is to be transmitted use the\n"
     " following command:\n"
@@ -1604,7 +1656,18 @@ const char helpString[] =
     " A SET TYPE command should be entered before the device is attached to a\n"
     " listening port.\n"
 #endif
+    "3 Corruption\n"
+    " Corruption Troll - the DDCMP emulation includes a process that will\n"
+    " intentionally drop or corrupt some messages.  This emulates the\n"
+    " less-than-perfect communications lines encountered in the real world,\n"
+    " and enables network monitoring software to see non-zero error counters.\n"
+    "\n"
+    " The troll selects messages with a probablility selected by the SET %U\n"
+    " CORRUPT command.  The units are 0.1%%; that is, a value of 1 means that\n"
+    " every message has a 1/1000 chance of being selected to be corrupted\n"
+    " or discarded.\n"
      /****************************************************************************/
+#define DMC_HLP_ATTACH "Configuration Attach"
     "2 Attach\n"
     " The device must be attached to a receive port, use the ATTACH command\n"
     " specifying the receive port number.\n"
@@ -1636,6 +1699,16 @@ const char helpString[] =
     " The %D device and %U line configuration and state can be displayed with\n"
     " one of the available show commands.\n"
     "2 $Show commands\n"
+    "1 Diagnostics\n"
+    " Corruption Troll - the DDCMP emulation includes a process that will\n"
+    " intentionally drop or corrupt some messages.  This emulates the\n"
+    " less-than-perfect communications lines encountered in the real world,\n"
+    " and enables network monitoring software to see non-zero error counters.\n"
+    "\n"
+    " The troll selects messages with a probablility selected by the SET\n"
+    " CORRUPT command.  The units are 0.1%%; that is, a value of 1 means that\n"
+    " every message has a 1/1000 chance of being selected to be corrupted\n"
+    " or discarded.\n"
     "1 Restrictions\n"
     " Real hardware synchronous connections could operate in Multi-Point mode.\n"
     " Multi-Point mode was a way of sharing a single wire with multiple\n"
@@ -1708,15 +1781,7 @@ return scp_help (st, dptr, uptr, flag, helpString, cptr, devname, devcount, conn
 
 t_stat dmc_help_attach (FILE *st, DEVICE *dptr, UNIT *uptr, int32 flag, char *cptr)
 {
-const char helpString[] =
-" The communication line performs input and output through a TCP session\n"
-" connected to a user-specified port.  The ATTACH command specifies the\n"
-" listening port to be used when the incoming connection is established:\n\n"
-"+sim> ATTACH %U {interface:}port{,UDP}     set up listening port\n\n"
-" where port is a decimal number between 1 and 65535 that is not being\n"
-" used for other TCP/IP activities.\n\n";
-return scp_help (st, dptr, uptr, flag, helpString, cptr);
-return SCPE_OK;
+return dmc_help (st, dptr, uptr, flag, DMC_HLP_ATTACH);
 }
 
 void dmc_setinint(CTLR *controller)
@@ -2529,7 +2594,7 @@ if (controller->state == Running) {
     BUFFER *buffer = dmc_buffer_queue_head(controller->rcv_queue);
 
     while (buffer) {
-        ddcmp_tmxr_get_packet_ln (controller->line, (const uint8 **)&controller->link.rcv_pkt, &controller->link.rcv_pkt_size);
+        ddcmp_tmxr_get_packet_ln (controller->line, (const uint8 **)&controller->link.rcv_pkt, &controller->link.rcv_pkt_size, *controller->corruption_factor);
         if (!controller->link.rcv_pkt)
             break;
         ans = TRUE;
@@ -3292,7 +3357,7 @@ while (buffer) {
     if (buffer->transfer_buffer[0] == 0)
         return;
     /* Need to make sure we dynamically compute the packet CRCs since header details can change */
-    r = ddcmp_tmxr_put_packet_crc_ln (controller->line, buffer->transfer_buffer, buffer->count);
+    r = ddcmp_tmxr_put_packet_crc_ln (controller->line, buffer->transfer_buffer, buffer->count, *controller->corruption_factor);
     if (r == SCPE_OK) {
         controller->link.xmt_buffer = buffer;
         controller->ddcmp_control_packets_sent += (buffer->transfer_buffer[0] == DDCMP_ENQ) ? 1 : 0;
@@ -3494,6 +3559,7 @@ for (i=0; i < DMC_NUMDEVICE; i++) {
     controller->baseaddr = &dmc_baseaddr[i];
     controller->basesize = &dmc_basesize[i];
     controller->modem = &dmc_modem[i];
+    controller->corruption_factor = &dmc_corruption[i];
     controller->unit = &controller->device->units[i];
     controller->unit->ctlr = (void *)controller;
     controller->index = i;
@@ -3519,6 +3585,7 @@ for (i=0; i < DMP_NUMDEVICE; i++) {
     controller->baseaddr = &dmp_baseaddr[i];
     controller->basesize = &dmp_basesize[i];
     controller->modem = &dmp_modem[i];
+    controller->corruption_factor = &dmp_corruption[i];
     controller->unit = &controller->device->units[i];
     controller->unit->ctlr = (void *)controller;
     controller->index = i + DMC_NUMDEVICE;
@@ -3539,6 +3606,7 @@ if (0 == dmc_units[0].flags) {       /* First Time Initializations */
         dmc_dev.units[i] = dmc_unit_template;
         controller->unit->ctlr = (void *)controller;
         dmc_microdiag[i] = TRUE;
+        dmc_corruption[i] = 0;
         }
     tmxr_set_modem_control_passthru (&dmc_desc);   /* We always want Modem Control */
     dmc_units[dmc_dev.numunits-2] = dmc_poll_unit_template;
@@ -3556,6 +3624,7 @@ if (0 == dmc_units[0].flags) {       /* First Time Initializations */
         *controller->modem = 0;
         dmp_dev.units[i] = dmc_unit_template;
         controller->unit->ctlr = (void *)controller;
+        dmp_corruption[i] = 0;
         }
     tmxr_set_modem_control_passthru (&dmp_desc);   /* We always want Modem Control */
     dmp_units[dmp_dev.numunits-2] = dmc_poll_unit_template;
