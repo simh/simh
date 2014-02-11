@@ -207,22 +207,22 @@ DEVICE tim_dev = {
 
 t_bool rdtim (a10 ea, int32 prv)
 {
-d10 tempbase[2];
-int32 used;
-d10 incr;
+double fract;                     /* Fraction of current interval completed */
+d10 tempbase[2];                  /* Local copy of tempbase to interpolate */
+int32 used;                       /* Used part of curr intv, in hw ticks   */
+d10 incr;                         /* Interpolated increment for timebase   */
 
 tempbase[0] = tim_base[0];                              /* copy time base */
 tempbase[1] = tim_base[1];
 
-/* used = time remaining in this service interval (instructions)
- * poll = instructions in the whole service interval.
- * incr = fraction of interval consumed * HW ticks per interval.
- * Thus, incr is approximate number of HW ticks to add to the timebase
+used = tmr_poll - (sim_activate_time (&tim_unit) - 1);
+fract = (double)used / (double)tmr_poll;
+
+/*
+ * incr is approximate number of HW ticks to add to the timebase
  * value returned.  This does NOT update the timebase.
  */
-used = tmr_poll - (sim_activate_time (&tim_unit) - 1);
-incr = (d10) (((double) used * TIM_HW_FREQ) /
-        ((double) tmr_poll * (double) tim_period));
+incr = fract * (double)tim_period;
 tim_incr_base (tempbase, incr);
 
 /* Although the two LSB of the counter contribute carry to the
@@ -279,20 +279,27 @@ return update_interval (tim_interval);
 
 static t_bool update_interval (d10 new_interval)
 {
-tim_new_period = CLRS (new_interval + ((new_interval & TIM_HWRE_MASK)? 010000 : 0));
-if (!(tim_new_period & ~TIM_HWRE_MASK))
-    tim_new_period = 010000;
+/*
+ * The value provided is in milliseconds shifted 12 positions to the
+ * left; if any of the 12 rightmost bits is different to zero we must
+ * add one millisecond to the interval. Reference:
+ * AA-H391A-TK_DECsystem-10_DECSYSTEM-20_Processor_Reference_Jun1982.pdf
+ * (page 4-37)
+ */
+int32 interval_millis = (new_interval >> 12) +
+                        (new_interval & TIM_HWRE_MASK ? 1 : 0);
+if (interval_millis == 0) interval_millis = 1;
 
-clk_tps = (int32) (0.5 + ( ((double)TIM_HW_FREQ) / (double)tim_new_period ));
-
+/* tim_new_period is the new value for the interval in hw ticks */
+tim_new_period = interval_millis * (TIM_HW_FREQ / 1000);
+/* clk_tps is the new number of clocks ticks per second */
+clk_tps = 1000 / interval_millis;
+   
 /* tmxr is polled every tim_mult clks.  Compute the divisor matching the target. */
-
-tim_mult = (clk_tps <= TIM_TMXR_FREQ)? 1 :  ((clk_tps + (TIM_TMXR_FREQ-1)) / TIM_TMXR_FREQ);
-
-/* Estimate instructions/tick for fixed timing */
-
+tim_mult = (clk_tps <= TIM_TMXR_FREQ) ? 1 : (clk_tps / TIM_TMXR_FREQ) ;
+   
+/* Estimate instructions/tick for fixed timing - just for KLAD */
 tim_unit.wait = TIM_WAIT_IPS / clk_tps;
-
 tmxr_poll = tim_unit.wait * tim_mult;
 
 /* The next tim_svc will update the activation time.
