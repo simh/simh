@@ -222,7 +222,7 @@ fract = (double)used / (double)tmr_poll;
  * incr is approximate number of HW ticks to add to the timebase
  * value returned.  This does NOT update the timebase.
  */
-incr = fract * (double)tim_period;
+incr = (d10)(fract * (double)tim_period);
 tim_incr_base (tempbase, incr);
 
 /* Although the two LSB of the counter contribute carry to the
@@ -286,9 +286,10 @@ static t_bool update_interval (d10 new_interval)
  * AA-H391A-TK_DECsystem-10_DECSYSTEM-20_Processor_Reference_Jun1982.pdf
  * (page 4-37)
  */
-int32 interval_millis = (new_interval >> 12) +
-                        (new_interval & TIM_HWRE_MASK ? 1 : 0);
-if (interval_millis == 0) interval_millis = 1;
+int32 interval_millis = (int32)(((new_interval >> 12) +
+                                (new_interval & TIM_HWRE_MASK ? 1 : 0)));
+if (interval_millis == 0)
+    interval_millis = 1;
 
 /* tim_new_period is the new value for the interval in hw ticks */
 tim_new_period = interval_millis * (TIM_HW_FREQ / 1000);
