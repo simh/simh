@@ -1174,13 +1174,115 @@ static const char simh_help[] =
       " character is a \":\".  The target of a goto is the first matching label\n"
       " in the current do command file which is encountered.  Since labels\n"
       " don't do anything else besides being the targets of goto's, they could\n"
-      " also be used to provide comments in do command files, for example::\n\n"
+      " also be used to provide comments in do command files.\n\n"
+      "4Examples\n\n"
       "++:: This is a comment\n"
-
+      "++echo Some Message to Output\n"
+      "++:Target\n"
+      "++:: This is a comment\n"
+      "++GOTO Target\n\n"
 #define HLP_RETURN      "*Commands Executing_Command_Files RETURN"
+       /***************** 80 character line width template *************************/
       "3RETURN\n"
+      " The RETURN command causes the current procedure call to be restored to the\n"
+      " calling context, possibly returning a specific return status.\n"
+      " If no return status is specified, the return status from the last command\n"
+      " executed will be returned.  The calling context may have ON traps defined\n"
+      " which may redirect command flow in that context.\n\n"
       "++return                   return from command file with last command status\n"
-      "++return {-Q} <status>     return from command file with specific status\n"
+      "++return {-Q} <status>     return from command file with specific status\n\n"
+      " The status return can be any numeric value or one of the standard SCPE_\n"
+      " condition names.\n\n"
+      " The -Q switch on the RETURN command will cause the specified status to\n"
+      " be returned, but normal error status message printing to be suppressed.\n"
+      "4Condition Names\n"
+      " The available standard SCPE_ condition names are\n"
+      "5 NXM\n"
+      " Address space exceeded\n"
+      "5 UNATT\n"
+      " Unit not attached\n"
+      "5 IOERR\n"
+      " I/O error\n"
+      "5 CSUM\n"
+      " Checksum error\n"
+      "5 FMT\n"
+      " Format error\n"
+      "5 NOATT\n"
+      " Unit not attachable\n"
+      "5 OPENERR\n"
+      " File open error\n"
+      "5 MEM\n"
+      " Memory exhausted\n"
+      "5 ARG\n"
+      " Invalid argument\n"
+      "5 STEP\n"
+      " Step expired\n"
+      "5 UNK\n"
+      " Unknown command\n"
+      "5 RO\n"
+      " Read only argument\n"
+      "5 INCOMP\n"
+      " Command not completed\n"
+      "5 STOP\n"
+      " Simulation stopped\n"
+      "5 EXIT\n"
+      " Goodbye\n"
+      "5 TTIERR\n"
+      " Console input I/O error\n"
+      "5 TTOERR\n"
+      " Console output I/O error\n"
+      "5 EOF\n"
+      " End of file\n"
+      "5 REL\n"
+      " Relocation error\n"
+      "5 NOPARAM\n"
+      " No settable parameters\n"
+      "5 ALATT\n"
+      " Unit already attached\n"
+      "5 TIMER\n"
+      " Hardware timer error\n"
+      "5 SIGERR\n"
+      " SIGINT handler setup error\n"
+      "5 TTYERR\n"
+      " Console terminal setup error\n"
+      "5 NOFNC\n"
+      " Command not allowed\n"
+      "5 UDIS\n"
+      " Unit disabled\n"
+      "5 NORO\n"
+      " Read only operation not allowed\n"
+      "5 INVSW\n"
+      " Invalid switch\n"
+      "5 MISVAL\n"
+      " Missing value\n"
+      "5 2FARG\n"
+      " Too few arguments\n"
+      "5 2MARG\n"
+      " Too many arguments\n"
+      "5 NXDEV\n"
+      " Non-existent device\n"
+      "5 NXUN\n"
+      " Non-existent unit\n"
+      "5 NXREG\n"
+      " Non-existent register\n"
+      "5 NXPAR\n"
+      " Non-existent parameter\n"
+      "5 NEST\n"
+      " Nested DO command limit exceeded\n"
+      "5 IERR\n"
+      " Internal error\n"
+      "5 MTRLNT\n"
+      " Invalid magtape record length\n"
+      "5 LOST\n"
+      " Console Telnet connection lost\n"
+      "5 TTMO\n"
+      " Console Telnet connection timed out\n"
+      "5 STALL\n"
+      " Console Telnet output stall\n"
+      "5 AFAIL\n"
+      " Assertion failed\n"
+      "5 INVREM\n"
+      " Invalid remote console command\n"
 #define HLP_SHIFT       "*Commands Executing_Command_Files SHIFT"
       "3SHIFT\n"
       "++shift                    shift the command file's positional parameters\n"
@@ -1194,32 +1296,19 @@ static const char simh_help[] =
       "++on <condition>           clear action for specific condition\n"
 #define HLP_PROCEED     "*Commands Executing_Command_Files PROCEED"
 #define HLP_IGNORE      "*Commands Executing_Command_Files PROCEED"
+       /***************** 80 character line width template *************************/
       "3PROCEED/IGNORE\n"
+      " The PROCEED or IGNORE commands do nothing.  They are potentially useful\n"
+      " placeholders for an ON action condition which should be explicitly ignored\n"
       "++proceed                  continue command file execution without doing anything\n"
       "++ignore                   continue command file execution without doing anything\n"
 
 #if 0
 
-    GOTO <Label>                 Command is now available.  Labels are lines 
-                                 in which the first non whitespace character 
-                                 is a ":".  The target of a goto is the first 
-                                 matching label in the current do command 
-                                 file which is encountered.  Since labels 
-                                 don't do anything else besides being the 
-                                 targets of goto's, they could be used to 
-                                 provide comments in do command files, for 
-                                 example (":: This is a comment")
     SET ON                       Enables error trapping for currently defined 
                                  traps (by ON commands)
     SET NOON                     Disables error trapping for currently 
                                  defined traps (by ON commands)
-    RETURN                       Return from the current do command file 
-                                 execution with the status from the last 
-                                 executed command
-    RETURN <statusvalue>         Return from the current do command file 
-                                 execution with the indicated status.  Status 
-                                 can be a number or a SCPE_<conditionname> 
-                                 name string.
     ON <statusvalue> commandtoprocess{; additionalcommandtoprocess}
                                  Sets the action(s) to take when the specific 
                                  error status is returned by a command in the 
@@ -8436,7 +8525,7 @@ if ((failed = setjmp (help_env)) != 0) {
              help_where.prox ? "Near '" : "", 
              help_where.prox ? 15 : 0, help_where.prox ? 15 : 0, 
              help_where.prox ? help_where.prox : "", 
-             help_where.prox ? "'" : "");
+                 help_where.prox ? "'" : "");
     cleanHelp (&top);
     return failed;
     }
