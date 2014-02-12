@@ -197,11 +197,11 @@ for (;;) {
     csum = origin = field = newf = 0;                   /* init */
     do {                                                /* skip leader */
         if ((hi = sim_bin_getc (fi, &newf)) == EOF)
-           if (sections_read != 0) {
-              printf ("%d sections sucessfully read\n\r", sections_read);
-              return SCPE_OK;
-           } else
-              return SCPE_FMT;
+            if (sections_read != 0) {
+                printf ("%d sections sucessfully read\n\r", sections_read);
+                return SCPE_OK;
+            } else
+                return SCPE_FMT;
         } while ((hi == 0) || (hi >= 0200));
     for (;;) {                                          /* data blocks */
         if ((lo = sim_bin_getc (fi, &newf)) == EOF)     /* low char */
@@ -213,9 +213,11 @@ for (;;) {
         if (hi == 0200) {                               /* end of tape? */
             if ((csum - wd) & 07777) {                  /* valid csum? */
                 if (sections_read != 0)
-                   printf ("%d sections sucessfully read\n\r", sections_read);
+                    printf ("%d sections sucessfully read\n\r", sections_read);
                 return SCPE_CSUM;
-            }
+                }
+            if (!(sim_switches & SWMASK ('A')))        /* Load all sections? */
+                return SCPE_OK;
             sections_read++;
             break;
             }
