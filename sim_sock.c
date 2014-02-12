@@ -1069,7 +1069,8 @@ if (connectaddr != NULL) {
 #ifdef AF_INET6
     p_getnameinfo((struct sockaddr *)&clientname, size, *connectaddr, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
     if (0 == memcmp("::ffff:", *connectaddr, 7))        /* is this a IPv4-mapped IPv6 address? */
-        strcpy(*connectaddr, 7+*connectaddr);           /* prefer bare IPv4 address if possible */
+        memmove(*connectaddr, 7+*connectaddr,           /* prefer bare IPv4 address */
+                strlen(*connectaddr) - 7 + 1);          /* length to include terminating \0 */
 #else
     strcpy(*connectaddr, inet_ntoa(((struct sockaddr_in *)&connectaddr)->s_addr));
 #endif
@@ -1148,7 +1149,8 @@ int32 ret = 0;
 *portnamebuf = '\0';
 ret = p_getnameinfo(addr, size, hostnamebuf, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 if (0 == memcmp("::ffff:", hostnamebuf, 7))        /* is this a IPv4-mapped IPv6 address? */
-    strcpy(hostnamebuf, 7+hostnamebuf);           /* prefer bare IPv4 address if possible */
+    memmove(hostnamebuf, 7+hostnamebuf,            /* prefer bare IPv4 address */
+            strlen(hostnamebuf) + 7 - 1);          /* length to include terminating \0 */
 if (!ret)
     ret = p_getnameinfo(addr, size, NULL, 0, portnamebuf, NI_MAXSERV, NI_NUMERICSERV);
 #else
