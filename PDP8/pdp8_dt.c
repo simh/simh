@@ -306,22 +306,22 @@ int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos, int32 dir);
 DIB dt_dib = { DEV_DTA, 2, { &dt76, &dt77 } };
 
 UNIT dt_unit[] = {
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
-                  UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC, &dt_flush) }
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_8FMT+UNIT_FIX+UNIT_ATTABLE+
+             UNIT_DISABLE+UNIT_ROABLE, DT_CAPAC) }
     };
 
 REG dt_reg[] = {
@@ -1241,6 +1241,7 @@ else if (uptr->flags & UNIT_11FMT)
     printf ("16b format");
 else printf ("18b/36b format");
 printf (", buffering file in memory\n");
+uptr->io_flush = dt_flush;
 if (uptr->flags & UNIT_8FMT)                            /* 12b? */
     uptr->hwmark = fxread (uptr->filebuf, sizeof (uint16),
             uptr->capac, uptr->fileref);

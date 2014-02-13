@@ -328,22 +328,22 @@ DIB dt_dib = {
     };
 
 UNIT dt_unit[] = {
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE+UNIT_11FMT, DT_CAPAC, &dt_flush) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE+UNIT_11FMT, DT_CAPAC) },
     { UDATA (&dt_svcdone, UNIT_DIS, 0) }
     };
 
@@ -1249,6 +1249,7 @@ else if (uptr->flags & UNIT_11FMT)
     printf ("16b format");
 else printf ("18b/36b format");
 printf (", buffering file in memory\n");
+uptr->io_flush = dt_flush;
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (int16), D8_NBSIZE, uptr->fileref);

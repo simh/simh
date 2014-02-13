@@ -90,6 +90,7 @@
 #define UNIT_11FMT      (1 << UNIT_V_11FMT)
 #define STATE           u3                              /* unit state */
 #define LASTT           u4                              /* last time update */
+#define WRITTEN         u5                              /* device buffer is dirty and needs flushing */
 #define UNIT_WPRT       (UNIT_WLK | UNIT_RO)            /* write protect */
 
 /* System independent DECtape constants */
@@ -197,6 +198,7 @@ int32 td77 (int32 IR, int32 AC);
 t_stat td_svc (UNIT *uptr);
 t_stat td_reset (DEVICE *dptr);
 t_stat td_attach (UNIT *uptr, char *cptr);
+void td_flush (UNIT *uptr);
 t_stat td_detach (UNIT *uptr);
 t_stat td_boot (int32 unitno, DEVICE *dptr);
 t_bool td_newsa (int32 newf);
@@ -659,6 +661,7 @@ int32 nibp = 3 * (DT_WSIZE - 1 - (line % DT_WSIZE));    /* nibble pos */
 
 ba = ba + (line / DT_WSIZE);                            /* block addr */
 fbuf[ba] = (fbuf[ba] & ~(07 << nibp)) | (dat << nibp);  /* upd data nibble */
+uptr->WRITTEN = TRUE;
 if (ba >= uptr->hwmark)                                 /* upd length */
     uptr->hwmark = ba + 1;
 return;
@@ -803,6 +806,7 @@ else if (uptr->flags & UNIT_11FMT)
     printf ("16b format");
 else printf ("18b/36b format");
 printf (", buffering file in memory\n");
+uptr->io_flush = td_flush;
 if (uptr->flags & UNIT_8FMT)                            /* 12b? */
     uptr->hwmark = fxread (uptr->filebuf, sizeof (uint16),
             uptr->capac, uptr->fileref);
@@ -856,20 +860,16 @@ return SCPE_OK;
    Deallocate buffer
 */
 
-t_stat td_detach (UNIT* uptr)
+void td_flush (UNIT* uptr)
 {
 uint32 pdp18b[D18_NBSIZE];
 uint16 pdp11b[D18_NBSIZE], *fbuf;
 int32 i, k;
-int32 u = uptr - td_dev.units;
 uint32 ba;
 
-if (!(uptr->flags & UNIT_ATT))
-    return SCPE_OK;
-fbuf = (uint16 *) uptr->filebuf;                        /* file buffer */
-if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
-    printf ("%s%d: writing buffer to file\n", sim_dname (&td_dev), u);
+if (uptr->WRITTEN && uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
     rewind (uptr->fileref);                             /* start of file */
+    fbuf = (uint16 *) uptr->filebuf;                    /* file buffer */
     if (uptr->flags & UNIT_8FMT)                        /* PDP8? */
         fxwrite (uptr->filebuf, sizeof (uint16),        /* write file */
             uptr->hwmark, uptr->fileref);
@@ -892,7 +892,21 @@ if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
                 D18_NBSIZE, uptr->fileref);
             }                                           /* end loop buf */
         }                                               /* end else */
-    if (ferror (uptr->fileref)) perror ("I/O error");
+    if (ferror (uptr->fileref))
+        perror ("I/O error");
+    }
+uptr->WRITTEN = FALSE;                                  /* no longer dirty */
+}
+
+t_stat td_detach (UNIT* uptr)
+{
+int u = (int)(uptr - td_dev.units);
+
+if (!(uptr->flags & UNIT_ATT))
+    return SCPE_OK;
+if (uptr->hwmark && ((uptr->flags & UNIT_RO)== 0)) {    /* any data? */
+    printf ("%s%d: writing buffer to file\n", sim_dname (&td_dev), u);
+    td_flush (uptr);
     }                                                   /* end if hwmark */
 free (uptr->filebuf);                                   /* release buf */
 uptr->flags = uptr->flags & ~UNIT_BUF;                  /* clear buf flag */

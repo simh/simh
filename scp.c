@@ -3103,10 +3103,8 @@ if (1) {
         for (j = 0; j < dptr->numunits; j++) {          /* if not buffered in mem */
             uptr = dptr->units + j;
             if ((uptr->flags & UNIT_ATT) &&             /* attached, */
-                !(uptr->flags & UNIT_BUF) &&            /* not buffered, */
-                (uptr->fileref))                        /* real file, */
-                if (uptr->io_flush)                     /* unit specific flush routine */
-                    uptr->io_flush (uptr);
+                (uptr->io_flush))                       /* unit specific flush routine */
+                uptr->io_flush (uptr);
             }
         }
     }
@@ -5429,15 +5427,16 @@ if (sim_deb)                                            /* flush debug log */
 for (i = 1; (dptr = sim_devices[i]) != NULL; i++) {     /* flush attached files */
     for (j = 0; j < dptr->numunits; j++) {              /* if not buffered in mem */
         uptr = dptr->units + j;
-        if ((uptr->flags & UNIT_ATT) &&                 /* attached, */
-            !(uptr->flags & UNIT_BUF) &&                /* not buffered, */
-            (uptr->fileref)) {                          /* real file, */
+        if (uptr->flags & UNIT_ATT) {                   /* attached, */
             if (uptr->io_flush)                         /* unit specific flush routine */
-                uptr->io_flush (uptr);
-            else
-                if (!(uptr->dynflags & UNIT_NO_FIO) &&  /* is FILE *, */
+                uptr->io_flush (uptr);                  /* call it */
+            else {
+                if (!(uptr->flags & UNIT_BUF) &&        /* not buffered, */
+                    (uptr->fileref) &&                  /* real file, */
+                    !(uptr->dynflags & UNIT_NO_FIO) &&  /* is FILE *, */
                     !(uptr->flags & UNIT_RO))           /* not read only? */
                     fflush (uptr->fileref);
+                }
             }
         }
     }

@@ -372,22 +372,22 @@ int32 dt_gethdr (UNIT *uptr, int32 blk, int32 relpos);
 DIB dt_dib = { DEV_DTA, 2, &dt_iors, { &dt75, &dt76 } };
 
 UNIT dt_unit[] = {
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) },
-    { UDATAFLUSH (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
-                  UNIT_ROABLE, DT_CAPAC, &dt_flush) }
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) },
+    { UDATA (&dt_svc, UNIT_FIX+UNIT_ATTABLE+UNIT_DISABLE+
+             UNIT_ROABLE, DT_CAPAC) }
     };
 
 REG dt_reg[] = {
@@ -1443,6 +1443,7 @@ else if (uptr->flags & UNIT_11FMT)
     printf ("16b format");
 else printf ("18b/36b format");
 printf (", buffering file in memory\n");
+uptr->io_flush = dt_flush;
 if (uptr->flags & UNIT_8FMT) {                          /* 12b? */
     for (ba = 0; ba < uptr->capac; ) {                  /* loop thru file */
         k = fxread (pdp8b, sizeof (uint16), D8_NBSIZE, uptr->fileref);
