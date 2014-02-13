@@ -336,7 +336,7 @@ extern t_stat tim_set_mod (UNIT *uptr, int32 val, char *cptr, void *desc);
    cpu_mod      CPU modifier list
 */
 
-UNIT cpu_unit = { UDATA (NULL, UNIT_FIX, MAXMEMSIZE) };
+UNIT cpu_unit = { UDATA (NULL, UNIT_FIX + UNIT_BINK, MAXMEMSIZE) };
 
 REG cpu_reg[] = {
     { ORDATA (PC, saved_PC, VASIZE) },
