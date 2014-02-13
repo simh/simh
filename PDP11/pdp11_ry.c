@@ -243,9 +243,9 @@ MTAB ry_mod[] = {
     { MTAB_XTD|MTAB_VDV|MTAB_VALR, 0, "VECTOR", "VECTOR",
       &set_vec, &show_vec, NULL, "Interrupt vector" },
 #else
-    { MTAB_XTD|MTAB_VDV, 004, NULL, "ADDRESS",
+    { MTAB_XTD|MTAB_VDV, 004, "ADDRESS", NULL,
       NULL, &show_addr, NULL, "Display Bus Address" },
-    { MTAB_XTD|MTAB_VDV, 0, NULL, "VECTOR",
+    { MTAB_XTD|MTAB_VDV, 0, "VECTOR", NULL,
       NULL, &show_vec, NULL, "Display Interrupt vector" },
 #endif
     { 0 }
