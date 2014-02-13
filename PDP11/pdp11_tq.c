@@ -354,8 +354,6 @@ t_stat tq_reset (DEVICE *dptr);
 t_stat tq_attach (UNIT *uptr, char *cptr);
 t_stat tq_detach (UNIT *uptr);
 t_stat tq_boot (int32 unitno, DEVICE *dptr);
-t_stat tq_set_wlk (UNIT *uptr, int32 val, char *cptr, void *desc);
-t_stat tq_set_size (UNIT *uptr, int32 val, char *cptr, void *desc);
 t_stat tq_show_ctrl (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_show_unitq (FILE *st, UNIT *uptr, int32 val, void *desc);
 t_stat tq_set_type (UNIT *uptr, int32 val, char *cptr, void *desc);
