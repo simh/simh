@@ -384,12 +384,12 @@ t_stat eth_mac_scan (ETH_MAC* mac, char* strmac)
     return SCPE_ARG;
   if ((a0 > 0xFF) || (a1 > 0xFF) || (a2 > 0xFF) || (a3 > 0xFF) || (a4 > 0xFF) || (a5 > 0xFF))
     return SCPE_ARG;
-  newmac[0] = a0;
-  newmac[1] = a1;
-  newmac[2] = a2;
-  newmac[3] = a3;
-  newmac[4] = a4;
-  newmac[5] = a5;
+  newmac[0] = (unsigned char)a0;
+  newmac[1] = (unsigned char)a1;
+  newmac[2] = (unsigned char)a2;
+  newmac[3] = (unsigned char)a3;
+  newmac[4] = (unsigned char)a4;
+  newmac[5] = (unsigned char)a5;
 
   /* final check - mac cannot be broadcast or multicast address */
   if (!memcmp(newmac, zeros, sizeof(ETH_MAC)) ||  /* broadcast */
@@ -607,8 +607,8 @@ int eth_strncasecmp(char* string1, char* string2, size_t len)
   for (i=0; i<len; i++) {
     s1 = string1[i];
     s2 = string2[i];
-    if (islower (s1)) s1 = toupper (s1);
-    if (islower (s2)) s2 = toupper (s2);
+    if (islower (s1)) s1 = (unsigned char)toupper (s1);
+    if (islower (s2)) s2 = (unsigned char)toupper (s2);
 
     if (s1 < s2)
       return -1;
@@ -1509,7 +1509,7 @@ ETH_DEV* volatile dev = (ETH_DEV*)arg;
 int status = 0;
 int sched_policy;
 struct sched_param sched_priority;
-int sel_ret;
+int sel_ret = 0;
 int do_select = 0;
 SOCKET select_fd = 0;
 #if defined (_WIN32)
@@ -1987,7 +1987,7 @@ if ((dev->eth_api == ETH_API_PCAP) && (pcap_setnonblock (dev->handle, 1, errbuf)
   }
 #endif
 #endif /* !defined (USE_READER_THREAD */
-#if defined (__APPLE__)
+#if defined (__APPLE__) && defined (HAVE_PCAP_NETWORK)
 if (dev->eth_api == ETH_API_PCAP) {
   /* Deliver packets immediately, needed for OS X 10.6.2 and later
    * (Snow-Leopard).
@@ -2629,7 +2629,7 @@ switch (IP->proto) {
        'template' header which may not include a value being populated 
        in the IP header length (which is only 16 bits).
        We process as payload everything which isn't known header data. */
-    payload_len = len - (14 + IP_HLEN(IP));
+    payload_len = (uint16)(len - (14 + IP_HLEN(IP)));
     mtu_payload = ETH_MIN_JUMBO_FRAME - (14 + IP_HLEN(IP));
     frag_offset = 0;
     while (payload_len > 0) {
@@ -2683,7 +2683,7 @@ switch (IP->proto) {
        'template' header which may not include a value being populated 
        in the IP header length (which is only 16 bits).
        We process as payload everything which isn't known header data. */
-    payload_len = len - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
+    payload_len = (uint16)(len - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP)));
     mtu_payload = ETH_MIN_JUMBO_FRAME - (14 + IP_HLEN(IP) + TCP_DATA_OFFSET(TCP));
     while (payload_len > 0) {
       if (payload_len > mtu_payload) {
