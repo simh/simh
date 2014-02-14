@@ -784,8 +784,8 @@ static void vh_getc (   int32   vh  )
 /* I/O dispatch routines */
 
 static t_stat vh_rd (   int32   *data,
-            int32   PA,
-            int32   access  )
+                        int32   PA,
+                        int32   access  )
 {
     int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
@@ -872,12 +872,13 @@ fprintf (stderr, "\rtqln %d\n", 64 - tmxr_tqln (lp->tmln));
     return (SCPE_OK);
 }
 
-static t_stat vh_wr (   int32   data,
-            int32   PA,
-            int32   access  )
+static t_stat vh_wr (   int32   ldata,
+                        int32   PA,
+                        int32   access  )
 {
     int32   vh = ((PA - vh_dib.ba) >> 4), line;
     TMLX    *lp;
+    uint16  data = (uint16)ldata;
 
     if (vh > VH_MAXMUX)                         /* validate mux number */
         return SCPE_IERR;
@@ -896,7 +897,7 @@ static t_stat vh_wr (   int32   data,
                 data &= ~CSR_MASTER_RESET;
             if (vh == 0) /* Only start unit service on the first unit.  Units are polled there */
                 sim_clock_coschedule (&vh_unit[0], tmxr_poll);
-            sim_activate_after (&vh_unit[1], 1200000);  /* 1.2 seconds */
+            sim_activate_after (&vh_unit[vh_dev.numunits-1], 1200000);  /* 1.2 seconds */
         }
         if ((data & CSR_RXIE) == 0)
             vh_clr_rxint (vh);
@@ -1378,6 +1379,7 @@ static t_stat vh_reset (    DEVICE  *dptr   )
     CLR_INT (VHRX);
     CLR_INT (VHTX);
     sim_cancel (&vh_unit[0]);
+    vh_dib.lnt = (vh_desc.lines / VH_LINES) * IOLN_VH;      /* set length */
     return (auto_config (dptr->name, (dptr->flags & DEV_DIS) ? 0 : vh_desc.lines/VH_LINES));
 }
 
@@ -1467,7 +1469,7 @@ static t_stat vh_show_txq ( FILE    *st,
 
 static t_stat vh_setnl (UNIT *uptr, int32 val, char *cptr, void *desc)
 {
-int32 newln, i, t, ndev;
+int32 newln, i, t;
 t_stat r;
 
 if (cptr == NULL)
@@ -1491,12 +1493,8 @@ if (newln < vh_desc.lines) {
             vh_clear (i / VH_LINES, TRUE);              /* reset mux */
         }
     }
-vh_dib.lnt = (newln / VH_LINES) * IOLN_VH;              /* set length */
 vh_desc.lines = newln;
-ndev = ((vh_dev.flags & DEV_DIS)? 0: (vh_desc.lines / VH_LINES));
-vh_dev.numunits = (newln / VH_LINES) + 1;
-vh_reset (&vh_dev);
-return auto_config (vh_dev.name, ndev);                 /* auto config */
+return vh_reset (&vh_dev);
 }
 
 /* SET DHU/DHV mode processor */
