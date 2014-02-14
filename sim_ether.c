@@ -890,16 +890,16 @@ const char *eth_capabilities(void)
      ":UDP";
  }
 
+#if (defined (xBSD) || defined (__APPLE__)) && (defined (HAVE_TAP_NETWORK) || defined (HAVE_PCAP_NETWORK))
+#include <sys/ioctl.h>
+#include <net/bpf.h>
+#endif
+
 #if defined (HAVE_PCAP_NETWORK)
 /*============================================================================*/
 /*      WIN32, Linux, and xBSD routines use WinPcap and libpcap packages      */
 /*        OpenVMS Alpha uses a WinPcap port and an associated execlet         */
 /*============================================================================*/
-
-#if defined (xBSD) || defined(__APPLE__)
-#include <sys/ioctl.h>
-#include <net/bpf.h>
-#endif /* xBSD */
 
 #include <pcap.h>
 #include <string.h>
